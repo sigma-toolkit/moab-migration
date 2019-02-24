@@ -349,32 +349,37 @@ else
                      pymoab/tag.pyx:pymoab/tag.pyx
                      pymoab/tag.pxd:pymoab/tag.pxd
                      pymoab/core.pyx:pymoab/core.pyx
-		     pymoab/core.pxd:pymoab/core.pxd
-		     pymoab/rng.pyx:pymoab/rng.pyx
-		     pymoab/rng.pxd:pymoab/rng.pxd
-		     pymoab/hcoord.pyx:pymoab/hcoord.pyx
-		     pymoab/hcoord.pxd:pymoab/hcoord.pxd
-		     pymoab/types.pyx:pymoab/types.pyx
-		     pymoab/topo_util.pyx:pymoab/topo_util.pyx
-		     pymoab/topo_util.pxd:pymoab/topo_util.pxd
-		     pymoab/scd.pyx:pymoab/scd.pyx
-		     pymoab/scd.pxd:pymoab/scd.pxd
-		     pymoab/skinner.pyx:pymoab/skinner.pyx
-		     pymoab/skinner.pxd:pymoab/skinner.pxd
-		     pymoab/tag_conventions.pxd:pymoab/tag_conventions.pxd
-		     pymoab/__init__.pxd:pymoab/__init__.pxd
-		     pymoab/__init__.py:pymoab/__init__.py])
+                     pymoab/parallelcomm.pyx:pymoab/parallelcomm.pyx
+                     pymoab/parallelcomm.pxd:pymoab/parallelcomm.pxd
+		                 pymoab/core.pxd:pymoab/core.pxd
+		                 pymoab/rng.pyx:pymoab/rng.pyx
+		                 pymoab/rng.pxd:pymoab/rng.pxd
+		                 pymoab/hcoord.pyx:pymoab/hcoord.pyx
+		                 pymoab/hcoord.pxd:pymoab/hcoord.pxd
+		                 pymoab/types.pyx:pymoab/types.pyx
+		                 pymoab/topo_util.pyx:pymoab/topo_util.pyx
+		                 pymoab/topo_util.pxd:pymoab/topo_util.pxd
+		                 pymoab/scd.pyx:pymoab/scd.pyx
+		                 pymoab/scd.pxd:pymoab/scd.pxd
+		                 pymoab/skinner.pyx:pymoab/skinner.pyx
+		                 pymoab/skinner.pxd:pymoab/skinner.pxd
+		                 pymoab/tag_conventions.pxd:pymoab/tag_conventions.pxd
+		                 pymoab/__init__.pxd:pymoab/__init__.pxd
+		                 pymoab/__init__.py:pymoab/__init__.py
+		                 ])
     # link test files to build location
-    AC_CONFIG_LINKS([test/pymoab/driver.py:test/pymoab/driver.py
-                     test/pymoab/test_core.py:test/pymoab/test_core.py
-		     test/pymoab/test_tag.py:test/pymoab/test_tag.py
-		     test/pymoab/test_scd.py:test/pymoab/test_scd.py
-		     test/pymoab/test_hom.py:test/pymoab/test_hom.py
-		     test/pymoab/test_topo_util.py:test/pymoab/test_topo_util.py
-		     test/pymoab/test_range.py:test/pymoab/test_range.py
-		     test/pymoab/test_skinner.py:test/pymoab/test_skinner.py
-		     test/pymoab/cyl_grps.h5m:test/pymoab/cyl_grps.h5m
-		     test/pymoab/cyl_grps.vtk:test/pymoab/cyl_grps.vtk])
+    AC_CONFIG_LINKS([ test/pymoab/driver.py:test/pymoab/driver.py
+                      test/pymoab/test_core.py:test/pymoab/test_core.py
+                      test/pymoab/test_parallelcomm.py:test/pymoab/test_parallelcomm.py
+                      test/pymoab/test_tag.py:test/pymoab/test_tag.py
+                      test/pymoab/test_scd.py:test/pymoab/test_scd.py
+                      test/pymoab/test_hom.py:test/pymoab/test_hom.py
+                      test/pymoab/test_topo_util.py:test/pymoab/test_topo_util.py
+                      test/pymoab/test_range.py:test/pymoab/test_range.py
+                      test/pymoab/test_skinner.py:test/pymoab/test_skinner.py
+                      test/pymoab/cyl_grps.h5m:test/pymoab/cyl_grps.h5m
+                      test/pymoab/cyl_grps.vtk:test/pymoab/cyl_grps.vtk
+                    ])
     # if a python install location is specified, use that
     if (test "x$PYMOAB_PREFIX" != "x"); then
       pymoab_custom_install=yes

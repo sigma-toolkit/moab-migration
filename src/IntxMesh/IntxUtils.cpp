@@ -35,6 +35,10 @@
 #include "GridElements.h"
 #endif
 
+#ifdef MOAB_HAVE_EIGEN3
+#include "Eigen/Dense"
+#endif
+
 namespace moab
 {
 
@@ -792,7 +796,7 @@ ErrorCode IntxUtils::ScaleToRadius( Interface* mb, EntityHandle set, double R )
 }
 
 // assume they are one the same sphere
-double IntxAreaUtils::spherical_angle( double* A, double* B, double* C, double Radius )
+double IntxAreaUtils::spherical_angle( const double* A, const double* B, const double* C, double Radius )
 {
     // the angle by definition is between the planes OAB and OBC
     CartVect a( A );
@@ -811,7 +815,7 @@ double IntxAreaUtils::spherical_angle( double* A, double* B, double* C, double R
 // could be bigger than M_PI;
 // angle at B could be bigger than M_PI, if the orientation is such that ABC points toward the
 // interior
-double IntxUtils::oriented_spherical_angle( double* A, double* B, double* C )
+double IntxUtils::oriented_spherical_angle( const double* A, const double* B, const double* C )
 {
     // assume the same radius, sphere at origin
     CartVect a( A ), b( B ), c( C );
@@ -830,7 +834,7 @@ double IntxUtils::oriented_spherical_angle( double* A, double* B, double* C )
     return ang;
 }
 
-double IntxAreaUtils::area_spherical_triangle( double* A, double* B, double* C, double Radius )
+double IntxAreaUtils::area_spherical_triangle( const double* A, const double* B, const double* C, double Radius )
 {
     switch( m_eAreaMethod )
     {
@@ -838,7 +842,7 @@ double IntxAreaUtils::area_spherical_triangle( double* A, double* B, double* C, 
             return area_spherical_triangle_girard( A, B, C, Radius );
 #ifdef MOAB_HAVE_TEMPESTREMAP
         case GaussQuadrature:
-            return area_spherical_triangle_GQ( A, B, C, Radius );
+            return area_spherical_triangle_GQ( A, B, C );
 #endif
         case lHuiller:
         default:
@@ -846,7 +850,7 @@ double IntxAreaUtils::area_spherical_triangle( double* A, double* B, double* C, 
     }
 }
 
-double IntxAreaUtils::area_spherical_polygon( double* A, int N, double Radius, int* sign )
+double IntxAreaUtils::area_spherical_polygon( const double* A, int N, double Radius, int* sign )
 {
     switch( m_eAreaMethod )
     {
@@ -854,7 +858,7 @@ double IntxAreaUtils::area_spherical_polygon( double* A, int N, double Radius, i
             return area_spherical_polygon_girard( A, N, Radius );
 #ifdef MOAB_HAVE_TEMPESTREMAP
         case GaussQuadrature:
-            return area_spherical_polygon_GQ( A, N, Radius );
+            return area_spherical_polygon_GQ( A, N );
 #endif
         case lHuiller:
         default:
@@ -862,7 +866,7 @@ double IntxAreaUtils::area_spherical_polygon( double* A, int N, double Radius, i
     }
 }
 
-double IntxAreaUtils::area_spherical_triangle_girard( double* A, double* B, double* C, double Radius )
+double IntxAreaUtils::area_spherical_triangle_girard( const double* A, const double* B, const double* C, double Radius )
 {
     double correction = spherical_angle( A, B, C, Radius ) + spherical_angle( B, C, A, Radius ) +
                         spherical_angle( C, A, B, Radius ) - M_PI;
@@ -876,7 +880,7 @@ double IntxAreaUtils::area_spherical_triangle_girard( double* A, double* B, doub
         return -area;
 }
 
-double IntxAreaUtils::area_spherical_polygon_girard( double* A, int N, double Radius )
+double IntxAreaUtils::area_spherical_polygon_girard( const double* A, int N, double Radius )
 {
     // this should work for non-convex polygons too
     // assume that the A, A+3, ..., A+3*(N-1) are the coordinates
@@ -893,7 +897,7 @@ double IntxAreaUtils::area_spherical_polygon_girard( double* A, int N, double Ra
     return Radius * Radius * correction;
 }
 
-double IntxAreaUtils::area_spherical_polygon_lHuiller( double* A, int N, double Radius, int* sign )
+double IntxAreaUtils::area_spherical_polygon_lHuiller( const double* A, int N, double Radius, int* sign )
 {
     // This should work for non-convex polygons too
     // In the input vector A, assume that the A, A+3, ..., A+3*(N-1) are the coordinates
@@ -918,7 +922,8 @@ double IntxAreaUtils::area_spherical_polygon_lHuiller( double* A, int N, double 
 }
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
-double IntxAreaUtils::area_spherical_polygon_GQ( double* A, int N, double Radius )
+
+double IntxAreaUtils::area_spherical_polygon_GQ( const double* A, int N )
 {
     // this should work for non-convex polygons too
     // In the input vector A, assume that the A, A+3, ..., A+3*(N-1) are the coordinates
@@ -926,29 +931,91 @@ double IntxAreaUtils::area_spherical_polygon_GQ( double* A, int N, double Radius
     // If negative orientation, the area can be negative
     if( N <= 2 ) return 0.;
 
-    // assume positive orientain
+    // assume positive orientation
     double area = 0.;
     for( int i = 1; i < N - 1; i++ )
     {
-        int i1 = i + 1;
-        area += area_spherical_triangle_GQ( A, A + 3 * i, A + 3 * i1, Radius );
+        area += area_spherical_triangle_GQ( A, A + 3 * i, A + 3 * ( i + 1 ) );
     }
     return area;
 }
 
-/* compute the area by using Gauss-Quadratures; use TR interfaces directly */
-double IntxAreaUtils::area_spherical_triangle_GQ( double* ptA, double* ptB, double* ptC, double )
+double IntxAreaUtils::area_spherical_triangle_GQ( const double* inode1, const double* inode2, const double* inode3 )
 {
+#if defined( MOAB_HAVE_EIGEN3 )
+    typedef Eigen::Map< const Eigen::Vector3d > V3d;
+    const V3d node1( inode1 );
+    const V3d node2( inode2 );
+    const V3d node3( inode3 );
+    const int nOrder = 6;
+
+    // If we change the quadrature order, use the call: GaussQuadrature::GetPoints(nOrder, 0.0, 1.0, dG, dW);
+    const double dG[6] = { 0.03376524289842397, 0.1693953067668678, 0.3806904069584016,
+                           0.6193095930415985,  0.8306046932331322, 0.966234757101576 };
+    const double dW[6] = { 0.08566224618958521, 0.1803807865240693, 0.2339569672863455,
+                           0.2339569672863455,  0.1803807865240693, 0.08566224618958521 };
+
+    double dFaceArea = 0.0;
+    Eigen::Vector3d dF, dF2, dDaF, dDbF, dDaG, dDbG, nodeCross;
+
+    // Calculate area at quadrature node and sum it up
+    for( int p = 0; p < nOrder; p++ )
+    {
+        for( int q = 0; q < nOrder; q++ )
+        {
+
+            const double dA = dG[p];
+            const double dB = dG[q];
+
+            // V3d dF = (1.0 - dB) * (((1.0 - dA) * node1) + (dA * node2)) + (dB * node3);
+            dF  = ( ( 1.0 - dB ) * ( 1.0 - dA ) ) * node1 + ( ( 1.0 - dB ) * dA ) * node2 + dB * node3;
+            dF2 = dF.array().square();
+
+            dDaF = ( 1.0 - dB ) * ( node2 - node1 );
+
+            dDbF = -( 1.0 - dA ) * node1 - dA * node2 + node3;
+
+            const double dR         = dF.norm();
+            const double dDenomTerm = 1.0 / ( dR * dR * dR );
+
+            dDaG << dDaF( 0 ) * ( dF2( 1 ) + dF2( 2 ) ) - dF( 0 ) * ( dDaF( 1 ) * dF( 1 ) + dDaF( 2 ) * dF( 2 ) ),
+                dDaF( 1 ) * ( dF2( 0 ) + dF2( 2 ) ) - dF( 1 ) * ( dDaF( 0 ) * dF( 0 ) + dDaF( 2 ) * dF( 2 ) ),
+                dDaF( 2 ) * ( dF2( 0 ) + dF2( 1 ) ) - dF( 2 ) * ( dDaF( 0 ) * dF( 0 ) + dDaF( 1 ) * dF( 1 ) );
+
+            dDbG << dDbF( 0 ) * ( dF2( 1 ) + dF2( 2 ) ) - dF( 0 ) * ( dDbF( 1 ) * dF( 1 ) + dDbF( 2 ) * dF( 2 ) ),
+                dDbF( 1 ) * ( dF2( 0 ) + dF2( 2 ) ) - dF( 1 ) * ( dDbF( 0 ) * dF( 0 ) + dDbF( 2 ) * dF( 2 ) ),
+                dDbF( 2 ) * ( dF2( 0 ) + dF2( 1 ) ) - dF( 2 ) * ( dDbF( 0 ) * dF( 0 ) + dDbF( 1 ) * dF( 1 ) );
+
+            // Scale the vectors by the denominator
+            dDaG *= dDenomTerm;
+            dDbG *= dDenomTerm;
+
+            // Cross product gives local Jacobian: dGaG x dDbG
+            nodeCross << dDaG( 1 ) * dDbG( 2 ) - dDaG( 2 ) * dDbG( 1 ), dDaG( 2 ) * dDbG( 0 ) - dDaG( 0 ) * dDbG( 2 ),
+                dDaG( 0 ) * dDbG( 1 ) - dDaG( 1 ) * dDbG( 0 );
+
+            const double dJacobian = nodeCross.norm();
+
+            // dFaceArea += 2.0 * dW[p] * dW[q] * (1.0 - dG[q]) * dJacobian;
+            dFaceArea += dW[p] * dW[q] * dJacobian;
+        }
+    }
+
+    return dFaceArea;
+#else
+    /* compute the area by using Gauss-Quadratures; use TR interfaces directly */
     Face face( 3 );
     NodeVector nodes( 3 );
-    nodes[0] = Node( ptA[0], ptA[1], ptA[2] );
-    nodes[1] = Node( ptB[0], ptB[1], ptB[2] );
-    nodes[2] = Node( ptC[0], ptC[1], ptC[2] );
+    nodes[0] = Node( inode1[0], inode1[1], inode1[2] );
+    nodes[1] = Node( inode2[0], inode2[1], inode2[2] );
+    nodes[2] = Node( inode3[0], inode3[1], inode3[2] );
     face.SetNode( 0, 0 );
     face.SetNode( 1, 1 );
     face.SetNode( 2, 2 );
     return CalculateFaceArea( face, nodes );
+#endif
 }
+
 #endif
 
 /*
@@ -977,7 +1044,8 @@ double IntxAreaUtils::area_spherical_triangle_GQ( double* ptA, double* ptB, doub
  *
  *  E = 4*atan(sqrt(tan(s/2)*tan((s-a)/2)*tan((s-b)/2)*tan((s-c)/2)))
  */
-double IntxAreaUtils::area_spherical_triangle_lHuiller( double* ptA, double* ptB, double* ptC, double Radius )
+double IntxAreaUtils::area_spherical_triangle_lHuiller( const double* ptA, const double* ptB, const double* ptC,
+                                                        double Radius )
 {
 
     // now, a is angle BOC, O is origin

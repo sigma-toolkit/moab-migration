@@ -1462,15 +1462,18 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
             // remove from the set !
             if( !point_cloud_target )
             {
-                Range covEnts;
+                std::vector< EntityHandle > covEnts;
                 rval = m_interface->get_entities_by_dimension( m_covering_source_set, 2, covEnts );MB_CHK_ERR( rval );
-                Tag gidtag = m_interface->globalId_tag();
 
                 std::map< int, int > loc_gid_to_lid_covsrc;
                 std::vector< int > gids( covEnts.size(), -1 );
-                rval = m_interface->tag_get_data( gidtag, covEnts, &gids[0] );MB_CHK_ERR( rval );
+                Tag gidtag = m_interface->globalId_tag();
+
+                rval = m_interface->tag_get_data( gidtag, covEnts.data(), covEnts.size(), &gids[0] );MB_CHK_ERR( rval );
+
                 for( unsigned ie = 0; ie < gids.size(); ++ie )
                 {
+                    assert( gids[ie] > 0 );
                     loc_gid_to_lid_covsrc[gids[ie]] = ie;
                 }
 
@@ -1550,18 +1553,18 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
 #endif
                 if( size > 1 )
                 {
+
                     // some source elements cover multiple target partitions; the conservation logic
                     // requires to know all overlap elements for a source element; they need to be
                     // communicated from the other target partitions
                     //
                     // so first we have to identify source (coverage) elements that cover multiple
                     // target partitions
-
+                    //
                     // we will then mark the source, we will need to migrate the overlap elements
                     // that cover this to the original source for the source element; then
                     // distribute the overlap elements to all processors that have the coverage mesh
                     // used
-
                     rval = augment_overlap_set();MB_CHK_ERR( rval );
                 }
             }

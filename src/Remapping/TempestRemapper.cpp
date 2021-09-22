@@ -36,6 +36,7 @@
 #include "MBParallelConventions.h"
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
+#include "FiniteElementTools.h"
 #include "GaussLobattoQuadrature.h"
 #endif
 
@@ -247,14 +248,13 @@ ErrorCode TempestRemapper::ConvertTempestMesh( Remapper::IntersectionContext ctx
 #define NEW_CONVERT_LOGIC
 
 #ifdef NEW_CONVERT_LOGIC
-ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType meshType,
+ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType /*meshType*/,
                                                          Mesh* mesh,
                                                          EntityHandle& mesh_set,
                                                          Range& entities,
                                                          Range* vertices )
 {
     ErrorCode rval;
-
     const bool outputEnabled = ( TempestRemapper::verbose && is_root );
     const NodeVector& nodes  = mesh->nodes;
     const FaceVector& faces  = mesh->faces;
@@ -1048,16 +1048,13 @@ ErrorCode TempestRemapper::GenerateCSMeshMetadata( const int ntot_elements,
     int err;
     moab::ErrorCode rval;
 
-    const int res = std::sqrt( ntot_elements / 6 );
+    const int csResolution = std::sqrt( ntot_elements / 6.0 );
 
-    // create a temporary CS mesh
+    if( csResolution * csResolution * 6 != ntot_elements ) return MB_INVALID_SIZE;
+
+    // Create a temporary Cubed-Sphere mesh
     // NOTE: This will not work for RRM grids. Need to run HOMME for that case anyway
-    err = GenerateCSMesh( csMesh, res, "", "NetCDF4" );
-    if( err )
-    {
-        MB_CHK_SET_ERR( MB_FAILURE, "Failed to generate CS mesh through TempestRemap" );
-        ;
-    }
+    err = GenerateCSMesh( csMesh, csResolution, "", "NetCDF4" );MB_CHK_SET_ERR( err ? MB_FAILURE : MB_SUCCESS, "Failed to generate CS mesh through TempestRemap" );
 
     rval = this->GenerateMeshMetadata( csMesh, ntot_elements, ents, secondary_ents, dofTagName, nP );MB_CHK_SET_ERR( rval, "Failed in call to GenerateMeshMetadata" );
 
@@ -1076,7 +1073,8 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
     Tag dofTag;
     bool created = false;
     rval         = m_interface->tag_get_handle( dofTagName.c_str(), nP * nP, MB_TYPE_INTEGER, dofTag,
-                                                MB_TAG_DENSE | MB_TAG_CREAT, 0, &created );MB_CHK_SET_ERR( rval, "Failed creating DoF tag" );
+                                                MB_TAG_DENSE | MB_TAG_CREAT, 0, &created );
+    MB_CHK_SET_ERR( rval, "Failed creating DoF tag" );
 
     // Number of Faces
     int nElements = static_cast< int >( csMesh.faces.size() );
@@ -1206,7 +1204,8 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
 
         if( locElem )
         {
-            rval = m_interface->tag_set_data( dofTag, &current_eh, 1, dofIDs );MB_CHK_SET_ERR( rval, "Failed to tag_set_data for DoFs" );
+            rval = m_interface->tag_set_data( dofTag, &current_eh, 1, dofIDs );
+            MB_CHK_SET_ERR( rval, "Failed to tag_set_data for DoFs" );
         }
     }
 
@@ -1459,14 +1458,14 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
             // remove from the set !
             if( !point_cloud_target )
             {
-                std::vector< EntityHandle > covEnts;
+                Range covEnts;
                 rval = m_interface->get_entities_by_dimension( m_covering_source_set, 2, covEnts );MB_CHK_ERR( rval );
 
                 std::map< int, int > loc_gid_to_lid_covsrc;
                 std::vector< int > gids( covEnts.size(), -1 );
-                Tag gidtag = m_interface->globalId_tag();
 
-                rval = m_interface->tag_get_data( gidtag, covEnts.data(), covEnts.size(), &gids[0] );MB_CHK_ERR( rval );
+                Tag gidtag = m_interface->globalId_tag();
+                rval = m_interface->tag_get_data( gidtag, covEnts, gids.data() );MB_CHK_ERR( rval );
 
                 for( unsigned ie = 0; ie < gids.size(); ++ie )
                 {
@@ -1483,8 +1482,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                     EntityHandle intxCell = *it;
                     int srcParent         = -1;
                     rval                  = m_interface->tag_get_data( srcParentTag, &intxCell, 1, &srcParent );MB_CHK_ERR( rval );
-                    // if (is_root) std::cout << "Found intersecting element: " << srcParent << ",
-                    // " << gid_to_lid_covsrc[srcParent] << "\n";
+
                     assert( srcParent >= 0 );
                     intxCov.insert( covEnts[loc_gid_to_lid_covsrc[srcParent]] );
                 }

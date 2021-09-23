@@ -667,6 +667,7 @@ int main( int argc, char* argv[] )
 
         // print some diagnostic checks to see if the overlap grid resolved the input meshes
         // correctly
+        double dTotalOverlapArea = 0.0;
         if( runCtx->print_diagnostics )
         {
             double local_areas[3],
@@ -697,6 +698,7 @@ int main( int argc, char* argv[] )
                                         fabs( global_areas[0] - global_areas[2] ) / global_areas[0],
                                         fabs( global_areas[1] - global_areas[2] ) / global_areas[1] );
             }
+            dTotalOverlapArea = global_areas[2];
         }
 
         if( runCtx->intxFilename.size() )
@@ -757,7 +759,7 @@ int main( int argc, char* argv[] )
                 const double dNormalTolerance = 1.0E-8;
                 const double dStrictTolerance = 1.0E-12;
                 weightMap->CheckMap( runCtx->fCheck, runCtx->fCheck, runCtx->fCheck && ( runCtx->ensureMonotonicity ),
-                                     dNormalTolerance, dStrictTolerance );
+                                     dNormalTolerance, dStrictTolerance, dTotalOverlapArea );
             }
 
             if( runCtx->outFilename.size() )

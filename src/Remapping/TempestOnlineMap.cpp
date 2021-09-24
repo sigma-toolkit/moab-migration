@@ -22,6 +22,9 @@
 #include "STLStringHelper.h"
 #include "LinearRemapFV.h"
 
+#include "LinearRemapSE0.h"
+#include "LinearRemapFV.h"
+
 #include "moab/Remapping/TempestOnlineMap.hpp"
 #include "DebugOutput.hpp"
 #include "moab/TupleList.hpp"
@@ -125,19 +128,7 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapTags( const std::string srcDofT
 
     if( rval == moab::MB_TAG_NOT_FOUND && m_eInputType != DiscretizationType_FV )
     {
-        int ntot_elements = 0, nelements = m_remapper->m_source_entities.size();
-#ifdef MOAB_HAVE_MPI
-        int ierr = MPI_Allreduce( &nelements, &ntot_elements, 1, MPI_INT, MPI_SUM, m_pcomm->comm() );
-        if( ierr != 0 ) MB_CHK_SET_ERR( MB_FAILURE, "MPI_Allreduce failed to get total source elements" );
-#else
-        ntot_elements = nelements;
-#endif
-
-        rval = m_remapper->GenerateCSMeshMetadata( ntot_elements, m_remapper->m_covering_source_entities,
-                                                   &m_remapper->m_source_entities, srcDofTagName, m_nDofsPEl_Src );MB_CHK_ERR( rval );
-
-        rval = m_interface->tag_get_handle( srcDofTagName.c_str(), m_nDofsPEl_Src * m_nDofsPEl_Src, MB_TYPE_INTEGER,
-                                            this->m_dofTagSrc, MB_TAG_ANY );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( MB_FAILURE, "DoF tag is not set correctly for source mesh." );
     }
     else
         MB_CHK_ERR( rval );
@@ -147,19 +138,7 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapTags( const std::string srcDofT
         m_interface->tag_get_handle( tgtDofTagName.c_str(), tagSize, MB_TYPE_INTEGER, this->m_dofTagDest, MB_TAG_ANY );
     if( rval == moab::MB_TAG_NOT_FOUND && m_eOutputType != DiscretizationType_FV )
     {
-        int ntot_elements = 0, nelements = m_remapper->m_target_entities.size();
-#ifdef MOAB_HAVE_MPI
-        int ierr = MPI_Allreduce( &nelements, &ntot_elements, 1, MPI_INT, MPI_SUM, m_pcomm->comm() );
-        if( ierr != 0 ) MB_CHK_SET_ERR( MB_FAILURE, "MPI_Allreduce failed to get total source elements" );
-#else
-        ntot_elements = nelements;
-#endif
-
-        rval = m_remapper->GenerateCSMeshMetadata( ntot_elements, m_remapper->m_target_entities, NULL, tgtDofTagName,
-                                                   m_nDofsPEl_Dest );MB_CHK_ERR( rval );
-
-        rval = m_interface->tag_get_handle( tgtDofTagName.c_str(), m_nDofsPEl_Dest * m_nDofsPEl_Dest, MB_TYPE_INTEGER,
-                                            this->m_dofTagDest, MB_TAG_ANY );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( MB_FAILURE, "DoF tag is not set correctly for target mesh." );
     }
     else
         MB_CHK_ERR( rval );
@@ -1310,6 +1289,9 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                              "GLL input mesh" );
             }
 
+            // LinearRemapSE4( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, dataGLLNodesSrcCov, dataGLLJacobian,
+            // nMonotoneType, fContinuousIn,
+            //                              fNoConservation, false, *this );
             LinearRemapSE4_Tempest_MOAB( dataGLLNodesSrcCov, dataGLLJacobian, nMonotoneType, fContinuousIn,
                                          mapOptions.fNoConservation );
         }

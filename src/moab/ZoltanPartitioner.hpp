@@ -185,12 +185,15 @@ class ZoltanPartitioner : public PartitionerBase< int >
     // partition owned cell in a new number of parts, based on adjacency
     // we might have some extra adjacencies expressed in extraAdjCellsId, which could point to a
     // cell on a different task
+
     ErrorCode partition_owned_cells( Range& owned,
                                      std::multimap< int, int >& extraGraphEdges,
                                      std::map< int, int > procs,
                                      int& numNewPartitions,
                                      std::map< int, Range >& distribution,
-                                     int met );
+                                     int met,
+                                     std::vector<char> & ZoltanBuffer);
+
 
 #ifdef MOAB_HAVE_CGM
     ErrorCode write_partition( const int nparts,

@@ -42,30 +42,6 @@
 // #define VVERBOSE
 // #define CHECK_INCREASING_DOF
 
-void LinearRemapFVtoGLL( const Mesh& meshInput,
-                         const Mesh& meshOutput,
-                         const Mesh& meshOverlap,
-                         const DataArray3D< int >& dataGLLNodes,
-                         const DataArray3D< double >& dataGLLJacobian,
-                         const DataArray1D< double >& dataGLLNodalArea,
-                         int nOrder,
-                         OfflineMap& mapRemap,
-                         int nMonotoneType,
-                         bool fContinuous,
-                         bool fNoConservation );
-
-void LinearRemapFVtoGLL_Volumetric( const Mesh& meshInput,
-                                    const Mesh& meshOutput,
-                                    const Mesh& meshOverlap,
-                                    const DataArray3D< int >& dataGLLNodes,
-                                    const DataArray3D< double >& dataGLLJacobian,
-                                    const DataArray1D< double >& dataGLLNodalArea,
-                                    int nOrder,
-                                    OfflineMap& mapRemap,
-                                    int nMonotoneType,
-                                    bool fContinuous,
-                                    bool fNoConservation );
-
 ///////////////////////////////////////////////////////////////////////////////
 
 #define MPI_CHK_ERR( err )                                          \
@@ -1012,7 +988,7 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                 }
 
                 // Check for forward correspondence in overlap mesh
-                if( m_meshInput->faces.size() - ixSourceFaceMax == 0 )
+                if( m_meshInputCov->faces.size() - ixSourceFaceMax == 0 )
                 {
                     if( is_root ) dbgprint.printf( 0, "Overlap mesh forward correspondence found\n" );
                 }

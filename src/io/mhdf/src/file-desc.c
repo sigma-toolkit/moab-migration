@@ -4,7 +4,6 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-/*#include <stdio.h>*/
 #include <H5Tpublic.h>
 #include <H5Dpublic.h>
 #include <H5Ppublic.h>
@@ -31,12 +30,8 @@ static void* realloc_data( struct mhdf_FileDesc** data, size_t append_bytes, mhd
     void* result_ptr;
     struct mhdf_FileDesc* const input_ptr = *data;
     unsigned char* mem_ptr                = (unsigned char*)input_ptr;
-    /*printf("address %p \n", mem_ptr);*/
-    size_t new_size, occupied_size = input_ptr->offset - mem_ptr;
 
-    /* input_ptr->offset - input_ptr == currently occupied size
-       input_ptr->total_size         == currently allocated size
-     */
+    size_t new_size, occupied_size = input_ptr->offset - mem_ptr;
 
     int append_bytes_padded = append_bytes + alignment - 1;
     /* if the end of the allocated space is before the end of the required space */
@@ -133,7 +128,7 @@ static struct mhdf_FileDesc* get_elem_desc( mhdf_FileHandle file_handle,
     void* ptr;
     long junk;
 
-    ptr = realloc_data( &result, strlen( elem_handle ) + 1, status, 1 );
+    ptr = realloc_data( &result, strlen( elem_handle ) + 1, status, sizeof(char) );
     if( !ptr ) return NULL;
     strcpy( ptr, elem_handle );
     result->elems[idx].handle = ptr;
@@ -145,7 +140,7 @@ static struct mhdf_FileDesc* get_elem_desc( mhdf_FileHandle file_handle,
         return NULL;
     }
 
-    ptr = realloc_data( &result, strlen( buffer ) + 1, status, 1 );
+    ptr = realloc_data( &result, strlen( buffer ) + 1, status, sizeof(char) );
     if( !ptr ) return NULL;
     strcpy( ptr, buffer );
     result->elems[idx].type = ptr;
@@ -217,7 +212,7 @@ static struct mhdf_FileDesc* get_tag_desc( mhdf_FileHandle file_handle,
     int valsize, size, close_type = 0;
     hsize_t array_len;
 
-    ptr = realloc_data( &result, strlen( name ) + 1, status, 1 );
+    ptr = realloc_data( &result, strlen( name ) + 1, status, sizeof(char) );
     if( NULL == ptr ) return NULL;
     strcpy( ptr, name );
     result->tags[idx].name = ptr;
@@ -339,7 +334,7 @@ static struct mhdf_FileDesc* get_tag_desc( mhdf_FileHandle file_handle,
     {
         if( have_default )
         {
-            ptr = realloc_data( &result, have_default, status, 1 );
+            ptr = realloc_data( &result, have_default, status, sizeof(int) );
             if( NULL == ptr )
             {
                 if( close_type )
@@ -352,7 +347,7 @@ static struct mhdf_FileDesc* get_tag_desc( mhdf_FileHandle file_handle,
         }
         if( have_global )
         {
-            ptr = realloc_data( &result, have_global, status, 1 );
+            ptr = realloc_data( &result, have_global, status, sizeof(int) );
             if( NULL == ptr )
             {
                 if( close_type )
@@ -505,7 +500,7 @@ struct mhdf_FileDesc* mhdf_getFileSummary( mhdf_FileHandle file_handle,
 
     /* allocate array of tag descriptors */
     size = num_tag_names * sizeof( struct mhdf_TagDesc );
-    ptr  = realloc_data( &result, size, status, 8);
+    ptr  = realloc_data( &result, size, status, 8 );
     if( NULL == ptr )
     {
         free( elem_handles );
@@ -568,7 +563,7 @@ struct mhdf_FileDesc* mhdf_getFileSummary( mhdf_FileHandle file_handle,
         }
         else
         {
-            indices = realloc_data( &result, size * sizeof( int ), status, 4 );
+            indices = realloc_data( &result, size * sizeof( int ), status, sizeof( int ) );
             if( NULL == indices )
             {
                 free( array );
@@ -610,7 +605,7 @@ struct mhdf_FileDesc* mhdf_getFileSummary( mhdf_FileHandle file_handle,
         }
         else
         {
-            indices = realloc_data( &result, size * sizeof( int ), status, 4 );
+            indices = realloc_data( &result, size * sizeof( int ), status, sizeof( int ) );
             if( NULL == ptr )
             {
                 free( array );
@@ -634,7 +629,7 @@ struct mhdf_FileDesc* mhdf_getFileSummary( mhdf_FileHandle file_handle,
          *  to determine number of parts, etc
          *   this is needed for iMOAB and VisIt plugin */
         const int NPRIMARY_SETS = 5;
-        ptr                     = realloc_data( &result, NPRIMARY_SETS * sizeof( int ), status, 4 );
+        ptr                     = realloc_data( &result, NPRIMARY_SETS * sizeof( int ), status, sizeof( int ) );
         if( NULL == ptr || mhdf_isError( status ) )
         {
             free( array );
@@ -644,7 +639,7 @@ struct mhdf_FileDesc* mhdf_getFileSummary( mhdf_FileHandle file_handle,
         for( i = 0; i < NPRIMARY_SETS; ++i )
             result->numEntSets[i] = 0;
 
-        ptr = realloc_data( &result, NPRIMARY_SETS * sizeof( int* ), status, 8 );
+        ptr = realloc_data( &result, NPRIMARY_SETS * sizeof( int* ), status, sizeof( int* ) );
         if( NULL == ptr || mhdf_isError( status ) )
         {
             free( array );
@@ -652,7 +647,7 @@ struct mhdf_FileDesc* mhdf_getFileSummary( mhdf_FileHandle file_handle,
         }
         result->defTagsEntSets = ptr;
 
-        ptr = realloc_data( &result, NPRIMARY_SETS * sizeof( int* ), status, 8 );
+        ptr = realloc_data( &result, NPRIMARY_SETS * sizeof( int* ), status, sizeof( int* ) );
         if( NULL == ptr || mhdf_isError( status ) )
         {
             free( array );
@@ -680,7 +675,7 @@ struct mhdf_FileDesc* mhdf_getFileSummary( mhdf_FileHandle file_handle,
                         result->numEntSets[k] = nval;
                         if( nval <= 0 ) continue; /* do not do anything */
 
-                        ptr = realloc_data( &result, nval * sizeof( int ), status, 4 );
+                        ptr = realloc_data( &result, nval * sizeof( int ), status, sizeof( int ) );
                         if( NULL == ptr || mhdf_isError( status ) )
                         {
                             free( array );
@@ -690,7 +685,7 @@ struct mhdf_FileDesc* mhdf_getFileSummary( mhdf_FileHandle file_handle,
                         result->defTagsEntSets[k] = ptr;
                         tag_desc                  = &( result->tags[i] );
 
-                        ptr = realloc_data( &result, nval * sizeof( int ), status, 4 );
+                        ptr = realloc_data( &result, nval * sizeof( int ), status, sizeof( int ) );
                         if( NULL == ptr || mhdf_isError( status ) )
                         {
                             free( array );
@@ -763,7 +758,7 @@ struct mhdf_FileDesc* mhdf_getFileSummary( mhdf_FileHandle file_handle,
                         result->numEntSets[k] = nval; /* k could be 0 or 1 */
                         if( nval <= 0 ) continue;     /* do not do anything */
 
-                        ptr = realloc_data( &result, nval * sizeof( int ), status, 4 );
+                        ptr = realloc_data( &result, nval * sizeof( int ), status, sizeof( int ) );
                         if( NULL == ptr || mhdf_isError( status ) )
                         {
                             free( array );
@@ -773,7 +768,7 @@ struct mhdf_FileDesc* mhdf_getFileSummary( mhdf_FileHandle file_handle,
                         result->defTagsEntSets[k] = ptr;
                         tag_desc                  = &( result->tags[i] );
 
-                        ptr = realloc_data( &result, nval * sizeof( int ), status, 4 );
+                        ptr = realloc_data( &result, nval * sizeof( int ), status, sizeof( int ) );
                         if( NULL == ptr || mhdf_isError( status ) )
                         {
                             free( array );

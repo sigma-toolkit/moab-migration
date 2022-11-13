@@ -1832,7 +1832,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
 
     if( serial )
     {
-        assert( total_tag_len * nents_to_be_set == *num_tag_storage_length );
+        assert( total_tag_len * nents_to_be_set - *num_tag_storage_length == 0 );
         // tags are unrolled, we loop over global ids first, then careful about tags
         for( int i = 0; i < nents_to_be_set; i++ )
         {
@@ -1856,7 +1856,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         // we will create first a tuple to rendevous points, then from there send to the processor that requested it
         // it is a 2-hop global gather scatter
         int nbLocalVals = *num_tag_storage_length / ( (int)tagNames.size() );
-        assert( *num_tag_storage_length == nbLocalVals * tagNames.size() );
+        assert( nbLocalVals * tagNames.size() - *num_tag_storage_length == 0 );
         TupleList TLsend;
         TLsend.initialize( 2, 0, 0, total_tag_len, nbLocalVals );  //  to proc, marker(gid), total_tag_len doubles
         TLsend.enableWriteAccess();
@@ -1884,7 +1884,8 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
             }
             TLsend.inc_n();
         }
-        assert(indexInRealLocal == nbLocalVals * total_tag_len);
+
+        assert( nbLocalVals * total_tag_len - indexInRealLocal == 0 );
         // send now requests, basically inform the rendez-vous point who needs a particular global id
         // send the data to the other processors:
         ( pco->proc_config().crystal_router() )->gs_transfer( 1, TLsend, 0 );
@@ -1970,7 +1971,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
                         TLBack.vi_wr[3 * n + 1] = currentValue1;  // initial value (resend, just for verif ?)
                         TLBack.vi_wr[3 * n + 2] = TLsend.vi_rd[2 * ( indexInTLsend + i2 )];  // from proc on comp2
                         // also fill tag values
-                        for( int k = 0; k < total_tag_len; k++ )
+                        for( size_t k = 0; k < total_tag_len; k++ )
                         {
                             TLBack.vr_rd[total_tag_len * n + k] =
                                 TLsend.vr_rd[total_tag_len * indexInTLsend + k];  // deep copy of tag values

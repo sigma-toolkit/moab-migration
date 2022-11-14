@@ -469,7 +469,7 @@ struct mhdf_FileDesc* mhdf_getFileSummary( mhdf_FileHandle file_handle,
 
     /* allocate array of element descriptors */
     size = result->num_elem_desc * sizeof( struct mhdf_ElemDesc );
-    ptr  = realloc_data( &result, size, status, 8 );
+    ptr  = realloc_data( &result, size, status, sizeof( char* ) );
     if( NULL == ptr )
     {
         free( elem_handles );
@@ -500,7 +500,7 @@ struct mhdf_FileDesc* mhdf_getFileSummary( mhdf_FileHandle file_handle,
 
     /* allocate array of tag descriptors */
     size = num_tag_names * sizeof( struct mhdf_TagDesc );
-    ptr  = realloc_data( &result, size, status, 8 );
+    ptr  = realloc_data( &result, size, status, sizeof( char* ) );
     if( NULL == ptr )
     {
         free( elem_handles );

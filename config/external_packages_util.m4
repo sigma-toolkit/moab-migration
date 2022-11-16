@@ -1591,11 +1591,11 @@ AC_DEFUN([AUSCM_CONFIGURE_DOWNLOAD_TEMPESTREMAP],[
   tempestremap_repository_branch="master"
 
   # Invoke the download-tempestremap command
-  m4_case( TEMPESTREMAP_DOWNLOAD_VERSION, [2.1.3], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://ftp.mcs.anl.gov/pub/fathom/TPL/tempestremap-2.1.3.tar.gz], [$2] ) ],
-                                  [2.1.1], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://ftp.mcs.anl.gov/pub/fathom/TPL/tempestremap-2.1.1.tar.gz], [$2] ) ],
+  m4_case( TEMPESTREMAP_DOWNLOAD_VERSION, [2.1.6], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://ftp.mcs.anl.gov/pub/fathom/TPL/tempestremap-2.1.6.tar.gz], [$2] ) ],
+                                  [2.1.3], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://ftp.mcs.anl.gov/pub/fathom/TPL/tempestremap-2.1.3.tar.gz], [$2] ) ],
                                   [2.0.5], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://ftp.mcs.anl.gov/pub/fathom/TPL/tempestremap-2.0.5.tar.gz], [$2] ) ],
                                   [2.0.3], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://ftp.mcs.anl.gov/pub/fathom/TPL/tempestremap-2.0.3.tar.gz], [$2] ) ],
-                                  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://ftp.mcs.anl.gov/pub/fathom/TPL/tempestremap-2.1.3.tar.gz], [$2] ) ] )
+                                  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://ftp.mcs.anl.gov/pub/fathom/TPL/tempestremap-2.1.6.tar.gz], [$2] ) ] )
 
   if (test "x$downloadtempestremap" == "xyes") ; then
     # download the latest TempestRemap sources, configure and install
@@ -1680,18 +1680,18 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_TEMPESTREMAP],
   if [ $1 ]; then
     # configure PACKAGE with a minimal build: MPI, HDF5, TEMPESTREMAP
     compiler_opts="CC=$CC CXX=$CXX FC=$FC F90=$FC F77=$F77"
-    configure_command="$compiler_opts $tempestremap_src_dir/configure --prefix=$tempestremap_install_dir --libdir=$tempestremap_install_dir/lib --with-pic=1 --enable-shared=$enable_shared"
+    configure_command="$compiler_opts $tempestremap_src_dir/configure --prefix=$tempestremap_install_dir --libdir=$tempestremap_install_dir/lib --with-pic=1 --enable-shared=$enable_shared --enable-static=$enable_static"
     if (test "$enablenetcdf" != "no"); then
-      configure_command="$configure_command --with-netcdf=$NETCDF_DIR LDFLAGS=\"$NETCDF_LDFLAGS $LDFLAGS\" CPPFLAGS=\"$NETCDF_CPPFLAGS $CPPFLAGS\" LIBS=\"$NETCDF_LIBS $LIBS\""
+      configure_command="$configure_command --with-netcdf=$NETCDF_DIR"
     else
-      AC_MSG_ERROR([TempestRemap requires NetCDF with C++ interfaces to be enabled.])
+      AC_MSG_ERROR([TempestRemap requires NetCDF to be enabled.])
     fi
     if (test "$enablehdf5" != "no"); then
-      configure_command="$configure_command --with-hdf5=$HDF5_DIR LDFLAGS=\"$HDF5_LDFLAGS $LDFLAGS\" CPPFLAGS=\"$HDF5_CPPFLAGS $CPPFLAGS\" LIBS=\"$HDF5_LIBS $LIBS -ldl -lm -lz\""
+      configure_command="$configure_command --with-hdf5=$HDF5_DIR"
     else
-      configure_command="$configure_command LDFLAGS=\"$LDFLAGS\" CPPFLAGS=\"$CPPFLAGS\" LIBS=\"$LIBS\""
+      AC_MSG_ERROR([TempestRemap requires HDF5 to be enabled.])
     fi
-    configure_command="$configure_command --enable-linkable-library"
+    configure_command="$configure_command LDFLAGS=\"$NETCDF_LDFLAGS $HDF5_LDFLAGS $LDFLAGS\" CPPFLAGS=\"$NETCDF_CPPFLAGS $HDF5_CPPFLAGS $CPPFLAGS\" LIBS=\"$NETCDF_LIBS $HDF5_LIBS $LIBS\""
 
     eval "echo 'Using configure command :==> cd $tempestremap_build_dir && $configure_command > $tempestremap_src_dir/../config_tempestremap.log' > $tempestremap_src_dir/../config_tempestremap.log"
     PREFIX_PRINT([Configuring with default options  (debug=$enable_debug with-netcdf=$enablenetcdf with-hdf5=$enablehdf5 shared=$enable_shared) ])

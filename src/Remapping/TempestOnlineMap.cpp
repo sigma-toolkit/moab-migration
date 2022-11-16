@@ -1137,9 +1137,9 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             else
             {
                 AnnounceStartBlock( "Calculating offline map (default)" );
-                LinearRemapFVtoFV( *m_meshInputCov, *m_meshOutput, *m_meshOverlap,
-                                   ( mapOptions.fMonotone ) ? ( 1 ) : ( mapOptions.nPin ), *this );
-                // LinearRemapFVtoFV_Tempest_MOAB( ( mapOptions.fMonotone ? 1 : mapOptions.nPin ) );
+                // LinearRemapFVtoFV( *m_meshInputCov, *m_meshOutput, *m_meshOverlap,
+                //                   ( mapOptions.fMonotone ) ? ( 1 ) : ( mapOptions.nPin ), *this );
+                LinearRemapFVtoFV_Tempest_MOAB( ( mapOptions.fMonotone ? 1 : mapOptions.nPin ) );
             }
         }
         else if( eInputType == DiscretizationType_FV )

@@ -1,5 +1,22 @@
 # MOAB Library Release Notes
 
+## Version 5.4.1
+
+### Features
+
+- *PR #601*: Added preliminary support for bilinear maps exposed by TempestRemap (tested and working only in serial for meshes without topological holes)
+- *PR #597*: New iMOAB routine: `iMOAB_SetDoubleTagStorageWithGid` that stores the values in a MOAB double Tag, for DoFs with specified global IDs
+- *PR #588*: Introduce a new iMOAB example that can perform a one-hop or two-hop communication pattern for data
+
+### Enhancements
+
+- *PR #602*: Update MOAB to use TempestRemap v2.1.6 by default
+- *PR #598*: CMake: Fix test install for newer versions of pip and setuptools
+
+### Fixes
+
+- *PR #600*: Fix a VisIt MOAB plugin bug due to an elusive pointer alignment issue when reading header info from h5m files
+
 ## Version 5.4.0
 
 ### Features

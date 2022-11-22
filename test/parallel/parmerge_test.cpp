@@ -2,6 +2,7 @@
 #include "moab/Core.hpp"
 #include "moab_mpi.h"
 #include "moab/ParallelMergeMesh.hpp"
+#include "MBParallelConventions.h"
 #include "TestUtil.hpp"
 #include <iostream>
 
@@ -89,7 +90,39 @@ int main( int argc, char* argv[] )
             return 1;
         }
     }
-    rval = mb->write_file( "testpm.h5m", 0, "PARALLEL=WRITE_PART" );
+    Range verts, verts_owned;
+    rval = mb->get_entities_by_type( 0, MBVERTEX, verts );MB_CHK_ERR( rval );
+
+    // Get local owned vertices
+    rval = pc->filter_pstatus( verts, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &verts_owned );MB_CHK_ERR( rval );
+    int num_owned_verts = (int) verts_owned.size();
+
+    int num_total_verts = 0;
+    MPI_Reduce(&num_owned_verts, &num_total_verts, 1, MPI_INT, MPI_SUM, 0,
+               MPI_COMM_WORLD);
+
+    if (0==rank)
+        std::cout << "total vertex number: " << num_total_verts <<  "\n";
+
+    // each brick has 27 vertices;
+    // first 2 share 9, total number of vertices should be 27*2 -9 = 45
+    //  for each additional row of 2 bricks, we will have 3*5* 2 = 30 more vertices
+    int correct = 45 + (nproc/2 - 1) * 30;
+    if (nproc%2 == 1)
+        correct += 18; // odd cases have extra 18 nodes (3 * 3 * 2)
+    if (nproc >= 2 && 0==rank)
+    {
+        if (correct != num_total_verts)
+        {
+            std::cout << "incorrect number of vertices, expected:  " << correct << "\n";
+            delete pc;
+            delete mb;
+            MPI_Finalize();
+            return 1;
+        }
+    }
+
+    rval = mb->write_file( "testpm.h5m", 0, "PARALLEL=WRITE_PART" );MB_CHK_ERR( rval );
     if( rval != MB_SUCCESS )
     {
         std::cout << "fail to write output file \n";

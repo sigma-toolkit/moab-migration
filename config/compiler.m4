@@ -398,6 +398,7 @@ if (test "x$ENABLE_FORTRAN" != "xno" && test "x$CHECK_FC" != "xno"); then
     *mira*)  LIBS="$LIBS /soft/compilers/ibmcmp-feb2015/vacpp/bg/12.1/bglib64/libibmc++.a"; fcxxlinkage=yes ;;
   esac
 
+  AC_LANG_PUSH(Fortran 77)
   if (test "$cxx_compiler" == "Intel"); then
     my_save_ldflags="$LDFLAGS"
     LDFLAGS="$LDFLAGS -cxxlib"
@@ -462,6 +463,7 @@ if (test "x$ENABLE_FORTRAN" != "xno" && test "x$CHECK_FC" != "xno"); then
     fi
 
   fi
+  AC_LANG_POP(Fortran 77)
 
   if (test "$fcxxlinkage" != "yes"); then
     AC_MSG_WARN([Unrecognized C++ linkage for C/Fortran programs])

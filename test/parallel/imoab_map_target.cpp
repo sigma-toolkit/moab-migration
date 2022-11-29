@@ -401,7 +401,7 @@ int main( int argc, char* argv[] )
             POP_TIMER( couComm, rankInCouComm )
 
             {
-                char outputFileTgt[] = "fOcnOnCpl4.h5m";
+                char outputFileTgt[] = "fOcnOnCpl5.h5m";
                 ierr                 = iMOAB_WriteMesh( cplOcnPID, outputFileTgt, fileWriteOptions );
                 CHECKIERR( ierr, "could not write fOcnOnCpl.h5m to disk" )
             }

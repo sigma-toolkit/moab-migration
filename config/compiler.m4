@@ -753,7 +753,7 @@ case "$cxx_compiler:$host_cpu" in
     FATHOM_CXX_SPECIAL="$EXTRA_INTEL_CXXFLAGS -wd981 -wd279 -wd1418 -wd383 -wd1572 -wd2259"
     ;;
   Cray:*)
-    FATHOM_CXX_SPECIAL="-g –craype-verbose"
+    FATHOM_CXX_SPECIAL="-g -craype-verbose"
     ;;
   VisualAge:*)
     FATHOM_CXX_32BIT=-q32

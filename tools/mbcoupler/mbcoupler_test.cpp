@@ -537,8 +537,10 @@ ErrorCode get_file_options( int argc,
 #ifdef MOAB_HAVE_HDF5
     if( 1 == argc )
     {
-        if( 0 == rank ) std::cout << "No arguments given; using output file dum.h5m." << std::endl;
-        outFile = "dum.h5m";
+        std::stringstream dfname;
+        dfname << "dum" << nprocs << ".h5m";
+        outFile = dfname.str();
+        if( 0 == rank ) std::cout << "No arguments given; using output file " << outFile << std::endl;
     }
 #endif
 

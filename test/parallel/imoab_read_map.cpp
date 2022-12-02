@@ -382,9 +382,9 @@ int main( int argc, char* argv[] )
             POP_TIMER( couComm, rankInCouComm )
             if( 1 == n )  // write only for n==1 case
             {
-                char outputFileTgt[] = "fOcnOnCpl.h5m";
+                char outputFileTgt[] = "fOcnOnCpl8.h5m";
                 ierr                 = iMOAB_WriteMesh( cplOcnPID, outputFileTgt, fileWriteOptions );
-                CHECKIERR( ierr, "could not write fOcnOnCpl.h5m to disk" )
+                CHECKIERR( ierr, "could not write fOcnOnCpl8.h5m to disk" )
             }
         }
 

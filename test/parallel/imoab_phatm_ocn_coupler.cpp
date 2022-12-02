@@ -557,7 +557,7 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "failed to compute projection weight application" );
         POP_TIMER( couComm, rankInCouComm )
 
-        char outputFileTgt[] = "fOcnOnCpl2.h5m";
+        char outputFileTgt[] = "fOcnOnCpl7.h5m";
         ierr                 = iMOAB_WriteMesh( cplOcnPID, outputFileTgt, fileWriteOptions );
     }
     // send the projected tag back to ocean pes, with send/receive tag

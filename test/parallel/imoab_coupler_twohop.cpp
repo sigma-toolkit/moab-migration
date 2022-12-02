@@ -411,7 +411,7 @@ int main( int argc, char* argv[] )
         // Let us now write the map file to disk and then read it back to test the I/O API in iMOAB
 #ifdef MOAB_HAVE_NETCDF
         {
-            const std::string atmocn_map_file_name = "atm_ocn_map.nc";
+            const std::string atmocn_map_file_name = "atm_ocn_map2.nc";
             ierr = iMOAB_WriteMappingWeightsToFile( cplAtmOcnPID, weights_identifiers[0].c_str(),
                                                     atmocn_map_file_name.c_str() );
             CHECKIERR( ierr, "failed to write map file to disk" );
@@ -598,9 +598,9 @@ int main( int argc, char* argv[] )
             POP_TIMER( couComm, rankInCouComm )
             if( 1 == n )  // write only for n==1 case
             {
-                char outputFileTgt[] = "fOcnOnCpl.h5m";
+                char outputFileTgt[] = "fOcnOnCpl1.h5m";
                 ierr                 = iMOAB_WriteMesh( cplOcnPID, outputFileTgt, fileWriteOptions );
-                CHECKIERR( ierr, "could not write fOcnOnCpl.h5m to disk" )
+                CHECKIERR( ierr, "could not write fOcnOnCpl1.h5m to disk" )
             }
         }
 
@@ -755,9 +755,9 @@ int main( int argc, char* argv[] )
             POP_TIMER( couComm, rankInCouComm )
             if( 1 == n )  // write only for n==1 case
             {
-                char outputFileTgt[] = "fOcnOnCpl2.h5m";
+                char outputFileTgt[] = "fOcnOnCpl0.h5m";
                 ierr                 = iMOAB_WriteMesh( cplOcnPID, outputFileTgt, fileWriteOptions );
-                CHECKIERR( ierr, "could not write the second fOcnOnCpl.h5m to disk" )
+                CHECKIERR( ierr, "could not write the second fOcnOnCpl0.h5m to disk" )
             }
         }
 

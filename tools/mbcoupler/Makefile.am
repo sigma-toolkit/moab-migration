@@ -59,5 +59,5 @@ endif
 LOG_COMPILER = `if echo "$(PARALLEL_TESTS)" | $(GREP) "$$p" > /dev/null; then echo "${MPIEXEC} ${MPIEXEC_NP} ${NP}"; else echo ""; fi`
 
 EXTRA_DIST = CMakeLists.txt
-MOSTLYCLEANFILES = dum.h5m
+MOSTLYCLEANFILES = dum.h5m dum1.h5m dum2.h5m
 DISTCLEANFILES = a.out

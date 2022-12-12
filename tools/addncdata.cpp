@@ -147,14 +147,14 @@ int main( int argc, char* argv[] )
     ProgOptions opts;
 
     std::string inputfile, outfile( "out.h5m" ), netcdfFile, variable_name, sefile_name;
-
+    bool skip_time = false;
     opts.addOpt< std::string >( "input,i", "input mesh filename", &inputfile );
     opts.addOpt< std::string >( "netcdfFile,n", "netcdf file aligned with the mesh input file", &netcdfFile );
     opts.addOpt< std::string >( "output,o", "output mesh filename", &outfile );
-
     opts.addOpt< std::string >( "var,v", "variable to extract and add to output file", &variable_name );
-
     opts.addOpt< std::string >( "sefile,s", "spectral elements file (coarse SE mesh)", &sefile_name );
+    opts.addOpt< void >( "skip_time,x", "do not look for time dimension on this variable (default is use time) ", &skip_time );
+
     opts.parseCommandLine( argc, argv );
 
     Core* mb = new Core();
@@ -266,12 +266,15 @@ int main( int argc, char* argv[] )
 
     int time_id = -1;
     fail        = nc_inq_varid( ncFile, "time", &time_id );
-    if( NC_NOERR != fail ) MB_SET_ERR( MB_FAILURE, "addncdata:: Couldn't get time variable id" );
+    if( NC_NOERR != fail &&  (!skip_time) ) MB_SET_ERR( MB_FAILURE, "addncdata:: Couldn't get time variable id" );
     std::vector< float > times;
-    if( NC_NOERR == fail )
+    if (!skip_time)
     {
-        int ii;
-        GET_1D_FLT_VAR( "time", ii, times );
+        if( NC_NOERR == fail )
+        {
+            int ii;
+            GET_1D_FLT_VAR( "time", ii, times );
+        }
     }
     Tag newTag;
 

@@ -64,9 +64,11 @@ class NCHelper
 
   protected:
     //! Separate set and non-set variables (common to scd mesh and ucd mesh)
+    // add also mesh data, that do not have time components, but do have mesh dimensions
     ErrorCode read_variables_setup( std::vector< std::string >& var_names,
                                     std::vector< int >& tstep_nums,
                                     std::vector< ReadNC::VarData >& vdatas,
+                                    std::vector< ReadNC::VarData >& meshdatas,
                                     std::vector< ReadNC::VarData >& vsetdatas );
 
     //! Read set variables (common to scd mesh and ucd mesh)

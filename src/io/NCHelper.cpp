@@ -374,6 +374,7 @@ ErrorCode NCHelper::update_time_tag_vals()
 ErrorCode NCHelper::read_variables_setup( std::vector< std::string >& var_names,
                                           std::vector< int >& tstep_nums,
                                           std::vector< ReadNC::VarData >& vdatas,
+                                          std::vector< ReadNC::VarData >& vmeshdatas,
                                           std::vector< ReadNC::VarData >& vsetdatas )
 {
     std::map< std::string, ReadNC::VarData >& varInfo = _readNC->varInfo;
@@ -1030,9 +1031,10 @@ ErrorCode ScdNCHelper::create_mesh( Range& faces )
 ErrorCode ScdNCHelper::read_variables( std::vector< std::string >& var_names, std::vector< int >& tstep_nums )
 {
     std::vector< ReadNC::VarData > vdatas;
+    std::vector< ReadNC::VarData > vmeshdatas;
     std::vector< ReadNC::VarData > vsetdatas;
 
-    ErrorCode rval = read_variables_setup( var_names, tstep_nums, vdatas, vsetdatas );MB_CHK_SET_ERR( rval, "Trouble setting up to read variables" );
+    ErrorCode rval = read_variables_setup( var_names, tstep_nums, vdatas, vmeshdatas, vsetdatas );MB_CHK_SET_ERR( rval, "Trouble setting up to read variables" );
 
     if( !vsetdatas.empty() )
     {
@@ -1325,9 +1327,10 @@ ErrorCode ScdNCHelper::create_quad_coordinate_tag()
 ErrorCode UcdNCHelper::read_variables( std::vector< std::string >& var_names, std::vector< int >& tstep_nums )
 {
     std::vector< ReadNC::VarData > vdatas;
+    std::vector< ReadNC::VarData > vmeshdatas;
     std::vector< ReadNC::VarData > vsetdatas;
 
-    ErrorCode rval = read_variables_setup( var_names, tstep_nums, vdatas, vsetdatas );MB_CHK_SET_ERR( rval, "Trouble setting up to read variables" );
+    ErrorCode rval = read_variables_setup( var_names, tstep_nums, vdatas, vmeshdatas, vsetdatas );MB_CHK_SET_ERR( rval, "Trouble setting up to read variables" );
 
     if( !vsetdatas.empty() )
     {

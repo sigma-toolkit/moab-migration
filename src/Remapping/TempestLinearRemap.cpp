@@ -373,7 +373,7 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
     // Reset the source and target data first
     m_rowVector.setZero();
     m_colVector.setZero();
-
+#define VERBOSE
 #ifdef VERBOSE
     std::stringstream sstr;
     static int callId = 0;
@@ -385,20 +385,54 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
     // solution vector
     if( transpose )
     {
+#ifdef VERBOSE
+        output_file << "RowVector: " << m_rowVector.size() << ", SrcVals: " << srcVals.size()
+                    << ", Sizes: " << m_nTotDofs_Dest << ", " << row_gdofmap.size() << "\n";
+#endif
         // Permute the source data first
         for( unsigned i = 0; i < srcVals.size(); ++i )
         {
             if( row_dtoc_dofmap[i] >= 0 )
+            {
                 m_rowVector( row_dtoc_dofmap[i] ) = srcVals[i];  // permute and set the row (source) vector properly
+#ifdef VERBOSE
+                output_file << i << " " << row_gdofmap[row_dtoc_dofmap[i]] + 1 << "  " << srcVals[i] << "\n";
+#endif
+            }
         }
 
-        m_colVector = m_weightMatrix.adjoint() * m_rowVector;
+        WeightCMatrix adjMatrix (m_weightMatrix.transpose());
+        //const std::vector<double> vptr ( adjMatrix.valuePtr(), adjMatrix.valuePtr() + adjMatrix.nonZeros() );
+        //std::cout << "Weight matrix :: " << adjMatrix.nonZeros() << ", " << adjMatrix.outerSize() << "\n";
+        //for (double v: vptr) std::cout << v << ' ';
+        //std::cout << "\n\n";
+        
+        // std::cout << "Row vector applied:: " << m_rowVector.transpose() << std::endl;
 
+        // m_colVector = (adjMatrix * m_rowVector.transpose() ).transpose();
+        m_colVector = (m_rowVector.transpose() * m_weightMatrix );
+
+        std::cout << "1. Column vector applied:: " << m_colVector(0) << ", " << m_colVector(1) << std::endl;
+
+        m_colVector = ( m_weightMatrix.transpose() * m_rowVector ).transpose();
+
+        std::cout << "2. Column vector applied:: " << m_colVector(0) << ", " << m_colVector(1) << std::endl;
+
+
+#ifdef VERBOSE
+        output_file << "ColVector: " << m_colVector.size() << ", TgtVals:" << tgtVals.size()
+                    << ", Sizes: " << m_nTotDofs_SrcCov << ", " << col_dtoc_dofmap.size() << "\n";
+#endif
         // Permute the resulting target data back
         for( unsigned i = 0; i < tgtVals.size(); ++i )
         {
             if( col_dtoc_dofmap[i] >= 0 )
+            {
                 tgtVals[i] = m_colVector( col_dtoc_dofmap[i] );  // permute and set the row (source) vector properly
+#ifdef VERBOSE
+                output_file << i << " " << col_gdofmap[col_dtoc_dofmap[i]] + 1 << "  " << tgtVals[i] << "\n";
+#endif
+            }
         }
     }
     else
@@ -408,6 +442,7 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
         output_file << "ColVector: " << m_colVector.size() << ", SrcVals: " << srcVals.size()
                     << ", Sizes: " << m_nTotDofs_SrcCov << ", " << col_dtoc_dofmap.size() << "\n";
 #endif
+        // Permute the source data first
         for( unsigned i = 0; i < srcVals.size(); ++i )
         {
             if( col_dtoc_dofmap[i] >= 0 )
@@ -442,6 +477,7 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
     output_file.flush();  // required here
     output_file.close();
 #endif
+#undef VERBOSE
 
     // All done with matvec application
     return moab::MB_SUCCESS;

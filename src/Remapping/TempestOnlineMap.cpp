@@ -1749,15 +1749,34 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
     }
 
     // The tag data is np*np*n_el_src
-    rval = m_interface->tag_get_data( srcSolutionTag, sents, &solSTagVals[0] );MB_CHK_SET_ERR( rval, "Getting local tag data failed" );
+    if ( !transpose )
+    {
+      rval = m_interface->tag_get_data( srcSolutionTag, sents, &solSTagVals[0] );MB_CHK_SET_ERR( rval, "Getting local tag data failed" );
 
-    // Compute the application of weights on the suorce solution data and store it in the
-    // destination solution vector data Optionally, can also perform the transpose application of
-    // the weight matrix. Set the 3rd argument to true if this is needed
-    rval = this->ApplyWeights( solSTagVals, solTTagVals, transpose );MB_CHK_SET_ERR( rval, "Applying remap operator onto source vector data failed" );
+      // Compute the application of weights on the suorce solution data and store it in the
+      // destination solution vector data Optionally, can also perform the transpose application of
+      // the weight matrix. Set the 3rd argument to true if this is needed
+      rval = this->ApplyWeights( solSTagVals, solTTagVals, transpose );MB_CHK_SET_ERR( rval, "Applying remap operator onto source vector data failed" );
 
-    // The tag data is np*np*n_el_dest
-    rval = m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] );MB_CHK_SET_ERR( rval, "Setting local tag data failed" );
+      // The tag data is np*np*n_el_dest
+      rval = m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] );MB_CHK_SET_ERR( rval, "Setting local tag data failed" );
+    }
+    else
+    {
+      rval = m_interface->tag_get_data( tgtSolutionTag, tents, &solTTagVals[0] );MB_CHK_SET_ERR( rval, "Getting local tag data failed" );
+
+      std::cout << "in transpose block: source size = " << solSTagVals.size() << " and target size = " << solTTagVals.size() << std::endl;
+      std::cout << "target data = " << solTTagVals[0] << ", " << solTTagVals[1] << ", " << solTTagVals[2] << ", " << solTTagVals[3]  << std::endl;
+
+      // Compute the application of weights on the suorce solution data and store it in the
+      // destination solution vector data Optionally, can also perform the transpose application of
+      // the weight matrix. Set the 3rd argument to true if this is needed
+      rval = this->ApplyWeights( solTTagVals, solSTagVals, transpose );MB_CHK_SET_ERR( rval, "Applying remap operator onto source vector data failed" );
+      std::cout << "source data = " << solSTagVals[0] << ", " << solSTagVals[1] << ", " << solSTagVals[2] << ", " << solSTagVals[3]  << std::endl;
+
+      // The tag data is np*np*n_el_dest
+      rval = m_interface->tag_set_data( srcSolutionTag, sents, &solSTagVals[0] );MB_CHK_SET_ERR( rval, "Setting local tag data failed" );
+    }
 
     return moab::MB_SUCCESS;
 }

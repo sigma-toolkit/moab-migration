@@ -28,6 +28,8 @@
 #include "moab/CpuTimer.hpp"
 #include "DebugOutput.hpp"
 
+#include "mba.hpp"
+
 //#ifndef MOAB_HAVE_MPI
 //    #error mbtempest tool requires MPI configuration
 //#endif
@@ -1008,6 +1010,73 @@ double sample_stationary_vortex( double dLon, double dLat )
     }
 
     return ( 1.0 - tanh( dRho / dD * sin( dLon - dOmega * dT ) ) );
+}
+
+moab::ErrorCode compute_mba_set( moab::Interface* mbi,
+                                 moab::EntityHandle& meshset_source,
+                                 moab::EntityHandle& meshset_target,
+                                 std::string& tagname )
+{
+    ErrorCode err;
+    bool apply_tag = tagname.size();
+
+    moab::Tag dtag;
+    if( apply_tag )
+    {
+        err = mbi->tag_get_handle( varProject, 1, moab::MB_TYPE_DOUBLE, dtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+    }
+
+    moab::Range source_elems;
+    err = mbi->get_entities_by_dimension( meshset_source, 2, source_elems, true );MB_CHK_ERR( err );
+
+    moab::Range target_elems;
+    err = mbi->get_entities_by_dimension( meshset_target, 2, target_elems, true );MB_CHK_ERR( err );
+
+    const size_t nd = source_elems.size();
+    const size_t ni = target_elems.size();
+
+    std::vector< double > source_xyz, source_tdata, target_xyz, target_tdata;
+    source_xyz.resize( nd * 3, 0.0 );
+    err = mbi->get_coords( source_elems, source_xyz.data() );MB_CHK_ERR( err );
+
+    if( apply_tag )
+    {
+        source_tdata.resize( nd, 0.0 );
+        err = mbi->tag_get_data( dtag, source_elems, source_tdata.data() );MB_CHK_ERR( err );
+    }
+
+    target_xyz.resize( ni * 3, 0.0 );
+    err = mbi->get_coords( target_elems, target_xyz.data() );MB_CHK_ERR( err );
+
+    target_tdata.resize( ni, 0.0 );
+    std::cout << "Computing the MBA interpolant now";
+    err = compute_mba( source_xyz, source_tdata, target_xyz, target_tdata );MB_CHK_ERR( err );
+
+    std::vector< mba::point< 3 > > coords( nd );
+    size_t offset = 0;
+    for( size_t k = 0; k < nd; k++, offset += 3 )
+        coords[k] = mba::point< 3 >{ xyzd[offset], xyzd[offset + 1], xyzd[offset + 2] };
+
+    // now set the data on target instance of MOAB tag
+    if( apply_tag )
+    {
+        // Bounding box containing the data points.
+        mba::point< 3 > lo = { -1, -1, -1 };
+        mba::point< 3 > hi = { 1, 1, 1 };
+
+        // Initial grid size.
+        mba::index< 3 > grid = { 5, 5, 5 };
+
+        // Algorithm setup.
+        mba::MBA< 3 > interp( lo, hi, grid, coords, fd );
+
+        // Get interpolated value at arbitrary location.
+        offset = 0;
+        for( size_t k = 0; k < ni; k++, offset += 3 )
+            target_tdata[k] = interp( mba::point< 3 >{ xyzi[offset], xyzi[offset + 1], xyzi[offset + 2] } );
+
+        err = mbi->tag_set_data( dtag, target_elems, target_tdata.data() );MB_CHK_ERR( err );
+    }
 }
 
 ///////////////////////////////////////////////

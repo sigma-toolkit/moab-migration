@@ -33,6 +33,9 @@
 #include <sstream>
 #include "moab/Core.hpp"
 
+#include "mba.hpp"
+#include "nanoflann.hpp"
+
 #ifndef MOAB_HAVE_MPI
 #error " compile with MPI and HDF5 for this example to work \n";
 #endif
@@ -73,15 +76,134 @@ using namespace std;
 
 ErrorCode ScaleCoords( Interface* mb, Range& nodes, double R, bool is_cartesian = true );
 
+moab::ErrorCode shepard_interpolate( int dimension,
+                                     std::vector< double >& xyzd,
+                                     std::vector< double >& fd,
+                                     double power,
+                                     std::vector< double >& xyzi,
+                                     std::vector< double >& fi );
+
+moab::ErrorCode modified_shepard_interpolate( int dimension,
+                                     std::vector< double >& xyzd,
+                                     std::vector< double >& fd,
+                                     double power,
+                                     std::vector< double >& xyzi,
+                                     std::vector< double >& fi );
+
+moab::ErrorCode compute_mba( std::vector< double >& xyzd,
+                     std::vector< double >& fd,
+                     std::vector< double >& xyzi,
+                     std::vector< double >& fi );
+
+template < typename T >
+struct PointCloud
+{
+    using coord_t = T;  //!< The type of each coordinate
+
+    const static int projection    = 2;
+    const static int in_dimension  = 3;
+    const static int out_dimension = 2;
+    const std::vector< T >& xyz;
+    std::vector< T > xyz_T;
+    const size_t count;
+
+    PointCloud( const std::vector< T >& pxyz ) : xyz( pxyz ), count( pxyz.size() / in_dimension )
+    {
+        xyz_T.resize( out_dimension * count );
+
+        init();
+    }
+
+    void init()
+    {
+        double cd[3];
+        unsigned offset = 0;
+        for( size_t i = 0; i < count; i++ )
+        {
+            cd[0] = xyz[offset];
+            cd[1] = xyz[offset + 1];
+            cd[2] = xyz[offset + 2];
+            IntxUtils::transform_coordinates( cd, projection );
+            xyz_T[i * out_dimension]     = cd[0];
+            xyz_T[i * out_dimension + 1] = cd[1];
+        }
+    }
+
+    // Must return the number of data points
+    inline size_t kdtree_get_point_count() const
+    {
+        return count;
+    }
+
+    // Returns the dim'th component of the idx'th point in the class:
+    // Since this is inlined and the "dim" argument is typically an immediate
+    // value, the
+    //  "if/else's" are actually solved at compile time.
+    inline T kdtree_get_pt( const size_t idx, const size_t dim ) const
+    {
+        return ( dim ? xyz_T[idx * out_dimension + 1] : xyz_T[idx * out_dimension] );
+    }
+
+    // Optional bounding-box computation: return false to default to a standard
+    // bbox computation loop.
+    //   Return true if the BBOX was already computed by the class and returned
+    //   in "bb" so it can be avoided to redo it again. Look at bb.size() to
+    //   find out the expected dimensionality (e.g. 2 or 3 for point clouds)
+    template < class BBOX >
+    bool kdtree_get_bbox( BBOX& /* bb */ ) const
+    {
+        return false;
+    }
+};
+
+template < typename T >
+struct PC3D
+{
+    using coord_t = T;  //!< The type of each coordinate
+
+    const static int dimension  = 3;
+    const std::vector< T >& xyz;
+    const size_t count;
+
+    PC3D( const std::vector< T >& pxyz ) : xyz( pxyz ), count( pxyz.size() / dimension )
+    {
+    }
+
+    // Must return the number of data points
+    inline size_t kdtree_get_point_count() const
+    {
+        return count;
+    }
+
+    // Returns the dim'th component of the idx'th point in the class:
+    // Since this is inlined and the "dim" argument is typically an immediate
+    // value, the
+    //  "if/else's" are actually solved at compile time.
+    inline T kdtree_get_pt( const size_t idx, const size_t dim ) const
+    {
+        return xyz[idx * dimension + dim];
+    }
+
+    // Optional bounding-box computation: return false to default to a standard
+    // bbox computation loop.
+    //   Return true if the BBOX was already computed by the class and returned
+    //   in "bb" so it can be avoided to redo it again. Look at bb.size() to
+    //   find out the expected dimensionality (e.g. 2 or 3 for point clouds)
+    template < class BBOX >
+    bool kdtree_get_bbox( BBOX& /* bb */ ) const
+    {
+        return false;
+    }
+};
+
 //
 // Start of main test program
 //
 int main( int argc, char** argv )
 {
     ErrorCode err;
-    int ierr, rank;
+    int ierr, rank, size;
     string mpas_filename, roms_filename, output_filename;
-    MPI_Comm comm = MPI_COMM_WORLD;
     /// Parallel Read options:
     ///   PARALLEL = type {READ_PART}
     ///   PARTITION = PARALLEL_PARTITION : Partition as you read
@@ -93,21 +215,44 @@ int main( int argc, char** argv )
     ///   PARALLEL_COMM = index
     // string read_options = "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;"
     //                       "PARTITION_DISTRIBUTE";  // ;PARALLEL_GHOSTS=3.0.1
-    string read_options  = "";
-    string write_options = "";  // "PARALLEL=WRITE_PART"
-    const double radius  = 1.0;
+    const double radius         = 1.0;
+    bool ensureMonotonicity     = false;
+    bool computeWeights         = false;
+    bool computeShepards        = false;
+    std::string strMethod       = "";
+    const char* varProject      = "bottomDepth";
+    const double shepard_power  = 2;
+    const bool useTranspose     = false;
 
     {
         ProgOptions opts;
 
         // set default values
-        mpas_filename   = "mpas_grid.nc";
-        roms_filename   = "roms_grid.h5m";
+        if( useTranspose )
+        {
+            roms_filename = "mpas_grid.h5m";
+            mpas_filename = "roms_grid.h5m";
+        }
+        else
+        {
+            mpas_filename = "mpas_grid.h5m";
+            roms_filename = "roms_grid.h5m";
+        }
+
         output_filename = "output_mpas_roms_map2d.nc";
 
         opts.addOpt< std::string >( "mpas", "MPAS filename with 2D mesh and 3D dataset", &mpas_filename );
         opts.addOpt< std::string >( "roms", "ROMS filename with 2D mesh", &roms_filename );
         opts.addOpt< std::string >( "out", "Output filename for ROMS 2D mesh and remapped dataset", &output_filename );
+        opts.addOpt< std::string >( "method", "Additional computational method arguments (invdist, bilin, intbilin)",
+                                    &strMethod );
+        opts.addOpt< void >( "shepard", "Use Shepard's inverse-distance weighting to compute projection",
+                             &computeShepards );
+        opts.addOpt< void >( "mono", "Ensure monotonicity in the weight generation",
+                             &ensureMonotonicity );
+        opts.addOpt< void >( "weights,w",
+                             "Compute and output the weights",
+                             &computeWeights );
 
         opts.parseCommandLine( argc, argv );
     }
@@ -126,7 +271,16 @@ int main( int argc, char** argv )
     // Initialize MPI first
     ierr = MPI_Init( &argc, &argv );MPICHKERR( ierr, "MPI_Init failed" );
 
-    ierr = MPI_Comm_rank( MPI_COMM_WORLD, &rank );MPICHKERR( ierr, "MPI_Comm_rank failed" );
+    MPI_Comm comm = MPI_COMM_WORLD;
+
+    ierr = MPI_Comm_rank( comm, &rank );MPICHKERR( ierr, "MPI_Comm_rank failed" );
+    ierr = MPI_Comm_size( comm, &size );MPICHKERR( ierr, "MPI_Comm_size failed" );
+
+    // string mpas_read_options = size > 1 ? "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;NO_EDGES;VARIABLE=bottomDepth;"
+    //     : "NO_EDGES;VARIABLE=bottomDepth;";
+    string mpas_read_options = size > 1 ? "" : "";
+    string roms_read_options = size > 1 ? "" : "";
+    string write_options     = size > 1 ? "PARALLEL=WRITE_PART" : "";
 
     dbgprint( "********** Remap MPAS-to-ROMS **********\n" );
 
@@ -152,11 +306,8 @@ int main( int argc, char** argv )
     // Create the parallel communicator object with the partition handle associated with MOAB
     ParallelComm* parallel_communicator = ParallelComm::get_pcomm( mbi, partnset, &comm );
 
-#ifdef MOAB_HAVE_MPI
+    // construct the remapper
     moab::TempestRemapper remapper( mbi, parallel_communicator );
-#else
-    moab::TempestRemapper remapper( mbi );
-#endif
     remapper.meshValidate     = true;
     remapper.constructEdgeMap = false;
     remapper.initialize();
@@ -167,7 +318,12 @@ int main( int argc, char** argv )
     // Load the MPAS file from disk with given options
     {
         dbgprint( "Reading MPAS file from disk" );
-        err = mbi->load_file( mpas_filename.c_str(), &mpasset, read_options.c_str() );MB_CHK_SET_ERR( err, "MOAB::load_file for MPAS mesh failed" );
+        err = mbi->load_file( mpas_filename.c_str(), &mpasset, mpas_read_options.c_str() );MB_CHK_SET_ERR( err, "MOAB::load_file for MPAS mesh failed" );
+
+        // Tag depthtag;
+        // err = mbi->tag_get_handle( "bottomDepth", 1, moab::MB_TYPE_DOUBLE, depthtag, moab::MB_TAG_DENSE | moab::MB_TAG_CREAT);
+        // if( err != MB_SUCCESS ) dbgprint( "Error: " << err << "; Failed to get bottomDepth tag handle" );
+        // MB_CHK_SET_ERR( err, "MPAS bottomDepth tag failed" );
 
         // Get all entities in the database
         moab::Range mpas_verts, mpas_elems;
@@ -176,7 +332,7 @@ int main( int argc, char** argv )
         dbgprint( "MPAS mesh contains " << mpas_verts.size() << " vertices and " << mpas_elems.size() << " elements");
 
         // Rescale the radius of both to compute the intersection
-        err = ScaleCoords( mbi, mpas_verts, radius, true );MB_CHK_ERR( err );
+        err = ScaleCoords( mbi, mpas_verts, radius, !useTranspose );MB_CHK_ERR( err );
         err = mbi->write_file( "mpas_modified_2d.h5m", "H5M", write_options.c_str(), &mpasset, 1 );MB_CHK_ERR( err );
         err = remapper.ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( err );
     }
@@ -184,7 +340,7 @@ int main( int argc, char** argv )
     // Load the ROMS file from disk with given options
     {
         dbgprint( "Reading ROMS file from disk" );
-        err = mbi->load_file( roms_filename.c_str(), &romsset, read_options.c_str() );MB_CHK_SET_ERR( err, "MOAB::load_file for ROMS mesh failed" );
+        err = mbi->load_file( roms_filename.c_str(), &romsset, roms_read_options.c_str() );MB_CHK_SET_ERR( err, "MOAB::load_file for ROMS mesh failed" );
 
         // Get all entities in the database
         moab::Range roms_verts, roms_elems;
@@ -193,84 +349,246 @@ int main( int argc, char** argv )
         dbgprint( "ROMS mesh contains " << roms_verts.size() << " vertices and " << roms_elems.size() << " elements");
 
         // Rescale the radius of both to compute the intersection
-        err = ScaleCoords( mbi, roms_verts, radius, false );MB_CHK_ERR( err );
+        err = ScaleCoords( mbi, roms_verts, radius, useTranspose );MB_CHK_ERR( err );
         err = mbi->write_file( "roms_modified_2d.h5m", "H5M", write_options.c_str(), &romsset, 1 );MB_CHK_ERR( err );
         err = remapper.ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( err );
     }
 
-    // exit(1);
-
-    dbgprint( "Constructing covering set for intersection" );
+    EntityHandle mpas_covering_set;
     const double epsrel = ReferenceTolerance;
     const double boxeps = 1e-6;
-    err = remapper.ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false );MB_CHK_ERR( err );
-
-    // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm
-    dbgprint( "Setup and compute mesh intersections between source (MPAS) and target (ROMS) meshes" );
-    err = remapper.ComputeOverlapMesh( true, false );MB_CHK_ERR( err );
-
-    EntityHandle& intersection_set = remapper.GetMeshSet( moab::Remapper::OverlapMesh );
-
-    // print some diagnostic checks to see if the overlap grid resolved the input meshes correctly
+    if (false)
     {
-        moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::GaussQuadrature );
+        moab::Intx2MeshOnSphere mbintx( mbi );
+        mbintx.set_error_tolerance( epsrel );
+        mbintx.set_radius_source_mesh( radius );
+        mbintx.set_radius_destination_mesh( radius );
+        mbintx.set_box_error( boxeps );
 
-        double local_areas[3];  // Array for Initial area, and through Method 1 and Method 2
-        // local_areas[0] = area_on_sphere_lHuiller ( mbi, runCtx->meshsets[1], radius );
-        local_areas[0] = areaAdaptor.area_on_sphere( mbi, mpasset, radius );
-        local_areas[1] = areaAdaptor.area_on_sphere( mbi, romsset, radius );
-        local_areas[2] = areaAdaptor.area_on_sphere( mbi, intersection_set, radius );
+        // moab::Range local_verts;
+        // err = mbi->get_entities_by_dimension( romsset, 0, local_verts );MB_CHK_ERR( err );
+        // err = mbintx.build_processor_euler_boxes( romsset, local_verts );MB_CHK_ERR( err );
+        err = mbi->create_meshset( moab::MESHSET_SET, mpas_covering_set );MB_CHK_SET_ERR( err, "Can't create new set" );
+        dbgprint( "Constructing covering set for intersection" );
+        err = mbintx.construct_covering_set( mpasset, mpas_covering_set );MB_CHK_ERR( err );
+    }
+    else
+    {
+        // err = remapper.ConstructCoveringSet( epsrel, radius, radius, boxeps, false );MB_CHK_ERR( err );
+        // mpas_covering_set = remapper.GetMeshSet( moab::Remapper::CoveringMesh );
 
-        dbgprint( "initial area: source mesh = " << local_areas[0] << ", target mesh = " << local_areas[1]
-                                                 << ", overlap mesh = " << local_areas[2] );
-        dbgprint( "relative error w.r.t source = " << fabs( local_areas[0] - local_areas[2] ) / local_areas[0]
-                                                   << ", and target = "
-                                                   << fabs( local_areas[1] - local_areas[2] ) / local_areas[1] );
+        // Cull the MPAS set so that we don't have a global mesh
+        err = mbi->create_meshset( moab::MESHSET_SET, mpas_covering_set );MB_CHK_SET_ERR( err, "Can't create new set" );
+
+        // construct a kd-tree index:
+        using KdTree =
+            nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PC3D< double > >,
+                                                 PC3D< double >, 3 /* dim */
+                                                 >;
+
+        moab::Range mpas_elems;
+        err = mbi->get_entities_by_dimension( mpasset, 2, mpas_elems );MB_CHK_ERR( err );
+        std::vector< double > mpas_xyz( mpas_elems.size() * 3 );
+        err = mbi->get_coords( mpas_elems, mpas_xyz.data() );MB_CHK_ERR( err );
+
+        moab::Range roms_elems;
+        err = mbi->get_entities_by_dimension( romsset, 2, roms_elems );MB_CHK_ERR( err );
+
+        double query_pt[3];  // dimension
+
+        PC3D< double > cloud( mpas_xyz );
+        KdTree tree( 3 /*dim*/, cloud, { 10 /* max leaf */ } );
+
+        moab::Range culled_elems;
+        const size_t num_results =
+            static_cast< size_t >( ( 2 * shepard_power + 1 ) * ( 2 * shepard_power + 1 ) - shepard_power );
+        std::vector< size_t > srcindx( num_results );
+        std::vector< double > srcdist( num_results );
+        nanoflann::KNNResultSet< double > resultSet( num_results );
+        for( size_t i = 0; i < roms_elems.size(); i++ )
+        {
+            const moab::EntityHandle ehandle = roms_elems[i];
+            err               = mbi->get_coords( &ehandle, 1, &query_pt[0] );MB_CHK_ERR( err );
+
+            // Do a KNN search
+            resultSet.init( srcindx.data(), srcdist.data() );
+            tree.findNeighbors( resultSet, query_pt );
+
+            for( size_t j = 0; j < num_results; ++j )
+                culled_elems.insert( mpas_elems[srcindx[j]] );
+        }
+        err = mbi->add_entities( mpas_covering_set, culled_elems );MB_CHK_ERR( err );
+        dbgprint( "Culled MPAS mesh contains " << culled_elems.size() << " elements" );
+
+        err = mbi->write_file( "mpas_covering_2d.h5m", "H5M", write_options.c_str(), &mpas_covering_set, 1 );MB_CHK_ERR( err );
     }
 
-    // Write out to output file to visualize reduction/exchange of tag data
-    dbgprint( "Writing intersection mesh... " );
-    err = mbi->write_file( "mesh_intersection.h5m", "H5M", write_options.c_str(), &intersection_set, 1 );MB_CHK_ERR( err );
+    if( computeShepards )
+    {
+        moab::Tag dtag;
+        err = mbi->tag_get_handle( varProject, 1, moab::MB_TYPE_DOUBLE, dtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
 
-    // Create two tag handles: Exchange and Reduction operations
-    // dbgprint( "-Computing weights " << "..." );
-    // Tag tagReduce, tagExchange;
-    // {
-    //     stringstream sstr;
-    //     // Create the exchange tag: default name = USERTAG_EXC
-    //     sstr << tagName << "_EXC";
-    //     err = mbi->tag_get_handle( sstr.str().c_str(), 1, MB_TYPE_INTEGER, tagExchange, MB_TAG_CREAT | MB_TAG_DENSE,
-    //                                &tagValue );MB_CHK_SET_ERR( err, "Retrieving tag handles failed" );
+        // call Shepard's interpolant to compute data
+        moab::Range mpas_elems;
+        // moab::Range& mpas_elems = remapper.GetMeshEntities( Remapper::SourceMesh );
+        err = mbi->get_entities_by_dimension( mpas_covering_set, 2, mpas_elems, true );MB_CHK_ERR( err );
 
-    //     // Create the exchange tag: default name = USERTAG_RED
-    //     sstr.str( "" );
-    //     sstr << tagName << "_RED";
-    //     err = mbi->tag_get_handle( sstr.str().c_str(), 1, MB_TYPE_DOUBLE, tagReduce, MB_TAG_CREAT | MB_TAG_DENSE,
-    //                                &tagValue );MB_CHK_SET_ERR( err, "Retrieving tag handles failed" );
-    // }
+        moab::Range& roms_elems = remapper.GetMeshEntities( Remapper::TargetMesh );
 
-    // // Perform exchange tag data
-    // dbgprint( "-Exchanging tags between processors " );
-    // {
-    //     Range partEnts, dimEnts;
-    //     for( int dim = 0; dim <= 3; dim++ )
-    //     {
-    //         // Get all entities of dimension = dim
-    //         err = mbi->get_entities_by_dimension( rootset, dim, dimEnts, false );MB_CHK_ERR( err );
+        std::vector< double > mpas_xyz( mpas_elems.size()*3 ), mpas_tdata( mpas_elems.size() );
+        err = mbi->get_coords( mpas_elems, mpas_xyz.data() );MB_CHK_ERR( err );
+        err = mbi->tag_get_data( dtag, mpas_elems, mpas_tdata.data() );MB_CHK_ERR( err );
 
-    //         vector< int > tagValues( dimEnts.size(), static_cast< int >( tagValue ) * ( rank + 1 ) * ( dim + 1 ) );
-    //         // Set local tag data for exchange
-    //         err = mbi->tag_set_data( tagExchange, dimEnts, &tagValues[0] );MB_CHK_SET_ERR( err, "Setting local tag data failed during exchange phase" );
-    //         // Merge entities into parent set
-    //         partEnts.merge( dimEnts );
-    //     }
+        std::cout << mpas_elems.size() << " -- First three tag data: " << mpas_tdata[0] << ", " << mpas_tdata[1] << ", "
+                  << mpas_tdata[2] << "\n";
 
-    //     // Exchange tags between processors
-    //     err = parallel_communicator->exchange_tags( tagExchange, partEnts );MB_CHK_SET_ERR( err, "Exchanging tags between processors failed" );
-    // }
+        // err = mbi->get_entities_by_dimension( romsset, 2, roms_elems );MB_CHK_ERR( err );
 
-    // Write out to output file to visualize reduction/exchange of tag data
-    // err = mbi->write_file( output_filename.c_str(), "H5M", write_options.c_str() );MB_CHK_ERR( err );
+        std::vector< double > roms_xyz( roms_elems.size()*3 ), roms_tdata( roms_elems.size(), 0.0 );
+        err = mbi->get_coords( roms_elems, roms_xyz.data() );MB_CHK_ERR( err );
+
+        // compute the actual shepard's interpolation
+        // dbgprint( "Computing the Shepard's interpolant now" );
+        // err = modified_shepard_interpolate( 3, mpas_xyz, mpas_tdata, shepard_power , roms_xyz, roms_tdata );MB_CHK_ERR( err );
+
+        dbgprint( "Computing the MBA interpolant now" );
+        err = compute_mba( mpas_xyz, mpas_tdata, roms_xyz, roms_tdata );MB_CHK_ERR( err );
+
+        // now set the data on ROMS instance of MOAB tag
+        dbgprint( "Setting tag data to ROMS mesh" );
+        err = mbi->tag_set_data( dtag, roms_elems, roms_tdata.data() );MB_CHK_ERR( err );
+    }
+    else
+    {
+        // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm
+        dbgprint( "Setup and compute mesh intersections between source (MPAS) and target (ROMS) meshes" );
+        err = remapper.ComputeOverlapMesh( true, false );MB_CHK_ERR( err );
+
+        EntityHandle& intersection_set = remapper.GetMeshSet( moab::Remapper::OverlapMesh );
+
+        // print some diagnostic checks to see if the overlap grid resolved the input meshes correctly
+        {
+            moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::GaussQuadrature );
+
+            double local_areas[3];  // Array for Initial area, and through Method 1 and Method 2
+            // local_areas[0] = area_on_sphere_lHuiller ( mbi, runCtx->meshsets[1], radius );
+            local_areas[0] = areaAdaptor.area_on_sphere( mbi, mpasset, radius );
+            local_areas[1] = areaAdaptor.area_on_sphere( mbi, romsset, radius );
+            local_areas[2] = areaAdaptor.area_on_sphere( mbi, intersection_set, radius );
+
+            dbgprint( "initial area: source mesh = " << local_areas[0] << ", target mesh = " << local_areas[1]
+                                                    << ", overlap mesh = " << local_areas[2] );
+            dbgprint( "relative error w.r.t source = " << fabs( local_areas[0] - local_areas[2] ) / local_areas[0]
+                                                    << ", and target = "
+                                                    << fabs( local_areas[1] - local_areas[2] ) / local_areas[1] );
+        }
+
+        // Write out to output file to visualize reduction/exchange of tag data
+        dbgprint( "Writing intersection mesh... " );
+        err = mbi->write_file( "mesh_intersection.h5m", "H5M", write_options.c_str(), &intersection_set, 1 );MB_CHK_ERR( err );
+
+        // compute the mapping weights
+        if( computeWeights )
+        {
+            dbgprint( "\nSetup computation of weights" );
+            // Call to generate the remapping weights with the tempest meshes
+            moab::TempestOnlineMap weightMap( &remapper );
+
+            GenerateOfflineMapAlgorithmOptions mapOptions;
+            mapOptions.nPin             = 1;
+            mapOptions.nPout            = 1;
+            mapOptions.fSourceConcave   = false;
+            mapOptions.fTargetConcave   = false;
+            mapOptions.strMethod        = strMethod; // invdist, bilin
+            mapOptions.fMonotone        = ensureMonotonicity;
+            mapOptions.fNoCorrectAreas  = false;
+            mapOptions.fNoCheck         = true;
+            mapOptions.strOutputMapFile = output_filename; // ask TR to write it out
+            mapOptions.strOutputFormat  = "Netcdf4";
+
+            dbgprint( "Compute weights with TempestRemap" );
+            err = weightMap.GenerateRemappingWeights( "fv",         // std::string strInputType
+                                                    "fv",         // std::string strOutputType,
+                                                    mapOptions,   // const GenerateOfflineMapAlgorithmOptions& options
+                                                    "GLOBAL_ID",  // const std::string& source_tag_name
+                                                    "GLOBAL_ID"   // const std::string& target_tag_name
+            );MB_CHK_ERR( err );
+
+            // check the generated weights and output information
+            {
+                const double dNormalTolerance = 1.0E-8;
+                const double dStrictTolerance = 1.0E-12;
+                weightMap.CheckMap( true, true, ensureMonotonicity, dNormalTolerance, dStrictTolerance );
+            }
+
+            {
+                // Write the map to disk
+                dbgprint( "\nWrite the weights to " << output_filename );
+
+                typedef std::map< std::string, std::string > AttributeMap;
+                typedef AttributeMap::value_type AttributePair;
+
+                AttributeMap mapAttributes;
+
+                mapAttributes.insert( AttributePair( "domain_a", mpas_filename ) );
+                mapAttributes.insert( AttributePair( "domain_b", roms_filename ) );
+                mapAttributes.insert( AttributePair( "grid_file_src", mpas_filename ) );
+                mapAttributes.insert( AttributePair( "grid_file_dst", roms_filename ) );
+                mapAttributes.insert( AttributePair( "grid_file_ovr", "mesh_intersection.h5m" ) );
+                mapAttributes.insert(
+                    AttributePair( "concave_src", ( mapOptions.fSourceConcave ) ? ( "true" ) : ( "false" ) ) );
+                mapAttributes.insert(
+                    AttributePair( "concave_dst", ( mapOptions.fTargetConcave ) ? ( "true" ) : ( "false" ) ) );
+                if( mapOptions.strSourceMeta != "" )
+                {
+                    mapAttributes.insert( AttributePair( "meta_src", mapOptions.strSourceMeta ) );
+                }
+                if( mapOptions.strTargetMeta != "" )
+                {
+                    mapAttributes.insert( AttributePair( "meta_dst", mapOptions.strTargetMeta ) );
+                }
+                mapAttributes.insert( AttributePair( "type_src", "fv" ) );
+                mapAttributes.insert( AttributePair( "type_dst", "fv" ) );
+                mapAttributes.insert( AttributePair( "np_src", std::to_string( (long long)mapOptions.nPin ) ) );
+                mapAttributes.insert( AttributePair( "np_dst", std::to_string( (long long)mapOptions.nPout ) ) );
+                mapAttributes.insert( AttributePair( "mono", ( mapOptions.fMonotone ) ? ( "true" ) : ( "false" ) ) );
+                mapAttributes.insert( AttributePair( "nobubble", "false" ) );
+                mapAttributes.insert(
+                    AttributePair( "nocorrectareas", "false" ) );
+                mapAttributes.insert( AttributePair( "noconserve", "false" ) );
+                mapAttributes.insert( AttributePair( "sparse_constraints", "false" ) );
+                mapAttributes.insert( AttributePair( "method", mapOptions.strMethod ) );
+                mapAttributes.insert( AttributePair( "version", "RemapMPASROMS v0.1" ) );
+
+                weightMap.Write( mapOptions.strOutputMapFile, mapAttributes, NcFile::Netcdf4Classic );
+
+                // // Write the map file to disk in parallel using either HDF5 or SCRIP interface
+                // err = weightMap.WriteParallelMap( output_filename.c_str() );MB_CHK_ERR( err );
+            }
+
+            // Now apply the map to compute bottom depth in ROMS mesh
+            if( true )
+            {
+                // MPAS variable to project = "bottomDepth"
+                moab::Tag dtag;
+                err = mbi->tag_get_handle( varProject, 1, moab::MB_TYPE_DOUBLE, dtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+
+                // Now let us apply the weights onto the vector and project onto target mesh
+                err = weightMap.ApplyWeights( dtag, dtag, useTranspose );MB_CHK_ERR( err );
+            }
+        }
+
+        remapper.clear();
+    }
+
+    if (useTranspose)
+    {
+        err = mbi->write_file( "roms_2d_projected.h5m", "H5M", write_options.c_str(), &mpasset, 1 );MB_CHK_ERR( err );
+    }
+    else
+    {
+        err = mbi->write_file( "roms_2d_projected.h5m", "H5M", write_options.c_str(), &romsset, 1 );MB_CHK_ERR( err );
+    }
 
     // Done, cleanup
     delete mbi;
@@ -288,9 +606,6 @@ static void spherical_to_cart( double lat, double lon, double R, double res[3] )
     res[0] = R * cos( lat ) * cos( lon );  // x coordinate
     res[1] = R * cos( lat ) * sin( lon );  // y
     res[2] = R * sin( lat );               // z
-    // res[0] = R * sin( lat ) * cos( lon );  // x coordinate
-    // res[1] = R * sin( lat ) * sin( lon );  // y
-    // res[2] = R * cos( lat );               // z
 }
 
 ErrorCode ScaleCoords( Interface* mb, Range& nodes, double R, bool is_cartesian )
@@ -308,8 +623,8 @@ ErrorCode ScaleCoords( Interface* mb, Range& nodes, double R, bool is_cartesian 
         if( !is_cartesian )
         {
             rval = mb->get_coords( &nd, 1, posi );MB_CHK_ERR( rval );
-            spherical_to_cart( posi[0], posi[1], R, posf );
-            // dbgprint( nd << " lat=" << posi[0] << ", lon=" << posi[1] << "; Cartesian = [" << posf[0] << ", " << posf[1] << ", " << posf[2] << "]" );
+            spherical_to_cart( posi[1], posi[0], R, posf );
+            // dbgprint( nd << " lat=" << posi[1] << ", lon=" << posi[0] << "; Cartesian = [" << posf[0] << ", " << posf[1] << ", " << posf[2] << "]" );
         }
         else
         {
@@ -330,4 +645,331 @@ ErrorCode ScaleCoords( Interface* mb, Range& nodes, double R, bool is_cartesian 
         rval    = mb->set_coords( &nd, 1, posf );MB_CHK_ERR( rval );
     }
     return MB_SUCCESS;
+}
+
+moab::ErrorCode shepard_interpolate( int dimension,
+                             std::vector< double >& xyzd,
+                             std::vector< double >& fd,
+                             double power,
+                             std::vector< double >& xyzi,
+                             std::vector< double >& fi )
+//****************************************************************************80
+//  Original source from:
+//
+//    SHEPARD_INTERP_ND evaluates a multidimensional Shepard interpolant.
+//    https://people.sc.fsu.edu/~jburkardt/f_src/shepard_interp_nd/shepard_interp_nd.html
+//
+//  Reference:
+//
+//    Donald Shepard,
+//    A two-dimensional interpolation function for irregularly spaced data,
+//    ACM '68: Proceedings of the 1968 23rd ACM National Conference,
+//    ACM, pages 517-524, 1969.
+//
+{
+    size_t nd  = xyzd.size() / dimension;
+    size_t ni  = xyzi.size() / dimension;
+    double ind = 1.0 / static_cast< double >( nd );
+
+    for( size_t i = 0; i < ni; i++ )
+    {
+        std::vector< double > w( nd, 0.0 );
+        int z;
+        const int ioffset = i * dimension;
+        if( power < 1 )
+        {
+            for( size_t j = 0; j < nd; j++ )
+                w[j] = ind;
+        }
+        else
+        {
+            z = -1;
+            for( size_t j = 0; j < nd; j++ )
+            {
+                double t = 0.0;
+                const int joffset = j * dimension;
+                for( int i2 = 0; i2 < dimension; i2++ )
+                {
+                    t += std::pow( xyzi[i2 + ioffset] - xyzd[i2 + joffset], 2.0 );
+                }
+                w[j] = std::sqrt( t );
+                if( w[j] < 1e-12 )
+                {
+                    z = j;
+                    break;
+                }
+            }
+
+            if( z != -1 )
+            {
+                for( size_t j = 0; j < nd; j++ )
+                    w[j] = 0.0;
+                w[z] = 1.0;
+            }
+            else
+            {
+                double s = 0.0;
+                for( size_t j = 0; j < nd; j++ )
+                {
+                    w[j] = 1.0 / std::pow( w[j], power );
+                    s += w[j];
+                }
+
+                for( size_t j = 0; j < nd; j++ )
+                    w[j] /= s;
+            }
+        }
+
+        fi[i] = 0.0;
+        for( size_t k = 0; k < nd; k++ )
+        {
+            fi[i] += w[k] * fd[k];
+        }
+        w.clear();
+    }
+
+    return moab::MB_SUCCESS;
+}
+
+
+
+moab::ErrorCode compute_mba( std::vector< double >& xyzd,
+                             std::vector< double >& fd,
+                             std::vector< double >& xyzi,
+                             std::vector< double >& fi )
+{
+    size_t nd = xyzd.size() / 3;
+    size_t ni = xyzi.size() / 3;
+
+    // Bounding box containing the data points.
+    mba::point< 3 > lo = { -1, -1, -1 };
+    mba::point< 3 > hi = { 1, 1, 1 };
+
+    // Initial grid size.
+    mba::index< 3 > grid = { 5, 5, 5 };
+
+    std::vector< mba::point< 3 > > coords(nd);
+    size_t offset = 0;
+    for( size_t k = 0; k < nd; k++, offset += 3 )
+        coords[k] = mba::point< 3 >{ xyzd[offset], xyzd[offset + 1], xyzd[offset + 2] };
+
+    // Algorithm setup.
+    mba::MBA< 3 > interp( lo, hi, grid, coords, fd, 6 /*levels*/, 1e-8 /*tolerance*/, 0.5 /*min_fill*/ );
+    // mba::linear_approximation< 3 > interp( coords.begin(), coords.end(), fd.begin() );
+
+    // Get interpolated value at arbitrary location.
+    offset = 0;
+    for( size_t k = 0; k < ni; k++, offset+=3 )
+        fi[k] = interp( mba::point< 3 >{ xyzi[offset], xyzi[offset + 1], xyzi[offset + 2] } );
+
+    return moab::MB_SUCCESS;
+}
+
+moab::ErrorCode modified_shepard_interpolate( int dimension,
+                                              std::vector< double >& xyzd,
+                                              std::vector< double >& fd,
+                                              double power,
+                                              std::vector< double >& xyzi,
+                                              std::vector< double >& fi )
+//****************************************************************************80
+//  Original source from:
+//
+//    SHEPARD_INTERP_ND evaluates a multidimensional Shepard interpolant.
+//    https://people.sc.fsu.edu/~jburkardt/f_src/shepard_interp_nd/shepard_interp_nd.html
+//
+//  Reference:
+//
+//    Donald Shepard,
+//    https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7302837/
+//    ACM '68: Proceedings of the 1968 23rd ACM National Conference,
+//    ACM, pages 517-524, 1969.
+//
+{
+    power = 2;
+    // First call the regular inverse-distance weighting method
+    shepard_interpolate( dimension, xyzd, fd, power, xyzi, fi );
+
+    power = 4;
+
+    size_t nd  = xyzd.size() / dimension;
+    size_t ni  = xyzi.size() / dimension;
+    std::vector< double > w( nd, 0.0 );
+
+    double fisecnum = 0.0;
+    for( size_t k = 0; k < nd; k++ )
+        fisecnum += fd[k];
+
+    assert(power >= 1.0);
+
+    for( size_t i = 0; i < ni; i++ )
+    {
+        const int ioffset = i * dimension;
+        int z;
+        double s = 0.0, is = 0.0;
+        {
+            z = -1;
+            for( size_t j = 0; j < nd; j++ )
+            {
+                double t          = 0.0;
+                const int joffset = j * dimension;
+                for( int i2 = 0; i2 < dimension; i2++ )
+                {
+                    t += std::pow( xyzi[i2 + ioffset] - xyzd[i2 + joffset], 2.0 );
+                }
+                w[j] = std::sqrt( t );
+                if( w[j] < 1e-6 )
+                {
+                    z = j;
+                    break;
+                }
+            }
+
+            if( z != -1 )
+            {
+                for( size_t j = 0; j < nd; j++ )
+                    w[j] = 0.0;
+                w[z] = 1.0;
+                s = is = 1.0;
+
+            }
+            else
+            {
+                for( size_t j = 0; j < nd; j++ )
+                {
+                    w[j] = 1.0 / std::pow( w[j], power );
+                    s += w[j];
+                    is += 1.0/w[j];
+                }
+
+                for( size_t j = 0; j < nd; j++ )
+                    w[j] /= s;
+            }
+        }
+
+        fi[i] += nd * ( fisecnum - nd * fi[i] ) / ( nd * nd - s * is );
+    }
+
+    return moab::MB_SUCCESS;
+}
+
+moab::ErrorCode modified_shepard_interpolate2( int dimension,
+                                              std::vector< double >& xyzd,
+                                              std::vector< double >& fd,
+                                              double power,
+                                              std::vector< double >& xyzi,
+                                              std::vector< double >& fi )
+//****************************************************************************80
+//  Original source from:
+//
+//    SHEPARD_INTERP_ND evaluates a multidimensional Shepard interpolant.
+//    https://people.sc.fsu.edu/~jburkardt/f_src/shepard_interp_nd/shepard_interp_nd.html
+//
+//  Reference:
+//
+//    Donald Shepard,
+//    https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7302837/
+//    ACM '68: Proceedings of the 1968 23rd ACM National Conference,
+//    ACM, pages 517-524, 1969.
+//
+{
+    // size_t nd  = xyzd.size() / dimension;
+    size_t ni  = xyzi.size() / dimension;
+
+    // construct a kd-tree index:
+    using KdTree = nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PointCloud< double > >,
+                                                        PointCloud< double >, 3 /* dim */
+                                                        >;
+
+    PointCloud< double > cloud( xyzd );
+    KdTree tree( 3 /*dim*/, cloud, { 10 /* max leaf */ } );
+
+    double query_pt[3];  // dimension
+
+    const size_t num_results = static_cast< size_t >( ( 2 * power + 1 ) * ( 2 * power + 1 ) - power );
+    double ind               = ( 1.0 / num_results );
+    std::vector< size_t > srcindx( num_results );
+    std::vector< double > srcdist( num_results );
+    nanoflann::KNNResultSet< double > resultSet( num_results );
+    for( size_t i = 0; i < ni; i++ )
+    {
+        const int ioffset = i * dimension;
+        {
+            for( int dd = 0; dd < dimension; dd++ )
+                query_pt[dd] = xyzi[ioffset + dd];
+            // IntxUtils::transform_coordinates( query_pt, PointCloud< double >::projection );
+
+            // Do a KNN search
+            resultSet.init( srcindx.data(), srcdist.data() );
+            tree.findNeighbors( resultSet, query_pt );
+
+            // tree.knnSearch( &query_pt[0], num_results, &srcindx[0], &srcdist[0] );
+
+            // std::cout << "knnSearch(nn=" << num_results << "): \n";
+            for( size_t ll = 0; ll < num_results; ++ll )
+            {
+                double dist = 0.0;
+                for( int dd = 0; dd < dimension; dd++ )
+                    dist += ( xyzi[ioffset + dd] - xyzd[srcindx[ll] * dimension + dd] ) *
+                            ( xyzi[ioffset + dd] - xyzd[srcindx[ll] * dimension + dd] );
+                dist        = std::sqrt( dist );
+                std::cout << i << "\tret_index=" << srcindx[ll] << " out_dist_sqr=" << srcdist[ll] << ", " << dist << std::endl;
+                srcdist[ll] = dist;
+            }
+        }
+
+        std::vector< double > w( num_results, 0.0 );
+        int z;
+        if( power < 1 )
+        {
+            for( size_t j = 0; j < num_results; j++ )
+                w[j] = ind;
+        }
+        else
+        {
+            z = -1;
+            for( size_t j = 0; j < num_results; j++ )
+            {
+                // double t          = 0.0;
+                // const int joffset = j * dimension;
+                // for( int i2 = 0; i2 < dimension; i2++ )
+                // {
+                //     t += std::pow( xyzi[i2 + ioffset] - xyzd[i2 + joffset], 2.0 );
+                // }
+                w[j] = srcdist[j];// std::sqrt( t );
+                if( w[j] < 1e-12 )
+                {
+                    z = j;
+                    break;
+                }
+            }
+
+            if( z != -1 )
+            {
+                for( size_t j = 0; j < num_results; j++ )
+                    w[j] = 0.0;
+                w[z] = 1.0;
+            }
+            else
+            {
+                double s = 0.0;
+                for( size_t j = 0; j < num_results; j++ )
+                {
+                    w[j] = 1.0 / std::pow( w[j], power );
+                    s += w[j];
+                }
+
+                for( size_t j = 0; j < num_results; j++ )
+                    w[j] /= s;
+            }
+        }
+
+        fi[i] = 0.0;
+        for( size_t k = 0; k < num_results; k++ )
+        {
+            fi[i] += w[k] * fd[k];
+        }
+        w.clear();
+    }
+
+    return moab::MB_SUCCESS;
 }

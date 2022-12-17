@@ -296,8 +296,11 @@ class TempestOnlineMap : public OfflineMap
 
 #ifdef MOAB_HAVE_EIGEN3
 
-    typedef Eigen::Matrix< double, 1, Eigen::Dynamic > WeightDRowVector;
-    typedef Eigen::Matrix< double, Eigen::Dynamic, 1 > WeightDColVector;
+    // typedef Eigen::Matrix< double, 1, Eigen::Dynamic > WeightDRowVector;
+    // typedef Eigen::Matrix< double, Eigen::Dynamic, 1 > WeightDColVector;
+    typedef Eigen::VectorXd WeightDRowVector;
+    typedef Eigen::VectorXd WeightDColVector;
+
     typedef Eigen::SparseVector< double > WeightSVector;
     typedef Eigen::SparseMatrix< double, Eigen::RowMajor > WeightRMatrix;
     typedef Eigen::SparseMatrix< double, Eigen::ColMajor > WeightCMatrix;

@@ -1777,26 +1777,28 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
     }
 
     // The tag data is np*np*n_el_src
-    rval = m_interface->tag_get_data( srcSolutionTag, sents, &solSTagVals[0] );MB_CHK_SET_ERR( rval, "Getting local tag data failed" );
-
-    // Compute the application of weights on the suorce solution data and store it in the
-    // destination solution vector data Optionally, can also perform the transpose application of
-    // the weight matrix. Set the 3rd argument to true if this is needed
-    rval = this->ApplyWeights( solSTagVals, solTTagVals, transpose );MB_CHK_SET_ERR( rval, "Applying remap operator onto source vector data failed" );
-
-    if( caasType != CAAS_NONE )
+    if ( !transpose )
     {
-        std::string tgtSolutionTagName;
-        rval = m_interface->tag_get_name( tgtSolutionTag, tgtSolutionTagName );MB_CHK_SET_ERR( rval, "Getting tag name failed" );
+      rval = m_interface->tag_get_data( srcSolutionTag, sents, &solSTagVals[0] );MB_CHK_SET_ERR( rval, "Getting local tag data failed" );
 
-        // Perform CAAS iterations iteratively until convergence
-        constexpr int nmax_caas_iterations = 10;
-        double mismatch                    = 1.0;
-        int caasIteration                  = 0;
-        double initialMismatch             = 0.0;
-        while( ( fabs( mismatch / initialMismatch ) > 1e-15 && fabs( mismatch ) > 1e-15 ) &&
-               caasIteration++ < nmax_caas_iterations )  // iterate until convergence or a maximum of 5 iterations
-        {
+      // Compute the application of weights on the suorce solution data and store it in the
+      // destination solution vector data Optionally, can also perform the transpose application of
+      // the weight matrix. Set the 3rd argument to true if this is needed
+      rval = this->ApplyWeights( solSTagVals, solTTagVals, transpose );MB_CHK_SET_ERR( rval, "Applying remap operator onto source vector data failed" );
+
+      if( caasType != CAAS_NONE )
+      {
+          std::string tgtSolutionTagName;
+          rval = m_interface->tag_get_name( tgtSolutionTag, tgtSolutionTagName );MB_CHK_SET_ERR( rval, "Getting tag name failed" );
+
+          // Perform CAAS iterations iteratively until convergence
+          constexpr int nmax_caas_iterations = 10;
+          double mismatch                    = 1.0;
+          int caasIteration                  = 0;
+          double initialMismatch = 0.0;
+          while( ( fabs( mismatch / initialMismatch ) > 1e-15 && fabs( mismatch ) > 1e-15 ) &&
+                caasIteration++ < nmax_caas_iterations )  // iterate until convergence or a maximum of 5 iterations
+          {
             // The tag data is np*np*n_el_dest
             rval = m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] );MB_CHK_SET_ERR( rval, "Setting local tag data failed" );
 
@@ -1816,11 +1818,24 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
                         tgtSolutionTagName.c_str(), caasIteration, mDefect.first, dMassDiffPostGlobal );
             }
             mismatch = dMassDiffPostGlobal;
-        }
-    }
+          }
+      }
 
-    // The tag data is np*np*n_el_dest
-    rval = m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] );MB_CHK_SET_ERR( rval, "Setting local tag data failed" );
+      // The tag data is np*np*n_el_dest
+      rval = m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] );MB_CHK_SET_ERR( rval, "Setting local tag data failed" );
+    }
+    else
+    {
+      rval = m_interface->tag_get_data( tgtSolutionTag, tents, &solTTagVals[0] );MB_CHK_SET_ERR( rval, "Getting local tag data failed" );
+
+      // Compute the application of weights on the suorce solution data and store it in the
+      // destination solution vector data Optionally, can also perform the transpose application of
+      // the weight matrix. Set the 3rd argument to true if this is needed
+      rval = this->ApplyWeights( solTTagVals, solSTagVals, transpose );MB_CHK_SET_ERR( rval, "Applying remap operator onto source vector data failed" );
+
+      // The tag data is np*np*n_el_dest
+      rval = m_interface->tag_set_data( srcSolutionTag, sents, &solSTagVals[0] );MB_CHK_SET_ERR( rval, "Setting local tag data failed" );
+    }
 
     return moab::MB_SUCCESS;
 }

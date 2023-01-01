@@ -568,6 +568,13 @@ ErrorCode TempestRemapper::ConvertMeshToTempest( Remapper::IntersectionContext c
         rval = convert_mesh_to_tempest_private( m_target, m_target_set, m_target_entities, &m_target_vertices );MB_CHK_SET_ERR( rval, "Can't convert target mesh to Tempest" );
         if( m_target_entities.size() == 0 && m_target_vertices.size() != 0 ) this->point_cloud_target = true;
     }
+    else if( ctx == Remapper::CoveringMesh )  // Covering source mesh
+    {
+        if( !m_covering_source ) m_covering_source = new Mesh();
+        if( outputEnabled ) dbgprint.printf( 0, "Converting (covering source) MOAB to TempestRemap Mesh representation ...\n" );
+        rval = convert_mesh_to_tempest_private( m_covering_source, m_covering_source_set, m_covering_source_entities,
+                                                &m_covering_source_vertices );MB_CHK_SET_ERR( rval, "Can't convert covering source mesh to Tempest" );
+    }
     else if( ctx == Remapper::OverlapMesh )  // Overlap mesh
     {
         if( !m_overlap ) m_overlap = new Mesh();

@@ -12,6 +12,7 @@ import netCDF4
 taglist_clean = ["nCells", "nEdges", "nVertices", "nVertLevels", "maxEdges", "maxEdges2", "vertexDegree", "Time", "TWO"]
 taglist_d = ["bottomDepth"] # ["bed_elevation", "bottomDepth", "bottomDepthObserved", "fCell"]
 taglist_i = [] # ["maxLevelCell", "minLevelCell"]
+taglist_z = ["refBottomDepth"]
 hdf5_filename = "mpas_grid_raw.h5m"
 nc_filename = "mpas_grid.nc"
 
@@ -47,6 +48,7 @@ tdata = np.zeros((polys.size()))
 
 # get the tag data
 ncf = netCDF4.Dataset(nc_filename, 'r')
+nVertLevels = ncf.dimensions["nVertLevels"].size
 for dtag in taglist_d:
     print("\nAnalyzing", dtag)
 
@@ -72,6 +74,21 @@ for itag in taglist_i:
     print("Setting", itag, "tag data")
     thandle = mb.tag_get_handle(itag,1,types.MB_TYPE_INTEGER,types.MB_TAG_DENSE,True)
     mb.tag_set_data(thandle,polys,tdata)
+
+zdata = np.zeros((nVertLevels))
+for ztag in taglist_z:
+    print("\nAnalyzing", ztag)
+
+    ncvar = ncf.variables[ztag]
+    print(ncvar)
+
+    # get the actual data out of the variable
+    zdata[:] = ncvar[:]
+
+    print("Setting", ztag, "tag data")
+    thandle = mb.tag_get_handle(ztag,nVertLevels,types.MB_TYPE_DOUBLE,types.MB_TAG_SPARSE,True)
+    mb.tag_set_data(thandle,root_set,zdata)
+
 
 ncf.close()
 mb.write_file("mpas_grid.h5m")

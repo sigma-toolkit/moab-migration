@@ -580,6 +580,8 @@ inline TempestRemapper::TempestMeshType TempestRemapper::GetMeshType( Remapper::
             return m_source_type;
         case Remapper::TargetMesh:
             return m_target_type;
+        case Remapper::CoveringMesh:
+            return m_source_type;
         case Remapper::OverlapMesh:
             return m_overlap_type;
         case Remapper::DEFAULT:  // not need yet case Remapper::SourceMeshWithGhosts

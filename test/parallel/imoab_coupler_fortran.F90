@@ -58,14 +58,13 @@ program imoab_coupler_fortran
    integer :: fNoBubble, fMonotoneTypeID, fVolumetric, fNoConserve, fValidate, fInverseDistanceMap
 
    integer, dimension(2) ::  tagIndex
-   integer, dimension (2) :: tagTypes!  { DENSE_DOUBLE, DENSE_DOUBLE }
    integer :: atmCompNDoFs ! = disc_orders[0] * disc_orders[0],
    integer :: ocnCompNDoFs !  = 1 /*FV*/
    character(:), allocatable :: bottomFields, bottomProjectedFields
    integer, dimension(3) ::  nverts, nelem, nblocks, nsbc, ndbc
    double precision, allocatable :: vals(:) ! to set the double values to 0
    integer :: i ! for loops
-   integer :: storLeng, eetype ! for tags defs
+   integer :: storLeng ! for tags defs
    character(:), allocatable :: concat_fieldname, concat_fieldnameT, outputFileOcn
    integer :: tagIndexIn2 ! not really needed
    integer :: dummyCpl, dummyRC, dummyType
@@ -241,8 +240,6 @@ program imoab_coupler_fortran
    end if
 
    ! start copy
-   tagTypes(1) = 1 ! somehow, DENSE_DOUBLE give 0, while it should be 1; maybe moab::DENSE_DOUBLE ?
-   tagTypes(2) = 1 ! ! DENSE_DOUBLE
    atmCompNDoFs = disc_orders1*disc_orders1
    ocnCompNDoFs = 1 ! /*FV*/
 
@@ -250,9 +247,9 @@ program imoab_coupler_fortran
    bottomProjectedFields = 'a2oTbot_proj:a2oUbot_proj:a2oVbot_proj'//C_NULL_CHAR
 
    if (cplComm .NE. MPI_COMM_NULL) then
-      ierr = iMOAB_DefineTagStorage(cplAtmPID, bottomFields, tagTypes(1), atmCompNDoFs, tagIndex(1))
+      ierr = iMOAB_DefineTagStorage(cplAtmPID, bottomFields, TAG_DENSE_DOUBLE, atmCompNDoFs, tagIndex(1))
       call errorout(ierr, 'failed to define the field tags a2oTbot:a2oUbot:a2oVbot ')
-      ierr = iMOAB_DefineTagStorage(cplOcnPID, bottomProjectedFields, tagTypes(2), ocnCompNDoFs, tagIndex(2))
+      ierr = iMOAB_DefineTagStorage(cplOcnPID, bottomProjectedFields, TAG_DENSE_DOUBLE, ocnCompNDoFs, tagIndex(2))
       call errorout(ierr, 'failed to define the field tags a2oTbot_proj:a2oUbot_proj:a2oVbot_proj')
    end if
 
@@ -267,17 +264,16 @@ program imoab_coupler_fortran
 
       ierr = iMOAB_GetMeshInfo(cplAtmPID, nverts, nelem, nblocks, nsbc, ndbc)
       call errorout(ierr, 'failed to get num primary elems')
+
       storLeng = nelem(3)*atmCompNDoFs*3 ! 3 tags
       allocate (vals(storLeng))
-      eetype = 1 ! double type
-
       do i = 1, storLeng
          vals(:) = 0.
       end do
 
       ! set the tag values to 0.0
-      ierr = iMOAB_SetDoubleTagStorage(cplAtmPID, bottomFields, storLeng, eetype, vals)
-      call errorout(ierr, 'cannot make tag nul')
+      ierr = iMOAB_SetDoubleTagStorage(cplAtmPID, bottomFields, storLeng, TAG_OWNER_ELEMENTS, vals)
+      call errorout(ierr, 'cannot set tag for bottomFields')
 
    end if
 
@@ -333,7 +329,7 @@ program imoab_coupler_fortran
    ! first makje sure the tags are defined, otherwise they cannot be received
    if (ocnComm .ne. MPI_COMM_NULL) then
 
-      ierr = iMOAB_DefineTagStorage(cmpOcnPID, bottomProjectedFields, tagTypes(2), ocnCompNDoFs, tagIndexIn2)
+      ierr = iMOAB_DefineTagStorage(cmpOcnPID, bottomProjectedFields, TAG_DENSE_DOUBLE, ocnCompNDoFs, tagIndexIn2)
       call errorout(ierr, 'failed to define the field tag for receiving back the tag a2oTbot_proj,  on ocn pes')
 
    end if

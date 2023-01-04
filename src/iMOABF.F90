@@ -7,6 +7,22 @@ module iMOAB
    use iso_c_binding
    implicit none
 
+   ! constant parameters for tag type and layout
+   ! equivalent to enum MOAB_TAG_TYPE in iMOAB.h
+   integer, parameter :: TAG_DENSE_INTEGER  = 0
+   integer, parameter :: TAG_DENSE_DOUBLE   = 1
+   integer, parameter :: TAG_DENSE_HANDLE   = 2
+   integer, parameter :: TAG_SPARSE_INTEGER = 3
+   integer, parameter :: TAG_SPARSE_DOUBLE  = 4
+   integer, parameter :: TAG_SPARSE_HANDLE  = 5
+
+   ! constant parameters for tag definition on entities
+   ! equivalent to enum MOAB_TAG_OWNER_TYPE in iMOAB.h
+   integer, parameter :: TAG_OWNER_VERTICES  = 0
+   integer, parameter :: TAG_OWNER_EDGES     = 1
+   integer, parameter :: TAG_OWNER_FACES     = 2
+   integer, parameter :: TAG_OWNER_ELEMENTS  = 3
+
 ! Interface to all the API routines
    interface
 

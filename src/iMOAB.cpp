@@ -1452,10 +1452,10 @@ ErrCode iMOAB_DefineTagStorage( iMOAB_AppID pid,
                                 int* tag_index )
 {
     // see if the tag is already existing, and if yes, check the type, length
-    if( *tag_type < 0 || *tag_type > 5 )
+    if( *tag_type < DENSE_INTEGER || *tag_type > SPARSE_ENTITYHANDLE )
     {
         return moab::MB_FAILURE;
-    }  // we have 6 types of tags supported so far
+    }  // we have 6 types of tags supported so far in enum MOAB_TAG_TYPE
 
     DataType tagDataType;
     TagType tagType;
@@ -1473,37 +1473,37 @@ ErrCode iMOAB_DefineTagStorage( iMOAB_AppID pid,
 
     switch( *tag_type )
     {
-        case 0:
+        case DENSE_INTEGER:
             tagDataType = MB_TYPE_INTEGER;
             tagType     = MB_TAG_DENSE;
             defaultVal  = defInt;
             break;
 
-        case 1:
+        case DENSE_DOUBLE:
             tagDataType = MB_TYPE_DOUBLE;
             tagType     = MB_TAG_DENSE;
             defaultVal  = defDouble;
             break;
 
-        case 2:
+        case DENSE_ENTITYHANDLE:
             tagDataType = MB_TYPE_HANDLE;
             tagType     = MB_TAG_DENSE;
             defaultVal  = defHandle;
             break;
 
-        case 3:
+        case SPARSE_INTEGER:
             tagDataType = MB_TYPE_INTEGER;
             tagType     = MB_TAG_SPARSE;
             defaultVal  = defInt;
             break;
 
-        case 4:
+        case SPARSE_DOUBLE:
             tagDataType = MB_TYPE_DOUBLE;
             tagType     = MB_TAG_SPARSE;
             defaultVal  = defDouble;
             break;
 
-        case 5:
+        case SPARSE_ENTITYHANDLE:
             tagDataType = MB_TYPE_HANDLE;
             tagType     = MB_TAG_SPARSE;
             defaultVal  = defHandle;
@@ -1610,12 +1610,11 @@ ErrCode iMOAB_SetIntTagStorage( iMOAB_AppID pid,
 
     // set it on a subset of entities, based on type and length
     Range* ents_to_set;
-
-    if( *ent_type == 0 )  // vertices
+    if( *ent_type == TAG_VERTEX )  // vertices
     {
         ents_to_set = &data.all_verts;
     }
-    else  // if (*ent_type == 1) // *ent_type can be 0 (vertices) or 1 (elements)
+    else  // if (*ent_type == TAG_ELEMENT) // *ent_type can be TAG_VERTEX or TAG_ELEMENT
     {
         ents_to_set = &data.primary_elems;
     }
@@ -1667,12 +1666,11 @@ ErrCode iMOAB_GetIntTagStorage( iMOAB_AppID pid,
 
     // set it on a subset of entities, based on type and length
     Range* ents_to_get;
-
-    if( *ent_type == 0 )  // vertices
+    if( *ent_type == TAG_VERTEX )  // vertices
     {
         ents_to_get = &data.all_verts;
     }
-    else  // if (*ent_type == 1)
+    else  // if (*ent_type == TAG_ELEMENT)
     {
         ents_to_get = &data.primary_elems;
     }
@@ -1710,11 +1708,11 @@ ErrCode iMOAB_SetDoubleTagStorage( iMOAB_AppID pid,
     appData& data      = context.appDatas[*pid];
     Range* ents_to_set = NULL;
 
-    if( *ent_type == 0 )  // vertices
+    if( *ent_type == TAG_VERTEX )  // vertices
     {
         ents_to_set = &data.all_verts;
     }
-    else if( *ent_type == 1 )
+    else // TAG_ELEMENT
     {
         ents_to_set = &data.primary_elems;
     }
@@ -1771,11 +1769,11 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
     appData& data      = context.appDatas[*pid];
     Range* ents_to_set = NULL;
 
-    if( *ent_type == 0 )  // vertices
+    if( *ent_type == TAG_VERTEX )  // vertices
     {
         ents_to_set = &data.all_verts;
     }
-    else if( *ent_type == 1 )
+    else // TAG_ELEMENT
     {
         ents_to_set = &data.primary_elems;
     }
@@ -2023,15 +2021,15 @@ ErrCode iMOAB_GetDoubleTagStorage( iMOAB_AppID pid,
 
     // set it on a subset of entities, based on type and length
     Range* ents_to_get = NULL;
-
-    if( *ent_type == 0 )  // vertices
+    if( *ent_type == TAG_VERTEX )  // vertices
     {
         ents_to_get = &data.all_verts;
     }
-    else if( *ent_type == 1 )
+    else // TAG_ELEMENT
     {
         ents_to_get = &data.primary_elems;
     }
+
     int nents_to_get = (int)ents_to_get->size();
     int position     = 0;
     for( size_t i = 0; i < tagNames.size(); i++ )

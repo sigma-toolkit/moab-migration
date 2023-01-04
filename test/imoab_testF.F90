@@ -46,7 +46,7 @@ include 'mpif.h'
       integer  bID
       !     for some tags in the file
       character :: tagname1*128, tagname2*128
-      integer      tagtype(2), enttype(2), num_co
+      integer      tagtype(2), num_co
       integer      tagindex(2)
       integer      ntsync
 
@@ -151,17 +151,15 @@ include 'mpif.h'
       !      the 2 tags used in this example exist in the file, already
       ! first tag, INTFIELD is on vertices, integer
       ! second tag DFIELD is on elements, double
-      tagtype(1)=0                                  !dense, int
-      tagtype(2)=1                                  !dense, double
-      enttype(1)=0                                  ! on verts
-      enttype(2)=1                                  ! on elem
+      tagtype(1)=TAG_DENSE_INTEGER      ! dense, int
+      tagtype(2)=TAG_DENSE_DOUBLE       ! dense, double
       num_co = 1
       tagname1 ='INTFIELD'//C_NULL_CHAR
-      ierr = iMOAB_DefineTagStorage(pid, tagname1, tagtype(1), num_co, tagindex(1) )
+      ierr = iMOAB_DefineTagStorage(pid, tagname1, TAG_DENSE_INTEGER, num_co, tagindex(1) )
       call errorout(ierr, 'failed to get tag INTFIELD')
 
       tagname2 ='DFIELD'//C_NULL_CHAR
-      ierr = iMOAB_DefineTagStorage(pid, tagname2, tagtype(2), num_co, tagindex(2) )
+      ierr = iMOAB_DefineTagStorage(pid, tagname2, TAG_DENSE_DOUBLE, num_co, tagindex(2) )
       call errorout(ierr, 'failed to get tag DFIELD')
 
       ! synchronize one of the tags only, just to see what happens
@@ -234,7 +232,7 @@ include 'mpif.h'
       ! query int tag values on vertices
       iTAG= ifree
 
-      ierr = iMOAB_GetIntTagStorage(pid, tagname1, nverts(3), enttype(1), IWORK(iTAG) )
+      ierr = iMOAB_GetIntTagStorage(pid, tagname1, nverts(3), TAG_OWNER_VERTICES, IWORK(iTAG) )
       call errorout(ierr, 'failed to get INTFIELD tag')
       ifree = iTAG + nverts(3)
       print * , 'INTFIELD tag values'
@@ -244,7 +242,7 @@ include 'mpif.h'
       dTAG = dfree
       ! query double tag values on elements
 
-      ierr = iMOAB_GetDoubleTagStorage(pid, tagname2, nelem(3), entType(2), DWORK(dTAG) )
+      ierr = iMOAB_GetDoubleTagStorage(pid, tagname2, nelem(3), TAG_OWNER_ELEMENTS, DWORK(dTAG) )
       call errorout(ierr, 'failed to get DFIELD tag')
       dfree = dTAG + nelem(3)
       print *, 'DFIELD tag values: (not exchanged) '

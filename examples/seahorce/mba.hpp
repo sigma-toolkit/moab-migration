@@ -605,7 +605,7 @@ class control_lattice_sparse : public control_lattice<NDim> {
 
             double compression = static_cast<double>(bytes) / dense_bytes;
             os << "] (" << bytes << " bytes, compression: "
-                << std::fixed << std::setprecision(2) << compression << ")";
+                << std::fixed << std::setprecision(2) << compression << "), DoFs = " << phi.size();
 
             os.flags(ff);
             os.precision(fp);
@@ -833,8 +833,9 @@ class MBA {
 
                 cl.push_back(psi);
 
-                std::cout << "Level: " << lev << std::endl;
+                std::cout << "\nDense Level: " << lev << std::endl << "\t";
                 psi->report( std::cout );
+                std::cout << ", residual = " << res;
             }
 
             // Create sparse tail of the hierrchy.
@@ -846,8 +847,9 @@ class MBA {
 
                 res = cl.back()->residual( coo_begin, coo_end, val.begin() );
 
-                std::cout << "Level: " << lev << std::endl;
-                cl.back()->report(std::cout);
+                std::cout << "\nSparse Level: " << lev << std::endl << "\t";
+                cl.back()->report( std::cout );
+                std::cout << ", residual = " << res;
             }
             std::cout << std::endl;
 

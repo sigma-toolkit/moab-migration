@@ -13,6 +13,7 @@ taglist_clean = ["nCells", "nEdges", "nVertices", "nVertLevels", "maxEdges", "ma
 taglist_d = ["bottomDepth"] # ["bed_elevation", "bottomDepth", "bottomDepthObserved", "fCell"]
 taglist_i = [] # ["maxLevelCell", "minLevelCell"]
 taglist_z = ["refBottomDepth"]
+taglist_4d = ["temperature", "salinity"]
 hdf5_filename = "mpas_grid_raw.h5m"
 nc_filename = "mpas_grid.nc"
 
@@ -88,6 +89,20 @@ for ztag in taglist_z:
     print("Setting", ztag, "tag data")
     thandle = mb.tag_get_handle(ztag,nVertLevels,types.MB_TYPE_DOUBLE,types.MB_TAG_SPARSE,True)
     mb.tag_set_data(thandle,root_set,zdata)
+
+
+for fdtag in taglist_4d:
+    print("\nAnalyzing", fdtag)
+
+    ncvar = ncf.variables[fdtag]
+    print(ncvar)
+
+    # get the actual data out of the variable
+    tdata[gids[:]] = ncvar[0, :, 0]
+
+    print("Setting", fdtag, "tag data")
+    thandle = mb.tag_get_handle(fdtag,1,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE,True)
+    mb.tag_set_data(thandle,polys,tdata)
 
 
 ncf.close()

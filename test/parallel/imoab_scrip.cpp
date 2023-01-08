@@ -28,12 +28,13 @@ int main( int argc, char* argv[] )
     int ierr;
     int rankInGlobalComm, numProcesses;
     MPI_Group jgroup;
-    std::string readopts( "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN" );
-    std::string readopts2( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS" );
-    std::string readopts3("PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION");
+    std::string readopts2( "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN" );
+    std::string readopts( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS" );
+    std::string readoptsLnd("PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION");
     std::string filename=TestDir + "unittest/SCRIPgrid_2x2_nomask_c210211.nc";
     std::string atmFilename=TestDir + "unittest/wholeATM_T.h5m";
     std::string rofInp=TestDir + "unittest/wholeRof_06.h5m";
+    std::string seq_flds_r2x_fields("Forr_rofl:Forr_rofi:Firr_rofi:Flrr_flood:Flrr_volr:Flrr_volrmch:Flrr_supply:Flrr_deficit");
     int cmpAtm = 5, cmpRof = 21, cplRof=22;
     int cplatm        = 6;  // component ids are unique over all pes, and established in advance;
     int nghlay = 0;// no ghost layers
@@ -144,27 +145,63 @@ int main( int argc, char* argv[] )
 
     // load atm mesh and migrate, not used actually
     int repartitioner_scheme = 2; // zoltan is used
-    /*ierr =
-        setup_component_coupler_meshes( cmpAtmPID, cmpAtm, cplAtmPID, cplatm, &atmComm, &atmPEGroup, &couComm,
-                                        &couPEGroup, &atmCouComm, atmFilename, readopts, nghlay, repartitioner_scheme );*/
-
+    if (atmComm != MPI_COMM_NULL ){
+        ierr =
+            setup_component_coupler_meshes( cmpAtmPID, cmpAtm, cplAtmPID, cplatm, &atmComm, &atmPEGroup, &couComm,
+                                            &couPEGroup, &atmCouComm, atmFilename, readopts, nghlay, repartitioner_scheme );
+        CHECKIERR( ierr, "Cannot load and migrate atm mesh " )
+    }
+    int tagtype = 1, numco = 1, tagIndex = 0;
     if( cmpRofID >= 0 ) {
         // load  rof mesh with data on it
-        ierr = iMOAB_LoadMesh( rofPID, rofInp.c_str(), readopts3.c_str(), &nghlay );
+        ierr = iMOAB_LoadMesh( rofPID, rofInp.c_str(), readoptsLnd.c_str(), &nghlay );
         CHECKIERR( ierr, "Cannot load mosart data mesh" )
+
+        ierr = iMOAB_DefineTagStorage( rofPID, seq_flds_r2x_fields.c_str(), &tagtype, &numco, &tagIndex );
+        CHECKIERR( ierr, "failed to define the fields on mosart point cloud" )
     }
     // load rof scrip file on coupler only
     if( couComm != MPI_COMM_NULL )
     {
-        ierr = iMOAB_LoadMesh( cplRofPID, filename.c_str(), readopts.c_str(), &nghlay );
-        CHECKIERR( ierr, "Cannot load atm component mesh" )
+        ierr = iMOAB_LoadMesh( cplRofPID, filename.c_str(), readopts2.c_str(), &nghlay );
+        CHECKIERR( ierr, "Cannot load scrip mesh on coupler" )
+        // define tags on receiving end
+        ierr = iMOAB_DefineTagStorage( cplRofPID, seq_flds_r2x_fields.c_str(), &tagtype, &numco, &tagIndex );
+        CHECKIERR( ierr, "failed to define the fields on mosart coupler mesh " )
         // test what we read from scrip file
         char outputFileTgt[] = "readCplRof.h5m";
-        char fileWriteOptions[] = "PARALLEL=WRITE_PART;DEBUG_IO=2";
+        char fileWriteOptions[] = "PARALLEL=WRITE_PART";
         ierr                  = iMOAB_WriteMesh( cplRofPID, outputFileTgt, fileWriteOptions);
-        CHECKIERR( ierr, "cannot write Rof mesh after receiving" )
+        CHECKIERR( ierr, "cannot write Rof mesh on coupler" )
     }
     // compute comm graph between coupler and wholeRof
+    if (MPI_COMM_NULL != rofCouComm)
+    {
+        // compute the comm graph between point cloud rof and coupler version of rof (full mesh)
+        // we are now on joint pes, compute comm graph between rof and coupler model
+        int typeA = 2; // point cloud on component PEs
+        int typeB = 3; // full mesh on coupler pes, we just read it
+        ierr = iMOAB_ComputeCommGraph( rofPID, cplRofPID, &rofCouComm, &rofPEGroup, &couPEGroup,
+         &typeA, &typeB, &cmpRof, &cplRof) ;
+        CHECKIERR( ierr, "cannot compute comm graph for mosart " )
+    }
+
+    // now send / receive some tags
+    if (cplRofPID >= 0) {//  send
+       // basically, use the initial partitioning
+       ierr = iMOAB_SendElementTag(rofPID, seq_flds_r2x_fields.c_str(), &rofCouComm, &cplRof);
+       CHECKIERR( ierr, "cannot send tags  " )
+    }
+
+    if ( cplRofPID >= 0 ){ //  we are on receiving end
+       ierr = iMOAB_ReceiveElementTag(cplRofPID, seq_flds_r2x_fields.c_str(), &rofCouComm, &cmpRof);
+       CHECKIERR( ierr, "cannot receive tags " )
+       char outputFileTgt[] = "afterSend.h5m";
+       char fileWriteOptions[] = "PARALLEL=WRITE_PART";
+       ierr                  = iMOAB_WriteMesh( cplRofPID, outputFileTgt, fileWriteOptions);
+       CHECKIERR( ierr, "cannot write Rof mesh with data on coupler" )
+    }
+
 
     MPI_Finalize();
 

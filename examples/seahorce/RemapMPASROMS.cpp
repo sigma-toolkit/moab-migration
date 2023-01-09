@@ -447,8 +447,6 @@ int main( int argc, char** argv )
 
         moab::Range& roms_elems = remapper.GetMeshEntities( Remapper::TargetMesh );
 
-        // err = mbi->get_entities_by_dimension( romsset, 2, roms_elems );MB_CHK_ERR( err );
-
         // compute the actual shepard's interpolation
         // dbgprint( "Computing the Shepard's interpolant now" );
         // err = modified_shepard_interpolate( 3, mpas_xyz, mpas_tdata, shepard_power , roms_xyz, roms_tdata );MB_CHK_ERR( err );
@@ -477,70 +475,6 @@ int main( int argc, char** argv )
         err = ComputeFieldProjectionMBA( mbi, meshOverlap, "bottomDepth", mpas_elems, roms_elems, true /* bool normalize */ );MB_CHK_ERR( err );
         err = ComputeFieldProjectionMBA( mbi, meshOverlap, "salinity", mpas_elems, roms_elems, true /* bool normalize */ );MB_CHK_ERR( err );
         err = ComputeFieldProjectionMBA( mbi, meshOverlap, "temperature", mpas_elems, roms_elems, true /* bool normalize */ );MB_CHK_ERR( err );
-
-        // moab::Tag dtag;
-        // err = mbi->tag_get_handle( varProject, 1, moab::MB_TYPE_DOUBLE, dtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
-        // err = mbi->tag_get_data( dtag, mpas_elems, mpas_tdata.data() );MB_CHK_ERR( err );
-
-        // // Loop over all Faces in meshOverlap
-        // double dTotalFieldIntegralIn = 0.0, dTotalFieldIntegralOut = 0.0, normFactor = 1.0;
-        // Mesh meshOverlap;
-        // Mesh& meshInput   = *remapper.GetMesh( moab::Remapper::CoveringMesh );
-        // Mesh& meshOutput  = *remapper.GetMesh( moab::Remapper::TargetMesh );
-        // if( normalize )
-        // {
-        //     meshInput.ConstructEdgeMap();
-        //     meshOutput.ConstructEdgeMap();
-        //     // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm
-        //     dbgprint( "Setup and compute mesh intersections between source (MPAS) and target (ROMS) meshes" );
-        //     // err = remapper.ComputeOverlapMesh( true, false );MB_CHK_ERR( err );
-        //     bool concaveMeshA = false, concaveMeshB = false, allowNoOverlap = true, verbose = false;
-        //     int err = GenerateOverlapWithMeshes( meshInput, meshOutput, meshOverlap, "" /*outFilename*/, "Netcdf4",
-        //                                          "exact", concaveMeshA, concaveMeshB, allowNoOverlap, verbose );
-        //     if( err )
-        //     {
-        //         MB_CHK_SET_ERR( MB_FAILURE, "TempestRemap: Can't compute the intersection of meshes on the sphere" );
-        //     }
-
-        //     // EntityHandle& intersection_set = remapper.GetMeshSet( moab::Remapper::OverlapMesh );
-
-        //     // Loop through all overlap faces associated with this source face
-        //     for( size_t j = 0; j < meshOverlap.faces.size(); j++ )
-        //     {
-        //         int iSourceFace = meshOverlap.vecSourceFaceIx[j];
-
-        //         // signal to not participate, because it is a ghost target
-        //         if( iSourceFace < 0 ) continue;  // skip and do not do anything
-
-        //         dTotalFieldIntegralIn += mpas_tdata[iSourceFace] * meshOverlap.vecFaceArea[j];
-        //     }
-        // }
-
-        // dbgprint( "Computing the MBA interpolant now" );
-        // err = compute_mba( mpas_xyz, mpas_tdata, roms_xyz, roms_tdata );MB_CHK_ERR( err );
-
-        // if( normalize )
-        // {
-        //     // Loop through all overlap-target faces and compute integral
-        //     for( size_t j = 0; j < meshOverlap.faces.size(); j++ )
-        //     {
-        //         int iTargetFace = meshOverlap.vecTargetFaceIx[j];
-
-        //         // signal to not participate, because it is a ghost target
-        //         if( iTargetFace < 0 ) continue;  // skip and do not do anything
-
-        //         dTotalFieldIntegralOut += roms_tdata[iTargetFace] * meshOverlap.vecFaceArea[j];
-        //     }
-
-        //     normFactor = dTotalFieldIntegralIn / dTotalFieldIntegralOut;
-        //     for( size_t ind = 0; ind < roms_tdata.size(); ind++ )
-        //         roms_tdata[ind] *= normFactor;
-        // }
-
-        // // now set the data on ROMS instance of MOAB tag
-        // dbgprint( "Setting tag data to ROMS mesh" );
-        // err = mbi->tag_set_data( dtag, roms_elems, roms_tdata.data() );MB_CHK_ERR( err );
-
     }
     else
     {

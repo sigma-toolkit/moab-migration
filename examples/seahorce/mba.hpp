@@ -819,6 +819,10 @@ class MBA {
                 res = psi->residual(coo_begin, coo_end, val.begin());
                 double fill = psi->fill_ratio();
 
+                std::cout << "\nDense Level: 0\n\t";
+                psi->report( std::cout );
+                std::cout << ", residual = " << res;
+
                 for(; (lev < max_levels) && (res > eps) && (fill > min_fill); ++lev) {
                     grid = grid * 2ul - 1ul;
 
@@ -829,13 +833,13 @@ class MBA {
 
                     f->append_refined(*psi);
                     psi.swap(f);
+
+                    std::cout << "\nDense Level: " << lev << std::endl << "\t";
+                    psi->report( std::cout );
+                    std::cout << ", residual = " << res;
                 }
 
                 cl.push_back(psi);
-
-                std::cout << "\nDense Level: " << lev << std::endl << "\t";
-                psi->report( std::cout );
-                std::cout << ", residual = " << res;
             }
 
             // Create sparse tail of the hierrchy.

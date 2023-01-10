@@ -336,6 +336,12 @@ module iMOAB
         integer(c_int), intent(out) :: num_global_elems
       end function iMOAB_GetGlobalInfo
 
+      integer(c_int) function  iMOAB_DuplicateAppMesh( pid, poid )bind(C, name='iMOAB_DuplicateAppMesh')
+      use, intrinsic :: iso_c_binding, only: c_int
+        integer(c_int), intent(in) :: pid
+        integer(c_int), intent(in) :: poid
+      end function iMOAB_DuplicateAppMesh
+
   integer(c_int) function iMOAB_WriteLocalMesh(pid, prefix) bind(C, name='iMOAB_WriteLocalMesh')
     use, intrinsic :: iso_c_binding, only : c_int, c_char
     integer(c_int), intent(in) :: pid

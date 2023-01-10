@@ -890,6 +890,18 @@ ErrCode iMOAB_SetGlobalInfo( iMOAB_AppID pid, int* num_global_verts, int* num_gl
  */
 ErrCode iMOAB_GetGlobalInfo( iMOAB_AppID pid, int* num_global_verts, int* num_global_elems );
 
+/**
+ * \brief copy mesh from one instance to another.
+ * after this, the 2 moab apps will have a perfect duplicate of vertices and cells, global ids will match
+ * but they will live in 2 different file sets (apps). before this, the output id should be empty
+ * no other taggs will be copied from initial app to the output app
+ *
+ * \param[in]  pid (iMOAB_AppID)             The unique pointer to the application ID.
+ * \param[in]  poid (iMOAB_AppID)            The unique pointer to the copied application ID (it has to be created in advance)
+ *
+ */
+ErrCode iMOAB_DuplicateAppMesh( iMOAB_AppID pid, iMOAB_AppID poid );
+
 #ifdef MOAB_HAVE_MPI
 
 /**

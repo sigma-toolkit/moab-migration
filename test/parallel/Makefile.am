@@ -43,7 +43,7 @@ TESTS = pcomm_unit \
 
 if HAVE_HDF5_PARALLEL
   HDF5_TESTS = parallel_hdf5_test mhdf_parallel parallel_write_test \
-         parallel_adj parmerge_test augment_with_ghosts uref_hirec_test_parallel migrate_test \
+         parallel_adj parmerge_test augment_with_ghosts uref_hirec_test_parallel migrate_test zoltan_repartition_test \
          ghost_thin_layers commgraph_test 
 
 if HAVE_ZOLTAN
@@ -54,10 +54,12 @@ if HAVE_TEMPESTREMAP
 AM_CPPFLAGS += $(TEMPESTREMAP_INCLUDE)
 migrate_test_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
 migrate_nontrivial_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
+zoltan_repartition_test_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
 commgraph_test_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
 else
 migrate_test_LDADD = $(LDADD) $(FCLIBS)
 migrate_nontrivial_LDADD = $(LDADD) $(FCLIBS)
+zoltan_repartition_test_LDADD = $(LDADD) $(FCLIBS)
 commgraph_test_LDADD = $(LDADD) $(FCLIBS)
 endif
 
@@ -187,6 +189,7 @@ imoab_ptest2_SOURCES = imoab_ptest2.cpp
 hireconst_test_parallel_SOURCES = hireconst_test_parallel.cpp
 uref_hirec_test_parallel_SOURCES = uref_hirec_test_parallel.cpp ../geomObject.cpp
 migrate_test_SOURCES = migrate_test.cpp
+zoltan_repartition_test_SOURCES = zoltan_repartition_test.cpp
 imoab_coupler_SOURCES = imoab_coupler.cpp
 imoab_coupler_twohop_SOURCES = imoab_coupler_twohop.cpp
 imoab_phatm_ocn_coupler_SOURCES = imoab_phatm_ocn_coupler.cpp

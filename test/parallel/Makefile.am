@@ -129,7 +129,7 @@ endif
 endif
 
 if HAVE_HDF5_PARALLEL
- IMOAB_TESTS += imoab_setwithGid
+ IMOAB_TESTS += imoab_setwithGid imoab_copy
 endif
 
 IMESH_TESTS =
@@ -186,6 +186,7 @@ augment_with_ghosts_SOURCES = augment_with_ghosts.cpp
 imoab_ptest_SOURCES = imoab_ptest.F
 imoab_coupler_fortran_SOURCES = imoab_coupler_fortran.F90
 imoab_ptest2_SOURCES = imoab_ptest2.cpp
+imoab_copy_SOURCES = imoab_copy.cpp
 hireconst_test_parallel_SOURCES = hireconst_test_parallel.cpp
 uref_hirec_test_parallel_SOURCES = uref_hirec_test_parallel.cpp ../geomObject.cpp
 migrate_test_SOURCES = migrate_test.cpp
@@ -272,7 +273,7 @@ MOSTLYCLEANFILES = mhdf_ll.h5m \
                    Ocn2WithProj.h5m recvAtm2CoupFull.h5m recvAtm2.h5m  atm2_ocn_map.nc atm_ocn_map2.nc fOcnOnCpl8.h5m fOcnOnCpl0.h5m fOcnOnCpl1.h5m \
                    afterSend.h5m readCplRof.h5m fOcnBilinOnCpl atm_ocn_bilin_map_p2.nc OcnWithProjBilin.h5m fOcnBilinOnCpl.h5m recvAtmx.h5m \
 		   test_esmf_rcbzoltan_no_mixed_elements.h5m test_esmf_rcbzoltan.h5m test_esmf_no_mixed_elements.h5m test_esmf.h5m \
-		   atmDOCN_map.nc OcnDomMesh.h5m OcnDomMeshProj.h5m
+		   atmDOCN_map.nc OcnDomMesh.h5m OcnDomMeshProj.h5m  outfile.h5m 
 
 EXTRA_DIST = imoab_coupler_utils.hpp
 FORTDEFS = $(FCDEFS)

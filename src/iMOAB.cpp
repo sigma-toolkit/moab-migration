@@ -1533,8 +1533,8 @@ ErrCode iMOAB_DuplicateAppMesh( iMOAB_AppID pid, iMOAB_AppID poid )
 
 #ifdef MOAB_HAVE_MPI
    rval = iMOAB_ResolveSharedEntities( poid, &nverts, &globalIds[0] ); MB_CHK_ERR( rval );
-   rval = iMOAB_UpdateMeshInfo(poid);MB_CHK_ERR( rval );
 #endif
+   rval = iMOAB_UpdateMeshInfo(poid);MB_CHK_ERR( rval );
    return moab::MB_SUCCESS;
 }
 

@@ -43,7 +43,7 @@ TESTS = pcomm_unit \
 
 if HAVE_HDF5_PARALLEL
   HDF5_TESTS = parallel_hdf5_test mhdf_parallel parallel_write_test \
-         parallel_adj parmerge_test augment_with_ghosts uref_hirec_test_parallel migrate_test \
+         parallel_adj parmerge_test augment_with_ghosts uref_hirec_test_parallel migrate_test imoab_copy \
          ghost_thin_layers commgraph_test 
 
 if HAVE_ZOLTAN
@@ -55,23 +55,24 @@ AM_CPPFLAGS += $(TEMPESTREMAP_INCLUDE)
 migrate_test_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
 migrate_nontrivial_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
 commgraph_test_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
+imoab_copy_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
 else
 migrate_test_LDADD = $(LDADD) $(FCLIBS)
 migrate_nontrivial_LDADD = $(LDADD) $(FCLIBS)
 commgraph_test_LDADD = $(LDADD) $(FCLIBS)
+imoab_copy_LDADD = $(LDADD) $(FCLIBS)
 endif
 
 if HAVE_TEMPESTREMAP
-  HDF5_TESTS += imoab_coupler imoab_coupler_twohop imoab_phatm_ocn_coupler test_mapweights_bcast imoab_scrip imoab_copy
+  HDF5_TESTS += imoab_coupler imoab_coupler_twohop imoab_phatm_ocn_coupler test_mapweights_bcast 
   imoab_coupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_copy_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_coupler_twohop_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_phatm_ocn_coupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_read_map_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_map2_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_map_target_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
 if HAVE_NETCDF
-  HDF5_TESTS += imoab_read_map imoab_map2 imoab_map_target
+  HDF5_TESTS += imoab_read_map imoab_map2 imoab_map_target imoab_scrip
 endif
 if HAVE_EXTMESHES
   HDF5_TESTS +=  imoab_apg2_ol_coupler

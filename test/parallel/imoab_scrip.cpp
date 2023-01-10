@@ -187,19 +187,21 @@ int main( int argc, char* argv[] )
     }
 
     // now send / receive some tags
-    if (cplRofPID >= 0) {//  send
-       // basically, use the initial partitioning
-       ierr = iMOAB_SendElementTag(rofPID, seq_flds_r2x_fields.c_str(), &rofCouComm, &cplRof);
-       CHECKIERR( ierr, "cannot send tags  " )
+    if( cplRofAppID >= 0 )
+    {  //  send
+        // basically, use the initial partitioning
+        ierr = iMOAB_SendElementTag( rofPID, seq_flds_r2x_fields.c_str(), &rofCouComm, &cplRof );
+        CHECKIERR( ierr, "cannot send tags  " )
     }
 
-    if ( cplRofPID >= 0 ){ //  we are on receiving end
-       ierr = iMOAB_ReceiveElementTag(cplRofPID, seq_flds_r2x_fields.c_str(), &rofCouComm, &cmpRof);
-       CHECKIERR( ierr, "cannot receive tags " )
-       char outputFileTgt[] = "afterSend.h5m";
-       char fileWriteOptions[] = "PARALLEL=WRITE_PART";
-       ierr                  = iMOAB_WriteMesh( cplRofPID, outputFileTgt, fileWriteOptions);
-       CHECKIERR( ierr, "cannot write Rof mesh with data on coupler" )
+    if( cplRofAppID >= 0 )
+    {  //  we are on receiving end
+        ierr = iMOAB_ReceiveElementTag( cplRofPID, seq_flds_r2x_fields.c_str(), &rofCouComm, &cmpRof );
+        CHECKIERR( ierr, "cannot receive tags " )
+        char outputFileTgt[]    = "afterSend.h5m";
+        char fileWriteOptions[] = "PARALLEL=WRITE_PART";
+        ierr                    = iMOAB_WriteMesh( cplRofPID, outputFileTgt, fileWriteOptions );
+        CHECKIERR( ierr, "cannot write Rof mesh with data on coupler" )
     }
 
 

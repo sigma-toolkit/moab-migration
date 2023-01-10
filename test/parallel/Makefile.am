@@ -43,7 +43,7 @@ TESTS = pcomm_unit \
 
 if HAVE_HDF5_PARALLEL
   HDF5_TESTS = parallel_hdf5_test mhdf_parallel parallel_write_test \
-         parallel_adj parmerge_test augment_with_ghosts uref_hirec_test_parallel migrate_test imoab_copy \
+         parallel_adj parmerge_test augment_with_ghosts uref_hirec_test_parallel migrate_test \
          ghost_thin_layers commgraph_test 
 
 if HAVE_ZOLTAN
@@ -55,12 +55,10 @@ AM_CPPFLAGS += $(TEMPESTREMAP_INCLUDE)
 migrate_test_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
 migrate_nontrivial_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
 commgraph_test_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
-imoab_copy_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
 else
 migrate_test_LDADD = $(LDADD) $(FCLIBS)
 migrate_nontrivial_LDADD = $(LDADD) $(FCLIBS)
 commgraph_test_LDADD = $(LDADD) $(FCLIBS)
-imoab_copy_LDADD = $(LDADD) $(FCLIBS)
 endif
 
 if HAVE_TEMPESTREMAP

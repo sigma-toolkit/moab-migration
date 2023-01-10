@@ -1767,11 +1767,12 @@ void ZoltanPartitioner::SetRCB_Parameters( const bool recompute_rcb_box )
 
     myZZ->Set_Param( "DEBUG_LEVEL", "0" );  // no debug messages
     myZZ->Set_Param( "LB_METHOD", "RCB" );  // recursive coordinate bisection
-    // myZZ->Set_Param( "RCB_RECOMPUTE_BOX", "1" );  // recompute RCB box if needed ?
+    // myZZ->Set_Param( "REMAP", "0" );  // recursive coordinate bisection
+    // myZZ->Set_Param( "RCB_RECOMPUTE_BOX", "1" );
+    // myZZ->Set_Param( "LB_APPROACH", "PARTITION" );
 
     // RCB parameters:
-
-    myZZ->Set_Param( "RCB_OUTPUT_LEVEL", "1" );
+    myZZ->Set_Param( "RCB_OUTPUT_LEVEL", "0" );
     myZZ->Set_Param( "KEEP_CUTS", "1" );  // save decomposition so that we can infer partitions
     // myZZ->Set_Param("RCB_RECTILINEAR_BLOCKS", "1"); // don't split point on boundary
     if( recompute_rcb_box ) myZZ->Set_Param( "RCB_RECOMPUTE_BOX", "1" );
@@ -2427,7 +2428,7 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
     int *assign_procs, *assign_parts;
 
     if( pco->rank() == 0 )
-        std::cout << "Computing partition using method (1-graph, 2-geom):" << met << " for " << numNewPartitions
+        std::cout << "Computing partition using method (1-graph, 2-geom): " << met << " for " << numNewPartitions
                   << " parts..." << std::endl;
 
 #ifndef NDEBUG

@@ -64,6 +64,7 @@ endif
 if HAVE_TEMPESTREMAP
   HDF5_TESTS += imoab_coupler imoab_coupler_twohop imoab_phatm_ocn_coupler test_mapweights_bcast imoab_scrip imoab_copy
   imoab_coupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
+  imoab_copy_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_coupler_twohop_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_phatm_ocn_coupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_read_map_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)

@@ -187,14 +187,14 @@ int main( int argc, char* argv[] )
     }
 
     // now send / receive some tags
-    if( cplRofPID >= 0 )
+    if( cplRofAppID >= 0 )
     {  //  send
         // basically, use the initial partitioning
         ierr = iMOAB_SendElementTag( rofPID, seq_flds_r2x_fields.c_str(), &rofCouComm, &cplRof );
         CHECKIERR( ierr, "cannot send tags  " )
     }
 
-    if( cplRofPID >= 0 )
+    if( cplRofAppID >= 0 )
     {  //  we are on receiving end
         ierr = iMOAB_ReceiveElementTag( cplRofPID, seq_flds_r2x_fields.c_str(), &rofCouComm, &cmpRof );
         CHECKIERR( ierr, "cannot receive tags " )

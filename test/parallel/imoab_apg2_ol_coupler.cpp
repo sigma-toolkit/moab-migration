@@ -433,7 +433,7 @@ int main( int argc, char* argv[] )
         int typeA = 2;  // point cloud, phys mesh
         int typeB = 3;  // cells of atmosphere, dof based; maybe need another type for ParCommGraph graphtype ?
         ierr = iMOAB_ComputeCommGraph( cmpPhAtmPID, cplAtmOcnPID, &atmCouComm, &atmPEGroup, &couPEGroup, &typeA, &typeB,
-                                       &cmpatm, &atmocnid );
+                                       &cmpPhysAtm, &atmocnid );
         CHECKIERR( ierr, "cannot compute graph between phys grid on atm and intx between FV atm and ocn" )
     }
 
@@ -452,7 +452,7 @@ int main( int argc, char* argv[] )
         int typeA = 2;  // point cloud, phys mesh
         int typeB = 3;  // cells of atmosphere, dof based; need another type for ParCommGraph graphtype ?
         ierr = iMOAB_ComputeCommGraph( cmpPhAtmPID, cplAtmPID, &atmCouComm, &atmPEGroup, &couPEGroup, &typeA, &typeB,
-                                       &cmpatm, &cplatm );
+                                       &cmpPhysAtm, &cplatm );
         CHECKIERR( ierr, "cannot compute graph between phys grid on atm and FV atm on coupler" )
     }
 #endif
@@ -493,7 +493,7 @@ int main( int argc, char* argv[] )
         int typeA = 2;  // point cloud
         int typeB = 3;  // type 3 for land on coupler, based on global ids for land cells ?
         ierr = iMOAB_ComputeCommGraph( cmpPhAtmPID, cplAtmLndPID, &atmCouComm, &atmPEGroup, &couPEGroup, &typeA, &typeB,
-                                       &cmpatm, &atmlndid );
+                                       &cmpPhysAtm, &atmlndid );
         CHECKIERR( ierr, "cannot compute comm graph between atm and atm/lnd intersection" )
     }
 
@@ -668,8 +668,8 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         // receive on atm on coupler pes, that was redistributed according to coverage
-        ierr = iMOAB_ReceiveElementTag( cplAtmOcnPID, "T_ph:u_ph:v_ph", &atmCouComm, &cmpatm );
-        CHECKIERR( ierr, "cannot receive tag values" )
+        ierr = iMOAB_ReceiveElementTag( cplAtmOcnPID, "T_ph:u_ph:v_ph", &atmCouComm, &cmpPhysAtm );
+        CHECKIERR( ierr, "cannot receive tag values on intx atm ocn" )
     }
     POP_TIMER( MPI_COMM_WORLD, rankInGlobalComm )
 
@@ -755,7 +755,7 @@ int main( int argc, char* argv[] )
 
     // we used this to compute
     //  ierr = iMOAB_ComputeCommGraph(cmpPhAtmPID, cplLndPID, &atmCouComm, &atmPEGroup, &couPEGroup,
-    //     &typeA, &typeB, &cmpatm, &atmlndid);
+    //     &typeA, &typeB, &cmpPhysAtm, &atmlndid);
 
     // end copy
     PUSH_TIMER( "Send/receive data from phys comp atm to coupler land, using computed graph" )
@@ -770,7 +770,7 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         // receive on lnd on coupler pes
-        ierr = iMOAB_ReceiveElementTag( cplAtmLndPID, "T_ph:u_ph:v_ph", &atmCouComm, &cmpatm );
+        ierr = iMOAB_ReceiveElementTag( cplAtmLndPID, "T_ph:u_ph:v_ph", &atmCouComm, &cmpPhysAtm );
         CHECKIERR( ierr, "cannot receive tag values on land on coupler, for atm coupling" )
     }
     POP_TIMER( MPI_COMM_WORLD, rankInGlobalComm )
@@ -923,7 +923,7 @@ int main( int argc, char* argv[] )
 
     if( couComm != MPI_COMM_NULL )
     {
-        context_id = cmpatm;
+        context_id = cmpPhysAtm;
         ierr       = iMOAB_SendElementTag( cplAtmPID, "T2_ph:u2_ph:v2_ph", &atmCouComm, &context_id );
         CHECKIERR( ierr, "cannot send tag values back to atm pes" )
     }
@@ -967,7 +967,7 @@ int main( int argc, char* argv[] )
     {
         // receive on ocn on coupler pes, that was redistributed according to coverage
         ierr = iMOAB_ReceiveElementTag( cplLndPID, "T_proj:u_proj:v_proj", &lndCouComm, &cplatm );
-        CHECKIERR( ierr, "cannot receive tag values" )
+        CHECKIERR( ierr, "cannot receive tag values on land" )
     }
     POP_TIMER( MPI_COMM_WORLD, rankInGlobalComm )
 
@@ -1027,7 +1027,7 @@ int main( int argc, char* argv[] )
 
     if( couComm != MPI_COMM_NULL )
     {
-        context_id = cmpatm;
+        context_id = cmpPhysAtm;
         ierr       = iMOAB_SendElementTag( cplAtmPID, "T3_ph:u3_ph:v3_ph", &atmCouComm, &context_id );
         CHECKIERR( ierr, "cannot send tag values back to atm pes" )
     }

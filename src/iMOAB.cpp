@@ -636,7 +636,7 @@ ErrCode iMOAB_LoadMesh( iMOAB_AppID pid,
             if( idx != std::string::npos )
             {
                 std::string extension = filen.substr( idx + 1 );
-                if( extension == std::string( "h5m" ) ) newopts << ";;PARALLEL_COMM=" << *pid;
+                if( (extension == std::string( "h5m" )) || (extension == std::string( "nc" ))) newopts << ";;PARALLEL_COMM=" << *pid;
             }
 
             if( *num_ghost_layers >= 1 )

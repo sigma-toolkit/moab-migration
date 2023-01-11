@@ -4070,7 +4070,7 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false );MB_CHK_ERR( rval );
 
     // Next, compute intersections with MOAB.
-    rval = tdata.remapper->ComputeOverlapMesh( use_kdtree_search, false );MB_CHK_ERR( rval );
+    rval = tdata.remapper->ComputeOverlapMesh( true, false );MB_CHK_ERR( rval );
 
     // Mapping computation done
     if( validate )

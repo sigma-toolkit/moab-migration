@@ -110,7 +110,10 @@ int main( int argc, char* argv[] )
     }
 
     // load atm mesh and migrate, not used actually
-    int repartitioner_scheme = 2;  // zoltan is used
+    int repartitioner_scheme = 0;
+#ifdef MOAB_HAVE_ZOLTAN
+    repartitioner_scheme = 2;  // zoltan is used
+#endif
     if( rofComm != MPI_COMM_NULL )
     {
         ierr =

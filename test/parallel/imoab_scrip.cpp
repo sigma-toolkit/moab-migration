@@ -143,12 +143,15 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "Cannot register ROFX over coupler PEs" )
     }
 
-    // load atm mesh and migrate, not used actually
-    int repartitioner_scheme = 2; // zoltan is used
-    if (atmComm != MPI_COMM_NULL ){
-        ierr =
-            setup_component_coupler_meshes( cmpAtmPID, cmpAtm, cplAtmPID, cplatm, &atmComm, &atmPEGroup, &couComm,
-                                            &couPEGroup, &atmCouComm, atmFilename, readopts, nghlay, repartitioner_scheme );
+    int repartitioner_scheme = 0;
+#ifdef MOAB_HAVE_ZOLTAN
+    repartitioner_scheme = 2;  // zoltan is used
+#endif
+    if( atmComm != MPI_COMM_NULL )
+    {
+        ierr = setup_component_coupler_meshes( cmpAtmPID, cmpAtm, cplAtmPID, cplatm, &atmComm, &atmPEGroup, &couComm,
+                                               &couPEGroup, &atmCouComm, atmFilename, readopts, nghlay,
+                                               repartitioner_scheme );
         CHECKIERR( ierr, "Cannot load and migrate atm mesh " )
     }
     int tagtype = 1, numco = 1, tagIndex = 0;

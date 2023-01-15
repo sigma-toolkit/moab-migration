@@ -742,7 +742,7 @@ if (ENABLE_DOCS)
 
   #### Let us generate SPHINX documentation
   find_package(Doxygen REQUIRED)
-  find_package(Sphinx OPTIONAL)
+  find_package(Sphinx)
 
 # Find all the public headers
   get_target_property(MOAB_PUBLIC_HEADER_DIR MOAB INTERFACE_INCLUDE_DIRECTORIES)

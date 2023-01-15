@@ -41,7 +41,7 @@ copyright = '2021, Vijay Mahadevan, Iulian Grindeanu, Rajeev Jain, Patrick Shriw
 author = 'Vijay Mahadevan, Iulian Grindeanu, Rajeev Jain, Patrick Shriwise, Paul Wilson'
 
 # The full version, including alpha/beta/rc tags
-release = '5.2.1'
+release = '5.4.1'
 
 
 # -- General configuration ---------------------------------------------------

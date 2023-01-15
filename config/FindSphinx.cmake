@@ -1,52 +1,28 @@
-# - This module looks for Sphinx
-# Find the Sphinx documentation generator
+# CMake find_package() Module for Sphinx documentation generator
+# http://sphinx-doc.org/
 #
-# This modules defines
-# SPHINX_EXECUTABLE
+# Example usage:
+#
+# find_package(Sphinx)
+#
+# If successful the following variables will be defined
 # SPHINX_FOUND
+# SPHINX_EXECUTABLE
+
 find_program(SPHINX_EXECUTABLE
-  NAMES sphinx-build
-  PATHS
-    /usr/bin
-    /usr/local/bin
-    /opt/local/bin
-  DOC "Sphinx documentation generator"
-)
+             NAMES sphinx-build sphinx-build2
+             DOC "Path to sphinx-build executable")
 
-if( NOT SPHINX_EXECUTABLE )
-  set(_Python_VERSIONS
-    2.7 2.6 2.5 2.4 2.3 2.2 2.1 2.0 1.6 1.5
-  )
-  foreach( _version ${_Python_VERSIONS} )
-    set( _sphinx_NAMES sphinx-build-${_version} )
-    find_program( SPHINX_EXECUTABLE
-      NAMES ${_sphinx_NAMES}
-      PATHS
-        /usr/bin
-        /usr/local/bin
-        /opt/loca/bin
-      DOC "Sphinx documentation generator"
-    )
-  endforeach()
-endif()
-
+# Handle REQUIRED and QUIET arguments
+# this will also set SPHINX_FOUND to true if SPHINX_EXECUTABLE exists
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(Sphinx DEFAULT_MSG SPHINX_EXECUTABLE)
-mark_as_advanced(SPHINX_EXECUTABLE)
+find_package_handle_standard_args(Sphinx
+                                  "Failed to locate sphinx-build executable"
+                                  SPHINX_EXECUTABLE)
 
-function(Sphinx_add_target target_name builder conf source destination)
+# Provide options for controlling different types of output
+option(SPHINX_OUTPUT_HTML "Output standalone HTML files" ON)
+option(SPHINX_OUTPUT_MAN "Output man pages" ON)
 
-  add_custom_target(${target_name} ALL
-    COMMAND ${SPHINX_EXECUTABLE} -b ${builder}
-    -c ${conf}
-    ${source}
-    ${destination}
-    COMMENT "Generating sphinx documentation: ${builder}"
-  )
-
-  set_property(DIRECTORY
-    APPEND PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${destination}
-  )
-
-endfunction()
+option(SPHINX_WARNINGS_AS_ERRORS "When building documentation treat warnings as errors" ON)
 

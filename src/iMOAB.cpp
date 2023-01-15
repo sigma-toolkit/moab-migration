@@ -2038,6 +2038,7 @@ ErrCode iMOAB_GetDoubleTagStorage( iMOAB_AppID pid,
     {
         if( data.tagMap.find( tagNames[i] ) == data.tagMap.end() )
         {
+            std::cout << "app: " << data.name<< "can't find tag " << tagNames[i].c_str() << " at index " << i << "\n";
             return moab::MB_FAILURE;
         }  // tag not defined
 
@@ -2051,11 +2052,16 @@ ErrCode iMOAB_GetDoubleTagStorage( iMOAB_AppID pid,
 
         if( dtype != MB_TYPE_DOUBLE )
         {
+            std::cout << "tag " << tagNames[i] << " at index " << i << " is not double \n";
             return moab::MB_FAILURE;
         }
 
         if( position + nents_to_get * tagLength > *num_tag_storage_length )
+        {
+            std::cout << "tag " << tagNames[i] << " position + nents_to_get * tagLength " <<
+                    position + nents_to_get * tagLength << " *num_tag_storage_length " << *num_tag_storage_length  << "\n";
             return moab::MB_FAILURE;  // too many entity values to get
+        }
 
         rval = context.MBI->tag_get_data( tag, *ents_to_get, &tag_storage_data[position] );MB_CHK_ERR( rval );
         position = position + nents_to_get * tagLength;

@@ -241,6 +241,7 @@ nobase_libMOAB_la_include_HEADERS = \
   moab/WriterIface.hpp \
   moab/ElemEvaluator.hpp \
   moab/win32_config.h \
+  moab/nanoflann.hpp \
   MBEntityType.h \
   MBCN.h \
   MBCN_protos.h \
@@ -325,6 +326,8 @@ if HAVE_TEMPESTREMAP
      moab/Remapping/TempestOnlineMap.hpp
 
 endif # if HAVE_TEMPESTREMAP
+
+MOAB_REMAPPING_HDRS += moab/Remapping/MBA.hpp
 
 # Add the remapping sources to the library
 libMOAB_la_SOURCES += $(MOAB_REMAPPING_SRCS)

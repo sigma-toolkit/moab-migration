@@ -49,6 +49,8 @@ THE SOFTWARE.
 #include <cmath>
 #include <cassert>
 
+#include "moab/Remapping/TempestRemapper.hpp"
+
 namespace mba {
 
 using std::ptrdiff_t;
@@ -862,4 +864,293 @@ class MBA {
 
 } // namespace mba
 
+template < int dimension >
+moab::ErrorCode compute_mba_set( moab::Interface* mbi,
+                                 moab::TempestRemapper& remapper,
+                                 moab::EntityHandle& meshset_source,
+                                 moab::EntityHandle& meshset_target,
+                                 moab::Tag& srctag,
+                                 std::string target_tagname,
+                                 moab::Tag& tgttag,
+                                 bool normalize = true );
+
+
+template<>
+moab::ErrorCode compute_mba_set<3>( moab::Interface* mbi,
+                                 moab::TempestRemapper& remapper,
+                                 moab::EntityHandle& meshset_source,
+                                 moab::EntityHandle& meshset_target,
+                                 moab::Tag& srctag,
+                                 std::string target_tagname,
+                                 moab::Tag& tgttag,
+                                 bool normalize )
+{
+    const int dimension = 3;
+    moab::ErrorCode err;
+    assert( target_tagname.size() );
+
+    {
+        // err = mbi->tag_get_handle( source_tagname.c_str(), 1, moab::MB_TYPE_DOUBLE, srctag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+        err = mbi->tag_get_handle( target_tagname.c_str(), 1, moab::MB_TYPE_DOUBLE, tgttag, moab::MB_TAG_DENSE | moab::MB_TAG_CREAT );MB_CHK_ERR( err );
+    }
+
+    moab::Range source_elems;
+    err = mbi->get_entities_by_dimension( meshset_source, 2, source_elems, true );MB_CHK_ERR( err );
+
+    moab::Range target_elems;
+    err = mbi->get_entities_by_dimension( meshset_target, 2, target_elems, true );MB_CHK_ERR( err );
+
+    const size_t nd = source_elems.size();
+    const size_t ni = target_elems.size();
+
+    std::vector< double > source_xyz, source_tdata, target_xyz, target_tdata;
+    source_xyz.resize( nd * dimension, 0.0 );
+    err = mbi->get_coords( source_elems, source_xyz.data() );MB_CHK_ERR( err );
+
+    source_tdata.resize( nd, 0.0 );
+    err = mbi->tag_get_data( srctag, source_elems, source_tdata.data() );MB_CHK_ERR( err );
+
+    target_xyz.resize( ni * dimension, 0.0 );
+    err = mbi->get_coords( target_elems, target_xyz.data() );MB_CHK_ERR( err );
+
+    // Loop over all Faces in meshOverlap
+    double dTotalFieldIntegralIn = 0.0, dTotalFieldIntegralOut = 0.0;
+    Mesh& meshOverlap = *remapper.GetMesh( moab::Remapper::OverlapMesh );
+    // Mesh& meshInput   = *remapper.GetMesh( moab::Remapper::CoveringMesh );
+    // Mesh& meshOutput  = *remapper.GetMesh( moab::Remapper::TargetMesh );
+    if( normalize )
+    {
+        // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm
+        // std::cout << "Setup and compute mesh intersections between source (MPAS) and target (ROMS) meshes\n";
+        // err = remapper.ComputeOverlapMesh( true, false );MB_CHK_ERR( err );
+
+        // meshInput.ConstructEdgeMap();
+        // meshOutput.ConstructEdgeMap();
+        // bool concaveMeshA = false, concaveMeshB = false, allowNoOverlap = true, verbose = false;
+        // int err = GenerateOverlapWithMeshes( meshInput, meshOutput, meshOverlap, "" /*outFilename*/, "Netcdf4", "exact",
+        //                                      concaveMeshA, concaveMeshB, allowNoOverlap, verbose );
+        // if( err )
+        // {
+        //     MB_CHK_SET_ERR( MB_FAILURE, "TempestRemap: Can't compute the intersection of meshes on the sphere" );
+        // }
+
+        // EntityHandle& intersection_set = remapper.GetMeshSet( moab::Remapper::OverlapMesh );
+
+        // Loop through all overlap faces associated with this source face
+        for( size_t j = 0; j < meshOverlap.faces.size(); j++ )
+        {
+            int iSourceFace = meshOverlap.vecSourceFaceIx[j];
+
+            // signal to not participate, because it is a ghost target
+            if( iSourceFace < 0 ) continue;  // skip and do not do anything
+
+            dTotalFieldIntegralIn += source_tdata[iSourceFace] * meshOverlap.vecFaceArea[j];
+        }
+    }
+
+    target_tdata.resize( ni, 0.0 );
+    std::cout << "Computing the MBA interpolant now";
+    // err = compute_mba( source_xyz, source_tdata, target_xyz, target_tdata );MB_CHK_ERR( err );
+
+    // now set the data on target instance of MOAB tag
+    {
+        // Bounding box containing the data points.
+        mba::point< dimension > lo = { -1, -1, -1 };
+        mba::point< dimension > hi = { 1, 1, 1 };
+
+        // Initial grid size.
+        // const size_t init_grid_size = static_cast< size_t >( std::max( 10.0, std::sqrt( nd ) / 25 ) );
+        // mba::index< 3 > grid        = { init_grid_size, init_grid_size, init_grid_size };
+        mba::index< dimension > grid = { 5, 5, 2 };
+
+        std::vector< mba::point< 3 > > coords( nd );
+        size_t offset = 0;
+        for( size_t k = 0; k < nd; k++, offset += 3 )
+            coords[k] = mba::point< dimension >{ source_xyz[offset], source_xyz[offset + 1], source_xyz[offset + 2] };
+
+        // Algorithm setup.
+        mba::MBA< dimension > interp( lo, hi, grid, coords, source_tdata, 10 /*levels*/, 1e-14 /*tolerance*/,
+                                      0.5 /*min_fill*/ );
+        // mba::linear_approximation< 3 > interp( coords.begin(), coords.end(), fd.begin() );
+
+        // Get interpolated value at arbitrary location.
+        offset = 0;
+        for( size_t k = 0; k < ni; k++, offset += dimension )
+            target_tdata[k] =
+                interp( mba::point< dimension >{ target_xyz[offset], target_xyz[offset + 1], target_xyz[offset + 2] } );
+    }
+
+    if( normalize )
+    {
+        // Loop through all overlap-target faces and compute integral
+        for( size_t j = 0; j < meshOverlap.faces.size(); j++ )
+        {
+            int iTargetFace = meshOverlap.vecTargetFaceIx[j];
+
+            // signal to not participate, because it is a ghost target
+            if( iTargetFace < 0 ) continue;  // skip and do not do anything
+
+            dTotalFieldIntegralOut += target_tdata[iTargetFace] * meshOverlap.vecFaceArea[j];
+        }
+
+        if( dTotalFieldIntegralOut > 1e-8 )
+        {
+            const double normFactor = dTotalFieldIntegralIn / dTotalFieldIntegralOut;
+            for( size_t ind = 0; ind < target_tdata.size(); ind++ )
+                target_tdata[ind] *= normFactor;
+        }
+    }
+
+    // now set the final projected tag value on target mesh
+    err = mbi->tag_set_data( tgttag, target_elems, target_tdata.data() );MB_CHK_ERR( err );
+
+    return moab::MB_SUCCESS;
+}
+
+
+void spherical_to_cart( double lat, double lon, double R, double res[3] )
+{
+    lat *= 3.14159265358979323846 / 180;
+    lon *= 3.14159265358979323846 / 180;
+    res[0] = R * cos( lat ) * cos( lon );  // x coordinate
+    res[1] = R * cos( lat ) * sin( lon );  // y
+    res[2] = R * sin( lat );               // z
+}
+
+double mlat[2] = { 4 * M_PI, -4 * M_PI }, mlon[2] = { 4 * M_PI, -4 * M_PI };
+
+void cart_to_spherical( const double cart3d[3], mba::point< 2 >& latlon )
+{
+    double c3d[3] = { cart3d[0], cart3d[1], cart3d[2] };
+    moab::IntxUtils::transform_coordinates( c3d, 2 /* int projection_type */ );
+
+    latlon[0] = c3d[1];
+    latlon[1] = c3d[0];
+
+    return;
+}
+
+template <>
+moab::ErrorCode compute_mba_set< 2 >( moab::Interface* mbi,
+                                      moab::TempestRemapper& remapper,
+                                      moab::EntityHandle& meshset_source,
+                                      moab::EntityHandle& meshset_target,
+                                      moab::Tag& srctag,
+                                      std::string target_tagname,
+                                      moab::Tag& tgttag,
+                                      bool normalize )
+{
+    const int dimension = 2;
+    moab::ErrorCode err;
+    assert( target_tagname.size() );
+
+    {
+        // err = mbi->tag_get_handle( source_tagname.c_str(), 1, moab::MB_TYPE_DOUBLE, srctag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+        err = mbi->tag_get_handle( target_tagname.c_str(), 1, moab::MB_TYPE_DOUBLE, tgttag,
+                                   moab::MB_TAG_DENSE | moab::MB_TAG_CREAT );MB_CHK_ERR( err );
+    }
+
+    moab::Range source_elems;
+    err = mbi->get_entities_by_dimension( meshset_source, 2, source_elems, true );MB_CHK_ERR( err );
+
+    moab::Range target_elems;
+    err = mbi->get_entities_by_dimension( meshset_target, 2, target_elems, true );MB_CHK_ERR( err );
+
+    const size_t nd = source_elems.size();
+    const size_t ni = target_elems.size();
+
+    std::vector< double > source_xyz, source_tdata, target_xyz, target_tdata;
+    source_xyz.resize( nd * 3, 0.0 );
+    err = mbi->get_coords( source_elems, source_xyz.data() );MB_CHK_ERR( err );
+
+    source_tdata.resize( nd, 0.0 );
+    err = mbi->tag_get_data( srctag, source_elems, source_tdata.data() );MB_CHK_ERR( err );
+
+    target_xyz.resize( nd * 3, 0.0 );
+    err = mbi->get_coords( target_elems, target_xyz.data() );MB_CHK_ERR( err );
+
+    // Loop over all Faces in meshOverlap
+    double dTotalFieldIntegralIn = 0.0, dTotalFieldIntegralOut = 0.0;
+    Mesh& meshOverlap = *remapper.GetMesh( moab::Remapper::OverlapMesh );
+    if( normalize )
+    {
+        // Loop through all overlap faces associated with this source face
+        for( size_t j = 0; j < meshOverlap.faces.size(); j++ )
+        {
+            int iSourceFace = meshOverlap.vecSourceFaceIx[j];
+
+            // signal to not participate, because it is a ghost target
+            if( iSourceFace < 0 ) continue;  // skip and do not do anything
+
+            dTotalFieldIntegralIn += source_tdata[iSourceFace] * meshOverlap.vecFaceArea[j];
+        }
+    }
+
+    target_tdata.resize( ni, 0.0 );
+    std::cout << "Computing the MBA interpolant now";
+    // now set the data on target instance of MOAB tag
+    {
+        std::vector< mba::point< dimension > > coords( nd );
+        size_t offset = 0;
+        for( size_t k = 0; k < nd; k++, offset += 3 )
+            cart_to_spherical( &source_xyz[offset], coords[k] );
+
+        // const double dPadding = M_PI;
+        // Bounding box containing the data points.
+        // mba::point< dimension > lo = { mlon[0] - dPadding, mlat[0] - dPadding };
+        // mba::point< dimension > hi = { mlon[1] + dPadding, mlat[1] + dPadding };
+        mba::point< dimension > lo = { -4 * M_PI, -4 * M_PI };
+        mba::point< dimension > hi = { 4 * M_PI, 4 * M_PI };
+
+        // Initial grid size.
+        // const size_t init_grid_size = static_cast< size_t >( std::max( 10.0, std::sqrt( nd ) / 10 ) );
+        // mba::index< 2 > grid        = { init_grid_size, init_grid_size };
+        mba::index< dimension > grid = { 5, 5 };
+
+        std::cout << "Minimum latitude = " << mlat[0] << " and longitude = " << mlon[0] << std::endl;
+        std::cout << "Maximum latitude = " << mlat[1] << " and longitude = " << mlon[1] << std::endl;
+
+        // Algorithm setup.
+        mba::MBA< dimension > interp( lo, hi, grid, coords, source_tdata, 10 /*levels*/, 1e-12 /*tolerance*/,
+                                      0.5 /*min_fill*/ );
+        // mba::linear_approximation< 2 > interp( coords.begin(), coords.end(), fd.begin() );
+
+        // Get interpolated value at arbitrary location.
+        offset = 0;
+        mba::point< dimension > icoords;
+        for( size_t k = 0; k < ni; k++, offset += 3 )
+        {
+            cart_to_spherical( &target_xyz[offset], icoords );
+            target_tdata[k] = interp( icoords );
+        }
+    }
+
+    if( normalize )
+    {
+        // Loop through all overlap-target faces and compute integral
+        for( size_t j = 0; j < meshOverlap.faces.size(); j++ )
+        {
+            int iTargetFace = meshOverlap.vecTargetFaceIx[j];
+
+            // signal to not participate, because it is a ghost target
+            if( iTargetFace < 0 ) continue;  // skip and do not do anything
+
+            dTotalFieldIntegralOut += target_tdata[iTargetFace] * meshOverlap.vecFaceArea[j];
+        }
+
+        if( dTotalFieldIntegralOut > 1e-8 )
+        {
+            const double normFactor = dTotalFieldIntegralIn / dTotalFieldIntegralOut;
+            for( size_t ind = 0; ind < target_tdata.size(); ind++ )
+                target_tdata[ind] *= normFactor;
+        }
+    }
+
+    // now set the final projected tag value on target mesh
+    err = mbi->tag_set_data( tgttag, target_elems, target_tdata.data() );MB_CHK_ERR( err );
+
+    return moab::MB_SUCCESS;
+}
+
+///////////////////////////////////////////////
 #endif

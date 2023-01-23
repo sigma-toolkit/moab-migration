@@ -118,7 +118,6 @@ option ( ENABLE_PNETCDF    "Include PNetCDF interfaces in the build (Requires Ne
 option ( ENABLE_METIS      "Include Metis support for partitioning algorithms?" OFF )
 option ( ENABLE_PARMETIS   "Include ParMetis support for partitioning algorithms?" OFF )
 option ( ENABLE_ZOLTAN     "Include Zoltan support for partitioning algorithms?" OFF )
-option ( ENABLE_VTK        "Include VTK I/O interfaces in the build?" OFF )
 option ( ENABLE_TESTING    "Enable Testing"                                  ON  )
 option ( MOAB_FORCE_64_BIT_HANDLES "Force MBEntityHandle to be 64 bits (uint64_t)" OFF )
 option ( MOAB_FORCE_32_BIT_HANDLES "Force MBEntityHandle to be 32 bits (uint32_t)" OFF )

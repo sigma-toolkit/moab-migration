@@ -68,12 +68,10 @@ static int* Parts          = NULL;
 
 const bool debug = false;
 
-ZoltanPartitioner::ZoltanPartitioner( Interface* impl
+ZoltanPartitioner::ZoltanPartitioner( Interface* impl,
 #ifdef MOAB_HAVE_MPI
-                                      ,
-                                      ParallelComm* parcomm
+                                      ParallelComm* parcomm,
 #endif
-                                      ,
                                       const bool use_coords,
                                       int argc,
                                       char** argv

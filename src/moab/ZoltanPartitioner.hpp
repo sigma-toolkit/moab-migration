@@ -110,12 +110,10 @@ class ZoltanPartitioner : public PartitionerBase< int >
 {
 
   public:
-    ZoltanPartitioner( Interface* impl       = NULL
+    ZoltanPartitioner( Interface* impl       = NULL,
 #ifdef MOAB_HAVE_MPI
-                       ,
-                       ParallelComm* parcomm = NULL
+                       ParallelComm* parcomm = NULL,
 #endif
-                       ,
                        const bool use_coords = false,
                        int argc              = 0,
                        char** argv           = NULL

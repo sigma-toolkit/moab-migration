@@ -68,7 +68,12 @@ static int* Parts          = NULL;
 
 const bool debug = false;
 
-ZoltanPartitioner::ZoltanPartitioner( Interface* impl,
+ZoltanPartitioner::ZoltanPartitioner( Interface* impl
+#ifdef MOAB_HAVE_MPI
+                                      ,
+                                      ParallelComm* parcomm
+#endif
+                                      ,
                                       const bool use_coords,
                                       int argc,
                                       char** argv
@@ -76,8 +81,14 @@ ZoltanPartitioner::ZoltanPartitioner( Interface* impl,
                                       ,
                                       GeometryQueryTool* gqt
 #endif
+
                                       )
-    : PartitionerBase< int >( impl, use_coords ), myZZ( NULL ), myNumPts( 0 ), argcArg( argc ), argvArg( argv )
+    : PartitionerBase< int >( impl, use_coords
+#ifdef MOAB_HAVE_MPI
+                                      ,
+                                      parcomm
+#endif
+    ), myZZ( NULL ), myNumPts( 0 ), argcArg( argc ), argvArg( argv )
 #ifdef MOAB_HAVE_CGM
       ,
       gti( gqt )
@@ -2262,7 +2273,6 @@ void mbGetPart( void* /* userDefinedData */,
 
 // new methods for partition in parallel, used by migrate in iMOAB
 ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
-                                                    ParallelComm* pco,
                                                     std::multimap< int, int >& extraGraphEdges,
                                                     std::map< int, int > procs,
                                                     int& numNewPartitions,
@@ -2291,7 +2301,8 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
 
     ErrorCode rval = mbImpl->tag_get_data( gid, primary, &ids[0] );MB_CHK_ERR( rval );
 
-    int rank = pco->rank();  // current rank , will be put on regular neighbors
+    // mbpc is member in base class, PartitionerBase
+    int rank = mbpc->rank();  // current rank , will be put on regular neighbors
     int i    = 0;
     for( Range::iterator rit = primary.begin(); rit != primary.end(); ++rit, i++ )
     {
@@ -2349,7 +2360,7 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
 
 #ifdef VERBOSE
     std::stringstream ff2;
-    ff2 << "zoltanInput_" << pco->rank() << ".txt";
+    ff2 << "zoltanInput_" << mbpc->rank() << ".txt";
     std::ofstream ofs;
     ofs.open( ff2.str().c_str(), std::ofstream::out );
     ofs << "Length vector: " << std::endl;
@@ -2380,12 +2391,12 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
     Parts        = NULL;
 
     float version;
-    if( pco->rank() == 0 ) std::cout << "Initializing zoltan..." << std::endl;
+    if( mbpc->rank() == 0 ) std::cout << "Initializing zoltan..." << std::endl;
 
     Zoltan_Initialize( argcArg, argvArg, &version );
 
     // Create Zoltan object.  This calls Zoltan_Create.
-    if( NULL == myZZ ) myZZ = new Zoltan( pco->comm() );
+    if( NULL == myZZ ) myZZ = new Zoltan( mbpc->comm() );
 
     // set # requested partitions
     char buff[10];
@@ -2426,7 +2437,7 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
     ZOLTAN_ID_PTR export_global_ids, export_local_ids;
     int *assign_procs, *assign_parts;
 
-    if( pco->rank() == 0 )
+    if( mbpc->rank() == 0 )
         std::cout << "Computing partition using method (1-graph, 2-geom):" << met << " for " << numNewPartitions
                   << " parts..." << std::endl;
 
@@ -2455,7 +2466,7 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
 
 #ifdef VERBOSE
     std::stringstream ff3;
-    ff3 << "zoltanOutput_" << pco->rank() << ".txt";
+    ff3 << "zoltanOutput_" << mbpc->rank() << ".txt";
     std::ofstream ofs3;
     ofs3.open( ff3.str().c_str(), std::ofstream::out );
     ofs3 << " export elements on rank " << rank << " \n";

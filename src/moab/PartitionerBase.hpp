@@ -40,7 +40,11 @@ class PartitionerBase
 {
 
   public:
-    PartitionerBase( Interface* impl = NULL, const bool use_coords = false );
+    PartitionerBase( Interface* impl = NULL, const bool use_coords = false
+#ifdef MOAB_HAVE_MPI
+    , ParallelComm* parcomm = NULL
+#endif
+    );
 
     virtual ~PartitionerBase();
 
@@ -104,7 +108,6 @@ class PartitionerBase
 #ifdef MOAB_HAVE_MPI
     ParallelComm* mbpc;
 #endif
-    bool write_output;
     bool useCoords;
     bool newComm;
     bool assign_global_ids;
@@ -113,15 +116,27 @@ class PartitionerBase
 };
 
 template < typename T >
-inline PartitionerBase< T >::PartitionerBase( Interface* impl, const bool use_coords )
-    : mbImpl( impl ), useCoords( use_coords ), newComm( false )
+inline PartitionerBase< T >::PartitionerBase( Interface* impl, const bool use_coords
+#ifdef MOAB_HAVE_MPI
+    ,
+    ParallelComm* parcomm
+#endif
+)
+    : mbImpl( impl ), useCoords( use_coords )
+#ifdef MOAB_HAVE_MPI
+    , mbpc(parcomm)
+#endif
+, newComm( false ), assign_global_ids(false)
 {
 #ifdef MOAB_HAVE_MPI
-    mbpc = ParallelComm::get_pcomm( mbImpl, 0 );
-    if( !mbpc )
+    if(!mbpc)
     {
-        mbpc    = new ParallelComm( impl, MPI_COMM_WORLD, 0 );
-        newComm = true;
+        mbpc = ParallelComm::get_pcomm( mbImpl, 0 );
+        if( !mbpc )
+        {
+            mbpc    = new ParallelComm( impl, MPI_COMM_WORLD, 0 );
+            newComm = true;
+        }
     }
 #endif
 }

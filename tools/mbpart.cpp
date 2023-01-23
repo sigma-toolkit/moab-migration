@@ -230,8 +230,8 @@ int main( int argc, char* argv[] )
     {
         if( part_geom_mesh_size < 0. )
         {
-            // partition mesh
-            zoltan_tool = new ZoltanPartitioner( &mb, false, argc, argv );
+            // partition mesh we have no ParallelComm here, so we will create one later
+            zoltan_tool = new ZoltanPartitioner( &mb, NULL, false, argc, argv );
         }
         else
         {
@@ -245,7 +245,8 @@ int main( int argc, char* argv[] )
                 return EXIT_FAILURE;
             }
             GeometryQueryTool* gti = GeometryQueryTool::instance();
-            zoltan_tool            = new ZoltanPartitioner( &mb, false, argc, argv, gti );
+            // no ParallelComm so far
+            zoltan_tool            = new ZoltanPartitioner( &mb, NULL, false, argc, argv, gti );
 #else
             std::cerr << "CGM should be configured to partition geometry." << std::endl << std::endl;
             opts.printHelp();

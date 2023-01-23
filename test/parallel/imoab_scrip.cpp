@@ -190,7 +190,7 @@ int main( int argc, char* argv[] )
     }
 
     // now send / receive some tags
-    if( cplRofAppID >= 0 )
+    if( cmpRofID >= 0 )
     {  //  send
         // basically, use the initial partitioning
         ierr = iMOAB_SendElementTag( rofPID, seq_flds_r2x_fields.c_str(), &rofCouComm, &cplRof );
@@ -207,7 +207,12 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "cannot write Rof mesh with data on coupler" )
     }
 
-
+    if( cmpRofID >= 0 )
+    {  //  send
+        // basically, use the initial partitioning
+        ierr = iMOAB_FreeSenderBuffers( rofPID, &cplRof );
+        CHECKIERR( ierr, "cannot free buffers  " )
+    }
     MPI_Finalize();
 
     return 0;

@@ -110,7 +110,12 @@ class ZoltanPartitioner : public PartitionerBase< int >
 {
 
   public:
-    ZoltanPartitioner( Interface* impl       = NULL,
+    ZoltanPartitioner( Interface* impl       = NULL
+#ifdef MOAB_HAVE_MPI
+                       ,
+                       ParallelComm* parcomm = NULL
+#endif
+                       ,
                        const bool use_coords = false,
                        int argc              = 0,
                        char** argv           = NULL
@@ -118,6 +123,8 @@ class ZoltanPartitioner : public PartitionerBase< int >
                        ,
                        GeometryQueryTool* gqt = NULL
 #endif
+
+
     );
 
     virtual ~ZoltanPartitioner();
@@ -181,7 +188,6 @@ class ZoltanPartitioner : public PartitionerBase< int >
     // we might have some extra adjacencies expressed in extraAdjCellsId, which could point to a
     // cell on a different task
     ErrorCode partition_owned_cells( Range& owned,
-                                     ParallelComm* pco,
                                      std::multimap< int, int >& extraGraphEdges,
                                      std::map< int, int > procs,
                                      int& numNewPartitions,

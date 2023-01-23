@@ -1232,14 +1232,14 @@ ErrorCode ParCommGraph::compute_partition( ParallelComm* pco, Range& owned, int 
     if( rootSender ) std::cout << " time preparing the input for Zoltan:" << t2 - t1 << " seconds. \n";
         // so adj cells ids; need to call zoltan for parallel partition
 #ifdef MOAB_HAVE_ZOLTAN
-    ZoltanPartitioner* mbZTool = new ZoltanPartitioner( mb );
+    ZoltanPartitioner* mbZTool = new ZoltanPartitioner( mb, pco );
     if( 1 <= met )  //  partition in zoltan, either graph or geometric partitioner
     {
         std::map< int, Range > distribution;  // how to distribute owned elements by processors in receiving groups
         // in how many tasks do we want to be distributed?
         int numNewPartitions = (int)receiverTasks.size();
         Range primaryCells   = owned.subset_by_dimension( primaryDim );
-        rval = mbZTool->partition_owned_cells( primaryCells, pco, extraGraphEdges, extraCellsProc, numNewPartitions,
+        rval = mbZTool->partition_owned_cells( primaryCells, extraGraphEdges, extraCellsProc, numNewPartitions,
                                                distribution, met );MB_CHK_ERR( rval );
         for( std::map< int, Range >::iterator mit = distribution.begin(); mit != distribution.end(); mit++ )
         {

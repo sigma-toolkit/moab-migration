@@ -24,10 +24,6 @@ option ( MOAB_BUILD_MBTEMPEST    "Build the TempestRemap coupler tool?"         
 #  add_subdirectory( refiner )
 #endif ( )
 
-#if (ENABLE_MESQUITE AND MOAB_HAVE_CGM)
-#  add_subdirectory(mesquite)
-#endif(ENABLE_MESQUITE AND MOAB_HAVE_CGM)
-
 include_directories(
   ${CMAKE_BINARY_DIR}
   ${CMAKE_BINARY_DIR}/src

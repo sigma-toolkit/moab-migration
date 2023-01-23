@@ -58,7 +58,7 @@ MB_DEFS=""
 
 ENABLE_FORTRAN=no
 AC_ARG_ENABLE([fortran],
-              [AS_HELP_STRING([--disable-fortran], [Disable Fortran support and name mangling in ITAPS/MBCN C headers])])
+              [AS_HELP_STRING([--disable-fortran], [Disable Fortran support and name mangling])])
 
 if (test "x$enable_fortran" != "xno"); then
   ENABLE_FORTRAN=yes
@@ -416,20 +416,11 @@ AC_SUBST([python_patterns])
 #                           iMesh Part 1 of 2
 ################################################################################
 AC_ARG_ENABLE( [imesh],
-[AS_HELP_STRING([--disable-imesh],[Do not build support for iMesh interface.])],
-[disable_imesh=$enableval],
-[disable_imesh=yes] )
+[AS_HELP_STRING([--enable-imesh],[Build support for iMesh interface.])],
+[ENABLE_imesh=$enableval],
+[ENABLE_imesh=no] )
 
-if (test "xyes" != "x$disable_imesh" && test "xno" != "x$disable_imesh"); then
-  AC_MSG_ERROR([Unknown argument --disable-imesh=$enableval])
-else
-  if (test "$disable_imesh" != "no"); then
-    ENABLE_imesh=yes
-  else
-    ENABLE_imesh=no
-  fi
-  DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --enable-imesh=$ENABLE_imesh"
-fi
+DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --enable-imesh=$ENABLE_imesh"
 
 ################################################################################
 #                           FBiGeom Part 1 of 2

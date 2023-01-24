@@ -147,7 +147,7 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_ZOLTAN
     repartitioner_scheme = 2;  // zoltan is used
 #endif
-    if( atmComm != MPI_COMM_NULL )
+    if( atmCouComm != MPI_COMM_NULL )
     {
         ierr = setup_component_coupler_meshes( cmpAtmPID, cmpAtm, cplAtmPID, cplatm, &atmComm, &atmPEGroup, &couComm,
                                                &couPEGroup, &atmCouComm, atmFilename, readopts, nghlay,

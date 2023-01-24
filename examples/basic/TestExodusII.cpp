@@ -17,12 +17,11 @@
  *
  *
  * <b> To compile: </b>
- *    make TestExodusII MOAB_DIR=<installdir> \n
+ *    make TestExodusII \n
  *
  * <b> To run: </b>
  *    -# TestExodusII <mesh-file> \n
- *    -# TestExodusII (This uses the default <mesh-file>:
- * <MOAB_SRC_DIR>/MeshFiles/unittest/mbtest2.g)
+ *    -# TestExodusII (This uses the default <mesh-file>: MeshFiles/unittest/mbtest2.g)
  */
 #include <iostream>
 

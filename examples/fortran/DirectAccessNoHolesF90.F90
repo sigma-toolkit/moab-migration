@@ -33,7 +33,7 @@
 !!    -#  Iterate through quads, normalizing tag2 by vertex count and comparing values of tag1 and tag2
 !!
 !! <b>To compile</b>: \n
-!!    make DirectAccessNoHolesF90 MOAB_DIR=<installdir>  \n
+!!    make DirectAccessNoHolesF90 \n
 !! <b>To run</b>: ./DirectAccessNoHolesF90 [-nquads <# quads>]\n
 !!
 !! VSM: Note that IBM xlf compilers do not like dynamic sizing functions for

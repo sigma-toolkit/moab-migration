@@ -160,9 +160,9 @@ ErrorCode OrientedBoxTreeTool::join_trees( const Range& sets, EntityHandle& set_
  *\param instance   MOAB instance
  *\param box        The oriented box containing all the entities
  *\param axis       The axis for which the split plane is orthogonal
+ *\param entities   The entities intersecting plane
  *\param left_list  Output, entities to the left of the plane
  *\param right_list Output, entities to the right of the plane
- *\param num_intersecting Output, number entities intersecting plane
  */
 static ErrorCode split_box( Interface* instance,
                             const OrientedBox& box,

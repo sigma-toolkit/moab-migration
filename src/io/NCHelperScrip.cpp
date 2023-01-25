@@ -4,6 +4,7 @@
 
 #include "NCHelperScrip.hpp"
 #include "moab/ReadUtilIface.hpp"
+#include "AEntityFactory.hpp"
 #include "moab/IntxMesh/IntxUtils.hpp"
 #ifdef MOAB_HAVE_MPI
 #include "moab/ParallelMergeMesh.hpp"
@@ -349,6 +350,25 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
     Range all_verts;
     rval = mbImpl->get_connectivity( faces, all_verts );MB_CHK_ERR( rval );
     rval = mbImpl->add_entities( _fileSet, all_verts );MB_CHK_ERR( rval );
+    // need to add adjacencies; TODO: fix this for all nc readers
+    // copy this logic from migrate mesh in par comm graph
+    Core* mb                 = (Core*)mbImpl;
+    AEntityFactory* adj_fact = mb->a_entity_factory();
+    if( !adj_fact->vert_elem_adjacencies() )
+        adj_fact->create_vert_elem_adjacencies();
+    else
+    {
+        for( Range::iterator it = faces.begin(); it != faces.end(); it++ )
+        {
+            EntityHandle eh          = *it;
+            const EntityHandle* conn = NULL;
+            int num_nodes            = 0;
+            rval                     = mb->get_connectivity( eh, conn, num_nodes );
+            if( MB_SUCCESS != rval ) return rval;
+            adj_fact->notify_create_entity( eh, conn, num_nodes );
+        }
+    }
+
 #ifdef MOAB_HAVE_MPI
     if( myPcomm )
     {

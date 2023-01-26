@@ -358,7 +358,7 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
         adj_fact->create_vert_elem_adjacencies();
     else
     {
-        for( Range::iterator it = faces.begin(); it != faces.end(); it++ )
+        for( Range::iterator it = faces.begin(); it != faces.end(); ++it )
         {
             EntityHandle eh          = *it;
             const EntityHandle* conn = NULL;

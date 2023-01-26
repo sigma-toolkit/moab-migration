@@ -2839,8 +2839,11 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
     // nothing to do if it already exists
     if (already_exists)
     {
+#ifdef VERBOSE
         if (!localRank)
-            std::cout << " parcomgraph already existing, do not compute again\n";
+            std::cout << " parcomgraph already existing between components "<<
+			*comp1 << " and " << *comp2 << ". Do not compute again\n";
+#endif
         return moab::MB_SUCCESS;
     }
 

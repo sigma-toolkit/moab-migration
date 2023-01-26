@@ -27,12 +27,15 @@ addPCdata: addPCdata.o ${MOAB_LIBDIR}/libMOAB.la
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
+run-addPCdata: addPCdata
+	${RUNSERIAL} ./addPCdata
+
 ExtractLand: ExtractLand.o ${MOAB_LIBDIR}/libMOAB.la
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
-run-addPCdata: addPCdata
-	${RUNSERIAL} ./addPCdata
+run-ExtractLand: addPCdata
+	${RUNSERIAL} ./ExtractLand -h 
 
 copyPartition: copyPartition.o ${MOAB_LIBDIR}/libMOAB.la
 	@echo "[CXXLD]  $@"

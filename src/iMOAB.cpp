@@ -2818,14 +2818,42 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
     MPI_Comm_rank( global, &localRank );
     MPI_Comm_size( global, &numProcs );
     // instantiate the par comm graph
+
+    // we should search if we have another pcomm with the same comp ids in the list already
+    // sort of check existing comm graphs in the map context.appDatas[*pid].pgraph
+    bool already_exists = false;
+    if( *pid1 >= 0 )
+    {
+        appData& data                               = context.appDatas[*pid1];
+        std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *comp2);
+        if ( mt != data.pgraph.end() )
+            already_exists = true;
+    }
+    if( *pid2 >= 0 )
+    {
+        appData& data                               = context.appDatas[*pid2];
+        std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *comp1);
+        if ( mt != data.pgraph.end() )
+            already_exists = true;
+    }
+    // nothing to do if it already exists
+    if (already_exists)
+    {
+#ifdef VERBOSE
+        if (!localRank)
+            std::cout << " parcomgraph already existing between components "<<
+			*comp1 << " and " << *comp2 << ". Do not compute again\n";
+#endif
+        return moab::MB_SUCCESS;
+    }
+
     // ParCommGraph::ParCommGraph(MPI_Comm joincomm, MPI_Group group1, MPI_Group group2, int coid1,
     // int coid2)
     ParCommGraph* cgraph = NULL;
     if( *pid1 >= 0 ) cgraph = new ParCommGraph( global, srcGroup, tgtGroup, *comp1, *comp2 );
     ParCommGraph* cgraph_rev = NULL;
     if( *pid2 >= 0 ) cgraph_rev = new ParCommGraph( global, tgtGroup, srcGroup, *comp2, *comp1 );
-    // we should search if we have another pcomm with the same comp ids in the list already
-    // sort of check existing comm graphs in the map context.appDatas[*pid].pgraph
+
     if( *pid1 >= 0 ) context.appDatas[*pid1].pgraph[*comp2] = cgraph;      // the context will be the other comp
     if( *pid2 >= 0 ) context.appDatas[*pid2].pgraph[*comp1] = cgraph_rev;  // from 2 to 1
     // each model has a list of global ids that will need to be sent by gs to rendezvous the other

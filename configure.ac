@@ -501,21 +501,6 @@ else
 fi
 
 ################################################################################
-#                           Mesquite Part 1 of 2
-################################################################################
-AC_ARG_ENABLE( [mesquite],
-[AS_HELP_STRING([--enable-mesquite],[Build support for Mesquite interfaces.])],
-[enable_mesquite=$enableval],
-[enable_mesquite=no] )
-
-if (test "xyes" != "x$enable_mesquite" && test "xno" != "x$enable_mesquite"); then
-  AC_MSG_ERROR([Unknown argument --enable-mesquite=$enableval])
-else
-  DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --enable-mesquite=$enable_mesquite"
-fi
-
-
-################################################################################
 #                              Version Stuff
 ################################################################################
 
@@ -1257,28 +1242,6 @@ AC_SUBST(HAVE_IMESH)
 AC_SUBST(HAVE_IREL)
 AM_CONDITIONAL([USING_DEV_CGM],[test "xyes" = "x$USING_DEV_CGM"])
 
-################################################################################
-#                           Mesquite Part 2 of 2
-################################################################################
-
-AC_MSG_CHECKING([if Mesquite support is to be built])
-AC_MSG_RESULT([$enable_mesquite])
-HAVE_MESQUITE="no"
-if (test "xno" != "x$enable_mesquite"); then
-  if (test "x$ENABLE_imesh" != "xyes"); then
-    enable_mesquite=no
-    AC_MSG_WARN([** Disabling Mesquite since iGeom or iMesh is not configured correctly.])
-  fi
-  if (test "xno" != "x$enable_mesquite"); then
-    CONFIGURE_MESQUITE
-    AC_DEFINE(HAVE_MESQUITE,[1],"MOAB configured with Mesquite support")
-    HAVE_MESQUITE="yes"
-  fi
-fi
-AM_CONDITIONAL([ENABLE_mesquite],[test "yes" = "$enable_mesquite"])
-AM_CONDITIONAL([HAVE_CPPUNIT],[test "$HAVE_CPPUNIT" = "yes"])
-AC_SUBST(HAVE_MESQUITE)
-
 ###############################################################################
 #                           Optional Tools
 ###############################################################################
@@ -1657,23 +1620,6 @@ AC_CONFIG_FILES([Makefile
                  MeshFiles/unittest/mbcslam/Makefile
                  MeshFiles/unittest/h5file/Makefile
                  MeshFiles/examples/Makefile
-                 ])
-
-# Specify the headers to create for mesquite
-AC_CONFIG_FILES([src/mesquite/Makefile
-                 itaps/mesquite/Makefile
-                 test/mesquite/Makefile
-                 test/mesquite/convert/Makefile
-                 test/mesquite/igeom/Makefile
-                 test/mesquite/imesh/Makefile
-                 test/mesquite/unit/Makefile
-                 test/mesquite/parallel_untangle_shape/Makefile
-                 test/mesquite/parallel_smooth_laplace/Makefile
-                 test/mesquite/wrapper_tests/Makefile
-                 test/mesquite/higher_order/Makefile
-                 test/mesquite/slaved/Makefile
-                 tools/mesquite/Makefile
-                 MeshFiles/unittest/mesquite/Makefile
                  ])
 
 DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --enable-static=$enable_static --enable-shared=$enable_shared"

@@ -143,13 +143,6 @@ else
   mcnpmit_DIR =
 endif
 
-
-if ENABLE_mesquite
-  mesquite_DIR = mesquite
-else
-  mesquite_DIR =
-endif
-
 if PARALLEL
   parread = parread
 else
@@ -205,7 +198,6 @@ SUBDIRS = . \
           $(mbcslam_DIR) \
           $(mcnpmit_DIR) \
           $(vtkMOABReader_DIR) \
-          $(mesquite_DIR) \
           $(geometry_DIR)
 
 mbgsets_SOURCES = gsets.cpp

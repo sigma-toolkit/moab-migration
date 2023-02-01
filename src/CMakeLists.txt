@@ -33,10 +33,6 @@ add_subdirectory(io)
 message(STATUS "Adding IntxMesh subdirectory.")
 add_subdirectory(IntxMesh)
 
-if (ENABLE_MESQUITE AND MOAB_HAVE_CGM)
-  #  add_subdirectory(mesquite)
-endif(ENABLE_MESQUITE AND MOAB_HAVE_CGM)
-
 if( MOAB_HAVE_HDF5 )
   include_directories(${HDF5_INCLUDES})
   set( MOAB_HDF_LIBS ${HDF5_LIBRARIES} )

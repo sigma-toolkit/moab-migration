@@ -2,7 +2,6 @@
  * This test will load a file and duplicate it
  */
 
-
 #include "moab/Core.hpp"
 
 // MPI includes
@@ -22,7 +21,6 @@
 
 using namespace moab;
 
-
 int main( int argc, char* argv[] )
 {
     int ierr;
@@ -32,11 +30,10 @@ int main( int argc, char* argv[] )
     std::string readopts( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS" );
 
     std::string rofInp = TestDir + "unittest/recMeshOcn.h5m";
-    std::string filename("outmesh.h5m");
+    std::string filename( "outmesh.h5m" );
 
-    int  cmpRof = 21, cplRof=22;
-    int nghlay = 0;// no ghost layers
-
+    int cmpRof = 21, cplRof = 22;
+    int nghlay = 0;  // no ghost layers
 
     MPI_Init( &argc, &argv );
     MPI_Comm_rank( MPI_COMM_WORLD, &rankInGlobalComm );
@@ -45,18 +42,16 @@ int main( int argc, char* argv[] )
 
     int startG1 = 0, startG4 = 0;
     int endG1, endG4;
-    endG1 = endG4 = numProcesses-1;
+    endG1 = endG4 = numProcesses - 1;
 
     ProgOptions opts;
 
     opts.addOpt< std::string >( "file,f", " imoab mesh file", &rofInp );
 
-
     opts.addOpt< std::string >( "outfile,o", "output mesh file", &filename );
 
     opts.addOpt< int >( "startAtm,a", "start task for input layout", &startG1 );
     opts.addOpt< int >( "endAtm,b", "end task for input layout", &endG1 );
-
 
     opts.addOpt< int >( "startCoupler,g", "start task for coupler layout", &startG4 );
     opts.addOpt< int >( "endCoupler,j", "end task for coupler layout", &endG4 );
@@ -65,8 +60,8 @@ int main( int argc, char* argv[] )
 
     if( !rankInGlobalComm )
     {
-        std::cout << " input file: " << rofInp  << "\n   on tasks : " << startG1 << ":" << endG1 <<
-            "\n coupler    on tasks : " << startG4 << ":" << endG4 << "\n";
+        std::cout << " input file: " << rofInp << "\n   on tasks : " << startG1 << ":" << endG1
+                  << "\n coupler    on tasks : " << startG4 << ":" << endG4 << "\n";
     }
 
     // load files on 2 different communicators, groups
@@ -76,7 +71,6 @@ int main( int argc, char* argv[] )
     MPI_Comm rofComm;
     ierr = create_group_and_comm( startG1, endG1, jgroup, &rofPEGroup, &rofComm );
     CHECKIERR( ierr, "Cannot create rof MPI group and communicator " )
-
 
     // we will always have a coupler
     MPI_Group couPEGroup;
@@ -95,13 +89,14 @@ int main( int argc, char* argv[] )
 
     int cmpRofID       = -1;
     iMOAB_AppID rofPID = &cmpRofID;
-    if (rofComm != MPI_COMM_NULL ) {
+    if( rofComm != MPI_COMM_NULL )
+    {
         ierr = iMOAB_RegisterApplication( "ROF", &rofComm, &cmpRof, rofPID );
         CHECKIERR( ierr, "Cannot register Rof App" )
     }
 
-    int cplRofAppID = -1;
-    iMOAB_AppID  cplRofPID = &cplRofAppID;
+    int cplRofAppID       = -1;
+    iMOAB_AppID cplRofPID = &cplRofAppID;
 
     int rankInCouComm = -1;
     if( couComm != MPI_COMM_NULL )
@@ -127,23 +122,58 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "Cannot load and migrate rof mesh " )
     }
 
-    int cplCopyAppID = -1;
-    iMOAB_AppID  cplCopyPID = &cplCopyAppID;
-    int copyId = 100 + cplRof;
+    int cplCopyAppID       = -1;
+    iMOAB_AppID cplCopyPID = &cplCopyAppID;
+    int copyId             = 100 + cplRof;
     // make a copy on coupler comm
     if( couComm != MPI_COMM_NULL )
     {
         ierr = iMOAB_RegisterApplication( "COPY", &couComm, &copyId,
-                cplCopyPID );  // copy on coupler pes
+                                          cplCopyPID );  // copy on coupler pes
         CHECKIERR( ierr, "Cannot register COPY app over coupler PEs" )
 
-        ierr = iMOAB_DuplicateAppMesh(cplRofPID, cplCopyPID);
+        ierr = iMOAB_DuplicateAppMesh( cplRofPID, cplCopyPID );
         CHECKIERR( ierr, "Cannot duplicate mesh over coupler PEs" )
 
         char fileWriteOptions[] = "PARALLEL=WRITE_PART";
-        ierr  = iMOAB_WriteMesh( cplCopyPID, filename.c_str(), fileWriteOptions);
+        ierr                    = iMOAB_WriteMesh( cplCopyPID, filename.c_str(), fileWriteOptions );
         CHECKIERR( ierr, "cannot write duplicated mesh" )
     }
+
+    // we could deregister cplLndAtmPID
+    if( couComm != MPI_COMM_NULL )
+    {
+        ierr = iMOAB_DeregisterApplication( cplCopyPID );
+        CHECKIERR( ierr, "cannot deregister copy app" )
+    }
+
+    // we could deregister cplRofPID
+    if( couComm != MPI_COMM_NULL )
+    {
+        ierr = iMOAB_DeregisterApplication( cplRofPID );
+        CHECKIERR( ierr, "cannot deregister coupler app" )
+    }
+
+    if( rofComm != MPI_COMM_NULL )
+    {
+        ierr = iMOAB_DeregisterApplication( rofPID );
+        CHECKIERR( ierr, "cannot deregister app rofPID " )
+    }
+
+    ierr = iMOAB_Finalize();
+    CHECKIERR( ierr, "did not finalize iMOAB" )
+
+    // free rof coupler group and comm
+    if( MPI_COMM_NULL != rofCouComm ) MPI_Comm_free( &rofCouComm );
+    MPI_Group_free( &joinRofCouGroup );
+    if( MPI_COMM_NULL != rofComm ) MPI_Comm_free( &rofComm );
+
+    if( MPI_COMM_NULL != couComm ) MPI_Comm_free( &couComm );
+
+    MPI_Group_free( &rofPEGroup );
+
+    MPI_Group_free( &couPEGroup );
+    MPI_Group_free( &jgroup );
 
     MPI_Finalize();
 

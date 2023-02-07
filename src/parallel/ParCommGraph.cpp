@@ -545,8 +545,7 @@ ErrorCode ParCommGraph::receive_mesh( MPI_Comm jcomm,
             EntityHandle eh          = *it;
             const EntityHandle* conn = NULL;
             int num_nodes            = 0;
-            rval                     = mb->get_connectivity( eh, conn, num_nodes );
-            if( MB_SUCCESS != rval ) return rval;
+            rval                     = mb->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
             adj_fact->notify_create_entity( eh, conn, num_nodes );
         }
     }

@@ -153,7 +153,7 @@ ErrorCode ParallelMergeMesh::GetGlobalBox( double* gbox )
     box.bMax *= -1;
 
     /*Communicate to all processors*/
-    MPI_Allreduce( (void*)&box, gbox, 6, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD );
+    MPI_Allreduce( (void*)&box, gbox, 6, MPI_DOUBLE, MPI_MIN, myPcomm->comm() );
 
     /*Assemble Global Bounding Box*/
     // Flip the max back

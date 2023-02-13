@@ -4,6 +4,7 @@
 
 #include "NCHelperScrip.hpp"
 #include "moab/ReadUtilIface.hpp"
+#include "AEntityFactory.hpp"
 #include "moab/IntxMesh/IntxUtils.hpp"
 #ifdef MOAB_HAVE_MPI
 #include "moab/ParallelMergeMesh.hpp"
@@ -95,9 +96,10 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
     int rank         = 0;
     int procs        = 1;
     bool& isParallel = _readNC->isParallel;
+    ParallelComm* myPcomm = NULL;
     if( isParallel )
     {
-        ParallelComm*& myPcomm = _readNC->myPcomm;
+        myPcomm = _readNC->myPcomm;
         rank                   = myPcomm->proc_config().proc_rank();
         procs                  = myPcomm->proc_config().proc_size();
     }
@@ -125,7 +127,7 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
         start_cell_idx++;  // 0 based -> 1 based
 
         // Redistribute local cells after trivial partition (e.g. apply Zoltan partition)
-        ErrorCode rval = redistribute_local_cells( start_cell_idx );MB_CHK_SET_ERR( rval, "Failed to redistribute local cells after trivial partition" );
+        ErrorCode rval = redistribute_local_cells( start_cell_idx, myPcomm );MB_CHK_SET_ERR( rval, "Failed to redistribute local cells after trivial partition" );
     }
     else
     {
@@ -348,8 +350,25 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
     Range all_verts;
     rval = mbImpl->get_connectivity( faces, all_verts );MB_CHK_ERR( rval );
     rval = mbImpl->add_entities( _fileSet, all_verts );MB_CHK_ERR( rval );
+    // need to add adjacencies; TODO: fix this for all nc readers
+    // copy this logic from migrate mesh in par comm graph
+    Core* mb                 = (Core*)mbImpl;
+    AEntityFactory* adj_fact = mb->a_entity_factory();
+    if( !adj_fact->vert_elem_adjacencies() )
+        adj_fact->create_vert_elem_adjacencies();
+    else
+    {
+        for( Range::iterator it = faces.begin(); it != faces.end(); ++it )
+        {
+            EntityHandle eh          = *it;
+            const EntityHandle* conn = NULL;
+            int num_nodes            = 0;
+            rval                     = mb->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
+            adj_fact->notify_create_entity( eh, conn, num_nodes );
+        }
+    }
+
 #ifdef MOAB_HAVE_MPI
-    ParallelComm*& myPcomm = _readNC->myPcomm;
     if( myPcomm )
     {
         double tol = 1.e-12;  // this is the same as static tolerance in NCHelper
@@ -383,7 +402,7 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
 }
 
 #ifdef MOAB_HAVE_MPI
-ErrorCode NCHelperScrip::redistribute_local_cells( int start_cell_idx )
+ErrorCode NCHelperScrip::redistribute_local_cells( int start_cell_idx, ParallelComm * pco )
 {
     // If possible, apply Zoltan partition
 #ifdef MOAB_HAVE_ZOLTAN
@@ -411,7 +430,7 @@ ErrorCode NCHelperScrip::redistribute_local_cells( int start_cell_idx )
         // is better
         Interface*& mbImpl         = _readNC->mbImpl;
         DebugOutput& dbgOut        = _readNC->dbgOut;
-        ZoltanPartitioner* mbZTool = new ZoltanPartitioner( mbImpl, false, 0, NULL );
+        ZoltanPartitioner* mbZTool = new ZoltanPartitioner( mbImpl, pco, false, 0, NULL );
         std::vector< double > xCell( nLocalCells );
         std::vector< double > yCell( nLocalCells );
         std::vector< double > zCell( nLocalCells );

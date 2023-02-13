@@ -255,9 +255,10 @@ ErrorCode NCHelperGCRM::create_mesh( Range& faces )
     int rank         = 0;
     int procs        = 1;
     bool& isParallel = _readNC->isParallel;
+    ParallelComm* myPcomm = NULL;
     if( isParallel )
     {
-        ParallelComm*& myPcomm = _readNC->myPcomm;
+        myPcomm = _readNC->myPcomm;
         rank                   = myPcomm->proc_config().proc_rank();
         procs                  = myPcomm->proc_config().proc_size();
     }
@@ -288,7 +289,7 @@ ErrorCode NCHelperGCRM::create_mesh( Range& faces )
         start_cell_idx++;  // 0 based -> 1 based
 
         // Redistribute local cells after trivial partition (e.g. apply Zoltan partition)
-        ErrorCode rval = redistribute_local_cells( start_cell_idx );MB_CHK_SET_ERR( rval, "Failed to redistribute local cells after trivial partition" );
+        ErrorCode rval = redistribute_local_cells( start_cell_idx, myPcomm);MB_CHK_SET_ERR( rval, "Failed to redistribute local cells after trivial partition" );
     }
     else
     {
@@ -740,7 +741,7 @@ ErrorCode NCHelperGCRM::read_ucd_variables_to_nonset( std::vector< ReadNC::VarDa
 #endif
 
 #ifdef MOAB_HAVE_MPI
-ErrorCode NCHelperGCRM::redistribute_local_cells( int start_cell_idx )
+ErrorCode NCHelperGCRM::redistribute_local_cells( int start_cell_idx, ParallelComm * pco )
 {
     // If possible, apply Zoltan partition
 #ifdef MOAB_HAVE_ZOLTAN
@@ -783,7 +784,7 @@ ErrorCode NCHelperGCRM::redistribute_local_cells( int start_cell_idx )
         // is better
         Interface*& mbImpl         = _readNC->mbImpl;
         DebugOutput& dbgOut        = _readNC->dbgOut;
-        ZoltanPartitioner* mbZTool = new ZoltanPartitioner( mbImpl, false, 0, NULL );
+        ZoltanPartitioner* mbZTool = new ZoltanPartitioner( mbImpl, pco, false, 0, NULL );
         ErrorCode rval             = mbZTool->repartition( xCell, yCell, zCell, start_cell_idx, "RCB", localGidCells );MB_CHK_SET_ERR( rval, "Error in Zoltan partitioning" );
         delete mbZTool;
 

@@ -13,7 +13,9 @@
 
 namespace moab
 {
-
+#ifdef MOAB_HAVE_MPI
+  class ParallelComm;
+#endif
 //! Child helper class for MPAS grid
 class NCHelperMPAS : public UcdNCHelper
 {
@@ -49,7 +51,7 @@ class NCHelperMPAS : public UcdNCHelper
 
 #ifdef MOAB_HAVE_MPI
     //! Redistribute local cells after trivial partition (e.g. Zoltan partition, if applicable)
-    ErrorCode redistribute_local_cells( int start_cell_index );
+    ErrorCode redistribute_local_cells( int start_cell_index,  ParallelComm * pco  );
 #endif
 
     //! Create local vertices

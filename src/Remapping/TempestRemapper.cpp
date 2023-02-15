@@ -1300,45 +1300,51 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
             // remove from the set !
             if( !point_cloud_target )
             {
-                Range covEnts;
-                rval = m_interface->get_entities_by_dimension( m_covering_source_set, 2, covEnts );MB_CHK_ERR( rval );
-                Tag gidtag = m_interface->globalId_tag();
-
+                std::vector< EntityHandle > covEnts;
                 std::map< int, int > loc_gid_to_lid_covsrc;
+
+                rval = m_interface->get_entities_by_dimension( m_covering_source_set, 2, covEnts );MB_CHK_ERR( rval );
+
+                Tag gidtag = m_interface->globalId_tag();
                 std::vector< int > gids( covEnts.size(), -1 );
-                rval = m_interface->tag_get_data( gidtag, covEnts, &gids[0] );MB_CHK_ERR( rval );
+                rval = m_interface->tag_get_data( gidtag, covEnts.data(), covEnts.size(), &gids[0] );MB_CHK_ERR( rval );
                 for( unsigned ie = 0; ie < gids.size(); ++ie )
                 {
+                    assert( gids[ie] > 0 );
                     loc_gid_to_lid_covsrc[gids[ie]] = ie;
                 }
 
-                Range intxCov;
-                Range intxCells;
-                Tag srcParentTag;
-                rval = m_interface->tag_get_handle( "SourceParent", srcParentTag );MB_CHK_ERR( rval );
-                rval = m_interface->get_entities_by_dimension( m_overlap_set, 2, intxCells );MB_CHK_ERR( rval );
-                for( Range::iterator it = intxCells.begin(); it != intxCells.end(); it++ )
-                {
-                    EntityHandle intxCell = *it;
-                    int blueParent        = -1;
-                    rval                  = m_interface->tag_get_data( srcParentTag, &intxCell, 1, &blueParent );MB_CHK_ERR( rval );
-                    // if (is_root) std::cout << "Found intersecting element: " << blueParent << ",
-                    // " << gid_to_lid_covsrc[blueParent] << "\n";
-                    assert( blueParent >= 0 );
-                    intxCov.insert( covEnts[loc_gid_to_lid_covsrc[blueParent]] );
-                }
-
-                Range notNeededCovCells = moab::subtract( covEnts, intxCov );
-                // remove now from coverage set the cells that are not needed
-                rval = m_interface->remove_entities( m_covering_source_set, notNeededCovCells );MB_CHK_ERR( rval );
-                covEnts = moab::subtract( covEnts, notNeededCovCells );
-#ifdef VERBOSE
-                std::cout << " total participating elements in the covering set: " << intxCov.size() << "\n";
-                std::cout << " remove from coverage set elements that are not intersected: " << notNeededCovCells.size()
-                          << "\n";
-#endif
                 if( size > 1 )
                 {
+                    std::vector< EntityHandle > intxCov;
+                    Range intxCells;
+                    Tag srcParentTag;
+                    rval = m_interface->tag_get_handle( "SourceParent", srcParentTag );MB_CHK_ERR( rval );
+                    rval = m_interface->get_entities_by_dimension( m_overlap_set, 2, intxCells );MB_CHK_ERR( rval );
+
+                    std::vector< int > srcParentData( intxCells.size(), -1 );
+                    for( auto srcParent : srcParentData )
+                    {
+                        assert( srcParent >= 0 );
+                        intxCov.push_back( covEnts[loc_gid_to_lid_covsrc[srcParent]] );
+                    }
+
+                    std::sort( intxCov.begin(), intxCov.end() );
+                    std::sort( covEnts.begin(), covEnts.end() );
+                    std::vector< EntityHandle > notNeededCovCells;
+                    std::set_difference( intxCov.begin(), intxCov.end(), covEnts.begin(), covEnts.end(),
+                                         std::back_inserter( notNeededCovCells ) );
+
+                    // Range notNeededCovCells = moab::subtract( covEnts, intxCov );
+                    // remove now from coverage set the cells that are not needed
+                    rval = m_interface->remove_entities( m_covering_source_set, notNeededCovCells.data(),
+                                                         notNeededCovCells.size() );MB_CHK_ERR( rval );
+#ifdef VERBOSE
+                    std::cout << " total participating elements in the covering set: " << intxCov.size() << "\n";
+                    std::cout << " remove from coverage set elements that are not intersected: "
+                              << notNeededCovCells.size() << "\n";
+#endif
+
                     // some source elements cover multiple target partitions; the conservation logic
                     // requires to know all overlap elements for a source element; they need to be
                     // communicated from the other target partitions

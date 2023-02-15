@@ -78,10 +78,10 @@ struct ToolContext
     ToolContext( moab::Interface* icore )
         : mbcore( icore ), proc_id( 0 ), n_procs( 1 ), outputFormatter( std::cout, 0, 0 ),
 #endif
-          blockSize( 5 ), fvMethod("none"), outFilename( "outputFile.nc" ), intxFilename( "intxFile.h5m" ), baselineFile( "" ),
-          meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ), computeWeights( false ),
+          blockSize( 5 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "intxFile.h5m" ),
+          baselineFile( "" ), meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ), computeWeights( false ),
           verifyWeights( false ), enforceConvexity( false ), ensureMonotonicity( 0 ), rrmGrids( false ),
-          kdtreeSearch( true ), fCheck( n_procs > 1 ? false : true ), fVolumetric(false)
+          kdtreeSearch( true ), fCheck( n_procs > 1 ? false : true ), fVolumetric( false )
     {
         inFilenames.resize( 2 );
         doftag_names.resize( 2 );
@@ -265,7 +265,7 @@ struct ToolContext
                 break;
         }
 
-        if( meshType > moab::TempestRemapper::ICO ) // compute overlap mesh and maps possibly
+        if( meshType > moab::TempestRemapper::ICO )  // compute overlap mesh and maps possibly
         {
             opts.getOptAllArgs( "load,l", inFilenames );
             opts.getOptAllArgs( "order,o", disc_orders );
@@ -273,21 +273,19 @@ struct ToolContext
             opts.getOptAllArgs( "global_id,i", doftag_names );
 
             assert( inFilenames.size() == 2 );
-            assert( disc_orders.size() == 2 );
-            assert( disc_methods.size() == 2 );
+            assert( disc_orders.size() == 0 || disc_orders.size() == 2 );
+            assert( disc_methods.size() == 0 || disc_methods.size() == 2 );
+            assert( doftag_names.size() == 0 || doftag_names.size() == 2 );
             assert( ensureMonotonicity >= 0 && ensureMonotonicity <= 3 );
 
-            // get discretization order parameters
+            // set default discretization order parameters
             if( disc_orders.size() == 0 ) disc_orders.resize( 2, 1 );
-            if( disc_orders.size() == 1 ) disc_orders.push_back( 1 );
 
-            // get discretization method parameters
+            // set default discretization method parameters
             if( disc_methods.size() == 0 ) disc_methods.resize( 2, "fv" );
-            if( disc_methods.size() == 1 ) disc_methods.push_back( "fv" );
 
-            // get DoF tagname parameters
+            // set default DoF tagname parameters
             if( doftag_names.size() == 0 ) doftag_names.resize( 2, "GLOBAL_ID" );
-            if( doftag_names.size() == 1 ) doftag_names.push_back( "GLOBAL_ID" );
 
             // for computing maps and overlaps, set discretization orders
             mapOptions.nPin           = disc_orders[0];
@@ -549,8 +547,8 @@ int main( int argc, char* argv[] )
             }
             rval = areaAdaptor.positive_orientation( mbCore, runCtx->meshsets[0], radius_src );MB_CHK_ERR( rval );
             if( !proc_id )
-                outputFormatter.printf( 0, "The source set contains %lu vertices and %lu elements \n",
-                                        srcverts.size(), srcelems.size() );
+                outputFormatter.printf( 0, "The source set contains %lu vertices and %lu elements \n", srcverts.size(),
+                                        srcelems.size() );
 
             moab::Range tgtverts, tgtelems;
             rval = mbCore->get_entities_by_dimension( runCtx->meshsets[1], 0, tgtverts );MB_CHK_ERR( rval );
@@ -562,8 +560,8 @@ int main( int argc, char* argv[] )
             }
             rval = areaAdaptor.positive_orientation( mbCore, runCtx->meshsets[1], radius_dest );MB_CHK_ERR( rval );
             if( !proc_id )
-                outputFormatter.printf( 0, "The target set contains %lu vertices and %lu elements \n",
-                                        tgtverts.size(), tgtelems.size() );
+                outputFormatter.printf( 0, "The target set contains %lu vertices and %lu elements \n", tgtverts.size(),
+                                        tgtelems.size() );
         }
 
         // First compute the covering set such that the target elements are fully covered by the
@@ -869,6 +867,7 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[0], radius_src );MB_CHK_ERR( rval );
         rval = remapper.ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( rval );
         ctx.meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );
+        // ctx.meshes[0]->Write( "SourceMesh.g" );
 
         // Load the target mesh and validate
         rval = remapper.LoadNativeMesh( ctx.inFilenames[1], ctx.meshsets[1], tmetadata, additional_read_opts );MB_CHK_ERR( rval );
@@ -883,6 +882,7 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[1], radius_dest );MB_CHK_ERR( rval );
         rval = remapper.ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
         ctx.meshes[1] = remapper.GetMesh( moab::Remapper::TargetMesh );
+        // ctx.meshes[1]->Write( "TargetMesh.g" );
     }
     else if( ctx.meshType == moab::TempestRemapper::ICO )
     {

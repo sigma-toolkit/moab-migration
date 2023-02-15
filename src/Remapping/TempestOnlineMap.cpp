@@ -21,6 +21,7 @@
 #include "SparseMatrix.h"
 #include "STLStringHelper.h"
 #include "LinearRemapFV.h"
+#include "LinearRemapSE0.h"
 
 #include "moab/Remapping/TempestOnlineMap.hpp"
 #include "DebugOutput.hpp"
@@ -802,7 +803,7 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
 
         // Method flags
         std::string strMapAlgorithm( "" );
-        int nMonotoneType    = ( mapOptions.fMonotone ) ? ( 1 ) : ( 0 );
+        int nMonotoneType = ( mapOptions.fMonotone ) ? ( 1 ) : ( 0 );
 
         // Make an index of method arguments
         std::set< std::string > setMethodStrings;
@@ -1137,9 +1138,9 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             else
             {
                 AnnounceStartBlock( "Calculating offline map (default)" );
-                // LinearRemapFVtoFV( *m_meshInputCov, *m_meshOutput, *m_meshOverlap,
-                //                   ( mapOptions.fMonotone ) ? ( 1 ) : ( mapOptions.nPin ), *this );
-                LinearRemapFVtoFV_Tempest_MOAB( ( mapOptions.fMonotone ? 1 : mapOptions.nPin ) );
+                LinearRemapFVtoFV( *m_meshInputCov, *m_meshOutput, *m_meshOverlap,
+                                   ( mapOptions.fMonotone ) ? ( 1 ) : ( mapOptions.nPin ), *this );
+                // LinearRemapFVtoFV_Tempest_MOAB( ( mapOptions.fMonotone ? 1 : mapOptions.nPin ) );
             }
         }
         else if( eInputType == DiscretizationType_FV )
@@ -1321,8 +1322,11 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                              "GLL input mesh" );
             }
 
-            LinearRemapSE4_Tempest_MOAB( dataGLLNodesSrcCov, dataGLLJacobian, nMonotoneType, fContinuousIn,
-                                         mapOptions.fNoConservation );
+            // LinearRemapSE4_Tempest_MOAB( dataGLLNodesSrcCov, dataGLLJacobian, nMonotoneType, fContinuousIn,
+            //                              mapOptions.fNoConservation );
+            LinearRemapSE4( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, dataGLLNodesSrcCov, dataGLLJacobian,
+                            nMonotoneType, fContinuousIn, mapOptions.fNoConservation, mapOptions.fSparseConstraints,
+                            *this );
         }
         else if( ( eInputType != DiscretizationType_FV ) && ( eOutputType != DiscretizationType_FV ) )
         {
@@ -1409,9 +1413,14 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             // Generate remap
             if( is_root ) dbgprint.printf( 0, "Calculating remap weights\n" );
 
-            LinearRemapGLLtoGLL2_MOAB( dataGLLNodesSrcCov, dataGLLJacobianIn, dataGLLNodesDest, dataGLLJacobianOut,
-                                       this->GetTargetAreas(), mapOptions.nPin, mapOptions.nPout, nMonotoneType,
-                                       fContinuousIn, fContinuousOut, mapOptions.fNoConservation );
+            // LinearRemapGLLtoGLL2_MOAB( dataGLLNodesSrcCov, dataGLLJacobianIn, dataGLLNodesDest, dataGLLJacobianOut,
+            //                            this->GetTargetAreas(), mapOptions.nPin, mapOptions.nPout, nMonotoneType,
+            //                            fContinuousIn, fContinuousOut, mapOptions.fNoConservation );
+
+            LinearRemapGLLtoGLL_Integrated( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, dataGLLNodesSrcCov,
+                                            dataGLLJacobianIn, dataGLLNodesDest, dataGLLJacobianOut,
+                                            this->GetTargetAreas(), mapOptions.nPin, mapOptions.nPout, nMonotoneType,
+                                            fContinuousIn, fContinuousOut, mapOptions.fSparseConstraints, *this );
         }
         else
         {

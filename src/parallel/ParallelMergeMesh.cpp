@@ -290,6 +290,12 @@ ErrorCode ParallelMergeMesh::PartitionGlobalBox( double* gbox, double* lengths, 
     double xLen       = gbox[3] - gbox[0];
     double yLen       = gbox[4] - gbox[1];
     double zLen       = gbox[5] - gbox[2];
+    // avoid division by zero for deciding the way to partition the global box
+    // make all sides of the box at least myEps
+    // it can be zero in some cases, so not possible to compare the ratios :) for best division
+    if (xLen < myEps) xLen = myEps;
+    if (yLen < myEps) yLen = myEps;
+    if (zLen < myEps) zLen = myEps;
     unsigned numProcs = myPcomm->size();
 
     // Partition sides from the longest to shortest lengths

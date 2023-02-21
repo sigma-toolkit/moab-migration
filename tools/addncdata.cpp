@@ -264,12 +264,13 @@ int main( int argc, char* argv[] )
 
     if( NC_FLOAT == dataType ) float_var = true;
 
+    bool use_time = false;
     int time_id = -1;
-    fail        = nc_inq_varid( ncFile, "time", &time_id );
-    if( NC_NOERR != fail ) MB_SET_ERR( MB_FAILURE, "addncdata:: Couldn't get time variable id" );
     std::vector< float > times;
+    fail        = nc_inq_varid( ncFile, "time", &time_id );
     if( NC_NOERR == fail )
     {
+        use_time = true;
         int ii;
         GET_1D_FLT_VAR( "time", ii, times );
     }
@@ -404,7 +405,7 @@ int main( int argc, char* argv[] )
         }
     }
     else if( ( dims.size() == 3 ) && vertex_data && dimIndex == 2 &&
-             mbtype == MB_TYPE_DOUBLE )  // the last one is the vertex
+             mbtype == MB_TYPE_DOUBLE && use_time)  // the last one is the vertex
     {
         // the case when the last dim is ncol (for homme type mesh))
         size_t dim0, dim1;  // dim 2 is ncol..

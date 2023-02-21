@@ -138,6 +138,15 @@ int main( int argc, char* argv[] )
         char fileWriteOptions[] = "PARALLEL=WRITE_PART";
         ierr                    = iMOAB_WriteMesh( cplCopyPID, filename.c_str(), fileWriteOptions );
         CHECKIERR( ierr, "cannot write duplicated mesh" )
+
+        int nverts[3], nelem[3], nverts2[3], nelem2[3];
+        // check the mesh has same number of vertices and elements
+        ierr = iMOAB_GetMeshInfo( cplRofPID, nverts, nelem, 0, 0, 0 );
+        CHECKIERR( ierr, "cannot get info on initial mesh" )
+        ierr = iMOAB_GetMeshInfo( cplCopyPID, nverts2, nelem2, 0, 0, 0 );
+        CHECKIERR( ierr, "cannot get info on copied mesh" )
+        CHECK_EQUAL( nverts[0], nverts2[0] );
+        CHECK_EQUAL( nelem[0], nelem2[0] );
     }
 
     // we could deregister cplLndAtmPID

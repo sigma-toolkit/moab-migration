@@ -3,6 +3,7 @@
 
 #include "moab/MOABConfig.h"
 #include "moab/Core.hpp"
+#include "AEntityFactory.hpp"
 
 #ifdef MOAB_HAVE_MPI
 #include "moab_mpi.h"
@@ -143,8 +144,8 @@ ErrCode iMOAB_Initialize( int argc, iMOAB_String* argv )
     {
         context.MBI = new( std::nothrow ) moab::Core;
         // retrieve the default tags
-        const char* const shared_set_tag_names[] = { MATERIAL_SET_TAG_NAME, NEUMANN_SET_TAG_NAME,
-                                                     DIRICHLET_SET_TAG_NAME, GLOBAL_ID_TAG_NAME };
+        const char* const shared_set_tag_names[] = {MATERIAL_SET_TAG_NAME, NEUMANN_SET_TAG_NAME, DIRICHLET_SET_TAG_NAME,
+                                                    GLOBAL_ID_TAG_NAME};
         // blocks, visible surfaceBC(neumann), vertexBC (Dirichlet), global id, parallel partition
         Tag gtags[4];
 
@@ -1461,81 +1462,105 @@ ErrCode iMOAB_GetPointerToVertexBC( iMOAB_AppID pid,
 ErrCode iMOAB_DuplicateAppMesh( iMOAB_AppID pid, iMOAB_AppID poid )
 {
     // the file set , parallel comm are all in vectors indexed by *pid
-   appData& data = context.appDatas[*pid];
-   appData& dataout = context.appDatas[*poid];
-   int rankHere  = 0;
+    appData& data    = context.appDatas[*pid];
+    appData& dataout = context.appDatas[*poid];
+    int rankHere     = 0;
 #ifdef MOAB_HAVE_MPI
-   ParallelComm* pco = context.pcomms[*pid];
-   ParallelComm* pcout = context.pcomms[*poid];
-   rankHere          = pco->rank();
+    ParallelComm* pco   = context.pcomms[*pid];
+    ParallelComm* pcout = context.pcomms[*poid];
+    rankHere            = pco->rank();
 #endif
-   if( !rankHere )
-       std::cout << " Mesh for application with ID: " << *pid << " global id: " << data.global_id << " name: " << data.name
-                 << "\n  is copied in application with ID " << *poid << " name " << dataout.name << "\n";
 
-   EntityHandle fileSet = data.file_set;
-   EntityHandle outFileSet = dataout.file_set;
-   // get all entities part of the file set
-   Range verts;
-   ErrorCode rval = context.MBI->get_entities_by_dimension( fileSet, 0, verts);MB_CHK_ERR( rval );
-   Range primaryCells;
-   rval = context.MBI->get_entities_by_dimension( fileSet, data.dimension, primaryCells);MB_CHK_ERR( rval );
-   // first, deep copy vertices
-   std::vector<double> coords;
-   coords.resize(verts.size()*3);
-   //  virtual ErrorCode get_coords( const Range& entities, double* coords ) const;
-   rval = context.MBI->get_coords(verts, &coords[0]); MB_CHK_ERR( rval );
-   std::vector<int> globalIds;
-   globalIds.resize(verts.size());
-   Tag gid = context.MBI->globalId_tag();
-   rval = context.MBI->tag_get_data(gid, verts, &globalIds[0] );MB_CHK_ERR( rval );
+#ifdef VERBOSE
+    if( !rankHere )
+        std::cout << " Mesh for application with ID: " << *pid << " global id: " << data.global_id
+                  << " name: " << data.name << "\n  is copied in application with ID " << *poid << " name "
+                  << dataout.name << "\n";
+#endif
+    EntityHandle fileSet    = data.file_set;
+    EntityHandle outFileSet = dataout.file_set;
+    // get all entities part of the file set
+    Range verts;
+    ErrorCode rval = context.MBI->get_entities_by_dimension( fileSet, 0, verts );MB_CHK_ERR( rval );
+    Range primaryCells;
+    rval = context.MBI->get_entities_by_dimension( fileSet, data.dimension, primaryCells );MB_CHK_ERR( rval );
+    Range connVerts;
+    rval = context.MBI->get_connectivity( primaryCells, connVerts );MB_CHK_ERR( rval );
+    verts.merge( connVerts );
+    // first, deep copy vertices
+    std::vector< double > coords;
+    coords.resize( verts.size() * 3 );
 
-   // ErrorCode create_vertices( const double* coordinates, const int nverts, Range& entity_handles );
-   Range newVerts;
-   int nverts = (int)verts.size();
-   rval = context.MBI->create_vertices( &coords[0], nverts, newVerts );MB_CHK_ERR( rval );
-   // set global ID the same
-   rval = context.MBI->tag_set_data(gid, newVerts,  &globalIds[0]);MB_CHK_ERR( rval );
-   rval = context.MBI->add_entities(outFileSet, newVerts );MB_CHK_ERR( rval );
-   // create new cells, cell by cell, and add them to the file set, and set the global id too
-   // use the vertex global id for identification
-   std::map<EntityHandle, int>  oldMap;
-   std::map<int, EntityHandle>  newMap;
-   int i=0;
-   for (auto it=verts.begin(); it!= verts.end(); ++it, ++i)
-   {
-       EntityHandle oldVert = *it;
-       EntityHandle newVert = newVerts[i];
-       int globalId = globalIds[i];
-       oldMap[oldVert] = globalId;
-       newMap[globalId] = newVert;
-   }
-   for (auto it=primaryCells.begin(); it!= primaryCells.end(); ++it)
-   {
-       EntityHandle oldCell=*it;
-       int nnodes;
-       const EntityHandle *conn = NULL;
-       rval = context.MBI->get_connectivity( oldCell, conn, nnodes);MB_CHK_ERR( rval );
-       std::vector<EntityHandle> newConn;
-       newConn.resize(nnodes);
-       EntityType type = context.MBI->type_from_handle(oldCell);
-       for (int i=0; i<nnodes; i++)
-       {
-           newConn[i] = newMap [ oldMap[ conn[i] ] ];
-       }
-       EntityHandle newCell;
-       rval = context.MBI->create_element(type, &newConn[0], nnodes, newCell);MB_CHK_ERR( rval );
-       rval = context.MBI->add_entities(outFileSet, &newCell, 1);MB_CHK_ERR( rval );
-       int globalIdCell = 0;
-       rval = context.MBI->tag_get_data(gid, &oldCell, 1, &globalIdCell);MB_CHK_ERR( rval );
-       rval = context.MBI->tag_set_data(gid, &newCell, 1, &globalIdCell);MB_CHK_ERR( rval );
-   }
+    rval = context.MBI->get_coords( verts, &coords[0] );MB_CHK_ERR( rval );
+    std::vector< int > globalIds;
+    globalIds.resize( verts.size() );
+    Tag gid = context.MBI->globalId_tag();
+    rval    = context.MBI->tag_get_data( gid, verts, &globalIds[0] );MB_CHK_ERR( rval );
+
+    Range newVerts;
+    int nverts = (int)verts.size();
+    rval       = context.MBI->create_vertices( &coords[0], nverts, newVerts );MB_CHK_ERR( rval );
+    // set global ID the same
+    rval = context.MBI->tag_set_data( gid, newVerts, &globalIds[0] );MB_CHK_ERR( rval );
+    rval = context.MBI->add_entities( outFileSet, newVerts );MB_CHK_ERR( rval );
+    // create new cells, cell by cell, and add them to the file set, and set the global id too
+    // use the vertex global id for identification
+    std::map< EntityHandle, int > oldMap;
+    std::map< int, EntityHandle > newMap;
+    int i = 0;
+    for( auto it = verts.begin(); it != verts.end(); ++it, ++i )
+    {
+        EntityHandle oldVert = *it;
+        EntityHandle newVert = newVerts[i];
+        int globalId         = globalIds[i];
+        oldMap[oldVert]      = globalId;
+        newMap[globalId]     = newVert;
+    }
+    Range newCells;
+    for( auto it = primaryCells.begin(); it != primaryCells.end(); ++it )
+    {
+        EntityHandle oldCell = *it;
+        int nnodes;
+        const EntityHandle* conn = NULL;
+        rval                     = context.MBI->get_connectivity( oldCell, conn, nnodes );MB_CHK_ERR( rval );
+        std::vector< EntityHandle > newConn;
+        newConn.resize( nnodes );
+        EntityType type = context.MBI->type_from_handle( oldCell );
+        for( int i = 0; i < nnodes; i++ )
+        {
+            newConn[i] = newMap[oldMap[conn[i]]];
+        }
+        EntityHandle newCell;
+        rval = context.MBI->create_element( type, &newConn[0], nnodes, newCell );MB_CHK_ERR( rval );
+        rval = context.MBI->add_entities( outFileSet, &newCell, 1 );MB_CHK_ERR( rval );
+        int globalIdCell = 0;
+        rval             = context.MBI->tag_get_data( gid, &oldCell, 1, &globalIdCell );MB_CHK_ERR( rval );
+        rval = context.MBI->tag_set_data( gid, &newCell, 1, &globalIdCell );MB_CHK_ERR( rval );
+        newCells.insert( newCell );
+    }
+    // adjacencies need to be added explicitly
+    Core* mb                 = (Core*)context.MBI;
+    AEntityFactory* adj_fact = mb->a_entity_factory();
+    if( !adj_fact->vert_elem_adjacencies() )
+        adj_fact->create_vert_elem_adjacencies();
+    else
+    {
+        for( Range::iterator it = newCells.begin(); it != newCells.end(); ++it )
+        {
+            EntityHandle eh          = *it;
+            const EntityHandle* conn = NULL;
+            int num_nodes            = 0;
+            rval                     = mb->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
+            adj_fact->notify_create_entity( eh, conn, num_nodes );
+        }
+    }
 
 #ifdef MOAB_HAVE_MPI
-   rval = iMOAB_ResolveSharedEntities( poid, &nverts, &globalIds[0] ); MB_CHK_ERR( rval );
+    rval = iMOAB_ResolveSharedEntities( poid, &nverts, &globalIds[0] );MB_CHK_ERR( rval );
 #endif
-   rval = iMOAB_UpdateMeshInfo(poid);MB_CHK_ERR( rval );
-   return moab::MB_SUCCESS;
+
+    rval = iMOAB_UpdateMeshInfo( poid );MB_CHK_ERR( rval );
+    return moab::MB_SUCCESS;
 }
 
 ErrCode iMOAB_DefineTagStorage( iMOAB_AppID pid,
@@ -2315,7 +2340,7 @@ ErrCode iMOAB_CreateElements( iMOAB_AppID pid,
     ReadUtilIface* read_iface;
     ErrorCode rval = context.MBI->query_interface( read_iface );MB_CHK_ERR( rval );
 
-    EntityType mbtype = (EntityType)( *type );
+    EntityType mbtype = ( EntityType )( *type );
     EntityHandle actual_start_handle;
     EntityHandle* array = NULL;
     rval = read_iface->get_element_connect( *num_elem, *num_nodes_per_element, mbtype, 1, actual_start_handle, array );MB_CHK_ERR( rval );
@@ -2429,7 +2454,7 @@ ErrCode iMOAB_ResolveSharedEntities( iMOAB_AppID pid, int* num_verts, int* marke
     Tag part_tag;
     dum_id = -1;
     rval   = context.MBI->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_tag,
-                                          MB_TAG_CREAT | MB_TAG_SPARSE, &dum_id );
+                                        MB_TAG_CREAT | MB_TAG_SPARSE, &dum_id );
 
     if( part_tag == NULL || ( ( rval != MB_SUCCESS ) && ( rval != MB_ALREADY_ALLOCATED ) ) )
     {
@@ -2697,7 +2722,7 @@ ErrCode iMOAB_ReceiveMesh( iMOAB_AppID pid, MPI_Comm* join, MPI_Group* sendingGr
     Tag part_tag;
     int dum_id = -1;
     rval       = context.MBI->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_tag,
-                                              MB_TAG_CREAT | MB_TAG_SPARSE, &dum_id );
+                                        MB_TAG_CREAT | MB_TAG_SPARSE, &dum_id );
 
     if( part_tag == NULL || ( ( rval != MB_SUCCESS ) && ( rval != MB_ALREADY_ALLOCATED ) ) )
     {
@@ -3287,7 +3312,7 @@ ErrCode iMOAB_MergeVertices( iMOAB_AppID pid )
     Tag part_tag;
     int dum_id = -1;
     rval       = context.MBI->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_tag,
-                                              MB_TAG_CREAT | MB_TAG_SPARSE, &dum_id );
+                                        MB_TAG_CREAT | MB_TAG_SPARSE, &dum_id );
 
     if( part_tag == NULL || ( ( rval != MB_SUCCESS ) && ( rval != MB_ALREADY_ALLOCATED ) ) )
     {
@@ -4613,8 +4638,7 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
     {
         std::stringstream sstr;
         sstr << "outputSrcDest_" << *pid_intersection << "_" << ivar << "_" << pco_intx->rank() << ".h5m";
-        EntityHandle sets[2] = { context.appDatas[*tdata.pid_src].file_set,
-                                 context.appDatas[*tdata.pid_dest].file_set };
+        EntityHandle sets[2] = {context.appDatas[*tdata.pid_src].file_set, context.appDatas[*tdata.pid_dest].file_set};
         rval                 = context.MBI->write_file( sstr.str().c_str(), NULL, "", sets, 2 );MB_CHK_ERR( rval );
     }
     {
@@ -4622,7 +4646,7 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         sstr << "outputCovSrcDest_" << *pid_intersection << "_" << ivar << "_" << pco_intx->rank() << ".h5m";
         // EntityHandle sets[2] = {data_intx.file_set, data_intx.covering_set};
         EntityHandle covering_set = remapper->GetCoveringSet();
-        EntityHandle sets[2]      = { covering_set, context.appDatas[*tdata.pid_dest].file_set };
+        EntityHandle sets[2]      = {covering_set, context.appDatas[*tdata.pid_dest].file_set};
         rval                      = context.MBI->write_file( sstr.str().c_str(), NULL, "", sets, 2 );MB_CHK_ERR( rval );
     }
     {

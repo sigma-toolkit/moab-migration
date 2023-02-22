@@ -86,7 +86,7 @@ int main( int argc, char* argv[] )
 #endif
     int startG3 = startG1, endG3 = endG1;  // these are for land layout
     int startG4 = startG1, endG4 = endG1;  // these are for coupler layout
-    int context_id = -1;                   // used now for freeing buffers
+    int context_id;                   // used now for freeing buffers
 
     // default: load atm on 2 proc, ocean on 2, land on 2; migrate to 2 procs, then compute intx
     // later, we need to compute weight matrix with tempestremap
@@ -334,11 +334,6 @@ int main( int argc, char* argv[] )
     // infer atm2 from ocean:
     // atm
     repartitioner_scheme = 5;  // reuse the partition stored at previous step
-    /*ierr =
-        setup_component_coupler_meshes( cmpAtmPID, cmpatm, cplAtm2PID, cplatm2, &atmComm, &atmPEGroup, &couComm,
-                                        &couPEGroup, &atmCouComm, atmFilename, readopts, nghlay, repartitioner_scheme );
-    CHECKIERR( ierr, "Cannot load and migrate atm mesh for ocean context " )*/
-    // we cannot use setup_component_coupler_meshes for ocn - atm2, because atm was already loaded
     if( atmCouComm != MPI_COMM_NULL && 5 == repartitioner_scheme )  // yes, we just set it to 5
     {
         // need to send the zoltan buffer from coupler root towards the component root (atm in this case)

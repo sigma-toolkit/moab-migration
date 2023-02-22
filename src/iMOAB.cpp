@@ -4184,12 +4184,15 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( rval );
     rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
 
+#ifdef VERBOSE_ZOLTAN_TIMINGS
 #ifdef MOAB_HAVE_MPI
     double t1;
     if( is_root ) t1 = MPI_Wtime();
 #endif
+#endif
     // First, compute the covering source set.
     rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false );MB_CHK_ERR( rval );
+#ifdef VERBOSE_ZOLTAN_TIMINGS
 #ifdef MOAB_HAVE_MPI
     double t2;
     if( is_root )
@@ -4197,6 +4200,7 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
         t2 = MPI_Wtime();
         std::cout << "[LOG] Time: coverage mesh:" << t2 - t1 << "\n";
     }
+#endif
 #endif
     // Next, compute intersections with MOAB.
     rval = tdata.remapper->ComputeOverlapMesh( use_kdtree_search, false );MB_CHK_ERR( rval );

@@ -110,7 +110,7 @@ int main( int argc, char* argv[] )
     std::vector< int > groupTasks;
     int startG1 = 0, startG2 = 0, endG1 = numProcesses - 1, endG2 = numProcesses - 1, startG3 = startG1, endG3 = endG1;
     int startG4 = startG1, endG4 = endG1;  // these are for coupler layout
-    int context_id = -1;                   // used now for freeing buffers
+    int context_id;                   // used now for freeing buffers
 
     // default: load atm on 2 proc, ocean on 2, land on 2; migrate to 2 procs, then compute intx
     // later, we need to compute weight matrix with tempestremap
@@ -339,6 +339,7 @@ int main( int argc, char* argv[] )
     ierr = setup_component_coupler_meshes( cmpLndPID, cmplnd, cplLndPID, cpllnd, &lndComm, &lndPEGroup, &couComm,
                                            &couPEGroup, &lndCouComm, lndFilename, readoptsPhysAtm, nghlay,
                                            repartitioner_scheme );
+    CHECKIERR( ierr, "cannot setup land mesh" )
 
     if( couComm != MPI_COMM_NULL )
     {  // write only for n==1 case
@@ -500,6 +501,7 @@ int main( int argc, char* argv[] )
 
             ierr =
                 iMOAB_WriteMappingWeightsToFile( cplLndAtmPID, weights_identifiers[1], lnd_atm_map_file_name.c_str() );
+            CHECKIERR( ierr, "cannot write map file " )
             POP_TIMER( couComm, rankInCouComm )
         }
     }

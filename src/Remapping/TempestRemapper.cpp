@@ -1999,10 +1999,12 @@ ErrorCode TempestRemapper::augment_overlap_set()
     // add the new polygons to the overlap set
     // these will be ghosted, so will participate in conservation only
     rval = m_interface->add_entities( m_overlap_set, newPolygons );MB_CHK_ERR( rval );
+#ifdef VERBOSE
     if( !rank )
     {
         std::cout << "Augmenting: add " << newPolygons.size() << " polygons on root task \n";
     }
+#endif
     return MB_SUCCESS;
 }
 

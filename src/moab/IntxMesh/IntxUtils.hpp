@@ -231,22 +231,22 @@ class IntxAreaUtils
      */
     double spherical_angle( double* A, double* B, double* C, double Radius );
 
-    double area_spherical_triangle( double* A, double* B, double* C, double Radius, int rank = -1 );
+    double area_spherical_triangle( double* A, double* B, double* C, double Radius, int rank = 0 );
 
-    double area_spherical_polygon( double* A, int N, double Radius, int* sign = NULL, int rank = -1 );
+    double area_spherical_polygon( double* A, int N, double Radius, int* sign = NULL, int rank = 0 );
 
-    double area_spherical_element( Interface* mb, EntityHandle elem, double R, int rank );
+    double area_spherical_element( Interface* mb, EntityHandle elem, double R, int rank = 0 );
 
-    double area_on_sphere( Interface* mb, EntityHandle set, double R, int rank = -1);
+    double area_on_sphere( Interface* mb, EntityHandle set, double R, int rank = 0 );
 
-    ErrorCode positive_orientation( Interface* mb, EntityHandle set, double R, int rank );
+    ErrorCode positive_orientation( Interface* mb, EntityHandle set, double R, int rank = 0 );
 
   private:
     /* lHuiller method for computing area on a spherical triangle */
-    double area_spherical_triangle_lHuiller( double* ptA, double* ptB, double* ptC, double Radius, int rank = -1 );
+    double area_spherical_triangle_lHuiller( double* ptA, double* ptB, double* ptC, double Radius, int rank = 0 );
 
     /* lHuiller method for computing area on a spherical polygon */
-    double area_spherical_polygon_lHuiller( double* A, int N, double Radius, int* sign = NULL, int rank =-1);
+    double area_spherical_polygon_lHuiller( double* A, int N, double Radius, int* sign = NULL, int rank = 0 );
 
     /* Girard method for computing area on a spherical triangle with spherical excess */
     double area_spherical_triangle_girard( double* A, double* B, double* C, double Radius );

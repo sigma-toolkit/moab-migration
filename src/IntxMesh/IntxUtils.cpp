@@ -1074,7 +1074,8 @@ double IntxAreaUtils::area_spherical_element( Interface* mb, EntityHandle elem, 
     {
         if( lsign < 0 )
         {
-            std::cout << " IntxAreaUtils::area_spherical_element : lsign :" << lsign << " area:" << area << "\n ";
+            std::cout << " IntxAreaUtils::area_spherical_element : lsign :" << lsign << " area:" << area << " rank:"
+                    << rank << "\n";
             mb->list_entity( elem );
         }
     }

@@ -2503,10 +2503,9 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
         // the root of the coupler, which will store the buffer
         if( 4 == met )
         {
-            size_t bufSize;
             if( 0 == rank )
             {
-                bufSize = myZZ->Serialize_Size();
+                size_t bufSize = myZZ->Serialize_Size();
                 /* Then allocate  the buffer */
                 ZoltanBuffer.resize( bufSize );
                 int ierr = myZZ->Serialize( bufSize, &ZoltanBuffer[0] );

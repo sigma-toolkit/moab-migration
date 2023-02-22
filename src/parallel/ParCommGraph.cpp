@@ -573,7 +573,7 @@ ErrorCode ParCommGraph::receive_mesh( MPI_Comm jcomm,
             adj_fact->create_vert_elem_adjacencies();
         else
         {
-            for( Range::iterator it = newEnts.begin(); it != newEnts.end(); it++ )
+            for( Range::iterator it = newEnts.begin(); it != newEnts.end(); ++it )
             {
                 EntityHandle eh          = *it;
                 const EntityHandle* conn = NULL;

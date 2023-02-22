@@ -2,6 +2,7 @@
 #include "moab/FileOptions.hpp"
 #include "moab/ReadUtilIface.hpp"
 #include "moab/IntxMesh/IntxUtils.hpp"
+#include "AEntityFactory.hpp"
 #ifdef MOAB_HAVE_MPI
 #include "moab/ParallelMergeMesh.hpp"
 #endif
@@ -430,51 +431,48 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     }
 
     // int nj = gDims[4]-gDims[1]; // is it about 1 in irregular cases
-    int j              = lDims[1];
-    int i              = lDims[0];  // if elem_index is getting to next row, increase j
-    int local_row_size = lDims[3] - lDims[0];
-    elem_index         = 0;
+
+    int local_row_size = lCDims[3] - lCDims[0];
+    int global_row_size = gDims[3] - gDims[0]; // this is along
+    elem_index         = -1;
     int index          = 0;  // consider the mask for advancing in moab arrays;
     //printf(" map size :%ld \n", vertex_map.size());
     // create now vertex arrays, size vertex_map.size()
-    for( ; elem_index < local_elems; elem_index++ )
-    {
-        if( 0 == mask[elem_index] ) continue;  // nothing to do, do not advance elem_index in actual moab arrays
-        // set area and fraction on those elements too
-        for( int k = 0; k < nv; k++ )
+    for (int j = lCDims[1]; j<lCDims[4]; j++)
+        for (int i = lCDims[0]; i<lCDims[3]; i++)
         {
-            int index_v_arr = nv * elem_index + k;
-            if( nv > 1 )
+            elem_index++;
+            if( 0 == mask[elem_index] ) continue;  // nothing to do, do not advance elem_index in actual moab arrays
+            // set area and fraction on those elements too
+            for( int k = 0; k < nv; k++ )
             {
-                double x      = xv[index_v_arr];
-                double y      = yv[index_v_arr];
-                double cosphi = cos( pideg * y );
-                double zmult  = sin( pideg * y );
-                double xmult  = cosphi * cos( x * pideg );
-                double ymult  = cosphi * sin( x * pideg );
-                Node3D pt( xmult, ymult, zmult );
-                conn_arr[index * nv + k] = vertex_map[pt];
+                int index_v_arr = nv * elem_index + k;
+                if( nv > 1 )
+                {
+                    double x      = xv[index_v_arr];
+                    double y      = yv[index_v_arr];
+                    double cosphi = cos( pideg * y );
+                    double zmult  = sin( pideg * y );
+                    double xmult  = cosphi * cos( x * pideg );
+                    double ymult  = cosphi * sin( x * pideg );
+                    Node3D pt( xmult, ymult, zmult );
+                    conn_arr[index * nv + k] = vertex_map[pt];
+                }
             }
-        }
-        EntityHandle cell = start_vertex + index;
-        if( nv > 1 ) cell = start_cell + index;
-        // set other tags, like xc, yc, frac, area
-        rval = mbImpl->tag_set_data( xcTag, &cell, 1, &xc[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set xc tag" );
-        rval = mbImpl->tag_set_data( ycTag, &cell, 1, &yc[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set yc tag" );
-        rval = mbImpl->tag_set_data( areaTag, &cell, 1, &area[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set area tag" );
-        rval = mbImpl->tag_set_data( fracTag, &cell, 1, &frac[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set frac tag" );
+            EntityHandle cell = start_vertex + index;
+            if( nv > 1 ) cell = start_cell + index;
+            // set other tags, like xc, yc, frac, area
+            rval = mbImpl->tag_set_data( xcTag, &cell, 1, &xc[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set xc tag" );
+            rval = mbImpl->tag_set_data( ycTag, &cell, 1, &yc[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set yc tag" );
+            rval = mbImpl->tag_set_data( areaTag, &cell, 1, &area[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set area tag" );
+            rval = mbImpl->tag_set_data( fracTag, &cell, 1, &frac[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set frac tag" );
 
-        // set the global id too:
-        int globalId = j * local_row_size + i + 1;
-        i++;
-        if( ( i - lDims[0] ) % local_row_size == 0 )
-        {
-            j++;
-            i = lDims[0];  // start over next row
+            // set the global id too:
+            int globalId = j * global_row_size + i + 1;
+            rval = mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId );MB_CHK_SET_ERR( rval, "Failed to set global id tag" );
+            index++;
         }
-        rval = mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId );MB_CHK_SET_ERR( rval, "Failed to set global id tag" );
-        index++;
-    }
+
 
     rval = mbImpl->add_entities( _fileSet, tmp_range );MB_CHK_SET_ERR( rval, "Failed to add new cells to current file set" );
 
@@ -492,6 +490,26 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     rval = mbImpl->get_connectivity( faces, all_verts );MB_CHK_ERR( rval );
     //printf(" range vert size :%ld \n", all_verts.size());
     rval = mbImpl->add_entities( _fileSet, all_verts );MB_CHK_ERR( rval );
+
+    // need to add adjacencies; TODO: fix this for all nc readers
+    // copy this logic from migrate mesh in par comm graph
+    Core* mb                 = (Core*)mbImpl;
+    AEntityFactory* adj_fact = mb->a_entity_factory();
+    if( !adj_fact->vert_elem_adjacencies() )
+        adj_fact->create_vert_elem_adjacencies();
+    else
+    {
+        for( Range::iterator it = faces.begin(); it != faces.end(); ++it )
+        {
+            EntityHandle eh          = *it;
+            const EntityHandle* conn = NULL;
+            int num_nodes            = 0;
+            rval                     = mb->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
+            adj_fact->notify_create_entity( eh, conn, num_nodes );
+        }
+    }
+
+
 #ifdef MOAB_HAVE_MPI
     ParallelComm*& myPcomm = _readNC->myPcomm;
     if( myPcomm )

@@ -594,7 +594,7 @@ int main( int argc, char* argv[] )
                 moab::EntityHandle& ovmesh  = remapper->GetMeshSet( moab::Remapper::OverlapMesh );
 
                 // load the mesh in MOAB format
-                std::vector< int > metadata;
+                std::vector< int > metadata(2);
                 result = remapper->LoadNativeMesh( *j, srcmesh, metadata );MB_CHK_ERR( result );
 
                 // Check if our MOAB mesh has RED and BLUE tags; this would indicate we are converting

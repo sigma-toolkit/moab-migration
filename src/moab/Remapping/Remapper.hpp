@@ -111,7 +111,6 @@ class Remapper
         Tag rectilinearTag;
         rval = m_interface->tag_get_handle( "ClimateMetadata", rectilinearTag );
 
-        metadata.clear();
         if( rval != MB_FAILURE && rval != MB_TAG_NOT_FOUND && rval != MB_ALREADY_ALLOCATED &&
             rectilinearTag != nullptr )
         {
@@ -119,6 +118,7 @@ class Remapper
             moab::EntityHandle rootset = 0;
             rval                       = m_interface->tag_get_data( rectilinearTag, &rootset, 1,
                                                                     dimSizes );  // MB_CHK_SET_ERR( rval, "Error geting tag data" );
+            metadata.clear();
             metadata.push_back( dimSizes[0] );
             metadata.push_back( dimSizes[1] );
             metadata.push_back( dimSizes[2] );

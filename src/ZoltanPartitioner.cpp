@@ -81,12 +81,14 @@ ZoltanPartitioner::ZoltanPartitioner( Interface* impl,
 #endif
 
                                       )
-    : PartitionerBase< int >( impl, use_coords
+    : PartitionerBase< int >( impl,
+                              use_coords
 #ifdef MOAB_HAVE_MPI
-                                      ,
-                                      parcomm
+                              ,
+                              parcomm
 #endif
-    ), myZZ( NULL ), myNumPts( 0 ), argcArg( argc ), argvArg( argv )
+                              ),
+      myZZ( NULL ), myNumPts( 0 ), argcArg( argc ), argvArg( argv )
 #ifdef MOAB_HAVE_CGM
       ,
       gti( gqt )
@@ -590,7 +592,7 @@ ErrorCode ZoltanPartitioner::partition_mesh_and_geometry( const double part_geom
 
     if( NULL == zmethod || !strcmp( zmethod, "RCB" ) )
     {
-        if (projection_type == 2)
+        if( projection_type == 2 )
             SetRCB_Parameters( true );
         else
             SetRCB_Parameters( recompute_rcb_box );
@@ -1672,7 +1674,7 @@ ErrorCode ZoltanPartitioner::write_partition( const int nparts,
     Tag part_set_tag;
     int dum_id = -1, i;
     result     = mbImpl->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_set_tag,
-                                         MB_TAG_SPARSE | MB_TAG_CREAT, &dum_id );RR;
+                                     MB_TAG_SPARSE | MB_TAG_CREAT, &dum_id );RR;
 
     // get any sets already with this tag, and clear them
     Range tagged_sets;
@@ -2277,9 +2279,11 @@ void mbGetPart( void* /* userDefinedData */,
 // new methods for partition in parallel, used by migrate in iMOAB
 ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
                                                     std::multimap< int, int >& extraGraphEdges,
-                                                    std::map< int, int > procs, int& numNewPartitions,
-                                                    std::map< int, Range >& distribution, int met,
-                                                    std::vector<char> & ZoltanBuffer )
+                                                    std::map< int, int > procs,
+                                                    int& numNewPartitions,
+                                                    std::map< int, Range >& distribution,
+                                                    int met,
+                                                    std::vector< char >& ZoltanBuffer )
 {
     // start copy
     MeshTopoUtil mtu( mbImpl );
@@ -2403,7 +2407,8 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
 
     // Create Zoltan object.  This calls Zoltan_Create.
     // old code
-    if (met <= 4 ) {
+    if( met <= 4 )
+    {
 
         if( NULL == myZZ ) myZZ = new Zoltan( mbpc->comm() );
 
@@ -2424,10 +2429,10 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
         {
             myZZ->Set_Num_Geom_Fn( mbGetObjectSize, NULL );
             myZZ->Set_Geom_Multi_Fn( mbGetObject, NULL );
-            if (3<=met)
-                SetRCB_Parameters(/*const bool recompute_rcb_box*/true);  // recompute rcb box
+            if( 3 <= met )
+                SetRCB_Parameters( /*const bool recompute_rcb_box*/ true );  // recompute rcb box
             else
-                SetRCB_Parameters(/*const bool recompute_rcb_box*/false);  // recompute rcb box // is it faster ?
+                SetRCB_Parameters( /*const bool recompute_rcb_box*/ false );  // recompute rcb box // is it faster ?
         }
         else if( 1 == met )
         {
@@ -2449,11 +2454,9 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
         ZOLTAN_ID_PTR export_global_ids, export_local_ids;
         int *assign_procs, *assign_parts;
 
-
         if( mbpc->rank() == 0 )
             std::cout << "Computing partition using method (1-graph, 2-geom):" << met << " for " << numNewPartitions
                       << " parts..." << std::endl;
-
 
 #ifndef NDEBUG
 #if 0
@@ -2473,9 +2476,9 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
       }
 #endif
 #endif
-        retval = myZZ->LB_Partition( changes, numGidEntries, numLidEntries, num_import, import_global_ids, import_local_ids,
-                                     import_procs, import_to_part, num_export, export_global_ids, export_local_ids,
-                                     assign_procs, assign_parts );
+        retval = myZZ->LB_Partition( changes, numGidEntries, numLidEntries, num_import, import_global_ids,
+                                     import_local_ids, import_procs, import_to_part, num_export, export_global_ids,
+                                     export_local_ids, assign_procs, assign_parts );
         if( ZOLTAN_OK != retval ) return MB_FAILURE;
 
 #ifdef VERBOSE
@@ -2498,17 +2501,17 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
         // new code: if method == 4, we need to serialize, and send it to root of the coupler
         // here, we serialize it; sending it will happen in the calling method, where we have access to
         // the root of the coupler, which will store the buffer
-        if (4 == met)
+        if( 4 == met )
         {
             size_t bufSize;
-            if (0 == rank) {
+            if( 0 == rank )
+            {
                 bufSize = myZZ->Serialize_Size();
                 /* Then allocate  the buffer */
-                ZoltanBuffer.resize(bufSize);
-                int ierr = myZZ->Serialize(bufSize, &ZoltanBuffer[0]);
-                if (ierr != 0 ) MB_CHK_ERR(MB_FAILURE);
+                ZoltanBuffer.resize( bufSize );
+                int ierr = myZZ->Serialize( bufSize, &ZoltanBuffer[0] );
+                if( ierr != 0 ) MB_CHK_ERR( MB_FAILURE );
             }
-
         }
         assert( num_export == (int)primary.size() );
         for( i = 0; i < num_export; i++ )
@@ -2523,21 +2526,21 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
         delete myZZ;
         myZZ = NULL;
     }
-    else if (5 == met)
+    else if( 5 == met )
     {
         if( NULL == myZZ ) myZZ = new Zoltan( mbpc->comm() );
         // zoltan buffer is only on rank 0 right now
         // broadcast it first:
         int rank = mbpc->rank();
         size_t bufSize;
-        if (rank == 0) bufSize = ZoltanBuffer.size();
-        MPI_Bcast((char *)&bufSize, sizeof(bufSize), MPI_CHAR, 0, mbpc->comm());
-        if (0 != rank) ZoltanBuffer.resize(bufSize);
+        if( rank == 0 ) bufSize = ZoltanBuffer.size();
+        MPI_Bcast( (char*)&bufSize, sizeof( bufSize ), MPI_CHAR, 0, mbpc->comm() );
+        if( 0 != rank ) ZoltanBuffer.resize( bufSize );
 
-        MPI_Bcast(&ZoltanBuffer[0], bufSize, MPI_CHAR, 0, mbpc->comm());
+        MPI_Bcast( &ZoltanBuffer[0], bufSize, MPI_CHAR, 0, mbpc->comm() );
         // deserialize on each task
-        int ierr = myZZ->Deserialize(ZoltanBuffer.size(), &ZoltanBuffer[0]);
-        if (ierr != 0 ) MB_CHK_ERR(MB_FAILURE);
+        int ierr = myZZ->Deserialize( ZoltanBuffer.size(), &ZoltanBuffer[0] );
+        if( ierr != 0 ) MB_CHK_ERR( MB_FAILURE );
 
         // use here the partitioning !!
         /* code in inferred partitions:
@@ -2550,9 +2553,9 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
         for( Range::iterator rit = primary.begin(); rit != primary.end(); ++rit, i++ )
         {
             EntityHandle cell = *rit;
-            int proc=0, part=0;
+            int proc = 0, part = 0;
             // coords are calculated in advance, contain the centers of the cells, maybe in gnomonic plane
-            myZZ->LB_Point_PP_Assign( &coords[3*i], proc, part );
+            myZZ->LB_Point_PP_Assign( &coords[3 * i], proc, part );
             distribution[part].insert( cell );
         }
         // TODO

@@ -62,15 +62,12 @@ int main( int argc, char* argv[] )
 
     MPI_Comm_group( MPI_COMM_WORLD, &jgroup );  // all processes in jgroup
 
-
-    int  cplatm = 6;  //
-    std::string atmFilename =
-            "../../sandbox/MeshFiles/e3sm/o_ne11pg2/ne11pg2_inf.h5m";
+    int cplatm              = 6;  //
+    std::string atmFilename = "../../sandbox/MeshFiles/e3sm/o_ne11pg2/ne11pg2_inf.h5m";
     // get the ocn from the ol_ne4pg2 projection folder, it has some data
     int rankInOcnComm = -1;
     int cmpocn = 17, cplocn = 18, ocnatmid = 1806;  // 18*100+6
-    std::string ocnFilename =
-            "../../sandbox/MeshFiles/e3sm/ol_ne4pg2/ocn.h5m";
+    std::string ocnFilename = "../../sandbox/MeshFiles/e3sm/ol_ne4pg2/ocn.h5m";
 
     // load atm directly on coupler pes! and do intx there, after ocean migration
     // ocean is source !
@@ -80,9 +77,8 @@ int main( int argc, char* argv[] )
     int nghlay = 0;  // number of ghost layers for loading the file
     std::vector< int > groupTasks;
     // group 1 is atm, 2 is ocn; atm not used ? skip group 3 (land)
-    int  startG2 = 0, endG2 = numProcesses - 1;
+    int startG2 = 0, endG2 = numProcesses - 1;
     int startG4 = startG2, endG4 = endG2;  // these are for coupler layout
-
 
     // default: load atm on 2 proc, ocean on 2, land on 2; migrate to 2 procs, then compute intx
     // later, we need to compute weight matrix with tempestremap
@@ -100,7 +96,7 @@ int main( int argc, char* argv[] )
     int n = 1;  // number of send/receive / project / send back cycles
     opts.addOpt< int >( "iterations,n", "number of iterations for coupler", &n );
 
-    bool analytic_field=false;
+    bool analytic_field = false;
 
     opts.addOpt< void >( "analytic,q", "analytic field", &analytic_field );
 
@@ -111,10 +107,10 @@ int main( int argc, char* argv[] )
     if( !rankInGlobalComm )
     {
         // do not use group 1!
-        std::cout << " atm file: " << atmFilename << "\n   on tasks : " << startG4 << ":" << endG4 <<
-           "\n ocn file: " << ocnFilename << "\n     on tasks : " << startG2 << ":" << endG2 <<
-           "\n  partitioning (0 trivial, 1 graph, 2 geometry, 3 gnomonic :"
-                 << repartitioner_scheme << "\n  " << " number of iterations: " << n << "\n";
+        std::cout << " atm file: " << atmFilename << "\n   on tasks : " << startG4 << ":" << endG4
+                  << "\n ocn file: " << ocnFilename << "\n     on tasks : " << startG2 << ":" << endG2
+                  << "\n  partitioning (0 trivial, 1 graph, 2 geometry, 3 gnomonic :" << repartitioner_scheme << "\n  "
+                  << " number of iterations: " << n << "\n";
     }
     MPI_Group ocnPEGroup;
     MPI_Comm ocnComm;
@@ -154,7 +150,6 @@ int main( int argc, char* argv[] )
 
         ierr = iMOAB_RegisterApplication( "OCNX", &couComm, &cplocn, cplOcnPID );  // ocn on coupler pes
         CHECKIERR( ierr, "Cannot register OCN over coupler PEs" )
-
     }
     if( ocnComm != MPI_COMM_NULL )
     {
@@ -169,14 +164,14 @@ int main( int argc, char* argv[] )
         // load atm mesh on copler pes
         ierr = iMOAB_LoadMesh( cplAtmPID, atmFilename.c_str(), readopts.c_str(), &nghlay );
         CHECKIERR( ierr, "Cannot load atm mesh on coupler pes" )
-
     }
 
     // load ocn and migrate to coupler
-    repartitioner_scheme = 2; // will use RCB
+    repartitioner_scheme = 2;  // will use RCB
     // ocean
-    ierr = setup_component_coupler_meshes( cmpOcnPID, cmpocn, cplOcnPID, cplocn, &ocnComm, &ocnPEGroup, &couComm,
-                                            &couPEGroup, &ocnCouComm, ocnFilename, readopts, nghlay, repartitioner_scheme );
+    ierr =
+        setup_component_coupler_meshes( cmpOcnPID, cmpocn, cplOcnPID, cplocn, &ocnComm, &ocnPEGroup, &couComm,
+                                        &couPEGroup, &ocnCouComm, ocnFilename, readopts, nghlay, repartitioner_scheme );
     CHECKIERR( ierr, "Cannot load and migrate ocn mesh" )
     if( couComm != MPI_COMM_NULL )
     {
@@ -223,28 +218,28 @@ int main( int argc, char* argv[] )
     MPI_Barrier( MPI_COMM_WORLD );
 
     int fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 1, fNoConserve = 0, fNoBubble = 1, fInverseDistanceMap = 0;
-    const char* weights_identifiers[2] = { "scalar", "scalar-pc" };
-    int disc_orders[3]                 = { 4, 1, 1 };
-    const char* disc_methods[3]        = { "cgll", "fv", "pcloud" };
-    const char* dof_tag_names[3]       = { "GLOBAL_DOFS", "GLOBAL_ID", "GLOBAL_ID" };
+    const char* weights_identifiers[2] = {"scalar", "scalar-pc"};
+    int disc_orders[3]                 = {4, 1, 1};
+    const char* disc_methods[3]        = {"cgll", "fv", "pcloud"};
+    const char* dof_tag_names[3]       = {"GLOBAL_DOFS", "GLOBAL_ID", "GLOBAL_ID"};
     if( couComm != MPI_COMM_NULL )
     {
         PUSH_TIMER( couComm, "Compute the projection weights with TempestRemap" )
-        ierr = iMOAB_ComputeScalarProjectionWeights(
-            cplOcnAtmPID, weights_identifiers[0], disc_methods[1], &disc_orders[1],  // fv
-            disc_methods[1], &disc_orders[1],                                        // fv
-            &fNoBubble, &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap, &fNoConserve, &fValidate,
-            dof_tag_names[1], dof_tag_names[1] );
+        ierr = iMOAB_ComputeScalarProjectionWeights( cplOcnAtmPID, weights_identifiers[0], disc_methods[1],
+                                                     &disc_orders[1],                   // fv
+                                                     disc_methods[1], &disc_orders[1],  // fv
+                                                     &fNoBubble, &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap,
+                                                     &fNoConserve, &fValidate, dof_tag_names[1], dof_tag_names[1] );
         CHECKIERR( ierr, "cannot compute scalar projection weights" )
         POP_TIMER( couComm, rankInCouComm )
     }
 
     int tagIndex[2];
-    int tagTypes[2]  = { DENSE_DOUBLE, DENSE_DOUBLE };
+    int tagTypes[2]  = {DENSE_DOUBLE, DENSE_DOUBLE};
     int atmCompNDoFs = 1 /* FV disc_orders[0]*disc_orders[0] */, ocnCompNDoFs = 1 /*FV*/;
 
-    const char* bottomTempField          = "T_proj";  // on ocean input files
-    const char* bottomTempProjectedField = "T_proj2"; // on projected atm
+    const char* bottomTempField          = "T_proj";   // on ocean input files
+    const char* bottomTempProjectedField = "T_proj2";  // on projected atm
     const char* bottomUVelField          = "u_proj";
     const char* bottomUVelProjectedField = "u_proj2";
     const char* bottomVVelField          = "v_proj";
@@ -268,7 +263,6 @@ int main( int argc, char* argv[] )
         ierr = iMOAB_DefineTagStorage( cplAtmPID, bottomVVelProjectedField, &tagTypes[1], &atmCompNDoFs, &tagIndex[1] );
         CHECKIERR( ierr, "failed to define the field tag v_proj2" );
     }
-
 
     // need to make sure that the coverage mesh (created during intx method OCN - ATM) received the tag that need to be
     // projected to target (atm); the coverage mesh has only the ids; need to change the migrate method to
@@ -304,7 +298,7 @@ int main( int argc, char* argv[] )
             // set the tag to 0
         }
     }
-    if (analytic_field && (ocnComm != MPI_COMM_NULL) ) // we are on ocean pes
+    if( analytic_field && ( ocnComm != MPI_COMM_NULL ) )  // we are on ocean pes
     {
         // cmpOcnPID, "T_proj:u_proj:v_proj"
         ierr = iMOAB_DefineTagStorage( cmpOcnPID, bottomTempField, &tagTypes[0], &ocnCompNDoFs, &tagIndex[0] );
@@ -338,8 +332,7 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "cannot make tag u_proj null" )
         ierr = iMOAB_SetDoubleTagStorage( cmpOcnPID, bottomVVelField, &storLeng, &eetype, &vals[0] );
         CHECKIERR( ierr, "cannot make tag v_proj null" )
-                    // set the tag to 0
-
+        // set the tag to 0
     }
     MPI_Barrier( MPI_COMM_WORLD );
     // start a virtual loop for number of iterations
@@ -348,18 +341,17 @@ int main( int argc, char* argv[] )
         PUSH_TIMER( MPI_COMM_WORLD, "Send/receive data from ocn component to coupler in atm context" )
         if( ocnComm != MPI_COMM_NULL )
         {
-          // as always, use nonblocking sends
-          // this is for projection to atm, from ocean:
+            // as always, use nonblocking sends
+            // this is for projection to atm, from ocean:
             ierr = iMOAB_SendElementTag( cmpOcnPID, "T_proj:u_proj:v_proj", &ocnCouComm, &cplatm );
             CHECKIERR( ierr, "cannot send tag values" )
         }
         if( couComm != MPI_COMM_NULL )
         {
-          // receive on ocn on coupler pes, that was redistributed according to coverage
+            // receive on ocn on coupler pes, that was redistributed according to coverage
             ierr = iMOAB_ReceiveElementTag( cplOcnPID, "T_proj:u_proj:v_proj", &ocnCouComm, &cplatm );
             CHECKIERR( ierr, "cannot receive tag values" )
         }
-
 
         // we can now free the sender buffers
         if( ocnComm != MPI_COMM_NULL )
@@ -374,24 +366,24 @@ int main( int argc, char* argv[] )
             const char* concat_fieldname  = "T_proj:u_proj:v_proj";
             const char* concat_fieldnameT = "T_proj2:u_proj2:v_proj2";
 
-         /* We have the remapping weights computed earlier, and te field. Let us apply the weights onto the tag
+            /* We have the remapping weights computed earlier, and te field. Let us apply the weights onto the tag
           * we defined  on the source mesh and get the projection on the target mesh */
             PUSH_TIMER( couComm, "Apply Scalar projection weights" )
             ierr = iMOAB_ApplyScalarProjectionWeights( cplOcnAtmPID, weights_identifiers[0], concat_fieldname,
-                                                    concat_fieldnameT );
+                                                       concat_fieldnameT );
             CHECKIERR( ierr, "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )
-         // do not write if iters > 0)
-           if( 1 == n )
-           {
-               char outputFileTgt[] = "fAtmOnCpl5.h5m";
-               ierr = iMOAB_WriteMesh( cplAtmPID, outputFileTgt, fileWriteOptions );
-               CHECKIERR( ierr, "failed to write fAtmOnCpl3.h5m " );
-           }
+            // do not write if iters > 0)
+            if( 1 == n )
+            {
+                char outputFileTgt[] = "fAtmOnCpl5.h5m";
+                ierr                 = iMOAB_WriteMesh( cplAtmPID, outputFileTgt, fileWriteOptions );
+                CHECKIERR( ierr, "failed to write fAtmOnCpl3.h5m " );
+            }
         }
     }
-        // do not need to send the tag to atm pes, from atm mesh on coupler pes; we are already on atm pes
-   // free data
+    // do not need to send the tag to atm pes, from atm mesh on coupler pes; we are already on atm pes
+    // free data
     // free up the MPI objects and finalize
 
     if( couComm != MPI_COMM_NULL )
@@ -417,12 +409,10 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "cannot deregister app ATMX" )
     }
 
-
     ierr = iMOAB_Finalize();
     CHECKIERR( ierr, "did not finalize iMOAB" )
 
     // free atm coupler group and comm
-
 
     if( MPI_COMM_NULL != ocnComm ) MPI_Comm_free( &ocnComm );
     // free ocn - coupler group and comm
@@ -430,7 +420,6 @@ int main( int argc, char* argv[] )
     MPI_Group_free( &joinOcnCouGroup );
 
     if( MPI_COMM_NULL != couComm ) MPI_Comm_free( &couComm );
-
 
     MPI_Group_free( &ocnPEGroup );
 

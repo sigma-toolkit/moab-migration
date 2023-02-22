@@ -100,7 +100,7 @@ int IntxUtils::SortAndRemoveDoubles2( double* P, int& nP, double epsilon_1 )
     if( nP < 2 ) return 0;  // nothing to do
 
     // center of gravity for the points
-    double c[2] = { 0., 0. };
+    double c[2] = {0., 0.};
     int k       = 0;
     for( k = 0; k < nP; k++ )
     {
@@ -1069,13 +1069,13 @@ double IntxAreaUtils::area_spherical_element( Interface* mb, EntityHandle elem, 
     rval = mb->get_coords( verts, nsides, &coords[0] );MB_CHK_ERR_RET_VAL( rval, -1.0 );
 
     // compute and return the area of the polygonal element
-    int lsign = 1;
+    int lsign   = 1;
     double area = area_spherical_polygon( &coords[0], nsides, R, &lsign, rank );
     {
-        if (lsign<0)
+        if( lsign < 0 )
         {
             std::cout << " IntxAreaUtils::area_spherical_element : lsign :" << lsign << " area:" << area << "\n ";
-            mb->list_entity(elem);
+            mb->list_entity( elem );
         }
     }
     return area;
@@ -1184,8 +1184,8 @@ ErrorCode IntxUtils::enforce_convexity( Interface* mb, EntityHandle lset, int my
                 // break the next triangle, even though not optimal
                 // so create the triangle i+1, i+2, i+3; remove i+2 from original list
                 // even though not optimal in general, it is good enough.
-                EntityHandle conn3[3] = { verts[( i + 1 ) % nsides], verts[( i + 2 ) % nsides],
-                                          verts[( i + 3 ) % nsides] };
+                EntityHandle conn3[3] = {verts[( i + 1 ) % nsides], verts[( i + 2 ) % nsides],
+                                         verts[( i + 3 ) % nsides]};
                 // create a polygon with num_nodes-1 vertices, and connectivity
                 // verts[i+1], verts[i+3], (all except i+2)
                 std::vector< EntityHandle > conn( nsides - 1 );
@@ -1265,7 +1265,7 @@ ErrorCode IntxUtils::fix_degenerate_quads( Interface* mb, EntityHandle set )
                 rval          = mb->tag_get_data( gid, &quad, 1, &global_id );MB_CHK_ERR( rval );
                 int i2                = ( i + 2 ) % num_nodes;
                 int i3                = ( i + 3 ) % num_nodes;
-                EntityHandle conn3[3] = { conn4[i], conn4[i2], conn4[i3] };
+                EntityHandle conn3[3] = {conn4[i], conn4[i2], conn4[i3]};
                 EntityHandle tri;
                 rval = mb->create_element( MBTRI, conn3, 3, tri );MB_CHK_ERR( rval );
                 mb->add_entities( set, &tri, 1 );
@@ -1321,9 +1321,10 @@ ErrorCode IntxAreaUtils::positive_orientation( Interface* mb, EntityHandle set, 
                 rval = mb->set_connectivity( cell, &newconn[0], num_nodes );
                 if( MB_SUCCESS != rval ) return rval;
                 int gid;
-                rval = mb->tag_get_data(gidTag, &cell, 1, &gid);
+                rval = mb->tag_get_data( gidTag, &cell, 1, &gid );
                 if( MB_SUCCESS != rval ) return rval;
-                std::cout <<" revert cell with global id:" << gid << " with num_nodes " << num_nodes << " on rank " << rank <<"\n";
+                std::cout << " revert cell with global id:" << gid << " with num_nodes " << num_nodes << " on rank "
+                          << rank << "\n";
             }
             else
             {

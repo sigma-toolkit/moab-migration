@@ -54,7 +54,7 @@ int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< unsigne
                                                       DataArray2D< double >& dVertexLat,
                                                       std::vector< int >& masks,
                                                       unsigned& N,  // will have the local, after
-                                                      int & nv,
+                                                      int& nv,
                                                       int& maxdof )
 {
     // first decide maxdof, for partitioning
@@ -368,9 +368,9 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     int nS = m_weightMatrix.nonZeros();
 
 #if defined( MOAB_HAVE_MPI ) && defined( MOAB_HAVE_NETCDFPAR )
-    int locbuf[5] = { (int)nA, (int)nB, nS, nSourceNodesPerFace, nTargetNodesPerFace };
-    int offbuf[3] = { 0, 0, 0 };
-    int globuf[5] = { 0, 0, 0, 0, 0 };
+    int locbuf[5] = {(int)nA, (int)nB, nS, nSourceNodesPerFace, nTargetNodesPerFace};
+    int offbuf[3] = {0, 0, 0};
+    int globuf[5] = {0, 0, 0, 0, 0};
     MPI_Scan( locbuf, offbuf, 3, MPI_INT, MPI_SUM, m_pcomm->comm() );
     MPI_Allreduce( locbuf, globuf, 3, MPI_INT, MPI_SUM, m_pcomm->comm() );
     MPI_Allreduce( &locbuf[3], &globuf[3], 2, MPI_INT, MPI_MAX, m_pcomm->comm() );
@@ -381,8 +381,8 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     offbuf[2] -= nS;
 
 #else
-    int offbuf[3]            = { 0, 0, 0 };
-    int globuf[5]            = { (int)nA, (int)nB, nS, nSourceNodesPerFace, nTargetNodesPerFace };
+    int offbuf[3]            = {0, 0, 0};
+    int globuf[5]            = {(int)nA, (int)nB, nS, nSourceNodesPerFace, nTargetNodesPerFace};
 #endif
 
     // Write output dimensions entries
@@ -711,7 +711,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
         if( itMap != areaAtRow.end() )
         {
             double areaRow = itMap->second;  // we fished a lot for this !
-            assert(localColInd<vecSourceFaceArea.GetRows());
+            assert( localColInd < vecSourceFaceArea.GetRows() );
             dFracA[localColInd] += val / vecSourceFaceArea[localColInd] * areaRow;
         }
     }
@@ -730,7 +730,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
 #endif
 
     varRow->set_cur( (long)offbuf[2] );
-    varRow->put( &( vecRow[0] ) , nS );
+    varRow->put( &( vecRow[0] ), nS );
 
     varCol->set_cur( (long)offbuf[2] );
     varCol->put( &( vecCol[0] ), nS );
@@ -1003,37 +1003,37 @@ moab::ErrorCode moab::TempestOnlineMap::WriteHDF5MapFile( const std::string& str
     map_disc_details[5] = m_iMonotonicity;
 
 #ifdef MOAB_HAVE_MPI
-    int loc_smatmetadata[13] = { tot_src_ents,
-                                 tot_tgt_ents,
-                                 m_remapper->max_source_edges,
-                                 m_remapper->max_target_edges,
-                                 maxrow + 1,
-                                 maxcol + 1,
-                                 weightMatNNZ,
-                                 map_disc_details[0],
-                                 map_disc_details[1],
-                                 map_disc_details[2],
-                                 map_disc_details[3],
-                                 map_disc_details[4],
-                                 map_disc_details[5] };
+    int loc_smatmetadata[13] = {tot_src_ents,
+                                tot_tgt_ents,
+                                m_remapper->max_source_edges,
+                                m_remapper->max_target_edges,
+                                maxrow + 1,
+                                maxcol + 1,
+                                weightMatNNZ,
+                                map_disc_details[0],
+                                map_disc_details[1],
+                                map_disc_details[2],
+                                map_disc_details[3],
+                                map_disc_details[4],
+                                map_disc_details[5]};
     rval                     = m_interface->tag_set_data( tagMapMetaData, &m_meshOverlapSet, 1, &loc_smatmetadata[0] );MB_CHK_SET_ERR( rval, "Setting local tag data failed" );
-    int glb_smatmetadata[13] = { 0,
-                                 0,
-                                 0,
-                                 0,
-                                 0,
-                                 0,
-                                 0,
-                                 map_disc_details[0],
-                                 map_disc_details[1],
-                                 map_disc_details[2],
-                                 map_disc_details[3],
-                                 map_disc_details[4],
-                                 map_disc_details[5] };
+    int glb_smatmetadata[13] = {0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                map_disc_details[0],
+                                map_disc_details[1],
+                                map_disc_details[2],
+                                map_disc_details[3],
+                                map_disc_details[4],
+                                map_disc_details[5]};
     int loc_buf[7]           = {
         tot_src_ents, tot_tgt_ents, weightMatNNZ, m_remapper->max_source_edges, m_remapper->max_target_edges,
-        maxrow,       maxcol };
-    int glb_buf[4] = { 0, 0, 0, 0 };
+        maxrow,       maxcol};
+    int glb_buf[4] = {0, 0, 0, 0};
     MPI_Reduce( &loc_buf[0], &glb_buf[0], 3, MPI_INT, MPI_SUM, 0, m_pcomm->comm() );
     glb_smatmetadata[0] = glb_buf[0];
     glb_smatmetadata[1] = glb_buf[1];
@@ -1044,19 +1044,19 @@ moab::ErrorCode moab::TempestOnlineMap::WriteHDF5MapFile( const std::string& str
     glb_smatmetadata[4] = glb_buf[2];
     glb_smatmetadata[5] = glb_buf[3];
 #else
-    int glb_smatmetadata[13] = { tot_src_ents,
-                                 tot_tgt_ents,
-                                 m_remapper->max_source_edges,
-                                 m_remapper->max_target_edges,
-                                 maxrow,
-                                 maxcol,
-                                 weightMatNNZ,
-                                 map_disc_details[0],
-                                 map_disc_details[1],
-                                 map_disc_details[2],
-                                 map_disc_details[3],
-                                 map_disc_details[4],
-                                 map_disc_details[5] };
+    int glb_smatmetadata[13] = {tot_src_ents,
+                                tot_tgt_ents,
+                                m_remapper->max_source_edges,
+                                m_remapper->max_target_edges,
+                                maxrow,
+                                maxcol,
+                                weightMatNNZ,
+                                map_disc_details[0],
+                                map_disc_details[1],
+                                map_disc_details[2],
+                                map_disc_details[3],
+                                map_disc_details[4],
+                                map_disc_details[5]};
 #endif
     // These values represent number of rows and columns. So should be 1-based.
     glb_smatmetadata[4]++;
@@ -1141,7 +1141,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteHDF5MapFile( const std::string& str
 #endif
 
     // EntityHandle sets[3] = {m_remapper->m_source_set, m_remapper->m_target_set, m_remapper->m_overlap_set};
-    EntityHandle sets[1] = { m_remapper->m_overlap_set };
+    EntityHandle sets[1] = {m_remapper->m_overlap_set};
     rval                 = m_interface->write_file( strOutputFile.c_str(), NULL, writeOptions, sets, 1 );MB_CHK_ERR( rval );
 
 #ifdef WRITE_SCRIP_FILE

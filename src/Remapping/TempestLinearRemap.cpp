@@ -175,8 +175,7 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_Tempest_MOAB( int nOrder )
 
         for( ; ixOverlapEnd < m_meshOverlap->faces.size(); ixOverlapEnd++ )
         {
-            if( ixFirst - m_meshOverlap->vecSourceFaceIx[ixOverlapEnd] != 0 )
-                break;
+            if( ixFirst - m_meshOverlap->vecSourceFaceIx[ixOverlapEnd] != 0 ) break;
         }
 
         unsigned nOverlapFaces = ixOverlapEnd - ixOverlapBegin;
@@ -184,7 +183,8 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_Tempest_MOAB( int nOrder )
         if( nOverlapFaces == 0 )
         {
             {
-               std::cout <<"rank:" <<  rank << " " <<  m_remapper->GetGlobalID( Remapper::CoveringMesh, ixFirst) << "\n";
+                std::cout << "rank:" << rank << " " << m_remapper->GetGlobalID( Remapper::CoveringMesh, ixFirst )
+                          << "\n";
             }
             continue;
         }
@@ -332,7 +332,7 @@ void moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3()
 #ifdef MOAB_HAVE_MPI
     // find out min/max for NNZ, ncols, nrows
     // should work on std c++ 11
-    int arr3[6] = { NNZ, nrows, ncols, -NNZ, -nrows, -ncols };
+    int arr3[6] = {NNZ, nrows, ncols, -NNZ, -nrows, -ncols};
     int rarr3[6];
     MPI_Reduce( arr3, rarr3, 6, MPI_INT, MPI_MIN, 0, m_pcomm->comm() );
 

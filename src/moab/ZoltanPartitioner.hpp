@@ -110,7 +110,7 @@ class ZoltanPartitioner : public PartitionerBase< int >
 {
 
   public:
-    ZoltanPartitioner( Interface* impl       = NULL,
+    ZoltanPartitioner( Interface* impl = NULL,
 #ifdef MOAB_HAVE_MPI
                        ParallelComm* parcomm = NULL,
 #endif
@@ -121,7 +121,6 @@ class ZoltanPartitioner : public PartitionerBase< int >
                        ,
                        GeometryQueryTool* gqt = NULL
 #endif
-
 
     );
 
@@ -192,8 +191,7 @@ class ZoltanPartitioner : public PartitionerBase< int >
                                      int& numNewPartitions,
                                      std::map< int, Range >& distribution,
                                      int met,
-                                     std::vector<char> & ZoltanBuffer);
-
+                                     std::vector< char >& ZoltanBuffer );
 
 #ifdef MOAB_HAVE_CGM
     ErrorCode write_partition( const int nparts,

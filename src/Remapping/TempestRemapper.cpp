@@ -286,7 +286,7 @@ ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType meshTyp
     {
         int defaultInt = -1;
         rval           = m_interface->tag_get_handle( "TargetParent", 1, MB_TYPE_INTEGER, tgtParentTag,
-                                                      MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );MB_CHK_SET_ERR( rval, "can't create positive tag" );
+                                            MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );MB_CHK_SET_ERR( rval, "can't create positive tag" );
 
         rval = m_interface->tag_get_handle( "SourceParent", 1, MB_TYPE_INTEGER, srcParentTag,
                                             MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );MB_CHK_SET_ERR( rval, "can't create negative tag" );
@@ -911,7 +911,7 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
     Tag dofTag;
     bool created = false;
     rval         = m_interface->tag_get_handle( dofTagName.c_str(), nP * nP, MB_TYPE_INTEGER, dofTag,
-                                                MB_TAG_DENSE | MB_TAG_CREAT, 0, &created );MB_CHK_SET_ERR( rval, "Failed creating DoF tag" );
+                                        MB_TAG_DENSE | MB_TAG_CREAT, 0, &created );MB_CHK_SET_ERR( rval, "Failed creating DoF tag" );
 
     // Number of Faces
     int nElements = static_cast< int >( csMesh.faces.size() );
@@ -1341,8 +1341,8 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                 }
 
                 Range intxCovRange;
-		        std::copy( intxCov.rbegin(), intxCov.rend(), range_inserter( intxCovRange ) );
-		        Range notNeededCovCells = moab::subtract( covEnts, intxCovRange );
+                std::copy( intxCov.rbegin(), intxCov.rend(), range_inserter( intxCovRange ) );
+                Range notNeededCovCells = moab::subtract( covEnts, intxCovRange );
 
                 rval = m_interface->remove_entities( m_covering_source_set, notNeededCovCells );MB_CHK_ERR( rval );
                 covEnts = moab::subtract( covEnts, notNeededCovCells );
@@ -1939,7 +1939,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
     Tag ghostTag;
     int orig_proc = -1;
     rval          = m_interface->tag_get_handle( "ORIG_PROC", 1, MB_TYPE_INTEGER, ghostTag, MB_TAG_DENSE | MB_TAG_CREAT,
-                                                 &orig_proc );MB_CHK_ERR( rval );
+                                        &orig_proc );MB_CHK_ERR( rval );
 
     int nvNew = TLv2.get_n();
     // if number of vertices to be created is 0, it means there is no need of ghost intx cells,

@@ -802,7 +802,7 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
 
         // Method flags
         std::string strMapAlgorithm( "" );
-        int nMonotoneType    = ( mapOptions.fMonotone ) ? ( 1 ) : ( 0 );
+        int nMonotoneType = ( mapOptions.fMonotone ) ? ( 1 ) : ( 0 );
 
         // Make an index of method arguments
         std::set< std::string > setMethodStrings;
@@ -1520,7 +1520,7 @@ int moab::TempestOnlineMap::IsConservative( double dTolerance )
     std::vector< int > nElementsInProc;
     const int nDATA = 3;
     if( !rank ) nElementsInProc.resize( size * nDATA );
-    int senddata[nDATA] = { nColumns, m_nTotDofs_SrcCov, m_nTotDofs_Src };
+    int senddata[nDATA] = {nColumns, m_nTotDofs_SrcCov, m_nTotDofs_Src};
     ierr = MPI_Gather( senddata, nDATA, MPI_INT, nElementsInProc.data(), nDATA, MPI_INT, rootProc, m_pcomm->comm() );
     if( ierr != MPI_SUCCESS ) return -1;
 
@@ -1741,7 +1741,7 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
             meshset    = m_remapper->m_covering_source_set;
             trmesh     = m_remapper->m_covering_source;
             entities   = ( m_remapper->point_cloud_source ? m_remapper->m_covering_source_vertices
-                                                          : m_remapper->m_covering_source_entities );
+                                                        : m_remapper->m_covering_source_entities );
             discOrder  = m_nDofsPEl_Src;
             discMethod = m_eInputType;
             break;
@@ -2102,7 +2102,7 @@ moab::ErrorCode moab::TempestOnlineMap::ComputeMetrics( moab::Remapper::Intersec
             meshset    = m_remapper->m_covering_source_set;
             trmesh     = m_remapper->m_covering_source;
             entities   = ( m_remapper->point_cloud_source ? m_remapper->m_covering_source_vertices
-                                                          : m_remapper->m_covering_source_entities );
+                                                        : m_remapper->m_covering_source_entities );
             discOrder  = m_nDofsPEl_Src;
             discMethod = m_eInputType;
             break;

@@ -317,7 +317,7 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "Cannot register Phys Atm App " )
 
         // load the next component mesh
-        PUSH_TIMER(atmComm, "Load Phys Atm  mesh" )
+        PUSH_TIMER( atmComm, "Load Phys Atm  mesh" )
         ierr = iMOAB_LoadMesh( cmpPhAtmPID, atmPhysMesh.c_str(), readoptsPhysAtm.c_str(), &nghlay );
         CHECKIERR( ierr, "Cannot load Atm Phys  mesh on atm pes" )
         POP_TIMER( atmComm, rankInAtmComm )
@@ -374,10 +374,10 @@ int main( int argc, char* argv[] )
     }
 #endif
 
-    const char* weights_identifiers[2] = { "scalar", "scalar-pc" };
-    int disc_orders[3]                 = { 4, 1, 1 };
-    const char* disc_methods[3]        = { "cgll", "fv", "pcloud" };
-    const char* dof_tag_names[3]       = { "GLOBAL_DOFS", "GLOBAL_ID", "GLOBAL_ID" };
+    const char* weights_identifiers[2] = {"scalar", "scalar-pc"};
+    int disc_orders[3]                 = {4, 1, 1};
+    const char* disc_methods[3]        = {"cgll", "fv", "pcloud"};
+    const char* dof_tag_names[3]       = {"GLOBAL_DOFS", "GLOBAL_ID", "GLOBAL_ID"};
 #ifdef ENABLE_ATMOCN_COUPLING
     if( couComm != MPI_COMM_NULL )
     {
@@ -587,7 +587,7 @@ int main( int argc, char* argv[] )
 #endif
 
     int tagIndex[2];
-    int tagTypes[2]  = { DENSE_DOUBLE, DENSE_DOUBLE };
+    int tagTypes[2]  = {DENSE_DOUBLE, DENSE_DOUBLE};
     int atmCompNDoFs = 1 /* FV disc_orders[0]*disc_orders[0] */, ocnCompNDoFs = 1 /*FV*/;
 
     const char* bottomFields = "T_ph:u_ph:v_ph";  // same as on phys atm mesh

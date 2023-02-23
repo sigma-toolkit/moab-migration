@@ -275,7 +275,9 @@ MOSTLYCLEANFILES = mhdf_ll.h5m \
                    atmcov_withdata_1.h5m atmcov_withdata_0.h5m CoupOcn.h5m ocntgt_1.h5m ocntgt_0.h5m atmcov_0.h5m atmcov_1.h5m \
                    OcnWithProjF.h5m OcnOnCplF.h5m AtmOnCplF.h5m atm_ocn_map_f.nc fOcnOnCpl4.h5m fOcnOnCpl5.h5m fOcnOnCpl6.h5m fOcnOnCpl7.h5m\
                    Ocn2WithProj.h5m recvAtm2CoupFull.h5m recvAtm2.h5m  atm2_ocn_map.nc atm_ocn_map2.nc fOcnOnCpl8.h5m fOcnOnCpl0.h5m fOcnOnCpl1.h5m \
-                   afterSend.h5m readCplRof.h5m
+                   afterSend.h5m readCplRof.h5m \
+                   AtmWithProj3.h5m AtmWithProj31.h5m fAtmOnCpl4.h5m fAtmOnCpl41.h5m fAtmOnCpl42.h5m AtmWithProj2.h5m AtmWithProj21.h5m \
+                   fAtmOnCpl31.h5m fAtmOnCpl32.h5m fAtmOnCpl4.h5m fAtmOnCpl41.h5m
 
 EXTRA_DIST = imoab_coupler_utils.hpp
 FORTDEFS = $(FCDEFS)

@@ -715,9 +715,9 @@ int main( int argc, char* argv[] )
             // do not write if iters > 0)
             if( 1 == n )  // write it only if n==1 (only one iteration)
             {
-                char outputFileTgt[] = "fAtmOnCpl3.h5m";
+                char outputFileTgt[] = "fAtmOnCpl32.h5m";
                 ierr                 = iMOAB_WriteMesh( cplAtmPID, outputFileTgt, fileWriteOptions );
-                CHECKIERR( ierr, "failed to write fAtmOnCpl3.h5m " );
+                CHECKIERR( ierr, "failed to write fAtmOnCpl32.h5m " );
             }
         }
         // send the tag to atm pes, from atm mesh on coupler pes
@@ -750,9 +750,9 @@ int main( int argc, char* argv[] )
         POP_TIMER( MPI_COMM_WORLD, rankInGlobalComm )
         if( ( atmComm != MPI_COMM_NULL ) && ( 1 == n ) )
         {
-            char outputFileAtm[] = "AtmWithProj2.h5m";
+            char outputFileAtm[] = "AtmWithProj21.h5m";
             ierr                 = iMOAB_WriteMesh( cmpAtmPID, outputFileAtm, fileWriteOptions );
-            CHECKIERR( ierr, "cannot write AtmWithProj2.h5m" )
+            CHECKIERR( ierr, "cannot write AtmWithProj21.h5m" )
         }
 #endif
 
@@ -795,9 +795,9 @@ int main( int argc, char* argv[] )
             POP_TIMER( couComm, rankInCouComm )
             if( 1 == n )
             {
-                char outputFileTgt[] = "fAtmOnCpl4.h5m";
+                char outputFileTgt[] = "fAtmOnCpl42.h5m";
                 ierr                 = iMOAB_WriteMesh( cplAtmPID, outputFileTgt, fileWriteOptions );
-                CHECKIERR( ierr, "failed to write fAtmOnCpl4.h5m " );
+                CHECKIERR( ierr, "failed to write fAtmOnCpl42.h5m " );
             }
         }
         // send the tag to atm pes, from atm mesh on coupler pes

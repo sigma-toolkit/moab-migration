@@ -334,7 +334,7 @@ int main( int argc, char* argv[] )
     // infer atm2 from ocean:
     // atm
     repartitioner_scheme = 5;  // reuse the partition stored at previous step
-    if( atmCouComm != MPI_COMM_NULL && 5 == repartitioner_scheme )  // yes, we just set it to 5
+    if( atmCouComm != MPI_COMM_NULL )
     {
         // need to send the zoltan buffer from coupler root towards the component root (atm in this case)
         int is_fort = 0;
@@ -632,9 +632,9 @@ int main( int argc, char* argv[] )
             POP_TIMER( couComm, rankInCouComm )
             if( 1 == n )
             {
-                char outputFileTgt[] = "fAtmOnCpl4.h5m";
+                char outputFileTgt[] = "fAtmOnCpl41.h5m";
                 ierr                 = iMOAB_WriteMesh( cplAtmPID, outputFileTgt, fileWriteOptions );
-                CHECKIERR( ierr, "failed to write fAtmOnCpl4.h5m " );
+                CHECKIERR( ierr, "failed to write fAtmOnCpl41.h5m " );
             }
         }
 #ifdef VERBOSE
@@ -723,7 +723,7 @@ int main( int argc, char* argv[] )
             {
                 char outputFileTgt[] = "fAtmOnCpl5.h5m";
                 ierr                 = iMOAB_WriteMesh( cplAtm2PID, outputFileTgt, fileWriteOptions );
-                CHECKIERR( ierr, "failed to write fAtmOnCpl3.h5m " );
+                CHECKIERR( ierr, "failed to write fAtmOnCpl5.h5m " );
             }
         }
 
@@ -754,18 +754,6 @@ int main( int argc, char* argv[] )
 
 #endif
     }
-    // free up the MPI objects and finalize
-    // order of registering:
-    /*   ierr = iMOAB_RegisterApplication( "ATMX", &couComm, &cplatm, cplAtmPID );  // atm on coupler pes, land context
-    ierr = iMOAB_RegisterApplication( "LNDX", &couComm, &cpllnd, cplLndPID );  // lnd on coupler pes
-    ierr = iMOAB_RegisterApplication( "ATM2X", &couComm, &cplatm2, cplAtm2PID );  // atm on coupler pes, ocean context
-    ierr = iMOAB_RegisterApplication( "OCNX", &couComm, &cplocn, cplOcnPID );  // ocn on coupler pes
-    ierr = iMOAB_RegisterApplication( "ATM1", &atmComm, &cmpatm, cmpAtmPID );
-    ierr = iMOAB_RegisterApplication( "OCN1", &ocnComm, &cmpocn, cmpOcnPID );
-    ierr = iMOAB_RegisterApplication( "LND1", &lndComm, &cmplnd, cmpLndPID );
-    ierr = iMOAB_RegisterApplication( "LNDATM", &couComm, &lndatmid, cplLndAtmPID );
-    ierr = iMOAB_RegisterApplication( "OCNATM", &couComm, &ocnatmid, cplOcnAtm2PID ); */
-    // de-registering in reverse order
 
 #ifdef ENABLE_OCNATM_COUPLING
     if( couComm != MPI_COMM_NULL )

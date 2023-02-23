@@ -719,9 +719,9 @@ int main( int argc, char* argv[] )
             // do not write if iters > 0)
             if( 1 == n )  // write it only if n==1 (only one iteration)
             {
-                char outputFileTgt[] = "fAtmOnCpl3.h5m";
+                char outputFileTgt[] = "fAtmOnCpl31.h5m";
                 ierr                 = iMOAB_WriteMesh( cplAtmPID, outputFileTgt, fileWriteOptions );
-                CHECKIERR( ierr, "failed to write fAtmOnCpl3.h5m " );
+                CHECKIERR( ierr, "failed to write fAtmOnCpl31.h5m " );
             }
         }
         // send the tag to atm pes, from atm mesh on coupler pes
@@ -834,9 +834,9 @@ int main( int argc, char* argv[] )
 
         if( ( atmComm != MPI_COMM_NULL ) && ( 1 == n ) )
         {
-            char outputFileAtm[] = "AtmWithProj3.h5m";
+            char outputFileAtm[] = "AtmWithProj31.h5m";
             ierr                 = iMOAB_WriteMesh( cmpAtmPID, outputFileAtm, fileWriteOptions );
-            CHECKIERR( ierr, "cannot write AtmWithProj3.h5m" )
+            CHECKIERR( ierr, "cannot write AtmWithProj31.h5m" )
         }
         // end copy
 #endif

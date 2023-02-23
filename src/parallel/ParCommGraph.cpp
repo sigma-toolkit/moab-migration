@@ -1632,7 +1632,7 @@ ErrorCode ParCommGraph::send_graph_partition( ParallelComm* pco, MPI_Comm jcomm,
 }
 // method to expose local graph info: sender id, receiver id, sizes of elements to send, after or
 // before intersection
-ErrorCode ParCommGraph::dump_comm_information( std::string prefix, int is_send, int verbose )
+ErrorCode ParCommGraph::dump_comm_information( const std::string & prefix, int is_send, int verbose )
 {
     //
     if( -1 != rankInGroup1 && 1 == is_send )  // it is a sender task

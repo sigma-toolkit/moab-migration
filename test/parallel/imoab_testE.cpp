@@ -248,7 +248,7 @@ int main( int argc, char* argv[] )
     ierr =
         setup_component_coupler_meshes( cmpLndPID, cmplnd, cplLndPID, cpllnd, &lndComm, &lndPEGroup, &couComm,
                                         &couPEGroup, &lndCouComm, lndFilename, readopts, nghlay, repartitioner_scheme );
-
+    CHECKIERR( ierr, "Cannot load and migrate land mesh " )
     if( couComm != MPI_COMM_NULL )
     {  // write only for n==1 case
         char outputFileLnd[] = "recvLnd.h5m";
@@ -426,6 +426,7 @@ int main( int argc, char* argv[] )
 #endif
             ierr =
                 iMOAB_WriteMappingWeightsToFile( cplLndAtmPID, weights_identifiers[0], lnd_atm_map_file_name.c_str() );
+            CHECKIERR( ierr, "cannot write map file" );
             POP_TIMER( couComm, rankInCouComm )
         }
     }

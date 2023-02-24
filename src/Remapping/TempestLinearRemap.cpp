@@ -163,11 +163,12 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_Tempest_MOAB( int nOrder )
     for( size_t ixFirst = 0; ixFirst < m_meshInputCov->faces.size(); ixFirst++ )
     {
         // Output every 1000 elements
+#ifdef VERBOSE
         if( ixFirst % outputFrequency == 0 && is_root )
         {
             dbgprint.printf( 0, "Element %zu/%lu\n", ixFirst, m_meshInputCov->faces.size() );
         }
-
+#endif
         // Find the set of Faces that overlap faceFirst
         int ixOverlapBegin    = ixOverlap;
         unsigned ixOverlapEnd = ixOverlapBegin;

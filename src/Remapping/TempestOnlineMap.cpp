@@ -1111,32 +1111,32 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             // Construct OfflineMap
             if( strMapAlgorithm == "invdist" )
             {
-                AnnounceStartBlock( "Calculating offline map (invdist)" );
+                AnnounceStartBlock( "Calculating map (invdist)" );
                 LinearRemapFVtoFVInvDist( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else if( strMapAlgorithm == "delaunay" )
             {
-                AnnounceStartBlock( "Calculating offline map (delaunay)" );
+                AnnounceStartBlock( "Calculating map (delaunay)" );
                 LinearRemapTriangulation( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else if( strMapAlgorithm == "fvintbilin" )
             {
-                AnnounceStartBlock( "Calculating offline map (intbilin)" );
+                AnnounceStartBlock( "Calculating map (intbilin)" );
                 LinearRemapIntegratedBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else if( strMapAlgorithm == "fvintbilingb" )
             {
-                AnnounceStartBlock( "Calculating offline map (intbilingb)" );
+                AnnounceStartBlock( "Calculating map (intbilingb)" );
                 LinearRemapIntegratedGeneralizedBarycentric( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else if( strMapAlgorithm == "fvbilin" )
             {
-                AnnounceStartBlock( "Calculating offline map (bilin)" );
+                AnnounceStartBlock( "Calculating map (bilin)" );
                 LinearRemapBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else
             {
-                AnnounceStartBlock( "Calculating offline map (default)" );
+                AnnounceStartBlock( "Calculating map (default)" );
                 // LinearRemapFVtoFV( *m_meshInputCov, *m_meshOutput, *m_meshOverlap,
                 //                   ( mapOptions.fMonotone ) ? ( 1 ) : ( mapOptions.nPin ), *this );
                 LinearRemapFVtoFV_Tempest_MOAB( ( mapOptions.fMonotone ? 1 : mapOptions.nPin ) );
@@ -1489,7 +1489,9 @@ int moab::TempestOnlineMap::IsConsistent( double dTolerance )
         {
             fConsistent++;
             int rowGID = row_gdofmap[i];
+#ifdef VERBOSE
             Announce( "TempestOnlineMap is not consistent in row %i (%1.15e)", rowGID, dRowSums[i] );
+#endif
         }
     }
 
@@ -1628,10 +1630,12 @@ int moab::TempestOnlineMap::IsConservative( double dTolerance )
             if( fabs( it->second - 1.0 ) > dTolerance )
             {
                 fConservative++;
+#ifdef VERBOSE
                 Announce( "TempestOnlineMap is not conservative in column "
                           // "%i (%1.15e)", it->first, it->second );
                           "%i (%1.15e)",
                           it->first, it->second /* / dColumnSourceAreasOnRoot[it->first] */ );
+#endif
             }
         }
     }

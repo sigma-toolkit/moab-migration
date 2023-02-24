@@ -365,14 +365,10 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
         mdb_type = MBPOLYGON;
     // for nv = 1 , type is vertex
 
-    if( nv > 1 )
+    if( nv > 1 && nb_with_mask1 > 0 )
     {
         rval = _readNC->readMeshIface->get_element_connect( nb_with_mask1, nv, mdb_type, 0, start_cell, conn_arr );MB_CHK_SET_ERR( rval, "Failed to create local cells" );
-
-
-        if (nb_with_mask1 > 0)
-            tmp_range.insert( start_cell, start_cell + nb_with_mask1 - 1 );
-        // create also nv*nb_with_mask1 vertices, and compute their coordinates
+        tmp_range.insert( start_cell, start_cell + nb_with_mask1 - 1 );
     }
 
     // Create vertices; first identify different ones, with a tolerance

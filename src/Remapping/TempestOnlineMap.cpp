@@ -1489,9 +1489,7 @@ int moab::TempestOnlineMap::IsConsistent( double dTolerance )
         {
             fConsistent++;
             int rowGID = row_gdofmap[i];
-#ifdef VERBOSE
             Announce( "TempestOnlineMap is not consistent in row %i (%1.15e)", rowGID, dRowSums[i] );
-#endif
         }
     }
 
@@ -1630,12 +1628,10 @@ int moab::TempestOnlineMap::IsConservative( double dTolerance )
             if( fabs( it->second - 1.0 ) > dTolerance )
             {
                 fConservative++;
-#ifdef VERBOSE
                 Announce( "TempestOnlineMap is not conservative in column "
                           // "%i (%1.15e)", it->first, it->second );
                           "%i (%1.15e)",
                           it->first, it->second /* / dColumnSourceAreasOnRoot[it->first] */ );
-#endif
             }
         }
     }

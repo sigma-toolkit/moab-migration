@@ -71,6 +71,7 @@ struct ToolContext
     bool fCheck;
     bool fVolumetric;
     bool useGnomonicProjection;
+    bool useCAAS;
     GenerateOfflineMapAlgorithmOptions mapOptions;
     bool print_diagnostics;
 
@@ -85,7 +86,7 @@ struct ToolContext
           blockSize( 5 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "" ), baselineFile( "" ),
           meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ), computeWeights( false ),
           verifyWeights( false ), enforceConvexity( false ), ensureMonotonicity( 0 ), rrmGrids( false ),
-          kdtreeSearch( true ), fCheck( false ), fVolumetric( false ), useGnomonicProjection( false ),
+          kdtreeSearch( true ), fCheck( false ), fVolumetric( false ), useGnomonicProjection( false ), useCAAS( false ),
           print_diagnostics( true )
     {
         inFilenames.resize( 2 );
@@ -235,6 +236,8 @@ struct ToolContext
                              "from source to target "
                              "grid by applying the maps",
                              &verifyWeights );
+
+        opts.addOpt< void >( "caas", "apply CAAS nonlinear filter after linear map application", &useCAAS );
 
         opts.addOpt< std::string >( "baseline", "Output baseline file", &baselineFile );
 
@@ -680,9 +683,9 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_MPI
             MPI_Allreduce( &local_areas[0], &global_areas[0], 3, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
 #else
-            global_areas[0]                 = local_areas[0];
-            global_areas[1]                 = local_areas[1];
-            global_areas[2]                 = local_areas[2];
+            global_areas[0] = local_areas[0];
+            global_areas[1] = local_areas[1];
+            global_areas[2] = local_areas[2];
 #endif
             if( !proc_id )
             {
@@ -790,7 +793,7 @@ int main( int argc, char* argv[] )
             {
                 // Let us pick a sampling test function for solution evaluation
                 moab::TempestOnlineMap::sample_function testFunction =
-                    &sample_stationary_vortex;  // &sample_slow_harmonic;
+                    &sample_fast_harmonic;  // &sample_slow_harmonic, &sample_stationary_vortex;
 
                 runCtx->timer_push( "describe a solution on source grid" );
                 moab::Tag srcAnalyticalFunction;
@@ -811,8 +814,9 @@ int main( int argc, char* argv[] )
                 runCtx->timer_pop();
 
                 runCtx->timer_push( "compute solution projection on target grid" );
-                rval = weightMap->ApplyWeights( srcAnalyticalFunction, tgtProjectedFunction );MB_CHK_ERR( rval );
+                rval = weightMap->ApplyWeights( srcAnalyticalFunction, tgtProjectedFunction, false, runCtx->useCAAS );MB_CHK_ERR( rval );
                 runCtx->timer_pop();
+
                 rval = mbCore->write_file( "tgtWithSolnTag2.h5m", NULL, writeOptions, &runCtx->meshsets[1], 1 );MB_CHK_ERR( rval );
 
                 if( nprocs == 1 && runCtx->baselineFile.size() )
@@ -930,8 +934,7 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         // Load the source mesh and validate
         rval =
             remapper.LoadNativeMesh( ctx.inFilenames[0], ctx.meshsets[0], smetadata, additional_read_opts_src.c_str() );MB_CHK_ERR( rval );
-        if( smetadata.size() )
-            remapper.SetMeshType( moab::Remapper::SourceMesh, smetadata );
+        if( smetadata.size() ) remapper.SetMeshType( moab::Remapper::SourceMesh, smetadata );
 
         // Rescale the radius of both to compute the intersection
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[0], radius_src );MB_CHK_ERR( rval );
@@ -940,8 +943,7 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         std::string addititional_read_opts_tgt = get_file_read_options( ctx, ctx.inFilenames[1] );
         rval = remapper.LoadNativeMesh( ctx.inFilenames[1], ctx.meshsets[1], tmetadata,
                                         addititional_read_opts_tgt.c_str() );MB_CHK_ERR( rval );
-        if( tmetadata.size() )
-            remapper.SetMeshType( moab::Remapper::TargetMesh, tmetadata );
+        if( tmetadata.size() ) remapper.SetMeshType( moab::Remapper::TargetMesh, tmetadata );
 
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[1], radius_dest );MB_CHK_ERR( rval );
 

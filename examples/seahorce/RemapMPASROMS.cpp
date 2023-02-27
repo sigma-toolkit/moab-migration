@@ -48,6 +48,8 @@
 #include "moab/Remapping/TempestRemapper.hpp"
 #include "moab/Remapping/TempestOnlineMap.hpp"
 
+#include "spline.h"
+
 using namespace moab;
 using namespace std;
 
@@ -100,8 +102,15 @@ moab::ErrorCode ComputeFieldProjectionMBA( moab::Interface* mbi,
                                            std::string varProject,
                                            moab::Range& srcelems,
                                            moab::Range& dstelems,
+                                           bool is_three_dimensional,
                                            bool normalize = true,
                                            const double constantoffset = 0.0 );
+
+moab::ErrorCode monotone_hermite_1d_1d( std::vector< double >& xd,
+                                  std::vector< double >& fd,
+                                  std::vector< double >& xi,
+                                  std::vector< double >& fi,
+                                  bool monotone = true );
 
 ErrorCode CloneToTRMesh( moab::Interface* m_interface, Mesh& mesh, EntityHandle mesh_set );
 
@@ -206,6 +215,9 @@ struct PC3D
     }
 };
 
+constexpr int mpas_zlevels = 60;
+constexpr int roms_zlevels = 50;
+
 //
 // Start of main test program
 //
@@ -233,13 +245,13 @@ int main( int argc, char** argv )
     std::string strMethod       = "";
     const double shepard_power  = 3;
     const bool useTranspose     = false;
-    const double mpas_zh[60]    = { 10,      20,      30,      40,      50,      60,      70,      80,      90,
-                                    100,     110,     120,     130,     140,     150,     160,     170.197, 180.761,
-                                    191.821, 203.499, 215.923, 229.233, 243.584, 259.156, 276.152, 294.815, 315.424,
-                                    338.312, 363.875, 392.58,  424.989, 461.767, 503.707, 551.749, 606.997, 670.729,
-                                    744.398, 829.607, 928.043, 1041.37, 1171.04, 1318.09, 1482.9,  1664.99, 1863.01,
-                                    2074.87, 2298.04, 2529.9,  2768.1,  3010.67, 3256.14, 3503.45, 3751.89, 4001.01,
-                                    4250.53, 4500.26, 4750.12, 5000.05, 5250.01, 5499.99 };
+    // const double mpas_zh[60]    = { 10,      20,      30,      40,      50,      60,      70,      80,      90,
+    //                                 100,     110,     120,     130,     140,     150,     160,     170.197, 180.761,
+    //                                 191.821, 203.499, 215.923, 229.233, 243.584, 259.156, 276.152, 294.815, 315.424,
+    //                                 338.312, 363.875, 392.58,  424.989, 461.767, 503.707, 551.749, 606.997, 670.729,
+    //                                 744.398, 829.607, 928.043, 1041.37, 1171.04, 1318.09, 1482.9,  1664.99, 1863.01,
+    //                                 2074.87, 2298.04, 2529.9,  2768.1,  3010.67, 3256.14, 3503.45, 3751.89, 4001.01,
+    //                                 4250.53, 4500.26, 4750.12, 5000.05, 5250.01, 5499.99 };
 
     {
         ProgOptions opts;
@@ -439,9 +451,9 @@ int main( int argc, char** argv )
         // err = modified_shepard_interpolate( 3, mpas_xyz, mpas_tdata, shepard_power, roms_xyz, roms_tdata );MB_CHK_ERR( err );
 
         // Now let us compute the mba hierarchy for each field
-        err = ComputeFieldProjectionMBA( mbi, meshOverlap, "bottomDepth", mpas_elems, roms_elems, true /* bool normalize */ );MB_CHK_ERR( err );
-        err = ComputeFieldProjectionMBA( mbi, meshOverlap, "salinity", mpas_elems, roms_elems, true /* bool normalize */ );MB_CHK_ERR( err );
-        err = ComputeFieldProjectionMBA( mbi, meshOverlap, "temperature", mpas_elems, roms_elems, true /* bool normalize */ );MB_CHK_ERR( err );
+        err = ComputeFieldProjectionMBA( mbi, meshOverlap, "bottomDepth", mpas_elems, roms_elems, false, true /* bool normalize */ );MB_CHK_ERR( err );
+        err = ComputeFieldProjectionMBA( mbi, meshOverlap, "salinity", mpas_elems, roms_elems, true, true /* bool normalize */ );MB_CHK_ERR( err );
+        err = ComputeFieldProjectionMBA( mbi, meshOverlap, "temperature", mpas_elems, roms_elems, true, true /* bool normalize */ );MB_CHK_ERR( err );
     }
     else
     {
@@ -562,7 +574,7 @@ int main( int argc, char** argv )
                 }
                 else
                 {
-                    err = ComputeFieldProjectionMBA( mbi, meshOverlap, "salinity", mpas_elems, roms_elems,
+                    err = ComputeFieldProjectionMBA( mbi, meshOverlap, "salinity", mpas_elems, roms_elems, true,
                                                      true /* bool normalize */, 35.0 );MB_CHK_ERR( err );
                 }
 
@@ -580,12 +592,12 @@ int main( int argc, char** argv )
                 }
                 else
                 {
-                    err = ComputeFieldProjectionMBA( mbi, meshOverlap, "temperature", mpas_elems, roms_elems,
+                    err = ComputeFieldProjectionMBA( mbi, meshOverlap, "temperature", mpas_elems, roms_elems, true,
                                                      true /* bool normalize */, 8.5 );MB_CHK_ERR( err );
                 }
 
 
-                err = ComputeFieldProjectionMBA( mbi, meshOverlap, "bottomDepth", mpas_elems, roms_elems,
+                err = ComputeFieldProjectionMBA( mbi, meshOverlap, "bottomDepth", mpas_elems, roms_elems, false,
                                                  true /* bool normalize */, 2000.0 );MB_CHK_ERR( err );
             }
 
@@ -649,6 +661,20 @@ ErrorCode ScaleCoords( Interface* mb, Range& nodes, double R, bool is_cartesian 
         rval    = mb->set_coords( &nd, 1, posf );MB_CHK_ERR( rval );
     }
     return MB_SUCCESS;
+}
+
+moab::ErrorCode monotone_hermite_1d( std::vector< double >& xd,
+                                  std::vector< double >& fd,
+                                  std::vector< double >& xi,
+                                  std::vector< double >& fi,
+                                  bool monotone )
+{
+    tk::spline splrecons( xd, fd, tk::spline::cspline, monotone );
+
+    for (size_t i = 0; i < xi.size(); ++i)
+        fi[i] = splrecons(xi[i]);
+
+    return moab::MB_SUCCESS;
 }
 
 moab::ErrorCode shepard_interpolate( int dimension,
@@ -985,15 +1011,18 @@ moab::ErrorCode ComputeFieldProjectionMBA( moab::Interface* mbi,
                                            std::string varProject,
                                            moab::Range& srcelems,
                                            moab::Range& dstelems,
+                                           bool is_three_dimensional,
                                            bool normalize,
                                            const double constantoffset )
 {
+    constexpr src_zlayers = is_three_dimensional ? mpas_zlevels : 1;
+    constexpr dst_zlayers = is_three_dimensional ? roms_zlevels : 1;
     moab::ErrorCode err;
     moab::Tag dtag;
-    err = mbi->tag_get_handle( varProject.c_str(), 1, moab::MB_TYPE_DOUBLE, dtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+    err = mbi->tag_get_handle( varProject.c_str(), src_zlayers, moab::MB_TYPE_DOUBLE, dtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
 
     // get the source data from tag
-    std::vector< double > src_tdata( srcelems.size() ), dst_tdata( dstelems.size() );
+    std::vector< double > src_tdata( srcelems.size() * src_zlayers ), dst_tdata( dstelems.size() * dst_zlayers );
     err = mbi->tag_get_data( dtag, srcelems, src_tdata.data() );MB_CHK_ERR( err );
 
     // get the coordinates of the elements

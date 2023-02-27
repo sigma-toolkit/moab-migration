@@ -71,6 +71,7 @@ struct ToolContext
     bool fCheck;
     bool fVolumetric;
     bool useGnomonicProjection;
+    bool useCAAS;
     GenerateOfflineMapAlgorithmOptions mapOptions;
 
 #ifdef MOAB_HAVE_MPI
@@ -84,7 +85,8 @@ struct ToolContext
           blockSize( 5 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "" ), baselineFile( "" ),
           meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ), computeWeights( false ),
           verifyWeights( false ), enforceConvexity( false ), ensureMonotonicity( 0 ), rrmGrids( false ),
-          kdtreeSearch( true ), fCheck( false ), fVolumetric( false ), useGnomonicProjection( false )
+          kdtreeSearch( true ), fCheck( false ), fVolumetric( false ), useGnomonicProjection( false ),
+          useCAAS( false )
     {
         inFilenames.resize( 2 );
         doftag_names.resize( 2 );
@@ -233,6 +235,9 @@ struct ToolContext
                              "from source to target "
                              "grid by applying the maps",
                              &verifyWeights );
+
+        opts.addOpt< void >( "caas", "apply CAAS nonlinear filter after linear map application",
+                             &useCAAS );
 
         opts.addOpt< std::string >( "baseline", "Output baseline file", &baselineFile );
 
@@ -785,7 +790,7 @@ int main( int argc, char* argv[] )
             {
                 // Let us pick a sampling test function for solution evaluation
                 moab::TempestOnlineMap::sample_function testFunction =
-                    &sample_stationary_vortex;  // &sample_slow_harmonic;
+                    &sample_fast_harmonic;  // &sample_slow_harmonic, &sample_stationary_vortex;
 
                 runCtx->timer_push( "describe a solution on source grid" );
                 moab::Tag srcAnalyticalFunction;
@@ -806,8 +811,9 @@ int main( int argc, char* argv[] )
                 runCtx->timer_pop();
 
                 runCtx->timer_push( "compute solution projection on target grid" );
-                rval = weightMap->ApplyWeights( srcAnalyticalFunction, tgtProjectedFunction );MB_CHK_ERR( rval );
+                rval = weightMap->ApplyWeights( srcAnalyticalFunction, tgtProjectedFunction, false, runCtx->useCAAS );MB_CHK_ERR( rval );
                 runCtx->timer_pop();
+
                 rval = mbCore->write_file( "tgtWithSolnTag2.h5m", NULL, writeOptions, &runCtx->meshsets[1], 1 );MB_CHK_ERR( rval );
 
                 if( nprocs == 1 && runCtx->baselineFile.size() )

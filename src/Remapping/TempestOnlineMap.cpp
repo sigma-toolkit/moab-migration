@@ -39,6 +39,8 @@
 #include "netcdfcpp.h"
 #endif
 
+// #define USE_NATIVE_TEMPESTREMAP_ROUTINES
+
 ///////////////////////////////////////////////////////////////////////////////
 
 // #define VERBOSE
@@ -74,6 +76,9 @@ moab::TempestOnlineMap::TempestOnlineMap( moab::TempestRemapper* remapper ) : Of
     rank        = remapper->rank;
     size        = remapper->size;
 
+    // set default order
+    m_input_order = m_output_order = 1;
+
     // Initialize dimension information from file
     this->setup_sizes_dimensions();
 }
@@ -105,13 +110,13 @@ void moab::TempestOnlineMap::setup_sizes_dimensions()
 
 moab::TempestOnlineMap::~TempestOnlineMap()
 {
-    m_interface = NULL;
+    m_interface = nullptr;
 #ifdef MOAB_HAVE_MPI
-    m_pcomm = NULL;
+    m_pcomm = nullptr;
 #endif
-    m_meshInput   = NULL;
-    m_meshOutput  = NULL;
-    m_meshOverlap = NULL;
+    m_meshInput   = nullptr;
+    m_meshOutput  = nullptr;
+    m_meshOverlap = nullptr;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -149,10 +154,12 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapTags( const std::string srcDofT
 ///////////////////////////////////////////////////////////////////////////////
 
 moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType srcType,
+                                                              int srcOrder,
                                                               bool isSrcContinuous,
                                                               DataArray3D< int >* srcdataGLLNodes,
                                                               DataArray3D< int >* srcdataGLLNodesSrc,
                                                               DiscretizationType destType,
+                                                              int destOrder,
                                                               bool isTgtContinuous,
                                                               DataArray3D< int >* tgtdataGLLNodes )
 {
@@ -163,6 +170,8 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
     // We are assuming that these are element based tags that are sized: np * np
     m_srcDiscType  = srcType;
     m_destDiscType = destType;
+    m_input_order  = srcOrder;
+    m_output_order = destOrder;
 
     bool vprint = is_root && false;
 
@@ -437,7 +446,7 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
 #endif
 
     m_nTotDofs_SrcCov = 0;
-    if( srcdataGLLNodes == NULL )
+    if( srcdataGLLNodes == nullptr )
     { /* we only have a mapping for elements as DoFs */
         for( unsigned i = 0; i < col_gdofmap.size(); ++i )
         {
@@ -496,7 +505,7 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
 
     // Now compute the mapping and store it for the original source mesh
     m_nTotDofs_Src = 0;
-    if( srcdataGLLNodesSrc == NULL )
+    if( srcdataGLLNodesSrc == nullptr )
     { /* we only have a mapping for elements as DoFs */
         for( unsigned i = 0; i < srccol_gdofmap.size(); ++i )
         {
@@ -553,7 +562,7 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
     // Now compute the mapping and store it for the target mesh
     // To access the GID for each row: row_gdofmap [ row_ldofmap [ 0 : local_ndofs ] ] = GDOF
     m_nTotDofs_Dest = 0;
-    if( tgtdataGLLNodes == NULL )
+    if( tgtdataGLLNodes == nullptr )
     { /* we only have a mapping for elements as DoFs */
         for( unsigned i = 0; i < row_gdofmap.size(); ++i )
         {
@@ -1059,7 +1068,8 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             this->InitializeTargetCoordinatesFromMeshFV( *m_meshOutput );
 
             // Finite volume input / Finite element output
-            rval = this->SetDOFmapAssociation( eInputType, false, NULL, NULL, eOutputType, false, NULL );MB_CHK_ERR( rval );
+            rval = this->SetDOFmapAssociation( eInputType, mapOptions.nPin, false, nullptr, nullptr, eOutputType,
+                                               mapOptions.nPout, false, nullptr );MB_CHK_ERR( rval );
 
             // Construct remap for FV-FV
             if( is_root ) dbgprint.printf( 0, "Calculating remap weights\n" );
@@ -1104,10 +1114,13 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             }
             else
             {
-                if( is_root ) AnnounceStartBlock( "Calculating map (default)" );
-                // LinearRemapFVtoFV( *m_meshInputCov, *m_meshOutput, *m_meshOverlap,
-                //                   ( mapOptions.fMonotone ) ? ( 1 ) : ( mapOptions.nPin ), *this );
+                if( is_root ) AnnounceStartBlock( "Calculating conservative FV-FV map" );
+#ifdef USE_NATIVE_TEMPESTREMAP_ROUTINES
+                LinearRemapFVtoFV( *m_meshInputCov, *m_meshOutput, *m_meshOverlap,
+                                  ( mapOptions.fMonotone ) ? ( 1 ) : ( mapOptions.nPin ), *this );
+#else
                 LinearRemapFVtoFV_Tempest_MOAB( ( mapOptions.fMonotone ? 1 : mapOptions.nPin ) );
+#endif
             }
         }
         else if( eInputType == DiscretizationType_FV )
@@ -1146,8 +1159,9 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             if( m_meshInputCov->edgemap.size() == 0 ) m_meshInputCov->ConstructEdgeMap( false );
 
             // Finite volume input / Finite element output
-            rval = this->SetDOFmapAssociation( eInputType, false, NULL, NULL, eOutputType,
-                                               ( eOutputType == DiscretizationType_CGLL ), &dataGLLNodesDest );MB_CHK_ERR( rval );
+            rval = this->SetDOFmapAssociation( eInputType, mapOptions.nPin, false, nullptr, nullptr, eOutputType,
+                                               mapOptions.nPout, ( eOutputType == DiscretizationType_CGLL ),
+                                               &dataGLLNodesDest );MB_CHK_ERR( rval );
 
             // Generate remap weights
             if( strMapAlgorithm == "volumetric" )
@@ -1213,10 +1227,11 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
 
             // Finite volume input / Finite element output
             rval = this->SetDOFmapAssociation(
-                eInputType, ( eInputType == DiscretizationType_CGLL ),
-                ( m_bPointCloudSource || eInputType == DiscretizationType_FV ? NULL : &dataGLLNodesSrcCov ),
-                ( m_bPointCloudSource || eInputType == DiscretizationType_FV ? NULL : &dataGLLNodesSrc ), eOutputType,
-                ( eOutputType == DiscretizationType_CGLL ), ( m_bPointCloudTarget ? NULL : &dataGLLNodesDest ) );MB_CHK_ERR( rval );
+                eInputType, mapOptions.nPin, ( eInputType == DiscretizationType_CGLL ),
+                ( m_bPointCloudSource || eInputType == DiscretizationType_FV ? nullptr : &dataGLLNodesSrcCov ),
+                ( m_bPointCloudSource || eInputType == DiscretizationType_FV ? nullptr : &dataGLLNodesSrc ), eOutputType,
+                mapOptions.nPout, ( eOutputType == DiscretizationType_CGLL ),
+                ( m_bPointCloudTarget ? nullptr : &dataGLLNodesDest ) );MB_CHK_ERR( rval );
 
             // Construct remap
             if( is_root ) dbgprint.printf( 0, "Calculating remap weights with Nearest-Neighbor method\n" );
@@ -1277,8 +1292,9 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             }
 
             // Finite element input / Finite volume output
-            rval = this->SetDOFmapAssociation( eInputType, ( eInputType == DiscretizationType_CGLL ),
-                                               &dataGLLNodesSrcCov, &dataGLLNodesSrc, eOutputType, false, NULL );MB_CHK_ERR( rval );
+            rval = this->SetDOFmapAssociation( eInputType, mapOptions.nPin, ( eInputType == DiscretizationType_CGLL ),
+                                               &dataGLLNodesSrcCov, &dataGLLNodesSrc, eOutputType, mapOptions.nPout,
+                                               false, nullptr );MB_CHK_ERR( rval );
 
             // Generate remap
             if( is_root ) dbgprint.printf( 0, "Calculating remap weights\n" );
@@ -1289,11 +1305,14 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                              "GLL input mesh" );
             }
 
-            // LinearRemapSE4( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, dataGLLNodesSrcCov, dataGLLJacobian,
-            // nMonotoneType, fContinuousIn,
-            //                              fNoConservation, false, *this );
+#ifdef USE_NATIVE_TEMPESTREMAP_ROUTINES
+            LinearRemapSE4( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, dataGLLNodesSrcCov, dataGLLJacobian,
+                            nMonotoneType, fContinuousIn, mapOptions.fNoConservation, mapOptions.fSparseConstraints,
+                            *this );
+#else
             LinearRemapSE4_Tempest_MOAB( dataGLLNodesSrcCov, dataGLLJacobian, nMonotoneType, fContinuousIn,
                                          mapOptions.fNoConservation );
+#endif
         }
         else if( ( eInputType != DiscretizationType_FV ) && ( eOutputType != DiscretizationType_FV ) )
         {
@@ -1373,16 +1392,23 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             }
 
             // Input Finite Element to Output Finite Element
-            rval = this->SetDOFmapAssociation( eInputType, ( eInputType == DiscretizationType_CGLL ),
-                                               &dataGLLNodesSrcCov, &dataGLLNodesSrc, eOutputType,
+            rval = this->SetDOFmapAssociation( eInputType, mapOptions.nPin, ( eInputType == DiscretizationType_CGLL ),
+                                               &dataGLLNodesSrcCov, &dataGLLNodesSrc, eOutputType, mapOptions.nPout,
                                                ( eOutputType == DiscretizationType_CGLL ), &dataGLLNodesDest );MB_CHK_ERR( rval );
 
             // Generate remap
             if( is_root ) dbgprint.printf( 0, "Calculating remap weights\n" );
 
-            LinearRemapGLLtoGLL2_MOAB( dataGLLNodesSrcCov, dataGLLJacobianIn, dataGLLNodesDest, dataGLLJacobianOut,
-                                       this->GetTargetAreas(), mapOptions.nPin, mapOptions.nPout, nMonotoneType,
-                                       fContinuousIn, fContinuousOut, mapOptions.fNoConservation );
+#ifdef USE_NATIVE_TEMPESTREMAP_ROUTINES
+            LinearRemapGLLtoGLL_Integrated( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, dataGLLNodesSrcCov,
+                                            dataGLLJacobianIn, dataGLLNodesDest, dataGLLJacobianOut,
+                                            this->GetTargetAreas(), mapOptions.nPin, mapOptions.nPout, nMonotoneType,
+                                            fContinuousIn, fContinuousOut, mapOptions.fSparseConstraints, *this );
+#else
+                LinearRemapGLLtoGLL2_MOAB( dataGLLNodesSrcCov, dataGLLJacobianIn, dataGLLNodesDest, dataGLLJacobianOut,
+                                           this->GetTargetAreas(), mapOptions.nPin, mapOptions.nPout, nMonotoneType,
+                                           fContinuousIn, fContinuousOut, mapOptions.fNoConservation );
+#endif
         }
         else
         {
@@ -1658,7 +1684,8 @@ int moab::TempestOnlineMap::IsMonotone( double dTolerance )
 
 moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
                                                       moab::Tag tgtSolutionTag,
-                                                      bool transpose )
+                                                      bool transpose,
+                                                      bool useCAAS )
 {
     moab::ErrorCode rval;
 
@@ -1714,7 +1741,7 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
     // Compute the application of weights on the suorce solution data and store it in the
     // destination solution vector data Optionally, can also perform the transpose application of
     // the weight matrix. Set the 3rd argument to true if this is needed
-    rval = this->ApplyWeights( solSTagVals, solTTagVals, transpose );MB_CHK_SET_ERR( rval, "Applying remap operator onto source vector data failed" );
+    rval = this->ApplyWeights( solSTagVals, solTTagVals, transpose, useCAAS );MB_CHK_SET_ERR( rval, "Applying remap operator onto source vector data failed" );
 
     // The tag data is np*np*n_el_dest
     rval = m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] );MB_CHK_SET_ERR( rval, "Setting local tag data failed" );
@@ -1766,7 +1793,7 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
     // (DoF space)
     rval = m_interface->tag_get_handle( solnName.c_str(), discOrder * discOrder, MB_TYPE_DOUBLE, solnTag,
                                         MB_TAG_DENSE | MB_TAG_CREAT );MB_CHK_ERR( rval );
-    if( clonedSolnTag != NULL )
+    if( clonedSolnTag != nullptr )
     {
         if( cloneSolnName.size() == 0 )
         {

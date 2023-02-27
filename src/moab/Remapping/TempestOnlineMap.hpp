@@ -231,12 +231,18 @@ class TempestOnlineMap : public OfflineMap
     ///     consistently.
     ///	</summary>
     moab::ErrorCode SetDOFmapAssociation( DiscretizationType srcType,
+                                          int srcOrder,
                                           bool isSrcContinuous,
                                           DataArray3D< int >* srcdataGLLNodes,
                                           DataArray3D< int >* srcdataGLLNodesSrc,
                                           DiscretizationType destType,
-                                          bool isDestContinuous,
+                                          int destOrder,
+                                          bool isTgtContinuous,
                                           DataArray3D< int >* tgtdataGLLNodes );
+
+    double ApplyCAASLimiting( std::vector< double >& dataInDouble,
+                              std::vector< double >& dataOutDouble,
+                              bool useCAASLocal );
 
 #ifdef MOAB_HAVE_EIGEN3
 
@@ -336,7 +342,8 @@ class TempestOnlineMap : public OfflineMap
     ///	</summary>
     moab::ErrorCode ApplyWeights( std::vector< double >& srcVals,
                                   std::vector< double >& tgtVals,
-                                  bool transpose = false );
+                                  bool transpose = false,
+                                  bool useCAAS   = false );
 
     ///	<summary>
     ///		Apply the weight matrix onto the source vector (tag) provided as input, and return the
@@ -344,7 +351,10 @@ class TempestOnlineMap : public OfflineMap
     ///     Compute:        \p tgtVals = A(S->T) * \srcVals, or
     ///     if (transpose)  \p tgtVals = [A(T->S)]^T * \srcVals
     ///	</summary>
-    moab::ErrorCode ApplyWeights( moab::Tag srcSolutionTag, moab::Tag tgtSolutionTag, bool transpose = false );
+    moab::ErrorCode ApplyWeights( moab::Tag srcSolutionTag,
+                                  moab::Tag tgtSolutionTag,
+                                  bool transpose = false,
+                                  bool useCAAS   = false );
 
     typedef double ( *sample_function )( double, double );
 
@@ -445,6 +455,7 @@ class TempestOnlineMap : public OfflineMap
     std::vector< int > row_dtoc_dofmap, col_dtoc_dofmap, srccol_dtoc_dofmap;
 
     std::map< int, int > rowMap, colMap;
+    int m_input_order, m_output_order;
 
     DataArray3D< int > dataGLLNodesSrc, dataGLLNodesSrcCov, dataGLLNodesDest;
     DiscretizationType m_srcDiscType, m_destDiscType;

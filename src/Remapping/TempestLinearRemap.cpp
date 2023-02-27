@@ -364,10 +364,197 @@ void moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3()
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+double moab::TempestOnlineMap::ApplyCAASLimiting( std::vector< double >& dataInDouble,
+                                                  std::vector< double >& dataOutDouble,
+                                                  bool useCAASLocal )
+{
+    const size_t nSourceCount                   = dataInDouble.size();
+    const size_t nTargetCount                   = dataOutDouble.size();
+    const DataArray1D< double >& m_dSourceAreas = this->GetSourceAreas();
+    const DataArray1D< double >& m_dTargetAreas = this->GetTargetAreas();
+
+    // Announce input mass
+    double dSourceMass = 0.0;
+    double dSourceMin  = dataInDouble[0];
+    double dSourceMax  = dataInDouble[0];
+    for( size_t i = 0; i < nSourceCount; i++ )
+    {
+        dSourceMass += dataInDouble[i] * m_dSourceAreas[i];
+        if( dataInDouble[i] < dSourceMin )
+        {
+            dSourceMin = dataInDouble[i];
+        }
+        if( dataInDouble[i] > dSourceMax )
+        {
+            dSourceMax = dataInDouble[i];
+        }
+    }
+
+    // Apply the offline map to the data
+    double lb = dataOutDouble[0], ub = dataOutDouble[0];
+    {
+        DataArray1D< double > x( nTargetCount );
+        DataArray1D< double > l( nTargetCount ), u( nTargetCount );
+        for( size_t i = 0; i < nTargetCount; i++ )
+        {
+            ub   = fmax( ub, dataInDouble[i] );
+            lb   = fmin( lb, dataInDouble[i] );
+            l[i] = u[i] = dataOutDouble[i];
+        }
+        double b = dSourceMass;
+
+        for( size_t i = 0; i < nTargetCount; i++ )
+        {
+            b -= dataOutDouble[i] * m_dTargetAreas[i];
+        }
+
+        if( useCAASLocal )
+        {
+            // int GLLSizeIn  = 0;  // FV
+            // int GLLSizeOut = 0;  // FV
+            // int pOut       = dataGLLNodesOut.GetSize( 0 );
+            // int qOut       = dataGLLNodesOut.GetSize( 1 );
+            // int pIn        = dataGLLNodesIn.GetSize( 0 );
+            // int qIn        = dataGLLNodesIn.GetSize( 1 );
+            // int pIn          = m_input_order;
+            double f_maxI    = 0.0;
+            double f_minI    = 0.0;
+            int nTargetFaces = nTargetCount;
+
+            std::vector< std::vector< int > > SourceOvTarget( nTargetFaces );
+
+            for( size_t i = 0; i < m_meshOverlap->faces.size(); i++ )
+            {
+                int ixT = m_meshOverlap->vecTargetFaceIx[i];
+                int ixS = m_meshOverlap->vecSourceFaceIx[i];
+                SourceOvTarget[ixT].push_back( ixS );
+            }
+
+            std::vector< double > local_UB( nTargetCount );
+            std::vector< double > local_LB( nTargetCount );
+
+            for( size_t i = 0; i < nTargetCount; i++ )
+            {
+                AdjacentFaceVector vecAdjFaces;
+
+                GetAdjacentFaceVectorByEdge( *m_meshInputCov, SourceOvTarget[i][0], ( m_input_order + 1 ) * ( m_input_order + 1 ),
+                                             vecAdjFaces );
+                f_maxI = dataInDouble[vecAdjFaces[0].first];
+                f_minI = dataInDouble[vecAdjFaces[0].first];
+                for( size_t j = 0; j < vecAdjFaces.size(); j++ )
+                {
+                    int k  = vecAdjFaces[j].first;
+                    f_maxI = fmax( f_maxI, dataInDouble[k] );
+                    f_minI = fmin( f_minI, dataInDouble[k] );
+                }
+
+                for( size_t j = 0; j < SourceOvTarget[i].size(); j++ )
+                {
+
+                    int k  = SourceOvTarget[i][j];
+                    f_maxI = fmax( f_maxI, dataInDouble[k] );
+                    f_minI = fmin( f_minI, dataInDouble[k] );
+                }
+
+                // f_minI=fmax(f_minI,0.0);
+
+                local_UB[i] = f_maxI;
+                local_LB[i] = f_minI;
+            }
+
+            double mt = 0.0;
+            for( size_t i = 0; i < nTargetCount; i++ )
+            {
+                mt += m_dTargetAreas[i] * ( local_LB[i] - dataOutDouble[i] );
+            }
+
+            for( size_t i = 0; i < nTargetCount; i++ )
+            {
+                l[i] = local_LB[i] - l[i];
+                u[i] = local_UB[i] - u[i];
+            }
+
+            // Adjust mass of lower bound if greater than b
+            double mL = 0.0;
+
+            for( size_t i = 0; i < nTargetCount; i++ )
+            {
+                mL += m_dTargetAreas[i] * l[i];
+            }
+            if( mL > b )
+            {
+                for( size_t i = 0; i < nTargetCount; i++ )
+                {
+                    mL   = mL - m_dTargetAreas[i] * l[i] + m_dTargetAreas[i] * ( dSourceMin - dataOutDouble[i] );
+                    l[i] = dSourceMin - dataOutDouble[i];
+                    if( mL < b )
+                    {
+                        break;
+                    }
+                }
+            }
+
+            // Adjust mass of upper bound if less than b
+            double mU = 0.0;
+
+            if( mU < b )
+            {
+                for( size_t i = 0; i < nTargetCount; i++ )
+                {
+                    mU   = mU - m_dTargetAreas[i] * u[i] + m_dTargetAreas[i] * ( dSourceMax - dataOutDouble[i] );
+                    u[i] = dSourceMax - dataOutDouble[i];
+                    if( mU > b )
+                    {
+                        break;
+                    }
+                }
+            }
+        }  // if( useCAASLocal )
+        else // useCAASGlobal
+        {
+            for( size_t i = 0; i < nTargetCount; i++ )
+            {
+                l[i] = lb - l[i];
+                u[i] = ub - u[i];
+            }
+        }
+
+        // Invoke CAAS application on the offline map
+        this->CAAS( x, l, u, b );
+
+        // Add correction
+        for( size_t i = 0; i < nTargetCount; i++ )
+        {
+            dataOutDouble[i] += x[i];
+        }
+    }
+
+    // Announce output mass
+    double dTargetMass = 0.0;
+    double dTargetMin  = dataOutDouble[0];
+    double dTargetMax  = dataOutDouble[0];
+    for( size_t i = 0; i < nTargetCount; i++ )
+    {
+        dTargetMass += dataOutDouble[i] * m_dTargetAreas[i];
+        if( dataOutDouble[i] < dTargetMin )
+        {
+            dTargetMin = dataOutDouble[i];
+        }
+        if( dataOutDouble[i] > dTargetMax )
+        {
+            dTargetMax = dataOutDouble[i];
+        }
+    }
+
+    return ( dTargetMass - dSourceMass );
+}
+
 //#define VERBOSE
 moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& srcVals,
                                                       std::vector< double >& tgtVals,
-                                                      bool transpose )
+                                                      bool transpose,
+                                                      bool useCAAS )
 {
     // Reset the source and target data first
     m_rowVector.setZero();
@@ -435,6 +622,11 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
 #endif
             }
         }
+    }
+
+    if( useCAAS )
+    {
+        double mismatch = this->ApplyCAASLimiting( srcVals, tgtVals, true );
     }
 
 #ifdef VERBOSE

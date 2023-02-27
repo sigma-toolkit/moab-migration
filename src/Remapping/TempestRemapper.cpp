@@ -1303,7 +1303,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                 Range covEnts;
                 rval = m_interface->get_entities_by_dimension( m_covering_source_set, 2, covEnts );MB_CHK_ERR( rval );
 
-                std::map< int, int > loc_gid_to_lid_covsrc( covEnts.size() );
+                std::map< int, int > loc_gid_to_lid_covsrc;
                 std::vector< int > gids( covEnts.size(), -1 );
                 Tag gidtag = m_interface->globalId_tag();
                 rval = m_interface->tag_get_data( gidtag, covEnts, &gids[0] );MB_CHK_ERR( rval );

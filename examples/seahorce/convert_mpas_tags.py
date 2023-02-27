@@ -90,6 +90,7 @@ for ztag in taglist_z:
     thandle = mb.tag_get_handle(ztag,nVertLevels,types.MB_TYPE_DOUBLE,types.MB_TAG_SPARSE,True)
     mb.tag_set_data(thandle,root_set,zdata)
 
+tdata3d = np.zeros((polys.size(), nVertLevels))
 
 for fdtag in taglist_4d:
     print("\nAnalyzing", fdtag)
@@ -98,11 +99,11 @@ for fdtag in taglist_4d:
     print(ncvar)
 
     # get the actual data out of the variable
-    tdata[gids[:]] = ncvar[0, :, 0]
+    tdata3d[gids[:], :] = ncvar[0, :, :]
 
     print("Setting", fdtag, "tag data")
-    thandle = mb.tag_get_handle(fdtag,1,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE,True)
-    mb.tag_set_data(thandle,polys,tdata)
+    thandle = mb.tag_get_handle(fdtag,nVertLevels,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE,True)
+    mb.tag_set_data(thandle,polys,tdata3d)
 
 
 ncf.close()

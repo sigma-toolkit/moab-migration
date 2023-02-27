@@ -1111,32 +1111,32 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             // Construct OfflineMap
             if( strMapAlgorithm == "invdist" )
             {
-                AnnounceStartBlock( "Calculating offline map (invdist)" );
+                AnnounceStartBlock( "Calculating map (invdist)" );
                 LinearRemapFVtoFVInvDist( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else if( strMapAlgorithm == "delaunay" )
             {
-                AnnounceStartBlock( "Calculating offline map (delaunay)" );
+                AnnounceStartBlock( "Calculating map (delaunay)" );
                 LinearRemapTriangulation( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else if( strMapAlgorithm == "fvintbilin" )
             {
-                AnnounceStartBlock( "Calculating offline map (intbilin)" );
+                AnnounceStartBlock( "Calculating map (intbilin)" );
                 LinearRemapIntegratedBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else if( strMapAlgorithm == "fvintbilingb" )
             {
-                AnnounceStartBlock( "Calculating offline map (intbilingb)" );
+                AnnounceStartBlock( "Calculating map (intbilingb)" );
                 LinearRemapIntegratedGeneralizedBarycentric( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else if( strMapAlgorithm == "fvbilin" )
             {
-                AnnounceStartBlock( "Calculating offline map (bilin)" );
+                AnnounceStartBlock( "Calculating map (bilin)" );
                 LinearRemapBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else
             {
-                AnnounceStartBlock( "Calculating offline map (default)" );
+                AnnounceStartBlock( "Calculating map (default)" );
                 // LinearRemapFVtoFV( *m_meshInputCov, *m_meshOutput, *m_meshOverlap,
                 //                   ( mapOptions.fMonotone ) ? ( 1 ) : ( mapOptions.nPin ), *this );
                 LinearRemapFVtoFV_Tempest_MOAB( ( mapOptions.fMonotone ? 1 : mapOptions.nPin ) );

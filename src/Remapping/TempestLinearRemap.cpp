@@ -163,11 +163,12 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_Tempest_MOAB( int nOrder )
     for( size_t ixFirst = 0; ixFirst < m_meshInputCov->faces.size(); ixFirst++ )
     {
         // Output every 1000 elements
+#ifdef VERBOSE
         if( ixFirst % outputFrequency == 0 && is_root )
         {
             dbgprint.printf( 0, "Element %zu/%lu\n", ixFirst, m_meshInputCov->faces.size() );
         }
-
+#endif
         // Find the set of Faces that overlap faceFirst
         int ixOverlapBegin    = ixOverlap;
         unsigned ixOverlapEnd = ixOverlapBegin;
@@ -494,7 +495,7 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
     DataArray1D< double > dW;
     GaussLobattoQuadrature::GetPoints( nP, 0.0, 1.0, dG, dW );
 
-    // Announcemnets
+    // Announcements
     moab::DebugOutput dbgprint( std::cout, this->rank, 0 );
     dbgprint.set_prefix( "[LinearRemapSE4_Tempest_MOAB]: " );
     if( is_root )
@@ -547,13 +548,13 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
         {
             _EXCEPTIONT( "Only quadrilateral elements allowed for SE remapping" );
         }
-
+#ifdef VERBOSE
         // Announce computation progress
         if( ixFirst % outputFrequency == 0 && is_root )
         {
             dbgprint.printf( 0, "Element %zu/%lu\n", ixFirst, m_meshInputCov->faces.size() );
         }
-
+#endif
         // Need to re-number the overlap elements such that vecSourceFaceIx[a:b] = 0, then 1 and so
         // on wrt the input mesh data Then the overlap_end and overlap_begin will be correct.
         // However, the relation with MOAB and Tempest will go out of the roof
@@ -979,12 +980,13 @@ void moab::TempestOnlineMap::LinearRemapGLLtoGLL2_MOAB( const DataArray3D< int >
 
     for( size_t ixFirst = 0; ixFirst < m_meshInputCov->faces.size(); ixFirst++ )
     {
+#ifdef VERBOSE
         // Announce computation progress
         if( ixFirst % outputFrequency == 0 && is_root )
         {
             dbgprint.printf( 0, "Element %zu/%lu\n", ixFirst, m_meshInputCov->faces.size() );
         }
-
+#endif
         // Quantities from the First Mesh
         const Face& faceFirst = m_meshInputCov->faces[ixFirst];
 
@@ -1336,12 +1338,13 @@ void moab::TempestOnlineMap::LinearRemapGLLtoGLL2_MOAB( const DataArray3D< int >
 
     for( size_t ixFirst = 0; ixFirst < m_meshInputCov->faces.size(); ixFirst++ )
     {
+#ifdef VERBOSE
         // Announce computation progress
         if( ixFirst % outputFrequency == 0 && is_root )
         {
             dbgprint.printf( 0, "Element %zu/%lu\n", ixFirst, m_meshInputCov->faces.size() );
         }
-
+#endif
         // Number of overlapping Faces and triangles
         int nOverlapFaces = nAllOverlapFaces[ixFirst];
 
@@ -1501,12 +1504,13 @@ void moab::TempestOnlineMap::LinearRemapGLLtoGLL2_Pointwise_MOAB( const DataArra
     // Loop through all faces on m_meshInputCov
     for( size_t ixFirst = 0; ixFirst < m_meshInputCov->faces.size(); ixFirst++ )
     {
+#ifdef VERBOSE
         // Announce computation progress
         if( ixFirst % outputFrequency == 0 && is_root )
         {
             dbgprint.printf( 0, "Element %zu/%lu\n", ixFirst, m_meshInputCov->faces.size() );
         }
-
+#endif
         // Quantities from the First Mesh
         const Face& faceFirst = m_meshInputCov->faces[ixFirst];
 

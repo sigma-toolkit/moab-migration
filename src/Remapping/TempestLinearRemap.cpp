@@ -382,153 +382,284 @@ double moab::TempestOnlineMap::ApplyCAASLimiting( std::vector< double >& dataInD
     for( size_t i = 0; i < nSourceCount; i++ )
     {
         dSourceMass += dataInDouble[i] * m_dSourceAreas[i];
-        if( dataInDouble[i] < dSourceMin )
-        {
-            dSourceMin = dataInDouble[i];
-        }
-        if( dataInDouble[i] > dSourceMax )
-        {
-            dSourceMax = dataInDouble[i];
-        }
+        dSourceMax = fmax( dSourceMax, dataInDouble[i] );
+        dSourceMin = fmin( dSourceMin, dataInDouble[i] );
     }
 
     // Apply the offline map to the data
-    double lb = dataOutDouble[0], ub = dataOutDouble[0];
     {
         DataArray1D< double > x( nTargetCount );
-        DataArray1D< double > l( nTargetCount ), u( nTargetCount );
-        for( size_t i = 0; i < nTargetCount; i++ )
-        {
-            ub   = fmax( ub, dataInDouble[i] );
-            lb   = fmin( lb, dataInDouble[i] );
-            l[i] = u[i] = dataOutDouble[i];
-        }
-        double b = dSourceMass;
+        DataArray1D< double > dataLowerBound( nTargetCount );
+        DataArray1D< double > dataUpperBound( nTargetCount );
 
+        double dMassDiff = dSourceMass;
         for( size_t i = 0; i < nTargetCount; i++ )
         {
-            b -= dataOutDouble[i] * m_dTargetAreas[i];
+            dMassDiff -= dataOutDouble[i] * m_dTargetAreas[i];
         }
 
         if( useCAASLocal )
         {
-            // int GLLSizeIn  = 0;  // FV
-            // int GLLSizeOut = 0;  // FV
-            // int pOut       = dataGLLNodesOut.GetSize( 0 );
-            // int qOut       = dataGLLNodesOut.GetSize( 1 );
-            // int pIn        = dataGLLNodesIn.GetSize( 0 );
-            // int qIn        = dataGLLNodesIn.GetSize( 1 );
-            // int pIn          = m_input_order;
-            double f_maxI    = 0.0;
-            double f_minI    = 0.0;
+            double dMinI;
+            double dMaxI;
+
             int nTargetFaces = nTargetCount;
+            if( m_destDiscType == DiscretizationType_CGLL || m_destDiscType == DiscretizationType_DGLL )
+            {
+                nTargetFaces = ( dataGLLNodesDest.IsAttached() > 0 ? m_pdataGLLNodesOut->GetSize( 2 ) : nTargetCount );
+            }
 
-            std::vector< std::vector< int > > SourceOvTarget( nTargetFaces );
+            std::vector< double > vecLocalUpperBound( nTargetCount );
+            std::vector< double > vecLocalLowerBound( nTargetCount );
 
+            std::vector< std::vector< int > > vecSourceOvTarget( nTargetFaces );
             for( size_t i = 0; i < m_meshOverlap->faces.size(); i++ )
             {
+
                 int ixT = m_meshOverlap->vecTargetFaceIx[i];
                 int ixS = m_meshOverlap->vecSourceFaceIx[i];
-                SourceOvTarget[ixT].push_back( ixS );
+                vecSourceOvTarget[ixT].push_back( ixS );
             }
 
-            std::vector< double > local_UB( nTargetCount );
-            std::vector< double > local_LB( nTargetCount );
-
-            for( size_t i = 0; i < nTargetCount; i++ )
-            {
-                AdjacentFaceVector vecAdjFaces;
-
-                GetAdjacentFaceVectorByEdge( *m_meshInputCov, SourceOvTarget[i][0], ( m_input_order + 1 ) * ( m_input_order + 1 ),
-                                             vecAdjFaces );
-                f_maxI = dataInDouble[vecAdjFaces[0].first];
-                f_minI = dataInDouble[vecAdjFaces[0].first];
-                for( size_t j = 0; j < vecAdjFaces.size(); j++ )
-                {
-                    int k  = vecAdjFaces[j].first;
-                    f_maxI = fmax( f_maxI, dataInDouble[k] );
-                    f_minI = fmin( f_minI, dataInDouble[k] );
-                }
-
-                for( size_t j = 0; j < SourceOvTarget[i].size(); j++ )
-                {
-
-                    int k  = SourceOvTarget[i][j];
-                    f_maxI = fmax( f_maxI, dataInDouble[k] );
-                    f_minI = fmin( f_minI, dataInDouble[k] );
-                }
-
-                // f_minI=fmax(f_minI,0.0);
-
-                local_UB[i] = f_maxI;
-                local_LB[i] = f_minI;
-            }
-
-            double mt = 0.0;
-            for( size_t i = 0; i < nTargetCount; i++ )
-            {
-                mt += m_dTargetAreas[i] * ( local_LB[i] - dataOutDouble[i] );
-            }
-
-            for( size_t i = 0; i < nTargetCount; i++ )
-            {
-                l[i] = local_LB[i] - l[i];
-                u[i] = local_UB[i] - u[i];
-            }
-
-            // Adjust mass of lower bound if greater than b
-            double mL = 0.0;
-
-            for( size_t i = 0; i < nTargetCount; i++ )
-            {
-                mL += m_dTargetAreas[i] * l[i];
-            }
-            if( mL > b )
+            //FV to FV
+            if( !dataGLLNodesSrcCov.IsAttached() && !dataGLLNodesDest.IsAttached() )
             {
                 for( size_t i = 0; i < nTargetCount; i++ )
                 {
-                    mL   = mL - m_dTargetAreas[i] * l[i] + m_dTargetAreas[i] * ( dSourceMin - dataOutDouble[i] );
-                    l[i] = dSourceMin - dataOutDouble[i];
-                    if( mL < b )
+                    dMaxI = dataInDouble[vecSourceOvTarget[i][0]];
+                    dMinI = dataInDouble[vecSourceOvTarget[i][0]];
+
+                    //Compute max over interstecting source faces
+
+                    for( size_t j = 0; j < vecSourceOvTarget[i].size(); j++ )
                     {
-                        break;
+                        int k = vecSourceOvTarget[i][j];
+                        dMaxI = fmax( dMaxI, dataInDouble[k] );
+                        dMinI = fmin( dMinI, dataInDouble[k] );
+                    }
+
+                    if( useCAASLocal )
+                    {
+                        double dMaxIAdj = dMaxI;
+                        double dMinIAdj = dMinI;
+
+                        AdjacentFaceVector vecAdjFaces;
+
+                        GetAdjacentFaceVectorByEdge( *m_meshInputCov, vecSourceOvTarget[i][0],
+                                                     ( m_iPin + 1 ) * ( m_iPin + 1 ), vecAdjFaces );
+
+                        //Compute max over neighboring faces
+                        for( size_t j = 0; j < vecAdjFaces.size(); j++ )
+                        {
+                            int k = vecAdjFaces[j].first;
+
+                            dMaxIAdj = fmax( dMaxIAdj, dataInDouble[k] );
+                            dMinIAdj = fmin( dMinIAdj, dataInDouble[k] );
+                        }
+
+                        vecLocalLowerBound[i] = dMinIAdj;
+                        vecLocalUpperBound[i] = dMaxIAdj;
+                    }
+                    else
+                    {
+                        vecLocalLowerBound[i] = dMinI;
+                        vecLocalUpperBound[i] = dMaxI;
+                    }
+                }
+            }
+            //FE to FE
+            else if( dataGLLNodesSrcCov.IsAttached() && dataGLLNodesDest.IsAttached() )
+            {
+                std::vector< std::vector< double > > vecMaxI( nTargetCount );
+                std::vector< std::vector< double > > vecMinI( nTargetCount );
+
+                for( size_t i = 0; i < m_pdataGLLNodesOut->GetSize( 2 ); i++ )
+                {
+                    int q = vecSourceOvTarget[i][0];
+
+                    dMaxI = dataInDouble[dataGLLNodesSrcCov[0][0][q] - 1];
+                    dMinI = dataInDouble[dataGLLNodesSrcCov[0][0][q] - 1];
+
+                    //Compute maximum over all source elements that intersect target element i
+                    for( size_t j = 0; j < vecSourceOvTarget[i].size(); j++ )
+                    {
+                        for( size_t k = 0; k < dataGLLNodesSrcCov.GetSize( 0 ); k++ )
+                        {
+                            for( size_t r = 0; r < dataGLLNodesSrcCov.GetSize( 1 ); r++ )
+                            {
+                                int m = vecSourceOvTarget[i][j];
+                                int n = dataGLLNodesSrcCov[k][r][m] - 1;
+
+                                dMaxI = fmax( dMaxI, dataInDouble[n] );
+                                dMinI = fmin( dMinI, dataInDouble[n] );
+                            }
+                        }
+                    }
+
+                    for( size_t l = 0; l < dataGLLNodesDest.GetSize( 0 ); l++ )
+                    {
+                        for( size_t s = 0; s < dataGLLNodesDest.GetSize( 1 ); s++ )
+                        {
+                            int t = dataGLLNodesDest[l][s][i] - 1;
+
+                            vecMaxI[t].push_back( dMaxI );
+                            vecMinI[t].push_back( dMinI );
+                        }
+                    }
+                }
+
+                for( size_t i = 0; i < nTargetCount; i++ )
+                {
+                    double dMaxNodeI = vecMaxI[i][0];
+                    double dMinNodeI = vecMinI[i][0];
+
+                    //Determine maximum and minimum for corner and edge nodes
+                    for( size_t j = 0; j < vecMaxI[i].size(); j++ )
+                    {
+                        dMaxNodeI = fmax( dMaxNodeI, vecMaxI[i][j] );
+                        dMinNodeI = fmin( dMinNodeI, vecMinI[i][j] );
+                    }
+
+                    // if( !useCAASLocal )
+                    {
+                        vecLocalUpperBound[i] = dMaxNodeI;
+                        vecLocalLowerBound[i] = dMinNodeI;
+                    }
+                }
+            }
+            //FV to GLL
+            else if( dataGLLNodesDest.IsAttached() )
+            {
+                std::vector< std::vector< double > > vecMaxI( nTargetCount );
+                std::vector< std::vector< double > > vecMinI( nTargetCount );
+
+                for( size_t i = 0; i < dataGLLNodesDest.GetSize( 2 ); i++ )
+                {
+                    dMaxI = dataInDouble[vecSourceOvTarget[i][0]];
+                    dMinI = dataInDouble[vecSourceOvTarget[i][0]];
+
+                    for( size_t j = 0; j < vecSourceOvTarget[i].size(); j++ )
+                    {
+                        int k = vecSourceOvTarget[i][j];
+                        dMaxI = fmax( dMaxI, dataInDouble[k] );
+                        dMinI = fmin( dMinI, dataInDouble[k] );
+                    }
+
+                    double dMaxIAdj;
+                    double dMinIAdj;
+
+                    if( useCAASLocal )
+                    {
+                        dMaxIAdj = dMaxI;
+                        dMinIAdj = dMinI;
+
+                        AdjacentFaceVector vecAdjFaces;
+
+                        GetAdjacentFaceVectorByEdge( *m_meshInputCov, vecSourceOvTarget[i][0],
+                                                     ( m_iPin + 1 ) * ( m_iPin + 1 ), vecAdjFaces );
+
+                        for( size_t j = 0; j < vecAdjFaces.size(); j++ )
+                        {
+                            int k = vecAdjFaces[j].first;
+
+                            dMaxIAdj = fmax( dMaxIAdj, dataInDouble[k] );
+                            dMinIAdj = fmin( dMinIAdj, dataInDouble[k] );
+                        }
+                    }
+
+                    //For lp bounds, push back the max/min over the intersecting set, and the adjacency set
+                    //For local bounds, push back the max/min over the intersecting set
+                    for( size_t l = 0; l < dataGLLNodesDest.GetSize( 0 ); l++ )
+                    {
+                        for( size_t s = 0; s < dataGLLNodesDest.GetSize( 1 ); s++ )
+                        {
+                            int t = dataGLLNodesDest[l][s][i] - 1;
+
+                            if( useCAASLocal )
+                            {
+                                vecMaxI[t].push_back( dMaxIAdj );
+                                vecMinI[t].push_back( dMinIAdj );
+                            }
+                            else
+                            {
+                                vecMaxI[t].push_back( dMaxI );
+                                vecMinI[t].push_back( dMinI );
+                            }
+                        }
+                    }
+                }
+
+                for( size_t i = 0; i < nTargetCount; i++ )
+                {
+                    double dMaxNodeI = vecMaxI[i][0];
+                    double dMinNodeI = vecMinI[i][0];
+
+                    //Determine maximum and minimum for corner and edge nodes
+                    for( size_t j = 0; j < vecMaxI[i].size(); j++ )
+                    {
+                        dMaxNodeI = fmax( dMaxNodeI, vecMaxI[i][j] );
+                        dMinNodeI = fmin( dMinNodeI, vecMinI[i][j] );
+                    }
+
+                    vecLocalUpperBound[i] = dMaxNodeI;
+                    vecLocalLowerBound[i] = dMinNodeI;
+                }
+            }
+            else
+            {
+                for( size_t i = 0; i < nTargetCount; i++ )
+                {
+                    int q = vecSourceOvTarget[i][0];
+
+                    dMaxI = dataInDouble[dataGLLNodesSrcCov[0][0][q] - 1];
+                    dMinI = dataInDouble[dataGLLNodesSrcCov[0][0][q] - 1];
+
+                    //Compute maximum over all source elements that intersect target element i
+                    for( size_t j = 0; j < vecSourceOvTarget[i].size(); j++ )
+                    {
+                        for( size_t k = 0; k < dataGLLNodesSrcCov.GetSize( 0 ); k++ )
+                        {
+                            for( size_t r = 0; r < dataGLLNodesSrcCov.GetSize( 1 ); r++ )
+                            {
+                                int m = vecSourceOvTarget[i][j];
+                                int n = dataGLLNodesSrcCov[k][r][m] - 1;
+
+                                dMaxI = fmax( dMaxI, dataInDouble[n] );
+                                dMinI = fmin( dMinI, dataInDouble[n] );
+                            }
+                        }
+                    }
+
+                    // if( useCAASLocal )
+                    {
+                        vecLocalLowerBound[i] = dMinI;
+                        vecLocalUpperBound[i] = dMaxI;
                     }
                 }
             }
 
-            // Adjust mass of upper bound if less than b
-            double mU = 0.0;
-
-            if( mU < b )
+            for( size_t i = 0; i < dataLowerBound.GetRows(); i++ )
             {
-                for( size_t i = 0; i < nTargetCount; i++ )
-                {
-                    mU   = mU - m_dTargetAreas[i] * u[i] + m_dTargetAreas[i] * ( dSourceMax - dataOutDouble[i] );
-                    u[i] = dSourceMax - dataOutDouble[i];
-                    if( mU > b )
-                    {
-                        break;
-                    }
-                }
+                dataLowerBound[i] = vecLocalLowerBound[i] - dataOutDouble[i];
+                dataUpperBound[i] = vecLocalUpperBound[i] - dataOutDouble[i];
             }
+
         }  // if( useCAASLocal )
         else // useCAASGlobal
         {
             for( size_t i = 0; i < nTargetCount; i++ )
             {
-                l[i] = lb - l[i];
-                u[i] = ub - u[i];
+                dataLowerBound[i] = dSourceMin - dataLowerBound[i];
+                dataUpperBound[i] = dSourceMax - dataUpperBound[i];
             }
         }
 
-        // Invoke CAAS application on the offline map
-        this->CAAS( x, l, u, b );
+        DataArray1D< double > xDout;
+        xDout.SetSize( nTargetCount );
+        xDout.AttachToData( dataOutDouble.data() );
 
-        // Add correction
-        for( size_t i = 0; i < nTargetCount; i++ )
-        {
-            dataOutDouble[i] += x[i];
-        }
+        // Invoke CAAS application on the offline map
+        this->CAAS( xDout, dataLowerBound, dataUpperBound, dMassDiff );
     }
 
     // Announce output mass

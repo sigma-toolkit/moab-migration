@@ -1101,6 +1101,9 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             */
         }
 
+        this->m_pmeshSource  = m_meshInputCov;
+        this->m_pmeshOverlap = m_meshOverlap;
+
         // Finite volume input / Finite volume output
         if( ( eInputType == DiscretizationType_FV ) && ( eOutputType == DiscretizationType_FV ) )
         {
@@ -1111,6 +1114,9 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             // Initialize coordinates for map
             this->InitializeSourceCoordinatesFromMeshFV( *m_meshInputCov );
             this->InitializeTargetCoordinatesFromMeshFV( *m_meshOutput );
+
+            this->m_pdataGLLNodesIn  = nullptr;
+            this->m_pdataGLLNodesOut = nullptr;
 
             // Finite volume input / Finite element output
             rval = this->SetDOFmapAssociation( eInputType, mapOptions.nPin, false, NULL, NULL, eOutputType,
@@ -1174,6 +1180,9 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             // Initialize coordinates for map
             this->InitializeSourceCoordinatesFromMeshFV( *m_meshInputCov );
             this->InitializeTargetCoordinatesFromMeshFE( *m_meshOutput, mapOptions.nPout, dataGLLNodesDest );
+
+            this->m_pdataGLLNodesIn  = nullptr;
+            this->m_pdataGLLNodesOut = &dataGLLNodesDest;
 
             // Generate the continuous Jacobian
             bool fContinuous = ( eOutputType == DiscretizationType_CGLL );
@@ -1338,6 +1347,9 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                              "GLL input mesh" );
             }
 
+            this->m_pdataGLLNodesIn  = &dataGLLNodesSrcCov;
+            this->m_pdataGLLNodesOut = nullptr;
+
 #ifdef USE_NATIVE_TEMPESTREMAP_ROUTINES
             LinearRemapSE4( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, dataGLLNodesSrcCov, dataGLLJacobian,
                             nMonotoneType, fContinuousIn, mapOptions.fNoConservation, mapOptions.fSparseConstraints,
@@ -1428,6 +1440,9 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             rval = this->SetDOFmapAssociation( eInputType, mapOptions.nPin, ( eInputType == DiscretizationType_CGLL ),
                                                &dataGLLNodesSrcCov, &dataGLLNodesSrc, eOutputType, mapOptions.nPout,
                                                ( eOutputType == DiscretizationType_CGLL ), &dataGLLNodesDest );MB_CHK_ERR( rval );
+
+            this->m_pdataGLLNodesIn  = &dataGLLNodesSrcCov;
+            this->m_pdataGLLNodesOut = &dataGLLNodesDest;
 
             // Generate remap
             if( is_root ) dbgprint.printf( 0, "Calculating remap weights\n" );

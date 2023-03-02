@@ -393,10 +393,18 @@ double moab::TempestOnlineMap::ApplyCAASLimiting( std::vector< double >& dataInD
         DataArray1D< double > dataUpperBound( nTargetCount );
 
         double dMassDiff = dSourceMass;
+
+        double dTargetMin = dataOutDouble[0];
+        double dTargetMax = dataOutDouble[0];
         for( size_t i = 0; i < nTargetCount; i++ )
         {
             dMassDiff -= dataOutDouble[i] * m_dTargetAreas[i];
+            dTargetMax = fmax( dTargetMax, dataOutDouble[i] );
+            dTargetMin = fmin( dTargetMin, dataOutDouble[i] );
         }
+
+        // Early exit if the values are monotone already.
+        if( dTargetMax <= dSourceMax && dTargetMin <= dSourceMin ) return 0.0;
 
         if( useCAASLocal )
         {

@@ -466,8 +466,8 @@ int main( int argc, char** argv )
             OfflineMap weightMap;
 
             GenerateOfflineMapAlgorithmOptions mapOptions;
-            mapOptions.nPin             = 3;
-            mapOptions.nPout            = 3;
+            mapOptions.nPin             = 1;
+            mapOptions.nPout            = 1;
             mapOptions.fSourceConcave   = false;
             mapOptions.fTargetConcave   = false;
             mapOptions.strMethod        = strMethod; // invdist, bilin
@@ -551,13 +551,14 @@ int main( int argc, char** argv )
                 DataArray1D< double > dataInDouble( mpas_elems.size() );
                 DataArray1D< double > dataOutDouble( roms_elems.size() );
 
-                const bool useConservativeSalinity = false;
-                const bool useConservativeTemperature = false;
+                const bool useConservativeSalinity = true;
+                const bool useConservativeTemperature = true;
 
                 if( useConservativeSalinity )
                 {
                     moab::Tag stag;
-                    err = mbi->tag_get_handle( "salinity", 1, moab::MB_TYPE_DOUBLE, stag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+                    err = mbi->tag_get_handle( "salinity", 1, moab::MB_TYPE_DOUBLE, stag, moab::MB_TAG_DENSE );
+                    std::cout << "Errorcode : " << err << std::endl; MB_CHK_ERR( err );
 
                     // Apply the map onto the salinity solution field
                     err = mbi->tag_get_data( stag, mpas_elems, dataInDouble );MB_CHK_ERR( err );
@@ -1015,8 +1016,8 @@ moab::ErrorCode ComputeFieldProjectionMBA( moab::Interface* mbi,
                                            bool normalize,
                                            const double constantoffset )
 {
-    constexpr src_zlayers = is_three_dimensional ? mpas_zlevels : 1;
-    constexpr dst_zlayers = is_three_dimensional ? roms_zlevels : 1;
+    const int src_zlayers = is_three_dimensional ? mpas_zlevels : 1;
+    const int dst_zlayers = is_three_dimensional ? roms_zlevels : 1;
     moab::ErrorCode err;
     moab::Tag dtag;
     err = mbi->tag_get_handle( varProject.c_str(), src_zlayers, moab::MB_TYPE_DOUBLE, dtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );

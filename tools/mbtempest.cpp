@@ -790,14 +790,14 @@ int main( int argc, char* argv[] )
             {
                 // Let us pick a sampling test function for solution evaluation
                 moab::TempestOnlineMap::sample_function testFunction =
-                    &sample_stationary_vortex;  // sample_slow_harmonic, sample_stationary_vortex, sample_fast_harmonic;
+                    &sample_fast_harmonic;  // sample_slow_harmonic, sample_stationary_vortex, sample_fast_harmonic;
 
                 runCtx->timer_push( "describe a solution on source grid" );
                 moab::Tag srcAnalyticalFunction;
                 rval = weightMap->DefineAnalyticalSolution( srcAnalyticalFunction, "AnalyticalSolnSrcExact",
                                                             moab::Remapper::SourceMesh, testFunction );MB_CHK_ERR( rval );
                 runCtx->timer_pop();
-                rval = mbCore->write_file( "srcWithSolnTag.h5m", NULL, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
+                // rval = mbCore->write_file( "srcWithSolnTag.h5m", NULL, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
 
                 runCtx->timer_push( "describe a solution on target grid" );
                 moab::Tag tgtAnalyticalFunction;

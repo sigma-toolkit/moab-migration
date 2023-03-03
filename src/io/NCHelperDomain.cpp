@@ -295,6 +295,7 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     for( int i = 0; i < local_elems; i++ )
         if( 1 == mask[i] ) nb_with_mask1++;
 
+    dbgOut.tprintf( 1, "local cells with mask 1: %d \n", nb_with_mask1 );
     std::vector< NCDF_SIZE > startsv( 3 );
     startsv[0] = vmask.readStarts[0];
     startsv[1] = vmask.readStarts[1];
@@ -364,150 +365,151 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
         mdb_type = MBPOLYGON;
     // for nv = 1 , type is vertex
 
-    if( nv > 1 )
+    if( nv > 1 && nb_with_mask1 > 0 )
     {
         rval = _readNC->readMeshIface->get_element_connect( nb_with_mask1, nv, mdb_type, 0, start_cell, conn_arr );MB_CHK_SET_ERR( rval, "Failed to create local cells" );
-
         tmp_range.insert( start_cell, start_cell + nb_with_mask1 - 1 );
-        // create also nv*nb_with_mask1 vertices, and compute their coordinates
     }
 
     // Create vertices; first identify different ones, with a tolerance
     std::map< Node3D, EntityHandle > vertex_map;
 
-    // Set vertex coordinates
-    // will read all xv, yv, but use only those with correct mask on
+    if (nb_with_mask1 > 0) {
+        // Set vertex coordinates
+        // will read all xv, yv, but use only those with correct mask on
 
-    int elem_index     = 0;  // total index in netcdf arrays
-    const double pideg = acos( -1.0 ) / 180.0;
+        int elem_index     = 0;  // total index in netcdf arrays
+        const double pideg = acos( -1.0 ) / 180.0;
 
-    for( ; elem_index < local_elems; elem_index++ )
-    {
-        if( 0 == mask[elem_index] ) continue;  // nothing to do, do not advance elem_index in actual moab arrays
-        // set area and fraction on those elements too
-        for( int k = 0; k < nv; k++ )
+        for( ; elem_index < local_elems; elem_index++ )
         {
-            int index_v_arr = nv * elem_index + k;
-            double x, y;
-            if( nv > 1 )
-            {
-                x             = xv[index_v_arr];
-                y             = yv[index_v_arr];
-                double cosphi = cos( pideg * y );
-                double zmult  = sin( pideg * y );
-                double xmult  = cosphi * cos( x * pideg );
-                double ymult  = cosphi * sin( x * pideg );
-                Node3D pt( xmult, ymult, zmult );
-                vertex_map[pt] = 0;
-            }
-            else
-            {
-                x = xc[elem_index];
-                y = yc[elem_index];
-                Node3D pt( x, y, 0 );
-                vertex_map[pt] = 0;
-            }
-        }
-    }
-    int nLocalVertices = (int)vertex_map.size();
-    std::vector< double* > arrays;
-    EntityHandle start_vertex;
-    rval = _readNC->readMeshIface->get_node_coords( 3, nLocalVertices, 0, start_vertex, arrays );MB_CHK_SET_ERR( rval, "Failed to create local vertices" );
-
-    vtx_handle = start_vertex;
-    // Copy vertex coordinates into entity sequence coordinate arrays
-    // and copy handle into vertex_map.
-    double *x = arrays[0], *y = arrays[1], *z = arrays[2];
-    for( auto i = vertex_map.begin(); i != vertex_map.end(); ++i )
-    {
-        i->second = vtx_handle;
-        ++vtx_handle;
-        *x = i->first.coords[0];
-        ++x;
-        *y = i->first.coords[1];
-        ++y;
-        *z = i->first.coords[2];
-        ++z;
-    }
-
-    // int nj = gDims[4]-gDims[1]; // is it about 1 in irregular cases
-
-    int local_row_size = lCDims[3] - lCDims[0];
-    int global_row_size = gDims[3] - gDims[0]; // this is along
-    elem_index         = -1;
-    int index          = 0;  // consider the mask for advancing in moab arrays;
-    //printf(" map size :%ld \n", vertex_map.size());
-    // create now vertex arrays, size vertex_map.size()
-    for (int j = lCDims[1]; j<lCDims[4]; j++)
-        for (int i = lCDims[0]; i<lCDims[3]; i++)
-        {
-            elem_index++;
             if( 0 == mask[elem_index] ) continue;  // nothing to do, do not advance elem_index in actual moab arrays
             // set area and fraction on those elements too
             for( int k = 0; k < nv; k++ )
             {
                 int index_v_arr = nv * elem_index + k;
+                double x, y;
                 if( nv > 1 )
                 {
-                    double x      = xv[index_v_arr];
-                    double y      = yv[index_v_arr];
+                    x             = xv[index_v_arr];
+                    y             = yv[index_v_arr];
                     double cosphi = cos( pideg * y );
                     double zmult  = sin( pideg * y );
                     double xmult  = cosphi * cos( x * pideg );
                     double ymult  = cosphi * sin( x * pideg );
                     Node3D pt( xmult, ymult, zmult );
-                    conn_arr[index * nv + k] = vertex_map[pt];
+                    vertex_map[pt] = 0;
+                }
+                else
+                {
+                    x = xc[elem_index];
+                    y = yc[elem_index];
+                    Node3D pt( x, y, 0 );
+                    vertex_map[pt] = 0;
                 }
             }
-            EntityHandle cell = start_vertex + index;
-            if( nv > 1 ) cell = start_cell + index;
-            // set other tags, like xc, yc, frac, area
-            rval = mbImpl->tag_set_data( xcTag, &cell, 1, &xc[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set xc tag" );
-            rval = mbImpl->tag_set_data( ycTag, &cell, 1, &yc[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set yc tag" );
-            rval = mbImpl->tag_set_data( areaTag, &cell, 1, &area[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set area tag" );
-            rval = mbImpl->tag_set_data( fracTag, &cell, 1, &frac[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set frac tag" );
+        }
+        int nLocalVertices = (int)vertex_map.size();
+        std::vector< double* > arrays;
+        EntityHandle start_vertex;
+        rval = _readNC->readMeshIface->get_node_coords( 3, nLocalVertices, 0, start_vertex, arrays );MB_CHK_SET_ERR( rval, "Failed to create local vertices" );
 
-            // set the global id too:
-            int globalId = j * global_row_size + i + 1;
-            rval = mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId );MB_CHK_SET_ERR( rval, "Failed to set global id tag" );
-            index++;
+        vtx_handle = start_vertex;
+        // Copy vertex coordinates into entity sequence coordinate arrays
+        // and copy handle into vertex_map.
+        double *x = arrays[0], *y = arrays[1], *z = arrays[2];
+        for( auto i = vertex_map.begin(); i != vertex_map.end(); ++i )
+        {
+            i->second = vtx_handle;
+            ++vtx_handle;
+            *x = i->first.coords[0];
+            ++x;
+            *y = i->first.coords[1];
+            ++y;
+            *z = i->first.coords[2];
+            ++z;
         }
 
+        // int nj = gDims[4]-gDims[1]; // is it about 1 in irregular cases
 
-    rval = mbImpl->add_entities( _fileSet, tmp_range );MB_CHK_SET_ERR( rval, "Failed to add new cells to current file set" );
+        int local_row_size = lCDims[3] - lCDims[0];
+        int global_row_size = gDims[3] - gDims[0]; // this is along
+        elem_index         = -1;
+        int index          = 0;  // consider the mask for advancing in moab arrays;
+        //printf(" map size :%ld \n", vertex_map.size());
+        // create now vertex arrays, size vertex_map.size()
+        for (int j = lCDims[1]; j<lCDims[4]; j++)
+            for (int i = lCDims[0]; i<lCDims[3]; i++)
+            {
+                elem_index++;
+                if( 0 == mask[elem_index] ) continue;  // nothing to do, do not advance elem_index in actual moab arrays
+                // set area and fraction on those elements too
+                for( int k = 0; k < nv; k++ )
+                {
+                    int index_v_arr = nv * elem_index + k;
+                    if( nv > 1 )
+                    {
+                        double x      = xv[index_v_arr];
+                        double y      = yv[index_v_arr];
+                        double cosphi = cos( pideg * y );
+                        double zmult  = sin( pideg * y );
+                        double xmult  = cosphi * cos( x * pideg );
+                        double ymult  = cosphi * sin( x * pideg );
+                        Node3D pt( xmult, ymult, zmult );
+                        conn_arr[index * nv + k] = vertex_map[pt];
+                    }
+                }
+                EntityHandle cell = start_vertex + index;
+                if( nv > 1 ) cell = start_cell + index;
+                // set other tags, like xc, yc, frac, area
+                rval = mbImpl->tag_set_data( xcTag, &cell, 1, &xc[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set xc tag" );
+                rval = mbImpl->tag_set_data( ycTag, &cell, 1, &yc[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set yc tag" );
+                rval = mbImpl->tag_set_data( areaTag, &cell, 1, &area[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set area tag" );
+                rval = mbImpl->tag_set_data( fracTag, &cell, 1, &frac[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set frac tag" );
 
-    // modify local file set, to merge coincident vertices, and to correct repeated vertices in elements
-    std::vector< Tag > tagList;
-    tagList.push_back( mGlobalIdTag );
-    tagList.push_back( xcTag );
-    tagList.push_back( ycTag );
-    tagList.push_back( areaTag );
-    tagList.push_back( fracTag );
-    rval = IntxUtils::remove_padded_vertices( mbImpl, _fileSet, tagList );MB_CHK_SET_ERR( rval, "Failed to remove duplicate vertices" );
+                // set the global id too:
+                int globalId = j * global_row_size + i + 1;
+                rval = mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId );MB_CHK_SET_ERR( rval, "Failed to set global id tag" );
+                index++;
+            }
 
-    rval = mbImpl->get_entities_by_dimension( _fileSet, 2, faces );MB_CHK_ERR( rval );
-    Range all_verts;
-    rval = mbImpl->get_connectivity( faces, all_verts );MB_CHK_ERR( rval );
-    //printf(" range vert size :%ld \n", all_verts.size());
-    rval = mbImpl->add_entities( _fileSet, all_verts );MB_CHK_ERR( rval );
 
-    // need to add adjacencies; TODO: fix this for all nc readers
-    // copy this logic from migrate mesh in par comm graph
-    Core* mb                 = (Core*)mbImpl;
-    AEntityFactory* adj_fact = mb->a_entity_factory();
-    if( !adj_fact->vert_elem_adjacencies() )
-        adj_fact->create_vert_elem_adjacencies();
-    else
-    {
-        for( Range::iterator it = faces.begin(); it != faces.end(); ++it )
+        rval = mbImpl->add_entities( _fileSet, tmp_range );MB_CHK_SET_ERR( rval, "Failed to add new cells to current file set" );
+
+        // modify local file set, to merge coincident vertices, and to correct repeated vertices in elements
+        std::vector< Tag > tagList;
+        tagList.push_back( mGlobalIdTag );
+        tagList.push_back( xcTag );
+        tagList.push_back( ycTag );
+        tagList.push_back( areaTag );
+        tagList.push_back( fracTag );
+        rval = IntxUtils::remove_padded_vertices( mbImpl, _fileSet, tagList );MB_CHK_SET_ERR( rval, "Failed to remove duplicate vertices" );
+
+        rval = mbImpl->get_entities_by_dimension( _fileSet, 2, faces );MB_CHK_ERR( rval );
+        Range all_verts;
+        rval = mbImpl->get_connectivity( faces, all_verts );MB_CHK_ERR( rval );
+        //printf(" range vert size :%ld \n", all_verts.size());
+        rval = mbImpl->add_entities( _fileSet, all_verts );MB_CHK_ERR( rval );
+
+        // need to add adjacencies; TODO: fix this for all nc readers
+        // copy this logic from migrate mesh in par comm graph
+        Core* mb                 = (Core*)mbImpl;
+        AEntityFactory* adj_fact = mb->a_entity_factory();
+        if( !adj_fact->vert_elem_adjacencies() )
+            adj_fact->create_vert_elem_adjacencies();
+        else
         {
-            EntityHandle eh          = *it;
-            const EntityHandle* conn = NULL;
-            int num_nodes            = 0;
-            rval                     = mb->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
-            adj_fact->notify_create_entity( eh, conn, num_nodes );
+            for( Range::iterator it = faces.begin(); it != faces.end(); ++it )
+            {
+                EntityHandle eh          = *it;
+                const EntityHandle* conn = NULL;
+                int num_nodes            = 0;
+                rval                     = mb->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
+                adj_fact->notify_create_entity( eh, conn, num_nodes );
+            }
         }
     }
+
 
 
 #ifdef MOAB_HAVE_MPI

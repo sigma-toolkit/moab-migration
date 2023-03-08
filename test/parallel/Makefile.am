@@ -47,7 +47,7 @@ if HAVE_HDF5_PARALLEL
          ghost_thin_layers commgraph_test 
 
 if HAVE_ZOLTAN
-  HDF5_TESTS += migrate_nontrivial imoab_testE imoab_ola_base
+  HDF5_TESTS += migrate_nontrivial
 endif
 
 if HAVE_TEMPESTREMAP
@@ -73,12 +73,14 @@ if HAVE_NETCDF
   HDF5_TESTS += imoab_read_map imoab_map2 imoab_map_target
 endif
 if HAVE_EXTMESHES
-  HDF5_TESTS +=  imoab_apg2_ol_coupler imoab_ol_apg2_coupler imoab_testB imoab_ola_base
+if HAVE_ZOLTAN
+  HDF5_TESTS +=  imoab_apg2_ol_coupler imoab_ol_apg2_coupler imoab_testB imoab_ola_base imoab_testE
   imoab_ol_apg2_coupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_apg2_ol_coupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_testB_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_testE_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_ola_base_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
+endif
 endif
   test_mapweights_bcast_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
   

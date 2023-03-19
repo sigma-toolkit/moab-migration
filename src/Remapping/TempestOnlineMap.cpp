@@ -934,12 +934,17 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
 
         rval = SetDOFmapTags( srcDofTagName, tgtDofTagName );MB_CHK_ERR( rval );
 
+        Tag areaTag;
+        rval = m_interface->tag_get_handle( "ELEMAREAS_MBTR", 1, MB_TYPE_DOUBLE, areaTag,
+                                             MB_TAG_DENSE | MB_TAG_CREAT );MB_CHK_ERR( rval );
+
         double dTotalAreaInput = 0.0, dTotalAreaOutput = 0.0;
         if( !m_bPointCloudSource )
         {
             // Calculate Input Mesh Face areas
             if( is_root ) dbgprint.printf( 0, "Calculating input mesh Face areas\n" );
             double dTotalAreaInput_loc = m_meshInput->CalculateFaceAreas( mapOptions.fSourceConcave );
+            rval = m_interface->tag_set_data( areaTag, m_remapper->m_source_entities, m_meshInput->vecFaceArea );MB_CHK_ERR( rval ); 
             dTotalAreaInput            = dTotalAreaInput_loc;
 #ifdef MOAB_HAVE_MPI
             if( m_pcomm )
@@ -949,6 +954,7 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
 
             // Input mesh areas
             m_meshInputCov->CalculateFaceAreas( mapOptions.fSourceConcave );
+            rval = m_interface->tag_set_data( areaTag, m_remapper->m_covering_source_entities, m_meshInputCov->vecFaceArea );MB_CHK_ERR( rval ); 
         }
 
         if( !m_bPointCloudTarget )
@@ -962,6 +968,7 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                 MPI_Reduce( &dTotalAreaOutput_loc, &dTotalAreaOutput, 1, MPI_DOUBLE, MPI_SUM, 0, m_pcomm->comm() );
 #endif
             if( is_root ) dbgprint.printf( 0, "Output Mesh Geometric Area: %1.15e\n", dTotalAreaOutput );
+            rval = m_interface->tag_set_data( areaTag, m_remapper->m_target_entities, m_meshOutput->vecFaceArea );MB_CHK_ERR( rval ); 
         }
 
         if( !m_bPointCloud )

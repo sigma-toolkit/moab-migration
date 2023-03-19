@@ -18,6 +18,7 @@
 #include "DebugOutput.hpp"
 #include "moab/Remapping/TempestRemapper.hpp"
 #include "moab/ReadUtilIface.hpp"
+#include "moab/MeshTopoUtil.hpp"
 
 // Intersection includes
 #include "moab/IntxMesh/Intx2MeshOnSphere.hpp"
@@ -66,11 +67,11 @@ ErrorCode TempestRemapper::initialize( bool initialize_fsets )
     MPI_Initialized( &flagInit );
     if( flagInit )
     {
-        is_parallel = true;
         assert( m_pcomm != NULL );
         rank    = m_pcomm->rank();
         size    = m_pcomm->size();
         is_root = ( rank == 0 );
+        is_parallel = ( size > 1 );
     }
 #endif
 
@@ -710,8 +711,9 @@ ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
         m_covering_source = new Mesh();
         rval = convert_mesh_to_tempest_private( m_covering_source, m_covering_source_set, m_covering_source_entities,
                                                 &m_covering_source_vertices );MB_CHK_SET_ERR( rval, "Can't convert source Tempest mesh" );
-        // std::cout << "ComputeGlobalLocalMaps: " << rank << ", " << " covering entities = [" <<
-        // m_covering_source_vertices.size() << ", " << m_covering_source_entities.size() << "]\n";
+        // std::cout << "ComputeGlobalLocalMaps: " << rank << ", "
+        //           << " covering entities = [" << m_covering_source_vertices.size() << ", "
+        //           << m_covering_source_entities.size() << "]\n";
     }
     gid_to_lid_src.clear();
     lid_to_gid_src.clear();
@@ -916,7 +918,7 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
     // Number of Faces
     int nElements = static_cast< int >( csMesh.faces.size() );
 
-    assert( nElements == ntot_elements );
+    if( nElements != ntot_elements ) return MB_INVALID_SIZE;
 
     // Initialize data structures
     DataArray3D< int > dataGLLnodes;
@@ -1093,12 +1095,6 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_covering_source_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
 
         rval = mbintx->construct_covering_set( m_source_set, m_covering_source_set );MB_CHK_ERR( rval );
-        // if (rank == 1)
-        // {
-        //     moab::Range ents;
-        //     m_interface->get_entities_by_dimension(m_covering_source_set, 2, ents);
-        //     m_interface->remove_entities(m_covering_source_set, ents);
-        // }
     }
     else
     {
@@ -1300,6 +1296,23 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
             // remove from the set !
             if( !point_cloud_target )
             {
+                if( size > 1 )
+                {
+                    // some source elements cover multiple target partitions; the conservation logic
+                    // requires to know all overlap elements for a source element; they need to be
+                    // communicated from the other target partitions
+                    //
+                    // so first we have to identify source (coverage) elements that cover multiple
+                    // target partitions
+
+                    // we will then mark the source, we will need to migrate the overlap elements
+                    // that cover this to the original source for the source element; then
+                    // distribute the overlap elements to all processors that have the coverage mesh
+                    // used
+
+                    rval = augment_overlap_set();MB_CHK_ERR( rval );
+                }
+
                 Range covEnts;
                 rval = m_interface->get_entities_by_dimension( m_covering_source_set, 2, covEnts );MB_CHK_ERR( rval );
                 Tag gidtag = m_interface->globalId_tag();
@@ -1317,6 +1330,9 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                 Tag srcParentTag;
                 rval = m_interface->tag_get_handle( "SourceParent", srcParentTag );MB_CHK_ERR( rval );
                 rval = m_interface->get_entities_by_dimension( m_overlap_set, 2, intxCells );MB_CHK_ERR( rval );
+
+                moab::MeshTopoUtil mtu( m_interface );
+                constexpr int numrings = 1;
                 for( Range::iterator it = intxCells.begin(); it != intxCells.end(); it++ )
                 {
                     EntityHandle intxCell = *it;
@@ -1325,34 +1341,43 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                     // if (is_root) std::cout << "Found intersecting element: " << blueParent << ",
                     // " << gid_to_lid_covsrc[blueParent] << "\n";
                     assert( blueParent >= 0 );
-                    intxCov.insert( covEnts[loc_gid_to_lid_covsrc[blueParent]] );
+                    EntityHandle srcParentEnt = covEnts[loc_gid_to_lid_covsrc[blueParent]];
+                    intxCov.insert( srcParentEnt );
+
+                    // // insert one ring neighbors as well
+                    // moab::Range adj1;
+                    // rval = mtu.get_bridge_adjacencies( srcParentEnt, 0, 2, adj1 );MB_CHK_ERR( rval );
+                    // intxCov.merge( adj1 );
+                    // const EntityHandle* connect;
+                    // int num_connect;
+                    // moab::Range to_ents;
+                    // rval = m_interface->get_connectivity( srcParentEnt, connect,
+                    //                                       num_connect );MB_CHK_ERR( rval );
+                    // rval = m_interface->get_adjacencies( connect, num_connect, 2 /*to_dim*/, false, to_ents,
+                    //                                      Interface::UNION );MB_CHK_ERR( rval );
+                    // intxCov.merge(to_ents);
                 }
+
+                // std::cout << "Coverage elements: " << intxCov << std::endl;
+                // std::cout << "Number of entities in coverage mesh: " << intxCov.size() << std::endl;
+                // insert one ring neighbors as well
+                moab::Range adj1, commonadj;
+                rval = mtu.get_bridge_adjacencies( intxCov, 0, 2, adj1, numrings );MB_CHK_ERR( rval );
+                adj1      = moab::intersect( covEnts, adj1 );
+                // adj1      = moab::subtract( adj1, commonadj );
+                intxCov.merge( adj1 );
+                // std::cout << "Number of entities after augmenting coverage mesh: " << intxCov.size() << std::endl;
+                // std::cout << "Coverage elements: " << intxCov << std::endl;
 
                 Range notNeededCovCells = moab::subtract( covEnts, intxCov );
                 // remove now from coverage set the cells that are not needed
-                rval = m_interface->remove_entities( m_covering_source_set, notNeededCovCells );MB_CHK_ERR( rval );
-                covEnts = moab::subtract( covEnts, notNeededCovCells );
+                // rval = m_interface->remove_entities( m_covering_source_set, notNeededCovCells );MB_CHK_ERR( rval );
+                // covEnts = moab::subtract( covEnts, notNeededCovCells );
 #ifdef VERBOSE
-                std::cout << " total participating elements in the covering set: " << intxCov.size() << "\n";
-                std::cout << " remove from coverage set elements that are not intersected: " << notNeededCovCells.size()
+                std::cout << "Total participating elements in the covering set: " << intxCov.size() << "\n";
+                std::cout << "Removed from coverage set elements that are not intersected: " << notNeededCovCells.size()
                           << "\n";
 #endif
-                if( size > 1 )
-                {
-                    // some source elements cover multiple target partitions; the conservation logic
-                    // requires to know all overlap elements for a source element; they need to be
-                    // communicated from the other target partitions
-                    //
-                    // so first we have to identify source (coverage) elements that cover multiple
-                    // target partitions
-
-                    // we will then mark the source, we will need to migrate the overlap elements
-                    // that cover this to the original source for the source element; then
-                    // distribute the overlap elements to all processors that have the coverage mesh
-                    // used
-
-                    rval = augment_overlap_set();MB_CHK_ERR( rval );
-                }
             }
 
             // m_covering_source = new Mesh();

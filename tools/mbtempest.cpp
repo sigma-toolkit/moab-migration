@@ -409,7 +409,7 @@ int main( int argc, char* argv[] )
                                                // TempestOnlineMap.hpp is included in this file, and is part of MOAB
     // Some constant parameters
 
-    const double boxeps = 1e-6;
+    const double boxeps = 1e-1;
 
     if( runCtx->meshType == moab::TempestRemapper::OVERLAP_MEMORY )
     {
@@ -883,6 +883,9 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[1], radius_dest );MB_CHK_ERR( rval );
         rval = remapper.ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
         ctx.meshes[1] = remapper.GetMesh( moab::Remapper::TargetMesh );
+
+        // ctx.meshes[0]->Write( "SourceMeshMBTR.g" );
+        // ctx.meshes[1]->Write( "TargetMeshMBTR.g" );
     }
     else if( ctx.meshType == moab::TempestRemapper::ICO )
     {

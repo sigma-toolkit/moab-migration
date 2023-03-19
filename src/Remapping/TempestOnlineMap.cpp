@@ -66,23 +66,10 @@ moab::TempestOnlineMap::TempestOnlineMap( moab::TempestRemapper* remapper ) : Of
     m_meshOutput   = remapper->GetMesh( moab::Remapper::TargetMesh );
     m_meshOverlap  = remapper->GetMesh( moab::Remapper::OverlapMesh );
 
-    is_parallel = false;
-    is_root     = true;
-    rank        = 0;
-    root_proc   = rank;
-    size        = 1;
-#ifdef MOAB_HAVE_MPI
-    int flagInit;
-    MPI_Initialized( &flagInit );
-    if( flagInit )
-    {
-        is_parallel = true;
-        assert( m_pcomm != NULL );
-        rank    = m_pcomm->rank();
-        size    = m_pcomm->size();
-        is_root = ( rank == 0 );
-    }
-#endif
+    is_parallel = remapper->is_parallel;
+    is_root     = remapper->is_root;
+    rank        = remapper->rank;
+    size        = remapper->size;
 
     // Compute and store the total number of source and target DoFs corresponding
     // to number of rows and columns in the mapping.
@@ -1144,6 +1131,17 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             }
             else if( strMapAlgorithm == "fvbilin" )
             {
+#ifdef VERBOSE
+                if ( is_root ) {
+                  m_meshInputCov->Write( "SourceMeshMBTR.g" );
+                  m_meshOutput->Write( "TargetMeshMBTR.g" );
+                }
+                else
+                {
+                  m_meshInputCov->Write( "SourceMeshMBTR" + std::to_string( rank ) + ".g" );
+                  m_meshOutput->Write( "TargetMeshMBTR" + std::to_string( rank ) + ".g" );
+                }
+#endif
                 if( is_root ) AnnounceStartBlock( "Calculating map (bilin)" );
                 LinearRemapBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }

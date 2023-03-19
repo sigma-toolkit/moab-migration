@@ -383,7 +383,6 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
         std::vector< EntityHandle > leaves;
         for( int i = 0; i < nnodes; i++ )
         {
-
             leaves.clear();
             rval = kd.distance_search( &positions[3 * i], av_len, leaves, tolerance, epsilon_1 );MB_CHK_ERR( rval );
 

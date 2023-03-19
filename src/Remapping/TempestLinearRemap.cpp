@@ -154,8 +154,9 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_Tempest_MOAB( int nOrder )
 
     // Current overlap face
     int ixOverlap                  = 0;
+#ifdef VERBOSE
     const unsigned outputFrequency = ( m_meshInputCov->faces.size() / 10 ) + 1;
-
+#endif
     DataArray2D< double > dIntArray;
     DataArray1D< double > dConstraint( nCoefficients );
 
@@ -526,8 +527,9 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
 
     // Current Overlap Face
     int ixOverlap                  = 0;
+#ifdef VERBOSE
     const unsigned outputFrequency = ( m_meshInputCov->faces.size() / 10 ) + 1;
-
+#endif
     // generic triangle used for area computation, for triangles around the center of overlap face;
     // used for overlap faces with more than 4 edges;
     // nodes array will be set for each triangle;
@@ -963,8 +965,9 @@ void moab::TempestOnlineMap::LinearRemapGLLtoGLL2_MOAB( const DataArray3D< int >
 
     // Loop through all faces on m_meshInput
     ixOverlap                      = 0;
+#ifdef VERBOSE
     const unsigned outputFrequency = ( m_meshInputCov->faces.size() / 10 ) + 1;
-
+#endif
     if( is_root ) dbgprint.printf( 0, "Building conservative distribution maps\n" );
 
     // generic triangle used for area computation, for triangles around the center of overlap face;
@@ -1499,8 +1502,9 @@ void moab::TempestOnlineMap::LinearRemapGLLtoGLL2_Pointwise_MOAB( const DataArra
     DataArray1D< bool > fSecondNodeFound( dataNodalAreaOut.GetRows() );
 
     ixOverlap                      = 0;
+#ifdef VERBOSE
     const unsigned outputFrequency = ( m_meshInputCov->faces.size() / 10 ) + 1;
-
+#endif
     // Loop through all faces on m_meshInputCov
     for( size_t ixFirst = 0; ixFirst < m_meshInputCov->faces.size(); ixFirst++ )
     {
@@ -1522,7 +1526,6 @@ void moab::TempestOnlineMap::LinearRemapGLLtoGLL2_Pointwise_MOAB( const DataArra
         // Loop through all Overlap Faces
         for( int i = 0; i < nOverlapFaces; i++ )
         {
-
             // Quantities from the Second Mesh
             int ixSecond = m_meshOverlap->vecTargetFaceIx[ixOverlap + i];
 
@@ -1530,7 +1533,6 @@ void moab::TempestOnlineMap::LinearRemapGLLtoGLL2_Pointwise_MOAB( const DataArra
             if( ixSecond < 0 ) continue;  // do not do anything
 
             const NodeVector& nodesSecond = m_meshOutput->nodes;
-
             const Face& faceSecond = m_meshOutput->faces[ixSecond];
 
             // Loop through all nodes on the second face
@@ -1548,16 +1550,10 @@ void moab::TempestOnlineMap::LinearRemapGLLtoGLL2_Pointwise_MOAB( const DataArra
                         ixSecondNode = ixSecond * nPout * nPout + s * nPout + t;
                     }
 
-                    if( ixSecondNode >= fSecondNodeFound.GetRows() )
-                    {
-                        _EXCEPTIONT( "Logic error" );
-                    }
+                    if( ixSecondNode >= fSecondNodeFound.GetRows() ) _EXCEPTIONT( "Logic error" );
 
                     // Check if this node has been found already
-                    if( fSecondNodeFound[ixSecondNode] )
-                    {
-                        continue;
-                    }
+                    if( fSecondNodeFound[ixSecondNode] ) continue;
 
                     // Check this node
                     Node node;
@@ -1576,9 +1572,7 @@ void moab::TempestOnlineMap::LinearRemapGLLtoGLL2_Pointwise_MOAB( const DataArra
                     // Check if this node is within the first Face
                     if( ( dAlphaIn < -1.0e-10 ) || ( dAlphaIn > 1.0 + 1.0e-10 ) || ( dBetaIn < -1.0e-10 ) ||
                         ( dBetaIn > 1.0 + 1.0e-10 ) )
-                    {
                         continue;
-                    }
 
                     // Node is within the overlap region, mark as found
                     fSecondNodeFound[ixSecondNode] = true;

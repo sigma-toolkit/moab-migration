@@ -123,7 +123,7 @@ if ENABLE_mbpart
   AM_CPPFLAGS += $(ZOLTAN_INC_FLAGS)
   AM_LDFLAGS += $(ZOLTAN_LIB_FLAGS)
   mbpart_SOURCES = mbpart.cpp
-  mbpart_LDADD = $(top_builddir)/src/libMOAB.la $(ZOLTAN_LIBS)
+  mbpart_LDADD = $(top_builddir)/src/libMOAB.la $(ZOLTAN_LIBS) $(PARMETIS_LIBS) $(METIS_LIBS)
 if HAVE_CGM
   mbpart_LDADD += $(CGM_LIBS)
 endif
@@ -133,7 +133,7 @@ if ENABLE_metis
   AM_CPPFLAGS += $(METIS_INCLUDES)
   AM_LDFLAGS += $(METIS_LIB_FLAGS)
   mbpart_SOURCES = mbpart.cpp
-  mbpart_LDADD = $(top_builddir)/src/libMOAB.la $(METIS_LIBS)
+  mbpart_LDADD = $(top_builddir)/src/libMOAB.la
 endif
 endif
 

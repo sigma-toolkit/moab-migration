@@ -4255,6 +4255,7 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
     int* disc_order_source,
     const iMOAB_String disc_method_target,
     int* disc_order_target,
+    const iMOAB_String fv_method,
     int* fNoBubble,
     int* fMonotoneTypeID,
     int* fVolumetric,
@@ -4292,6 +4293,7 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
     mapOptions.fTargetConcave = false;
 
     mapOptions.strMethod = "";
+    if( fv_method ) mapOptions.strMethod += std::string(fv_method) + ";";
     if( fMonotoneTypeID )
     {
         switch( *fMonotoneTypeID )

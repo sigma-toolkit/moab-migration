@@ -363,6 +363,10 @@ class GeomQueryTool
      */
     void set_numerical_precision( double new_precision );
 
+    void set_verbosity(bool value) {
+      verbose = value;
+    }
+
     double get_numerical_precision()
     {
         return numericalPrecision;
@@ -385,6 +389,7 @@ class GeomQueryTool
 
   private:
     GeomTopoTool* geomTopoTool;
+    bool verbose;
     bool owns_gtt;
     Interface* MBI;
     OrientedBoxTreeTool* obbTreeTool;

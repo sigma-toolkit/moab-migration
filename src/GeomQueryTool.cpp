@@ -18,9 +18,8 @@
 
 #include "moab/OrientedBoxTreeTool.hpp"
 
-const bool debug = false;
 #ifdef __DEBUG
-debug = true;
+#define MB_GQT_DEBUG
 #endif
 
 namespace moab
@@ -630,7 +629,7 @@ GeomQueryTool::GeomQueryTool( Interface* impl,
                               bool trace_counting,
                               double overlap_thickness,
                               double numerical_precision )
-    : owns_gtt( true )
+  : verbose( false ), owns_gtt( true )
 {
     geomTopoTool = new GeomTopoTool( impl, find_geomsets, modelRootSet, p_rootSets_vector, restore_rootSets );
 
@@ -652,7 +651,7 @@ GeomQueryTool::GeomQueryTool( GeomTopoTool* geomtopotool,
                               bool trace_counting,
                               double overlap_thickness,
                               double numerical_precision )
-    : owns_gtt( false )
+  : verbose( false ), owns_gtt( false )
 {
 
     geomTopoTool = geomtopotool;
@@ -757,12 +756,11 @@ ErrorCode GeomQueryTool::ray_fire( const EntityHandle volume,
         }
     }
 
-    if( debug )
-    {
+#ifdef MB_GQT_DEBUG
         std::cout << "ray_fire:"
                   << " xyz=" << point[0] << " " << point[1] << " " << point[2] << " uvw=" << dir[0] << " " << dir[1]
                   << " " << dir[2] << " entity_handle=" << volume << std::endl;
-    }
+#endif
 
     const double huge_val = std::numeric_limits< double >::max();
     double dist_limit     = huge_val;
@@ -820,10 +818,9 @@ ErrorCode GeomQueryTool::ray_fire( const EntityHandle volume,
     if( dists.empty() )
     {
         next_surf = 0;
-        if( debug )
-        {
-            std::cout << "          next_surf=0 dist=(undef)" << std::endl;
-        }
+        #ifdef MB_GQT_DEBUG
+        std::cout << "          next_surf=0 dist=(undef)" << std::endl;
+        #endif
         return MB_SUCCESS;
     }
 
@@ -883,11 +880,10 @@ ErrorCode GeomQueryTool::ray_fire( const EntityHandle volume,
     if( -1 == exit_idx )
     {
         next_surf = 0;
-        if( debug )
-        {
-            std::cout << "next surf hit = 0, dist = (undef)" << std::endl;
-        }
-        return MB_SUCCESS;
+        #ifdef MB_GQT_DEBUG
+        std::cout << "next surf hit = 0, dist = (undef)" << std::endl;
+        #endif
+    return MB_SUCCESS;
     }
 
     // return the intersection
@@ -899,8 +895,7 @@ ErrorCode GeomQueryTool::ray_fire( const EntityHandle volume,
         history->prev_facets.push_back( facets[exit_idx] );
     }
 
-    if( debug )
-    {
+#ifdef MB_GQT_DEBUG
         if( 0 > dists[exit_idx] )
         {
             std::cout << "          OVERLAP track length=" << dists[exit_idx] << std::endl;
@@ -912,7 +907,7 @@ ErrorCode GeomQueryTool::ray_fire( const EntityHandle volume,
             std::cout << point[i] + dir[i] * next_surf_dist << " ";
         }
         std::cout << std::endl;
-    }
+#endif
 
     return MB_SUCCESS;
 }
@@ -1055,7 +1050,7 @@ ErrorCode GeomQueryTool::point_in_volume( const EntityHandle volume,
             {
                 // Should not be here because Plucker ray-triangle test does not
                 // return coplanar rays as intersections.
-                std::cout << "direction==tangent" << std::endl;
+                std::cerr << "direction==tangent" << std::endl;
                 result = -1;
             }
             else
@@ -1065,10 +1060,11 @@ ErrorCode GeomQueryTool::point_in_volume( const EntityHandle volume,
         }
     }
 
-    if( debug )
-        std::cout << "pt_in_vol: result=" << result << " xyz=" << xyz[0] << " " << xyz[1] << " " << xyz[2]
-                  << " uvw=" << u << " " << v << " " << w << " vol_id=" << volume
-                  << std::endl;  // todo: use geomtopotool to get id by entity handle
+#ifdef MB_GQT_DEBUG
+    std::cout << "pt_in_vol: result=" << result << " xyz=" << xyz[0] << " " << xyz[1] << " " << xyz[2]
+                << " uvw=" << u << " " << v << " " << w << " vol_id=" << volume
+                << std::endl;  // todo: use geomtopotool to get id by entity handle
+#endif
 
     return MB_SUCCESS;
 }
@@ -1625,6 +1621,7 @@ void GeomQueryTool::set_overlap_thickness( double new_thickness )
     {
         overlapThickness = new_thickness;
     }
+    if (verbose)
     std::cout << "Set overlap thickness = " << overlapThickness << std::endl;
 }
 
@@ -1639,7 +1636,7 @@ void GeomQueryTool::set_numerical_precision( double new_precision )
     {
         numericalPrecision = new_precision;
     }
-
+    if (verbose)
     std::cout << "Set numerical precision = " << numericalPrecision << std::endl;
 }
 

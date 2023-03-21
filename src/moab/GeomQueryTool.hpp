@@ -367,6 +367,10 @@ class GeomQueryTool
       verbose = value;
     }
 
+    bool get_verbosity() const {
+      return verbose;
+    }
+
     double get_numerical_precision()
     {
         return numericalPrecision;

@@ -118,15 +118,14 @@ class PartitionerBase
 template < typename T >
 inline PartitionerBase< T >::PartitionerBase( Interface* impl, const bool use_coords
 #ifdef MOAB_HAVE_MPI
-    ,
-    ParallelComm* parcomm
+    , ParallelComm* parcomm
 #endif
 )
-    : mbImpl( impl ), useCoords( use_coords )
+    : mbImpl( impl )
 #ifdef MOAB_HAVE_MPI
     , mbpc(parcomm)
 #endif
-, newComm( false ), assign_global_ids(false)
+ , useCoords( use_coords ), newComm( false ), assign_global_ids(false)
 {
 #ifdef MOAB_HAVE_MPI
     if(!mbpc)

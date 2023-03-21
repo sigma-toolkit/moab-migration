@@ -68,9 +68,9 @@ ErrorCode TempestRemapper::initialize( bool initialize_fsets )
     if( flagInit )
     {
         assert( m_pcomm != NULL );
-        rank    = m_pcomm->rank();
-        size    = m_pcomm->size();
-        is_root = ( rank == 0 );
+        rank        = m_pcomm->rank();
+        size        = m_pcomm->size();
+        is_root     = ( rank == 0 );
         is_parallel = ( size > 1 );
     }
 #endif
@@ -1334,7 +1334,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                 for( Range::iterator it = intxCells.begin(); it != intxCells.end(); it++ )
                 {
                     EntityHandle intxCell = *it;
-                    int srcParent        = -1;
+                    int srcParent         = -1;
                     rval                  = m_interface->tag_get_data( srcParentTag, &intxCell, 1, &srcParent );MB_CHK_ERR( rval );
                     assert( srcParent >= 0 );
                     EntityHandle srcParentEnt = covEnts[loc_gid_to_lid_covsrc[srcParent]];
@@ -1347,7 +1347,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                 // insert one ring neighbors as well
                 moab::Range adj1, commonadj;
                 rval = mtu.get_bridge_adjacencies( intxCov, 0, 2, adj1, numrings );MB_CHK_ERR( rval );
-                adj1      = moab::intersect( covEnts, adj1 );
+                adj1 = moab::intersect( covEnts, adj1 );
                 intxCov.merge( adj1 );
 
                 Range notNeededCovCells = moab::subtract( covEnts, intxCov );

@@ -789,7 +789,7 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
 
         // Method flags
         std::string strMapAlgorithm( "" );
-        int nMonotoneType    = ( mapOptions.fMonotone ) ? ( 1 ) : ( 0 );
+        int nMonotoneType = ( mapOptions.fMonotone ) ? ( 1 ) : ( 0 );
 
         // Make an index of method arguments
         std::set< std::string > setMethodStrings;
@@ -1132,14 +1132,15 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             else if( strMapAlgorithm == "fvbilin" )
             {
 #ifdef VERBOSE
-                if ( is_root ) {
-                  m_meshInputCov->Write( "SourceMeshMBTR.g" );
-                  m_meshOutput->Write( "TargetMeshMBTR.g" );
+                if( is_root )
+                {
+                    m_meshInputCov->Write( "SourceMeshMBTR.g" );
+                    m_meshOutput->Write( "TargetMeshMBTR.g" );
                 }
                 else
                 {
-                  m_meshInputCov->Write( "SourceMeshMBTR" + std::to_string( rank ) + ".g" );
-                  m_meshOutput->Write( "TargetMeshMBTR" + std::to_string( rank ) + ".g" );
+                    m_meshInputCov->Write( "SourceMeshMBTR" + std::to_string( rank ) + ".g" );
+                    m_meshOutput->Write( "TargetMeshMBTR" + std::to_string( rank ) + ".g" );
                 }
 #endif
                 if( is_root ) AnnounceStartBlock( "Calculating map (bilin)" );

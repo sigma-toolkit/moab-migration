@@ -222,7 +222,7 @@ program imoab_coupler_fortran
 
       ierr = iMOAB_ComputeScalarProjectionWeights( &
              cplAtmOcnPID, weights_identifier1, disc_methods1, disc_orders1, &
-             disc_methods2, disc_orders2, fNoBubble, fMonotoneTypeID, fVolumetric, fInverseDistanceMap, fNoConserve, &
+             disc_methods2, disc_orders2, C_NULL_CHAR, fNoBubble, fMonotoneTypeID, fVolumetric, fInverseDistanceMap, fNoConserve, &
              fValidate, dof_tag_names1, dof_tag_names2)
       call errorout(ierr, 'cannot compute scalar projection weights')
 

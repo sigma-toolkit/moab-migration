@@ -425,9 +425,9 @@ int main( int argc, char* argv[] )
     {
         PUSH_TIMER( "Compute the projection weights with TempestRemap" )
         ierr = iMOAB_ComputeScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0], disc_methods[0],
-                                                     &disc_orders[0], disc_methods[1], &disc_orders[1], &fNoBubble,
-                                                     &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap, &fNoConserve,
-                                                     &fValidate, dof_tag_names[0], dof_tag_names[1] );
+                                                     &disc_orders[0], disc_methods[1], &disc_orders[1], nullptr,
+                                                     &fNoBubble, &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap,
+                                                     &fNoConserve, &fValidate, dof_tag_names[0], dof_tag_names[1] );
         CHECKIERR( ierr, "cannot compute scalar projection weights" )
         POP_TIMER( couComm, rankInCouComm )
     }

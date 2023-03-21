@@ -488,7 +488,7 @@ module iMOAB
       integer(c_int) function iMOAB_ComputeScalarProjectionWeights(pid_intersection, solution_weights_identifier, &
                                                                   disc_method_source, disc_order_source, &
                                                                   disc_method_target, disc_order_target, &
-                                                                  fNoBubble, fMonotoneTypeID, fVolumetric, &
+                                                                  fv_methods, fNoBubble, fMonotoneTypeID, fVolumetric, &
                                                                   fInverseDistanceMap, fNoConservation, fValidate, &
                                                                   source_solution_tag_dof_name, target_solution_tag_dof_name) &
                                                                   bind(C, name='iMOAB_ComputeScalarProjectionWeights')
@@ -498,6 +498,7 @@ module iMOAB
         character(kind=c_char), intent(in) :: disc_method_source(*)
         integer(c_int), intent(in) :: disc_order_source
         character(kind=c_char), intent(in) :: disc_method_target(*)
+        character(kind=c_char), intent(in) :: fv_methods(*)
         integer(c_int), intent(in) :: disc_order_target
         integer(c_int), intent(in) :: fNoBubble
         integer(c_int), intent(in) :: fMonotoneTypeID

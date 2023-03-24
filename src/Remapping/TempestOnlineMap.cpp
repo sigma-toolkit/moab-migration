@@ -934,9 +934,14 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
 
         rval = SetDOFmapTags( srcDofTagName, tgtDofTagName );MB_CHK_ERR( rval );
 
+        ///   the tag should be created already in the e3sm workflow; if not, create it here
         Tag areaTag;
-        rval = m_interface->tag_get_handle( "ELEMAREAS_MBTR", 1, MB_TYPE_DOUBLE, areaTag,
-                                             MB_TAG_DENSE | MB_TAG_CREAT );MB_CHK_ERR( rval );
+        rval = m_interface->tag_get_handle( "aream", 1, MB_TYPE_DOUBLE, areaTag,
+                                             MB_TAG_DENSE |  MB_TAG_EXCL | MB_TAG_CREAT );
+        if ( MB_ALREADY_ALLOCATED == rval )
+        {
+        	if( is_root ) dbgprint.printf( 0, "aream tag already defined \n" );
+        }
 
         double dTotalAreaInput = 0.0, dTotalAreaOutput = 0.0;
         if( !m_bPointCloudSource )
@@ -954,7 +959,8 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
 
             // Input mesh areas
             m_meshInputCov->CalculateFaceAreas( mapOptions.fSourceConcave );
-            rval = m_interface->tag_set_data( areaTag, m_remapper->m_covering_source_entities, m_meshInputCov->vecFaceArea );MB_CHK_ERR( rval ); 
+            // we do not need to set the area on coverage mesh, only on source and target meshes
+            // rval = m_interface->tag_set_data( areaTag, m_remapper->m_covering_source_entities, m_meshInputCov->vecFaceArea );MB_CHK_ERR( rval );
         }
 
         if( !m_bPointCloudTarget )

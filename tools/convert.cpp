@@ -88,6 +88,7 @@ static void print_usage( const char* name, std::ostream& stream )
 #ifdef MOAB_HAVE_TEMPESTREMAP
            << "\t-B             - Use TempestRemap exodus file reader and convert to MOAB format" << std::endl
            << "\t-b             - Convert MOAB mesh to TempestRemap exodus file writer" << std::endl
+           << "\t-S             - Scale climate mesh to unit sphere" << std::endl
            << "\t-i             - Name of the global DoF tag to use with mbtempest" << std::endl
            << "\t-r             - Order of field DoF (discretization) data; FV=1,SE=[1,N]" << std::endl
 #endif
@@ -192,6 +193,7 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_TEMPESTREMAP
     std::string globalid_tag_name;
     int spectral_order = 1;
+    bool unitscaling = false;
 #endif
 
     const char* const mesh_tag_names[] = { DIRICHLET_SET_TAG_NAME, NEUMANN_SET_TAG_NAME, MATERIAL_SET_TAG_NAME,
@@ -252,6 +254,9 @@ int main( int argc, char* argv[] )
                     break;
                 case 'b':
                     tempestout = true;
+                    break;
+                case 'S':
+                    unitscaling = true;
                     break;
 #endif
                 case '1':
@@ -447,6 +452,8 @@ int main( int argc, char* argv[] )
 
             if( tempestin )
             {
+                moab::EntityHandle& srcmesh = remapper->GetMeshSet( moab::Remapper::SourceMesh );
+
                 // convert
                 result = remapper->LoadMesh( moab::Remapper::SourceMesh, inFileName, moab::TempestRemapper::DEFAULT );MB_CHK_ERR( result );
 
@@ -456,6 +463,11 @@ int main( int argc, char* argv[] )
 
                 // Load the meshes and validate
                 result = remapper->ConvertTempestMesh( moab::Remapper::SourceMesh );
+
+                if( unitscaling )
+                {
+                    result = moab::IntxUtils::ScaleToRadius( gMB, srcmesh, 1.0 );MB_CHK_ERR( result );
+                }
 
                 // Check if we are converting a RLL grid
                 NcFile ncInput( inFileName.c_str(), NcFile::ReadOnly );
@@ -596,6 +608,11 @@ int main( int argc, char* argv[] )
                 // load the mesh in MOAB format
                 std::vector< int > metadata(2);
                 result = remapper->LoadNativeMesh( *j, srcmesh, metadata );MB_CHK_ERR( result );
+
+                if( unitscaling )
+                {
+                    result = moab::IntxUtils::ScaleToRadius( gMB, srcmesh, 1.0 );MB_CHK_ERR( result );
+                }
 
                 // Check if our MOAB mesh has RED and BLUE tags; this would indicate we are converting
                 // an overlap grid

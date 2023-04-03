@@ -15,6 +15,9 @@
 #include <string>
 #include <iostream>
 #include <cassert>
+#include <numeric>    // std::iota
+#include <algorithm>  // std::sort, std::stable_sort
+
 #include "DebugOutput.hpp"
 #include "moab/Remapping/TempestRemapper.hpp"
 #include "moab/ReadUtilIface.hpp"
@@ -449,8 +452,10 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     elems.clear();
     rval = m_interface->get_entities_by_dimension( mesh_set, 2, elems );MB_CHK_ERR( rval );
 
+    const size_t nelems = elems.size();
+
     // resize the number of elements in Tempest mesh
-    faces.resize( elems.size() );
+    faces.resize( nelems );
 
     // let us now get the vertices from all the elements
     rval = m_interface->get_connectivity( elems, verts );MB_CHK_ERR( rval );
@@ -471,10 +476,27 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
         useRange = false;
     }
 
-    for( unsigned iface = 0; iface < elems.size(); ++iface )
+    std::vector< int > globIds( nelems );
+
+    moab::Tag gid = m_interface->globalId_tag();
+    rval          = m_interface->tag_get_data( gid, elems, &globIds[0] );MB_CHK_ERR( rval );
+
+    // initialize original index locations
+    std::vector< size_t > sortedIdx( nelems );
+    std::iota( sortedIdx.begin(), sortedIdx.end(), 0 );
+
+    // sort indexes based on comparing values in v
+    // using std::stable_sort instead of std::sort
+    // to avoid unnecessary index re-orderings
+    // when v contains elements of equal values
+    std::stable_sort( sortedIdx.begin(), sortedIdx.end(),
+                      [&globIds]( size_t i1, size_t i2 ) { return globIds[i1] < globIds[i2]; } );
+
+    // for( unsigned iface = 0; iface < nelems; ++iface )
+    for( unsigned iface = 0; iface < nelems; ++iface )
     {
         Face& face           = faces[iface];
-        EntityHandle ehandle = elems[iface];
+        EntityHandle ehandle = elems[sortedIdx[iface]];
 
         // get the connectivity for each edge
         const EntityHandle* connectface;

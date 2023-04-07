@@ -193,7 +193,7 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_TEMPESTREMAP
     std::string globalid_tag_name;
     int spectral_order = 1;
-    bool unitscaling = false;
+    bool unitscaling   = false;
 #endif
 
     const char* const mesh_tag_names[] = { DIRICHLET_SET_TAG_NAME, NEUMANN_SET_TAG_NAME, MATERIAL_SET_TAG_NAME,
@@ -606,7 +606,7 @@ int main( int argc, char* argv[] )
                 moab::EntityHandle& ovmesh  = remapper->GetMeshSet( moab::Remapper::OverlapMesh );
 
                 // load the mesh in MOAB format
-                std::vector< int > metadata(2);
+                std::vector< int > metadata( 2 );
                 result = remapper->LoadNativeMesh( *j, srcmesh, metadata );MB_CHK_ERR( result );
 
                 if( unitscaling )
@@ -928,7 +928,7 @@ int main( int argc, char* argv[] )
             tempestMesh->Write( out, NcFile::Netcdf4 );
             file_written = true;
         }
-        delete remapper; // cleanup
+        delete remapper;  // cleanup
     }
 #endif
 

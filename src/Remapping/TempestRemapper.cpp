@@ -68,9 +68,9 @@ ErrorCode TempestRemapper::initialize( bool initialize_fsets )
     if( flagInit )
     {
         assert( m_pcomm != NULL );
-        rank    = m_pcomm->rank();
-        size    = m_pcomm->size();
-        is_root = ( rank == 0 );
+        rank        = m_pcomm->rank();
+        size        = m_pcomm->size();
+        is_root     = ( rank == 0 );
         is_parallel = ( size > 1 );
     }
 #endif
@@ -711,8 +711,9 @@ ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
         m_covering_source = new Mesh();
         rval = convert_mesh_to_tempest_private( m_covering_source, m_covering_source_set, m_covering_source_entities,
                                                 &m_covering_source_vertices );MB_CHK_SET_ERR( rval, "Can't convert source Tempest mesh" );
-        // std::cout << "ComputeGlobalLocalMaps: " << rank << ", " << " covering entities = [" <<
-        // m_covering_source_vertices.size() << ", " << m_covering_source_entities.size() << "]\n";
+        // std::cout << "ComputeGlobalLocalMaps: " << rank << ", "
+        //           << " covering entities = [" << m_covering_source_vertices.size() << ", "
+        //           << m_covering_source_entities.size() << "]\n";
     }
     gid_to_lid_src.clear();
     lid_to_gid_src.clear();
@@ -917,7 +918,7 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
     // Number of Faces
     int nElements = static_cast< int >( csMesh.faces.size() );
 
-    assert( nElements == ntot_elements );
+    if( nElements != ntot_elements ) return MB_INVALID_SIZE;
 
     // Initialize data structures
     DataArray3D< int > dataGLLnodes;
@@ -1094,12 +1095,6 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_covering_source_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
 
         rval = mbintx->construct_covering_set( m_source_set, m_covering_source_set );MB_CHK_ERR( rval );
-        // if (rank == 1)
-        // {
-        //     moab::Range ents;
-        //     m_interface->get_entities_by_dimension(m_covering_source_set, 2, ents);
-        //     m_interface->remove_entities(m_covering_source_set, ents);
-        // }
     }
     else
     {
@@ -1313,20 +1308,19 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                     loc_gid_to_lid_covsrc[gids[ie]] = ie;
                 }
 
-                Range intxCov;
-                Range intxCells;
+                Range intxCov, intxCells;
                 Tag srcParentTag;
                 rval = m_interface->tag_get_handle( "SourceParent", srcParentTag );MB_CHK_ERR( rval );
                 rval = m_interface->get_entities_by_dimension( m_overlap_set, 2, intxCells );MB_CHK_ERR( rval );
                 for( Range::iterator it = intxCells.begin(); it != intxCells.end(); it++ )
                 {
                     EntityHandle intxCell = *it;
-                    int blueParent        = -1;
-                    rval                  = m_interface->tag_get_data( srcParentTag, &intxCell, 1, &blueParent );MB_CHK_ERR( rval );
-                    // if (is_root) std::cout << "Found intersecting element: " << blueParent << ",
-                    // " << gid_to_lid_covsrc[blueParent] << "\n";
-                    assert( blueParent >= 0 );
-                    intxCov.insert( covEnts[loc_gid_to_lid_covsrc[blueParent]] );
+                    int srcParent        = -1;
+                    rval                  = m_interface->tag_get_data( srcParentTag, &intxCell, 1, &srcParent );MB_CHK_ERR( rval );
+                    // if (is_root) std::cout << "Found intersecting element: " << srcParent << ",
+                    // " << gid_to_lid_covsrc[srcParent] << "\n";
+                    assert( srcParent >= 0 );
+                    intxCov.insert( covEnts[loc_gid_to_lid_covsrc[srcParent]] );
                 }
 
                 Range notNeededCovCells = moab::subtract( covEnts, intxCov );
@@ -1355,11 +1349,6 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                     rval = augment_overlap_set();MB_CHK_ERR( rval );
                 }
             }
-
-            // m_covering_source = new Mesh();
-            // rval = convert_mesh_to_tempest_private ( m_covering_source, m_covering_source_set,
-            // m_covering_source_entities, &m_covering_source_vertices ); MB_CHK_SET_ERR ( rval,
-            // "Can't convert source Tempest mesh" );
         }
 #endif
 

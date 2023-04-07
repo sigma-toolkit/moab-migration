@@ -153,7 +153,7 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_Tempest_MOAB( int nOrder )
     }
 
     // Current overlap face
-    int ixOverlap                  = 0;
+    int ixOverlap = 0;
 #ifdef VERBOSE
     const unsigned outputFrequency = ( m_meshInputCov->faces.size() / 10 ) + 1;
 #endif
@@ -176,8 +176,7 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_Tempest_MOAB( int nOrder )
 
         for( ; ixOverlapEnd < m_meshOverlap->faces.size(); ixOverlapEnd++ )
         {
-            if( ixFirst - m_meshOverlap->vecSourceFaceIx[ixOverlapEnd] != 0 )
-                break;
+            if( ixFirst - m_meshOverlap->vecSourceFaceIx[ixOverlapEnd] != 0 ) break;
         }
 
         unsigned nOverlapFaces = ixOverlapEnd - ixOverlapBegin;
@@ -526,7 +525,7 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
 #endif
 
     // Current Overlap Face
-    int ixOverlap                  = 0;
+    int ixOverlap = 0;
 #ifdef VERBOSE
     const unsigned outputFrequency = ( m_meshInputCov->faces.size() / 10 ) + 1;
 #endif
@@ -964,7 +963,7 @@ void moab::TempestOnlineMap::LinearRemapGLLtoGLL2_MOAB( const DataArray3D< int >
     DataArray2D< double > dOverlapOutputArea( m_meshOverlap->faces.size(), nPout * nPout );
 
     // Loop through all faces on m_meshInput
-    ixOverlap                      = 0;
+    ixOverlap = 0;
 #ifdef VERBOSE
     const unsigned outputFrequency = ( m_meshInputCov->faces.size() / 10 ) + 1;
 #endif
@@ -1501,7 +1500,7 @@ void moab::TempestOnlineMap::LinearRemapGLLtoGLL2_Pointwise_MOAB( const DataArra
     // Number of times this point was found
     DataArray1D< bool > fSecondNodeFound( dataNodalAreaOut.GetRows() );
 
-    ixOverlap                      = 0;
+    ixOverlap = 0;
 #ifdef VERBOSE
     const unsigned outputFrequency = ( m_meshInputCov->faces.size() / 10 ) + 1;
 #endif
@@ -1533,7 +1532,7 @@ void moab::TempestOnlineMap::LinearRemapGLLtoGLL2_Pointwise_MOAB( const DataArra
             if( ixSecond < 0 ) continue;  // do not do anything
 
             const NodeVector& nodesSecond = m_meshOutput->nodes;
-            const Face& faceSecond = m_meshOutput->faces[ixSecond];
+            const Face& faceSecond        = m_meshOutput->faces[ixSecond];
 
             // Loop through all nodes on the second face
             for( int s = 0; s < nPout; s++ )

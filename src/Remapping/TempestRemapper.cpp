@@ -18,6 +18,7 @@
 #include "DebugOutput.hpp"
 #include "moab/Remapping/TempestRemapper.hpp"
 #include "moab/ReadUtilIface.hpp"
+#include "moab/MeshTopoUtil.hpp"
 
 // Intersection includes
 #include "moab/IntxMesh/Intx2MeshOnSphere.hpp"
@@ -66,11 +67,11 @@ ErrorCode TempestRemapper::initialize( bool initialize_fsets )
     MPI_Initialized( &flagInit );
     if( flagInit )
     {
-        is_parallel = true;
         assert( m_pcomm != NULL );
         rank    = m_pcomm->rank();
         size    = m_pcomm->size();
         is_root = ( rank == 0 );
+        is_parallel = ( size > 1 );
     }
 #endif
 

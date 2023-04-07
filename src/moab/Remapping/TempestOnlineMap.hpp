@@ -460,7 +460,7 @@ class TempestOnlineMap : public OfflineMap
     Mesh* m_meshOverlap;
 
     bool is_parallel, is_root;
-    int rank, size, root_proc;
+    int rank, size;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

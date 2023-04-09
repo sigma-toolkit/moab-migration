@@ -215,7 +215,7 @@ program imoab_coupler_fortran
    fMonotoneTypeID = 0
    fVolumetric = 0
    fNoConserve = 0
-   fValidate = 1
+   fValidate = 0
    fInverseDistanceMap = 0
 
    if (cplComm .NE. MPI_COMM_NULL) then

@@ -1325,8 +1325,8 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
 
                 Range notNeededCovCells = moab::subtract( covEnts, intxCov );
                 // remove now from coverage set the cells that are not needed
-                // rval = m_interface->remove_entities( m_covering_source_set, notNeededCovCells );MB_CHK_ERR( rval );
-                // covEnts = moab::subtract( covEnts, notNeededCovCells );
+                rval = m_interface->remove_entities( m_covering_source_set, notNeededCovCells );MB_CHK_ERR( rval );
+                covEnts = moab::subtract( covEnts, notNeededCovCells );
 
                 // Need to loop over covEnts now and ensure at least N-rings are available dependign on whether bilinear (1) or
                 // high order FV (p) methods are being used for map generation. For bilinear/FV(1): need 1 ring, and for FV(p)

@@ -32,6 +32,7 @@
 #include <string>
 #include <sstream>
 #include "moab/Core.hpp"
+#include "moab/ReadUtilIface.hpp"
 
 #include "moab/Remapping/MBA.hpp"
 #include "moab/nanoflann.hpp"
@@ -86,16 +87,22 @@ moab::ErrorCode shepard_interpolate( int dimension,
                                      std::vector< double >& fi );
 
 moab::ErrorCode modified_shepard_interpolate( int dimension,
-                                     std::vector< double >& xyzd,
-                                     std::vector< double >& fd,
-                                     double power,
-                                     std::vector< double >& xyzi,
-                                     std::vector< double >& fi );
+                                              std::vector< double >& xyzd,
+                                              std::vector< double >& fd,
+                                              double power,
+                                              std::vector< double >& xyzi,
+                                              std::vector< double >& fi );
 
 moab::ErrorCode compute_mba( std::vector< double >& xyzd,
-                     std::vector< double >& fd,
-                     std::vector< double >& xyzi,
-                     std::vector< double >& fi );
+                             std::vector< double >& fd,
+                             std::vector< double >& xyzi,
+                             std::vector< double >& fi );
+
+moab::ErrorCode ExtrudePolygonsToPolyhedra( Interface* mb,
+                                            std::vector< double >& layer_thickness,
+                                            moab::EntityHandle& poly2dset,
+                                            moab::EntityHandle& outputset,
+                                            std::string prefix );
 
 moab::ErrorCode ComputeFieldProjectionMBA( moab::Interface* mbi,
                                            Mesh& meshOverlap,
@@ -103,16 +110,24 @@ moab::ErrorCode ComputeFieldProjectionMBA( moab::Interface* mbi,
                                            moab::Range& srcelems,
                                            moab::Range& dstelems,
                                            bool is_three_dimensional,
-                                           bool normalize = true,
+                                           bool normalize              = true,
                                            const double constantoffset = 0.0 );
 
 moab::ErrorCode monotone_hermite_1d_1d( std::vector< double >& xd,
-                                  std::vector< double >& fd,
-                                  std::vector< double >& xi,
-                                  std::vector< double >& fi,
-                                  bool monotone = true );
+                                        std::vector< double >& fd,
+                                        std::vector< double >& xi,
+                                        std::vector< double >& fi,
+                                        bool monotone = true );
 
 ErrorCode CloneToTRMesh( moab::Interface* m_interface, Mesh& mesh, EntityHandle mesh_set );
+
+// 3D settings
+constexpr int mpas_zlevels = 60;
+constexpr int roms_zlevels = 5;
+
+// NOTE: cannot use conservative projections if use_3dprojection=true
+constexpr bool useConservativeSalinity    = true;
+constexpr bool useConservativeTemperature = true;
 
 template < typename T >
 struct PointCloud
@@ -180,13 +195,11 @@ struct PC3D
 {
     using coord_t = T;  //!< The type of each coordinate
 
-    const static int dimension  = 3;
+    const static int dimension = 3;
     const std::vector< T >& xyz;
     const size_t count;
 
-    PC3D( const std::vector< T >& pxyz ) : xyz( pxyz ), count( pxyz.size() / dimension )
-    {
-    }
+    PC3D( const std::vector< T >& pxyz ) : xyz( pxyz ), count( pxyz.size() / dimension ) {}
 
     // Must return the number of data points
     inline size_t kdtree_get_point_count() const
@@ -215,9 +228,6 @@ struct PC3D
     }
 };
 
-constexpr int mpas_zlevels = 60;
-constexpr int roms_zlevels = 50;
-
 //
 // Start of main test program
 //
@@ -237,21 +247,15 @@ int main( int argc, char** argv )
     ///   PARALLEL_COMM = index
     // string read_options = "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;"
     //                       "PARTITION_DISTRIBUTE";  // ;PARALLEL_GHOSTS=3.0.1
-    const double radius         = 1.0;
-    bool ensureMonotonicity     = false;
-    bool computeWeights         = false;
-    bool computeShepards        = false;
-    bool normalize              = false;
-    std::string strMethod       = "";
-    const double shepard_power  = 3;
-    const bool useTranspose     = false;
-    // const double mpas_zh[60]    = { 10,      20,      30,      40,      50,      60,      70,      80,      90,
-    //                                 100,     110,     120,     130,     140,     150,     160,     170.197, 180.761,
-    //                                 191.821, 203.499, 215.923, 229.233, 243.584, 259.156, 276.152, 294.815, 315.424,
-    //                                 338.312, 363.875, 392.58,  424.989, 461.767, 503.707, 551.749, 606.997, 670.729,
-    //                                 744.398, 829.607, 928.043, 1041.37, 1171.04, 1318.09, 1482.9,  1664.99, 1863.01,
-    //                                 2074.87, 2298.04, 2529.9,  2768.1,  3010.67, 3256.14, 3503.45, 3751.89, 4001.01,
-    //                                 4250.53, 4500.26, 4750.12, 5000.05, 5250.01, 5499.99 };
+    const double radius        = 1.0;
+    bool ensureMonotonicity    = false;
+    bool computeWeights        = false;
+    bool computeMBA       = false;
+    bool normalize             = false;
+    bool use_3dprojection      = false;
+    std::string strMethod      = "";
+    const double shepard_power = 3;
+    const bool useTranspose    = false;
 
     {
         ProgOptions opts;
@@ -276,13 +280,18 @@ int main( int argc, char** argv )
         opts.addOpt< std::string >( "method", "Additional computational method arguments (invdist, bilin, intbilin)",
                                     &strMethod );
         opts.addOpt< void >( "shepard", "Use Shepard's inverse-distance weighting to compute projection",
-                             &computeShepards );
+                             &computeMBA );
         opts.addOpt< void >( "mono", "Ensure monotonicity in the weight generation", &ensureMonotonicity );
         opts.addOpt< void >( "normalize", "Re-normalize interpolant to preserve field integral", &normalize );
         opts.addOpt< void >( "weights,w", "Compute and output the weights", &computeWeights );
+        opts.addOpt< void >( "threed", "Compute full 3D temperature and salinity projection", &use_3dprojection );
 
         opts.parseCommandLine( argc, argv );
     }
+
+    //
+    const int src_zlayers = use_3dprojection ? mpas_zlevels : 1;
+    const int dst_zlayers = use_3dprojection ? roms_zlevels : 1;
 
     // Print usage if not enough arguments
     if( argc < 1 )
@@ -296,12 +305,15 @@ int main( int argc, char** argv )
     }
 
     // Initialize MPI first
-    ierr = MPI_Init( &argc, &argv );MPICHKERR( ierr, "MPI_Init failed" );
+    ierr = MPI_Init( &argc, &argv );
+    MPICHKERR( ierr, "MPI_Init failed" );
 
     MPI_Comm comm = MPI_COMM_WORLD;
 
-    ierr = MPI_Comm_rank( comm, &rank );MPICHKERR( ierr, "MPI_Comm_rank failed" );
-    ierr = MPI_Comm_size( comm, &size );MPICHKERR( ierr, "MPI_Comm_size failed" );
+    ierr = MPI_Comm_rank( comm, &rank );
+    MPICHKERR( ierr, "MPI_Comm_rank failed" );
+    ierr = MPI_Comm_size( comm, &size );
+    MPICHKERR( ierr, "MPI_Comm_size failed" );
 
     string mpas_read_options = size > 1 ? "" : "";
     string roms_read_options = size > 1 ? "" : "";
@@ -350,7 +362,7 @@ int main( int argc, char** argv )
         moab::Range mpas_verts, mpas_elems;
         err = mbi->get_entities_by_dimension( mpasset, 0, mpas_verts );MB_CHK_ERR( err );
         err = mbi->get_entities_by_dimension( mpasset, 2, mpas_elems );MB_CHK_ERR( err );
-        dbgprint( "MPAS mesh contains " << mpas_verts.size() << " vertices and " << mpas_elems.size() << " elements");
+        dbgprint( "MPAS mesh contains " << mpas_verts.size() << " vertices and " << mpas_elems.size() << " elements" );
 
         // Rescale the radius of both to compute the intersection
         err = ScaleCoords( mbi, mpas_verts, radius, !useTranspose );MB_CHK_ERR( err );
@@ -366,7 +378,7 @@ int main( int argc, char** argv )
         // Get all entities in the database
         err = mbi->get_entities_by_dimension( romsset, 0, roms_verts );MB_CHK_ERR( err );
         err = mbi->get_entities_by_dimension( romsset, 2, roms_elems );MB_CHK_ERR( err );
-        dbgprint( "ROMS mesh contains " << roms_verts.size() << " vertices and " << roms_elems.size() << " elements");
+        dbgprint( "ROMS mesh contains " << roms_verts.size() << " vertices and " << roms_elems.size() << " elements" );
 
         // Rescale the radius of both to compute the intersection
         err = ScaleCoords( mbi, roms_verts, radius, useTranspose );MB_CHK_ERR( err );
@@ -375,21 +387,17 @@ int main( int argc, char** argv )
     }
 
     // Cull the MPAS set so that we don't have a global mesh
-    moab::Range mpas_elems;
+    moab::Range mpas_verts, mpas_elems;
     {
         // construct a kd-tree index:
-        using KdTree =
-            nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PC3D< double > >,
-                                                 PC3D< double >, 3 /* dim */
-                                                 >;
+        using KdTree = nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PC3D< double > >,
+                                                            PC3D< double >, 3 /* dim */
+                                                            >;
 
         moab::Range orig_mpas_elems;
         err = mbi->get_entities_by_dimension( mpasset, 2, orig_mpas_elems );MB_CHK_ERR( err );
         std::vector< double > mpas_xyz( orig_mpas_elems.size() * 3 );
         err = mbi->get_coords( orig_mpas_elems, mpas_xyz.data() );MB_CHK_ERR( err );
-
-        moab::Range roms_elems;
-        err = mbi->get_entities_by_dimension( romsset, 2, roms_elems );MB_CHK_ERR( err );
 
         double query_pt[3];  // dimension
         PC3D< double > cloud( mpas_xyz );
@@ -403,7 +411,7 @@ int main( int argc, char** argv )
         for( size_t i = 0; i < roms_elems.size(); i++ )
         {
             const moab::EntityHandle ehandle = roms_elems[i];
-            err               = mbi->get_coords( &ehandle, 1, &query_pt[0] );MB_CHK_ERR( err );
+            err                              = mbi->get_coords( &ehandle, 1, &query_pt[0] );MB_CHK_ERR( err );
 
             // Do a KNN search
             resultSet.init( srcindx.data(), srcdist.data() );
@@ -413,11 +421,15 @@ int main( int argc, char** argv )
                 mpas_elems.insert( orig_mpas_elems[srcindx[j]] );
         }
         err = mbi->add_entities( mpas_covering_set, mpas_elems );MB_CHK_ERR( err );
-        dbgprint( "Culled MPAS mesh contains " << mpas_elems.size() << " elements" );
+
+        err = mbi->write_file( "mpas_covering_2d.h5m", "H5M", write_options.c_str(), &mpas_covering_set, 1 );MB_CHK_ERR( err );
+
+        err = mbi->get_connectivity( mpas_elems, mpas_verts, true );MB_CHK_ERR( err );
+        err = mbi->add_entities( mpas_covering_set, mpas_verts );MB_CHK_ERR( err );
+        dbgprint( "Culled MPAS mesh contains " << mpas_elems.size() << " elements and " << mpas_verts.size()
+                                               << " vertices." );
 
         err = remapper.ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( err );
-
-        // err = mbi->write_file( "mpas_covering_2d.h5m", "H5M", write_options.c_str(), &mpas_covering_set, 1 );MB_CHK_ERR( err );
     }
 
     Mesh meshInput;
@@ -435,15 +447,60 @@ int main( int argc, char** argv )
         std::cout << "Setup and compute mesh intersections between source (MPAS) and target (ROMS) meshes\n";
         // err = remapper.ComputeOverlapMesh( true, false );MB_CHK_ERR( err );
         bool concaveMeshA = false, concaveMeshB = false, allowNoOverlap = true, verbose = false;
-        int ierr = GenerateOverlapWithMeshes( meshInput, meshOutput, meshOverlap, "" /*outFilename*/, "Netcdf4", "exact",
-                                             concaveMeshA, concaveMeshB, allowNoOverlap, verbose );
+        int ierr = GenerateOverlapWithMeshes( meshInput, meshOutput, meshOverlap, "" /*outFilename*/, "Netcdf4",
+                                              "exact", concaveMeshA, concaveMeshB, allowNoOverlap, verbose );
         if( ierr )
         {
             MB_CHK_SET_ERR( MB_FAILURE, "TempestRemap: Can't compute the intersection of meshes on the sphere" );
         }
     }
 
-    if( computeShepards )
+    // let us perform 3D extrusions as needed
+    EntityHandle mpasset3d=0, romsset3d=0;
+    // moab::Range mpas_verts, mpas_elems;
+    {
+        printf( "Getting MPAS height tag now\n" );
+        moab::Tag mhtag;
+        err = mbi->tag_get_handle( "layerThickness_3d", src_zlayers, moab::MB_TYPE_DOUBLE, mhtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+        std::vector< double > zmh_xyz3d( mpas_elems.size() * src_zlayers ),
+            zrh_xyz3d( roms_elems.size() * dst_zlayers );
+        err = mbi->tag_get_data( mhtag, mpas_elems, zmh_xyz3d.data() );MB_CHK_ERR( err );
+
+        printf( "Extruding MPAS polyhedra now\n" );
+        err = ExtrudePolygonsToPolyhedra( mbi, zmh_xyz3d, mpas_covering_set, mpasset3d, "mpas" );MB_CHK_ERR( err );
+
+        err = ComputeFieldProjectionMBA( mbi, meshOverlap, "bottomDepth", mpas_elems, roms_elems, false,
+                                         true /* bool normalize */, 2000.0 );MB_CHK_ERR( err );
+
+        std::vector< double > zrh_xyz2d( roms_elems.size() );
+        moab::Tag rhtag;
+        err = mbi->tag_get_handle( "bottomDepth", 1, moab::MB_TYPE_DOUBLE, rhtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+        err = mbi->tag_get_data( rhtag, roms_elems, zrh_xyz2d.data() );MB_CHK_ERR( err );
+
+        for( size_t i = 0; i < roms_elems.size(); ++i )
+        {
+            const double pbathymetry = zrh_xyz2d[i];
+            const double delz        = pbathymetry / dst_zlayers;
+            const int offset         = i * dst_zlayers;
+            for( int j = 0; j < dst_zlayers; ++j )
+                zrh_xyz3d[offset + j] = delz;
+        }
+
+        printf( "Extruding ROMS polyhedra now\n" );
+        err = ExtrudePolygonsToPolyhedra( mbi, zrh_xyz3d, romsset, romsset3d, "roms" );MB_CHK_ERR( err );
+
+        mpas_verts.clear();
+        roms_verts.clear();
+        mpas_elems.clear();
+        roms_elems.clear();
+
+        err = mbi->get_entities_by_dimension( mpasset3d, 0, mpas_verts );MB_CHK_ERR( err );
+        err = mbi->get_entities_by_dimension( mpasset3d, 3, mpas_elems );MB_CHK_ERR( err );
+        err = mbi->get_entities_by_dimension( romsset3d, 0, roms_verts );MB_CHK_ERR( err );
+        err = mbi->get_entities_by_dimension( romsset3d, 3, roms_elems );MB_CHK_ERR( err );
+    }
+
+    if( use_3dprojection || computeMBA || !( useConservativeSalinity || useConservativeTemperature ) )
     {
         // call Shepard's interpolant to compute data
         // compute the actual shepard's interpolation
@@ -451,14 +508,17 @@ int main( int argc, char** argv )
         // err = modified_shepard_interpolate( 3, mpas_xyz, mpas_tdata, shepard_power, roms_xyz, roms_tdata );MB_CHK_ERR( err );
 
         // Now let us compute the mba hierarchy for each field
-        err = ComputeFieldProjectionMBA( mbi, meshOverlap, "bottomDepth", mpas_elems, roms_elems, false, true /* bool normalize */ );MB_CHK_ERR( err );
-        err = ComputeFieldProjectionMBA( mbi, meshOverlap, "salinity", mpas_elems, roms_elems, true, true /* bool normalize */ );MB_CHK_ERR( err );
-        err = ComputeFieldProjectionMBA( mbi, meshOverlap, "temperature", mpas_elems, roms_elems, true, true /* bool normalize */ );MB_CHK_ERR( err );
+        // err = ComputeFieldProjectionMBA( mbi, meshOverlap, "bottomDepth", mpas_elems, roms_elems, false,
+        //                                  true /* bool normalize */ );MB_CHK_ERR( err );
+        err = ComputeFieldProjectionMBA( mbi, meshOverlap, ( use_3dprojection ? "salinity_3d" : "salinity" ),
+                                         mpas_elems, roms_elems, use_3dprojection, true /* bool normalize */, 35.0 );MB_CHK_ERR( err );
+        err = ComputeFieldProjectionMBA( mbi, meshOverlap, ( use_3dprojection ? "temperature_3d" : "temperature" ),
+                                         mpas_elems, roms_elems, use_3dprojection, true /* bool normalize */, 8.5 );MB_CHK_ERR( err );
     }
     else
     {
         // compute the mapping weights
-        // if( computeWeights )
+        // if( useConservativeSalinity || useConservativeTemperature )
         {
             dbgprint( "\nSetup computation of weights" );
             // Call to generate the remapping weights with the tempest meshes
@@ -470,15 +530,16 @@ int main( int argc, char** argv )
             mapOptions.nPout            = 1;
             mapOptions.fSourceConcave   = false;
             mapOptions.fTargetConcave   = false;
-            mapOptions.strMethod        = strMethod; // invdist, bilin
+            mapOptions.strMethod        = strMethod;  // invdist, bilin
             mapOptions.fMonotone        = ensureMonotonicity;
             mapOptions.fNoCorrectAreas  = false;
             mapOptions.fNoCheck         = true;
-            mapOptions.strOutputMapFile = output_filename; // ask TR to write it out
+            mapOptions.strOutputMapFile = output_filename;  // ask TR to write it out
             mapOptions.strOutputFormat  = "Netcdf4";
 
             dbgprint( "Compute weights with TempestRemap" );
-            ierr = GenerateOfflineMapWithMeshes( meshInput, meshOutput, meshOverlap, "fv", "fv", mapOptions, weightMap );
+            ierr =
+                GenerateOfflineMapWithMeshes( meshInput, meshOutput, meshOverlap, "fv", "fv", mapOptions, weightMap );
 
             // err = weightMap.GenerateRemappingWeights( "fv",         // std::string strInputType
             //                                         "fv",         // std::string strOutputType,
@@ -526,8 +587,7 @@ int main( int argc, char** argv )
                 mapAttributes.insert( AttributePair( "np_dst", std::to_string( (long long)mapOptions.nPout ) ) );
                 mapAttributes.insert( AttributePair( "mono", ( mapOptions.fMonotone ) ? ( "true" ) : ( "false" ) ) );
                 mapAttributes.insert( AttributePair( "nobubble", "false" ) );
-                mapAttributes.insert(
-                    AttributePair( "nocorrectareas", "false" ) );
+                mapAttributes.insert( AttributePair( "nocorrectareas", "false" ) );
                 mapAttributes.insert( AttributePair( "noconserve", "false" ) );
                 mapAttributes.insert( AttributePair( "sparse_constraints", "false" ) );
                 mapAttributes.insert( AttributePair( "method", mapOptions.strMethod ) );
@@ -551,63 +611,75 @@ int main( int argc, char** argv )
                 DataArray1D< double > dataInDouble( mpas_elems.size() );
                 DataArray1D< double > dataOutDouble( roms_elems.size() );
 
-                const bool useConservativeSalinity = true;
-                const bool useConservativeTemperature = true;
+                // We need to project the bottomDepth (Bathymetry) first so that we can project in 3D
+                // err = ComputeFieldProjectionMBA( mbi, meshOverlap, "bottomDepth", mpas_elems, roms_elems, false,
+                //                                  true /* bool normalize */, 2000.0 );MB_CHK_ERR( err );
 
                 if( useConservativeSalinity )
                 {
+                    constexpr double salinity_avg = 35.0;
                     moab::Tag stag;
                     err = mbi->tag_get_handle( "salinity", 1, moab::MB_TYPE_DOUBLE, stag, moab::MB_TAG_DENSE );
-                    std::cout << "Errorcode : " << err << std::endl; MB_CHK_ERR( err );
+                    std::cout << "Errorcode : " << err << std::endl;MB_CHK_ERR( err );
 
                     // Apply the map onto the salinity solution field
                     err = mbi->tag_get_data( stag, mpas_elems, dataInDouble );MB_CHK_ERR( err );
                     for( size_t i = 0; i < dataInDouble.GetRows(); i++ )
-                        dataInDouble[i] -= 35;
+                        dataInDouble[i] -= salinity_avg;
+
                     // Compute the projection for the salinity field
                     weights.Apply( dataInDouble, dataOutDouble );
+
                     // Scale data values
                     for( size_t i = 0; i < dataOutDouble.GetRows(); i++ )
-                        dataOutDouble[i] += 35;
+                        dataOutDouble[i] += salinity_avg;
 
                     // Set the salinity solution field on the ROMS mesh
                     err = mbi->tag_set_data( stag, roms_elems, dataOutDouble );MB_CHK_ERR( err );
                 }
                 else
                 {
-                    err = ComputeFieldProjectionMBA( mbi, meshOverlap, "salinity", mpas_elems, roms_elems, true,
-                                                     true /* bool normalize */, 35.0 );MB_CHK_ERR( err );
+                    err = ComputeFieldProjectionMBA( mbi, meshOverlap,
+                                                     ( use_3dprojection ? "salinity_3d" : "salinity" ), mpas_elems,
+                                                     roms_elems, use_3dprojection, true /* bool normalize */, 35.0 );MB_CHK_ERR( err );
                 }
 
                 // Apply the map onto the temperature solution field
                 if( useConservativeTemperature )
                 {
+                    constexpr double temperature_avg = 8.5;
                     moab::Tag ttag;
                     err = mbi->tag_get_handle( "temperature", 1, moab::MB_TYPE_DOUBLE, ttag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
 
+                    // Apply the map onto the salinity solution field
                     err = mbi->tag_get_data( ttag, mpas_elems, dataInDouble );MB_CHK_ERR( err );
-                    // Compute the projection for the temperature field
+                    for( size_t i = 0; i < dataInDouble.GetRows(); i++ )
+                        dataInDouble[i] -= temperature_avg;
+
+                    // Compute the projection for the salinity field
                     weights.Apply( dataInDouble, dataOutDouble );
+
+                    // Scale data values
+                    for( size_t i = 0; i < dataOutDouble.GetRows(); i++ )
+                        dataOutDouble[i] += temperature_avg;
+
                     // Set the temperature solution field on the ROMS mesh
                     err = mbi->tag_set_data( ttag, roms_elems, dataOutDouble );MB_CHK_ERR( err );
                 }
                 else
                 {
-                    err = ComputeFieldProjectionMBA( mbi, meshOverlap, "temperature", mpas_elems, roms_elems, true,
-                                                     true /* bool normalize */, 8.5 );MB_CHK_ERR( err );
+                    err =
+                        ComputeFieldProjectionMBA( mbi, meshOverlap,
+                                                   ( use_3dprojection ? "temperature_3d" : "temperature" ), mpas_elems,
+                                                   roms_elems, use_3dprojection, true /* bool normalize */, 8.5 );MB_CHK_ERR( err );
                 }
-
-
-                err = ComputeFieldProjectionMBA( mbi, meshOverlap, "bottomDepth", mpas_elems, roms_elems, false,
-                                                 true /* bool normalize */, 2000.0 );MB_CHK_ERR( err );
             }
-
         }
 
         remapper.clear();
     }
 
-    if (useTranspose)
+    if( useTranspose )
     {
         err = mbi->write_file( "roms_2d_projected.h5m", "H5M", write_options.c_str(), &mpasset, 1 );MB_CHK_ERR( err );
     }
@@ -651,7 +723,8 @@ ErrorCode ScaleCoords( Interface* mb, Range& nodes, double R, bool is_cartesian 
         double len = std::sqrt( posf[0] * posf[0] + posf[1] * posf[1] + posf[2] * posf[2] );
         if( len < 1e-12 )
         {
-            dbgprint( nd << " X=" << posf[0] << ", Y=" << posf[1] << ", Z = " << posf[2] << ": Failed with length == 0.");
+            dbgprint( nd << " X=" << posf[0] << ", Y=" << posf[1] << ", Z = " << posf[2]
+                         << ": Failed with length == 0." );
             return MB_FAILURE;
         }
 
@@ -659,31 +732,31 @@ ErrorCode ScaleCoords( Interface* mb, Range& nodes, double R, bool is_cartesian 
         posf[0] *= R / len;
         posf[1] *= R / len;
         posf[2] *= R / len;
-        rval    = mb->set_coords( &nd, 1, posf );MB_CHK_ERR( rval );
+        rval = mb->set_coords( &nd, 1, posf );MB_CHK_ERR( rval );
     }
     return MB_SUCCESS;
 }
 
 moab::ErrorCode monotone_hermite_1d( std::vector< double >& xd,
-                                  std::vector< double >& fd,
-                                  std::vector< double >& xi,
-                                  std::vector< double >& fi,
-                                  bool monotone )
+                                     std::vector< double >& fd,
+                                     std::vector< double >& xi,
+                                     std::vector< double >& fi,
+                                     bool monotone )
 {
     tk::spline splrecons( xd, fd, tk::spline::cspline, monotone );
 
-    for (size_t i = 0; i < xi.size(); ++i)
-        fi[i] = splrecons(xi[i]);
+    for( size_t i = 0; i < xi.size(); ++i )
+        fi[i] = splrecons( xi[i] );
 
     return moab::MB_SUCCESS;
 }
 
 moab::ErrorCode shepard_interpolate( int dimension,
-                             std::vector< double >& xyzd,
-                             std::vector< double >& fd,
-                             double power,
-                             std::vector< double >& xyzi,
-                             std::vector< double >& fi )
+                                     std::vector< double >& xyzd,
+                                     std::vector< double >& fd,
+                                     double power,
+                                     std::vector< double >& xyzi,
+                                     std::vector< double >& fi )
 //****************************************************************************80
 //  Original source from:
 //
@@ -717,7 +790,7 @@ moab::ErrorCode shepard_interpolate( int dimension,
             z = -1;
             for( size_t j = 0; j < nd; j++ )
             {
-                double t = 0.0;
+                double t          = 0.0;
                 const int joffset = j * dimension;
                 for( int i2 = 0; i2 < dimension; i2++ )
                 {
@@ -762,8 +835,6 @@ moab::ErrorCode shepard_interpolate( int dimension,
     return moab::MB_SUCCESS;
 }
 
-
-
 moab::ErrorCode compute_mba( std::vector< double >& xyzd,
                              std::vector< double >& fd,
                              std::vector< double >& xyzi,
@@ -779,9 +850,9 @@ moab::ErrorCode compute_mba( std::vector< double >& xyzd,
     // Initial grid size.
     // const size_t init_grid_size = static_cast< size_t >( std::max( 10.0, std::sqrt( nd ) / 8 ) );
     // mba::index< 3 > grid        = { init_grid_size, init_grid_size, 2 };
-    mba::index< 3 > grid        = { 100, 100, 3 };
+    mba::index< 3 > grid = { 100, 100, 100 };
 
-    std::vector< mba::point< 3 > > coords(nd);
+    std::vector< mba::point< 3 > > coords( nd );
     size_t offset = 0;
     for( size_t k = 0; k < nd; k++, offset += 3 )
         coords[k] = mba::point< 3 >{ xyzd[offset], xyzd[offset + 1], xyzd[offset + 2] };
@@ -792,7 +863,7 @@ moab::ErrorCode compute_mba( std::vector< double >& xyzd,
 
     // Get interpolated value at arbitrary location.
     offset = 0;
-    for( size_t k = 0; k < ni; k++, offset+=3 )
+    for( size_t k = 0; k < ni; k++, offset += 3 )
         fi[k] = interp( mba::point< 3 >{ xyzi[offset], xyzi[offset + 1], xyzi[offset + 2] } );
 
     return moab::MB_SUCCESS;
@@ -824,15 +895,15 @@ moab::ErrorCode modified_shepard_interpolate( int dimension,
 
     power = 4;
 
-    size_t nd  = xyzd.size() / dimension;
-    size_t ni  = xyzi.size() / dimension;
+    size_t nd = xyzd.size() / dimension;
+    size_t ni = xyzi.size() / dimension;
     std::vector< double > w( nd, 0.0 );
 
     double fisecnum = 0.0;
     for( size_t k = 0; k < nd; k++ )
         fisecnum += fd[k];
 
-    assert(power >= 1.0);
+    assert( power >= 1.0 );
 
     for( size_t i = 0; i < ni; i++ )
     {
@@ -863,7 +934,6 @@ moab::ErrorCode modified_shepard_interpolate( int dimension,
                     w[j] = 0.0;
                 w[z] = 1.0;
                 s = is = 1.0;
-
             }
             else
             {
@@ -871,7 +941,7 @@ moab::ErrorCode modified_shepard_interpolate( int dimension,
                 {
                     w[j] = 1.0 / std::pow( w[j], power );
                     s += w[j];
-                    is += 1.0/w[j];
+                    is += 1.0 / w[j];
                 }
 
                 for( size_t j = 0; j < nd; j++ )
@@ -886,11 +956,11 @@ moab::ErrorCode modified_shepard_interpolate( int dimension,
 }
 
 moab::ErrorCode modified_shepard_interpolate2( int dimension,
-                                              std::vector< double >& xyzd,
-                                              std::vector< double >& fd,
-                                              double power,
-                                              std::vector< double >& xyzi,
-                                              std::vector< double >& fi )
+                                               std::vector< double >& xyzd,
+                                               std::vector< double >& fd,
+                                               double power,
+                                               std::vector< double >& xyzi,
+                                               std::vector< double >& fi )
 //****************************************************************************80
 //  Original source from:
 //
@@ -906,7 +976,7 @@ moab::ErrorCode modified_shepard_interpolate2( int dimension,
 //
 {
     // size_t nd  = xyzd.size() / dimension;
-    size_t ni  = xyzi.size() / dimension;
+    size_t ni = xyzi.size() / dimension;
 
     // construct a kd-tree index:
     using KdTree = nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PointCloud< double > >,
@@ -944,8 +1014,9 @@ moab::ErrorCode modified_shepard_interpolate2( int dimension,
                 for( int dd = 0; dd < dimension; dd++ )
                     dist += ( xyzi[ioffset + dd] - xyzd[srcindx[ll] * dimension + dd] ) *
                             ( xyzi[ioffset + dd] - xyzd[srcindx[ll] * dimension + dd] );
-                dist        = std::sqrt( dist );
-                std::cout << i << "\tret_index=" << srcindx[ll] << " out_dist_sqr=" << srcdist[ll] << ", " << dist << std::endl;
+                dist = std::sqrt( dist );
+                std::cout << i << "\tret_index=" << srcindx[ll] << " out_dist_sqr=" << srcdist[ll] << ", " << dist
+                          << std::endl;
                 srcdist[ll] = dist;
             }
         }
@@ -968,7 +1039,7 @@ moab::ErrorCode modified_shepard_interpolate2( int dimension,
                 // {
                 //     t += std::pow( xyzi[i2 + ioffset] - xyzd[i2 + joffset], 2.0 );
                 // }
-                w[j] = srcdist[j];// std::sqrt( t );
+                w[j] = srcdist[j];  // std::sqrt( t );
                 if( w[j] < 1e-12 )
                 {
                     z = j;
@@ -1007,6 +1078,204 @@ moab::ErrorCode modified_shepard_interpolate2( int dimension,
     return moab::MB_SUCCESS;
 }
 
+moab::ErrorCode ExtrudePolygonsToPolyhedra( Interface* mb,
+                                            std::vector< double >& layer_thickness,
+                                            moab::EntityHandle& poly2dset,
+                                            moab::EntityHandle& outputset,
+                                            std::string prefix )
+{
+    ErrorCode rval;
+    if( outputset == 0 )
+    {
+        rval = mb->create_meshset( moab::MESHSET_SET, outputset );MB_CHK_SET_ERR( rval, "Can't create new set" );
+    }
+
+    // Get verts entities, by type
+    Range verts, edges, faces;
+    // rval = mb->get_entities_by_type( poly2dset, MBVERTEX, verts );MB_CHK_ERR( rval );
+    rval = mb->get_entities_by_dimension( poly2dset, 0, verts );MB_CHK_ERR( rval );
+
+    // Get faces, by dimension, so we stay generic to entity type
+    rval = mb->get_entities_by_dimension( poly2dset, 2, faces );MB_CHK_ERR( rval );
+    std::cout << "Number of 2D entities: vertices = " << verts.size() << ", faces = " << faces.size() << endl;
+
+    // add the initial faces to the first set
+    rval = mb->add_entities( outputset, faces );MB_CHK_ERR( rval );
+    // Create all edges
+    rval = mb->get_adjacencies( faces, 1, true, edges, Interface::UNION );MB_CHK_ERR( rval );
+
+    if( true )
+    {
+        std::cout << "Input Polygonal Mesh details::" << std::endl;
+        std::cout << "\tNumber of Vertices = " << verts.size() << std::endl;
+        std::cout << "\t          Edges    = " << edges.size() << std::endl;
+        std::cout << "\t          Faces    = " << faces.size() << std::endl;
+    }
+
+    std::vector< double > coords;
+    unsigned nvPerLayer = verts.size();
+    coords.resize( 3 * nvPerLayer );
+
+    // get the vertex coordinates for the polygonal mesh
+    rval = mb->get_coords( verts, &coords[0] );MB_CHK_ERR( rval );
+
+    // create first vertices
+    size_t nlayers = layer_thickness.size() / faces.size();
+    std::vector< int > elements_per_layer( nlayers, 1 );
+    Range* newVerts = new Range[nlayers + 1];
+    newVerts[0]     = verts;  // just for convenience
+    for( size_t ii = 0, ilayer = 0; ii < nlayers; ii++ )
+    {
+        for( int jj = 0; jj < elements_per_layer[ii]; jj++, ++ilayer )
+        {
+            for( unsigned i = 0; i < nvPerLayer; i++ )
+            {
+                // Subtract or Add depending on the z-Direction to extrude
+                if( i ) coords[3 * i + 2] += layer_thickness[ii * nvPerLayer + i];
+            }
+
+            rval = mb->create_vertices( &coords[0], nvPerLayer, newVerts[ilayer + 1] );MB_CHK_ERR( rval );
+        }
+    }
+
+    // for each edge, we will create layers quads
+    unsigned nquads = edges.size() * nlayers;
+    ReadUtilIface* read_iface;
+    rval = mb->query_interface( read_iface );MB_CHK_SET_ERR( rval, "Error in query_interface" );
+
+    EntityHandle start_elem, *connect;
+
+    // Create quads
+    rval = read_iface->get_element_connect( nquads, 4, MBQUAD, 0, start_elem, connect );MB_CHK_SET_ERR( rval, "Error in get_element_connect" );
+    unsigned nedges = edges.size();
+
+    int indexConn = 0;
+    for( unsigned j = 0; j < nedges; j++ )
+    {
+        EntityHandle edge = edges[j];
+
+        const EntityHandle* conn2 = NULL;
+        int num_nodes;
+        rval = mb->get_connectivity( edge, conn2, num_nodes );MB_CHK_ERR( rval );
+        if( 2 != num_nodes ) MB_CHK_ERR( MB_FAILURE );
+
+        // see if the edge is on boundary; if yes, add the corresponding quads to the 3rd neumann set
+        Range adjFacesToEdge;
+        rval = mb->get_adjacencies( &edge, 1, 2, false, adjFacesToEdge );MB_CHK_ERR( rval );
+        if( adjFacesToEdge.size() == 1 )  //
+        {
+            Range lateralQuads( start_elem + indexConn / 4, start_elem + indexConn / 4 + nlayers - 1 );
+            rval = mb->add_entities( outputset, lateralQuads );MB_CHK_ERR( rval );
+        }
+
+        int i0 = verts.index( conn2[0] );
+        int i1 = verts.index( conn2[1] );
+        for( unsigned ii = 0; ii < nlayers; ii++ )
+        {
+            connect[indexConn++] = newVerts[ii][i0];
+            connect[indexConn++] = newVerts[ii][i1];
+            connect[indexConn++] = newVerts[ii + 1][i1];
+            connect[indexConn++] = newVerts[ii + 1][i0];
+        }
+    }
+
+    // Create the material ID tag
+    int zero = 0;
+    moab::Tag gidTag;
+    rval = mb->tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, gidTag, MB_TAG_DENSE | MB_TAG_CREAT, &zero );
+
+    unsigned int nfaces = faces.size();
+    std::vector< EntityHandle > allPolygons( nfaces * ( nlayers + 1 ) );
+    for( unsigned int i = 0; i < nfaces; i++ )
+        allPolygons[i] = faces[i];
+
+    for( unsigned int j = 0; j < nfaces; j++ )
+    {
+        // vertices are parallel to the base vertices
+        // polygons with at most MAXEDGES edges
+        // edges will be used to determine the lateral faces of polyhedra (prisms)
+        std::vector< int > indexVerts( MAXEDGES, 0 );
+        std::vector< EntityHandle > newConn( MAXEDGES, 0 );
+        std::vector< EntityHandle > polyhedronConn( MAXEDGES + 2, 0 );
+        std::vector< int > indexEdges( MAXEDGES, 0 );  // index of edges in base polygon
+
+        EntityHandle polyg = faces[j];
+
+        const EntityHandle* connp = NULL;
+        int num_nodes;
+        rval = mb->get_connectivity( polyg, connp, num_nodes );MB_CHK_ERR( rval );
+
+        for( int i = 0; i < num_nodes; i++ )
+        {
+            indexVerts[i]             = verts.index( connp[i] );
+            int i1                    = ( i + 1 ) % num_nodes;
+            EntityHandle edgeVerts[2] = { connp[i], connp[i1] };
+
+            // get edge adjacent to these vertices
+            Range adjEdges;
+            rval = mb->get_adjacencies( edgeVerts, 2, 1, false, adjEdges );MB_CHK_ERR( rval );
+            if( adjEdges.size() < 1 ) MB_CHK_SET_ERR( MB_FAILURE, "Did not find any adjacent edges" );
+            indexEdges[i] = edges.index( adjEdges[0] );
+            if( indexEdges[i] < 0 ) MB_CHK_SET_ERR( MB_FAILURE, "Did not find any edges in the range" );
+        }
+
+        for( unsigned kk = 0, ilayer = 0; kk < nlayers; kk++ )
+        {
+            for( int jj = 0; jj < elements_per_layer[kk]; jj++, ++ilayer )
+            {
+                // create a polygon on each layer
+                for( int i = 0; i < num_nodes; i++ )
+                    newConn[i] = newVerts[ilayer + 1][indexVerts[i]];  // vertices in layer ilayer+1
+
+                rval =
+                    mb->create_element( MBPOLYGON, &newConn[0], num_nodes, allPolygons[nfaces * ( ilayer + 1 ) + j] );MB_CHK_ERR( rval );
+
+                // now create a polyhedra with top, bottom and lateral swept faces
+                // first face is the bottom
+                polyhedronConn[0] = allPolygons[nfaces * ilayer + j];
+                // second face is the top
+                polyhedronConn[1] = allPolygons[nfaces * ( ilayer + 1 ) + j];
+
+                // next add lateral quads, in order of edges, using the start_elem
+                // first layer of quads has EntityHandle from start_elem to start_elem+nedges-1
+                // second layer of quads has EntityHandle from start_elem + nedges to start_elem+2*nedges-1 ,etc
+                for( int i = 0; i < num_nodes; i++ )
+                {
+                    polyhedronConn[2 + i] = start_elem + ilayer + nlayers * indexEdges[i];
+                }
+
+                // Create polyhedron
+                EntityHandle polyhedron;
+                rval = mb->create_element( MBPOLYHEDRON, &polyhedronConn[0], 2 + num_nodes, polyhedron );MB_CHK_ERR( rval );
+
+                // add the polyhedron to the block
+                rval = mb->add_entities( outputset, &polyhedron, 1 );MB_CHK_ERR( rval );
+            }
+        }
+    }
+
+    // add to the second neumann set the last layer of polygons
+    // std::vector<EntityHandle> allPolygons(nfaces*(nlayers+1)) are all polygons
+    // the last layer starts at allPolygons[nfaces*nlayers], size nfaces
+    // rval = mb->add_entities( outputset, &allPolygons[nfaces * nlayers], nfaces );MB_CHK_ERR( rval );
+
+    // give global ids to polyhedra, they will be used for side sets;
+    // the order will be the same as the order in the file, by ranges of polyhedra
+    Range polyhs;
+    rval = mb->get_entities_by_type( outputset, MBPOLYHEDRON, polyhs );MB_CHK_ERR( rval );
+    std::vector< int > gidVals( polyhs.size() );
+    std::iota( gidVals.begin(), gidVals.end(), 1 );
+    rval = mb->tag_set_data( gidTag, polyhs, gidVals.data() );MB_CHK_ERR( rval );
+
+    // add subsequent layers of vertices
+    rval = mb->add_entities( outputset, allPolygons.data(), allPolygons.size() );MB_CHK_ERR( rval );
+    // rval = mb->write_file( std::string( prefix + "_polygon_3d.h5m" ).c_str(), "H5M", "REPEAT_FACE_BLOCKS;", &outputset,
+    //                        1 );
+    rval = mb->write_file( std::string( prefix + "_polygon_3d.vtk" ).c_str(), "VTK", "", &outputset, 1 );MB_CHK_ERR( rval );
+
+    return moab::MB_SUCCESS;
+}
+
 moab::ErrorCode ComputeFieldProjectionMBA( moab::Interface* mbi,
                                            Mesh& meshOverlap,
                                            std::string varProject,
@@ -1016,24 +1285,69 @@ moab::ErrorCode ComputeFieldProjectionMBA( moab::Interface* mbi,
                                            bool normalize,
                                            const double constantoffset )
 {
-    const int src_zlayers = is_three_dimensional ? mpas_zlevels : 1;
-    const int dst_zlayers = is_three_dimensional ? roms_zlevels : 1;
     moab::ErrorCode err;
     moab::Tag dtag;
-    err = mbi->tag_get_handle( varProject.c_str(), src_zlayers, moab::MB_TYPE_DOUBLE, dtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+    err = mbi->tag_get_handle( varProject.c_str(), 1, moab::MB_TYPE_DOUBLE, dtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
 
     // get the source data from tag
-    std::vector< double > src_tdata( srcelems.size() * src_zlayers ), dst_tdata( dstelems.size() * dst_zlayers );
+    std::vector< double > src_tdata( srcelems.size() ), dst_tdata( dstelems.size() );
     err = mbi->tag_get_data( dtag, srcelems, src_tdata.data() );MB_CHK_ERR( err );
 
     // get the coordinates of the elements
     std::vector< double > src_xyz( srcelems.size() * 3 ), dst_xyz( dstelems.size() * 3 );
-    err = mbi->get_coords( srcelems, src_xyz.data() );MB_CHK_ERR( err );
-    err = mbi->get_coords( dstelems, dst_xyz.data() );MB_CHK_ERR( err );
+
+    if( is_three_dimensional && false)
+    {
+        moab::Tag mhtag;
+        err = mbi->tag_get_handle( "layerThickness_3d", src_zlayers, moab::MB_TYPE_DOUBLE, mhtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+        std::vector< double > src_xyz2d( srcelems.size() * 3 ), dst_xyz2d( dstelems.size() * 3 ),
+            zmh_xyz2d( srcelems.size() * src_zlayers ), zrh_xyz2d( dstelems.size() );
+        err = mbi->tag_get_data( mhtag, srcelems, zmh_xyz2d.data() );MB_CHK_ERR( err );
+        err = mbi->get_coords( srcelems, src_xyz2d.data() );MB_CHK_ERR( err );
+        err = mbi->get_coords( dstelems, dst_xyz2d.data() );MB_CHK_ERR( err );
+        int offset = 0;
+        for( size_t j = 0; j < srcelems.size(); j++, offset += src_zlayers * 3 )
+        {
+            int eoffset = j * srcelems.size();
+            for( int i = 0; i < src_zlayers; ++i )
+            {
+                // printf( "Coord: (%f, %f) - (%f / %f)\n", src_xyz2d[i * 3], src_xyz2d[i * 3 + 1], src_xyz2d[i * 3 + 2],
+                //         zmh_xyz2d[eoffset] );
+                src_xyz[offset + i * 3]     = src_xyz2d[i * 3];
+                src_xyz[offset + i * 3 + 1] = src_xyz2d[i * 3 + 1];
+                src_xyz[offset + i * 3 + 2] = zmh_xyz2d[eoffset];
+            }
+        }
+        zmh_xyz2d.clear();
+        src_xyz2d.clear();
+
+        moab::Tag rhtag;
+        err = mbi->tag_get_handle( "bottomDepth", 1, moab::MB_TYPE_DOUBLE, rhtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+        err = mbi->tag_get_data( rhtag, srcelems, zrh_xyz2d.data() );MB_CHK_ERR( err );
+
+        offset = 0;
+        for( size_t j = 0; j < dstelems.size(); j++, offset += dst_zlayers * 3 )
+        {
+            const double zhi = zrh_xyz2d[j] / dst_zlayers;
+            for( int i = 0; i < dst_zlayers; ++i )
+            {
+                dst_xyz[offset + i * 3]     = dst_xyz2d[i * 3];
+                dst_xyz[offset + i * 3 + 1] = dst_xyz2d[i * 3 + 1];
+                dst_xyz[offset + i * 3 + 2] = i * zhi;
+            }
+        }
+        dst_xyz2d.clear();
+        zrh_xyz2d.clear();
+    }
+    else
+    {
+        err = mbi->get_coords( srcelems, src_xyz.data() );MB_CHK_ERR( err );
+        err = mbi->get_coords( dstelems, dst_xyz.data() );MB_CHK_ERR( err );
+    }
 
     // Loop over all Faces in meshOverlap
     double dTotalFieldIntegralIn = 0.0, dTotalFieldIntegralOut = 0.0, normFactor = 1.0;
-    if( normalize )
+    if( normalize && !is_three_dimensional )
     {
         for( size_t j = 0; j < src_tdata.size(); j++ )
             src_tdata[j] -= constantoffset;
@@ -1053,7 +1367,7 @@ moab::ErrorCode ComputeFieldProjectionMBA( moab::Interface* mbi,
     std::cout << "\nComputing the MBA interpolant now for field " + varProject;
     err = compute_mba( src_xyz, src_tdata, dst_xyz, dst_tdata );MB_CHK_ERR( err );
 
-    if( normalize )
+    if( normalize && !is_three_dimensional )
     {
         // Loop through all overlap-target faces and compute integral
         for( size_t j = 0; j < meshOverlap.faces.size(); j++ )
@@ -1134,8 +1448,7 @@ ErrorCode CloneToTRMesh( moab::Interface* m_interface, Mesh& mesh, EntityHandle 
 
     // Set the data for the vertices
     std::vector< double > coordx( nnodes ), coordy( nnodes ), coordz( nnodes );
-    rval = m_interface->get_coords( verts, &coordx[0], &coordy[0], &coordz[0] );
-    MB_CHK_ERR( rval );
+    rval = m_interface->get_coords( verts, &coordx[0], &coordy[0], &coordz[0] );MB_CHK_ERR( rval );
     for( unsigned inode = 0; inode < nnodes; ++inode )
     {
         Node& node = nodes[inode];

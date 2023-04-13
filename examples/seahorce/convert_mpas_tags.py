@@ -13,7 +13,7 @@ taglist_clean = ["nCells", "nEdges", "nVertices", "nVertLevels", "maxEdges", "ma
 taglist_d = ["bottomDepth"] # ["bed_elevation", "bottomDepth", "bottomDepthObserved", "fCell"]
 taglist_i = [] # ["maxLevelCell", "minLevelCell"]
 taglist_z = ["refBottomDepth"]
-taglist_4d = ["temperature", "salinity"]
+taglist_4d = ["temperature", "salinity", "layerThickness"]
 taglist_42d = ["temperature", "salinity"]
 hdf5_filename = "mpas_grid_raw.h5m"
 nc_filename = "mpas_grid.nc"
@@ -60,6 +60,8 @@ for dtag in taglist_d:
     # get the actual data out of the variable
     tdata[gids[:]] = ncvar[:]
 
+    print(tdata[:50])
+
     print("Setting", dtag, "tag data")
     thandle = mb.tag_get_handle(dtag,1,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE,True)
     mb.tag_set_data(thandle,polys,tdata)
@@ -91,7 +93,8 @@ for ztag in taglist_z:
     thandle = mb.tag_get_handle(ztag,nVertLevels,types.MB_TYPE_DOUBLE,types.MB_TAG_SPARSE,True)
     mb.tag_set_data(thandle,root_set,zdata)
 
-tdata3d = np.zeros((polys.size(), nVertLevels))
+# tdata3d = np.zeros((polys.size(), nVertLevels))
+tdata3d = np.zeros((polys.size() * nVertLevels))
 
 for fdtag in taglist_4d:
     print("\nAnalyzing", fdtag)
@@ -100,7 +103,10 @@ for fdtag in taglist_4d:
     print(ncvar)
 
     # get the actual data out of the variable
-    tdata3d[gids[:], :] = ncvar[0, :, :]
+    tdata3d[:] = ncvar[0, gids[:], :].flatten()
+
+    # print(tdata3d[300*60:301*60])
+    # print(tdata3d[301*60:302*60])
 
     print("Setting", fdtag, "tag data")
     thandle = mb.tag_get_handle(fdtag+"_3d",nVertLevels,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE,True)
@@ -113,7 +119,7 @@ for fdtag in taglist_42d:
     print(ncvar)
 
     # get the actual data out of the variable
-    tdata[gids[:]] = ncvar[0, :, 0]
+    tdata[:] = ncvar[0, gids[:], 0].flatten()
 
     print("Setting", fdtag, "tag data")
     thandle = mb.tag_get_handle(fdtag,1,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE,True)

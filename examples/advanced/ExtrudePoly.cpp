@@ -7,6 +7,7 @@
 #include "moab/Core.hpp"
 #include "moab/ReadUtilIface.hpp"
 #include <iostream>
+#include <numeric>
 
 using namespace moab;
 using namespace std;
@@ -62,6 +63,9 @@ int main( int argc, char** argv )
 
     cout << "Number of edges is " << edges.size() << endl;
 
+    Tag gidTag = mb->globalId_tag();
+
+    std::vector< int > gidData;
     std::vector< double > coords;
     int nvPerLayer = (int)verts.size();
     coords.resize( 3 * nvPerLayer );
@@ -76,6 +80,9 @@ int main( int argc, char** argv )
             coords[3 * i + 2] += layer_thick;
 
         rval = mb->create_vertices( &coords[0], nvPerLayer, newVerts[ii + 1] );MB_CHK_ERR( rval );
+        gidData.resize( nvPerLayer );
+        std::iota( gidData.begin(), gidData.end(), nvPerLayer + ii * nvPerLayer );
+        rval = mb->tag_set_data( gidTag, newVerts[ii + 1], gidData.data() );
     }
     // for each edge, we will create layers quads
     int nquads = edges.size() * layers;
@@ -120,6 +127,7 @@ int main( int argc, char** argv )
 
     // edges will be used to determine the lateral faces of polyhedra (prisms)
     int indexEdges[MAXEDGES] = { 0 };  // index of edges in base polygon
+    int gidElem              = 1;
     for( int j = 0; j < nfaces; j++ )
     {
         EntityHandle polyg = faces[j];
@@ -127,6 +135,8 @@ int main( int argc, char** argv )
         const EntityHandle* connp = NULL;
         int num_nodes;
         rval = mb->get_connectivity( polyg, connp, num_nodes );MB_CHK_ERR( rval );
+
+        // printf("Polygon %d has %d nodes\n", j, num_nodes);
 
         for( int i = 0; i < num_nodes; i++ )
         {
@@ -165,8 +175,16 @@ int main( int argc, char** argv )
             // Create polyhedron
             EntityHandle polyhedron;
             rval = mb->create_element( MBPOLYHEDRON, polyhedronConn, 2 + num_nodes, polyhedron );MB_CHK_ERR( rval );
+
+            rval = mb->tag_set_data( gidTag, &polyhedron, 1, &gidElem );
+            gidElem++;
         }
     }
+
+    gidData.resize( nfaces * ( layers + 1 ) );
+    std::iota( gidData.begin(), gidData.end(), 1 );
+    rval = mb->tag_set_data( gidTag, allPolygons, nfaces * ( layers + 1 ), gidData.data() );
+
     rval = mb->write_file( output.c_str() );MB_CHK_ERR( rval );
 
     delete mb;

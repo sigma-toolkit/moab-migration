@@ -163,8 +163,8 @@ void WriteNCDF::time_and_date( char* time_string, char* date_string )
     strftime( date_string, TIME_STR_LEN, "%m/%d/%Y", local_time );
 
     // Terminate with NULL character
-    time_string[10] = (char)NULL;
-    date_string[10] = (char)NULL;
+    time_string[10] = '\0';
+    date_string[10] = '\0';
 }
 
 ErrorCode WriteNCDF::write_file( const char* exodus_file_name,

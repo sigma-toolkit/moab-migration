@@ -20,7 +20,7 @@ using namespace std;
 #define MAXEDGES 20
 // Note: change the file name below to test a trivial "No such file or directory" error
 string test_file_name = string( MESH_DIR ) + string( "/io/poly8-10.vtk" );
-string output         = string( "polyhedra.vtk" );
+string output         = string( "polyhedra.h5m" );
 int layers            = 1;
 double layer_thick    = 1.0;
 

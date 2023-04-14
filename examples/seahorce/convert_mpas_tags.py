@@ -1,3 +1,7 @@
+## Workflow:
+# Convert: mbconvert mpasgrid.nc mpas_grid_raw.h5m
+# Preprocess: python convert_mpas_tags.py
+
 import numpy as np
 from pymoab import core,types
 import netCDF4
@@ -9,7 +13,7 @@ import netCDF4
 ## Only z: refBottomDepth, refZMid, vertCoordMovementWeights
 ## Only edges: dvEdge, edgeMask(z)
 ## Cells/z: restingThickness
-taglist_clean = ["nCells", "nEdges", "nVertices", "nVertLevels", "maxEdges", "maxEdges2", "vertexDegree", "Time", "TWO"]
+taglist_clean = ["nCells", "nEdges", "nVertices", "nVertLevels", "maxEdges", "maxEdges2", "vertexDegree", "Time", "TWO", "bed_elevation", "bottomDepth", "bottomDepthObserved", "boundaryLayerDepth0", "dvEdge", "edgeMask", "fCell", "layerThickness0", "maxLevelCell", "minLevelCell", "normalVelocity0", "refBottomDepth", "refZMid", "restingThickness", "salinity0", "temperature0", "vertCoordMovementWeights"]
 taglist_d = ["bottomDepth"] # ["bed_elevation", "bottomDepth", "bottomDepthObserved", "fCell"]
 taglist_i = [] # ["maxLevelCell", "minLevelCell"]
 taglist_z = ["refBottomDepth"]

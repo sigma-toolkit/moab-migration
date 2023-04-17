@@ -118,7 +118,7 @@ ErrorCode CloneToTRMesh( moab::Interface* m_interface, Mesh& mesh, EntityHandle 
 
 // 3D settings
 constexpr int mpas_zlevels = 60;
-constexpr int roms_zlevels = 5;
+constexpr int roms_zlevels = 25;
 int src_zlayers = 0, dst_zlayers = 0;
 
 template < typename T >
@@ -383,7 +383,6 @@ int main( int argc, char** argv )
         // Rescale the radius of both to compute the intersection
         err = ScaleCoords( mbi, roms_verts, radius, useTranspose );MB_CHK_ERR( err );
         err = mbi->write_file( "roms_modified_2d.h5m", "H5M", write_options.c_str(), &romsset, 1 );MB_CHK_ERR( err );
-        err = remapper.ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( err );
     }
 
     // Cull the MPAS set so that we don't have a global mesh
@@ -430,12 +429,13 @@ int main( int argc, char** argv )
         dbgprint( "Culled MPAS mesh contains " << mpas_elems.size() << " elements and " << mpas_verts.size()
                                                << " vertices." );
 
-        err = remapper.ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( err );
     }
 
     Mesh meshInput, meshOutput, meshOverlap;
     if( normalize || !( computeMBA || computeShepard ) )
     {
+        // err = remapper.ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( err );
+        // err = remapper.ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( err );
         CloneToTRMesh( mbi, meshInput, mpas_covering_set );
         CloneToTRMesh( mbi, meshOutput, romsset );
 
@@ -473,7 +473,7 @@ int main( int argc, char** argv )
 
             // Project the bottom Bathymetry data from MPAS to ROMS so that we can impose it.
             err = ComputeFieldProjections( mbi, meshOverlap, "bottomDepth", "bottomDepth", mpas_elems, roms_elems,
-                                           false /*use_3dprojection*/, false /* bool normalize */, 2000.0, computeMBA );MB_CHK_SET_ERR( err, "Can't create new set" );
+                                           false /*use_3dprojection*/, false /* bool normalize */, 2000.0, true );MB_CHK_SET_ERR( err, "Can't create new set" );
 
             std::vector< double > zrh_xyz2d( roms_elems.size() );
             moab::Tag rhtag;
@@ -487,7 +487,7 @@ int main( int argc, char** argv )
                 const int offset         = i * dst_zlayers;
                 for( int j = 0; j < dst_zlayers; ++j )
                     zrh_xyz3d[offset + j] = delz;
-                // printf( "Thickness value for ROMS element %d, %d = %f, %f\n", i, dst_zlayers, zrh_xyz2d[i] , delz );
+                printf( "Thickness value for ROMS element %d, %d = %f, %f\n", i, dst_zlayers, zrh_xyz2d[i] , delz );
             }
 
             printf( "Extruding ROMS polyhedra now\n" );
@@ -497,13 +497,15 @@ int main( int argc, char** argv )
             err = mbi->get_entities_by_dimension( mpasset3d, 3, mpas3d_elems );MB_CHK_ERR( err );
 
             std::cout << "3D MPAS: " << mpas3d_verts.size() << " vertices and " << mpas3d_elems.size() << " elements.\n";
-            err = mbi->write_file( "mpas_full_3d.h5m", "H5M", write_options.c_str(), &mpasset3d, 1 );MB_CHK_ERR( err );
+            err = mbi->write_file( "mpas_full_3d.vtk", "VTK", write_options.c_str(), &mpasset3d, 1 );MB_CHK_ERR( err );
 
             err = mbi->get_entities_by_dimension( romsset3d, 0, roms3d_verts );MB_CHK_ERR( err );
             err = mbi->get_entities_by_dimension( romsset3d, 3, roms3d_elems );MB_CHK_ERR( err );
 
             std::cout << "3D ROMS: " << roms3d_verts.size() << " vertices and " << roms3d_elems.size() << " elements.\n";
-            err = mbi->write_file( "roms_full_3d.h5m", "H5M", write_options.c_str(), &romsset3d, 1 );MB_CHK_ERR( err );
+            err = mbi->write_file( "roms_full_3d.vtk", "VTK", write_options.c_str(), &romsset3d, 1 );MB_CHK_ERR( err );
+
+            exit(1);
         }
         else
         {
@@ -529,16 +531,21 @@ int main( int argc, char** argv )
                       << " elements.\n";
         }
     }
+    else {
+        // Project the bottom Bathymetry data from MPAS to ROMS so that we can impose it.
+        err = ComputeFieldProjections( mbi, meshOverlap, "bottomDepth", "bottomDepth", mpas_elems, roms_elems,
+                                       false /*use_3dprojection*/, true /* bool normalize */, 2000.0, true );MB_CHK_SET_ERR( err, "Can't create new set" );
+    }
 
     if( use_3dprojection || computeMBA )
     {
         // Now let us compute the mba hierarchy for each field
         err = ComputeFieldProjections( mbi, meshOverlap, ( use_3dprojection ? "salinity_3d" : "salinity" ),
                                        ( use_3dprojection ? "salinity_3d_roms" : "salinity_roms" ), mpas_elems,
-                                       roms_elems, use_3dprojection, true /* bool normalize */, 35.0, computeMBA, &mpas3d_elems, &roms3d_elems );MB_CHK_ERR( err );
+                                       roms_elems, use_3dprojection, normalize /* bool normalize */, 35.0, computeMBA, &mpas3d_elems, &roms3d_elems );MB_CHK_ERR( err );
         err = ComputeFieldProjections( mbi, meshOverlap, ( use_3dprojection ? "temperature_3d" : "temperature" ),
                                        ( use_3dprojection ? "temperature_3d_roms" : "temperature_roms" ), mpas_elems,
-                                       roms_elems, use_3dprojection, true /* bool normalize */, 8.5, computeMBA,
+                                       roms_elems, use_3dprojection, normalize /* bool normalize */, 8.5, computeMBA,
                                        &mpas3d_elems, &roms3d_elems );
         MB_CHK_ERR( err );
     }
@@ -551,12 +558,12 @@ int main( int argc, char** argv )
         // Now let us compute the mba hierarchy for each field
         err = ComputeFieldProjections( mbi, meshOverlap, ( use_3dprojection ? "salinity_3d" : "salinity" ),
                                        ( use_3dprojection ? "salinity_3d_roms" : "salinity_roms" ), mpas_elems,
-                                       roms_elems, use_3dprojection, true /* bool normalize */, 35.0, computeMBA,
+                                       roms_elems, use_3dprojection, normalize /* bool normalize */, 35.0, computeMBA,
                                        &mpas3d_elems, &roms3d_elems );
         MB_CHK_ERR( err );
         err = ComputeFieldProjections( mbi, meshOverlap, ( use_3dprojection ? "temperature_3d" : "temperature" ),
                                        ( use_3dprojection ? "temperature_3d_roms" : "temperature_roms" ), mpas_elems,
-                                       roms_elems, use_3dprojection, true /* bool normalize */, 8.5, computeMBA,
+                                       roms_elems, use_3dprojection, normalize /* bool normalize */, 8.5, computeMBA,
                                        &mpas3d_elems, &roms3d_elems );
         MB_CHK_ERR( err );
     }
@@ -858,7 +865,7 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
     // Initial grid size.
     // const size_t init_grid_size = static_cast< size_t >( std::max( 10.0, std::sqrt( nd ) / 8 ) );
     // mba::index< 3 > grid        = { init_grid_size, init_grid_size, 2 };
-    mba::index< 3 > grid = { 100, 100, 100 };
+    mba::index< 3 > grid = { 100, 100, 10 };
 
     std::vector< mba::point< 3 > > coords( nd );
     size_t offset = 0;
@@ -1313,32 +1320,43 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( Interface* mb,
     newVerts[0]     = verts;  // just for convenience
     for( size_t ii = 0; ii < nlayers; ii++ )
     {
-        // for( size_t i = 0; i < nverts; i++ )
-        //     coords[3 * i + 2] -= 0.5;  // constant offset for layers (testing)
-
         for( size_t i = 0; i < nverts; i++ )
         {
+#if 1
             Range eladjs;
             const EntityHandle vtx = verts[i];
             rval                   = mb->get_adjacencies( &vtx, 1, 2, true, eladjs, Interface::UNION );MB_CHK_ERR( rval );
 
             if( eladjs.size() )
             {
-                double thickness = 0;
+                double thickness = 0.0;
                 for( size_t k = 0; k < eladjs.size(); ++k )
                 {
                     int il = faces.index( eladjs[k] );
                     thickness += layer_thickness[il * nlayers + ii];
+                    if( thickness < 0 )
+                    {
+                        std::cout << "OHOHOH";
+                        printf( "Thickness value for layer %zu: element %zu  = %f\n", ii, k,
+                                layer_thickness[il * nlayers + ii] );
+                        exit( 1 );
+                    }
                 }
                 thickness /= eladjs.size();
 
-                // printf( "Thickness value for layer %d: vertex %d = %f\n", ii, i, thickness );
+                // printf( "Thickness value for layer %zu: vertex %zu, adj = %zu = %f\n", ii, i, eladjs.size(),
+                //         thickness );
+
+                if (thickness < 0) {std::cout << "OHOHOH"; exit(1);}
 
                 // Subtract or Add depending on the z-Direction to extrude
                 coords[3 * i + 2] -= thickness;
             }
             else
                 printf( "Vertex %zu has no adjacencies, coord = %f\n", i, coords[3 * i + 2] );
+#else
+            coords[3 * i + 2] -= 0.5;  // constant offset for layers (testing)
+#endif
         }
 
         rval = mb->create_vertices( &coords[0], nverts, newVerts[ii + 1] );MB_CHK_ERR( rval );

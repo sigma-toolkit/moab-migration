@@ -62,7 +62,7 @@ for dtag in taglist_d:
     print(ncvar)
 
     # get the actual data out of the variable
-    tdata[gids[:]] = ncvar[:]
+    tdata[:] = ncvar[gids[:]]
 
     print(tdata[:50])
 

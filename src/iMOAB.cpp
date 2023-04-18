@@ -3217,7 +3217,8 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* join,
                              iMOAB_AppID pid_intx,
                              int* src_id,
                              int* migr_id,
-                             int* context_id )
+                             int* context_id,
+                             int * allCov )
 {
     // first, based on the scompid and migrcomp, find the parCommGraph corresponding to this
     // exchange
@@ -3320,8 +3321,9 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* join,
 
         // if we have no intx cells, it means we are on point clouds; quick fix just use all cells
         // from coverage set
-        if( cells.empty() )
+        if( *allCov || cells.empty() )
         {
+            cells.clear();
             // get coverage set
             assert( *pid_intx >= 0 );
             appData& dataIntx      = context.appDatas[*pid_intx];

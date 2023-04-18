@@ -387,8 +387,9 @@ int main( int argc, char* argv[] )
         // will
         //  use the element global id, which should uniquely identify the element
         PUSH_TIMER( "Compute OCN coverage graph for ATM mesh" )
+        int allCov = 1;
         ierr = iMOAB_CoverageGraph( &atmCouComm, cmpAtmPID, cplAtmPID, cplAtmOcnPID, &cmpatm, &cplatm,
-                                    &cplocn );  // it happens over joint communicator
+                                    &cplocn, &allCov );  // it happens over joint communicator
         CHECKIERR( ierr, "cannot recompute direct coverage graph for ocean" )
         POP_TIMER( atmCouComm, rankInAtmComm )  // hijack this rank
     }
@@ -412,8 +413,9 @@ int main( int argc, char* argv[] )
         // time,
         /// we will use the element global id, which should uniquely identify the element
         PUSH_TIMER( "Compute LND coverage graph for ATM mesh" )
+        int allCov = 1;
         ierr = iMOAB_CoverageGraph( &atmCouComm, cmpAtmPID, cplAtmPID, cplAtmLndPID, &cmpatm, &cplatm,
-                                    &cpllnd );  // it happens over joint communicator
+                                    &cpllnd, &allCov );  // it happens over joint communicator
         CHECKIERR( ierr, "cannot recompute direct coverage graph for land" )
         POP_TIMER( atmCouComm, rankInAtmComm )  // hijack this rank
     }

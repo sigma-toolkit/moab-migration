@@ -1330,7 +1330,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
 
                 Range notNeededCovCells = moab::subtract( covEnts, intxCov );
                 // remove now from coverage set the cells that are not needed
-                rval = m_interface->remove_entities( m_covering_source_set, notNeededCovCells );MB_CHK_ERR( rval );
+                //rval = m_interface->remove_entities( m_covering_source_set, notNeededCovCells );MB_CHK_ERR( rval );
                 covEnts = moab::subtract( covEnts, notNeededCovCells );
 #ifdef VERBOSE
                 std::cout << " total participating elements in the covering set: " << intxCov.size() << "\n";

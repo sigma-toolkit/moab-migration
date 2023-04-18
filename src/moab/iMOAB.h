@@ -1012,7 +1012,7 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
  * cells involved in intersection with the target cells. The new ParCommGraph between cc source mesh and cx source mesh
  * will be used just for tag migration, later on; The original ParCommGraph will stay unchanged, because this source mesh
  * could be used for other intersection (atm with lnd) ? on component source tasks, we will wait for information; from each
- * intersection task, will receive cells ids involved in intersection.
+ * intersection task, will receive cells ids involved in intersection. Sometimes we will use all cells from coverage set
  *
  * \param[in]  joint_communicator (MPI_Comm *)     The joint communicator that overlaps component PEs and coupler PEs.
  * \param[in]  pid_src (iMOAB_AppID)               The unique application identifier for the component mesh on component PEs.
@@ -1021,6 +1021,7 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
  * \param[in]  src_id (int*)                       The external id for the component mesh on component PE.
  * \param[in]  migr_id (int*)                      The external id for the migrated mesh on coupler PEs.
  * \param[in]  context_id (int*)                   The unique identifier of the other participating component in intersection (target).
+ * \param[in]  allCov (int*)                       All cells from coverage set will be used, not only those involved in intersection
  * \return ErrCode                                 The error code indicating success or failure.
  */
 ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
@@ -1029,7 +1030,8 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
                              iMOAB_AppID pid_intx,
                              int* src_id,
                              int* migr_id,
-                             int* context_id );
+                             int* context_id,
+                             int * allCov );
 
 /**
  * \brief Dump info about communication graph.

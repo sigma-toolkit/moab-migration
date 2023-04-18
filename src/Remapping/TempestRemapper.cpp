@@ -19,6 +19,7 @@
 #include "moab/Remapping/TempestRemapper.hpp"
 #include "moab/ReadUtilIface.hpp"
 #include "moab/MeshTopoUtil.hpp"
+#include "AEntityFactory.hpp"
 
 // Intersection includes
 #include "moab/IntxMesh/Intx2MeshOnSphere.hpp"
@@ -480,6 +481,9 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
         const EntityHandle* connectface;
         int nnodesf;
         rval = m_interface->get_connectivity( ehandle, connectface, nnodesf );MB_CHK_ERR( rval );
+        // account for padded polygons
+        while( connectface[nnodesf - 2] == connectface[nnodesf - 1] && nnodesf > 3 )
+            nnodesf--;
 
         face.edges.resize( nnodesf );
         for( int iverts = 0; iverts < nnodesf; ++iverts )
@@ -1324,9 +1328,55 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                 }
 
                 Range notNeededCovCells = moab::subtract( covEnts, intxCov );
-                // remove now from coverage set the cells that are not needed
-                rval = m_interface->remove_entities( m_covering_source_set, notNeededCovCells );MB_CHK_ERR( rval );
+
+                // now let us get only the covering entities that participate in intersection mesh
                 covEnts = moab::subtract( covEnts, notNeededCovCells );
+
+                // in order for getting 1-ring neighborhood, we need to be sure that the adjacencies are updated (created)
+                if (false)
+                {
+                    // update all adjacency list
+                    Core* mb                 = dynamic_cast< Core* >( m_interface );
+                    AEntityFactory* adj_fact = mb->a_entity_factory();
+                    if( !adj_fact->vert_elem_adjacencies() )
+                        adj_fact->create_vert_elem_adjacencies();
+                    else
+                    {
+                        for( Range::iterator it = covEnts.begin(); it != covEnts.end(); ++it )
+                        {
+                            EntityHandle eh          = *it;
+                            const EntityHandle* conn = NULL;
+                            int num_nodes            = 0;
+                            rval                     = mb->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
+                            adj_fact->notify_create_entity( eh, conn, num_nodes );
+                        }
+                    }
+
+                    // next, for elements on the edge of the partition, get one ring adjacencies
+                    Skinner skinner( mb );
+                    Range skin;
+                    rval = skinner.find_skin( m_covering_source_set, covEnts, false, skin );MB_CHK_SET_ERR( rval, "Unable to find skin" );
+                    for( Range::iterator it = skin.begin(); it != skin.end(); ++it )
+                    {
+                        const EntityHandle* conn = NULL;
+                        int len                  = 0;
+                        rval                     = mb->get_connectivity( *it, conn, len, false );MB_CHK_ERR( rval );
+                        for( int ie = 0; ie < len; ++ie )
+                        {
+                            std::vector< EntityHandle > adjacent_entities;
+                            rval = adj_fact->get_adjacencies( conn[ie], 2, false, adjacent_entities );MB_CHK_ERR( rval );
+                            for ( auto ent : adjacent_entities)
+                                notNeededCovCells.erase( ent );  // ent is part of the 1-ring neighborhood
+                        }
+                    }
+                }
+
+                // remove now from coverage set the cells that are not needed
+                // rval = m_interface->remove_entities( m_covering_source_set, notNeededCovCells );MB_CHK_ERR( rval );
+
+                rval = m_interface->write_mesh( std::string( "sourcecoveragemesh_p" + std::to_string( rank ) + ".h5m" ).c_str(),
+                                                &m_covering_source_set, 1 );
+                MB_CHK_ERR( rval );
 
                 // Need to loop over covEnts now and ensure at least N-rings are available dependign on whether bilinear (1) or
                 // high order FV (p) methods are being used for map generation. For bilinear/FV(1): need 1 ring, and for FV(p)

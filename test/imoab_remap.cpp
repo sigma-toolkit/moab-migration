@@ -171,7 +171,7 @@ int main( int argc, char* argv[] )
     // const char* disc_methods[2] = {"fv", "fv"};
     // const char* dof_tag_names[2] = {"GLOBAL_ID", "GLOBAL_ID"};
     int disc_orders[3]  = { 4, 1, 1 };
-    int fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 1, fNoConserve = 0, fNoBubble = 1, fInverseDistanceMap = 0;
+    int fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 0, fNoConserve = 0, fNoBubble = 1, fInverseDistanceMap = 0;
 
     const std::string disc_methods[3]        = { "cgll", "fv", "pcloud" };
     const std::string dof_tag_names[3]       = { "GLOBAL_DOFS", "GLOBAL_ID", "GLOBAL_ID" };

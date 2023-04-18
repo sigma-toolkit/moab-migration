@@ -421,7 +421,7 @@ int main( int argc, char* argv[] )
 
     MPI_Barrier( MPI_COMM_WORLD );
 
-    int fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 1, fNoConserve = 0, fNoBubble = 1, fInverseDistanceMap = 0;
+    int fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 0, fNoConserve = 0, fNoBubble = 1, fInverseDistanceMap = 0;
 
 #ifdef ENABLE_ATMOCN_COUPLING
 #ifdef VERBOSE

@@ -1374,8 +1374,8 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                 // remove now from coverage set the cells that are not needed
                 // rval = m_interface->remove_entities( m_covering_source_set, notNeededCovCells );MB_CHK_ERR( rval );
 
-                rval = m_interface->write_mesh( std::string( "sourcecoveragemesh_p" + std::to_string( rank ) + ".h5m" ).c_str(),
-                                                &m_covering_source_set, 1 );
+                //rval = m_interface->write_mesh( std::string( "sourcecoveragemesh_p" + std::to_string( rank ) + ".h5m" ).c_str(),
+                //                                &m_covering_source_set, 1 );
                 MB_CHK_ERR( rval );
 
                 // Need to loop over covEnts now and ensure at least N-rings are available dependign on whether bilinear (1) or

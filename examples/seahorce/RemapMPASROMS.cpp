@@ -79,7 +79,7 @@ using namespace std;
         cerr << "[" << rank << "]: " << MSG << endl; \
     } while( false )
 
-ErrorCode ScaleCoords( Interface* mb, Range& nodes, double R, bool is_cartesian = true );
+ErrorCode ScaleCoords( Interface* mb, Range& nodes, double R, bool is_cartesian = true, bool is_threed = false );
 
 moab::ErrorCode ShepardInterpolator( int dimension,
                                      std::vector< double >& xyzd,
@@ -102,8 +102,7 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
 moab::ErrorCode ExtrudePolygonsToPolyhedra( Interface* mb,
                                             std::vector< double >& layer_thickness,
                                             moab::EntityHandle& poly2dset,
-                                            moab::EntityHandle& outputset,
-                                            bool is_mpas );
+                                            moab::EntityHandle& outputset );
 
 moab::ErrorCode ComputeFieldProjections( moab::Interface* mbi,
                                          Mesh& meshOverlap,
@@ -239,7 +238,7 @@ int main( int argc, char** argv )
 {
     ErrorCode err;
     int ierr, rank, size;
-    string mpas_filename, roms_filename, output_filename;
+    string mpas_filename, roms_filename, roms_3d_filename, output_filename;
     /// Parallel Read options:
     ///   PARALLEL = type {READ_PART}
     ///   PARTITION = PARALLEL_PARTITION : Partition as you read
@@ -277,6 +276,8 @@ int main( int argc, char** argv )
             mpas_filename = "mpas_grid.h5m";
             roms_filename = "roms_grid.h5m";
         }
+
+        roms_3d_filename = "roms_3d_grid.h5m";
 
         output_filename = "output_mpas_roms_map2d.nc";
 
@@ -386,7 +387,7 @@ int main( int argc, char** argv )
         dbgprint( "MPAS mesh contains " << mpas_verts.size() << " vertices and " << mpas_elems.size() << " elements" );
 
         // Rescale the radius of both to compute the intersection
-        err = ScaleCoords( mbi, mpas_verts, radius, !useTranspose );MB_CHK_ERR( err );
+        err = ScaleCoords( mbi, mpas_verts, radius, !useTranspose, false );MB_CHK_ERR( err );
         err = mbi->write_file( "mpas_modified_2d.h5m", "H5M", write_options.c_str(), &mpasset, 1 );MB_CHK_ERR( err );
     }
 
@@ -402,7 +403,7 @@ int main( int argc, char** argv )
         dbgprint( "ROMS mesh contains " << roms_verts.size() << " vertices and " << roms_elems.size() << " elements" );
 
         // Rescale the radius of both to compute the intersection
-        err = ScaleCoords( mbi, roms_verts, radius, useTranspose );MB_CHK_ERR( err );
+        err = ScaleCoords( mbi, roms_verts, radius, useTranspose, false );MB_CHK_ERR( err );
         err = mbi->write_file( "roms_modified_2d.h5m", "H5M", write_options.c_str(), &romsset, 1 );MB_CHK_ERR( err );
     }
 
@@ -510,29 +511,34 @@ int main( int argc, char** argv )
             // }
 
             printf( "Extruding MPAS polyhedra now\n" );
-            err = ExtrudePolygonsToPolyhedra( mbi, zmh_xyz3d, mpas_covering_set, mpasset3d, true );MB_CHK_SET_ERR( err, "Can't extrude MPAS polygons" );
+            err = ExtrudePolygonsToPolyhedra( mbi, zmh_xyz3d, mpas_covering_set, mpasset3d );MB_CHK_SET_ERR( err, "Can't extrude MPAS polygons" );
 
             // Project the bottom Bathymetry data from MPAS to ROMS so that we can impose it.
-            err = ComputeFieldProjections( mbi, meshOverlap, "bottomDepth", "bottomDepth", mpas_elems, roms_elems,
-                                           false /*use_3dprojection*/, false /* bool normalize */, 2000.0, true );MB_CHK_SET_ERR( err, "Can't create new set" );
+            // err = ComputeFieldProjections( mbi, meshOverlap, "bottomDepth", "bottomDepth", mpas_elems, roms_elems,
+            //                                false /*use_3dprojection*/, false /* bool normalize */, 2000.0, true );MB_CHK_SET_ERR( err, "Can't create new set" );
 
-            std::vector< double > zrh_xyz2d( roms_elems.size() );
-            moab::Tag rhtag;
-            err = mbi->tag_get_handle( "bottomDepth", 1, moab::MB_TYPE_DOUBLE, rhtag, moab::MB_TAG_DENSE );MB_CHK_SET_ERR( err, "Can't get bottomDepth tag" );
-            err = mbi->tag_get_data( rhtag, roms_elems, zrh_xyz2d.data() );MB_CHK_SET_ERR( err, "Can't get bottomDepth tag data" );
+            // std::vector< double > zrh_xyz2d( roms_elems.size() );
+            // moab::Tag rhtag;
+            // err = mbi->tag_get_handle( "bottomDepth", 1, moab::MB_TYPE_DOUBLE, rhtag, moab::MB_TAG_DENSE );MB_CHK_SET_ERR( err, "Can't get bottomDepth tag" );
+            // err = mbi->tag_get_data( rhtag, roms_elems, zrh_xyz2d.data() );MB_CHK_SET_ERR( err, "Can't get bottomDepth tag data" );
 
-            for( size_t i = 0; i < roms_elems.size(); ++i )
-            {
-                const double pbathymetry = zrh_xyz2d[i];
-                const double delz        = pbathymetry / dst_zlayers;
-                const int offset         = i * dst_zlayers;
-                for( int j = 0; j < dst_zlayers; ++j )
-                    zrh_xyz3d[offset + j] = delz;
-                // printf( "Thickness value for ROMS element %zu, %d = %f, %f\n", i, dst_zlayers, zrh_xyz2d[i], delz );
-            }
+            // for( size_t i = 0; i < roms_elems.size(); ++i )
+            // {
+            //     const double pbathymetry = zrh_xyz2d[i];
+            //     const double delz        = pbathymetry / dst_zlayers;
+            //     const int offset         = i * dst_zlayers;
+            //     for( int j = 0; j < dst_zlayers; ++j )
+            //         zrh_xyz3d[offset + j] = delz;
+            //     // printf( "Thickness value for ROMS element %zu, %d = %f, %f\n", i, dst_zlayers, zrh_xyz2d[i], delz );
+            // }
 
-            printf( "Extruding ROMS polyhedra now\n" );
-            err = ExtrudePolygonsToPolyhedra( mbi, zrh_xyz3d, romsset, romsset3d, false );MB_CHK_SET_ERR( err, "Can't extrude ROMS polygons" );
+            // printf( "Extruding ROMS polyhedra now\n" );
+            // err = ExtrudePolygonsToPolyhedra( mbi, zrh_xyz3d, romsset, romsset3d, false );MB_CHK_SET_ERR( err, "Can't extrude ROMS polygons" );
+
+            err = mbi->create_meshset( moab::MESHSET_SET, romsset3d );MB_CHK_SET_ERR( err, "Can't create new set" );
+
+            dbgprint( "Reading ROMS 3D mesh file from disk" );
+            err = mbi->load_file( roms_3d_filename.c_str(), &romsset3d, roms_read_options.c_str() );MB_CHK_SET_ERR( err, "MOAB::load_file for ROMS 3D mesh failed" );
 
             err = mbi->get_entities_by_dimension( mpasset3d, 0, mpas3d_verts );MB_CHK_ERR( err );
             err = mbi->get_entities_by_dimension( mpasset3d, 3, mpas3d_elems );MB_CHK_ERR( err );
@@ -546,6 +552,8 @@ int main( int argc, char** argv )
 
             std::cout << "3D ROMS: " << roms3d_verts.size() << " vertices and " << roms3d_elems.size()
                       << " elements.\n";
+            // Rescale the radius of both to compute the intersection
+            err = ScaleCoords( mbi, roms3d_verts, radius, false, true );MB_CHK_ERR( err );
             err = mbi->write_file( "roms_full_3d.h5m", "H5M", write_options.c_str(), &romsset3d, 1 );MB_CHK_ERR( err );
         }
         else
@@ -744,16 +752,29 @@ int main( int argc, char** argv )
         // remapper.clear();
     }
 
-    const std::string output_file = ( use_3dprojection ? "roms_3d_projected.h5m" : "roms_2d_projected.h5m" );
-    dbgprint( "Writing out the target mesh with projected fields to '" << output_file << "'" );
+    const std::string mpas_output_file = ( use_3dprojection ? "mpas_3d_source.h5m" : "mpas_2d_source.h5m" );
+    dbgprint( "Writing out the source mesh with fields to '" << mpas_output_file << "'" );
     if( useTranspose )
     {
-        err = mbi->write_file( output_file.c_str(), "H5M", write_options.c_str(),
+        err = mbi->write_file( mpas_output_file.c_str(), "H5M", write_options.c_str(),
                                ( use_3dprojection ? &mpasset3d : &mpasset ), 1 );MB_CHK_ERR( err );
     }
     else
     {
-        err = mbi->write_file( output_file.c_str(), "H5M", write_options.c_str(),
+        err = mbi->write_file( mpas_output_file.c_str(), "H5M", write_options.c_str(),
+                               ( use_3dprojection ? &romsset3d : &romsset ), 1 );MB_CHK_ERR( err );
+    }
+
+    const std::string roms_output_file = ( use_3dprojection ? "roms_3d_projected.h5m" : "roms_2d_projected.h5m" );
+    dbgprint( "Writing out the target mesh with projected fields to '" << roms_output_file << "'" );
+    if( useTranspose )
+    {
+        err = mbi->write_file( roms_output_file.c_str(), "H5M", write_options.c_str(),
+                               ( use_3dprojection ? &mpasset3d : &mpasset ), 1 );MB_CHK_ERR( err );
+    }
+    else
+    {
+        err = mbi->write_file( roms_output_file.c_str(), "H5M", write_options.c_str(),
                                ( use_3dprojection ? &romsset3d : &romsset ), 1 );MB_CHK_ERR( err );
     }
 
@@ -768,11 +789,11 @@ int main( int argc, char** argv )
     return 0;
 }
 
-ErrorCode ScaleCoords( Interface* mb, Range& nodes, double R, bool is_cartesian )
+ErrorCode ScaleCoords( Interface* mb, Range& nodes, double R, bool is_cartesian, bool is_threed )
 {
     ErrorCode rval;
     int rank = 0;
-    double posi[3], posf[3];
+    double posi[3], posf[3], len = 0;
 
     // one by one, get the node and project it on the sphere, with a radius given
     // the center of the sphere is at 0,0,0
@@ -783,7 +804,12 @@ ErrorCode ScaleCoords( Interface* mb, Range& nodes, double R, bool is_cartesian 
         if( !is_cartesian )
         {
             rval = mb->get_coords( &nd, 1, posi );MB_CHK_ERR( rval );
-            spherical_to_cart( posi[1], posi[0], R, posf );
+            const double lat = posi[1] * 3.14159265358979323846 / 180;
+            const double lon = posi[0] * 3.14159265358979323846 / 180;
+            posf[0]          = R * cos( lat ) * cos( lon );  // x coordinate
+            posf[1]          = R * cos( lat ) * sin( lon );  // y
+            posf[2]          = R * sin( lat );               // z
+            // spherical_to_cart( posi[1], posi[0], R, posf );
             // dbgprint( nd << " lat=" << posi[1] << ", lon=" << posi[0] << "; Cartesian = [" << posf[0] << ", " << posf[1] << ", " << posf[2] << "]" );
         }
         else
@@ -791,7 +817,7 @@ ErrorCode ScaleCoords( Interface* mb, Range& nodes, double R, bool is_cartesian 
             rval = mb->get_coords( &nd, 1, posf );MB_CHK_ERR( rval );
         }
 
-        double len = std::sqrt( posf[0] * posf[0] + posf[1] * posf[1] + posf[2] * posf[2] );
+        len = std::sqrt( posf[0] * posf[0] + posf[1] * posf[1] + posf[2] * posf[2] );
         if( len < 1e-12 )
         {
             dbgprint( nd << " X=" << posf[0] << ", Y=" << posf[1] << ", Z = " << posf[2]
@@ -802,7 +828,12 @@ ErrorCode ScaleCoords( Interface* mb, Range& nodes, double R, bool is_cartesian 
         // rescale to radius
         posf[0] *= R / len;
         posf[1] *= R / len;
-        posf[2] *= R / len;
+        if( is_threed && !is_cartesian )
+            posf[2] = posi[2];
+        else
+            posf[2] *= R / len;
+        // if (is_threed)
+        //     dbgprint( nd << " X=" << posf[0] << ", Y=" << posf[1] << ", Z = " << posf[2]  );
         rval = mb->set_coords( &nd, 1, posf );MB_CHK_ERR( rval );
     }
     return MB_SUCCESS;
@@ -928,8 +959,8 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
         coords[k] = mba::point< 3 >{ xyzd[offset], xyzd[offset + 1], xyzd[offset + 2] };
 
     // Algorithm setup.
-    mba::MBA< 3 > interp( lo, hi, grid, coords, fd, nlevels /*levels*/, 1e-14 /*tolerance*/, 0.5 /*min_fill*/ );
-    // mba::linear_approximation< 3 > interp( coords.begin(), coords.end(), fd.begin() );
+    // mba::MBA< 3 > interp( lo, hi, grid, coords, fd, nlevels /*levels*/, 1e-14 /*tolerance*/, 0.5 /*min_fill*/ );
+    mba::linear_approximation< 3 > interp( coords.begin(), coords.end(), fd.begin() );
 
     // Get interpolated value at arbitrary location.
     offset = 0;
@@ -1321,8 +1352,7 @@ ErrorCode CloneToTRMesh( moab::Interface* m_interface, Mesh& mesh, EntityHandle 
 moab::ErrorCode ExtrudePolygonsToPolyhedra( Interface* mb,
                                             std::vector< double >& layer_thickness,
                                             moab::EntityHandle& poly2dset,
-                                            moab::EntityHandle& outputset,
-                                            bool is_mpas )
+                                            moab::EntityHandle& outputset )
 {
     ErrorCode rval;
     if( outputset == 0 )
@@ -1341,10 +1371,7 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( Interface* mb,
 
     // add the initial faces to the first set
     rval = mb->add_entities( outputset, verts );MB_CHK_ERR( rval );
-    if( is_mpas )
-    {
-        rval = mb->add_entities( outputset, faces );MB_CHK_ERR( rval );
-    }
+    rval = mb->add_entities( outputset, faces );MB_CHK_ERR( rval );
 
     // Create all edges
     rval = mb->get_adjacencies( faces, 1, true, edges, Interface::UNION );MB_CHK_ERR( rval );
@@ -1385,52 +1412,17 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( Interface* mb,
     {
         for( size_t i = 0; i < nverts; i++ )
         {
+            // constant offset
             // coords[3 * i + 2] -= 0.5;
-            if( !is_mpas )
-            {
-                Range eladjs;
-                const EntityHandle vtx = verts[i];
-                rval                   = mb->get_adjacencies( &vtx, 1, 2, true, eladjs, Interface::UNION );MB_CHK_ERR( rval );
 
-                if( eladjs.size() )
-                {
-                    double thickness = 0.0;
-                    for( size_t k = 0; k < eladjs.size(); ++k )
-                    {
-                        int il = faces.index( eladjs[k] );
-                        thickness += layer_thickness[il * nlayers + ii];
-                        if( thickness < 0 )
-                        {
-                            printf( "Thickness value for layer %d: element %zu  = %f\n", ii, k,
-                                    layer_thickness[il * nlayers + ii] );
-                            exit( 1 );
-                        }
-                    }
-                    thickness /= eladjs.size();
+            // Algo:
+            // zlev(minLevelCell(iCell),iCell) = ssh(iCell)
+            // do k = minLevelCell( iCell ), maxLevelCell( iCell )
+            //   zlev( k + 1, iCell ) = zlev( k, iCell ) - layerThickness( k, iCell )
+            // end do
 
-                    if( thickness < 0 )
-                    {
-                        printf( "Thickness value for layer %d: vertex %zu, adj = %zu = %f\n", ii, i, eladjs.size(),
-                                thickness );
-                        exit( 1 );
-                    }
-
-                    // Subtract or Add depending on the z-Direction to extrude
-                    coords[3 * i + 2] -= thickness;
-                }
-                else
-                    printf( "Vertex %zu has no adjacencies, coord = %f\n", i, coords[3 * i + 2] );
-            }
-            else
-            {
-                // zlev(minLevelCell(iCell),iCell) = ssh(iCell)
-                // do k = minLevelCell( iCell ), maxLevelCell( iCell )
-                //   zlev( k + 1, iCell ) = zlev( k, iCell ) - layerThickness( k, iCell )
-                // end do
-
-                // Subtract depending on the z-Direction to extrude
-                coords[3 * i + 2] -= layer_thickness[ii];
-            }
+            // Subtract depending on the z-Direction to extrude
+            coords[3 * i + 2] -= layer_thickness[ii];
         }
 
         rval = mb->create_vertices( &coords[0], nverts, newVerts[ii + 1] );MB_CHK_ERR( rval );
@@ -1444,14 +1436,13 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( Interface* mb,
 
     EntityHandle start_elem;
     std::vector< EntityHandle > allPolygons;
-    if( is_mpas )
     {
         // for each edge, we will create nlayers quads
         ReadUtilIface* read_iface;
         rval = mb->query_interface( read_iface );MB_CHK_SET_ERR( rval, "Error in query_interface" );
 
         // Create quads
-        EntityHandle *connect;
+        EntityHandle* connect;
         rval = read_iface->get_element_connect( nquads, 4, MBQUAD, 0, start_elem, connect );MB_CHK_SET_ERR( rval, "Error in get_element_connect" );
         Range quads( start_elem, start_elem + nquads );
 
@@ -1509,7 +1500,6 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( Interface* mb,
     moab::Tag minlvlTag, maxlvlTag;
     moab::Tag mpas_soltags[nvars], mpas_soltags_new[nvars];
     std::vector< double > src_data( src_zlayers * nvars );
-    if( is_mpas )
     {
         rval = mb->tag_get_handle( "minLevelCell", 1, moab::MB_TYPE_INTEGER, minlvlTag, moab::MB_TAG_DENSE );MB_CHK_ERR( rval );
         minlevelFace.resize( nfaces );
@@ -1543,7 +1533,6 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( Interface* mb,
         rval = mb->get_connectivity( polyg, connp, nnodes );MB_CHK_ERR( rval );
 
         std::vector< int > vecents( nnodes + 2, polyGID );
-        if( is_mpas )
         {
             const int orig_nodes = nnodes;
 
@@ -1577,24 +1566,17 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( Interface* mb,
                 rval = mb->tag_get_data( mpas_soltags[it], &polyg, 1, src_data.data() + it * src_zlayers );MB_CHK_ERR( rval );
             }
         }
-        else
-        {
-            std::copy( connp, connp + nnodes, vertexConn );
-            for( int i = 0; i < nnodes; i++ )
-                indexVerts[i] = verts.index( connp[i] );
-        }
 
         for( int ii = 0; ii < nlayers; ii++ )
         {
             // only add this extruded MPAS element if it is within the accepted layer mask
-            if( is_mpas && ( ii + 1 < minlevelFace[j] || ii + 1 >= maxlevelFace[j] ) ) continue;
+            if( ii + 1 < minlevelFace[j] || ii + 1 >= maxlevelFace[j] ) continue;
 
             // create a polygon on each layer
             for( int i = 0; i < nnodes; i++ )
                 vertexConn[nnodes + i] = newVerts[ii + 1][indexVerts[i]];  // vertices in layer ii+1
 
             EntityHandle polyhedron;
-            if( is_mpas )
             {
                 rval = mb->create_element( etype, &vertexConn[nnodes], nnodes, allPolygons[nfaces * ( ii + 1 ) + j] );MB_CHK_ERR( rval );
                 // allPolygonsGID[nfaces * ( ii + 1 ) + j] = ipolygon++;
@@ -1629,22 +1611,6 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( Interface* mb,
 
                 rval = mb->tag_set_data( gidTag, &allPolygons[nfaces * ( ii + 1 ) + j], 1, &ipolygon );MB_CHK_ERR( rval );
                 ipolygon++;
-            }
-            else
-            {
-                EntityType extrudedType;
-                switch( etype )
-                {
-                    case MBTRI:
-                        extrudedType = MBPRISM;
-                        break;
-                    case MBQUAD:
-                        extrudedType = MBHEX;
-                        break;
-                    default:
-                        MB_CHK_SET_ERR( MB_FAILURE, "Unsupported standard 2D element type found for extrusion." );
-                }
-                rval = mb->create_element( extrudedType, vertexConn, 2 * nnodes, polyhedron );MB_CHK_ERR( rval );
             }
 
             rval = mb->add_entities( outputset, &polyhedron, 1 );MB_CHK_ERR( rval );

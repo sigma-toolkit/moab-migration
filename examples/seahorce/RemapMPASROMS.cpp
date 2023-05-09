@@ -410,7 +410,7 @@ int main( int argc, char** argv )
     // Cull the MPAS set so that we don't have a global mesh
     moab::Range mpas_verts, mpas_elems, mpas3d_verts, mpas3d_elems;
     {
-        const int nring_neighborhood = 3;
+        const int nring_neighborhood = 2;
         // construct a kd-tree index:
         using KdTree = nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PC3D< double > >,
                                                             PC3D< double >, 3 /* dim */

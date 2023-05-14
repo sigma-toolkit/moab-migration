@@ -78,10 +78,10 @@ struct ToolContext
     ToolContext( moab::Interface* icore )
         : mbcore( icore ), proc_id( 0 ), n_procs( 1 ), outputFormatter( std::cout, 0, 0 ),
 #endif
-          blockSize( 5 ), fvMethod("none"), outFilename( "outputFile.nc" ), intxFilename( "intxFile.h5m" ), baselineFile( "" ),
-          meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ), computeWeights( false ),
+          blockSize( 5 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "intxFile.h5m" ),
+          baselineFile( "" ), meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ), computeWeights( false ),
           verifyWeights( false ), enforceConvexity( false ), ensureMonotonicity( 0 ), rrmGrids( false ),
-          kdtreeSearch( true ), fCheck( n_procs > 1 ? false : true ), fVolumetric(false)
+          kdtreeSearch( true ), fCheck( n_procs > 1 ? false : true ), fVolumetric( false )
     {
         inFilenames.resize( 2 );
         doftag_names.resize( 2 );
@@ -265,7 +265,7 @@ struct ToolContext
                 break;
         }
 
-        if( meshType > moab::TempestRemapper::ICO ) // compute overlap mesh and maps possibly
+        if( meshType > moab::TempestRemapper::ICO )  // compute overlap mesh and maps possibly
         {
             opts.getOptAllArgs( "load,l", inFilenames );
             opts.getOptAllArgs( "order,o", disc_orders );
@@ -409,7 +409,7 @@ int main( int argc, char* argv[] )
                                                // TempestOnlineMap.hpp is included in this file, and is part of MOAB
     // Some constant parameters
 
-    const double boxeps = 1e-6;
+    const double boxeps = 1e-1;
 
     if( runCtx->meshType == moab::TempestRemapper::OVERLAP_MEMORY )
     {
@@ -549,8 +549,8 @@ int main( int argc, char* argv[] )
             }
             rval = areaAdaptor.positive_orientation( mbCore, runCtx->meshsets[0], radius_src );MB_CHK_ERR( rval );
             if( !proc_id )
-                outputFormatter.printf( 0, "The source set contains %lu vertices and %lu elements \n",
-                                        srcverts.size(), srcelems.size() );
+                outputFormatter.printf( 0, "The source set contains %lu vertices and %lu elements \n", srcverts.size(),
+                                        srcelems.size() );
 
             moab::Range tgtverts, tgtelems;
             rval = mbCore->get_entities_by_dimension( runCtx->meshsets[1], 0, tgtverts );MB_CHK_ERR( rval );
@@ -562,8 +562,8 @@ int main( int argc, char* argv[] )
             }
             rval = areaAdaptor.positive_orientation( mbCore, runCtx->meshsets[1], radius_dest );MB_CHK_ERR( rval );
             if( !proc_id )
-                outputFormatter.printf( 0, "The target set contains %lu vertices and %lu elements \n",
-                                        tgtverts.size(), tgtelems.size() );
+                outputFormatter.printf( 0, "The target set contains %lu vertices and %lu elements \n", tgtverts.size(),
+                                        tgtelems.size() );
         }
 
         // First compute the covering set such that the target elements are fully covered by the
@@ -883,6 +883,9 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[1], radius_dest );MB_CHK_ERR( rval );
         rval = remapper.ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
         ctx.meshes[1] = remapper.GetMesh( moab::Remapper::TargetMesh );
+
+        // ctx.meshes[0]->Write( "SourceMeshMBTR.g" );
+        // ctx.meshes[1]->Write( "TargetMeshMBTR.g" );
     }
     else if( ctx.meshType == moab::TempestRemapper::ICO )
     {

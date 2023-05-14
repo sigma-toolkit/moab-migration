@@ -400,11 +400,11 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         PUSH_TIMER( "Compute the projection weights with TempestRemap" )
-        ierr =
-            iMOAB_ComputeScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0].c_str(), disc_methods[0].c_str(),
-                                                  &disc_orders[0], disc_methods[1].c_str(), &disc_orders[1], &fNoBubble,
-                                                  &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap, &fNoConserve,
-                                                  &fValidate, dof_tag_names[0].c_str(), dof_tag_names[1].c_str() );
+        ierr = iMOAB_ComputeScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0].c_str(),
+                                                     disc_methods[0].c_str(), &disc_orders[0], disc_methods[1].c_str(),
+                                                     &disc_orders[1], nullptr, &fNoBubble, &fMonotoneTypeID,
+                                                     &fVolumetric, &fInverseDistanceMap, &fNoConserve, &fValidate,
+                                                     dof_tag_names[0].c_str(), dof_tag_names[1].c_str() );
         CHECKIERR( ierr, "cannot compute scalar projection weights" )
         POP_TIMER( couComm, rankInCouComm )
 
@@ -435,11 +435,11 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         PUSH_TIMER( "Compute the projection weights with TempestRemap for atm2/ocn" )
-        ierr =
-            iMOAB_ComputeScalarProjectionWeights( cplAtm2OcnPID, weights_identifiers[0].c_str(), disc_methods[0].c_str(),
-                                                  &disc_orders[0], disc_methods[1].c_str(), &disc_orders[1], &fNoBubble,
-                                                  &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap, &fNoConserve,
-                                                  &fValidate, dof_tag_names[0].c_str(), dof_tag_names[1].c_str() );
+        ierr = iMOAB_ComputeScalarProjectionWeights( cplAtm2OcnPID, weights_identifiers[0].c_str(),
+                                                     disc_methods[0].c_str(), &disc_orders[0], disc_methods[1].c_str(),
+                                                     &disc_orders[1], nullptr, &fNoBubble, &fMonotoneTypeID,
+                                                     &fVolumetric, &fInverseDistanceMap, &fNoConserve, &fValidate,
+                                                     dof_tag_names[0].c_str(), dof_tag_names[1].c_str() );
         CHECKIERR( ierr, "cannot compute scalar projection weights for atm2/ocn" )
         POP_TIMER( couComm, rankInCouComm )
 

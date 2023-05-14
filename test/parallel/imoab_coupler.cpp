@@ -421,7 +421,7 @@ int main( int argc, char* argv[] )
 
     MPI_Barrier( MPI_COMM_WORLD );
 
-    int fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 1, fNoConserve = 0, fNoBubble = 1, fInverseDistanceMap = 0;
+    int fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 0, fNoConserve = 0, fNoBubble = 1, fInverseDistanceMap = 0;
 
 #ifdef ENABLE_ATMOCN_COUPLING
 #ifdef VERBOSE
@@ -439,11 +439,11 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         PUSH_TIMER( "Compute the projection weights with TempestRemap" )
-        ierr =
-            iMOAB_ComputeScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0].c_str(), disc_methods[0].c_str(),
-                                                  &disc_orders[0], disc_methods[1].c_str(), &disc_orders[1], &fNoBubble,
-                                                  &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap, &fNoConserve,
-                                                  &fValidate, dof_tag_names[0].c_str(), dof_tag_names[1].c_str() );
+        ierr = iMOAB_ComputeScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0].c_str(),
+                                                     disc_methods[0].c_str(), &disc_orders[0], disc_methods[1].c_str(),
+                                                     &disc_orders[1], nullptr, &fNoBubble, &fMonotoneTypeID,
+                                                     &fVolumetric, &fInverseDistanceMap, &fNoConserve, &fValidate,
+                                                     dof_tag_names[0].c_str(), dof_tag_names[1].c_str() );
         CHECKIERR( ierr, "cannot compute scalar projection weights" )
         POP_TIMER( couComm, rankInCouComm )
 
@@ -476,11 +476,11 @@ int main( int argc, char* argv[] )
         fValidate = 0;
         /* Compute the weights to preoject the solution from ATM component to LND compoenent */
         PUSH_TIMER( "Compute ATM-LND remapping weights" )
-        ierr =
-            iMOAB_ComputeScalarProjectionWeights( cplAtmLndPID, weights_identifiers[1].c_str(), disc_methods[0].c_str(),
-                                                  &disc_orders[0], disc_methods[2].c_str(), &disc_orders[2], &fNoBubble,
-                                                  &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap, &fNoConserve,
-                                                  &fValidate, dof_tag_names[0].c_str(), dof_tag_names[2].c_str() );
+        ierr = iMOAB_ComputeScalarProjectionWeights( cplAtmLndPID, weights_identifiers[1].c_str(),
+                                                     disc_methods[0].c_str(), &disc_orders[0], disc_methods[2].c_str(),
+                                                     &disc_orders[2], nullptr, &fNoBubble, &fMonotoneTypeID,
+                                                     &fVolumetric, &fInverseDistanceMap, &fNoConserve, &fValidate,
+                                                     dof_tag_names[0].c_str(), dof_tag_names[2].c_str() );
         CHECKIERR( ierr, "failed to compute remapping projection weights for ATM-LND scalar "
                          "non-conservative field" );
         POP_TIMER( couComm, rankInCouComm )

@@ -3320,8 +3320,9 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* join,
 
         // if we have no intx cells, it means we are on point clouds; quick fix just use all cells
         // from coverage set
-        if( cells.empty() )
+        // if( cells.empty() )
         {
+            cells.clear();
             // get coverage set
             assert( *pid_intx >= 0 );
             appData& dataIntx      = context.appDatas[*pid_intx];
@@ -3978,7 +3979,7 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     double radius_source = 1.0;
     double radius_target = 1.0;
     const double epsrel  = ReferenceTolerance;  // ReferenceTolerance is defined in Defines.h in tempestremap source ;
-    const double boxeps  = 1.e-6;
+    const double boxeps  = 1.e-2;
 
     // Get the source and target data and pcomm objects
     appData& data_src  = context.appDatas[*pid_src];
@@ -4255,6 +4256,7 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
     int* disc_order_source,
     const iMOAB_String disc_method_target,
     int* disc_order_target,
+    const iMOAB_String fv_method,
     int* fNoBubble,
     int* fMonotoneTypeID,
     int* fVolumetric,
@@ -4292,6 +4294,7 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
     mapOptions.fTargetConcave = false;
 
     mapOptions.strMethod = "";
+    if( fv_method ) mapOptions.strMethod += std::string(fv_method) + ";";
     if( fMonotoneTypeID )
     {
         switch( *fMonotoneTypeID )

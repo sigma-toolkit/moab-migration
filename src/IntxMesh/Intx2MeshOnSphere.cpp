@@ -948,7 +948,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     // get all mesh verts1
     Range mesh_verts;
     rval = mb->get_connectivity( meshCells, mesh_verts );MB_CHK_SET_ERR( rval, "can't get  mesh vertices" );
-    int num_mesh_verts = (int)mesh_verts.size();
+    size_t num_mesh_verts = mesh_verts.size();
 
     // now see the mesh points positions; to what boxes should we send them?
     std::vector< double > coords_mesh( 3 * num_mesh_verts );
@@ -957,7 +957,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     // decide gnomonic plane for each vertex, as in the compute boxes
     std::vector< int > gnplane;
     gnplane.resize( num_mesh_verts );
-    for( int i = 0; i < num_mesh_verts; i++ )
+    for( size_t i = 0; i < num_mesh_verts; i++ )
     {
         CartVect pos( &coords_mesh[3 * i] );
         int pl;

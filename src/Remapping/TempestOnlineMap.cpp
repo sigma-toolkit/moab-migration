@@ -66,23 +66,10 @@ moab::TempestOnlineMap::TempestOnlineMap( moab::TempestRemapper* remapper ) : Of
     m_meshOutput   = remapper->GetMesh( moab::Remapper::TargetMesh );
     m_meshOverlap  = remapper->GetMesh( moab::Remapper::OverlapMesh );
 
-    is_parallel = false;
-    is_root     = true;
-    rank        = 0;
-    root_proc   = rank;
-    size        = 1;
-#ifdef MOAB_HAVE_MPI
-    int flagInit;
-    MPI_Initialized( &flagInit );
-    if( flagInit )
-    {
-        is_parallel = true;
-        assert( m_pcomm != NULL );
-        rank    = m_pcomm->rank();
-        size    = m_pcomm->size();
-        is_root = ( rank == 0 );
-    }
-#endif
+    is_parallel = remapper->is_parallel;
+    is_root     = remapper->is_root;
+    rank        = remapper->rank;
+    size        = remapper->size;
 
     // Compute and store the total number of source and target DoFs corresponding
     // to number of rows and columns in the mapping.
@@ -802,7 +789,7 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
 
         // Method flags
         std::string strMapAlgorithm( "" );
-        int nMonotoneType    = ( mapOptions.fMonotone ) ? ( 1 ) : ( 0 );
+        int nMonotoneType = ( mapOptions.fMonotone ) ? ( 1 ) : ( 0 );
 
         // Make an index of method arguments
         std::set< std::string > setMethodStrings;
@@ -937,10 +924,10 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
         ///   the tag should be created already in the e3sm workflow; if not, create it here
         Tag areaTag;
         rval = m_interface->tag_get_handle( "aream", 1, MB_TYPE_DOUBLE, areaTag,
-                                             MB_TAG_DENSE |  MB_TAG_EXCL | MB_TAG_CREAT );
-        if ( MB_ALREADY_ALLOCATED == rval )
+                                            MB_TAG_DENSE | MB_TAG_EXCL | MB_TAG_CREAT );
+        if( MB_ALREADY_ALLOCATED == rval )
         {
-        	if( is_root ) dbgprint.printf( 0, "aream tag already defined \n" );
+            if( is_root ) dbgprint.printf( 0, "aream tag already defined \n" );
         }
 
         double dTotalAreaInput = 0.0, dTotalAreaOutput = 0.0;
@@ -949,8 +936,8 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             // Calculate Input Mesh Face areas
             if( is_root ) dbgprint.printf( 0, "Calculating input mesh Face areas\n" );
             double dTotalAreaInput_loc = m_meshInput->CalculateFaceAreas( mapOptions.fSourceConcave );
-            rval = m_interface->tag_set_data( areaTag, m_remapper->m_source_entities, m_meshInput->vecFaceArea );MB_CHK_ERR( rval ); 
-            dTotalAreaInput            = dTotalAreaInput_loc;
+            rval = m_interface->tag_set_data( areaTag, m_remapper->m_source_entities, m_meshInput->vecFaceArea );MB_CHK_ERR( rval );
+            dTotalAreaInput = dTotalAreaInput_loc;
 #ifdef MOAB_HAVE_MPI
             if( m_pcomm )
                 MPI_Reduce( &dTotalAreaInput_loc, &dTotalAreaInput, 1, MPI_DOUBLE, MPI_SUM, 0, m_pcomm->comm() );
@@ -974,7 +961,7 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                 MPI_Reduce( &dTotalAreaOutput_loc, &dTotalAreaOutput, 1, MPI_DOUBLE, MPI_SUM, 0, m_pcomm->comm() );
 #endif
             if( is_root ) dbgprint.printf( 0, "Output Mesh Geometric Area: %1.15e\n", dTotalAreaOutput );
-            rval = m_interface->tag_set_data( areaTag, m_remapper->m_target_entities, m_meshOutput->vecFaceArea );MB_CHK_ERR( rval ); 
+            rval = m_interface->tag_set_data( areaTag, m_remapper->m_target_entities, m_meshOutput->vecFaceArea );MB_CHK_ERR( rval );
         }
 
         if( !m_bPointCloud )
@@ -1144,6 +1131,18 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             }
             else if( strMapAlgorithm == "fvbilin" )
             {
+#ifdef VERBOSE
+                if( is_root )
+                {
+                    m_meshInputCov->Write( "SourceMeshMBTR.g" );
+                    m_meshOutput->Write( "TargetMeshMBTR.g" );
+                }
+                else
+                {
+                    m_meshInputCov->Write( "SourceMeshMBTR" + std::to_string( rank ) + ".g" );
+                    m_meshOutput->Write( "TargetMeshMBTR" + std::to_string( rank ) + ".g" );
+                }
+#endif
                 if( is_root ) AnnounceStartBlock( "Calculating map (bilin)" );
                 LinearRemapBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }

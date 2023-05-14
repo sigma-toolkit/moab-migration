@@ -215,15 +215,21 @@ program imoab_coupler_fortran
    fMonotoneTypeID = 0
    fVolumetric = 0
    fNoConserve = 0
-   fValidate = 1
+   fValidate = 0
    fInverseDistanceMap = 0
 
    if (cplComm .NE. MPI_COMM_NULL) then
 
       ierr = iMOAB_ComputeScalarProjectionWeights( &
              cplAtmOcnPID, weights_identifier1, disc_methods1, disc_orders1, &
-             disc_methods2, disc_orders2, fNoBubble, fMonotoneTypeID, fVolumetric, fInverseDistanceMap, fNoConserve, &
+             disc_methods2, disc_orders2, ""//C_NULL_CHAR, fNoBubble, fMonotoneTypeID, fVolumetric, fInverseDistanceMap, fNoConserve, &
              fValidate, dof_tag_names1, dof_tag_names2)
+      call errorout(ierr, 'cannot compute scalar projection weights')
+
+      ierr = iMOAB_ComputeScalarProjectionWeights( &
+             cplAtmOcnPID, "bilinear"//C_NULL_CHAR, "fv"//C_NULL_CHAR, 1, &
+             "fv"//C_NULL_CHAR, 1, "bilin"//C_NULL_CHAR, fNoBubble, fMonotoneTypeID, fVolumetric, fInverseDistanceMap, fNoConserve, &
+             fValidate, "GLOBAL_ID"//C_NULL_CHAR, "GLOBAL_ID"//C_NULL_CHAR)
       call errorout(ierr, 'cannot compute scalar projection weights')
 
 #ifdef MOAB_HAVE_NETCDF

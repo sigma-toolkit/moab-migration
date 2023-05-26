@@ -1,14 +1,20 @@
 /*
  * This imoab_coupler_bilin test will simulate coupling between atm and ocean using bilinear map
  * 2 meshes will be loaded from 2 files (atm, ocean), and they will be migrated to
- * all processors (coupler pes); then, intx will be performed between migrated meshes
+ * coupler processors (coupler pes); then, intx will be performed between migrated meshes
  * and weights will be generated, such that a field from one component will be transferred to
  * the other component
  * currently, the atm will send some data to be projected to ocean comp
  *
- * first, intersect atm and ocn, and recompute comm graph 1 between atm and atm_cx, for ocn intx
- * second, intersect atm and lnd, and recompute comm graph 2 between atm and atm_cx for lnd intx
-
+ * first, intersect atm and ocn, compute bilinear map
+ * use the current 2 hop strategy; first send from atm comp to atm coupler, then,
+ * in a second hop, send from atm coupler to coverage for ocn intx
+ *
+ * project then 2 fields to the ocean (Sa_pbot and Sa_dens)
+ * we also write the map in parallel
+ *
+ * when we run on 1 process and 2 processes, we get a different map and
+ * different field projected
  */
 
 #include "moab/Core.hpp"
@@ -114,6 +120,8 @@ int main( int argc, char* argv[] )
     opts.addOpt< int >( "endCoupler,j", "end task for coupler layout", &endG4 );
 
     opts.addOpt< int >( "partitioning,p", "partitioning option for migration", &repartitioner_scheme );
+
+    opts.parseCommandLine( argc, argv );
 
     char fileWriteOptions[] = "PARALLEL=WRITE_PART";
 

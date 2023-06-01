@@ -387,7 +387,7 @@ int main( int argc, char* argv[] )
     moab::TempestRemapper remapper( mbCore );
 #endif
     remapper.meshValidate     = true;
-    remapper.constructEdgeMap = false;
+    remapper.constructEdgeMap = true;
     remapper.initialize();
 
     // Default area_method = lHuiller; Options: Girard, GaussQuadrature (if TR is available)
@@ -409,7 +409,7 @@ int main( int argc, char* argv[] )
                                                // TempestOnlineMap.hpp is included in this file, and is part of MOAB
     // Some constant parameters
 
-    const double boxeps = 1e-1;
+    const double boxeps = 5e-1;
 
     if( runCtx->meshType == moab::TempestRemapper::OVERLAP_MEMORY )
     {

@@ -76,6 +76,7 @@ ErrorCode TempestRemapper::initialize( bool initialize_fsets )
         size        = m_pcomm->size();
         is_root     = ( rank == 0 );
         is_parallel = ( size > 1 );
+        // is_parallel = true;
     }
 #endif
 
@@ -243,6 +244,134 @@ ErrorCode TempestRemapper::ConvertTempestMesh( Remapper::IntersectionContext ctx
     }
 }
 
+#define NEW_CONVERT_LOGIC
+
+#ifdef NEW_CONVERT_LOGIC
+ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType meshType,
+                                                         Mesh* mesh,
+                                                         EntityHandle& mesh_set,
+                                                         Range& entities,
+                                                         Range* vertices )
+{
+    ErrorCode rval;
+
+    const bool outputEnabled = ( TempestRemapper::verbose && is_root );
+    const NodeVector& nodes  = mesh->nodes;
+    const FaceVector& faces  = mesh->faces;
+
+    moab::DebugOutput dbgprint( std::cout, this->rank, 0 );
+    dbgprint.set_prefix( "[TempestToMOAB]: " );
+
+    ReadUtilIface* iface;
+    rval = m_interface->query_interface( iface );MB_CHK_SET_ERR( rval, "Can't get reader interface" );
+
+    Tag gidTag = m_interface->globalId_tag();
+
+    // Set the data for the vertices
+    std::vector< double* > arrays;
+    std::vector< int > gidsv( nodes.size() );
+    EntityHandle startv;
+    rval = iface->get_node_coords( 3, nodes.size(), 0, startv, arrays );MB_CHK_SET_ERR( rval, "Can't get node coords" );
+    for( unsigned iverts = 0; iverts < nodes.size(); ++iverts )
+    {
+        const Node& node  = nodes[iverts];
+        arrays[0][iverts] = node.x;
+        arrays[1][iverts] = node.y;
+        arrays[2][iverts] = node.z;
+        gidsv[iverts]     = iverts + 1;
+    }
+    Range mbverts( startv, startv + nodes.size() - 1 );
+    rval = m_interface->add_entities( mesh_set, mbverts );MB_CHK_SET_ERR( rval, "Can't add entities" );
+    rval = m_interface->tag_set_data( gidTag, mbverts, &gidsv[0] );MB_CHK_SET_ERR( rval, "Can't set global_id tag" );
+
+    gidsv.clear();
+    entities.clear();
+
+    Tag srcParentTag, tgtParentTag;
+    std::vector< int > srcParent( faces.size(), -1 ), tgtParent( faces.size(), -1 );
+    std::vector< int > gidse( faces.size(), -1 );
+    bool storeParentInfo = ( mesh->vecSourceFaceIx.size() > 0 );
+
+    if( storeParentInfo )
+    {
+        int defaultInt = -1;
+        rval           = m_interface->tag_get_handle( "TargetParent", 1, MB_TYPE_INTEGER, tgtParentTag,
+                                                      MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );MB_CHK_SET_ERR( rval, "can't create positive tag" );
+
+        rval = m_interface->tag_get_handle( "SourceParent", 1, MB_TYPE_INTEGER, srcParentTag,
+                                            MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );MB_CHK_SET_ERR( rval, "can't create negative tag" );
+    }
+
+    // Let us first perform a full pass assuming arbitrary polygons. This is especially true for
+    // overlap meshes.
+    //   1. We do a first pass over faces, decipher edge size and group into categories based on
+    //   element type
+    //   2. Next we loop over type, and add blocks of elements into MOAB
+    //   3. For each block within the loop, also update the connectivity of elements.
+    {
+        if( outputEnabled )
+            dbgprint.printf( 0, "..Mesh size: Nodes [%zu]  Elements [%zu].\n", nodes.size(), faces.size() );
+        Range mbcells;
+        for( unsigned ifaces = 0; ifaces < faces.size(); ++ifaces )
+        {
+            const Face& face         = faces[ifaces];
+            const unsigned num_v_per_elem = face.edges.size();
+
+            std::vector< EntityHandle > conn( num_v_per_elem );
+
+            for( unsigned iedges = 0; iedges < num_v_per_elem; ++iedges )
+            {
+                conn[iedges] = startv + face.edges[iedges].node[0];
+            }
+
+            EntityHandle polyNew;
+            switch( num_v_per_elem )
+            {
+                case 3:
+                    // if( outputEnabled )
+                    //     dbgprint.printf( 0, "....Block %d: Triangular Elements [%u].\n", iBlock++, nPolys[iType] );
+                    rval = m_interface->create_element( MBTRI, &conn[0], num_v_per_elem, polyNew );MB_CHK_SET_ERR( rval, "Can't get element connectivity" );
+                    break;
+                case 4:
+                    // if( outputEnabled )
+                    //     dbgprint.printf( 0, "....Block %d: Quadrilateral Elements [%u].\n", iBlock++, nPolys[iType] );
+                    rval = m_interface->create_element( MBQUAD, &conn[0], num_v_per_elem, polyNew );MB_CHK_SET_ERR( rval, "Can't get element connectivity" );
+                    break;
+                default:
+                    // if( outputEnabled )
+                    //     dbgprint.printf( 0, "....Block %d: Polygonal [%u] Elements [%u].\n", iBlock++, iType,
+                    //                      nPolys[iType] );
+                    rval = m_interface->create_element( MBPOLYGON, &conn[0], num_v_per_elem, polyNew );MB_CHK_SET_ERR( rval, "Can't get element connectivity" );
+                    break;
+            }
+
+            mbcells.insert( polyNew );
+
+            gidse[ifaces] = ifaces + 1;
+
+            if( storeParentInfo )
+            {
+                srcParent[ifaces] = mesh->vecSourceFaceIx[ifaces] + 1;
+                tgtParent[ifaces] = mesh->vecTargetFaceIx[ifaces] + 1;
+            }
+        }
+
+        m_interface->add_entities( mesh_set, mbcells );
+
+        rval = m_interface->tag_set_data( gidTag, mbcells, &gidse[0] );MB_CHK_SET_ERR( rval, "Can't set global_id tag" );
+        if( storeParentInfo )
+        {
+            rval = m_interface->tag_set_data( srcParentTag, mbcells, &srcParent[0] );MB_CHK_SET_ERR( rval, "Can't set tag data" );
+            rval = m_interface->tag_set_data( tgtParentTag, mbcells, &tgtParent[0] );MB_CHK_SET_ERR( rval, "Can't set tag data" );
+        }
+    }
+
+    if( vertices ) *vertices = mbverts;
+
+    return MB_SUCCESS;
+}
+
+#else
 ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType meshType,
                                                          Mesh* mesh,
                                                          EntityHandle& mesh_set,
@@ -397,6 +526,7 @@ ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType meshTyp
 
     return MB_SUCCESS;
 }
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -459,12 +589,12 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     faces.resize( nelems );
 
     // let us now get the vertices from all the elements
-    rval = m_interface->get_entities_by_dimension( mesh_set, 0, verts );MB_CHK_ERR( rval );
-    // rval = m_interface->get_connectivity( elems, verts );MB_CHK_ERR( rval );
-    // if( verts.size() == 0 )
-    // {
-    //     rval = m_interface->get_entities_by_dimension( mesh_set, 0, verts );MB_CHK_ERR( rval );
-    // }
+    // rval = m_interface->get_entities_by_dimension( mesh_set, 0, verts );MB_CHK_ERR( rval );
+    rval = m_interface->get_connectivity( elems, verts );MB_CHK_ERR( rval );
+    if( verts.size() == 0 )
+    {
+        rval = m_interface->get_entities_by_dimension( mesh_set, 0, verts );MB_CHK_ERR( rval );
+    }
     // assert(verts.size() > 0); // If not, this may be an invalid mesh ! possible for unbalanced
     // loads
 
@@ -494,9 +624,7 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     for( unsigned iface = 0; iface < nelems; ++iface )
     {
         Face& face           = faces[iface];
-        EntityHandle ehandle = elems[sortedIdx[iface]];
-
-        // std::cout << iface << " - MOAB = " << sortedIdx[iface] << std::endl;
+        EntityHandle ehandle = ( offlineWorkflow ? elems[sortedIdx[iface]] : elems[iface] );
 
         // get the connectivity for each edge
         const EntityHandle* connectface;

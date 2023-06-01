@@ -37,13 +37,14 @@ class TempestRemapper : public Remapper
 {
   public:
 #ifdef MOAB_HAVE_MPI
-    TempestRemapper( moab::Interface* mbInt, moab::ParallelComm* pcomm = NULL )
+    TempestRemapper( moab::Interface* mbInt, moab::ParallelComm* pcomm = NULL, bool offlineMode = false )
         : Remapper( mbInt, pcomm ),
 #else
-    TempestRemapper( moab::Interface* mbInt )
+    TempestRemapper( moab::Interface* mbInt, bool offlineMode = false )
         : Remapper( mbInt ),
 #endif
-          meshValidate( false ), constructEdgeMap( false ), m_source_type( DEFAULT ), m_target_type( DEFAULT )
+          offlineWorkflow( offlineMode ), meshValidate( false ), constructEdgeMap( false ), m_source_type( DEFAULT ),
+          m_target_type( DEFAULT )
     {
     }
 
@@ -261,6 +262,7 @@ class TempestRemapper : public Remapper
     ErrorCode GetIMasks( Remapper::IntersectionContext ctx, std::vector< int >& masks );
 
   public:               // public members
+    const bool offlineWorkflow; // check whether we are in an offline workflow context (mbtempest)
     bool meshValidate;  // Validate the mesh after loading from file
 
     bool constructEdgeMap;  //  Construct the edge map within the TempestRemap datastructures

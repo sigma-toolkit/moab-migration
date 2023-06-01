@@ -43,6 +43,8 @@
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
 #include "moab/Remapping/TempestRemapper.hpp"
+
+constexpr bool offlineGenerator = true;
 #endif
 
 #include <cstdio>
@@ -427,9 +429,9 @@ int main( int argc, char* argv[] )
     if( tempestin or tempestout )
     {
 #ifdef MOAB_HAVE_MPI
-        remapper = new moab::TempestRemapper( gMB, pcomm );
+        remapper = new moab::TempestRemapper( gMB, pcomm, offlineGenerator );
 #else
-        remapper      = new moab::TempestRemapper( gMB );
+        remapper = new moab::TempestRemapper( gMB, offlineGenerator );
 #endif
     }
 

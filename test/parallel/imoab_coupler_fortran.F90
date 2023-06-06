@@ -69,6 +69,8 @@ program imoab_coupler_fortran
    character(:), allocatable :: concat_fieldname, concat_fieldnameT, outputFileOcn
    integer :: tagIndexIn2 ! not really needed
    integer :: dummyCpl, dummyRC, dummyType
+   real*8  :: boxeps
+   integer :: gnomonic
 
    cmpatm = 5
    cplatm = 6
@@ -185,7 +187,9 @@ program imoab_coupler_fortran
    end if
 
    if (cplComm .NE. MPI_COMM_NULL) then
-      ierr = iMOAB_ComputeMeshIntersectionOnSphere(cplAtmPID, cplOcnPID, cplAtmOcnPID)
+      boxeps = 1.e-6
+      gnomonic = 1
+      ierr = iMOAB_ComputeMeshIntersectionOnSphere(cplAtmPID, cplOcnPID, cplAtmOcnPID, boxeps, gnomonic)
       ! coverage mesh was computed here, for cplAtmPID, atm on coupler pes
       ! basically, atm was redistributed according to target (ocean) partition, to "cover" the
       !ocean partitions check if intx valid, write some h5m intx file

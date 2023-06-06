@@ -11,6 +11,7 @@
 #include "moab/IntxMesh/Intx2MeshOnSphere.hpp"
 #include "moab/IntxMesh/IntxUtils.hpp"
 #include "moab/GeomUtil.hpp"
+#include "moab/BoundBox.hpp"
 #ifdef MOAB_HAVE_MPI
 #include "moab/ParallelComm.hpp"
 #endif
@@ -701,8 +702,12 @@ ErrorCode Intx2MeshOnSphere::update_tracer_data( EntityHandle out_set, Tag& tagE
 }
 
 #ifdef MOAB_HAVE_MPI
-ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set, Range& local_verts )
+ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set, Range& local_verts, bool gnomonic )
 {
+    if (!gnomonic)
+    {
+        return Intx2Mesh::build_processor_euler_boxes(euler_set, local_verts);
+    }
     localEnts.clear();
     ErrorCode rval = mb->get_entities_by_dimension( euler_set, 2, localEnts );MB_CHK_SET_ERR( rval, "can't get local ents" );
 
@@ -845,7 +850,7 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
 // will distribute the mesh to other procs, so that on each task, the covering set covers the local
 // bounding box this means it will cover the second (local) mesh set; So the covering set will cover
 // completely the second local mesh set (in intersection)
-ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distributed_set, EntityHandle& covering_set )
+ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distributed_set, EntityHandle& covering_set, bool gnomonic )
 {
     // primary element came from, in the joint communicator ; this will be forwarded by coverage
     // mesh needed for tag migrate later on
@@ -956,13 +961,16 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
 
     // decide gnomonic plane for each vertex, as in the compute boxes
     std::vector< int > gnplane;
-    gnplane.resize( num_mesh_verts );
-    for( size_t i = 0; i < num_mesh_verts; i++ )
+    if (gnomonic)
     {
-        CartVect pos( &coords_mesh[3 * i] );
-        int pl;
-        IntxUtils::decide_gnomonic_plane( pos, pl );
-        gnplane[i] = pl;
+        gnplane.resize( num_mesh_verts );
+        for( size_t i = 0; i < num_mesh_verts; i++ )
+        {
+            CartVect pos( &coords_mesh[3 * i] );
+            int pl;
+            IntxUtils::decide_gnomonic_plane( pos, pl );
+            gnplane[i] = pl;
+        }
     }
 
     std::vector< int > gids( num_mesh_verts );
@@ -987,49 +995,71 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         {
             EntityHandle v = conn[i];
             int index      = mesh_verts.index( v );
-            planes.insert( gnplane[index] );
+            if (gnomonic)
+	        planes.insert( gnplane[index] );
             for( int j = 0; j < 3; j++ )
             {
                 elco[3 * i + j] = coords_mesh[3 * index + j];  // extract from coords
             }
         }
-        // now loop over all planes that need to be considered for this element
-        for( std::set< int >::iterator st = planes.begin(); st != planes.end(); st++ )
-        {
-            int pl         = *st;  // gnomonic plane considered
-            double qmin[2] = { DBL_MAX, DBL_MAX };
-            double qmax[2] = { -DBL_MAX, -DBL_MAX };
-            for( int i = 0; i < num_nodes; i++ )
+	if (gnomonic)
+	{
+            // now loop over all planes that need to be considered for this element
+            for( std::set< int >::iterator st = planes.begin(); st != planes.end(); st++ )
             {
-                CartVect dp( &elco[3 * i] );  // uses constructor for CartVect that takes a
-                                              // pointer to double
-                // gnomonic projection
-                double c2[2];
-                IntxUtils::gnomonic_projection( dp, Rsrc, pl, c2[0], c2[1] );  // 2 coordinates
-                for( int j = 0; j < 2; j++ )
+                int pl         = *st;  // gnomonic plane considered
+                double qmin[2] = { DBL_MAX, DBL_MAX };
+                double qmax[2] = { -DBL_MAX, -DBL_MAX };
+                for( int i = 0; i < num_nodes; i++ )
                 {
-                    if( qmin[j] > c2[j] ) qmin[j] = c2[j];
-                    if( qmax[j] < c2[j] ) qmax[j] = c2[j];
-                }
+                   CartVect dp( &elco[3 * i] );  // uses constructor for CartVect that takes a
+                                             // pointer to double
+                   // gnomonic projection
+                   double c2[2];
+                   IntxUtils::gnomonic_projection( dp, Rsrc, pl, c2[0], c2[1] );  // 2 coordinates
+                   for( int j = 0; j < 2; j++ )
+                   {
+                       if( qmin[j] > c2[j] ) qmin[j] = c2[j];
+                       if( qmax[j] < c2[j] ) qmax[j] = c2[j];
+                   }
+               }
+               // now decide if processor p should be interested in this cell, by looking at plane pl
+               // 2d box this is one of the few size n loops;
+               for( int p = 0; p < numprocs; p++ )  // each cell q can be sent to more than one processor
+               {
+                   double procMin1 = allBoxes[24 * p + 4 * ( pl - 1 )];  // these were determined before
+                   //
+                   if( procMin1 >= DBL_MAX )  // the processor has no targets on this plane
+                       continue;
+                   double procMin2 = allBoxes[24 * p + 4 * ( pl - 1 ) + 1];
+                   double procMax1 = allBoxes[24 * p + 4 * ( pl - 1 ) + 2];
+                   double procMax2 = allBoxes[24 * p + 4 * ( pl - 1 ) + 3];
+                   // test overlap of 2d boxes
+                   if( procMin1 > qmax[0] + box_error || procMin2 > qmax[1] + box_error ) continue;  //
+                   if( qmin[0] > procMax1 + box_error || qmin[1] > procMax2 + box_error ) continue;
+                   // good to be inserted
+                   Rto[p].insert( q );
+               }
             }
-            // now decide if processor p should be interested in this cell, by looking at plane pl
-            // 2d box this is one of the few size n loops;
-            for( int p = 0; p < numprocs; p++ )  // each cell q can be sent to more than one processor
-            {
-                double procMin1 = allBoxes[24 * p + 4 * ( pl - 1 )];  // these were determined before
-                //
-                if( procMin1 >= DBL_MAX )  // the processor has no targets on this plane
-                    continue;
-                double procMin2 = allBoxes[24 * p + 4 * ( pl - 1 ) + 1];
-                double procMax1 = allBoxes[24 * p + 4 * ( pl - 1 ) + 2];
-                double procMax2 = allBoxes[24 * p + 4 * ( pl - 1 ) + 3];
-                // test overlap of 2d boxes
-                if( procMin1 > qmax[0] + box_error || procMin2 > qmax[1] + box_error ) continue;  //
-                if( qmin[0] > procMax1 + box_error || qmin[1] > procMax2 + box_error ) continue;
-                // good to be inserted
-                Rto[p].insert( q );
-            }
-        }
+	}
+	else // regular 3d box; one box per processor 
+	{
+	    for (int p=0; p < numprocs; p++)
+	    {
+		BoundBox box(&allBoxes[ 6 * p ]);
+		bool insert=false;
+                for (int i=0; i<num_nodes; i++)
+		{
+		    if (box.contains_point(&elco[3*i], box_error))
+		    {
+		        insert = true; 
+			break;
+		    }
+		}
+		if (insert)
+		    Rto[p].insert( q );
+	    }
+	}
     }
 
     // here, we will use crystal router to send each cell to designated tasks (mesh migration)

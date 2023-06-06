@@ -311,41 +311,42 @@ ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType meshTyp
     {
         if( outputEnabled )
             dbgprint.printf( 0, "..Mesh size: Nodes [%zu]  Elements [%zu].\n", nodes.size(), faces.size() );
-        Range mbcells;
+        std::vector< EntityHandle > mbcells( faces.size() );
+        unsigned ntris = 0, nquads = 0, npolys = 0;
+        std::vector< EntityHandle > conn( 16 );
+
         for( unsigned ifaces = 0; ifaces < faces.size(); ++ifaces )
         {
             const Face& face         = faces[ifaces];
             const unsigned num_v_per_elem = face.edges.size();
-
-            std::vector< EntityHandle > conn( num_v_per_elem );
 
             for( unsigned iedges = 0; iedges < num_v_per_elem; ++iedges )
             {
                 conn[iedges] = startv + face.edges[iedges].node[0];
             }
 
-            EntityHandle polyNew;
             switch( num_v_per_elem )
             {
                 case 3:
                     // if( outputEnabled )
                     //     dbgprint.printf( 0, "....Block %d: Triangular Elements [%u].\n", iBlock++, nPolys[iType] );
-                    rval = m_interface->create_element( MBTRI, &conn[0], num_v_per_elem, polyNew );MB_CHK_SET_ERR( rval, "Can't get element connectivity" );
+                    rval = m_interface->create_element( MBTRI, &conn[0], num_v_per_elem, mbcells[ifaces] );MB_CHK_SET_ERR( rval, "Can't get element connectivity" );
+                    ntris++;
                     break;
                 case 4:
                     // if( outputEnabled )
                     //     dbgprint.printf( 0, "....Block %d: Quadrilateral Elements [%u].\n", iBlock++, nPolys[iType] );
-                    rval = m_interface->create_element( MBQUAD, &conn[0], num_v_per_elem, polyNew );MB_CHK_SET_ERR( rval, "Can't get element connectivity" );
+                    rval = m_interface->create_element( MBQUAD, &conn[0], num_v_per_elem, mbcells[ifaces] );MB_CHK_SET_ERR( rval, "Can't get element connectivity" );
+                    nquads++;
                     break;
                 default:
                     // if( outputEnabled )
                     //     dbgprint.printf( 0, "....Block %d: Polygonal [%u] Elements [%u].\n", iBlock++, iType,
                     //                      nPolys[iType] );
-                    rval = m_interface->create_element( MBPOLYGON, &conn[0], num_v_per_elem, polyNew );MB_CHK_SET_ERR( rval, "Can't get element connectivity" );
+                    rval = m_interface->create_element( MBPOLYGON, &conn[0], num_v_per_elem, mbcells[ifaces] );MB_CHK_SET_ERR( rval, "Can't get element connectivity" );
+                    npolys++;
                     break;
             }
-
-            mbcells.insert( polyNew );
 
             gidse[ifaces] = ifaces + 1;
 
@@ -356,14 +357,21 @@ ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType meshTyp
             }
         }
 
-        m_interface->add_entities( mesh_set, mbcells );
+        if( ntris ) dbgprint.printf( 0, "....Triangular Elements [%u].\n", ntris );
+        if( nquads ) dbgprint.printf( 0, "....Quadrangular Elements [%u].\n", nquads );
+        if( npolys ) dbgprint.printf( 0, "....Polygonal Elements [%u].\n", npolys );
 
-        rval = m_interface->tag_set_data( gidTag, mbcells, &gidse[0] );MB_CHK_SET_ERR( rval, "Can't set global_id tag" );
+        rval = m_interface->add_entities( mesh_set, &mbcells[0], mbcells.size());MB_CHK_SET_ERR( rval, "Could not add entities" );
+
+        rval = m_interface->tag_set_data( gidTag, &mbcells[0], mbcells.size(), &gidse[0] );MB_CHK_SET_ERR( rval, "Can't set global_id tag" );
         if( storeParentInfo )
         {
-            rval = m_interface->tag_set_data( srcParentTag, mbcells, &srcParent[0] );MB_CHK_SET_ERR( rval, "Can't set tag data" );
-            rval = m_interface->tag_set_data( tgtParentTag, mbcells, &tgtParent[0] );MB_CHK_SET_ERR( rval, "Can't set tag data" );
+            rval = m_interface->tag_set_data( srcParentTag, &mbcells[0], mbcells.size(), &srcParent[0] );MB_CHK_SET_ERR( rval, "Can't set tag data" );
+            rval = m_interface->tag_set_data( tgtParentTag, &mbcells[0], mbcells.size(), &tgtParent[0] );MB_CHK_SET_ERR( rval, "Can't set tag data" );
         }
+
+        // insert from mbcells to entities to preserve ordering
+        std::copy( mbcells.begin(), mbcells.end(), range_inserter( entities ) );
     }
 
     if( vertices ) *vertices = mbverts;
@@ -589,14 +597,12 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     faces.resize( nelems );
 
     // let us now get the vertices from all the elements
-    // rval = m_interface->get_entities_by_dimension( mesh_set, 0, verts );MB_CHK_ERR( rval );
     rval = m_interface->get_connectivity( elems, verts );MB_CHK_ERR( rval );
     if( verts.size() == 0 )
     {
         rval = m_interface->get_entities_by_dimension( mesh_set, 0, verts );MB_CHK_ERR( rval );
     }
-    // assert(verts.size() > 0); // If not, this may be an invalid mesh ! possible for unbalanced
-    // loads
+    // assert(verts.size() > 0); // If not, this may be an invalid mesh ! possible for unbalanced loads
 
     std::map< EntityHandle, int > indxMap;
     bool useRange = true;

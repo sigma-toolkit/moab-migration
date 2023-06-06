@@ -1066,7 +1066,8 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
                                                  double radius_src,
                                                  double radius_tgt,
                                                  double boxeps,
-                                                 bool regional_mesh )
+                                                 bool regional_mesh,
+	                                         bool gnomonic	)
 {
     ErrorCode rval;
 
@@ -1094,11 +1095,11 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
 #ifdef MOAB_HAVE_MPI
     if( is_parallel )
     {
-        rval = mbintx->build_processor_euler_boxes( m_target_set, local_verts );MB_CHK_ERR( rval );
+        rval = mbintx->build_processor_euler_boxes( m_target_set, local_verts, gnomonic );MB_CHK_ERR( rval );
 
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_covering_source_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
 
-        rval = mbintx->construct_covering_set( m_source_set, m_covering_source_set );MB_CHK_ERR( rval );
+        rval = mbintx->construct_covering_set( m_source_set, m_covering_source_set, gnomonic );MB_CHK_ERR( rval );
     }
     else
     {

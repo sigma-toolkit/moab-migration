@@ -98,7 +98,8 @@ class TempestRemapper : public Remapper
                                           double radius_src  = 1.0,
                                           double radius_tgt  = 1.0,
                                           double boxeps      = 0.1,
-                                          bool regional_mesh = false );
+                                          bool regional_mesh = false,
+		                          bool gnomonic      = true );
 
     /// <summary>
     ///     Compute the intersection mesh between the source and target grids that have been

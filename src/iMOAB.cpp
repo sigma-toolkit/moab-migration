@@ -3970,7 +3970,7 @@ static ErrCode ComputeSphereRadius( iMOAB_AppID pid, double* radius )
     return moab::MB_SUCCESS;
 }
 
-ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMOAB_AppID pid_intx )
+ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMOAB_AppID pid_intx, double * p_boxeps, int * p_gnomonic )
 {
     ErrorCode rval;
     ErrCode ierr;
@@ -3979,7 +3979,9 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     double radius_source = 1.0;
     double radius_target = 1.0;
     const double epsrel  = ReferenceTolerance;  // ReferenceTolerance is defined in Defines.h in tempestremap source ;
-    const double boxeps  = 2.e-1;
+    double boxeps  = *p_boxeps;
+    bool gnomonic = true;
+    if (*p_gnomonic == 0) gnomonic = false;
 
     // Get the source and target data and pcomm objects
     appData& data_src  = context.appDatas[*pid_src];
@@ -4096,9 +4098,10 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
 
     // First, compute the covering source set.
-    rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false );MB_CHK_ERR( rval );
+    rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic );MB_CHK_ERR( rval );
 
     // Next, compute intersections with MOAB.
+    // for bilinear, this is an overkill
     rval = tdata.remapper->ComputeOverlapMesh( use_kdtree_search, false );MB_CHK_ERR( rval );
 
     // Mapping computation done

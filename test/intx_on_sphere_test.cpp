@@ -138,7 +138,8 @@ int main( int argc, char* argv[] )
     {
         double elapsed = MPI_Wtime();
         rval           = mb->create_meshset( moab::MESHSET_SET, covering_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
-        rval = worker.construct_covering_set( sf1, covering_set );MB_CHK_ERR( rval );  // lots of communication if mesh is distributed very differently
+	bool gnomonic = true;
+        rval = worker.construct_covering_set( sf1, covering_set, gnomonic );MB_CHK_ERR( rval );  // lots of communication if mesh is distributed very differently
         elapsed = MPI_Wtime() - elapsed;
         if( 0 == rank ) std::cout << "\nTime to communicate the mesh = " << elapsed << std::endl;
         // area fraction of the covering set that needed to be communicated from other processors

@@ -210,7 +210,9 @@ int main( int argc, char* argv[] )
 
     /* Next compute the mesh intersection on the sphere between the source (ATM) and target (OCN)
      * meshes */
-    ierr = iMOAB_ComputeMeshIntersectionOnSphere( atmPID, ocnPID, atmocnPID );
+    double boxeps = 1.e-6;
+    int gnomonic = 1;
+    ierr = iMOAB_ComputeMeshIntersectionOnSphere( atmPID, ocnPID, atmocnPID, &boxeps, &gnomonic );
     CHECKIERR( ierr, "failed to compute mesh intersection between ATM and OCN" );
 
 #ifdef ENABLE_ATMLND_COUPLING

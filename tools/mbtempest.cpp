@@ -300,6 +300,8 @@ struct ToolContext
             if( expectedFVMethod != "none" )
             {
                 mapOptions.strMethod += expectedFVMethod + ";";
+                fvMethod = expectedFVMethod;
+
                 // These FV projection methods are non-conservative; specify it explicitly
                 mapOptions.fNoConservation = true;
             }

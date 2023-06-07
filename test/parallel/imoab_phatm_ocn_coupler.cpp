@@ -359,7 +359,7 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         double boxeps = 1.e-6;
-	int gnomonic = 1;
+        int gnomonic = 1;
         ierr = iMOAB_ComputeMeshIntersectionOnSphere(
             cplAtmPID, cplOcnPID,
             cplAtmOcnPID, &boxeps, &gnomonic );  // coverage mesh was computed here, for cplAtmPID, atm on coupler pes

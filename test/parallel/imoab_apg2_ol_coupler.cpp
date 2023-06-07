@@ -462,8 +462,8 @@ int main( int argc, char* argv[] )
 #ifdef ENABLE_ATMLND_COUPLING
     if( couComm != MPI_COMM_NULL )
     {
-	double boxeps = 1.e-6;
-	int gnomonic = 1;
+	    double boxeps = 1.e-6;
+	    int gnomonic = 1;
         PUSH_TIMER( "Compute ATM-LND mesh intersection" )
         ierr = iMOAB_ComputeMeshIntersectionOnSphere( cplAtmPID, cplLndPID, cplAtmLndPID,  &boxeps, &gnomonic );
         CHECKIERR( ierr, "failed to compute atm - land intx for mapping" );
@@ -472,7 +472,7 @@ int main( int argc, char* argv[] )
         PUSH_TIMER( "Compute LND-ATM mesh intersection" )
         ierr =
             iMOAB_ComputeMeshIntersectionOnSphere( cplLndPID, cplAtmPID, cplLndAtmPID, &boxeps, &gnomonic );  // coverage mesh was computed
-        CHECKIERR( ierr, "cannot compute intersection" ) &boxeps, &gnomonic
+        CHECKIERR( ierr, "cannot compute intersection" )
         POP_TIMER( couComm, rankInCouComm )
     }
     if( atmCouComm != MPI_COMM_NULL )

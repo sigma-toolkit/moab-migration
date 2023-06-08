@@ -93,7 +93,7 @@ int main( int argc, char* argv[] )
 #endif
 
 #ifdef ENABLE_ATMCPLOCN_COUPLING
-    int cplatm2 = 10,
+    int cplatm2   = 10,
         atm2ocnid = 610;  // component ids are unique over all pes, and established in advance;
 #endif
 
@@ -101,8 +101,8 @@ int main( int argc, char* argv[] )
 
     int nghlay = 0;  // number of ghost layers for loading the file
     std::vector< int > groupTasks;
-    int startG1 = 0, startG2 = 0,
-        endG1 = numProcesses - 1, endG2 = numProcesses - 1; // Support launch of imoab_coupler test on any combo of 2*x processes
+    int startG1 = 0, startG2 = 0, endG1 = numProcesses - 1,
+        endG2   = numProcesses - 1;        // Support launch of imoab_coupler test on any combo of 2*x processes
     int startG4 = startG1, endG4 = endG1;  // these are for coupler layout
     int context_id = -1;                   // used now for freeing buffers
 
@@ -315,10 +315,10 @@ int main( int argc, char* argv[] )
     {
         PUSH_TIMER( "Compute ATM-OCN mesh intersection" )
         double boxeps = 1.e-6;
-        int gnomonic = 1;
-        ierr = iMOAB_ComputeMeshIntersectionOnSphere(
-            cplAtmPID, cplOcnPID,
-            cplAtmOcnPID, &boxeps, &gnomonic );  // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
+        int gnomonic  = 1;
+        ierr          = iMOAB_ComputeMeshIntersectionOnSphere(
+                     cplAtmPID, cplOcnPID, cplAtmOcnPID, &boxeps,
+                     &gnomonic );  // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
         // basically, atm was redistributed according to target (ocean) partition, to "cover" the
         // ocean partitions check if intx valid, write some h5m intx file
         CHECKIERR( ierr, "cannot compute intersection for atm/ocn" )
@@ -352,17 +352,17 @@ int main( int argc, char* argv[] )
     {
         PUSH_TIMER( "Compute ATM-OCN mesh intersection" )
         double boxeps = 1.e-6;
-        int gnomonic = 1;
-        ierr = iMOAB_ComputeMeshIntersectionOnSphere(
-            cplAtm2PID, cplOcnPID,
-            cplAtm2OcnPID, &boxeps, &gnomonic );  // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
+        int gnomonic  = 1;
+        ierr          = iMOAB_ComputeMeshIntersectionOnSphere(
+                     cplAtm2PID, cplOcnPID, cplAtm2OcnPID, &boxeps,
+                     &gnomonic );  // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
         // basically, atm was redistributed according to target (ocean) partition, to "cover" the
         // ocean partitions check if intx valid, write some h5m intx file
         CHECKIERR( ierr, "cannot compute intersection for atm2/ocn" )
         POP_TIMER( couComm, rankInCouComm )
-    // }
-    // if( atmCouComm != MPI_COMM_NULL )
-    // {
+        // }
+        // if( atmCouComm != MPI_COMM_NULL )
+        // {
         // the new graph will be for sending data from atm comp to coverage mesh for land mesh;
         // it involves initial atm app; cmpAtmPID; also migrate atm mesh on coupler pes, cplAtmPID
         // results are in cplAtmLndPID, intx mesh; remapper also has some info about coverage mesh
@@ -374,11 +374,11 @@ int main( int argc, char* argv[] )
         // Context: cplatm2 already holds the comm-graph for communicating between atm component and coupler2
         // We just need to create a comm graph to internally transfer data from coupler atm to coupler ocean
         // ierr = iMOAB_CoverageGraph( &couComm, cplAtm2PID, cplAtm2OcnPID, cplAtm2OcnPID, &cplatm2, &atm2ocnid,
-                                    // &cplocn );  // it happens over joint communicator
+        // &cplocn );  // it happens over joint communicator
         int type1 = 1;
         int type2 = 1;
-        ierr      = iMOAB_ComputeCommGraph( cplAtm2PID, cplAtm2OcnPID, &couComm, &couPEGroup, &couPEGroup, &type1, &type2,
-                                            &cplatm2, &atm2ocnid );
+        ierr = iMOAB_ComputeCommGraph( cplAtm2PID, cplAtm2OcnPID, &couComm, &couPEGroup, &couPEGroup, &type1, &type2,
+                                       &cplatm2, &atm2ocnid );
         CHECKIERR( ierr, "cannot recompute direct coverage graph for ocean from atm2" )
         POP_TIMER( couComm, rankInCouComm )  // hijack this rank
     }
@@ -421,11 +421,11 @@ int main( int argc, char* argv[] )
             CHECKIERR( ierr, "failed to write map file to disk" );
 
             const std::string intx_from_file_identifier = "map-from-file";
-            int dummyCpl = -1;
-            int dummy_rowcol = -1;
-            int dummyType = 0;
+            int dummyCpl                                = -1;
+            int dummy_rowcol                            = -1;
+            int dummyType                               = 0;
             ierr = iMOAB_LoadMappingWeightsFromFile( cplAtmOcnPID, &dummyCpl, &dummy_rowcol, &dummyType,
-                 intx_from_file_identifier.c_str(), atmocn_map_file_name.c_str() );
+                                                     intx_from_file_identifier.c_str(), atmocn_map_file_name.c_str() );
             CHECKIERR( ierr, "failed to load map file from disk" );
         }
 #endif
@@ -471,9 +471,9 @@ int main( int argc, char* argv[] )
     int tagTypes[2]  = { DENSE_DOUBLE, DENSE_DOUBLE };
     int atmCompNDoFs = disc_orders[0] * disc_orders[0], ocnCompNDoFs = 1 /*FV*/;
 
-    const char* bottomFields          = "a2oTbot:a2oUbot:a2oVbot";
-    const char* bottomProjectedFields = "a2oTbot_proj:a2oUbot_proj:a2oVbot_proj";
-    const char* bottomSourceFields2 = "a2oT2bot_src:a2oU2bot_src:a2oV2bot_src";
+    const char* bottomFields           = "a2oTbot:a2oUbot:a2oVbot";
+    const char* bottomProjectedFields  = "a2oTbot_proj:a2oUbot_proj:a2oVbot_proj";
+    const char* bottomSourceFields2    = "a2oT2bot_src:a2oU2bot_src:a2oV2bot_src";
     const char* bottomProjectedFields3 = "a2oT2bot_proj:a2oU2bot_proj:a2oV2bot_proj";
 
     if( couComm != MPI_COMM_NULL )
@@ -517,7 +517,7 @@ int main( int argc, char* argv[] )
             CHECKIERR( ierr, "failed to get num primary elems" );
             int numAllElem = nelem[2];
             std::vector< double > vals;
-            int storLeng = atmCompNDoFs * numAllElem *3; // 3 tags
+            int storLeng = atmCompNDoFs * numAllElem * 3;  // 3 tags
             int eetype   = 1;
 
             vals.resize( storLeng );
@@ -625,8 +625,7 @@ int main( int argc, char* argv[] )
         {
             // need to use ocean comp id for context
             context_id = cmpocn;  // id for ocean on comp
-            ierr =
-                iMOAB_SendElementTag( cplOcnPID, bottomProjectedFields, &ocnCouComm, &context_id );
+            ierr       = iMOAB_SendElementTag( cplOcnPID, bottomProjectedFields, &ocnCouComm, &context_id );
             CHECKIERR( ierr, "cannot send tag values back to ocean pes" )
         }
 
@@ -634,8 +633,7 @@ int main( int argc, char* argv[] )
         if( ocnComm != MPI_COMM_NULL )
         {
             context_id = cplocn;  // id for ocean on coupler
-            ierr       = iMOAB_ReceiveElementTag( cmpOcnPID, bottomProjectedFields, &ocnCouComm,
-                                                  &context_id );
+            ierr       = iMOAB_ReceiveElementTag( cmpOcnPID, bottomProjectedFields, &ocnCouComm, &context_id );
             CHECKIERR( ierr, "cannot receive tag values from ocean mesh on coupler pes" )
         }
 
@@ -674,8 +672,7 @@ int main( int argc, char* argv[] )
                 int ent_type = 1;
                 ierr         = iMOAB_GetIntTagStorage( cmpOcnPID, GidStr.c_str(), &nelem[2], &ent_type, &gidElems[0] );
                 CHECKIERR( ierr, "failed to get global ids" );
-                ierr = iMOAB_GetDoubleTagStorage( cmpOcnPID, "a2oTbot_proj", &nelem[2], &ent_type,
-                                                  &tempElems[0] );
+                ierr = iMOAB_GetDoubleTagStorage( cmpOcnPID, "a2oTbot_proj", &nelem[2], &ent_type, &tempElems[0] );
                 CHECKIERR( ierr, "failed to get temperature field" );
                 int err_code = 1;
                 check_baseline_file( baseline, gidElems, tempElems, 1.e-9, err_code );
@@ -708,14 +705,14 @@ int main( int argc, char* argv[] )
             ierr = iMOAB_FreeSenderBuffers( cmpAtmPID, &cplatm );  // context is for ocean
             CHECKIERR( ierr, "cannot free buffers used to resend atm tag towards the coverage mesh" )
         }
-// #ifdef VERBOSE
+        // #ifdef VERBOSE
         if( couComm != MPI_COMM_NULL && 1 == n )
         {  // write only for n==1 case
             char outputFileRecvd[] = "recvAtm2CoupFull.h5m";
             ierr                   = iMOAB_WriteMesh( cplAtm2PID, outputFileRecvd, fileWriteOptions );
             CHECKIERR( ierr, "could not write recvAtmCoupLnd.h5m to disk" )
         }
-// #endif
+        // #endif
 
         PUSH_TIMER( "Send/receive data from atm2 coupler to ocean coupler based on coverage data" )
         if( couComm != MPI_COMM_NULL )
@@ -738,9 +735,9 @@ int main( int argc, char* argv[] )
             ierr = iMOAB_FreeSenderBuffers( cplAtm2PID, &atm2ocnid );  // context is intx external id
             CHECKIERR( ierr, "cannot free buffers used to resend atm tag towards the coverage mesh" )
         }
-// #ifdef VERBOSE
+        // #ifdef VERBOSE
         // we should not write this one, is should be the same as recvAtm2CoupFull above
-      /*  if( couComm != MPI_COMM_NULL && 1 == n )
+        /*  if( couComm != MPI_COMM_NULL && 1 == n )
         {  // write only for n==1 case
             char outputFileRecvd[] = "recvAtm2CoupOcnCtx.h5m";
             ierr                   = iMOAB_WriteMesh( cplAtm2PID, outputFileRecvd, fileWriteOptions );
@@ -770,8 +767,8 @@ int main( int argc, char* argv[] )
         if( ocnComm != MPI_COMM_NULL )
         {
             int tagIndexIn2;
-            ierr = iMOAB_DefineTagStorage( cmpOcnPID, bottomProjectedFields3, &tagTypes[1],
-                                           &ocnCompNDoFs, &tagIndexIn2 );
+            ierr =
+                iMOAB_DefineTagStorage( cmpOcnPID, bottomProjectedFields3, &tagTypes[1], &ocnCompNDoFs, &tagIndexIn2 );
             CHECKIERR( ierr, "failed to define the field tag for receiving back the tags "
                              "a2oTbot_proj, a2oUbot_proj, a2oVbot_proj on ocn pes" );
         }
@@ -793,8 +790,7 @@ int main( int argc, char* argv[] )
         if( ocnComm != MPI_COMM_NULL )
         {
             context_id = cplocn;  // id for ocean on coupler
-            ierr       = iMOAB_ReceiveElementTag( cmpOcnPID, bottomProjectedFields3, &ocnCouComm,
-                                                  &context_id );
+            ierr       = iMOAB_ReceiveElementTag( cmpOcnPID, bottomProjectedFields3, &ocnCouComm, &context_id );
             CHECKIERR( ierr, "cannot receive tag values from ocean mesh on coupler pes" )
         }
         std::cout << "received ocn data from coupler to component\n";

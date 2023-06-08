@@ -571,9 +571,8 @@ int main( int argc, char* argv[] )
         // First compute the covering set such that the target elements are fully covered by the
         // lcoal source grid
         runCtx->timer_push( "construct covering set for intersection" );
-	bool gnomonic = true;
-	if (runCtx->fvMethod == std::string("bilin"))
-		gnomonic = false;
+        bool gnomonic = true;
+        if( runCtx->fvMethod == std::string( "bilin" ) ) gnomonic = false;
         rval = remapper.ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, runCtx->rrmGrids, gnomonic );MB_CHK_ERR( rval );
         runCtx->timer_pop();
 

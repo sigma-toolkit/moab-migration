@@ -2,7 +2,6 @@
  * This test will load a scrip file in parallel and write it back
  */
 
-
 #include "moab/Core.hpp"
 
 // MPI includes
@@ -22,7 +21,6 @@
 
 using namespace moab;
 
-
 int main( int argc, char* argv[] )
 {
     int ierr;
@@ -30,15 +28,15 @@ int main( int argc, char* argv[] )
     MPI_Group jgroup;
     std::string readopts2( "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN" );
     std::string readopts( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS" );
-    std::string readoptsLnd("PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION");
-    std::string filename=TestDir + "unittest/SCRIPgrid_2x2_nomask_c210211.nc";
-    std::string atmFilename=TestDir + "unittest/wholeATM_T.h5m";
-    std::string rofInp=TestDir + "unittest/wholeRof_06.h5m";
-    std::string seq_flds_r2x_fields("Forr_rofl:Forr_rofi:Firr_rofi:Flrr_flood:Flrr_volr:Flrr_volrmch:Flrr_supply:Flrr_deficit");
-    int cmpAtm = 5, cmpRof = 21, cplRof=22;
-    int cplatm        = 6;  // component ids are unique over all pes, and established in advance;
-    int nghlay = 0;// no ghost layers
-
+    std::string readoptsLnd( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION" );
+    std::string filename    = TestDir + "unittest/SCRIPgrid_2x2_nomask_c210211.nc";
+    std::string atmFilename = TestDir + "unittest/wholeATM_T.h5m";
+    std::string rofInp      = TestDir + "unittest/wholeRof_06.h5m";
+    std::string seq_flds_r2x_fields(
+        "Forr_rofl:Forr_rofi:Firr_rofi:Flrr_flood:Flrr_volr:Flrr_volrmch:Flrr_supply:Flrr_deficit" );
+    int cmpAtm = 5, cmpRof = 21, cplRof = 22;
+    int cplatm = 6;  // component ids are unique over all pes, and established in advance;
+    int nghlay = 0;  // no ghost layers
 
     MPI_Init( &argc, &argv );
     MPI_Comm_rank( MPI_COMM_WORLD, &rankInGlobalComm );
@@ -47,13 +45,12 @@ int main( int argc, char* argv[] )
 
     int startG1 = 0, startG2 = 0, startG4 = 0;
     int endG1, endG2, endG4;
-    endG1 = endG2 = endG4 = numProcesses-1;
+    endG1 = endG2 = endG4 = numProcesses - 1;
 
     ProgOptions opts;
     opts.addOpt< std::string >( "atmosphere,t", "atm mesh filename ", &atmFilename );
 
     opts.addOpt< std::string >( "mosart,m", " mosart with data", &rofInp );
-
 
     opts.addOpt< std::string >( "scrip,s", "scrip mesh file", &filename );
 
@@ -70,10 +67,10 @@ int main( int argc, char* argv[] )
 
     if( !rankInGlobalComm )
     {
-        std::cout << " atm file: " << atmFilename << "\n   on tasks : " << startG1 << ":" << endG1 <<
-            "\n mosart input file file: " << rofInp << "\n     on tasks : " << startG2 << ":" << endG2 <<
-            "\n scrip file on coupler: " << filename <<
-            "\n coupler    on tasks : " << startG4 << ":" << endG4 << "\n";
+        std::cout << " atm file: " << atmFilename << "\n   on tasks : " << startG1 << ":" << endG1
+                  << "\n mosart input file file: " << rofInp << "\n     on tasks : " << startG2 << ":" << endG2
+                  << "\n scrip file on coupler: " << filename << "\n coupler    on tasks : " << startG4 << ":" << endG4
+                  << "\n";
     }
 
     // load files on 2 different communicators, groups
@@ -87,7 +84,6 @@ int main( int argc, char* argv[] )
     MPI_Comm rofComm;
     ierr = create_group_and_comm( startG2, endG2, jgroup, &rofPEGroup, &rofComm );
     CHECKIERR( ierr, "Cannot create rof MPI group and communicator " )
-
 
     // we will always have a coupler
     MPI_Group couPEGroup;
@@ -112,22 +108,24 @@ int main( int argc, char* argv[] )
 
     int cmpRofID       = -1;
     iMOAB_AppID rofPID = &cmpRofID;
-    if (rofComm != MPI_COMM_NULL ) {
+    if( rofComm != MPI_COMM_NULL )
+    {
         ierr = iMOAB_RegisterApplication( "ROF", &rofComm, &cmpRof, rofPID );
         CHECKIERR( ierr, "Cannot register Rof App" )
     }
 
     int cmpAtmAppID       = -1;
     iMOAB_AppID cmpAtmPID = &cmpAtmAppID;
-    if (atmComm != MPI_COMM_NULL) {
+    if( atmComm != MPI_COMM_NULL )
+    {
         ierr = iMOAB_RegisterApplication( "ATM", &atmComm, &cmpAtm, cmpAtmPID );
         CHECKIERR( ierr, "Cannot register Atm App" )
     }
     int cplAtmAppID       = -1;
     iMOAB_AppID cplAtmPID = &cplAtmAppID;
 
-    int cplRofAppID = -1;
-    iMOAB_AppID  cplRofPID = &cplRofAppID;
+    int cplRofAppID       = -1;
+    iMOAB_AppID cplRofPID = &cplRofAppID;
 
     int rankInCouComm = -1;
     if( couComm != MPI_COMM_NULL )
@@ -155,7 +153,8 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "Cannot load and migrate atm mesh " )
     }
     int tagtype = 1, numco = 1, tagIndex = 0;
-    if( cmpRofID >= 0 ) {
+    if( cmpRofID >= 0 )
+    {
         // load  rof mesh with data on it
         ierr = iMOAB_LoadMesh( rofPID, rofInp.c_str(), readoptsLnd.c_str(), &nghlay );
         CHECKIERR( ierr, "Cannot load mosart data mesh" )
@@ -172,20 +171,20 @@ int main( int argc, char* argv[] )
         ierr = iMOAB_DefineTagStorage( cplRofPID, seq_flds_r2x_fields.c_str(), &tagtype, &numco, &tagIndex );
         CHECKIERR( ierr, "failed to define the fields on mosart coupler mesh " )
         // test what we read from scrip file
-        char outputFileTgt[] = "readCplRof.h5m";
+        char outputFileTgt[]    = "readCplRof.h5m";
         char fileWriteOptions[] = "PARALLEL=WRITE_PART";
-        ierr                  = iMOAB_WriteMesh( cplRofPID, outputFileTgt, fileWriteOptions);
+        ierr                    = iMOAB_WriteMesh( cplRofPID, outputFileTgt, fileWriteOptions );
         CHECKIERR( ierr, "cannot write Rof mesh on coupler" )
     }
     // compute comm graph between coupler and wholeRof
-    if (MPI_COMM_NULL != rofCouComm)
+    if( MPI_COMM_NULL != rofCouComm )
     {
         // compute the comm graph between point cloud rof and coupler version of rof (full mesh)
         // we are now on joint pes, compute comm graph between rof and coupler model
-        int typeA = 2; // point cloud on component PEs
-        int typeB = 3; // full mesh on coupler pes, we just read it
-        ierr = iMOAB_ComputeCommGraph( rofPID, cplRofPID, &rofCouComm, &rofPEGroup, &couPEGroup,
-         &typeA, &typeB, &cmpRof, &cplRof) ;
+        int typeA = 2;  // point cloud on component PEs
+        int typeB = 3;  // full mesh on coupler pes, we just read it
+        ierr      = iMOAB_ComputeCommGraph( rofPID, cplRofPID, &rofCouComm, &rofPEGroup, &couPEGroup, &typeA, &typeB,
+                                            &cmpRof, &cplRof );
         CHECKIERR( ierr, "cannot compute comm graph for mosart " )
     }
 

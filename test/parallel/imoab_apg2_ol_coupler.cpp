@@ -382,18 +382,19 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         PUSH_TIMER( "Compute ATM-OCN mesh intersection" )
-        double boxeps=1.e-6;
-        int gnomonic = 1;
-        ierr = iMOAB_ComputeMeshIntersectionOnSphere(
-            cplAtmPID, cplOcnPID, cplAtmOcnPID, &boxeps, &gnomonic );  // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
+        double boxeps = 1.e-6;
+        int gnomonic  = 1;
+        ierr          = iMOAB_ComputeMeshIntersectionOnSphere(
+                     cplAtmPID, cplOcnPID, cplAtmOcnPID, &boxeps,
+                     &gnomonic );  // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
         // basically, atm was redistributed according to target (ocean) partition, to "cover" the ocean partitions
         // check if intx valid, write some h5m intx file
         CHECKIERR( ierr, "cannot compute intersection" )
         POP_TIMER( couComm, rankInCouComm )
 
         PUSH_TIMER( "Compute OCN-ATM mesh intersection" )
-        ierr =
-            iMOAB_ComputeMeshIntersectionOnSphere( cplOcnPID, cplAtmPID, cplOcnAtmPID,  &boxeps, &gnomonic );  // coverage mesh was computed
+        ierr = iMOAB_ComputeMeshIntersectionOnSphere( cplOcnPID, cplAtmPID, cplOcnAtmPID, &boxeps,
+                                                      &gnomonic );  // coverage mesh was computed
         CHECKIERR( ierr, "cannot compute intersection" )
         POP_TIMER( couComm, rankInCouComm )
     }
@@ -463,15 +464,15 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         double boxeps = 1.e-6;
-        int gnomonic = 1;
+        int gnomonic  = 1;
         PUSH_TIMER( "Compute ATM-LND mesh intersection" )
-        ierr = iMOAB_ComputeMeshIntersectionOnSphere( cplAtmPID, cplLndPID, cplAtmLndPID,  &boxeps, &gnomonic );
+        ierr = iMOAB_ComputeMeshIntersectionOnSphere( cplAtmPID, cplLndPID, cplAtmLndPID, &boxeps, &gnomonic );
         CHECKIERR( ierr, "failed to compute atm - land intx for mapping" );
         POP_TIMER( couComm, rankInCouComm )
 
         PUSH_TIMER( "Compute LND-ATM mesh intersection" )
-        ierr =
-            iMOAB_ComputeMeshIntersectionOnSphere( cplLndPID, cplAtmPID, cplLndAtmPID, &boxeps, &gnomonic );  // coverage mesh was computed
+        ierr = iMOAB_ComputeMeshIntersectionOnSphere( cplLndPID, cplAtmPID, cplLndAtmPID, &boxeps,
+                                                      &gnomonic );  // coverage mesh was computed
         CHECKIERR( ierr, "cannot compute intersection" )
         POP_TIMER( couComm, rankInCouComm )
     }
@@ -542,8 +543,9 @@ int main( int argc, char* argv[] )
         ierr = iMOAB_ComputeScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0], disc_methods[1],
                                                      &disc_orders[1],                   // fv
                                                      disc_methods[1], &disc_orders[1],  // fv
-                                                     nullptr, &fNoBubble, &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap,
-                                                     &fNoConserve, &fValidate, dof_tag_names[1], dof_tag_names[1] );
+                                                     nullptr, &fNoBubble, &fMonotoneTypeID, &fVolumetric,
+                                                     &fInverseDistanceMap, &fNoConserve, &fValidate, dof_tag_names[1],
+                                                     dof_tag_names[1] );
         CHECKIERR( ierr, "cannot compute scalar projection weights" )
         POP_TIMER( couComm, rankInCouComm )
     }
@@ -555,8 +557,9 @@ int main( int argc, char* argv[] )
         ierr = iMOAB_ComputeScalarProjectionWeights( cplOcnAtmPID, weights_identifiers[0], disc_methods[1],
                                                      &disc_orders[1],                   // fv
                                                      disc_methods[1], &disc_orders[1],  // fv
-                                                     nullptr, &fNoBubble, &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap,
-                                                     &fNoConserve, &fValidate, dof_tag_names[1], dof_tag_names[1] );
+                                                     nullptr, &fNoBubble, &fMonotoneTypeID, &fVolumetric,
+                                                     &fInverseDistanceMap, &fNoConserve, &fValidate, dof_tag_names[1],
+                                                     dof_tag_names[1] );
         CHECKIERR( ierr, "cannot compute scalar projection weights" )
         POP_TIMER( couComm, rankInCouComm )
     }
@@ -573,18 +576,18 @@ int main( int argc, char* argv[] )
         // Compute the weights to project the solution from ATM component to LND component
         PUSH_TIMER( "Compute ATM-LND remapping weights" )
         ierr = iMOAB_ComputeScalarProjectionWeights( cplAtmLndPID, weights_identifiers[0], disc_methods[1],
-                                                     &disc_orders[1], disc_methods[1], &disc_orders[1], nullptr, &fNoBubble,
-                                                     &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap, &fNoConserve,
-                                                     &fValidate, dof_tag_names[1], dof_tag_names[1] );
+                                                     &disc_orders[1], disc_methods[1], &disc_orders[1], nullptr,
+                                                     &fNoBubble, &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap,
+                                                     &fNoConserve, &fValidate, dof_tag_names[1], dof_tag_names[1] );
         CHECKIERR( ierr, "failed to compute remapping projection weights for ATM-LND scalar non-conservative field" );
         POP_TIMER( couComm, rankInCouComm )
 
         // Compute the weights to project the solution from LND component to ATM component
         PUSH_TIMER( "Compute LND-ATM remapping weights" )
         ierr = iMOAB_ComputeScalarProjectionWeights( cplLndAtmPID, weights_identifiers[0], disc_methods[1],
-                                                     &disc_orders[1], disc_methods[1], &disc_orders[1], nullptr, &fNoBubble,
-                                                     &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap, &fNoConserve,
-                                                     &fValidate, dof_tag_names[1], dof_tag_names[1] );
+                                                     &disc_orders[1], disc_methods[1], &disc_orders[1], nullptr,
+                                                     &fNoBubble, &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap,
+                                                     &fNoConserve, &fValidate, dof_tag_names[1], dof_tag_names[1] );
         CHECKIERR( ierr, "failed to compute remapping projection weights for LND-ATM scalar non-conservative field" );
         POP_TIMER( couComm, rankInCouComm )
     }

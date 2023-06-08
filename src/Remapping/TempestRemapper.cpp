@@ -875,8 +875,10 @@ ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
         //           << " covering entities = [" << m_covering_source_vertices.size() << ", "
         //           << m_covering_source_entities.size() << "]\n";
     }
+#ifdef VERBOSE
     m_covering_source->Write( std::string( "coverage_TR_p" + std::to_string( rank ) + ".g" ) );
     m_target->Write( std::string( "target_TR_p" + std::to_string( rank ) + ".g" ) );
+#endif
     gid_to_lid_src.clear();
     lid_to_gid_src.clear();
     gid_to_lid_covsrc.clear();

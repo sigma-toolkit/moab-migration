@@ -1226,7 +1226,7 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
                                                  double radius_tgt,
                                                  double boxeps,
                                                  bool regional_mesh,
-	                                         bool gnomonic	)
+	                                             bool gnomonic	)
 {
     ErrorCode rval;
 

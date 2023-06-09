@@ -706,7 +706,7 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
 {
     if (!gnomonic)
     {
-        return Intx2Mesh::build_processor_euler_boxes(euler_set, local_verts);
+        return Intx2Mesh::build_processor_euler_boxes(euler_set, local_verts, gnomonic);
     }
     localEnts.clear();
     ErrorCode rval = mb->get_entities_by_dimension( euler_set, 2, localEnts );MB_CHK_SET_ERR( rval, "can't get local ents" );

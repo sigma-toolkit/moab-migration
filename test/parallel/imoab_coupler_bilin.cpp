@@ -33,7 +33,7 @@
 #include "moab/ProgOptions.hpp"
 #include <iostream>
 #include <sstream>
-
+//#include <iomanip>
 #include "imoab_coupler_utils.hpp"
 
 using namespace moab;
@@ -107,6 +107,7 @@ int main( int argc, char* argv[] )
     opts.addOpt< std::string >( "atmosphere,t", "atm mesh filename (source)", &atmFilename );
 #ifdef ENABLE_ATMOCN_COUPLING
     opts.addOpt< std::string >( "ocean,m", "ocean mesh filename (target)", &ocnFilename );
+    std::string baseline    = TestDir + "unittest/baseline3.txt";
 #endif
     opts.addOpt< int >( "startAtm,a", "start task for atmosphere layout", &startG1 );
     opts.addOpt< int >( "endAtm,b", "end task for atmosphere layout", &endG1 );
@@ -119,6 +120,9 @@ int main( int argc, char* argv[] )
     opts.addOpt< int >( "endCoupler,j", "end task for coupler layout", &endG4 );
 
     opts.addOpt< int >( "partitioning,p", "partitioning option for migration", &repartitioner_scheme );
+
+    bool no_regression_test = false;
+    opts.addOpt< void >( "no_regression,r", "do not do regression test against baseline 3", &no_regression_test );
 
     opts.parseCommandLine( argc, argv );
 
@@ -326,6 +330,13 @@ int main( int argc, char* argv[] )
     const char* bottomFields          = "Sa_dens:Sa_pbot";
     const char* bottomProjectedFields = "Sa_dens:Sa_pbot";
 
+    if( ocnComm != MPI_COMM_NULL )
+    {
+        context_id = cplocn;  // id for ocean on coupler
+        ierr = iMOAB_DefineTagStorage( cmpOcnPID, bottomProjectedFields, &tagTypes[1], &ocnCompNDoFs, &tagIndex[1] );
+        CHECKIERR( ierr, "failed to define the field tag Sa_dens:Sa_pbot" );
+    }
+
     if( couComm != MPI_COMM_NULL )
     {
         ierr = iMOAB_DefineTagStorage( cplAtmPID, bottomFields, &tagTypes[0], &atmCompNDoFs, &tagIndex[0] );
@@ -463,6 +474,46 @@ int main( int argc, char* argv[] )
         ierr                 = iMOAB_WriteMesh( cmpOcnPID, outputFileOcn, fileWriteOptions );
         CHECKIERR( ierr, "could not write OcnWithProj.h5m to disk" )
     }
+    // do a check agains a baseline test
+    if( !no_regression_test && (ocnComm != MPI_COMM_NULL))
+    {
+        // the same as remap test
+        // get temp field on ocean, from conservative, the global ids, and check to the baseline file
+        // first get GlobalIds from ocn, and fields:
+        int nverts[3], nelem[3];
+        ierr = iMOAB_GetMeshInfo( cmpOcnPID, nverts, nelem, 0, 0, 0 );
+        CHECKIERR( ierr, "failed to get ocn mesh info" );
+        std::vector< int > gidElems;
+        gidElems.resize( nelem[2] );
+        std::vector< double > tempElems;
+        tempElems.resize( nelem[2] );
+        // get global id storage
+        const std::string GidStr = "GLOBAL_ID";  // hard coded too
+        int tag_type = DENSE_INTEGER, ncomp = 1, tagInd = 0;
+        ierr = iMOAB_DefineTagStorage( cmpOcnPID, GidStr.c_str(), &tag_type, &ncomp, &tagInd );
+        CHECKIERR( ierr, "failed to define global id tag" );
+
+        int ent_type = 1;
+        ierr         = iMOAB_GetIntTagStorage( cmpOcnPID, GidStr.c_str(), &nelem[2], &ent_type, &gidElems[0] );
+        CHECKIERR( ierr, "failed to get global ids" );
+        ierr = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot", &nelem[2], &ent_type, &tempElems[0] );
+        CHECKIERR( ierr, "failed to get temperature field" );
+//        {
+//            // write baseline file
+//            std::fstream fs;
+//            fs.open( "baseline3.txt", std::fstream::out );
+//            fs << std::setprecision( 15 );  // maximum precision for doubles
+//            for( size_t i = 0; i < tempElems.size(); i++ )
+//                fs << gidElems[i] << " " << tempElems[i] << "\n";
+//            fs.close();
+//        }
+        int err_code = 1;
+        check_baseline_file( baseline, gidElems, tempElems, 1.e-9, err_code );
+        if( 0 == err_code )
+            std::cout << " passed baseline test atm2ocn on ocean task " << rankInOcnComm << "\n";
+    }
+
+
 #endif
 
 #ifdef ENABLE_ATMOCN_COUPLING

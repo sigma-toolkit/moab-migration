@@ -444,14 +444,12 @@ module iMOAB
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
 
-      integer(c_int) function iMOAB_ComputeMeshIntersectionOnSphere(pid_source, pid_target, pid_intersection, boxeps, gnomonic) &
+      integer(c_int) function iMOAB_ComputeMeshIntersectionOnSphere(pid_source, pid_target, pid_intersection) &
                                                                   bind(C, name='iMOAB_ComputeMeshIntersectionOnSphere')
         use, intrinsic :: iso_c_binding, only: c_int, c_double
         integer(c_int), intent(in) :: pid_source
         integer(c_int), intent(in) :: pid_target
         integer(c_int), intent(in) :: pid_intersection
-        real(c_double), intent(in) :: boxeps
-        integer(c_int), intent(in) :: gnomonic
       end function iMOAB_ComputeMeshIntersectionOnSphere
 
       integer(c_int) function iMOAB_ComputePointDoFIntersection(pid_source, pid_target, pid_intersection) &

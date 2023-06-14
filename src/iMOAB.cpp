@@ -3979,7 +3979,7 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     double radius_source = 1.0;
     double radius_target = 1.0;
     const double epsrel  = ReferenceTolerance;  // ReferenceTolerance is defined in Defines.h in tempestremap source ;
-    constexpr double boxeps  = 1.e-6;
+    constexpr double boxeps  = 1.e-1;
     constexpr bool gnomonic = false;
 
     // Get the source and target data and pcomm objects

@@ -415,7 +415,7 @@ int main( int argc, char* argv[] )
                                                // TempestOnlineMap.hpp is included in this file, and is part of MOAB
     // Some constant parameters
 
-    const double boxeps = 1e-6;
+    const double boxeps = 1e-1;
 
     if( runCtx->meshType == moab::TempestRemapper::OVERLAP_MEMORY )
     {

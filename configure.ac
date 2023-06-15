@@ -1270,6 +1270,11 @@ else
   MB_OPTIONAL_TOOL([mbcslam],    [no], [no])
 fi
 
+if test "x$ENABLE_imesh" != "xyes"; then
+  MB_OPTIONAL_TOOL([mbcslam],    [no], [no])
+  MB_OPTIONAL_TOOL([mcnpmit],    [no], [no])
+fi
+
 MB_OPTIONAL_TOOL([h5mtools],     [${enablehdf5}], [${enablehdf5}])
 MB_OPTIONAL_TOOL([mbquality],    [yes], [yes])
 MB_OPTIONAL_TOOL([mbtempest],    [${HAVE_TEMPEST}], [${HAVE_TEMPEST}])

@@ -106,12 +106,6 @@ if ENABLE_gsets
   bin_PROGRAMS += mbgsets
 endif
 
-if ENABLE_refiner
-  refiner_DIR = refiner
-else
-  refiner_DIR=
-endif
-
 if ENABLE_mbcoupler
   mbcoupler_DIR = mbcoupler
 else
@@ -193,11 +187,9 @@ endif
 noinst_PROGRAMS = $(parread)
 
 SUBDIRS = . \
-          $(refiner_DIR) \
           $(mbcoupler_DIR) \
           $(mbcslam_DIR) \
           $(mcnpmit_DIR) \
-          $(vtkMOABReader_DIR) \
           $(geometry_DIR)
 
 mbgsets_SOURCES = gsets.cpp

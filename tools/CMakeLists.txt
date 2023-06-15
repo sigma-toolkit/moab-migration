@@ -20,10 +20,6 @@ option ( MOAB_BUILD_MBUMR        "Build the uniform mesh refinement tool?"      
 option ( MOAB_BUILD_MBQUALITY    "Build the quality metrics tool?"               ON )
 option ( MOAB_BUILD_MBTEMPEST    "Build the TempestRemap coupler tool?"         OFF )
 
-#if ( MOAB_HAVE_MPI AND MPI_FOUND )
-#  add_subdirectory( refiner )
-#endif ( )
-
 include_directories(
   ${CMAKE_BINARY_DIR}
   ${CMAKE_BINARY_DIR}/src

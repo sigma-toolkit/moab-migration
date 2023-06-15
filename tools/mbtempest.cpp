@@ -68,6 +68,7 @@ struct ToolContext
     bool kdtreeSearch;
     bool fCheck;
     bool fVolumetric;
+    bool useGnomonicProjection;
     GenerateOfflineMapAlgorithmOptions mapOptions;
 
 #ifdef MOAB_HAVE_MPI
@@ -81,7 +82,7 @@ struct ToolContext
           blockSize( 5 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "intxFile.h5m" ),
           baselineFile( "" ), meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ), computeWeights( false ),
           verifyWeights( false ), enforceConvexity( false ), ensureMonotonicity( 0 ), rrmGrids( false ),
-          kdtreeSearch( true ), fCheck( n_procs > 1 ? false : true ), fVolumetric( false )
+          kdtreeSearch( true ), fCheck( n_procs > 1 ? false : true ), fVolumetric( false ), useGnomonicProjection( false )
     {
         inFilenames.resize( 2 );
         doftag_names.resize( 2 );
@@ -198,6 +199,9 @@ struct ToolContext
 
         opts.addOpt< int >( "monotonicity", "Ensure monotonicity in the weight generation. Options=[0,1,2,3]",
                             &ensureMonotonicity );
+
+        opts.addOpt< void >( "gnomonic", "Use Gnomonic plane projections to compute coverage mesh.",
+                            &useGnomonicProjection );
 
         opts.addOpt< std::string >( "fvmethod",
                                     "Sub-type method for FV-FV projections (invdist, delaunay, bilin, "
@@ -411,7 +415,7 @@ int main( int argc, char* argv[] )
                                                // TempestOnlineMap.hpp is included in this file, and is part of MOAB
     // Some constant parameters
 
-    const double boxeps = 5e-1;
+    const double boxeps = 1e-1;
 
     if( runCtx->meshType == moab::TempestRemapper::OVERLAP_MEMORY )
     {
@@ -571,9 +575,7 @@ int main( int argc, char* argv[] )
         // First compute the covering set such that the target elements are fully covered by the
         // lcoal source grid
         runCtx->timer_push( "construct covering set for intersection" );
-        bool gnomonic = true;
-        if( runCtx->fvMethod == std::string( "bilin" ) ) gnomonic = false;
-        rval = remapper.ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, runCtx->rrmGrids, gnomonic );MB_CHK_ERR( rval );
+        rval = remapper.ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, runCtx->rrmGrids, runCtx->useGnomonicProjection );MB_CHK_ERR( rval );
         runCtx->timer_pop();
 
         // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm

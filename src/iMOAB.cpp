@@ -3970,7 +3970,7 @@ static ErrCode ComputeSphereRadius( iMOAB_AppID pid, double* radius )
     return moab::MB_SUCCESS;
 }
 
-ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMOAB_AppID pid_intx, double * p_boxeps, int * p_gnomonic )
+ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMOAB_AppID pid_intx )
 {
     ErrorCode rval;
     ErrCode ierr;
@@ -3979,10 +3979,8 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     double radius_source = 1.0;
     double radius_target = 1.0;
     const double epsrel  = ReferenceTolerance;  // ReferenceTolerance is defined in Defines.h in tempestremap source ;
-    double boxeps  = 1.e-6;
-    if (p_boxeps!= nullptr) boxeps = *p_boxeps;
-    bool gnomonic = true;
-    if ( (p_gnomonic != nullptr) && (*p_gnomonic == 0)) gnomonic = false;
+    constexpr double boxeps  = 1.e-1;
+    constexpr bool gnomonic = false;
 
     // Get the source and target data and pcomm objects
     appData& data_src  = context.appDatas[*pid_src];

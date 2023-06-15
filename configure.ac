@@ -58,7 +58,7 @@ MB_DEFS=""
 
 ENABLE_FORTRAN=no
 AC_ARG_ENABLE([fortran],
-              [AS_HELP_STRING([--disable-fortran], [Disable Fortran support and name mangling in ITAPS/MBCN C headers])])
+              [AS_HELP_STRING([--disable-fortran], [Disable Fortran support and name mangling])])
 
 if (test "x$enable_fortran" != "xno"); then
   ENABLE_FORTRAN=yes
@@ -416,20 +416,11 @@ AC_SUBST([python_patterns])
 #                           iMesh Part 1 of 2
 ################################################################################
 AC_ARG_ENABLE( [imesh],
-[AS_HELP_STRING([--disable-imesh],[Do not build support for iMesh interface.])],
-[disable_imesh=$enableval],
-[disable_imesh=yes] )
+[AS_HELP_STRING([--enable-imesh],[Build support for iMesh interface.])],
+[ENABLE_imesh=$enableval],
+[ENABLE_imesh=no] )
 
-if (test "xyes" != "x$disable_imesh" && test "xno" != "x$disable_imesh"); then
-  AC_MSG_ERROR([Unknown argument --disable-imesh=$enableval])
-else
-  if (test "$disable_imesh" != "no"); then
-    ENABLE_imesh=yes
-  else
-    ENABLE_imesh=no
-  fi
-  DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --enable-imesh=$ENABLE_imesh"
-fi
+DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --enable-imesh=$ENABLE_imesh"
 
 ################################################################################
 #                           FBiGeom Part 1 of 2
@@ -914,38 +905,10 @@ fi
 #                            Optional Libraries
 ################################################################################
 
-AC_ARG_WITH([vtk],
-  [AS_HELP_STRING([--with-vtk=DIR],[Enable VTK support, and specify VTK location])],
-  [WITH_VTK=$withval
-   DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --with-vtk=\"${withval}\""
-  ],[WITH_VTK=])
-
-VTKMOAB_DEFAULT=no
-if (test "x$WITH_VTK" != "xno" && test "x$WITH_VTK" != "x"); then
-  VTKMOAB_DEFAULT=yes
-fi
-
-AC_ARG_WITH( [vtk-lib-suffix],
-             [AS_HELP_STRING([--with-vtk-lib-suffix=SUFFIX],[Specify optional suffix to VTK library names, e.g. -pv3.98])],
-             [case "x$withval" in
-               xyes)
-                 AC_MSG_ERROR([Must specify a non-empty suffix!])
-		             VTK_LIB_SUFFIX=
-                 ;;
-               xno)
-                 AC_MSG_ERROR([Must specify a non-empty suffix!])
-		             VTK_LIB_SUFFIX=
-                 ;;
-               x*)
-		             VTK_LIB_SUFFIX="$withval"
-                 DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --with-vtk-lib-suffix=\"${withval}\""
-                 ;;
-               esac],[VTK_LIB_SUFFIX=] )
-
 # Provide downloadable option for TempestRemap library
-# Supported TempestRemap versions: 2.1.3, 2.1.1, 2.0.5, 2.0.3
+# Supported TempestRemap versions: 2.2.0, 2.1.6
 # Arguments: 1) Default Version Number, 2) Download by default ?
-AUSCM_CONFIGURE_DOWNLOAD_TEMPESTREMAP([2.1.6], [no])
+AUSCM_CONFIGURE_DOWNLOAD_TEMPESTREMAP([2.2.0], [no])
 
 # Configuration for TempestRemap library
 AC_ARG_WITH([tempestremap],
@@ -1279,7 +1242,6 @@ AS_HELP_STRING([--disable-tools],[Disable all tools by default])],
   # Individual tools
 MB_OPTIONAL_TOOL([mbconvert],    [yes], [yes])
 MB_OPTIONAL_TOOL([hexmodops],    [yes], [yes])
-MB_OPTIONAL_TOOL([vtkMOABReader],[${VTKMOAB_DEFAULT}], [${VTKMOAB_DEFAULT}])
 MB_OPTIONAL_TOOL([mbsize],       [yes], [yes])
 MB_OPTIONAL_TOOL([mbhonodes],    [yes], [yes])
 MB_OPTIONAL_TOOL([mbskin],       [yes], [yes])
@@ -1308,7 +1270,11 @@ else
   MB_OPTIONAL_TOOL([mbcslam],    [no], [no])
 fi
 
-MB_OPTIONAL_TOOL([refiner],      [no], [no])
+if test "x$ENABLE_imesh" != "xyes"; then
+  MB_OPTIONAL_TOOL([mbcslam],    [no], [no])
+  MB_OPTIONAL_TOOL([mcnpmit],    [no], [no])
+fi
+
 MB_OPTIONAL_TOOL([h5mtools],     [${enablehdf5}], [${enablehdf5}])
 MB_OPTIONAL_TOOL([mbquality],    [yes], [yes])
 MB_OPTIONAL_TOOL([mbtempest],    [${HAVE_TEMPEST}], [${HAVE_TEMPEST}])
@@ -1322,14 +1288,6 @@ MB_OPTIONAL_TOOL([ahf],          [no], [no])
 MB_OPTIONAL_TOOL([mbumr],        [yes], [yes])
 if (test "xyes" = "x$ENABLE_ahf"); then
   AC_DEFINE([HAVE_AHF],[1],[Enable use of AHF data-structures for querying adjacency information])
-fi
-
-if test "xyes" = "x$ENABLE_vtkMOABReader"; then
-  if test "xno" = "x$WITH_VTK"; then
-    AC_MSG_ERROR([vtkMOABReader requires VTK])
-  elif (test "x" = "x$WITH_VTK"); then
-    WITH_VTK=yes
-  fi
 fi
 
 dnl Define a function that checks for the existence of a library
@@ -1349,169 +1307,6 @@ dnl  - Optional library path linker argument (e.g. -L/opt/foo)
     LIBS="$old_LIBS"
   ])
 
-dnl Define a function that checks for the existence of a library
-dnl and if it exists, prepends the corresponding link flag to a
-dnl sepecified variable
-dnl Arguments:
-dnl  - The library name
-dnl  - The name of the variable to which to prepend the library link flag
-dnl  - List of extra libraries required for link test
-dnl  - Optional library path linker argument (e.g. -L/opt/foo)
-  AC_DEFUN([FATHOM_CHECK_VTK_LIB_LIST],[
-    old_LIBS="$LIBS"
-    LIBS="$5 ${$3} $old_LIBS"
-    AC_CHECK_LIB([$1$VTK_LIB_SUFFIX], main,
-       [$3="-l$1$VTK_LIB_SUFFIX ${$3}"],
-       [],[$4])dnl
-    LIBS="$old_LIBS"
-  ])
-
-
-################################################################################
-#                    VTK for vtkMOABReader
-################################################################################
-AC_DEFUN([FATHOM_MERGE_LISTS],[
-  $1="$2"
-  # Reverse list two
-  for item3 in $3; do
-    found=no
-    for item2 in $2; do
-      if test "x$item2" = "x$item3"; then found=yes; fi
-    done
-    if test "$found" = "no"; then $1="${$1} $item3"; fi
-  done
-  $1="${$1} $2"
-])
-
-if  (test "x$WITH_VTK" != "xno" && test "x$WITH_VTK" != "x"); then
-  AC_PATH_X
-  AC_PATH_XTRA
-  if test "xyes" = "x$no_x"; then
-    AC_MSG_ERROR([X11 not found])
-  fi
-
-  AC_LANG_PUSH([C++])
-
-  VTK_INCLUDES=
-  case "x$WITH_VTK" in
-    xyes|x)
-      VTK_LIB_DIR=
-      VTK_INC_DIR=
-      for dir in  /usr/local/include/vtk /usr/local/include/vtk-* /usr/include/vtk  /usr/include/vtk-*; do
-        if test "x" = "x$VTK_INC_DIR"; then
-          AC_CHECK_FILE([${dir}/vtkUnstructuredGrid.h],[VTK_INC_DIR="-I$dir"])
-        fi
-      done
-      if test x = x"$VTK_INC_DIR"; then
-        AC_CHECK_HEADER([vtkUnstructuredGrid.h],[],
-                        [AC_MSG_ERROR([VTK includes not found])])
-      else
-        VTK_INCLUDES="$VTK_INC_DIR"
-      fi
-      old_LIBS="$LIBS"
-      for dir in /usr/lib/vtk /usr/lib /usr/bin /usr; do
-        if test "x" = "x$VTK_LIB_DIR"; then
-          LIBS="$old_LIBS -L$dir"
-          FATHOM_CHECK_VTK_LIB_LIST([vtkCommonCore],[$VTK_LIB_SUFFIX], [VTK_LIB_DIR],[],[-L$dir])
-        fi
-      done
-      if test "x" = "x$VTK_LIB_DIR"; then
-        AC_MSG_ERROR([VTK libraries not found])
-      fi
-      LIBS="$old_LIBS"
-      ;;
-    x?*)
-      VTK_LIB_DIR=
-      VTK_INC_DIR=
-      for dir in ${WITH_VTK}/include/vtk* ${WITH_VTK}/include ${WITH_VTK}/include/paraview* ${WITH_VTK}/VTK ${WITH_VTK}; do
-        if test "x" = "x$VTK_INC_DIR"; then
-          AC_CHECK_FILE([${dir}/vtkUnstructuredGrid.h],[VTK_INC_DIR="-I$dir"])
-        fi
-      done
-      if test "x" = "x$VTK_INC_DIR"; then
-        # Check for non-installed VTK source
-        AC_CHECK_FILE([vtkUnstructuredGrid.h],[
-          for subdir in . Common Common/DataModel Filtering GenericFiltering Graphics Hybrid Imaging Parallel Patented Rendering Utilities Utilities/vtkexpat Utilities/expat Utilities/DICOMParser Utilties/vtkpng Utilities/vtkzlib Utilities/freetype/include/freetype Wrapping; do
-        	  AC_MSG_CHECKING([for directory ${WITH_VTK}/$subdir])
-        	  if test -d ${WITH_VTK}/$subdir; then
-        	    VTK_INC_DIR="$VTK_INC_DIR -I${WITH_VTK}/$subdir"
-        	    AC_MSG_RESULT([yes])
-        	  else
-        	    AC_MSG_RESULT([no])
-        	  fi
-        	done
-        	],[AC_MSG_ERROR([VTK includes not found])]
-        )
-      fi
-      VTK_INCLUDES="$VTK_INC_DIR"
-      old_LIBS="$LIBS"
-      for dir in ${WITH_VTK}/lib ${WITH_VTK}/lib/vtk ${VTK_DIR}/bin ${WITH_VTK}/bin ${WITH_VTK}; do
-        if test "x" = "x$VTK_LIB_DIR"; then
-          LIBS="$old_LIBS -L$dir"
-          FATHOM_CHECK_VTK_LIB_LIST([vtkCommonCore],[$VTK_LIB_SUFFIX], [VTK_LIB_DIR],[],[-L$dir])
-        fi
-      done
-      if test "x" = "x$VTK_LIB_DIR"; then
-        AC_MSG_ERROR([VTK libraries not found])
-      else
-        AC_DEFINE([HAVE_VTK],[1],["Define if configured with VTK I/O library support."])
-      fi
-      LIBS="$old_LIBS"
-      ;;
-  esac
-
-   # These are ordered such that a given library depends only on those libraries
-   # that preceed it in the list.
-  FATHOM_CHECK_LIB_LIST([dl],[AC_DEFINE([HAVE_LDL],[1],["Define if configured with dynamic library loading support."])],     [vtk_sys_libs])
-  FATHOM_CHECK_LIB_LIST([m],[AC_DEFINE([HAVE_LM],[1],["Define if configured with math library support."])],      [vtk_sys_libs])
-  FATHOM_CHECK_LIB_LIST([gcc],[],    [vtk_sys_libs])
-  x_libs_arg="$X_EXTRA_LIBS -lX11 $X_PRE_LIBS"
-  FATHOM_CHECK_LIB_LIST([Xext],[],[vtk_x_libs],[$x_libs_arg],[-L$x_libraries])
-  FATHOM_CHECK_LIB_LIST([ICE],[], [vtk_x_libs],[$x_libs_arg],[-L$x_libraries])
-  FATHOM_CHECK_LIB_LIST([SM],[],  [vtk_x_libs],[$x_libs_arg],[-L$x_libraries])
-  FATHOM_CHECK_LIB_LIST([Xt],[],  [vtk_x_libs],[$x_libs_arg],[-L$x_libraries])
-  FATHOM_CHECK_LIB_LIST([GL],[AC_DEFINE([HAVE_GL],[1],["Define if configured with openGL library support."])],  [vtk_x_libs],[$x_libs_arg],[-L$x_libraries])
-  FATHOM_CHECK_LIB_LIST([GLU],[], [vtk_x_libs],[$x_libs_arg],[-L$x_libraries])
-  vtk_libs_arg="-L$x_libraries $vtk_x_libs $X_EXTRA_LIBS -lX11 $X_PRE_LIBS $vtk_sys_libs"
-
-  FATHOM_CHECK_VTK_LIB_LIST([vtksys],[$VTK_LIB_SUFFIX],        [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtkCommonCore],[$VTK_LIB_SUFFIX], [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtkDICOMParser],[$VTK_LIB_SUFFIX],[vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtkfreetype],[$VTK_LIB_SUFFIX],   [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtkexpat],[$VTK_LIB_SUFFIX],      [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtkzlib],[$VTK_LIB_SUFFIX],       [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtkpng],[$VTK_LIB_SUFFIX],        [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtkjpeg],[$VTK_LIB_SUFFIX],       [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtktiff],[$VTK_LIB_SUFFIX],       [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtkftgl],[$VTK_LIB_SUFFIX],       [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtkFiltersCore],[$VTK_LIB_SUFFIX],  [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtkImagingCore],[$VTK_LIB_SUFFIX],    [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([verdict],[$VTK_LIB_SUFFIX],       [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtkGraphics],[$VTK_LIB_SUFFIX],   [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtkNetCDF],[$VTK_LIB_SUFFIX],     [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtkexoIIc],[$VTK_LIB_SUFFIX],     [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtkmetaio],[$VTK_LIB_SUFFIX],     [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtkIOCore],[$VTK_LIB_SUFFIX],         [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtkRenderingCore],[$VTK_LIB_SUFFIX],  [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  FATHOM_CHECK_VTK_LIB_LIST([vtkParallelCore],[$VTK_LIB_SUFFIX],   [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-  #FATHOM_CHECK_VTK_LIB_LIST([vtkHybrid],[$VTK_LIB_SUFFIX],     [vtk_libs],[$vtk_libs_arg],[-L$VTK_LIB_DIR])
-
-   # Make sure we found at least vtkCommonCore and vtkRendering
-  if ! echo "x $vtk_libs" | grep lvtkCommonCore >/dev/null; then
-    AC_MSG_ERROR("VTK library 'vtkCommonCore' not found.")
-  fi
-
-  AC_LANG_POP([C++])
-
-  FATHOM_MERGE_LISTS([XLIBS_tmp],[$X_EXTRA_LIBS -lX11 $X_PRE_LIBS],[$vtk_x_libs])
-  FATHOM_MERGE_LISTS([XLIBS],[$vtk_sys_libs],[$XLIBS_tmp])
-  VTK_LIBS="$LIBS -L$VTK_LIB_DIR $vtk_libs $XLIBS"
-  VTK_INCLUDES="$VTK_INCLUDES"
-  AC_SUBST(VTK_LIBS)
-  AC_SUBST(VTK_INCLUDES)
-  AC_SUBST(VTK_LIB_DIR)
-  AC_SUBST(VTK_INC_DIR)
-fi
 
 ###############################################################################
 #                       Download Auxilliary Files locally
@@ -1603,12 +1398,10 @@ AC_CONFIG_FILES([Makefile
                  itaps/irel/Makefile
                  itaps/irel/iRel-Defs.inc
                  tools/Makefile
-                 tools/refiner/Makefile
                  tools/mbcoupler/Makefile
                  tools/mbcslam/Makefile
                  tools/mcnpmit/Makefile
                  tools/geometry/Makefile
-                 tools/vtkMOABReader/CMakeLists.txt
                  doc/user.dox
 		 doc/cython_filter.py
                  doc/config.tex

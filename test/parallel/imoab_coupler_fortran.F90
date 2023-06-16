@@ -69,6 +69,8 @@ program imoab_coupler_fortran
    character(:), allocatable :: concat_fieldname, concat_fieldnameT, outputFileOcn
    integer :: tagIndexIn2 ! not really needed
    integer :: dummyCpl, dummyRC, dummyType
+   real*8  :: boxeps
+   integer :: gnomonic
 
    cmpatm = 5
    cplatm = 6

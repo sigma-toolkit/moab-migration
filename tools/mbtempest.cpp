@@ -68,6 +68,7 @@ struct ToolContext
     bool kdtreeSearch;
     bool fCheck;
     bool fVolumetric;
+    bool useGnomonicProjection;
     GenerateOfflineMapAlgorithmOptions mapOptions;
 
 #ifdef MOAB_HAVE_MPI
@@ -81,7 +82,7 @@ struct ToolContext
           blockSize( 5 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "intxFile.h5m" ),
           baselineFile( "" ), meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ), computeWeights( false ),
           verifyWeights( false ), enforceConvexity( false ), ensureMonotonicity( 0 ), rrmGrids( false ),
-          kdtreeSearch( true ), fCheck( n_procs > 1 ? false : true ), fVolumetric( false )
+          kdtreeSearch( true ), fCheck( n_procs > 1 ? false : true ), fVolumetric( false ), useGnomonicProjection( false )
     {
         inFilenames.resize( 2 );
         doftag_names.resize( 2 );
@@ -199,6 +200,9 @@ struct ToolContext
         opts.addOpt< int >( "monotonicity", "Ensure monotonicity in the weight generation. Options=[0,1,2,3]",
                             &ensureMonotonicity );
 
+        opts.addOpt< void >( "gnomonic", "Use Gnomonic plane projections to compute coverage mesh.",
+                            &useGnomonicProjection );
+
         opts.addOpt< std::string >( "fvmethod",
                                     "Sub-type method for FV-FV projections (invdist, delaunay, bilin, "
                                     "intbilin, intbilingb, none. Default: none)",
@@ -300,6 +304,8 @@ struct ToolContext
             if( expectedFVMethod != "none" )
             {
                 mapOptions.strMethod += expectedFVMethod + ";";
+                fvMethod = expectedFVMethod;
+
                 // These FV projection methods are non-conservative; specify it explicitly
                 mapOptions.fNoConservation = true;
             }
@@ -387,7 +393,7 @@ int main( int argc, char* argv[] )
     moab::TempestRemapper remapper( mbCore );
 #endif
     remapper.meshValidate     = true;
-    remapper.constructEdgeMap = false;
+    remapper.constructEdgeMap = true;
     remapper.initialize();
 
     // Default area_method = lHuiller; Options: Girard, GaussQuadrature (if TR is available)
@@ -569,7 +575,7 @@ int main( int argc, char* argv[] )
         // First compute the covering set such that the target elements are fully covered by the
         // lcoal source grid
         runCtx->timer_push( "construct covering set for intersection" );
-        rval = remapper.ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, runCtx->rrmGrids );MB_CHK_ERR( rval );
+        rval = remapper.ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, runCtx->rrmGrids, runCtx->useGnomonicProjection );MB_CHK_ERR( rval );
         runCtx->timer_pop();
 
         // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm

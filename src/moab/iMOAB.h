@@ -1072,8 +1072,8 @@ ErrCode iMOAB_MergeVertices( iMOAB_AppID pid );
  *
  * \param[in]  pid_source (iMOAB_AppID)            The unique pointer to the source application ID.
  * \param[in]  pid_target (iMOAB_AppID)            The unique pointer to the destination application ID.
- * \param[out] pid_intersection (iMOAB_AppID)      The unique pointer to the intersection application ID.
- * \return ErrCode                                    The error code indicating success or failure.
+ * \param[in]  pid_intersection (iMOAB_AppID)      The unique pointer to the intersection application ID.
+ * \return ErrCode                                 The error code indicating success or failure.
  */
 ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_source,
                                                iMOAB_AppID pid_target,

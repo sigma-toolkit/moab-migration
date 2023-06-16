@@ -446,7 +446,7 @@ module iMOAB
 
       integer(c_int) function iMOAB_ComputeMeshIntersectionOnSphere(pid_source, pid_target, pid_intersection) &
                                                                   bind(C, name='iMOAB_ComputeMeshIntersectionOnSphere')
-        use, intrinsic :: iso_c_binding, only: c_int
+        use, intrinsic :: iso_c_binding, only: c_int, c_double
         integer(c_int), intent(in) :: pid_source
         integer(c_int), intent(in) :: pid_target
         integer(c_int), intent(in) :: pid_intersection

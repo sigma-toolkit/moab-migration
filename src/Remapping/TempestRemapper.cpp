@@ -15,6 +15,9 @@
 #include <string>
 #include <iostream>
 #include <cassert>
+#include <numeric>  // std::iota
+#include <algorithm>  // std::sort, std::stable_sort
+
 #include "DebugOutput.hpp"
 #include "moab/Remapping/TempestRemapper.hpp"
 #include "moab/ReadUtilIface.hpp"
@@ -68,18 +71,19 @@ ErrorCode TempestRemapper::initialize( bool initialize_fsets )
     MPI_Initialized( &flagInit );
     if( flagInit )
     {
-        assert( m_pcomm != NULL );
+        assert( m_pcomm != nullptr );
         rank        = m_pcomm->rank();
         size        = m_pcomm->size();
         is_root     = ( rank == 0 );
         is_parallel = ( size > 1 );
+        // is_parallel = true;
     }
 #endif
 
-    m_source          = NULL;
-    m_target          = NULL;
-    m_overlap         = NULL;
-    m_covering_source = NULL;
+    m_source          = nullptr;
+    m_target          = nullptr;
+    m_overlap         = nullptr;
+    m_covering_source = nullptr;
 
     point_cloud_source = false;
     point_cloud_target = false;
@@ -100,22 +104,22 @@ ErrorCode TempestRemapper::clear()
     if( m_source )
     {
         delete m_source;
-        m_source = NULL;
+        m_source = nullptr;
     }
     if( m_target )
     {
         delete m_target;
-        m_target = NULL;
+        m_target = nullptr;
     }
     if( m_overlap )
     {
         delete m_overlap;
-        m_overlap = NULL;
+        m_overlap = nullptr;
     }
     if( m_covering_source && size > 1 )
     {
         delete m_covering_source;
-        m_covering_source = NULL;
+        m_covering_source = nullptr;
     }
 
     point_cloud_source = false;
@@ -232,7 +236,7 @@ ErrorCode TempestRemapper::ConvertTempestMesh( Remapper::IntersectionContext ctx
     else if( ctx != Remapper::DEFAULT )
     {
         if( outputEnabled ) std::cout << "Converting (overlap) TempestRemap Mesh object to MOAB representation ...\n";
-        return convert_tempest_mesh_private( m_overlap_type, m_overlap, m_overlap_set, m_overlap_entities, NULL );
+        return convert_tempest_mesh_private( m_overlap_type, m_overlap, m_overlap_set, m_overlap_entities, nullptr );
     }
     else
     {
@@ -240,6 +244,142 @@ ErrorCode TempestRemapper::ConvertTempestMesh( Remapper::IntersectionContext ctx
     }
 }
 
+#define NEW_CONVERT_LOGIC
+
+#ifdef NEW_CONVERT_LOGIC
+ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType meshType,
+                                                         Mesh* mesh,
+                                                         EntityHandle& mesh_set,
+                                                         Range& entities,
+                                                         Range* vertices )
+{
+    ErrorCode rval;
+
+    const bool outputEnabled = ( TempestRemapper::verbose && is_root );
+    const NodeVector& nodes  = mesh->nodes;
+    const FaceVector& faces  = mesh->faces;
+
+    moab::DebugOutput dbgprint( std::cout, this->rank, 0 );
+    dbgprint.set_prefix( "[TempestToMOAB]: " );
+
+    ReadUtilIface* iface;
+    rval = m_interface->query_interface( iface );MB_CHK_SET_ERR( rval, "Can't get reader interface" );
+
+    Tag gidTag = m_interface->globalId_tag();
+
+    // Set the data for the vertices
+    std::vector< double* > arrays;
+    std::vector< int > gidsv( nodes.size() );
+    EntityHandle startv;
+    rval = iface->get_node_coords( 3, nodes.size(), 0, startv, arrays );MB_CHK_SET_ERR( rval, "Can't get node coords" );
+    for( unsigned iverts = 0; iverts < nodes.size(); ++iverts )
+    {
+        const Node& node  = nodes[iverts];
+        arrays[0][iverts] = node.x;
+        arrays[1][iverts] = node.y;
+        arrays[2][iverts] = node.z;
+        gidsv[iverts]     = iverts + 1;
+    }
+    Range mbverts( startv, startv + nodes.size() - 1 );
+    rval = m_interface->add_entities( mesh_set, mbverts );MB_CHK_SET_ERR( rval, "Can't add entities" );
+    rval = m_interface->tag_set_data( gidTag, mbverts, &gidsv[0] );MB_CHK_SET_ERR( rval, "Can't set global_id tag" );
+
+    gidsv.clear();
+    entities.clear();
+
+    Tag srcParentTag, tgtParentTag;
+    std::vector< int > srcParent( faces.size(), -1 ), tgtParent( faces.size(), -1 );
+    std::vector< int > gidse( faces.size(), -1 );
+    bool storeParentInfo = ( mesh->vecSourceFaceIx.size() > 0 );
+
+    if( storeParentInfo )
+    {
+        int defaultInt = -1;
+        rval           = m_interface->tag_get_handle( "TargetParent", 1, MB_TYPE_INTEGER, tgtParentTag,
+                                                      MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );MB_CHK_SET_ERR( rval, "can't create positive tag" );
+
+        rval = m_interface->tag_get_handle( "SourceParent", 1, MB_TYPE_INTEGER, srcParentTag,
+                                            MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );MB_CHK_SET_ERR( rval, "can't create negative tag" );
+    }
+
+    // Let us first perform a full pass assuming arbitrary polygons. This is especially true for
+    // overlap meshes.
+    //   1. We do a first pass over faces, decipher edge size and group into categories based on
+    //   element type
+    //   2. Next we loop over type, and add blocks of elements into MOAB
+    //   3. For each block within the loop, also update the connectivity of elements.
+    {
+        if( outputEnabled )
+            dbgprint.printf( 0, "..Mesh size: Nodes [%zu]  Elements [%zu].\n", nodes.size(), faces.size() );
+        std::vector< EntityHandle > mbcells( faces.size() );
+        unsigned ntris = 0, nquads = 0, npolys = 0;
+        std::vector< EntityHandle > conn( 16 );
+
+        for( unsigned ifaces = 0; ifaces < faces.size(); ++ifaces )
+        {
+            const Face& face         = faces[ifaces];
+            const unsigned num_v_per_elem = face.edges.size();
+
+            for( unsigned iedges = 0; iedges < num_v_per_elem; ++iedges )
+            {
+                conn[iedges] = startv + face.edges[iedges].node[0];
+            }
+
+            switch( num_v_per_elem )
+            {
+                case 3:
+                    // if( outputEnabled )
+                    //     dbgprint.printf( 0, "....Block %d: Triangular Elements [%u].\n", iBlock++, nPolys[iType] );
+                    rval = m_interface->create_element( MBTRI, &conn[0], num_v_per_elem, mbcells[ifaces] );MB_CHK_SET_ERR( rval, "Can't get element connectivity" );
+                    ntris++;
+                    break;
+                case 4:
+                    // if( outputEnabled )
+                    //     dbgprint.printf( 0, "....Block %d: Quadrilateral Elements [%u].\n", iBlock++, nPolys[iType] );
+                    rval = m_interface->create_element( MBQUAD, &conn[0], num_v_per_elem, mbcells[ifaces] );MB_CHK_SET_ERR( rval, "Can't get element connectivity" );
+                    nquads++;
+                    break;
+                default:
+                    // if( outputEnabled )
+                    //     dbgprint.printf( 0, "....Block %d: Polygonal [%u] Elements [%u].\n", iBlock++, iType,
+                    //                      nPolys[iType] );
+                    rval = m_interface->create_element( MBPOLYGON, &conn[0], num_v_per_elem, mbcells[ifaces] );MB_CHK_SET_ERR( rval, "Can't get element connectivity" );
+                    npolys++;
+                    break;
+            }
+
+            gidse[ifaces] = ifaces + 1;
+
+            if( storeParentInfo )
+            {
+                srcParent[ifaces] = mesh->vecSourceFaceIx[ifaces] + 1;
+                tgtParent[ifaces] = mesh->vecTargetFaceIx[ifaces] + 1;
+            }
+        }
+
+        if( ntris ) dbgprint.printf( 0, "....Triangular Elements [%u].\n", ntris );
+        if( nquads ) dbgprint.printf( 0, "....Quadrangular Elements [%u].\n", nquads );
+        if( npolys ) dbgprint.printf( 0, "....Polygonal Elements [%u].\n", npolys );
+
+        rval = m_interface->add_entities( mesh_set, &mbcells[0], mbcells.size());MB_CHK_SET_ERR( rval, "Could not add entities" );
+
+        rval = m_interface->tag_set_data( gidTag, &mbcells[0], mbcells.size(), &gidse[0] );MB_CHK_SET_ERR( rval, "Can't set global_id tag" );
+        if( storeParentInfo )
+        {
+            rval = m_interface->tag_set_data( srcParentTag, &mbcells[0], mbcells.size(), &srcParent[0] );MB_CHK_SET_ERR( rval, "Can't set tag data" );
+            rval = m_interface->tag_set_data( tgtParentTag, &mbcells[0], mbcells.size(), &tgtParent[0] );MB_CHK_SET_ERR( rval, "Can't set tag data" );
+        }
+
+        // insert from mbcells to entities to preserve ordering
+        std::copy( mbcells.begin(), mbcells.end(), range_inserter( entities ) );
+    }
+
+    if( vertices ) *vertices = mbverts;
+
+    return MB_SUCCESS;
+}
+
+#else
 ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType meshType,
                                                          Mesh* mesh,
                                                          EntityHandle& mesh_set,
@@ -394,6 +534,7 @@ ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType meshTyp
 
     return MB_SUCCESS;
 }
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -450,8 +591,10 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     elems.clear();
     rval = m_interface->get_entities_by_dimension( mesh_set, 2, elems );MB_CHK_ERR( rval );
 
+    const size_t nelems = elems.size();
+
     // resize the number of elements in Tempest mesh
-    faces.resize( elems.size() );
+    faces.resize( nelems );
 
     // let us now get the vertices from all the elements
     rval = m_interface->get_connectivity( elems, verts );MB_CHK_ERR( rval );
@@ -459,8 +602,7 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     {
         rval = m_interface->get_entities_by_dimension( mesh_set, 0, verts );MB_CHK_ERR( rval );
     }
-    // assert(verts.size() > 0); // If not, this may be an invalid mesh ! possible for unbalanced
-    // loads
+    // assert(verts.size() > 0); // If not, this may be an invalid mesh ! possible for unbalanced loads
 
     std::map< EntityHandle, int > indxMap;
     bool useRange = true;
@@ -472,10 +614,23 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
         useRange = false;
     }
 
-    for( unsigned iface = 0; iface < elems.size(); ++iface )
+    std::vector< int > globIds( nelems );
+
+    moab::Tag gid = m_interface->globalId_tag();
+    rval            = m_interface->tag_get_data( gid, elems, &globIds[0] );MB_CHK_ERR( rval );
+    // initialize original index locations
+    std::vector< size_t > sortedIdx( nelems );
+    std::iota( sortedIdx.begin(), sortedIdx.end(), 0 );
+    // sort indexes based on comparing values in v, using std::stable_sort instead of std::sort
+    // to avoid unnecessary index re-orderings when v contains elements of equal values
+    std::sort(
+          sortedIdx.begin(), sortedIdx.end(),
+          [&globIds]( size_t i1, size_t i2 ) { return globIds[i1] < globIds[i2]; } );
+
+    for( unsigned iface = 0; iface < nelems; ++iface )
     {
         Face& face           = faces[iface];
-        EntityHandle ehandle = elems[iface];
+        EntityHandle ehandle = ( offlineWorkflow ? elems[sortedIdx[iface]] : elems[iface] );
 
         // get the connectivity for each edge
         const EntityHandle* connectface;
@@ -715,10 +870,15 @@ ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
         m_covering_source = new Mesh();
         rval = convert_mesh_to_tempest_private( m_covering_source, m_covering_source_set, m_covering_source_entities,
                                                 &m_covering_source_vertices );MB_CHK_SET_ERR( rval, "Can't convert source Tempest mesh" );
+
         // std::cout << "ComputeGlobalLocalMaps: " << rank << ", "
         //           << " covering entities = [" << m_covering_source_vertices.size() << ", "
         //           << m_covering_source_entities.size() << "]\n";
     }
+#ifdef VERBOSE
+    m_covering_source->Write( std::string( "coverage_TR_p" + std::to_string( rank ) + ".g" ) );
+    m_target->Write( std::string( "target_TR_p" + std::to_string( rank ) + ".g" ) );
+#endif
     gid_to_lid_src.clear();
     lid_to_gid_src.clear();
     gid_to_lid_covsrc.clear();
@@ -991,7 +1151,6 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
         {
             for( int i = 0; i < nP; i++ )
             {
-
                 // Get local map vectors
                 Node nodeGLL;
                 Node dDx1G;
@@ -1066,7 +1225,8 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
                                                  double radius_src,
                                                  double radius_tgt,
                                                  double boxeps,
-                                                 bool regional_mesh )
+                                                 bool regional_mesh,
+	                                             bool gnomonic	)
 {
     ErrorCode rval;
 
@@ -1094,11 +1254,11 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
 #ifdef MOAB_HAVE_MPI
     if( is_parallel )
     {
-        rval = mbintx->build_processor_euler_boxes( m_target_set, local_verts );MB_CHK_ERR( rval );
+        rval = mbintx->build_processor_euler_boxes( m_target_set, local_verts, gnomonic );MB_CHK_ERR( rval );
 
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_covering_source_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
 
-        rval = mbintx->construct_covering_set( m_source_set, m_covering_source_set );MB_CHK_ERR( rval );
+        rval = mbintx->construct_covering_set( m_source_set, m_covering_source_set, gnomonic );MB_CHK_ERR( rval );
     }
     else
     {
@@ -1216,9 +1376,9 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
     {
         // Now let us construct the overlap mesh, by calling TempestRemap interface directly
         // For the overlap method, choose between: "fuzzy", "exact" or "mixed"
-        assert( m_source != NULL );
-        assert( m_target != NULL );
-        if( m_overlap != NULL ) delete m_overlap;
+        assert( m_source != nullptr );
+        assert( m_target != nullptr );
+        if( m_overlap != nullptr ) delete m_overlap;
         m_overlap         = new Mesh();
         bool concaveMeshA = false, concaveMeshB = false;
         int err = GenerateOverlapWithMeshes( *m_covering_source, *m_target, *m_overlap, "" /*outFilename*/, "Netcdf4",
@@ -1345,7 +1505,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                         for( Range::iterator it = covEnts.begin(); it != covEnts.end(); ++it )
                         {
                             EntityHandle eh          = *it;
-                            const EntityHandle* conn = NULL;
+                            const EntityHandle* conn = nullptr;
                             int num_nodes            = 0;
                             rval                     = mb->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
                             adj_fact->notify_create_entity( eh, conn, num_nodes );
@@ -1358,7 +1518,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                     rval = skinner.find_skin( m_covering_source_set, covEnts, false, skin );MB_CHK_SET_ERR( rval, "Unable to find skin" );
                     for( Range::iterator it = skin.begin(); it != skin.end(); ++it )
                     {
-                        const EntityHandle* conn = NULL;
+                        const EntityHandle* conn = nullptr;
                         int len                  = 0;
                         rval                     = mb->get_connectivity( *it, conn, len, false );MB_CHK_ERR( rval );
                         for( int ie = 0; ie < len; ++ie )
@@ -1369,14 +1529,14 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                                 notNeededCovCells.erase( ent );  // ent is part of the 1-ring neighborhood
                         }
                     }
+
+                    rval = m_interface->write_mesh(
+                        std::string( "sourcecoveragemesh_p" + std::to_string( rank ) + ".h5m" ).c_str(),
+                        &m_covering_source_set, 1 );MB_CHK_ERR( rval );
                 }
 
                 // remove now from coverage set the cells that are not needed
                 // rval = m_interface->remove_entities( m_covering_source_set, notNeededCovCells );MB_CHK_ERR( rval );
-
-                //rval = m_interface->write_mesh( std::string( "sourcecoveragemesh_p" + std::to_string( rank ) + ".h5m" ).c_str(),
-                //                                &m_covering_source_set, 1 );
-                MB_CHK_ERR( rval );
 
                 // Need to loop over covEnts now and ensure at least N-rings are available dependign on whether bilinear (1) or
                 // high order FV (p) methods are being used for map generation. For bilinear/FV(1): need 1 ring, and for FV(p)
@@ -1628,7 +1788,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
              set_it != overlapCellsToSend2.end(); ++set_it )
         {
             int nnodes_local          = 0;
-            const EntityHandle* conn1 = NULL;
+            const EntityHandle* conn1 = nullptr;
             rval                      = m_interface->get_connectivity( *set_it, conn1, nnodes_local );MB_CHK_ERR( rval );
             for( int k = 0; k < nnodes_local; k++ )
                 vertices.insert( conn1[k] );
@@ -1702,7 +1862,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
             TLc.vi_wr[sizeTuple * n + 1] = sourceParentID;
             TLc.vi_wr[sizeTuple * n + 2] = targetParentID;
             int nnodes;
-            const EntityHandle* conn = NULL;
+            const EntityHandle* conn = nullptr;
             rval                     = m_interface->get_connectivity( intxCell, conn, nnodes );MB_CHK_ERR( rval );
             TLc.vi_wr[sizeTuple * n + 3] = nnodes;
             for( int i = 0; i < nnodes; i++ )

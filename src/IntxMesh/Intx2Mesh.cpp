@@ -843,8 +843,12 @@ void Intx2Mesh::correct_polygon( EntityHandle* nodes, int& nP )
     return;
 }
 #ifdef MOAB_HAVE_MPI
-ErrorCode Intx2Mesh::build_processor_euler_boxes( EntityHandle euler_set, Range& local_verts )
+ErrorCode Intx2Mesh::build_processor_euler_boxes( EntityHandle euler_set, Range& local_verts, bool gnomonic )
 {
+    // if it comes here, we want regular 3d boxes
+    // need to refactor this code
+    if (gnomonic)
+        gnomonic = false;
     localEnts.clear();
     ErrorCode rval = mb->get_entities_by_dimension( euler_set, 2, localEnts );ERRORR( rval, "can't get ents by dimension" );
 

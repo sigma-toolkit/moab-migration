@@ -1,5 +1,28 @@
 # MOAB Library Release Notes
 
+## Version 5.5
+
+### Features
+
+- *PR #611*: deprecate mesquite source and mesh files
+- *PR #613*: deprecate itaps framework; build imesh interface only when requested with --enable-imesh
+             deprecate vtk reader plugin and the refiner tool 
+- *PR #634*: allow online calculation of bilinear maps with tempestremap
+ 
+
+### Enhancements
+- *PR #625*: control verbosity in the Geometry Query Tool
+- *PR #623*: set the "aream" tag when computing the online maps; it is needed for flux corrections 
+- *PR #633*: use by default newer version of tempestremap (2.2) 
+
+### Fixes
+
+- *PR #605*: Push fortran language before checking to avoid false positives
+- *PR #607*: Add relative Python installation path to PYTHONPATH for local install
+- *PR #612*: Fix metadata for RLL files
+- *PR #627*: Fix for Issue #157, terminate strings for exodus writer
+- *PR #628*: Fix for Issue #165, cmake related build fixes
+
 ## Version 5.4.1
 
 ### Features

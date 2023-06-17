@@ -4,24 +4,31 @@
 
 ### Features
 
-- *PR #611*: deprecate mesquite source and mesh files
-- *PR #613*: deprecate itaps framework; build imesh interface only when requested with --enable-imesh
-             deprecate vtk reader plugin and the refiner tool 
-- *PR #634*: allow online calculation of bilinear maps with tempestremap
- 
+- *PR #611*: Deprecate Mesquite sources and mesh files in the repository
+- *PR #613, #636*: Deprecate old and unmaintained interfaces and tools (to be removed in the next release)
+    - ITAPS framework: iMesh interfaces are only built when requested with `--enable-imesh`
+    - VTK reader plugin for Paraview (outdated)
+    - Refiner tool
+- *PR #629, #630, #634, #635*: Allow online calculation of bilinear maps with TempestRemap
 
 ### Enhancements
-- *PR #625*: control verbosity in the Geometry Query Tool
-- *PR #623*: set the "aream" tag when computing the online maps; it is needed for flux corrections 
-- *PR #633*: use by default newer version of tempestremap (2.2) 
+
+- *PR #625*: Control verbosity in the Geometry Query Tool
+- *PR #623*: Set the "aream" tag when computing the online maps; it is needed for flux corrections
+- *PR #633*: Use by default newer version of TempestRemap (2.2)
 
 ### Fixes
 
-- *PR #605*: Push fortran language before checking to avoid false positives
+- *PR #605*: Autotools fixes - push Fortran language before checking to avoid false positives
+- *PR *604, #606*: Improve regression and integration tests
 - *PR #607*: Add relative Python installation path to PYTHONPATH for local install
 - *PR #612*: Fix metadata for RLL files
+- *PR #615*: Optimizations for iMOAB
+- *PR #619*: Bugfix for ParallelMerge
 - *PR #627*: Fix for Issue #157, terminate strings for exodus writer
-- *PR #628*: Fix for Issue #165, cmake related build fixes
+- *PR #628*: Fix for Issue #165, CMake related build fixes
+- *PR #610, #614, #618*: IO improvements
+- *PR #612, #626*: General updates to tools (mbconvert, mbaddnc)
 
 ## Version 5.4.1
 
@@ -53,7 +60,7 @@
 - *PR #578*: Improve comparemaps tool
 - *PR #590*: PyMOAB is now installed with pip instead of setup.py
 - *PR #587*: Read masks from SCRIP file and propagate to final remap operator
-- *PR #586*: Reduce memory allocation for vertex tags defined on sequences (16\*1024 instead of 512\*1024) 
+- *PR #586*: Reduce memory allocation for vertex tags defined on sequences (16\*1024 instead of 512\*1024)
 - *PR #592*: Fix several compiler warnings, documentation, updated autotools support (autoconf<=2.71), updated CMake/PyMOAB support, parallel build with module dependency (iMOAB), Codacy issues
 
 ### Fixes
@@ -69,7 +76,7 @@
 
 ### Features
 
-- *PR #563*: A new tool to visualize maps (mbvisumap) to display DoF coupling between source and target component meshes with a given linear map file. 
+- *PR #563*: A new tool to visualize maps (mbvisumap) to display DoF coupling between source and target component meshes with a given linear map file.
 
 ### Enhancements
 

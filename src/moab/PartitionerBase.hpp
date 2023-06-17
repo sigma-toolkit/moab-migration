@@ -40,9 +40,11 @@ class PartitionerBase
 {
 
   public:
-    PartitionerBase( Interface* impl = NULL, const bool use_coords = false
+    PartitionerBase( Interface* impl       = NULL,
+                     const bool use_coords = false
 #ifdef MOAB_HAVE_MPI
-    , ParallelComm* parcomm = NULL
+                     ,
+                     ParallelComm* parcomm = NULL
 #endif
     );
 
@@ -116,19 +118,23 @@ class PartitionerBase
 };
 
 template < typename T >
-inline PartitionerBase< T >::PartitionerBase( Interface* impl, const bool use_coords
+inline PartitionerBase< T >::PartitionerBase( Interface* impl,
+                                              const bool use_coords
 #ifdef MOAB_HAVE_MPI
-    , ParallelComm* parcomm
+                                              ,
+                                              ParallelComm* parcomm
 #endif
-)
+                                              )
     : mbImpl( impl )
 #ifdef MOAB_HAVE_MPI
-    , mbpc(parcomm)
+      ,
+      mbpc( parcomm )
 #endif
- , useCoords( use_coords ), newComm( false ), assign_global_ids(false)
+      ,
+      useCoords( use_coords ), newComm( false ), assign_global_ids( false )
 {
 #ifdef MOAB_HAVE_MPI
-    if(!mbpc)
+    if( !mbpc )
     {
         mbpc = ParallelComm::get_pcomm( mbImpl, 0 );
         if( !mbpc )

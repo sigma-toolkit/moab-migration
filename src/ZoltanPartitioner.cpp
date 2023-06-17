@@ -81,12 +81,14 @@ ZoltanPartitioner::ZoltanPartitioner( Interface* impl,
 #endif
 
                                       )
-    : PartitionerBase< int >( impl, use_coords
+    : PartitionerBase< int >( impl,
+                              use_coords
 #ifdef MOAB_HAVE_MPI
-                                      ,
-                                      parcomm
+                              ,
+                              parcomm
 #endif
-    ), myZZ( NULL ), myNumPts( 0 ), argcArg( argc ), argvArg( argv )
+                              ),
+      myZZ( NULL ), myNumPts( 0 ), argcArg( argc ), argvArg( argv )
 #ifdef MOAB_HAVE_CGM
       ,
       gti( gqt )

@@ -340,15 +340,15 @@ ErrorCode NCHelperMPAS::create_mesh( Range& faces )
     DebugOutput& dbgOut   = _readNC->dbgOut;
 
 #ifdef MOAB_HAVE_MPI
-    int rank         = 0;
-    int procs        = 1;
-    bool& isParallel = _readNC->isParallel;
+    int rank              = 0;
+    int procs             = 1;
+    bool& isParallel      = _readNC->isParallel;
     ParallelComm* myPcomm = NULL;
     if( isParallel )
     {
-        myPcomm  = _readNC->myPcomm;
-        rank                   = myPcomm->proc_config().proc_rank();
-        procs                  = myPcomm->proc_config().proc_size();
+        myPcomm = _readNC->myPcomm;
+        rank    = myPcomm->proc_config().proc_rank();
+        procs   = myPcomm->proc_config().proc_size();
     }
 
     // Need to know whether we'll be creating gather mesh
@@ -962,7 +962,7 @@ ErrorCode NCHelperMPAS::read_ucd_variables_to_nonset( std::vector< ReadNC::VarDa
 #endif
 
 #ifdef MOAB_HAVE_MPI
-ErrorCode NCHelperMPAS::redistribute_local_cells( int start_cell_idx, ParallelComm * pco )
+ErrorCode NCHelperMPAS::redistribute_local_cells( int start_cell_idx, ParallelComm* pco )
 {
     // If possible, apply Zoltan partition
 #ifdef MOAB_HAVE_ZOLTAN

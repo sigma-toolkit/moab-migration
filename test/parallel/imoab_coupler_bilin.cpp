@@ -98,7 +98,7 @@ int main( int argc, char* argv[] )
     int startG1 = 0, startG2 = 0, endG1 = numProcesses - 1, endG2 = numProcesses - 1;
     // Support launch of imoab_coupler test on any combo of 2*x processes
     int startG4 = startG1, endG4 = endG1;  // these are for coupler layout
-    int context_id;                   // used now for freeing buffers
+    int context_id;                        // used now for freeing buffers
 
     // default: load atm on 2 proc, ocean on 2, land on 2; migrate to 2 procs, then compute intx
     // later, we need to compute weight matrix with tempestremap
@@ -107,7 +107,7 @@ int main( int argc, char* argv[] )
     opts.addOpt< std::string >( "atmosphere,t", "atm mesh filename (source)", &atmFilename );
 #ifdef ENABLE_ATMOCN_COUPLING
     opts.addOpt< std::string >( "ocean,m", "ocean mesh filename (target)", &ocnFilename );
-    std::string baseline    = TestDir + "unittest/baseline3.txt";
+    std::string baseline = TestDir + "unittest/baseline3.txt";
 #endif
     opts.addOpt< int >( "startAtm,a", "start task for atmosphere layout", &startG1 );
     opts.addOpt< int >( "endAtm,b", "end task for atmosphere layout", &endG1 );
@@ -264,8 +264,7 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         PUSH_TIMER( "Compute ATM-OCN mesh intersection" )
-        ierr          = iMOAB_ComputeMeshIntersectionOnSphere(
-                     cplAtmPID, cplOcnPID, cplAtmOcnPID );
+        ierr = iMOAB_ComputeMeshIntersectionOnSphere( cplAtmPID, cplOcnPID, cplAtmOcnPID );
         // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
         // basically, atm was redistributed according to target (ocean) partition, to "cover" the
         // ocean partitions check if intx valid, write some h5m intx file
@@ -473,7 +472,7 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "could not write OcnWithProj.h5m to disk" )
     }
     // do a check agains a baseline test
-    if( !no_regression_test && (ocnComm != MPI_COMM_NULL))
+    if( !no_regression_test && ( ocnComm != MPI_COMM_NULL ) )
     {
         // the same as remap test
         // get temp field on ocean, from conservative, the global ids, and check to the baseline file
@@ -496,21 +495,19 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "failed to get global ids" );
         ierr = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot", &nelem[2], &ent_type, &tempElems[0] );
         CHECKIERR( ierr, "failed to get temperature field" );
-//        {
-//            // write baseline file
-//            std::fstream fs;
-//            fs.open( "baseline3.txt", std::fstream::out );
-//            fs << std::setprecision( 15 );  // maximum precision for doubles
-//            for( size_t i = 0; i < tempElems.size(); i++ )
-//                fs << gidElems[i] << " " << tempElems[i] << "\n";
-//            fs.close();
-//        }
+        //        {
+        //            // write baseline file
+        //            std::fstream fs;
+        //            fs.open( "baseline3.txt", std::fstream::out );
+        //            fs << std::setprecision( 15 );  // maximum precision for doubles
+        //            for( size_t i = 0; i < tempElems.size(); i++ )
+        //                fs << gidElems[i] << " " << tempElems[i] << "\n";
+        //            fs.close();
+        //        }
         int err_code = 1;
         check_baseline_file( baseline, gidElems, tempElems, 1.e-9, err_code );
-        if( 0 == err_code )
-            std::cout << " passed baseline test atm2ocn on ocean task " << rankInOcnComm << "\n";
+        if( 0 == err_code ) std::cout << " passed baseline test atm2ocn on ocean task " << rankInOcnComm << "\n";
     }
-
 
 #endif
 

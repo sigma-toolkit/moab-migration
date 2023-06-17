@@ -253,7 +253,7 @@ int main( int argc, char* argv[] )
     nc_type dataType;
 
     // read the variable, and set it to the tag
-    fail            = nc_inq_vartype( ncFile, nc_var, &dataType );
+    fail = nc_inq_vartype( ncFile, nc_var, &dataType );
     if( NC_NOERR != fail ) MB_SET_ERR( MB_FAILURE, "addncdata:: Couldn't get variable type" );
     DataType mbtype = MB_TYPE_DOUBLE;
     bool float_var  = false;
@@ -265,9 +265,9 @@ int main( int argc, char* argv[] )
     if( NC_FLOAT == dataType ) float_var = true;
 
     bool use_time = false;
-    int time_id = -1;
+    int time_id   = -1;
     std::vector< float > times;
-    fail        = nc_inq_varid( ncFile, "time", &time_id );
+    fail = nc_inq_varid( ncFile, "time", &time_id );
     if( NC_NOERR == fail )
     {
         use_time = true;
@@ -404,8 +404,8 @@ int main( int argc, char* argv[] )
             }
         }
     }
-    else if( ( dims.size() == 3 ) && vertex_data && dimIndex == 2 &&
-             mbtype == MB_TYPE_DOUBLE && use_time)  // the last one is the vertex
+    else if( ( dims.size() == 3 ) && vertex_data && dimIndex == 2 && mbtype == MB_TYPE_DOUBLE &&
+             use_time )  // the last one is the vertex
     {
         // the case when the last dim is ncol (for homme type mesh))
         size_t dim0, dim1;  // dim 2 is ncol..
@@ -531,4 +531,3 @@ int main( int argc, char* argv[] )
     }
     return 0;
 }
-

@@ -273,7 +273,7 @@ moab::ErrorCode GenerateTestMatrixAndVectors( int nx,
                                 ( curcol >= 0 && curcol < total_nrow ) )
                             {
                                 if( !use_7pt_stencil || ( sz * sz + sy * sy + sx * sx <= 1 ) )
-                                {   // This logic will skip over point that are not part of a 7-pt
+                                {  // This logic will skip over point that are not part of a 7-pt
                                     // stencil
                                     if( curcol == currow )
                                     {

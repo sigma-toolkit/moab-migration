@@ -374,7 +374,8 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     // Create vertices; first identify different ones, with a tolerance
     std::map< Node3D, EntityHandle > vertex_map;
 
-    if (nb_with_mask1 > 0) {
+    if( nb_with_mask1 > 0 )
+    {
         // Set vertex coordinates
         // will read all xv, yv, but use only those with correct mask on
 
@@ -432,14 +433,14 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
 
         // int nj = gDims[4]-gDims[1]; // is it about 1 in irregular cases
 
-        int local_row_size = lCDims[3] - lCDims[0];
-        int global_row_size = gDims[3] - gDims[0]; // this is along
-        elem_index         = -1;
-        int index          = 0;  // consider the mask for advancing in moab arrays;
+        int local_row_size  = lCDims[3] - lCDims[0];
+        int global_row_size = gDims[3] - gDims[0];  // this is along
+        elem_index          = -1;
+        int index           = 0;  // consider the mask for advancing in moab arrays;
         //printf(" map size :%ld \n", vertex_map.size());
         // create now vertex arrays, size vertex_map.size()
-        for (int j = lCDims[1]; j<lCDims[4]; j++)
-            for (int i = lCDims[0]; i<lCDims[3]; i++)
+        for( int j = lCDims[1]; j < lCDims[4]; j++ )
+            for( int i = lCDims[0]; i < lCDims[3]; i++ )
             {
                 elem_index++;
                 if( 0 == mask[elem_index] ) continue;  // nothing to do, do not advance elem_index in actual moab arrays
@@ -469,10 +470,9 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
 
                 // set the global id too:
                 int globalId = j * global_row_size + i + 1;
-                rval = mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId );MB_CHK_SET_ERR( rval, "Failed to set global id tag" );
+                rval         = mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId );MB_CHK_SET_ERR( rval, "Failed to set global id tag" );
                 index++;
             }
-
 
         rval = mbImpl->add_entities( _fileSet, tmp_range );MB_CHK_SET_ERR( rval, "Failed to add new cells to current file set" );
 
@@ -509,8 +509,6 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
             }
         }
     }
-
-
 
 #ifdef MOAB_HAVE_MPI
     ParallelComm*& myPcomm = _readNC->myPcomm;

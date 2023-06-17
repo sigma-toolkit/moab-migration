@@ -230,9 +230,10 @@ int main( int argc, char* argv[] )
 
     /* Compute the weights to preoject the solution from ATM component to OCN compoenent */
     ierr = iMOAB_ComputeScalarProjectionWeights( atmocnPID, weights_identifiers[0].c_str(), disc_methods[0].c_str(),
-                                                 &disc_orders[0], disc_methods[1].c_str(), &disc_orders[1], nullptr, &fNoBubble,
-                                                 &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap, &fNoConserve,
-                                                 &fValidate, dof_tag_names[0].c_str(), dof_tag_names[1].c_str() );
+                                                 &disc_orders[0], disc_methods[1].c_str(), &disc_orders[1], nullptr,
+                                                 &fNoBubble, &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap,
+                                                 &fNoConserve, &fValidate, dof_tag_names[0].c_str(),
+                                                 dof_tag_names[1].c_str() );
     CHECKIERR( ierr, "failed to compute remapping projection weights for ATM-OCN scalar "
                      "non-conservative field" );
 

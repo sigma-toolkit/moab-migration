@@ -847,8 +847,7 @@ ErrorCode Intx2Mesh::build_processor_euler_boxes( EntityHandle euler_set, Range&
 {
     // if it comes here, we want regular 3d boxes
     // need to refactor this code
-    if (gnomonic)
-        gnomonic = false;
+    if( gnomonic ) gnomonic = false;
     localEnts.clear();
     ErrorCode rval = mb->get_entities_by_dimension( euler_set, 2, localEnts );ERRORR( rval, "can't get ents by dimension" );
 

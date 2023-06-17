@@ -82,7 +82,8 @@ struct ToolContext
           blockSize( 5 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "intxFile.h5m" ),
           baselineFile( "" ), meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ), computeWeights( false ),
           verifyWeights( false ), enforceConvexity( false ), ensureMonotonicity( 0 ), rrmGrids( false ),
-          kdtreeSearch( true ), fCheck( n_procs > 1 ? false : true ), fVolumetric( false ), useGnomonicProjection( false )
+          kdtreeSearch( true ), fCheck( n_procs > 1 ? false : true ), fVolumetric( false ),
+          useGnomonicProjection( false )
     {
         inFilenames.resize( 2 );
         doftag_names.resize( 2 );
@@ -201,7 +202,7 @@ struct ToolContext
                             &ensureMonotonicity );
 
         opts.addOpt< void >( "gnomonic", "Use Gnomonic plane projections to compute coverage mesh.",
-                            &useGnomonicProjection );
+                             &useGnomonicProjection );
 
         opts.addOpt< std::string >( "fvmethod",
                                     "Sub-type method for FV-FV projections (invdist, delaunay, bilin, "
@@ -575,7 +576,8 @@ int main( int argc, char* argv[] )
         // First compute the covering set such that the target elements are fully covered by the
         // lcoal source grid
         runCtx->timer_push( "construct covering set for intersection" );
-        rval = remapper.ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, runCtx->rrmGrids, runCtx->useGnomonicProjection );MB_CHK_ERR( rval );
+        rval =
+            remapper.ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, runCtx->rrmGrids, runCtx->useGnomonicProjection );MB_CHK_ERR( rval );
         runCtx->timer_pop();
 
         // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm

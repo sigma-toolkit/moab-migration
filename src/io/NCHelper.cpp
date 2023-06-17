@@ -527,15 +527,15 @@ ErrorCode NCHelper::read_variables_to_set( std::vector< ReadNC::VarData >& vdata
             {
                 case NC_BYTE:
                 case NC_CHAR:
-                    delete[]( char* ) data;
+                    delete[](char*)data;
                     break;
                 case NC_SHORT:
                 case NC_INT:
-                    delete[]( int* ) data;
+                    delete[](int*)data;
                     break;
                 case NC_FLOAT:
                 case NC_DOUBLE:
-                    delete[]( double* ) data;
+                    delete[](double*)data;
                     break;
                 default:
                     break;

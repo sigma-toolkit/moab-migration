@@ -89,7 +89,7 @@ ErrorCode QuadraticHex::jacobianFcn( const double* params,
     for( int i = 0; i < 27; i++ )
     {
         const double sh[3]  = { SH( corner[i][0], params[0] ), SH( corner[i][1], params[1] ),
-                               SH( corner[i][2], params[2] ) };
+                                SH( corner[i][2], params[2] ) };
         const double dsh[3] = { DSH( corner[i][0], params[0] ), DSH( corner[i][1], params[1] ),
                                 DSH( corner[i][2], params[2] ) };
 

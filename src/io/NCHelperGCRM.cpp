@@ -252,15 +252,15 @@ ErrorCode NCHelperGCRM::create_mesh( Range& faces )
     DebugOutput& dbgOut = _readNC->dbgOut;
 
 #ifdef MOAB_HAVE_MPI
-    int rank         = 0;
-    int procs        = 1;
-    bool& isParallel = _readNC->isParallel;
+    int rank              = 0;
+    int procs             = 1;
+    bool& isParallel      = _readNC->isParallel;
     ParallelComm* myPcomm = NULL;
     if( isParallel )
     {
         myPcomm = _readNC->myPcomm;
-        rank                   = myPcomm->proc_config().proc_rank();
-        procs                  = myPcomm->proc_config().proc_size();
+        rank    = myPcomm->proc_config().proc_rank();
+        procs   = myPcomm->proc_config().proc_size();
     }
 
     // Need to know whether we'll be creating gather mesh
@@ -289,7 +289,7 @@ ErrorCode NCHelperGCRM::create_mesh( Range& faces )
         start_cell_idx++;  // 0 based -> 1 based
 
         // Redistribute local cells after trivial partition (e.g. apply Zoltan partition)
-        ErrorCode rval = redistribute_local_cells( start_cell_idx, myPcomm);MB_CHK_SET_ERR( rval, "Failed to redistribute local cells after trivial partition" );
+        ErrorCode rval = redistribute_local_cells( start_cell_idx, myPcomm );MB_CHK_SET_ERR( rval, "Failed to redistribute local cells after trivial partition" );
     }
     else
     {
@@ -741,7 +741,7 @@ ErrorCode NCHelperGCRM::read_ucd_variables_to_nonset( std::vector< ReadNC::VarDa
 #endif
 
 #ifdef MOAB_HAVE_MPI
-ErrorCode NCHelperGCRM::redistribute_local_cells( int start_cell_idx, ParallelComm * pco )
+ErrorCode NCHelperGCRM::redistribute_local_cells( int start_cell_idx, ParallelComm* pco )
 {
     // If possible, apply Zoltan partition
 #ifdef MOAB_HAVE_ZOLTAN

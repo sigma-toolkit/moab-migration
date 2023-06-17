@@ -640,7 +640,7 @@ void test_get_set( const char* name,
 void test_get_set_sparse_int()
 {
     const int data[]  = { 21, 00, 46, 30, 26, 63, 05, 49, 31, 39, 86, 77, 24, 37, 25, 98,
-                         26, 20, 01, 54, 16, 28, 55, 49, 96, 18, 28, 18, 53, 00, 80, 48 };
+                          26, 20, 01, 54, 16, 28, 55, 49, 96, 18, 28, 18, 53, 00, 80, 48 };
     const int num_val = sizeof( data ) / sizeof( data[0] );
 
     test_get_set( "sparse_int", 2, MB_TAG_SPARSE, MB_TYPE_INTEGER, data, num_val / 2, 0 );
@@ -652,7 +652,7 @@ void test_get_set_sparse_int()
 void test_get_set_dense_int()
 {
     const int data[]  = { 231, 416, 294, 504, 318, 558, 494, 006, 464, 648, 737, 045, 179, 852, 944, 336,
-                         773, 248, 434, 615, 677, 667, 521, 748, 820, 533, 955, 300, 108, 726, 747, 597 };
+                          773, 248, 434, 615, 677, 667, 521, 748, 820, 533, 955, 300, 108, 726, 747, 597 };
     const int num_val = sizeof( data ) / sizeof( data[0] );
 
     test_get_set( "dense_int", 1, MB_TAG_DENSE, MB_TYPE_INTEGER, data, num_val, 0 );
@@ -1665,7 +1665,7 @@ void test_get_set_variable_length_sparse()
     test_get_set_variable_length( "vnodef", MB_TAG_SPARSE, MB_TYPE_DOUBLE, dvals, dlens, 5, 0, 0 );
 
     const int ints[32]   = { 1,  2,  3,  4,  5,  6,  7,  8,  9,  10,  11,  12,  13,  14,  15,
-                           -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15 };
+                             -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15 };
     const void* ivals[9] = { ints,      ints + 1,  ints + 3,  ints + 12, ints + 17,
                              ints + 21, ints + 28, ints + 29, ints + 31 };
     const int ilens[9]   = { 1, 2, 9, 5, 4, 7, 1, 2, 1 };
@@ -1681,7 +1681,7 @@ void test_get_set_variable_length_dense()
     test_get_set_variable_length( "vnodef", MB_TAG_DENSE, MB_TYPE_DOUBLE, dvals, dlens, 5, 0, 0 );
 
     const int ints[32]   = { 1,  2,  3,  4,  5,  6,  7,  8,  9,  10,  11,  12,  13,  14,  15,
-                           -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15 };
+                             -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15 };
     const void* ivals[9] = { ints,      ints + 1,  ints + 3,  ints + 12, ints + 17,
                              ints + 21, ints + 28, ints + 29, ints + 31 };
     const int ilens[9]   = { 1, 2, 9, 5, 4, 7, 1, 2, 1 };
@@ -1731,7 +1731,7 @@ void test_clear_variable_length( TagType storage )
     test_get_set_variable_length( "vnodef_clear", storage, MB_TYPE_DOUBLE, dvals, &dlen, 1, 0, 0 );
 
     const int ints[32]  = { 1,  2,  3,  4,  5,  6,  7,  8,  9,  10,  11,  12,  13,  14,  15,
-                           -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15 };
+                            -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15 };
     const void* ivals[] = { ints };
     const int ilen      = sizeof( ints ) / sizeof( int );
     const int defvals[] = { 42, 5, 8, 74 };

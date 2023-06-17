@@ -110,7 +110,7 @@ class ZoltanPartitioner : public PartitionerBase< int >
 {
 
   public:
-    ZoltanPartitioner( Interface* impl       = NULL,
+    ZoltanPartitioner( Interface* impl = NULL,
 #ifdef MOAB_HAVE_MPI
                        ParallelComm* parcomm = NULL,
 #endif
@@ -121,7 +121,6 @@ class ZoltanPartitioner : public PartitionerBase< int >
                        ,
                        GeometryQueryTool* gqt = NULL
 #endif
-
 
     );
 

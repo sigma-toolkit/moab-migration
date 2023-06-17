@@ -11,7 +11,7 @@
 namespace moab
 {
 #ifdef MOAB_HAVE_MPI
-  class ParallelComm;
+class ParallelComm;
 #endif
 class NCHelperScrip : public ScdNCHelper
 {
@@ -27,7 +27,7 @@ class NCHelperScrip : public ScdNCHelper
 
 #ifdef MOAB_HAVE_MPI
     //! Redistribute local cells after trivial partition (e.g. Zoltan partition, if applicable)
-    ErrorCode redistribute_local_cells( int start_cell_index, ParallelComm * pco );
+    ErrorCode redistribute_local_cells( int start_cell_index, ParallelComm* pco );
 #endif
 
   private:

@@ -62,7 +62,7 @@ ErrorCode write_geometry( const char* output_file_name )
     // Define a 2x2x2 cube centered at orgin
     // with concavity in +Z face.
     const double coords[]    = { 1, -1, -1, 1, 1,  -1, -1, 1,  -1, -1, -1, -1, 1, -1,
-                              1, 1,  1,  1, -1, 1,  1,  -1, -1, 1,  0,  0,  0 };
+                                 1, 1,  1,  1, -1, 1,  1,  -1, -1, 1,  0,  0,  0 };
     const int connectivity[] = {
         0, 3, 1, 3, 2, 1,  // -Z
         0, 1, 4, 5, 4, 1,  // +X
@@ -141,9 +141,9 @@ ErrorCode overlap_write_geometry( const char* output_file_name )
     // Define two 1x2x2 cubes that overlap from 0 <= x <= 0.01
     // cube 0 centered at (0.5,0,0)
     const double coords[]    = { 1, -1, -1, 1, 1, -1, 0, 1, -1, 0, -1, -1, 1, -1, 1, 1, 1, 1, 0, 1, 1, 0, -1, 1,
-                              // cube 1 centered near (-0.5,0,0)
-                              0.01, -1, -1, 0.01, 1, -1, -1, 1, -1, -1, -1, -1, 0.01, -1, 1, 0.01, 1, 1, -1, 1, 1, -1,
-                              -1, 1 };
+                                 // cube 1 centered near (-0.5,0,0)
+                                 0.01, -1, -1, 0.01, 1, -1, -1, 1, -1, -1, -1, -1, 0.01, -1, 1, 0.01, 1, 1, -1, 1, 1, -1,
+                                 -1, 1 };
     const int connectivity[] = { 0, 3, 1, 3, 2, 1,    // -Z
                                  0, 1, 4, 5, 4, 1,    // +X
                                  1, 2, 6, 6, 5, 1,    // +Y

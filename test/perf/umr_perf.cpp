@@ -457,7 +457,7 @@ ErrorCode create_simple_mesh( Core* mb, EntityType type )
         const size_t num_vtx  = sizeof( coords ) / sizeof( double ) / 3;
 
         const int conn[]       = { 0, 1, 4, 3, 9,  10, 13, 12, 1, 2, 5, 4, 10, 11, 14, 13,
-                             3, 4, 7, 6, 12, 13, 16, 15, 4, 5, 8, 7, 13, 14, 17, 16 };
+                                   3, 4, 7, 6, 12, 13, 16, 15, 4, 5, 8, 7, 13, 14, 17, 16 };
         const size_t num_elems = sizeof( conn ) / sizeof( int ) / 8;
 
         EntityHandle verts[num_vtx], cells[num_elems];

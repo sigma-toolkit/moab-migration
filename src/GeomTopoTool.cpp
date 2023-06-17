@@ -113,8 +113,10 @@ int GeomTopoTool::dimension( EntityHandle this_set )
     // get the data for those tags
     int dim;
     result = mdbImpl->tag_get_data( geomTag, &this_set, 1, &dim );
-    if( MB_SUCCESS != result ) return -1;
-    else return dim;
+    if( MB_SUCCESS != result )
+        return -1;
+    else
+        return dim;
 }
 
 int GeomTopoTool::global_id( EntityHandle this_set )
@@ -138,8 +140,10 @@ int GeomTopoTool::global_id( EntityHandle this_set )
     // get the data for those tags
     int id;
     result = mdbImpl->tag_get_data( gidTag, &this_set, 1, &id );
-    if( MB_SUCCESS != result ) return -1;
-    else return id;
+    if( MB_SUCCESS != result )
+        return -1;
+    else
+        return id;
 }
 
 EntityHandle GeomTopoTool::entity_by_id( int dimension1, int id )
@@ -155,8 +159,10 @@ EntityHandle GeomTopoTool::entity_by_id( int dimension1, int id )
     Range results;
     rval = mdbImpl->get_entities_by_type_and_tag( 0, MBENTITYSET, tags, vals, 2, results );
 
-    if( MB_SUCCESS != rval ) return 0;
-    else return results.front();
+    if( MB_SUCCESS != rval )
+        return 0;
+    else
+        return results.front();
 }
 
 ErrorCode GeomTopoTool::other_entity( EntityHandle bounded,

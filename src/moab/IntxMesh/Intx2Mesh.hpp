@@ -169,7 +169,7 @@ class Intx2Mesh
      */
 #ifdef MOAB_HAVE_MPI
 
-    virtual ErrorCode build_processor_euler_boxes( EntityHandle euler_set, Range& local_verts, bool gnomonic=true );
+    virtual ErrorCode build_processor_euler_boxes( EntityHandle euler_set, Range& local_verts, bool gnomonic = true );
 #endif
     void correct_polygon( EntityHandle* foundIds, int& nP );
 #ifdef MOAB_HAVE_MPI

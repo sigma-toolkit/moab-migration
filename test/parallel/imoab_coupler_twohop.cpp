@@ -314,8 +314,7 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         PUSH_TIMER( "Compute ATM-OCN mesh intersection" )
-        ierr          = iMOAB_ComputeMeshIntersectionOnSphere(
-                     cplAtmPID, cplOcnPID, cplAtmOcnPID );
+        ierr = iMOAB_ComputeMeshIntersectionOnSphere( cplAtmPID, cplOcnPID, cplAtmOcnPID );
         // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
         // basically, atm was redistributed according to target (ocean) partition, to "cover" the
         // ocean partitions check if intx valid, write some h5m intx file
@@ -349,8 +348,7 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         PUSH_TIMER( "Compute ATM-OCN mesh intersection" )
-        ierr          = iMOAB_ComputeMeshIntersectionOnSphere(
-                     cplAtm2PID, cplOcnPID, cplAtm2OcnPID );
+        ierr = iMOAB_ComputeMeshIntersectionOnSphere( cplAtm2PID, cplOcnPID, cplAtm2OcnPID );
         // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
         // basically, atm was redistributed according to target (ocean) partition, to "cover" the
         // ocean partitions check if intx valid, write some h5m intx file

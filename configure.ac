@@ -422,6 +422,11 @@ AC_ARG_ENABLE( [imesh],
 
 DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --enable-imesh=$ENABLE_imesh"
 
+if (test "xno" != "x$ENABLE_imesh"); then
+  AC_MSG_WARN([ITAPS is deprecated and will be removed in the next major release.])
+  AC_MSG_WARN([Consider using iMOAB for a more flexible and scalable interface.])
+fi
+
 ################################################################################
 #                           FBiGeom Part 1 of 2
 ################################################################################

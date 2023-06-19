@@ -138,6 +138,8 @@ mark_as_advanced(
 )
 
 if ( ENABLE_IMESH OR ENABLE_FBIGEOM )
+  MESSAGE("WARNING: iMesh and ITAPS interfaces are now deprecated, and will be removed in the next release.")
+  MESSAGE("COMMENT: Consider using iMOAB for a more flexible and scalable interface.")
   include (${CMAKE_ROOT}/Modules/CMakeDetermineFortranCompiler.cmake)
 endif ()
 

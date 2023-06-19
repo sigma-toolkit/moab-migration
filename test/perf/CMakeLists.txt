@@ -1,7 +1,6 @@
 add_subdirectory(point_location)
 set( LIBS MOAB ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
-set( TESTS adj_mem_time_test.cpp
-           )
+set( TESTS adj_mem_time_test.cpp )
 
 if(MOAB_HAVE_HDF5)
   set( TESTS ${TESTS} adj_time.cpp )
@@ -38,5 +37,4 @@ foreach( fname ${TOOLS} )
   add_executable( ${base} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname})
   set_target_properties( ${base} PROPERTIES COMPILE_FLAGS "${MOAB_DEFINES} ${TEST_COMP_FLAGS} -DTEST" )
   target_link_libraries( ${base} ${LIBS} )
-  message("linking: ${base} ${LIBS}" )
 endforeach()

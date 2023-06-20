@@ -1206,7 +1206,7 @@ ErrorCode MeshSet::insert_entity_vector( const EntityHandle* vect, size_t len, E
         typedef const std::pair< EntityHandle, EntityHandle >* pair_vect_t;
         pair_vect_t pair_vect = ( rangevect.empty() ) ? NULL : reinterpret_cast< pair_vect_t >( &rangevect[0] );
         rval                  = range_tool< pair_vect_t >::ranged_insert_entities(
-                             count, contentList, pair_vect, pair_vect + rangevect.size() / 2, my_h, tracking() ? adj : 0 );
+            count, contentList, pair_vect, pair_vect + rangevect.size() / 2, my_h, tracking() ? adj : 0 );
     }
     mContentCount = count;
     return rval;
@@ -1225,7 +1225,7 @@ ErrorCode MeshSet::remove_entity_vector( const EntityHandle* vect, size_t len, E
         typedef const std::pair< EntityHandle, EntityHandle >* pair_vect_t;
         pair_vect_t pair_vect = ( rangevect.empty() ) ? NULL : reinterpret_cast< pair_vect_t >( &rangevect[0] );
         rval                  = range_tool< pair_vect_t >::ranged_remove_entities(
-                             count, contentList, pair_vect, pair_vect + rangevect.size() / 2, my_h, tracking() ? adj : 0 );
+            count, contentList, pair_vect, pair_vect + rangevect.size() / 2, my_h, tracking() ? adj : 0 );
     }
     mContentCount = count;
     return rval;

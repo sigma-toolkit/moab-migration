@@ -212,7 +212,7 @@ namespace element_utility
             for( int i = 0; i < 27; i++ )
             {
                 const double sh[3]  = { SH( reference_points( i, 0 ), p[0] ), SH( reference_points( i, 1 ), p[1] ),
-                                       SH( reference_points( i, 2 ), p[2] ) };
+                                        SH( reference_points( i, 2 ), p[2] ) };
                 const double dsh[3] = { DSH( reference_points( i, 0 ), p[0] ), DSH( reference_points( i, 1 ), p[1] ),
                                         DSH( reference_points( i, 2 ), p[2] ) };
                 for( int j = 0; j < 3; j++ )

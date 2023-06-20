@@ -698,32 +698,32 @@ static ErrorCode create_two_hex_full_mesh( Interface* mb,
     for( int i = 0; i < 12; ++i )
         if( MB_SUCCESS != mb->create_vertex( coords + 3 * i, vertices[i] ) ) return MB_FAILURE;
     EntityHandle hex1_conn[]           = { vertices[6], vertices[7],  vertices[1], vertices[0],
-                                 vertices[9], vertices[10], vertices[4], vertices[3] };
+                                           vertices[9], vertices[10], vertices[4], vertices[3] };
     EntityHandle hex2_conn[]           = { vertices[7],  vertices[8],  vertices[2], vertices[1],
-                                 vertices[10], vertices[11], vertices[5], vertices[4] };
+                                           vertices[10], vertices[11], vertices[5], vertices[4] };
     EntityHandle shared_quad_conn[]    = { vertices[7], vertices[1], vertices[4], vertices[10] };
     EntityHandle hex1_face_conn[][4]   = { { vertices[6], vertices[7], vertices[10], vertices[9] },
-                                         { vertices[7], vertices[6], vertices[0], vertices[1] },
-                                         { vertices[1], vertices[0], vertices[3], vertices[4] },
-                                         { vertices[9], vertices[10], vertices[4], vertices[3] },
-                                         { vertices[3], vertices[0], vertices[6], vertices[9] } };
+                                           { vertices[7], vertices[6], vertices[0], vertices[1] },
+                                           { vertices[1], vertices[0], vertices[3], vertices[4] },
+                                           { vertices[9], vertices[10], vertices[4], vertices[3] },
+                                           { vertices[3], vertices[0], vertices[6], vertices[9] } };
     EntityHandle hex2_face_conn[][4]   = { { vertices[7], vertices[8], vertices[11], vertices[10] },
-                                         { vertices[8], vertices[7], vertices[1], vertices[2] },
-                                         { vertices[2], vertices[1], vertices[4], vertices[5] },
-                                         { vertices[10], vertices[11], vertices[5], vertices[4] },
-                                         { vertices[5], vertices[2], vertices[8], vertices[11] } };
+                                           { vertices[8], vertices[7], vertices[1], vertices[2] },
+                                           { vertices[2], vertices[1], vertices[4], vertices[5] },
+                                           { vertices[10], vertices[11], vertices[5], vertices[4] },
+                                           { vertices[5], vertices[2], vertices[8], vertices[11] } };
     EntityHandle shared_edge_conn[][2] = { { vertices[1], vertices[7] },
                                            { vertices[7], vertices[10] },
                                            { vertices[10], vertices[4] },
                                            { vertices[4], vertices[1] } };
     EntityHandle hex1_edge_conn[][2]   = { { vertices[6], vertices[7] }, { vertices[9], vertices[10] },
-                                         { vertices[3], vertices[4] }, { vertices[0], vertices[1] },
-                                         { vertices[6], vertices[9] }, { vertices[9], vertices[3] },
-                                         { vertices[3], vertices[0] }, { vertices[0], vertices[6] } };
+                                           { vertices[3], vertices[4] }, { vertices[0], vertices[1] },
+                                           { vertices[6], vertices[9] }, { vertices[9], vertices[3] },
+                                           { vertices[3], vertices[0] }, { vertices[0], vertices[6] } };
     EntityHandle hex2_edge_conn[][2]   = { { vertices[7], vertices[8] },  { vertices[10], vertices[11] },
-                                         { vertices[4], vertices[5] },  { vertices[1], vertices[2] },
-                                         { vertices[8], vertices[11] }, { vertices[11], vertices[5] },
-                                         { vertices[5], vertices[2] },  { vertices[2], vertices[8] } };
+                                           { vertices[4], vertices[5] },  { vertices[1], vertices[2] },
+                                           { vertices[8], vertices[11] }, { vertices[11], vertices[5] },
+                                           { vertices[5], vertices[2] },  { vertices[2], vertices[8] } };
     rval                               = mb->create_element( MBHEX, hex1_conn, 8, hexes[0] );
     if( MB_SUCCESS != rval ) return rval;
     rval = mb->create_element( MBHEX, hex2_conn, 8, hexes[1] );
@@ -5686,7 +5686,7 @@ ErrorCode mb_skin_fileset_test()
     const size_t num_vtx  = sizeof( coords ) / sizeof( double ) / 3;
 
     const int conn[]       = { 0, 1, 4,  5,  6,  7,  10, 11, 1, 2, 3, 4,  7,  8,  9,  10,
-                         6, 7, 10, 11, 12, 13, 16, 17, 7, 8, 9, 10, 13, 14, 15, 16 };
+                               6, 7, 10, 11, 12, 13, 16, 17, 7, 8, 9, 10, 13, 14, 15, 16 };
     const size_t num_elems = sizeof( conn ) / sizeof( int ) / 8;
 
     EntityHandle verts[num_vtx], cells[num_elems];
@@ -7598,8 +7598,8 @@ ErrorCode create_some_mesh( Interface* iface )
     assert( num_vtx == 27u );
 
     const int conn[]      = { 0,  1,  4,  3,  9,  10, 13, 12, 1,  2,  5,  4,  10, 11, 14, 13, 3,  4,  7,  6,  12, 13,
-                         16, 15, 4,  5,  8,  9,  13, 14, 17, 16, 9,  10, 13, 12, 18, 19, 22, 21, 10, 11, 14, 13,
-                         19, 20, 23, 22, 12, 13, 16, 15, 21, 22, 25, 24, 13, 14, 17, 18, 22, 23, 26, 25 };
+                              16, 15, 4,  5,  8,  9,  13, 14, 17, 16, 9,  10, 13, 12, 18, 19, 22, 21, 10, 11, 14, 13,
+                              19, 20, 23, 22, 12, 13, 16, 15, 21, 22, 25, 24, 13, 14, 17, 18, 22, 23, 26, 25 };
     const size_t num_elem = sizeof( conn ) / sizeof( conn[0] ) / 8;
     assert( num_elem == 8u );
 

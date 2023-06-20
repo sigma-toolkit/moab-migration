@@ -39,8 +39,8 @@ void initialize_default_files()
     std::vector< RayTest > tests;
     std::string file = STRINGIFY( MESHDIR ) "/3k-tri-sphere.vtk";
     RayTest set1[]   = { { "triangle interior ", 1, CartVect( 0, 0, 0 ), CartVect( 99.8792, -5, 0.121729 ) },
-                       { "triangle edge ", 2, CartVect( 0, 0, 0 ), CartVect( 4.99167, 0, 99.7502 ) },
-                       { "triangle node ", 6, CartVect( 0, 0, 0 ), CartVect( 0, 0, 100 ) } };
+                         { "triangle edge ", 2, CartVect( 0, 0, 0 ), CartVect( 4.99167, 0, 99.7502 ) },
+                         { "triangle node ", 6, CartVect( 0, 0, 0 ), CartVect( 0, 0, 100 ) } };
 
     num_tests = sizeof( set1 ) / sizeof( set1[0] );
     tests.insert( tests.begin(), &set1[0], &set1[num_tests] );

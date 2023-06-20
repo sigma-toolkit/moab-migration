@@ -24,7 +24,7 @@ int main( int argc, char* argv[] )
 
     ProgOptions opts;
 
-    std::string  pg2file, lndfile, outfile;
+    std::string pg2file, lndfile, outfile;
 
     opts.addOpt< std::string >( "land,l", "phys grid filename", &lndfile );
     opts.addOpt< std::string >( "pg2file,p", "pg2 mesh file", &pg2file );
@@ -84,24 +84,25 @@ int main( int argc, char* argv[] )
     // look now at gid values for vertices
     for( i = 0; i < (int)verts1.size(); i++ )
     {
-        int gid           = globalIdsVerts[i];
-        landCells.insert(gidToCell[gid]);
+        int gid = globalIdsVerts[i];
+        landCells.insert( gidToCell[gid] );
     }
 
-    rval = mb2->add_entities(fileSet, landCells);;MB_CHK_SET_ERR( rval, "can't add land cells" );
+    rval = mb2->add_entities( fileSet, landCells );
+    ;MB_CHK_SET_ERR( rval, "can't add land cells" );
 
     rval = mb2->write_file( outfile.c_str(), 0, 0, &fileSet, 1 );MB_CHK_SET_ERR( rval, "can't write file" );
 
     // write the original with mask 0/1, default -1
     Tag mask;
-    double def_val=-1.;
-    rval = mb2->tag_get_handle( "mask", 1, MB_TYPE_DOUBLE, mask, MB_TAG_CREAT | MB_TAG_DENSE, &def_val );MB_CHK_SET_ERR( rval, "can't create mask tag" );
+    double def_val = -1.;
+    rval           = mb2->tag_get_handle( "mask", 1, MB_TYPE_DOUBLE, mask, MB_TAG_CREAT | MB_TAG_DENSE, &def_val );MB_CHK_SET_ERR( rval, "can't create mask tag" );
     for( Range::iterator it = cells.begin(); it != cells.end(); ++it, i++ )
     {
         EntityHandle cell = *it;
         // set to 0
         double val = 0.;
-        rval = mb2->tag_set_data(mask, &cell, 1, &val); MB_CHK_SET_ERR( rval, "can't set mask tag" );
+        rval       = mb2->tag_set_data( mask, &cell, 1, &val );MB_CHK_SET_ERR( rval, "can't set mask tag" );
     }
 
     for( Range::iterator it = landCells.begin(); it != landCells.end(); ++it, i++ )
@@ -109,9 +110,9 @@ int main( int argc, char* argv[] )
         EntityHandle cell = *it;
         // set to 0
         double val = 1.;
-        rval = mb2->tag_set_data(mask, &cell, 1, &val); MB_CHK_SET_ERR( rval, "can't set mask tag" );
+        rval       = mb2->tag_set_data( mask, &cell, 1, &val );MB_CHK_SET_ERR( rval, "can't set mask tag" );
     }
-    rval = mb2->delete_entities(&fileSet, 1); MB_CHK_SET_ERR( rval, "can't delete set" );
+    rval = mb2->delete_entities( &fileSet, 1 );MB_CHK_SET_ERR( rval, "can't delete set" );
     rval = mb2->write_file( "AtmWithLandMask.h5m" );MB_CHK_SET_ERR( rval, "can't write file" );
     delete mb;
     delete mb2;

@@ -143,9 +143,9 @@ int main( int argc, char** argv )
 
     rc = iMOAB_DefineTagStorage( pid, "afrac:ifrac", &tagType, &num_components, &tagIndex );
     ERROR( rc, "failed to create tags afrac:ifrac " );
-    double af[4] = {1.,1.,1.,1.};
-    int entType = 1; // cells
-    rc = iMOAB_SetDoubleTagStorage( pid, "afrac", &nume, &entType, af);
+    double af[4] = { 1., 1., 1., 1. };
+    int entType  = 1;  // cells
+    rc           = iMOAB_SetDoubleTagStorage( pid, "afrac", &nume, &entType, af );
     ERROR( rc, "failed to set tag afrac " );
     /*     write out the mesh file to disk, in parallel, if h5m*/
 #ifdef MOAB_HAVE_HDF5_PARALLEL
@@ -161,12 +161,12 @@ int main( int argc, char** argv )
 
     // write again
 #ifdef MOAB_HAVE_HDF5_PARALLEL
-    rc               = iMOAB_WriteMesh( pid, outfile, wopts );
+    rc = iMOAB_WriteMesh( pid, outfile, wopts );
     ERROR( rc, "can't write mesh 3\n" );
 #endif
 
     tagType = DENSE_INTEGER;
-    rc = iMOAB_DefineTagStorage( pid, "INTFIELD", &tagType, &num_components, &tagIndex );
+    rc      = iMOAB_DefineTagStorage( pid, "INTFIELD", &tagType, &num_components, &tagIndex );
     ERROR( rc, "failed to get tag INTFIELD " );
     // set some values
     std::vector< int > valstest( numv );
@@ -175,7 +175,7 @@ int main( int argc, char** argv )
         valstest[k] = my_id + k;
     }
     int num_tag_storage_length = numv * num_components;
-    entType                = 0;  // vertex
+    entType                    = 0;  // vertex
     // create an integer tag
 
     rc = iMOAB_SetIntTagStorage( pid, "INTFIELD", &num_tag_storage_length, &entType, &valstest[0] );
@@ -185,19 +185,18 @@ int main( int argc, char** argv )
     ERROR( rc, "failed reduce tags max " );
 
     /* see ghost elements */
-   dimgh      = 2; /* will ghost quads, topological dim 2 */
-   bridge     = 0; /* use vertex as bridge */
-   num_layers = 1; /* so far, one layer only */
-   rc         = iMOAB_DetermineGhostEntities( pid, &dimgh, &num_layers, &bridge );
-   ERROR( rc, "can't determine ghosts" );
+    dimgh      = 2; /* will ghost quads, topological dim 2 */
+    bridge     = 0; /* use vertex as bridge */
+    num_layers = 1; /* so far, one layer only */
+    rc         = iMOAB_DetermineGhostEntities( pid, &dimgh, &num_layers, &bridge );
+    ERROR( rc, "can't determine ghosts" );
 
-
-   /*     write out the mesh file to disk, in parallel, if h5m*/
+    /*     write out the mesh file to disk, in parallel, if h5m*/
 #ifdef MOAB_HAVE_HDF5_PARALLEL
-   rc               = iMOAB_WriteMesh( pid, outfile, wopts );
-   ERROR( rc, "can't write mesh" );
+    rc = iMOAB_WriteMesh( pid, outfile, wopts );
+    ERROR( rc, "can't write mesh" );
 #endif
-       /*     all done. de-register and finalize */
+    /*     all done. de-register and finalize */
     rc = iMOAB_DeregisterApplication( pid );
     ERROR( rc, "can't de-register app" );
 

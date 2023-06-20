@@ -100,7 +100,7 @@ class TempestRemapper : public Remapper
                                           double radius_tgt  = 1.0,
                                           double boxeps      = 0.1,
                                           bool regional_mesh = false,
-		                          bool gnomonic      = true );
+                                          bool gnomonic      = true );
 
     /// <summary>
     ///     Compute the intersection mesh between the source and target grids that have been
@@ -262,9 +262,9 @@ class TempestRemapper : public Remapper
     ///	</summary>
     ErrorCode GetIMasks( Remapper::IntersectionContext ctx, std::vector< int >& masks );
 
-  public:               // public members
-    const bool offlineWorkflow; // check whether we are in an offline workflow context (mbtempest)
-    bool meshValidate;  // Validate the mesh after loading from file
+  public:                        // public members
+    const bool offlineWorkflow;  // check whether we are in an offline workflow context (mbtempest)
+    bool meshValidate;           // Validate the mesh after loading from file
 
     bool constructEdgeMap;  //  Construct the edge map within the TempestRemap datastructures
 

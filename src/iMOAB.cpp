@@ -636,7 +636,8 @@ ErrCode iMOAB_LoadMesh( iMOAB_AppID pid,
             if( idx != std::string::npos )
             {
                 std::string extension = filen.substr( idx + 1 );
-                if( (extension == std::string( "h5m" )) || (extension == std::string( "nc" ))) newopts << ";;PARALLEL_COMM=" << *pid;
+                if( ( extension == std::string( "h5m" ) ) || ( extension == std::string( "nc" ) ) )
+                    newopts << ";;PARALLEL_COMM=" << *pid;
             }
 
             if( *num_ghost_layers >= 1 )
@@ -1528,8 +1529,8 @@ ErrCode iMOAB_DefineTagStorage( iMOAB_AppID pid,
     std::string separator( ":" );
     split_tag_names( tag_name, separator, tagNames );
 
-    ErrorCode rval = moab::MB_SUCCESS;  // assume success already :)
-    appData& data  = context.appDatas[*pid];
+    ErrorCode rval           = moab::MB_SUCCESS;  // assume success already :)
+    appData& data            = context.appDatas[*pid];
     int already_defined_tags = 0;
 
     for( size_t i = 0; i < tagNames.size(); i++ )
@@ -1565,14 +1566,15 @@ ErrCode iMOAB_DefineTagStorage( iMOAB_AppID pid,
         }
     }
     // we don't need default values anymore, avoid leaks
-    int rankHere  = 0;
+    int rankHere = 0;
 #ifdef MOAB_HAVE_MPI
     ParallelComm* pco = context.pcomms[*pid];
     rankHere          = pco->rank();
 #endif
-    if( !rankHere && already_defined_tags)
+    if( !rankHere && already_defined_tags )
         std::cout << " application with ID: " << *pid << " global id: " << data.global_id << " name: " << data.name
-                  << " has "  << already_defined_tags << " already defined tags out of " << tagNames.size() << " tags \n";
+                  << " has " << already_defined_tags << " already defined tags out of " << tagNames.size()
+                  << " tags \n";
     delete[] defInt;
     delete[] defDouble;
     delete[] defHandle;
@@ -1825,8 +1827,8 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
     }
     bool serial = true;
 #ifdef MOAB_HAVE_MPI
-    ParallelComm* pco = context.pcomms[*pid];
-    unsigned num_procs     = pco->size();
+    ParallelComm* pco  = context.pcomms[*pid];
+    unsigned num_procs = pco->size();
     if( num_procs > 1 ) serial = false;
 #endif
 
@@ -1871,7 +1873,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
             int n                   = TLsend.get_n();
             TLsend.vi_wr[2 * n]     = to_proc;  // send to processor
             TLsend.vi_wr[2 * n + 1] = marker;
-            int indexInTagValues = 0;
+            int indexInTagValues    = 0;
             // tag data collect by number of tags
             for( size_t j = 0; j < tagList.size(); j++ )
             {
@@ -2808,10 +2810,10 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
     int localRank = 0, numProcs = 1;
 
     bool isFortran = false;
-    if (*pid1>=0) isFortran = isFortran || context.appDatas[*pid1].is_fortran;
-    if (*pid2>=0) isFortran = isFortran || context.appDatas[*pid2].is_fortran;
+    if( *pid1 >= 0 ) isFortran = isFortran || context.appDatas[*pid1].is_fortran;
+    if( *pid2 >= 0 ) isFortran = isFortran || context.appDatas[*pid2].is_fortran;
 
-    MPI_Comm global = ( isFortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( join ) ) : *join );
+    MPI_Comm global    = ( isFortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( join ) ) : *join );
     MPI_Group srcGroup = ( isFortran ? MPI_Group_f2c( *reinterpret_cast< MPI_Fint* >( group1 ) ) : *group1 );
     MPI_Group tgtGroup = ( isFortran ? MPI_Group_f2c( *reinterpret_cast< MPI_Fint* >( group2 ) ) : *group2 );
 
@@ -2825,24 +2827,22 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
     if( *pid1 >= 0 )
     {
         appData& data                               = context.appDatas[*pid1];
-        std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *comp2);
-        if ( mt != data.pgraph.end() )
-            already_exists = true;
+        std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *comp2 );
+        if( mt != data.pgraph.end() ) already_exists = true;
     }
     if( *pid2 >= 0 )
     {
         appData& data                               = context.appDatas[*pid2];
-        std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *comp1);
-        if ( mt != data.pgraph.end() )
-            already_exists = true;
+        std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *comp1 );
+        if( mt != data.pgraph.end() ) already_exists = true;
     }
     // nothing to do if it already exists
-    if (already_exists)
+    if( already_exists )
     {
 #ifdef VERBOSE
-        if (!localRank)
-            std::cout << " parcomgraph already existing between components "<<
-			*comp1 << " and " << *comp2 << ". Do not compute again\n";
+        if( !localRank )
+            std::cout << " parcomgraph already existing between components " << *comp1 << " and " << *comp2
+                      << ". Do not compute again\n";
 #endif
         return moab::MB_SUCCESS;
     }
@@ -3387,7 +3387,7 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* join,
             appData& dataIntx      = context.appDatas[*pid_intx];
             EntityHandle cover_set = dataIntx.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
             recvGraph1->set_cover_set( cover_set );
-            context.appDatas[*pid_migr].pgraph[*context_id] = recvGraph1; // possible memory leak if context_id is same
+            context.appDatas[*pid_migr].pgraph[*context_id] = recvGraph1;  // possible memory leak if context_id is same
         }
         for( std::map< int, std::set< int > >::iterator mit = idsFromProcs.begin(); mit != idsFromProcs.end(); mit++ )
         {
@@ -3614,16 +3614,14 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     assert( groupA );
     assert( groupB );
     bool is_fortran = false;
-    if (*pid1 >=0) is_fortran = context.appDatas[*pid1].is_fortran || is_fortran;
-    if (*pid2 >=0) is_fortran = context.appDatas[*pid2].is_fortran || is_fortran;
-    if (*pid3 >=0) is_fortran = context.appDatas[*pid3].is_fortran || is_fortran;
+    if( *pid1 >= 0 ) is_fortran = context.appDatas[*pid1].is_fortran || is_fortran;
+    if( *pid2 >= 0 ) is_fortran = context.appDatas[*pid2].is_fortran || is_fortran;
+    if( *pid3 >= 0 ) is_fortran = context.appDatas[*pid3].is_fortran || is_fortran;
 
     MPI_Comm joint_communicator =
         ( is_fortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( jointcomm ) ) : *jointcomm );
-    MPI_Group group_first =
-        ( is_fortran ? MPI_Group_f2c( *reinterpret_cast< MPI_Fint* >( groupA ) ) : *groupA );
-    MPI_Group group_second =
-        ( is_fortran ? MPI_Group_f2c( *reinterpret_cast< MPI_Fint* >( groupB ) ) : *groupB );
+    MPI_Group group_first  = ( is_fortran ? MPI_Group_f2c( *reinterpret_cast< MPI_Fint* >( groupA ) ) : *groupA );
+    MPI_Group group_second = ( is_fortran ? MPI_Group_f2c( *reinterpret_cast< MPI_Fint* >( groupB ) ) : *groupB );
 
     ErrorCode rval = MB_SUCCESS;
     int localRank = 0, numProcs = 1;
@@ -3897,16 +3895,16 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     }
     else
     {
-        TLv.initialize( 2, 0, 0, 3, 0 ); // no vertices here, for sure
-        TLv.enableWriteAccess(); // to be able to receive stuff, even if nothing is here yet, on this task
-        if (*type != 2) // for point cloud, we do not need to initialize TLc (for cells)
+        TLv.initialize( 2, 0, 0, 3, 0 );  // no vertices here, for sure
+        TLv.enableWriteAccess();          // to be able to receive stuff, even if nothing is here yet, on this task
+        if( *type != 2 )                  // for point cloud, we do not need to initialize TLc (for cells)
         {
             // we still need to initialize the tuples with the right size, as in form_tuples_to_migrate_mesh
-            int size_tuple = 2 + ( ( *type != 1 ) ? 0 : lenTagType1 ) + 1 + 10;  // 10 is the max number of vertices in cell; kind of arbitrary
+            int size_tuple = 2 + ( ( *type != 1 ) ? 0 : lenTagType1 ) + 1 +
+                             10;  // 10 is the max number of vertices in cell; kind of arbitrary
             TLc.initialize( size_tuple, 0, 0, 0, 0 );
             TLc.enableWriteAccess();
         }
-
     }
     pc.crystal_router()->gs_transfer( 1, TLv, 0 );  // communication towards coupler tasks, with mesh vertices
     if( *type != 2 ) pc.crystal_router()->gs_transfer( 1, TLc, 0 );  // those are cells
@@ -3979,7 +3977,7 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     double radius_source = 1.0;
     double radius_target = 1.0;
     const double epsrel  = ReferenceTolerance;  // ReferenceTolerance is defined in Defines.h in tempestremap source ;
-    constexpr double boxeps  = 1.e-1;
+    constexpr double boxeps = 1.e-1;
     constexpr bool gnomonic = false;
 
     // Get the source and target data and pcomm objects
@@ -4296,7 +4294,7 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
     mapOptions.fTargetConcave = false;
 
     mapOptions.strMethod = "";
-    if( fv_method ) mapOptions.strMethod += std::string(fv_method) + ";";
+    if( fv_method ) mapOptions.strMethod += std::string( fv_method ) + ";";
     if( fMonotoneTypeID )
     {
         switch( *fMonotoneTypeID )

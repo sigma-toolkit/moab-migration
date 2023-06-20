@@ -321,7 +321,7 @@ void make_mesh( Interface& iface )
             for( int x = 0; x <= dim; ++x )
             {
                 const double coords[]   = { static_cast< double >( x ), static_cast< double >( y ),
-                                          static_cast< double >( z ) };
+                                            static_cast< double >( z ) };
                 EntityHandle new_handle = 0;
                 ErrorCode rval          = iface.create_vertex( coords, new_handle );CHECK_ERR( rval );
                 CHECK_EQUAL( ++prev_handle, new_handle );

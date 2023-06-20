@@ -15,7 +15,7 @@
 #include <string>
 #include <iostream>
 #include <cassert>
-#include <numeric>  // std::iota
+#include <numeric>    // std::iota
 #include <algorithm>  // std::sort, std::stable_sort
 
 #include "DebugOutput.hpp"
@@ -317,7 +317,7 @@ ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType meshTyp
 
         for( unsigned ifaces = 0; ifaces < faces.size(); ++ifaces )
         {
-            const Face& face         = faces[ifaces];
+            const Face& face              = faces[ifaces];
             const unsigned num_v_per_elem = face.edges.size();
 
             for( unsigned iedges = 0; iedges < num_v_per_elem; ++iedges )
@@ -361,7 +361,7 @@ ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType meshTyp
         if( nquads ) dbgprint.printf( 0, "....Quadrangular Elements [%u].\n", nquads );
         if( npolys ) dbgprint.printf( 0, "....Polygonal Elements [%u].\n", npolys );
 
-        rval = m_interface->add_entities( mesh_set, &mbcells[0], mbcells.size());MB_CHK_SET_ERR( rval, "Could not add entities" );
+        rval = m_interface->add_entities( mesh_set, &mbcells[0], mbcells.size() );MB_CHK_SET_ERR( rval, "Could not add entities" );
 
         rval = m_interface->tag_set_data( gidTag, &mbcells[0], mbcells.size(), &gidse[0] );MB_CHK_SET_ERR( rval, "Can't set global_id tag" );
         if( storeParentInfo )
@@ -617,15 +617,14 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     std::vector< int > globIds( nelems );
 
     moab::Tag gid = m_interface->globalId_tag();
-    rval            = m_interface->tag_get_data( gid, elems, &globIds[0] );MB_CHK_ERR( rval );
+    rval          = m_interface->tag_get_data( gid, elems, &globIds[0] );MB_CHK_ERR( rval );
     // initialize original index locations
     std::vector< size_t > sortedIdx( nelems );
     std::iota( sortedIdx.begin(), sortedIdx.end(), 0 );
     // sort indexes based on comparing values in v, using std::stable_sort instead of std::sort
     // to avoid unnecessary index re-orderings when v contains elements of equal values
-    std::sort(
-          sortedIdx.begin(), sortedIdx.end(),
-          [&globIds]( size_t i1, size_t i2 ) { return globIds[i1] < globIds[i2]; } );
+    std::sort( sortedIdx.begin(), sortedIdx.end(),
+               [&globIds]( size_t i1, size_t i2 ) { return globIds[i1] < globIds[i2]; } );
 
     for( unsigned iface = 0; iface < nelems; ++iface )
     {
@@ -1226,7 +1225,7 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
                                                  double radius_tgt,
                                                  double boxeps,
                                                  bool regional_mesh,
-	                                             bool gnomonic	)
+                                                 bool gnomonic )
 {
     ErrorCode rval;
 
@@ -1479,7 +1478,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                 for( Range::iterator it = intxCells.begin(); it != intxCells.end(); it++ )
                 {
                     EntityHandle intxCell = *it;
-                    int srcParent        = -1;
+                    int srcParent         = -1;
                     rval                  = m_interface->tag_get_data( srcParentTag, &intxCell, 1, &srcParent );MB_CHK_ERR( rval );
                     // if (is_root) std::cout << "Found intersecting element: " << srcParent << ",
                     // " << gid_to_lid_covsrc[srcParent] << "\n";
@@ -1493,7 +1492,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                 covEnts = moab::subtract( covEnts, notNeededCovCells );
 
                 // in order for getting 1-ring neighborhood, we need to be sure that the adjacencies are updated (created)
-                if (false)
+                if( false )
                 {
                     // update all adjacency list
                     Core* mb                 = dynamic_cast< Core* >( m_interface );
@@ -1525,7 +1524,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                         {
                             std::vector< EntityHandle > adjacent_entities;
                             rval = adj_fact->get_adjacencies( conn[ie], 2, false, adjacent_entities );MB_CHK_ERR( rval );
-                            for ( auto ent : adjacent_entities)
+                            for( auto ent : adjacent_entities )
                                 notNeededCovCells.erase( ent );  // ent is part of the 1-ring neighborhood
                         }
                     }

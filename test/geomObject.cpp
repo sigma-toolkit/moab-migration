@@ -138,7 +138,7 @@ class torus : public geomObject
         double twodnrm       = geomObject::Twonorm( 2, transfer );
         double tubecenter[3] = { c * transfer[0] / twodnrm + centerx, c * transfer[1] / twodnrm + centery, centerz };
         double direction[3]  = { oldcoords[0] - tubecenter[0], oldcoords[1] - tubecenter[1],
-                                oldcoords[2] - tubecenter[2] };
+                                 oldcoords[2] - tubecenter[2] };
         double len           = geomObject::Twonorm( 3, direction );
         assert( len > 0 );
         direction[0] /= len;

@@ -431,7 +431,7 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_MPI
         remapper = new moab::TempestRemapper( gMB, pcomm, offlineGenerator );
 #else
-        remapper = new moab::TempestRemapper( gMB, offlineGenerator );
+        remapper      = new moab::TempestRemapper( gMB, offlineGenerator );
 #endif
     }
 

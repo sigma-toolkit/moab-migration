@@ -246,7 +246,7 @@ int main( int argc, char* argv[] )
             }
             GeometryQueryTool* gti = GeometryQueryTool::instance();
             // no ParallelComm so far
-            zoltan_tool            = new ZoltanPartitioner( &mb, NULL, false, argc, argv, gti );
+            zoltan_tool = new ZoltanPartitioner( &mb, NULL, false, argc, argv, gti );
 #else
             std::cerr << "CGM should be configured to partition geometry." << std::endl << std::endl;
             opts.printHelp();

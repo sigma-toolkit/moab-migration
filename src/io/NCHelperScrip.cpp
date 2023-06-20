@@ -93,15 +93,15 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
     ErrorCode rval;
 
 #ifdef MOAB_HAVE_MPI
-    int rank         = 0;
-    int procs        = 1;
-    bool& isParallel = _readNC->isParallel;
+    int rank              = 0;
+    int procs             = 1;
+    bool& isParallel      = _readNC->isParallel;
     ParallelComm* myPcomm = NULL;
     if( isParallel )
     {
         myPcomm = _readNC->myPcomm;
-        rank                   = myPcomm->proc_config().proc_rank();
-        procs                  = myPcomm->proc_config().proc_size();
+        rank    = myPcomm->proc_config().proc_rank();
+        procs   = myPcomm->proc_config().proc_size();
     }
 
     if( procs >= 2 )
@@ -402,7 +402,7 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
 }
 
 #ifdef MOAB_HAVE_MPI
-ErrorCode NCHelperScrip::redistribute_local_cells( int start_cell_idx, ParallelComm * pco )
+ErrorCode NCHelperScrip::redistribute_local_cells( int start_cell_idx, ParallelComm* pco )
 {
     // If possible, apply Zoltan partition
 #ifdef MOAB_HAVE_ZOLTAN

@@ -492,7 +492,8 @@ int main( int argc, char** argv )
     }
 
     Mesh meshInput, meshOutput, meshOverlap;
-    if( normalize || !( computeMBA || computeShepard ) )
+    OfflineMap weightMap;
+    if( normalize || computeTR )
     {
         // err = remapper.ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( err );
         // err = remapper.ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( err );
@@ -511,6 +512,84 @@ int main( int argc, char** argv )
         if( ierr )
         {
             MB_CHK_SET_ERR( MB_FAILURE, "TempestRemap: Can't compute the intersection of meshes on the sphere" );
+        }
+
+        if( computeTR )
+        {
+            dbgprint( "\nSetup computation of weights" );
+            // Call to generate the remapping weights with the tempest meshes
+
+            GenerateOfflineMapAlgorithmOptions mapOptions;
+            mapOptions.nPin             = 1;
+            mapOptions.nPout            = 1;
+            mapOptions.fSourceConcave   = false;
+            mapOptions.fTargetConcave   = false;
+            mapOptions.strMethod        = strMethod;  // invdist, bilin, intbilin, delaunay
+            mapOptions.fMonotone        = ensureMonotonicity;
+            mapOptions.fNoCorrectAreas  = false;
+            mapOptions.fNoCheck         = true;
+            mapOptions.strOutputMapFile = output_filename;  // ask TR to write it out
+            mapOptions.strOutputFormat  = "Netcdf4";
+
+            dbgprint( "Compute weights with TempestRemap" );
+            ierr = GenerateOfflineMapWithMeshes( meshInput,    // Mesh inputMesh
+                                                 meshOutput,   // Mesh outputMesh,
+                                                 meshOverlap,  // Mesh overlapMesh,
+                                                 "fv",         // std::string inputDiscretization,
+                                                 "fv",         // std::string outputDiscretization,
+                                                 mapOptions,   // const GenerateOfflineMapAlgorithmOptions& options
+                                                 weightMap );
+            MB_CHK_ERR( err );
+
+            // check the generated weights and output information
+            {
+                const double dNormalTolerance = 1.0E-8;
+                const double dStrictTolerance = 1.0E-12;
+                weightMap.CheckMap( true, true, ensureMonotonicity, dNormalTolerance, dStrictTolerance );
+            }
+
+            // Write the map to disk
+            {
+                typedef std::map< std::string, std::string > AttributeMap;
+                typedef AttributeMap::value_type AttributePair;
+
+                AttributeMap mapAttributes;
+
+                mapAttributes.insert( AttributePair( "domain_a", mpas_filename ) );
+                mapAttributes.insert( AttributePair( "domain_b", roms_filename ) );
+                mapAttributes.insert( AttributePair( "grid_file_src", mpas_filename ) );
+                mapAttributes.insert( AttributePair( "grid_file_dst", roms_filename ) );
+                mapAttributes.insert( AttributePair( "grid_file_ovr", "mesh_intersection.h5m" ) );
+                mapAttributes.insert(
+                    AttributePair( "concave_src", ( mapOptions.fSourceConcave ) ? ( "true" ) : ( "false" ) ) );
+                mapAttributes.insert(
+                    AttributePair( "concave_dst", ( mapOptions.fTargetConcave ) ? ( "true" ) : ( "false" ) ) );
+                if( mapOptions.strSourceMeta != "" )
+                {
+                    mapAttributes.insert( AttributePair( "meta_src", mapOptions.strSourceMeta ) );
+                }
+                if( mapOptions.strTargetMeta != "" )
+                {
+                    mapAttributes.insert( AttributePair( "meta_dst", mapOptions.strTargetMeta ) );
+                }
+                mapAttributes.insert( AttributePair( "type_src", "fv" ) );
+                mapAttributes.insert( AttributePair( "type_dst", "fv" ) );
+                mapAttributes.insert( AttributePair( "np_src", std::to_string( (long long)mapOptions.nPin ) ) );
+                mapAttributes.insert( AttributePair( "np_dst", std::to_string( (long long)mapOptions.nPout ) ) );
+                mapAttributes.insert( AttributePair( "mono", ( mapOptions.fMonotone ) ? ( "true" ) : ( "false" ) ) );
+                mapAttributes.insert( AttributePair( "nobubble", "false" ) );
+                mapAttributes.insert( AttributePair( "nocorrectareas", "false" ) );
+                mapAttributes.insert( AttributePair( "noconserve", "false" ) );
+                mapAttributes.insert( AttributePair( "sparse_constraints", "false" ) );
+                mapAttributes.insert( AttributePair( "method", mapOptions.strMethod ) );
+                mapAttributes.insert( AttributePair( "version", "RemapMPASROMS v0.1" ) );
+
+                dbgprint( "\nWrite the weights to " << output_filename );
+                weightMap.Write( mapOptions.strOutputMapFile, mapAttributes, NcFile::Netcdf4Classic );
+
+                // // Write the map file to disk in parallel using either HDF5 or SCRIP interface
+                // err = weightMap.WriteParallelMap( output_filename.c_str() );MB_CHK_ERR( err );
+            }
         }
     }
 
@@ -634,10 +713,39 @@ int main( int argc, char** argv )
     }
     else
     {
-        // Project the bottom Bathymetry data from MPAS to ROMS so that we can impose it.
-        err = ComputeFieldProjections( mbi, meshOverlap, "bottomDepth", "bottomDepth", mpas_elems, roms_elems,
-                                       false /*use_3dprojection*/, false /* bool normalize */, 2000.0, computeMBA,
-                                       bathymetryOrder );MB_CHK_SET_ERR( err, "Can't create new set" );
+        if (computeTR)
+        {
+            // get the handle to the weight matrix
+            const SparseMatrix< double >& weights = weightMap.GetSparseMatrix();
+            DataArray1D< double > dataInDouble( mpas_elems.size() );
+            DataArray1D< double > dataOutDouble( roms_elems.size() );
+
+            constexpr double bottomDepth_avg = 2000.0;
+            moab::Tag stag;
+            err = mbi->tag_get_handle( "bottomDepth", 1, moab::MB_TYPE_DOUBLE, stag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+
+            // Apply the map onto the bottomDepth solution field
+            err = mbi->tag_get_data( stag, mpas_elems, dataInDouble );MB_CHK_ERR( err );
+            for( size_t i = 0; i < dataInDouble.GetRows(); i++ )
+                dataInDouble[i] -= bottomDepth_avg;
+
+            // Compute the projection for the bottomDepth field
+            weights.Apply( dataInDouble, dataOutDouble );
+
+            // Scale data values
+            for( size_t i = 0; i < dataOutDouble.GetRows(); i++ )
+                dataOutDouble[i] += bottomDepth_avg;
+
+            // Set the bottomDepth solution field on the ROMS mesh
+            err = mbi->tag_set_data( stag, roms_elems, dataOutDouble );MB_CHK_ERR( err );
+        }
+        else
+        {
+            // Project the bottom Bathymetry data from MPAS to ROMS so that we can impose it.
+            err = ComputeFieldProjections( mbi, meshOverlap, "bottomDepth", "bottomDepth", mpas_elems, roms_elems,
+                                        false /*use_3dprojection*/, false /* bool normalize */, 2000.0, computeMBA,
+                                        bathymetryOrder );MB_CHK_SET_ERR( err, "Can't create new set" );
+        }
     }
 
     if( use_3dprojection || computeMBA )
@@ -668,139 +776,59 @@ int main( int argc, char** argv )
     }
     else
     {
-        // compute the conservative 2D mapping weights
+        // Now apply the map to compute the field projections on the ROMS mesh
+        // Now let us apply the weights onto the vector and project onto target mesh
+        // err = weightMap.ApplyWeights( stag, stag, false );MB_CHK_ERR( err );
+        // err = weightMap.ApplyWeights( ttag, ttag, false );MB_CHK_ERR( err );
+
+        // get the handle to the weight matrix
+        const SparseMatrix< double >& weights = weightMap.GetSparseMatrix();
+        DataArray1D< double > dataInDouble( mpas_elems.size() );
+        DataArray1D< double > dataOutDouble( roms_elems.size() );
+
+        // assert( useConservativeSalinity );
         {
-            dbgprint( "\nSetup computation of weights" );
-            // Call to generate the remapping weights with the tempest meshes
-            OfflineMap weightMap;
+            constexpr double salinity_avg = 35.0;
+            moab::Tag stag;
+            err = mbi->tag_get_handle( "salinity", 1, moab::MB_TYPE_DOUBLE, stag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
 
-            GenerateOfflineMapAlgorithmOptions mapOptions;
-            mapOptions.nPin             = 1;
-            mapOptions.nPout            = 1;
-            mapOptions.fSourceConcave   = false;
-            mapOptions.fTargetConcave   = false;
-            mapOptions.strMethod        = strMethod;  // invdist, bilin, intbilin, delaunay
-            mapOptions.fMonotone        = ensureMonotonicity;
-            mapOptions.fNoCorrectAreas  = false;
-            mapOptions.fNoCheck         = true;
-            mapOptions.strOutputMapFile = output_filename;  // ask TR to write it out
-            mapOptions.strOutputFormat  = "Netcdf4";
+            // Apply the map onto the salinity solution field
+            err = mbi->tag_get_data( stag, mpas_elems, dataInDouble );MB_CHK_ERR( err );
+            for( size_t i = 0; i < dataInDouble.GetRows(); i++ )
+                dataInDouble[i] -= salinity_avg;
 
-            dbgprint( "Compute weights with TempestRemap" );
-            ierr = GenerateOfflineMapWithMeshes( meshInput,    // Mesh inputMesh
-                                                 meshOutput,   // Mesh outputMesh,
-                                                 meshOverlap,  // Mesh overlapMesh,
-                                                 "fv",         // std::string inputDiscretization,
-                                                 "fv",         // std::string outputDiscretization,
-                                                 mapOptions,   // const GenerateOfflineMapAlgorithmOptions& options
-                                                 weightMap );MB_CHK_ERR( err );
+            // Compute the projection for the salinity field
+            weights.Apply( dataInDouble, dataOutDouble );
 
-            // check the generated weights and output information
-            {
-                const double dNormalTolerance = 1.0E-8;
-                const double dStrictTolerance = 1.0E-12;
-                weightMap.CheckMap( true, true, ensureMonotonicity, dNormalTolerance, dStrictTolerance );
-            }
+            // Scale data values
+            for( size_t i = 0; i < dataOutDouble.GetRows(); i++ )
+                dataOutDouble[i] += salinity_avg;
 
-            // Write the map to disk
-            {
-                typedef std::map< std::string, std::string > AttributeMap;
-                typedef AttributeMap::value_type AttributePair;
+            // Set the salinity solution field on the ROMS mesh
+            err = mbi->tag_set_data( stag, roms_elems, dataOutDouble );MB_CHK_ERR( err );
+        }
 
-                AttributeMap mapAttributes;
+        // Apply the map onto the temperature solution field
+        // assert( useConservativeTemperature );
+        {
+            constexpr double temperature_avg = 8.5;
+            moab::Tag ttag;
+            err = mbi->tag_get_handle( "temperature", 1, moab::MB_TYPE_DOUBLE, ttag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
 
-                mapAttributes.insert( AttributePair( "domain_a", mpas_filename ) );
-                mapAttributes.insert( AttributePair( "domain_b", roms_filename ) );
-                mapAttributes.insert( AttributePair( "grid_file_src", mpas_filename ) );
-                mapAttributes.insert( AttributePair( "grid_file_dst", roms_filename ) );
-                mapAttributes.insert( AttributePair( "grid_file_ovr", "mesh_intersection.h5m" ) );
-                mapAttributes.insert(
-                    AttributePair( "concave_src", ( mapOptions.fSourceConcave ) ? ( "true" ) : ( "false" ) ) );
-                mapAttributes.insert(
-                    AttributePair( "concave_dst", ( mapOptions.fTargetConcave ) ? ( "true" ) : ( "false" ) ) );
-                if( mapOptions.strSourceMeta != "" )
-                {
-                    mapAttributes.insert( AttributePair( "meta_src", mapOptions.strSourceMeta ) );
-                }
-                if( mapOptions.strTargetMeta != "" )
-                {
-                    mapAttributes.insert( AttributePair( "meta_dst", mapOptions.strTargetMeta ) );
-                }
-                mapAttributes.insert( AttributePair( "type_src", "fv" ) );
-                mapAttributes.insert( AttributePair( "type_dst", "fv" ) );
-                mapAttributes.insert( AttributePair( "np_src", std::to_string( (long long)mapOptions.nPin ) ) );
-                mapAttributes.insert( AttributePair( "np_dst", std::to_string( (long long)mapOptions.nPout ) ) );
-                mapAttributes.insert( AttributePair( "mono", ( mapOptions.fMonotone ) ? ( "true" ) : ( "false" ) ) );
-                mapAttributes.insert( AttributePair( "nobubble", "false" ) );
-                mapAttributes.insert( AttributePair( "nocorrectareas", "false" ) );
-                mapAttributes.insert( AttributePair( "noconserve", "false" ) );
-                mapAttributes.insert( AttributePair( "sparse_constraints", "false" ) );
-                mapAttributes.insert( AttributePair( "method", mapOptions.strMethod ) );
-                mapAttributes.insert( AttributePair( "version", "RemapMPASROMS v0.1" ) );
+            // Apply the map onto the salinity solution field
+            err = mbi->tag_get_data( ttag, mpas_elems, dataInDouble );MB_CHK_ERR( err );
+            for( size_t i = 0; i < dataInDouble.GetRows(); i++ )
+                dataInDouble[i] -= temperature_avg;
 
-                dbgprint( "\nWrite the weights to " << output_filename );
-                weightMap.Write( mapOptions.strOutputMapFile, mapAttributes, NcFile::Netcdf4Classic );
+            // Compute the projection for the salinity field
+            weights.Apply( dataInDouble, dataOutDouble );
 
-                // // Write the map file to disk in parallel using either HDF5 or SCRIP interface
-                // err = weightMap.WriteParallelMap( output_filename.c_str() );MB_CHK_ERR( err );
-            }
+            // Scale data values
+            for( size_t i = 0; i < dataOutDouble.GetRows(); i++ )
+                dataOutDouble[i] += temperature_avg;
 
-            // Now apply the map to compute the field projections on the ROMS mesh
-            {
-                // Now let us apply the weights onto the vector and project onto target mesh
-                // err = weightMap.ApplyWeights( stag, stag, false );MB_CHK_ERR( err );
-                // err = weightMap.ApplyWeights( ttag, ttag, false );MB_CHK_ERR( err );
-
-                // get the handle to the weight matrix
-                const SparseMatrix< double >& weights = weightMap.GetSparseMatrix();
-                DataArray1D< double > dataInDouble( mpas_elems.size() );
-                DataArray1D< double > dataOutDouble( roms_elems.size() );
-
-                // assert( useConservativeSalinity );
-                {
-                    constexpr double salinity_avg = 35.0;
-                    moab::Tag stag;
-                    err = mbi->tag_get_handle( "salinity", 1, moab::MB_TYPE_DOUBLE, stag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
-
-                    // Apply the map onto the salinity solution field
-                    err = mbi->tag_get_data( stag, mpas_elems, dataInDouble );MB_CHK_ERR( err );
-                    for( size_t i = 0; i < dataInDouble.GetRows(); i++ )
-                        dataInDouble[i] -= salinity_avg;
-
-                    // Compute the projection for the salinity field
-                    weights.Apply( dataInDouble, dataOutDouble );
-
-                    // Scale data values
-                    for( size_t i = 0; i < dataOutDouble.GetRows(); i++ )
-                        dataOutDouble[i] += salinity_avg;
-
-                    // Set the salinity solution field on the ROMS mesh
-                    err = mbi->tag_set_data( stag, roms_elems, dataOutDouble );MB_CHK_ERR( err );
-                }
-
-                // Apply the map onto the temperature solution field
-                // assert( useConservativeTemperature );
-                {
-                    constexpr double temperature_avg = 8.5;
-                    moab::Tag ttag;
-                    err = mbi->tag_get_handle( "temperature", 1, moab::MB_TYPE_DOUBLE, ttag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
-
-                    // Apply the map onto the salinity solution field
-                    err = mbi->tag_get_data( ttag, mpas_elems, dataInDouble );MB_CHK_ERR( err );
-                    for( size_t i = 0; i < dataInDouble.GetRows(); i++ )
-                        dataInDouble[i] -= temperature_avg;
-
-                    // Compute the projection for the salinity field
-                    weights.Apply( dataInDouble, dataOutDouble );
-
-                    // Scale data values
-                    for( size_t i = 0; i < dataOutDouble.GetRows(); i++ )
-                        dataOutDouble[i] += temperature_avg;
-
-                    // Set the temperature solution field on the ROMS mesh
-                    err = mbi->tag_set_data( ttag, roms_elems, dataOutDouble );MB_CHK_ERR( err );
-                }
-            }
+            // Set the temperature solution field on the ROMS mesh
+            err = mbi->tag_set_data( ttag, roms_elems, dataOutDouble );MB_CHK_ERR( err );
         }
 
         // remapper.clear();
@@ -971,43 +999,51 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
     const size_t nd = fd.size();
     const size_t ni = fi.size();
 
-    int nlevels = 10;
-
-    // Bounding box containing the data points.
-    mba::point< 3 > lo = { -1, -1, -1 };
-    mba::point< 3 > hi = { 1, 1, 1 };
-
-    // Initial grid size.
-    // const size_t init_grid_size = static_cast< size_t >( std::max( 10.0, std::sqrt( nd ) / 8 ) );
-    // mba::index< 3 > grid        = { init_grid_size, init_grid_size, 2 };
-    mba::index< 3 > grid = { 50, 50, 2 };
-
-    if( is_threed )
-    {
-        lo[2] = -1e5;
-        hi[2] = 1e5;
-
-        grid[2] = 50;
-
-        nlevels = 5;
-    }
-
-    std::vector< mba::point< 3 > > coords( nd );
-    size_t offset = 0;
-    for( size_t k = 0; k < nd; k++, offset += 3 )
-        coords[k] = mba::point< 3 >{ xyzd[offset], xyzd[offset + 1], xyzd[offset + 2] };
-
     // Algorithm setup.
     if( order == 1 )
     {
+        std::vector< mba::point< 3 > > coords( nd );
+        size_t offset = 0;
+        for( size_t k = 0; k < nd; k++, offset += 3 )
+            coords[k] = mba::point< 3 >{ xyzd[offset], xyzd[offset + 1], xyzd[offset + 2] };
+            // coords[k] = mba::point< 2 >{ xyzd[offset], xyzd[offset + 1] };
+
         mba::linear_approximation< 3 > interp( coords.begin(), coords.end(), fd.begin() );
         // Get interpolated value at arbitrary location.
         offset = 0;
         for( size_t k = 0; k < ni; k++, offset += 3 )
             fi[k] = interp( mba::point< 3 >{ xyzi[offset], xyzi[offset + 1], xyzi[offset + 2] } );
+            // fi[k] = interp( mba::point< 2 >{ xyzi[offset], xyzi[offset + 1] } );
     }
     else
     {
+
+        std::vector< mba::point< 3 > > coords( nd );
+        size_t offset = 0;
+        for( size_t k = 0; k < nd; k++, offset += 3 )
+            coords[k] = mba::point< 3 >{ xyzd[offset], xyzd[offset + 1], xyzd[offset + 2] };
+
+        int nlevels = 10;
+
+        // Bounding box containing the data points.
+        mba::point< 3 > lo = { -1, -1, -1 };
+        mba::point< 3 > hi = { 1, 1, 1 };
+
+        // Initial grid size.
+        // const size_t init_grid_size = static_cast< size_t >( std::max( 10.0, std::sqrt( nd ) / 8 ) );
+        // mba::index< 3 > grid        = { init_grid_size, init_grid_size, 2 };
+        mba::index< 3 > grid = { 50, 50, 2 };
+
+        if( is_threed )
+        {
+            lo[2] = -1e5;
+            hi[2] = 1e5;
+
+            grid[2] = 50;
+
+            nlevels = 5;
+        }
+
         mba::MBA< 3 > interp( lo, hi, grid, coords, fd, nlevels /*levels*/, 1e-14 /*tolerance*/, 0.5 /*min_fill*/ );
         // Get interpolated value at arbitrary location.
         offset = 0;
@@ -1429,14 +1465,6 @@ moab::ErrorCode ExtrudeROMSQuadsToHexes( Interface* mb,
     // Create all edges
     rval = mb->get_adjacencies( faces, 1, true, edges, Interface::UNION );MB_CHK_ERR( rval );
 
-    // output some information
-    {
-        dbgprint( " Input 2D " << ( is_mpas ? "MPAS" : "ROMS") << " Mesh details ::" );
-        dbgprint( "\tNumber of Vertices = " << verts.size() );
-        dbgprint( "\t          Edges    = " << edges.size() );
-        dbgprint( "\t          Faces    = " << faces.size() );
-    }
-
     const size_t nverts = verts.size();
     const size_t nedges = edges.size();
     const size_t nfaces = faces.size();
@@ -1444,16 +1472,24 @@ moab::ErrorCode ExtrudeROMSQuadsToHexes( Interface* mb,
     const size_t nquads = nedges * nlayers;
     std::vector< double > coords( 3 * nverts );
 
+    // output some information
+    {
+        dbgprint( " Input 2D " << ( is_mpas ? "MPAS" : "ROMS" ) << " Mesh details ::" );
+        dbgprint( "\tNumber of Vertices = " << nverts );
+        dbgprint( "\t          Edges    = " << edges.size() );
+        dbgprint( "\t          Faces    = " << nfaces );
+    }
+
     // get the vertex coordinates for the polygonal mesh
     rval = mb->get_coords( verts, &coords[0] );MB_CHK_ERR( rval );
 
     Tag gidTag = mb->globalId_tag();
-    std::vector< int > gidData, gidParentVertexData( verts.size() ), gidParentFaceData( faces.size() );
 
     Tag parentTag;
     rval = mb->tag_get_handle( "ColumnParent", 1, moab::MB_TYPE_INTEGER, parentTag,
                                moab::MB_TAG_DENSE | moab::MB_TAG_CREAT );MB_CHK_ERR( rval );
 
+    std::vector< int > gidData( nverts ), gidParentVertexData( nverts ), gidParentFaceData( nfaces );
     rval = mb->tag_get_data( gidTag, verts, gidParentVertexData.data() );MB_CHK_ERR( rval );
     rval = mb->tag_get_data( gidTag, faces, gidParentFaceData.data() );MB_CHK_ERR( rval );
 
@@ -1508,8 +1544,7 @@ moab::ErrorCode ExtrudeROMSQuadsToHexes( Interface* mb,
         }
 
         rval = mb->create_vertices( &coords[0], nverts, newVerts[ii + 1] );MB_CHK_ERR( rval );
-        gidData.resize( nverts );
-        std::iota( gidData.begin(), gidData.end(), nverts + ii * nverts );
+        std::iota( gidData.begin(), gidData.end(), nverts * (1 + ii) );
         rval = mb->tag_set_data( gidTag, newVerts[ii + 1], gidData.data() );MB_CHK_ERR( rval );
         rval = mb->tag_set_data( parentTag, newVerts[ii + 1], gidParentVertexData.data() );MB_CHK_ERR( rval );
 

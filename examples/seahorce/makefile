@@ -8,7 +8,7 @@ PAREXAMPLES =
 
 ifeq ("$(MOAB_MPI_ENABLED)","yes")
 ifeq ("$(MOAB_HDF5_ENABLED)","yes")
-PAREXAMPLES += RemapMPASROMS
+PAREXAMPLES += RemapMPASROMS FilterElements
 parallel: ${PAREXAMPLES}
 endif
 else
@@ -19,6 +19,8 @@ ALLEXAMPLES = ${EXAMPLES} ${PAREXAMPLES}
 all: $(ALLEXAMPLES)
 
 RemapMPASROMS: RemapMPASROMS.o ${MOAB_LIBDIR}/libMOAB.la
+
+FilterElements: FilterElements.o ${MOAB_LIBDIR}/libMOAB.la
 
 $(EXAMPLES) $(PAREXAMPLES):
 	@echo "[CXXLD]  $@"

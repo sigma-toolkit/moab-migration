@@ -1530,7 +1530,7 @@ moab::ErrorCode ExtrudeROMSQuadsToHexes( Interface* mb,
 
     // add the initial faces to the first set
     rval = mb->add_entities( outputset, verts );MB_CHK_ERR( rval );
-    // if( is_mpas )
+    //if( is_mpas )
     {
         rval = mb->add_entities( outputset, faces );MB_CHK_ERR( rval );
     }

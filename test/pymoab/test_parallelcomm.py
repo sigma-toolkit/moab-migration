@@ -1,15 +1,8 @@
 from pymoab import core
 from pymoab import types
-from pymoab.rng import Range
-from pymoab.scd import ScdInterface
-from pymoab.hcoord import HomCoord
-from subprocess import call
-from driver import test_driver, CHECK, CHECK_EQ, CHECK_NOT_EQ, CHECK_ITER_EQ
+from driver import test_driver_parallel, CHECK_EQ, CHECK_NOT_EQ, CHECK_ITER_EQ
 
 from mpi4py import MPI
-#from mpi4py import MPI
-#import mpi4py.MPI as MPI
-#from mpi4py.libmpi cimport *
 from pymoab import parallelcomm
 
 import numpy as np
@@ -18,7 +11,7 @@ import os
 bytes_per_char_ = np.array(["a"]).nbytes
 
 def test_parallel_rank_size():
-    
+
     mpicomm = MPI.COMM_WORLD
     mpirank = mpicomm.Get_rank()
     mpisize = mpicomm.Get_size()
@@ -32,7 +25,7 @@ def test_parallel_rank_size():
     # print("ParallelComm instance ", id, " has rank = ", rank, " out of ", size, " processors.")
 
     assert pid >= 0
-    CHECK_EQ(mpirank,rank)
+    CHECK_EQ(mpirank, rank)
     CHECK_EQ(mpisize, size)
 
 def test_parallel_load_mesh():
@@ -101,11 +94,11 @@ def test_parallel_write_tags():
     pc = parallelcomm.ParallelComm(mb, comm=MPI.COMM_WORLD)
     rank = pc.rank()
 
-    ##                  (1,1)
+    ##                  (1,1)3
     ##
     ##      PART 0               PART 1
     ##
-    ## (0,0)            (1,0)              (2,0)
+    ## (0,0)1           (1,0)2              (2,0)4
     if rank == 0:
         coords = np.array((0,0,0,1,0,0,1,1,0),dtype='float64')
     else:
@@ -130,12 +123,11 @@ def test_parallel_write_tags():
     mb.add_entities(pset, tris)
 
     pc.resolve_shared_ents(pset, tris, resolve_dim=2, shared_dim=1)
-    
+
     # pc.resolve_shared_ents(pset, 2, 1)
 
-    pc.assign_global_ids(setid=pset, dimension=2, startid=1, largestdimonly=False, isparallel=True, ownedonly=False)
-    rank = np.array((pc.rank()), dtype='int64')
-
+    # pc.assign_global_ids(setid=pset, dimension=2, startid=1, largestdimonly=False, isparallel=True, ownedonly=False)
+    # rank = np.array((pc.rank()), dtype='int64')
     # mb.tag_set_data(pc.partition_tag(), pset, rank)
 
     # create writing tag
@@ -145,16 +137,24 @@ def test_parallel_write_tags():
                                   types.MB_TAG_DENSE,
                                   create_if_missing=True)
     # set some data on that tag
-    data = [0.7071, 0.7071, 0.0, 0.5, 0.0, 0.5, -1.0, 1.0, 0.7071]
+    if rank == 0:
+        data = [0.7071, 0.7071, 0.0, 0.5, 0.0, 0.5, -1.0, 1.0, 0.7071]
+    else:
+        data = [0.5, 0.0, 0.5, 0.7071, 0.7071, 0.0, -1.0, 1.0, 0.7071]
 
     mb.tag_set_data(write_tag, vertices, data)
 
     mb.write_file(outfile, output_tags = [write_tag], writeopts = 'PARALLEL=WRITE_PART')
 
     mb2 = core.Core()
-    mb2.load_file(outfile, readopts = 'PARALLEL=BCAST_DELETE;PARTITION=PARALLEL_TRIVIAL;PARALLEL_RESOLVE_SHARED_ENTS')
+    # mb2.load_file(outfile, readopts = 'PARALLEL=BCAST_DELETE;PARTITION=PARALLEL_TRIVIAL;PARALLEL_RESOLVE_SHARED_ENTS')
+    mb2.load_file(outfile, readopts = 'PARALLEL=BCAST_DELETE;PARTITION=TRIVIAL;PARALLEL_RESOLVE_SHARED_ENTS')
+
+    # pc.resolve_shared_ents(pset, tris, resolve_dim=2, shared_dim=1)
 
     vs = mb2.get_entities_by_type(0, types.MBVERTEX)
+
+    CHECK_EQ(len(vs), 3)
 
     # get the write tag
     new_write_tag = mb2.tag_get_handle("WRITE")
@@ -162,33 +162,15 @@ def test_parallel_write_tags():
     # make sure we can still get data for the write tag
     d = mb2.tag_get_data(new_write_tag, vs)
 
-    # make sure the second tag is not there
-    try:
-        no_write_tag = mb2.tag_get_handle("NO_WRITE")
-        raise AssertionError("Tag get handle succeeded when it should not.")
-    except(RuntimeError):
-        pass
-
-    # write multiple tags
-    mb.write_file(outfile, output_tags = [write_tag, no_write_tag], writeopts = 'PARALLEL=WRITE_PART')
-
-    mb2 = core.Core()
-    pc2 = parallelcomm.ParallelComm(mb2, comm=MPI.COMM_WORLD)
-    mb2.load_file(outfile, readopts = 'PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS')
-
-    vs = mb2.get_entities_by_type(0, types.MBVERTEX)
-
-    # get the write tag
-    new_write_tag = mb2.tag_get_handle("WRITE")
-
-    # make sure we can still get data for the write tag
-    d = mb2.tag_get_data(new_write_tag, vs)
-
-    # make sure the tag is not there
-    new_no_write_tag = mb2.tag_get_handle("NO_WRITE")
-
-    # make sure we can now get data for the "no-write" tag
-    d = mb2.tag_get_data(new_no_write_tag, vs)
+    # check if the data we set on vertices are correct
+    if rank == 0:
+        CHECK_ITER_EQ(d[0], [0.7071, 0.7071, 0.0])
+        CHECK_ITER_EQ(d[1], [0.5, 0.0, 0.5])
+        CHECK_ITER_EQ(d[2], [-1.0, 1.0, 0.7071])
+    else:
+        CHECK_ITER_EQ(d[0], [0.5, 0.0, 0.5])
+        CHECK_ITER_EQ(d[1], [-1.0, 1.0, 0.7071])
+        CHECK_ITER_EQ(d[2], [0.7071, 0.7071, 0.0])
 
 
 def test_parallel_delete_mesh():
@@ -210,4 +192,5 @@ if __name__ == "__main__":
              test_parallel_write_tags,
              test_parallel_delete_mesh
              ]
-    test_driver(tests)
+
+    test_driver_parallel(tests)

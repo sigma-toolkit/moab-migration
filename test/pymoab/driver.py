@@ -30,6 +30,23 @@ def run_tests(test_list):
             print(colors.OKGREEN + "PASS" + colors.ENDC + ": " + test.__name__)
     sys.exit(ret_val)
 
+def test_driver_parallel(test_list, comm=None):
+    from mpi4py import MPI
+    ret_val = 0
+    if comm == None: comm = MPI.COMM_WORLD
+    mpirank = comm.Get_rank()
+    for test in test_list:
+        try:
+            test()
+        except:
+            if mpirank == 0: print(colors.FAIL + "FAIL" + colors.ENDC + ": " + test.__name__)
+            ret_val += 1
+            traceback.print_exc()
+        else:
+            if mpirank == 0: print(colors.OKGREEN + "PASS" + colors.ENDC + ": " + test.__name__)
+    sys.exit(ret_val)
+
+
 def CHECK_ITER_EQ(actual_value, expected_value):
     CHECK_EQ(len(actual_value), len(expected_value))
     for a,e in zip(actual_value, expected_value):

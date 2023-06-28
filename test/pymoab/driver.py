@@ -37,13 +37,13 @@ def test_driver_parallel(test_list, comm=None):
     mpirank = comm.Get_rank()
     for test in test_list:
         try:
-            test()
+            test(comm)
         except:
-            if mpirank == 0: print(colors.FAIL + "FAIL" + colors.ENDC + ": " + test.__name__)
+            if mpirank == 0: print("[{0}]: ".format(mpirank) + colors.FAIL + "FAIL" + colors.ENDC + ": " + test.__name__)
             ret_val += 1
-            traceback.print_exc()
+            print("[{0}]: Exception ".format(mpirank) + traceback.format_exc())
         else:
-            if mpirank == 0: print(colors.OKGREEN + "PASS" + colors.ENDC + ": " + test.__name__)
+            if mpirank == 0: print("[{0}]: ".format(mpirank) + colors.OKGREEN + "PASS" + colors.ENDC + ": " + test.__name__)
     sys.exit(ret_val)
 
 

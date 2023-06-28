@@ -89,7 +89,7 @@ cdef class ParallelComm(object):
 
     def assign_global_ids(self, setid, int dimension=3, int startid=1, bint largestdimonly=True, bint isparallel=True, bint ownedonly=False, exceptions = ()):
         """
-        Invoke the algorithm to assign global IDs in parallel based on dimension of entities and 
+        Invoke the algorithm to assign global IDs in parallel based on dimension of entities and
         whether it is filtered over owned/shared entities.
         """
         # cdef moab.EntityHandle setHandle = setid
@@ -98,7 +98,7 @@ cdef class ParallelComm(object):
         check_error(err, exceptions)
         # return err
 
-    def resolve_shared_ents (self, setid, proc_ents, int resolve_dim=3, int shared_dim=-1, Tag idTag=None, exceptions = ()):
+    def resolve_shared_entities (self, setid, proc_ents, int resolve_dim=3, int shared_dim=-1, Tag idTag=None, exceptions = ()):
         """
         Resolve shared entities in parallel
         """

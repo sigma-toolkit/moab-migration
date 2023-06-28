@@ -10,11 +10,11 @@ import os
 
 bytes_per_char_ = np.array(["a"]).nbytes
 
-def test_parallel_rank_size():
+def test_parallel_rank_size(mpicomm):
 
-    mpicomm = MPI.COMM_WORLD
     mpirank = mpicomm.Get_rank()
     mpisize = mpicomm.Get_size()
+
     mb = core.Core()
     pc = parallelcomm.ParallelComm(mb, comm=mpicomm)
 
@@ -22,15 +22,12 @@ def test_parallel_rank_size():
     rank = pc.rank()
     size = pc.size()
 
-    # print("ParallelComm instance ", id, " has rank = ", rank, " out of ", size, " processors.")
-
     assert pid >= 0
     CHECK_EQ(mpirank, rank)
     CHECK_EQ(mpisize, size)
 
-def test_parallel_load_mesh():
+def test_parallel_load_mesh(mpicomm):
     mb = core.Core()
-    pc = parallelcomm.ParallelComm(mb, comm=MPI.COMM_WORLD)
     try:
         mb.load_file("parallel_file.h5m", file_set = None, readopts = 'PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS')
     except:
@@ -45,7 +42,6 @@ def test_parallel_load_mesh():
 
     #load into file_set
     mb1 = core.Core()
-    pc1 = parallelcomm.ParallelComm(mb1, comm=MPI.COMM_WORLD)
     file_set = mb1.create_meshset()
     try:
         mb1.load_file("parallel_file.h5m", file_set, readopts = 'PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS')
@@ -62,9 +58,8 @@ def test_parallel_load_mesh():
     ents = mb1.get_entities_by_type(file_set,types.MBMAXTYPE)
     CHECK_NOT_EQ(len(ents),0)
 
-def test_parallel_write_mesh():
+def test_parallel_write_mesh(mpicomm):
     mb = core.Core()
-    pc = parallelcomm.ParallelComm(mb, comm=MPI.COMM_WORLD)
     mb.create_vertices(np.ones(3))
 
     try:
@@ -82,7 +77,7 @@ def test_parallel_write_mesh():
             raise(IOError, "Failed to parallel write MOAB file.")
 
 
-def test_parallel_write_tags():
+def test_parallel_write_tags(mpicomm):
     """
     Test write tag functionality
     """
@@ -91,7 +86,7 @@ def test_parallel_write_tags():
     outfile = "parallel_write_tag_test.h5m"
 
     mb = core.Core()
-    pc = parallelcomm.ParallelComm(mb, comm=MPI.COMM_WORLD)
+    pc = parallelcomm.ParallelComm(mb, comm=mpicomm)
     rank = pc.rank()
 
     ##                  (1,1)3
@@ -122,9 +117,9 @@ def test_parallel_write_tags():
     pset = pc.create_part()
     mb.add_entities(pset, tris)
 
-    pc.resolve_shared_ents(pset, tris, resolve_dim=2, shared_dim=1)
+    pc.resolve_shared_entities(pset, tris, resolve_dim=2, shared_dim=1)
 
-    # pc.resolve_shared_ents(pset, 2, 1)
+    # pc.resolve_shared_entities(pset, 2, 1)
 
     # pc.assign_global_ids(setid=pset, dimension=2, startid=1, largestdimonly=False, isparallel=True, ownedonly=False)
     # rank = np.array((pc.rank()), dtype='int64')
@@ -150,7 +145,7 @@ def test_parallel_write_tags():
     # mb2.load_file(outfile, readopts = 'PARALLEL=BCAST_DELETE;PARTITION=PARALLEL_TRIVIAL;PARALLEL_RESOLVE_SHARED_ENTS')
     mb2.load_file(outfile, readopts = 'PARALLEL=BCAST_DELETE;PARTITION=TRIVIAL;PARALLEL_RESOLVE_SHARED_ENTS')
 
-    # pc.resolve_shared_ents(pset, tris, resolve_dim=2, shared_dim=1)
+    # pc.resolve_shared_entities(pset, tris, resolve_dim=2, shared_dim=1)
 
     vs = mb2.get_entities_by_type(0, types.MBVERTEX)
 
@@ -173,16 +168,56 @@ def test_parallel_write_tags():
         CHECK_ITER_EQ(d[2], [0.7071, 0.7071, 0.0])
 
 
-def test_parallel_delete_mesh():
+def test_assign_global_ids(mpicomm):
+    """
+    Test assignment of global ID numbers
+    """
+
+    # test values
+    outfile = "parallel_write_tag_test.h5m"
+
     mb = core.Core()
-    mb.create_vertices(np.ones(9))
-    rs = mb.get_root_set()
-    ents = mb.get_entities_by_handle(rs)
-    CHECK_EQ(len(ents),3)
-    # now delete all mesh entities
-    mb.delete_mesh()
-    ents = mb.get_entities_by_handle(rs)
-    CHECK_EQ(len(ents),0)
+    pc = parallelcomm.ParallelComm(mb, comm=mpicomm)
+    rank = pc.rank()
+
+    ##                  (1,1)3
+    ##
+    ##      PART 0               PART 1
+    ##
+    ## (0,0)1           (1,0)2              (2,0)4
+    if rank == 0:
+        coords = np.array((0,0,0,1,0,0,1,1,0),dtype='float64')
+    else:
+        coords = np.array((1,0,0,2,0,0,1,1,0),dtype='float64')
+    vertices = mb.create_vertices(coords)
+    CHECK_EQ(len(vertices),3)
+
+    #create elements
+    verts = np.array(((vertices[0],vertices[1],vertices[2]),),dtype='uint64')
+    tris = mb.create_elements(types.MBTRI,verts)
+    CHECK_EQ(len(tris),1)
+
+    #check that the element is there via GLOBAL_ID tag
+    global_id_tag = mb.tag_get_handle(types.GLOBAL_ID_TAG_NAME)
+    if rank == 0:
+        gids = np.array((1, 2, 3), dtype='int64')
+    else:
+        gids = np.array((2, 4, 3), dtype='int64')
+    mb.tag_set_data(global_id_tag, vertices, gids)
+
+    egids = [[(rank+1)%2+1]] # rank 0: gid=2, rank 1: gid=1
+    mb.tag_set_data(global_id_tag, tris, egids)
+
+    pset = pc.create_part()
+    mb.add_entities(pset, tris)
+
+    pc.resolve_shared_entities(pset, tris, resolve_dim=2, shared_dim=1)
+
+    pc.assign_global_ids(setid=pset, dimension=2, startid=1, largestdimonly=True, isparallel=True, ownedonly=False)
+
+    e2gids = mb.tag_get_data(global_id_tag, tris)
+
+    CHECK_EQ(e2gids, [[rank+1]])
 
 
 if __name__ == "__main__":
@@ -190,7 +225,7 @@ if __name__ == "__main__":
              test_parallel_load_mesh,
              test_parallel_write_mesh,
              test_parallel_write_tags,
-             test_parallel_delete_mesh
+             test_assign_global_ids
              ]
 
-    test_driver_parallel(tests)
+    test_driver_parallel(tests, MPI.COMM_WORLD)

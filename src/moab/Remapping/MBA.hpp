@@ -653,7 +653,7 @@ class linear_approximation {
                 return;
             }
 
-            double A[NDim + 1][NDim + 1] = {0};
+            double A[NDim + 1][NDim + 1] = {{0}};
 
             CooIter p = coo_begin;
             ValIter v = val_begin;

@@ -327,7 +327,7 @@ if HAVE_TEMPESTREMAP
 
 endif # if HAVE_TEMPESTREMAP
 
-MOAB_REMAPPING_HDRS += moab/Remapping/MBA.hpp
+MOAB_REMAPPING_HDRS += moab/Remapping/MBA.hpp moab/Remapping/mlinterp.hpp
 
 # Add the remapping sources to the library
 libMOAB_la_SOURCES += $(MOAB_REMAPPING_SRCS)

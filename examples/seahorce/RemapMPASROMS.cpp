@@ -50,7 +50,7 @@
 #include "moab/IntxMesh/IntxUtils.hpp"
 // #include "moab/Remapping/TempestRemapper.hpp"
 
-#include "spline.h"
+#include "moab/Remapping/mlinterp.hpp"
 
 using namespace moab;
 using namespace std;
@@ -245,7 +245,7 @@ struct PC3D
 int main( int argc, char** argv )
 {
     ErrorCode err;
-    int ierr, rank, size;
+    int rank, size;
     string mpas_filename, roms_filename, roms_3d_filename, output_filename;
     /// Parallel Read options:
     ///   PARALLEL = type {READ_PART}
@@ -602,7 +602,7 @@ int main( int argc, char** argv )
     {
         if( generateExtrusions )
         {
-            constexpr bool useConstantRefAxialThickness = false;
+            constexpr bool useConstantRefAxialThickness = true;
 
             std::vector< double > zmh_xyz3d( mpas_elems.size() * src_zlayers ),
                 zrh_xyz3d( roms_elems.size() * dst_zlayers );
@@ -643,10 +643,39 @@ int main( int argc, char** argv )
 
             if( ProjectMPASBathymetryToROMS )
             {
-                // Project the bottom Bathymetry data from MPAS to ROMS so that we can impose it.
-                err = ComputeFieldProjections( mbi, meshOverlap, "bottomDepth", "bottomDepth", mpas_elems, roms_elems,
-                                               false /*use_3dprojection*/, false /* bool normalize */, 2000.0,
-                                               computeMBA, bathymetryOrder );MB_CHK_SET_ERR( err, "Can't create new set" );
+                if( computeTR )
+                {
+                    // get the handle to the weight matrix
+                    const SparseMatrix< double >& weights = weightMap.GetSparseMatrix();
+                    DataArray1D< double > dataInDouble( mpas_elems.size() );
+                    DataArray1D< double > dataOutDouble( roms_elems.size() );
+
+                    constexpr double bottomDepth_avg = 2000.0;
+                    moab::Tag stag;
+                    err = mbi->tag_get_handle( "bottomDepth", 1, moab::MB_TYPE_DOUBLE, stag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+
+                    // Apply the map onto the bottomDepth solution field
+                    err = mbi->tag_get_data( stag, mpas_elems, dataInDouble );MB_CHK_ERR( err );
+                    for( size_t i = 0; i < dataInDouble.GetRows(); i++ )
+                        dataInDouble[i] -= bottomDepth_avg;
+
+                    // Compute the projection for the bottomDepth field
+                    weights.Apply( dataInDouble, dataOutDouble );
+
+                    // Scale data values
+                    for( size_t i = 0; i < dataOutDouble.GetRows(); i++ )
+                        dataOutDouble[i] += bottomDepth_avg;
+
+                    // Set the bottomDepth solution field on the ROMS mesh
+                    err = mbi->tag_set_data( stag, roms_elems, dataOutDouble );MB_CHK_ERR( err );
+                }
+                else
+                {
+                    // Project the bottom Bathymetry data from MPAS to ROMS so that we can impose it.
+                    err = ComputeFieldProjections( mbi, meshOverlap, "bottomDepth", "bottomDepth", mpas_elems,
+                                                   roms_elems, false /*use_3dprojection*/, false /* bool normalize */,
+                                                   2000.0, computeMBA, bathymetryOrder );MB_CHK_SET_ERR( err, "Can't create new set" );
+                }
 
                 std::vector< double > zrh_xyz2d( roms_elems.size() );
                 moab::Tag rhtag;
@@ -998,6 +1027,50 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
 {
     const size_t nd = fd.size();
     const size_t ni = fi.size();
+
+    if (false)
+    {
+        if( is_threed )
+        {
+            std::vector< double > xd( nd ), yd( nd ), zd( nd ), xi( ni ), yi( ni ), zi( ni );
+            size_t offset = 0;
+            for( size_t k = 0; k < nd; k++, offset += 3 )
+            {
+                xd[k] = xyzd[offset];
+                yd[k] = xyzd[offset + 1];
+                zd[k] = xyzd[offset + 2];
+            }
+            offset = 0;
+            for( size_t k = 0; k < ni; k++, offset += 3 )
+            {
+                xi[k] = xyzi[offset];
+                yi[k] = xyzi[offset + 1];
+                zi[k] = xyzi[offset + 2];
+            }
+            // mlinterp::interp( &nd, ni, fd, fi, xd, xi, yd, yi, zd, zi );
+
+            return MB_SUCCESS;
+        }
+        else
+        {
+            std::vector< double > xd( nd ), yd( nd ), xi( ni ), yi( ni );
+            size_t offset = 0;
+            for( size_t k = 0; k < nd; k++, offset += 3 )
+            {
+                xd[k] = xyzd[offset];
+                yd[k] = xyzd[offset + 1];
+            }
+            offset = 0;
+            for( size_t k = 0; k < ni; k++, offset += 3 )
+            {
+                xi[k] = xyzi[offset];
+                yi[k] = xyzi[offset + 1];
+            }
+            // mlinterp::interp( &nd, ni, fd, fi, xd, xi, yd, yi );
+
+            return MB_SUCCESS;
+        }
+    }
 
     // Algorithm setup.
     if( order == 1 )
@@ -1457,7 +1530,7 @@ moab::ErrorCode ExtrudeROMSQuadsToHexes( Interface* mb,
 
     // add the initial faces to the first set
     rval = mb->add_entities( outputset, verts );MB_CHK_ERR( rval );
-    if( is_mpas )
+    // if( is_mpas )
     {
         rval = mb->add_entities( outputset, faces );MB_CHK_ERR( rval );
     }

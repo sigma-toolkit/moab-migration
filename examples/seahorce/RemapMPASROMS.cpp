@@ -78,7 +78,11 @@ using namespace std;
         cout << "[" << rank << "]: " << MSG << endl; \
     } while( false )
 
-ErrorCode ScaleCoords( Interface* mb, Range& nodes, double R, bool is_cartesian = true, bool is_threed = false );
+ErrorCode ScaleCoords( Interface* mb,
+                       std::vector< moab::EntityHandle >& nodes,
+                       double R,
+                       bool is_cartesian = true,
+                       bool is_threed    = false );
 
 moab::ErrorCode ShepardInterpolator( int dimension,
                                      std::vector< double >& xyzd,
@@ -120,22 +124,23 @@ moab::ErrorCode ComputeFieldProjections( moab::Interface* mbi,
                                          Mesh& meshOverlap,
                                          std::string varProjectSrc,
                                          std::string varProjectDst,
-                                         moab::Range& srcelems,
-                                         moab::Range& dstelems,
+                                         std::vector< moab::EntityHandle >& srcelems,
+                                         std::vector< moab::EntityHandle >& dstelems,
                                          bool is_three_dimensional,
-                                         bool normalize              = true,
-                                         const double constantoffset = 0.0,
-                                         bool useMBA                 = true,
-                                         int order                   = 1,
-                                         moab::Range* src3delems     = nullptr,
-                                         moab::Range* dst3delems     = nullptr );
+                                         bool normalize                                = true,
+                                         const double constantoffset                   = 0.0,
+                                         bool useMBA                                   = true,
+                                         int order                                     = 1,
+                                         std::vector< moab::EntityHandle >* src3delems = nullptr,
+                                         std::vector< moab::EntityHandle >* dst3delems = nullptr );
 
 ErrorCode CloneToTRMesh( moab::Interface* m_interface, Mesh& mesh, EntityHandle mesh_set );
 
 // 3D settings
-constexpr int mpas_zlevels = 60;
-constexpr int roms_zlevels = 5;
-constexpr int nvars        = 2;
+constexpr int mpas_zreflevels = 60;
+constexpr int mpas_zlevels    = 60;
+constexpr int roms_zlevels    = 4;
+constexpr int nvars           = 2;
 int src_zlayers = 0, dst_zlayers = 0;
 
 // tag name data
@@ -144,67 +149,6 @@ const char* mpas_threed_cum_tagnames[nvars] = { "salinity_3d", "temperature_3d" 
 const char* mpas_threed_tagnames[nvars]     = { "Salinity3d", "Temperature3d" };
 const char* roms_twod_tagnames[nvars]       = { "Salinity2DROMS", "Temperature2DROMS" };
 const char* roms_threed_tagnames[nvars]     = { "Salinity3dROMS", "Temperature3dROMS" };
-
-template < typename T >
-struct PointCloud
-{
-    using coord_t = T;  //!< The type of each coordinate
-
-    const static int projection    = 2;
-    const static int in_dimension  = 3;
-    const static int out_dimension = 2;
-    const std::vector< T >& xyz;
-    std::vector< T > xyz_T;
-    const size_t count;
-
-    PointCloud( const std::vector< T >& pxyz ) : xyz( pxyz ), count( pxyz.size() / in_dimension )
-    {
-        xyz_T.resize( out_dimension * count );
-
-        init();
-    }
-
-    void init()
-    {
-        double cd[3];
-        size_t offset = 0;
-        for( size_t i = 0; i < count; i++ )
-        {
-            cd[0] = xyz[offset];
-            cd[1] = xyz[offset + 1];
-            cd[2] = xyz[offset + 2];
-            IntxUtils::transform_coordinates( cd, projection );
-            xyz_T[i * out_dimension]     = cd[0];
-            xyz_T[i * out_dimension + 1] = cd[1];
-        }
-    }
-
-    // Must return the number of data points
-    inline size_t kdtree_get_point_count() const
-    {
-        return count;
-    }
-
-    // Returns the dim'th component of the idx'th point in the class:
-    // Since this is inlined and the "dim" argument is typically an immediate
-    // value, the
-    //  "if/else's" are actually solved at compile time.
-    inline T kdtree_get_pt( const size_t idx, const size_t dim ) const
-    {
-        return ( dim ? xyz_T[idx * out_dimension + 1] : xyz_T[idx * out_dimension] );
-    }
-
-    // Optional bounding-box computation: return false to default to a standard
-    // bbox computation loop.
-    //   Return true if the BBOX was already computed by the class and returned
-    //   in "bb" so it can be avoided to redo it again. Look at bb.size() to
-    //   find out the expected dimensionality (e.g. 2 or 3 for point clouds)
-    template < class BBOX >
-    bool kdtree_get_bbox( BBOX& /* bb */ ) const
-    {
-        return false;
-    }
-};
 
 template < typename T >
 struct PC3D
@@ -415,6 +359,8 @@ int main( int argc, char** argv )
     err = mbi->create_meshset( moab::MESHSET_SET, romsset );MB_CHK_SET_ERR( err, "Can't create new set" );
 
     // Load the MPAS file from disk with given options
+    std::vector< moab::EntityHandle > mpas_verts, mpas_elems;
+    std::vector< moab::EntityHandle > mpas3d_verts, mpas3d_elems;
     {
         dbgprint( "Reading MPAS file from disk" );
         err = mbi->load_file( mpas_filename.c_str(), &mpasset, mpas_read_options.c_str() );MB_CHK_SET_ERR( err, "MOAB::load_file for MPAS mesh failed" );
@@ -425,7 +371,6 @@ int main( int argc, char** argv )
         // MB_CHK_SET_ERR( err, "MPAS bottomDepth tag failed" );
 
         // Get all entities in the database
-        moab::Range mpas_verts, mpas_elems;
         err = mbi->get_entities_by_dimension( mpasset, 0, mpas_verts );MB_CHK_ERR( err );
         err = mbi->get_entities_by_dimension( mpasset, 2, mpas_elems );MB_CHK_ERR( err );
         dbgprint( "MPAS mesh contains " << mpas_verts.size() << " vertices and " << mpas_elems.size() << " elements" );
@@ -436,7 +381,8 @@ int main( int argc, char** argv )
     }
 
     // Load the ROMS file from disk with given options
-    moab::Range roms_verts, roms_elems, roms3d_verts, roms3d_elems;
+    std::vector< moab::EntityHandle > roms_verts, roms_elems;
+    std::vector< moab::EntityHandle > roms3d_verts, roms3d_elems;
     {
         dbgprint( "Reading ROMS file from disk" );
         err = mbi->load_file( roms_filename.c_str(), &romsset, roms_read_options.c_str() );MB_CHK_SET_ERR( err, "MOAB::load_file for ROMS mesh failed" );
@@ -452,7 +398,6 @@ int main( int argc, char** argv )
     }
 
     // Cull the MPAS set so that we don't have a global mesh
-    moab::Range mpas_verts, mpas_elems, mpas3d_verts, mpas3d_elems;
     {
         const int nring_neighborhood = 2;
         // construct a kd-tree index:
@@ -474,6 +419,9 @@ int main( int argc, char** argv )
         std::vector< size_t > srcindx( num_results );
         std::vector< double > srcdist( num_results );
         nanoflann::KNNResultSet< double > resultSet( num_results );
+        mpas_elems.clear();
+        mpas_verts.clear();
+        moab::Range lelems, lverts;
         for( size_t i = 0; i < roms_elems.size(); i++ )
         {
             const moab::EntityHandle ehandle = roms_elems[i];
@@ -484,14 +432,17 @@ int main( int argc, char** argv )
             tree.findNeighbors( resultSet, query_pt );
 
             for( size_t j = 0; j < num_results; ++j )
-                mpas_elems.insert( orig_mpas_elems[srcindx[j]] );
+                lelems.insert( orig_mpas_elems[srcindx[j]] );
         }
-        err = mbi->add_entities( mpas_covering_set, mpas_elems );MB_CHK_ERR( err );
+        err = mbi->add_entities( mpas_covering_set, lelems );MB_CHK_ERR( err );
 
         err = mbi->write_file( "mpas_covering_2d.h5m", "H5M", write_options.c_str(), &mpas_covering_set, 1 );MB_CHK_ERR( err );
 
-        err = mbi->get_connectivity( mpas_elems, mpas_verts, true );MB_CHK_ERR( err );
-        err = mbi->add_entities( mpas_covering_set, mpas_verts );MB_CHK_ERR( err );
+        err = mbi->get_connectivity( lelems, lverts, true );MB_CHK_ERR( err );
+        err = mbi->add_entities( mpas_covering_set, lverts );
+        MB_CHK_ERR( err );
+        err = mbi->get_entities_by_dimension( mpas_covering_set, 2, mpas_elems );MB_CHK_ERR( err );
+        err = mbi->get_entities_by_dimension( mpas_covering_set, 0, mpas_verts );MB_CHK_ERR( err );
         dbgprint( "Culled MPAS mesh contains " << mpas_elems.size() << " elements and " << mpas_verts.size()
                                                << " vertices." );
     }
@@ -614,10 +565,10 @@ int main( int argc, char** argv )
             if( useConstantRefAxialThickness )
             {
                 moab::Tag mztag;
-                err = mbi->tag_get_handle( "refBottomDepth", src_zlayers, moab::MB_TYPE_DOUBLE, mztag,
+                err = mbi->tag_get_handle( "refBottomDepth", mpas_zreflevels, moab::MB_TYPE_DOUBLE, mztag,
                                            moab::MB_TAG_SPARSE );MB_CHK_SET_ERR( err, "Can't get tag handle: refBottomDepth" );
 
-                std::vector< double > ref_zmh_z1d( src_zlayers );
+                std::vector< double > ref_zmh_z1d( mpas_zreflevels );
                 err = mbi->tag_get_data( mztag, &root_set, 1, ref_zmh_z1d.data() );MB_CHK_SET_ERR( err, "Can't get refBottomDepth data" );
                 // constexpr double mpas_ref_levels[] = {
                 //     10,      20,      30,      40,      50,      60,      70,      80,      90,      100,
@@ -628,12 +579,16 @@ int main( int argc, char** argv )
                 //     3256.14, 3503.45, 3751.89, 4001.01, 4250.53, 4500.26, 4750.12, 5000.05, 5250.01, 5499.99 };
                 for( size_t i = 0; i < mpas_elems.size(); ++i )
                 {
-                    const int offset  = i * src_zlayers;
+                    const int offset = i * src_zlayers;
                     // zmh_xyz3d[offset] = 0;
                     // for( int j = 1; j <= src_zlayers; ++j )
                     //     zmh_xyz3d[offset + j] = ref_zmh_z1d[j - 1] + zmh_xyz3d[offset + j - 1];
-                    for( int j = 0; j < src_zlayers; ++j )
-                        zmh_xyz3d[offset + j] = ref_zmh_z1d[j];
+                    // for( int j = 0; j < src_zlayers; ++j )
+                    //     zmh_xyz3d[offset + j] = ref_zmh_z1d[j];
+
+                    zmh_xyz3d[offset] = ref_zmh_z1d[0];
+                    for( int j = 1; j < src_zlayers; ++j )
+                        zmh_xyz3d[offset + j] = ref_zmh_z1d[j] - ref_zmh_z1d[j-1];
                 }
             }
             else
@@ -641,7 +596,7 @@ int main( int argc, char** argv )
                 moab::Tag mhtag;
                 err = mbi->tag_get_handle( "layerThickness_3d", src_zlayers, moab::MB_TYPE_DOUBLE, mhtag,
                                            moab::MB_TAG_DENSE );MB_CHK_SET_ERR( err, "Can't get tag handle: layerThickness_3d" );
-                err = mbi->tag_get_data( mhtag, mpas_elems, zmh_xyz3d.data() );MB_CHK_SET_ERR( err, "Can't get layerThickness_3d data" );
+                err = mbi->tag_get_data( mhtag, mpas_elems.data(), mpas_elems.size(), zmh_xyz3d.data() );MB_CHK_SET_ERR( err, "Can't get layerThickness_3d data" );
             }
 
             dbgprint( "\nExtruding MPAS polygonal mesh ..." );
@@ -662,7 +617,7 @@ int main( int argc, char** argv )
                     err = mbi->tag_get_handle( "bottomDepth", 1, moab::MB_TYPE_DOUBLE, stag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
 
                     // Apply the map onto the bottomDepth solution field
-                    err = mbi->tag_get_data( stag, mpas_elems, dataInDouble );MB_CHK_ERR( err );
+                    err = mbi->tag_get_data( stag, mpas_elems.data(), mpas_elems.size(), dataInDouble );MB_CHK_ERR( err );
                     for( size_t i = 0; i < dataInDouble.GetRows(); i++ )
                         dataInDouble[i] -= bottomDepth_avg;
 
@@ -674,7 +629,7 @@ int main( int argc, char** argv )
                         dataOutDouble[i] += bottomDepth_avg;
 
                     // Set the bottomDepth solution field on the ROMS mesh
-                    err = mbi->tag_set_data( stag, roms_elems, dataOutDouble );MB_CHK_ERR( err );
+                    err = mbi->tag_set_data( stag, roms_elems.data(), roms_elems.size(), dataOutDouble );MB_CHK_ERR( err );
                 }
                 else
                 {
@@ -687,7 +642,7 @@ int main( int argc, char** argv )
                 std::vector< double > zrh_xyz2d( roms_elems.size() );
                 moab::Tag rhtag;
                 err = mbi->tag_get_handle( "bottomDepth", 1, moab::MB_TYPE_DOUBLE, rhtag, moab::MB_TAG_DENSE );MB_CHK_SET_ERR( err, "Can't get bottomDepth tag" );
-                err = mbi->tag_get_data( rhtag, roms_elems, zrh_xyz2d.data() );MB_CHK_SET_ERR( err, "Can't get bottomDepth tag data" );
+                err = mbi->tag_get_data( rhtag, roms_elems.data(), roms_elems.size(), zrh_xyz2d.data() );MB_CHK_SET_ERR( err, "Can't get bottomDepth tag data" );
 
                 err = mbi->write_file( "roms_3d_2dsurface.h5m", "H5M", write_options.c_str(), &romsset, 1 );MB_CHK_ERR( err );
 
@@ -761,7 +716,7 @@ int main( int argc, char** argv )
             err = mbi->tag_get_handle( "bottomDepth", 1, moab::MB_TYPE_DOUBLE, stag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
 
             // Apply the map onto the bottomDepth solution field
-            err = mbi->tag_get_data( stag, mpas_elems, dataInDouble );MB_CHK_ERR( err );
+            err = mbi->tag_get_data( stag, mpas_elems.data(), mpas_elems.size(), dataInDouble );MB_CHK_ERR( err );
             for( size_t i = 0; i < dataInDouble.GetRows(); i++ )
                 dataInDouble[i] -= bottomDepth_avg;
 
@@ -773,7 +728,7 @@ int main( int argc, char** argv )
                 dataOutDouble[i] += bottomDepth_avg;
 
             // Set the bottomDepth solution field on the ROMS mesh
-            err = mbi->tag_set_data( stag, roms_elems, dataOutDouble );MB_CHK_ERR( err );
+            err = mbi->tag_set_data( stag, roms_elems.data(), roms_elems.size(), dataOutDouble );MB_CHK_ERR( err );
         }
         else
         {
@@ -831,7 +786,7 @@ int main( int argc, char** argv )
             err = mbi->tag_get_handle( "salinity", 1, moab::MB_TYPE_DOUBLE, stag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
 
             // Apply the map onto the salinity solution field
-            err = mbi->tag_get_data( stag, mpas_elems, dataInDouble );MB_CHK_ERR( err );
+            err = mbi->tag_get_data( stag, mpas_elems.data(), mpas_elems.size(), dataInDouble );MB_CHK_ERR( err );
             for( size_t i = 0; i < dataInDouble.GetRows(); i++ )
                 dataInDouble[i] -= salinity_avg;
 
@@ -843,7 +798,7 @@ int main( int argc, char** argv )
                 dataOutDouble[i] += salinity_avg;
 
             // Set the salinity solution field on the ROMS mesh
-            err = mbi->tag_set_data( stag, roms_elems, dataOutDouble );MB_CHK_ERR( err );
+            err = mbi->tag_set_data( stag, roms_elems.data(), roms_elems.size(), dataOutDouble );MB_CHK_ERR( err );
         }
 
         // Apply the map onto the temperature solution field
@@ -854,7 +809,7 @@ int main( int argc, char** argv )
             err = mbi->tag_get_handle( "temperature", 1, moab::MB_TYPE_DOUBLE, ttag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
 
             // Apply the map onto the salinity solution field
-            err = mbi->tag_get_data( ttag, mpas_elems, dataInDouble );MB_CHK_ERR( err );
+            err = mbi->tag_get_data( ttag, mpas_elems.data(), mpas_elems.size(), dataInDouble );MB_CHK_ERR( err );
             for( size_t i = 0; i < dataInDouble.GetRows(); i++ )
                 dataInDouble[i] -= temperature_avg;
 
@@ -866,7 +821,7 @@ int main( int argc, char** argv )
                 dataOutDouble[i] += temperature_avg;
 
             // Set the temperature solution field on the ROMS mesh
-            err = mbi->tag_set_data( ttag, roms_elems, dataOutDouble );MB_CHK_ERR( err );
+            err = mbi->tag_set_data( ttag, roms_elems.data(), roms_elems.size(), dataOutDouble );MB_CHK_ERR( err );
         }
 
         // remapper.clear();
@@ -894,14 +849,14 @@ int main( int argc, char** argv )
     return 0;
 }
 
-ErrorCode ScaleCoords( Interface* mb, Range& nodes, double R, bool is_cartesian, bool is_threed )
+ErrorCode ScaleCoords( Interface* mb, std::vector<moab::EntityHandle>& nodes, double R, bool is_cartesian, bool is_threed )
 {
     ErrorCode rval;
     double posi[3], posf[3], len = 0;
 
     // one by one, get the node and project it on the sphere, with a radius given
     // the center of the sphere is at 0,0,0
-    for( Range::iterator nit = nodes.begin(); nit != nodes.end(); ++nit )
+    for( auto nit = nodes.begin(); nit != nodes.end(); ++nit )
     {
         EntityHandle nd = *nit;
 
@@ -1244,11 +1199,11 @@ moab::ErrorCode modified_shepard_interpolate2( int dimension,
     size_t ni = xyzi.size() / dimension;
 
     // construct a kd-tree index:
-    using KdTree = nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PointCloud< double > >,
-                                                        PointCloud< double >, 3 /* dim */
+    using KdTree = nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PC3D< double > >,
+                                                        PC3D< double >, 3 /* dim */
                                                         >;
 
-    PointCloud< double > cloud( xyzd );
+    PC3D< double > cloud( xyzd );
     KdTree tree( 3 /*dim*/, cloud, { 10 /* max leaf */ } );
 
     double query_pt[3];  // dimension
@@ -1348,34 +1303,34 @@ moab::ErrorCode ComputeFieldProjections( moab::Interface* mbi,
                                          Mesh& meshOverlap,
                                          std::string varProjectSrc,
                                          std::string varProjectDst,
-                                         moab::Range& srcelems,
-                                         moab::Range& dstelems,
+                                         std::vector< moab::EntityHandle >& srcelems,
+                                         std::vector< moab::EntityHandle >& dstelems,
                                          bool is_three_dimensional,
                                          bool normalize,
                                          const double constantoffset,
                                          bool useMBA,
                                          int order,
-                                         moab::Range* src3delems,
-                                         moab::Range* dst3delems )
+                                         std::vector< moab::EntityHandle >* src3delems,
+                                         std::vector< moab::EntityHandle >* dst3delems )
 {
     moab::ErrorCode err;
     moab::Tag dmtag;
     if( is_three_dimensional ) assert( src3delems && dst3delems );
-    const Range& source_range = is_three_dimensional ? *src3delems : srcelems;
-    const Range& target_range = is_three_dimensional ? *dst3delems : dstelems;
+    const std::vector< moab::EntityHandle >& source_range = is_three_dimensional ? *src3delems : srcelems;
+    const std::vector< moab::EntityHandle >& target_range = is_three_dimensional ? *dst3delems : dstelems;
 
     // err = mbi->tag_get_handle( varProject.c_str(), src_zlayers, moab::MB_TYPE_DOUBLE, dmtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
     err = mbi->tag_get_handle( varProjectSrc.c_str(), 1, moab::MB_TYPE_DOUBLE, dmtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
 
     // get the source data from tag
     std::vector< double > src_tdata( source_range.size() ), dst_tdata( target_range.size() );
-    err = mbi->tag_get_data( dmtag, source_range, src_tdata.data() );MB_CHK_ERR( err );
+    err = mbi->tag_get_data( dmtag, source_range.data(), source_range.size(), src_tdata.data() );MB_CHK_ERR( err );
 
     // get the coordinates of the elements
     std::vector< double > src_xyz( source_range.size() * 3 ), dst_xyz( target_range.size() * 3 );
     {
-        err = mbi->get_coords( source_range, src_xyz.data() );MB_CHK_ERR( err );
-        err = mbi->get_coords( target_range, dst_xyz.data() );MB_CHK_ERR( err );
+        err = mbi->get_coords( source_range.data(), source_range.size(), src_xyz.data() );MB_CHK_ERR( err );
+        err = mbi->get_coords( target_range.data(), target_range.size(), dst_xyz.data() );MB_CHK_ERR( err );
     }
 
     // Loop over all Faces in meshOverlap
@@ -1439,7 +1394,7 @@ moab::ErrorCode ComputeFieldProjections( moab::Interface* mbi,
     err = mbi->tag_get_handle( varProjectDst.c_str(), 1, moab::MB_TYPE_DOUBLE, drtag,
                                moab::MB_TAG_DENSE | moab::MB_TAG_CREAT );MB_CHK_ERR( err );
 
-    err = mbi->tag_set_data( drtag, target_range, dst_tdata.data() );MB_CHK_ERR( err );
+    err = mbi->tag_set_data( drtag, target_range.data(), target_range.size(), dst_tdata.data() );MB_CHK_ERR( err );
 
     return moab::MB_SUCCESS;
 }
@@ -1543,9 +1498,9 @@ moab::ErrorCode ExtrudeROMSQuadsToHexes( Interface* mb,
     // std::cout << "Number of 2D entities: vertices = " << verts.size() << ", faces = " << faces.size() << endl;
 
     // add the initial faces to the first set
-    rval = mb->add_entities( outputset, verts );MB_CHK_ERR( rval );
     if( is_mpas )
     {
+        rval = mb->add_entities( outputset, verts );MB_CHK_ERR( rval );
         rval = mb->add_entities( outputset, faces );MB_CHK_ERR( rval );
     }
 
@@ -1593,7 +1548,7 @@ moab::ErrorCode ExtrudeROMSQuadsToHexes( Interface* mb,
             {
                 Range eladjs;
                 const EntityHandle vtx = verts[i];
-                rval                   = mb->get_adjacencies( &vtx, 1, 2, true, eladjs, Interface::UNION );MB_CHK_ERR( rval );
+                rval                   = mb->get_adjacencies( &vtx, 1, 2, false, eladjs, Interface::UNION );MB_CHK_ERR( rval );
 
                 if( eladjs.size() )
                 {
@@ -1704,7 +1659,7 @@ moab::ErrorCode ExtrudeROMSQuadsToHexes( Interface* mb,
     std::vector< int > minlevelFace, maxlevelFace;
     moab::Tag minlvlTag, maxlvlTag;
     moab::Tag mpas_soltags[nvars], mpas_soltags_new[nvars];
-    std::vector< double > src_data( src_zlayers * nvars );
+    std::vector< double > src_data( mpas_zreflevels * nvars );
     if( is_mpas )
     {
         rval = mb->tag_get_handle( "minLevelCell", 1, moab::MB_TYPE_INTEGER, minlvlTag, moab::MB_TAG_DENSE );MB_CHK_ERR( rval );
@@ -1718,7 +1673,7 @@ moab::ErrorCode ExtrudeROMSQuadsToHexes( Interface* mb,
 
         for( auto it = 0; it < nvars; ++it )
         {
-            rval = mb->tag_get_handle( mpas_threed_cum_tagnames[it], src_zlayers, moab::MB_TYPE_DOUBLE,
+            rval = mb->tag_get_handle( mpas_threed_cum_tagnames[it], mpas_zreflevels, moab::MB_TYPE_DOUBLE,
                                        mpas_soltags[it], moab::MB_TAG_DENSE );MB_CHK_ERR( rval );
 
             rval = mb->tag_get_handle( mpas_threed_tagnames[it], 1, moab::MB_TYPE_DOUBLE, mpas_soltags_new[it],

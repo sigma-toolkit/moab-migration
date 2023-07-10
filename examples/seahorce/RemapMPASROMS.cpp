@@ -50,7 +50,7 @@
 #include "moab/IntxMesh/IntxUtils.hpp"
 // #include "moab/Remapping/TempestRemapper.hpp"
 
-#include "moab/Remapping/mlinterp.hpp"
+// #include "moab/Remapping/mlinterp.hpp"
 
 using namespace moab;
 using namespace std;
@@ -270,7 +270,7 @@ int main( int argc, char** argv )
     bool generateExtrusions = false;
     std::string strMethod   = "";
     int bathymetryOrder    = 3;
-    int fieldOrder         = 1;
+    int fieldOrder         = 3;
 
     {
         ProgOptions opts;
@@ -624,9 +624,11 @@ int main( int argc, char** argv )
                 for( size_t i = 0; i < mpas_elems.size(); ++i )
                 {
                     const int offset  = i * src_zlayers;
-                    zmh_xyz3d[offset] = 0;
-                    for( int j = 1; j < src_zlayers; ++j )
-                        zmh_xyz3d[offset + j] = ref_zmh_z1d[j - 1] + zmh_xyz3d[offset + j - 1];
+                    // zmh_xyz3d[offset] = 0;
+                    // for( int j = 1; j <= src_zlayers; ++j )
+                    //     zmh_xyz3d[offset + j] = ref_zmh_z1d[j - 1] + zmh_xyz3d[offset + j - 1];
+                    for( int j = 0; j < src_zlayers; ++j )
+                        zmh_xyz3d[offset + j] = ref_zmh_z1d[j];
                 }
             }
             else
@@ -794,14 +796,16 @@ int main( int argc, char** argv )
     else if( computeShepard )
     {
         // Now let us compute the Shepard's interpolant to compute data for each field
-        err = ComputeFieldProjections( mbi, meshOverlap, ( use_3dprojection ? "salinity_3d" : "salinity" ),
-                                       ( use_3dprojection ? "salinity_3d_roms" : "salinity_roms" ), mpas_elems,
-                                       roms_elems, use_3dprojection, normalize /* bool normalize */, 35.0, false /*computeMBA*/,
-                                       fieldOrder, &mpas3d_elems, &roms3d_elems );MB_CHK_ERR( err );
-        err = ComputeFieldProjections( mbi, meshOverlap, ( use_3dprojection ? "temperature_3d" : "temperature" ),
-                                       ( use_3dprojection ? "temperature_3d_roms" : "temperature_roms" ), mpas_elems,
-                                       roms_elems, use_3dprojection, normalize /* bool normalize */, 8.5, false /*computeMBA*/,
-                                       fieldOrder, &mpas3d_elems, &roms3d_elems );MB_CHK_ERR( err );
+        err = ComputeFieldProjections( mbi, meshOverlap,
+                                       ( use_3dprojection ? mpas_threed_tagnames[0] : mpas_twod_tagnames[0] ),
+                                       ( use_3dprojection ? roms_threed_tagnames[0] : roms_twod_tagnames[0] ),
+                                       mpas_elems, roms_elems, use_3dprojection, normalize /* bool normalize */, 35.0,
+                                       false /*computeMBA*/, fieldOrder, &mpas3d_elems, &roms3d_elems );MB_CHK_ERR( err );
+        err = ComputeFieldProjections( mbi, meshOverlap,
+                                       ( use_3dprojection ? mpas_threed_tagnames[1] : mpas_twod_tagnames[1] ),
+                                       ( use_3dprojection ? roms_threed_tagnames[1] : roms_twod_tagnames[1] ),
+                                       mpas_elems, roms_elems, use_3dprojection, normalize /* bool normalize */, 8.5,
+                                       false /*computeMBA*/, fieldOrder, &mpas3d_elems, &roms3d_elems );MB_CHK_ERR( err );
     }
     else
     {
@@ -1530,7 +1534,7 @@ moab::ErrorCode ExtrudeROMSQuadsToHexes( Interface* mb,
 
     // add the initial faces to the first set
     rval = mb->add_entities( outputset, verts );MB_CHK_ERR( rval );
-    //if( is_mpas )
+    if( is_mpas )
     {
         rval = mb->add_entities( outputset, faces );MB_CHK_ERR( rval );
     }

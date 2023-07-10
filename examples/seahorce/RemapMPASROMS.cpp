@@ -139,7 +139,7 @@ ErrorCode CloneToTRMesh( moab::Interface* m_interface, Mesh& mesh, EntityHandle 
 // 3D settings
 constexpr int mpas_zreflevels = 60;
 constexpr int mpas_zlevels    = 60;
-constexpr int roms_zlevels    = 4;
+constexpr int roms_zlevels    = 60;
 constexpr int nvars           = 2;
 int src_zlayers = 0, dst_zlayers = 0;
 
@@ -1352,12 +1352,12 @@ moab::ErrorCode ComputeFieldProjections( moab::Interface* mbi,
         }
     }
 
-    if( is_three_dimensional )
+    if( is_three_dimensional && order == 0 )
     {
         std::cout << "\nComputing Nearest-neighbor interpolant (order=0) for field " << varProjectSrc << std::endl;
         err = ComputeNNInterpolant( src_xyz, src_tdata, dst_xyz, dst_tdata );MB_CHK_ERR( err );
     }
-    else if( useMBA  )
+    else if( useMBA || is_three_dimensional )
     {
         std::cout << "\nComputing MBA interpolant (order=" << order << ") for field " << varProjectSrc << std::endl;
         err = ComputeMBAInterpolant( src_xyz, src_tdata, dst_xyz, dst_tdata, is_three_dimensional, order );MB_CHK_ERR( err );
@@ -1732,7 +1732,7 @@ moab::ErrorCode ExtrudeROMSQuadsToHexes( Interface* mb,
         {
             for( int i = 0; i < nnodes; i++ )
             {
-                vertexConn[i] = connp[i];
+                // vertexConn[nnodes + i] = connp[i];
                 indexVerts[i] = verts.index( connp[i] );
             }
         }
@@ -1743,8 +1743,18 @@ moab::ErrorCode ExtrudeROMSQuadsToHexes( Interface* mb,
             if( is_mpas && ( ii + 1 < minlevelFace[j] || ii + 1 > maxlevelFace[j] ) ) continue;
 
             // create a polygon on each layer
-            for( int i = 0; i < nnodes; i++ )
-                vertexConn[nnodes + i] = newVerts[ii + 1][indexVerts[i]];  // vertices in layer ii+1
+            if( is_mpas )
+            {
+                for( int i = 0; i < nnodes; i++ )
+                    vertexConn[nnodes + i] = newVerts[ii + 1][indexVerts[i]];  // vertices in layer ii+1
+            }
+            else
+            {
+                for( int i = 0; i < nnodes; i++ )
+                    vertexConn[i] = newVerts[ii + 1][indexVerts[i]];  // vertices in layer ii+1
+                for( int i = 0; i < nnodes; i++ )
+                    vertexConn[nnodes+i] = newVerts[ii][indexVerts[i]];  // vertices in layer ii+1
+            }
 
             EntityHandle polyhedron;
             if( is_mpas )

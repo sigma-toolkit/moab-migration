@@ -100,6 +100,11 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
                                        bool is_threed,
                                        int order );
 
+moab::ErrorCode ComputeNNInterpolant( const std::vector< double >& src_xyz,
+                                      const std::vector< double >& src_tdata,
+                                      const std::vector< double >& dst_xyz,
+                                      std::vector< double >& dst_tdata );
+
 moab::ErrorCode ExtrudeMPASPolygonsToPolyhedra( Interface* mb,
                                                 std::vector< double >& layer_thickness,
                                                 moab::EntityHandle& poly2dset,
@@ -129,7 +134,7 @@ ErrorCode CloneToTRMesh( moab::Interface* m_interface, Mesh& mesh, EntityHandle 
 
 // 3D settings
 constexpr int mpas_zlevels = 60;
-constexpr int roms_zlevels = 60;
+constexpr int roms_zlevels = 5;
 constexpr int nvars        = 2;
 int src_zlayers = 0, dst_zlayers = 0;
 
@@ -1109,19 +1114,19 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
         // Initial grid size.
         // const size_t init_grid_size = static_cast< size_t >( std::max( 10.0, std::sqrt( nd ) / 8 ) );
         // mba::index< 3 > grid        = { init_grid_size, init_grid_size, 2 };
-        mba::index< 3 > grid = { 50, 50, 2 };
+        mba::index< 3 > grid = { 100, 100, 2 };
 
         if( is_threed )
         {
             lo[2] = -1e5;
             hi[2] = 1e5;
 
-            grid[2] = 50;
+            grid[2] = 2 * mpas_zlevels;
 
             nlevels = 5;
         }
 
-        mba::MBA< 3 > interp( lo, hi, grid, coords, fd, nlevels /*levels*/, 1e-14 /*tolerance*/, 0.5 /*min_fill*/ );
+        mba::MBA< 3 > interp( lo, hi, grid, coords, fd, nlevels /*levels*/, 1e-14 /*tolerance*/, 0.7 /*min_fill*/ );
         // Get interpolated value at arbitrary location.
         offset = 0;
         for( size_t k = 0; k < ni; k++, offset += 3 )
@@ -1392,7 +1397,12 @@ moab::ErrorCode ComputeFieldProjections( moab::Interface* mbi,
         }
     }
 
-    if( useMBA )
+    if( is_three_dimensional )
+    {
+        std::cout << "\nComputing Nearest-neighbor interpolant (order=0) for field " << varProjectSrc << std::endl;
+        err = ComputeNNInterpolant( src_xyz, src_tdata, dst_xyz, dst_tdata );MB_CHK_ERR( err );
+    }
+    else if( useMBA  )
     {
         std::cout << "\nComputing MBA interpolant (order=" << order << ") for field " << varProjectSrc << std::endl;
         err = ComputeMBAInterpolant( src_xyz, src_tdata, dst_xyz, dst_tdata, is_three_dimensional, order );MB_CHK_ERR( err );
@@ -2127,6 +2137,43 @@ moab::ErrorCode ExtrudeMPASPolygonsToPolyhedra( Interface* mb,
 
     rval = mb->write_file( std::string( "mpas_polygon_3d.h5m" ).c_str(), "H5M", "DEBUG_IO=5", &outputset, 1 );
     // rval = mb->write_file( std::string( prefix + "_polygon_3d.vtk" ).c_str(), "VTK", "", &outputset, 1 );MB_CHK_ERR( rval );
+
+    return moab::MB_SUCCESS;
+}
+
+moab::ErrorCode ComputeNNInterpolant( const std::vector< double >& src_xyz,
+                                      const std::vector< double >& src_tdata,
+                                      const std::vector< double >& dst_xyz,
+                                      std::vector< double >& dst_tdata )
+{
+    const int num_neighbors = 1;
+    // construct a kd-tree index:
+    using KdTree = nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PC3D< double > >,
+                                                        PC3D< double >, 3 /* dim */
+                                                        >;
+
+
+    double query_pt[3];  // dimension
+    PC3D< double > cloud( src_xyz );
+    KdTree tree( 3 /*dim*/, cloud, { 10 /* max leaf */ } );
+
+    const size_t num_results = static_cast< size_t >( num_neighbors );
+    std::vector< size_t > srcindx( num_results );
+    std::vector< double > srcdist( num_results );
+    nanoflann::KNNResultSet< double > resultSet( num_results );
+    size_t offset= 0 ;
+    for( size_t i = 0; i < dst_tdata.size(); i++, offset += 3 )
+    {
+        query_pt[0] = dst_xyz[offset];
+        query_pt[1] = dst_xyz[offset+1];
+        query_pt[2] = dst_xyz[offset+2];
+
+        // Do a KNN search
+        resultSet.init( srcindx.data(), srcdist.data() );
+        tree.findNeighbors( resultSet, query_pt );
+
+        dst_tdata[i] = src_tdata[srcindx[0]];
+    }
 
     return moab::MB_SUCCESS;
 }

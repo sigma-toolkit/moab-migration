@@ -27,7 +27,7 @@ endif
 
 default:
 
-.SUFFIXES: .o .cpp .F90
+.SUFFIXES: .o .c .cpp .cxx .f .f90 .F90 .F
 
 VERBOSE=@
 ifeq ($(V),1)
@@ -42,13 +42,33 @@ else
 RUNPARALLEL = LD_LIBRARY_PATH=${RUNLD_LIBRARY_PATH} 
 endif
 
+.c.o:
+	@echo "  [C]  $<"
+	${VERBOSE}${MOAB_CC} ${CXXFLAGS} ${MOAB_CPPFLAGS} ${MOAB_INCLUDES} -DMESH_DIR=\"${MESH_DIR}\" -c $<
+
 .cpp.o:
 	@echo "  [CXX]  $<"
 	${VERBOSE}${MOAB_CXX} ${CXXFLAGS} ${MOAB_CXXFLAGS} ${MOAB_CPPFLAGS} ${MOAB_INCLUDES} -DMESH_DIR=\"${MESH_DIR}\" -c $<
 
+.cxx.o:
+	@echo "  [CXX]  $<"
+	${VERBOSE}${MOAB_CXX} ${CXXFLAGS} ${MOAB_CXXFLAGS} ${MOAB_CPPFLAGS} ${MOAB_INCLUDES} -DMESH_DIR=\"${MESH_DIR}\" -c $<
+
+.f.o:
+	@echo "   [FC]  $<"
+	${VERBOSE}${MOAB_F77} ${MOAB_FFLAGS} ${IMESH_FFLAGS} -std=legacy -fno-underscoring ${MOAB_CPPFLAGS} ${IMESH_INCLUDES} ${IMESH_FCDEFS} -DMESH_DIR=\"${MESH_DIR}\" -c $<
+
+.f90.o:
+	@echo "   [FC]  $<"
+	${VERBOSE}${MOAB_FC} ${MOAB_FCFLAGS} ${IMESH_FCFLAGS} ${MOAB_CPPFLAGS} -fno-underscoring ${IMESH_INCLUDES} ${IMESH_FCDEFS} -DMESH_DIR=\"${MESH_DIR}\" -c $<
+
 .F90.o:
 	@echo "   [FC]  $<"
-	${VERBOSE}${IMESH_FC} ${FCFLAGS} ${IMESH_FCFLAGS} ${MOAB_CPPFLAGS} ${IMESH_INCLUDES} ${IMESH_FCDEFS} $(FC_DEFINE)MESH_DIR=\"${MESH_DIR}\" -c $<
+	${VERBOSE}${MOAB_FC} ${MOAB_FCFLAGS} ${IMESH_FCFLAGS} ${MOAB_CPPFLAGS} ${IMESH_INCLUDES} ${IMESH_FCDEFS} -DMESH_DIR=\"${MESH_DIR}\" -c $<
+
+.F.o:
+	@echo "   [FC]  $<"
+	${VERBOSE}${MOAB_FC} ${MOAB_FCFLAGS} ${IMESH_FCFLAGS} ${MOAB_CPPFLAGS} ${IMESH_INCLUDES} ${IMESH_FCDEFS} -DMESH_DIR=\"${MESH_DIR}\" -c $<
 
 info:
 ifeq ("$(MOAB_DEV)","no")

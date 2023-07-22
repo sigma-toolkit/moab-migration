@@ -54,13 +54,13 @@ using namespace std;
 #define dbgprint( MSG )                      \
     do                                       \
     {                                        \
-        if( !rank ) cerr << ( MSG ) << endl; \
+        if( !rank ) cerr << MSG << endl; \
     } while( false )
 
 #define dbgprintall( MSG )                               \
     do                                                   \
     {                                                    \
-        cerr << "[" << rank << "]: " << ( MSG ) << endl; \
+        cerr << "[" << rank << "]: " << MSG << endl; \
     } while( false )
 
 // Function to parse input parameters

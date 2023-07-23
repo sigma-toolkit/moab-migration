@@ -98,16 +98,22 @@ ErrorCode NCHelperMPAS::init_mesh_vals()
     }
 
     // Look for time dimension
+    idx = -1;
     if( ( vit = std::find( dimNames.begin(), dimNames.end(), "Time" ) ) != dimNames.end() )
         idx = vit - dimNames.begin();
     else if( ( vit = std::find( dimNames.begin(), dimNames.end(), "time" ) ) != dimNames.end() )
         idx = vit - dimNames.begin();
     else
     {
-        MB_SET_ERR( MB_FAILURE, "Couldn't find 'Time' or 'time' dimension" );
+        tDim = -1;
     }
-    tDim       = idx;
-    nTimeSteps = dimLens[idx];
+    if (idx >= 0) {
+        tDim       = idx;
+        nTimeSteps = dimLens[idx];
+    }
+    else
+        nTimeSteps = 0;
+
 
     // Get number of cells
     if( ( vit = std::find( dimNames.begin(), dimNames.end(), "nCells" ) ) != dimNames.end() )

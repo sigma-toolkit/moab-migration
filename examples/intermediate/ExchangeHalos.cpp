@@ -152,14 +152,15 @@ int main( int argc, char** argv )
     // string read_options = "PARALLEL=READ_PART;PARTITION=TRIVIAL;PARALLEL_RESOLVE_SHARED_ENTS;"
     //                       "PARTITION_DISTRIBUTE;PARALLEL_COMM=0";
     // string read_options = ( size > 1 ? ";;PARALLEL=READ_PART;PARTITION_METHOD=SQIJ;DEBUG_IO=0;NO_EDGES;" : "" );
-    string read_options = ( size > 1 ? ";;PARALLEL=READ_PART;PARTITION_METHOD=SQIJ;PARALLEL_RESOLVE_SHARED_ENTS;"
-                                       "NO_EDGES;NO_MIXED_ELEMENTS;DEBUG_IO=0;"
-                                     : "" );
+    string read_options = ( size > 1 ? "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;"
+                                       "PARALLEL_RESOLVE_SHARED_ENTS;"
+                                       "DEBUG_IO=0;"
+                                     : "" );  // NO_EDGES;NO_MIXED_ELEMENTS;RCBZOLTAN, TRIVIAL
     // Load the file from disk with given options
     err = mbi->load_file( context.input_filename.c_str(), &fileset, read_options.c_str() );MB_CHK_SET_ERR( err, "MOAB::load_file failed" );
 
-    dbgprint( "- Writing to file " );
-    err = mbi->write_file( "exchangeHalos_output_tmp.h5m", "H5M", "PARALLEL=WRITE_PART;DEBUG_IO=0;", &fileset, 1 );MB_CHK_ERR( err );
+    // dbgprint( "- Writing to file " );
+    // err = mbi->write_file( "exchangeHalos_output_tmp.h5m", "H5M", "PARALLEL=WRITE_PART;DEBUG_IO=0;", &fileset, 1 );MB_CHK_ERR( err );
     dbgprint( "- " );
 
     // Ensure that all processes understand about multi-shared vertices and entities
@@ -173,8 +174,10 @@ int main( int argc, char** argv )
                                                            additional_entities, true /* store_remote_handles */,
                                                            true /* wait_all */ );MB_CHK_ERR( err );  // true to store remote handles
 
+    // Mesh is loaded and ghost cells are now available.
+
     // Ensure to augment the ghost cells with essential tag data
-    // err = parallel_communicator->augment_default_sets_with_ghosts( fileset );MB_CHK_ERR( err );
+    err = parallel_communicator->augment_default_sets_with_ghosts( fileset );MB_CHK_ERR( err );
 
     Range dimEnts;
     // Get all entities of dimension = dim
@@ -183,6 +186,7 @@ int main( int argc, char** argv )
 
     // Aggregate the total number of elements in the mesh
     auto numEntities = dimEnts.size();
+    // dbgprintall( " number of " << context.dimension << "D elements in local mesh = " << numEntities );
     int numTotalEntities;
     MPI_Reduce( &numEntities, &numTotalEntities, 1, MPI_INT, MPI_SUM, 0,
                 parallel_communicator->proc_config().proc_comm() );
@@ -266,27 +270,26 @@ int main( int argc, char** argv )
 
     // Perform exchange tag data
     dbgprint( "> Exchanging tags between processors " );
-    // if( false )
     {
         // Exchange tags between processors
         err = parallel_communicator->exchange_tags( tagScalar, dimEnts );MB_CHK_SET_ERR( err, "Exchanging scalar tag between processors failed" );
         err = parallel_communicator->exchange_tags( tagVector, dimEnts );MB_CHK_SET_ERR( err, "Exchanging vector tag between processors failed" );
     }
 
+    // Range edges;
+    // err = mbi->get_entities_by_dimension( 0, 1, edges );MB_CHK_ERR( err );
+    // err = mbi->delete_entities( edges );MB_CHK_ERR( err );
+
     dbgprint( "> Writing out the final mesh and data in MOAB h5m format. File = exchangeHalos_output.h5m." );
     string write_options = ( size > 1 ? "PARALLEL=WRITE_PART;DEBUG_IO=0;" : "" );
-    // string write_options = "PARALLEL=WRITE_PART;DEBUG_IO=2;";
     // Write out to output file to visualize reduction/exchange of tag data
-    // err = mbi->write_file( "exchangeHalos_output.h5m", "H5M", "PARALLEL=WRITE_PART" );MB_CHK_ERR( err );
-    // err = mbi->write_file( "exchangeHalos_output.h5m", "H5M", write_options.c_str() );MB_CHK_ERR( err );
     err = mbi->write_file( "exchangeHalos_output.h5m", "H5M", write_options.c_str(), &fileset, 1 );MB_CHK_ERR( err );
 
     // Done, cleanup
     delete parallel_communicator;
     delete mbi;
+    MPI_Finalize();
 
     dbgprint( "\n********** ExchangeHalos Example DONE! **********" );
-
-    MPI_Finalize();
     return 0;
 }

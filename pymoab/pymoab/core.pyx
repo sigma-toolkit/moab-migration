@@ -1,4 +1,5 @@
 """Implements core functionality."""
+# distutils: language = c++
 import sys
 
 from cython.operator cimport dereference as deref
@@ -14,7 +15,7 @@ from .tag cimport Tag, _tagArray
 from .rng cimport Range
 from .types import check_error, np_tag_type, validate_type, _convert_array, _eh_array, _eh_py_type
 from . import types
-from libcpp.vector cimport vector
+from libcpp.vector cimport vector as stdcpp_vector
 from libcpp.string cimport string as std_string
 from libc.stdlib cimport malloc
 
@@ -24,6 +25,7 @@ else:
     from collections.abc import Iterable
 
 cdef void* null = NULL
+ctypedef stdcpp_vector[eh.EntityHandle] EntityVector
 
 cdef class Core(object):
 
@@ -1541,9 +1543,9 @@ cdef class Core(object):
             if the EntityType provided is not valid
         """
         cdef moab.ErrorCode err
-        cdef Range entities = Range()
         cdef moab.EntityType typ = entity_type
-        cdef vector[eh.EntityHandle] hvec
+        cdef EntityVector hvec = EntityVector()
+        cdef Range entities = Range()
         if as_list:
             err = self.inst.get_entities_by_type(<unsigned long> meshset,
                                                  typ,
@@ -1706,7 +1708,7 @@ cdef class Core(object):
         """
         cdef moab.ErrorCode err
         cdef Range ents = Range()
-        cdef vector[eh.EntityHandle] hvec
+        cdef EntityVector hvec = EntityVector()
         if as_list:
             err = self.inst.get_entities_by_handle(<unsigned long> meshset, hvec, recur)
             check_error(err, exceptions)
@@ -1746,7 +1748,7 @@ cdef class Core(object):
         """
         cdef moab.ErrorCode err
         cdef Range ents = Range()
-        cdef vector[eh.EntityHandle] hvec
+        cdef EntityVector hvec = EntityVector()
         if as_list:
             err = self.inst.get_entities_by_dimension(<unsigned long> meshset, dimension, hvec, recur)
             check_error(err, exceptions)
@@ -1862,7 +1864,7 @@ cdef class Core(object):
         MOAB ErrorCode
             if an internal MOAB error occurs
         """
-        cdef vector[moab.TagInfo*] tags
+        cdef stdcpp_vector[moab.TagInfo*] tags
         err = self.inst.tag_get_tags_on_entity(entity, tags)
         tag_list = []
         for tag in tags:

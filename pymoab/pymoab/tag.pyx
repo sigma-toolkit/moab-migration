@@ -54,11 +54,11 @@ cdef class Tag(object):
         If the tag does not have a default value, None is returned.
         """
         tag_size = self.get_length()
+        shape = (tag_size,)
         dtype = self.get_dtype()
-        cdef np.ndarray arr = np.empty((tag_size,), dtype = dtype)
 
         cdef const void* data_ptr = self.inst.get_default_value()
-        arr.data = <char *> data_ptr
+        arr = np.frombuffer(<char*>data_ptr, dtype, tag_size).reshape(shape)
 
         if tag_size == 1:
             return arr[0]

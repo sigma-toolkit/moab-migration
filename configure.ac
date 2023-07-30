@@ -83,6 +83,12 @@ MPI_DIR=$WITH_MPI
 AC_SUBST(MPI_DIR)
 AC_SUBST(enablempi)
 
+# All language options initialized -- now call
+# libtool initialization
+# LT_INIT is deprecated
+LT_INIT([dlopen])
+LT_LANG([C++])
+
 # Invoke and find all necessary flags for C, C++, FC
 FATHOM_COMPILER_FLAGS([yes],[yes],[$ENABLE_FORTRAN])
 
@@ -92,12 +98,6 @@ AC_PROG_MKDIR_P
 AC_DISABLE_SHARED
 AC_SUBST(enable_static)
 AC_SUBST(enable_shared)
-
-# All language options initialized -- now call
-# libtool initialization
-# LT_INIT is deprecated
-LT_INIT([dlopen])
-LT_LANG([C++])
 
 AC_C_BIGENDIAN
 

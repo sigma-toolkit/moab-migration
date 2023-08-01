@@ -30,6 +30,7 @@
 
 // MOAB includes
 #include "moab/Core.hpp"
+#include "moab/CpuTimer.hpp"
 #include "moab/ProgOptions.hpp"
 
 #ifndef MOAB_HAVE_MPI
@@ -47,54 +48,110 @@
 using namespace moab;
 using namespace std;
 
-#define dbgprint( MSG )                  \
-    do                                   \
-    {                                    \
-        if( !rank ) cerr << MSG << endl; \
+#define dbgprint( MSG )                             \
+    do                                              \
+    {                                               \
+        if( !context.proc_id ) cerr << MSG << endl; \
     } while( false )
 
-#define dbgprintall( MSG )                           \
-    do                                               \
-    {                                                \
-        cerr << "[" << rank << "]: " << MSG << endl; \
+#define dbgprintall( MSG )                                      \
+    do                                                          \
+    {                                                           \
+        cerr << "[" << context.proc_id << "]: " << MSG << endl; \
     } while( false )
 
 struct RuntimeContext
 {
   public:
-    int dimension;
-    std::string input_filename;
-    int ghost_layers;
-    std::string scalar_tagname;
-    std::string vector_tagname;
-    int vector_length;
+    int dimension;                /// dimension of the problem
+    std::string input_filename;   /// input file name (nc format)
+    std::string output_filename;  /// output file name (h5m format)
+    int ghost_layers;             /// number of ghost layers
+    std::string scalar_tagname;   /// scalar tag name
+    std::string vector_tagname;   /// vector tag name
+    int vector_length;            /// length of the vector tag components
+    int num_max_exchange;         /// total number of exchange iterations
+    int proc_id;                  /// process identifier
+    int num_procs;                /// total number of processes
 
-    RuntimeContext()
-        : dimension( 2 ), input_filename( string( MESH_DIR ) + string( "/io/mpasx1.642.t.2.nc" ) ), ghost_layers( 1 ),
-          scalar_tagname( "h_s" ), vector_tagname( "ke" ), vector_length( 1 )
+    RuntimeContext( Interface* mbCore, ParallelComm* pComm )
+        : dimension( 2 ), input_filename( string( MESH_DIR ) + string( "/io/mpasx1.642.t.2.nc" ) ),
+          output_filename( "exchangeHalos_output.h5m" ), ghost_layers( 1 ), scalar_tagname( "h_s" ),
+          vector_tagname( "ke" ), vector_length( 1 ), num_max_exchange( 10 ), moab_interface( mbCore ),
+          parallel_communicator( pComm )
     {
+        timer = new moab::CpuTimer();
+
+        proc_id = parallel_communicator->rank();
+        num_procs = parallel_communicator->size();
     }
+
+    ~RuntimeContext()
+    {
+        delete timer;
+    }
+
+    /// @brief Parse the runtime command line options
+    /// @param argc - number of command line arguments
+    /// @param argv - command line arguments as string list
+    void ParseCLOptions( int argc, char* argv[] )
+    {
+        ProgOptions opts;
+        // Input mesh
+        opts.addOpt< std::string >( "input", "Input mesh filename to load in parallel", &input_filename );
+        // Dimension of the input mesh
+        opts.addOpt< int >( "dimension", "Input mesh dimension (default = 2)", &dimension );
+        // Tag names
+        opts.addOpt< std::string >( "stag", "Scalar tag name to exchange with neighboring tasks", &scalar_tagname );
+        opts.addOpt< std::string >( "vtag", "Vector tag name to exchange with neighboring tasks", &vector_tagname );
+        opts.addOpt< int >( "vtaglength", "Size of vector components per each entity", &vector_length );
+        opts.addOpt< int >( "nghosts", "Number of ghost layers (halos) to exchange", &ghost_layers );
+        opts.addOpt< int >( "nexchanges", "Number of ghost-halo exchange iterations to perform", &num_max_exchange );
+
+        opts.parseCommandLine( argc, argv );
+    }
+
+    void timer_push( std::string operation )
+    {
+        timer_ops = timer->time_since_birth();
+        opName    = operation;
+    }
+
+    void timer_pop( int nruns = 1 )
+    {
+        double locElapsed = timer->time_since_birth() - timer_ops, avgElapsed = 0, maxElapsed = 0;
+        MPI_Reduce( &locElapsed, &maxElapsed, 1, MPI_DOUBLE, MPI_MAX, 0, parallel_communicator->comm() );
+        MPI_Reduce( &locElapsed, &avgElapsed, 1, MPI_DOUBLE, MPI_SUM, 0, parallel_communicator->comm() );
+        if( !proc_id )
+        {
+            avgElapsed /= num_procs;
+            if( nruns > 1 )
+                std::cout << "[LOG] Time taken to " << opName.c_str() << ", averaged over " << nruns
+                          << " runs : max = " << maxElapsed / nruns << ", avg = " << avgElapsed / nruns << "\n";
+            else
+                std::cout << "[LOG] Time taken to " << opName.c_str() << " : max = " << maxElapsed
+                          << ", avg = " << avgElapsed << "\n";
+        }
+        // std::cout << "\n[LOG" << proc_id << "] Time taken to " << opName << " = " <<
+        // timer->time_since_birth() - timer_ops << std::endl;
+        opName.clear();
+    }
+
+    void clear ()
+    {
+        moab_interface = nullptr;
+        parallel_communicator = nullptr;
+    }
+
+  private:
+    moab::CpuTimer* timer;
+    double timer_ops;
+    std::string opName;
+
+    Interface* moab_interface;
+    ParallelComm* parallel_communicator;
 };
 
-// Function to parse input parameters
-ErrorCode parse_options( int argc, char** argv, RuntimeContext& context )
-{
-    ProgOptions opts;
-    // Input mesh
-    opts.addOpt< std::string >( "input", "Input mesh filename to load in parallel", &context.input_filename );
-    // Dimension of the input mesh
-    opts.addOpt< int >( "dimension", "Input mesh dimension (default = 2)", &context.dimension );
-    // Tag names
-    opts.addOpt< std::string >( "stag", "Scalar tag name to exchange with neighboring tasks", &context.scalar_tagname );
-    opts.addOpt< std::string >( "vtag", "Vector tag name to exchange with neighboring tasks", &context.vector_tagname );
-    opts.addOpt< int >( "vtaglength", "Size of vector components per each entity", &context.vector_length );
-    // Ghost layers
-    opts.addOpt< int >( "nghosts", "Number of ghost layers (halos) to exchange", &context.ghost_layers );
-
-    opts.parseCommandLine( argc, argv );
-
-    return MB_SUCCESS;
-}
 
 //
 // Start of main test program
@@ -102,7 +159,6 @@ ErrorCode parse_options( int argc, char** argv, RuntimeContext& context )
 int main( int argc, char** argv )
 {
     ErrorCode err;
-    RuntimeContext context;
 
     // Initialize MPI first
     MPI_Init( &argc, &argv );
@@ -120,13 +176,12 @@ int main( int argc, char** argv )
     MPI_Comm comm                       = MPI_COMM_WORLD;
     ParallelComm* parallel_communicator = ParallelComm::get_pcomm( mbi, partnset, &comm );
 
-    const int rank = parallel_communicator->rank();
-    const int size = parallel_communicator->size();
+    RuntimeContext context( mbi, parallel_communicator );
 
     dbgprint( "********** Exchange halos example **********\n" );
 
     // Get the input options
-    err = parse_options( argc, argv, context );MB_CHK_SET_ERR( err, "Parsing command-line options failed" );
+    context.ParseCLOptions( argc, argv );
 
     /////////////////////////////////////////////////////////////////////////
     // Print out the input parameters in use
@@ -152,17 +207,20 @@ int main( int argc, char** argv )
     // string read_options = "PARALLEL=READ_PART;PARTITION=TRIVIAL;PARALLEL_RESOLVE_SHARED_ENTS;"
     //                       "PARTITION_DISTRIBUTE;PARALLEL_COMM=0";
     // string read_options = ( size > 1 ? ";;PARALLEL=READ_PART;PARTITION_METHOD=SQIJ;DEBUG_IO=0;NO_EDGES;" : "" );
-    string read_options = ( size > 1 ? "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;"
+    string read_options = ( context.num_procs > 1 ? "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;"
                                        "PARALLEL_RESOLVE_SHARED_ENTS;"
                                        "DEBUG_IO=0;"
                                      : "" );  // NO_EDGES;NO_MIXED_ELEMENTS;RCBZOLTAN, TRIVIAL
+    context.timer_push( "Read input file" );
     // Load the file from disk with given options
     err = mbi->load_file( context.input_filename.c_str(), &fileset, read_options.c_str() );MB_CHK_SET_ERR( err, "MOAB::load_file failed" );
+    context.timer_pop();
 
     // dbgprint( "- Writing to file " );
     // err = mbi->write_file( "exchangeHalos_output_tmp.h5m", "H5M", "PARALLEL=WRITE_PART;DEBUG_IO=0;", &fileset, 1 );MB_CHK_ERR( err );
     dbgprint( "- " );
 
+    context.timer_push( "Setup ghost layers" );
     // Ensure that all processes understand about multi-shared vertices and entities
     err = parallel_communicator->correct_thin_ghost_layers();MB_CHK_ERR( err );
 
@@ -173,11 +231,10 @@ int main( int argc, char** argv )
         err = parallel_communicator->exchange_ghost_cells( context.dimension, bridge_dimension, 1,
                                                            additional_entities, true /* store_remote_handles */,
                                                            true /* wait_all */ );MB_CHK_ERR( err );  // true to store remote handles
-
-    // Mesh is loaded and ghost cells are now available.
-
+    // Mesh is now loaded and ghost cells are available on each task.
     // Ensure to augment the ghost cells with essential tag data
     err = parallel_communicator->augment_default_sets_with_ghosts( fileset );MB_CHK_ERR( err );
+    context.timer_pop();
 
     Range dimEnts;
     // Get all entities of dimension = dim
@@ -270,18 +327,28 @@ int main( int argc, char** argv )
 
     // Perform exchange tag data
     dbgprint( "> Exchanging tags between processors " );
+    context.timer_push( "Exchange scalar tag data" );
+    for( auto irun = 0; irun < context.num_max_exchange; ++irun )
     {
-        // Exchange tags between processors
+        // Exchange scalar tags between processors
         err = parallel_communicator->exchange_tags( tagScalar, dimEnts );MB_CHK_SET_ERR( err, "Exchanging scalar tag between processors failed" );
+    }
+    context.timer_pop( context.num_max_exchange );
+
+    context.timer_push( "Exchange vector tag data" );
+    for( auto irun = 0; irun < context.num_max_exchange; ++irun )
+    {
+        // Exchange vector tags between processors
         err = parallel_communicator->exchange_tags( tagVector, dimEnts );MB_CHK_SET_ERR( err, "Exchanging vector tag between processors failed" );
     }
+    context.timer_pop( context.num_max_exchange );
 
     // Range edges;
     // err = mbi->get_entities_by_dimension( 0, 1, edges );MB_CHK_ERR( err );
     // err = mbi->delete_entities( edges );MB_CHK_ERR( err );
 
     dbgprint( "> Writing out the final mesh and data in MOAB h5m format. File = exchangeHalos_output.h5m." );
-    string write_options = ( size > 1 ? "PARALLEL=WRITE_PART;DEBUG_IO=0;" : "" );
+    string write_options = ( context.num_procs > 1 ? "PARALLEL=WRITE_PART;DEBUG_IO=0;" : "" );
     // Write out to output file to visualize reduction/exchange of tag data
     err = mbi->write_file( "exchangeHalos_output.h5m", "H5M", write_options.c_str(), &fileset, 1 );MB_CHK_ERR( err );
 

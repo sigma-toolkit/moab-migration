@@ -1,3 +1,5 @@
+#cython: language_level=3
+
 """ MOAB MeshTopoUtil """
 from cython.operator cimport dereference as deref
 

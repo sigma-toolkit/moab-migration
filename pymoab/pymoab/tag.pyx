@@ -1,3 +1,5 @@
+#cython: language_level=3
+
 """MOAB Tag Class"""
 
 from pymoab cimport moab

@@ -1,3 +1,5 @@
+#cython: language_level=3
+
 """Python wrappers for MOAB Types."""
 
 from pymoab cimport moab

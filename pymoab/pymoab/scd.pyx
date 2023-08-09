@@ -1,3 +1,5 @@
+#cython: language_level=3
+
 """MOAB Structured Mesh Interface"""
 
 cimport numpy as np

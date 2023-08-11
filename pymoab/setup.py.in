@@ -10,9 +10,14 @@ from setuptools import setup, Extension, find_packages
 from Cython.Distutils import build_ext
 
 # make sure cython isn't too old
-if version.parse(Cython.__version__) < version.parse("3.0.0"):
+if version.parse(Cython.__version__) < version.parse("0.26"):
     sys.exit(
-        "Cython version is old. Upgrade to Cython 3.0 or later using pip install cython --upgrade [--user]"
+        "Cython version is old. Upgrade to Cython 0.29 using pip install cython==0.29.36 [--user]"
+    )
+# or that cython isn't too new!
+if version.parse(Cython.__version__) > version.parse("1.0.0"):
+    sys.exit(
+        "Cython version unsupported. Downgrade to Cython 0.29 or lower using pip install cython==0.29.36 [--user]"
     )
 
 # setup moab include paths

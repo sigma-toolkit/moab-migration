@@ -320,7 +320,7 @@ else
       fi
       AC_CHECK_PROG(CYTHON_AVAILABLE, cython, yes, no)
       if test x"$CYTHON_AVAILABLE" != x"yes" ; then
-          AC_MSG_ERROR([Cython is not installed. Use 'easy_install cython'.])
+          AC_MSG_ERROR([Cython is not installed. Use 'pip install cython==0.29.36'.])
       else
           CYTHON=`which cython`
           AC_SUBST(CYTHON)

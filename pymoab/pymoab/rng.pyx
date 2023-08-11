@@ -1,7 +1,12 @@
+#cython: language_level=3
+
 """Implements range functionality."""
 from cython.operator cimport dereference as deref
 from pymoab cimport moab
 from .types import _eh_array, _eh_py_type
+
+#import numpy as np
+from libcpp.vector cimport vector
 
 cdef void *null = NULL
 
@@ -187,6 +192,17 @@ cdef class Range(object):
             return Range(ents)
         else:
             raise ValueError("Invalid key (type: {}) provided.".format(type(key)))
+
+    def toarray(self):
+        """
+        Returns the copy of the range as an array.
+        """
+        #cdef np.ndarray[moab.EntityHandle] v
+        cdef vector[moab.EntityHandle] v = vector[moab.EntityHandle](self.inst.size())
+        #v = np.array((self.inst.size(),), dtype=np.uint64_t)
+        for i in range(self.inst.size()): v[i] = _eh_py_type(deref(self.inst)[i])
+        #return np.asarray(v, dtype = np.uint64)
+        return v
 
     def __richcmp__(self, other, op):
         cdef Range r

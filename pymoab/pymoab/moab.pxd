@@ -86,6 +86,7 @@ cdef extern from "moab/EntityType.hpp" namespace "moab":
         MBENTITYSET
         MBMAXTYPE
 
+
 cdef extern from "moab/Range.hpp" namespace "moab":
 
     Range intersect(Range&, Range&)
@@ -115,7 +116,6 @@ cdef extern from "moab/Range.hpp" namespace "moab":
 
         Range subset_by_type(EntityType t)
         Range subset_by_dimension(int dim)
-
 
         EntityHandle operator[](EntityID index)
 
@@ -296,13 +296,13 @@ cdef extern from "moab/Core.hpp" namespace "moab":
                              const double* coords)
         ErrorCode set_coords(const Range& entity_handles,
                              const double* coords)
+        #ErrorCode get_entities_by_type(const EntityHandle meshset,
+        #                               const EntityType typ,
+        #                               vector[EntityHandle] & entities,
+        #                               const bool recursive)
         ErrorCode get_entities_by_type(const EntityHandle meshset,
                                        const EntityType typ,
-                                       vector[EntityHandle]& entities,
-                                       const bool recursive)
-        ErrorCode get_entities_by_type(const EntityHandle meshset,
-                                       const EntityType typ,
-                                       Range& entities,
+                                       Range & entities,
                                        const bool recursive)
         ErrorCode get_entities_by_type_and_tag(const EntityHandle meshset,
                                                const EntityType typ,
@@ -313,19 +313,19 @@ cdef extern from "moab/Core.hpp" namespace "moab":
                                                const int condition,
                                                const bool recursive)
         ErrorCode get_entities_by_handle(const EntityHandle meshset,
-                                         Range& entities,
+                                         Range & entities,
                                          const bool recursive)
-        ErrorCode get_entities_by_handle(const EntityHandle meshset,
-                                         vector[EntityHandle]& entities,
-                                         const bool recursive)
+        #ErrorCode get_entities_by_handle(const EntityHandle meshset,
+        #                                 vector[EntityHandle] & entities,
+        #                                 const bool recursive)
         ErrorCode get_entities_by_dimension(const EntityHandle meshset,
                                             const int dimension,
                                             Range& entities,
                                             const bool recursive)
-        ErrorCode get_entities_by_dimension(const EntityHandle meshset,
-                                            const int dimension,
-                                            vector[EntityHandle] entities,
-                                            const bool recursive)
+        #ErrorCode get_entities_by_dimension(const EntityHandle meshset,
+        #                                    const int dimension,
+        #                                    vector[EntityHandle] & entities,
+        #                                    const bool recursive)
         ErrorCode remove_entities(EntityHandle meshset,
                                   const EntityHandle* entities,
                                   const int num_entities)
@@ -429,3 +429,4 @@ cdef extern from "moab/Skinner.hpp" namespace "moab":
         ErrorCode   find_skin (const EntityHandle meshset, const Range &entities, bool get_vertices,
                                 Range &output_handles, Range *output_reverse_handles, bool create_vert_elem_adjs,
                                 bool create_skin_elements, bool look_for_scd)
+

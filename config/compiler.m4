@@ -208,13 +208,13 @@ AC_SUBST(enable_cxx_optimize)
 EXTRA_PGI_ONLY_FCFLAGS="-Mfree"
 if (test "x$enable_debug" != "xno"); then # debug flags
 # GNU
-EXTRA_GNU_CXXFLAGS="-Wall -Wno-long-long -pipe -pedantic -Wshadow -Wno-unused-parameter -Wpointer-arith -Wformat -Wformat-security -Wextra -Wno-variadic-macros -Wno-unknown-pragmas"
-EXTRA_GNU_FCFLAGS="-pipe -pedantic -ffree-line-length-0"
+EXTRA_GNU_CXXFLAGS="-Wall -Wno-long-long -pedantic -Wshadow -Wno-unused-parameter -Wpointer-arith -Wformat -Wformat-security -Wextra -Wno-variadic-macros -Wno-unknown-pragmas"
+EXTRA_GNU_FCFLAGS="-pedantic"
 # CLANG
 EXTRA_CLANG_CXXFLAGS="$EXTRA_GNU_CXXFLAGS"
 EXTRA_CLANG_FCFLAGS="$EXTRA_GNU_FCFLAGS"
 # Intel
-EXTRA_INTEL_CXXFLAGS="-pipe -C"
+EXTRA_INTEL_CXXFLAGS="-C"
 EXTRA_INTEL_FCFLAGS="-C"
 # PGI
 EXTRA_PGI_CXXFLAGS="--diag_suppress 236 --diag_suppress=unrecognized_gcc_pragma -C"
@@ -286,8 +286,8 @@ if test "xyes" = "x$enable_debug"; then
     CFLAGS="$CFLAGS -fstack-protector-all"
     LDFLAGS="$LDFLAGS -fstack-protector-all"
     if (test "x$CHECK_FC" != "xno" && test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
-      FCFLAGS="$FCFLAGS -fstack-protector-all"
-      FFLAGS="$FFLAGS -fstack-protector-all"
+      FCFLAGS="$FCFLAGS -fstack-protector-all" 
+      FFLAGS="$FFLAGS -fstack-protector-all" 
     fi
   fi
   DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --enable-debug=yes"
@@ -386,6 +386,15 @@ if (test "x$ENABLE_FORTRAN" != "xno" && test "x$CHECK_FC" != "xno"); then
   AC_F77_MAIN
   AC_FC_MAIN
   FAC_FC_WRAPPERS
+
+  # Check crayftn system: e.g., Frontier or Perlmutter?
+  if (test "x$PE_ENV" = "xCRAY"); then
+    FCFLAGS="$FCFLAGS -f free -em"
+    FFLAGS="$FFLAGS -f free -em"
+  elif (test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
+    FCFLAGS="$FCFLAGS -ffree-line-length-0"
+    FFLAGS="$FFLAGS -ffree-line-length-0"
+  fi
 
   # check how to link against C++ runtime for fortran programs correctly
   fcxxlinkage=no

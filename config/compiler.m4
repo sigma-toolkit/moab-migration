@@ -243,10 +243,10 @@ EXTRA_BG_FCFLAGS="$EXTRA_BG_FCFLAGS -qarch=qp -qtune=auto -qpic=large -qenablevm
 fi
 
 # this is just a test comment
-if test "xno" != "x$CHECK_CC"; then
+if (test "xno" != "x$CHECK_CC"); then
   FATHOM_CC_FLAGS
 fi
-if test "xno" != "x$CHECK_CXX"; then
+if (test "xno" != "x$CHECK_CXX"); then
   FATHOM_CXX_FLAGS
 fi
 
@@ -285,7 +285,7 @@ if test "xyes" = "x$enable_debug"; then
     CXXFLAGS="$CXXFLAGS -fstack-protector-all"
     CFLAGS="$CFLAGS -fstack-protector-all"
     LDFLAGS="$LDFLAGS -fstack-protector-all"
-    if (test "x$CHECK_FC" != "xno"); then
+    if (test "x$CHECK_FC" != "xno" && test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
       FCFLAGS="$FCFLAGS -fstack-protector-all"
       FFLAGS="$FFLAGS -fstack-protector-all"
     fi
@@ -461,6 +461,17 @@ if (test "x$ENABLE_FORTRAN" != "xno" && test "x$CHECK_FC" != "xno"); then
         LDFLAGS="$my_save_ldflags"
       fi
     fi
+
+    # Need this check to build on summit/frontier OLCF
+    my_save_fcflags="$FCFLAGS"
+    FCFLAGS="$FCFLAGS -WF,-C!"
+      AC_MSG_CHECKING([whether $FC supports -WF,-C!])
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
+          [AC_MSG_RESULT([yes])]
+          [FFLAGS="$FFLAGS -WF,-C!"],
+          [AC_MSG_RESULT([no])
+          FCFLAGS=$my_save_fcflags]
+      )
 
   fi
   AC_LANG_POP([Fortran])
@@ -883,34 +894,44 @@ case "$cc_compiler:$host_cpu" in
     FATHOM_CC_32BIT=-m32
     FATHOM_CC_64BIT=-m64
     FATHOM_CC_SPECIAL="$EXTRA_GNU_ONLY_CXXFLAGS"
-    FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
-    FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    if (test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
+      FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
+      FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    fi
     ;;
   GNU:powerpc*)
     FATHOM_CC_32BIT=-m32
     FATHOM_CC_64BIT=-m64
     FATHOM_CC_SPECIAL="$EXTRA_GNU_ONLY_CXXFLAGS"
-    FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
-    FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    if (test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
+      FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
+      FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    fi
     ;;
   GNU:i?86|GNU:x86_64)
     FATHOM_CC_32BIT=-m32
     FATHOM_CC_64BIT=-m64
     FATHOM_CC_SPECIAL="$EXTRA_GNU_ONLY_CXXFLAGS"
-    FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
-    FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    if (test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
+      FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
+      FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    fi
     ;;
   GNU:mips*)
     FATHOM_CC_32BIT="-mips32 -mabi=32"
     FATHOM_CC_64BIT="-mips64 -mabi=64"
     FATHOM_CC_SPECIAL="$EXTRA_GNU_ONLY_CXXFLAGS"
-    FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
-    FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    if (test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
+      FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
+      FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    fi
     ;;
   GNU:*)
     FATHOM_CC_SPECIAL="$EXTRA_GNU_ONLY_CXXFLAGS"
-    FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
-    FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    if (test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
+      FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
+      FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    fi
     ;;
   Intel:*)
     FATHOM_CC_32BIT=-m32
@@ -971,8 +992,10 @@ case "$cc_compiler:$host_cpu" in
     ;;
   Clang:*)
     FATHOM_CC_SPECIAL="$EXTRA_CLANG_CXXFLAGS"
-    FATHOM_FC_SPECIAL="$EXTRA_CLANG_FCFLAGS"
-    FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    if (test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
+      FATHOM_FC_SPECIAL="$EXTRA_CLANG_FCFLAGS"
+      FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    fi
     FATHOM_CC_32BIT=-m32
     FATHOM_CC_64BIT=-m64
     ;;

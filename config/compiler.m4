@@ -390,11 +390,18 @@ if (test "x$ENABLE_FORTRAN" != "xno" && test "x$CHECK_FC" != "xno"); then
   # Check crayftn system: e.g., Frontier or Perlmutter?
   if (test "x$PE_ENV" = "xCRAY"); then
     FCFLAGS="$FCFLAGS -f free -em"
-    FFLAGS="$FFLAGS -f free -em"
+    FFLAGS="$FFLAGS -f free"
   elif (test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
     FCFLAGS="$FCFLAGS -ffree-line-length-0"
     FFLAGS="$FFLAGS -ffree-line-length-0"
   fi
+  PAC_FC_MODULE_EXT()
+  #if (test "$FCMODEXT" = "unknown"); then
+  #  echo "Did not find Fortran module extensions. Default := mod, lower case"
+  #else
+  #  echo "Found extension type for Fortran modules := $FCMODEXT, $FCMODCASE"
+  #fi
+  AM_CONDITIONAL( HAVE_LCASE_FCMOD, [ test "x$FCMODCASE" != "xupper" ] )
 
   # check how to link against C++ runtime for fortran programs correctly
   fcxxlinkage=no
@@ -1132,3 +1139,119 @@ else
     ifelse([$2],[],[:],[$2])
 fi
 ])
+dnl
+dnl
+dnl ------------------------------------------------------------------------
+dnl Special characteristics that have no autoconf counterpart but that
+dnl we need as part of the Fortran 90 support.  To distinquish these, they
+dnl have a [PAC] prefix.
+dnl 
+dnl At least one version of the Cray compiler needs the option -em to
+dnl generate a separate module file, rather than including the module
+dnl information in the object (.o) file.
+dnl
+dnl
+dnl PAC_FC_MODULE_EXT(action if found,action if not found)
+dnl
+AC_DEFUN([PAC_FC_MODULE_EXT],
+[AC_CACHE_CHECK([for Fortran 90 module extension],
+pac_cv_fc_module_ext,[
+pac_cv_fc_module_case="unknown"
+AC_LANG_PUSH(Fortran)
+AC_COMPILE_IFELSE([
+    AC_LANG_SOURCE([
+        module conftest
+        integer n
+        parameter (n=1)
+        end module conftest
+    ])
+],[
+    # Look for module name
+    # First, try to find known names.  This avoids confusion caused by
+    # additional files (like <name>.stb created by some versions of pgf90)
+    # Early versions of the Intel compiler used d as the module extension;
+    # we include that just to finish the test as early as possible.
+    for name in conftest CONFTEST ; do
+        for ext in mod MOD d ; do
+            if test -s $name.$ext ; then
+                if test $name = conftest ; then
+                    pac_cv_fc_module_case=lower
+                else
+                    pac_cv_fc_module_case=upper
+                fi
+                pac_cv_fc_module_ext=$ext
+                pac_MOD=$ext
+                break
+            fi
+        done
+        if test -n "$pac_cv_fc_module_ext" ; then break ; fi
+    done
+    if test -z "$pac_MOD" ; then
+        # The test on .err is needed for Cray Fortran.
+        pac_MOD=`ls conftest.* 2>&1 | grep -v conftest.${ac_fc_srcext} | grep -v conftest.o | grep -v conftest.err`
+        pac_MOD=`echo $pac_MOD | sed -e 's/conftest\.//g'`
+        pac_cv_fc_module_case="lower"
+        if test "X$pac_MOD" = "X" ; then
+            pac_MOD=`ls CONFTEST* 2>&1 | grep -v CONFTEST.${ac_fc_srcext} | grep -v CONFTEST.o | grep -v CONFTEST.err`
+            pac_MOD=`echo $pac_MOD | sed -e 's/CONFTEST\.//g'`
+            if test -n "$pac_MOD" -a -s "CONFTEST.$pac_MOD" ; then
+                pac_cv_fc_module_case="upper"
+            else
+                # Clear because we must have gotten an error message
+                pac_MOD=""
+            fi
+        fi
+        if test -z "$pac_MOD" ; then 
+            pac_cv_fc_module_ext="unknown"
+        else
+            pac_cv_fc_module_ext=$pac_MOD
+        fi
+    fi
+],[
+    pac_cv_fc_module_ext="unknown"
+])
+
+if test "$pac_cv_fc_module_ext" = "unknown" ; then
+    # Try again, but with an -em option.  Abbreviated, because we're
+    # just looking for the Cray option
+    saveFCFLAGS=$FCFLAGS
+    FCFLAGS="$FCFLAGS -em"
+    AC_COMPILE_IFELSE([
+    AC_LANG_SOURCE([
+        module conftest
+        integer n
+        parameter (n=1)
+        end module conftest
+    ])
+],[
+    if test -s conftest.mod ; then
+        pac_cv_fc_module_ext="mod"
+        pac_cv_fc_module_case="lower"
+    elif test -s CONFTEST.mod ; then
+        pac_cv_fc_module_ext="mod"
+        pac_cv_fc_module_case="upper"
+    fi
+],[
+    :
+    # do nothing - already have the unknown default value
+])
+    if test "$pac_cv_fc_module_ext" = "unknown" ; then
+        # The additional command line option did not help - restore
+        # the original flags.
+        FCFLAGS=$saveFCFLAGS
+    fi
+fi
+AC_LANG_POP(Fortran)
+])
+#
+AC_SUBST(FCMODEXT)
+AC_SUBST(FCMODCASE)
+if test "$pac_cv_fc_module_ext" = "unknown" ; then
+    ifelse($2,,:,[$2])
+else
+    ifelse($1,,FCMODEXT=$pac_MOD;FCMODCASE=$pac_cv_fc_module_case,[$1])
+fi
+])
+dnl
+dnl
+

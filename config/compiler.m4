@@ -401,7 +401,6 @@ if (test "x$ENABLE_FORTRAN" != "xno" && test "x$CHECK_FC" != "xno"); then
   #else
   #  echo "Found extension type for Fortran modules := $FCMODEXT, $FCMODCASE"
   #fi
-  AM_CONDITIONAL( HAVE_LCASE_FCMOD, [ test "x$FCMODCASE" != "xupper" ] )
 
   # check how to link against C++ runtime for fortran programs correctly
   fcxxlinkage=no
@@ -500,6 +499,8 @@ fi
 
 AC_SUBST(FLIBS)
 AC_SUBST(FCLIBS)
+
+AM_CONDITIONAL( HAVE_LCASE_FCMOD, [ test "x$FCMODCASE" != "xupper" ] )
 
 ]) # FATHOM_COMPILER_FLAGS
 

@@ -84,30 +84,29 @@ using namespace std;
 struct RuntimeContext
 {
   public:
-    int dimension;                /// dimension of the problem
+    int dimension{ 2 };           /// dimension of the problem
     std::string input_filename;   /// input file name (nc format)
     std::string output_filename;  /// output file name (h5m format)
-    int ghost_layers;             /// number of ghost layers
+    int ghost_layers{ 2 };        /// number of ghost layers
     std::string scalar_tagname;   /// scalar tag name
     std::string vector_tagname;   /// vector tag name
-    int vector_length;            /// length of the vector tag components
-    int num_max_exchange;         /// total number of exchange iterations
-    bool debug_output;            /// write debug output information?
+    int vector_length{ 2 };       /// length of the vector tag components
+    int num_max_exchange{ 10 };   /// total number of exchange iterations
+    bool debug_output{ false };   /// write debug output information?
     int proc_id;                  /// process identifier
     int num_procs;                /// total number of processes
-    double last_counter;          /// last time counter between push/pop timer
+    double last_counter{};        /// last time counter between push/pop timer
 
     // MOAB objects
-    Interface* moab_interface;
+    Interface* moab_interface{};
     ParallelComm* parallel_communicator;
-    EntityHandle fileset, partnset;
+    EntityHandle fileset{}, partnset{};
 
     /// @brief Constructor: allocate MOAB interface and communicator, and initialize
     /// other data members with some default values
     RuntimeContext( MPI_Comm comm = MPI_COMM_WORLD )
-        : dimension( 2 ), input_filename( string( MESH_DIR ) + string( "/io/mpasx1.642.t.2.nc" ) ),
-          output_filename( "exchangeHalos_output.h5m" ), ghost_layers( 2 ), scalar_tagname( "h_s" ),
-          vector_tagname( "ke" ), vector_length( 2 ), num_max_exchange( 10 ), debug_output( false )
+        : input_filename( string( MESH_DIR ) + string( "/io/mpasx1.642.t.2.nc" ) ),
+          output_filename( "exchangeHalos_output.h5m" ), scalar_tagname( "h_s" ), vector_tagname( "ke" )
     {
         // Create the moab instance
         moab_interface = new( std::nothrow ) Core;
@@ -172,10 +171,12 @@ struct RuntimeContext
 
     void timer_pop( int nruns = 1 )
     {
-        double locElapsed = timer->time_since_birth() - timer_ops, avgElapsed = 0, maxElapsed = 0;
+        double locElapsed = timer->time_since_birth() - timer_ops;
+        double avgElapsed = 0;
+        double maxElapsed = 0;
         MPI_Reduce( &locElapsed, &maxElapsed, 1, MPI_DOUBLE, MPI_MAX, 0, parallel_communicator->comm() );
         MPI_Reduce( &locElapsed, &avgElapsed, 1, MPI_DOUBLE, MPI_SUM, 0, parallel_communicator->comm() );
-        if( !proc_id )
+        if( proc_id == 0 )
         {
             avgElapsed /= num_procs;
             if( nruns > 1 )
@@ -190,34 +191,34 @@ struct RuntimeContext
         opName.clear();
     }
 
-    void load_file();
+    void load_file() const;
 
-    inline double last_elapsed()
+    inline double last_elapsed() const
     {
         return last_counter;
     }
 
-    moab::ErrorCode create_sv_tags( Tag& tagScalar, Tag& tagVector, Range& entities );
+    moab::ErrorCode create_sv_tags( Tag& tagScalar, Tag& tagVector, Range& entities ) const;
 
   private:
     /// @brief Compute the centroids of elements in 2D lat/lon space
     /// @param ents
     /// @return centroids (as lat/lon)
-    std::vector< double > compute_centroids( Range& ents );
+    std::vector< double > compute_centroids( const Range& ents ) const;
 
     moab::CpuTimer* timer;
-    double timer_ops;
+    double timer_ops{};
     std::string opName;
 };
 
-moab::ErrorCode RuntimeContext::create_sv_tags( Tag& tagScalar, Tag& tagVector, Range& entities )
+moab::ErrorCode RuntimeContext::create_sv_tags( Tag& tagScalar, Tag& tagVector, Range& entities ) const
 {
     // Get element (centroid) coordinates so that we can evaluate some arbitrary data
     std::vector< double > entCoords = compute_centroids( entities );  // [entities * [lon, lat]]
 
     dbgprinti( "> Getting scalar tag handle " << scalar_tagname << "..." );
     double defSTagValue = -1.0;
-    bool createdTScalar;
+    bool createdTScalar = false;
     // Create the exchange tag: default name = USERTAG_EXC
     runchk( moab_interface->tag_get_handle( scalar_tagname.c_str(), 1, MB_TYPE_DOUBLE, tagScalar,
                                             MB_TAG_CREAT | MB_TAG_DENSE, &defSTagValue, &createdTScalar ),
@@ -245,7 +246,7 @@ moab::ErrorCode RuntimeContext::create_sv_tags( Tag& tagScalar, Tag& tagVector, 
 
     dbgprinti( "> Getting vector tag handle " << vector_tagname << "..." );
     std::vector< double > defVTagValue( vector_length, -1.0 );
-    bool createdTVector;
+    bool createdTVector = false;
     // Create the exchange tag: default name = USERTAG_RED
     runchk( moab_interface->tag_get_handle( vector_tagname.c_str(), vector_length, MB_TYPE_DOUBLE, tagVector,
                                             MB_TAG_CREAT | MB_TAG_DENSE, defVTagValue.data(), &createdTVector ),
@@ -274,7 +275,7 @@ moab::ErrorCode RuntimeContext::create_sv_tags( Tag& tagScalar, Tag& tagVector, 
     return moab::MB_SUCCESS;
 }
 
-void RuntimeContext::load_file()
+void RuntimeContext::load_file() const
 {
     /// Parallel Read options:
     ///   PARALLEL = type {READ_PART}
@@ -306,7 +307,7 @@ void RuntimeContext::load_file()
              "MOAB::load_file failed" );
 }
 
-std::vector< double > RuntimeContext::compute_centroids( Range& ents )
+std::vector< double > RuntimeContext::compute_centroids( const Range& ents ) const
 {
     double node[3];
     std::vector< double > eCentroids( ents.size() * 2 );  // [lon, lat]
@@ -372,11 +373,12 @@ int main( int argc, char** argv )
         // runchk( context.parallel_communicator->correct_thin_ghost_layers(), "Thin layer correction failed" );
 
         // Exchange ghost cells
-        int ghost_dim = context.dimension, bridge_dimension = context.dimension - 1;
+        int ghost_dimension  = context.dimension;
+        int bridge_dimension = context.dimension - 1;
         // Let us now get all ghost layers from adjacent parts
         runchk( context.parallel_communicator->exchange_ghost_cells(
-                    context.dimension, bridge_dimension, context.ghost_layers, 0,
-                    true /* store_remote_handles */, true /* wait_all */, &context.fileset ),
+                    ghost_dimension, bridge_dimension, context.ghost_layers, 0, true /* store_remote_handles */,
+                    true /* wait_all */, &context.fileset ),
                 "Exchange ghost cells failed" );  // true to store remote handles
 
         // Mesh is now loaded and ghost cells are available on each task.
@@ -396,16 +398,17 @@ int main( int argc, char** argv )
         // Aggregate the total number of elements in the mesh
         auto numEntities = dimEnts.size();
         // dbgprintall( " number of " << context.dimension << "D elements in local mesh = " << numEntities );
-        int numTotalEntities;
+        int numTotalEntities = 0;
         MPI_Reduce( &numEntities, &numTotalEntities, 1, MPI_INT, MPI_SUM, 0,
                     context.parallel_communicator->proc_config().proc_comm() );
         dbgprint( "Total number of " << context.dimension << "D elements in the mesh = " << numTotalEntities );
 
         // Create two tag handles: Exchange and Reduction operations
-        Tag tagScalar, tagVector;
+        Tag tagScalar = nullptr;
+        Tag tagVector = nullptr;
         runchk( context.create_sv_tags( tagScalar, tagVector, dimEnts ), "Unable to create scalar and vector tags" );
 
-        if( context.debug_output && !context.proc_id )  // only on root process, for debugging
+        if( context.debug_output && ( context.proc_id == 0 ) )  // only on root process, for debugging
         {
             dbgprint( "- Writing to file *before* ghost exchange " );
             runchk( context.moab_interface->write_file( "exchangeHalos_output_rank0_pre.h5m", "H5M", "DEBUG_IO=0;" ),
@@ -434,7 +437,7 @@ int main( int argc, char** argv )
         context.timer_pop( context.num_max_exchange );
         elapsed_times[3] = context.last_elapsed();
 
-        if( context.debug_output && !context.proc_id )  // only on root process, for debugging
+        if( context.debug_output && ( context.proc_id == 0 ) )  // only on root process, for debugging
         {
             dbgprint( "- Writing to file *after* ghost exchange " );
             runchk( context.moab_interface->write_file( "exchangeHalos_output_rank0_post.h5m", "H5M", "DEBUG_IO=0;" ),

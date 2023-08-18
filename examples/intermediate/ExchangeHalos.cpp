@@ -369,14 +369,14 @@ int main( int argc, char** argv )
         context.timer_push( "Setup ghost layers" );
         // Ensure that all processes understand about multi-shared vertices and entities
         // in case some adjacent parts are only m layers thick (where m < context.ghost_layers)
-        runchk( context.parallel_communicator->correct_thin_ghost_layers(), "Thin layer correction failed" );
+        // runchk( context.parallel_communicator->correct_thin_ghost_layers(), "Thin layer correction failed" );
 
         // Exchange ghost cells
-        int ghost_dim = 2, bridge_dimension = 1, additional_entities = ghost_dim;
+        int ghost_dim = context.dimension, bridge_dimension = context.dimension - 1;
         // Let us now get all ghost layers from adjacent parts
         runchk( context.parallel_communicator->exchange_ghost_cells(
-                    context.dimension, bridge_dimension, context.ghost_layers, additional_entities,
-                    true /* store_remote_handles */, false /* wait_all */, &context.fileset ),
+                    context.dimension, bridge_dimension, context.ghost_layers, 0,
+                    true /* store_remote_handles */, true /* wait_all */, &context.fileset ),
                 "Exchange ghost cells failed" );  // true to store remote handles
 
         // Mesh is now loaded and ghost cells are available on each task.

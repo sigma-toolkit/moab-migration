@@ -15,7 +15,6 @@ from .rng cimport Range
 from .types import check_error, np_tag_type, validate_type, _convert_array, _eh_array, _eh_py_type
 from . import types
 from libcpp.vector cimport vector
-from libcpp.string cimport string as std_string
 from libc.stdlib cimport malloc
 
 if sys.version_info < (3, 0):
@@ -1551,7 +1550,7 @@ cdef class Core(object):
                                                 recur)
         check_error(err, exceptions)
         if as_list:
-            return _eh_array(entities)
+            return entities.to_array()
         else:
             return entities
 
@@ -1705,7 +1704,7 @@ cdef class Core(object):
         check_error(err, exceptions)
 
         if as_list:
-            return _eh_array(ents)
+            return ents.to_array()
         else:
             return ents
 
@@ -1743,7 +1742,7 @@ cdef class Core(object):
         check_error(err, exceptions)
 
         if as_list:
-            return _eh_array(ents)
+            return ents.to_array()
         else:
             return ents
 

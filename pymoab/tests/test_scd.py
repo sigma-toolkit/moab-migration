@@ -75,6 +75,7 @@ def scd_tst(bnds):
         pass
 
     t = scd.box_set_tag(True)
+    assert t.get_type() == types.MB_TYPE_OPAQUE
 
     boxes = scd.find_boxes()
     assert len(boxes) == 0

@@ -29,13 +29,10 @@ cdef class ScdInterface(object):
         Requires a moab core, c, to operate on.
         """
         self.interface  = <moab.Interface*> c.inst
-        self.inst = new moab.ScdInterface(self.interface,False)
+        self.inst = new moab.ScdInterface(<moab.Interface*>c.inst, False)
+        if not self.inst:
+            raise MemoryError("Failed to create ScdInterface object")
 
-    def __del__(self):
-        """
-        Destructor.
-        """
-        del self.inst
 
     def construct_box(self,
                       low,
@@ -156,7 +153,8 @@ cdef class ScdInterface(object):
             if a MOAB error occurs
         """
         cdef Tag tag = Tag()
-        tag.inst = self.inst.box_set_tag(create_if_missing)
+        cdef bint create = create_if_missing
+        tag.inst = self.inst.box_set_tag(create)
         if <void*> tag.inst == null:
             check_error(MB_FAILURE)
         else:
@@ -265,10 +263,10 @@ cdef class ScdInterface(object):
 cdef class ScdBox(object):
 
     def __cinit__(self):
-        self.inst = <moab.ScdBox*> malloc(sizeof(moab.ScdBox))
+        self.inst = <moab.ScdBox*> malloc(sizeof(moab.ScdBox*))
+        if not self.inst:
+            raise MemoryError("Failed to allocate moab.ScdBox")
 
-    def __del__(self):
-        del self.inst
 
     def box_min(self):
         """

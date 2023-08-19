@@ -1,3 +1,4 @@
+#cython: language_level=3
 """ MOAB MeshTopoUtil """
 
 from pymoab cimport moab

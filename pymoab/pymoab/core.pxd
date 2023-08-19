@@ -1,3 +1,4 @@
+#cython: language_level=3
 """ Core Cython Header """
 
 from pymoab cimport moab

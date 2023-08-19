@@ -1,3 +1,4 @@
+#cython: language_level=3
 """Header file for MOAB"""
 from libcpp cimport bool
 from libcpp.vector cimport vector

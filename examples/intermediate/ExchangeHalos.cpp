@@ -1,30 +1,27 @@
 /** @example ExchangeHalos.cpp
  * \brief Example program that shows the use case for performing tag data exchange
- * between parallel processors in order to sync data on shared entities. The reduction
- * operation on tag data is also shown where the user can perform any of the actions supported
- * by MPI_Op on data residing on shared entities. \n
+ * between parallel processors in order to sync data on shared entities.
  *
  * <b>This example </b>:
- *    -# Initialize MPI and instantiate MOAB
- *    -# Get user options: Input mesh file name, tag name (default: USERTAG), tag value
- * (default: 1.0)
+ *    -# Initialize MPI and instantiates MOAB
+ *    -# Gets user options: Input mesh file name, vector tag length, ghost layer size etc
  *    -# Create the root and partition sets
  *    -# Instantiate ParallelComm and read the mesh file in parallel using appropriate options
- *    -# Create two tags: USERTAG_EXC (exchange) and USERTAG_RED (reduction)
- *    -# Set tag data and exchange shared entity information between processors
- *      -# Get entities in all dimensions and set local (current rank, dimension) dependent data for
- *     exchange tag (USERTAG_EXC)
- *      -# Perform exchange of tag data so that data on shared entities are synced via
- * ParallelCommunicator.
- *    -#  Set tag data and reduce shared entity information between processors using MPI_SUM
- *      -#  Get higher dimensional entities in the current partition and set local (current rank)
- *     dependent data for reduce tag (USERTAG_EXC)
- *      -#  Perform the reduction operation (MPI_SUM) on shared entities via ParallelCommunicator.
+ *    -# Create the required number of ghost layers as requested by the user (default = 3)
+ *    -# Get 2D MPAS polygonal entities in the mesh and filter to get only the "owned" entities
+ *    -# Create two tags: scalar_variable (single data/cell) and vector_variable (multiple data/cell)
+ *    -# Set tag data using analytical functions for both scalar and vector fields on owned entities
+ *    -# Exchange shared entity information and tags between processors
+ *      -# If debugging is turned on, store mesh file and tag on root process (will not contain data on shared entities)
+ *      -# Perform exchange of scalar tag data on shared entities
+ *      -# Perform exchange of vector tag data on shared entities
+ *      -# If debugging is turned on, store mesh file and tag on root process (will now contain data on *all* entities)
  *    -#  Destroy the MOAB instance and finalize MPI
  *
- * <b>To run:</b> \n mpiexec -n 2 ./ExchangeHalos <mesh_file> <tag_name> <tag_value> \n
- * <b>Example:</b> \n mpiexec -n 2 ./ExchangeHalos ../MeshFiles/unittest/64bricks_1khex.h5m
- * USERTAG 100 \n
+ * <b>To run:</b> \n mpiexec -n np ./ExchangeHalos --input <mpas_mesh_file> --nghosts <ghostlayers> --vtaglength <vector component size> --nexchanges <number of exchange runs> \n
+ * <b>Sample:</b> \n mpiexec -n 16 ./ExchangeHalos --input $MOAB_DIR/MeshFiles/unittest/io/mpasx1.642.t.2.nc --nghosts 3 --vtaglength 100 \n
+ *
+ * NOTE: --debug option can be added to write out extra files in h5m format to visualize some output (written from root task only) \n
  *
  */
 
@@ -48,22 +45,10 @@
 using namespace moab;
 using namespace std;
 
-#define dbgprinti( MSG )                    \
-    do                                      \
-    {                                       \
-        if( !proc_id ) cout << MSG << endl; \
-    } while( false )
-
-#define dbgprint( MSG )                             \
-    do                                              \
-    {                                               \
-        if( !context.proc_id ) cout << MSG << endl; \
-    } while( false )
-
-#define dbgprintall( MSG )                                      \
-    do                                                          \
-    {                                                           \
-        cout << "[" << context.proc_id << "]: " << MSG << endl; \
+#define dbgprint( MSG )                                 \
+    do                                                  \
+    {                                                   \
+        if( context.proc_id == 0 ) cout << MSG << endl; \
     } while( false )
 
 #define runchk( CODE, MSG )         \
@@ -73,53 +58,55 @@ using namespace std;
         MB_CHK_SET_ERR( err, MSG ); \
     } while( false )
 
-#define runchk0( CODE, MSG )        \
-    do                              \
-    {                               \
-        ErrorCode err = CODE;       \
-        if( err ) dbgprinti( MSG ); \
-        MB_CHK_ERR_CONT( err );     \
+#define runchk_cont( CODE, MSG )                     \
+    do                                               \
+    {                                                \
+        ErrorCode err = CODE;                        \
+        MB_CHK_ERR_CONT( err );                      \
+        if( err ) cout << "Error:: " << MSG << endl; \
     } while( false )
 
+/// @brief The RunttimeContext is an example specific class to store
+/// the run specific input data, MOAB datastructures used during the run
+/// and provides other utility functions to profile operations etc
 struct RuntimeContext
 {
   public:
     int dimension{ 2 };           /// dimension of the problem
     std::string input_filename;   /// input file name (nc format)
     std::string output_filename;  /// output file name (h5m format)
-    int ghost_layers{ 2 };        /// number of ghost layers
+    int ghost_layers{ 3 };        /// number of ghost layers
     std::string scalar_tagname;   /// scalar tag name
     std::string vector_tagname;   /// vector tag name
-    int vector_length{ 2 };       /// length of the vector tag components
+    int vector_length{ 3 };       /// length of the vector tag components
     int num_max_exchange{ 10 };   /// total number of exchange iterations
     bool debug_output{ false };   /// write debug output information?
-    int proc_id;                  /// process identifier
-    int num_procs;                /// total number of processes
-    double last_counter{};        /// last time counter between push/pop timer
+    int proc_id{ 1 };             /// process identifier
+    int num_procs{ 1 };           /// total number of processes
+    double last_counter{ 0.0 };   /// last time counter between push/pop timer
 
     // MOAB objects
-    Interface* moab_interface{};
-    ParallelComm* parallel_communicator;
-    EntityHandle fileset{}, partnset{};
+    Interface* moab_interface{ nullptr };
+    ParallelComm* parallel_communicator{ nullptr };
+    EntityHandle fileset{ 0 }, partnset{ 0 };
 
     /// @brief Constructor: allocate MOAB interface and communicator, and initialize
     /// other data members with some default values
     RuntimeContext( MPI_Comm comm = MPI_COMM_WORLD )
         : input_filename( string( MESH_DIR ) + string( "/io/mpasx1.642.t.2.nc" ) ),
-          output_filename( "exchangeHalos_output.h5m" ), scalar_tagname( "h_s" ), vector_tagname( "ke" )
+          output_filename( "exchangeHalos_output.h5m" ), scalar_tagname( "scalar_variable" ),
+          vector_tagname( "vector_variable" )
     {
         // Create the moab instance
         moab_interface = new( std::nothrow ) Core;
         if( NULL == moab_interface ) exit( 1 );
 
         // Create sets for the mesh and partition.  Then pass these to the load_file functions to populate the mesh.
-        runchk0( moab_interface->create_meshset( MESHSET_SET, fileset ), "Creating root set failed" );
-        runchk0( moab_interface->create_meshset( MESHSET_SET, partnset ), "Creating partition set failed" );
+        runchk_cont( moab_interface->create_meshset( MESHSET_SET, fileset ), "Creating root set failed" );
+        runchk_cont( moab_interface->create_meshset( MESHSET_SET, partnset ), "Creating partition set failed" );
 
         // Create the parallel communicator object with the partition handle associated with MOAB
         parallel_communicator = ParallelComm::get_pcomm( moab_interface, partnset, &comm );
-
-        timer = new moab::CpuTimer();
 
         proc_id   = parallel_communicator->rank();
         num_procs = parallel_communicator->size();
@@ -128,7 +115,6 @@ struct RuntimeContext
     /// @brief Destructor: deallocate MOAB interface and communicator
     ~RuntimeContext()
     {
-        delete timer;
         delete parallel_communicator;
         delete moab_interface;
     }
@@ -142,36 +128,35 @@ struct RuntimeContext
         // Input mesh
         opts.addOpt< std::string >( "input", "Input mesh filename to load in parallel", &input_filename );
         // Output mesh
+        opts.addOpt< void >( "debug", "Should we write output file? Default=false", &debug_output );
         opts.addOpt< std::string >(
-            "output", "Output mesh filename for verification (default=exchangeHalos_output.h5m)", &output_filename );
+            "output", "Output mesh filename for verification (use --debug). Default=exchangeHalos_output.h5m",
+            &output_filename );
         // Dimension of the input mesh
-        opts.addOpt< int >( "dimension", "Input mesh dimension (default = 2)", &dimension );
-        // Scalar and Vector tag names
-        opts.addOpt< std::string >( "stag", "Scalar tag name to exchange with neighboring tasks (default=h_s)",
-                                    &scalar_tagname );
-        opts.addOpt< std::string >( "vtag", "Vector tag name to exchange with neighboring tasks (default=ke)",
-                                    &vector_tagname );
         // Vector tag length
-        opts.addOpt< int >( "vtaglength", "Size of vector components per each entity (default=2)", &vector_length );
+        opts.addOpt< int >( "vtaglength", "Size of vector components per each entity. Ddefault=3", &vector_length );
         // Number of halo (ghost) regions
-        opts.addOpt< int >( "nghosts", "Number of ghost layers (halos) to exchange (default=2)", &ghost_layers );
+        opts.addOpt< int >( "nghosts", "Number of ghost layers (halos) to exchange. Default=3", &ghost_layers );
         // Number of times to perform the halo exchange for timing
-        opts.addOpt< int >( "nexchanges", "Number of ghost-halo exchange iterations to perform (default=10)",
+        opts.addOpt< int >( "nexchanges", "Number of ghost-halo exchange iterations to perform. Default=10",
                             &num_max_exchange );
-        opts.addOpt< void >( "debug", "Should we write output file? (default=false)", &debug_output );
 
         opts.parseCommandLine( argc, argv );
     }
 
-    void timer_push( std::string operation )
+    /// @brief Measure and start the timer to profile a task
+    /// @param operation String name of the task being measured
+    inline void timer_push( std::string operation )
     {
-        timer_ops = timer->time_since_birth();
-        opName    = operation;
+        mTimerOps = mTimer.time_since_birth();
+        mOpName   = operation;
     }
 
-    void timer_pop( int nruns = 1 )
+    /// @brief Stop the timer and store the elapsed duration
+    /// @param nruns Optional argument used to average the measured time
+    void timer_pop( const int nruns = 1 )
     {
-        double locElapsed = timer->time_since_birth() - timer_ops;
+        double locElapsed = mTimer.time_since_birth() - mTimerOps;
         double avgElapsed = 0;
         double maxElapsed = 0;
         MPI_Reduce( &locElapsed, &maxElapsed, 1, MPI_DOUBLE, MPI_MAX, 0, parallel_communicator->comm() );
@@ -180,92 +165,104 @@ struct RuntimeContext
         {
             avgElapsed /= num_procs;
             if( nruns > 1 )
-                std::cout << "[LOG] Time taken to " << opName.c_str() << ", averaged over " << nruns
+                std::cout << "[LOG] Time taken to " << mOpName.c_str() << ", averaged over " << nruns
                           << " runs : max = " << maxElapsed / nruns << ", avg = " << avgElapsed / nruns << "\n";
             else
-                std::cout << "[LOG] Time taken to " << opName.c_str() << " : max = " << maxElapsed
+                std::cout << "[LOG] Time taken to " << mOpName.c_str() << " : max = " << maxElapsed
                           << ", avg = " << avgElapsed << "\n";
 
             last_counter = maxElapsed / nruns;
         }
-        opName.clear();
+        mOpName.clear();
     }
 
-    void load_file() const;
-
+    /// @brief Return the last elapsed time
+    /// @return last_counter from timer_pop was called
     inline double last_elapsed() const
     {
         return last_counter;
     }
 
+    /// @brief Load a MOAB supported file (h5m or nc format) from disk
+    ///        representing an MPAS mesh
+    /// @param load_ghosts Optional boolean to specify whether to load ghosts
+    ///                    when reading the file (only relevant for h5m)
+    /// @return Error code if any (else MB_SUCCESS)
+    moab::ErrorCode load_file( bool load_ghosts = false );
+
+    /// @brief Create scalar and vector tags in the MOAB mesh instance
+    /// @param tagScalar Tag reference to the scalar field
+    /// @param tagVector Tag reference to the vector field
+    /// @param entities Entities on which both the scalar and vector fields are defined
+    /// @return Error code if any (else MB_SUCCESS)
     moab::ErrorCode create_sv_tags( Tag& tagScalar, Tag& tagVector, Range& entities ) const;
 
   private:
     /// @brief Compute the centroids of elements in 2D lat/lon space
-    /// @param ents
-    /// @return centroids (as lat/lon)
-    std::vector< double > compute_centroids( const Range& ents ) const;
+    /// @param entities Entities to compute centroids
+    /// @return Vector of centroids (as lat/lon)
+    std::vector< double > compute_centroids( const Range& entities ) const;
 
-    moab::CpuTimer* timer;
-    double timer_ops{};
-    std::string opName;
+    moab::CpuTimer mTimer;
+    double mTimerOps{ 0.0 };
+    std::string mOpName;
 };
+
+static double evaluate_function( double lon, double lat, int type = 1, double multiplier = 1.0 )
+{
+    switch( type )
+    {
+        case 1:
+            return ( 2.0 + std::pow( sin( 2.0 * lat ), 16.0 ) * cos( 16.0 * lon ) ) * multiplier;
+        default:
+            return ( 2.0 + cos( lon ) * cos( lon ) * cos( 2.0 * lat ) ) * multiplier;
+    }
+}
 
 moab::ErrorCode RuntimeContext::create_sv_tags( Tag& tagScalar, Tag& tagVector, Range& entities ) const
 {
     // Get element (centroid) coordinates so that we can evaluate some arbitrary data
     std::vector< double > entCoords = compute_centroids( entities );  // [entities * [lon, lat]]
 
-    dbgprinti( "> Getting scalar tag handle " << scalar_tagname << "..." );
+    if( proc_id == 0 ) cout << "> Getting scalar tag handle " << scalar_tagname << "..." << endl;
     double defSTagValue = -1.0;
     bool createdTScalar = false;
-    // Create the exchange tag: default name = USERTAG_EXC
+    // Create the scalar exchange tag: default name = "scalar_variable"
     runchk( moab_interface->tag_get_handle( scalar_tagname.c_str(), 1, MB_TYPE_DOUBLE, tagScalar,
                                             MB_TAG_CREAT | MB_TAG_DENSE, &defSTagValue, &createdTScalar ),
             "Retrieving scalar tag handle failed" );
 
-    if( createdTScalar )
+    assert( createdTScalar );
+    // set the data for scalar tag
     {
         std::vector< double > tagValues( entities.size(), -1.0 );
         std::generate( tagValues.begin(), tagValues.end(), [=, &entCoords]() {
             static int index = 0;
-            const int offset = index * 2;
-
-            // double value =
-            //     ( 2.0 + cos( entCoords[offset] ) * cos( entCoords[offset] ) * cos( 2.0 * entCoords[offset + 1] ) );
-            double value =
-                ( 2.0 + std::pow( sin( 2.0 * entCoords[offset + 1] ), 16.0 ) * cos( 16.0 * entCoords[offset] ) );
-
-            index++;
-            return value;
+            const int offset = index++ * 2;
+            return evaluate_function( entCoords[offset], entCoords[offset + 1] );
         } );
         // Set local scalar tag data for exchange
         runchk( moab_interface->tag_set_data( tagScalar, entities, tagValues.data() ),
                 "Setting scalar tag data failed" );
     }
 
-    dbgprinti( "> Getting vector tag handle " << vector_tagname << "..." );
+    if( proc_id == 0 ) cout << "> Getting vector tag handle " << vector_tagname << "..." << endl;
     std::vector< double > defVTagValue( vector_length, -1.0 );
     bool createdTVector = false;
-    // Create the exchange tag: default name = USERTAG_RED
+    // Create the scalar exchange tag: default name = "vector_variable"
     runchk( moab_interface->tag_get_handle( vector_tagname.c_str(), vector_length, MB_TYPE_DOUBLE, tagVector,
                                             MB_TAG_CREAT | MB_TAG_DENSE, defVTagValue.data(), &createdTVector ),
             "Retrieving vector tag handle failed" );
 
-    if( createdTVector )
+    assert( createdTVector );
+    // set the data for vector tag
     {
         const int veclength = vector_length;
         std::vector< double > tagValues( entities.size() * veclength, -1.0 );
         std::generate( tagValues.begin(), tagValues.end(), [=, &entCoords]() {
             static int index = 0;
-            const int offset = ( index / veclength ) * 2;
-
-            double value =
-                ( 2.0 + cos( entCoords[offset] ) * cos( entCoords[offset] ) * cos( 2.0 * entCoords[offset + 1] ) ) *
-                ( index % veclength + 1.0 );  // assign some scalar multiple value for different vector components
-
-            index++;
-            return value;
+            const int offset = ( index++ / veclength ) * 2;
+            return evaluate_function( entCoords[offset], entCoords[offset + 1], 2, ( index % veclength + 1.0 ) );
         } );
         // Set local tag data for exchange
         runchk( moab_interface->tag_set_data( tagVector, entities, tagValues.data() ),
@@ -275,16 +272,18 @@ moab::ErrorCode RuntimeContext::create_sv_tags( Tag& tagScalar, Tag& tagVector, 
     return moab::MB_SUCCESS;
 }
 
-void RuntimeContext::load_file() const
+moab::ErrorCode RuntimeContext::load_file( bool load_ghosts )
 {
     /// Parallel Read options:
-    ///   PARALLEL = type {READ_PART}
-    ///   PARTITION = PARALLEL_PARTITION : Partition as you read
+    ///   PARALLEL = type {READ_PART} : Read on all tasks
+    ///   PARTITION_METHOD = RCBZOLTAN : Use Zoltan partitioner to compute an online partition and redistribute on the fly
+    ///   PARTITION = PARALLEL_PARTITION : Partition as you read based on part information stored in h5m file
     ///   PARALLEL_RESOLVE_SHARED_ENTS : Communicate to all processors to get the shared adjacencies
-    ///   consistently in parallel PARALLEL_GHOSTS : a.b.c
-    ///                   : a = 3 - highest dimension of entities
-    ///                   : b = 0 -
-    ///                   : c = 1 - number of layers
+    ///   consistently in parallel
+    ///   PARALLEL_GHOSTS : a.b.c
+    ///                   : a = 2 - highest dimension of entities (2D in this case)
+    ///                   : b = 1 - dimension of entities to calculate adjacencies (vertex=0, edges=1)
+    ///                   : c = 3 - number of ghost layers needed (3 in this case)
     string read_options        = "DEBUG_IO=0;";
     std::string::size_type idx = input_filename.rfind( '.' );
     std::string extension      = "";
@@ -292,29 +291,34 @@ void RuntimeContext::load_file() const
     {
         extension = input_filename.substr( idx + 1 );
         if( !extension.compare( "nc" ) )
+            // PARTITION_METHOD= [RCBZOLTAN, TRIVIAL]
             read_options += "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;"
-                            "PARALLEL_RESOLVE_SHARED_ENTS;VARIABLE=;";  // NO_EDGES;NO_MIXED_ELEMENTS;RCBZOLTAN, TRIVIAL
+                            "PARALLEL_RESOLVE_SHARED_ENTS;NO_EDGES;NO_MIXED_ELEMENTS;VARIABLE=;";
         else if( !extension.compare( "h5m" ) )
             read_options += "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;"
-                            "PARALLEL_RESOLVE_SHARED_ENTS;";
+                            "PARALLEL_RESOLVE_SHARED_ENTS;" +
+                            ( load_ghosts ? "PARALLEL_GHOSTS=2.1." + std::to_string( ghost_layers ) + ";" : "" );
         else
-            read_options += "PARALLEL=READ_PART;PARTITION_METHOD=TRIVIAL;"
-                            "PARALLEL_RESOLVE_SHARED_ENTS;";
+        {
+            std::cout << "Error unsupported file type (only h5m and nc) for this example: " << input_filename
+                      << std::endl;
+            return moab::MB_UNSUPPORTED_OPERATION;
+        }
     }
 
-    // Load the file from disk with given options
-    runchk0( moab_interface->load_file( input_filename.c_str(), &fileset, read_options.c_str() ),
-             "MOAB::load_file failed" );
+    // Load the file from disk with given read options in parallel
+    return moab_interface->load_file( input_filename.c_str(), &fileset, read_options.c_str() );
 }
 
-std::vector< double > RuntimeContext::compute_centroids( const Range& ents ) const
+std::vector< double > RuntimeContext::compute_centroids( const Range& entities ) const
 {
     double node[3];
-    std::vector< double > eCentroids( ents.size() * 2 );  // [lon, lat]
-    for( size_t ients = 0, offset = 0; ients < ents.size(); ++ients, offset += 2 )
+    std::vector< double > eCentroids( entities.size() * 2 );  // [lon, lat]
+    size_t offset = 0;
+    for( auto entity : entities )
     {
-        const EntityHandle entity = ents[ients];
-        runchk0( moab_interface->get_coords( &entity, 1, node ), "Getting entity coordinates failed" );
+        // Get the element coordinates (centroid) on the real mesh
+        runchk_cont( moab_interface->get_coords( &entity, 1, node ), "Getting entity coordinates failed" );
 
         // scale by magnitude so that mesh is on unit sphere
         double magnitude = std::sqrt( node[0] * node[0] + node[1] * node[1] + node[2] * node[2] );
@@ -326,6 +330,8 @@ std::vector< double > RuntimeContext::compute_centroids( const Range& ents ) con
         eCentroids[offset] = atan2( node[1], node[0] );
         if( eCentroids[offset] < 0.0 ) eCentroids[offset] += 2.0 * M_PI;
         eCentroids[offset + 1] = asin( node[2] );
+
+        offset += 2;  // increment the offset
     }
     return eCentroids;
 }
@@ -360,48 +366,50 @@ int main( int argc, char** argv )
         double elapsed_times[4];
 
         context.timer_push( "Read input file" );
-        // Load the file from disk with given options
-        context.load_file();
+        {
+            // Load the file from disk with given options
+            runchk( context.load_file(), "MOAB::load_file failed for filename: " << context.input_filename );
+        }
         context.timer_pop();
         elapsed_times[0] = context.last_elapsed();
 
-        dbgprint( "- " );
+        dbgprint( "\n- Starting execution -\n" );
 
         context.timer_push( "Setup ghost layers" );
-        // Ensure that all processes understand about multi-shared vertices and entities
-        // in case some adjacent parts are only m layers thick (where m < context.ghost_layers)
-        // runchk( context.parallel_communicator->correct_thin_ghost_layers(), "Thin layer correction failed" );
+        {
+            // Ensure that all processes understand about multi-shared vertices and entities
+            // in case some adjacent parts are only m layers thick (where m < context.ghost_layers)
+            runchk( context.parallel_communicator->correct_thin_ghost_layers(), "Thin layer correction failed" );
 
-        // Exchange ghost cells
-        int ghost_dimension  = context.dimension;
-        int bridge_dimension = context.dimension - 1;
-        // Let us now get all ghost layers from adjacent parts
-        runchk( context.parallel_communicator->exchange_ghost_cells(
-                    ghost_dimension, bridge_dimension, context.ghost_layers, 0, true /* store_remote_handles */,
-                    true /* wait_all */, &context.fileset ),
-                "Exchange ghost cells failed" );  // true to store remote handles
-
-        // Mesh is now loaded and ghost cells are available on each task.
-        // Ensure to augment the ghost cells with essential tag data such as MATERIAL_SET etc if we need them
-        // runchk( context.parallel_communicator->augment_default_sets_with_ghosts( fileset ), "Ghost cell data augment failed");
+            // Exchange ghost cells
+            int ghost_dimension  = context.dimension;
+            int bridge_dimension = context.dimension - 1;
+            // Let us now get all ghost layers from adjacent parts
+            runchk( context.parallel_communicator->exchange_ghost_cells(
+                        ghost_dimension, bridge_dimension, context.ghost_layers, 0, true /* store_remote_handles */,
+                        true /* wait_all */, &context.fileset ),
+                    "Exchange ghost cells failed" );  // true to store remote handles
+        }
         context.timer_pop();
         elapsed_times[1] = context.last_elapsed();
 
         Range dimEnts;
-        // Get all entities of dimension = dim
-        runchk( context.moab_interface->get_entities_by_dimension( context.fileset, context.dimension, dimEnts ),
-                "Getting 2D entities failed" );
-        // Get only owned entities! The ghosted/shared entities will get their data when we exchange
-        runchk( context.parallel_communicator->filter_pstatus( dimEnts, PSTATUS_NOT_OWNED, PSTATUS_NOT ),
-                "Filtering pstatus failed" );
+        {
+            // Get all entities of dimension = dim
+            runchk( context.moab_interface->get_entities_by_dimension( context.fileset, context.dimension, dimEnts ),
+                    "Getting 2D entities failed" );
+            // Get only owned entities! The ghosted/shared entities will get their data when we exchange
+            // So let us filter entities based on the status: NOT x NOT_OWNED = OWNED status :-)
+            runchk( context.parallel_communicator->filter_pstatus( dimEnts, PSTATUS_NOT_OWNED, PSTATUS_NOT ),
+                    "Filtering pstatus failed" );
 
-        // Aggregate the total number of elements in the mesh
-        auto numEntities = dimEnts.size();
-        // dbgprintall( " number of " << context.dimension << "D elements in local mesh = " << numEntities );
-        int numTotalEntities = 0;
-        MPI_Reduce( &numEntities, &numTotalEntities, 1, MPI_INT, MPI_SUM, 0,
-                    context.parallel_communicator->proc_config().proc_comm() );
-        dbgprint( "Total number of " << context.dimension << "D elements in the mesh = " << numTotalEntities );
+            // Aggregate the total number of elements in the mesh
+            auto numEntities     = dimEnts.size();
+            int numTotalEntities = 0;
+            MPI_Reduce( &numEntities, &numTotalEntities, 1, MPI_INT, MPI_SUM, 0,
+                        context.parallel_communicator->proc_config().proc_comm() );
+            dbgprint( "Total number of " << context.dimension << "D elements in the mesh = " << numTotalEntities );
+        }
 
         // Create two tag handles: Exchange and Reduction operations
         Tag tagScalar = nullptr;
@@ -410,12 +418,12 @@ int main( int argc, char** argv )
 
         if( context.debug_output && ( context.proc_id == 0 ) )  // only on root process, for debugging
         {
-            dbgprint( "- Writing to file *before* ghost exchange " );
+            dbgprint( "> Writing to file *before* ghost exchange " );
             runchk( context.moab_interface->write_file( "exchangeHalos_output_rank0_pre.h5m", "H5M", "DEBUG_IO=0;" ),
                     "Writing to disk failed" );
         }
 
-        // Perform exchange tag data
+        // Perform exchange of tag data between neighboring tasks
         dbgprint( "> Exchanging tags between processors " );
         context.timer_push( "Exchange scalar tag data" );
         for( auto irun = 0; irun < context.num_max_exchange; ++irun )
@@ -439,7 +447,7 @@ int main( int argc, char** argv )
 
         if( context.debug_output && ( context.proc_id == 0 ) )  // only on root process, for debugging
         {
-            dbgprint( "- Writing to file *after* ghost exchange " );
+            dbgprint( "> Writing to file *after* ghost exchange " );
             runchk( context.moab_interface->write_file( "exchangeHalos_output_rank0_post.h5m", "H5M", "DEBUG_IO=0;" ),
                     "Writing to disk failed" );
         }
@@ -453,9 +461,9 @@ int main( int argc, char** argv )
                     "File write failed" );
         }
 
-        dbgprint( "> Consolidated: [" << context.num_procs << ", " << context.ghost_layers << ", " << elapsed_times[0]
-                                      << ", " << elapsed_times[1] << ", " << elapsed_times[2] << ", "
-                                      << elapsed_times[3] << "]," );
+        dbgprint( "\n> Consolidated: [" << context.num_procs << ", " << context.ghost_layers << ", " << elapsed_times[0]
+                                        << ", " << elapsed_times[1] << ", " << elapsed_times[2] << ", "
+                                        << elapsed_times[3] << "]," );
 
         dbgprint( "\n********** ExchangeHalos Example DONE! **********" );
     }

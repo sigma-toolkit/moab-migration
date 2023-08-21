@@ -82,7 +82,7 @@ ErrorCode NCHelperMPAS::init_mesh_vals()
     std::map< std::string, ReadNC::VarData >& varInfo = _readNC->varInfo;
 
     ErrorCode rval;
-    unsigned int idx;
+    int idx;
     std::vector< std::string >::iterator vit;
 
     // Get max edges per cell reported in the MPAS file header

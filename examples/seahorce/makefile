@@ -4,7 +4,7 @@ include ../makefile.config
 default: all
 
 MOAB_CXXFLAGS += -Xpreprocessor -fopenmp #-g3 -O0
-MOAB_CXXFLAGS += -g3 -Iinclude/
+MOAB_CXXFLAGS += -g3 -Iinclude
 
 EXAMPLES = RemapMPASROMS FilterElements
 all: RemapMPASROMS
@@ -16,6 +16,14 @@ RemapMPASROMS: RemapMPASROMS.o ${MOAB_LIBDIR}/libMOAB.la
 FilterElements: FilterElements.o ${MOAB_LIBDIR}/libMOAB.la
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
+
+pchip_test: pchip_test.o
+	@echo "[CXXLD]  $@"
+	${VERBOSE}${MOAB_CXX} -o $@ $< 
+
+test_pchip: test_pchip.o
+	@echo "[CXXLD]  $@"
+	${VERBOSE}${MOAB_CXX} -o $@ $< 
 
 define compile-command
 ${VERBOSE}${MOAB_CXX} ${CXXFLAGS} ${MOAB_CXXFLAGS} ${MOAB_CPPFLAGS} ${MOAB_INCLUDES} -DMESH_DIR=\"${MESH_DIR}\" -c $<

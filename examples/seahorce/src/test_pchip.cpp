@@ -3,7 +3,7 @@
  *
  *       Filename:  test_pchip.cpp
  *
- *    Description:  
+ *    Description:
  *
  *        Version:  1.0
  *        Created:  07/17/2023 18:56:49
@@ -107,7 +107,7 @@ int main()
     Vector x = {1.0, 2.0, 3.0, 4.0, 5.0};
     Vector y = {2.0, 1.0, 3.0, 5.0, 4.0};
 
-    double query = 6.0;
+    double query = 1.5;
 
     // Perform PCHIP interpolation with extrapolation based on nearest-neighbor
     double interpolatedValue = pchipInterpolate(x, y, query);

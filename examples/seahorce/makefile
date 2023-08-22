@@ -3,34 +3,27 @@ include ../makefile.config
 
 default: all
 
-EXAMPLES = 
-PAREXAMPLES = 
-#MOAB_CXXFLAGS += -Xpreprocessor -fopenmp #-g3 -O0
-MOAB_CXXFLAGS += -g3
+MOAB_CXXFLAGS += -Xpreprocessor -fopenmp #-g3 -O0
+MOAB_CXXFLAGS += -g3 -Iinclude/
 
-ifeq ("$(MOAB_MPI_ENABLED)","yes")
-ifeq ("$(MOAB_HDF5_ENABLED)","yes")
-PAREXAMPLES += RemapMPASROMS FilterElements
-parallel: ${PAREXAMPLES}
-endif
-else
-parallel:
-endif
-
-ALLEXAMPLES = ${EXAMPLES} ${PAREXAMPLES}
-all: $(ALLEXAMPLES)
+EXAMPLES = RemapMPASROMS FilterElements
+all: RemapMPASROMS
 
 RemapMPASROMS: RemapMPASROMS.o ${MOAB_LIBDIR}/libMOAB.la
 	@echo "[CXXLD]  $@"
-	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK} 
+	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK} -L/opt/homebrew/Cellar/libomp/16.0.6/lib -lomp
 
 FilterElements: FilterElements.o ${MOAB_LIBDIR}/libMOAB.la
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
-#$(EXAMPLES) $(PAREXAMPLES):
-#	@echo "[CXXLD]  $@"
-#	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
+define compile-command
+${VERBOSE}${MOAB_CXX} ${CXXFLAGS} ${MOAB_CXXFLAGS} ${MOAB_CPPFLAGS} ${MOAB_INCLUDES} -DMESH_DIR=\"${MESH_DIR}\" -c $<
+endef
+
+%.o: src/%.cpp
+	@echo "  [CXX]  $<"
+	$(compile-command)
 
 clean: clobber
-	rm -rf ${ALLEXAMPLES}
+	rm -rf ${EXAMPLES}

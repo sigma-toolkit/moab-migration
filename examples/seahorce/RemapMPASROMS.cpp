@@ -242,21 +242,24 @@ int main( int argc, char** argv )
     ///   PARALLEL_COMM = index
     // string read_options = "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;"
     //                       "PARTITION_DISTRIBUTE";  // ;PARALLEL_GHOSTS=3.0.1
-    const double radius     = 1.0;
-    int dimension           = 2;
-    bool ensureMonotonicity = false;
-    bool computeTR          = false;
-    bool computeShepard     = false;
-    bool computeMBA         = false;
-    bool nearestNeighbor    = false;
-    bool threetwooneD       = false;
+    const double radius          = 1.0;
+    int dimension                = 2;
+    bool ensureMonotonicity      = false;
+    bool computeTR               = false;
+    bool computeShepard          = false;
+    bool computeMBA              = false;
+    bool nearestNeighbor         = false;
+    bool threetwooneD            = false;
+    bool normalize               = false;
+    bool use_3dprojection        = false;
+    bool generateExtrusions      = false;
+    bool oneDfirst               = false;
+    std::string strMethod        = "";
+    std::string bathymetryMethod = "bilin";
+    int bathymetryOrder          = 3;
+    int fieldOrder               = 3;
 
-    bool normalize          = false;
-    bool use_3dprojection   = false;
-    bool generateExtrusions = false;
-    std::string strMethod   = "";
-    int bathymetryOrder     = 3;
-    int fieldOrder          = 3;
+    constexpr bool useCAAS = true;
 
     {
         ProgOptions opts;
@@ -280,6 +283,8 @@ int main( int argc, char** argv )
         opts.addOpt< void >( "mono", "Ensure monotonicity in the weight generation (only for TR-FV)",
                              &ensureMonotonicity );
         opts.addOpt< void >( "321D", "Compute three-dimensional projections using a 2Dx1D approach", &threetwooneD );
+        opts.addOpt< void >( "1D2D", "Use 1Dx2D as opposed to 2Dx1D for 321D projection", &oneDfirst );
+        ;
         opts.addOpt< void >(
             "normalize",
             "Re-normalize interpolant to preserve global field integral (only 2D and requires mesh intersection)",
@@ -454,7 +459,7 @@ int main( int argc, char** argv )
 
     // Cull the MPAS set so that we don't have a global mesh
     {
-        const int nring_neighborhood = 2;
+        const int nring_neighborhood = 1;
         // construct a kd-tree index:
         using KdTree = nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PC3D< double > >,
                                                             PC3D< double >, 3 /* dim */
@@ -501,10 +506,11 @@ int main( int argc, char** argv )
                                                << " vertices." );
     }
 
-    if( normalize || computeTR )
+    if( normalize || computeTR || true )
     {
         // call compute 2D map
-        err = ComputeTempestRemapWeights( mbi, context, mpas_covering_set, romsset, strMethod, ensureMonotonicity );MB_CHK_SET_ERR( err, "Canot compute 2D remapping weights" );
+        err = ComputeTempestRemapWeights( mbi, context, mpas_covering_set, romsset, bathymetryMethod,
+                                          ensureMonotonicity );MB_CHK_SET_ERR( err, "Canot compute 2D remapping weights" );
     }
 
     constexpr bool ProjectMPASBathymetryToROMS = true;
@@ -568,7 +574,7 @@ int main( int argc, char** argv )
                 // Project the bottom Bathymetry data from MPAS to ROMS so that we can impose it.
                 err = ComputeFieldProjections( mbi, context, "bottomDepth", "bottomDepth", mpas_elems, roms_elems,
                                                false /*use_3dprojection*/, false /* 2Dx1D */,
-                                               false /* bool normalize */, 2000.0, strMethod, bathymetryOrder );MB_CHK_SET_ERR( err, "Can't create new set" );
+                                               false /* bool normalize */, 2000.0, bathymetryMethod, bathymetryOrder );MB_CHK_SET_ERR( err, "Can't create new set" );
 
                 std::vector< double > zrh_xyz2d( roms_elems.size() );
                 moab::Tag rhtag;
@@ -671,11 +677,12 @@ int main( int argc, char** argv )
         // Project the bottom Bathymetry data from MPAS to ROMS so that we can impose it.
         err = ComputeFieldProjections( mbi, context, "bottomDepth", "bottomDepth", mpas_elems, roms_elems,
                                        false /*use_3dprojection*/, false /* 2Dx1D */, false /* bool normalize */,
-                                       2000.0, strMethod, bathymetryOrder );MB_CHK_SET_ERR( err, "Can't create new set" );
+                                       2000.0, bathymetryMethod, bathymetryOrder );MB_CHK_SET_ERR( err, "Can't create new set" );
     }
 
-    constexpr bool twoDfirst = true;
-    constexpr bool useCAAS   = true;
+    bool twoDfirst = !oneDfirst;
+#define VERTICAL_INTERPOLATION
+
     if( threetwooneD )
     {
 
@@ -701,15 +708,16 @@ int main( int argc, char** argv )
         // get the handle to the weight matrix
         const SparseMatrix< double >& weights = context.weightMap.GetSparseMatrix();
 
+        double defaultvalue = -1.0;
         moab::Tag mpas_soltags_3d[2], roms_soltags_elem[2];
         err = mbi->tag_get_handle( mpas_threed_cum_tagnames[0], mpas_zreflevels, moab::MB_TYPE_DOUBLE,
                                    mpas_soltags_3d[0], moab::MB_TAG_DENSE );MB_CHK_SET_ERR( err, "Can't create salinity tag" );
         err = mbi->tag_get_handle( mpas_threed_cum_tagnames[1], mpas_zreflevels, moab::MB_TYPE_DOUBLE,
                                    mpas_soltags_3d[1], moab::MB_TAG_DENSE );MB_CHK_SET_ERR( err, "Can't create temperature tag" );
         err = mbi->tag_get_handle( roms_threed_tagnames[0], 1, moab::MB_TYPE_DOUBLE, roms_soltags_elem[0],
-                                   moab::MB_TAG_DENSE | moab::MB_TAG_CREAT );MB_CHK_SET_ERR( err, "Can't create salinity tag on ROMS3D" );
+                                   moab::MB_TAG_DENSE | moab::MB_TAG_CREAT, &defaultvalue );MB_CHK_SET_ERR( err, "Can't create salinity tag on ROMS3D" );
         err = mbi->tag_get_handle( roms_threed_tagnames[1], 1, moab::MB_TYPE_DOUBLE, roms_soltags_elem[1],
-                                   moab::MB_TAG_DENSE | moab::MB_TAG_CREAT );MB_CHK_SET_ERR( err, "Can't create temperature tag on ROMS3D" );
+                                   moab::MB_TAG_DENSE | moab::MB_TAG_CREAT, &defaultvalue );MB_CHK_SET_ERR( err, "Can't create temperature tag on ROMS3D" );
 
         std::vector< double > src_salinity_data( mpassize * mpas_zreflevels ),
             src_temperature_data( mpassize * mpas_zreflevels );
@@ -736,10 +744,9 @@ int main( int argc, char** argv )
         zmh_z[0] = zmh_ztmp[0] / 2;
         for( size_t j = 1; j < mpas_zlevels; ++j )
         {
-            zmh_z[j] = zmh_z[j - 1] + ( zmh_ztmp[j] - zmh_ztmp[j - 1] );
+            zmh_z[j] = zmh_ztmp[j - 1] + 0.5 * ( zmh_ztmp[j] - zmh_ztmp[j - 1] );
         }
 
-#define VERTICAL_INTERPOLATION
         if( twoDfirst )
         {
             // First compute the projections in 2D for each MPAS layer.
@@ -778,7 +785,7 @@ int main( int argc, char** argv )
 
                 if( useCAAS )
                     ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap, 1 /*nPin*/,
-                                       dataInDoubleS, dataOutDoubleS, true /*useCAASLocal*/ );
+                                       dataInDoubleS, dataOutDoubleS, false /*useCAASLocal*/ );
 
 #ifndef VERTICAL_INTERPOLATION
                 err = mbi->tag_set_data( roms_soltags_elem[0], roms_slice.data(), roms_slice.size(), dataOutDoubleS );MB_CHK_SET_ERR( err, "Can't set salinity tag data" );
@@ -791,7 +798,7 @@ int main( int argc, char** argv )
 
                 if( useCAAS )
                     ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap, 1 /*nPin*/,
-                                       dataInDoubleT, dataOutDoubleT, true /*useCAASLocal*/ );
+                                       dataInDoubleT, dataOutDoubleT, false /*useCAASLocal*/ );
 
 #ifndef VERTICAL_INTERPOLATION
                 err = mbi->tag_set_data( roms_soltags_elem[1], roms_slice.data(), roms_slice.size(), dataOutDoubleT );MB_CHK_SET_ERR( err, "Can't set temperature tag data" );
@@ -873,8 +880,8 @@ int main( int argc, char** argv )
                     double roms_zlocation                = ( j + 0.5 ) * delz;
                     srctgt_salinity_data[j + offsetr]    = pchipInterpolate( zmh_z, mpasroms_zvalsS, roms_zlocation );
                     srctgt_temperature_data[j + offsetr] = pchipInterpolate( zmh_z, mpasroms_zvalsT, roms_zlocation );
-                    // tgt_salinity_data[i + offset]    = linearInterpolate( zmh_z, roms_zvalsS, roms_zlocation );
-                    // tgt_temperature_data[i + offset] = linearInterpolate( zmh_z, roms_zvalsT, roms_zlocation );
+                    // tgt_salinity_data[i + offset]    = linearInterpolate( zmh_z, mpasroms_zvalsT, roms_zlocation );
+                    // tgt_temperature_data[i + offset] = linearInterpolate( zmh_z, mpasroms_zvalsT, roms_zlocation );
                 }
             }
 #endif
@@ -936,10 +943,12 @@ int main( int argc, char** argv )
             }
         }
 
+#ifdef VERTICAL_INTERPOLATION
         err = mbi->tag_set_data( roms_soltags_elem[0], roms3d_elems.data(), roms3d_elems.size(),
                                  tgt_salinity_data.data() );MB_CHK_SET_ERR( err, "Can't set salinity tag data" );
         err = mbi->tag_set_data( roms_soltags_elem[1], roms3d_elems.data(), roms3d_elems.size(),
                                  tgt_temperature_data.data() );MB_CHK_SET_ERR( err, "Can't set temperature tag data" );
+#endif
     }
     else if( use_3dprojection || computeMBA )
     {
@@ -1459,47 +1468,56 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
     else
     {
         std::vector< mba::point< 3 > > coords( nd );
-#pragma omp parallel for
+#pragma omp parallel for shared( coords )
         for( size_t k = 0; k < nd; k++ )
         {
             const size_t offset = k * 3;
             coords[k]           = mba::point< 3 >{ xyzd[offset], xyzd[offset + 1], xyzd[offset + 2] };
         }
 
+        // construct a kd-tree index:
+        using KdTree = nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PC3D< double > >,
+                                                            PC3D< double >, 3 /* dim */
+                                                            >;
+
+        PC3D< double > cloud_src( xyzd ), cloud_tgt( xyzi );
+        KdTree tree_src( 3 /*dim*/, cloud_src, { 5 /* max leaf */ } );
+        KdTree tree_tgt( 3 /*dim*/, cloud_tgt, { 5 /* max leaf */ } );
+        KdTree::BoundingBox bbox_src, bbox_tgt;
+        tree_src.computeBoundingBox( bbox_src );
+        tree_tgt.computeBoundingBox( bbox_tgt );
+
+        printf( "Found bounding boxes: (%f, %f), (%f, %f), (%f, %f)\n", bbox_src[0].low, bbox_src[0].high,
+                bbox_src[1].low, bbox_src[1].high, bbox_src[2].low, bbox_src[2].high );
+
+        printf( "Found bounding boxes: (%f, %f), (%f, %f), (%f, %f)\n", bbox_tgt[0].low, bbox_tgt[0].high,
+                bbox_tgt[1].low, bbox_tgt[1].high, bbox_tgt[2].low, bbox_tgt[2].high );
+
         int nlevels = 10;
 
         // Bounding box containing the data points.
-        mba::point< 3 > lo = { -1, -1, -1 };
-        mba::point< 3 > hi = { 1, 1, 1 };
+        // mba::point< 3 > lo = { bbox_src[0].low * 0.9, bbox_src[1].low * 1.1, bbox_src[2].low * 1.1 };
+        // mba::point< 3 > hi = { bbox_src[0].high, bbox_src[1].high, bbox_src[2].high };
+        mba::point< 3 > lo = { -1.0, -1.0, -1E5 };
+        mba::point< 3 > hi = { 1.0, 1.0, 1000.0 };
 
         // Initial grid size.
         // const size_t init_grid_size = static_cast< size_t >( std::max( 10.0, std::sqrt( nd ) / 8 ) );
         // mba::index< 3 > grid        = { init_grid_size, init_grid_size, 2 };
-        mba::index< 3 > grid = { 15, 15, 2 };
+        mba::index< 3 > grid = { 13, 13, mpas_zlevels / 2 };
 
-        if( is_threed )
-        {
-            lo[2] = -1e5;
-            hi[2] = 10;
-
-            grid[2] = mpas_zlevels;
-
-            nlevels = 7;
-        }
+        // if( is_threed )
+        // {
+        //     grid[2] = mpas_zlevels;
+        //     nlevels = 3;
+        // }
 
         mba::MBA< 3 >* interp = nullptr;
         if( use_recursive )
         {
             ErrorCode err = ComputeNNInterpolant( xyzd, fd, xyzi, filocal );MB_CHK_ERR( err );
 
-            // construct a kd-tree index:
-            using KdTree = nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PC3D< double > >,
-                                                                PC3D< double >, 3 /* dim */
-                                                                >;
-
-            PC3D< double > cloud( xyzd );
-            KdTree tree( 3 /*dim*/, cloud, { 15 /* max leaf */ } );
-            const auto& tmpTree = tree;
+            const auto& tmpTree = tree_src;
 
             std::function< double( mba::point< 3 > ) > initFn = [&tmpTree, fd]( mba::point< 3 > query_pt ) {
                 size_t srcindx;
@@ -1508,23 +1526,24 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
 
                 // Do a KNN search
                 resultSet.init( &srcindx, &srcdist );
-                printf( "Querying point: %f %f %f\n", query_pt[0], query_pt[1], query_pt[2] );
+                // printf( "Querying point: %f %f %f\n", query_pt[0], query_pt[1], query_pt[2] );
                 tmpTree.findNeighbors( resultSet, query_pt.data() );
 
                 return fd[srcindx];
             };
 
-            interp = new mba::MBA< 3 >( lo, hi, grid, coords, fd, nlevels /*levels*/, 1e-14 /*tolerance*/,
-                                        0.7 /*min_fill*/, initFn );
+            interp = new mba::MBA< 3 >( lo, hi, grid, coords, fd, nlevels /*levels*/, 1e-8 /*tolerance*/,
+                                        0.25 /*min_fill*/, initFn );
         }
         else
         {
-            interp = new mba::MBA< 3 >( lo, hi, grid, coords, fd, nlevels /*levels*/, 1e-14 /*tolerance*/,
-                                        0.7 /*min_fill*/ );
+            interp = new mba::MBA< 3 >( lo, hi, grid, coords, fd, nlevels /*levels*/, 1e-8 /*tolerance*/,
+                                        0.25 /*min_fill*/ );
         }
 
         // Get interpolated value at arbitrary location.
-#pragma omp parallel for
+        std::cout << "\nEvaluating the interpolant now...\n";
+#pragma omp parallel for shared( fi, interp )
         for( size_t k = 0; k < ni; k++ )
         {
             const size_t offset = k * 3;
@@ -1799,7 +1818,8 @@ moab::ErrorCode ComputeFieldProjections( moab::Interface* mbi,
         }
     }
 
-    if( !strMethod.compare( "" ) || !strMethod.compare( "bilin" ) || !strMethod.compare( "delaunay" ) )
+    if( !strMethod.compare( "" ) || !strMethod.compare( "bilin" ) || !strMethod.compare( "intbilin" ) ||
+        !strMethod.compare( "delaunay" ) )
     {
         // get the handle to the weight matrix
         const SparseMatrix< double >& weights = context.weightMap.GetSparseMatrix();

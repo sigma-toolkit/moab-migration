@@ -2,7 +2,7 @@
 #include <vector>
 #include <cmath>
 
-#include "pchip.hpp"
+#include "PCHIP.hpp"
 
 int main()
 {

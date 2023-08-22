@@ -21,10 +21,6 @@ pchip_test: pchip_test.o
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< 
 
-test_pchip: test_pchip.o
-	@echo "[CXXLD]  $@"
-	${VERBOSE}${MOAB_CXX} -o $@ $< 
-
 define compile-command
 ${VERBOSE}${MOAB_CXX} ${CXXFLAGS} ${MOAB_CXXFLAGS} ${MOAB_CPPFLAGS} ${MOAB_INCLUDES} -DMESH_DIR=\"${MESH_DIR}\" -c $<
 endef

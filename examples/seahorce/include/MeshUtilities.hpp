@@ -270,8 +270,12 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( moab::Interface* mb,
     }
 
     for( int ii = 0; ii < nlayers; ii++ )
+    {
         for( size_t j = 0; j < nfaces; j++ )
         {
+            // only add this extruded MPAS element if it is within the accepted layer mask
+            if( is_mpas && ( ii + 1 < minlevelFace[j] || ii + 1 > maxlevelFace[j] ) ) continue;
+
             const EntityHandle polyg = faces[j];
             const EntityType etype   = mb->type_from_handle( polyg );
             const int polyGID        = gidParentFaceData[j];
@@ -328,7 +332,7 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( moab::Interface* mb,
 
             {
                 // only add this extruded MPAS element if it is within the accepted layer mask
-                if( is_mpas && ( ii + 1 < minlevelFace[j] || ii + 1 > maxlevelFace[j] ) ) continue;
+                // if( is_mpas && ( ii + 1 < minlevelFace[j] || ii + 1 > maxlevelFace[j] ) ) continue;
 
                 // create a polygon on each layer
                 if( is_mpas )
@@ -406,6 +410,7 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( moab::Interface* mb,
                 rval = mb->tag_set_data( parentTag, &polyhedron, 1, &polyGID );MB_CHK_ERR( rval );
             }
         }
+    }
 
     // output some information
     {

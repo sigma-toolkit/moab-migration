@@ -47,6 +47,8 @@
 // #include "moab/Remapping/mlinterp.hpp"
 #include "MeshUtilities.hpp"
 
+#define VERTICAL_INTERPOLATION
+
 using namespace moab;
 using namespace std;
 
@@ -105,12 +107,12 @@ int main( int argc, char** argv )
     bool oneDfirst               = false;
     std::string strMethod        = "";
     std::string bathymetryMethod = "bilin";
-    int bathymetryOrder          = 3;
+    int bathymetryOrder          = 1;
     int fieldOrder               = 3;
 
     int src_zlayers = 0, dst_zlayers = 0;
 
-    constexpr bool useCAAS = true;
+    constexpr bool useCAAS = false;
 
     {
         ProgOptions opts;
@@ -531,11 +533,9 @@ int main( int argc, char** argv )
     }
 
     bool twoDfirst = !oneDfirst;
-#define VERTICAL_INTERPOLATION
 
     if( threetwooneD )
     {
-
         // Now let us compute the mba hierarchy for each field
         // err =
         //     ComputeFieldProjections( mbi, context,
@@ -575,9 +575,6 @@ int main( int argc, char** argv )
         err = mbi->tag_get_data( mpas_soltags_3d[0], mpas_elems.data(), mpassize, src_salinity_data.data() );MB_CHK_ERR( err );
         err = mbi->tag_get_data( mpas_soltags_3d[1], mpas_elems.data(), mpassize, src_temperature_data.data() );MB_CHK_ERR( err );
 
-        std::vector< double > tgt_salinity_data( romssize * roms_zlevels ),
-            tgt_temperature_data( romssize * roms_zlevels );
-
         std::vector< double > zmh_ztmp( mpas_zreflevels );
         moab::Tag mztag;
         err =
@@ -590,12 +587,43 @@ int main( int argc, char** argv )
         std::vector< double > zrh_xyz2d( romssize );
         err = mbi->tag_get_data( rhtag, roms_elems.data(), romssize, zrh_xyz2d.data() );MB_CHK_SET_ERR( err, "Can't get bottomDepth tag data" );
 
-        std::vector< double > zmh_z( mpas_zreflevels );
-        zmh_z[0] = zmh_ztmp[0] / 2;
+        std::vector< int > minlevelFace, maxlevelFace;
+        moab::Tag minlvlTag, maxlvlTag;
+        err = mbi->tag_get_handle( "minLevelCell", 1, moab::MB_TYPE_INTEGER, minlvlTag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+        minlevelFace.resize( mpassize );
+        err = mbi->tag_get_data( minlvlTag, mpas_elems.data(), mpassize, minlevelFace.data() );MB_CHK_ERR( err );
+
+        err = mbi->tag_get_handle( "maxLevelCell", 1, moab::MB_TYPE_INTEGER, maxlvlTag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+        maxlevelFace.resize( mpassize );
+        err = mbi->tag_get_data( maxlvlTag, mpas_elems.data(), mpassize, maxlevelFace.data() );MB_CHK_ERR( err );
+
+        std::vector< double > zmh_z( mpas_zreflevels ), zmh_z_rev( mpas_zreflevels );
+        zmh_z_rev[0] = -zmh_ztmp[0] / 2;
+        // double totalz = -zmh_ztmp[0];
+        // printf( "zmh_z_rev[%d] = %f and element z-coord = %f \n", 0, zmh_z_rev[0], -zmh_ztmp[0] );
         for( size_t j = 1; j < mpas_zlevels; ++j )
         {
-            zmh_z[j] = zmh_ztmp[j - 1] + 0.5 * ( zmh_ztmp[j] - zmh_ztmp[j - 1] );
+            zmh_z_rev[j] = -( zmh_ztmp[j - 1] + 0.5 * ( zmh_ztmp[j] - zmh_ztmp[j - 1] ) );
+            // zmh_z[j] = ( totalz - 0.5 * zmh_ztmp[j] );
+            // printf( "zmh_z[%d] = %f and element z-coord = %f \n", j, zmh_z[j], -zmh_ztmp[j] );
         }
+        for( int j = mpas_zlevels - 1; j >= 0; --j )
+        {
+            zmh_z[j] = zmh_z_rev[mpas_zlevels - 1 - j];
+            // printf( "zmh_z_rev[%d] = %f and element z-coord = %f \n", j, zmh_z_rev[mpas_zlevels - 1 - j], zmh_z[j] );
+        }
+
+        // for( size_t j = 0; j < mpas_zlevels; ++j )
+        // {
+        //     double coords[3];
+        //     {
+        //         mbi->get_coords( &mpas3d_elems[j * mpassize], 1, coords );
+        //         printf( "zmh_z[%d] = %f and element z-coord = %f\n", j, zmh_z[j], coords[2] );
+        //     }
+        // }
+
+        std::vector< double > tgt_salinity_data( romssize * roms_zlevels ),
+            tgt_temperature_data( romssize * roms_zlevels );
 
         if( twoDfirst )
         {
@@ -608,26 +636,34 @@ int main( int argc, char** argv )
                 tgtsrc_temperature_data( romssize * mpas_zreflevels );
 
             DataArray1D< double > dataInDoubleS( mpassize ), dataInDoubleT( mpassize );
-            unsigned offsetm = 0, offsetr = 0;
             for( int ii = 0; ii < mpas_zlevels; ii++ )
             {
+                unsigned offsetr = romssize * ii;
+
                 dbgprint( "Computing projection for MPAS level: " << ii );
 
                 DataArray1D< double > dataOutDoubleS( romssize, false ), dataOutDoubleT( romssize, false );
 
-                std::vector< EntityHandle > mpas_slice( mpas3d_elems.begin() + offsetm,
-                                                        mpas3d_elems.begin() + offsetm + mpassize );
+#ifndef VERTICAL_INTERPOLATION
+                // std::vector< EntityHandle > mpas_slice( mpas3d_elems.begin() + offsetm,
+                //                                         mpas3d_elems.begin() + offsetm + mpassize );
                 std::vector< EntityHandle > roms_slice( roms3d_elems.begin() + offsetr,
                                                         roms3d_elems.begin() + offsetr + romssize );
-
+#endif
                 for( size_t j = 0; j < mpassize; ++j )
                 {
                     const size_t offset = j * mpas_zlevels;
-                    dataInDoubleS[j]    = src_salinity_data[ii + offset];
-                    dataInDoubleT[j]    = src_temperature_data[ii + offset];
+                    dataInDoubleS[j]    = ii > maxlevelFace[j] - 1 ? src_salinity_data[maxlevelFace[j] - 1 + offset]
+                                                                   : src_salinity_data[ii + offset];
+                    dataInDoubleT[j]    = ii > maxlevelFace[j] - 1 ? src_temperature_data[maxlevelFace[j] - 1 + offset]
+                                                                   : src_temperature_data[ii + offset];
+                    // if( ii == 0 || ii == mpas_zlevels - 1 )
+                    // {
+                    //     std::cout << "Level " << ii << ": Salinity = " << dataInDoubleS[j]
+                    //               << ", Temperature = " << dataInDoubleT[j] << std::endl;
+                    // }
                 }
 
-                // dataInDoubleS.AttachToData( src_salinity_data.data() + offsetm );
                 dataOutDoubleS.AttachToData( tgtsrc_salinity_data.data() + offsetr );
 
                 // Compute the projection for the salinity field
@@ -640,7 +676,6 @@ int main( int argc, char** argv )
 #ifndef VERTICAL_INTERPOLATION
                 err = mbi->tag_set_data( roms_soltags_elem[0], roms_slice.data(), roms_slice.size(), dataOutDoubleS );MB_CHK_SET_ERR( err, "Can't set salinity tag data" );
 #endif
-                // dataInDoubleT.AttachToData( src_temperature_data.data() + offsetm );
                 dataOutDoubleT.AttachToData( tgtsrc_temperature_data.data() + offsetr );
 
                 // Compute the projection for the temperature field
@@ -659,30 +694,35 @@ int main( int argc, char** argv )
                 // err = ComputeFieldProjections( mbi, context, mpas_threed_tagnames[1], roms_threed_tagnames[1], mpas_slice,
                 //                                roms_slice, false, true /* 2Dx1D */, normalize /* bool normalize */, 5.0,
                 //                                strMethod, fieldOrder );MB_CHK_SET_ERR( err, "Can't project temperature data" );
-
-                offsetm += mpassize;
-                offsetr += romssize;
             }
 
 #ifdef VERTICAL_INTERPOLATION
             // First MPAS z-levels
-
             // Now ROMS
 
             // Now project each data layer in axial direction.
             // NOTE: Embarassingly parallel
-            std::vector< double > roms_zvalsS( mpas_zlevels ), roms_zvalsT( mpas_zlevels );
-
+#pragma omp parallel for shared( zrh_xyz2d, tgtsrc_salinity_data, tgtsrc_temperature_data, tgt_salinity_data, \
+                                     tgt_temperature_data )
             for( size_t i = 0; i < romssize; ++i )
             {
-                const double pbathymetry = zrh_xyz2d[i];
-                const double delz        = pbathymetry / dst_zlayers;
+                std::vector< double > roms_zvalsS( mpas_zlevels ), roms_zvalsT( mpas_zlevels );
+                // unsigned offsetr = romssize * ii;
+                // std::vector< EntityHandle > mpas_slice( mpas3d_elems.begin() + offsetm,
+                //                                         mpas3d_elems.begin() + offsetm + mpassize );
+                // std::vector< EntityHandle > roms_slice( roms3d_elems.begin() + offsetr,
+                //                                         roms3d_elems.begin() + offsetr + romssize );
 
+                const double pbathymetry = zrh_xyz2d[i];
+                const double delz        = -pbathymetry / dst_zlayers;
+                // if (i==0) printf( "--- ROMS delz = %f\n", delz );
+
+                // double coords[3];
                 for( size_t j = 0; j < mpas_zlevels; ++j )
                 {
-                    const size_t offset = j * romssize;
-                    roms_zvalsS[j]      = tgtsrc_salinity_data[i + offset];
-                    roms_zvalsT[j]      = tgtsrc_temperature_data[i + offset];
+                    const size_t offset               = j * romssize;
+                    roms_zvalsS[mpas_zlevels - 1 - j] = tgtsrc_salinity_data[i + offset];
+                    roms_zvalsT[mpas_zlevels - 1 - j] = tgtsrc_temperature_data[i + offset];
                 }
 
                 for( int j = 0; j < dst_zlayers; ++j )
@@ -690,10 +730,10 @@ int main( int argc, char** argv )
                     const size_t offset   = j * romssize;
                     double roms_zlocation = ( j + 0.5 ) * delz;
                     // Project data from zmh_z to zrh_z
-                    // tgt_salinity_data[i + offset]    = pchipInterpolate( zmh_z, roms_zvalsS, roms_zlocation );
-                    // tgt_temperature_data[i + offset] = pchipInterpolate( zmh_z, roms_zvalsT, roms_zlocation );
-                    tgt_salinity_data[i + offset]    = linearInterpolate( zmh_z, roms_zvalsS, roms_zlocation );
-                    tgt_temperature_data[i + offset] = linearInterpolate( zmh_z, roms_zvalsT, roms_zlocation );
+                    tgt_salinity_data[i + offset]    = pchipInterpolate( zmh_z, roms_zvalsS, roms_zlocation );
+                    tgt_temperature_data[i + offset] = pchipInterpolate( zmh_z, roms_zvalsT, roms_zlocation );
+                    // tgt_salinity_data[i + offset]    = linearInterpolate( zmh_z, roms_zvalsS, roms_zlocation );
+                    // tgt_temperature_data[i + offset] = linearInterpolate( zmh_z, roms_zvalsT, roms_zlocation );
                 }
             }
 #endif
@@ -713,25 +753,26 @@ int main( int argc, char** argv )
             for( size_t i = 0; i < mpassize; ++i )
             {
                 const size_t offset = i * mpas_zlevels;
-                for( size_t j = 0; j < mpas_zlevels; ++j )
+                for( int j = 0; j < mpas_zlevels; ++j )
                 {
-                    mpasroms_zvalsS[j] = src_salinity_data[j + offset];
-                    mpasroms_zvalsT[j] = src_temperature_data[j + offset];
-                    // roms_zvalsS[mpas_zlevels - 1 - j] = tgtsrc_salinity_data[i + offset];
-                    // roms_zvalsT[mpas_zlevels - 1 - j] = tgtsrc_temperature_data[i + offset];
+
+                    mpasroms_zvalsS[mpas_zlevels - 1 - j] = j > maxlevelFace[i] - 1
+                                                                ? src_salinity_data[maxlevelFace[i] - 1 + offset]
+                                                                : src_salinity_data[j + offset];
+                    mpasroms_zvalsT[mpas_zlevels - 1 - j] = j > maxlevelFace[i] - 1
+                                                                ? src_temperature_data[maxlevelFace[i] - 1 + offset]
+                                                                : src_temperature_data[j + offset];
                 }
 
                 const size_t offsetr = i * roms_zlevels;
                 for( int j = 0; j < roms_zlevels; ++j )
                 {
                     const double pbathymetry = zrh_xyz2d[i];
-                    const double delz        = pbathymetry / dst_zlayers;
+                    const double delz        = -pbathymetry / dst_zlayers;
 
                     double roms_zlocation                = ( j + 0.5 ) * delz;
-                    // srctgt_salinity_data[j + offsetr]    = pchipInterpolate( zmh_z, mpasroms_zvalsS, roms_zlocation );
-                    // srctgt_temperature_data[j + offsetr] = pchipInterpolate( zmh_z, mpasroms_zvalsT, roms_zlocation );
-                    tgt_salinity_data[i + offsetr]    = linearInterpolate( zmh_z, mpasroms_zvalsT, roms_zlocation );
-                    tgt_temperature_data[i + offsetr] = linearInterpolate( zmh_z, mpasroms_zvalsT, roms_zlocation );
+                    srctgt_salinity_data[j + offsetr]    = pchipInterpolate( zmh_z, mpasroms_zvalsS, roms_zlocation );
+                    srctgt_temperature_data[j + offsetr] = pchipInterpolate( zmh_z, mpasroms_zvalsT, roms_zlocation );
                 }
             }
 #endif
@@ -1006,10 +1047,12 @@ moab::ErrorCode ComputeFieldProjections( moab::Interface* mbi,
     }
     else if( !strMethod.compare( "mba" ) )
     {
-        std::array< size_t, 3 > grid = { 13, 13, mpas_zlevels / 2 };
-        std::array< double, 6 > bbox = { -1.0, -1.0, -1E5, 1.0, 1.0, 10 };
+        constexpr int nlevels        = 7;
+        std::array< size_t, 3 > grid = { 15, 15, mpas_zlevels };
+        std::array< double, 6 > bbox = { -1.0, -1.0, -1E6, 1.0, 1.0, 1000 };
         std::cout << "\nComputing MBA interpolant (order=4, degree=3) for field " << varProjectSrc << std::endl;
-        err = ComputeMBAInterpolant( src_xyz, src_tdata, dst_xyz, dst_tdata, is_three_dimensional, order, grid, bbox );MB_CHK_ERR( err );
+        err = ComputeMBAInterpolant( src_xyz, src_tdata, dst_xyz, dst_tdata, is_three_dimensional, order, grid, bbox,
+                                     nlevels );MB_CHK_ERR( err );
     }
     else if( !strMethod.compare( "shepard" ) )
     {

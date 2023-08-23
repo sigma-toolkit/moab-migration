@@ -27,7 +27,7 @@ int main( int argc, char** argv )
     {
         // User has input a mesh file
         test_file_name = argv[1];
-        dimension = atoi(argv[2]);
+        dimension      = atoi( argv[2] );
     }
 
     // Instantiate & load a mesh from a file

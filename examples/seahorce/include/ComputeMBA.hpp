@@ -12,7 +12,8 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
                                        bool is_threed,
                                        int order,
                                        std::array< size_t, 3 >& grid,
-                                       std::array< double, 6 >& bbox_user )
+                                       std::array< double, 6 >& bbox_user,
+                                       int nlevels = 7 )
 {
     const size_t nd = fd.size();
     const size_t ni = fi.size();
@@ -121,8 +122,6 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
             const size_t offset = k * 3;
             coords[k]           = mba::point< 3 >{ xyzd[offset], xyzd[offset + 1], xyzd[offset + 2] };
         }
-
-        int nlevels = 10;
 
         // construct a kd-tree index:
         PC3D< double > cloud_src( xyzd );

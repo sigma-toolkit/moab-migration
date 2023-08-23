@@ -4,16 +4,18 @@
 typedef std::vector< double > Vector;
 
 // Helper function for finding the index of the nearest neighbor
-int findNearestNeighbor( const Vector& x, double query )
+int findNearestNeighbor( const Vector& x, const Vector& /*y*/, double& query )
 {
     int n          = x.size();
     int idx        = 0;
     double minDist = std::abs( x[0] - query );
+    double dist    = 0.0;
 
     // Naive: linear search
     for( int i = 1; i < n; ++i )
     {
-        double dist = std::abs( x[i] - query );
+        // if( y[i] < 1e-10 ) continue;  // skip nodes with 0.0 values
+        dist = std::abs( x[i] - query );
         if( dist < minDist )
         {
             minDist = dist;
@@ -21,6 +23,7 @@ int findNearestNeighbor( const Vector& x, double query )
         }
     }
 
+    // printf( "Query = %f, Minimum distance: dist = %f, IDX = %d\n", query, dist, idx );
     return idx;
 }
 
@@ -42,7 +45,7 @@ double pchipInterpolate( const Vector& x, const Vector& y, double query )
         return y[n - 1];
 
     // Find the interval containing the query point
-    int idx = findNearestNeighbor( x, query );
+    int idx = findNearestNeighbor( x, y, query );
 
     // Compute slopes for the neighboring points
     // double h0;
@@ -96,7 +99,7 @@ double linearInterpolate( const Vector& x, const Vector& y, double query )
         return y[n - 1];
 
     // Find the interval containing the query point
-    int idx = findNearestNeighbor( x, query );
+    int idx = findNearestNeighbor( x, y, query );
 
     // Compute the interpolation weight
     double t = ( query - x[idx] ) / ( x[idx + 1] - x[idx] );

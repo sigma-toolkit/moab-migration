@@ -7,10 +7,10 @@
 int main()
 {
     // Example usage
-    Vector x = { 1.0, 2.0, 3.0, 4.0, 5.0 };
-    Vector y = { 2.0, 1.0, 3.0, 5.0, 4.0 };
+    Vector x = { 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0 };
+    Vector y = { 2.0, 1.0, 3.0, 5.0, 4.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 
-    double query1 = 2.5, query2 = 7.0;
+    double query1 = 2.5, query2 = 8.0;
 
     // Perform PCHIP interpolation for interior nodes
     double interpolatedValue1 = pchipInterpolate( x, y, query1 );

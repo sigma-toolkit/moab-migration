@@ -389,7 +389,7 @@ ErrCode iMOAB_WriteLocalMesh( iMOAB_AppID pid, iMOAB_String prefix );
  *
  * \note The method should be called after mesh modifications, for example reading a file or creating mesh in memory
  *
- * <B>Operations:</B> Not Collective
+ * <B>Operations:</B> Collective
  *
  * \param[in]  pid (iMOAB_AppID)       The unique pointer to the application ID.
  * \return ErrCode                     The error code indicating success or failure.

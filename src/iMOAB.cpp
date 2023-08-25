@@ -830,6 +830,16 @@ ErrCode iMOAB_UpdateMeshInfo( iMOAB_AppID pid )
         rval = pco->filter_pstatus( data.primary_elems, PSTATUS_GHOST, PSTATUS_NOT, -1, &data.owned_elems );MB_CHK_ERR( rval );
 
         data.ghost_elems = subtract( data.primary_elems, data.owned_elems );
+        // now update global number of primary cells and global number of vertices
+        // determine first number of owned vertices
+        // Get local owned vertices
+        Range verts_owned;
+        rval = pco->filter_pstatus( data.all_verts, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &verts_owned );MB_CHK_ERR( rval );
+        int local[2], global[2];
+        local[0] = verts_owned.size();
+        local[1] = data.owned_elems.size();
+        MPI_Allreduce( local, global, 2, MPI_INT, MPI_SUM, pco->comm() );
+        rval = iMOAB_SetGlobalInfo( pid, &(global[0]), &(global[1]) );MB_CHK_ERR( rval );
     }
     else
     {

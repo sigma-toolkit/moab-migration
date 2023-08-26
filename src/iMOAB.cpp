@@ -2626,6 +2626,11 @@ ErrCode iMOAB_ReceiveMesh( iMOAB_AppID pid, MPI_Comm* join, MPI_Group* sendingGr
     int rank = pco->rank();
     rval     = context.MBI->tag_set_data( part_tag, &local_set, 1, &rank );MB_CHK_ERR( rval );
 
+    // make sure that the GLOBAL_ID is defined as a tag
+    int tagtype = 0; // dense, integer
+    int numco = 1; // size
+    int tagindex; // not used
+    rval = iMOAB_DefineTagStorage( pid, "GLOBAL_ID", &tagtype, &numco, &tagindex);MB_CHK_ERR( rval );
     // populate the mesh with current data info
     rval = iMOAB_UpdateMeshInfo( pid );MB_CHK_ERR( rval );
 

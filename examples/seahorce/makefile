@@ -9,6 +9,7 @@ MOAB_CXXFLAGS += -g3 -Iinclude
 EXAMPLES = RemapMPASROMS FilterElements
 all: RemapMPASROMS
 
+RemapMPASROMS.o: include/*.hpp
 RemapMPASROMS: RemapMPASROMS.o ${MOAB_LIBDIR}/libMOAB.la
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK} -L/opt/homebrew/Cellar/libomp/16.0.6/lib -lomp
@@ -16,10 +17,6 @@ RemapMPASROMS: RemapMPASROMS.o ${MOAB_LIBDIR}/libMOAB.la
 FilterElements: FilterElements.o ${MOAB_LIBDIR}/libMOAB.la
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
-
-pchip_test: pchip_test.o
-	@echo "[CXXLD]  $@"
-	${VERBOSE}${MOAB_CXX} -o $@ $< 
 
 define compile-command
 ${VERBOSE}${MOAB_CXX} ${CXXFLAGS} ${MOAB_CXXFLAGS} ${MOAB_CPPFLAGS} ${MOAB_INCLUDES} -DMESH_DIR=\"${MESH_DIR}\" -c $<

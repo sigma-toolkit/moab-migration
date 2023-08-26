@@ -259,7 +259,7 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( moab::Interface* mb,
         maxlevelFace.resize( nfaces );
         rval = mb->tag_get_data( maxlvlTag, faces, maxlevelFace.data() );MB_CHK_ERR( rval );
 
-        for( auto it = 0; it < nvars; ++it )
+        for( size_t it = 0; it < nvars; ++it )
         {
             rval = mb->tag_get_handle( mpas_threed_cum_tagnames[it], mpas_zreflevels, moab::MB_TYPE_DOUBLE,
                                        mpas_soltags[it], moab::MB_TAG_DENSE );MB_CHK_ERR( rval );
@@ -315,7 +315,7 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( moab::Interface* mb,
                     if( indexEdges[i] < 0 ) MB_CHK_SET_ERR( MB_FAILURE, "did not find edge in range" );
                 }
 
-                for( auto it = 0; it < nvars; ++it )
+                for( size_t it = 0; it < nvars; ++it )
                 {
                     // get the source data from tag
                     rval = mb->tag_get_data( mpas_soltags[it], &polyg, 1, src_data.data() + it * zlayers );MB_CHK_ERR( rval );
@@ -376,7 +376,7 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( moab::Interface* mb,
 
                     rval = mb->tag_set_data( parentTag, polyhedronConn, nnodes + 2, vecents.data() );MB_CHK_ERR( rval );
 
-                    for( auto it = 0; it < nvars; ++it )
+                    for( size_t it = 0; it < nvars; ++it )
                     {
                         // get the source data from tag
                         rval = mb->tag_set_data( mpas_soltags_new[it], &polyhedron, 1,

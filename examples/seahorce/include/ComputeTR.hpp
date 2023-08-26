@@ -12,7 +12,11 @@ struct RemappingContext
     Mesh meshOutput;
     Mesh meshOverlap;
     OfflineMap weightMap;
+
+    double mpas_zref_heights[mpas_zreflevels];
 };
+
+const char* template_map_output_filename = "mpas_roms_map_";
 
 moab::ErrorCode CloneToTRMesh( moab::Interface* m_interface, Mesh& mesh, moab::EntityHandle mesh_set )
 {
@@ -93,6 +97,31 @@ moab::ErrorCode CloneToTRMesh( moab::Interface* m_interface, Mesh& mesh, moab::E
     return MB_SUCCESS;
 }
 
+moab::ErrorCode LoadTempestRemapWeights( moab::Interface* mbi,
+                                          RemappingContext& context,
+                                          moab::EntityHandle src_set,
+                                          moab::EntityHandle tgt_set,
+                                          std::string strMethod )
+{
+    CloneToTRMesh( mbi, context.meshInput, src_set );
+    CloneToTRMesh( mbi, context.meshOutput, tgt_set );
+
+    context.meshInput.ConstructEdgeMap();
+    context.meshOutput.ConstructEdgeMap();
+
+    // load the 2D intersection mesh from disk
+    // context.meshOverlap = Mesh( "mesh_intersection.g" );
+
+    // next read the map file
+    NcError ncerror( NcError::silent_nonfatal );
+    std::string map_output_filename =
+        std::string( template_map_output_filename ) + ( strMethod.size() ? strMethod : "fv" ) + ".nc";
+    std::cout << "Reading TempestRemap map file: " << map_output_filename << "\n";
+    context.weightMap.Read( map_output_filename );
+
+    return moab::MB_SUCCESS;
+}
+
 moab::ErrorCode ComputeTempestRemapWeights( moab::Interface* mbi,
                                             RemappingContext& context,
                                             moab::EntityHandle src_set,
@@ -123,7 +152,8 @@ moab::ErrorCode ComputeTempestRemapWeights( moab::Interface* mbi,
     dbgprint( "\nSetup computation of weights" );
     // Call to generate the remapping weights with the tempest meshes
 
-    const std::string output_filename = "output_mpas_roms_map2d.nc";
+    std::string map_output_filename =
+        std::string( template_map_output_filename ) + ( strMethod.size() ? strMethod : "fv" ) + ".nc";
     GenerateOfflineMapAlgorithmOptions mapOptions;
     mapOptions.nPin             = 1;
     mapOptions.nPout            = 1;
@@ -133,7 +163,7 @@ moab::ErrorCode ComputeTempestRemapWeights( moab::Interface* mbi,
     mapOptions.fMonotone        = ensureMonotonicity;
     mapOptions.fNoCorrectAreas  = false;
     mapOptions.fNoCheck         = true;
-    mapOptions.strOutputMapFile = output_filename;  // ask TR to write it out
+    mapOptions.strOutputMapFile = map_output_filename;  // ask TR to write it out
     mapOptions.strOutputFormat  = "Netcdf4";
 
     dbgprint( "Compute weights with TempestRemap" );
@@ -155,16 +185,17 @@ moab::ErrorCode ComputeTempestRemapWeights( moab::Interface* mbi,
     // Write the map to disk
 #ifdef WRITE_MAP_FILE
     {
+        // First write out the overlap mesh to disk
+        context.meshOverlap.Write( "mesh_intersection.g" );
+
+        // Next prepare set of attributes to add to the map NC file
         typedef std::map< std::string, std::string > AttributeMap;
         typedef AttributeMap::value_type AttributePair;
 
         AttributeMap mapAttributes;
-
-        mapAttributes.insert( AttributePair( "domain_a", mpas_filename ) );
-        mapAttributes.insert( AttributePair( "domain_b", roms_filename ) );
-        mapAttributes.insert( AttributePair( "grid_file_src", mpas_filename ) );
-        mapAttributes.insert( AttributePair( "grid_file_dst", roms_filename ) );
-        mapAttributes.insert( AttributePair( "grid_file_ovr", "mesh_intersection.h5m" ) );
+        mapAttributes.insert( AttributePair( "grid_file_src", "mpas_grid.h5m" ) );
+        mapAttributes.insert( AttributePair( "grid_file_dst", "roms_grid.h5m" ) );
+        mapAttributes.insert( AttributePair( "grid_file_ovr", "mesh_intersection.g" ) );
         mapAttributes.insert(
             AttributePair( "concave_src", ( mapOptions.fSourceConcave ) ? ( "true" ) : ( "false" ) ) );
         mapAttributes.insert(
@@ -189,7 +220,7 @@ moab::ErrorCode ComputeTempestRemapWeights( moab::Interface* mbi,
         mapAttributes.insert( AttributePair( "method", mapOptions.strMethod ) );
         mapAttributes.insert( AttributePair( "version", "RemapMPASROMS v0.1" ) );
 
-        dbgprint( "\nWrite the weights to " << output_filename );
+        dbgprint( "\nWrite the weights to " << map_output_filename );
         context.weightMap.Write( mapOptions.strOutputMapFile, mapAttributes, NcFile::Netcdf4Classic );
 
         // // Write the map file to disk in parallel using either HDF5 or SCRIP interface

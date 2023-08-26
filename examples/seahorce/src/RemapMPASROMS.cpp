@@ -43,8 +43,8 @@
 #include "RemapMPASROMS.hpp"
 #include "ComputeNN.hpp"
 #include "ComputeShepard.hpp"
-#include "PCHIP.hpp"
-#include "spline.h"
+// #include "spline.h"
+#include "HermiteCubicCurve.hpp"
 #include "ComputeTR.hpp"
 #include "ComputeMBA.hpp"
 #include "moab/Remapping/mlinterp.hpp"
@@ -768,7 +768,7 @@ int main( int argc, char** argv )
 
             // Now project each data layer in axial direction.
             // NOTE: Embarassingly parallel
-#pragma omp parallel for shared( zrh_xyz2d, tgtsrc_salinity_data, tgtsrc_temperature_data, tgt_salinity_data, \
+#pragma omp parallel for shared( zrh_xyz3d, tgtsrc_salinity_data, tgtsrc_temperature_data, tgt_salinity_data, \
                                      tgt_temperature_data )
             for( size_t i = 0; i < romssize; ++i )
             {
@@ -787,8 +787,17 @@ int main( int argc, char** argv )
                 }
 
 #ifndef VERTICAL_INTERPOLANT_LINEAR
-                tk::spline splS( zmh_z, roms_zvalsS, tk::spline::cspline_hermite, true );
-                tk::spline splT( zmh_z, roms_zvalsT, tk::spline::cspline_hermite, true );
+                // tk::spline splS( zmh_z, roms_zvalsS, tk::spline::cspline_hermite, true );
+                // tk::spline splT( zmh_z, roms_zvalsT, tk::spline::cspline_hermite, true );
+                HermiteCubicCurve< double > splHC_S;
+                HermiteCubicCurve< double > splHC_T;
+                for( int imzl = 0; imzl < mpas_zlevels; imzl++ )
+                {
+                    splHC_S.add( zmh_z[imzl], roms_zvalsS[imzl] );
+                    splHC_T.add( zmh_z[imzl], roms_zvalsT[imzl] );
+                }
+                splHC_S.finish();
+                splHC_T.finish();
 #endif
 
                 double roms_ztotal = 0.0;
@@ -810,14 +819,12 @@ int main( int argc, char** argv )
                                       zmh_z.data(), &roms_zlocation                           // Input axis (x)
                     );
 #else
-                    tgt_salinity_data[i + offset]    = splS( roms_zlocation );
-                    tgt_temperature_data[i + offset] = splT( roms_zlocation );
+                    // tgt_salinity_data[i + offset]           = splS( roms_zlocation );
+                    // tgt_temperature_data[i + offset]        = splT( roms_zlocation );
+                    tgt_salinity_data[i + offset]           = splHC_S.at( roms_zlocation );
+                    tgt_temperature_data[i + offset]        = splHC_T.at( roms_zlocation );
 #endif
 
-                    // tgt_salinity_data[i + offset]    = pchipInterpolate( zmh_z, roms_zvalsS, roms_zlocation );
-                    // tgt_temperature_data[i + offset] = pchipInterpolate( zmh_z, roms_zvalsT, roms_zlocation );
-                    // tgt_salinity_data[i + offset]    = linearInterpolate( zmh_z, roms_zvalsS, roms_zlocation );
-                    // tgt_temperature_data[i + offset] = linearInterpolate( zmh_z, roms_zvalsT, roms_zlocation );
                     if( tgt_salinity_data[i + offset] < 34.86 || tgt_salinity_data[i + offset] > 35.32 )
                     {
                         printf( "---(%zu, %d) ROMS z = %f, offset = %d, value = %f, zmh_z: [%f, %f]\n", i, irzl,
@@ -836,22 +843,16 @@ int main( int argc, char** argv )
 #ifdef VERTICAL_INTERPOLATION
             // Now project each data layer in axial direction.
             // NOTE: Embarassingly parallel
-            std::vector< double > mpasroms_zvalsS( mpas_zlevels ),
-                mpasroms_zvalsT( mpas_zlevels );  // Data on MPAS 2D but ROMS 1D vertical
 
+#pragma omp parallel for shared( zrh_xyz3d, src_salinity_data, src_temperature_data, tgt_salinity_data, \
+                                     tgt_temperature_data, srctgt_salinity_data, srctgt_temperature_data )
             for( size_t i = 0; i < mpassize; ++i )
             {
+                std::vector< double > mpasroms_zvalsS( mpas_zlevels ),
+                    mpasroms_zvalsT( mpas_zlevels );  // Data on MPAS 2D but ROMS 1D vertical
                 const size_t offset = i * mpas_zlevels;
                 for( int imzl = 0; imzl < mpas_zlevels; ++imzl )
                 {
-
-                    // mpasroms_zvalsS[mpas_zlevels - 1 - imzl] = imzl + 1 > maxlevelFace[i]
-                    //                                             ? src_salinity_data[maxlevelFace[i] - 1 + offset]
-                    //                                             : src_salinity_data[imzl + offset];
-                    // mpasroms_zvalsT[mpas_zlevels - 1 - imzl] = imzl + 1 > maxlevelFace[i]
-                    //                                             ? src_temperature_data[maxlevelFace[i] - 1 + offset]
-                    //                                             : src_temperature_data[imzl + offset];
-
                     mpasroms_zvalsS[imzl] = imzl + 1 > maxlevelFace[i]
                                                                 ? src_salinity_data[maxlevelFace[i] - 1 + offset]
                                                                 : src_salinity_data[imzl + offset];
@@ -861,8 +862,17 @@ int main( int argc, char** argv )
                 }
 
 #ifndef VERTICAL_INTERPOLANT_LINEAR
-                tk::spline splS( zmh_z, mpasroms_zvalsS, tk::spline::cspline_hermite, true );
-                tk::spline splT( zmh_z, mpasroms_zvalsT, tk::spline::cspline_hermite, true );
+                // tk::spline splS( zmh_z, mpasroms_zvalsS, tk::spline::cspline_hermite, true );
+                // tk::spline splT( zmh_z, mpasroms_zvalsT, tk::spline::cspline_hermite, true );
+                HermiteCubicCurve< double > splHC_S;
+                HermiteCubicCurve< double > splHC_T;
+                for( int imzl = 0; imzl < mpas_zlevels; imzl++ )
+                {
+                    splHC_S.add( zmh_z[imzl], mpasroms_zvalsS[imzl] );
+                    splHC_T.add( zmh_z[imzl], mpasroms_zvalsT[imzl] );
+                }
+                splHC_S.finish();
+                splHC_T.finish();
 #endif
 
                 const size_t offsetr = i * roms_zlevels;
@@ -886,8 +896,10 @@ int main( int argc, char** argv )
                                       zmh_z.data(), &roms_zlocation                           // Input axis (x)
                     );
 #else
-                    srctgt_salinity_data[irzl + offsetr]    = splS( roms_zlocation );
-                    srctgt_temperature_data[irzl + offsetr] = splT( roms_zlocation );
+                    // srctgt_salinity_data[irzl + offsetr]    = splS( roms_zlocation );
+                    // srctgt_temperature_data[irzl + offsetr] = splT( roms_zlocation );
+                    srctgt_salinity_data[irzl + offsetr]    = splHC_S.at( roms_zlocation );
+                    srctgt_temperature_data[irzl + offsetr] = splHC_T.at( roms_zlocation );
 #endif
                     // srctgt_salinity_data[irzl + offsetr]    = pchipInterpolate( zmh_z, mpasroms_zvalsS, roms_zlocation );
                     // srctgt_temperature_data[irzl + offsetr] = pchipInterpolate( zmh_z, mpasroms_zvalsT, roms_zlocation );

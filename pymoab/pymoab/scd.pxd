@@ -1,3 +1,4 @@
+#cython: language_level=3
 """MOAB Structured Mesh Interface"""
 
 from pymoab cimport moab

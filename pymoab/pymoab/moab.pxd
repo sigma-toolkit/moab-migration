@@ -1,3 +1,4 @@
+#cython: language_level=3
 """Header file for MOAB"""
 from libcpp cimport bool
 from libcpp.vector cimport vector
@@ -298,10 +299,6 @@ cdef extern from "moab/Core.hpp" namespace "moab":
                              const double* coords)
         ErrorCode get_entities_by_type(const EntityHandle meshset,
                                        const EntityType typ,
-                                       vector[EntityHandle]& entities,
-                                       const bool recursive)
-        ErrorCode get_entities_by_type(const EntityHandle meshset,
-                                       const EntityType typ,
                                        Range& entities,
                                        const bool recursive)
         ErrorCode get_entities_by_type_and_tag(const EntityHandle meshset,
@@ -315,16 +312,9 @@ cdef extern from "moab/Core.hpp" namespace "moab":
         ErrorCode get_entities_by_handle(const EntityHandle meshset,
                                          Range& entities,
                                          const bool recursive)
-        ErrorCode get_entities_by_handle(const EntityHandle meshset,
-                                         vector[EntityHandle]& entities,
-                                         const bool recursive)
         ErrorCode get_entities_by_dimension(const EntityHandle meshset,
                                             const int dimension,
                                             Range& entities,
-                                            const bool recursive)
-        ErrorCode get_entities_by_dimension(const EntityHandle meshset,
-                                            const int dimension,
-                                            vector[EntityHandle] entities,
                                             const bool recursive)
         ErrorCode remove_entities(EntityHandle meshset,
                                   const EntityHandle* entities,

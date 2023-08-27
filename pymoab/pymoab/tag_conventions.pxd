@@ -1,4 +1,4 @@
-
+#cython: language_level=3
 from libcpp.string cimport string as std_string
 
 
@@ -16,4 +16,3 @@ cdef extern from "MBTagConventions.hpp":
     cdef int        CATEGORY_TAG_SIZE
     cdef std_string NAME_TAG_NAME
     cdef int        NAME_TAG_SIZE
-

@@ -76,6 +76,8 @@ def test_write_tags():
     mb = core.Core()
     vs = mb.create_vertices(np.ones(3))
 
+    global_id_tag = mb.tag_get_handle("GLOBAL_ID")
+
     # create writing tag
     write_tag = mb.tag_get_handle("WRITE",
                                   3,

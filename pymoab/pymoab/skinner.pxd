@@ -1,3 +1,4 @@
+#cython: language_level=3
 """Implements the skinner functionality to find the geometric skin entities."""
 
 from pymoab cimport moab

@@ -208,13 +208,13 @@ AC_SUBST(enable_cxx_optimize)
 EXTRA_PGI_ONLY_FCFLAGS="-Mfree"
 if (test "x$enable_debug" != "xno"); then # debug flags
 # GNU
-EXTRA_GNU_CXXFLAGS="-Wall -Wno-long-long -pipe -pedantic -Wshadow -Wno-unused-parameter -Wpointer-arith -Wformat -Wformat-security -Wextra -Wno-variadic-macros -Wno-unknown-pragmas"
-EXTRA_GNU_FCFLAGS="-pipe -pedantic -ffree-line-length-0"
+EXTRA_GNU_CXXFLAGS="-Wall -Wno-long-long -pedantic -Wshadow -Wno-unused-parameter -Wpointer-arith -Wformat -Wformat-security -Wextra -Wno-variadic-macros -Wno-unknown-pragmas"
+EXTRA_GNU_FCFLAGS="-pedantic"
 # CLANG
 EXTRA_CLANG_CXXFLAGS="$EXTRA_GNU_CXXFLAGS"
 EXTRA_CLANG_FCFLAGS="$EXTRA_GNU_FCFLAGS"
 # Intel
-EXTRA_INTEL_CXXFLAGS="-pipe -C"
+EXTRA_INTEL_CXXFLAGS="-C"
 EXTRA_INTEL_FCFLAGS="-C"
 # PGI
 EXTRA_PGI_CXXFLAGS="--diag_suppress 236 --diag_suppress=unrecognized_gcc_pragma -C"
@@ -243,10 +243,10 @@ EXTRA_BG_FCFLAGS="$EXTRA_BG_FCFLAGS -qarch=qp -qtune=auto -qpic=large -qenablevm
 fi
 
 # this is just a test comment
-if test "xno" != "x$CHECK_CC"; then
+if (test "xno" != "x$CHECK_CC"); then
   FATHOM_CC_FLAGS
 fi
-if test "xno" != "x$CHECK_CXX"; then
+if (test "xno" != "x$CHECK_CXX"); then
   FATHOM_CXX_FLAGS
 fi
 
@@ -285,9 +285,9 @@ if test "xyes" = "x$enable_debug"; then
     CXXFLAGS="$CXXFLAGS -fstack-protector-all"
     CFLAGS="$CFLAGS -fstack-protector-all"
     LDFLAGS="$LDFLAGS -fstack-protector-all"
-    if (test "x$CHECK_FC" != "xno"); then
-      FCFLAGS="$FCFLAGS -fstack-protector-all"
-      FFLAGS="$FFLAGS -fstack-protector-all"
+    if (test "x$CHECK_FC" != "xno" && test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
+      FCFLAGS="$FCFLAGS -fstack-protector-all" 
+      FFLAGS="$FFLAGS -fstack-protector-all" 
     fi
   fi
   DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --enable-debug=yes"
@@ -387,6 +387,21 @@ if (test "x$ENABLE_FORTRAN" != "xno" && test "x$CHECK_FC" != "xno"); then
   AC_FC_MAIN
   FAC_FC_WRAPPERS
 
+  # Check crayftn system: e.g., Frontier or Perlmutter?
+  if (test "x$PE_ENV" = "xCRAY"); then
+    FCFLAGS="$FCFLAGS -f free -em"
+    FFLAGS="$FFLAGS -f free"
+  elif (test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
+    FCFLAGS="$FCFLAGS -ffree-line-length-0"
+    FFLAGS="$FFLAGS -ffree-line-length-0"
+  fi
+  PAC_FC_MODULE_EXT()
+  #if (test "$FCMODEXT" = "unknown"); then
+  #  echo "Did not find Fortran module extensions. Default := mod, lower case"
+  #else
+  #  echo "Found extension type for Fortran modules := $FCMODEXT, $FCMODCASE"
+  #fi
+
   # check how to link against C++ runtime for fortran programs correctly
   fcxxlinkage=no
 
@@ -462,6 +477,17 @@ if (test "x$ENABLE_FORTRAN" != "xno" && test "x$CHECK_FC" != "xno"); then
       fi
     fi
 
+    # Need this check to build on summit/frontier OLCF
+    my_save_fcflags="$FCFLAGS"
+    FCFLAGS="$FCFLAGS -WF,-C!"
+      AC_MSG_CHECKING([whether $FC supports -WF,-C!])
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
+          [AC_MSG_RESULT([yes])]
+          [FFLAGS="$FFLAGS -WF,-C!"],
+          [AC_MSG_RESULT([no])
+          FCFLAGS=$my_save_fcflags]
+      )
+
   fi
   AC_LANG_POP([Fortran])
 
@@ -473,6 +499,8 @@ fi
 
 AC_SUBST(FLIBS)
 AC_SUBST(FCLIBS)
+
+AM_CONDITIONAL( HAVE_LCASE_FCMOD, [ test "x$FCMODCASE" != "xupper" ] )
 
 ]) # FATHOM_COMPILER_FLAGS
 
@@ -883,34 +911,44 @@ case "$cc_compiler:$host_cpu" in
     FATHOM_CC_32BIT=-m32
     FATHOM_CC_64BIT=-m64
     FATHOM_CC_SPECIAL="$EXTRA_GNU_ONLY_CXXFLAGS"
-    FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
-    FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    if (test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
+      FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
+      FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    fi
     ;;
   GNU:powerpc*)
     FATHOM_CC_32BIT=-m32
     FATHOM_CC_64BIT=-m64
     FATHOM_CC_SPECIAL="$EXTRA_GNU_ONLY_CXXFLAGS"
-    FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
-    FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    if (test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
+      FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
+      FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    fi
     ;;
   GNU:i?86|GNU:x86_64)
     FATHOM_CC_32BIT=-m32
     FATHOM_CC_64BIT=-m64
     FATHOM_CC_SPECIAL="$EXTRA_GNU_ONLY_CXXFLAGS"
-    FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
-    FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    if (test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
+      FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
+      FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    fi
     ;;
   GNU:mips*)
     FATHOM_CC_32BIT="-mips32 -mabi=32"
     FATHOM_CC_64BIT="-mips64 -mabi=64"
     FATHOM_CC_SPECIAL="$EXTRA_GNU_ONLY_CXXFLAGS"
-    FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
-    FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    if (test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
+      FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
+      FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    fi
     ;;
   GNU:*)
     FATHOM_CC_SPECIAL="$EXTRA_GNU_ONLY_CXXFLAGS"
-    FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
-    FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    if (test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
+      FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
+      FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    fi
     ;;
   Intel:*)
     FATHOM_CC_32BIT=-m32
@@ -971,8 +1009,10 @@ case "$cc_compiler:$host_cpu" in
     ;;
   Clang:*)
     FATHOM_CC_SPECIAL="$EXTRA_CLANG_CXXFLAGS"
-    FATHOM_FC_SPECIAL="$EXTRA_CLANG_FCFLAGS"
-    FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    if (test "x$ac_cv_f77_compiler_gnu" = "xyes"); then
+      FATHOM_FC_SPECIAL="$EXTRA_CLANG_FCFLAGS"
+      FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
+    fi
     FATHOM_CC_32BIT=-m32
     FATHOM_CC_64BIT=-m64
     ;;
@@ -1100,3 +1140,119 @@ else
     ifelse([$2],[],[:],[$2])
 fi
 ])
+dnl
+dnl
+dnl ------------------------------------------------------------------------
+dnl Special characteristics that have no autoconf counterpart but that
+dnl we need as part of the Fortran 90 support.  To distinquish these, they
+dnl have a [PAC] prefix.
+dnl 
+dnl At least one version of the Cray compiler needs the option -em to
+dnl generate a separate module file, rather than including the module
+dnl information in the object (.o) file.
+dnl
+dnl
+dnl PAC_FC_MODULE_EXT(action if found,action if not found)
+dnl
+AC_DEFUN([PAC_FC_MODULE_EXT],
+[AC_CACHE_CHECK([for Fortran 90 module extension],
+pac_cv_fc_module_ext,[
+pac_cv_fc_module_case="unknown"
+AC_LANG_PUSH(Fortran)
+AC_COMPILE_IFELSE([
+    AC_LANG_SOURCE([
+        module conftest
+        integer n
+        parameter (n=1)
+        end module conftest
+    ])
+],[
+    # Look for module name
+    # First, try to find known names.  This avoids confusion caused by
+    # additional files (like <name>.stb created by some versions of pgf90)
+    # Early versions of the Intel compiler used d as the module extension;
+    # we include that just to finish the test as early as possible.
+    for name in conftest CONFTEST ; do
+        for ext in mod MOD d ; do
+            if test -s $name.$ext ; then
+                if test $name = conftest ; then
+                    pac_cv_fc_module_case=lower
+                else
+                    pac_cv_fc_module_case=upper
+                fi
+                pac_cv_fc_module_ext=$ext
+                pac_MOD=$ext
+                break
+            fi
+        done
+        if test -n "$pac_cv_fc_module_ext" ; then break ; fi
+    done
+    if test -z "$pac_MOD" ; then
+        # The test on .err is needed for Cray Fortran.
+        pac_MOD=`ls conftest.* 2>&1 | grep -v conftest.${ac_fc_srcext} | grep -v conftest.o | grep -v conftest.err`
+        pac_MOD=`echo $pac_MOD | sed -e 's/conftest\.//g'`
+        pac_cv_fc_module_case="lower"
+        if test "X$pac_MOD" = "X" ; then
+            pac_MOD=`ls CONFTEST* 2>&1 | grep -v CONFTEST.${ac_fc_srcext} | grep -v CONFTEST.o | grep -v CONFTEST.err`
+            pac_MOD=`echo $pac_MOD | sed -e 's/CONFTEST\.//g'`
+            if test -n "$pac_MOD" -a -s "CONFTEST.$pac_MOD" ; then
+                pac_cv_fc_module_case="upper"
+            else
+                # Clear because we must have gotten an error message
+                pac_MOD=""
+            fi
+        fi
+        if test -z "$pac_MOD" ; then 
+            pac_cv_fc_module_ext="unknown"
+        else
+            pac_cv_fc_module_ext=$pac_MOD
+        fi
+    fi
+],[
+    pac_cv_fc_module_ext="unknown"
+])
+
+if test "$pac_cv_fc_module_ext" = "unknown" ; then
+    # Try again, but with an -em option.  Abbreviated, because we're
+    # just looking for the Cray option
+    saveFCFLAGS=$FCFLAGS
+    FCFLAGS="$FCFLAGS -em"
+    AC_COMPILE_IFELSE([
+    AC_LANG_SOURCE([
+        module conftest
+        integer n
+        parameter (n=1)
+        end module conftest
+    ])
+],[
+    if test -s conftest.mod ; then
+        pac_cv_fc_module_ext="mod"
+        pac_cv_fc_module_case="lower"
+    elif test -s CONFTEST.mod ; then
+        pac_cv_fc_module_ext="mod"
+        pac_cv_fc_module_case="upper"
+    fi
+],[
+    :
+    # do nothing - already have the unknown default value
+])
+    if test "$pac_cv_fc_module_ext" = "unknown" ; then
+        # The additional command line option did not help - restore
+        # the original flags.
+        FCFLAGS=$saveFCFLAGS
+    fi
+fi
+AC_LANG_POP(Fortran)
+])
+#
+AC_SUBST(FCMODEXT)
+AC_SUBST(FCMODCASE)
+if test "$pac_cv_fc_module_ext" = "unknown" ; then
+    ifelse($2,,:,[$2])
+else
+    ifelse($1,,FCMODEXT=$pac_MOD;FCMODCASE=$pac_cv_fc_module_case,[$1])
+fi
+])
+dnl
+dnl
+

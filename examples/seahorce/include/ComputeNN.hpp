@@ -1,5 +1,5 @@
-#ifndef __pc3d_hpp__
-#define __pc3d_hpp__
+#ifndef __computeNN_hpp__
+#define __computeNN_hpp__
 
 #include "RemapMPASROMS.hpp"
 #include "moab/nanoflann.hpp"
@@ -91,4 +91,4 @@ moab::ErrorCode ComputeNNInterpolant( const std::vector< double >& src_xyz,
     return moab::MB_SUCCESS;
 }
 
-#endif  // __pc3d_hpp__
+#endif  // __computeNN_hpp__

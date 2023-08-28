@@ -116,7 +116,7 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
     else
     {
         std::vector< mba::point< 3 > > coords( nd );
-#pragma omp parallel for shared( coords )
+#pragma omp parallel for shared( coords, xyzd )
         for( size_t k = 0; k < nd; k++ )
         {
             const size_t offset = k * 3;
@@ -124,10 +124,10 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
         }
 
         // construct a kd-tree index:
-        PC3D< double > cloud_src( xyzd );
-        KdTree tree_src( 3 /*dim*/, cloud_src, { 5 /* max leaf */ } );
         if( false )
         {
+            PC3D< double > cloud_src( xyzd );
+            KdTree tree_src( 3 /*dim*/, cloud_src, { 5 /* max leaf */ } );
             // construct a kd-tree index:
             PC3D< double > cloud_tgt( xyzi );
             KdTree tree_tgt( 3 /*dim*/, cloud_tgt, { 5 /* max leaf */ } );
@@ -151,6 +151,8 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
         {
             moab::ErrorCode err = ComputeNNInterpolant( xyzd, fd, xyzi, filocal );MB_CHK_ERR( err );
 
+            PC3D< double > cloud_src( xyzd );
+            KdTree tree_src( 3 /*dim*/, cloud_src, { 5 /* max leaf */ } );
             const auto& tmpTree = tree_src;
 
             std::function< double( mba::point< 3 > ) > initFn = [&tmpTree, fd]( mba::point< 3 > query_pt ) {
@@ -166,18 +168,18 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
                 return fd[srcindx];
             };
 
-            interp = new mba::MBA< 3 >( lo, hi, grid, coords, fd, nlevels /*levels*/, 1e-8 /*tolerance*/,
-                                        0.25 /*min_fill*/, initFn );
+            interp = new mba::MBA< 3 >( lo, hi, grid, coords, fd, nlevels /*levels*/, 1e-12 /*tolerance*/,
+                                        0.5 /*min_fill*/, initFn );
         }
         else
         {
-            interp = new mba::MBA< 3 >( lo, hi, grid, coords, fd, nlevels /*levels*/, 1e-8 /*tolerance*/,
-                                        0.25 /*min_fill*/ );
+            interp = new mba::MBA< 3 >( lo, hi, grid, coords, fd, nlevels /*levels*/, 1e-12 /*tolerance*/,
+                                        0.5 /*min_fill*/ );
         }
 
         // Get interpolated value at arbitrary location.
         std::cout << "\nEvaluating the interpolant now...\n";
-#pragma omp parallel for shared( fi, interp )
+#pragma omp parallel for shared( fi, interp, xyzi ) schedule( guided, 16 )
         for( size_t k = 0; k < ni; k++ )
         {
             const size_t offset = k * 3;

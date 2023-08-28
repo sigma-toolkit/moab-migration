@@ -1,97 +1,21 @@
 #ifndef __remap_mpas_roms_hpp__
 #define __remap_mpas_roms_hpp__
 
+// MOAB config include
 #include "moab/MOABConfig.h"
+#include "ExampleConfig.hpp"
+#include "ExampleErrorHandler.hpp"
 
+// MOAB includes
 #include "moab/Core.hpp"
 #include "moab/CpuTimer.hpp"
 #include "moab/ProgOptions.hpp"
 #include "moab/ParallelComm.hpp"
 
-// 3D settings
-constexpr int mpas_zreflevels = 60;
-constexpr int mpas_zlevels    = 60;
-constexpr int roms_zlevels    = 100;
-constexpr int nvars           = 2;
-
-// tag name data
-const char* mpas_twod_tagnames[nvars]       = { "salinity", "temperature" };
-const char* mpas_threed_cum_tagnames[nvars] = { "salinity_3d", "temperature_3d" };
-const char* mpas_threed_tagnames[nvars]     = { "Salinity3d", "Temperature3d" };
-const char* roms_twod_tagnames[nvars]       = { "Salinity2DROMS", "Temperature2DROMS" };
-const char* roms_threed_tagnames[nvars]     = { "Salinity3dROMS", "Temperature3dROMS" };
-
-// write the map file to disk; comment out to just compute in-memory
-#define VERTICAL_INTERPOLATION
-// #define VERTICAL_INTERPOLANT_LINEAR
-#define WRITE_MAP_FILE
-
 #ifdef MOAB_HAVE_TEMPESTREMAP
 #include "GridElements.h"
 #include "OfflineMap.h"
 #endif
-
-// Error check routines and utility macros
-#define dbgprint( MSG )                                           \
-    do                                                            \
-    {                                                             \
-        if( context.proc_id == 0 ) std::cout << MSG << std::endl; \
-    } while( false )
-
-#define dbgprintall( MSG )                                                \
-    do                                                                    \
-    {                                                                     \
-        std::cout << "[" << context.proc_id << "]: " << MSG << std::endl; \
-    } while( false )
-
-#define println( MSG )                                    \
-    do                                                    \
-    {                                                     \
-        if( proc_id == 0 ) std::cout << MSG << std::endl; \
-    } while( false )
-
-// get number of arguments with __NARG__
-#define __NARG__( ... )  __NARG_I_( __VA_ARGS__, __RSEQ_N() )
-#define __NARG_I_( ... ) __ARG_N( __VA_ARGS__ )
-#define __ARG_N( _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, \
-                 _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42,  \
-                 _43, _44, _45, _46, _47, _48, _49, _50, _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, _61, _62,  \
-                 _63, N, ... )                                                                                        \
-    N
-#define __RSEQ_N()                                                                                                    \
-    63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36,   \
-        35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, \
-        7, 6, 5, 4, 3, 2, 1, 0
-
-// general definition for any function name
-#define _VFUNC_( name, n ) name##n
-#define _VFUNC( name, n )  _VFUNC_( name, n )
-#define VFUNC( func, ... ) _VFUNC( func, __NARG__( __VA_ARGS__ ) )( __VA_ARGS__ )
-
-// #define FOO( ... )         VFUNC( FOO, __VA_ARGS__ )
-
-#define runchk( ... ) VFUNC( runchk, __VA_ARGS__ )
-
-#define runchk1( CODE )     \
-    do                      \
-    {                       \
-        MB_CHK_ERR( CODE ); \
-    } while( false )
-
-#define runchk2( CODE, MSG )        \
-    do                              \
-    {                               \
-        moab::ErrorCode err = CODE; \
-        MB_CHK_SET_ERR( err, MSG ); \
-    } while( false )
-
-#define runchk_cont( CODE, MSG )                               \
-    do                                                         \
-    {                                                          \
-        moab::ErrorCode err = CODE;                            \
-        if( err ) std::cout << "Error:: " << MSG << std::endl; \
-        MB_CHK_ERR_CONT( err );                                \
-    } while( false )
 
 /// @brief class RuntimeContext
 /// The RunttimeContext stores and manages the MPAS-ROMS coupler specific
@@ -143,7 +67,6 @@ struct RuntimeContext
     /// other data members with some default values
     RuntimeContext( MPI_Comm comm = MPI_COMM_WORLD )
     {
-        moab::ErrorCode err;
         // Create the moab instance
         moab_interface = new( std::nothrow ) moab::Core;
         if( NULL == moab_interface ) exit( 1 );
@@ -252,21 +175,26 @@ struct RuntimeContext
         // Print out the input parameters
         if( proc_id == 0 )
         {
-            println( "********** Remap MPAS-to-ROMS **********\n" );
+          std::stringstream sstr;
+          sstr << "********** Remap MPAS-to-ROMS **********" << std::endl << std::endl;
 
-            println( " -- Runtime Parameters -- " );
-            println( "   MPAS mesh file: " << mpas_filename );
-            println( "   ROMS mesh file: " << roms_filename );
+          sstr << " -- Runtime Parameters -- " << std::endl;
+          sstr << "   MPAS mesh file: " << mpas_filename << std::endl;
+          sstr << "   ROMS mesh file: " << roms_filename << std::endl;
 
-            println( "        Dimension: " << dimension );
-            println( "        Algorithm: " << ( nearestNeighbor ? "Nearest Neighbor mapping"
-                                                : computeTR     ? "TempestRemap Conservative mapping"
-                                                : computeMBA    ? "Multilevel B-spline Approximation"
-                                                                : "Shepard interpolant" ) );
-            if( computeTR ) println( "           Method: " << strMethod );
-            println( " Bathymetry Order: " << bathymetryOrder );
-            println( "      Field Order: " << fieldOrder );
-            println( std::endl );
+          sstr << "        Dimension: " << dimension << std::endl;
+          sstr << "        Algorithm: "
+               << ( nearestNeighbor ? "Nearest Neighbor mapping"
+                    : computeTR     ? "TempestRemap Conservative mapping"
+                    : computeMBA    ? "Multilevel B-spline Approximation"
+                                    : "Shepard interpolant" )
+               << std::endl;
+          if( computeTR ) sstr << "           Method: " << strMethod << std::endl;
+          sstr << " Bathymetry Order: " << bathymetryOrder << std::endl;
+          sstr << "      Field Order: " << fieldOrder << std::endl;
+          sstr << std::endl;
+
+          std::cout << sstr.str() << std::endl;
         }
     }
 
@@ -280,24 +208,13 @@ struct RuntimeContext
 
     /// @brief Stop the timer and store the elapsed duration
     /// @param nruns Optional argument used to average the measured time
-    void timer_pop( const int nruns = 1 )
+    void timer_pop()
     {
         double locElapsed = mTimer.time_since_birth() - mTimerOps;
-        double avgElapsed = 0;
-        double maxElapsed = 0;
-        MPI_Reduce( &locElapsed, &maxElapsed, 1, MPI_DOUBLE, MPI_MAX, 0, parallel_communicator->comm() );
-        MPI_Reduce( &locElapsed, &avgElapsed, 1, MPI_DOUBLE, MPI_SUM, 0, parallel_communicator->comm() );
         if( proc_id == 0 )
         {
-            avgElapsed /= num_procs;
-            if( nruns > 1 )
-                std::cout << "[LOG] Time taken to " << mOpName.c_str() << ", averaged over " << nruns
-                          << " runs : max = " << maxElapsed / nruns << ", avg = " << avgElapsed / nruns << "\n";
-            else
-                std::cout << "[LOG] Time taken to " << mOpName.c_str() << " : max = " << maxElapsed
-                          << ", avg = " << avgElapsed << "\n";
-
-            last_counter = maxElapsed / nruns;
+          std::cout << "[LOG] Time taken to " << mOpName.c_str() << " := " << locElapsed << std::endl;
+          last_counter = locElapsed;
         }
         mOpName.clear();
     }
@@ -314,5 +231,22 @@ struct RuntimeContext
     double mTimerOps{ 0.0 };
     std::string mOpName;
 };
+
+// Forward declarations
+
+moab::ErrorCode ComputeFieldProjections( moab::Interface* mbi,
+                                         RuntimeContext& context,
+                                         std::string varProjectSrc,
+                                         std::string varProjectDst,
+                                         std::vector< moab::EntityHandle >& srcelems,
+                                         std::vector< moab::EntityHandle >& dstelems,
+                                         bool is_three_dimensional,
+                                         bool is_three2x1_dimensional,
+                                         bool normalize                                = true,
+                                         const double constantoffset                   = 0.0,
+                                         const std::string strMethod                   = "mba",
+                                         int order                                     = 3,
+                                         std::vector< moab::EntityHandle >* src3delems = nullptr,
+                                         std::vector< moab::EntityHandle >* dst3delems = nullptr );
 
 #endif  // __remap_mpas_roms_hpp__

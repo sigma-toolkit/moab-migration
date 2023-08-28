@@ -415,10 +415,11 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( RuntimeContext& context,
     }
 
     // output some information
+    if( context.proc_id == 0 )
     {
-        dbgprint( " Output 3D " << ( is_mpas ? "MPAS" : "ROMS" ) << " Mesh details ::" );
-        dbgprint( "\tNumber of Vertices = " << nverts * ( nlayers + 1 ) );
-        dbgprint( "\t          Elements = " << gidElem - 1 );
+        std::cout << " Output 3D " << ( is_mpas ? "MPAS" : "ROMS" ) << " Mesh details ::" << std::endl;
+        std::cout << "\tNumber of Vertices = " << nverts * ( nlayers + 1 ) << std::endl;
+        std::cout << "\t          Elements = " << gidElem - 1 << std::endl;
     }
 
     return moab::MB_SUCCESS;

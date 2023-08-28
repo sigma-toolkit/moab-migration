@@ -41,6 +41,7 @@
 #include "RemapMPASROMS.hpp"
 #include "ComputeNN.hpp"
 #include "ComputeShepard.hpp"
+#include "ComputeDelaunay.hpp"
 #include "HermiteCubicCurve.hpp"
 #include "ComputeTR.hpp"
 #include "ComputeMBA.hpp"
@@ -50,25 +51,13 @@
 using namespace moab;
 using namespace std;
 
-moab::ErrorCode ComputeDelaunayInterpolant( std::vector< double >& xyzd,
-                                            std::vector< double >& fd,
-                                            std::vector< double >& xyzi,
-                                            std::vector< double >& fi );
+// Utility macros
+#define dbgprint( MSG )                                           \
+    do                                                            \
+    {                                                             \
+        if( context.proc_id == 0 ) std::cout << MSG << std::endl; \
+    } while( false )
 
-moab::ErrorCode ComputeFieldProjections( moab::Interface* mbi,
-                                         RuntimeContext& context,
-                                         std::string varProjectSrc,
-                                         std::string varProjectDst,
-                                         std::vector< moab::EntityHandle >& srcelems,
-                                         std::vector< moab::EntityHandle >& dstelems,
-                                         bool is_three_dimensional,
-                                         bool is_three2x1_dimensional,
-                                         bool normalize                                = true,
-                                         const double constantoffset                   = 0.0,
-                                         const std::string strMethod                   = "mba",
-                                         int order                                     = 3,
-                                         std::vector< moab::EntityHandle >* src3delems = nullptr,
-                                         std::vector< moab::EntityHandle >* dst3delems = nullptr );
 
 //
 // Start of main test program
@@ -111,17 +100,22 @@ int main( int argc, char** argv )
         std::vector< moab::EntityHandle > mpas3d_verts, mpas3d_elems;
         {
             dbgprint( "Reading MPAS file from disk" );
-            runchk( mbi->load_file( context.mpas_filename.c_str(), &context.mpasset ), "MOAB::load_file for MPAS mesh failed" );
-
+            context.timer_push( "Load ROMS 2D mesh file" );
+            runchk( mbi->load_file( context.mpas_filename.c_str(), &context.mpasset ),
+                    "MOAB::load_file for MPAS mesh failed" );
             // Get all entities in the database
             runchk( mbi->get_entities_by_dimension( context.mpasset, 0, mpas_verts ) );
             runchk( mbi->get_entities_by_dimension( context.mpasset, 2, mpas_elems ) );
+            // Rescale the radius to unit sphere to compute the intersection
+            runchk( ScaleCoords( mbi, mpas_verts, radius, true, false ) );
+            context.timer_pop();
+
             dbgprint( "MPAS mesh contains " << mpas_verts.size() << " vertices and " << mpas_elems.size()
                                             << " elements" );
 
-            // Rescale the radius of both to compute the intersection
-            runchk( ScaleCoords( mbi, mpas_verts, radius, true, false ) );
+#ifdef VERBOSE_OUTPUT
             runchk( mbi->write_file( "mpas_modified_2d.h5m", "H5M", write_options.c_str(), &context.mpasset, 1 ) );
+#endif
         }
 
         // Load the ROMS file from disk with given options
@@ -129,21 +123,27 @@ int main( int argc, char** argv )
         std::vector< moab::EntityHandle > roms3d_verts, roms3d_elems;
         {
             dbgprint( "Reading ROMS file from disk" );
-            runchk( mbi->load_file( context.roms_filename.c_str(), &context.romsset ), "MOAB::load_file for ROMS mesh failed" );
-
+            context.timer_push( "Load ROMS 2D mesh file" );
+            runchk( mbi->load_file( context.roms_filename.c_str(), &context.romsset ),
+                    "MOAB::load_file for ROMS mesh failed" );
             // Get all entities in the database
             runchk( mbi->get_entities_by_dimension( context.romsset, 0, roms_verts ) );
             runchk( mbi->get_entities_by_dimension( context.romsset, 2, roms_elems ) );
+            // Rescale the radius to unit sphere to compute the intersection
+            runchk( ScaleCoords( mbi, roms_verts, radius, false, false ) );
+            context.timer_pop();
+
             dbgprint( "ROMS mesh contains " << roms_verts.size() << " vertices and " << roms_elems.size()
                                             << " elements" );
 
-            // Rescale the radius of both to compute the intersection
-            runchk( ScaleCoords( mbi, roms_verts, radius, false, false ) );
+#ifdef VERBOSE_OUTPUT
             runchk( mbi->write_file( "roms_modified_2d.h5m", "H5M", write_options.c_str(), &context.romsset, 1 ) );
+#endif
         }
 
         // Cull the MPAS set so that we don't have a global mesh
         {
+            context.timer_push( "Cull MPAS surface mesh: covering region" );
             const int nring_neighborhood = 1;
             // construct a kd-tree index:
             using KdTree = nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PC3D< double > >,
@@ -180,8 +180,11 @@ int main( int argc, char** argv )
                     lelems.insert( orig_mpas_elems[srcindx[j]] );
             }
             runchk( mbi->add_entities( context.mpas_covering_set, lelems ) );
+            context.timer_pop();
 
+#ifdef VERBOSE_OUTPUT
             runchk( mbi->write_file( "mpas_covering_2d.h5m", "H5M", write_options.c_str(), &context.mpas_covering_set, 1 ) );
+#endif
 
             runchk( mbi->get_connectivity( lelems, lverts, true ) );
             runchk( mbi->add_entities( context.mpas_covering_set, lverts ) );
@@ -193,22 +196,27 @@ int main( int argc, char** argv )
 
         if( context.normalize || context.computeTR )
         {
+            context.timer_push( "Compute TempestRemap weights for method: " + context.bathymetryMethod );
             // call to compute the 2D map and store to disk
             runchk( ComputeTempestRemapWeights( context, context.mpas_covering_set, context.romsset, context.bathymetryMethod,
                                                 context.ensureMonotonicity ),
                     "Cannot compute 2D remapping weights" );
+            context.timer_pop();
         }
         else
         {
+            context.timer_push( "Load TempestRemap weights for method: " + context.bathymetryMethod );
             // load the computed 2D map files
             runchk( LoadTempestRemapWeights( context, context.mpas_covering_set, context.romsset, context.bathymetryMethod ),
                     "Cannot load 2D remapping weights" );
+            context.timer_pop();
         }
 
         // let us perform 3D extrusions as needed
         EntityHandle root_set  = 0;
         EntityHandle mpasset3d = 0, romsset3d = 0;
 
+        context.timer_push( "Project Bathymetry field" );
         {
             // Initialize all important data
 
@@ -236,6 +244,7 @@ int main( int argc, char** argv )
                                              2000.0, context.bathymetryMethod, context.bathymetryOrder ),
                     "Can't create new set" );
         }
+        context.timer_pop();
 
         std::vector< double > zmh_xyz3d, zrh_xyz3d;
         if( context.use_3dprojection || context.threetwooneD )
@@ -273,9 +282,11 @@ int main( int argc, char** argv )
             if( context.generateExtrusions )
             {
                 dbgprint( "\nExtruding MPAS polygonal mesh ..." );
+                context.timer_push( "Extrude MPAS 2D polygonal mesh to 3D polyhedral mesh" );
                 runchk( ExtrudePolygonsToPolyhedra( context, zmh_xyz3d, context.mpas_covering_set, mpasset3d, true,
                                                     src_zlayers ),
                         "Can't extrude MPAS polygons" );
+                context.timer_pop();
 
                 {
                     std::vector< double > zrh_xyz2d( roms_elems.size() );
@@ -285,7 +296,9 @@ int main( int argc, char** argv )
                     runchk( mbi->tag_get_data( rhtag, roms_elems.data(), roms_elems.size(), zrh_xyz2d.data() ),
                             "Can't get bottomDepth tag data" );
 
+#ifdef VERBOSE_OUTPUT
                     runchk( mbi->write_file( "roms_3d_2dsurface.h5m", "H5M", write_options.c_str(), &context.romsset, 1 ) );
+#endif
 
 #define USE_STRETCHING_FUNCTION
 
@@ -377,8 +390,10 @@ int main( int argc, char** argv )
                     }
 
                     dbgprint( "\nExtruding ROMS structured quad mesh..." );
+                    context.timer_push( "Extrude ROMS 2D-QUAD mesh to 3D-HEX mesh with adaptive z-layers" );
                     runchk( ExtrudePolygonsToPolyhedra( context, zrh_xyz3d, context.romsset, romsset3d, false, dst_zlayers ),
                             "Can't extrude ROMS polygons" );
+                    context.timer_pop();
                 }
 
                 runchk( mbi->get_entities_by_dimension( mpasset3d, 0, mpas3d_verts ) );
@@ -430,38 +445,6 @@ int main( int argc, char** argv )
                 runchk( mbi->tag_get_data( rh3tag, roms3d_elems.data(), roms3d_elems.size(), zrh_xyz3d.data() ),
                         "Can't get layerThickness_3d data" );
 
-                // // get MPAS and ROMS height factors for elements
-                // {
-                //     moab::Tag mztag;
-                //     runchk( mbi->tag_get_handle( "refBottomDepth", mpas_zreflevels, moab::MB_TYPE_DOUBLE, mztag,
-                //                                moab::MB_TAG_SPARSE ), "Can't get tag handle: refBottomDepth" );
-
-                //     runchk( mbi->tag_get_data( mztag, &root_set, 1, context.mpas_zref_heights.data() ), "Can't get refBottomDepth data" );
-                //     for( size_t i = 0; i < mpas_elems.size(); ++i )
-                //     {
-                //         const int offset = i * src_zlayers;
-                //         zmh_xyz3d[offset] = context.mpas_zref_heights[0];
-                //         for( int j = 1; j < src_zlayers; ++j )
-                //             zmh_xyz3d[offset + j] = context.mpas_zref_heights[j] - context.mpas_zref_heights[j - 1];
-                //     }
-
-                //     // Now ROMS
-                //     std::vector< double > zrh_xyz2d( roms_elems.size() );
-                //     moab::Tag rhtag;
-                //     runchk( mbi->tag_get_handle( "bottomDepth", 1, moab::MB_TYPE_DOUBLE, rhtag, moab::MB_TAG_DENSE ), "Can't get bottomDepth tag" );
-                //     runchk( mbi->tag_get_data( rhtag, roms_elems.data(), roms_elems.size(), zrh_xyz2d.data() ), "Can't get bottomDepth tag data" );
-
-                //     for( size_t i = 0; i < roms_elems.size(); ++i )
-                //     {
-                //         const double pbathymetry = zrh_xyz2d[i];
-                //         const double delz        = pbathymetry / dst_zlayers;
-                //         const int offset         = i * dst_zlayers;
-                //         for( int j = 0; j < dst_zlayers; ++j )
-                //         {
-                //             zrh_xyz3d[offset + j] = delz;
-                //         }
-                //     }
-                // }
             }
         }
 
@@ -529,36 +512,15 @@ int main( int argc, char** argv )
             maxlevelFace.resize( mpassize );
             runchk( mbi->tag_get_data( maxlvlTag, mpas_elems.data(), mpassize, maxlevelFace.data() ) );
 
-            std::vector< double > zmh_z( mpas_zreflevels ), zmh_z_rev( mpas_zreflevels );
-            zmh_z_rev[0] = 0.5 * context.mpas_zref_heights[0];
-            // double totalz = -context.mpas_zref_heights[0];
-            // printf( "zmh_z_rev[%d] = %f and element z-coord = %f \n", 0, zmh_z_rev[0], context.mpas_zref_heights[0] );
+            std::vector< double > zmh_z( mpas_zreflevels );
+            zmh_z[0] = 0.5 * context.mpas_zref_heights[0];
             for( size_t j = 1; j < mpas_zlevels; ++j )
             {
-                zmh_z_rev[j] = 0.5 * ( context.mpas_zref_heights[j - 1] + context.mpas_zref_heights[j] );
-                // zmh_z[j] = ( totalz - 0.5 * context.mpas_zref_heights[j] );
-                // printf( "zmh_z[%d] = %f and element z-coord = %f \n", j, zmh_z_rev[j], -context.mpas_zref_heights[j] );
+                zmh_z[j] = 0.5 * ( context.mpas_zref_heights[j - 1] + context.mpas_zref_heights[j] );
             }
-            // for( int j = mpas_zlevels - 1; j >= 0; --j )
-            for( size_t j = 0; j < mpas_zlevels; ++j )
-            {
-                // zmh_z[j] = zmh_z_rev[mpas_zlevels - 1 - j];
-                zmh_z[j] = zmh_z_rev[j];
-                // printf( "zmh_z_rev[%d] = %f and element z-coord = %f \n", j, zmh_z_rev[j], zmh_z[j] );
-            }
-
-            // for( size_t j = 0; j < mpas_zlevels; ++j )
-            // {
-            //     double coords[3];
-            //     {
-            //         mbi->get_coords( &mpas3d_elems[j * mpassize], 1, coords );
-            //         printf( "zmh_z[%d] = %f and element z-coord = %f\n", j, zmh_z[j], coords[2] );
-            //     }
-            // }
 
             std::vector< double > tgt_salinity_data( romssize * roms_zlevels ),
                 tgt_temperature_data( romssize * roms_zlevels );
-
             if( twoDfirst )
             {
                 // First compute the projections in 2D for each MPAS layer.
@@ -569,6 +531,7 @@ int main( int argc, char** argv )
                 std::vector< double > tgtsrc_salinity_data( romssize * mpas_zreflevels ),
                     tgtsrc_temperature_data( romssize * mpas_zreflevels );
 
+                context.timer_push( "Compute 3D projection: 2Dx1D algorithm" );
 #pragma omp parallel for shared( tgtsrc_salinity_data, tgtsrc_temperature_data, weights )
                 for( int ii = 0; ii < mpas_zlevels; ii++ )
                 {
@@ -707,6 +670,7 @@ int main( int argc, char** argv )
                     }
                 }
 #endif
+                context.timer_pop();
             }
             else  // Vertical first and horizontal next
             {
@@ -716,7 +680,7 @@ int main( int argc, char** argv )
 #ifdef VERTICAL_INTERPOLATION
                 // Now project each data layer in axial direction.
                 // NOTE: Embarassingly parallel
-
+                context.timer_push( "Compute 3D projection: 1Dx2D algorithm" );
 #pragma omp parallel for shared( zrh_xyz3d, src_salinity_data, src_temperature_data, tgt_salinity_data, \
                                      tgt_temperature_data, srctgt_salinity_data, srctgt_temperature_data )
                 for( size_t i = 0; i < mpassize; ++i )
@@ -781,6 +745,8 @@ int main( int argc, char** argv )
                 }
 #endif
 
+#pragma omp parallel for shared( srctgt_salinity_data, srctgt_temperature_data, tgt_salinity_data, \
+                                     tgt_temperature_data, weights )
                 for( size_t ii = 0; ii < roms_zlevels; ii++ )
                 {
                     DataArray1D< double > dataInDoubleS( mpassize ), dataInDoubleT( mpassize );
@@ -838,6 +804,7 @@ int main( int argc, char** argv )
                     //                                roms_slice, false, true /* 2Dx1D */, normalize /* bool normalize */, 5.0,
                     //                                strMethod, fieldOrder ), "Can't project temperature data" );
                 }
+                context.timer_pop();
             }
 
 #ifdef VERTICAL_INTERPOLATION
@@ -851,6 +818,8 @@ int main( int argc, char** argv )
         }
         else if( context.use_3dprojection || context.computeMBA )
         {
+            if( context.use_3dprojection ) context.timer_push( "Compute 2D projection: MBA algorithm" );
+            else context.timer_push( "Compute 3D projection: MBA algorithm" );
             // Now let us compute the mba hierarchy for each field
             runchk( ComputeFieldProjections(
                 mbi, context, ( context.use_3dprojection ? mpas_threed_tagnames[0] : mpas_twod_tagnames[0] ),
@@ -862,9 +831,11 @@ int main( int argc, char** argv )
                 ( context.use_3dprojection ? roms_threed_tagnames[1] : roms_twod_tagnames[1] ), mpas_elems, roms_elems,
                 context.use_3dprojection, false /* 2Dx1D */, context.normalize /* bool normalize */, 8.5,
                 context.strMethod, context.fieldOrder, &mpas3d_elems, &roms3d_elems ) );
+            context.timer_pop();
         }
         else if( context.computeShepard )
         {
+            context.timer_push( "Compute 2D projection: Shepard algorithm" );
             // Now let us compute the Shepard's interpolant to compute data for each field
             runchk( ComputeFieldProjections(
                 mbi, context, ( context.use_3dprojection ? mpas_threed_tagnames[0] : mpas_twod_tagnames[0] ),
@@ -876,6 +847,7 @@ int main( int argc, char** argv )
                 ( context.use_3dprojection ? roms_threed_tagnames[1] : roms_twod_tagnames[1] ), mpas_elems, roms_elems,
                 context.use_3dprojection, false /* 2Dx1D */, context.normalize /* bool normalize */, 8.5,
                 context.strMethod, context.fieldOrder, &mpas3d_elems, &roms3d_elems ) );
+            context.timer_pop();
         }
         else
         {
@@ -889,7 +861,7 @@ int main( int argc, char** argv )
             DataArray1D< double > dataInDouble( mpas_elems.size() );
             DataArray1D< double > dataOutDouble( roms_elems.size() );
 
-            // assert( useConservativeSalinity );
+            context.timer_push( "Compute 2D projection: TempestRemap linear maps" );
             {
                 constexpr double salinity_avg = 35.0;
                 moab::Tag stag;
@@ -897,15 +869,17 @@ int main( int argc, char** argv )
 
                 // Apply the map onto the salinity solution field
                 runchk( mbi->tag_get_data( stag, mpas_elems.data(), mpas_elems.size(), dataInDouble ) );
-                for( size_t i = 0; i < dataInDouble.GetRows(); i++ )
-                    dataInDouble[i] -= salinity_avg;
+                if( context.normalize )
+                    for( size_t i = 0; i < dataInDouble.GetRows(); i++ )
+                        dataInDouble[i] -= salinity_avg;
 
                 // Compute the projection for the salinity field
                 weights.Apply( dataInDouble, dataOutDouble );
 
                 // Scale data values
-                for( size_t i = 0; i < dataOutDouble.GetRows(); i++ )
-                    dataOutDouble[i] += salinity_avg;
+                if( context.normalize )
+                    for( size_t i = 0; i < dataOutDouble.GetRows(); i++ )
+                        dataOutDouble[i] += salinity_avg;
 
                 // Set the salinity solution field on the ROMS mesh
                 runchk( mbi->tag_set_data( stag, roms_elems.data(), roms_elems.size(), dataOutDouble ) );
@@ -920,21 +894,22 @@ int main( int argc, char** argv )
 
                 // Apply the map onto the salinity solution field
                 runchk( mbi->tag_get_data( ttag, mpas_elems.data(), mpas_elems.size(), dataInDouble ) );
-                for( size_t i = 0; i < dataInDouble.GetRows(); i++ )
-                    dataInDouble[i] -= temperature_avg;
+                if( context.normalize )
+                    for( size_t i = 0; i < dataInDouble.GetRows(); i++ )
+                        dataInDouble[i] -= temperature_avg;
 
                 // Compute the projection for the salinity field
                 weights.Apply( dataInDouble, dataOutDouble );
 
                 // Scale data values
-                for( size_t i = 0; i < dataOutDouble.GetRows(); i++ )
-                    dataOutDouble[i] += temperature_avg;
+                if( context.normalize )
+                    for( size_t i = 0; i < dataOutDouble.GetRows(); i++ )
+                        dataOutDouble[i] += temperature_avg;
 
                 // Set the temperature solution field on the ROMS mesh
                 runchk( mbi->tag_set_data( ttag, roms_elems.data(), roms_elems.size(), dataOutDouble ) );
             }
-
-            // remapper.clear();
+            context.timer_pop();
         }
         dbgprint( std::endl );
 
@@ -952,23 +927,11 @@ int main( int argc, char** argv )
 
         if( !rank ) dbgprint( "\n********** Remap MPAS-to-ROMS DONE! **********" );
     }
-    // Done, cleanup
 
     // Done, cleanup
     MPI_Finalize();
 
     return 0;
-}
-
-moab::ErrorCode ComputeDelaunayInterpolant( std::vector< double >& /*xyzd*/,
-                                            std::vector< double >& /*fd*/,
-                                            std::vector< double >& /*xyzi*/,
-                                            std::vector< double >& /*fi*/ )
-{
-    // int nd = fd.size();
-    // int ni = fi.size();
-
-    return moab::MB_SUCCESS;
 }
 
 moab::ErrorCode ComputeFieldProjections( moab::Interface* mbi,

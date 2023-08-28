@@ -4,17 +4,6 @@
 #include "RemapMPASROMS.hpp"
 #include "TempestRemapAPI.h"
 #include "FiniteVolumeTools.h"
-#include "OfflineMap.h"
-
-struct RemappingContext
-{
-    Mesh meshInput;
-    Mesh meshOutput;
-    Mesh meshOverlap;
-    OfflineMap weightMap;
-
-    double mpas_zref_heights[mpas_zreflevels];
-};
 
 const char* template_map_output_filename = "mpas_roms_map_";
 
@@ -97,14 +86,13 @@ moab::ErrorCode CloneToTRMesh( moab::Interface* m_interface, Mesh& mesh, moab::E
     return MB_SUCCESS;
 }
 
-moab::ErrorCode LoadTempestRemapWeights( moab::Interface* mbi,
-                                          RemappingContext& context,
-                                          moab::EntityHandle src_set,
-                                          moab::EntityHandle tgt_set,
-                                          std::string strMethod )
+moab::ErrorCode LoadTempestRemapWeights( RuntimeContext& context,
+                                         moab::EntityHandle src_set,
+                                         moab::EntityHandle tgt_set,
+                                         std::string strMethod )
 {
-    CloneToTRMesh( mbi, context.meshInput, src_set );
-    CloneToTRMesh( mbi, context.meshOutput, tgt_set );
+    CloneToTRMesh( context.moab_interface, context.meshInput, src_set );
+    CloneToTRMesh( context.moab_interface, context.meshOutput, tgt_set );
 
     context.meshInput.ConstructEdgeMap();
     context.meshOutput.ConstructEdgeMap();
@@ -122,8 +110,7 @@ moab::ErrorCode LoadTempestRemapWeights( moab::Interface* mbi,
     return moab::MB_SUCCESS;
 }
 
-moab::ErrorCode ComputeTempestRemapWeights( moab::Interface* mbi,
-                                            RemappingContext& context,
+moab::ErrorCode ComputeTempestRemapWeights( RuntimeContext& context,
                                             moab::EntityHandle src_set,
                                             moab::EntityHandle tgt_set,
                                             std::string strMethod,
@@ -131,14 +118,15 @@ moab::ErrorCode ComputeTempestRemapWeights( moab::Interface* mbi,
 {
     // err = remapper.ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( err );
     // err = remapper.ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( err );
-    CloneToTRMesh( mbi, context.meshInput, src_set );
-    CloneToTRMesh( mbi, context.meshOutput, tgt_set );
+    CloneToTRMesh( context.moab_interface, context.meshInput, src_set );
+    CloneToTRMesh( context.moab_interface, context.meshOutput, tgt_set );
 
     context.meshInput.ConstructEdgeMap();
     context.meshOutput.ConstructEdgeMap();
 
     // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm
-    std::cout << "Setup and compute mesh intersections between source (MPAS) and target (ROMS) meshes\n";
+    if( context.proc_id == 0 )
+        std::cout << "Setup and compute mesh intersections between source (MPAS) and target (ROMS) meshes" << std::endl;
     // err = remapper.ComputeOverlapMesh( true, false );MB_CHK_ERR( err );
     bool concaveMeshA = false, concaveMeshB = false, allowNoOverlap = true, verbose = false;
     int ierr =
@@ -149,9 +137,9 @@ moab::ErrorCode ComputeTempestRemapWeights( moab::Interface* mbi,
         MB_CHK_SET_ERR( moab::MB_FAILURE, "TempestRemap: Can't compute the intersection of meshes on the sphere" );
     }
 
-    dbgprint( "\nSetup computation of weights" );
-    // Call to generate the remapping weights with the tempest meshes
+    if( context.proc_id == 0 ) std::cout << "\nSetup computation of weights" << std::endl;
 
+    // Call to generate the remapping weights with the tempest meshes
     std::string map_output_filename =
         std::string( template_map_output_filename ) + ( strMethod.size() ? strMethod : "fv" ) + ".nc";
     GenerateOfflineMapAlgorithmOptions mapOptions;
@@ -166,7 +154,7 @@ moab::ErrorCode ComputeTempestRemapWeights( moab::Interface* mbi,
     mapOptions.strOutputMapFile = map_output_filename;  // ask TR to write it out
     mapOptions.strOutputFormat  = "Netcdf4";
 
-    dbgprint( "Compute weights with TempestRemap" );
+    if( context.proc_id == 0 ) std::cout << "Compute weights with TempestRemap" << std::endl;
     ierr = GenerateOfflineMapWithMeshes( context.meshInput,    // Mesh inputMesh
                                          context.meshOutput,   // Mesh outputMesh,
                                          context.meshOverlap,  // Mesh overlapMesh,
@@ -220,7 +208,7 @@ moab::ErrorCode ComputeTempestRemapWeights( moab::Interface* mbi,
         mapAttributes.insert( AttributePair( "method", mapOptions.strMethod ) );
         mapAttributes.insert( AttributePair( "version", "RemapMPASROMS v0.1" ) );
 
-        dbgprint( "\nWrite the weights to " << map_output_filename );
+        if( context.proc_id == 0 ) std::cout << "\nWrite the weights to " << map_output_filename << std::endl;
         context.weightMap.Write( mapOptions.strOutputMapFile, mapAttributes, NcFile::Netcdf4Classic );
 
         // // Write the map file to disk in parallel using either HDF5 or SCRIP interface

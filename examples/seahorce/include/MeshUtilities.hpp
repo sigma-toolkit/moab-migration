@@ -42,8 +42,8 @@ moab::ErrorCode ScaleCoords( moab::Interface* mb,
         len = std::sqrt( posf[0] * posf[0] + posf[1] * posf[1] + posf[2] * posf[2] );
         if( len < 1e-12 )
         {
-            dbgprint( nd << " X=" << posf[0] << ", Y=" << posf[1] << ", Z = " << posf[2]
-                         << ": Failed with length == 0." );
+            std::cout << nd << " X=" << posf[0] << ", Y=" << posf[1] << ", Z = " << posf[2]
+                      << ": Failed with length == 0." << std::endl;
             return moab::MB_FAILURE;
         }
 
@@ -61,7 +61,7 @@ moab::ErrorCode ScaleCoords( moab::Interface* mb,
     return moab::MB_SUCCESS;
 }
 
-moab::ErrorCode ExtrudePolygonsToPolyhedra( moab::Interface* mb,
+moab::ErrorCode ExtrudePolygonsToPolyhedra( RuntimeContext& context,
                                             std::vector< double >& layer_thickness,
                                             moab::EntityHandle& poly2dset,
                                             moab::EntityHandle& outputset,
@@ -71,6 +71,7 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( moab::Interface* mb,
     using namespace moab;
     using namespace std;
     ErrorCode rval;
+    Interface* mb = context.moab_interface;
     if( outputset == 0 )
     {
         rval = mb->create_meshset( moab::MESHSET_SET, outputset );MB_CHK_SET_ERR( rval, "Can't create new set" );
@@ -103,11 +104,12 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( moab::Interface* mb,
     std::vector< double > coords( 3 * nverts );
 
     // output some information
+    if( context.proc_id == 0 )
     {
-        dbgprint( " Input 2D " << ( is_mpas ? "MPAS" : "ROMS" ) << " Mesh details ::" );
-        dbgprint( "\tNumber of Vertices = " << nverts );
-        dbgprint( "\t          Edges    = " << edges.size() );
-        dbgprint( "\t          Faces    = " << nfaces );
+        std::cout << " Input 2D " << ( is_mpas ? "MPAS" : "ROMS" ) << " Mesh details ::" << std::endl;
+        std::cout << "\tNumber of Vertices = " << nverts << std::endl;
+        std::cout << "\t          Edges    = " << edges.size() << std::endl;
+        std::cout << "\t          Faces    = " << nfaces << std::endl;
     }
 
     // get the vertex coordinates for the polygonal mesh

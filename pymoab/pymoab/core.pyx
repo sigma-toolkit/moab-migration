@@ -10,12 +10,11 @@ import ctypes
 from pymoab cimport moab
 from pymoab cimport eh
 
-from .tag cimport Tag, _tagArray
+from .tag cimport Tag, _TagArray
 from .rng cimport Range
 from .types import check_error, np_tag_type, validate_type, _convert_array, _eh_array, _eh_py_type
 from . import types
 from libcpp.vector cimport vector
-from libcpp.string cimport string as std_string
 from libc.stdlib cimport malloc
 
 if sys.version_info < (3, 0):
@@ -134,14 +133,14 @@ cdef class Core(object):
         cdef const char * file_name = cfname
         cdef moab.ErrorCode err
         cdef int num_tags = 0
-        cdef _tagArray ta = _tagArray()
+        cdef _TagArray ta = _TagArray()
 
         if output_tags:
             assert isinstance(output_tags, Iterable), "Non-iterable output_tags argument."
             for tag in output_tags:
                 assert isinstance(tag, Tag), "Non-tag type passed in output_tags."
             num_tags = len(output_tags)
-            ta = _tagArray(output_tags)
+            ta = _TagArray(output_tags)
         else:
             ta.ptr = NULL
 
@@ -713,7 +712,7 @@ cdef class Core(object):
         """
         cdef bytes cname = str(name).encode('UTF-8')
         cdef const char* tag_name = cname
-        cdef Tag tag = Tag()
+        cdef moab.TagInfo* tag_ptr = NULL
         cdef moab.ErrorCode err
         cdef moab.DataType tt
         cdef int s
@@ -745,14 +744,16 @@ cdef class Core(object):
             def_val_ptr = <const void*> default_val_arr.data
 
         if tag_type is None and size is None and storage_type is None:
-            err = self.inst.tag_get_handle(tag_name, tag.inst)
+            err = self.inst.tag_get_handle(tag_name, tag_ptr)
         else:
             tt = tag_type
             s = size
             flags = storage_type|types.MB_TAG_CREAT if create_if_missing else storage_type
-            err = self.inst.tag_get_handle(tag_name, s, tt, tag.inst, flags, def_val_ptr, NULL)
+            err = self.inst.tag_get_handle(tag_name, s, tt, tag_ptr, flags, def_val_ptr, NULL)
 
         check_error(err, exceptions)
+        tag = Tag()
+        tag.inst = tag_ptr
         return tag
 
     def tag_set_data(self, Tag tag, entity_handles, data, exceptions = ()):
@@ -1543,21 +1544,14 @@ cdef class Core(object):
         cdef moab.ErrorCode err
         cdef Range entities = Range()
         cdef moab.EntityType typ = entity_type
-        cdef vector[eh.EntityHandle] hvec
+        err = self.inst.get_entities_by_type(<unsigned long> meshset,
+                                                typ,
+                                                deref(entities.inst),
+                                                recur)
+        check_error(err, exceptions)
         if as_list:
-            err = self.inst.get_entities_by_type(<unsigned long> meshset,
-                                                 typ,
-                                                 hvec,
-                                                 recur)
-            check_error(err, exceptions)
-            return hvec
-
+            return entities.to_array()
         else:
-            err = self.inst.get_entities_by_type(<unsigned long> meshset,
-                                                 typ,
-                                                 deref(entities.inst),
-                                                 recur)
-            check_error(err, exceptions)
             return entities
 
     def get_entities_by_type_and_tag(self,
@@ -1659,7 +1653,7 @@ cdef class Core(object):
                 arr[i] = <void*> this_data.data if this_data is not None else NULL
 
         #create tag array to pass to function
-        cdef _tagArray ta = _tagArray(tags)
+        cdef _TagArray ta = _TagArray(tags)
         #convert type to tag type
         cdef moab.EntityType typ = entity_type
         #a range to hold returned entities
@@ -1706,14 +1700,12 @@ cdef class Core(object):
         """
         cdef moab.ErrorCode err
         cdef Range ents = Range()
-        cdef vector[eh.EntityHandle] hvec
+        err = self.inst.get_entities_by_handle(<unsigned long> meshset, deref(ents.inst), recur)
+        check_error(err, exceptions)
+
         if as_list:
-            err = self.inst.get_entities_by_handle(<unsigned long> meshset, hvec, recur)
-            check_error(err, exceptions)
-            return hvec
+            return ents.to_array()
         else:
-            err = self.inst.get_entities_by_handle(<unsigned long> meshset, deref(ents.inst), recur)
-            check_error(err, exceptions)
             return ents
 
     def get_entities_by_dimension(self, meshset, int dimension, bint recur = False, bint as_list = False, exceptions = ()):
@@ -1746,14 +1738,12 @@ cdef class Core(object):
         """
         cdef moab.ErrorCode err
         cdef Range ents = Range()
-        cdef vector[eh.EntityHandle] hvec
+        err = self.inst.get_entities_by_dimension(<unsigned long> meshset, dimension, deref(ents.inst), recur)
+        check_error(err, exceptions)
+
         if as_list:
-            err = self.inst.get_entities_by_dimension(<unsigned long> meshset, dimension, hvec, recur)
-            check_error(err, exceptions)
-            return hvec
+            return ents.to_array()
         else:
-            err = self.inst.get_entities_by_dimension(<unsigned long> meshset, dimension, deref(ents.inst), recur)
-            check_error(err, exceptions)
             return ents
 
     def delete_mesh(self):

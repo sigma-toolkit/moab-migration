@@ -159,6 +159,9 @@ cdef class Range(object):
         r.inst.merge(mbr)
         return r
 
+    def to_array(self):
+        return _eh_array(self)
+
     def __iter__(self):
         """
         Iterator

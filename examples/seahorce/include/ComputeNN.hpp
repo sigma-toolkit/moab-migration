@@ -46,7 +46,7 @@ using KdTree = nanoflann::
     KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PC3D< double > >, PC3D< double >, 3 /* dim */
                               >;
 
-moab::ErrorCode ComputeNNInterpolant( RuntimeContext& context,
+moab::ErrorCode ComputeNNInterpolant( RuntimeContext& ,
                                       const std::vector< double >& src_xyz,
                                       const std::vector< double >& src_tdata,
                                       const std::vector< double >& dst_xyz,

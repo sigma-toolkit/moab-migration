@@ -5,10 +5,11 @@
 #include "moab/MOABConfig.h"
 
 // 3D settings
-constexpr int mpas_zreflevels = 60;
-constexpr int mpas_zlevels    = 60;
-constexpr int roms_zlevels    = 100;
-constexpr int nvars           = 2;
+constexpr int mpas_zreflevels  = 60;
+constexpr int mpas_zlevels     = 60;
+constexpr int roms_zlevels     = 100;
+constexpr int nvars            = 2;
+constexpr double axial_scaling = 1.0E4;
 
 // tag name data
 const char* mpas_twod_tagnames[nvars]       = { "salinity", "temperature" };
@@ -21,5 +22,6 @@ const char* roms_threed_tagnames[nvars]     = { "Salinity3dROMS", "Temperature3d
 #define VERTICAL_INTERPOLATION
 // #define VERTICAL_INTERPOLANT_LINEAR
 #define WRITE_MAP_FILE
+// #define VERBOSE_OUTPUT
 
 #endif // __example_config_hpp__

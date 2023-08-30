@@ -264,9 +264,10 @@ int main( int argc, char** argv )
                     // for( int j = 0; j < src_zlayers; ++j )
                     //     zmh_xyz3d[offset + j] = context.mpas_zref_heights[j];
 
-                    zmh_xyz3d[offset] = context.mpas_zref_heights[0];
+                    zmh_xyz3d[offset] = context.mpas_zref_heights[0] / axial_scaling;
                     for( int j = 1; j < src_zlayers; ++j )
-                        zmh_xyz3d[offset + j] = context.mpas_zref_heights[j] - context.mpas_zref_heights[j - 1];
+                        zmh_xyz3d[offset + j] =
+                            ( context.mpas_zref_heights[j] - context.mpas_zref_heights[j - 1] ) / axial_scaling;
                 }
             }
             else
@@ -337,13 +338,13 @@ int main( int argc, char** argv )
                     };
 
                     auto vtransform_1 = [&]( double s, double h ) {
-                        constexpr double hc = 3150;  // hc has to be less than or equal to min(h)
+                        constexpr double hc = 3150 / axial_scaling;  // hc has to be less than or equal to min(h)
                         double vstretch_val = vstretching_1( s );
                         return hc * ( s - vstretch_val ) + vstretch_val * h;
                     };
 
                     auto vtransform_2 = [&]( double s, double h ) {
-                        constexpr double hc = 3000;  // hc has to be less than or equal to min(h)
+                        constexpr double hc = 3000 / axial_scaling;  // hc has to be less than or equal to min(h)
                         double vstretch_val = vstretching_4( s );
                         return ( hc * s + vstretch_val * h ) / ( hc + h );
                     };
@@ -352,7 +353,7 @@ int main( int argc, char** argv )
 
                     for( size_t i = 0; i < roms_elems.size(); ++i )
                     {
-                        const double pbathymetry = zrh_xyz2d[i];
+                        const double pbathymetry = zrh_xyz2d[i] / axial_scaling;
                         const double delz        = pbathymetry / dst_zlayers;
                         const int offset         = i * dst_zlayers;
 #ifdef USE_STRETCHING_FUNCTION
@@ -818,8 +819,22 @@ int main( int argc, char** argv )
         }
         else if( context.use_3dprojection || context.computeMBA )
         {
-            if( context.use_3dprojection ) context.timer_push( "Compute 2D projection: MBA algorithm" );
-            else context.timer_push( "Compute 3D projection: MBA algorithm" );
+            if( !context.strMethod.compare( "delaunay" ) )
+            {
+                // get the coordinates of the elements
+                std::vector< double > src_xyz( mpas3d_elems.size() * 3 );
+                runchk( mbi->get_coords( mpas3d_elems.data(), mpas3d_elems.size(), src_xyz.data() ) );
+                // setup the necessary data-structures for computing the Delaunay interpolant
+                runchk( SetupDelaunayInterpolant( context, src_xyz ) );
+            }
+
+            if( context.computeMBA )
+                if( context.use_3dprojection )
+                    context.timer_push( "Compute 2D projection: MBA algorithm" );
+                else
+                    context.timer_push( "Compute 3D projection: MBA algorithm" );
+            else
+                context.timer_push( "Compute 3D projection: " + context.strMethod + " algorithm" );
             // Now let us compute the mba hierarchy for each field
             runchk( ComputeFieldProjections(
                 mbi, context, ( context.use_3dprojection ? mpas_threed_tagnames[0] : mpas_twod_tagnames[0] ),
@@ -988,8 +1003,7 @@ moab::ErrorCode ComputeFieldProjections( moab::Interface* mbi,
         }
     }
 
-    if( !strMethod.compare( "" ) || !strMethod.compare( "bilin" ) || !strMethod.compare( "intbilin" ) ||
-        !strMethod.compare( "delaunay" ) )
+    if( !strMethod.compare( "" ) || !strMethod.compare( "bilin" ) || !strMethod.compare( "intbilin" )  )
     {
         // get the handle to the weight matrix
         const SparseMatrix< double >& weights = context.weightMap.GetSparseMatrix();
@@ -1005,23 +1019,26 @@ moab::ErrorCode ComputeFieldProjections( moab::Interface* mbi,
     {
         std::cout << "\nComputing Nearest-neighbor interpolant (order=1, degree=0) for field " << varProjectSrc
                   << std::endl;
-        err = ComputeNNInterpolant( src_xyz, src_tdata, dst_xyz, dst_tdata );MB_CHK_ERR( err );
+        err = ComputeNNInterpolant( context, src_xyz, src_tdata, dst_xyz, dst_tdata );MB_CHK_ERR( err );
     }
     else if( !strMethod.compare( "delaunay" ) )
     {
         std::cout << "\nComputing Delaunay Piecewise-Linear interpolant (order=2, degree=1) for field " << varProjectSrc
                   << std::endl;
-        err = ComputeDelaunayInterpolant( src_xyz, src_tdata, dst_xyz, dst_tdata );MB_CHK_ERR( err );
+        err = ComputeDelaunayInterpolant( context, src_xyz, src_tdata, dst_xyz, dst_tdata );MB_CHK_ERR( err );
     }
     else if( !strMethod.compare( "mba" ) )
     {
         // constexpr int nlevels         = 7;
-        // std::array< size_t, 3 > grid = { 15, 15, mpas_zlevels };
-        constexpr int nlevels        = 9;
-        std::array< size_t, 3 > grid = { 4, 4, mpas_zlevels / 4 };
-        std::array< double, 6 > bbox = { -1.0, -1.0, -1E6, 1.0, 1.0, 1000 };
+        // std::array< size_t, 3 > grid = { 16, 16, mpas_zlevels };
+        // constexpr int nlevels        = 9;
+        // std::array< size_t, 3 > grid = { 4, 4, mpas_zlevels / 4 };
+        constexpr int nlevels        = 10;
+        std::array< size_t, 3 > grid = { 2, 2, mpas_zlevels/4 };
+        // std::array< double, 6 > bbox = { -1.0, -1.0, -1E5, 1.0, 1.0, 1E2 };
+        std::array< double, 6 > bbox = { -1.0, -1.0, -10.0, 1.0, 1.0, 10 };
         std::cout << "\nComputing MBA interpolant (order=4, degree=3) for field " << varProjectSrc << std::endl;
-        err = ComputeMBAInterpolant( src_xyz, src_tdata, dst_xyz, dst_tdata, is_three_dimensional, order, grid, bbox,
+        err = ComputeMBAInterpolant( context, src_xyz, src_tdata, dst_xyz, dst_tdata, is_three_dimensional, order, grid, bbox,
                                      nlevels );MB_CHK_ERR( err );
     }
     else if( !strMethod.compare( "shepard" ) )

@@ -46,21 +46,19 @@ using KdTree = nanoflann::
     KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PC3D< double > >, PC3D< double >, 3 /* dim */
                               >;
 
-moab::ErrorCode ComputeNNInterpolant( const std::vector< double >& src_xyz,
+moab::ErrorCode ComputeNNInterpolant( RuntimeContext& context,
+                                      const std::vector< double >& src_xyz,
                                       const std::vector< double >& src_tdata,
                                       const std::vector< double >& dst_xyz,
                                       std::vector< double >& dst_tdata )
 {
     constexpr double power       = 2.0;
     constexpr size_t num_results = 1;
-    // construct a kd-tree index:
-    using KdTree = nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PC3D< double > >,
-                                                        PC3D< double >, 3 /* dim */
-                                                        >;
 
+    // construct a kd-tree index:
     double query_pt[3];  // dimension
     PC3D< double > cloud( src_xyz );
-    KdTree tree( 3 /*dim*/, cloud, { 15 /* max leaf */ } );
+    KdTree tree( 3 /*dim*/, cloud, { 10 /* max leaf */ } );
 
     size_t offset = 0;
     for( size_t i = 0; i < dst_tdata.size(); i++, offset += 3 )

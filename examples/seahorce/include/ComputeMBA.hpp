@@ -5,7 +5,8 @@
 #include "moab/Remapping/MBA.hpp"
 #include "ComputeNN.hpp"
 
-moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
+moab::ErrorCode ComputeMBAInterpolant( RuntimeContext& context,
+                                       std::vector< double >& xyzd,
                                        std::vector< double >& fd,
                                        std::vector< double >& xyzi,
                                        std::vector< double >& fi,
@@ -76,7 +77,7 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
         mba::linear_approximation< 3 >* interp;
         if( use_recursive )
         {
-            moab::ErrorCode err = ComputeNNInterpolant( xyzd, fd, xyzi, filocal );MB_CHK_ERR( err );
+            moab::ErrorCode err = ComputeNNInterpolant( context, xyzd, fd, xyzi, filocal );MB_CHK_ERR( err );
 
             std::vector< mba::point< 3 > > coords( ni );
 #pragma omp parallel for shared( coords )
@@ -149,7 +150,7 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
         mba::MBA< 3 >* interp = nullptr;
         if( use_recursive )
         {
-            moab::ErrorCode err = ComputeNNInterpolant( xyzd, fd, xyzi, filocal );MB_CHK_ERR( err );
+            moab::ErrorCode err = ComputeNNInterpolant( context, xyzd, fd, xyzi, filocal );MB_CHK_ERR( err );
 
             PC3D< double > cloud_src( xyzd );
             KdTree tree_src( 3 /*dim*/, cloud_src, { 5 /* max leaf */ } );
@@ -179,11 +180,11 @@ moab::ErrorCode ComputeMBAInterpolant( std::vector< double >& xyzd,
 
         // Get interpolated value at arbitrary location.
         std::cout << "\nEvaluating the interpolant now...\n";
-#pragma omp parallel for shared( fi, interp, xyzi ) schedule( guided, 16 )
+#pragma omp parallel for shared( fi, interp, xyzi ) schedule( guided, 64 )
         for( size_t k = 0; k < ni; k++ )
         {
-            const size_t offset = k * 3;
-            fi[k]               = ( *interp )( mba::point< 3 >{ xyzi[offset], xyzi[offset + 1], xyzi[offset + 2] } );
+            auto offset = k * 3;
+            fi[k]       = ( *interp )( mba::point< 3 >{ xyzi[offset], xyzi[offset + 1], xyzi[offset + 2] } );
         }
 
         delete interp;

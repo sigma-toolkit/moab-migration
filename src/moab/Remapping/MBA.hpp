@@ -374,7 +374,7 @@ class control_lattice_dense : public control_lattice<NDim> {
                 std::fill(t_delta.data(), t_delta.data() + t_delta.size(), 0.0);
                 std::fill(t_omega.data(), t_omega.data() + t_omega.size(), 0.0);
 
-#pragma omp for
+#pragma omp for schedule (dynamic, 100)
                 for(ptrdiff_t l = 0; l < n; ++l) {
                     auto p = coo_begin[l];
                     auto v = val_begin[l];
@@ -432,7 +432,7 @@ class control_lattice_dense : public control_lattice<NDim> {
         double operator()(const point<NDim> &p) const {
             index<NDim> i;
             point<NDim> s;
-
+// #pragma omp parallel for shared( i, s, p, cmin, hinv )
             for(unsigned d = 0; d < NDim; ++d) {
                 double u = (p[d] - cmin[d]) * hinv[d];
                 i[d] = floor(u) - 1;
@@ -440,9 +440,9 @@ class control_lattice_dense : public control_lattice<NDim> {
             }
 
             double f = 0;
-
             for(grid_iterator<NDim> d(4); d; ++d) {
                 double w = 1.0;
+// #pragma omp parallel for reduction( * : w )
                 for(unsigned k = 0; k < NDim; ++k) w *= Bspline(d[k], s[k]);
 
                 f += w * phi(i + (*d));
@@ -572,6 +572,7 @@ class control_lattice_sparse : public control_lattice<NDim> {
             index<NDim> i;
             point<NDim> s;
 
+// #pragma omp parallel for shared( i, s, p, cmin, hinv )
             for(unsigned d = 0; d < NDim; ++d) {
                 double u = (p[d] - cmin[d]) * hinv[d];
                 i[d] = floor(u) - 1;
@@ -579,9 +580,9 @@ class control_lattice_sparse : public control_lattice<NDim> {
             }
 
             double f = 0;
-
             for(grid_iterator<NDim> d(4); d; ++d) {
                 double w = 1.0;
+// #pragma omp parallel for reduction( * : w )
                 for(unsigned k = 0; k < NDim; ++k) w *= Bspline(d[k], s[k]);
 
                 f += w * get_phi(i + (*d));
@@ -714,11 +715,13 @@ singular:
         double operator()(const point<NDim> &p) const {
             double f = C[NDim];
 
-            for(unsigned i = 0; i < NDim; ++i)
+// #pragma omp parallel for reduction( + : f )
+            for( unsigned i = 0; i < NDim; ++i )
                 f += C[i] * p[i];
 
             return f;
         }
+
     private:
         std::array<double, NDim+1> C;
 };
@@ -758,7 +761,6 @@ class MBA {
 
         double operator()(const point<NDim> &p) const {
             double f = 0.0;
-
             for(auto &psi : cl) {
                 f += (*psi)(p);
             }

@@ -60,7 +60,7 @@ class HermiteCubicCurve
         dualQuadratic,
         fritschCarlson
     };
-    GradientMode mode = GradientMode::dualQuadratic;
+    GradientMode mode = GradientMode::fritschCarlson;
 
     std::vector< HermiteCubicSegment< Value > > segments;
 
@@ -230,6 +230,7 @@ class HermiteCubicCurve
     {
         if( x <= earliest.x ) return earliest.y;
         if( x >= latest.x ) return latest.y;
+        // linear search
         for( int i = (int)segments.size() - 1; i >= 0; --i )
         {
             auto& segment = segments[i];

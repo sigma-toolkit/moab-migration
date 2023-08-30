@@ -61,6 +61,11 @@ struct RuntimeContext
     moab::EntityHandle partnset{ 0 };
     moab::EntityHandle mpasset, mpas_covering_set, romsset;
 
+    moab::Range mpas_elems, mpas_verts;
+    moab::Range roms_elems, roms_verts;
+    moab::Range mpas3d_elems, mpas3d_verts, mpas3d_dual_elems;
+    moab::Range roms3d_elems, roms3d_verts;
+
     double mpas_zref_heights[mpas_zreflevels];
 
     /// @brief Constructor: allocate MOAB interface and communicator, and initialize

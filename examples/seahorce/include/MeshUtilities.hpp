@@ -33,6 +33,8 @@ moab::ErrorCode ScaleCoords( moab::Interface* mb,
             posf[2]          = R * sin( lat );               // z
             // spherical_to_cart( posi[1], posi[0], R, posf );
             // dbgprint( nd << " lat=" << posi[1] << ", lon=" << posi[0] << "; Cartesian = [" << posf[0] << ", " << posf[1] << ", " << posf[2] << "]" );
+            // std::cout << "ERROR: We do not know how to scale z-coordinate if not cartesian\n";
+            // exit(1);
         }
         else
         {
@@ -51,9 +53,14 @@ moab::ErrorCode ScaleCoords( moab::Interface* mb,
         posf[0] *= R / len;
         posf[1] *= R / len;
         if( is_threed && !is_cartesian )
-            posf[2] = posi[2];
+        {
+            posf[1] /= R / len;
+            // posf[2] = posi[2] / len;
+            // posf[2] /= axial_scaling;
+        }
         else
             posf[2] *= R / len;
+            // posf[2] /= len;
         // if (is_threed)
         //     dbgprint( nd << " X=" << posf[0] << ", Y=" << posf[1] << ", Z = " << posf[2]  );
         rval = mb->set_coords( &nd, 1, posf );MB_CHK_ERR( rval );

@@ -65,6 +65,7 @@ using namespace std;
 int main( int argc, char** argv )
 {
     constexpr bool useCAAS  = false;
+    // constexpr double radius = 6371220.0;
     constexpr double radius = 1.0;
 
     // Initialize MPI first
@@ -1035,8 +1036,8 @@ moab::ErrorCode ComputeFieldProjections( moab::Interface* mbi,
         // std::array< size_t, 3 > grid = { 4, 4, mpas_zlevels / 4 };
         constexpr int nlevels        = 10;
         std::array< size_t, 3 > grid = { 2, 2, mpas_zlevels/4 };
-        // std::array< double, 6 > bbox = { -1.0, -1.0, -1E5, 1.0, 1.0, 1E2 };
-        std::array< double, 6 > bbox = { -1.0, -1.0, -10.0, 1.0, 1.0, 10 };
+        std::array< double, 6 > bbox = { -1.0, -1.0, -1E5, 1.0, 1.0, 1E2 };
+        // std::array< double, 6 > bbox = { -1.0, -1.0, -10.0, 1.0, 1.0, 10 };
         std::cout << "\nComputing MBA interpolant (order=4, degree=3) for field " << varProjectSrc << std::endl;
         err = ComputeMBAInterpolant( context, src_xyz, src_tdata, dst_xyz, dst_tdata, is_three_dimensional, order, grid, bbox,
                                      nlevels );MB_CHK_ERR( err );

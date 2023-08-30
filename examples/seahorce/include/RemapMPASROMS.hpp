@@ -12,6 +12,8 @@
 #include "moab/ProgOptions.hpp"
 #include "moab/ParallelComm.hpp"
 
+#include <Eigen/Dense>
+
 #ifdef MOAB_HAVE_TEMPESTREMAP
 #include "GridElements.h"
 #include "OfflineMap.h"
@@ -61,10 +63,12 @@ struct RuntimeContext
     moab::EntityHandle partnset{ 0 };
     moab::EntityHandle mpasset, mpas_covering_set, romsset;
 
-    moab::Range mpas_elems, mpas_verts;
-    moab::Range roms_elems, roms_verts;
-    moab::Range mpas3d_elems, mpas3d_verts, mpas3d_dual_elems;
-    moab::Range roms3d_elems, roms3d_verts;
+    Eigen::Matrix< int, Eigen::Dynamic, 4 > dual_mpas_tetrahedron;
+    std::vector< double > dual_mpas_tetrahedron_centroids;
+    // moab::Range mpas_elems, mpas_verts;
+    // moab::Range roms_elems, roms_verts;
+    // moab::Range mpas3d_elems, mpas3d_verts, mpas3d_dual_elems;
+    // moab::Range roms3d_elems, roms3d_verts;
 
     double mpas_zref_heights[mpas_zreflevels];
 

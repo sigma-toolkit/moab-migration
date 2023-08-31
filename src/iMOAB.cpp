@@ -66,8 +66,9 @@ struct appData
     int global_id;  // external component id, unique for application
     std::string name;
     Range all_verts;
-    Range local_verts;  // it could include shared, but not owned at the interface
-    // these vertices would be all_verts if no ghosting was required
+    // local vertices would be all_verts if no ghosting was required
+    Range local_verts;     // it could include shared, but not owned at the interface
+    Range owned_verts;     // owned_verts <= local_verts <= all_verts
     Range ghost_vertices;  // locally ghosted from other processors
     Range primary_elems;
     Range owned_elems;
@@ -777,6 +778,7 @@ ErrCode iMOAB_UpdateMeshInfo( iMOAB_AppID pid )
     data.all_verts.clear();
     data.primary_elems.clear();
     data.local_verts.clear();
+    data.owned_verts.clear();
     data.ghost_vertices.clear();
     data.owned_elems.clear();
     data.ghost_elems.clear();
@@ -833,13 +835,12 @@ ErrCode iMOAB_UpdateMeshInfo( iMOAB_AppID pid )
         // now update global number of primary cells and global number of vertices
         // determine first number of owned vertices
         // Get local owned vertices
-        Range verts_owned;
-        rval = pco->filter_pstatus( data.all_verts, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &verts_owned );MB_CHK_ERR( rval );
+        rval = pco->filter_pstatus( data.all_verts, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &data.owned_verts );MB_CHK_ERR( rval );
         int local[2], global[2];
-        local[0] = verts_owned.size();
+        local[0] = data.owned_verts.size();
         local[1] = data.owned_elems.size();
         MPI_Allreduce( local, global, 2, MPI_INT, MPI_SUM, pco->comm() );
-        rval = iMOAB_SetGlobalInfo( pid, &(global[0]), &(global[1]) );MB_CHK_ERR( rval );
+        rval = iMOAB_SetGlobalInfo( pid, &( global[0] ), &( global[1] ) );MB_CHK_ERR( rval );
     }
     else
     {
@@ -891,7 +892,7 @@ ErrCode iMOAB_GetMeshInfo( iMOAB_AppID pid,
     {
         num_visible_vertices[2] = static_cast< int >( data.all_verts.size() );
         num_visible_vertices[1] = static_cast< int >( data.ghost_vertices.size() );
-        // local are those that are not ghosts
+        // local are those that are not ghosts; they may include shared, not owned vertices
         num_visible_vertices[0] = num_visible_vertices[2] - num_visible_vertices[1];
     }
 
@@ -2627,10 +2628,10 @@ ErrCode iMOAB_ReceiveMesh( iMOAB_AppID pid, MPI_Comm* join, MPI_Group* sendingGr
     rval     = context.MBI->tag_set_data( part_tag, &local_set, 1, &rank );MB_CHK_ERR( rval );
 
     // make sure that the GLOBAL_ID is defined as a tag
-    int tagtype = 0; // dense, integer
-    int numco = 1; // size
-    int tagindex; // not used
-    rval = iMOAB_DefineTagStorage( pid, "GLOBAL_ID", &tagtype, &numco, &tagindex);MB_CHK_ERR( rval );
+    int tagtype = 0;  // dense, integer
+    int numco   = 1;  // size
+    int tagindex;     // not used
+    rval = iMOAB_DefineTagStorage( pid, "GLOBAL_ID", &tagtype, &numco, &tagindex );MB_CHK_ERR( rval );
     // populate the mesh with current data info
     rval = iMOAB_UpdateMeshInfo( pid );MB_CHK_ERR( rval );
 

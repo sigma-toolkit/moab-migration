@@ -140,7 +140,7 @@ int main( int argc, char** argv )
     ERROR( rc, "can't update mesh info" );
 
     int num_global_verts, num_global_cells;
-    iMOAB_GetGlobalInfo( pid, &num_global_verts, &num_global_cells);
+    iMOAB_GetGlobalInfo( pid, &num_global_verts, &num_global_cells );
 
     // test iMOAB_ReduceTagsMax on a tag
     int tagType        = DENSE_DOUBLE;

@@ -271,27 +271,26 @@ int main( int argc, char* argv[] )
                                         &couPEGroup, &atmCouComm, atmFilename, readopts, nghlay, repartitioner_scheme );
     CHECKIERR( ierr, "Cannot load and migrate atm mesh" )
 
-    int global_atm[2] = {0, 0};
-    if (atmComm != MPI_COMM_NULL)
+    int global_atm[2] = { 0, 0 };
+    if( atmComm != MPI_COMM_NULL )
     {
-        ierr = iMOAB_GetGlobalInfo(cmpAtmPID, &(global_atm[0]), &(global_atm[1]));
+        ierr = iMOAB_GetGlobalInfo( cmpAtmPID, &( global_atm[0] ), &( global_atm[1] ) );
         CHECKIERR( ierr, "cannot get atm global info" )
-        if(!rankInAtmComm)
+        if( !rankInAtmComm )
             std::cout << " atm mesh: vertices: " << global_atm[0] << " cells: " << global_atm[1] << "\n";
     }
     // broadcast to all tasks
-    int global_atm_red[2] = {0, 0};
-    MPI_Allreduce(global_atm, global_atm_red, 2, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-    if (couComm != MPI_COMM_NULL)
+    int global_atm_red[2] = { 0, 0 };
+    MPI_Allreduce( global_atm, global_atm_red, 2, MPI_INT, MPI_MAX, MPI_COMM_WORLD );
+    if( couComm != MPI_COMM_NULL )
     {
         int global_atm_cou[2];
-        ierr = iMOAB_GetGlobalInfo(cplAtmPID, &(global_atm_cou[0]), &(global_atm_cou[1]));
+        ierr = iMOAB_GetGlobalInfo( cplAtmPID, &( global_atm_cou[0] ), &( global_atm_cou[1] ) );
         CHECKIERR( ierr, "cannot get atm global info on coupler" )
-        CHECK_ARRAYS_EQUAL(global_atm_red, 2, global_atm_cou, 2);
-        if(!rankInCouComm)
+        CHECK_ARRAYS_EQUAL( global_atm_red, 2, global_atm_cou, 2 );
+        if( !rankInCouComm )
             std::cout << " atm mesh on coupler: vertices: " << global_atm[0] << " cells: " << global_atm[1] << "\n";
     }
-
 
 #ifdef VERBOSE
     if( couComm != MPI_COMM_NULL && 1 == n )

@@ -19,6 +19,20 @@
 #include "OfflineMap.h"
 #endif
 
+enum RemappingMethod
+{
+    DefaultRemappingMethod         = -1,
+    NearestNeighborInterpolant     = 0,
+    TempestRemapFV                 = 1,
+    TempestRemapBilinear           = 2,
+    TempestRemapInvDist            = 3,
+    DelaunayInterpolant            = 4,
+    ShepardInterpolant             = 5,
+    TrilinearTensor2D1D            = 6,
+    TrilinearTensor1D2D            = 7,
+    MultilevelBsplineApproximation = 8
+};
+
 /// @brief class RuntimeContext
 /// The RunttimeContext stores and manages the MPAS-ROMS coupler specific
 /// to multiscale modeling. The class also provides other utility functions
@@ -36,10 +50,11 @@ struct RuntimeContext
     std::string roms_filename{ "roms_grid.h5m" };  /// input ROMS grid file
     int dimension{ 2 };                            /// dimensionality of the problem: 2 or 3
     bool ensureMonotonicity{ false };  /// flag indicating use of monotone approximations for projections (TempestRemap)
-    bool computeTR{ false };           /// flag indicating use of TempestRemap conservative schemes for projections
-    bool computeShepard{ false };      /// flag indicating use of Shepard approximations for projections
-    bool computeMBA{ false };          /// flag indicating use of multilevel B-spline approximations for projections
-    bool nearestNeighbor{ false };     /// flag indicating use of nearest neighbor method for projections
+    bool computeTRMaps{ false };       /// flag indicating use of TempestRemap conservative schemes for projections
+    // bool computeShepardInterpolant{ false };      /// flag indicating use of Shepard approximations for projections
+    bool computeMBAInterpolant{ false };  /// flag indicating use of multilevel B-spline approximations for projections
+    // bool computeNNInterpolant{ false };  /// flag indicating use of nearest neighbor method for projections
+    // bool computeDelaunayInterpolant{ false };  ///flag indicating use of delaunay natural neighbor interpolant
     bool normalize{ false };           /// normalize the dataset to original source data integral
                                        /// (more relevant for 2D; not implemented for 3D at the moment)
     bool use_3dprojection{ false };    /// perform 2D projections (if false), else compute 3D projections
@@ -49,13 +64,15 @@ struct RuntimeContext
                                        /// (tensor product computations) as opposed to full 3D
     bool oneDfirst{ false };           /// flag to specify that 1Dx2D should be performed as opposed
                                        /// to 2Dx1D (only relevant when threetwooneD is true)
-    std::string strMethod{ "" };       /// remapping method used to other scalar fields (temperature, salinity)
-    std::string bathymetryMethod{ "bilin" };  /// remapping method used for Bathymetry field
-    int bathymetryOrder{ 1 };                 /// order of the reconstruction for Bathymetry field
-    int fieldOrder{ 3 };         /// order of the reconstruction for other scalar fields (temperature, salinity)
+    // std::string strMethod{ "" };       /// remapping method used to other scalar fields (temperature, salinity)
+    // std::string bathymetryMethod{ "" };  /// remapping method used for Bathymetry field
+    // int bathymetryOrder{ 3 };                 /// order of the reconstruction for Bathymetry field
+    // int fieldOrder{ 3 };         /// order of the reconstruction for other scalar fields (temperature, salinity)
     int proc_id{ 1 };            /// process identifier
     int num_procs{ 1 };          /// total number of processes
     double last_counter{ 0.0 };  /// last time counter between push/pop timer
+
+    std::map< std::string, std::pair< RemappingMethod, int > > field_methods;
 
     // MOAB objects
     moab::Interface* moab_interface{ nullptr };
@@ -101,6 +118,100 @@ struct RuntimeContext
         delete moab_interface;
     }
 
+    static RemappingMethod GetMethod( std::string methodName )
+    {
+        /*
+            DefaultRemappingMethod         = -1,
+            NearestNeighborInterpolant     = 0,
+            TempestRemapFV                 = 1,
+            TempestRemapBilinear           = 2,
+            TempestRemapInvDist            = 3,
+            DelaunayInterpolant            = 4,
+            ShepardInterpolant             = 5,
+            TrilinearTensor2D1D            = 6,
+            TrilinearTensor1D2D            = 7,
+            MultilevelBsplineApproximation = 8
+        */
+        if( !methodName.compare( "NearestNeighborInterpolant" ) )
+            return NearestNeighborInterpolant;
+        else if( !methodName.compare( "TempestRemapFV" ) )
+            return TempestRemapFV;
+        else if( !methodName.compare( "TempestRemapBilinear" ) )
+            return TempestRemapBilinear;
+        else if( !methodName.compare( "TempestRemapInvDist" ) )
+            return TempestRemapInvDist;
+        else if( !methodName.compare( "DelaunayInterpolant" ) )
+            return DelaunayInterpolant;
+        else if( !methodName.compare( "ShepardInterpolant" ) )
+            return ShepardInterpolant;
+        else if( !methodName.compare( "TrilinearTensor2D1D" ) )
+            return TrilinearTensor2D1D;
+        else if( !methodName.compare( "TrilinearTensor2D1D" ) )
+            return TrilinearTensor2D1D;
+        else if( !methodName.compare( "MultilevelBsplineApproximation" ) )
+            return MultilevelBsplineApproximation;
+        else
+            return DefaultRemappingMethod;
+    }
+
+    static std::string GetMethod( RemappingMethod methodEnum )
+    {
+        /*
+            DefaultRemappingMethod         = -1,
+            NearestNeighborInterpolant     = 0,
+            TempestRemapFV                 = 1,
+            TempestRemapBilinear           = 2,
+            TempestRemapInvDist            = 3,
+            DelaunayInterpolant            = 4,
+            ShepardInterpolant             = 5,
+            TrilinearTensor2D1D            = 6,
+            TrilinearTensor1D2D            = 7,
+            MultilevelBsplineApproximation = 8
+        */
+        if( methodEnum == NearestNeighborInterpolant )
+            return "NearestNeighborInterpolant";
+        else if( methodEnum == TempestRemapFV )
+            return "TempestRemapFV";
+        else if( methodEnum == TempestRemapBilinear )
+            return "TempestRemapBilinear";
+        else if( methodEnum == TempestRemapInvDist )
+            return "TempestRemapInvDist";
+        else if( methodEnum == DelaunayInterpolant )
+            return "DelaunayInterpolant";
+        else if( methodEnum == ShepardInterpolant )
+            return "ShepardInterpolant";
+        else if( methodEnum == TrilinearTensor2D1D )
+            return "TrilinearTensor2D1D";
+        else if( methodEnum == TrilinearTensor2D1D )
+            return "TrilinearTensor2D1D";
+        else if( methodEnum == MultilevelBsplineApproximation )
+            return "MultilevelBsplineApproximation";
+        else
+            return "DefaultRemappingMethod";
+    }
+
+    /// @brief Function to split a given option as: field:method:order into appropriate pieces
+    /// @param str Original string containing all options
+    /// @param strings Output list of split strings
+    /// @param separator Separator character (default: ':')
+    void split_option( std::string str, std::vector< std::string >& strings, char separator = ':' )
+    {
+        strings.clear();
+        int startIndex = 0, endIndex = 0;
+        for( size_t i = 0; i <= str.size(); i++ )
+        {
+            // If we reached the end of the word or the end of the input.
+            if( str[i] == separator || i == str.size() )
+            {
+                endIndex = i;
+                std::string temp;
+                temp.append( str, startIndex, endIndex - startIndex );
+                strings.push_back( temp );
+                startIndex = endIndex + 1;
+            }
+        }
+    }
+
     /// @brief Parse the runtime command line options
     /// @param argc - number of command line arguments
     /// @param argv - command line arguments as string list
@@ -115,10 +226,14 @@ struct RuntimeContext
         // Problem setup
         opts.addOpt< int >( "dimension", "Compute 2D surface or 3D volumetric coupling (default=2)", &dimension );
         opts.addOpt< void >( "setup", "Compute full mesh extrusions needed for coupling in 3D", &generateExtrusions );
-        opts.addOpt< std::string >( "method",
-                                    "Additional computational method arguments (fv, invdist, bilin, intbilin, "
-                                    "delaunay, shepard, mba). default=MBA",
-                                    &strMethod );
+        // opts.addOpt< std::string >( "bathymetrymethod",
+        //                             "Additional computational method arguments (fv, invdist, bilin, intbilin, "
+        //                             "delaunay, shepard, mba). default=MBA",
+        //                             &bathymetryMethod );
+        // opts.addOpt< std::string >( "method",
+        //                             "Additional computational method arguments (fv, invdist, bilin, intbilin, "
+        //                             "delaunay, shepard, mba). default=MBA",
+        //                             &strMethod );
         opts.addOpt< void >( "mono", "Ensure monotonicity in the weight generation (only for TR-FV)",
                              &ensureMonotonicity );
         opts.addOpt< void >( "321D", "Compute three-dimensional projections using a 2Dx1D approach", &threetwooneD );
@@ -128,54 +243,107 @@ struct RuntimeContext
             "normalize",
             "Re-normalize interpolant to preserve global field integral (only 2D and requires mesh intersection)",
             &normalize );
-        opts.addOpt< int >( "bathymetryOrder",
-                            "Specify order of Bathymetry reconstruction. \n"
-                            "\tTR: method='' -> FV order, method='invdist,bilin,intbilin' -> order 2, \n"
-                            "\tShepard: shepard_power=order\n"
-                            "\tMBA: order=1 -> bilinear, else order 3\n"
-                            "(default=MBA3)",
-                            &bathymetryOrder );
-        opts.addOpt< int >( "fieldOrder",
-                            "Specify order for Temperature and Salinity field projection. \n"
-                            "\tTR: method='' -> FV order, method='invdist,bilin,intbilin' -> order 2, \n"
-                            "\tShepard: shepard_power=order\n"
-                            "\tMBA: order=1 -> bilinear, else order 3\n"
-                            "(default=MBA1)",
-                            &fieldOrder );
+        // opts.addOpt< int >( "bathymetryOrder",
+        //                     "Specify order of Bathymetry reconstruction. \n"
+        //                     "\tTR: method='' -> FV order, method='invdist,bilin,intbilin' -> order 2, \n"
+        //                     "\tShepard: shepard_power=order\n"
+        //                     "\tMBA: order=1 -> bilinear, else order 3\n"
+        //                     "(default=MBA3)",
+        //                     &bathymetryOrder );
+        // opts.addOpt< int >( "fieldOrder",
+        //                     "Specify order for Temperature and Salinity field projection. \n"
+        //                     "\tTR: method='' -> FV order, method='invdist,bilin,intbilin' -> order 2, \n"
+        //                     "\tShepard: shepard_power=order\n"
+        //                     "\tMBA: order=1 -> bilinear, else order 3\n"
+        //                     "(default=MBA1)",
+        //                     &fieldOrder );
+
+        std::string fmethodorder = "";
+        opts.addOpt< std::string >( "methodorder",
+                                    "Format: field:method, field: {Bathymetry,Temperature,Salinity}, "
+                                    "Method:{NearestNeighborInterpolant,"
+                                    "TempestRemapFV,"
+                                    "TempestRemapBilinear,"
+                                    "TempestRemapInvDist,"
+                                    "DelaunayInterpolant,"
+                                    "ShepardInterpolant,"
+                                    "TrilinearTensor2D1D,"
+                                    "TrilinearTensor1D2D,"
+                                    "MultilevelBsplineApproximation}",
+                                    &fmethodorder );
 
         opts.parseCommandLine( argc, argv );
 
-        if( strMethod == "shepard" )
         {
-            computeShepard = true;
+            field_methods["Bathymetry"]  = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
+            field_methods["Salinity"]    = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
+            field_methods["Temperature"] = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
+
+            std::vector< std::string > fieldmethods;
+            opts.getOptAllArgs( "methodorder", fieldmethods );
+
+            for( auto fmethod : fieldmethods )
+            {
+                std::vector< std::string > optionStorage;
+                split_option( fmethod, optionStorage );
+                assert( optionStorage.size() > 1 );
+                std::string fieldname = optionStorage[0];
+                if( ( !fieldname.compare( "Bathymetry" ) || !fieldname.compare( "Salinity" ) ||
+                      !fieldname.compare( "Temperature" ) ) &&
+                    optionStorage.size() > 1 )
+                {
+                    std::string tmpmethod   = optionStorage[1];
+                    RemappingMethod rmethod = GetMethod( tmpmethod );
+                    int methodorder         = 1;
+                    if( optionStorage.size() > 2 )  // order of the method
+                        methodorder = atoi( optionStorage[2].c_str() );
+
+                    field_methods[fieldname] = std::make_pair( rmethod, methodorder );
+                    if( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear || rmethod == TempestRemapInvDist )
+                        computeTRMaps = true;
+                    if( rmethod == MultilevelBsplineApproximation ) computeMBAInterpolant = true;
+                }
+                else
+                {
+                    std::cout << "Error: Ignoring specification for non-standard field: " << fieldname << std::endl;
+                }
+            }
         }
-        else if( strMethod == "mba" )
-        {
-            computeMBA = true;
-            // if( order == 1 ) strMethod = "mba:linear";
-            // else strMethod = "mba:cubic";
-        }
-        else if( strMethod == "nn" )
-        {
-            nearestNeighbor = true;
-        }
-        else
-        {
-            computeTR = true;
-            if( strMethod == "fv" ) strMethod = "";  // no sub-method necessary
-        }
+
+        // if( strMethod == "shepard" )
+        // {
+        //     computeShepardInterpolant = true;
+        // }
+        // else if( strMethod == "mba" )
+        // {
+        //     computeMBAInterpolant = true;
+        //     // if( order == 1 ) strMethod = "mba:linear";
+        //     // else strMethod = "mba:cubic";
+        // }
+        // else if( strMethod == "nn" )
+        // {
+        //     computeNNInterpolant = true;
+        // }
+        // else if( strMethod == "delaunay" && dimension == 3  )
+        // {
+        //     computeDelaunayInterpolant = true;
+        // }
+        // else
+        // {
+        //     computeTRProjection = true;
+        //     if( strMethod == "fv" ) strMethod = "";  // no sub-method necessary
+        // }
 
         // if( threetwooneD )
         // {
         //     strMethod = "bilin";
-        //     computeTR = true;
+        //     computeTRProjection = true;
         // }
 
         if( dimension == 3 ) use_3dprojection = true;
-        if( !computeMBA && !computeShepard && !computeTR ) computeMBA = true;
-
-        // only MBA is right now tested with 3D projections?
-        if( use_3dprojection ) computeMBA = true;
+        // if( ( !computeMBAInterpolant && !computeTRProjection  ) ||
+        //     use_3dprojection )  // only MBA is right now tested with 3D projections?
+        // computeMBAInterpolant = true;
     }
 
     /// @brief Method that prints out the runtime parameters in use for provenance
@@ -184,26 +352,30 @@ struct RuntimeContext
         // Print out the input parameters
         if( proc_id == 0 )
         {
-          std::stringstream sstr;
-          sstr << "********** Remap MPAS-to-ROMS **********" << std::endl << std::endl;
+            std::stringstream sstr;
+            sstr << "********** Remap MPAS-to-ROMS **********" << std::endl << std::endl;
 
-          sstr << " -- Runtime Parameters -- " << std::endl;
-          sstr << "   MPAS mesh file: " << mpas_filename << std::endl;
-          sstr << "   ROMS mesh file: " << roms_filename << std::endl;
+            sstr << " -- Runtime Parameters -- " << std::endl;
+            sstr << "   MPAS mesh file: " << mpas_filename << std::endl;
+            sstr << "   ROMS mesh file: " << roms_filename << std::endl;
 
-          sstr << "        Dimension: " << dimension << std::endl;
-          sstr << "        Algorithm: "
-               << ( nearestNeighbor ? "Nearest Neighbor mapping"
-                    : computeTR     ? "TempestRemap Conservative mapping"
-                    : computeMBA    ? "Multilevel B-spline Approximation"
-                                    : "Shepard interpolant" )
-               << std::endl;
-          if( computeTR ) sstr << "           Method: " << strMethod << std::endl;
-          sstr << " Bathymetry Order: " << bathymetryOrder << std::endl;
-          sstr << "      Field Order: " << fieldOrder << std::endl;
-          sstr << std::endl;
+            sstr << "        Dimension: " << dimension << std::endl;
+            // sstr << "        Algorithm: "
+            //  << ( computeNNInterpolant    ? "Nearest Neighbor mapping"
+            //           : computeTRProjection   ? "TempestRemap Conservative mapping"
+            //   : computeMBAInterpolant ? "Multilevel B-spline Approximation"
+            //                                   : "Shepard interpolant" )
+            //      << std::endl;
+            // if( computeTRProjection ) sstr << "           Method: " << strMethod << std::endl;
+            sstr << "   Field: Bathymetry, Method: " << GetMethod( field_methods["Bathymetry"].first )
+                 << ", Order: " << field_methods["Bathymetry"].second << std::endl;
+            sstr << "   Field: Salinity, Method: " << GetMethod( field_methods["Salinity"].first )
+                 << ", Order: " << field_methods["Salinity"].second << std::endl;
+            sstr << "   Field: Temperature, Method: " << GetMethod( field_methods["Temperature"].first )
+                 << ", Order: " << field_methods["Temperature"].second << std::endl;
+            sstr << std::endl;
 
-          std::cout << sstr.str() << std::endl;
+            std::cout << sstr.str() << std::endl;
         }
     }
 
@@ -222,8 +394,8 @@ struct RuntimeContext
         double locElapsed = mTimer.time_since_birth() - mTimerOps;
         if( proc_id == 0 )
         {
-          std::cout << "[LOG] Time taken to " << mOpName.c_str() << " := " << locElapsed << std::endl;
-          last_counter = locElapsed;
+            std::cout << "[LOG] Time taken to " << mOpName.c_str() << " := " << locElapsed << std::endl;
+            last_counter = locElapsed;
         }
         mOpName.clear();
     }
@@ -235,6 +407,23 @@ struct RuntimeContext
         return last_counter;
     }
 
+    /// @brief Computes the field projection for the variable according to method parameters requested by user
+    /// @param varProjectSrc Name of the source variable tag
+    /// @param varProjectDst Name of the target variable tag after projection
+    /// @param srcelems Source element list
+    /// @param dstelems Target element list
+    /// @param constantoffset If internal normalization is to be performed
+    /// @param src3delems If 3D, source element list of extruded cells
+    /// @param dst3delems If 3D, target element list of extruded cells
+    /// @return Error code
+    moab::ErrorCode ComputeFieldProjections( std::string varProjectSrc,
+                                             std::string varProjectDst,
+                                             std::vector< moab::EntityHandle >& srcelems,
+                                             std::vector< moab::EntityHandle >& dstelems,
+                                             const double constantoffset                   = 0.0,
+                                             std::vector< moab::EntityHandle >* src3delems = nullptr,
+                                             std::vector< moab::EntityHandle >* dst3delems = nullptr );
+
   private:
     moab::CpuTimer mTimer;
     double mTimerOps{ 0.0 };
@@ -242,20 +431,5 @@ struct RuntimeContext
 };
 
 // Forward declarations
-
-moab::ErrorCode ComputeFieldProjections( moab::Interface* mbi,
-                                         RuntimeContext& context,
-                                         std::string varProjectSrc,
-                                         std::string varProjectDst,
-                                         std::vector< moab::EntityHandle >& srcelems,
-                                         std::vector< moab::EntityHandle >& dstelems,
-                                         bool is_three_dimensional,
-                                         bool is_three2x1_dimensional,
-                                         bool normalize                                = true,
-                                         const double constantoffset                   = 0.0,
-                                         const std::string strMethod                   = "mba",
-                                         int order                                     = 3,
-                                         std::vector< moab::EntityHandle >* src3delems = nullptr,
-                                         std::vector< moab::EntityHandle >* dst3delems = nullptr );
 
 #endif  // __remap_mpas_roms_hpp__

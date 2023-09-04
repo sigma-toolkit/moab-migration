@@ -112,10 +112,18 @@ moab::ErrorCode LoadTempestRemapWeights( RuntimeContext& context,
 
 moab::ErrorCode ComputeTempestRemapWeights( RuntimeContext& context,
                                             moab::EntityHandle src_set,
-                                            moab::EntityHandle tgt_set,
-                                            std::string strMethod,
-                                            bool ensureMonotonicity )
+                                            moab::EntityHandle tgt_set )
 {
+    RemappingMethod rmethod = context.field_methods["Bathymetry"].first;
+    const int order         = context.field_methods["Bathymetry"].second;
+    std::string strMethod;
+    if( rmethod == TempestRemapBilinear )
+        strMethod = "bilin;normalize";
+    else if( rmethod == TempestRemapInvDist )
+        strMethod = "invdist;normalize";
+    else
+        strMethod = "";
+    const bool ensureMonotonicity = context.ensureMonotonicity;
     // err = remapper.ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( err );
     // err = remapper.ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( err );
     CloneToTRMesh( context.moab_interface, context.meshInput, src_set );
@@ -143,8 +151,8 @@ moab::ErrorCode ComputeTempestRemapWeights( RuntimeContext& context,
     std::string map_output_filename =
         std::string( template_map_output_filename ) + ( strMethod.size() ? strMethod : "fv" ) + ".nc";
     GenerateOfflineMapAlgorithmOptions mapOptions;
-    mapOptions.nPin             = 1;
-    mapOptions.nPout            = 1;
+    mapOptions.nPin             = order;
+    mapOptions.nPout            = order;
     mapOptions.fSourceConcave   = false;
     mapOptions.fTargetConcave   = false;
     mapOptions.strMethod        = strMethod;  // invdist, bilin, intbilin, delaunay

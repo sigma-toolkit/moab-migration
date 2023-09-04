@@ -47,4 +47,4 @@
         MB_CHK_ERR_CONT( err );                                \
     } while( false )
 
-#endif // __example_error_handler_hpp__
+#endif  // __example_error_handler_hpp__

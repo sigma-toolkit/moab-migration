@@ -12,7 +12,7 @@ moab::ErrorCode ScaleCoords( moab::Interface* mb,
                              std::vector< moab::EntityHandle >& nodes,
                              double R,
                              bool is_cartesian,
-                             bool is_threed )
+                             bool /*is_threed*/ )
 {
     moab::ErrorCode rval;
     double posi[3], posf[3], len = 0;
@@ -28,9 +28,9 @@ moab::ErrorCode ScaleCoords( moab::Interface* mb,
             rval = mb->get_coords( &nd, 1, posi );MB_CHK_ERR( rval );
             const double lat = posi[1] * 3.14159265358979323846 / 180;
             const double lon = posi[0] * 3.14159265358979323846 / 180;
-            posf[0]          = R * cos( lat ) * cos( lon );  // x coordinate
-            posf[1]          = R * cos( lat ) * sin( lon );  // y
-            posf[2]          = R * sin( lat );               // z
+            posf[0]          = cos( lat ) * cos( lon );  // x coordinate
+            posf[1]          = cos( lat ) * sin( lon );  // y
+            posf[2]          = sin( lat );               // z
             // spherical_to_cart( posi[1], posi[0], R, posf );
             // dbgprint( nd << " lat=" << posi[1] << ", lon=" << posi[0] << "; Cartesian = [" << posf[0] << ", " << posf[1] << ", " << posf[2] << "]" );
             // std::cout << "ERROR: We do not know how to scale z-coordinate if not cartesian\n";
@@ -42,6 +42,7 @@ moab::ErrorCode ScaleCoords( moab::Interface* mb,
         }
 
         len = std::sqrt( posf[0] * posf[0] + posf[1] * posf[1] + posf[2] * posf[2] );
+        // len = std::sqrt( posf[0] * posf[0] + posf[1] * posf[1] );
         if( len < 1e-12 )
         {
             std::cout << nd << " X=" << posf[0] << ", Y=" << posf[1] << ", Z = " << posf[2]
@@ -49,18 +50,17 @@ moab::ErrorCode ScaleCoords( moab::Interface* mb,
             return moab::MB_FAILURE;
         }
 
+        if( nit == nodes.begin() ) std::cout << "Length of the MPAS node magnitude: " << len << std::endl;
+
         // rescale to radius
         posf[0] *= R / len;
         posf[1] *= R / len;
-        if( is_threed && !is_cartesian )
-        {
-            posf[1] /= R / len;
-            // posf[2] = posi[2] / len;
-            // posf[2] /= axial_scaling;
-        }
-        else
-            posf[2] *= R / len;
-            // posf[2] /= len;
+        posf[2] *= R / len;
+        // posf[2] = 0.0;
+        // if( is_cartesian ) posf[2] *= R / len;
+        // else
+        //     posf[2] /= len;
+
         // if (is_threed)
         //     dbgprint( nd << " X=" << posf[0] << ", Y=" << posf[1] << ", Z = " << posf[2]  );
         rval = mb->set_coords( &nd, 1, posf );MB_CHK_ERR( rval );

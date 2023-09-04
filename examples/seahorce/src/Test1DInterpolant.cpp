@@ -30,12 +30,12 @@ typedef std::vector< double > Vector;
 int main()
 {
     // Example usage
-    Vector xA = { 1.0, 2.2, 3.7, 4.4, 5.6 };
-    Vector yA = { 2.0, 1.0, 3.0, 5.0, 4.0 };
+    Vector xA    = { 1.0, 2.2, 3.7, 4.4, 5.6 };
+    Vector yA    = { 2.0, 1.0, 3.0, 5.0, 4.0 };
     size_t nData = xA.size();
 
-    Vector queryPoints   = { 1.6, 5.0, 3.0, 0.2, 7.0, 2.2001 };
-    size_t nInterp       = queryPoints.size();
+    Vector queryPoints = { 1.6, 5.0, 3.0, 0.2, 7.0, 2.2001 };
+    size_t nInterp     = queryPoints.size();
     Vector queryMLIValue( nInterp );
 
     // Perform linear interpolation first

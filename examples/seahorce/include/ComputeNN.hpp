@@ -46,7 +46,7 @@ using KdTree = nanoflann::
     KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PC3D< double > >, PC3D< double >, 3 /* dim */
                               >;
 
-moab::ErrorCode ComputeNNInterpolant( RuntimeContext& ,
+moab::ErrorCode ComputeNNInterpolant( RuntimeContext&,
                                       const std::vector< double >& src_xyz,
                                       const std::vector< double >& src_tdata,
                                       const std::vector< double >& dst_xyz,
@@ -56,20 +56,17 @@ moab::ErrorCode ComputeNNInterpolant( RuntimeContext& ,
     constexpr size_t num_results = 1;
 
     // construct a kd-tree index:
-    double query_pt[3];  // dimension
     PC3D< double > cloud( src_xyz );
     KdTree tree( 3 /*dim*/, cloud, { 10 /* max leaf */ } );
-
-    size_t offset = 0;
-    for( size_t i = 0; i < dst_tdata.size(); i++, offset += 3 )
+#pragma omp parallel for shared( tree, dst_xyz, src_tdata, dst_tdata )
+    for( size_t i = 0; i < dst_tdata.size(); i++ )
     {
+        const size_t offset = i * 3;
         std::vector< size_t > srcindx( num_results );
         std::vector< double > srcdist( num_results );
         nanoflann::KNNResultSet< double > resultSet( num_results );
 
-        query_pt[0] = dst_xyz[offset];
-        query_pt[1] = dst_xyz[offset + 1];
-        query_pt[2] = dst_xyz[offset + 2];
+        const double* query_pt = dst_xyz.data() + offset;
 
         // Do a KNN search
         resultSet.init( srcindx.data(), srcdist.data() );

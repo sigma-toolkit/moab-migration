@@ -205,8 +205,12 @@ moab::ErrorCode SetupDelaunayInterpolant( RuntimeContext& context, std::vector< 
     // tetrahedrons = moab::Range( start_elem, start_elem + ntetrahedrons );
     // std::copy( out.tetrahedronlist, out.tetrahedronlist + ntetrahedrons * 4, connect );
 
-    context.dual_mpas_tetrahedron =
-        Eigen::Map< Eigen::Matrix< int, Eigen::Dynamic, 4 > >( out.tetrahedronlist, ntetrahedrons, 4 );
+    // context.dual_mpas_tetrahedron =
+    //     Eigen::Map< Eigen::Matrix< int, Eigen::Dynamic, 4 > >( out.tetrahedronlist, ntetrahedrons, 4 );
+
+    context.tetrahedraconn.resize( ntetrahedrons * 4 );
+    std::copy( out.tetrahedronlist, out.tetrahedronlist + ntetrahedrons * 4, context.tetrahedraconn.begin() );
+
     std::vector< double > tetcentroids( ntetrahedrons, 0.0 );
 // #pragma omp parallel for shared( tetcentroids, xyzd )
     for( auto index = 0; index < ntetrahedrons; index++ )
@@ -215,8 +219,7 @@ moab::ErrorCode SetupDelaunayInterpolant( RuntimeContext& context, std::vector< 
         for( auto eindex = 0; eindex < 4; eindex++ )
         {
             for( auto cindex = 0; cindex < 3; cindex++ )
-                tetcentroids[offset + cindex] +=
-                    xyzd[context.dual_mpas_tetrahedron( index, eindex ) * 3 + cindex];
+                tetcentroids[offset + cindex] += xyzd[context.tetrahedraconn[index * 4 +  eindex] * 3 + cindex];
         }
         for( auto cindex = 0; cindex < 3; cindex++ )
             tetcentroids[offset + cindex] /= 4;  // centroid of the tetrahedron
@@ -233,7 +236,7 @@ moab::ErrorCode SetupDelaunayInterpolant( RuntimeContext& context, std::vector< 
     {
         for( auto ic = 0; ic < 4; ic++ )
         {
-            const int iv                              = context.dual_mpas_tetrahedron( ie, ic );
+            const int iv                              = context.tetrahedraconn[ie * 4 + ic];
             const int size                            = context.vertex_to_element( iv, 0 );
             context.vertex_to_element( iv, size + 1 ) = ie;
             context.vertex_to_element( iv, 0 )        = size + 1;
@@ -397,29 +400,50 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
 
             for (int it = 1; it < v2e(0)+1; ++it)
             {
-                Vec4i connectivity = context.dual_mpas_tetrahedron( v2e( it ), Eigen::all );
+                const int* connectivity = &context.tetrahedraconn[v2e( it ) * 4];
                 // int nnodes;
                 // runchk( context.moab_interface->get_connectivity( element, connectivity, nnodes, true ) );
                 // assert( nnodes == 4 ); // we are expecting only tetrahedrons
 
                 double vcoords[12];
-                std::copy( xyzld.data() + connectivity( 0 ) * 3, xyzld.data() + connectivity( 0 ) * 3 + 3, vcoords );
-                std::copy( xyzld.data() + connectivity( 1 ) * 3, xyzld.data() + connectivity( 1 ) * 3 + 3, vcoords + 3 );
-                std::copy( xyzld.data() + connectivity( 2 ) * 3, xyzld.data() + connectivity( 2 ) * 3 + 3, vcoords + 6 );
-                std::copy( xyzld.data() + connectivity( 3 ) * 3, xyzld.data() + connectivity( 3 ) * 3 + 3, vcoords + 9 );
-                // runchk( context.moab_interface->get_coords( connectivity, nnodes, vcoords ) );
+                std::copy( xyzld.data() + connectivity[0] * 3, xyzld.data() + connectivity[0] * 3 + 3, vcoords );
+                std::copy( xyzld.data() + connectivity[1] * 3, xyzld.data() + connectivity[1] * 3 + 3, vcoords + 3 );
+                std::copy( xyzld.data() + connectivity[2] * 3, xyzld.data() + connectivity[2] * 3 + 3, vcoords + 6 );
+                std::copy( xyzld.data() + connectivity[3] * 3, xyzld.data() + connectivity[3] * 3 + 3, vcoords + 9 );
 
                 Vec4d bcoords;
                 if( bary_tet( vcoords, query_pt, bcoords ) )  // tetrahedron_barycentric
                 {
-                    // std::cout << "Query: " << "Connectivity: " << connectivity << ", Barycentric coords: " << bcoords << std::endl;
+                    Eigen::Map< const Eigen::Matrix< int, 1, 4 > > conn( connectivity, 1, 4 );
                     fi[index] = 0.0;
+                    // std::cout << "Query point: " << query_pt[0] << ", " << query_pt[1] << ", " << query_pt[2]
+                            //   << std::endl;
                     for( auto ic = 0; ic < 4; ++ic )
                     {
-                        fi[index] += fd[connectivity( ic )] * bcoords( ic );
+                        // std::cout << "\t ic = " << connectivity[ic] << ", bcoords( ic ) = " << bcoords( ic )
+                        //           << ", pvalue = " << fd[connectivity[ic]] << std::endl;
+                        fi[index] += fd[connectivity[ic]] * bcoords( ic );
                     }
                     found = true;
+                    // std::cout << " Interpolated value = " << fi[index] << std::endl << std::endl;
                     break;
+
+                    // // std::cout << "Query: " << "Connectivity: " << connectivity << ", Barycentric coords: " << bcoords << std::endl;
+                    // fi[index] = 0.0;
+                    // for( auto ic = 0; ic < 4; ++ic )
+                    // {
+                    //     fi[index] += fd[connectivity( ic )] * bcoords( ic );
+                    // }
+                    // found = true;
+                    // break;
+                }
+                else
+                {
+                    if( srcdist[jindex] < mindist )
+                    {
+                        mindist  = srcdist[jindex];
+                        minindex = srcindx[jindex];
+                    }
                 }
             }
 
@@ -433,10 +457,11 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
             //           << ") not found in the domain; mindist = " << mindist << ", minindex = " << minindex << std::endl;
 
             // std::cin.get();
-            Vec4i connectivity = context.dual_mpas_tetrahedron( minindex, Eigen::all );
+            const int* connectivity = &context.tetrahedraconn[minindex * 4];
             fi[index]          = 1.0 / 4 *
-                        ( fd[connectivity( 0 )] + fd[connectivity( 1 )] + fd[connectivity( 2 )] +
-                          fd[connectivity( 3 )] );  // assign value of first vertex (extrapolant); this is arbitrary
+                        ( fd[connectivity[0]] + fd[connectivity[1]] + fd[connectivity[2]] +
+                          fd[connectivity[3]] );  // assign value of first vertex (extrapolant); this is arbitrary
+            // fi[index] = fd[connectivity[0]];
             num_not_found++;
         }
     }

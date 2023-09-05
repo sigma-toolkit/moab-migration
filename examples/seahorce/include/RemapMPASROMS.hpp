@@ -80,7 +80,8 @@ struct RuntimeContext
     moab::EntityHandle partnset{ 0 };
     moab::EntityHandle mpasset, mpas_covering_set, romsset;
 
-    Eigen::Matrix< int, Eigen::Dynamic, 4 > dual_mpas_tetrahedron;
+    // Eigen::Matrix< int, Eigen::Dynamic, 4 > dual_mpas_tetrahedron;
+    std::vector< int > tetrahedraconn;
     Eigen::Matrix< int, Eigen::Dynamic, Eigen::Dynamic > vertex_to_element;
     std::vector< double > dual_mpas_tetrahedron_centroids;
     // moab::Range mpas_elems, mpas_verts;

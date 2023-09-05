@@ -32,6 +32,10 @@ Test1DInterpolant: Test1DInterpolant.o ${MOAB_LIBDIR}/libMOAB.la
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
+TestDelaunay: TestDelaunay.o ${MOAB_LIBDIR}/libMOAB.la  libtet.a
+	@echo "[CXXLD]  $@"
+	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}  libtet.a
+
 define compile-command
 ${VERBOSE}${MOAB_CXX} ${CXXFLAGS} ${MOAB_CXXFLAGS} ${MOAB_CPPFLAGS} ${MOAB_INCLUDES} -DMESH_DIR=\"${MESH_DIR}\" -c $<
 endef

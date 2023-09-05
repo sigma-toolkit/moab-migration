@@ -81,6 +81,7 @@ struct RuntimeContext
     moab::EntityHandle mpasset, mpas_covering_set, romsset;
 
     Eigen::Matrix< int, Eigen::Dynamic, 4 > dual_mpas_tetrahedron;
+    Eigen::Matrix< int, Eigen::Dynamic, Eigen::Dynamic > vertex_to_element;
     std::vector< double > dual_mpas_tetrahedron_centroids;
     // moab::Range mpas_elems, mpas_verts;
     // moab::Range roms_elems, roms_verts;
@@ -226,37 +227,14 @@ struct RuntimeContext
         // Problem setup
         opts.addOpt< int >( "dimension", "Compute 2D surface or 3D volumetric coupling (default=2)", &dimension );
         opts.addOpt< void >( "setup", "Compute full mesh extrusions needed for coupling in 3D", &generateExtrusions );
-        // opts.addOpt< std::string >( "bathymetrymethod",
-        //                             "Additional computational method arguments (fv, invdist, bilin, intbilin, "
-        //                             "delaunay, shepard, mba). default=MBA",
-        //                             &bathymetryMethod );
-        // opts.addOpt< std::string >( "method",
-        //                             "Additional computational method arguments (fv, invdist, bilin, intbilin, "
-        //                             "delaunay, shepard, mba). default=MBA",
-        //                             &strMethod );
         opts.addOpt< void >( "mono", "Ensure monotonicity in the weight generation (only for TR-FV)",
                              &ensureMonotonicity );
         opts.addOpt< void >( "321D", "Compute three-dimensional projections using a 2Dx1D approach", &threetwooneD );
         opts.addOpt< void >( "1D2D", "Use 1Dx2D as opposed to 2Dx1D for 321D projection", &oneDfirst );
-        ;
         opts.addOpt< void >(
             "normalize",
             "Re-normalize interpolant to preserve global field integral (only 2D and requires mesh intersection)",
             &normalize );
-        // opts.addOpt< int >( "bathymetryOrder",
-        //                     "Specify order of Bathymetry reconstruction. \n"
-        //                     "\tTR: method='' -> FV order, method='invdist,bilin,intbilin' -> order 2, \n"
-        //                     "\tShepard: shepard_power=order\n"
-        //                     "\tMBA: order=1 -> bilinear, else order 3\n"
-        //                     "(default=MBA3)",
-        //                     &bathymetryOrder );
-        // opts.addOpt< int >( "fieldOrder",
-        //                     "Specify order for Temperature and Salinity field projection. \n"
-        //                     "\tTR: method='' -> FV order, method='invdist,bilin,intbilin' -> order 2, \n"
-        //                     "\tShepard: shepard_power=order\n"
-        //                     "\tMBA: order=1 -> bilinear, else order 3\n"
-        //                     "(default=MBA1)",
-        //                     &fieldOrder );
 
         std::string fmethodorder = "";
         opts.addOpt< std::string >( "methodorder",
@@ -310,40 +288,7 @@ struct RuntimeContext
             }
         }
 
-        // if( strMethod == "shepard" )
-        // {
-        //     computeShepardInterpolant = true;
-        // }
-        // else if( strMethod == "mba" )
-        // {
-        //     computeMBAInterpolant = true;
-        //     // if( order == 1 ) strMethod = "mba:linear";
-        //     // else strMethod = "mba:cubic";
-        // }
-        // else if( strMethod == "nn" )
-        // {
-        //     computeNNInterpolant = true;
-        // }
-        // else if( strMethod == "delaunay" && dimension == 3  )
-        // {
-        //     computeDelaunayInterpolant = true;
-        // }
-        // else
-        // {
-        //     computeTRProjection = true;
-        //     if( strMethod == "fv" ) strMethod = "";  // no sub-method necessary
-        // }
-
-        // if( threetwooneD )
-        // {
-        //     strMethod = "bilin";
-        //     computeTRProjection = true;
-        // }
-
         if( dimension == 3 ) use_3dprojection = true;
-        // if( ( !computeMBAInterpolant && !computeTRProjection  ) ||
-        //     use_3dprojection )  // only MBA is right now tested with 3D projections?
-        // computeMBAInterpolant = true;
     }
 
     /// @brief Method that prints out the runtime parameters in use for provenance

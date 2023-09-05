@@ -240,10 +240,10 @@ moab::ErrorCode SetupDelaunayInterpolant( RuntimeContext& context, std::vector< 
         }
     }
 
-    for( auto ie = 0; ie < nvertices; ++ie )
-        std::cout << "Vertex: " << ie << ",  nAdjacentelements: " << context.vertex_to_element( ie, 0 ) << std::endl;
+    // for( auto ie = 0; ie < nvertices; ++ie )
+    //     std::cout << "Vertex: " << ie << ",  nAdjacentelements: " << context.vertex_to_element( ie, 0 ) << std::endl;
 
-    std::cin.get();
+    // std::cin.get();
     // context.dual_mpas_tetrahedron_centroids = std::vector< double >( ntetrahedrons, 0.0 );
     // for( auto index = 0; index < ntetrahedrons; index++ )
     // {
@@ -329,7 +329,6 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
     tree.computeBoundingBox( bbox_src );
     printf( "Source bounding boxes: (%f, %f), (%f, %f), (%3.10e, %3.10e)\n", bbox_src[0].low, bbox_src[0].high, bbox_src[1].low,
             bbox_src[1].high, bbox_src[2].low, bbox_src[2].high );
-    std::cin.get();
 
     const size_t num_results = 1;
     nanoflann::KNNResultSet< double > resultSet( num_results );
@@ -394,7 +393,7 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
             VecXi v2e =
                 context.vertex_to_element( element_index, Eigen::all );//.head( context.vertex_to_element( element_index, 0 ) + 1 );
 
-            printf( "%d: Found nearest vertex with element adjacencies: %d\n ", element_index, v2e( 0 ) );
+            // printf( "%d: Found nearest vertex with element adjacencies: %d\n ", element_index, v2e( 0 ) );
 
             for (int it = 1; it < v2e(0)+1; ++it)
             {

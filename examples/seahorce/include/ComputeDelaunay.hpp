@@ -7,7 +7,146 @@
 #include <Eigen/Dense>
 #include "moab/Matrix3.hpp"
 
-constexpr double mpas_radius = 63712200.0;
+constexpr double mpas_radius = 637122.0;
+
+typedef Eigen::Matrix< double, 4, 1 > Vec4d;
+/*============================================================================*/
+void crossProduct( double* ans, double* v1, double* v2 )
+/*==============================================================================
+ This function gives the cross product of two vectors.
+
+ Input  Type[len]  Description
+ -----  ---------  -----------
+ *ans   double[3]  Pointer to an answer array. Values will be overwritten
+ *v1    double[3]  Pointer to array of vector 1 components
+ *v2    double[3]  Pointer to array of vector 2 components
+
+ No outputs other than *ans
+
+*=============================================================================*/
+{
+    ans[0] = v1[1] * v2[2] - v1[2] * v2[1];
+    ans[1] = v1[2] * v2[0] - v1[0] * v2[2];
+    ans[2] = v1[0] * v2[1] - v1[1] * v2[0];
+    return;
+}
+
+/*============================================================================*/
+double dotProduct( double* v1, double* v2 )
+/*==============================================================================
+ This function gives the dot product of two vectors.
+
+ Input  Type[len]  Description
+ -----  ---------  -----------
+ *v1    double[3]  Pointer to array of vector 1 components
+ *v2    double[3]  Pointer to array of vector 2 components
+
+ Output  Type      Description
+ ------ ------     -----------
+ result double     the dot product
+
+*=============================================================================*/
+{
+    double result = v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
+    return ( result );
+}
+
+/*============================================================================*/
+static bool bary_tet( const double vcoords[12], const double p[3], Vec4d& bcoords )
+/*==============================================================================
+ This function gives the barycentric coordinates for a tetrahedron in 3 dimensions.
+ It works by calculating the volume of the subtetrahedron using the scalar triple
+ product. { V_tet = 1/6 * v1 * ( v2 x v2 ) }
+
+ This works for points outside the tetrahedron as well.
+
+ Input  Type[len]  Description
+ -----  ---------  -----------
+ *ans    double[4]  Pointer to an answer array. Values 0-3 will be overwritten
+ *p      double[3]  Pointer to array of (x,y,z) coordinates for the test point
+ *a      double[3]  Pointer to array of (x,y,z) coordinates for tet node 1
+ *b      double[3]  Pointer to array of (x,y,z) coordinates for tet node 2
+ *c      double[3]  Pointer to array of (x,y,z) coordinates for tet node 3
+ *d      double[3]  Pointer to array of (x,y,z) coordinates for tet node 4
+
+ No outputs other than *ans
+
+ The node order for a tetrahedron is conterclockwise around the base, then up.
+
+         4               3
+          /|\             |.
+         / | \            | . .
+        /  |  \           |  .   .  2
+       /   |   \          |    .  /\
+      /    |    \         |     ./  \
+     /     |     \        |     / .  \
+    /      |      \       |    /   .  \
+ 0 /_______|_______\ 2    |   /     .  \
+   \       |       /      |  /        . \
+    \      |      /       | /          . \
+     \     |     /        |/_____________.\
+      \    |    /        0                  1
+       \   |   /
+        \  |  /
+         \ | /
+          \|/
+            1
+
+
+*=============================================================================*/
+{
+    const double* a = &vcoords[0];
+    const double* b = &vcoords[3];
+    const double* c = &vcoords[6];
+    const double* d = &vcoords[9];
+    double vap[3];
+    double vbp[3];
+    double vcp[3];
+    double vdp[3];
+    double vab[3];
+    double vac[3];
+    double vad[3];
+    double vbc[3];
+    double vbd[3];
+    double va;
+    double vb;
+    double vc;
+    double vd;
+    double v;
+    double temp[3];
+
+    int i;
+
+    for( i = 0; i < 3; i++ )
+    {
+        vap[i] = p[i] - a[i];
+        vbp[i] = p[i] - b[i];
+        vcp[i] = p[i] - c[i];
+        vdp[i] = p[i] - d[i];
+        vab[i] = b[i] - a[i];
+        vac[i] = c[i] - a[i];
+        vad[i] = d[i] - a[i];
+        vbc[i] = c[i] - b[i];
+        vbd[i] = d[i] - b[i];
+    }
+    crossProduct( temp, vbd, vbc );
+    va = dotProduct( vbp, temp ) / 6.0;
+    crossProduct( temp, vac, vad );
+    vb = dotProduct( vap, temp ) / 6.0;
+    crossProduct( temp, vad, vab );
+    vc = dotProduct( vap, temp ) / 6.0;
+    crossProduct( temp, vab, vac );
+    vd = dotProduct( vap, temp ) / 6.0;
+    crossProduct( temp, vac, vad );
+    v = dotProduct( vab, temp ) / 6.0;
+
+    bcoords( 0 ) = va / v;
+    bcoords( 1 ) = vb / v;
+    bcoords( 2 ) = vc / v;
+    bcoords( 3 ) = vd / v;
+
+    return !( ( bcoords.array() < 0 ).any() );
+}
 
 moab::ErrorCode SetupDelaunayInterpolant( RuntimeContext& context, std::vector< double >& xyzd )
 {
@@ -192,7 +331,7 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
             bbox_src[1].high, bbox_src[2].low, bbox_src[2].high );
     std::cin.get();
 
-    const size_t num_results = 3;
+    const size_t num_results = 1;
     nanoflann::KNNResultSet< double > resultSet( num_results );
     int num_not_found = 0;
     for( size_t index = 0; index < ni; index++ )
@@ -272,7 +411,7 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
                 // runchk( context.moab_interface->get_coords( connectivity, nnodes, vcoords ) );
 
                 Vec4d bcoords;
-                if( tetrahedron_barycentric( vcoords, query_pt, bcoords ) )
+                if( bary_tet( vcoords, query_pt, bcoords ) )  // tetrahedron_barycentric
                 {
                     // std::cout << "Query: " << "Connectivity: " << connectivity << ", Barycentric coords: " << bcoords << std::endl;
                     fi[index] = 0.0;

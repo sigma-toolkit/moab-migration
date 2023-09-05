@@ -3,7 +3,6 @@
 #include "tetgen.h"  // Defined tetgenio, tetrahedralize().
 #include "ComputeNN.hpp"
 #include <Eigen/Dense>
-#include "moab/Matrix3.hpp"
 
 constexpr double mpas_radius = 1.0;
 
@@ -61,20 +60,6 @@ void Setup( std::vector< double >& xyzd )
 
     printf( "Number of points: %d, triangles: %d, tetrahedra: %d\n", nvertices, ntrianglefaces, ntetrahedrons );
 
-    // moab::ReadUtilIface* read_iface;
-    // runchk( context.moab_interface->query_interface( read_iface ), "Error in query_interface" );
-
-    // // Create quads
-    // moab::EntityHandle start_elem;
-    // moab::EntityHandle* connect;
-    // runchk( read_iface->get_element_connect( ntetrahedrons, 4, moab::MBTET, 0, start_elem, connect ),
-    //         "Error in get_element_connect" );
-    // moab::Range& tetrahedrons = context.mpas3d_dual_elems;
-    // tetrahedrons = moab::Range( start_elem, start_elem + ntetrahedrons );
-    // std::copy( out.tetrahedronlist, out.tetrahedronlist + ntetrahedrons * 4, connect );
-
-    // tetrahedraconn =
-    //     Eigen::Map< Eigen::Matrix< int, Eigen::Dynamic, 4 > >( out.tetrahedronlist, ntetrahedrons, 4 );
     tetrahedraconn.resize( ntetrahedrons * 4 );
     std::copy( out.tetrahedronlist, out.tetrahedronlist + ntetrahedrons * 4, tetrahedraconn.begin() );
 
@@ -96,8 +81,6 @@ void Setup( std::vector< double >& xyzd )
         if( ie < 10 )
             std::cout << "Vertex: " << ie << ",  nAdjacentelements: " << vertex_to_element( ie, 0 )
                       << std::endl;
-
-    // std::cin.get();
 
     // Output mesh to files 'mpasdel3d.node', 'mpasdel3d.ele' and 'mpasdel3d.face'.
     // out.save_nodes( "mpasdel3d" );
@@ -141,8 +124,8 @@ void ComputeDelaunayInterpolant( std::vector< double >& xyzd,
     size_t ni = fi.size();
 
     std::vector< double > xyzld( xyzd );
-    for( size_t in = 0; in < ni; in++ )
-        xyzld[3 * in + 2] /= mpas_radius;
+    // for( size_t in = 0; in < ni; in++ )
+    //     xyzld[3 * in + 2] /= mpas_radius;
     // PC3D< double > cloud( context.dual_mpas_tetrahedron_centroids );
     PC3D< double > cloud( xyzld );
     KdTree tree( 3 /*dim*/, cloud, { 10 /* max leaf */ } );
@@ -151,9 +134,8 @@ void ComputeDelaunayInterpolant( std::vector< double >& xyzd,
     tree.computeBoundingBox( bbox_src );
     printf( "Source bounding boxes: (%f, %f), (%f, %f), (%3.10e, %3.10e)\n", bbox_src[0].low, bbox_src[0].high, bbox_src[1].low,
             bbox_src[1].high, bbox_src[2].low, bbox_src[2].high );
-    std::cin.get();
 
-    const size_t num_results = 5;
+    const size_t num_results = 1;
     nanoflann::KNNResultSet< double > resultSet( num_results );
     int num_not_found = 0;
     for( size_t index = 0; index < ni; index++ )
@@ -175,44 +157,6 @@ void ComputeDelaunayInterpolant( std::vector< double >& xyzd,
             // Perform the natural interpolation on the element
             size_t element_index = srcindx[jindex];
 
-#ifdef USE_DUAL_TETS
-            Vec4i connectivity = context.dual_mpas_tetrahedron( element_index, Eigen::all );
-            // int nnodes;
-            // runchk( context.moab_interface->get_connectivity( element, connectivity, nnodes, true ) );
-            // assert( nnodes == 4 ); // we are expecting only tetrahedrons
-
-            double vcoords[12];
-            std::copy( xyzd.data() + connectivity( 0 ) * 3, xyzd.data() + connectivity( 0 ) * 3 + 3, vcoords );
-            std::copy( xyzd.data() + connectivity( 1 ) * 3, xyzd.data() + connectivity( 1 ) * 3 + 3, vcoords + 3 );
-            std::copy( xyzd.data() + connectivity( 2 ) * 3, xyzd.data() + connectivity( 2 ) * 3 + 3, vcoords + 6 );
-            std::copy( xyzd.data() + connectivity( 3 ) * 3, xyzd.data() + connectivity( 3 ) * 3 + 3, vcoords + 9 );
-            // runchk( context.moab_interface->get_coords( connectivity, nnodes, vcoords ) );
-            vcoords[2] /= mpas_radius;
-            vcoords[5] /= mpas_radius;
-            vcoords[8] /= mpas_radius;
-            vcoords[11] /= mpas_radius;
-
-            Vec4d bcoords;
-            if( tetrahedron_barycentric( vcoords, query_pt, bcoords ) )
-            {
-                // std::cout << "Query: " << "Connectivity: " << connectivity << ", Barycentric coords: " << bcoords << std::endl;
-                fi[index] = 0.0;
-                for( auto ic = 0; ic < 4; ++ic )
-                {
-                    fi[index] += fd[connectivity( ic )] * bcoords( ic );
-                }
-                found = true;
-                break;
-            }
-            else
-            {
-                if( srcdist[jindex] < mindist )
-                {
-                    mindist  = srcdist[jindex];
-                    minindex = srcindx[jindex];
-                }
-            }
-#else
             VecXi v2e =
                 vertex_to_element( element_index, Eigen::all );//.head( context.vertex_to_element( element_index, 0 ) + 1 );
 
@@ -237,19 +181,21 @@ void ComputeDelaunayInterpolant( std::vector< double >& xyzd,
                 {
                     Eigen::Map< const Eigen::Matrix< int, 1, 4 > > conn( connectivity, 1, 4 );
                     fi[index] = 0.0;
+                    std::cout << "Query point: " << query_pt[0] << ", " << query_pt[1] << ", " << query_pt[2]
+                              << std::endl;
                     for( auto ic = 0; ic < 4; ++ic )
                     {
+                        std::cout << "\t ic = " << connectivity[ic] << ", bcoords( ic ) = " << bcoords( ic )
+                                  << ", pvalue = " << fd[connectivity[ic]] << std::endl;
                         fi[index] += fd[connectivity[ic]] * bcoords( ic );
                     }
                     found = true;
-                    std::cout << "Query: "
-                              << "Connectivity: " << conn << ", Barycentric coords: " << bcoords << ", Interpolated = " << fi[index] << std::endl;
+                    std::cout << " Interpolated value = " << fi[index] << std::endl << std::endl;
                     break;
                 }
             }
 
-            // if( found ) break;
-#endif
+            if( found ) break;
         }
         // assert( found );
         if( !found )
@@ -276,17 +222,18 @@ int main()
     std::vector< double > xyzd = { -2, 0, 0, -1, 1, 0, 1, 1, 0, 2, 0, 0, 1, -1, 0, -1, -1, 0,
                                    -2, 0, 1, -1, 1, 1, 1, 1, 1, 2, 0, 1, 1, -1, 1, -1, -1, 1 };
     // std::vector< double > fd   = { 10, 12, 8, 3, 0.5, 0, 20, 22, 15, 6, 1, 0.1 };
-    std::vector< double > fd   = { 1, 1, 1, 1, 1, 1, 20, 22, 15, 6, 1, 0.1 };
+    std::vector< double > fd   = { 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2 };
     constexpr int Ni           = 2;
     std::vector< double > xyzi = { 0, 0, 0, -1, 0, 0.5 };
     std::vector< double > fi( Ni );
+    std::vector< double > fi_expected = { 1, 1.5 };
 
     Setup( xyzd );
 
     ComputeDelaunayInterpolant( xyzd, fd, xyzi, fi );
 
-    printf( "Value at point (%f, %f, %f) = %f\n", xyzi[0], xyzi[1], xyzi[2], fi[0] );
-    printf( "Value at point (%f, %f, %f) = %f\n", xyzi[3], xyzi[4], xyzi[5], fi[1] );
+    printf( "Value at point (%f, %f, %f) = %f; Expected = %f\n", xyzi[0], xyzi[1], xyzi[2], fi[0], fi_expected[0] );
+    printf( "Value at point (%f, %f, %f) = %f; Expected = %f\n", xyzi[3], xyzi[4], xyzi[5], fi[1], fi_expected[1] );
 
     return 0;
 }

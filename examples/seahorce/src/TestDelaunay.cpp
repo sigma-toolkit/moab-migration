@@ -15,6 +15,47 @@ typedef Eigen::Matrix< double, 3, 3 > Mat3d;
 std::vector< int > tetrahedraconn;
 Eigen::Matrix< int, Eigen::Dynamic, Eigen::Dynamic > vertex_to_element;
 
+/*============================================================================*/
+void crossProduct( double* ans, double* v1, double* v2 )
+/*==============================================================================
+ This function gives the cross product of two vectors.
+
+ Input  Type[len]  Description
+ -----  ---------  -----------
+ *ans   double[3]  Pointer to an answer array. Values will be overwritten
+ *v1    double[3]  Pointer to array of vector 1 components
+ *v2    double[3]  Pointer to array of vector 2 components
+
+ No outputs other than *ans
+
+*=============================================================================*/
+{
+    ans[0] = v1[1] * v2[2] - v1[2] * v2[1];
+    ans[1] = v1[2] * v2[0] - v1[0] * v2[2];
+    ans[2] = v1[0] * v2[1] - v1[1] * v2[0];
+    return;
+}
+
+/*============================================================================*/
+double dotProduct( double* v1, double* v2 )
+/*==============================================================================
+ This function gives the dot product of two vectors.
+
+ Input  Type[len]  Description
+ -----  ---------  -----------
+ *v1    double[3]  Pointer to array of vector 1 components
+ *v2    double[3]  Pointer to array of vector 2 components
+
+ Output  Type      Description
+ ------ ------     -----------
+ result double     the dot product
+
+*=============================================================================*/
+{
+    double result = v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
+    return ( result );
+}
+
 void Setup( std::vector< double >& xyzd )
 {
     tetgenio in, out;
@@ -86,6 +127,103 @@ void Setup( std::vector< double >& xyzd )
     // out.save_nodes( "mpasdel3d" );
     // out.save_faces( "mpasdel3d" );
     // out.save_elements( "mpasdel3d" );
+}
+
+/*============================================================================*/
+static bool bary_tet( const double vcoords[12], const double p[3], Vec4d& bcoords )
+/*==============================================================================
+ This function gives the barycentric coordinates for a tetrahedron in 3 dimensions.
+ It works by calculating the volume of the subtetrahedron using the scalar triple
+ product. { V_tet = 1/6 * v1 * ( v2 x v2 ) }
+
+ This works for points outside the tetrahedron as well.
+
+ Input  Type[len]  Description
+ -----  ---------  -----------
+ *ans    double[4]  Pointer to an answer array. Values 0-3 will be overwritten
+ *p      double[3]  Pointer to array of (x,y,z) coordinates for the test point
+ *a      double[3]  Pointer to array of (x,y,z) coordinates for tet node 1
+ *b      double[3]  Pointer to array of (x,y,z) coordinates for tet node 2
+ *c      double[3]  Pointer to array of (x,y,z) coordinates for tet node 3
+ *d      double[3]  Pointer to array of (x,y,z) coordinates for tet node 4
+
+ No outputs other than *ans
+
+ The node order for a tetrahedron is conterclockwise around the base, then up.
+
+         4               3
+          /|\             |.
+         / | \            | . .
+        /  |  \           |  .   .  2
+       /   |   \          |    .  /\
+      /    |    \         |     ./  \
+     /     |     \        |     / .  \
+    /      |      \       |    /   .  \
+ 0 /_______|_______\ 2    |   /     .  \
+   \       |       /      |  /        . \
+    \      |      /       | /          . \
+     \     |     /        |/_____________.\
+      \    |    /        0                  1
+       \   |   /
+        \  |  /
+         \ | /
+          \|/
+            1
+
+
+*=============================================================================*/
+{
+    const double* a = &vcoords[0];
+    const double* b = &vcoords[3];
+    const double* c = &vcoords[6];
+    const double* d = &vcoords[9];
+    double vap[3];
+    double vbp[3];
+    double vcp[3];
+    double vdp[3];
+    double vab[3];
+    double vac[3];
+    double vad[3];
+    double vbc[3];
+    double vbd[3];
+    double va;
+    double vb;
+    double vc;
+    double vd;
+    double v;
+    double temp[3];
+
+    int i;
+
+    for( i = 0; i < 3; i++ )
+    {
+        vap[i] = p[i] - a[i];
+        vbp[i] = p[i] - b[i];
+        vcp[i] = p[i] - c[i];
+        vdp[i] = p[i] - d[i];
+        vab[i] = b[i] - a[i];
+        vac[i] = c[i] - a[i];
+        vad[i] = d[i] - a[i];
+        vbc[i] = c[i] - b[i];
+        vbd[i] = d[i] - b[i];
+    }
+    crossProduct( temp, vbd, vbc );
+    va = dotProduct( vbp, temp ) / 6.0;
+    crossProduct( temp, vac, vad );
+    vb = dotProduct( vap, temp ) / 6.0;
+    crossProduct( temp, vad, vab );
+    vc = dotProduct( vap, temp ) / 6.0;
+    crossProduct( temp, vab, vac );
+    vd = dotProduct( vap, temp ) / 6.0;
+    crossProduct( temp, vac, vad );
+    v = dotProduct( vab, temp ) / 6.0;
+
+    bcoords(0) = va / v;
+    bcoords(1) = vb / v;
+    bcoords(2) = vc / v;
+    bcoords(3) = vd / v;
+
+    return !( ( bcoords.array() < 0 ).any() );
 }
 
 /// @brief Compute the barycentric coordinates of a tetrahedron in physical space
@@ -224,7 +362,7 @@ int main()
     // std::vector< double > fd   = { 10, 12, 8, 3, 0.5, 0, 20, 22, 15, 6, 1, 0.1 };
     std::vector< double > fd   = { 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2 };
     constexpr int Ni           = 2;
-    std::vector< double > xyzi = { 0, 0, 0, -1, 0, 0.5 };
+    std::vector< double > xyzi = { -1.1, 1, 0, -1, 0, 0.5 };
     std::vector< double > fi( Ni );
     std::vector< double > fi_expected = { 1, 1.5 };
 

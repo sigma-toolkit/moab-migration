@@ -3,7 +3,15 @@ include ../makefile.config
 
 default: all
 
-MOAB_CXXFLAGS += -Xpreprocessor -fopenmp
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+	MOAB_CXXFLAGS += -fopenmp
+	MOAB_LIBS_LINK += -fopenmp
+endif
+ifeq ($(UNAME_S),Darwin)
+	MOAB_CXXFLAGS += -Xpreprocessor -fopenmp
+	MOAB_LIBS_LINK += -L/opt/homebrew/Cellar/libomp/16.0.6/lib -lomp
+endif
 MOAB_CXXFLAGS += -Iinclude
 
 # PREDCXXFLAGS is for compiling J. Shewchuk's predicates. 
@@ -15,7 +23,7 @@ all: RemapMPASROMS
 RemapMPASROMS.o: include/*.hpp
 RemapMPASROMS: RemapMPASROMS.o ${MOAB_LIBDIR}/libMOAB.la libtet.a
 	@echo "[CXXLD]  $@"
-	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK} -L/opt/homebrew/Cellar/libomp/16.0.6/lib -lomp libtet.a
+	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK} libtet.a
 
 libtet.a: src/tetgen.cxx predicates.o
 	${VERBOSE}${MOAB_CXX} ${CXXFLAGS} ${MOAB_CXXFLAGS} -DTETLIBRARY -c src/tetgen.cxx

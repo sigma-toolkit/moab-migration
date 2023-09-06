@@ -7,9 +7,8 @@
 #include <Eigen/Dense>
 #include "moab/Matrix3.hpp"
 
-#define USE_DUAL_TETS
-#define N_MAX_V2EADJACENCIES 128
-constexpr double mpas_radius = 637122.0;
+// constexpr double rescale_factor = 6.37122E4;
+constexpr double rescale_factor = 2E4;
 
 typedef Eigen::Matrix< double, 4, 1 > Vec4d;
 /*============================================================================*/
@@ -167,7 +166,7 @@ moab::ErrorCode SetupDelaunayInterpolant( RuntimeContext& context, std::vector< 
     in.numberofpointattributes = 0;
 
     for( auto ix = 0; ix < in.numberofpoints; ix++ )
-        in.pointlist[ix * 3 + 2] /= mpas_radius;
+        in.pointlist[ix * 3 + 2] /= rescale_factor;
 
     // Output the PLC to files 'mpas3d.node'
     // in.save_nodes( "mpas3d" );
@@ -234,7 +233,7 @@ moab::ErrorCode SetupDelaunayInterpolant( RuntimeContext& context, std::vector< 
         }
         for( auto cindex = 0; cindex < 3; cindex++ )
             tetcentroids[offset + cindex] /= ncorners;  // centroid of the tetrahedron
-        // tetcentroids[offset + 2] /= mpas_radius;
+        // tetcentroids[offset + 2] /= rescale_factor;
         // std::cout << "Tetrahedron: " << index << " Coordinates: " << tetcentroids[offset] << ", "
         //           << tetcentroids[offset + 1] << ", " << tetcentroids[offset + 2] << std::endl;
     }
@@ -336,11 +335,13 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
 
     std::vector< double > xyzld( xyzd );
     for( size_t in = 0; in < nd; in++ )
-        xyzld[3 * in + 2] /= mpas_radius;
+        xyzld[3 * in + 2] /= rescale_factor;
 #ifdef USE_DUAL_TETS
     PC3D< double > cloud( context.dual_mpas_tetrahedron_centroids );
+    const size_t num_results = 64;
 #else
     PC3D< double > cloud( xyzld );
+    const size_t num_results = 1;
 #endif
 
     KdTree tree( 3 /*dim*/, cloud, { 10 /* max leaf */ } );
@@ -350,25 +351,29 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
     printf( "Source bounding boxes: (%f, %f), (%f, %f), (%3.10e, %3.10e)\n", bbox_src[0].low, bbox_src[0].high, bbox_src[1].low,
             bbox_src[1].high, bbox_src[2].low, bbox_src[2].high );
 
-    const size_t num_results = 1;
+    nanoflann::SearchParameters sparams;
     nanoflann::KNNResultSet< double > resultSet( num_results );
     int num_not_found = 0;
     for( size_t index = 0; index < ni; index++ )
     {
         // double* query_pt = &xyzi[index * 3];
-        double query_pt[3] = { xyzi[index * 3], xyzi[index * 3 + 1], xyzi[index * 3 + 2] / mpas_radius };
+        double query_pt[3] = { xyzi[index * 3], xyzi[index * 3 + 1], xyzi[index * 3 + 2] / rescale_factor };
 
         // Do a KNN search
         std::vector< size_t > srcindx( num_results );
         std::vector< double > srcdist( num_results );
         resultSet.init( srcindx.data(), srcdist.data() );
-        tree.findNeighbors( resultSet, query_pt );
+
+        bool treefound = tree.findNeighbors( resultSet, query_pt, sparams );
+        // bool treefound = tree.closest( resultSet, query_pt, sparams );
+        assert( treefound );
 
         bool found      = false;
         double mindist  = srcdist[0];
         size_t minindex = srcindx[0];
         for( size_t jindex = 0; jindex < num_results; ++jindex )
         {
+            // printf( "srcindex: %zu --  jindex=%zu, eindex=%lu, edistance=%f\n", index, jindex, srcindx[jindex], srcdist[jindex] );
             // Perform the natural interpolation on the element
             size_t element_index = srcindx[jindex];
 
@@ -389,6 +394,8 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
                 {
                     fi[index] += fd[connectivity[ic]] * bcoords( ic );
                 }
+                // if( index < 100000 )
+                // printf( "%d: Found point at result %d with distance=%3.8e\n", index, jindex, srcdist[jindex] );
                 found = true;
                 break;
             }

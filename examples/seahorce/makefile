@@ -13,6 +13,7 @@ ifeq ($(UNAME_S),Darwin)
 	MOAB_LIBS_LINK += -L/opt/homebrew/Cellar/libomp/16.0.6/lib -lomp
 endif
 MOAB_CXXFLAGS += -Iinclude
+#MOAB_CXXFLAGS += -g3 -O0
 
 # PREDCXXFLAGS is for compiling J. Shewchuk's predicates. 
 PREDCXXFLAGS = -O0

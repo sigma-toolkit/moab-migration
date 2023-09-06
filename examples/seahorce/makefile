@@ -26,7 +26,7 @@ RemapMPASROMS: RemapMPASROMS.o ${MOAB_LIBDIR}/libMOAB.la libtet.a
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK} libtet.a
 
 libtet.a: src/tetgen.cxx predicates.o
-	${VERBOSE}${MOAB_CXX} ${CXXFLAGS} ${MOAB_CXXFLAGS} -DTETLIBRARY -c src/tetgen.cxx
+	${VERBOSE}${MOAB_CXX} ${CXXFLAGS} ${MOAB_CXXFLAGS} -c src/tetgen.cxx
 	ar r libtet.a tetgen.o predicates.o
 
 predicates.o: src/predicates.cxx

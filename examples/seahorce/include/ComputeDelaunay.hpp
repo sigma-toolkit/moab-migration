@@ -52,7 +52,12 @@ double dotProduct( double* v1, double* v2 )
 }
 
 /*============================================================================*/
-static bool bary_tet( const double vcoords[12], const double p[3], Vec4d& bcoords )
+bool tetrahedron_barycentric2( const double* a,
+                               const double* b,
+                               const double* c,
+                               const double* d,
+                               const double p[3],
+                               Vec4d& bcoords )
 /*==============================================================================
  This function gives the barycentric coordinates for a tetrahedron in 3 dimensions.
  It works by calculating the volume of the subtetrahedron using the scalar triple
@@ -95,10 +100,10 @@ static bool bary_tet( const double vcoords[12], const double p[3], Vec4d& bcoord
 
 *=============================================================================*/
 {
-    const double* a = &vcoords[0];
-    const double* b = &vcoords[3];
-    const double* c = &vcoords[6];
-    const double* d = &vcoords[9];
+    // const double* a = &vcoords[0];
+    // const double* b = &vcoords[3];
+    // const double* c = &vcoords[6];
+    // const double* d = &vcoords[9];
     double vap[3];
     double vbp[3];
     double vcp[3];
@@ -115,9 +120,7 @@ static bool bary_tet( const double vcoords[12], const double p[3], Vec4d& bcoord
     double v;
     double temp[3];
 
-    int i;
-
-    for( i = 0; i < 3; i++ )
+    for( int i = 0; i < 3; i++ )
     {
         vap[i] = p[i] - a[i];
         vbp[i] = p[i] - b[i];
@@ -181,8 +184,10 @@ moab::ErrorCode SetupDelaunayInterpolant( RuntimeContext& context, std::vector< 
     // -k: Outputs mesh to .vtk file for viewing by Paraview.
     // -J: No jettison of unused vertices from output .node file.
     tetgenbehavior tetgen_be;
-    std::vector< char > options = { 'p', 'Y', 'c', 'z', 'J', 'k' };  // 'f', 'e',
+    std::vector< char > options = { 'p', 'Y', 'c', 'z', 'J' };  // 'f', 'e', 'k'
     tetgen_be.parse_commandline( options.data() );
+    tetgen_be.opt_max_flip_level = 0;
+    tetgen_be.opt_iterations     = 1;
     tetrahedralize( &tetgen_be, &in, &out );
 
     assert( out.numberofcorners == 4 );
@@ -190,8 +195,9 @@ moab::ErrorCode SetupDelaunayInterpolant( RuntimeContext& context, std::vector< 
     int nvertices      = out.numberofpoints;
     int ntrianglefaces = out.numberoftrifaces;
     int ntetrahedrons  = out.numberoftetrahedra;
+    int ncorners       = out.numberofcorners;
 
-    printf( "Number of points: %d, triangles: %d, tetrahedra: %d\n", nvertices, ntrianglefaces, ntetrahedrons );
+    printf( "Number of points: %d, triangles: %d, corners: %d, tetrahedra: %d\n", nvertices, ntrianglefaces, ncorners, ntetrahedrons );
 
     // moab::ReadUtilIface* read_iface;
     // runchk( context.moab_interface->query_interface( read_iface ), "Error in query_interface" );
@@ -208,38 +214,43 @@ moab::ErrorCode SetupDelaunayInterpolant( RuntimeContext& context, std::vector< 
     // context.dual_mpas_tetrahedron =
     //     Eigen::Map< Eigen::Matrix< int, Eigen::Dynamic, 4 > >( out.tetrahedronlist, ntetrahedrons, 4 );
 
-    context.tetrahedraconn.resize( ntetrahedrons * 4 );
-    std::copy( out.tetrahedronlist, out.tetrahedronlist + ntetrahedrons * 4, context.tetrahedraconn.begin() );
+    assert( ncorners == 4 );
+    context.tetrahedraconn.resize( ntetrahedrons * ncorners );
+    std::copy( out.tetrahedronlist, out.tetrahedronlist + ntetrahedrons * ncorners, context.tetrahedraconn.begin() );
 
-    std::vector< double > tetcentroids( ntetrahedrons, 0.0 );
+    std::vector< double > tetcentroids( ntetrahedrons * 3, 0.0 );
 // #pragma omp parallel for shared( tetcentroids, xyzd )
     for( auto index = 0; index < ntetrahedrons; index++ )
     {
         const int offset = index * 3;
-        for( auto eindex = 0; eindex < 4; eindex++ )
+        for( auto eindex = 0; eindex < ncorners; eindex++ )
         {
             for( auto cindex = 0; cindex < 3; cindex++ )
-                tetcentroids[offset + cindex] += xyzd[context.tetrahedraconn[index * 4 +  eindex] * 3 + cindex];
+                tetcentroids[offset + cindex] +=
+                    in.pointlist[context.tetrahedraconn[index * ncorners + eindex] * 3 + cindex];
         }
         for( auto cindex = 0; cindex < 3; cindex++ )
-            tetcentroids[offset + cindex] /= 4;  // centroid of the tetrahedron
-        tetcentroids[offset + 2] /= mpas_radius;
+            tetcentroids[offset + cindex] /= ncorners;  // centroid of the tetrahedron
+        // tetcentroids[offset + 2] /= mpas_radius;
         // std::cout << "Tetrahedron: " << index << " Coordinates: " << tetcentroids[offset] << ", "
         //           << tetcentroids[offset + 1] << ", " << tetcentroids[offset + 2] << std::endl;
     }
     context.dual_mpas_tetrahedron_centroids = tetcentroids;
 
-    context.vertex_to_element = Eigen::Matrix< int, Eigen::Dynamic, Eigen::Dynamic >( nvertices, 128 );
+    context.nvertcache        = std::vector< int >( nvertices, 0 );
+    context.vertex_to_element = Eigen::Matrix< int, Eigen::Dynamic, Eigen::Dynamic >( nvertices, 64 );
     context.vertex_to_element.setZero();
+    // context.vertex_to_element += 1;
     // Store vertex to element adjacency list
     for( auto ie = 0; ie < ntetrahedrons; ++ie )
     {
-        for( auto ic = 0; ic < 4; ic++ )
+        for( auto ic = 0; ic < ncorners; ic++ )
         {
-            const int iv                              = context.tetrahedraconn[ie * 4 + ic];
-            const int size                            = context.vertex_to_element( iv, 0 );
-            context.vertex_to_element( iv, size + 1 ) = ie;
-            context.vertex_to_element( iv, 0 )        = size + 1;
+            const int iv = context.tetrahedraconn[ie * ncorners + ic];
+            // const int size                            = context.vertex_to_element( iv, 0 );
+            context.vertex_to_element( iv, context.nvertcache[iv] ) = ie;
+            // context.vertex_to_element( iv, 0 )        = size + 1;
+            context.nvertcache[iv]++;
         }
     }
 
@@ -280,9 +291,14 @@ typedef Eigen::Matrix< double, 3, 3 > Mat3d;
 /// @param point Point for which barycentric coordinates are to be evaluated
 /// @param bcoords Barycentric coordinates to be returned
 /// @return True if point inside tetrahedron; False otherwise
-static bool tetrahedron_barycentric( const double vcoords[12], const double point[3], Vec4d& bcoords )
+bool tetrahedron_barycentric( const double* ar,
+                              const double* br,
+                              const double* cr,
+                              const double* dr,
+                              const double* point,
+                              Vec4d& bcoords )
 {
-    Eigen::Map< const Vec3d > a( vcoords ), b( vcoords + 3 ), c( vcoords + 6 ), d( vcoords + 9 ), p( point );
+    Eigen::Map< const Vec3d > a( ar ), b( br ), c( cr ), d( dr ), p( point );
 
     // form the jacobian matrix for the tetrahedron
     Mat3d LHS;
@@ -303,27 +319,27 @@ static bool tetrahedron_barycentric( const double vcoords[12], const double poin
     return !( ( bcoords.array() < 0 ).any() );
 }
 
+#define USE_DUAL_TETS
 moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
                                             std::vector< double >& xyzd,
                                             std::vector< double >& fd,
                                             std::vector< double >& xyzi,
                                             std::vector< double >& fi )
 {
-    // moab::Range tetrahedrons;
     // runchk( SetupDelaunayInterpolant( context, xyzd ), "Computing delaunay 3D triangulation failed" );
 
+    size_t nd = fd.size();
     size_t ni = fi.size();
 
-    // construct a kd-tree index:
-    // moab::Range& tetrahedrons = context.mpas3d_dual_elems;
-    // std::vector< double > tet_xyz( tetrahedrons.size() * 3 );
-    // runchk( context.moab_interface->get_coords( tetrahedrons, tet_xyz.data() ) );
-
     std::vector< double > xyzld( xyzd );
-    for( size_t in = 0; in < ni; in++ )
+    for( size_t in = 0; in < nd; in++ )
         xyzld[3 * in + 2] /= mpas_radius;
-    // PC3D< double > cloud( context.dual_mpas_tetrahedron_centroids );
+#ifdef USE_DUAL_TETS
+    PC3D< double > cloud( context.dual_mpas_tetrahedron_centroids );
+#else
     PC3D< double > cloud( xyzld );
+#endif
+
     KdTree tree( 3 /*dim*/, cloud, { 10 /* max leaf */ } );
 
     KdTree::BoundingBox bbox_src;
@@ -346,38 +362,30 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
         tree.findNeighbors( resultSet, query_pt );
 
         bool found      = false;
-        double mindist  = 1E6;
-        size_t minindex = num_results;
+        double mindist  = srcdist[0];
+        size_t minindex = srcindx[0];
         for( size_t jindex = 0; jindex < num_results; ++jindex )
         {
             // Perform the natural interpolation on the element
             size_t element_index = srcindx[jindex];
 
 #ifdef USE_DUAL_TETS
-            Vec4i connectivity = context.dual_mpas_tetrahedron( element_index, Eigen::all );
-            // int nnodes;
-            // runchk( context.moab_interface->get_connectivity( element, connectivity, nnodes, true ) );
-            // assert( nnodes == 4 ); // we are expecting only tetrahedrons
+            const int* connectivity = &context.tetrahedraconn[ element_index * 4];
 
-            double vcoords[12];
-            std::copy( xyzd.data() + connectivity( 0 ) * 3, xyzd.data() + connectivity( 0 ) * 3 + 3, vcoords );
-            std::copy( xyzd.data() + connectivity( 1 ) * 3, xyzd.data() + connectivity( 1 ) * 3 + 3, vcoords + 3 );
-            std::copy( xyzd.data() + connectivity( 2 ) * 3, xyzd.data() + connectivity( 2 ) * 3 + 3, vcoords + 6 );
-            std::copy( xyzd.data() + connectivity( 3 ) * 3, xyzd.data() + connectivity( 3 ) * 3 + 3, vcoords + 9 );
-            // runchk( context.moab_interface->get_coords( connectivity, nnodes, vcoords ) );
-            vcoords[2] /= mpas_radius;
-            vcoords[5] /= mpas_radius;
-            vcoords[8] /= mpas_radius;
-            vcoords[11] /= mpas_radius;
+            const double* a = xyzld.data() + connectivity[0] * 3;
+            const double* b = xyzld.data() + connectivity[1] * 3;
+            const double* c = xyzld.data() + connectivity[2] * 3;
+            const double* d = xyzld.data() + connectivity[3] * 3;
 
             Vec4d bcoords;
-            if( tetrahedron_barycentric( vcoords, query_pt, bcoords ) )
+            if( tetrahedron_barycentric2( a, b, c, d, query_pt,
+                                          bcoords ) )  // tetrahedron_barycentric, tetrahedron_barycentric2
             {
                 // std::cout << "Query: " << "Connectivity: " << connectivity << ", Barycentric coords: " << bcoords << std::endl;
                 fi[index] = 0.0;
                 for( auto ic = 0; ic < 4; ++ic )
                 {
-                    fi[index] += fd[connectivity( ic )] * bcoords( ic );
+                    fi[index] += fd[connectivity[ic]] * bcoords( ic );
                 }
                 found = true;
                 break;
@@ -396,21 +404,30 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
 
             // printf( "%d: Found nearest vertex with element adjacencies: %d\n ", element_index, v2e( 0 ) );
 
-            for (int it = 1; it < v2e(0)+1; ++it)
+            for( int it = 0; it < context.nvertcache[element_index]; ++it)
             {
-                const int* connectivity = &context.tetrahedraconn[v2e( it ) * 4];
-                // int nnodes;
-                // runchk( context.moab_interface->get_connectivity( element, connectivity, nnodes, true ) );
-                // assert( nnodes == 4 ); // we are expecting only tetrahedrons
+                const int* connectivity = context.tetrahedraconn.data() + v2e( it ) * 4;
+                if( v2e( it ) < 0 || v2e( it ) > 67266 )
+                {
+                    printf( "Values: it=%d, v2e(it)=%d, context.nvertcache=%d\n", it, v2e(it), context.nvertcache[element_index] );
 
-                double vcoords[12];
-                std::copy( xyzld.data() + connectivity[0] * 3, xyzld.data() + connectivity[0] * 3 + 3, vcoords );
-                std::copy( xyzld.data() + connectivity[1] * 3, xyzld.data() + connectivity[1] * 3 + 3, vcoords + 3 );
-                std::copy( xyzld.data() + connectivity[2] * 3, xyzld.data() + connectivity[2] * 3 + 3, vcoords + 6 );
-                std::copy( xyzld.data() + connectivity[3] * 3, xyzld.data() + connectivity[3] * 3 + 3, vcoords + 9 );
+                    printf( "Vertex{%d}: element=%d, connectivity=[%d, %d, %d, %d]\n", index, v2e( it ),
+                            connectivity[0], connectivity[1], connectivity[2], connectivity[3] );
+                    // if( v2e( it ) < 0 )
+                    continue;
+                }
+
+                const double *a = xyzld.data() + connectivity[0] * 3;
+                const double* b = xyzld.data() + connectivity[1] * 3;
+                const double* c = xyzld.data() + connectivity[2] * 3;
+                const double* d = xyzld.data() + connectivity[3] * 3;
+
+                // printf( "Vertex{%d}: element=%d, connectivity=[%d, %d, %d, %d]\n", index, v2e( it ), connectivity[0],
+                //         connectivity[1], connectivity[2], connectivity[3] );
 
                 Vec4d bcoords;
-                if( bary_tet( vcoords, query_pt, bcoords ) )  // tetrahedron_barycentric
+                if( tetrahedron_barycentric2( a, b, c, d, query_pt,
+                                              bcoords ) )  // tetrahedron_barycentric, tetrahedron_barycentric2
                 {
                     Eigen::Map< const Eigen::Matrix< int, 1, 4 > > conn( connectivity, 1, 4 );
                     fi[index] = 0.0;
@@ -464,7 +481,7 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
         }
     }
 
-    printf( "Number of query points not found = %d/%d\n", num_not_found,  ni );
+    printf( "Number of query points not found = %d/%zu\n", num_not_found, ni );
 
     return moab::MB_SUCCESS;
 }

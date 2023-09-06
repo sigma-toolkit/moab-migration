@@ -7,6 +7,8 @@
 #include <Eigen/Dense>
 #include "moab/Matrix3.hpp"
 
+#define USE_DUAL_TETS
+#define N_MAX_V2EADJACENCIES 128
 constexpr double mpas_radius = 637122.0;
 
 typedef Eigen::Matrix< double, 4, 1 > Vec4d;
@@ -218,6 +220,7 @@ moab::ErrorCode SetupDelaunayInterpolant( RuntimeContext& context, std::vector< 
     context.tetrahedraconn.resize( ntetrahedrons * ncorners );
     std::copy( out.tetrahedronlist, out.tetrahedronlist + ntetrahedrons * ncorners, context.tetrahedraconn.begin() );
 
+#ifdef USE_DUAL_TETS
     std::vector< double > tetcentroids( ntetrahedrons * 3, 0.0 );
 // #pragma omp parallel for shared( tetcentroids, xyzd )
     for( auto index = 0; index < ntetrahedrons; index++ )
@@ -236,9 +239,9 @@ moab::ErrorCode SetupDelaunayInterpolant( RuntimeContext& context, std::vector< 
         //           << tetcentroids[offset + 1] << ", " << tetcentroids[offset + 2] << std::endl;
     }
     context.dual_mpas_tetrahedron_centroids = tetcentroids;
-
+#else
     context.nvertcache        = std::vector< int >( nvertices, 0 );
-    context.vertex_to_element = Eigen::Matrix< int, Eigen::Dynamic, Eigen::Dynamic >( nvertices, 64 );
+    context.vertex_to_element = Eigen::Matrix< int, Eigen::Dynamic, Eigen::Dynamic >( nvertices, N_MAX_V2EADJACENCIES );
     context.vertex_to_element.setZero();
     // context.vertex_to_element += 1;
     // Store vertex to element adjacency list
@@ -253,6 +256,7 @@ moab::ErrorCode SetupDelaunayInterpolant( RuntimeContext& context, std::vector< 
             context.nvertcache[iv]++;
         }
     }
+#endif
 
     // for( auto ie = 0; ie < nvertices; ++ie )
     //     std::cout << "Vertex: " << ie << ",  nAdjacentelements: " << context.vertex_to_element( ie, 0 ) << std::endl;
@@ -319,7 +323,6 @@ bool tetrahedron_barycentric( const double* ar,
     return !( ( bcoords.array() < 0 ).any() );
 }
 
-#define USE_DUAL_TETS
 moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
                                             std::vector< double >& xyzd,
                                             std::vector< double >& fd,
@@ -370,8 +373,7 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
             size_t element_index = srcindx[jindex];
 
 #ifdef USE_DUAL_TETS
-            const int* connectivity = &context.tetrahedraconn[ element_index * 4];
-
+            const int* connectivity = context.tetrahedraconn.data() + element_index * 4;
             const double* a = xyzld.data() + connectivity[0] * 3;
             const double* b = xyzld.data() + connectivity[1] * 3;
             const double* c = xyzld.data() + connectivity[2] * 3;
@@ -407,16 +409,6 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
             for( int it = 0; it < context.nvertcache[element_index]; ++it)
             {
                 const int* connectivity = context.tetrahedraconn.data() + v2e( it ) * 4;
-                if( v2e( it ) < 0 || v2e( it ) > 67266 )
-                {
-                    printf( "Values: it=%d, v2e(it)=%d, context.nvertcache=%d\n", it, v2e(it), context.nvertcache[element_index] );
-
-                    printf( "Vertex{%d}: element=%d, connectivity=[%d, %d, %d, %d]\n", index, v2e( it ),
-                            connectivity[0], connectivity[1], connectivity[2], connectivity[3] );
-                    // if( v2e( it ) < 0 )
-                    continue;
-                }
-
                 const double *a = xyzld.data() + connectivity[0] * 3;
                 const double* b = xyzld.data() + connectivity[1] * 3;
                 const double* c = xyzld.data() + connectivity[2] * 3;
@@ -457,7 +449,7 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
                     if( srcdist[jindex] < mindist )
                     {
                         mindist  = srcdist[jindex];
-                        minindex = srcindx[jindex];
+                        minindex = v2e( it );
                     }
                 }
             }
@@ -472,7 +464,7 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
             //           << ") not found in the domain; mindist = " << mindist << ", minindex = " << minindex << std::endl;
 
             // std::cin.get();
-            const int* connectivity = &context.tetrahedraconn[minindex * 4];
+            const int* connectivity = context.tetrahedraconn.data() + minindex * 4;
             fi[index]          = 1.0 / 4 *
                         ( fd[connectivity[0]] + fd[connectivity[1]] + fd[connectivity[2]] +
                           fd[connectivity[3]] );  // assign value of first vertex (extrapolant); this is arbitrary

@@ -211,7 +211,7 @@ moab::ErrorCode SetupDelaunayInterpolant( RuntimeContext& context, std::vector< 
     context.tetrahedraconn.resize( ntetrahedrons * 4 );
     std::copy( out.tetrahedronlist, out.tetrahedronlist + ntetrahedrons * 4, context.tetrahedraconn.begin() );
 
-    std::vector< double > tetcentroids( ntetrahedrons, 0.0 );
+    std::vector< double > tetcentroids( ntetrahedrons * 3, 0.0 );
 // #pragma omp parallel for shared( tetcentroids, xyzd )
     for( auto index = 0; index < ntetrahedrons; index++ )
     {
@@ -309,7 +309,7 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
                                             std::vector< double >& xyzi,
                                             std::vector< double >& fi )
 {
-    assert( context.mpas3d_dual_elems.size() );
+    //assert( context.mpas3d_dual_elems.size() );
 
     // moab::Range tetrahedrons;
     // runchk( SetupDelaunayInterpolant( context, xyzd ), "Computing delaunay 3D triangulation failed" );

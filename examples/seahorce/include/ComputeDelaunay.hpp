@@ -309,8 +309,6 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
                                             std::vector< double >& xyzi,
                                             std::vector< double >& fi )
 {
-    assert( context.mpas3d_dual_elems.size() );
-
     // moab::Range tetrahedrons;
     // runchk( SetupDelaunayInterpolant( context, xyzd ), "Computing delaunay 3D triangulation failed" );
 

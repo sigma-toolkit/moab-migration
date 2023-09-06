@@ -315,7 +315,7 @@ void ComputeDelaunayInterpolant( std::vector< double >& xyzd,
                 // runchk( context.moab_interface->get_coords( connectivity, nnodes, vcoords ) );
 
                 Vec4d bcoords;
-                if( tetrahedron_barycentric( vcoords, query_pt, bcoords ) )
+                if( bary_tet( vcoords, query_pt, bcoords ) ) // tetrahedron_barycentric
                 {
                     Eigen::Map< const Eigen::Matrix< int, 1, 4 > > conn( connectivity, 1, 4 );
                     fi[index] = 0.0;
@@ -362,7 +362,7 @@ int main()
     // std::vector< double > fd   = { 10, 12, 8, 3, 0.5, 0, 20, 22, 15, 6, 1, 0.1 };
     std::vector< double > fd   = { 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2 };
     constexpr int Ni           = 2;
-    std::vector< double > xyzi = { -1.1, 1, 0, -1, 0, 0.5 };
+    std::vector< double > xyzi = { -1.1, 0, 0, -1, 0, 0.5 };
     std::vector< double > fi( Ni );
     std::vector< double > fi_expected = { 1, 1.5 };
 

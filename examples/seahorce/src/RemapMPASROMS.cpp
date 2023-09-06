@@ -303,8 +303,6 @@ int main( int argc, char** argv )
                         mbi->write_file( "roms_3d_2dsurface.h5m", "H5M", write_options.c_str(), &context.romsset, 1 ) );
 #endif
 
-#define USE_STRETCHING_FUNCTION
-
 #ifdef USE_STRETCHING_FUNCTION
                     /// Call stretching functions
                     // h = np.linspace( 10, 200, 10 );
@@ -888,7 +886,8 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( std::string varProjectS
 
     // get the coordinates of the elements
     std::vector< double > src_xyz( source_range.size() * 3 ), dst_xyz( target_range.size() * 3 );
-    if( !( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear || rmethod == TempestRemapInvDist ) )
+    if( !( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear || rmethod == TempestRemapInvDist ||
+           rmethod == TempestRemapDelaunay || rmethod == TempestRemapIntegratedBilinear ) )
     {
         err = mbi->get_coords( source_range.data(), source_range.size(), src_xyz.data() );MB_CHK_ERR( err );
         err = mbi->get_coords( target_range.data(), target_range.size(), dst_xyz.data() );MB_CHK_ERR( err );
@@ -913,7 +912,8 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( std::string varProjectS
         }
     }
 
-    if( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear || rmethod == TempestRemapInvDist )
+    if( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear || rmethod == TempestRemapInvDist ||
+        rmethod == TempestRemapDelaunay || rmethod == TempestRemapIntegratedBilinear )
     {
         // get the handle to the weight matrix
         const SparseMatrix< double >& weights = this->weightMap.GetSparseMatrix();

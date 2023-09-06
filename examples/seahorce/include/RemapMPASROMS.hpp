@@ -26,11 +26,13 @@ enum RemappingMethod
     TempestRemapFV                 = 1,
     TempestRemapBilinear           = 2,
     TempestRemapInvDist            = 3,
-    DelaunayInterpolant            = 4,
-    ShepardInterpolant             = 5,
-    TrilinearTensor2D1D            = 6,
-    TrilinearTensor1D2D            = 7,
-    MultilevelBsplineApproximation = 8
+    TempestRemapDelaunay           = 4,
+    TempestRemapIntegratedBilinear = 5,
+    DelaunayInterpolant            = 6,
+    ShepardInterpolant             = 7,
+    TrilinearTensor2D1D            = 8,
+    TrilinearTensor1D2D            = 9,
+    MultilevelBsplineApproximation = 10
 };
 
 /// @brief class RuntimeContext
@@ -143,6 +145,10 @@ struct RuntimeContext
             return TempestRemapBilinear;
         else if( !methodName.compare( "TempestRemapInvDist" ) )
             return TempestRemapInvDist;
+        else if( !methodName.compare( "TempestRemapDelaunay" ) )
+            return TempestRemapDelaunay;
+        else if( !methodName.compare( "TempestRemapIntegratedBilinear" ) )
+            return TempestRemapIntegratedBilinear;
         else if( !methodName.compare( "DelaunayInterpolant" ) )
             return DelaunayInterpolant;
         else if( !methodName.compare( "ShepardInterpolant" ) )
@@ -179,6 +185,10 @@ struct RuntimeContext
             return "TempestRemapBilinear";
         else if( methodEnum == TempestRemapInvDist )
             return "TempestRemapInvDist";
+        else if( methodEnum == TempestRemapDelaunay )
+            return "TempestRemapDelaunay";
+        else if( methodEnum == TempestRemapIntegratedBilinear )
+            return "TempestRemapIntegratedBilinear";
         else if( methodEnum == DelaunayInterpolant )
             return "DelaunayInterpolant";
         else if( methodEnum == ShepardInterpolant )
@@ -240,16 +250,18 @@ struct RuntimeContext
 
         std::string fmethodorder = "";
         opts.addOpt< std::string >( "methodorder",
-                                    "Format: field:method, field: {Bathymetry,Temperature,Salinity}, "
-                                    "Method:{NearestNeighborInterpolant,"
-                                    "TempestRemapFV,"
-                                    "TempestRemapBilinear,"
-                                    "TempestRemapInvDist,"
-                                    "DelaunayInterpolant,"
-                                    "ShepardInterpolant,"
-                                    "TrilinearTensor2D1D,"
-                                    "TrilinearTensor1D2D,"
-                                    "MultilevelBsplineApproximation}",
+                                    "Format: field:method, field: { Bathymetry, Temperature, Salinity }, "
+                                    "Method: { NearestNeighborInterpolant, "
+                                    "TempestRemapFV, "
+                                    "TempestRemapBilinear, "
+                                    "TempestRemapInvDist, "
+                                    "TempestRemapDelaunay, "
+                                    "TempestRemapIntegratedBilinear, "
+                                    "DelaunayInterpolant, "
+                                    "ShepardInterpolant, "
+                                    "TrilinearTensor2D1D, "
+                                    "TrilinearTensor1D2D, "
+                                    "MultilevelBsplineApproximation }",
                                     &fmethodorder );
 
         opts.parseCommandLine( argc, argv );
@@ -279,7 +291,9 @@ struct RuntimeContext
                         methodorder = atoi( optionStorage[2].c_str() );
 
                     field_methods[fieldname] = std::make_pair( rmethod, methodorder );
-                    if( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear || rmethod == TempestRemapInvDist )
+                    if( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear ||
+                        rmethod == TempestRemapInvDist || rmethod == TempestRemapDelaunay ||
+                        rmethod == TempestRemapIntegratedBilinear )
                         computeTRMaps = true;
                     if( rmethod == MultilevelBsplineApproximation ) computeMBAInterpolant = true;
                 }

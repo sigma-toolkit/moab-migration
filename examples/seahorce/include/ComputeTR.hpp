@@ -116,13 +116,27 @@ moab::ErrorCode ComputeTempestRemapWeights( RuntimeContext& context,
 {
     RemappingMethod rmethod = context.field_methods["Bathymetry"].first;
     const int order         = context.field_methods["Bathymetry"].second;
-    std::string strMethod;
+    std::string strMethod = "", strMethodTR = "";
     if( rmethod == TempestRemapBilinear )
-        strMethod = "bilin;normalize";
+    {
+        strMethod = "bilin";
+        strMethodTR = "bilin;normalize";
+    }
     else if( rmethod == TempestRemapInvDist )
-        strMethod = "invdist;normalize";
-    else
-        strMethod = "";
+    {
+        strMethod = "invdist";
+        strMethodTR = "invdist;normalize";
+    }
+    else if( rmethod == TempestRemapDelaunay )
+    {
+        strMethod   = "delaunay";
+        strMethodTR = "delaunay;normalize";
+    }
+    else if( rmethod == TempestRemapIntegratedBilinear )
+    {
+        strMethod   = "intbilin";
+        strMethodTR = "intbilin";
+    }
     const bool ensureMonotonicity = context.ensureMonotonicity;
     // err = remapper.ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( err );
     // err = remapper.ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( err );
@@ -136,9 +150,9 @@ moab::ErrorCode ComputeTempestRemapWeights( RuntimeContext& context,
     if( context.proc_id == 0 )
         std::cout << "Setup and compute mesh intersections between source (MPAS) and target (ROMS) meshes" << std::endl;
     // err = remapper.ComputeOverlapMesh( true, false );MB_CHK_ERR( err );
-    bool concaveMeshA = false, concaveMeshB = false, allowNoOverlap = true, verbose = false;
+    constexpr bool concaveMeshA = false, concaveMeshB = false, allowNoOverlap = true, verbose = false;
     int ierr =
-        GenerateOverlapWithMeshes( context.meshInput, context.meshOutput, context.meshOverlap, "" /*outFilename*/,
+        GenerateOverlapWithMeshes( context.meshOutput, context.meshInput, context.meshOverlap, "" /*outFilename*/,
                                    "Netcdf4", "exact", concaveMeshA, concaveMeshB, allowNoOverlap, verbose );
     if( ierr )
     {
@@ -155,7 +169,7 @@ moab::ErrorCode ComputeTempestRemapWeights( RuntimeContext& context,
     mapOptions.nPout            = order;
     mapOptions.fSourceConcave   = false;
     mapOptions.fTargetConcave   = false;
-    mapOptions.strMethod        = strMethod;  // invdist, bilin, intbilin, delaunay
+    mapOptions.strMethod        = strMethodTR;  // invdist, bilin, intbilin, delaunay
     mapOptions.fMonotone        = ensureMonotonicity;
     mapOptions.fNoCorrectAreas  = false;
     mapOptions.fNoCheck         = true;

@@ -315,6 +315,7 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
     // runchk( SetupDelaunayInterpolant( context, xyzd ), "Computing delaunay 3D triangulation failed" );
 
     size_t ni = fi.size();
+    size_t nd = fd.size();
 
     // construct a kd-tree index:
     // moab::Range& tetrahedrons = context.mpas3d_dual_elems;
@@ -322,7 +323,7 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
     // runchk( context.moab_interface->get_coords( tetrahedrons, tet_xyz.data() ) );
 
     std::vector< double > xyzld( xyzd );
-    for( size_t in = 0; in < ni; in++ )
+    for( size_t in = 0; in < nd; in++ )
         xyzld[3 * in + 2] /= mpas_radius;
     // PC3D< double > cloud( context.dual_mpas_tetrahedron_centroids );
     PC3D< double > cloud( xyzld );

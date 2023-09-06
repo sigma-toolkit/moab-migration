@@ -23,7 +23,7 @@ all: RemapMPASROMS
 RemapMPASROMS.o: include/*.hpp
 RemapMPASROMS: RemapMPASROMS.o ${MOAB_LIBDIR}/libMOAB.la libtet.a
 	@echo "[CXXLD]  $@"
-	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK} libtet.a
+	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}  -fopenmp libtet.a
 
 libtet.a: src/tetgen.cxx predicates.o
 	${VERBOSE}${MOAB_CXX} ${CXXFLAGS} ${MOAB_CXXFLAGS} -DTETLIBRARY -c src/tetgen.cxx
@@ -42,7 +42,7 @@ Test1DInterpolant: Test1DInterpolant.o ${MOAB_LIBDIR}/libMOAB.la
 
 TestDelaunay: TestDelaunay.o ${MOAB_LIBDIR}/libMOAB.la  libtet.a
 	@echo "[CXXLD]  $@"
-	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}  libtet.a
+	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}  libtet.a -fopenmp
 
 define compile-command
 ${VERBOSE}${MOAB_CXX} ${CXXFLAGS} ${MOAB_CXXFLAGS} ${MOAB_CPPFLAGS} ${MOAB_INCLUDES} -DMESH_DIR=\"${MESH_DIR}\" -c $<

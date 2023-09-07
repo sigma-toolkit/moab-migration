@@ -1,7 +1,7 @@
 /** @example ReadWriteTest.cpp \n
  * \brief Read mesh into MOAB and write some back \n
  *
- * <b>To run</b>: mpiexec -np 4 ReadWriteTest [input] [output] -O <read_opts> -o <write_opts>\n
+ * <b>To run</b>: mpiexec -np 4 ReadWriteTest [input] [output] -O [read_opts] -o [write_opts]\n
  *
  * used for stress test of reader/writer
  *  report times to read and write

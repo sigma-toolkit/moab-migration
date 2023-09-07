@@ -29,7 +29,7 @@
  * tag2
  *
  * <b>To compile</b>: \n
- *    make DirectAccessWithHoles MOAB_DIR=<installdir> \n
+ *    make DirectAccessWithHoles \n
  * <b>To run</b>: ./DirectAccess [-nquads <# quads>] [-holes <# holes>]\n
  *
  */

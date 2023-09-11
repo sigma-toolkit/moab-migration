@@ -861,7 +861,8 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         const double radius_src  = 1.0 /*2.0*acos(-1.0)*/;
         const double radius_dest = 1.0 /*2.0*acos(-1.0)*/;
 
-        const char* additional_read_opts = ( ctx.n_procs > 1 ? "NO_SET_CONTAINING_PARENTS;" : "" );
+        //const char* additional_read_opts = ( ctx.n_procs > 1 ? "NO_SET_CONTAINING_PARENTS;" : "" );
+        const char* additional_read_opts = "";
         std::vector< int > smetadata, tmetadata;
         // Load the source mesh and validate
         rval = remapper.LoadNativeMesh( ctx.inFilenames[0], ctx.meshsets[0], smetadata, additional_read_opts );MB_CHK_ERR( rval );

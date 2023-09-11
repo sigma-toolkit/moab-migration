@@ -86,11 +86,14 @@ class Remapper
         std::string opts      = "";
         if( m_pcomm->size() > 1 )
         {
-            if( extension != "h5m" )
-                opts = std::string( "PARALLEL=BCAST_DELETE;PARTITION=TRIVIAL;PARALLEL_RESOLVE_SHARED_ENTS" );
-            else
+            if( extension == "h5m" )
                 opts = std::string( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_"
-                                    "RESOLVE_SHARED_ENTS" );
+                                    "RESOLVE_SHARED_ENTS;" );
+            else if (extension == "nc")
+                opts = std::string( ";;PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;DEBUG_IO=0;" );
+                // opts = std::string( ";;PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;DEBUG_IO=0;PARALLEL_RESOLVE_SHARED_ENTS;NO_EDGES;" );
+            else
+                opts = std::string( "PARALLEL=BCAST_DELETE;PARTITION=TRIVIAL;PARALLEL_RESOLVE_SHARED_ENTS;" );
         }
 
         if( readopts )

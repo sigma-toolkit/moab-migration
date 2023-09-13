@@ -322,6 +322,19 @@ ErrorCode NCHelperESMF::redistribute_local_cells( int start_cell_idx, ParallelCo
         if( success ) MB_SET_ERR( MB_FAILURE, "Failed to get numElementConn" );
         // Make a copy of vertices_on_local_cells for sorting (keep original one to set cell
         // connectivity later)
+
+        // Correct local cell vertices array, replace the padded vertices with the last vertices
+        // in the corresponding cells; sometimes the padded vertices are 0, sometimes a large
+        // vertex id. Make sure they are consistent to our padded option
+        for( int local_cell_idx = 0; local_cell_idx < nLocalCells; local_cell_idx++ )
+        {
+            int num_edges             = num_edges_on_local_cells[local_cell_idx];
+            int idx_in_local_vert_arr = local_cell_idx * maxEdgesPerCell;
+            int last_vert_idx         = vertices_on_local_cells[idx_in_local_vert_arr + num_edges - 1];
+            for( int i = num_edges; i < maxEdgesPerCell; i++ )
+                vertices_on_local_cells[idx_in_local_vert_arr + i] = last_vert_idx;
+        }
+
         std::vector< int > vertices_on_local_cells_sorted( vertices_on_local_cells );
         std::sort( vertices_on_local_cells_sorted.begin(), vertices_on_local_cells_sorted.end() );
         std::copy( vertices_on_local_cells_sorted.rbegin(), vertices_on_local_cells_sorted.rend(),
@@ -369,7 +382,7 @@ ErrorCode NCHelperESMF::redistribute_local_cells( int start_cell_idx, ParallelCo
         if( success ) MB_SET_ERR( MB_FAILURE, "Failed on wait_all" );
 #endif
 
-        double * coords3d = new double[localGidVerts.size()*coordDim];
+        double * coords3d = new double[localGidVerts.size()*3];
         // now convert from lat/lon to 3d
         if (2 == coordDim)
         {

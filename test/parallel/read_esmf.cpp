@@ -176,7 +176,7 @@ void read_mesh_parallel( bool rcbzoltan, bool no_mixed_elements )
 #ifdef MOAB_HAVE_HDF5_PARALLEL
     std::string write_options( "PARALLEL=WRITE_PART;" );
 
-    std::string output_file = "test_mpas";
+    std::string output_file = "test_esmf";
     if( rcbzoltan ) output_file += "_rcbzoltan";
     if( no_mixed_elements ) output_file += "_no_mixed_elements";
     output_file += ".h5m";

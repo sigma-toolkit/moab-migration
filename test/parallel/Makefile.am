@@ -84,14 +84,14 @@ else
 endif
 
 if HAVE_NETCDF
-  NETCDF_TESTS = scdpart read_nc_par ucdtrvpart mpastrvpart gcrm_par
+  NETCDF_TESTS = scdpart read_nc_par ucdtrvpart mpastrvpart gcrm_par read_esmf
 else
   NETCDF_TESTS =
 endif
 
 if HAVE_PNETCDF
 if !HAVE_NETCDF
-  NETCDF_TESTS += scdpart read_nc_par ucdtrvpart mpastrvpart write_nc_par
+  NETCDF_TESTS += scdpart read_nc_par ucdtrvpart mpastrvpart write_nc_par read_esmf
 else
   NETCDF_TESTS += write_nc_par
 endif
@@ -175,6 +175,7 @@ scdpart_SOURCES = scdpart.cpp
 read_nc_par_SOURCES = ../io/read_nc.cpp
 ucdtrvpart_SOURCES = ucdtrvpart.cpp
 mpastrvpart_SOURCES = mpastrvpart.cpp
+read_esmf_SOURCES = read_esmf.cpp
 gcrm_par_SOURCES = gcrm_par.cpp
 write_nc_par_SOURCES = ../io/write_nc.cpp
 par_spatial_locator_test_SOURCES = par_spatial_locator_test.cpp

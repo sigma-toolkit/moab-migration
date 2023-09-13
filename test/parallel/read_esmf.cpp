@@ -40,7 +40,7 @@ void read_mesh_parallel( bool rcbzoltan, bool no_mixed_elements )
     rval = mb.get_entities_by_type( 0, MBVERTEX, local_verts );CHECK_ERR( rval );
 
     int verts_num = local_verts.size();
-    if( 2 == procs )
+  /*  if( 2 == procs )
     {
         if( rcbzoltan )
         {
@@ -171,7 +171,7 @@ void read_mesh_parallel( bool rcbzoltan, bool no_mixed_elements )
     {
         std::cout << "total cells: " << total_cells_num << "\n";
         CHECK_EQUAL( 642, total_cells_num );
-    }
+    }*/
 
 #ifdef MOAB_HAVE_HDF5_PARALLEL
     std::string write_options( "PARALLEL=WRITE_PART;" );

@@ -15,16 +15,18 @@ namespace moab
 class ParallelComm;
 #endif
 
-class NCHelperESMF: public moab::UcdNCHelper {
+class NCHelperESMF : public UcdNCHelper
+{
 public:
-    NCHelperESMF(( ReadNC* readNC, int fileId, const FileOptions& opts, EntityHandle fileSet );
+    NCHelperESMF( ReadNC* readNC, int fileId, const FileOptions& opts, EntityHandle fileSet );
     static bool can_read_file( ReadNC* readNC );
 
+
 private:
+
     //! Implementation of NCHelper::init_mesh_vals()
     virtual ErrorCode init_mesh_vals();
-    //! Implementation of NCHelper::check_existing_mesh()
-    virtual ErrorCode check_existing_mesh();
+
     //! Implementation of NCHelper::create_mesh()
     virtual ErrorCode create_mesh( Range& faces );
     //! Implementation of NCHelper::get_mesh_type_name()
@@ -42,9 +44,6 @@ private:
     //! Create local vertices
     ErrorCode create_local_vertices( const std::vector< int >& vertices_on_local_cells, EntityHandle& start_vertex );
 
-    //! Create local edges (optional)
-    ErrorCode create_local_edges( EntityHandle start_vertex, const std::vector< int >& num_edges_on_local_cells );
-
     //! Create local cells without padding (cells are divided into groups based on the number of
     //! edges)
     ErrorCode create_local_cells( const std::vector< int >& vertices_on_local_cells,
@@ -57,9 +56,26 @@ private:
                                          EntityHandle start_vertex,
                                          Range& faces );
 
+    virtual ErrorCode check_existing_mesh() {return MB_SUCCESS;}
+
+    //! Implementation of UcdNCHelper::read_ucd_variables_to_nonset_allocate()
+    virtual ErrorCode read_ucd_variables_to_nonset_allocate( std::vector< ReadNC::VarData >& vdatas,
+                                                             std::vector< int >& tstep_nums ){return MB_SUCCESS;}
+#ifdef MOAB_HAVE_PNETCDF
+    //! Implementation of UcdNCHelper::read_ucd_variables_to_nonset_async()
+    virtual ErrorCode read_ucd_variables_to_nonset_async( std::vector< ReadNC::VarData >& vdatas,
+                                                          std::vector< int >& tstep_nums ) {return MB_SUCCESS;}
+#else
+    //! Implementation of UcdNCHelper::read_ucd_variables_to_nonset()
+    virtual ErrorCode read_ucd_variables_to_nonset( std::vector< ReadNC::VarData >& vdatas,
+                                                    std::vector< int >& tstep_nums ){return MB_SUCCESS;}
+
+#endif
+
   private:
     int maxEdgesPerCell;
     int numCellGroups;
+    int coordDim;
     std::map< EntityHandle, int > cellHandleToGlobalID;
     Range facesOwned;
 };

@@ -6,6 +6,7 @@
 #include "NCHelperHOMME.hpp"
 #include "NCHelperMPAS.hpp"
 #include "NCHelperGCRM.hpp"
+#include "NCHelperESMF.hpp"
 
 #include <sstream>
 
@@ -66,6 +67,8 @@ NCHelper* NCHelper::get_nc_helper( ReadNC* readNC, int fileId, const FileOptions
     if( NCHelperScrip::can_read_file( readNC, fileId ) )
         return new( std::nothrow ) NCHelperScrip( readNC, fileId, opts, fileSet );
 
+    if( NCHelperESMF::can_read_file( readNC ) )
+        return new( std::nothrow ) NCHelperESMF( readNC, fileId, opts, fileSet );
     // Unknown NetCDF grid (will fill this in later for POP, CICE and CLM)
     return NULL;
 }

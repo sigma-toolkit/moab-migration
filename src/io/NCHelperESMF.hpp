@@ -77,6 +77,8 @@ private:
     int numCellGroups;
     int coordDim;
     std::map< EntityHandle, int > cellHandleToGlobalID;
+    int centerCoordsId;
+    bool degrees;
     Range facesOwned;
 };
 

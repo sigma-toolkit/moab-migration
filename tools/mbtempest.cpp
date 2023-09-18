@@ -215,7 +215,7 @@ struct ToolContext
         opts.addOpt< void >( "nobubble", "do not use bubble on interior of spectral element nodes",
                              &mapOptions.fNoBubble );
 
-        opts.addOpt< void >( "sparseconstraints", "do not use bubble on interior of spectral element nodes",
+        opts.addOpt< void >( "sparseconstraints", "Use sparse solver for constraints when we have high-valence (typical with high-res RLL mesh)",
                              &mapOptions.fSparseConstraints );
 
         opts.addOpt< void >( "rrmgrids",

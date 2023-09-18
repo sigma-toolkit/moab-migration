@@ -23,7 +23,7 @@ const double pideg = acos( -1.0 ) / 180.0;
 
 NCHelperESMF::NCHelperESMF( ReadNC* readNC, int fileId, const FileOptions& opts, EntityHandle fileSet )
 : UcdNCHelper( readNC, fileId, opts, fileSet ), maxEdgesPerCell( DEFAULT_MAX_EDGES_PER_CELL ), centerCoordsId(-1),
-  degrees(true), numCellGroups( 0 )
+  degrees(true), coordDim(0)
 {
 }
 
@@ -95,7 +95,6 @@ ErrorCode NCHelperESMF::init_mesh_vals()
     nVertices = dimLens[idx];
 
     // Get number of coord dimensions
-    int coordDimId = -1;
     if( ( vit = std::find( dimNames.begin(), dimNames.end(), "coordDim" ) ) != dimNames.end() )
         idx = vit - dimNames.begin();
     else
@@ -298,12 +297,6 @@ ErrorCode NCHelperESMF::create_mesh( Range& faces )
         rval = create_local_cells( vertices_on_local_cells, num_edges_on_local_cells, start_vertex, faces );MB_CHK_SET_ERR( rval, "Failed to create local cells for MPAS mesh" );
     }
 
-    // Set tag for numCellGroups
-    Tag numCellGroupsTag = 0;
-    rval                 = mbImpl->tag_get_handle( "__NUM_CELL_GROUPS", 1, MB_TYPE_INTEGER, numCellGroupsTag,
-                                                   MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_SET_ERR( rval, "Trouble creating __NUM_CELL_GROUPS tag" );
-    rval = mbImpl->tag_set_data( numCellGroupsTag, &_fileSet, 1, &numCellGroups );MB_CHK_SET_ERR( rval, "Trouble setting data to __NUM_CELL_GROUPS tag" );
-
     return MB_SUCCESS;
 }
 
@@ -335,6 +328,7 @@ ErrorCode NCHelperESMF::redistribute_local_cells( int start_cell_idx, ParallelCo
                                                  static_cast< NCDF_SIZE >( coordDim ) };
             int success = NCFUNCAG( _vara_double )( _fileId, centerCoordsId, read_starts, read_counts,
                                                                  &( coords[0] ) );
+            if( success ) MB_SET_ERR( MB_FAILURE, "Failed on reading center coordinates" );
             if (2 == coordDim)
             {
                 double factor = 1.;
@@ -366,7 +360,7 @@ ErrorCode NCHelperESMF::redistribute_local_cells( int start_cell_idx, ParallelCo
 
             success = NCFUNCAG( _vara_int )( _fileId, verticesOnCellVarId, read_starts, read_counts,
                                                      &( vertices_on_local_cells[0] ) );
-
+            if( success ) MB_SET_ERR( MB_FAILURE, "Failed on reading elementConn variable" );
             std::vector< int > num_edges_on_local_cells( nLocalCells );
 
             NCDF_SIZE read_start = start_cell_idx - 1 ;
@@ -651,8 +645,7 @@ ErrorCode NCHelperESMF::create_local_cells( const std::vector< int >& vertices_o
     {
         if( local_cells_with_n_edges[i].size() > 0 ) num_edges_on_cell_groups.push_back( i );
     }
-    numCellGroups = num_edges_on_cell_groups.size();
-
+    int numCellGroups = (int)num_edges_on_cell_groups.size();
     EntityHandle* conn_arr_local_cells_with_n_edges[DEFAULT_MAX_EDGES_PER_CELL + 1];
     for( int i = 0; i < numCellGroups; i++ )
     {
@@ -690,12 +683,6 @@ ErrorCode NCHelperESMF::create_local_cells( const std::vector< int >& vertices_o
             int local_cell_idx = localGidCells.index( global_cell_idx );  // Local cell index, 0 based
             assert( local_cell_idx != -1 );
 
-            if( numCellGroups > 1 )
-            {
-                // Populate cellHandleToGlobalID map to read cell variables
-                cellHandleToGlobalID[start_element + j] = global_cell_idx;
-            }
-
             for( int k = 0; k < num_edges_per_cell; k++ )
             {
                 EntityHandle global_vert_idx =
@@ -717,9 +704,6 @@ ErrorCode NCHelperESMF::create_padded_local_cells( const std::vector< int >& ver
 {
     Interface*& mbImpl = _readNC->mbImpl;
     Tag& mGlobalIdTag  = _readNC->mGlobalIdTag;
-
-    // Only one group of cells (each cell is represented by a polygon with maxEdgesPerCell edges)
-    numCellGroups = 1;
 
     // Create cells for this cell group
     EntityHandle start_element;

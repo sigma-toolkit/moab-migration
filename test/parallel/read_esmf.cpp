@@ -40,21 +40,21 @@ void read_mesh_parallel( bool rcbzoltan, bool no_mixed_elements )
     rval = mb.get_entities_by_type( 0, MBVERTEX, local_verts );CHECK_ERR( rval );
 
     int verts_num = local_verts.size();
-  /*  if( 2 == procs )
+    if( 2 == procs )
     {
         if( rcbzoltan )
         {
             if( 0 == rank )
-                CHECK_EQUAL( 685, verts_num );
+                CHECK_EQUAL( 457, verts_num );
             else if( 1 == rank )
-                CHECK_EQUAL( 685, verts_num );  // Not owned vertices included
+                CHECK_EQUAL( 457, verts_num );  // Not owned vertices included
         }
         else
         {
             if( 0 == rank )
-                CHECK_EQUAL( 1120, verts_num );
+                CHECK_EQUAL( 485, verts_num );
             else if( 1 == rank )
-                CHECK_EQUAL( 1122, verts_num );  // Not owned vertices included
+                CHECK_EQUAL( 471, verts_num );  // Not owned vertices included
         }
     }
 
@@ -66,101 +66,30 @@ void read_mesh_parallel( bool rcbzoltan, bool no_mixed_elements )
         if( rcbzoltan )
         {
             if( 0 == rank )
-                CHECK_EQUAL( 685, verts_num );
+                CHECK_EQUAL( 457, verts_num );
             else if( 1 == rank )
-                CHECK_EQUAL( 595, verts_num );  // Not owned vertices excluded
+                CHECK_EQUAL( 409, verts_num );  // Not owned vertices excluded
         }
         else
         {
             if( 0 == rank )
-                CHECK_EQUAL( 1120, verts_num );
+                CHECK_EQUAL( 485, verts_num );
             else if( 1 == rank )
-                CHECK_EQUAL( 160, verts_num );  // Not owned vertices excluded
-        }
-    }
-
-    // Get local edges
-    Range local_edges;
-    rval = mb.get_entities_by_type( 0, MBEDGE, local_edges );CHECK_ERR( rval );
-
-    int edges_num = local_edges.size();
-    if( 2 == procs )
-    {
-        if( rcbzoltan )
-        {
-            if( 0 == rank )
-                CHECK_EQUAL( 1005, edges_num );
-            else if( 1 == rank )
-                CHECK_EQUAL( 1005, edges_num );  // Not owned edges included
-        }
-        else
-        {
-            if( 0 == rank )
-                CHECK_EQUAL( 1438, edges_num );
-            else if( 1 == rank )
-                CHECK_EQUAL( 1444, edges_num );  // Not owned edges included
-        }
-    }
-
-    rval = pcomm->filter_pstatus( local_edges, PSTATUS_NOT_OWNED, PSTATUS_NOT );CHECK_ERR( rval );
-
-    edges_num = local_edges.size();
-    if( 2 == procs )
-    {
-        if( rcbzoltan )
-        {
-            if( 0 == rank )
-                CHECK_EQUAL( 1005, edges_num );
-            else if( 1 == rank )
-                CHECK_EQUAL( 915, edges_num );  // Not owned edges excluded
-        }
-        else
-        {
-            if( 0 == rank )
-                CHECK_EQUAL( 1438, edges_num );
-            else if( 1 == rank )
-                CHECK_EQUAL( 482, edges_num );  // Not owned edges excluded
+                CHECK_EQUAL( 381, verts_num );  // Not owned vertices excluded
         }
     }
 
     // Get local cells
     Range local_cells;
-    rval = mb.get_entities_by_type( 0, MBPOLYGON, local_cells );CHECK_ERR( rval );
 
-    int cells_num = local_cells.size();
-    if( 2 == procs )
-    {
-        CHECK_EQUAL( 321, cells_num );
-        CHECK_EQUAL( (size_t)1, local_cells.psize() );
-    }
+    rval = mb.get_entities_by_dimension( 0, 2, local_cells );CHECK_ERR( rval );
 
     rval = pcomm->filter_pstatus( local_cells, PSTATUS_NOT_OWNED, PSTATUS_NOT );CHECK_ERR( rval );
 
-    cells_num = local_cells.size();
+    int cells_num = (int)local_cells.size();
     if( 2 == procs )
     {
-        CHECK_EQUAL( 321, cells_num );
-        CHECK_EQUAL( (size_t)1, local_cells.psize() );
-    }
-
-    std::cout << "proc: " << rank << " verts:" << verts_num << "\n";
-
-    int total_verts_num;
-    MPI_Reduce( &verts_num, &total_verts_num, 1, MPI_INT, MPI_SUM, 0, pcomm->proc_config().proc_comm() );
-    if( 0 == rank )
-    {
-        std::cout << "total vertices: " << total_verts_num << "\n";
-        CHECK_EQUAL( 1280, total_verts_num );
-    }
-
-    std::cout << "proc: " << rank << " edges:" << edges_num << "\n";
-
-    int total_edges_num;
-    MPI_Reduce( &edges_num, &total_edges_num, 1, MPI_INT, MPI_SUM, 0, pcomm->proc_config().proc_comm() );
-    if( 0 == rank )
-    {
-        std::cout << "total edges: " << total_edges_num << "\n";
-        CHECK_EQUAL( 1920, total_edges_num );
+        CHECK_EQUAL( 468, cells_num );
     }
 
     std::cout << "proc: " << rank << " cells:" << cells_num << "\n";
@@ -170,8 +99,8 @@ void read_mesh_parallel( bool rcbzoltan, bool no_mixed_elements )
     if( 0 == rank )
     {
         std::cout << "total cells: " << total_cells_num << "\n";
-        CHECK_EQUAL( 642, total_cells_num );
-    }*/
+        CHECK_EQUAL( 936, total_cells_num );
+    }
 
 #ifdef MOAB_HAVE_HDF5_PARALLEL
     std::string write_options( "PARALLEL=WRITE_PART;" );

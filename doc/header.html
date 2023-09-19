@@ -13,25 +13,51 @@
 		$treeview
 		$search
 		$mathjax
-		<link href="$stylesheet" rel="stylesheet" type="text/css" />
-    <link href="customdoxygen.css" rel="stylesheet" type="text/css" />
     <!-- <link href="custom_dark_theme.css" rel="stylesheet" type="text/css" /> -->
     <!-- <link href="xt256-dark.css" rel="stylesheet" type="text/css" /> -->
-    <link href="custom.css" rel="stylesheet" type="text/css" />
-    <link href="xt256-light.css" rel="stylesheet" type="text/css" />
-    <script src="highlight.pack.js"></script>
+    <!-- <link href="custom.css" rel="stylesheet" type="text/css" /> -->
+    <!-- <link href="xt256-light.css" rel="stylesheet" type="text/css" /> -->
+    
+    <link href="$relpath^tabs.css" rel="stylesheet" type="text/css"/>
+    <script type="text/javascript" src="$relpath^jquery.js"></script>
+    <script type="text/javascript" src="$relpath^dynsections.js"></script>
+    <!--
+    <script type="text/javascript" src="$relpath^doxygen-awesome-darkmode-toggle.js"></script>
+    <script type="text/javascript" src="$relpath^doxygen-awesome-paragraph-link.js"></script>
+    <script type="text/javascript" src="$relpath^doxygen-awesome-interactive-toc.js"></script>
+    <script type="text/javascript" src="$relpath^doxygen-awesome-tabs.js"></script>
+    <script type="text/javascript" src="$relpath^doxygen-awesome-fragment-copy-button.js"></script>
+    <script type="text/javascript" src="$relpath^toggle-alternative-theme.js"></script>
+    <script type="text/javascript">
+        DoxygenAwesomeFragmentCopyButton.init()
+        DoxygenAwesomeDarkModeToggle.init()
+        DoxygenAwesomeParagraphLink.init()
+        DoxygenAwesomeInteractiveToc.init()
+        DoxygenAwesomeTabs.init()
+    </script>
+    -->
+    <link href="$relpath^customdoxygen.css" rel="stylesheet" type="text/css" />
+    <link href="$relpath^$stylesheet" rel="stylesheet" type="text/css" />
+    $extrastylesheet
+
+    <link href="$relpath^monokai.min.css" rel="stylesheet" type="text/css" />
+    <script type="text/javascript" src="$relpath^highlight.js"></script>
+    <script type="text/javascript" src="$relpath^cpp.min.js"></script>
+
     <script>
-			hljs.configure({languages: ['cpp']});
-			$(function() {
+      hljs.configure({languages: ['cpp','fortran','python']});
+      document.addEventListener('DOMContentLoaded', (event) => {
 					$(".fragment").each(function(i,node) {
+            $(node).removeClass("fragment");
 							var $node = $(node);
-							$node.html("<pre><code class='language-cpp " +
-												$node.attr("class")+"'>" +
-												$node.text()+"</code></pre>");
-							hljs.highlightBlock(node);
+            $node.html("<pre><code class='hljs language-cpp "+$node.attr("class")+"'>"
+												+
+                        $node.html()+"</code></pre>");
+						//hljs.highlightBlock(node);
 					});
-			});
-			// hljs.highlightAll();
+
+      });
+      hljs.highlightAll();
 		</script>
 	</head>
 	<body>

@@ -20,7 +20,6 @@
       <tab type="globals" visible="yes" title="" intro=""/>
     </tab>
     <tab type="examples" visible="yes" title="" intro=""/>  
-    <tab type="user" url="http://gnep.mcs.anl.gov:8010" title="Buildbot"/>
   </navindex>
 
   <!-- Layout definition for a class page -->

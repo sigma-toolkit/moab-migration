@@ -21,7 +21,6 @@
     <link href="$relpath^tabs.css" rel="stylesheet" type="text/css"/>
     <script type="text/javascript" src="$relpath^jquery.js"></script>
     <script type="text/javascript" src="$relpath^dynsections.js"></script>
-    <!--
     <script type="text/javascript" src="$relpath^doxygen-awesome-darkmode-toggle.js"></script>
     <script type="text/javascript" src="$relpath^doxygen-awesome-paragraph-link.js"></script>
     <script type="text/javascript" src="$relpath^doxygen-awesome-interactive-toc.js"></script>
@@ -35,7 +34,6 @@
         DoxygenAwesomeInteractiveToc.init()
         DoxygenAwesomeTabs.init()
     </script>
-    -->
     <link href="$relpath^customdoxygen.css" rel="stylesheet" type="text/css" />
     <link href="$relpath^$stylesheet" rel="stylesheet" type="text/css" />
     $extrastylesheet
@@ -43,19 +41,21 @@
     <link href="$relpath^monokai.min.css" rel="stylesheet" type="text/css" />
     <script type="text/javascript" src="$relpath^highlight.js"></script>
     <script type="text/javascript" src="$relpath^cpp.min.js"></script>
+    <script type="text/javascript" src="$relpath^fortran.min.js"></script>
+    <script type="text/javascript" src="$relpath^python.min.js"></script>
+    <script type="text/javascript" src="$relpath^markdown.min.js"></script>
 
     <script>
       hljs.configure({languages: ['cpp','fortran','python']});
       document.addEventListener('DOMContentLoaded', (event) => {
 					$(".fragment").each(function(i,node) {
-            $(node).removeClass("fragment");
 							var $node = $(node);
             $node.html("<pre><code class='hljs language-cpp "+$node.attr("class")+"'>"
 												+
                         $node.html()+"</code></pre>");
+            $node.removeClass("fragment");
 						//hljs.highlightBlock(node);
 					});
-
       });
       hljs.highlightAll();
 		</script>

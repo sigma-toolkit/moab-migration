@@ -1348,7 +1348,13 @@ HTML_EXTRA_FILES       = "@top_srcdir@/doc/highlight.js" \
                          "@top_srcdir@/doc/languages/cpp.min.js" \
                          "@top_srcdir@/doc/languages/fortran.min.js" \
                          "@top_srcdir@/doc/languages/python.min.js" \
-                         "@top_srcdir@/doc/languages/markdown.min.js"
+                         "@top_srcdir@/doc/languages/markdown.min.js" \
+                         "@top_srcdir@/doc/doxygen-awesome-darkmode-toggle.js" \
+                         "@top_srcdir@/doc/doxygen-awesome-paragraph-link.js" \
+                         "@top_srcdir@/doc/doxygen-awesome-interactive-toc.js" \
+                         "@top_srcdir@/doc/doxygen-awesome-tabs.js" \
+                         "@top_srcdir@/doc/doxygen-awesome-fragment-copy-button.js" \
+                         "@top_srcdir@/doc/toggle-alternative-theme.js"
 
 # The HTML_COLORSTYLE tag can be used to specify if the generated HTML output
 # should be rendered with a dark or light theme.

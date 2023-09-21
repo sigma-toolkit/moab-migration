@@ -11,7 +11,7 @@ from pymoab cimport moab
 from cython.operator cimport dereference as deref
 
 from .core cimport Core
-from .tag cimport Tag, _tagArray
+from .tag cimport Tag, _TagArray
 from .rng cimport Range
 from .types import check_error, np_tag_type, validate_type, _convert_array, _eh_array, _eh_py_type
 #from . import types
@@ -158,4 +158,3 @@ cdef class ParallelComm(object):
         Representation of class as a string
         """
         return self.__str__()
-

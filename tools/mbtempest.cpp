@@ -30,10 +30,6 @@
 #include "moab/CpuTimer.hpp"
 #include "DebugOutput.hpp"
 
-//#ifndef MOAB_HAVE_MPI
-//    #error mbtempest tool requires MPI configuration
-//#endif
-
 #ifdef MOAB_HAVE_MPI
 // MPI includes
 #include "moab_mpi.h"

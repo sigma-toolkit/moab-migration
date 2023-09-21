@@ -1,49 +1,11 @@
 /*! \page developerguide Developer's Guide
  
-  \subpage dg-contents
+  \tableofcontents
  
-  \subpage dg-figures
-
-*/
-
-/*!  \page dg-figures List of Figures
-
-    \ref figure1
-
-    \ref figure2
-
-    \ref figure3
-*/
-
-
-/*!  \page dg-contents Table of Contents
-
-  \ref sequence
-
-  \ref manager
-
-  \ref s-mesh
-
-  \ref sets
-
-  \ref impl-error-handling
-
-    \ref dgfiveone
-
-    \ref dgfivetwo
-
-    \ref dgfivethree
-
-    \ref dgfivefour
-
-    \ref dgfivefive
-
-    \ref dgfivesix
-
   \section sequence  1.EntitySequence & SequenceData
 
   \subsection figure1 Figure 1: EntitySequences For One SequenceData
-  \image html figure1.jpg
+  \image html figures/figure1.jpg
 
   \ref dg-figures "List of Figures"
 
@@ -106,7 +68,6 @@ a feature. Sequences for which the corresponding data cannot be used to store
 new entities (e.g. structured mesh discussed in a later section) will return -1 or
 some other invalid value.
 
- \ref dg-contents "Top"
 
   \section manager 2.TypeSequenceManager & SequenceManager
 
@@ -122,7 +83,7 @@ enforces the following four rules on its contained data:
 .
 
   \subsection figure2 Figure 2: SequenceManager and Related Classes
-  \image html figure2.jpg
+  \image html figures/figure2.jpg
 
   \ref dg-figures "List of Figures"
 
@@ -176,7 +137,6 @@ This is discussed in a later section.
 <sup>2</sup>Given rule four for the data managed by a <I>TypeSequenceManager</I>, any
 <I>SequenceData</I> for which all handles are allocated will be referenced by exactly one <I>EntitySequence</I>.
 
-  \ref dg-contents "Top"
 
  \section s-mesh 3.Structured Mesh
 
@@ -186,7 +146,6 @@ used to access the structured element connectivity. A standard <I>VertexSequence
 instance is used to access the ScdVertexData because the vertex data storage
 is the same as for unstructured mesh.
 
-  \ref dg-contents "Top"
 
   \section sets 4.Entity Sets
 
@@ -204,7 +163,7 @@ than is required at a given time for contained objects.
 - MeshSet
 
   \subsection figure3 Figure 3: SequenceManager and Related Classes
-  \image html figure3.jpg
+  \image html figures/figure3.jpg
 
   \ref dg-figures "List of Figures"
 
@@ -285,8 +244,6 @@ parent or child links of a set without every querying other set properties. The
 downside of this solution is that it makes the implementation a little less mod-
 ular and maintainable because the existing logic contained in the <I>MeshSet</I> class
 would need to be spread throughout the <I>MeshSetSequence</I> class.
-
-  \ref dg-contents "Top"
 
  \section impl-error-handling 5.Implementation of Error Handling
 
@@ -403,6 +360,5 @@ carefully decide whether that error is intentional. For example, a lower level M
 set an error on it, since the caller might expect to get that error code. In this case, the lower level routine just return MB_TAG_NOT_FOUND as a
 condition, and no error is being set. It is then up to the upper level callers to decide whether it should be a true error or not.
 
-  \ref dg-contents "Top"
 */
 

@@ -256,7 +256,5 @@ The decision of which branches to keep up-to-date is up to the developers.  Deve
      \endcode
 One should be careful with the branch name as a hard reset would overwrite all changes in the working directory.
 
-
-Top: \ref index 
   
  */

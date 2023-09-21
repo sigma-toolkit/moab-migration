@@ -843,9 +843,16 @@ dl.bug
 	border-collapse: separate;
 }
  
-#projectlogo img
+.light-mode #projectlogo .moablogo
 { 
 	border: 0px none;
+	content: url("moab-light.png");
+}
+
+.dark-mode #projectlogo .moablogo
+{ 
+	border: 0px none;
+	content: url("moab-dark.png");
 }
  
 #projectname

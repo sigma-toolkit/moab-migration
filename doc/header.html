@@ -37,7 +37,7 @@
     <link href="$relpath^customdoxygen.css" rel="stylesheet" type="text/css" />
     <link href="$relpath^$stylesheet" rel="stylesheet" type="text/css" />
     $extrastylesheet
-    <!-- <link href="$relpath^doxygen-awesome.css" rel="stylesheet" type="text/css"/> -->
+    <link href="$relpath^doxygen-awesome.css" rel="stylesheet" type="text/css"/>
 
     <link href="$relpath^monokai.min.css" rel="stylesheet" type="text/css" />
     <script type="text/javascript" src="$relpath^highlight.js"></script>
@@ -51,7 +51,7 @@
       document.addEventListener('DOMContentLoaded', (event) => {
 					$(".fragment").each(function(i,node) {
 							var $node = $(node);
-            $node.html("<pre><code class='hljs language-cpp "+$node.attr("class")+"'>"
+            $node.html("<pre><code class='hljs "+$node.attr("class")+"'>"
 												+
                         $node.html()+"</code></pre>");
             $node.removeClass("fragment");
@@ -70,7 +70,7 @@
 				<tbody>
 					<tr style="height: 56px;">
 						<!--BEGIN PROJECT_LOGO-->
-						<td id="projectlogo"><img alt="Logo" src="$projectlogo"/></td>
+            <td id="projectlogo"><a href="index.html"><img class="moablogo" alt="Logo" src="$projectlogo"/></a></td>
 						<!--END PROJECT_LOGO-->
 						<!--BEGIN PROJECT_NAME-->
 						<td id="projectalign" style="padding-left: 0.1em;">
@@ -89,7 +89,7 @@
 						<!--END !PROJECT_NAME-->
 						<!--BEGIN DISABLE_INDEX-->
 						<!--BEGIN SEARCHENGINE-->
-						<td>$searchbox</td>
+            <!-- <td>$searchbox</td> -->
 						<!--END SEARCHENGINE-->
 						<!--END DISABLE_INDEX-->
 					</tr>

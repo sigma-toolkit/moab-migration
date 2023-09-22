@@ -3608,8 +3608,9 @@ ErrCode iMOAB_WriteMappingWeightsToFile(
 
     std::string filename = std::string( remap_weights_filename );
 
+    std::map<std::string, std::string> attrMap;
     // Write the map file to disk in parallel using either HDF5 or SCRIP interface
-    rval = weightMap->WriteParallelMap( filename );MB_CHK_ERR( rval );
+    rval = weightMap->WriteParallelMap( filename, attrMap );MB_CHK_ERR( rval );
 
     return moab::MB_SUCCESS;
 }

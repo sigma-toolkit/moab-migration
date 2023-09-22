@@ -153,7 +153,7 @@ int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< unsigne
 
 ///////////////////////////////////////////////////////////////////////////////
 
-moab::ErrorCode moab::TempestOnlineMap::WriteParallelMap( const std::string& strFilename )
+moab::ErrorCode moab::TempestOnlineMap::WriteParallelMap( const std::string& strFilename, const std::map<std::string, std::string>& attrMap )
 {
     moab::ErrorCode rval;
 
@@ -164,7 +164,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteParallelMap( const std::string& str
     if( extension == "nc" )
     {
         /* Invoke the actual call to write the parallel map to disk in SCRIP format */
-        rval = this->WriteSCRIPMapFile( strFilename.c_str() );MB_CHK_ERR( rval );
+        rval = this->WriteSCRIPMapFile( strFilename.c_str(), attrMap );MB_CHK_ERR( rval );
     }
     else
     {
@@ -177,7 +177,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteParallelMap( const std::string& str
 
 ///////////////////////////////////////////////////////////////////////////////
 
-moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& strFilename )
+moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& strFilename, const std::map<std::string, std::string>& attrMap )
 {
     NcError error( NcError::silent_nonfatal );
 

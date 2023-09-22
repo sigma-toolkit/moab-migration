@@ -572,6 +572,8 @@ int main( int argc, char* argv[] )
                 outputFormatter.printf( 0, "The target set contains %lu vertices and %lu elements \n", tgtverts.size(),
                                         tgtelems.size() );
         }
+        rval = mbCore->write_file( "source_mesh.h5m", NULL, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
+        rval = mbCore->write_file( "target_mesh.h5m", NULL, writeOptions, &runCtx->meshsets[1], 1 );MB_CHK_ERR( rval );
 
         // First compute the covering set such that the target elements are fully covered by the
         // lcoal source grid
@@ -681,8 +683,7 @@ int main( int argc, char* argv[] )
 
             if( runCtx->outFilename.size() )
             {
-                // Write the map file to disk in parallel using either HDF5 or SCRIP interface
-                rval = weightMap->WriteParallelMap( runCtx->outFilename.c_str() );MB_CHK_ERR( rval );
+                std::map<std::string, std::string> attrMap;
 
                 // Write out the metadata information for the map file
                 if( proc_id == 0 )
@@ -714,6 +715,9 @@ int main( int argc, char* argv[] )
                              << "MOAB v5.1.0+" << std::endl;
                     metafile.close();
                 }
+                
+                // Write the map file to disk in parallel using either HDF5 or SCRIP interface
+                rval = weightMap->WriteParallelMap( runCtx->outFilename.c_str(), attrMap );MB_CHK_ERR( rval );
             }
 
             if( runCtx->verifyWeights )

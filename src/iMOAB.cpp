@@ -3609,6 +3609,21 @@ ErrCode iMOAB_WriteMappingWeightsToFile(
     std::string filename = std::string( remap_weights_filename );
 
     std::map<std::string, std::string> attrMap;
+    attrMap["title"] = "MOAB-TempestRemap (mbtempest) Online Regridding Weight Generator";
+    attrMap["normalization"] = "ovarea";
+    // attrMap["remap_options"] = mapOptions.strMethod;
+    // attrMap["domain_a"] = srcMeshName;
+    // attrMap["domain_b"] = tgtMeshName;
+    // attrMap["domain_aUb"] = intxFilename;
+    attrMap["map_aPb"] = filename;
+    // attrMap["methodorder_a"] = runCtx->disc_methods[0] + ":" + std::to_string(runCtx->disc_orders[0]);
+    // attrMap["concave_a"] = runCtx->mapOptions.fSourceConcave ? "true" : "false";
+    // attrMap["methodorder_b"] = runCtx->disc_methods[1] + ":" + std::to_string(runCtx->disc_orders[1]);
+    // attrMap["concave_b"] = runCtx->mapOptions.fTargetConcave ? "true" : "false";
+    // attrMap["bubble"] = runCtx->mapOptions.fNoBubble ? "false" : "true";
+    attrMap["MOABversion"] = std::string(MOAB_VERSION);
+    // attrMap["history"] = historyStr;
+ 
     // Write the map file to disk in parallel using either HDF5 or SCRIP interface
     rval = weightMap->WriteParallelMap( filename, attrMap );MB_CHK_ERR( rval );
 

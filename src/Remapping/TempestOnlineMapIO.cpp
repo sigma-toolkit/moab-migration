@@ -195,7 +195,15 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     }
 
     // Attributes
-    ncMap.add_att( "Title", "MOAB-TempestRemap Online Regridding Weight Generator" );
+    // ncMap.add_att( "Title", "MOAB-TempestRemap Online Regridding Weight Generator" );
+    auto it = attrMap.begin();
+    while (it != attrMap.end())
+    {
+      // set the map attributes
+      ncMap.add_att( it->first.c_str(), it->second.c_str() );
+      // increment iterator
+      it++;
+		}
 
     /**
      * Need to get the global maximum of number of vertices per element

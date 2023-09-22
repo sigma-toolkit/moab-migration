@@ -356,6 +356,7 @@ int main( int argc, char* argv[] )
     moab::ErrorCode rval;
     NcError error( NcError::verbose_nonfatal );
     std::stringstream sstr;
+    std::string historyStr;
 
     int proc_id = 0, nprocs = 1;
 #ifdef MOAB_HAVE_MPI
@@ -370,6 +371,10 @@ int main( int argc, char* argv[] )
     {
         return 1;
     }
+
+    // Build the history string
+    for (int ia = 0; ia < argc; ++ia)
+      historyStr += std::string(argv[ia]) + " ";
 
     ToolContext* runCtx;
 #ifdef MOAB_HAVE_MPI
@@ -572,8 +577,8 @@ int main( int argc, char* argv[] )
                 outputFormatter.printf( 0, "The target set contains %lu vertices and %lu elements \n", tgtverts.size(),
                                         tgtelems.size() );
         }
-        rval = mbCore->write_file( "source_mesh.h5m", NULL, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
-        rval = mbCore->write_file( "target_mesh.h5m", NULL, writeOptions, &runCtx->meshsets[1], 1 );MB_CHK_ERR( rval );
+        // rval = mbCore->write_file( "source_mesh.h5m", NULL, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
+        // rval = mbCore->write_file( "target_mesh.h5m", NULL, writeOptions, &runCtx->meshsets[1], 1 );MB_CHK_ERR( rval );
 
         // First compute the covering set such that the target elements are fully covered by the
         // lcoal source grid
@@ -684,38 +689,21 @@ int main( int argc, char* argv[] )
             if( runCtx->outFilename.size() )
             {
                 std::map<std::string, std::string> attrMap;
-
-                // Write out the metadata information for the map file
-                if( proc_id == 0 )
-                {
-                    size_t lastindex = runCtx->outFilename.find_last_of( "." );
-                    sstr.str( "" );
-                    sstr << runCtx->outFilename.substr( 0, lastindex ) << ".meta";
-
-                    std::ofstream metafile( sstr.str() );
-                    metafile << "Generator = MOAB-TempestRemap (mbtempest) Offline Regridding "
-                                "Weight Generator"
-                             << std::endl;
-                    metafile << "domain_a = " << runCtx->inFilenames[0] << std::endl;
-                    metafile << "domain_b = " << runCtx->inFilenames[1] << std::endl;
-                    metafile << "domain_aNb = "
-                             << ( runCtx->intxFilename.size() ? runCtx->intxFilename : "outOverlap.h5m" ) << std::endl;
-                    metafile << "map_aPb = " << runCtx->outFilename << std::endl;
-                    metafile << "type_src = " << runCtx->disc_methods[0] << std::endl;
-                    metafile << "np_src = " << runCtx->disc_orders[0] << std::endl;
-                    metafile << "concave_src = " << ( runCtx->mapOptions.fSourceConcave ? "true" : "false" )
-                             << std::endl;
-                    metafile << "type_dst = " << runCtx->disc_methods[1] << std::endl;
-                    metafile << "np_dst = " << runCtx->disc_orders[1] << std::endl;
-                    metafile << "concave_dst = " << ( runCtx->mapOptions.fTargetConcave ? "true" : "false" )
-                             << std::endl;
-                    metafile << "mono_type = " << runCtx->ensureMonotonicity << std::endl;
-                    metafile << "bubble = " << ( runCtx->mapOptions.fNoBubble ? "false" : "true" ) << std::endl;
-                    metafile << "version = "
-                             << "MOAB v5.1.0+" << std::endl;
-                    metafile.close();
-                }
-                
+                attrMap["title"] = "MOAB-TempestRemap (mbtempest) Offline Regridding Weight Generator";
+                attrMap["normalization"] = "ovarea";
+                attrMap["remap_options"] = runCtx->mapOptions.strMethod;
+                attrMap["domain_a"] = runCtx->inFilenames[0];
+                attrMap["domain_b"] = runCtx->inFilenames[1];
+                attrMap["domain_aUb"] = runCtx->intxFilename;
+                attrMap["map_aPb"] = runCtx->outFilename;
+                attrMap["methodorder_a"] = runCtx->disc_methods[0] + ":" + std::to_string(runCtx->disc_orders[0]);
+                attrMap["concave_a"] = runCtx->mapOptions.fSourceConcave ? "true" : "false";
+                attrMap["methodorder_b"] = runCtx->disc_methods[1] + ":" + std::to_string(runCtx->disc_orders[1]);
+                attrMap["concave_b"] = runCtx->mapOptions.fTargetConcave ? "true" : "false";
+                attrMap["bubble"] = runCtx->mapOptions.fNoBubble ? "false" : "true";
+                attrMap["MOABversion"] = std::string(MOAB_VERSION);
+                attrMap["history"] = historyStr;
+              
                 // Write the map file to disk in parallel using either HDF5 or SCRIP interface
                 rval = weightMap->WriteParallelMap( runCtx->outFilename.c_str(), attrMap );MB_CHK_ERR( rval );
             }

@@ -118,14 +118,12 @@ class Remapper
             rectilinearTag != nullptr )
         {
             int dimSizes[3];
-            moab::EntityHandle rootset = 0;
-            rval                       = m_interface->tag_get_data( rectilinearTag, &rootset, 1,
+            rval                       = m_interface->tag_get_data( rectilinearTag, &meshset, 1,
                                                                     dimSizes );  // MB_CHK_SET_ERR( rval, "Error geting tag data" );
             metadata.clear();
             metadata.push_back( dimSizes[0] );
             metadata.push_back( dimSizes[1] );
             metadata.push_back( dimSizes[2] );
-            // printf( "Mesh metadata: %d, %d, %d\n", metadata[0], metadata[1], metadata[2] );
         }
 
         return MB_SUCCESS;

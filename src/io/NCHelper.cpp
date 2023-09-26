@@ -6,6 +6,7 @@
 #include "NCHelperHOMME.hpp"
 #include "NCHelperMPAS.hpp"
 #include "NCHelperGCRM.hpp"
+#include "NCHelperESMF.hpp"
 
 #include <sstream>
 
@@ -66,6 +67,8 @@ NCHelper* NCHelper::get_nc_helper( ReadNC* readNC, int fileId, const FileOptions
     if( NCHelperScrip::can_read_file( readNC, fileId ) )
         return new( std::nothrow ) NCHelperScrip( readNC, fileId, opts, fileSet );
 
+    if( NCHelperESMF::can_read_file( readNC ) )
+        return new( std::nothrow ) NCHelperESMF( readNC, fileId, opts, fileSet );
     // Unknown NetCDF grid (will fill this in later for POP, CICE and CLM)
     return NULL;
 }
@@ -506,6 +509,12 @@ ErrorCode NCHelper::read_variables_to_set( std::vector< ReadNC::VarData >& vdata
                     if( success )
                         MB_SET_ERR( MB_FAILURE, "Failed to read short/int data for variable " << vdatas[i].varName );
                     break;
+                case NC_INT64:
+                    success = NCFUNCAG( _vara_long )( _fileId, vdatas[i].varId, &vdatas[i].readStarts[0],
+                                                                         &vdatas[i].readCounts[0], (long*)data );
+                    if( success )
+                        MB_SET_ERR( MB_FAILURE, "Failed to read long data for variable " << vdatas[i].varName );
+                    break;
                 case NC_FLOAT:
                 case NC_DOUBLE:
                     success = NCFUNCAG( _vara_double )( _fileId, vdatas[i].varId, &vdatas[i].readStarts[0],
@@ -532,6 +541,9 @@ ErrorCode NCHelper::read_variables_to_set( std::vector< ReadNC::VarData >& vdata
                 case NC_SHORT:
                 case NC_INT:
                     delete[](int*)data;
+                    break;
+                case NC_INT64:
+                    delete[] (long*)data;
                     break;
                 case NC_FLOAT:
                 case NC_DOUBLE:
@@ -617,6 +629,7 @@ ErrorCode NCHelper::get_tag_to_set( ReadNC::VarData& var_data, int tstep_num, Ta
             break;
         case NC_SHORT:
         case NC_INT:
+        case NC_INT64: //  this is a big stretch; we should introduce LONG tag
             rval = mbImpl->tag_get_handle( tag_name.str().c_str(), 0, MB_TYPE_INTEGER, tagh,
                                            MB_TAG_CREAT | MB_TAG_SPARSE | MB_TAG_VARLEN );MB_CHK_SET_ERR( rval, "Trouble creating tag " << tag_name.str() );
             break;
@@ -656,6 +669,7 @@ ErrorCode NCHelper::get_tag_to_nonset( ReadNC::VarData& var_data, int tstep_num,
             break;
         case NC_SHORT:
         case NC_INT:
+        case NC_INT64:
             rval = mbImpl->tag_get_handle( tag_name.str().c_str(), num_lev, MB_TYPE_INTEGER, tagh,
                                            MB_TAG_DENSE | MB_TAG_CREAT );MB_CHK_SET_ERR( rval, "Trouble creating tag " << tag_name.str() );
             break;
@@ -715,6 +729,15 @@ ErrorCode NCHelper::create_attrib_string( const std::map< std::string, ReadNC::A
                 if( success )
                     MB_SET_ERR( MB_FAILURE, "Failed to read int data for attribute " << attIt->second.attName );
                 ssAtt << "int;";
+                break;
+            case NC_INT64: // be careful here
+                sz      = attIt->second.attLen * sizeof( long );
+                attData = (long*)malloc( sz );
+                success = NCFUNC( get_att_long )( _fileId, attIt->second.attVarId, attIt->second.attName.c_str(),
+                                                 (long*)attData );
+                if( success )
+                    MB_SET_ERR( MB_FAILURE, "Failed to read int data for attribute " << attIt->second.attName );
+                ssAtt << "long;";
                 break;
             case NC_FLOAT:
                 sz      = attIt->second.attLen * sizeof( float );
@@ -870,6 +893,9 @@ ErrorCode NCHelper::read_variables_to_set_allocate( std::vector< ReadNC::VarData
                 case NC_SHORT:
                 case NC_INT:
                     vdatas[i].varDatas[t] = new int[vdatas[i].sz];
+                    break;
+                case NC_INT64:
+                    vdatas[i].varDatas[t] = new long[vdatas[i].sz];
                     break;
                 case NC_FLOAT:
                 case NC_DOUBLE:
@@ -1225,6 +1251,22 @@ ErrorCode ScdNCHelper::read_scd_variables_to_nonset( std::vector< ReadNC::VarDat
                     {
                         for( std::size_t idx = 0; idx != tmpintdata.size(); idx++ )
                             ( (int*)data )[idx] = tmpintdata[idx];
+                    }
+                    break;
+                }
+                case NC_INT64: {
+                    std::vector< long > tmpintdata( sz );
+                    success = NCFUNCAG( _vara_long )( _fileId, vdatas[i].varId, &vdatas[i].readStarts[0],
+                                                     &vdatas[i].readCounts[0], &tmpintdata[0] );
+                    if( success )
+                        MB_SET_ERR( MB_FAILURE, "Failed to read long data for variable " << vdatas[i].varName );
+                    if( vdatas[i].numLev > 1 )
+                        // Transpose (lev, lat, lon) to (lat, lon, lev)
+                        kji_to_jik( ni, nj, nk, data, &tmpintdata[0] );
+                    else
+                    {
+                        for( std::size_t idx = 0; idx != tmpintdata.size(); idx++ )
+                            ( (long*)data )[idx] = tmpintdata[idx];
                     }
                     break;
                 }

@@ -30,6 +30,7 @@ EXTRA_DIST = HommeMapping.nc \
 	     sample.stl \
              three.smf \
              mpasx1.642.t.2.nc \
+	     ne4np4-esmf.nc \
              2d_naca0012.cgns \
              cube.stp \
              cylcube.stp \

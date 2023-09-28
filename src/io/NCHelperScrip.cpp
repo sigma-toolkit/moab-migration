@@ -248,7 +248,7 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
         int gdId;
         int success = NCFUNC( inq_varid )( _fileId, "grid_dims", &gdId );
         if( success ) MB_SET_ERR( MB_FAILURE, "Failed to get variable id of grid_dims" );
-        
+
         // If rectilinear attribute present, mark it
         std::vector< int > vecDimSizes( 3, 0 );
         Tag rectilinearTag;
@@ -257,7 +257,7 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
         //                 :       RLL(3),           num_lat,        num_lon
 
         // create the maskTag GRID_IMASK, with default value of 1
-        
+
         vecDimSizes[0] = ( grid_rank == 2 ? 1 /* moab::TempestRemapper::RLL */ : 0 /* moab::TempestRemapper::CS */ );
         vecDimSizes[1] = grid_size; // number of elements
         vecDimSizes[2] = grid_size; // number of elements
@@ -269,20 +269,21 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
         {
             NCDF_SIZE read_starts[1] = { static_cast< NCDF_SIZE >( 0 ) };
             NCDF_SIZE read_counts[1] = { static_cast< NCDF_SIZE >( grid_rank ) };
-            std::vector< int > requeststatus(2);
 
             // Do a partial read in each subrange
 #ifdef MOAB_HAVE_PNETCDF
+            std::vector< int > requeststatus( 2 );
             success = NCFUNCREQG( _vara_int )( _fileId, gdId, read_starts, read_counts, vecDimSizes.data()+1,
                                                       &requeststatus[0] );
+            if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read grid_dims data" );
 
             // Wait outside the loop
             success = NCFUNC( wait_all )( _fileId, 1, &requeststatus[0], &requeststatus[1] );
             if( success ) MB_SET_ERR( MB_FAILURE, "Failed on wait_all" );
 #else
             success = NCFUNCAG( _vara_int )( _fileId, gdId, read_starts, read_counts, vecDimSizes.data()+1 );
-#endif
             if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read grid_dims data" );
+#endif
         }
 
         rval = mbImpl->tag_set_data(rectilinearTag, &_fileSet, 1, vecDimSizes.data());

@@ -76,15 +76,28 @@ class ReadNC : public ReaderIface
   public:
     static ReaderIface* factory( Interface* );
 
+    enum NCFormatType
+    {
+        NC_FORMAT_UNKNOWN_TYPE = 0,
+        NC_FORMAT_MPAS         = 1,
+        NC_FORMAT_SCRIP        = 2,
+        NC_FORMAT_ESMF         = 3,
+        NC_FORMAT_DOMAIN       = 4,
+        NC_FORMAT_HOMME        = 5,
+        NC_FORMAT_GCRM         = 6,
+        NC_FORMAT_EULER        = 7,
+        NC_FORMAT_FV           = 8
+    };
+
     //! Load an NC file
     ErrorCode load_file( const char* file_name,
                          const EntityHandle* file_set,
                          const FileOptions& opts,
-                         const SubsetList* subset_list = 0,
-                         const Tag* file_id_tag        = 0 );
+                         const SubsetList* subset_list = nullptr,
+                         const Tag* file_id_tag        = nullptr );
 
     //! Constructor
-    ReadNC( Interface* impl = NULL );
+    explicit ReadNC( Interface* impl = nullptr );
 
     //! Destructor
     virtual ~ReadNC();
@@ -93,7 +106,7 @@ class ReadNC : public ReaderIface
                                        const char* tag_name,
                                        const FileOptions& opts,
                                        std::vector< int >& tag_values_out,
-                                       const SubsetList* subset_list = 0 );
+                                       const SubsetList* subset_list = nullptr );
 
     //! ENTLOCNSEDGE for north/south edge
     //! ENTLOCWEEDGE for west/east edge

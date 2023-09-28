@@ -438,7 +438,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
 
         for( unsigned i = 0; i < srcdimSizes.size(); i++ )
         {
-            sprintf( szDim, "name%i", i );
+            snprintf( szDim, 64, "name%i", i );
             varSrcGridDims->add_att( szDim, srcdimNames[nSrcGridDims - i - 1].c_str() );
         }
 
@@ -450,7 +450,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
 
         for( unsigned i = 0; i < tgtdimSizes.size(); i++ )
         {
-            sprintf( szDim, "name%i", i );
+            snprintf( szDim, 64, "name%i", i );
             varDstGridDims->add_att( szDim, tgtdimNames[nDstGridDims - i - 1].c_str() );
         }
     }

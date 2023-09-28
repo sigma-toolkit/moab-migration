@@ -59,17 +59,26 @@ private:
     virtual ErrorCode check_existing_mesh() {return MB_SUCCESS;}
 
     //! Implementation of UcdNCHelper::read_ucd_variables_to_nonset_allocate()
-    virtual ErrorCode read_ucd_variables_to_nonset_allocate( std::vector< ReadNC::VarData >& vdatas,
-                                                             std::vector< int >& tstep_nums ){return MB_SUCCESS;}
+    virtual ErrorCode read_ucd_variables_to_nonset_allocate( std::vector< ReadNC::VarData >& /*vdatas*/,
+                                                             std::vector< int >& /*tstep_nums*/ )
+    {
+        return MB_SUCCESS;
+    }
+
 #ifdef MOAB_HAVE_PNETCDF
     //! Implementation of UcdNCHelper::read_ucd_variables_to_nonset_async()
-    virtual ErrorCode read_ucd_variables_to_nonset_async( std::vector< ReadNC::VarData >& vdatas,
-                                                          std::vector< int >& tstep_nums ) {return MB_SUCCESS;}
+    virtual ErrorCode read_ucd_variables_to_nonset_async( std::vector< ReadNC::VarData >& /*vdatas*/,
+                                                          std::vector< int >& /*tstep_nums*/ )
+    {
+        return MB_SUCCESS;
+    }
 #else
     //! Implementation of UcdNCHelper::read_ucd_variables_to_nonset()
-    virtual ErrorCode read_ucd_variables_to_nonset( std::vector< ReadNC::VarData >& vdatas,
-                                                    std::vector< int >& tstep_nums ){return MB_SUCCESS;}
-
+    virtual ErrorCode read_ucd_variables_to_nonset( std::vector< ReadNC::VarData >& /*vdatas*/,
+                                                    std::vector< int >& /*tstep_nums*/ )
+    {
+        return MB_SUCCESS;
+    }
 #endif
 
   private:

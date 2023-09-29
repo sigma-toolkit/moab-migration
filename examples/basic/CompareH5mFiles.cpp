@@ -26,8 +26,10 @@ int main( int argc, char** argv )
 
     ProgOptions opts;
 
+    int dim = 2;
     opts.addOpt< std::string >( "file1,f", "first file", &file1 );
     opts.addOpt< std::string >( "file2,g", "second file", &file2 );
+    opts.addOpt< int  >( "dimension,d", "dimension for entities", &dim );
 
     opts.parseCommandLine( argc, argv );
 
@@ -43,17 +45,17 @@ int main( int argc, char** argv )
     rval = mb->tag_get_tags(list1);MB_CHK_SET_ERR( rval, "can't get tags 1" );
 
     Range cells1;
-    rval = mb->get_entities_by_dimension(0, 2, cells1);MB_CHK_SET_ERR( rval, "can't get cells 1" );
+    rval = mb->get_entities_by_dimension(0, dim, cells1);MB_CHK_SET_ERR( rval, "can't get cells 1" );
 
     Range cells2;
-    rval = mb2->get_entities_by_dimension(0, 2, cells2);MB_CHK_SET_ERR( rval, "can't get cells 2" );
+    rval = mb2->get_entities_by_dimension(0, dim, cells2);MB_CHK_SET_ERR( rval, "can't get cells 2" );
 
     if (cells1.size() != cells2.size()) MB_CHK_SET_ERR( MB_FAILURE, "different size models " );
     vector<double> vals1, vals2;
     vals1.resize(cells1.size());
     vals2.resize(cells2.size());
     int k=0; // number of different double tags
-    std::cout << " compare files: " << file1 << " and " << file2 << "\n";
+    std::cout << " compare files: " << file1 << " and " << file2 << " dimension entity: " << dim << "\n";
     for (size_t i=0; i< list1.size(); i++)
     {
         Tag tag=list1[i];

@@ -104,8 +104,8 @@ class Remapper
             rectilinearTag != nullptr )
         {
             int dimSizes[3];
-            rval                       = m_interface->tag_get_data( rectilinearTag, &meshset, 1,
-                                                                    dimSizes );  // MB_CHK_SET_ERR( rval, "Error geting tag data" );
+            rval = m_interface->tag_get_data( rectilinearTag, &meshset, 1,
+                                              dimSizes );  // MB_CHK_SET_ERR( rval, "Error geting tag data" );
             metadata.clear();
             metadata.push_back( dimSizes[0] );
             metadata.push_back( dimSizes[1] );

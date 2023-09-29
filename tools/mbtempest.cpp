@@ -217,8 +217,10 @@ struct ToolContext
         opts.addOpt< void >( "nobubble", "do not use bubble on interior of spectral element nodes",
                              &mapOptions.fNoBubble );
 
-        opts.addOpt< void >( "sparseconstraints", "Use sparse solver for constraints when we have high-valence (typical with high-res RLL mesh)",
-                             &mapOptions.fSparseConstraints );
+        opts.addOpt< void >(
+            "sparseconstraints",
+            "Use sparse solver for constraints when we have high-valence (typical with high-res RLL mesh)",
+            &mapOptions.fSparseConstraints );
 
         opts.addOpt< void >( "rrmgrids",
                              "At least one of the meshes is a regionally refined grid (relevant to "
@@ -356,7 +358,7 @@ inline double sample_stationary_vortex( double dLon, double dLat );
 std::string get_file_read_options( ToolContext& ctx, std::string filename )
 {
     // if running in serial, blank option may suffice in general
-    std::string opts      = "";
+    std::string opts = "";
     if( ctx.n_procs > 1 )
     {
         size_t lastindex      = filename.find_last_of( "." );
@@ -397,20 +399,22 @@ std::string get_file_read_options( ToolContext& ctx, std::string filename )
                     }
                     if( iSCRIPFormat == 3 )  // Input from a NetCDF SCRIP file
                     {
-                        opts   = "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;";
+                        opts = "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;";
                     }
                     if( iMPASFormat == 4 )  // Input from a NetCDF SCRIP file
                     {
-                        opts   = "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;"
-                                 "PARALLEL_RESOLVE_SHARED_ENTS;NO_EDGES;NO_MIXED_ELEMENTS;VARIABLE=;";
+                        opts = "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;"
+                               "PARALLEL_RESOLVE_SHARED_ENTS;NO_EDGES;NO_MIXED_ELEMENTS;VARIABLE=;";
                     }
                 }
             }
 
+#ifdef MOAB_HAVE_MPI
             int line_size = opts.size();
             MPI_Bcast( &line_size, 1, MPI_INT, 0, MPI_COMM_WORLD );
             if( ctx.proc_id != 0 ) opts.resize( line_size );
             MPI_Bcast( const_cast< char* >( opts.data() ), line_size, MPI_CHAR, 0, MPI_COMM_WORLD );
+#endif
         }
         else
             return "PARALLEL=BCAST_DELETE;PARTITION=TRIVIAL;PARALLEL_RESOLVE_SHARED_ENTS;";
@@ -440,8 +444,8 @@ int main( int argc, char* argv[] )
     }
 
     // Build the history string
-    for (int ia = 0; ia < argc; ++ia)
-      historyStr += std::string(argv[ia]) + " ";
+    for( int ia = 0; ia < argc; ++ia )
+        historyStr += std::string( argv[ia] ) + " ";
 
     ToolContext* runCtx;
 #ifdef MOAB_HAVE_MPI
@@ -754,21 +758,23 @@ int main( int argc, char* argv[] )
 
             if( runCtx->outFilename.size() )
             {
-                std::map<std::string, std::string> attrMap;
-                attrMap["MOABversion"] = std::string(MOAB_VERSION);
-                attrMap["Title"] = "MOAB-TempestRemap (mbtempest) Offline Regridding Weight Generator";
+                std::map< std::string, std::string > attrMap;
+                attrMap["MOABversion"]   = std::string( MOAB_VERSION );
+                attrMap["Title"]         = "MOAB-TempestRemap (mbtempest) Offline Regridding Weight Generator";
                 attrMap["normalization"] = "ovarea";
                 attrMap["remap_options"] = runCtx->mapOptions.strMethod;
-                attrMap["domain_a"] = runCtx->inFilenames[0];
-                attrMap["domain_b"] = runCtx->inFilenames[1];
-                attrMap["domain_aUb"] = runCtx->intxFilename;
-                attrMap["map_aPb"] = runCtx->outFilename;
-                attrMap["methodorder_a"] = runCtx->disc_methods[0] + ":" + std::to_string(runCtx->disc_orders[0]) + ":" + std::string( runCtx->doftag_names[0] );
-                attrMap["concave_a"] = runCtx->mapOptions.fSourceConcave ? "true" : "false";
-                attrMap["methodorder_b"] = runCtx->disc_methods[1] + ":" + std::to_string(runCtx->disc_orders[1]) + ":" + std::string( runCtx->doftag_names[1] );
+                attrMap["domain_a"]      = runCtx->inFilenames[0];
+                attrMap["domain_b"]      = runCtx->inFilenames[1];
+                attrMap["domain_aUb"]    = runCtx->intxFilename;
+                attrMap["map_aPb"]       = runCtx->outFilename;
+                attrMap["methodorder_a"] = runCtx->disc_methods[0] + ":" + std::to_string( runCtx->disc_orders[0] ) +
+                                           ":" + std::string( runCtx->doftag_names[0] );
+                attrMap["concave_a"]     = runCtx->mapOptions.fSourceConcave ? "true" : "false";
+                attrMap["methodorder_b"] = runCtx->disc_methods[1] + ":" + std::to_string( runCtx->disc_orders[1] ) +
+                                           ":" + std::string( runCtx->doftag_names[1] );
                 attrMap["concave_b"] = runCtx->mapOptions.fTargetConcave ? "true" : "false";
-                attrMap["bubble"] = runCtx->mapOptions.fNoBubble ? "false" : "true";
-                attrMap["history"] = historyStr;
+                attrMap["bubble"]    = runCtx->mapOptions.fNoBubble ? "false" : "true";
+                attrMap["history"]   = historyStr;
 
                 // Write the map file to disk in parallel using either HDF5 or SCRIP interface
                 rval = weightMap->WriteParallelMap( runCtx->outFilename.c_str(), attrMap );MB_CHK_ERR( rval );
@@ -923,11 +929,11 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         std::string additional_read_opts_src = get_file_read_options( ctx, ctx.inFilenames[0] );
         std::vector< int > smetadata, tmetadata;
         // Load the source mesh and validate
-        rval = remapper.LoadNativeMesh( ctx.inFilenames[0], ctx.meshsets[0], smetadata, additional_read_opts_src.c_str() );MB_CHK_ERR( rval );
+        rval =
+            remapper.LoadNativeMesh( ctx.inFilenames[0], ctx.meshsets[0], smetadata, additional_read_opts_src.c_str() );MB_CHK_ERR( rval );
         if( smetadata.size() )
         {
-            remapper.SetMeshType( moab::Remapper::SourceMesh,
-                                  smetadata );
+            remapper.SetMeshType( moab::Remapper::SourceMesh, smetadata );
         }
         // Rescale the radius of both to compute the intersection
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[0], radius_src );MB_CHK_ERR( rval );
@@ -936,11 +942,11 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
 
         // Load the target mesh and validate
         std::string addititional_read_opts_tgt = get_file_read_options( ctx, ctx.inFilenames[1] );
-        rval = remapper.LoadNativeMesh( ctx.inFilenames[1], ctx.meshsets[1], tmetadata, addititional_read_opts_tgt.c_str() );MB_CHK_ERR( rval );
+        rval = remapper.LoadNativeMesh( ctx.inFilenames[1], ctx.meshsets[1], tmetadata,
+                                        addititional_read_opts_tgt.c_str() );MB_CHK_ERR( rval );
         if( tmetadata.size() )
         {
-            remapper.SetMeshType( moab::Remapper::TargetMesh,
-                                  tmetadata );
+            remapper.SetMeshType( moab::Remapper::TargetMesh, tmetadata );
         }
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[1], radius_dest );MB_CHK_ERR( rval );
         rval = remapper.ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );

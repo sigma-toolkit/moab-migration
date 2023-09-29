@@ -1484,7 +1484,7 @@ int moab::TempestOnlineMap::IsConsistent( double dTolerance )
 
     int ierr;
     int fConsistentGlobal = 0;
-    ierr = MPI_Allreduce( &fConsistent, &fConsistentGlobal, 1, MPI_INT, MPI_SUM, m_pcomm->comm() );
+    ierr                  = MPI_Allreduce( &fConsistent, &fConsistentGlobal, 1, MPI_INT, MPI_SUM, m_pcomm->comm() );
     if( ierr != MPI_SUCCESS ) return -1;
 
     return fConsistentGlobal;
@@ -1664,7 +1664,7 @@ int moab::TempestOnlineMap::IsMonotone( double dTolerance )
 
     int ierr;
     int fMonotoneGlobal = 0;
-    ierr = MPI_Allreduce( &fMonotone, &fMonotoneGlobal, 1, MPI_INT, MPI_SUM, m_pcomm->comm() );
+    ierr                = MPI_Allreduce( &fMonotone, &fMonotoneGlobal, 1, MPI_INT, MPI_SUM, m_pcomm->comm() );
     if( ierr != MPI_SUCCESS ) return -1;
 
     return fMonotoneGlobal;
@@ -2168,7 +2168,7 @@ moab::ErrorCode moab::TempestOnlineMap::ComputeMetrics( moab::Remapper::Intersec
     }
 #else
     ntotsize_glob = ntotsize;
-    globerrnorms = errnorms;
+    globerrnorms  = errnorms;
 #endif
     globerrnorms[0] = ( globerrnorms[0] / ntotsize_glob );
     globerrnorms[1] = std::sqrt( globerrnorms[1] / ntotsize_glob );

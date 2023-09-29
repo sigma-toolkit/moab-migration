@@ -153,7 +153,8 @@ int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< unsigne
 
 ///////////////////////////////////////////////////////////////////////////////
 
-moab::ErrorCode moab::TempestOnlineMap::WriteParallelMap( const std::string& strFilename, const std::map<std::string, std::string>& attrMap )
+moab::ErrorCode moab::TempestOnlineMap::WriteParallelMap( const std::string& strFilename,
+                                                          const std::map< std::string, std::string >& attrMap )
 {
     moab::ErrorCode rval;
 
@@ -177,7 +178,8 @@ moab::ErrorCode moab::TempestOnlineMap::WriteParallelMap( const std::string& str
 
 ///////////////////////////////////////////////////////////////////////////////
 
-moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& strFilename, const std::map<std::string, std::string>& attrMap )
+moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& strFilename,
+                                                           const std::map< std::string, std::string >& attrMap )
 {
     NcError error( NcError::silent_nonfatal );
 
@@ -197,13 +199,13 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     // Attributes
     // ncMap.add_att( "Title", "MOAB-TempestRemap Online Regridding Weight Generator" );
     auto it = attrMap.begin();
-    while (it != attrMap.end())
+    while( it != attrMap.end() )
     {
-      // set the map attributes
-      ncMap.add_att( it->first.c_str(), it->second.c_str() );
-      // increment iterator
-      it++;
-		}
+        // set the map attributes
+        ncMap.add_att( it->first.c_str(), it->second.c_str() );
+        // increment iterator
+        it++;
+    }
 
     /**
      * Need to get the global maximum of number of vertices per element

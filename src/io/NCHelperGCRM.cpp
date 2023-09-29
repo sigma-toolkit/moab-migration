@@ -645,7 +645,7 @@ ErrorCode NCHelperGCRM::read_ucd_variables_to_nonset_async( std::vector< ReadNC:
 ErrorCode NCHelperGCRM::read_ucd_variables_to_nonset( std::vector< ReadNC::VarData >& vdatas,
                                                       std::vector< int >& tstep_nums )
 {
-    bool& noEdges = _readNC->noEdges;
+    bool& noEdges       = _readNC->noEdges;
     DebugOutput& dbgOut = _readNC->dbgOut;
 
     ErrorCode rval = read_ucd_variables_to_nonset_allocate( vdatas, tstep_nums );MB_CHK_SET_ERR( rval, "Trouble allocating space to read non-set variables" );
@@ -694,12 +694,12 @@ ErrorCode NCHelperGCRM::read_ucd_variables_to_nonset( std::vector< ReadNC::VarDa
                     // basically, we have to give a different point
                     // for data to start, for every subrange :(
                     size_t indexInDoubleArray = 0;
-                    size_t ic = 0;
+                    size_t ic                 = 0;
                     for( Range::pair_iterator pair_iter = pLocalGid->pair_begin(); pair_iter != pLocalGid->pair_end();
                          ++pair_iter, ic++ )
                     {
-                        EntityHandle starth = pair_iter->first;
-                        EntityHandle endh = pair_iter->second;  // Inclusive
+                        EntityHandle starth     = pair_iter->first;
+                        EntityHandle endh       = pair_iter->second;  // Inclusive
                         vdatas[i].readStarts[1] = (NCDF_SIZE)( starth - 1 );
                         vdatas[i].readCounts[1] = (NCDF_SIZE)( endh - starth + 1 );
 

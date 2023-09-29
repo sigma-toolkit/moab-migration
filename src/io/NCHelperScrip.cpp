@@ -259,13 +259,14 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
         // create the maskTag GRID_IMASK, with default value of 1
 
         vecDimSizes[0] = ( grid_rank == 2 ? 1 /* moab::TempestRemapper::RLL */ : 0 /* moab::TempestRemapper::CS */ );
-        vecDimSizes[1] = grid_size; // number of elements
-        vecDimSizes[2] = grid_size; // number of elements
-        rval = mbImpl->tag_get_handle( "ClimateMetadata", 3, MB_TYPE_INTEGER, rectilinearTag,
-                                      MB_TAG_SPARSE | MB_TAG_CREAT, vecDimSizes.data() );
-        if( MB_ALREADY_ALLOCATED != rval && MB_SUCCESS != rval ) MB_CHK_SET_ERR( rval, "can't create rectilinear sizes tag" );
+        vecDimSizes[1] = grid_size;  // number of elements
+        vecDimSizes[2] = grid_size;  // number of elements
+        rval           = mbImpl->tag_get_handle( "ClimateMetadata", 3, MB_TYPE_INTEGER, rectilinearTag,
+                                                 MB_TAG_SPARSE | MB_TAG_CREAT, vecDimSizes.data() );
+        if( MB_ALREADY_ALLOCATED != rval && MB_SUCCESS != rval )
+            MB_CHK_SET_ERR( rval, "can't create rectilinear sizes tag" );
 
-        if ( grid_rank == 2 )
+        if( grid_rank == 2 )
         {
             NCDF_SIZE read_starts[1] = { static_cast< NCDF_SIZE >( 0 ) };
             NCDF_SIZE read_counts[1] = { static_cast< NCDF_SIZE >( grid_rank ) };
@@ -273,20 +274,20 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
             // Do a partial read in each subrange
 #ifdef MOAB_HAVE_PNETCDF
             std::vector< int > requeststatus( 2 );
-            success = NCFUNCREQG( _vara_int )( _fileId, gdId, read_starts, read_counts, vecDimSizes.data()+1,
-                                                      &requeststatus[0] );
+            success = NCFUNCREQG( _vara_int )( _fileId, gdId, read_starts, read_counts, vecDimSizes.data() + 1,
+                                               &requeststatus[0] );
             if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read grid_dims data" );
 
             // Wait outside the loop
             success = NCFUNC( wait_all )( _fileId, 1, &requeststatus[0], &requeststatus[1] );
             if( success ) MB_SET_ERR( MB_FAILURE, "Failed on wait_all" );
 #else
-            success = NCFUNCAG( _vara_int )( _fileId, gdId, read_starts, read_counts, vecDimSizes.data()+1 );
+            success = NCFUNCAG( _vara_int )( _fileId, gdId, read_starts, read_counts, vecDimSizes.data() + 1 );
             if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read grid_dims data" );
 #endif
         }
 
-        rval = mbImpl->tag_set_data(rectilinearTag, &_fileSet, 1, vecDimSizes.data());
+        rval = mbImpl->tag_set_data( rectilinearTag, &_fileSet, 1, vecDimSizes.data() );
     }
 
     // so we read xv, yv for all corners in the local mesh, and masks if they exist
@@ -451,7 +452,6 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
 #else
     rval = mbImpl->remove_entities( _fileSet, all_verts );MB_CHK_ERR( rval );
 #endif
-
 
     return MB_SUCCESS;
 }

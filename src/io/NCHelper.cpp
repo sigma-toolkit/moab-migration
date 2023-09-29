@@ -555,7 +555,7 @@ ErrorCode NCHelper::read_variables_to_set( std::vector< ReadNC::VarData >& vdata
                     break;
                 case NC_INT64:
                     success = NCFUNCAG( _vara_long )( _fileId, vdatas[i].varId, &vdatas[i].readStarts[0],
-                                                                         &vdatas[i].readCounts[0], (long*)data );
+                                                      &vdatas[i].readCounts[0], (long*)data );
                     if( success )
                         MB_SET_ERR( MB_FAILURE, "Failed to read long data for variable " << vdatas[i].varName );
                     break;
@@ -587,7 +587,7 @@ ErrorCode NCHelper::read_variables_to_set( std::vector< ReadNC::VarData >& vdata
                     delete[](int*)data;
                     break;
                 case NC_INT64:
-                    delete[] (long*)data;
+                    delete[](long*)data;
                     break;
                 case NC_FLOAT:
                 case NC_DOUBLE:
@@ -673,7 +673,7 @@ ErrorCode NCHelper::get_tag_to_set( ReadNC::VarData& var_data, int tstep_num, Ta
             break;
         case NC_SHORT:
         case NC_INT:
-        case NC_INT64: //  this is a big stretch; we should introduce LONG tag
+        case NC_INT64:  //  this is a big stretch; we should introduce LONG tag
             rval = mbImpl->tag_get_handle( tag_name.str().c_str(), 0, MB_TYPE_INTEGER, tagh,
                                            MB_TAG_CREAT | MB_TAG_SPARSE | MB_TAG_VARLEN );MB_CHK_SET_ERR( rval, "Trouble creating tag " << tag_name.str() );
             break;
@@ -774,11 +774,11 @@ ErrorCode NCHelper::create_attrib_string( const std::map< std::string, ReadNC::A
                     MB_SET_ERR( MB_FAILURE, "Failed to read int data for attribute " << attIt->second.attName );
                 ssAtt << "int;";
                 break;
-            case NC_INT64: // be careful here
+            case NC_INT64:  // be careful here
                 sz      = attIt->second.attLen * sizeof( long );
                 attData = (long*)malloc( sz );
                 success = NCFUNC( get_att_long )( _fileId, attIt->second.attVarId, attIt->second.attName.c_str(),
-                                                 (long*)attData );
+                                                  (long*)attData );
                 if( success )
                     MB_SET_ERR( MB_FAILURE, "Failed to read int data for attribute " << attIt->second.attName );
                 ssAtt << "long;";
@@ -1301,7 +1301,7 @@ ErrorCode ScdNCHelper::read_scd_variables_to_nonset( std::vector< ReadNC::VarDat
                 case NC_INT64: {
                     std::vector< long > tmpintdata( sz );
                     success = NCFUNCAG( _vara_long )( _fileId, vdatas[i].varId, &vdatas[i].readStarts[0],
-                                                     &vdatas[i].readCounts[0], &tmpintdata[0] );
+                                                      &vdatas[i].readCounts[0], &tmpintdata[0] );
                     if( success )
                         MB_SET_ERR( MB_FAILURE, "Failed to read long data for variable " << vdatas[i].varName );
                     if( vdatas[i].numLev > 1 )
@@ -1399,7 +1399,7 @@ ErrorCode ScdNCHelper::create_quad_coordinate_tag()
 #ifdef MOAB_HAVE_MPI
     rval = mbImpl->tag_iterate( tagh, ents_owned.begin(), ents_owned.end(), count, data );MB_CHK_SET_ERR( rval, "Failed to iterate COORDS tag on quads" );
 #else
-    rval = mbImpl->tag_iterate( tagh, ents.begin(), ents.end(), count, data );MB_CHK_SET_ERR( rval, "Failed to iterate COORDS tag on quads" );
+    rval         = mbImpl->tag_iterate( tagh, ents.begin(), ents.end(), count, data );MB_CHK_SET_ERR( rval, "Failed to iterate COORDS tag on quads" );
 #endif
     assert( count == (int)numOwnedEnts );
     double* quad_data = (double*)data;

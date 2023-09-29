@@ -183,8 +183,7 @@ class TempestRemapper : public Remapper
     /// <summary>
     ///     Set the mesh type corresponding to the intersection context
     /// </summary>
-    void SetMeshType( Remapper::IntersectionContext ctx,
-                      const std::vector< int >& metadata );
+    void SetMeshType( Remapper::IntersectionContext ctx, const std::vector< int >& metadata );
 
     /// <summary>
     ///     Get the mesh type corresponding to the intersection context
@@ -488,14 +487,13 @@ inline const moab::Range& TempestRemapper::GetMeshVertices( Remapper::Intersecti
     }
 }
 
-inline void TempestRemapper::SetMeshType( Remapper::IntersectionContext ctx,
-                                          const std::vector< int >& metadata )
+inline void TempestRemapper::SetMeshType( Remapper::IntersectionContext ctx, const std::vector< int >& metadata )
 {
     switch( ctx )
     {
         case Remapper::SourceMesh:
-            m_source_type = static_cast< moab::TempestRemapper::TempestMeshType >(metadata[0]);
-            if ( metadata[0] == 1 ) // RLL mesh
+            m_source_type = static_cast< moab::TempestRemapper::TempestMeshType >( metadata[0] );
+            if( metadata[0] == 1 )  // RLL mesh
             {
                 m_source_metadata.resize( 2 );
                 m_source_metadata[0] = metadata[1];
@@ -508,8 +506,8 @@ inline void TempestRemapper::SetMeshType( Remapper::IntersectionContext ctx,
             }
             break;
         case Remapper::TargetMesh:
-            m_target_type = static_cast< moab::TempestRemapper::TempestMeshType >(metadata[0]);
-            if ( metadata[0] == 1 ) // RLL mesh
+            m_target_type = static_cast< moab::TempestRemapper::TempestMeshType >( metadata[0] );
+            if( metadata[0] == 1 )  // RLL mesh
             {
                 m_target_metadata.resize( 2 );
                 m_target_metadata[0] = metadata[1];

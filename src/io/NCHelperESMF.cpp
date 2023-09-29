@@ -22,8 +22,8 @@ const int DEFAULT_MAX_EDGES_PER_CELL = 10;
 const double pideg = acos( -1.0 ) / 180.0;
 
 NCHelperESMF::NCHelperESMF( ReadNC* readNC, int fileId, const FileOptions& opts, EntityHandle fileSet )
-: UcdNCHelper( readNC, fileId, opts, fileSet ), maxEdgesPerCell( DEFAULT_MAX_EDGES_PER_CELL ), centerCoordsId(-1),
-  degrees(true), coordDim(0)
+    : UcdNCHelper( readNC, fileId, opts, fileSet ), maxEdgesPerCell( DEFAULT_MAX_EDGES_PER_CELL ), coordDim( 0 ),
+      centerCoordsId( -1 ), degrees( true )
 {
 }
 
@@ -139,7 +139,6 @@ ErrorCode NCHelperESMF::init_mesh_vals()
 
 ErrorCode NCHelperESMF::create_mesh( Range& faces )
 {
-    Interface*& mbImpl    = _readNC->mbImpl;
     bool& noMixedElements = _readNC->noMixedElements;
     DebugOutput& dbgOut   = _readNC->dbgOut;
 

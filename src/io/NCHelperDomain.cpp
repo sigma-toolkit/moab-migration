@@ -433,11 +433,11 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
 
         // int nj = gDims[4]-gDims[1]; // is it about 1 in irregular cases
 
-        int local_row_size  = lCDims[3] - lCDims[0];
+        // int local_row_size  = lCDims[3] - lCDims[0];
         int global_row_size = gDims[3] - gDims[0];  // this is along
         elem_index          = -1;
         int index           = 0;  // consider the mask for advancing in moab arrays;
-        //printf(" map size :%ld \n", vertex_map.size());
+
         // create now vertex arrays, size vertex_map.size()
         for( int j = lCDims[1]; j < lCDims[4]; j++ )
             for( int i = lCDims[0]; i < lCDims[3]; i++ )

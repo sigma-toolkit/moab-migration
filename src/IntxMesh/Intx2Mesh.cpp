@@ -898,6 +898,7 @@ ErrorCode Intx2Mesh::build_processor_euler_boxes( EntityHandle euler_set, Range&
 #endif
     if( MPI_SUCCESS != mpi_err ) return MB_FAILURE;
 
+#ifdef VERBOSE
     if( my_rank == 0 )
     {
         std::cout << " maximum number of vertices per cell are " << max_edges_1 << " on first mesh and " << max_edges_2
@@ -910,6 +911,7 @@ ErrorCode Intx2Mesh::build_processor_euler_boxes( EntityHandle euler_set, Range&
                       << allBoxes[6 * i + 5] << " \n";
         }
     }
+#endif
 
     return MB_SUCCESS;
 }

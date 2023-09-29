@@ -21,7 +21,7 @@
 namespace moab
 {
 
-NCHelper* NCHelper::get_nc_helper( ReadNC* readNC, int fileId, const FileOptions& opts, EntityHandle fileSet )
+ReadNC::NCFormatType NCHelper::get_nc_format( ReadNC* readNC, int fileId )
 {
     // Check if CF convention is being followed
     bool is_CF = false;
@@ -41,36 +41,80 @@ NCHelper* NCHelper::get_nc_helper( ReadNC* readNC, int fileId, const FileOptions
         if( 0 == success && att_data.find( "CF" ) != std::string::npos ) is_CF = true;
     }
 
-    if( is_CF )
-    {
-        if( NCHelperEuler::can_read_file( readNC, fileId ) )
-            return new( std::nothrow ) NCHelperEuler( readNC, fileId, opts, fileSet );
-        else if( NCHelperFV::can_read_file( readNC, fileId ) )
-            return new( std::nothrow ) NCHelperFV( readNC, fileId, opts, fileSet );
-        else if( NCHelperHOMME::can_read_file( readNC, fileId ) )
-            return new( std::nothrow ) NCHelperHOMME( readNC, fileId, opts, fileSet );
-        else if( NCHelperDomain::can_read_file( readNC, fileId ) )
-            return new( std::nothrow ) NCHelperDomain( readNC, fileId, opts, fileSet );
-    }
-    else
-    {
-        if( NCHelperMPAS::can_read_file( readNC ) )
-            return new( std::nothrow ) NCHelperMPAS( readNC, fileId, opts, fileSet );
-        // For a HOMME connectivity file, there might be no CF convention
-        else if( NCHelperHOMME::can_read_file( readNC, fileId ) )
-            return new( std::nothrow ) NCHelperHOMME( readNC, fileId, opts, fileSet );
-        // gcrm reader
-        else if( NCHelperGCRM::can_read_file( readNC ) )
-            return new( std::nothrow ) NCHelperGCRM( readNC, fileId, opts, fileSet );
-    }
-    // SCRIP can be CF or non CF, if it comes from MPAS :)
-    if( NCHelperScrip::can_read_file( readNC, fileId ) )
-        return new( std::nothrow ) NCHelperScrip( readNC, fileId, opts, fileSet );
+    // Depending on the format, update FileOptions as well
+    if( NCHelperMPAS::can_read_file( readNC ) )
+        return ReadNC::NC_FORMAT_MPAS;
+    else if( NCHelperScrip::can_read_file( readNC, fileId ) )
+        return ReadNC::NC_FORMAT_SCRIP;
+    else if( NCHelperESMF::can_read_file( readNC ) )
+        return ReadNC::NC_FORMAT_ESMF;
+    else if( NCHelperDomain::can_read_file( readNC, fileId ) && is_CF )
+        return ReadNC::NC_FORMAT_DOMAIN;
+    else if( NCHelperHOMME::can_read_file( readNC, fileId ) )
+        return ReadNC::NC_FORMAT_HOMME;
+    else if( NCHelperEuler::can_read_file( readNC, fileId ) && is_CF )
+        return ReadNC::NC_FORMAT_EULER;
+    else if( NCHelperGCRM::can_read_file( readNC ) )
+        return ReadNC::NC_FORMAT_GCRM;
+    else if( NCHelperFV::can_read_file( readNC, fileId ) && is_CF )
+        return ReadNC::NC_FORMAT_FV;
+    else  // Unknown NetCDF grid (will fill this in later for POP, CICE and CLM)
+        return ReadNC::NC_FORMAT_UNKNOWN_TYPE;
+}
 
-    if( NCHelperESMF::can_read_file( readNC ) )
-        return new( std::nothrow ) NCHelperESMF( readNC, fileId, opts, fileSet );
-    // Unknown NetCDF grid (will fill this in later for POP, CICE and CLM)
-    return NULL;
+//! Get appropriate file read options depending on the format of the NC file
+std::string NCHelper::get_default_ncformat_options( ReadNC::NCFormatType format )
+{
+    switch( format )
+    {
+        case moab::ReadNC::NC_FORMAT_GCRM:  // GCRM format reader
+        case moab::ReadNC::NC_FORMAT_MPAS:  // MPAS format reader
+            return "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;"
+                   "PARALLEL_RESOLVE_SHARED_ENTS;NO_EDGES;NO_MIXED_ELEMENTS;VARIABLE=;";
+        case moab::ReadNC::NC_FORMAT_SCRIP:  // SCRIP format reader
+            return "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;";
+        case moab::ReadNC::NC_FORMAT_ESMF:  // ESMF unstructured format reader
+            return "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;PARALLEL_RESOLVE_SHARED_ENTS;VARIABLE=;";
+        case moab::ReadNC::NC_FORMAT_DOMAIN:  // Climate Domain reader
+            return "PARALLEL=READ_PART;PARTITION_METHOD=SQIJ;VARIABLE=;";
+        case moab::ReadNC::NC_FORMAT_HOMME:  // HOMME format reader
+            return "PARALLEL=READ_PART;PARTITION_METHOD=TRIVIAL;PARALLEL_RESOLVE_SHARED_ENTS;";
+        case moab::ReadNC::NC_FORMAT_EULER:  // Euler format reader
+        case moab::ReadNC::NC_FORMAT_FV:     // FV climate format reader
+            return "PARALLEL=READ_PART;PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;"
+                   "PARTITION_METHOD=SQIJ;VARIABLE=;";
+        default:
+            return "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;PARALLEL_RESOLVE_SHARED_ENTS;";
+    }
+}
+
+NCHelper* NCHelper::get_nc_helper( ReadNC* readNC, int fileId, const FileOptions& opts, EntityHandle fileSet )
+{
+    ReadNC::NCFormatType nctype = NCHelper::get_nc_format( readNC, fileId );
+
+    switch( nctype )
+    {
+        case ReadNC::NC_FORMAT_MPAS:  // MPAS format reader
+            return new( std::nothrow ) NCHelperMPAS( readNC, fileId, opts, fileSet );
+        case ReadNC::NC_FORMAT_SCRIP:  // SCRIP format reader
+            // SCRIP can be CF or non CF, if it comes from MPAS :)
+            return new( std::nothrow ) NCHelperScrip( readNC, fileId, opts, fileSet );
+        case ReadNC::NC_FORMAT_ESMF:  // ESMF unstructured format reader
+            return new( std::nothrow ) NCHelperESMF( readNC, fileId, opts, fileSet );
+        case ReadNC::NC_FORMAT_DOMAIN:  // Climate Domain reader
+            return new( std::nothrow ) NCHelperDomain( readNC, fileId, opts, fileSet );
+        case ReadNC::NC_FORMAT_HOMME:  // HOMME format reader
+            // For a HOMME connectivity file, there might be no CF convention
+            return new( std::nothrow ) NCHelperHOMME( readNC, fileId, opts, fileSet );
+        case ReadNC::NC_FORMAT_GCRM:  // GCRM format reader
+            return new( std::nothrow ) NCHelperGCRM( readNC, fileId, opts, fileSet );
+        case ReadNC::NC_FORMAT_EULER:  // Euler format reader
+            return new( std::nothrow ) NCHelperEuler( readNC, fileId, opts, fileSet );
+        case ReadNC::NC_FORMAT_FV:  // FV climate format reader
+            return new( std::nothrow ) NCHelperFV( readNC, fileId, opts, fileSet );
+        default:  // Unknown NetCDF grid (will fill this in later for POP, CICE and CLM)
+            return nullptr;
+    }
 }
 
 ErrorCode NCHelper::create_conventional_tags( const std::vector< int >& tstep_nums )

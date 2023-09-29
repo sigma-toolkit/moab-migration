@@ -71,15 +71,8 @@ moab::TempestOnlineMap::TempestOnlineMap( moab::TempestRemapper* remapper ) : Of
     rank        = remapper->rank;
     size        = remapper->size;
 
-    // Compute and store the total number of source and target DoFs corresponding
-    // to number of rows and columns in the mapping.
-
     // Initialize dimension information from file
     this->setup_sizes_dimensions();
-
-    // Build a matrix of source and target discretization so that we know how to assign
-    // the global DoFs in parallel for the mapping weights
-    // For example, FV->FV: rows X cols = faces_source X faces_target
 }
 
 void moab::TempestOnlineMap::setup_sizes_dimensions()
@@ -88,19 +81,8 @@ void moab::TempestOnlineMap::setup_sizes_dimensions()
     {
         std::vector< std::string > dimNames;
         std::vector< int > dimSizes;
-        if( m_remapper->m_source_type == moab::TempestRemapper::RLL && m_remapper->m_source_metadata.size() )
-        {
-            dimNames.push_back( "lat" );
-            dimNames.push_back( "lon" );
-            dimSizes.resize( 2, 0 );
-            dimSizes[0] = m_remapper->m_source_metadata[1];
-            dimSizes[1] = m_remapper->m_source_metadata[2];
-        }
-        else
-        {
-            dimNames.push_back( "num_elem" );
-            dimSizes.push_back( m_meshInputCov->faces.size() );
-        }
+        dimNames.push_back( "num_elem" );
+        dimSizes.push_back( m_meshInputCov->faces.size() );
 
         this->InitializeSourceDimensions( dimNames, dimSizes );
     }
@@ -109,19 +91,8 @@ void moab::TempestOnlineMap::setup_sizes_dimensions()
     {
         std::vector< std::string > dimNames;
         std::vector< int > dimSizes;
-        if( m_remapper->m_target_type == moab::TempestRemapper::RLL && m_remapper->m_target_metadata.size() )
-        {
-            dimNames.push_back( "lat" );
-            dimNames.push_back( "lon" );
-            dimSizes.resize( 2, 0 );
-            dimSizes[0] = m_remapper->m_target_metadata[1];
-            dimSizes[1] = m_remapper->m_target_metadata[2];
-        }
-        else
-        {
-            dimNames.push_back( "num_elem" );
-            dimSizes.push_back( m_meshOutput->faces.size() );
-        }
+        dimNames.push_back( "num_elem" );
+        dimSizes.push_back( m_meshOutput->faces.size() );
 
         this->InitializeTargetDimensions( dimNames, dimSizes );
     }
@@ -216,6 +187,8 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
 
     bool vprint = is_root && false;
 
+    // Compute and store the total number of source and target DoFs corresponding
+    // to number of rows and columns in the mapping.
 #ifdef VVERBOSE
     {
         src_soln_gdofs.resize( m_remapper->m_covering_source_entities.size() * m_nDofsPEl_Src * m_nDofsPEl_Src, -1 );
@@ -731,6 +704,10 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
     const bool m_bPointCloudTarget = ( m_remapper->point_cloud_target );
     const bool m_bPointCloud       = m_bPointCloudSource || m_bPointCloudTarget;
 
+    // Build a matrix of source and target discretization so that we know how
+    // to assign the global DoFs in parallel for the mapping weights.
+    // For example,
+    //   for FV->FV: the rows represented target DoFs and cols represent source DoFs
     try
     {
         // Check command line parameters (data type arguments)

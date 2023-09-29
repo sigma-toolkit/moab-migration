@@ -153,7 +153,7 @@ int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< unsigne
 
 ///////////////////////////////////////////////////////////////////////////////
 
-moab::ErrorCode moab::TempestOnlineMap::WriteParallelMap( const std::string& strFilename )
+moab::ErrorCode moab::TempestOnlineMap::WriteParallelMap( const std::string& strFilename, const std::map<std::string, std::string>& attrMap )
 {
     moab::ErrorCode rval;
 
@@ -164,7 +164,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteParallelMap( const std::string& str
     if( extension == "nc" )
     {
         /* Invoke the actual call to write the parallel map to disk in SCRIP format */
-        rval = this->WriteSCRIPMapFile( strFilename.c_str() );MB_CHK_ERR( rval );
+        rval = this->WriteSCRIPMapFile( strFilename.c_str(), attrMap );MB_CHK_ERR( rval );
     }
     else
     {
@@ -177,7 +177,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteParallelMap( const std::string& str
 
 ///////////////////////////////////////////////////////////////////////////////
 
-moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& strFilename )
+moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& strFilename, const std::map<std::string, std::string>& attrMap )
 {
     NcError error( NcError::silent_nonfatal );
 
@@ -195,7 +195,15 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     }
 
     // Attributes
-    ncMap.add_att( "Title", "MOAB-TempestRemap Online Regridding Weight Generator" );
+    // ncMap.add_att( "Title", "MOAB-TempestRemap Online Regridding Weight Generator" );
+    auto it = attrMap.begin();
+    while (it != attrMap.end())
+    {
+      // set the map attributes
+      ncMap.add_att( it->first.c_str(), it->second.c_str() );
+      // increment iterator
+      it++;
+		}
 
     /**
      * Need to get the global maximum of number of vertices per element
@@ -282,11 +290,11 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     // Number of nodes per Face
     int nSourceNodesPerFace = dSourceVertexLon.GetColumns();
     int nTargetNodesPerFace = dTargetVertexLon.GetColumns();
+
     // if source or target cells have triangles at poles, center of those triangles need to come from
     // the original quad, not from center in 3d, converted to 2d again
     // start copy OnlineMap.cpp tempestremap
     // right now, do this only for source  mesh; copy the logic for target mesh
-
     for( unsigned i = 0; i < nA; i++ )
     {
         const Face& face = m_meshInput->faces[i];
@@ -332,7 +340,6 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     int max_row_dof, max_col_dof;  // output; arrays will be re-distributed in chunks [maxdof/size]
     // if (size > 1)
     {
-
         int ierr = rearrange_arrays_by_dofs( srccol_gdofmap, vecSourceFaceArea, dSourceCenterLon, dSourceCenterLat,
                                              dSourceVertexLon, dSourceVertexLat, masksA, nA, nSourceNodesPerFace,
                                              max_col_dof );  // now nA will be close to maxdof/size
@@ -373,9 +380,41 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     int globuf[5]            = { (int)nA, (int)nB, nS, nSourceNodesPerFace, nTargetNodesPerFace };
 #endif
 
+    std::vector< std::string > srcdimNames, tgtdimNames;
+    std::vector< int > srcdimSizes, tgtdimSizes;
+    {
+        if( m_remapper->m_source_type == moab::TempestRemapper::RLL && m_remapper->m_source_metadata.size() )
+        {
+            srcdimNames.push_back( "lat" );
+            srcdimNames.push_back( "lon" );
+            srcdimSizes.resize( 2, 0 );
+            srcdimSizes[0] = m_remapper->m_source_metadata[0];
+            srcdimSizes[1] = m_remapper->m_source_metadata[1];
+        }
+        else
+        {
+            srcdimNames.push_back( "num_elem" );
+            srcdimSizes.push_back( globuf[0] );
+        }
+
+        if( m_remapper->m_target_type == moab::TempestRemapper::RLL && m_remapper->m_target_metadata.size() )
+        {
+            tgtdimNames.push_back( "lat" );
+            tgtdimNames.push_back( "lon" );
+            tgtdimSizes.resize( 2, 0 );
+            tgtdimSizes[0] = m_remapper->m_target_metadata[0];
+            tgtdimSizes[1] = m_remapper->m_target_metadata[1];
+        }
+        else
+        {
+            tgtdimNames.push_back( "num_elem" );
+            tgtdimSizes.push_back( globuf[1] );
+        }
+    }
+
     // Write output dimensions entries
-    unsigned nSrcGridDims = ( m_vecSourceDimSizes.size() );
-    unsigned nDstGridDims = ( m_vecTargetDimSizes.size() );
+    unsigned nSrcGridDims = ( srcdimSizes.size() );
+    unsigned nDstGridDims = ( tgtdimSizes.size() );
 
     NcDim* dimSrcGridRank = ncMap.add_dim( "src_grid_rank", nSrcGridDims );
     NcDim* dimDstGridRank = ncMap.add_dim( "dst_grid_rank", nDstGridDims );
@@ -388,46 +427,31 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     ncMap.enable_var_par_access( varDstGridDims, is_independent );
 #endif
 
-    char szDim[64];
-    if( ( nSrcGridDims == 1 ) && ( m_vecSourceDimSizes[0] != (int)nA ) )
+    // write dimension names
     {
-        varSrcGridDims->put( &globuf[0], 1 );
-        varSrcGridDims->add_att( "name0", "num_dof" );
-    }
-    else
-    {
-        for( unsigned i = 0; i < m_vecSourceDimSizes.size(); i++ )
+        char szDim[64];
+        for( unsigned i = 0; i < srcdimSizes.size(); i++ )
         {
-            int tmp = ( i == 0 ? globuf[0] : m_vecSourceDimSizes[i] );
             varSrcGridDims->set_cur( nSrcGridDims - i - 1 );
-            varSrcGridDims->put( &( tmp ), 1 );
+            varSrcGridDims->put( &( srcdimSizes[nSrcGridDims - i - 1] ), 1 );
         }
 
-        for( unsigned i = 0; i < m_vecSourceDimSizes.size(); i++ )
+        for( unsigned i = 0; i < srcdimSizes.size(); i++ )
         {
-            sprintf( szDim, "name%i", i );
-            varSrcGridDims->add_att( szDim, m_vecSourceDimNames[nSrcGridDims - i - 1].c_str() );
+            snprintf( szDim, 64, "name%i", i );
+            varSrcGridDims->add_att( szDim, srcdimNames[nSrcGridDims - i - 1].c_str() );
         }
-    }
 
-    if( ( nDstGridDims == 1 ) && ( m_vecTargetDimSizes[0] != (int)nB ) )
-    {
-        varDstGridDims->put( &globuf[1], 1 );
-        varDstGridDims->add_att( "name0", "num_dof" );
-    }
-    else
-    {
-        for( unsigned i = 0; i < m_vecTargetDimSizes.size(); i++ )
+        for( unsigned i = 0; i < tgtdimSizes.size(); i++ )
         {
-            int tmp = ( i == 0 ? globuf[1] : m_vecTargetDimSizes[i] );
             varDstGridDims->set_cur( nDstGridDims - i - 1 );
-            varDstGridDims->put( &( tmp ), 1 );
+            varDstGridDims->put( &( tgtdimSizes[nDstGridDims - i - 1] ), 1 );
         }
 
-        for( unsigned i = 0; i < m_vecTargetDimSizes.size(); i++ )
+        for( unsigned i = 0; i < tgtdimSizes.size(); i++ )
         {
-            sprintf( szDim, "name%i", i );
-            varDstGridDims->add_att( szDim, m_vecTargetDimNames[nDstGridDims - i - 1].c_str() );
+            snprintf( szDim, 64, "name%i", i );
+            varDstGridDims->add_att( szDim, tgtdimNames[nDstGridDims - i - 1].c_str() );
         }
     }
 

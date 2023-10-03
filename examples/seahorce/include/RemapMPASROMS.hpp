@@ -73,6 +73,7 @@ struct RuntimeContext
     int proc_id{ 1 };            /// process identifier
     int num_procs{ 1 };          /// total number of processes
     double last_counter{ 0.0 };  /// last time counter between push/pop timer
+    bool useCAAS{ false };
 
     std::map< std::string, std::pair< RemappingMethod, int > > field_methods;
 
@@ -241,6 +242,7 @@ struct RuntimeContext
         opts.addOpt< void >( "setup", "Compute full mesh extrusions needed for coupling in 3D", &generateExtrusions );
         opts.addOpt< void >( "mono", "Ensure monotonicity in the weight generation (only for TR-FV)",
                              &ensureMonotonicity );
+        opts.addOpt< void >( "caas", "Use CAAS limiter", &useCAAS );
         opts.addOpt< void >( "321D", "Compute three-dimensional projections using a 2Dx1D approach", &threetwooneD );
         opts.addOpt< void >( "1D2D", "Use 1Dx2D as opposed to 2Dx1D for 321D projection", &oneDfirst );
         opts.addOpt< void >(

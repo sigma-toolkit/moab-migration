@@ -68,7 +68,6 @@ using namespace moab;
 //
 int main( int argc, char** argv )
 {
-    constexpr bool useCAAS = false;
     // constexpr double radius = 6371220.0;
     constexpr double radius = 1.0;
 
@@ -561,9 +560,10 @@ int main( int argc, char** argv )
                     // Compute the projection for the salinity field
                     weights.Apply( dataInDoubleS, dataOutDoubleS );
 
-                    if( useCAAS )
-                        ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap, 1 /*nPin*/,
-                                           dataInDoubleS, dataOutDoubleS, false /*useCAASLocal*/ );
+                    if( context.useCAAS )
+                        ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap,
+                                           context.field_methods["Bathymetry"].second /*nPin*/, dataInDoubleS,
+                                           dataOutDoubleS, true /*useCAASLocal*/ );
 
 #ifndef VERTICAL_INTERPOLATION
                     runchk( mbi->tag_set_data( roms_soltags_elem[0], roms_slice.data(), roms_slice.size(),
@@ -575,9 +575,10 @@ int main( int argc, char** argv )
                     // Compute the projection for the temperature field
                     weights.Apply( dataInDoubleT, dataOutDoubleT );
 
-                    if( useCAAS )
-                        ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap, 1 /*nPin*/,
-                                           dataInDoubleT, dataOutDoubleT, false /*useCAASLocal*/ );
+                    if( context.useCAAS )
+                        ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap,
+                                           context.field_methods["Bathymetry"].second /*nPin*/, dataInDoubleT,
+                                           dataOutDoubleT, true /*useCAASLocal*/ );
 
 #ifndef VERTICAL_INTERPOLATION
                     runchk( mbi->tag_set_data( roms_soltags_elem[1], roms_slice.data(), roms_slice.size(),
@@ -704,7 +705,7 @@ int main( int argc, char** argv )
                     splHC_T.finish();
 #endif
 
-                    double rcoords[3];
+                    double rcoords[3] = { 0, 0, 0 };
 
                     // auto entROMS = roms_elems[i];
                     // mbi->get_coords( &entROMS, 1, rcoords );
@@ -778,9 +779,10 @@ int main( int argc, char** argv )
                     // Compute the projection for the salinity field
                     weights.Apply( dataInDoubleS, dataOutDoubleS );
 
-                    if( useCAAS )
-                        ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap, 1 /*nPin*/,
-                                           dataInDoubleS, dataOutDoubleS, true /*useCAASLocal*/ );
+                    if( context.useCAAS )
+                        ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap,
+                                           context.field_methods["Bathymetry"].second /*nPin*/, dataInDoubleS,
+                                           dataOutDoubleS, true /*useCAASLocal*/ );
 
 #ifndef VERTICAL_INTERPOLATION
                     runchk( mbi->tag_set_data( roms_soltags_elem[0], roms_slice.data(), roms_slice.size(),
@@ -793,9 +795,10 @@ int main( int argc, char** argv )
                     // Compute the projection for the temperature field
                     weights.Apply( dataInDoubleT, dataOutDoubleT );
 
-                    if( useCAAS )
-                        ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap, 1 /*nPin*/,
-                                           dataInDoubleT, dataOutDoubleT, true /*useCAASLocal*/ );
+                    if( context.useCAAS )
+                        ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap,
+                                           context.field_methods["Bathymetry"].second /*nPin*/, dataInDoubleT,
+                                           dataOutDoubleT, true /*useCAASLocal*/ );
 
 #ifndef VERTICAL_INTERPOLATION
                     runchk( mbi->tag_set_data( roms_soltags_elem[1], roms_slice.data(), roms_slice.size(),

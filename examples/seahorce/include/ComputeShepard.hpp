@@ -295,4 +295,113 @@ moab::ErrorCode modified_shepard_interpolate2( int dimension,
     return moab::MB_SUCCESS;
 }
 
+moab::ErrorCode ComputeHierarchicalShepardInterpolant( RuntimeContext&,
+                                                       const std::vector< double >& src_xyz,
+                                                       const std::vector< double >& src_tdata,
+                                                       const std::vector< double >& dst_xyz,
+                                                       std::vector< double >& dst_tdata,
+                                                       int order )
+{
+    const double power = 1.0 * order;
+
+    // construct a kd-tree index:
+    PC3D< double > cloud( src_xyz );
+    KdTree tree( 3 /*dim*/, cloud, { 15 /* max leaf */ } );
+    KdTree::BoundingBox bbox_src;
+    tree.computeBoundingBox( bbox_src );
+    printf( "Source bounding boxes: (%f, %f), (%f, %f), (%3.10e, %3.10e)\n", bbox_src[0].low, bbox_src[0].high,
+            bbox_src[1].low, bbox_src[1].high, bbox_src[2].low, bbox_src[2].high );
+
+    constexpr double Radius = 1.0E-6;
+#pragma omp parallel for shared( tree, dst_xyz, src_tdata, dst_tdata )
+    for( size_t i = 0; i < dst_tdata.size(); i++ )
+    {
+        const size_t offset = i * 3;
+        dst_tdata[i]        = 0;
+
+        // constexpr size_t num_results[] = {1, 8, 13, 27};
+        // constexpr double num_res_weights[] = { 0.125, 0.33, 0.33, 0.215 };
+        // for( size_t ires = 0; ires < 4; ++ires )
+        // {
+        //     std::vector< size_t > srcindx( num_results[ires] );
+        //     std::vector< double > srcdist( num_results[ires] );
+        //     nanoflann::KNNResultSet< double > resultSet( num_results[ires] );
+
+        //     const double* query_pt = dst_xyz.data() + offset;
+
+        //     // Do a KNN search
+        //     resultSet.init( srcindx.data(), srcdist.data() );
+        //     tree.findNeighbors( resultSet, query_pt );
+
+        //     // check if the point is outside the bounding box
+        //     if( ( query_pt[0] < bbox_src[0].low || query_pt[1] < bbox_src[1].low || query_pt[2] < bbox_src[2].low ) ||
+        //         ( query_pt[0] > bbox_src[0].high || query_pt[1] > bbox_src[1].high || query_pt[2] > bbox_src[2].high ) )
+        //     {
+        //         // data needs to be extrapolated
+        //         if( query_pt[2] < bbox_src[2].low )  // point is below the MPAS sea bed
+        //             dst_tdata[i] += num_res_weights[ires] * src_tdata[srcindx[0]];
+        //         else  // point is above the MPAS sea surface
+        //             dst_tdata[i] += num_res_weights[ires] * src_tdata[srcindx[0]];
+        //     }
+        //     else
+        //     {
+        //         double value = 0.0, weights = 0.0;
+        //         for( size_t j = 0; j < num_results[ires]; ++j )
+        //         {
+        //             // const double idw = 1.0 / std::pow( srcdist[j], power );
+        //             const double idw = std::pow( fmax( 0.0, Radius - srcdist[j] ) / Radius / srcdist[j], power );
+        //             value += src_tdata[srcindx[j]] * idw;
+        //             weights += idw;
+        //         }
+
+        //         // dst_tdata[i] = src_tdata[srcindx[0]];
+        //         if( weights > Radius ) dst_tdata[i] += num_res_weights[ires] * value / weights;
+        //         else
+        //             dst_tdata[i] += num_res_weights[ires] * src_tdata[srcindx[0]];
+        //     }
+        // }
+        constexpr size_t num_results[]     = { 1, 8, 13, 27 };
+        // constexpr double num_res_weights[] = { 0.125, 0.33, 0.33, 0.215 };
+        {
+            std::vector< size_t > srcindx( num_results[3] );
+            std::vector< double > srcdist( num_results[3] );
+            nanoflann::KNNResultSet< double > resultSet( num_results[3] );
+
+            const double* query_pt = dst_xyz.data() + offset;
+
+            // Do a KNN search
+            resultSet.init( srcindx.data(), srcdist.data() );
+            tree.findNeighbors( resultSet, query_pt );
+
+            // check if the point is outside the bounding box
+            if( ( query_pt[0] < bbox_src[0].low || query_pt[1] < bbox_src[1].low || query_pt[2] < bbox_src[2].low ) ||
+                ( query_pt[0] > bbox_src[0].high || query_pt[1] > bbox_src[1].high || query_pt[2] > bbox_src[2].high ) )
+            {
+                // data needs to be extrapolated
+                if( query_pt[2] < bbox_src[2].low )  // point is below the MPAS sea bed
+                    dst_tdata[i] += src_tdata[srcindx[0]];
+                else  // point is above the MPAS sea surface
+                    dst_tdata[i] += src_tdata[srcindx[0]];
+            }
+            else
+            {
+                constexpr double alpha = 0.666;//2.0 / ( num_results[3] + 1 );
+                double value = 0.0, weights = 1.0;
+                for( size_t j = 0; j < num_results[3]; ++j )
+                // for( int j = num_results[3] - 1; j >= 0; j-- )
+                {
+                    // const double idw = 1.0 / std::pow( srcdist[j], power );
+                    // const double idw = std::pow( fmax( 0.0, Radius - srcdist[j] ) / Radius / srcdist[j], power );
+
+                    value = alpha * src_tdata[srcindx[j]] + (1.0 - alpha) * value;
+                }
+
+                dst_tdata[i] = value;
+            }
+        }
+    }
+
+    return moab::MB_SUCCESS;
+}
+
 #endif  // __compute_shepard_hpp__

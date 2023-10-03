@@ -7,7 +7,7 @@
 // 3D settings
 constexpr int mpas_zreflevels = 60;
 constexpr int mpas_zlevels    = 60;
-constexpr int roms_zlevels    = 120;
+constexpr int roms_zlevels    = 90;
 constexpr int nvars           = 2;
 // constexpr double axial_scaling = 100000.0;
 // constexpr double axial_scaling = 6371220.0;

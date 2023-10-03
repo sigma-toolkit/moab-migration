@@ -4,8 +4,6 @@
 #include "RemapMPASROMS.hpp"
 #include "tetgen.h"  // Defined tetgenio, tetrahedralize().
 #include "ComputeNN.hpp"
-#include <Eigen/Dense>
-#include "moab/Matrix3.hpp"
 
 // constexpr double rescale_factor = 6.37122E4;
 constexpr double rescale_factor = 2E4;

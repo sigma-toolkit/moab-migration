@@ -57,7 +57,12 @@ moab::ErrorCode ComputeNNInterpolant( RuntimeContext&,
 
     // construct a kd-tree index:
     PC3D< double > cloud( src_xyz );
-    KdTree tree( 3 /*dim*/, cloud, { 10 /* max leaf */ } );
+    KdTree tree( 3 /*dim*/, cloud, { 15 /* max leaf */ } );
+    KdTree::BoundingBox bbox_src;
+    tree.computeBoundingBox( bbox_src );
+    printf( "Source bounding boxes: (%f, %f), (%f, %f), (%3.10e, %3.10e)\n", bbox_src[0].low, bbox_src[0].high,
+            bbox_src[1].low, bbox_src[1].high, bbox_src[2].low, bbox_src[2].high );
+
 #pragma omp parallel for shared( tree, dst_xyz, src_tdata, dst_tdata )
     for( size_t i = 0; i < dst_tdata.size(); i++ )
     {
@@ -72,15 +77,29 @@ moab::ErrorCode ComputeNNInterpolant( RuntimeContext&,
         resultSet.init( srcindx.data(), srcdist.data() );
         tree.findNeighbors( resultSet, query_pt );
 
-        double value = 0.0, weights = 0.0;
-        for( size_t j = 0; j < num_results; ++j )
+        // check if the point is outside the bounding box
+        if( ( query_pt[0] < bbox_src[0].low && query_pt[1] < bbox_src[1].low && query_pt[2] < bbox_src[2].low ) ||
+            ( query_pt[0] > bbox_src[0].high && query_pt[1] > bbox_src[1].high && query_pt[2] > bbox_src[2].high ) )
         {
-            value += src_tdata[srcindx[j]] / std::pow( srcdist[j], power );
-            weights += 1.0 / std::pow( srcdist[j], power );
+            // data needs to be extrapolated
+            if( query_pt[2] < bbox_src[2].low ) // point is below the MPAS sea bed
+                dst_tdata[i] = src_tdata[srcindx[0]];
+            else  // point is above the MPAS sea surface
+                dst_tdata[i] = src_tdata[srcindx[0]];
         }
+        else
+        {
+            double value = 0.0, weights = 0.0;
+            for( size_t j = 0; j < num_results; ++j )
+            {
+                const double idw = std::max( 1e-8, std::pow( srcdist[j], power ) );
+                value += src_tdata[srcindx[j]] / idw;
+                weights += 1.0 / idw;
+            }
 
-        // dst_tdata[i] = src_tdata[srcindx[0]];
-        dst_tdata[i] = value / weights;
+            // dst_tdata[i] = src_tdata[srcindx[0]];
+            dst_tdata[i] = value / weights;
+        }
     }
 
     return moab::MB_SUCCESS;

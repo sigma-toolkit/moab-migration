@@ -5,14 +5,11 @@
 
 // Remapping related includes
 #include "FiniteVolumeTools.h"
-#include "moab/IntxMesh/IntxUtils.hpp"
-// #include "moab/Remapping/TempestRemapper.hpp"
 
 moab::ErrorCode ScaleCoords( moab::Interface* mb,
                              std::vector< moab::EntityHandle >& nodes,
                              double R,
-                             bool is_cartesian,
-                             bool /*is_threed*/ )
+                             bool is_cartesian )
 {
     moab::ErrorCode rval;
     double posi[3], posf[3], len = 0;

@@ -45,11 +45,16 @@
 #include "HermiteCubicCurve.hpp"
 #include "ComputeTR.hpp"
 #include "ComputeMBA.hpp"
+// #include "ComputeRBF.hpp"
+
+#ifdef USE_GMLS
+#include "ComputeGMLS.hpp"
+#endif
 #include "moab/Remapping/mlinterp.hpp"
 #include "MeshUtilities.hpp"
 
 using namespace moab;
-using namespace std;
+// using namespace std;
 
 // Utility macros
 #define dbgprint( MSG )                                           \
@@ -107,7 +112,7 @@ int main( int argc, char** argv )
             runchk( mbi->get_entities_by_dimension( context.mpasset, 0, mpas_verts ) );
             runchk( mbi->get_entities_by_dimension( context.mpasset, 2, mpas_elems ) );
             // Rescale the radius to unit sphere to compute the intersection
-            runchk( ScaleCoords( mbi, mpas_verts, radius, true, false ) );
+            runchk( ScaleCoords( mbi, mpas_verts, radius, true ) );
             context.timer_pop();
 
             dbgprint( "MPAS mesh contains " << mpas_verts.size() << " vertices and " << mpas_elems.size()
@@ -130,7 +135,7 @@ int main( int argc, char** argv )
             runchk( mbi->get_entities_by_dimension( context.romsset, 0, roms_verts ) );
             runchk( mbi->get_entities_by_dimension( context.romsset, 2, roms_elems ) );
             // Rescale the radius to unit sphere to compute the intersection
-            runchk( ScaleCoords( mbi, roms_verts, radius, false, false ) );
+            runchk( ScaleCoords( mbi, roms_verts, radius, false ) );
             context.timer_pop();
 
             dbgprint( "ROMS mesh contains " << roms_verts.size() << " vertices and " << roms_elems.size()
@@ -344,7 +349,7 @@ int main( int argc, char** argv )
                     };
 
                     auto vtransform_2 = [&]( double s, double h ) {
-                        constexpr double hc = 3000 / axial_scaling;  // hc has to be less than or equal to min(h)
+                        constexpr double hc = 3150 / axial_scaling;  // hc has to be less than or equal to min(h)
                         double vstretch_val = vstretching_4( s );
                         return ( hc * s + vstretch_val * h ) / ( hc + h );
                     };
@@ -418,7 +423,7 @@ int main( int argc, char** argv )
 
                 // std::cout << "3D ROMS: " << roms3d_verts.size() << " vertices and " << roms3d_elems.size() << " elements.\n";
                 // Rescale the radius of both to compute the intersection
-                // runchk( ScaleCoords( mbi, roms3d_verts, radius, false, true ) );
+                // runchk( ScaleCoords( mbi, roms3d_verts, radius, false ) );
                 runchk( mbi->write_file( "roms_full_3d.h5m", "H5M", write_options.c_str(), &romsset3d, 1 ) );
             }
             else
@@ -538,10 +543,12 @@ int main( int argc, char** argv )
                     for( size_t j = 0; j < mpassize; ++j )
                     {
                         const int offset = j * mpas_zlevels;
-                        dataInDoubleS[j] = maxlevelFace[j] - 1 < ii ? src_salinity_data[maxlevelFace[j] - 1 + offset]
-                                                                    : src_salinity_data[ii + offset];
-                        dataInDoubleT[j] = maxlevelFace[j] - 1 < ii ? src_temperature_data[maxlevelFace[j] - 1 + offset]
-                                                                    : src_temperature_data[ii + offset];
+                        dataInDoubleS[j] = maxlevelFace[j] - 1 < ii || src_salinity_data[ii + offset] < 1e-8
+                                               ? src_salinity_data[maxlevelFace[j] - 1 + offset]
+                                               : src_salinity_data[ii + offset];
+                        dataInDoubleT[j] = maxlevelFace[j] - 1 < ii || src_temperature_data[ii + offset] < 1e-8
+                                               ? src_temperature_data[maxlevelFace[j] - 1 + offset]
+                                               : src_temperature_data[ii + offset];
                         // if( ii == 0 || ii == mpas_zlevels - 1 )
                         // {
                         //     std::cout << "Level " << ii << ": Salinity = " << dataInDoubleS[j]
@@ -616,14 +623,18 @@ int main( int argc, char** argv )
                     splHC_S.finish();
                     splHC_T.finish();
 #endif
+                    double rcoords[3];
+                    auto entROMS = roms_elems[i];
+                    mbi->get_coords( &entROMS, 1, rcoords );
 
-                    double roms_ztotal = 0.0;
+                    double roms_ztotal = rcoords[2];
                     for( int irzl = 0; irzl < roms_zlevels; ++irzl )
                     {
+                        const double* zrh_xyz3d_loc = zrh_xyz3d.data() + i * roms_zlevels;
                         const int offset = irzl * romssize;
                         // double roms_zlocation = ( irzl + 0.5 ) * delz;
-                        double roms_zlocation = roms_ztotal + zrh_xyz3d[irzl] / 2;
-                        roms_ztotal += zrh_xyz3d[irzl];
+                        double roms_zlocation = roms_ztotal + zrh_xyz3d_loc[irzl] / 2;
+                        roms_ztotal += zrh_xyz3d_loc[irzl];
 
                         // Project data from zmh_z to zrh_z
 #ifdef VERTICAL_INTERPOLANT_LINEAR
@@ -671,10 +682,10 @@ int main( int argc, char** argv )
                     const size_t offset = i * mpas_zlevels;
                     for( int imzl = 0; imzl < mpas_zlevels; ++imzl )
                     {
-                        mpasroms_zvalsS[imzl] = imzl + 1 > maxlevelFace[i]
+                        mpasroms_zvalsS[imzl] = imzl + 1 > maxlevelFace[i] || src_salinity_data[imzl + offset] < 1e-8
                                                     ? src_salinity_data[maxlevelFace[i] - 1 + offset]
                                                     : src_salinity_data[imzl + offset];
-                        mpasroms_zvalsT[imzl] = imzl + 1 > maxlevelFace[i]
+                        mpasroms_zvalsT[imzl] = imzl + 1 > maxlevelFace[i] || src_temperature_data[imzl + offset] < 1e-8
                                                     ? src_temperature_data[maxlevelFace[i] - 1 + offset]
                                                     : src_temperature_data[imzl + offset];
                     }
@@ -693,8 +704,21 @@ int main( int argc, char** argv )
                     splHC_T.finish();
 #endif
 
+                    double rcoords[3];
+
+                    // auto entROMS = roms_elems[i];
+                    // mbi->get_coords( &entROMS, 1, rcoords );
+                    // for( int irzl = 0; irzl < roms_zlevels; ++irzl )
+                    // {
+                    //     const double* zrh_xyz3d_loc = zrh_xyz3d.data() + i * roms_zlevels;
+                    //     const int offset            = irzl * romssize;
+                    //     // double roms_zlocation = ( irzl + 0.5 ) * delz;
+                    //     double roms_zlocation = roms_ztotal + zrh_xyz3d_loc[irzl] / 2;
+                    //     roms_ztotal += zrh_xyz3d_loc[irzl];
+                    // }
+
                     const size_t offsetr = i * roms_zlevels;
-                    double roms_ztotal   = 0.0;
+                    double roms_ztotal   = rcoords[2];
                     for( size_t irzl = 0; irzl < roms_zlevels; ++irzl )
                     {
                         // const double pbathymetry = zrh_xyz2d[i];
@@ -966,7 +990,9 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( std::string varProjectS
     else if( rmethod == ShepardInterpolant )
     {
         std::cout << "\nComputing Shepard interpolant (order=" << order << ") for field " << varProjectSrc << std::endl;
-        err = ModifiedShepardInterpolator( 3, src_xyz, src_tdata, dst_xyz, dst_tdata, order );MB_CHK_ERR( err );
+        err = ComputeHierarchicalShepardInterpolant( *this, src_xyz, src_tdata, dst_xyz, dst_tdata, order );MB_CHK_ERR( err );
+        // err = ComputeRBFInterpolant( *this, src_xyz, src_tdata, dst_xyz, dst_tdata );MB_CHK_ERR( err );
+        //  err = ComputeGMLSInterpolant( *this, src_xyz, src_tdata, dst_xyz, dst_tdata );MB_CHK_ERR( err );
     }
 
     if( normalize && ( !is_three_dimensional ) && this->meshOverlap.faces.size() )

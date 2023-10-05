@@ -1198,5 +1198,3 @@ Initial results have demonstrated that the data abstraction provided by MOAB is 
  
  */
 
-#include "team.h"
-

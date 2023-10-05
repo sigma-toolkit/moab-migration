@@ -278,6 +278,56 @@
  * primary definition table (\c /tstt/nodes/coordinates , 
  * \c /tstt/elements/<name>/connectivity , or \c /tstt/sets/list), in the
  * same order as the entities in that primary definition table.
- * 
+ *
+ *
+ *\section mhdf_set mhdf Meshset data
+ *
+ * Meshset data is divided into three groups of data.  The set-list/meta-information table,
+ * the set contents table and the set children table.  Each is written and read independently.
+ *
+ * The set list table contains one row for each set.  Each row contains four values:
+ * {content list end index, child list end index, parent list end index, and flags}.  The flags 
+ * value is a collection of bits with
+ * values defined in \ref mhdf_set_flag .  The all the flags except \ref mhdf_SET_RANGE_BIT are
+ * saved properties of the mesh data and are not relevant to the actual file in any way.  The
+ * \ref mhdf_SET_RANGE_BIT flag is a toggle for how the meshset contents (not children) are saved.
+ * It is an internal property of the file format and should not be passed on to the mesh database.
+ * The content list end index and child list end index are the indices of the last entry for the
+ * set in the contents and children tables respectively.  In the case where a set has either no
+ * children or no contents, the last index of should be the same as the last index of the previous
+ * set in the table, or -1 for the first set in the table.  Thus the first index is always one
+ * greater than the last index of the previous set.  If the first index, calculated as one greater
+ * that the last index of the previous set is greater than the last index of the current set, then
+ * there are no values in the corresponding contents or children table for that set.
+ *
+ * The set contents table is a vector of integer global IDs that is the concatenation of the contents
+ * data for all of the mesh sets.  The values are stored corresponding to the order of the sets
+ * in the set list table.  Depending on the value of \ref mhdf_SET_RANGE_BIT in the flags field of
+ * the set list table, the contents for a specific set may be stored in one of two formats.  If the
+ * flag is set, the contents list is a list of pairs where each pair is a starting global Id and a 
+ * count.  For each pair, the set contains the range of global Ids beginning at the start value. 
+ * If the \ref mhdf_SET_RANGE_BIT flag is not set, the meshset contents are a simple list of global Ids.
+ *
+ * The meshset child table is a vector of integer global IDs.  It is a concatenation of the child
+ * lists for all the mesh sets, in the order the sets occur in the meshset list table.  The values
+ * are always simple lists.  The child table may never contain ranges of IDs.
+ *
+ *
+ *\section mhdf_tag mhdf Tag data
+ *
+ * The data for each tag can be stored in two places/formats:  sparse and/or
+ * dense.  The data may be stored in both, but there should not be redundant 
+ * values for the same entity.  
+ *
+ * Dense tag data is stored as multiple tables of tag values, one for each
+ * element group.  (Note:  special \ref mhdf_ElemHandle values are available
+ * for accessing dense tag data on nodes or meshsets via the \ref mhdf_node_type_handle
+ * and \ref mhdf_set_type_handle functions.)  Each dense tag table should contain
+ * the same number of entries as the element connectivity table.  The tag values 
+ * are associated with the corresponding element in the connectivity table.
+ *
+ * Sparse tag data is stored as a global table pair for each tag type.  The first
+ * if the pair of tables is a list of Global IDs.  The second is the corresponding
+ * tag value for each entity in the ID list.
  */
 

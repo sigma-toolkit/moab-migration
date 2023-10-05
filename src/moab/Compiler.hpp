@@ -12,8 +12,7 @@
 
 #ifdef IS_BUILDING_MB
 
-/**\defgroup PRIVCOMP Private Compiler-Specifc Pre-Processor Macros */
-/*@{*/
+/** Private Compiler-Specifc Pre-Processor Macros */
 
 /**\def __restrict__
  *\brief Provide functionality similar to C99 \c restrict keyword
@@ -41,12 +40,10 @@
 #endif
 #endif
 
-/*@}*/
 
 #endif
 
-/**\defgroup PUBCOMP Public Compiler-Specifc Pre-Processor Macros */
-/*@{*/
+/** Public Compiler-Specifc Pre-Processor Macros */
 
 /**\def PRINT_FORMAT(start)
  *\brief Give a hint to the compiler the function is like \c printf
@@ -103,7 +100,5 @@
 #else
 #define MB_DEPRECATED
 #endif
-
-/*@}*/
 
 #endif  // moab_COMPILER_HPP

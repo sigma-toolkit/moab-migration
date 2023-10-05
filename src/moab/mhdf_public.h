@@ -23,12 +23,6 @@ int mhdf_isError( mhdf_Status const* );
 /** \brief Get the error message given a status object.  */
 const char* mhdf_message( mhdf_Status const* );
 
-/*@}*/
-
-/**
- *\defgroup mhdf_type Common element type names.
- */
-/*@{*/
 
 /** \brief Name to use for edge element */
 #define mhdf_EDGE_TYPE_NAME "Edge"
@@ -53,7 +47,6 @@ const char* mhdf_message( mhdf_Status const* );
 /** \brief Name to use for hexagonal-based pyramid */
 #define mhdf_SEPTAHEDRON_TYPE_NAME "Septahedron"
 
-/*@}*/
 
 /** \brief Enum for tag data type class
  *
@@ -75,13 +68,6 @@ typedef enum mhdf_TagDataType
  * if indices (e.g. mhdf_createSetMeta, mhdf_createVarLenTag, etc.).
  */
 typedef long mhdf_index_t;
-
-/*@}*/
-
-/**
- *\defgroup mhdf_file File operations
- */
-/*@{*/
 
 /** \brief Opaque handle to an open file */
 typedef void* mhdf_FileHandle;
@@ -247,7 +233,7 @@ MHDF_FileDesc* mhdf_getFileSummary( mhdf_FileHandle file_handle,
                                     mhdf_Status* status,
                                     int extraSetInfo );
 
-/**\brief Fix nested pointers for copied/moved FileDesc struct
+/** \brief Fix nested pointers for copied/moved FileDesc struct
  *
  * This is a utility method to facility copying/moving/communicating
  * struct FileDesc instances.  The structure and all data it references
@@ -267,8 +253,6 @@ void mhdf_fixFileDesc( struct mhdf_FileDesc* copy_ptr, const struct mhdf_FileDes
  */
 void mhdf_closeFile( mhdf_FileHandle handle, mhdf_Status* status );
 
-/**\brief Check for open handles in file
- **/
 
 #ifdef __cplusplus
 } /* extern "C" */

@@ -23,19 +23,16 @@ extern "C" {
 #endif
 
 /**
- *\defgroup mhdf MHDF API for reading/writing MOAB-format HDF5 mesh files.
+ * MHDF API for reading/writing MOAB-format HDF5 mesh files.
  */
-/*@{*/
 
 /**
- *\defgroup mhdf_status Error handling
+ * Error handling
  */
-/*@{*/
 
 /**
- *\defgroup mhdf_group Element group handle
+ * Element group handle
  */
-/*@{*/
 
 /** \brief Get an mhdf_ElemHandle object for the node data.  
  *
@@ -117,11 +114,6 @@ void mhdf_writeHistory( mhdf_FileHandle file, const char** strings, int num_stri
  * \return An array of null-terminates strings.
  */
 char** mhdf_readHistory( mhdf_FileHandle file, int* num_records_out, mhdf_Status* status );
-/*@}*/
-/**
- *\defgroup mhdf_node Node coordinate data.
- */
-/*@{*/
 
 /* Node Coordinates */
 
@@ -254,12 +246,6 @@ void mhdf_readNodeCoordWithOpt( hid_t data_handle,
                                 double* coords,
                                 hid_t read_prop,
                                 mhdf_Status* status );
-
-/*@}*/
-/**
- *\defgroup mhdf_conn Element connectivity data.
- */
-/*@{*/
 
 /* Element Connectivity */
 
@@ -708,9 +694,9 @@ void mhdf_readPolyConnIDsWithOpt( hid_t poly_handle,
                                   void* id_list,
                                   hid_t read_prop,
                                   mhdf_Status* status );
-/*@}*/
+
 /**
- *\defgroup mhdf_adj Adjacency data.
+ * Adjacency data.
  *
  * Adjacency data is formated as a sequence of integer groups where
  * the first entry in each group is the ID of the element for which
@@ -718,7 +704,6 @@ void mhdf_readPolyConnIDsWithOpt( hid_t poly_handle,
  * adjacent entities, and the remainder of the group is the list of
  * IDs of the adjacent entities.
  */
-/*@{*/
 
 /** \brief Create adjacency data table for nodes, elements, polys, etc. 
  * 
@@ -855,10 +840,9 @@ void mhdf_readAdjacencyWithOpt( hid_t data_handle,
                                 hid_t read_prop,
                                 mhdf_Status* status );
 
-/*@}*/
 
 /**
- *\defgroup mhdf_set Meshset data.
+ * Meshset data.
  *
  * Meshset data is divided into three groups of data.  The set-list/meta-information table,
  * the set contents table and the set children table.  Each is written and read independently.
@@ -890,12 +874,10 @@ void mhdf_readAdjacencyWithOpt( hid_t data_handle,
  * lists for all the mesh sets, in the order the sets occur in the meshset list table.  The values
  * are always simple lists.  The child table may never contain ranges of IDs.
  */
-/*@{*/
 
 /**
- *\defgroup mhdf_set_flag Set flag bits
+ * Set flag bits
  */
-/*@{*/
 
 /** \brief Make entities in set aware of owning set (MOAB-specific?)*/
 #define mhdf_SET_OWNER_BIT 0x1
@@ -914,8 +896,6 @@ void mhdf_readAdjacencyWithOpt( hid_t data_handle,
  * the contents of the set are stored as a simple list of global IDs.
  */
 #define mhdf_SET_RANGE_BIT 0x8
-
-/*@}*/
 
 /** \brief Create table holding list of meshsets and their properties.
  * 
@@ -1376,10 +1356,9 @@ void mhdf_readSetParentsChildrenWithOpt( hid_t data_handle,
                                          hid_t read_prop,
                                          mhdf_Status* status );
 
-/*@}*/
 
 /**
- *\defgroup mhdf_tag Tag data.
+ * Tag data.
  *
  * The data for each tag can be stored in two places/formats:  sparse and/or
  * dense.  The data may be stored in both, but there should not be redundant 
@@ -1396,12 +1375,10 @@ void mhdf_readSetParentsChildrenWithOpt( hid_t data_handle,
  * if the pair of tables is a list of Global IDs.  The second is the corresponding
  * tag value for each entity in the ID list.
  */
-/*@{*/
 
 /**
- *\defgroup mhdf_tag_flag Tag type values   (MOAB-specific)
+ * Tag type values   (MOAB-specific)
  */
-/*@{*/
 
 /** \brief Was dense tag data in mesh database */
 #define mhdf_DENSE_TYPE 2
@@ -1412,7 +1389,6 @@ void mhdf_readSetParentsChildrenWithOpt( hid_t data_handle,
 /** \brief Unused */
 #define mhdf_MESH_TYPE 3
 
-/*@}*/
 
 /** \brief Make type native-endian.
  *
@@ -1885,9 +1861,6 @@ void mhdf_readSparseTagIndicesWithOpt( hid_t tag_handle,
                                        hid_t read_prop,
                                        mhdf_Status* status );
 
-/*@}*/
-
-/*@}*/
 
 #ifdef __cplusplus
 } /* extern "C" */

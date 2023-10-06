@@ -2,11 +2,11 @@
 # Configuration command builder
 
 # Build specifications
+CMAKE=yes
 ENABLE_DEBUG=no
 ENABLE_OPTIMIZE=yes
 ENABLE_SHARED=no
 ENABLE_STATIC=yes
-
 # Compiler specifications
 ENABLE_MPI=yes
 ENABLE_FORTRAN=yes
@@ -14,34 +14,53 @@ ENABLE_FORTRAN=yes
 # Installation specifications
 PREFIX_INSTALL_PATH=$HOME/install/MOAB
 
+ENABLE_EIGEN3=no
+ENABLE_TEMPESTREMAP=NO
 #####################
 ### DO NOT MODIFY ###
 #####################
 HOSTNAME=`hostname`
 INTERNAL_OPTIONS=""
-if (test "x$ENABLE_DEBUG" != "xno"); then
-	INTERNAL_OPTIONS="$INTERNAL_OPTIONS --enable-debug"
-else
-	INTERNAL_OPTIONS="$INTERNAL_OPTIONS --disable-debug"
-fi
-if (test "x$ENABLE_OPTIMIZE" != "xno"); then
-	INTERNAL_OPTIONS="$INTERNAL_OPTIONS --enable-optimize"
-else
-	INTERNAL_OPTIONS="$INTERNAL_OPTIONS --disable-optimize"
-fi
-if (test "x$ENABLE_SHARED" != "xno"); then
-	INTERNAL_OPTIONS="$INTERNAL_OPTIONS --enable-shared"
-else
-	INTERNAL_OPTIONS="$INTERNAL_OPTIONS --disable-shared"
-fi
-if (test "x$ENABLE_STATIC" != "xno"); then
-	INTERNAL_OPTIONS="$INTERNAL_OPTIONS --enable-static"
-else
-	INTERNAL_OPTIONS="$INTERNAL_OPTIONS --disable-static"
-fi
+if (test "x$CMAKE" != "xyes"); then
+  if (test "x$ENABLE_DEBUG" != "xno"); then
+    INTERNAL_OPTIONS="$INTERNAL_OPTIONS --enable-debug"
+  else
+    INTERNAL_OPTIONS="$INTERNAL_OPTIONS --disable-debug"
+  fi
+  if (test "x$ENABLE_OPTIMIZE" != "xno"); then
+    INTERNAL_OPTIONS="$INTERNAL_OPTIONS --enable-optimize"
+  else
+    INTERNAL_OPTIONS="$INTERNAL_OPTIONS --disable-optimize"
+  fi
+  if (test "x$ENABLE_SHARED" != "xno"); then
+    INTERNAL_OPTIONS="$INTERNAL_OPTIONS --enable-shared"
+  else
+    INTERNAL_OPTIONS="$INTERNAL_OPTIONS --disable-shared"
+  fi
+  if (test "x$ENABLE_STATIC" != "xno"); then
+    INTERNAL_OPTIONS="$INTERNAL_OPTIONS --enable-static"
+  else
+    INTERNAL_OPTIONS="$INTERNAL_OPTIONS --disable-static"
+  fi
 
-if (test "x$PREFIX_INSTALL_PATH" != "x"); then
-	INTERNAL_OPTIONS="$INTERNAL_OPTIONS --prefix=$PREFIX_INSTALL_PATH"
+  if (test "x$PREFIX_INSTALL_PATH" != "x"); then
+    INTERNAL_OPTIONS="$INTERNAL_OPTIONS --prefix=$PREFIX_INSTALL_PATH"
+  fi
+else
+  if (test "x$ENABLE_OPTIMIZE" != "xyes"); then
+    INTERNAL_OPTIONS="$INTERNAL_OPTIONS -DCMAKE_BUILD_TYPE=Debug"
+  else
+    INTERNAL_OPTIONS="$INTERNAL_OPTIONS -DCMAKE_BUILD_TYPE=RelWithDebInfo"
+  fi
+  if (test "x$ENABLE_SHARED" != "xno" || test "x$ENABLE_STATIC" != "xyes"); then
+    INTERNAL_OPTIONS="$INTERNAL_OPTIONS -DBUILD_SHARED_LIBS=ON"
+  else
+    INTERNAL_OPTIONS="$INTERNAL_OPTIONS -DBUILD_SHARED_LIBS=OFF"
+  fi
+
+  if (test "x$PREFIX_INSTALL_PATH" != "x"); then
+    INTERNAL_OPTIONS="$INTERNAL_OPTIONS -DCMAKE_INSTALL_PREFIX=$PREFIX_INSTALL_PATH"
+  fi
 fi
 
 # PRESET CONFIGURATION COMMANDS
@@ -189,9 +208,15 @@ fi
 
 if (test "x$ENABLE_MPI" != "xno"); then
   if (test "x$MBMPI_DIR" != "x"); then
-    INTERNAL_OPTIONS="$INTERNAL_OPTIONS --with-mpi=$MBMPI_DIR"
+    if (test "x$CMAKE" != "xyes"); then
+      INTERNAL_OPTIONS="$INTERNAL_OPTIONS --with-mpi=$MBMPI_DIR"
+    else
+      INTERNAL_OPTIONS="$INTERNAL_OPTIONS -DENABLE_MPI=ON -DMPI_HOME=$MBMPI_DIR"
+    fi
   else
-    INTERNAL_OPTIONS="$INTERNAL_OPTIONS --with-mpi"
+    if (test "x$CMAKE" != "xyes"); then
+      INTERNAL_OPTIONS="$INTERNAL_OPTIONS --with-mpi"
+    fi
   fi
 else
   MBCC=$MBNMPICC
@@ -200,53 +225,99 @@ else
   MBFC=$MBNMPIFC
 fi
 
-INTERNAL_OPTIONS="$INTERNAL_OPTIONS CC=$MBCC CXX=$MBCXX"
+if (test "x$CMAKE" != "xyes"); then
+  INTERNAL_OPTIONS="$INTERNAL_OPTIONS CC=$MBCC CXX=$MBCXX"
+else
+  INTERNAL_OPTIONS="$INTERNAL_OPTIONS -DCMAKE_C_COMPILER=$MBCC"
+  INTERNAL_OPTIONS="$INTERNAL_OPTIONS -DCMAKE_CXX_COMPILER=$MBCXX"
+fi
 
 if (test "x$ENABLE_FORTRAN" != "xno" && test "x$MBFC" != "x"); then
-	INTERNAL_OPTIONS="$INTERNAL_OPTIONS FC=$MBFC F77=$MBF77"
+  if (test "x$CMAKE" != "xyes"); then
+	  INTERNAL_OPTIONS="$INTERNAL_OPTIONS FC=$MBFC F77=$MBF77"
+	else
+    INTERNAL_OPTIONS="$INTERNAL_OPTIONS -DCMAKE_Fortran_COMPILER=$MBFC"
+  fi
 else
 	INTERNAL_OPTIONS="$INTERNAL_OPTIONS --disable-fortran"
 fi
 
-if (test "x$CROSSCOMPILE" != "xno"); then
+if (test "x$CMAKE" != "xyes" && test "x$CROSSCOMPILE" != "xno"); then
   INTERNAL_OPTIONS="$INTERNAL_OPTIONS cross_compiling=yes"
 fi
 
+LDFLAGSLIBS=""
 DEPENDENCY_OPTIONS=""
 if (test "x$MBBLASLAPACK_LIBS" != "x"); then
-  DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-blas=\"$MBBLASLAPACK_LIBS\" --with-lapack=\"$MBBLASLAPACK_LIBS\""
+  if (test "x$CMAKE" != "xyes"); then
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-blas=\"$MBBLASLAPACK_LIBS\" --with-lapack=\"$MBBLASLAPACK_LIBS\""
+  else
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS -DENABLE_BLASLAPACK=ON LDFLAGSLIBS=\"$LDFLAGSLIBS $MBBLASLAPACK_LIBS\""
+  fi
 fi
 
 if (test "x$MBHDF5_DIR" != "x"); then
-  DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-hdf5=$MBHDF5_DIR"
+  if (test "x$CMAKE" != "xyes"); then
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-hdf5=$MBHDF5_DIR"
+  else
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS -DENABLE_HDF5=ON -DHDF5_ROOT\"$MBHDF5_DIR\""
+  fi
 fi
 
 if (test "x$MBZLIB_DIR" != "x"); then
-  DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-zlib=$MBZLIB_DIR"
+  if (test "x$CMAKE" != "xyes"); then
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-zlib=$MBZLIB_DIR"
+  else
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS -DENABLE_ZLIB=ON -DZLIB_ROOT=$MBZLIB_DIR"
+  fi
 fi
 
 if (test "x$MBSZIP_DIR" != "x"); then
-  DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-szip=$MBSZIP_DIR"
+  if (test "x$CMAKE" != "xyes"); then
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-szip=$MBSZIP_DIR"
+  else
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS -DENABLE_SZIP=ON -DSZIP_ROOT=$MBSZIP_DIR"
+  fi
 fi
 
 if (test "x$MBNETCDF_DIR" != "x"); then
-  DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-netcdf=$MBNETCDF_DIR"
+  if (test "x$CMAKE" != "xyes"); then
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-netcdf=$MBNETCDF_DIR"
+  else
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS -DENABLE_NETCDF=ON -DNETCDF_ROOT=$MBNETCDF_DIR"
+  fi
 fi
 
 if (test "x$MBPNETCDF_DIR" != "x"); then
-  DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-pnetcdf=$MBPNETCDF_DIR"
+  if (test "x$CMAKE" != "xyes"); then
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-pnetcdf=$MBPNETCDF_DIR"
+  else
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS -DENABLE_PNETCDF=ON -DPNETCDF_ROOT=$MBPNETCDF_DIR"
+  fi
 fi
 
 if (test "x$MBMETIS_DIR" != "x"); then
-  DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-metis=$MBMETIS_DIR"
+  if (test "x$CMAKE" != "xyes"); then
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-metis=$MBMETIS_DIR"
+  else
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS -DENABLE_METIS=ON -DMETIS_ROOT=$MBMETIS_DIR"
+  fi
 fi
 
 if (test "x$MBPARMETIS_DIR" != "x"); then
-  DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-parmetis=$MBPARMETIS_DIR"
+  if (test "x$CMAKE" != "xyes"); then
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-parmetis=$MBPARMETIS_DIR"
+  else
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS -DENABLE_PARMETIS=ON -DPARMETIS_ROOT=$MBPARMETIS_DIR"
+  fi
 fi
 
 if (test "x$MBZOLTAN_DIR" != "x"); then
-  DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-zoltan=$MBZOLTAN_DIR"
+  if (test "x$CMAKE" != "xyes"); then
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-zoltan=$MBZOLTAN_DIR"
+  else
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS -DENABLE_ZOLTAN=ON -DZOLTAN_ROOT=$MBZOLTAN_DIR"
+  fi
 fi
 
 if (test "x$MBSCOTCH_DIR" != "x"); then
@@ -254,20 +325,30 @@ if (test "x$MBSCOTCH_DIR" != "x"); then
 fi
 
 if (test "x$MBPTSCOTCH_DIR" != "x"); then
-  DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-ptscotch=$MBPTSCOTCH_DIR"
-fi
-
-if (test "x$MBVTK_DIR" != "x"); then
-  DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-vtk=$MBVTK_DIR"
+  if (test "x$CMAKE" != "xyes"); then
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-ptscotch=$MBPTSCOTCH_DIR"
+  else
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS --with-ptscotch=$MBPTSCOTCH_DIR"
+  fi
 fi
 
 if (test "x$LIBS" != "x"); then
-  DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS LIBS=\"$LIBS\""
-  MBDWLD_OPTIONS="$MBDWLD_OPTIONS LIBS=\"$LIBS\""
+  if (test "x$CMAKE" != "xyes"); then
+    DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS LIBS=\"$LIBS\""
+    MBDWLD_OPTIONS="$MBDWLD_OPTIONS LIBS=\"$LIBS\""
+  else
+    LDFLAGSLIBS=\"$LDFLAGSLIBS $LIBS\"
+  fi
+fi
+
+if (test "x$CMAKE" != "xno"); then
+  DEPENDENCY_OPTIONS="$DEPENDENCY_OPTIONS -DCMAKE_EXE_LINKER_FLAGS=\"$LDFLAGSLIBS\""
 fi
 
 # Put them all together
-DWLD_CONFIGURE_CMD="$CONFIGURE_CMD $INTERNAL_OPTIONS $MBDWLD_OPTIONS --with-pic=1 --enable-tools --download-hdf5 --download-netcdf --download-metis"
+if (test "x$CMAKE" != "xyes"); then
+  DWLD_CONFIGURE_CMD="$CONFIGURE_CMD $INTERNAL_OPTIONS $MBDWLD_OPTIONS --with-pic=1 --enable-tools --download-hdf5 --download-netcdf --download-metis"
+fi
 CONFIGURE_CMD="$CONFIGURE_CMD $INTERNAL_OPTIONS $DEPENDENCY_OPTIONS"
 
 # PRINT OUT INFORMATION
@@ -296,8 +377,10 @@ echo "Configure command to use:"
 echo "-------------------------"
 echo "$CONFIGURE_CMD"
 echo ""
-echo "         OR"
-echo ""
-echo "$DWLD_CONFIGURE_CMD"
+if (test "x$CMAKE" != "xyes"); then
+  echo "         OR"
+  echo ""
+  echo "$DWLD_CONFIGURE_CMD"
+fi
 
 # Done.

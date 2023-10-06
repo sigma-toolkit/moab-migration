@@ -1010,7 +1010,6 @@ RECURSIVE              = YES
 # run.
 
 EXCLUDE                = @top_srcdir@/config \
-                         CMakeLists.txt \
                          driver.py \
                          cython_filter.py
 

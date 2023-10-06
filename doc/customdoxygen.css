@@ -139,7 +139,7 @@ dl.el {
 
 .fragment {
 	font-family: monospace, fixed;
-	font-size: 105%;
+	font-size: 100%;
 }
 
 pre.fragment {
@@ -843,9 +843,16 @@ dl.bug
 	border-collapse: separate;
 }
  
-#projectlogo img
+.light-mode #projectlogo .moablogo
 { 
 	border: 0px none;
+	content: url("moab-light.png");
+}
+
+.dark-mode #projectlogo .moablogo
+{ 
+	border: 0px none;
+	content: url("moab-dark.png");
 }
  
 #projectname

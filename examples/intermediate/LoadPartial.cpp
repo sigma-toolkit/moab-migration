@@ -1,6 +1,6 @@
 /** @example LoadPartial.cpp \n
  * \brief Load a part of a file  \n
- * <b>To run</b>: LoadPartial <file> <tag_name> <val1> <val2> ...\n
+ * <b>To run</b>: LoadPartial [file] [tag_name] [val1] [val2] ...\n
  *
  * In this example, it is shown how to load only a part of one file; the file must be organized in
  * sets. (cherry-picking only the sets we want) The sets to load are identified by a tag name and

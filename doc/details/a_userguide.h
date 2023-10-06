@@ -1,109 +1,8 @@
 /*! \page userguide User's Guide 
- 
-  \subpage team 
- 
-  \subpage contents
- 
-  \subpage figures
- 
-  \subpage tables
- 
-  \subpage differences
 
-  \subpage building
+  \tableofcontents
 
-  \page team MOAB team members
- <h2>The MOAB Team, including: </h2>
- 
- - Vijay S. Mahadevan (Argonne National Lab)
- - Timothy J. Tautges (Siemens, Univ Wisconsin-Madison)
- - Iulian Grindeanu (Argonne National Lab) 
- - Rajeev Jain (Argonne National Lab)
- - Danqing Wu  (Argonne National Lab)
- - Navamita Ray (Los Alamos National Lab)
- - Jane Hu (Univ Wisconsin-Madison)
- - Paul Wilson (Univ Wisconsin-Madison)
- - Patrick Shriwise (Argonne National Lab)
- - Anthony Scopatz (The University of South Carolina)
-
-
- <h2>Emeritus members:</h2>
- 
- - Jason A. Kraftcheck
- - Brandon M. Smith
- - Hong-Jun Kim
- - Jim Porter
- - Xiabing Xu
- 
-  \page contents Table of Contents
- 
-  \ref introduction  
-
-  \ref interface     
-
-	\ref twoone    
-
-	\ref twotwo     
-
-	\ref twothree       
-
-	\ref twofour   
-
-  \ref api     
-
-  \ref services      
-
-    \ref fourone    
-
-    \ref fourtwo   
-
-    \ref fourthree  
-
-    \ref fourfour      
-
-    \ref fourfive    
-
-    \ref foursix
-
-    \ref fourseven
-
-    \ref foureight
-
-  \ref parallel      
-
-    \ref fiveone    
-
-    \ref fivetwo     
-
-    \ref fivethree    
-
-    \ref fivefour      
-
-  \ref applications   
-
-  \ref implementation         
-
-  \ref pymoab
-
-  \ref representation     
-
-  \ref element    
-
-    \ref tenone  
-
-    \ref tentwo        
-
-    \ref tenthree      
-
-  \ref performance   
-
-  \ref error-handling
-
-  \ref conclusions    
-
-  \ref references 
-
-  \section introduction 1.Introduction
+  \section introduction 1. Introduction
 
 In scientific computing, systems of partial differential equations (PDEs) are solved on computers.  One of the most widely used methods to solve PDEs numerically is to solve over discrete neighborhoods or “elements” of the domain.  Popular discretization methods include Finite Difference (FD), Finite Element (FE), and Finite Volume (FV).  These methods require the decomposition of the domain into a discretized representation, which is referred to as a “mesh”.  The mesh is one of the fundamental types of data linking the various tools in the analysis process (mesh generation, analysis, visualization, etc.).  Thus, the representation of mesh data and operations on those data play a very important role in PDE-based simulations.
  
@@ -125,7 +24,7 @@ Several other sources of information about MOAB may also be of interest to reade
 
  \ref contents
 
- \section interface 2.MOAB Data Model
+ \section interface 2. MOAB Data Model
 The MOAB data model describes the basic types used in MOAB and the language used to communicate that data to applications.  This chapter describes that data model, along with some of the reasons for some of the design choices in MOAB.
 
  \ref contents
@@ -277,7 +176,7 @@ The semantic meaning of a tag is determined by applications using it.  However, 
 
   \ref contents
 
-  \section api 3.MOAB API Design Philosophy and Summary
+  \section api 3. MOAB API Design Philosophy and Summary
 
 This section describes the design philosophy behind MOAB, and summarizes the functions, data types and enumerated variables in the MOAB API.  A complete description of the MOAB API is available in online documentation in the MOAB distribution [11].
 
@@ -422,7 +321,7 @@ Table 3 lists the various groups of functions that comprise the MOAB API.  This 
 
  \ref contents
 
- \section services 4.Related Mesh Services
+ \section services 4. Related Mesh Services
 
 A number of mesh-based services are often used in conjunction with a mesh library.  For example, parallel applications often need to visualize the mesh and associated data.  Other services, like spatial interpolation or finding the faces on the “skin” of a 3D mesh, can be implemented more efficiently using knowledge of specific data structures in MOAB.  Several of these services provided with MOAB are described in this chapter.
 
@@ -441,7 +340,7 @@ There are capabilities in VisIt for viewing and manipulation of tag data and som
 To support parallel simulation, applications often need to partition a mesh into parts, designed to balance the load and minimize communication between sets.  MOAB includes the mbpart tool for this purpose, constructed on the well-known Zoltan partitioning library [16] and Metis [17].  After computing the partition using Zoltan or Metis, MOAB stores the partition as either tags on individual entities in the partition, or as tagged sets, one set per part.  Since a partition often exhibits locality similar to how the entities were created, storing it as sets (based on Range’s) is often more memory-efficient than an entity tag-based representation.  Figure below shows a couple of partitioned meshes computed with mbpart with -z option for Zoltan and visualized in VisIt.
 
 
- \image html vis_part.png
+ \image html figures/vis_part.png
 
 
 
@@ -622,7 +521,7 @@ Note that although information about model entities is recovered, MOAB by defaul
 
 The Common Geometry Module (CGM) [21] is a library for representing solid model and other types of solid geometry data.  The CUBIT mesh generation toolkit uses CGM for its geometric modeling support, and CGM can restore geometric models in the exact state in which they were represented in CUBIT.  MOAB contains a CGM reader, which can be enabled with a configure option.  Using this reader, MOAB can read geometric models, and represent their model topology using entity sets linked by parent/child relations.  The mesh in these models comes directly from the modeling engine faceting routines; these are the same facets used to visualize solid models in other graphics engines.  When used in conjunction with the VisIt visualization tool (see Section 4.1), this provides a solution for visualizing geometric models.  The figure below  shows a model imported using MOAB’s CGM reader and visualized with VisIt.
 
-\image html simple.png
+\image html figures/simple.png
 
 \ref contents
 
@@ -657,7 +556,7 @@ TODO:: Other features to be added
 
  MOAB supports generation of a mesh hierarchy i.e., a sequence of meshes with user specified degrees for each level of refinement, from an initial unstructured mesh with support for higher degrees of refinement (supported degrees are listed later).  Thus MOAB supports multi-degree and multi-level mesh generation via uniform refinement. The following figure shows the initial and most refined mesh for four simple meshes to illustrate the multi-degree capability.
 
-  \image html uref_allEtype.png "Uniform Refinement of 2D and 3D meshes"
+  \image html figures/uref_allEtype.png "Uniform Refinement of 2D and 3D meshes"
 
   Applications using mesh hierarchies require two types of mesh access: intralevel and interlevel. The intralevel access involves working with the mesh at a particular level whereas interlevel access involves querying across different levels. In order to achieve data locality with reduced cache misses for efficient intralevel mesh access, old vertices in the previous i.e. immediate parent mesh are duplicated in the current level. All the entities thus created for the current level use the new entityhandles of old vertices along with the handles of the new vertices. This design makes mesh at each level of the hierarchy independent of those at previous levels. For each mesh in the hierarchy, a MESHSET is created and all entities of the mesh are added to this MESHSET. Thus the meshes of the hierarchy are accessible via these level-wise MESHSET handles.
 
@@ -748,7 +647,7 @@ TODO:: Other features to be added
 
 In Table 5, the currently supported degrees of refinement for each dimension is listed along with the number of children created for each such degree for a single entity. The following figure shows the cpu times(serial run) for generating hierarchies with various degrees of refinement for each dimension and can be used by the user to guide in choosing the degrees of refinement for the hierarchy. For example, if a multilevel hierarchy is required, a degree 2 refinement per level would give a gradually increasing mesh with more number of levels. If a very refined mesh is desired quickly, then a small hierarchy with high-order refinement should be generated.
 
-\image html uref_timeEtype.png "Mesh sizes Vs. Time"
+\image html figures/uref_timeEtype.png "Mesh sizes Vs. Time"
 
 
   Current support:
@@ -765,7 +664,7 @@ In Table 5, the currently supported degrees of refinement for each dimension is 
 
  \ref contents
 
-  \section parallel 5.Parallel Mesh Representation and Query
+  \section parallel 5. Parallel Mesh Representation and Query
 
 A parallel mesh representation must strike a careful balance between providing an interface to mesh similar to that of a serial mesh, while also allowing the discovery of parallel aspects of the mesh and performance of parallel mesh-based operations efficiently.  MOAB supports a spatial domain-decomposed view of a parallel mesh, where each subdomain is assigned to a processor, lower-dimensional entities on interfaces between subdomains are shared between processors, and ghost entities can be exchanged with neighboring processors.  Locally, each subdomain, along with any locally-represented ghost entities, are accessed through a local MOAB instance.  Parallel aspects of the mesh, e.g. whether entities are shared, on an interface, or ghost entities, are embedded in the same data model (entities, sets, tags, interface) used in the rest of MOAB.  MOAB provides a suite of parallel functions for initializing and communicating with a parallel mesh, along with functions to query the parallel aspects of the mesh.
 
@@ -991,7 +890,7 @@ Once a parallel mesh has been initialized, applications can call the ParallelCom
 
   \ref contents
 
-  \section applications 6.Building MOAB-Based Applications
+  \section applications 6. Building MOAB-Based Applications
 
 There are two primary mechanisms supported by MOAB for building applications, one based on MOAB-defined make variables, and the other based on the use of libtool and autoconf.  Both assume the use of a “make”-based build system.  
 
@@ -1021,7 +920,7 @@ The second method for incorporating MOAB into an application’s build system is
 
   \ref contents
 
-  \section implementation  7.iMesh (ITAPS Mesh Interface) Implementation in MOAB
+  \section implementation  7. iMesh (ITAPS Mesh Interface) Implementation in MOAB
 
 iMesh is a common API to mesh data developed as part of the Interoperable Tools for Advanced Petascale Simulations (ITAPS) project [23].  Applications using the iMesh interface can operate on any implementation of that interface, including MOAB.  MOAB-based applications can take advantage of other services implemented on top of iMesh, including the MESQUITE mesh improvement toolkit [24].
 
@@ -1060,7 +959,7 @@ Note that using the iMesh interface from Fortran-based applications requires a c
 
   \ref contents
 
-  \section pymoab 8.Python Interface (PyMOAB)
+  \section pymoab 8. Python Interface (PyMOAB)
 
 A Python interface to MOAB's essential core functionality and a few other tools has been added as of Version 5.0. The pymoab module can be used to interactively interrogate existing mesh files or prototype MOAB-based algorithms. It can also be connected to other Python applications or modules for generation, manipulation, and visualization of a MOAB mesh and mesh data. Examples of this can be found in the laplaciansmoother.py and yt2moab.py files. Interaction with the PyMOAB interface is intended to be somewhat analagous to interaction with the MOAB C++ API. A simple example of file loading and mesh interrogation can be found in interrogate_mesh.py
 
@@ -1077,7 +976,7 @@ Examples of PyMOAB usage can be found in the /examples/python/ directory.
 
   \ref contents
 
-  \section representation 9.Structured Mesh Representation
+  \section representation 9. Structured Mesh Representation
 
 A structured mesh is defined as a D-dimensional mesh whose interior vertices have 2D connected edges.   Structured mesh can be stored without connectivity, if certain information is kept about the parametric space of each structured block of mesh.  MOAB can represent structured mesh with implicit connectivity, saving approximately 57% of the storage cost compared to an unstructured representation<sup>7</sup>.  Since connectivity must be computed on the fly, these queries execute a bit slower than those for unstructured mesh.  More information on the theory, and design behind MOAB's structured mesh representation can be found in [8].
 
@@ -1087,7 +986,7 @@ Currently, MOAB's structured mesh representation can only be used by creating st
 
  \ref contents
 
-  \section element 10.Spectral Element Meshes
+  \section element 10. Spectral Element Meshes
 
 The Spectral Element Method (SEM) is a high-order method, using a polynomial Legendre interpolation basis with Gauss-Lobatto quadrature points, in contrast to the Lagrange basis used in (linear) finite elements [25].  SEM obtains exponential convergence with decreasing mesh characteristic sizes, and codes implementing this method typically have high floating-point intensity, making the method highly efficient on modern CPUs.  Most Nth-order SEM codes require tensor product cuboid (quad/hex) meshes, with each d-dimensional element containing (N+1)^d degrees of freedom (DOFs).  There are various methods for representing SEM meshes and solution fields on them; this document discusses these methods and the tradeoffs between them.  The mesh parts of this discussion are given in terms of the iMesh mesh interface and its implementation by the MOAB mesh library.
 
@@ -1129,7 +1028,7 @@ In brief, we propose to represent elements using the linear, FE-ordered connecti
 
   \ref contents
 
-  \section performance 11.Performance and Using MOAB Efficiently from Applications
+  \section performance 11. Performance and Using MOAB Efficiently from Applications
 
 MOAB is designed to operate efficiently on groups of entities and for large meshes.  Applications will be most efficient when they operate on entities in groups, especially groups which are close in their order of creation.  The MOAB API is structured to encourage operations on groups of entities.  Conversely, MOAB will not perform as well as other libraries if there are frequent deletion and creation of entities.  For those types of applications, a mesh library using a C++ object-based representation is more appropriate.  In this section, performance of MOAB when executing a variety of tasks is described, and compared to that of other representations.  Of course, these metrics are based on the particular models and environments where they are run, and may or may not be representative of other application types.
 
@@ -1144,7 +1043,7 @@ This test can be run on your system to determine the runtime and memory performa
 
   \ref contents
 
-  \section error-handling 12.Error Handling
+  \section error-handling 12. Error Handling
 
 Errors are handled through the routine MBError(). This routine calls MBTraceBackErrorHandler(), the default error handler which tries to print a traceback.
 
@@ -1185,7 +1084,56 @@ For example code on error handling, please refer to examples/TestErrorHandling.c
 
   \ref contents
 
-  \section conclusions 13.Conclusions and Future Plans
+  \section differences 13. Differences Between iMesh and MOAB
+
+  The data models used in MOAB and iMesh are quite similar, but not identical.The most significant differences are the following:
+
+- Tags: MOAB differentiates between DENSE, SPARSE, and BIT tags, using different storage models for each, while iMesh uses a single tag concept.  iMesh allows application to query whether an entity has been given a tag of a specified type; this query is incompatible with the concept of a DENSE tag with a default value.  Thus, MOAB’s iMesh implementation creates SPARSE tags by default, and tags created and accessed through this interface will use more memory than DENSE tags created through MOAB’s native interface.  To mitigate this problem, MOAB implements an extension of the iMesh_createTag function which allows specification of the tag type (DENSE, SPARSE, etc.) to be created.  See later in this section for more information.
+
+- Higher-order nodes: ITAPS currently handles higher-order elements (e.g. a 10-node tetrahedron) using a special “Shape” interface.  In this interface, higher-order nodes are only accessible through the AEntities which they resolve.  MOAB’s iMesh implementation provides access to higher-order nodes in the same manner described in Section  , by varying the number of vertices defining each entity.  As a result, if higher-order entities are used in a model, the functions returning connectivity and vertex adjacencies always return all vertices, rather than providing an option to return just corner vertices.
+
+- Self-adjacencies: iMesh specifies that entities are not self-adjacent; that is, requesting adjacencies of the same dimension/type results in an error.  MOAB does not consider this an error, returning the entity itself.
+
+- Adjacency table and AEntities: iMesh uses the concept of an “adjacency table” to determine which AEntities are available and created by default.  MOAB uses input arguments to the get_adjacencies functions to control whether AEntities are created.  These flags provide finer-grained control over AEntities, but make it slightly less convenient to ensure that AEntities of a given dimension are always created.
+.
+
+
+  \ref contents
+
+  \section building 14. Building & Installing
+ 
+<h1> Standard Installation Instructions </h1>
+
+  MOAB uses an autoconf and libtool-based build process by default.  The procedure used to build MOAB from scratch depends on whether the source code was obtained from a “tarball” or directly from the Subversion repository.  Assuming the latter, the following steps should be executed for building and installing MOAB:
+  - Locate and build any required dependencies.  MOAB can be built with no dependencies on other libraries; this may be useful for applications only needing basic mesh representation and not needing to export mesh to formats implemented in other libraries.  MOAB’s native save/restore capability is built on HDF5-based files; applications needing to save and restore files from MOAB reliably should use this library.  MOAB also uses ExodusII, a netCDF-based file format developed at Sandia National Laboratories [10].  Applications needing to execute these tests should also build netCDF.  Note that MOAB uses netCDF’s C++ interface, which is not enabled by default in netCDF but can be enabled using the “–enable-cxx” option to netCDF’s configure script.
+  - Unpack source code into <moab>, and change current working directory to that location.
+  - Execute “autoreconf –fi”.
+  - Run configure script, by executing “./configure <options>”.  Recommended options:
+       -# –prefix=<install_dir>: directory below which MOAB library and include files will be installed; can either be the directory used for MOAB source (<moab> from step 1), or a different directory.
+       -# –hdf5-dir=<hdf5_dir>: directory whose “include” and “lib” subdirectories hold HDF5 include and library, respectively.  MOAB uses HDF5 for its native save/restore format (see Section 4.6.1).
+       -# –netcdf-dir=: directory whose “include” and “lib” subdirectories hold netCDF include and library, respectively.  MOAB uses netCDF-based files for many of its build tests.  If the location of netCDF cannot be found, MOAB’s build tests will not function properly, but MOAB will still be usable.
+       .
+  - Run “make check”; this runs a series of build tests, to verify that the MOAB build was successful.  Note this check will fail if netCDF is not used, but MOAB itself will still be usable from applications.
+  - Run “make install”; this copies include files and libraries to subdirectories of the directory specified in the “prefix” option.
+  .
+
+These steps are sufficient for building MOAB against HDF5 and netCDF.  By default, a small number of standard MOAB-based applications are also built, including mbconvert (a utility for reading and writing files), mbsize (for querying basic information about a mesh), and the iMesh interface (see Section 7).  Other utilities can be enabled using various other options to the configure script; for a complete list of build options, execute “./configure –help”.
+
+<h1> Other MOAB Components </h1>
+
+<h2> PyMOAB </h2>
+
+  To install the PyMOAB module, add "--enable-pymoab" in the configuration step described above. PyMOAB will build using whatever version of Python is available on the system when the configuration command is executed. It requires the following packages to operate properly:
+    - Python's <a href=https://pypi.python.org/pypi/setuptools> setuptools </a> and <a href=https://docs.python.org/3/library/distutils.html> distutils </a> for building, linking, and distribution
+    - <a href=https://docs.python.org/3/library/distutils.html> NumPy </a> for management of data being passed into and out of the MOAB database
+
+  PyMOAB can be installed with a custom prefix path which can be set adding "PYMOAB_PREFIX=/path/to/custom/install/location" to the configuration command.
+
+
+
+  \ref contents
+
+  \section conclusions 15. Conclusions and Future Plans
 
 MOAB, a Mesh-Oriented datABase, provides a simple but powerful data abstraction to structured and unstructured mesh, and makes that abstraction available through a function API.  MOAB provides the mesh representation for the VERDE mesh verification tool, which demonstrates some of the powerful mesh metadata representation capabilities in MOAB.  MOAB includes modules that import mesh in the ExodusII, CUBIT .cub and Vtk file formats, as well as the capability to write mesh to ExodusII, all without licensing restrictions normally found in ExodusII-based applications.  MOAB also has the capability to represent and query structured mesh in a way that optimizes storage space using the parametric space of a structured mesh; see Ref. [17] for details.
 
@@ -1193,7 +1141,7 @@ Initial results have demonstrated that the data abstraction provided by MOAB is 
 
   \ref contents
 
-  \section references 14.References
+  \section references 16. References
 
 [1] Mahadevan, Vijay S., Iulian Grindeanu, Rajeev Jain, Patrick Shriwise, Navamita Ray, Paul Wilson, Tautges, Timothy J., "SIGMA -- MOAB.", URL: \href{http://sigma.mcs.anl.gov/}{http://sigma.mcs.anl.gov/}
 
@@ -1247,67 +1195,6 @@ Initial results have demonstrated that the data abstraction provided by MOAB is 
 
 [26] T. J. Tautges, J. A. Kraftcheck, N. Bertram, V. Sachdeva and J. Magerlein, "Mesh Interface Resolution and Ghost Exchange in a Parallel Mesh Representation," 2012 IEEE 26th International Parallel and Distributed Processing Symposium Workshops & PhD Forum, Shanghai, 2012, pp. 1670-1679, doi: 10.1109/IPDPSW.2012.208.
   \ref contents
-
-  \page differences Differences Between iMesh and MOAB
-
-  The data models used in MOAB and iMesh are quite similar, but not identical.The most significant differences are the following:
-
-- Tags: MOAB differentiates between DENSE, SPARSE, and BIT tags, using different storage models for each, while iMesh uses a single tag concept.  iMesh allows application to query whether an entity has been given a tag of a specified type; this query is incompatible with the concept of a DENSE tag with a default value.  Thus, MOAB’s iMesh implementation creates SPARSE tags by default, and tags created and accessed through this interface will use more memory than DENSE tags created through MOAB’s native interface.  To mitigate this problem, MOAB implements an extension of the iMesh_createTag function which allows specification of the tag type (DENSE, SPARSE, etc.) to be created.  See later in this section for more information.
-
-- Higher-order nodes: ITAPS currently handles higher-order elements (e.g. a 10-node tetrahedron) using a special “Shape” interface.  In this interface, higher-order nodes are only accessible through the AEntities which they resolve.  MOAB’s iMesh implementation provides access to higher-order nodes in the same manner described in Section  , by varying the number of vertices defining each entity.  As a result, if higher-order entities are used in a model, the functions returning connectivity and vertex adjacencies always return all vertices, rather than providing an option to return just corner vertices.
-
-- Self-adjacencies: iMesh specifies that entities are not self-adjacent; that is, requesting adjacencies of the same dimension/type results in an error.  MOAB does not consider this an error, returning the entity itself.
-
-- Adjacency table and AEntities: iMesh uses the concept of an “adjacency table” to determine which AEntities are available and created by default.  MOAB uses input arguments to the get_adjacencies functions to control whether AEntities are created.  These flags provide finer-grained control over AEntities, but make it slightly less convenient to ensure that AEntities of a given dimension are always created.
-.
-
- \page figures List of Figures
  
-  This page is intended to be empty.
- 
-  \page tables List of Tables
- 
-     \ref tableone
-
-     \ref tabletwo
-
-     \ref tablethree
-
-     \ref tablefour
-
-     \ref tablefive
-
-     \ref tablesix
-
-     \ref tableseven
- 
-  \page building Building & Installing
- 
-<h1> Standard Installation Instructions </h1>
-
-  MOAB uses an autoconf and libtool-based build process by default.  The procedure used to build MOAB from scratch depends on whether the source code was obtained from a “tarball” or directly from the Subversion repository.  Assuming the latter, the following steps should be executed for building and installing MOAB:
-  - Locate and build any required dependencies.  MOAB can be built with no dependencies on other libraries; this may be useful for applications only needing basic mesh representation and not needing to export mesh to formats implemented in other libraries.  MOAB’s native save/restore capability is built on HDF5-based files; applications needing to save and restore files from MOAB reliably should use this library.  MOAB also uses ExodusII, a netCDF-based file format developed at Sandia National Laboratories [10].  Applications needing to execute these tests should also build netCDF.  Note that MOAB uses netCDF’s C++ interface, which is not enabled by default in netCDF but can be enabled using the “–enable-cxx” option to netCDF’s configure script.
-  - Unpack source code into <moab>, and change current working directory to that location.
-  - Execute “autoreconf –fi”.
-  - Run configure script, by executing “./configure <options>”.  Recommended options:
-       -# –prefix=<install_dir>: directory below which MOAB library and include files will be installed; can either be the directory used for MOAB source (<moab> from step 1), or a different directory.
-       -# –hdf5-dir=<hdf5_dir>: directory whose “include” and “lib” subdirectories hold HDF5 include and library, respectively.  MOAB uses HDF5 for its native save/restore format (see Section 4.6.1).
-       -# –netcdf-dir=: directory whose “include” and “lib” subdirectories hold netCDF include and library, respectively.  MOAB uses netCDF-based files for many of its build tests.  If the location of netCDF cannot be found, MOAB’s build tests will not function properly, but MOAB will still be usable.
-       .
-  - Run “make check”; this runs a series of build tests, to verify that the MOAB build was successful.  Note this check will fail if netCDF is not used, but MOAB itself will still be usable from applications.
-  - Run “make install”; this copies include files and libraries to subdirectories of the directory specified in the “prefix” option.
-  .
-
-These steps are sufficient for building MOAB against HDF5 and netCDF.  By default, a small number of standard MOAB-based applications are also built, including mbconvert (a utility for reading and writing files), mbsize (for querying basic information about a mesh), and the iMesh interface (see Section 7).  Other utilities can be enabled using various other options to the configure script; for a complete list of build options, execute “./configure –help”.
-
-<h1> Other MOAB Components </h1>
-
-<h2> PyMOAB </h2>
-
-  To install the PyMOAB module, add "--enable-pymoab" in the configuration step described above. PyMOAB will build using whatever version of Python is available on the system when the configuration command is executed. It requires the following packages to operate properly:
-    - Python's <a href=https://pypi.python.org/pypi/setuptools> setuptools </a> and <a href=https://docs.python.org/3/library/distutils.html> distutils </a> for building, linking, and distribution
-    - <a href=https://docs.python.org/3/library/distutils.html> NumPy </a> for management of data being passed into and out of the MOAB database
-
-  PyMOAB can be installed with a custom prefix path which can be set adding "PYMOAB_PREFIX=/path/to/custom/install/location" to the configuration command.
-
  */
+

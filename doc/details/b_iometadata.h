@@ -1,31 +1,6 @@
 /*! \page metadata I/O and Meta-Data Storage Conventions in MOAB
 
-	<Center> <H3>   Timothy J. Tautges </H3> </Center>
-
-  	\subpage  md-contents
-
-  	\subpage  md-tables
-*/
-
-/*!  \page md-contents Table of Contents
-
-  \ref meta-introduction
-
-  \ref meta-conventions
-
-  \ref meta-options
-
-  \ref meta-references
-
-  \ref appendixA
-
-  \ref appendixB
-
-  \ref appendixC
-
-  \ref appendixD
-
-  \ref appendixE
+  \tableofcontents
 
   \section meta-introduction  Introduction
 
@@ -44,7 +19,6 @@ The MOAB data model consists of the following basic types:
 
 The following section describes each meta-data tag convention in detail; these conventions are also summarized in Table 1.
 
-\ref md-contents "Top"
 
   \section meta-conventions  Meta-Data Conventions
 
@@ -180,7 +154,6 @@ The Spectral Element Method (SEM) is a high-order method, using a polynomial Leg
 
 .
 
-\ref md-contents "Top"
 
   \section meta-options Reader/Writer Options
 
@@ -216,7 +189,6 @@ Indicates that no mixed elements (e.g. pentagons and hexagons) should be created
 
 Indicates that no edges should be created and no edge variables will be read. This option can be used when there is no need to read variables on edges. For a huge MPAS file with 65M cells, it can save more than 3GB MOAB internal storage for edge connectivity.
 
-\ref md-contents "Top"
 
   \section meta-references References
 
@@ -225,7 +197,6 @@ Indicates that no edges should be created and no edge variables will be read. Th
 [2]     L. Diachin, A. Bauer, B. Fix, J. Kraftcheck, K. Jansen, X. Luo, M. Miller, C. Ollivier-Gooch, M.S. Shephard, T. Tautges, and H. Trease, “Interoperable mesh and geometry tools for advanced petascale simulations,” Journal of Physics: Conference Series,  vol. 78, 2007, p. 012015.
 [3]     T.J. Tautges, J.A. Kraftcheck, N. Bertram, V. Sachdeva, and J. Magerlein,  "Mesh Interface Resolution and Ghost Exchange in a Parallel Mesh Representation", In Proceedings of the 2012 IEEE 26th International Parallel and Distributed Processing Symposium Workshops & PhD Forum (IPDPSW '12), 2012.
 
-\ref md-contents "Top"
 
   \section appendixA Appendix A: Summary
 
@@ -444,7 +415,6 @@ GEOM_SENSE_N_SENSES/I*N</td>
 </tr>
 </table>
 
-\ref md-contents "Top"
 
   \section appendixB Appendix B: CCMIO (Star-CD, Star-CCM+) Reader/Writer Conventions
 
@@ -543,7 +513,6 @@ GEOM_SENSE_N_SENSES/I*N</td>
 Notes:
 1. If no name is present, labels the material group with “MaterialX”, where X is the index of that group.
 
-\ref md-contents "Top"
 
   \section appendixC Appendix C: ExodusII Reader/Writer Conventions 
 
@@ -609,7 +578,6 @@ whether the right-hand normal points into or out of the element. Forward-sense f
 to the Neumann set. Reverse-sense faces are put into a separate set; that set is tagged with the SENSE tag, with value = -1; and that reverse set is added to the Neummann set.
 .
 
-  \ref md-contents "Top"
 
   \section appendixD Appendix D: NC (Climate Data) Reader/Writer Conventions
 
@@ -794,7 +762,6 @@ __<var_name>_ATTRIBS tags
 </tr>
 </table>
 
-  \ref md-contents "Top"
 
   \section appendixE Appendix E: Nek5000 Reader/Writer Conventions
 
@@ -887,20 +854,5 @@ nx*ny*nz values)
 </td>
 </tr>
 </table>
-  \ref md-contents "Top"
         */
 
-/*!  \page md-tables List of Tables
-    \ref table1
-
-    \ref table2
-
-    \ref table3
-
-    \ref table4
-
-    \ref table5
-
-    \ref table6
-
-*/

@@ -54,7 +54,8 @@ int main( int argc, char** argv )
     vector<double> vals1, vals2;
     vals1.resize(cells1.size());
     vals2.resize(cells2.size());
-    int k=0; // number of different double tags
+    int k=0; // number of different fields
+    int k1=0; // number of exactly the same fields
     std::cout << " compare files: " << file1 << " and " << file2 << " dimension entity: " << dim << "\n";
     for (size_t i=0; i< list1.size(); i++)
     {
@@ -85,8 +86,12 @@ int main( int argc, char** argv )
             std::cout<<" tag: " << name << " \t difference : "<< sum <<"\n";
             k++;
         }
+	else
+        {
+            k1++;
+        }
     }
-    std::cout<<" different tags:" << k << "\n";
+    std::cout<<" different fields:" << k << " \n exactly the same fields:" << k1 << "\n";
     // Cr
     delete mb;
     delete mb2;

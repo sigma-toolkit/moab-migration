@@ -71,6 +71,7 @@ endif()
   # configure the setup script
   SET(SETUP_PY_IN "${CMAKE_CURRENT_SOURCE_DIR}/setup.py.cmake.in")
   SET(SETUP_PY    "${CMAKE_CURRENT_BINARY_DIR}/setup.py")
+  FILE(COPY "${CMAKE_CURRENT_SOURCE_DIR}/pyproject.toml" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
   CONFIGURE_FILE(${SETUP_PY_IN} ${SETUP_PY})
 
   # setup dependencies of the build command

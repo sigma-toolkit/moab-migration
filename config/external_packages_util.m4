@@ -1422,7 +1422,7 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_PARMETIS],
         configure_command="$configure_command shared=1"
       fi
       eval "echo 'Using configure command :==> cd $parmetis_build_dir && $configure_command > $parmetis_src_dir/../config_metis.log' > $parmetis_src_dir/../config_metis.log"
-      PREFIX_PRINT(Configuring Metis with default options  {debug=$enable_debug} )
+      PREFIX_PRINT(Configuring ParMetis with default options  {debug=$enable_debug} )
       eval "cd $parmetis_build_dir/metis && $configure_command >> $parmetis_src_dir/../config_metis.log 2>&1 && cd \"\$OLDPWD\""
 
       configure_command="$configure_command metis_path=$parmetis_build_dir/metis gklib_path=$parmetis_build_dir/metis/GKlib"

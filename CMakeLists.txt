@@ -132,6 +132,9 @@ option ( ENABLE_IREL         "Should build IREL?"        OFF )
 option ( ENABLE_BLASLAPACK   "Should require BLAS/LAPACK?" ON )
 option ( ENABLE_FORTRAN      "Should enable FORTRAN?" ON )
 option ( ENABLE_TEMPESTREMAP "Should enable TempestRemap dependency?" OFF )
+# Download packages
+option ( DOWNLOAD_METIS "Should download and build Metis dependency?" OFF )
+option ( DOWNLOAD_PARMETIS "Should download and build ParMetis dependency?" OFF )
 
 add_feature_info(SharedLibs BUILD_SHARED_LIBS "Should shared or static libraries be created?")
 add_feature_info(EnableFortran ENABLE_FORTRAN "Should FORTRAN support be enabled?")
@@ -152,6 +155,85 @@ if(APPLE)
   set(CMAKE_MACOSX_RPATH FALSE)
   set(CMAKE_INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/lib)
 endif()
+
+# Use external projects to download and build/configure projects for use
+# using CMake intrinsics 
+include(ExternalProject)
+#set(BASE_DOWNLOAD_PATH "https://ftp.mcs.anl.gov/pub/fathom/TPL")
+set(BASE_DOWNLOAD_PATH "/Users/mahadevan/Code/sigma/moab/build/TPLs")
+set(LIB_EXT ${CMAKE_CURRENT_BINARY_DIR}/sandbox)
+set(BUILD_EXT ${LIB_EXT}/builds)
+
+if(DOWNLOAD_METIS)
+
+  #    ExternalProject_Add(metis
+  #    URL               https://ftp.mcs.anl.gov/pub/fathom/TPL/metis-5.1.0.tar.gz
+  #    URL_HASH          MD5=5465e67079419a69e0116de24fce58fe
+  #    CONFIGURE_COMMAND "cmake ../metis -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX} -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} -DGKLIB_PATH=./GKlib -DDEBUG=1 -DSHARED=1"
+  #    #CONFIGURE_COMMAND "echo ${CMAKE_CURRENT_SOURCE_DIR}"
+  #    BUILD_COMMAND     ${MAKE_EXE} 
+  #  )
+
+  set(METIS_ROOT ${BUILD_EXT}/metis)
+  set(METIS_VERSION 5.1.0)
+  set(METIS_EXTRAOPTIONS "")
+  if (BUILD_SHARED_LIBS)
+    set(METIS_EXTRAOPTIONS "${METIS_EXTRAOPTIONS} shared=1")
+  endif (BUILD_SHARED_LIBS)
+  if (CMAKE_BUILD_TYPE MATCHES "Debug" OR CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
+    set(METIS_EXTRAOPTIONS "${METIS_EXTRAOPTIONS} debug=1")
+  endif (CMAKE_BUILD_TYPE MATCHES "Debug" OR CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
+
+  ExternalProject_Add(external_metis
+    URL ${BASE_DOWNLOAD_PATH}/metis-${METIS_VERSION}.tar.gz
+    URL_HASH MD5=5465e67079419a69e0116de24fce58fe
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    DOWNLOAD_NO_PROGRESS TRUE
+    PREFIX ${METIS_ROOT}
+    SOURCE_DIR ${LIB_EXT}/metis-${METIS_VERSION}
+    BUILD_IN_SOURCE ON
+    DOWNLOAD_DIR ${LIB_EXT}
+    CONFIGURE_COMMAND make config cc=${CMAKE_C_COMPILER} cxx=${CMAKE_CXX_COMPILER} prefix=${METIS_ROOT} gklib_path=${LIB_EXT}/metis-${METIS_VERSION}/GKlib
+    BUILD_COMMAND make
+    INSTALL_COMMAND make install
+    )
+
+endif(DOWNLOAD_METIS)
+
+if(DOWNLOAD_PARMETIS)
+
+  #    ExternalProject_Add(metis
+  #    URL               https://ftp.mcs.anl.gov/pub/fathom/TPL/metis-5.1.0.tar.gz
+  #    URL_HASH          MD5=5465e67079419a69e0116de24fce58fe
+  #    CONFIGURE_COMMAND "cmake ../metis -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX} -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} -DGKLIB_PATH=./GKlib -DDEBUG=1 -DSHARED=1"
+  #    #CONFIGURE_COMMAND "echo ${CMAKE_CURRENT_SOURCE_DIR}"
+  #    BUILD_COMMAND     ${MAKE_EXE} 
+  #  )
+  set(PARMETIS_ROOT ${BUILD_EXT}/parmetis)
+  set(PARMETIS_EXTRAOPTIONS "")
+  if (BUILD_SHARED_LIBS)
+    set(PARMETIS_EXTRAOPTIONS "${PARMETIS_EXTRAOPTIONS} shared=1")
+  endif (BUILD_SHARED_LIBS)
+  if (CMAKE_BUILD_TYPE MATCHES "Debug" OR CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
+    set(PARMETIS_EXTRAOPTIONS "${PARMETIS_EXTRAOPTIONS} debug=1")
+  endif (CMAKE_BUILD_TYPE MATCHES "Debug" OR CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
+
+  ExternalProject_Add(external_parmetis
+    URL ${BASE_DOWNLOAD_PATH}/parmetis-4.0.3.tar.gz
+    URL_HASH MD5=f69c479586bf6bb7aff6a9bc0c739628
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    DOWNLOAD_NO_PROGRESS TRUE
+    PREFIX ${PARMETIS_ROOT}
+    SOURCE_DIR ${LIB_EXT}/parmetis-4.0.3
+    BUILD_IN_SOURCE ON
+    DOWNLOAD_DIR ${LIB_EXT}
+    CONFIGURE_COMMAND make config cc=${CMAKE_C_COMPILER} cxx=${CMAKE_CXX_COMPILER} prefix=${PARMETIS_ROOT} ${PARMETIS_EXTRAOPTIONS} gklib_path=${LIB_EXT}/metis-5.1.0/GKlib metis_path=${LIB_EXT}/metis-5.1.0
+    BUILD_COMMAND make -j4
+    INSTALL_COMMAND make install
+    )
+
+endif(DOWNLOAD_PARMETIS)
+
 
 ################################################################################
 # Check for system include files

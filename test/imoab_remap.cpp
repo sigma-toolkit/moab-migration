@@ -175,7 +175,7 @@ int main( int argc, char* argv[] )
 
     const std::string disc_methods[3]        = { "cgll", "fv", "pcloud" };
     const std::string dof_tag_names[3]       = { "GLOBAL_DOFS", "GLOBAL_ID", "GLOBAL_ID" };
-    const std::string weights_identifiers[3] = { "scalar", "scalar_pointcloud", "scalar_conservative" };
+    const std::string weights_identifiers[4] = { "scalar", "scalar_pointcloud", "scalar_conservative", "noname_failed_test" };
 
     const std::string bottomTempField            = "a2oTbot";
     const std::string bottomTempFieldATM         = "a2oTbotATM";
@@ -365,6 +365,12 @@ int main( int argc, char* argv[] )
     ierr = iMOAB_ApplyScalarProjectionWeights( lndatmPID, weights_identifiers[1].c_str(),
                                                bottomTempProjectedField.c_str(), bottomTempFieldATM.c_str() );
     CHECKIERR( ierr, "failed to apply projection weights for LND-ATM scalar field" );
+
+    /* We expect the next test to deliberately fail since there should not be an identifier specified */
+    ierr = iMOAB_ApplyScalarProjectionWeights( lndatmPID, weights_identifiers[3].c_str(),
+                                               bottomTempProjectedField.c_str(), bottomTempFieldATM.c_str() );
+    CHECKIERR( ierr!=moab::MB_INDEX_OUT_OF_RANGE, "failed to fail applying projection weights for LND-ATM scalar field" );
+
 #endif
     /*
      * the file can be written in parallel, and it will contain additional tags defined by the user

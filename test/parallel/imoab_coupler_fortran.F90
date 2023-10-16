@@ -38,7 +38,6 @@ program imoab_coupler_fortran
    integer :: jgroup   ! group for global comm
    character(:), allocatable :: atmFileName
    character(:), allocatable :: ocnFileName
-   character(:), allocatable :: baselineFileName
    character(:), allocatable :: readopts, fileWriteOptions
    character :: appname*128
    character(:), allocatable :: weights_identifier1
@@ -61,12 +60,12 @@ program imoab_coupler_fortran
    integer, dimension (2) :: tagTypes!  { DENSE_DOUBLE, DENSE_DOUBLE }
    integer :: atmCompNDoFs ! = disc_orders[0] * disc_orders[0],
    integer :: ocnCompNDoFs !  = 1 /*FV*/
-   character(:), allocatable :: bottomFields, bottomProjectedFields
+   character(:), allocatable :: bottomFields
    integer, dimension(3) ::  nverts, nelem, nblocks, nsbc, ndbc
    double precision, allocatable :: vals(:) ! to set the double values to 0
    integer :: i ! for loops
    integer :: storLeng, eetype ! for tags defs
-   character(:), allocatable :: concat_fieldname, concat_fieldnameT, outputFileOcn
+   character(:), allocatable :: concat_fieldname, outputFileOcn
    integer :: tagIndexIn2 ! not really needed
    integer :: dummyCpl, dummyRC, dummyType
    real*8  :: boxeps
@@ -92,15 +91,8 @@ program imoab_coupler_fortran
    call errorout(ierr, 'fail to get joint group')
    ! readopts( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS" )
    ! readoptsLnd( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION" )
-   atmFileName = &
-     MOAB_MESH_DIR &
-     //'unittest/wholeATM_T.h5m'//C_NULL_CHAR
-   ocnFileName = &
-     MOAB_MESH_DIR &
-     //'unittest/recMeshOcn.h5m'//C_NULL_CHAR
-   baselineFileName = &
-     MOAB_MESH_DIR &
-     //'unittest/baseline1.txt'//C_NULL_CHAR
+   atmFileName = "atm_c2x_01.h5m"//C_NULL_CHAR
+   ocnFileName = "recMeshOcn.h5m"//C_NULL_CHAR
 
    ! all comms span the whole world, for simplicity
    atmComm = MPI_COMM_NULL
@@ -131,7 +123,6 @@ program imoab_coupler_fortran
       print *, ' number of tasks: ', num_procs
       print *, ' Atm file: ', atmFileName
       print *, ' Ocn file: ', ocnFileName
-      print *, ' baseline file: ', baselineFileName
       print *, ' using partitioner: ', partScheme
    end if
 
@@ -206,11 +197,11 @@ program imoab_coupler_fortran
    end if
 
    weights_identifier1 = 'scalar'//C_NULL_CHAR
-   disc_methods1 = 'cgll'//C_NULL_CHAR
+   disc_methods1 = 'fv'//C_NULL_CHAR
    disc_methods2 = 'fv'//C_NULL_CHAR
-   disc_orders1 = 4
+   disc_orders1 = 1
    disc_orders2 = 1
-   dof_tag_names1 = 'GLOBAL_DOFS'//C_NULL_CHAR
+   dof_tag_names1 = 'GLOBAL_ID'//C_NULL_CHAR
    dof_tag_names2 = 'GLOBAL_ID'//C_NULL_CHAR
    ! fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 1, fNoConserve = 0, fNoBubble = 1
    fNoBubble = 1
@@ -224,29 +215,22 @@ program imoab_coupler_fortran
 
       ierr = iMOAB_ComputeScalarProjectionWeights( &
              cplAtmOcnPID, weights_identifier1, disc_methods1, disc_orders1, &
-             disc_methods2, disc_orders2, ""//C_NULL_CHAR, fNoBubble, fMonotoneTypeID, fVolumetric, &
+             disc_methods2, disc_orders2, "bilin"//C_NULL_CHAR, fNoBubble, fMonotoneTypeID, fVolumetric, &
              fInverseDistanceMap, fNoConserve, &
              fValidate, dof_tag_names1, dof_tag_names2)
       call errorout(ierr, 'cannot compute scalar projection weights')
 
-      ierr = iMOAB_ComputeScalarProjectionWeights( &
-             cplAtmOcnPID, "bilinear"//C_NULL_CHAR, "fv"//C_NULL_CHAR, 1, &
-             "fv"//C_NULL_CHAR, 1, "bilin"//C_NULL_CHAR, fNoBubble, fMonotoneTypeID, fVolumetric, &
-             fInverseDistanceMap, fNoConserve, &
-             fValidate, "GLOBAL_ID"//C_NULL_CHAR, "GLOBAL_ID"//C_NULL_CHAR)
-      call errorout(ierr, 'cannot compute scalar projection weights')
-
 #ifdef MOAB_HAVE_NETCDF
       atmocn_map_file_name = 'atm_ocn_map_f.nc'//C_NULL_CHAR
-      ierr = iMOAB_WriteMappingWeightsToFile( cplAtmOcnPID, weights_identifier1, atmocn_map_file_name)
-      call errorout(ierr, 'failed to write map file to disk')
+      !ierr = iMOAB_WriteMappingWeightsToFile( cplAtmOcnPID, weights_identifier1, atmocn_map_file_name)
+      !call errorout(ierr, 'failed to write map file to disk')
       intx_from_file_identifier = 'map-from-file'//C_NULL_CHAR
       dummyCpl = -1
       dummyRC = -1
       dummyType = 0
-      ierr = iMOAB_LoadMappingWeightsFromFile( cplAtmOcnPID, dummyCpl, dummyRC, dummyType, &
-         intx_from_file_identifier, atmocn_map_file_name)
-      call errorout(ierr, 'failed to load map file from disk')
+      !ierr = iMOAB_LoadMappingWeightsFromFile( cplAtmOcnPID, dummyCpl, dummyRC, dummyType, &
+      !   intx_from_file_identifier, atmocn_map_file_name)
+      !call errorout(ierr, 'failed to load map file from disk')
 #endif
    end if
 
@@ -256,14 +240,13 @@ program imoab_coupler_fortran
    atmCompNDoFs = disc_orders1*disc_orders1
    ocnCompNDoFs = 1 ! /*FV*/
 
-   bottomFields = 'a2oTbot:a2oUbot:a2oVbot'//C_NULL_CHAR
-   bottomProjectedFields = 'a2oTbot_proj:a2oUbot_proj:a2oVbot_proj'//C_NULL_CHAR
+   bottomFields = 'Sa_z:Sa_topo:Sa_u:Sa_v:Sa_tbot:Sa_ptem:Sa_shum:Sa_pbot:Sa_dens:Sa_uovern:Sa_pslv:Sa_co2prog:Sa_co2diag:norm8wt'//C_NULL_CHAR
 
    if (cplComm .NE. MPI_COMM_NULL) then
       ierr = iMOAB_DefineTagStorage(cplAtmPID, bottomFields, tagTypes(1), atmCompNDoFs, tagIndex(1))
-      call errorout(ierr, 'failed to define the field tags a2oTbot:a2oUbot:a2oVbot ')
-      ierr = iMOAB_DefineTagStorage(cplOcnPID, bottomProjectedFields, tagTypes(2), ocnCompNDoFs, tagIndex(2))
-      call errorout(ierr, 'failed to define the field tags a2oTbot_proj:a2oUbot_proj:a2oVbot_proj')
+      call errorout(ierr, 'failed to define the field tags Sa_tbot:Sa_u:Sa_v ')
+      ierr = iMOAB_DefineTagStorage(cplOcnPID, bottomFields, tagTypes(2), ocnCompNDoFs, tagIndex(2))
+      call errorout(ierr, 'failed to define the field tags Sa_tbot_proj:Sa_u_proj:Sa_v_proj')
    end if
 
    ! make the tag 0, to check we are actually sending needed data
@@ -281,19 +264,18 @@ program imoab_coupler_fortran
       allocate (vals(storLeng))
       eetype = 1 ! double type
 
-      do i = 1, storLeng
-         vals(:) = 0.
-      end do
+      !do i = 1, storLeng
+      !   vals(:) = 0
+      !end do
 
       ! set the tag values to 0.0
-      ierr = iMOAB_SetDoubleTagStorage(cplAtmPID, bottomFields, storLeng, eetype, vals)
-      call errorout(ierr, 'cannot make tag nul')
+      !ierr = iMOAB_SetDoubleTagStorage(cplAtmPID, bottomFields, storLeng, eetype, vals)
+      !call errorout(ierr, 'cannot make tag nul')
 
    end if
 
    ! Define the field variables to project
-   concat_fieldname = 'a2oTbot:a2oUbot:a2oVbot'//C_NULL_CHAR
-   concat_fieldnameT = 'a2oTbot_proj:a2oUbot_proj:a2oVbot_proj'//C_NULL_CHAR
+   concat_fieldname = 'Sa_z:Sa_topo:Sa_u:Sa_v:Sa_tbot:Sa_ptem:Sa_shum:Sa_pbot:Sa_dens:Sa_uovern:Sa_pslv:Sa_co2prog:Sa_co2diag:norm8wt'//C_NULL_CHAR
 
    if (atmComm .NE. MPI_COMM_NULL) then
 
@@ -317,20 +299,20 @@ program imoab_coupler_fortran
       call errorout(ierr, 'cannot free buffers used to resend atm tag towards the coverage mesh')
 
    end if
-   if (cplComm .ne. MPI_COMM_NULL) then
+   !if (cplComm .ne. MPI_COMM_NULL) then
 
-      outputFileOcn = "AtmOnCplF.h5m"//C_NULL_CHAR
-      fileWriteOptions = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
-      ierr = iMOAB_WriteMesh(cplAtmPID, outputFileOcn, fileWriteOptions)
-      call errorout(ierr, 'could not write AtmOnCpl.h5m to disk')
+   !   outputFileOcn = "AtmOnCplF.h5m"//C_NULL_CHAR
+   !   fileWriteOptions = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
+   !   ierr = iMOAB_WriteMesh(cplAtmPID, outputFileOcn, fileWriteOptions)
+   !   call errorout(ierr, 'could not write AtmOnCpl.h5m to disk')
 
-   end if
+   !end if
    if (cplComm .ne. MPI_COMM_NULL) then
 
       ! We have the remapping weights now. Let us apply the weights onto the tag we defined
       ! on the source mesh and get the projection on the target mesh
       ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, weights_identifier1, concat_fieldname, &
-                                                concat_fieldnameT)
+                                                concat_fieldname)
       call errorout(ierr, 'failed to compute projection weight application')
 
       outputFileOcn = "OcnOnCplF.h5m"//C_NULL_CHAR
@@ -343,8 +325,8 @@ program imoab_coupler_fortran
    ! first makje sure the tags are defined, otherwise they cannot be received
    if (ocnComm .ne. MPI_COMM_NULL) then
 
-      ierr = iMOAB_DefineTagStorage(cmpOcnPID, bottomProjectedFields, tagTypes(2), ocnCompNDoFs, tagIndexIn2)
-      call errorout(ierr, 'failed to define the field tag for receiving back the tag a2oTbot_proj,  on ocn pes')
+      ierr = iMOAB_DefineTagStorage(cmpOcnPID, bottomFields, tagTypes(2), ocnCompNDoFs, tagIndexIn2)
+      call errorout(ierr, 'failed to define the field tag for receiving back the tag Sa_tbot_proj,  on ocn pes')
 
    end if
 
@@ -354,13 +336,13 @@ program imoab_coupler_fortran
    !  original graph (context is -1_
    if (cplComm .ne. MPI_COMM_NULL) then
       context_id = cmpocn
-      ierr = iMOAB_SendElementTag(cplOcnPID, concat_fieldnameT, ocnCouComm, context_id)
+      ierr = iMOAB_SendElementTag(cplOcnPID, concat_fieldname, ocnCouComm, context_id)
       call errorout(ierr, 'cannot send tag values back to ocean pes')
    end if
 
    if (ocnComm .ne. MPI_COMM_NULL) then
       context_id = cplocn
-      ierr = iMOAB_ReceiveElementTag(cmpOcnPID, concat_fieldnameT, ocnCouComm, context_id)
+      ierr = iMOAB_ReceiveElementTag(cmpOcnPID, concat_fieldname, ocnCouComm, context_id)
       call errorout(ierr, 'cannot receive tag values from ocean mesh on coupler pes')
    end if
 
@@ -377,8 +359,8 @@ program imoab_coupler_fortran
       if (my_id .eq. 0) then
          print *, ' Writing ocean mesh file with projected solution to disk: ', outputFileOcn
       end if
-      ierr = iMOAB_WriteMesh(cmpOcnPID, outputFileOcn, fileWriteOptions)
-      call errorout(ierr, 'could not write OcnWithProjF.h5m to disk')
+      !ierr = iMOAB_WriteMesh(cmpOcnPID, outputFileOcn, fileWriteOptions)
+      !call errorout(ierr, 'could not write OcnWithProjF.h5m to disk')
 
    end if
 

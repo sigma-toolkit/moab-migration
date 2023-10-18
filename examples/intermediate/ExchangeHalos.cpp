@@ -371,6 +371,14 @@ int main( int argc, char** argv )
             runchk( context.load_file(), "MOAB::load_file failed for filename: " << context.input_filename );
         }
         context.timer_pop();
+        if( context.debug_output )
+        {
+            dbgprint( "> Writing out the initial mesh. File = " << "initial_mesh.h5m" );
+            string write_options = ( context.num_procs > 1 ? "PARALLEL=WRITE_PART;DEBUG_IO=0;" : "" );
+            // Write out file to visualize initial partitioning
+            runchk( context.moab_interface->write_file( "initial_mesh.h5m" , "H5M", write_options.c_str() ),
+                    "File write failed" );
+        }
         elapsed_times[0] = context.last_elapsed();
 
         dbgprint( "\n- Starting execution -\n" );
@@ -389,6 +397,14 @@ int main( int argc, char** argv )
                         ghost_dimension, bridge_dimension, context.ghost_layers, 0, true /* store_remote_handles */,
                         true /* wait_all */, &context.fileset ),
                     "Exchange ghost cells failed" );  // true to store remote handles
+        }
+        if( context.debug_output )
+        {
+            dbgprint( "> Writing out the mesh after ghost exchange File = " << "ghosted_mesh.h5m" );
+            string write_options = ( context.num_procs > 1 ? "PARALLEL=WRITE_PART;DEBUG_IO=0;" : "" );
+            // Write out ghosted mesh
+            runchk( context.moab_interface->write_file( "ghosted_mesh.h5m" , "H5M", write_options.c_str() ),
+                    "File write failed" );
         }
         context.timer_pop();
         elapsed_times[1] = context.last_elapsed();

@@ -183,9 +183,7 @@ class TempestRemapper : public Remapper
     /// <summary>
     ///     Set the mesh type corresponding to the intersection context
     /// </summary>
-    void SetMeshType( Remapper::IntersectionContext ctx,
-                      TempestMeshType type,
-                      const std::vector< int >* metadata = nullptr );
+    void SetMeshType( Remapper::IntersectionContext ctx, const std::vector< int >& metadata );
 
     /// <summary>
     ///     Get the mesh type corresponding to the intersection context
@@ -489,32 +487,40 @@ inline const moab::Range& TempestRemapper::GetMeshVertices( Remapper::Intersecti
     }
 }
 
-inline void TempestRemapper::SetMeshType( Remapper::IntersectionContext ctx,
-                                          TempestRemapper::TempestMeshType type,
-                                          const std::vector< int >* metadata )
+inline void TempestRemapper::SetMeshType( Remapper::IntersectionContext ctx, const std::vector< int >& metadata )
 {
     switch( ctx )
     {
         case Remapper::SourceMesh:
-            m_source_type = type;
-            if( metadata )
+            m_source_type = static_cast< moab::TempestRemapper::TempestMeshType >( metadata[0] );
+            if( metadata[0] == 1 )  // RLL mesh
             {
-                m_source_metadata.resize( metadata->size() );
-                std::copy( metadata->begin(), metadata->end(), m_source_metadata.begin() );
+                m_source_metadata.resize( 2 );
+                m_source_metadata[0] = metadata[1];
+                m_source_metadata[1] = metadata[2];
+            }
+            else
+            {
+                m_source_metadata.resize( 1 );
+                m_source_metadata[0] = metadata[1];
             }
             break;
         case Remapper::TargetMesh:
-            m_target_type = type;
-            if( metadata )
+            m_target_type = static_cast< moab::TempestRemapper::TempestMeshType >( metadata[0] );
+            if( metadata[0] == 1 )  // RLL mesh
             {
-                m_target_metadata.resize( metadata->size() );
-                std::copy( metadata->begin(), metadata->end(), m_target_metadata.begin() );
+                m_target_metadata.resize( 2 );
+                m_target_metadata[0] = metadata[1];
+                m_target_metadata[1] = metadata[2];
+            }
+            else
+            {
+                m_target_metadata.resize( 1 );
+                m_target_metadata[0] = metadata[1];
             }
             break;
         case Remapper::OverlapMesh:
-            m_overlap_type = type;
-            break;
-        case Remapper::DEFAULT:
+            m_overlap_type = moab::TempestRemapper::OVERLAP_FILES;
         default:
             break;
     }

@@ -81,18 +81,7 @@ class Remapper
                               const char* readopts = 0 )
     {
 #ifdef MOAB_HAVE_MPI
-        size_t lastindex      = filename.find_last_of( "." );
-        std::string extension = filename.substr( lastindex + 1, filename.size() );
-        std::string opts      = "";
-        if( m_pcomm->size() > 1 )
-        {
-            if( extension != "h5m" )
-                opts = std::string( "PARALLEL=BCAST_DELETE;PARTITION=TRIVIAL;PARALLEL_RESOLVE_SHARED_ENTS" );
-            else
-                opts = std::string( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_"
-                                    "RESOLVE_SHARED_ENTS" );
-        }
-
+        std::string opts = "";
         if( readopts )
         {
             if( opts.size() )
@@ -115,14 +104,12 @@ class Remapper
             rectilinearTag != nullptr )
         {
             int dimSizes[3];
-            moab::EntityHandle rootset = 0;
-            rval                       = m_interface->tag_get_data( rectilinearTag, &rootset, 1,
-                                                                    dimSizes );  // MB_CHK_SET_ERR( rval, "Error geting tag data" );
+            rval = m_interface->tag_get_data( rectilinearTag, &meshset, 1,
+                                              dimSizes );  // MB_CHK_SET_ERR( rval, "Error geting tag data" );
             metadata.clear();
             metadata.push_back( dimSizes[0] );
             metadata.push_back( dimSizes[1] );
             metadata.push_back( dimSizes[2] );
-            // printf( "Mesh metadata: %d, %d, %d\n", metadata[0], metadata[1], metadata[2] );
         }
 
         return MB_SUCCESS;

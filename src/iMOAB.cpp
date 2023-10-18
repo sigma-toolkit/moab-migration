@@ -95,6 +95,7 @@ struct appData
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
     TempestMapAppData tempestData;
+    std::map< std::string, std::string > metadataMap;
 #endif
 };
 
@@ -3608,8 +3609,38 @@ ErrCode iMOAB_WriteMappingWeightsToFile(
 
     std::string filename = std::string( remap_weights_filename );
 
+    std::string metadataStr = data_intx.metadataMap[std::string( solution_weights_identifier )];
+    std::map<std::string, std::string> attrMap;
+    attrMap["title"] = "MOAB-TempestRemap Online Regridding Weight Generator";
+    attrMap["normalization"] = "ovarea";
+    // attrMap["domain_a"] = srcMeshName;
+    // attrMap["domain_b"] = tgtMeshName;
+    // attrMap["domain_aUb"] = intxFilename;
+    attrMap["map_aPb"] = filename;
+
+    const std::string delim = ";";
+    size_t pos = 0;
+    std::vector<std::string> stringAttr;
+    // use find() function to get the position of the delimiters
+    while (( pos = metadataStr.find (delim)) != std::string::npos)
+    {
+      std::string token1 = metadataStr.substr(0, pos); // store the substring
+      stringAttr.push_back(token1);
+      metadataStr.erase(0, pos + delim.length());  /* erase() function store the current positon and move to next token. */
+    }
+    stringAttr.push_back(metadataStr); // it print last token of the string.
+    assert(stringAttr.size() == 3);
+    attrMap["remap_options"] = stringAttr[0];
+    attrMap["methodorder_b"] = stringAttr[1];
+    attrMap["methodorder_a"] = stringAttr[2];
+    attrMap["concave_a"] = "false";  // defaults
+    attrMap["concave_b"] = "false";  // defaults
+    attrMap["bubble"] = "true";     // defaults
+    attrMap["MOABversion"] = std::string(MOAB_VERSION);
+    // attrMap["history"] = historyStr;
+ 
     // Write the map file to disk in parallel using either HDF5 or SCRIP interface
-    rval = weightMap->WriteParallelMap( filename );MB_CHK_ERR( rval );
+    rval = weightMap->WriteParallelMap( filename, attrMap );MB_CHK_ERR( rval );
 
     return moab::MB_SUCCESS;
 }
@@ -4337,6 +4368,12 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
     mapOptions.fNoCheck        = !( fValidate ? *fValidate : true );
     if( fVolumetric && *fVolumetric ) mapOptions.strMethod += "volumetric;";
     if( fInverseDistanceMap && *fInverseDistanceMap ) mapOptions.strMethod += "invdist;";
+
+    std::string metadataStr = mapOptions.strMethod + ";" + 
+                              std::string( disc_method_source ) + ":" + std::to_string(*disc_order_source) + ":" + std::string( source_solution_tag_dof_name ) + ";" + 
+                              std::string( disc_method_target ) + ":" + std::to_string(*disc_order_target) + ":" + std::string( target_solution_tag_dof_name );
+
+    data_intx.metadataMap[std::string( solution_weights_identifier )] = metadataStr;
 
     // Now let us compute the local-global mapping and store it in the context
     // We need this mapping when computing matvec products and to do reductions in parallel

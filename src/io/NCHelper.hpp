@@ -31,6 +31,12 @@ class NCHelper
     }
     virtual ~NCHelper() {}
 
+    //! Get appropriate format to read the file
+    static ReadNC::NCFormatType get_nc_format( ReadNC* readNC, int fileId );
+
+    //! Get appropriate format to read the file
+    static std::string get_default_ncformat_options( ReadNC::NCFormatType format );
+
     //! Get appropriate helper instance for ReadNC class
     static NCHelper* get_nc_helper( ReadNC* readNC, int fileId, const FileOptions& opts, EntityHandle fileSet );
 

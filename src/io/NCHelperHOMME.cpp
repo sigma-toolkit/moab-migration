@@ -819,12 +819,12 @@ ErrorCode NCHelperHOMME::read_ucd_variables_to_nonset( std::vector< ReadNC::VarD
                     // basically, we have to give a different point
                     // for data to start, for every subrange :(
                     size_t indexInDoubleArray = 0;
-                    size_t ic = 0;
+                    size_t ic                 = 0;
                     for( Range::pair_iterator pair_iter = localGidVerts.pair_begin();
                          pair_iter != localGidVerts.pair_end(); ++pair_iter, ic++ )
                     {
-                        EntityHandle starth = pair_iter->first;
-                        EntityHandle endh = pair_iter->second;  // Inclusive
+                        EntityHandle starth     = pair_iter->first;
+                        EntityHandle endh       = pair_iter->second;  // Inclusive
                         vdatas[i].readStarts[2] = (NCDF_SIZE)( starth - 1 );
                         vdatas[i].readCounts[2] = (NCDF_SIZE)( endh - starth + 1 );
 

@@ -95,7 +95,8 @@ class TempestOnlineMap : public OfflineMap
     ///	<summary>
     ///		Write the TempestOnlineMap to a parallel NetCDF file.
     ///	</summary>
-    moab::ErrorCode WriteParallelMap( const std::string& strTarget );
+    moab::ErrorCode WriteParallelMap( const std::string& strTarget,
+                                      const std::map< std::string, std::string >& attrMap );
 
     ///	<summary>
     ///		Determine if the map is first-order accurate.
@@ -210,7 +211,8 @@ class TempestOnlineMap : public OfflineMap
     ///	<summary>
     ///		Parallel I/O with HDF5 to write out the remapping weights from multiple processors.
     ///	</summary>
-    moab::ErrorCode WriteSCRIPMapFile( const std::string& strOutputFile );
+    moab::ErrorCode WriteSCRIPMapFile( const std::string& strOutputFile,
+                                       const std::map< std::string, std::string >& attrMap );
 
     ///	<summary>
     ///		Parallel I/O with NetCDF to write out the SCRIP file from multiple processors.

@@ -387,16 +387,19 @@ int main( int argc, char** argv )
         {
             // Ensure that all processes understand about multi-shared vertices and entities
             // in case some adjacent parts are only m layers thick (where m < context.ghost_layers)
-            runchk( context.parallel_communicator->correct_thin_ghost_layers(), "Thin layer correction failed" );
-
-            // Exchange ghost cells
             int ghost_dimension  = context.dimension;
             int bridge_dimension = context.dimension - 1;
+	    for (int gl = 1; gl <= context.ghost_layers; gl++)
+	    {
+
+            // Exchange ghost cells
             // Let us now get all ghost layers from adjacent parts
-            runchk( context.parallel_communicator->exchange_ghost_cells(
-                        ghost_dimension, bridge_dimension, context.ghost_layers, 0, true /* store_remote_handles */,
+               runchk( context.parallel_communicator->exchange_ghost_cells(
+                        ghost_dimension, bridge_dimension, gl, 0, true /* store_remote_handles */,
                         true /* wait_all */, &context.fileset ),
                     "Exchange ghost cells failed" );  // true to store remote handles
+               runchk( context.parallel_communicator->correct_thin_ghost_layers(), "Thin layer correction failed" );
+	    }
         }
         if( context.debug_output )
         {

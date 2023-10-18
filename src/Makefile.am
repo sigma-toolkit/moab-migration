@@ -294,10 +294,17 @@ intxmeshinclude_HEADERS = \
 if ENABLE_FORTRAN
 libMOAB_la_SOURCES += iMOABF.F90
 imoabincludedir = $(includedir)
-nodist_imoabinclude_HEADERS = imoab.mod
 
-imoab.mod: moab/iMOAB.h iMOABF.F90
-iMOAB.o: imoab.mod
+if HAVE_LCASE_FCMOD
+nodist_imoabinclude_HEADERS = imoab.$(FCMODEXT)
+imoab.$(FCMODEXT): moab/iMOAB.h iMOABF.F90
+iMOAB.o: imoab.$(FCMODEXT)
+else
+nodist_imoabinclude_HEADERS = IMOAB.$(FCMODEXT)
+IMOAB.$(FCMODEXT): moab/iMOAB.h iMOABF.F90
+iMOAB.o: IMOAB.$(FCMODEXT)
+endif
+
 endif # ENABLE_FORTRAN
 
 if ENABLE_mbtempest

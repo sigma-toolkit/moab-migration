@@ -3613,9 +3613,6 @@ ErrCode iMOAB_WriteMappingWeightsToFile(
     std::map<std::string, std::string> attrMap;
     attrMap["title"] = "MOAB-TempestRemap Online Regridding Weight Generator";
     attrMap["normalization"] = "ovarea";
-    // attrMap["domain_a"] = srcMeshName;
-    // attrMap["domain_b"] = tgtMeshName;
-    // attrMap["domain_aUb"] = intxFilename;
     attrMap["map_aPb"] = filename;
 
     const std::string delim = ";";
@@ -3625,7 +3622,8 @@ ErrCode iMOAB_WriteMappingWeightsToFile(
     while (( pos = metadataStr.find (delim)) != std::string::npos)
     {
       std::string token1 = metadataStr.substr(0, pos); // store the substring
-      stringAttr.push_back(token1);
+      if ( token1.size() > 0 )
+          stringAttr.push_back(token1);
       metadataStr.erase(0, pos + delim.length());  /* erase() function store the current positon and move to next token. */
     }
     stringAttr.push_back(metadataStr); // it print last token of the string.
@@ -3637,7 +3635,6 @@ ErrCode iMOAB_WriteMappingWeightsToFile(
     attrMap["concave_b"] = "false";  // defaults
     attrMap["bubble"] = "true";     // defaults
     attrMap["MOABversion"] = std::string(MOAB_VERSION);
-    // attrMap["history"] = historyStr;
  
     // Write the map file to disk in parallel using either HDF5 or SCRIP interface
     rval = weightMap->WriteParallelMap( filename, attrMap );MB_CHK_ERR( rval );

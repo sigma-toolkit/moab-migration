@@ -60,7 +60,8 @@ jobs:
         lcov -r coverage.info "`pwd`/test/*.*" -o coverage_sk.info
         curl -fLso codecov https://codecov.io/bash
         chmod +x codecov
-        ./codecov -t CODECOV_TOKEN
+        ./codecov -t "f9031728-4456-4464-b9e6-e240ab823fec"
+        # ./codecov -t CODECOV_TOKEN
   dockerbuild:
     docker:
       # replace with your preferred image

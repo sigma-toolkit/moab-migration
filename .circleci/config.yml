@@ -57,6 +57,12 @@ jobs:
         make all -j4
         make check -j4 -k
     - codecov/upload
+    - run: |
+        lcov -c -d . -o coverage.info --no-external
+        lcov -r coverage.info "`pwd`/test/*.*" -o coverage_sk.info
+        curl -fLso codecov https://codecov.io/bash
+        chmod +x codecov
+        ./codecov -t CODECOV_TOKEN
   dockerbuild:
     docker:
       # replace with your preferred image

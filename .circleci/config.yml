@@ -80,7 +80,12 @@ workflows:
       - build
   coverage_build:
     jobs:
-      - coverage-job
+      - coverage-job:
+        filters:
+            branches:
+              only:
+                - master
+                - develop
   docker_build:
     jobs:
       # - dockerbuild

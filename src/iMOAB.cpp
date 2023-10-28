@@ -3616,18 +3616,18 @@ ErrCode iMOAB_WriteMappingWeightsToFile(
     attrMap["map_aPb"] = filename;
 
     const std::string delim = ";";
-    size_t pos = 0;
-    std::vector<std::string> stringAttr;
+    size_t pos = 0, index = 0;
+    std::vector<std::string> stringAttr(3);
     // use find() function to get the position of the delimiters
     while (( pos = metadataStr.find (delim)) != std::string::npos)
     {
       std::string token1 = metadataStr.substr(0, pos); // store the substring
-      if ( token1.size() > 0 )
-          stringAttr.push_back(token1);
+      if ( token1.size() > 0 || index == 0 )
+          stringAttr[index++] = token1;
       metadataStr.erase(0, pos + delim.length());  /* erase() function store the current positon and move to next token. */
     }
-    stringAttr.push_back(metadataStr); // it print last token of the string.
-    assert(stringAttr.size() == 3);
+    stringAttr[index] = metadataStr; // store the last token of the string.
+    assert(index == 2);
     attrMap["remap_options"] = stringAttr[0];
     attrMap["methodorder_b"] = stringAttr[1];
     attrMap["methodorder_a"] = stringAttr[2];

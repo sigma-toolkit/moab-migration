@@ -91,8 +91,8 @@ struct RuntimeContext
     double last_counter{ 0.0 };   /// last time counter between push/pop timer
 
     // MOAB objects
-    moab::Interface* moab_interface{ nullptr };
-    moab::ParallelComm* parallel_communicator{ nullptr };
+    moab::Core moab_interface;
+    moab::ParallelComm* parallel_communicator;
     moab::EntityHandle fileset{ 0 }, partnset{ 0 };
 
     /// @brief Constructor: allocate MOAB interface and communicator, and initialize
@@ -109,7 +109,7 @@ struct RuntimeContext
 
     /// @brief Measure and start the timer to profile a task
     /// @param operation String name of the task being measured
-    inline void timer_push( std::string operation );
+    inline void timer_push( std::string& operation );
 
     /// @brief Stop the timer and store the elapsed duration
     /// @param nruns Optional argument used to average the measured time
@@ -131,7 +131,7 @@ struct RuntimeContext
     /// @param tagVector Tag reference to the vector field
     /// @param entities Entities on which both the scalar and vector fields are defined
     /// @return Error code if any (else MB_SUCCESS)
-    moab::ErrorCode create_sv_tags( moab::Tag& tagScalar, moab::Tag& tagVector, moab::Range& entities ) const;
+    moab::ErrorCode create_sv_tags( moab::Tag& tagScalar, moab::Tag& tagVector, moab::Range& entities );
 
     /// @brief Evaluate some closed-form Spherical Harmonic functions with an optional multiplier term
     /// @param lon Longitude in lat-lon space
@@ -234,7 +234,7 @@ int main( int argc, char** argv )
         Range dimEnts;
         {
             // Get all entities of dimension = dim
-            runchk( context.moab_interface->get_entities_by_dimension( context.fileset, context.dimension, dimEnts ),
+            runchk( context.moab_interface.get_entities_by_dimension( context.fileset, context.dimension, dimEnts ),
                     "Getting 2D entities failed" );
             // Get only owned entities! The ghosted/shared entities will get their data when we exchange
             // So let us filter entities based on the status: NOT x NOT_OWNED = OWNED status :-)
@@ -264,7 +264,7 @@ int main( int argc, char** argv )
         if( context.debug_output && ( context.proc_id == 0 ) )  // only on root process, for debugging
         {
             dbgprint( "> Writing to file *before* ghost exchange " );
-            runchk( context.moab_interface->write_file( "exchangeHalos_output_rank0_pre.h5m", "H5M", "" ),
+            runchk( context.moab_interface.write_file( "exchangeHalos_output_rank0_pre.h5m", "H5M", "" ),
                     "Writing to disk failed" );
         }
 
@@ -295,7 +295,7 @@ int main( int argc, char** argv )
         if( context.debug_output && ( context.proc_id == 0 ) )  // only on root process, for debugging
         {
             dbgprint( "> Writing to file *after* ghost exchange " );
-            runchk( context.moab_interface->write_file( "exchangeHalos_output_rank0_post.h5m", "H5M", "" ),
+            runchk( context.moab_interface.write_file( "exchangeHalos_output_rank0_post.h5m", "H5M", "" ),
                     "Writing to disk failed" );
         }
 
@@ -305,7 +305,7 @@ int main( int argc, char** argv )
             dbgprint( "> Writing out the final mesh and data in MOAB h5m format. File = " << context.output_filename );
             string write_options = ( context.num_procs > 1 ? "PARALLEL=WRITE_PART;DEBUG_IO=0;" : "" );
             // Write out to output file to visualize reduction/exchange of tag data
-            runchk( context.moab_interface->write_file( context.output_filename.c_str(), "H5M", write_options.c_str() ),
+            runchk( context.moab_interface.write_file( context.output_filename.c_str(), "H5M", write_options.c_str() ),
                     "File write failed" );
         }
 
@@ -333,16 +333,12 @@ RuntimeContext::RuntimeContext( MPI_Comm comm )
       output_filename( "exchangeHalos_output.h5m" ), scalar_tagname( "scalar_variable" ),
       vector_tagname( "vector_variable" )
 {
-    // Create the moab instance
-    moab_interface = new( std::nothrow ) moab::Core;
-    if( NULL == moab_interface ) exit( 1 );
-
     // Create sets for the mesh and partition.  Then pass these to the load_file functions to populate the mesh.
-    runchk_cont( moab_interface->create_meshset( moab::MESHSET_SET, fileset ), "Creating root set failed" );
-    runchk_cont( moab_interface->create_meshset( moab::MESHSET_SET, partnset ), "Creating partition set failed" );
+    runchk_cont( moab_interface.create_meshset( moab::MESHSET_SET, fileset ), "Creating root set failed" );
+    runchk_cont( moab_interface.create_meshset( moab::MESHSET_SET, partnset ), "Creating partition set failed" );
 
     // Create the parallel communicator object with the partition handle associated with MOAB
-    parallel_communicator = moab::ParallelComm::get_pcomm( moab_interface, partnset, &comm );
+    parallel_communicator = moab::ParallelComm::get_pcomm( &moab_interface, partnset, &comm );
 
     proc_id   = parallel_communicator->rank();
     num_procs = parallel_communicator->size();
@@ -351,7 +347,6 @@ RuntimeContext::RuntimeContext( MPI_Comm comm )
 RuntimeContext::~RuntimeContext()
 {
     delete parallel_communicator;
-    delete moab_interface;
 }
 
 void RuntimeContext::ParseCLOptions( int argc, char* argv[] )
@@ -377,7 +372,7 @@ void RuntimeContext::ParseCLOptions( int argc, char* argv[] )
     opts.parseCommandLine( argc, argv );
 }
 
-void RuntimeContext::timer_push( std::string operation )
+void RuntimeContext::timer_push( std::string& operation )
 {
     mTimerOps = mTimer.time_since_birth();
     mOpName   = operation;
@@ -410,9 +405,7 @@ double RuntimeContext::last_elapsed() const
     return last_counter;
 }
 
-moab::ErrorCode RuntimeContext::create_sv_tags( moab::Tag& tagScalar,
-                                                moab::Tag& tagVector,
-                                                moab::Range& entities ) const
+moab::ErrorCode RuntimeContext::create_sv_tags( moab::Tag& tagScalar, moab::Tag& tagVector, moab::Range& entities )
 {
     // Get element (centroid) coordinates so that we can evaluate some arbitrary data
     std::vector< double > entCoords = compute_centroids( entities );  // [entities * [lon, lat]]
@@ -422,8 +415,8 @@ moab::ErrorCode RuntimeContext::create_sv_tags( moab::Tag& tagScalar,
     bool createdTScalar = false;
     // Get or create the scalar tag: default name = "scalar_variable"
     // Type: double, Components: 1, Layout: Dense (all entities potentially), Default: -1.0
-    runchk( moab_interface->tag_get_handle( scalar_tagname.c_str(), 1, moab::MB_TYPE_DOUBLE, tagScalar,
-                                            moab::MB_TAG_CREAT | moab::MB_TAG_DENSE, &defSTagValue, &createdTScalar ),
+    runchk( moab_interface.tag_get_handle( scalar_tagname.c_str(), 1, moab::MB_TYPE_DOUBLE, tagScalar,
+                                           moab::MB_TAG_CREAT | moab::MB_TAG_DENSE, &defSTagValue, &createdTScalar ),
             "Retrieving scalar tag handle failed" );
 
     // we expect to create a new tag -- fail if Tag already exists since we do not want to overwrite data
@@ -437,7 +430,7 @@ moab::ErrorCode RuntimeContext::create_sv_tags( moab::Tag& tagScalar,
             return evaluate_function( entCoords[offset], entCoords[offset + 1] );
         } );
         // Set local scalar tag data for exchange
-        runchk( moab_interface->tag_set_data( tagScalar, entities, tagValues.data() ),
+        runchk( moab_interface.tag_set_data( tagScalar, entities, tagValues.data() ),
                 "Setting scalar tag data failed" );
     }
 
@@ -446,9 +439,9 @@ moab::ErrorCode RuntimeContext::create_sv_tags( moab::Tag& tagScalar,
     bool createdTVector = false;
     // Get or create the scalar tag: default name = "vector_variable"
     // Type: double, Components: vector_length, Layout: Dense (all entities potentially), Default: [-1.0,..]
-    runchk( moab_interface->tag_get_handle( vector_tagname.c_str(), vector_length, moab::MB_TYPE_DOUBLE, tagVector,
-                                            moab::MB_TAG_CREAT | moab::MB_TAG_DENSE, defVTagValue.data(),
-                                            &createdTVector ),
+    runchk( moab_interface.tag_get_handle( vector_tagname.c_str(), vector_length, moab::MB_TYPE_DOUBLE, tagVector,
+                                           moab::MB_TAG_CREAT | moab::MB_TAG_DENSE, defVTagValue.data(),
+                                           &createdTVector ),
             "Retrieving vector tag handle failed" );
 
     // we expect to create a new tag -- fail if Tag already exists since we do not want to overwrite data
@@ -464,7 +457,7 @@ moab::ErrorCode RuntimeContext::create_sv_tags( moab::Tag& tagScalar,
             return this->evaluate_function( entCoords[offset], entCoords[offset + 1], 2, ( index % veclength + 1.0 ) );
         } );
         // Set local tag data for exchange
-        runchk( moab_interface->tag_set_data( tagVector, entities, tagValues.data() ),
+        runchk( moab_interface.tag_set_data( tagVector, entities, tagValues.data() ),
                 "Setting vector tag data failed" );
     }
 
@@ -485,10 +478,9 @@ moab::ErrorCode RuntimeContext::load_file( bool load_ghosts )
     ///                   : c = 3 - number of ghost layers needed (3 in this case)
     std::string read_options   = "DEBUG_IO=0;";
     std::string::size_type idx = input_filename.rfind( '.' );
-    std::string extension      = "";
     if( num_procs > 1 && idx != std::string::npos )
     {
-        extension = input_filename.substr( idx + 1 );
+        std::string extension = input_filename.substr( idx + 1 );
         if( !extension.compare( "nc" ) )
             // PARTITION_METHOD= [RCBZOLTAN, TRIVIAL]
             read_options += "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;"
@@ -508,7 +500,7 @@ moab::ErrorCode RuntimeContext::load_file( bool load_ghosts )
     }
 
     // Load the file from disk with given read options in parallel and associate all entities to fileset
-    return moab_interface->load_file( input_filename.c_str(), &fileset, read_options.c_str() );
+    return moab_interface.load_file( input_filename.c_str(), &fileset, read_options.c_str() );
 }
 
 std::vector< double > RuntimeContext::compute_centroids( const moab::Range& entities ) const
@@ -519,7 +511,7 @@ std::vector< double > RuntimeContext::compute_centroids( const moab::Range& enti
     for( auto entity : entities )
     {
         // Get the element coordinates (centroid) on the real mesh
-        runchk_cont( moab_interface->get_coords( &entity, 1, node ), "Getting entity coordinates failed" );
+        runchk_cont( moab_interface.get_coords( &entity, 1, node ), "Getting entity coordinates failed" );
 
         // scale by magnitude so that element is on unit sphere
         double magnitude = std::sqrt( node[0] * node[0] + node[1] * node[1] + node[2] * node[2] );

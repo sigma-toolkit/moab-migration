@@ -109,7 +109,7 @@ struct RuntimeContext
 
     /// @brief Measure and start the timer to profile a task
     /// @param operation String name of the task being measured
-    inline void timer_push( std::string& operation );
+    inline void timer_push( const std::string& operation );
 
     /// @brief Stop the timer and store the elapsed duration
     /// @param nruns Optional argument used to average the measured time
@@ -372,7 +372,7 @@ void RuntimeContext::ParseCLOptions( int argc, char* argv[] )
     opts.parseCommandLine( argc, argv );
 }
 
-void RuntimeContext::timer_push( std::string& operation )
+void RuntimeContext::timer_push( const std::string& operation )
 {
     mTimerOps = mTimer.time_since_birth();
     mOpName   = operation;

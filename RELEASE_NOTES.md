@@ -13,6 +13,7 @@ PR #642: NCHelper - idx need to be integer
 PR #643: iMOAB - update global mesh info
 PR #646: Fix several outstanding issues with mbtempest
 PR #654: Fix a bug when metadata has an empty semicolon string
+PR #657: Assert on unknown key during iMOAB ApplyWeights
 
 ### Configuration and build
 PR #641, #651, #652: PyMOAB Updates for Cython 3.0 and other fixes
@@ -20,7 +21,6 @@ PR #647: Fix the DESTDIR propagation when installing PyMOAB
 PR #650: Changes to build on OLCF systems
 PR #656: Update CMake MPI configuration
 PR #655: CircleCI configuration updates
-
 
 ## Version 5.5
 

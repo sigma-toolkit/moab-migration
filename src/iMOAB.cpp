@@ -4403,7 +4403,9 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
     TempestMapAppData& tdata = data_intx.tempestData;
 
     // Now allocate and initialize the remapper object
-    moab::TempestRemapper* remapper   = tdata.remapper;
+    moab::TempestRemapper* remapper = tdata.remapper;
+    if( !tdata.weightMaps.count( std::string( solution_weights_identifier ) ) )  // key does not exist
+        return moab::MB_INDEX_OUT_OF_RANGE;
     moab::TempestOnlineMap* weightMap = tdata.weightMaps[std::string( solution_weights_identifier )];
 
     // we assume that there are separators ";" between the tag names

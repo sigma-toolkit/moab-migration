@@ -61,6 +61,7 @@ int main( int argc, char** argv )
     int k=0; // number of different fields
     int k1=0; // number of exactly the same fields
     std::cout << " compare files: " << file1 << " and " << file2 << " dimension entity: " << dim << "\n";
+    std::vector<std::string> same_fields;
     for (size_t i=0; i< list1.size(); i++)
     {
         Tag tag=list1[i];
@@ -92,10 +93,16 @@ int main( int argc, char** argv )
         }
 	else
         {
+	    same_fields.push_back(name);
             k1++;
         }
     }
     std::cout<<" different fields:" << k << " \n exactly the same fields:" << k1 << "\n";
+    for (size_t i=0; i<same_fields.size(); i++)
+    {
+	std::cout << " " << same_fields[i] ;
+    }
+    std::cout << "\n";
     // Cr
     delete mb;
     delete mb2;

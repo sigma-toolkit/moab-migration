@@ -282,10 +282,10 @@ dnl --------------------------------------------------------------------
 AC_DEFUN([DOWNLOAD_EXTERNAL_DATA],
 [
   PPREFIX="MOAB Data"
-  PREFIX_PRINT(Downloading data from MOAB FTP website: $1 )
+  PREFIX_PRINT(Downloading data from MOAB public archive: $1 )
   AS_MKDIR_P("$MOAB_EXTERNAL_MESHDIR/$2")
-  m4_foreach([fnamevar], [$3], [DOWNLOAD_EXTERNAL_PACKAGE([$1], [http://ftp.mcs.anl.gov/pub/fathom/MeshFiles/$2/fnamevar], [$MOAB_EXTERNAL_MESHDIR/$2/fnamevar], [], [yes])])
-  #DOWNLOAD_EXTERNAL_PACKAGE([$1-$fname], [http://ftp.mcs.anl.gov/pub/fathom/MeshFiles/$2/$fname], [$MOAB_EXTERNAL_MESHDIR/$2/$fname], [], [yes])
+  m4_foreach([fnamevar], [$3], [DOWNLOAD_EXTERNAL_PACKAGE([$1], [https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/$2/fnamevar], [$MOAB_EXTERNAL_MESHDIR/$2/fnamevar], [], [yes])])
+  #DOWNLOAD_EXTERNAL_PACKAGE([$1-$fname], [https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/$2/$fname], [$MOAB_EXTERNAL_MESHDIR/$2/$fname], [], [yes])
 ])
 
 dnl -------------------------------------------------------------
@@ -353,12 +353,12 @@ AC_DEFUN([DEFLATE_EXTERNAL_PACKAGE],
   need_configuration=false
   op_pkg_subdir=""
   if (test "x`basename $2|grep -E '\.tar'`" != "x" && test "$HAVE_TAR" != "no" ); then
-    ##op_pkg_subdir="`tar -tf $2 | head -n 1 | $SED -e 's/\/$//'`"
-    op_pkg_subdir="`tar -tf $2 | $SED -e 's@/.*@@' | uniq`"
+    op_pkg_subdir="`tar -tf $2 | head -n 1 | sed -e 's/\/$//' | sed -e 's/.\///g'`"
+    #op_pkg_subdir="`tar -tf $2 | $SED -e 's@/.*@@' | uniq`"
     PREFIX_PRINT([   Untar file: $2 ])
     PREFIX_PRINT([   Source dir: $pkg_srcdir ])
     if (test ! -d "$3/$op_pkg_subdir"); then
-      op_deflatelog$1="`cd $3 && tar -xf $2 && cd $currdir`"
+      op_deflatelog$1="`cd $3 && tar -xf $2 -C $pkg_srcdir  && cd $currdir`"
       need_configuration=true
     fi
     if [ $new_download ]; then
@@ -452,7 +452,7 @@ AC_DEFUN([PRINT_AUTOMATION_STATUS],
 dnl -------------------------------------------------------------
 dnl AUSCM_CONFIGURE_EXTERNAL_PACKAGE(PACKAGE_NAME, DOWNLOAD_URL, DEFAULT_BEHAVIOR)
 dnl Example:
-dnl AUSCM_CONFIGURE_EXTERNAL_PACKAGE(MOAB, "http://ftp.mcs.anl.gov/pub/fathom/moab-4.6-nightly.tar.gz" )
+dnl AUSCM_CONFIGURE_EXTERNAL_PACKAGE(MOAB, "https://web.cels.anl.gov/projects/sigma/downloads/moab/moab-5.5.0.tar.gz" )
 dnl -------------------------------------------------------------
 AC_DEFUN([AUSCM_CONFIGURE_EXTERNAL_PACKAGE],
 [
@@ -520,6 +520,7 @@ AC_DEFUN([AUSCM_CONFIGURE_EXTERNAL_PACKAGE],
       # Check if we need to download an archive file
       DOWNLOAD_EXTERNAL_PACKAGE([$1], [$pkg_download_url], [$MOAB_PACKAGES_DIR/$pkg_archive_name])
 
+      echo "Deflating archive $MOAB_PACKAGES_DIR/$pkg_archive_name to $pkg_srcdir"
       # Deflate the archive file containing the sources, if needed
       DEFLATE_EXTERNAL_PACKAGE([$1], [$MOAB_PACKAGES_DIR/$pkg_archive_name], [$pkg_srcdir])
     fi
@@ -703,10 +704,9 @@ AC_DEFUN([AUSCM_CONFIGURE_DOWNLOAD_HDF5],[
 
   # Invoke the download-hdf5 command
   m4_case( HDF5_DOWNLOAD_VERSION,
-                                  [1.12.1], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([HDF5], [https://ftp.mcs.anl.gov/pub/fathom/TPL/hdf5-hdf5-1_12_1.tar.gz], [$2] ) ],
-                                  [1.10.7], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([HDF5], [https://ftp.mcs.anl.gov/pub/fathom/TPL/hdf5-hdf5-1_10_7.tar.gz], [$2] ) ],
-                                  [1.8.22], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([HDF5], [https://ftp.mcs.anl.gov/pub/fathom/TPL/hdf5-hdf5-1_8_22.tar.gz], [$2] ) ],
-                                  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([HDF5], [https://ftp.mcs.anl.gov/pub/fathom/TPL/hdf5-hdf5-1_12_1.tar.gz], [$2] ) ]
+                                  [1.14.3], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([HDF5], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/hdf5-1_14_3.tar.gz], [$2] ) ],
+                                  [1.12.1], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([HDF5], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/hdf5-1_12_1.tar.gz], [$2] ) ],
+                                  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([HDF5], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/hdf5-1_14_3.tar.gz], [$2] ) ]
           )
 
   if (test "x$downloadhdf5" == "xyes") ; then
@@ -888,10 +888,9 @@ AC_DEFUN([AUSCM_CONFIGURE_DOWNLOAD_NETCDF],[
 
   # Invoke the download-netcdf command
   m4_case( NETCDF_DOWNLOAD_VERSION,
-                                  [4.8.1], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([NetCDF], [https://ftp.mcs.anl.gov/pub/fathom/TPL/netcdf-c-4.8.1.tar.gz], [$2] ) ],
-                                  [4.7.4], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([NetCDF], [https://ftp.mcs.anl.gov/pub/fathom/TPL/netcdf-c-4.7.4.tar.gz], [$2] ) ],
-                                  [4.6.3], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([NetCDF], [https://ftp.mcs.anl.gov/pub/fathom/TPL/netcdf-c-4.6.3.tar.gz], [$2] ) ],
-                                  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([NetCDF], [https://github.com/Unidata/netcdf-c/archive/v4.8.1.tar.gz], [$2] ) ] )
+                                  [4.9.2], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([NetCDF], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/netcdf-c-4_9_2.tar.gz], [$2] ) ],
+                                  [4.8.1], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([NetCDF], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/netcdf-c-4_8_1.tar.gz], [$2] ) ],
+                                  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([NetCDF], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/netcdf-c-4_9_2.tar.gz], [$2] ) ] )
 
   if (test "x$downloadnetcdf" == "xyes") ; then
     # download the latest NetCDF sources, configure and install
@@ -1065,8 +1064,8 @@ AC_DEFUN([AUSCM_CONFIGURE_DOWNLOAD_METIS],[
   fi
 
   # Invoke the download-metis command
-  m4_case( METIS_DOWNLOAD_VERSION, [5.1.0], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([METIS], [https://ftp.mcs.anl.gov/pub/fathom/TPL/metis-5.1.0.tar.gz], [$2] ) ],
-                                  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([METIS], [https://ftp.mcs.anl.gov/pub/fathom/TPL/metis-5.1.0.tar.gz], [$2] ) ] )
+  m4_case( METIS_DOWNLOAD_VERSION, [5.1.0], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([METIS], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/metis-5_1_0.tar.gz], [$2] ) ],
+                                  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([METIS], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/metis-5_1_0.tar.gz], [$2] ) ] )
 
   if (test "x$downloadmetis" == "xyes") ; then
     # download the latest METIS sources, configure and install
@@ -1331,8 +1330,8 @@ AC_DEFUN([AUSCM_CONFIGURE_DOWNLOAD_PARMETIS],[
   fi
 
   # Invoke the download-parmetis command
-  m4_case( PARMETIS_DOWNLOAD_VERSION, [4.0.3], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([PARMETIS], [https://ftp.mcs.anl.gov/pub/fathom/TPL/parmetis-4.0.3.tar.gz], [$2] ) ],
-                                      [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([PARMETIS], [https://ftp.mcs.anl.gov/pub/fathom/TPL/parmetis-4.0.3.tar.gz], [$2] ) ] )
+  m4_case( PARMETIS_DOWNLOAD_VERSION, [4.0.3], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([PARMETIS], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/parmetis-4_0_3.tar.gz], [$2] ) ],
+                                      [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([PARMETIS], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/parmetis-4_0_3.tar.gz], [$2] ) ] )
 
 
   if (test "x$downloadparmetis" == "xyes") ; then
@@ -1591,9 +1590,9 @@ AC_DEFUN([AUSCM_CONFIGURE_DOWNLOAD_TEMPESTREMAP],[
   tempestremap_repository_branch="master"
 
   # Invoke the download-tempestremap command
-  m4_case( TEMPESTREMAP_DOWNLOAD_VERSION, [2.2.0], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://web.cels.anl.gov/projects/sigma/downloads/tempestremap/tempestremap-2.2.0.tar.gz], [$2] ) ],
-                                  [2.1.6], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://web.cels.anl.gov/projects/sigma/downloads/tempestremap/tempestremap-2.1.6.tar.gz], [$2] ) ],
-                                  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://web.cels.anl.gov/projects/sigma/downloads/tempestremap/tempestremap-2.2.0.tar.gz], [$2] ) ] )
+  m4_case( TEMPESTREMAP_DOWNLOAD_VERSION, [2.2.0], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/tempestremap/tempestremap-2_2_0.tar.gz], [$2] ) ],
+                                  [2.1.6], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/tempestremap/tempestremap-2_1_6.tar.gz], [$2] ) ],
+                                  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/tempestremap/tempestremap-2_2_0.tar.gz], [$2] ) ] )
 
   if (test "x$downloadtempestremap" == "xyes") ; then
     # download the latest TempestRemap sources, configure and install
@@ -1762,8 +1761,8 @@ AC_DEFUN([AUSCM_CONFIGURE_DOWNLOAD_HYPRE],[
   m4_pushdef([HYPRE_DOWNLOAD_VERSION],[$1])dnl
 
   # Invoke the download-hypre command
-  m4_case( HYPRE_DOWNLOAD_VERSION, [2.23.0], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([HYPRE], [https://ftp.mcs.anl.gov/pub/fathom/TPL/hypre-2.23.0.tar.gz], [$2] ) ],
-                                             [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([HYPRE], [https://ftp.mcs.anl.gov/pub/fathom/TPL/hypre-2.23.0.tar.gz], [$2] ) ] )
+  m4_case( HYPRE_DOWNLOAD_VERSION, [2.23.0], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([HYPRE], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/hypre-2_23_0.tar.gz], [$2] ) ],
+                                             [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([HYPRE], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/hypre-2_23_0.tar.gz], [$2] ) ] )
 
 
   if (test "x$downloadhypre" == "xyes") ; then
@@ -1925,9 +1924,8 @@ AC_DEFUN([AUSCM_CONFIGURE_DOWNLOAD_EIGEN3],[
   m4_pushdef([EIGEN3_DOWNLOAD_VERSION],[$1])dnl
 
   # Invoke the download-eigen3 command
-  m4_case( EIGEN3_DOWNLOAD_VERSION, [3.4.0],  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([EIGEN3], [https://ftp.mcs.anl.gov/pub/fathom/TPL/eigen-3.4.0.tar.gz], [$2] ) ],
-                                    [3.3.7], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([EIGEN3], [https://ftp.mcs.anl.gov/pub/fathom/TPL/eigen-3.3.7.tar.gz], [$2] ) ],
-                                              [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([EIGEN3], [https://ftp.mcs.anl.gov/pub/fathom/TPL/eigen-3.4.0.tar.gz], [$2] ) ] )
+  m4_case( EIGEN3_DOWNLOAD_VERSION, [3.4.0],  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([EIGEN3], [web.cels.anl.gov/projects/sigma/downloads/TPL/eigen-3_4_0.tar.gz], [$2] ) ],
+                                              [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([EIGEN3], [web.cels.anl.gov/projects/sigma/downloads/TPL/eigen-3_4_0.tar.gz], [$2] ) ] )
 
 
   if (test "x$downloadeigen3" == "xyes") ; then

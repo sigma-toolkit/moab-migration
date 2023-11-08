@@ -90,5 +90,5 @@ int main( int argc, char* argv[] )
     result += RUN_TEST( test_correct_ghost );
 
     MPI_Finalize();
-    return 0;
+    return result;
 }

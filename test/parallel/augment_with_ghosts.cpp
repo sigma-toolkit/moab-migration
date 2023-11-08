@@ -138,5 +138,5 @@ int main( int argc, char* argv[] )
     result += RUN_TEST( test_read_with_ghost_no_augment );
 
     MPI_Finalize();
-    return 0;
+    return result;
 }

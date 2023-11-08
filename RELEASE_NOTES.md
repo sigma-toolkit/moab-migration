@@ -3,24 +3,24 @@
 ## Version 5.5.1
 
 ### Features
-PR #644: Improve Doxygen output for documentation. New website now available at https://web.cels.anl.gov/projects/sigma/docs/moab/index.html. Please update your bookmarks as the old ftp site will be taken down soon.
-PR #645, #648: New ESMF format NC reader
-PR $649: A new halo exchange example under intermediate folder to measure performance of nearest-neighbor halo-exchange communication kernels
+- *PR #644*: Improve Doxygen output for documentation. New website now available at https://web.cels.anl.gov/projects/sigma/docs/moab/index.html. Please update your bookmarks as the old ftp site will be taken down soon.
+- *PR #645, #648*: New ESMF format NC reader
+- *PR #649*: A new halo exchange example under intermediate folder to measure performance of nearest-neighbor halo-exchange communication kernels
 
 ### Fixes
-PR #640: Allow reading mpas file without time dimension
-PR #642: NCHelper - idx need to be integer
-PR #643: iMOAB - update global mesh info
-PR #646: Fix several outstanding issues with mbtempest
-PR #654: Fix a bug when metadata has an empty semicolon string
-PR #657: Assert on unknown key during iMOAB ApplyWeights
+- *PR #640*: Allow reading mpas file without time dimension
+- *PR #642*: NCHelper - idx need to be integer
+- *PR #643*: iMOAB - update global mesh info
+- *PR #646*: Fix several outstanding issues with mbtempest
+- *PR #654*: Fix a bug when metadata has an empty semicolon string
+- *PR #657*: Assert on unknown key during iMOAB ApplyWeights
 
 ### Configuration and build
-PR #641, #651, #652: PyMOAB Updates for Cython 3.0 and other fixes
-PR #647: Fix the DESTDIR propagation when installing PyMOAB
-PR #650: Changes to build on OLCF systems
-PR #656: Update CMake MPI configuration
-PR #655: CircleCI configuration updates
+- *PR #641, #651, #652*: PyMOAB Updates for Cython 3.0 and other fixes
+- *PR #647*: Fix the DESTDIR propagation when installing PyMOAB
+- *PR #650*: Changes to build on OLCF systems
+- *PR #656*: Update CMake MPI configuration
+- *PR #655*: CircleCI configuration updates
 
 ## Version 5.5
 

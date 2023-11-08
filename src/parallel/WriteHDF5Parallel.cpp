@@ -1371,29 +1371,32 @@ ErrorCode WriteHDF5Parallel::create_element_tables()
     };
 
     const int numtypes = exportList.size();
-    std::vector< ExportSet* > groups( numtypes );
-    std::vector< long > counts( numtypes ), offsets( numtypes ), max_ents( numtypes ), total_ents( numtypes );
-    std::vector< wid_t > start_ids( numtypes );
-
-    size_t idx = 0;
-    std::list< ExportSet >::iterator ex_iter;
-    for( ex_iter = exportList.begin(); ex_iter != exportList.end(); ++ex_iter, ++idx )
+    if (numtypes > 0)
     {
-        groups[idx] = &*ex_iter;
-        counts[idx] = ex_iter->range.size();
-    }
-    ErrorCode rval = create_dataset( numtypes, &counts[0], &offsets[0], &max_ents[0], &total_ents[0], ElemSetCreator(),
-                                     &groups[0], &start_ids[0] );
-    CHECK_MB( rval );
+        std::vector< ExportSet* > groups( numtypes );
+        std::vector< long > counts( numtypes ), offsets( numtypes ), max_ents( numtypes ), total_ents( numtypes );
+        std::vector< wid_t > start_ids( numtypes );
 
-    for( idx = 0, ex_iter = exportList.begin(); ex_iter != exportList.end(); ++ex_iter, ++idx )
-    {
-        ex_iter->first_id       = start_ids[idx];
-        ex_iter->offset         = offsets[idx];
-        ex_iter->max_num_ents   = max_ents[idx];
-        ex_iter->total_num_ents = total_ents[idx];
-        rval                    = assign_ids( ex_iter->range, ex_iter->first_id + ex_iter->offset );
+        size_t idx = 0;
+        std::list< ExportSet >::iterator ex_iter;
+        for( ex_iter = exportList.begin(); ex_iter != exportList.end(); ++ex_iter, ++idx )
+        {
+            groups[idx] = &*ex_iter;
+            counts[idx] = ex_iter->range.size();
+        }
+        ErrorCode rval = create_dataset( numtypes, &counts[0], &offsets[0], &max_ents[0], &total_ents[0], ElemSetCreator(),
+                                         &groups[0], &start_ids[0] );
         CHECK_MB( rval );
+
+        for( idx = 0, ex_iter = exportList.begin(); ex_iter != exportList.end(); ++ex_iter, ++idx )
+        {
+            ex_iter->first_id       = start_ids[idx];
+            ex_iter->offset         = offsets[idx];
+            ex_iter->max_num_ents   = max_ents[idx];
+            ex_iter->total_num_ents = total_ents[idx];
+            rval                    = assign_ids( ex_iter->range, ex_iter->first_id + ex_iter->offset );
+            CHECK_MB( rval );
+        }
     }
 
     return MB_SUCCESS;
@@ -1424,26 +1427,29 @@ ErrorCode WriteHDF5Parallel::create_adjacency_tables()
 
     ErrorCode rval;
     const int numtypes = groups.size();
-    std::vector< long > counts( numtypes );
-    std::vector< long > offsets( numtypes );
-    std::vector< long > max_ents( numtypes );
-    std::vector< long > totals( numtypes );
-    for( int i = 0; i < numtypes; ++i )
+    if (numtypes > 0)
     {
-        wid_t count;
-        rval = count_adjacencies( groups[i]->range, count );
+        std::vector< long > counts( numtypes );
+        std::vector< long > offsets( numtypes );
+        std::vector< long > max_ents( numtypes );
+        std::vector< long > totals( numtypes );
+        for( int i = 0; i < numtypes; ++i )
+        {
+            wid_t count;
+            rval = count_adjacencies( groups[i]->range, count );
+            CHECK_MB( rval );
+            counts[i] = count;
+        }
+
+        rval = create_dataset( numtypes, &counts[0], &offsets[0], &max_ents[0], &totals[0], AdjSetCreator(), &groups[0] );
         CHECK_MB( rval );
-        counts[i] = count;
-    }
 
-    rval = create_dataset( numtypes, &counts[0], &offsets[0], &max_ents[0], &totals[0], AdjSetCreator(), &groups[0] );
-    CHECK_MB( rval );
-
-    // Cppcheck warning (false positive): variable groups is assigned a value that is never used
-    for( int i = 0; i < numtypes; ++i )
-    {
-        groups[i]->max_num_adjs = max_ents[i];
-        groups[i]->adj_offset   = offsets[i];
+        // Cppcheck warning (false positive): variable groups is assigned a value that is never used
+        for( int i = 0; i < numtypes; ++i )
+        {
+            groups[i]->max_num_adjs = max_ents[i];
+            groups[i]->adj_offset   = offsets[i];
+        }
     }
     return MB_SUCCESS;
 }

@@ -980,7 +980,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
 
     // ranges to send to each processor; will hold vertices and elements (quads/ polygons)
     // will look if the box of the mesh cell covers bounding box(es) (within tolerances)
-    std::map< int, Range > Rto;
+    std::map< int, std::set<EntityHandle> > SetTo;
     int numprocs = parcomm->proc_config().proc_size();
 
     for( Range::iterator eit = meshCells.begin(); eit != meshCells.end(); ++eit )
@@ -1039,7 +1039,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
                     if( procMin1 > qmax[0] + box_error || procMin2 > qmax[1] + box_error ) continue;  //
                     if( qmin[0] > procMax1 + box_error || qmin[1] > procMax2 + box_error ) continue;
                     // good to be inserted
-                    Rto[p].insert( q );
+                    SetTo[p].insert( q );
                 }
             }
         }
@@ -1057,7 +1057,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
                         break;
                     }
                 }
-                if( insert ) Rto[p].insert( q );
+                if( insert ) SetTo[p].insert( q );
             }
         }
     }
@@ -1072,10 +1072,14 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     size_t numv = 0;
 
     // merge the list of vertices to be sent
+    std::map< int, Range > Rto;
     for( int p = 0; p < numprocs; p++ )
     {
+        std::set<EntityHandle> &setTo =SetTo[p];
+        Range & range_to_P = Rto[p]; // empty now, will be filled
+        std::copy( setTo.rbegin(), setTo.rend(), range_inserter( range_to_P ) );
         if( p == (int)my_rank ) continue;  // do not "send" it to current task, because it is already here
-        Range& range_to_P = Rto[p];
+
         // add the vertices to it
         if( range_to_P.empty() ) continue;  // nothing to send to proc p
 #ifdef VERBOSE

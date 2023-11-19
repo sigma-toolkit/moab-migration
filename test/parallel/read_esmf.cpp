@@ -13,8 +13,6 @@ using namespace moab;
 std::string example = TestDir + "unittest/io/ne4np4-esmf.nc";
 
 std::string read_options;
-const double eps = 1e-20;
-
 
 void read_mesh_parallel( bool rcbzoltan, bool no_mixed_elements )
 {

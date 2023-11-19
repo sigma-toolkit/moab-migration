@@ -32,13 +32,11 @@ int main( int argc, char* argv[] )
 {
     int ierr;
     int rankInGlobalComm, numProcesses;
-    MPI_Group jgroup;
     std::string readoptsLnd( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION" );
     std::string readopts( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS" );
 
     // Timer data
     moab::CpuTimer timer;
-    double timer_ops;
     std::string opName;
 
     MPI_Init( &argc, &argv );

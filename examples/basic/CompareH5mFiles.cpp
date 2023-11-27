@@ -80,20 +80,34 @@ int main( int argc, char** argv )
         rval = mb2->tag_get_handle(name.c_str(), tag2); MB_CHK_SET_ERR( rval, "can't get tag on second model" );
         rval = mb->tag_get_data(tag, cells1, &vals1[0]);MB_CHK_SET_ERR( rval, "can't get values on tag on model 1" );
         rval = mb2->tag_get_data(tag2, cells2, &vals2[0]);MB_CHK_SET_ERR( rval, "can't get values on tag on model 2" );
+        double minv1, maxv1, minv2, maxv2;
+        if (vals1.size() > 0)
+        {
+            minv1 = maxv1 = vals1[0];
+        }
+        if (vals2.size() > 0)
+        {
+            minv2 = maxv2 = vals2[0];
+        }
         // compute the difference
         double sum = 0;
         for (int j=0; j<vals1.size(); j++)
         {
             sum += fabs(vals1[j] - vals2[j]);
+            if (vals1[j]<minv1) minv1 = vals1[j];
+            if (vals1[j]>maxv1) maxv1 = vals1[j];
+            if (vals2[j]<minv2) minv2 = vals2[j];
+            if (vals2[j]>maxv2) maxv2 = vals2[j];
         }
         if (sum > 0.)
         {
-            std::cout<<" tag: " << name << " \t difference : "<< sum <<"\n";
+            std::cout<<" tag: " << name << " \t difference : "<< sum << " \t min/max (" << minv1 << "/" << maxv1<< ") \t (" <<
+                    minv2 << "/" << maxv2 <<") \n";
             k++;
         }
-	else
+        else
         {
-	    same_fields.push_back(name);
+            same_fields.push_back(name);
             k1++;
         }
     }

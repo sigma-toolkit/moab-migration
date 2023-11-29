@@ -5,10 +5,10 @@
 #include "moab/MOABConfig.h"
 
 // 3D settings
-constexpr int mpas_zreflevels = 60;
-constexpr int mpas_zlevels    = 60;
-constexpr int roms_zlevels    = 90;
-constexpr int nvars           = 2;
+constexpr int mpas_zreflevels = 80;
+constexpr int mpas_zlevels    = 80;
+constexpr int roms_zlevels    = 100;
+constexpr int nvars           = 4;
 // constexpr double axial_scaling = 100000.0;
 // constexpr double axial_scaling = 6371220.0;
 constexpr double axial_scaling = 1.0;
@@ -18,15 +18,25 @@ enum Fields
 {
     Bathymetry,
     Salinity,
-    Temperature
+    Temperature,
+    SeaSurfaceHeight,
+    VelocityX,
+    VelocityY
 };
 
+//
+const char* mpas_twod_standardtagnames[2] = { "bottomDepth", "timeDaily_avg_ssh" };
+
 // tag name data
-const char* mpas_twod_tagnames[nvars]       = { "salinity", "temperature" };
-const char* mpas_threed_cum_tagnames[nvars] = { "salinity_3d", "temperature_3d" };
-const char* mpas_threed_tagnames[nvars]     = { "Salinity3d", "Temperature3d" };
-const char* roms_twod_tagnames[nvars]       = { "Salinity", "Temperature" };
-const char* roms_threed_tagnames[nvars]     = { "Salinity", "Temperature" };
+const char* mpas_twod_tagnames[4] = { "salinity", "temperature", "VX", "VY" };
+// const char* mpas_threed_cum_tagnames[4] = { "salinity_3d", "temperature_3d", "velocityX",
+//                                                 "velocityY" };
+const char* mpas_threed_cum_tagnames[4] = { "timeDaily_avg_activeTracers_salinity_3d",
+                                            "timeDaily_avg_activeTracers_temperature_3d",
+                                            "timeDaily_avg_velocityMeridional_3d", "timeDaily_avg_velocityZonal_3d" };
+const char* mpas_threed_tagnames[4]     = { "mSalinity", "mTemperature", "mVX", "mVY" };
+const char* roms_twod_tagnames[4]       = { "rSalinity", "rTemperature", "rVX", "rVY" };
+const char* roms_threed_tagnames[4]     = { "rSalinity", "rTemperature", "rVX", "rVY" };
 
 // write the map file to disk; comment out to just compute in-memory
 #define VERTICAL_INTERPOLATION

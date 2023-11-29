@@ -362,7 +362,7 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
         std::vector< double > srcdist( num_results );
         resultSet.init( srcindx.data(), srcdist.data() );
 
-        bool treefound = tree.findNeighbors( resultSet, query_pt, sparams );
+        tree.findNeighbors( resultSet, query_pt, sparams );
         // bool treefound = tree.closest( resultSet, query_pt, sparams );
         assert( treefound );
 

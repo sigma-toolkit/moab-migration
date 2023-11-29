@@ -25,14 +25,14 @@ parser.add_option("-m", "--moab", dest="moabFile", help="MOAB grid file name use
 for option in parser.option_list:
         if option.default != ("NO", "DEFAULT"):
                 option.help += (" " if option.help else "") + "[default: %default]"
-                
+
 options, args = parser.parse_args()
 
 if not options.scripFile:
         sys.exit('Error: SCRIP input grid file is required.  Specify with -s command line argument.')
 if not options.moabFile:
         sys.exit('Error: MOAB output grid file is required.  Specify with -m command line argument.')
-        
+
 
 fin = netCDF4.Dataset(options.scripFile, 'r')
 #fout = netCDF4.Dataset(options.moabFile, 'w')  # This will clobber existing files
@@ -62,7 +62,7 @@ for e in xrange(grid_size):
       coords[3*(e*grid_corners+j)+1] = math.cos(latd) * math.sin(lond)
       coords[3*(e*grid_corners+j)+2] = math.sin(latd)
       connect[e,j] = e*grid_corners+j+1
-      
+
 mb.create_vertices(coords)
 mb.create_elements(types.MBPOLYGON, connect)
 

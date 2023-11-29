@@ -270,8 +270,9 @@ struct RuntimeContext
 
         {
             field_methods["Bathymetry"]  = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
-            field_methods["Salinity"]    = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
-            field_methods["Temperature"] = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
+            field_methods["SSH"]  = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
+            for (int iv = 0; iv < nvars; ++iv)
+                field_methods[roms_tagnames[iv]] = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
 
             std::vector< std::string > fieldmethods;
             opts.getOptAllArgs( "methodorder", fieldmethods );
@@ -282,27 +283,48 @@ struct RuntimeContext
                 split_option( fmethod, optionStorage );
                 assert( optionStorage.size() > 1 );
                 std::string fieldname = optionStorage[0];
-                if( ( !fieldname.compare( "Bathymetry" ) || !fieldname.compare( "Salinity" ) ||
-                      !fieldname.compare( "Temperature" ) ) &&
-                    optionStorage.size() > 1 )
+                if( !fieldname.compare( "Bathymetry" ) )
                 {
-                    std::string tmpmethod   = optionStorage[1];
-                    RemappingMethod rmethod = GetMethod( tmpmethod );
-                    int methodorder         = 1;
-                    if( optionStorage.size() > 2 )  // order of the method
-                        methodorder = atoi( optionStorage[2].c_str() );
-
-                    field_methods[fieldname] = std::make_pair( rmethod, methodorder );
-                    if( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear ||
-                        rmethod == TempestRemapInvDist || rmethod == TempestRemapDelaunay ||
-                        rmethod == TempestRemapIntegratedBilinear )
-                        computeTRMaps = true;
-                    if( rmethod == MultilevelBsplineApproximation ) computeMBAInterpolant = true;
+                    fieldname = "Bathymetry";
+                }
+                else if( !fieldname.compare( "Salinity" ) )
+                {
+                    fieldname = roms_tagnames[0];
+                }
+                else if( !fieldname.compare( "Temperature" ) )
+                {
+                    fieldname = roms_tagnames[1];
+                }
+                else if( !fieldname.compare( "SSH" ) )
+                {
+                    fieldname = "SSH";
+                }
+                else if( !fieldname.compare( "VX" ) )
+                {
+                    fieldname = roms_tagnames[2];
+                }
+                else if( !fieldname.compare( "VY" ) )
+                {
+                    fieldname = roms_tagnames[3];
                 }
                 else
                 {
                     std::cout << "Error: Ignoring specification for non-standard field: " << fieldname << std::endl;
+                    continue;
                 }
+
+                std::string tmpmethod   = optionStorage[1];
+                RemappingMethod rmethod = GetMethod( tmpmethod );
+                int methodorder         = 1;
+                if( optionStorage.size() > 2 )  // order of the method
+                    methodorder = atoi( optionStorage[2].c_str() );
+
+                field_methods[fieldname] = std::make_pair( rmethod, methodorder );
+                if( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear ||
+                    rmethod == TempestRemapInvDist || rmethod == TempestRemapDelaunay ||
+                    rmethod == TempestRemapIntegratedBilinear )
+                    computeTRMaps = true;
+                if( rmethod == MultilevelBsplineApproximation ) computeMBAInterpolant = true;
             }
         }
 
@@ -319,10 +341,9 @@ struct RuntimeContext
             sstr << "********** Remap MPAS-to-ROMS **********" << std::endl << std::endl;
 
             sstr << " -- Runtime Parameters -- " << std::endl;
-            sstr << "   MPAS mesh file: " << mpas_filename << std::endl;
-            sstr << "   ROMS mesh file: " << roms_filename << std::endl;
-
-            sstr << "        Dimension: " << dimension << std::endl;
+            sstr << "    Dimension: " << dimension << std::endl;
+            sstr << "    MPAS mesh file: " << mpas_filename << std::endl;
+            sstr << "    ROMS mesh file: " << roms_filename << std::endl;
             // sstr << "        Algorithm: "
             //  << ( computeNNInterpolant    ? "Nearest Neighbor mapping"
             //           : computeTRProjection   ? "TempestRemap Conservative mapping"
@@ -330,12 +351,14 @@ struct RuntimeContext
             //                                   : "Shepard interpolant" )
             //      << std::endl;
             // if( computeTRProjection ) sstr << "           Method: " << strMethod << std::endl;
-            sstr << "   Field: Bathymetry, Method: " << GetMethod( field_methods["Bathymetry"].first )
+            sstr << "    Field: Bathymetry, Method: " << GetMethod( field_methods["Bathymetry"].first )
                  << ", Order: " << field_methods["Bathymetry"].second << std::endl;
-            sstr << "   Field: Salinity, Method: " << GetMethod( field_methods["Salinity"].first )
-                 << ", Order: " << field_methods["Salinity"].second << std::endl;
-            sstr << "   Field: Temperature, Method: " << GetMethod( field_methods["Temperature"].first )
-                 << ", Order: " << field_methods["Temperature"].second << std::endl;
+            sstr << "    Field: SeaSurfaceHeight, Method: " << GetMethod( field_methods["SSH"].first )
+                 << ", Order: " << field_methods["SSH"].second << std::endl;
+            for( int iv = 0; iv < nvars; ++iv )
+                sstr << "    Field: " << roms_tagnames[iv]
+                     << ", Method: " << GetMethod( field_methods[roms_tagnames[iv]].first )
+                     << ", Order: " << field_methods[roms_tagnames[iv]].second << std::endl;
             sstr << std::endl;
 
             std::cout << sstr.str() << std::endl;
@@ -379,13 +402,19 @@ struct RuntimeContext
     /// @param src3delems If 3D, source element list of extruded cells
     /// @param dst3delems If 3D, target element list of extruded cells
     /// @return Error code
-    moab::ErrorCode ComputeFieldProjections( std::string varProjectSrc,
+    // moab::ErrorCode ComputeFieldProjections( std::string varProjectSrc,
+    //                                          std::string varProjectDst,
+    //                                          std::vector< moab::EntityHandle >& srcelems,
+    //                                          std::vector< moab::EntityHandle >& dstelems,
+    //                                          const double constantoffset                   = 0.0,
+    //                                          std::vector< moab::EntityHandle >* src3delems = nullptr,
+    //                                          std::vector< moab::EntityHandle >* dst3delems = nullptr );
+    moab::ErrorCode ComputeFieldProjections( int dimension,
+                                             std::string varProjectSrc,
                                              std::string varProjectDst,
-                                             std::vector< moab::EntityHandle >& srcelems,
-                                             std::vector< moab::EntityHandle >& dstelems,
-                                             const double constantoffset                   = 0.0,
-                                             std::vector< moab::EntityHandle >* src3delems = nullptr,
-                                             std::vector< moab::EntityHandle >* dst3delems = nullptr );
+                                             const std::vector< moab::EntityHandle >& source_range,
+                                             const std::vector< moab::EntityHandle >& target_range,
+                                             const double constantoffset = 0.0 );
 
   private:
     moab::CpuTimer mTimer;

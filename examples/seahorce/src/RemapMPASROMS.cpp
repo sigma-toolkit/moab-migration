@@ -220,7 +220,7 @@ int main( int argc, char** argv )
         EntityHandle root_set  = 0;
         EntityHandle mpasset3d = 0, romsset3d = 0;
 
-        context.timer_push( "Project Bathymetry field" );
+
         {
             // Initialize all important data
 
@@ -247,10 +247,18 @@ int main( int argc, char** argv )
             }
 
             // Project the bottom Bathymetry data from MPAS to ROMS so that we can impose it.
-            runchk( context.ComputeFieldProjections( "bottomDepth", "Bathymetry", mpas_elems, roms_elems, 2000.0 ),
-                    "Can't create new set" );
+            context.timer_push( "Project Bathymetry field" );
+            runchk( context.ComputeFieldProjections( 2, mpas_twod_standardtagnames[0], roms_twod_standardtagnames[0],
+                                                     mpas_elems, roms_elems, 2000.0 ),
+                    "Can't project Bathymetry field" );
+            context.timer_pop();
+
+            context.timer_push( "Project SeaSurfaceHeight field" );
+            runchk( context.ComputeFieldProjections( 2, mpas_twod_standardtagnames[1], roms_twod_standardtagnames[1],
+                                                     mpas_elems, roms_elems ),
+                    "Can't project SeaSurfaceHeight field" );
+            context.timer_pop();
         }
-        context.timer_pop();
 
         std::vector< double > zmh_xyz3d, zrh_xyz3d;
         if( context.use_3dprojection || context.threetwooneD )
@@ -469,18 +477,18 @@ int main( int argc, char** argv )
             moab::Tag mpas_soltags_3d[nvars], roms_soltags_elem[nvars];
             for (int iv=0; iv < nvars; ++iv)
             {
-                runchk( mbi->tag_get_handle( mpas_threed_cum_tagnames[iv], mpas_zreflevels, moab::MB_TYPE_DOUBLE,
+                runchk( mbi->tag_get_handle( mpas_tagnames[iv], mpas_zreflevels, moab::MB_TYPE_DOUBLE,
                                              mpas_soltags_3d[iv], moab::MB_TAG_DENSE ),
-                        "Can't get MPAS " << mpas_threed_cum_tagnames[iv] << " tag" );
+                        "Can't get MPAS " << mpas_tagnames[iv] << " tag" );
 
-                runchk( mbi->tag_get_handle( roms_threed_tagnames[iv], 1, moab::MB_TYPE_DOUBLE, roms_soltags_elem[iv],
+                runchk( mbi->tag_get_handle( roms_tagnames[iv], 1, moab::MB_TYPE_DOUBLE, roms_soltags_elem[iv],
                                              moab::MB_TAG_DENSE | moab::MB_TAG_CREAT, &defaultvalue ),
-                        "Can't create ROMS " << roms_threed_tagnames[iv] << " tag" );
+                        "Can't create ROMS " << roms_tagnames[iv] << " tag" );
             }
-            // runchk( mbi->tag_get_handle( mpas_threed_cum_tagnames[0], mpas_zreflevels, moab::MB_TYPE_DOUBLE,
+            // runchk( mbi->tag_get_handle( mpas_tagnames[0], mpas_zreflevels, moab::MB_TYPE_DOUBLE,
             //                              mpas_soltags_3d[0], moab::MB_TAG_DENSE ),
             //         "Can't create salinity tag" );
-            // runchk( mbi->tag_get_handle( mpas_threed_cum_tagnames[1], mpas_zreflevels, moab::MB_TYPE_DOUBLE,
+            // runchk( mbi->tag_get_handle( mpas_tagnames[1], mpas_zreflevels, moab::MB_TYPE_DOUBLE,
             //                              mpas_soltags_3d[1], moab::MB_TAG_DENSE ),
             //         "Can't create temperature tag" );
             // runchk( mbi->tag_get_handle( roms_threed_tagnames[0], 1, moab::MB_TYPE_DOUBLE, roms_soltags_elem[0],
@@ -793,34 +801,28 @@ int main( int argc, char** argv )
                 runchk( SetupDelaunayInterpolant( context, src_xyz ) );
             }
 
-            if( context.use_3dprojection )
-                context.timer_push(
-                    "Compute 3D projection: " + RuntimeContext::GetMethod( context.field_methods["Salinity"].first ) +
-                    " algorithm" );
-            else
-                context.timer_push(
-                    "Compute 2D projection: " + RuntimeContext::GetMethod( context.field_methods["Salinity"].first ) +
-                    " algorithm" );
-            // Now let us compute the mba hierarchy for each field
-            runchk( context.ComputeFieldProjections(
-                ( context.use_3dprojection ? mpas_threed_tagnames[0] : mpas_twod_tagnames[0] ),
-                ( context.use_3dprojection ? roms_threed_tagnames[0] : roms_twod_tagnames[0] ), mpas_elems, roms_elems,
-                35.0, &mpas3d_elems, &roms3d_elems ) );
-            context.timer_pop();
-
-            if( context.use_3dprojection )
-                context.timer_push( "Compute 3D projection: " +
-                                    RuntimeContext::GetMethod( context.field_methods["Temperature"].first ) +
-                                    " algorithm" );
-            else
-                context.timer_push( "Compute 2D projection: " +
-                                    RuntimeContext::GetMethod( context.field_methods["Temperature"].first ) +
-                                    " algorithm" );
-            runchk( context.ComputeFieldProjections(
-                ( context.use_3dprojection ? mpas_threed_tagnames[1] : mpas_twod_tagnames[1] ),
-                ( context.use_3dprojection ? roms_threed_tagnames[1] : roms_twod_tagnames[1] ), mpas_elems, roms_elems,
-                8.5, &mpas3d_elems, &roms3d_elems ) );
-            context.timer_pop();
+            for( int iv = 0; iv < nvars; ++iv )
+            {
+                if( context.use_3dprojection )
+                {
+                    context.timer_push( "Compute 3D projection: " +
+                                        RuntimeContext::GetMethod( context.field_methods[roms_tagnames[iv]].first ) +
+                                        " algorithm" );
+                    // Now let us compute the 3D field projections for each field
+                    runchk( context.ComputeFieldProjections( 3, mpas_ele_tagnames[iv], roms_tagnames[iv], mpas3d_elems,
+                                                             roms3d_elems ) );
+                }
+                else
+                {
+                    context.timer_push( "Compute 2D projection: " +
+                                        RuntimeContext::GetMethod( context.field_methods[roms_tagnames[iv]].first ) +
+                                        " algorithm" );
+                    // Now let us compute the 2D field projections for each field
+                    runchk( context.ComputeFieldProjections( 2, mpas_tagnames[iv], roms_tagnames[iv], mpas_elems,
+                                                             roms_elems ) );
+                }
+                context.timer_pop();
+            }
         }
         dbgprint( std::endl );
 
@@ -846,33 +848,44 @@ int main( int argc, char** argv )
     return 0;
 }
 
-moab::ErrorCode RuntimeContext::ComputeFieldProjections( std::string varProjectSrc,
+moab::ErrorCode RuntimeContext::ComputeFieldProjections( int dimension,
+                                                         std::string varProjectSrc,
                                                          std::string varProjectDst,
-                                                         std::vector< moab::EntityHandle >& srcelems,
-                                                         std::vector< moab::EntityHandle >& dstelems,
-                                                         const double constantoffset,
-                                                         std::vector< moab::EntityHandle >* src3delems,
-                                                         std::vector< moab::EntityHandle >* dst3delems )
+                                                         const std::vector< moab::EntityHandle >& source_range,
+                                                         const std::vector< moab::EntityHandle >& target_range,
+                                                         const double constantoffset )
 {
     moab::ErrorCode err;
     moab::Tag dmtag;
 
     moab::Interface* mbi = this->moab_interface;
 
-    const bool is_three_dimensional = ( !varProjectDst.compare( "Bathymetry" ) ? false : this->use_3dprojection );
+    const bool is_three_dimensional = ( !varProjectDst.compare( roms_twod_standardtagnames[0] ) ||
+                                                !varProjectDst.compare( roms_twod_standardtagnames[1] )
+                                            ? false
+                                            : (dimension == 3) );
     const bool normalize            = this->normalize;
     const RemappingMethod rmethod   = this->field_methods[varProjectDst].first;
     const int order                 = this->field_methods[varProjectDst].second;
-    if( is_three_dimensional ) assert( src3delems && dst3delems );
-    const std::vector< moab::EntityHandle >& source_range = is_three_dimensional ? *src3delems : srcelems;
-    const std::vector< moab::EntityHandle >& target_range = is_three_dimensional ? *dst3delems : dstelems;
-
-    // err = mbi->tag_get_handle( varProject.c_str(), src_zlayers, moab::MB_TYPE_DOUBLE, dmtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
-    err = mbi->tag_get_handle( varProjectSrc.c_str(), 1, moab::MB_TYPE_DOUBLE, dmtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+    // const std::vector< moab::EntityHandle >& source_range = is_three_dimensional ? *src3delems : srcelems;
+    // const std::vector< moab::EntityHandle >& target_range = is_three_dimensional ? *dst3delems : dstelems;
 
     // get the source data from tag
     std::vector< double > src_tdata( source_range.size() ), dst_tdata( target_range.size() );
-    err = mbi->tag_get_data( dmtag, source_range.data(), source_range.size(), src_tdata.data() );MB_CHK_ERR( err );
+    if( is_three_dimensional || ( !varProjectDst.compare( roms_twod_standardtagnames[0] ) ||
+                                                !varProjectDst.compare( roms_twod_standardtagnames[1] ) ) )
+    {
+        err = mbi->tag_get_handle( varProjectSrc.c_str(), 1, moab::MB_TYPE_DOUBLE, dmtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+        err = mbi->tag_get_data( dmtag, source_range.data(), source_range.size(), src_tdata.data() );MB_CHK_ERR( err );
+    }
+    else
+    {
+        err = mbi->tag_get_handle( varProjectSrc.c_str(), mpas_zreflevels, moab::MB_TYPE_DOUBLE, dmtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+        std::vector< double > src_tdata_layers( source_range.size() * mpas_zreflevels );
+        err = mbi->tag_get_data( dmtag, source_range.data(), source_range.size(), src_tdata_layers.data() );MB_CHK_ERR( err );
+        for( size_t il = 0; il < source_range.size(); ++il )
+            src_tdata[il] = src_tdata_layers[il * mpas_zreflevels];
+    }
 
     // get the coordinates of the elements
     std::vector< double > src_xyz( source_range.size() * 3 ), dst_xyz( target_range.size() * 3 );

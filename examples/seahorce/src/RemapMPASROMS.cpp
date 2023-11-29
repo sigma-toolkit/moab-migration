@@ -956,7 +956,9 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( std::string varProjectS
     else if( rmethod == ShepardInterpolant )
     {
         std::cout << "\nComputing Shepard interpolant (order=" << order << ") for field " << varProjectSrc << std::endl;
-        // err = ShepardInterpolatorAlgLib( this->dimension, src_xyz, src_tdata, dst_xyz, dst_tdata );MB_CHK_ERR( err );
+#ifdef MOAB_HAVE_ALGLIB
+        err = ShepardInterpolatorAlgLib( this->dimension, src_xyz, src_tdata, dst_xyz, dst_tdata );MB_CHK_ERR( err );
+#endif
         // err = modified_shepard_interpolate2( this->dimension, src_xyz, src_tdata, dst_xyz, dst_tdata );MB_CHK_ERR( err );
         err = ComputeHierarchicalShepardInterpolant( *this, src_xyz, src_tdata, dst_xyz, dst_tdata, order );MB_CHK_ERR( err );
         // err = RBFAlgLib( *this, src_xyz, src_tdata, dst_xyz, dst_tdata );MB_CHK_ERR( err );

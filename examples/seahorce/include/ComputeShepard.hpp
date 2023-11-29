@@ -3,6 +3,8 @@
 
 #include "RemapMPASROMS.hpp"
 
+#ifdef MOAB_HAVE_ALGLIB
+
 // alglib includes
 #include "interpolation.h"
 
@@ -76,6 +78,8 @@ moab::ErrorCode ShepardInterpolatorAlgLib( int dimension,
 
     return moab::MB_SUCCESS;
 }
+
+#endif
 
 moab::ErrorCode ShepardInterpolator( int dimension,
                                      std::vector< double >& xyzd,

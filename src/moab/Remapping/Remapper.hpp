@@ -96,7 +96,7 @@ class Remapper
         std::cout << "Reading file (" << filename << ") with options = [" << opts << "]\n";
 #endif
         moab::ErrorCode rval = m_interface->load_file( filename.c_str(), &meshset, opts.c_str() );MB_CHK_ERR( rval );
-
+        if( !m_pcomm->rank() ) std::cout << "Read file " << filename <<  "\n";
         Tag rectilinearTag;
         rval = m_interface->tag_get_handle( "ClimateMetadata", rectilinearTag );
 

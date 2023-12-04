@@ -364,7 +364,7 @@ std::string get_file_read_options( ToolContext& ctx, std::string filename )
         size_t lastindex      = filename.find_last_of( "." );
         std::string extension = filename.substr( lastindex + 1, filename.size() );
         if( extension == "h5m" )
-            return "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;";
+            return "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;DEBUG_IO=2";
         else if( extension == "nc" )
         {
             // set default set of options
@@ -618,6 +618,7 @@ int main( int argc, char* argv[] )
         // Usage: mpiexec -n 2 tools/mbtempest -t 5 -l mycs_2.h5m -l myico_2.h5m -f myoverlap_2.h5m
 #ifdef MOAB_HAVE_MPI
         rval = pcomm->check_all_shared_handles();MB_CHK_ERR( rval );
+	std::cout << " finished reading the files and checked shared handles \n";
 #endif
         // print verbosely about the problem setting
         {
@@ -936,8 +937,16 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
             remapper.SetMeshType( moab::Remapper::SourceMesh, smetadata );
         }
         // Rescale the radius of both to compute the intersection
+	
+	std::cout <<" loaded source  mesh  on " << ctx.proc_id << "\n";
+	MPI_Barrier(ctx.pcomm->comm());
+	std::cout <<" after barrier 1 " << ctx.proc_id << "\n";
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[0], radius_src );MB_CHK_ERR( rval );
+	MPI_Barrier(ctx.pcomm->comm());
+	std::cout <<" scaled to radius src , after barrier 2 " << radius_src << " on " << ctx.proc_id << "\n";
         rval = remapper.ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( rval );
+	std::cout <<" converted to tempeste remap mesh on proc " << ctx.proc_id << "\n";
+	MPI_Barrier(ctx.pcomm->comm());
         ctx.meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );
 
         // Load the target mesh and validate

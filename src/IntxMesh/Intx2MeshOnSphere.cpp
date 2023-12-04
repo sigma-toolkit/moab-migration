@@ -863,6 +863,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     assert( parcomm != NULL );
     Range meshCells;
     rval = mb->get_entities_by_dimension( initial_distributed_set, 2, meshCells );MB_CHK_SET_ERR( rval, "can't get cells by dimension from mesh set" );
+    std::cout << "from proc " << my_rank << " mesh cells:  " << meshCells.size() << "\n";
 
     if( 1 == parcomm->proc_config().proc_size() )
     {
@@ -1110,9 +1111,9 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     // enough then)
 
     TLq.enableWriteAccess();
-#ifdef VERBOSE
+//#ifdef VERBOSE
     std::cout << "from proc " << my_rank << " send " << numv << " vertices and " << numq << " elements\n";
-#endif
+//#endif
 
     for( int to_proc = 0; to_proc < numprocs; to_proc++ )
     {

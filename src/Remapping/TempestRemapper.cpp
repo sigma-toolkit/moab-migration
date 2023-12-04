@@ -1254,9 +1254,11 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
     if( is_parallel )
     {
         rval = mbintx->build_processor_euler_boxes( m_target_set, local_verts, gnomonic );MB_CHK_ERR( rval );
+	std::cout << "rank: " << rank << " local_verts.size()=" << local_verts.size() << std::endl;
 
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_covering_source_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
 
+	std::cout << "rank: " << rank << "id cov set " << m_interface->id_from_handle(m_covering_source_set) << " \n"  ;
         rval = mbintx->construct_covering_set( m_source_set, m_covering_source_set, gnomonic );MB_CHK_ERR( rval );
     }
     else

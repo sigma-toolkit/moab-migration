@@ -396,7 +396,9 @@ ErrorCode ReadHDF5::set_up_read( const char* filename, const FileOptions& opts )
 
             MPI_Bcast( fileInfo, size, MPI_BYTE, 0, myPcomm->proc_config().proc_comm() );
 
+            dbgOut.tprintf( 1, "before fixing file summary, size %d  address: %p\n", size, (void*)fileInfo );
             if( rank != 0 ) mhdf_fixFileDesc( fileInfo, reinterpret_cast< mhdf_FileDesc* >( fileInfo->offset ) );
+            dbgOut.tprintf( 1, "fixed file summary, size %d  address: %p\n", size, (void*)fileInfo );
         }
 
         file_prop = H5Pcreate( H5P_FILE_ACCESS );

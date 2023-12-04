@@ -783,7 +783,11 @@ ErrorCode IntxUtils::ScaleToRadius( Interface* mb, EntityHandle set, double R )
         rval = mb->get_coords( &nd, 1, (double*)&( pos[0] ) );
         if( rval != moab::MB_SUCCESS ) return rval;
         double len = pos.length();
-        if( len == 0. ) return MB_FAILURE;
+        if( len == 0. ) 
+	{
+           std::cout << " node with index " << mb->id_from_handle(nd) << " is at the origin \n"; 
+	   continue;
+	}
         pos  = R / len * pos;
         rval = mb->set_coords( &nd, 1, (double*)&( pos[0] ) );
         if( rval != moab::MB_SUCCESS ) return rval;

@@ -402,7 +402,7 @@ AC_DEFUN([CHECK_SOURCE_RECOMPILATION_HASH],
     # ac_cv_sha_moabcpp="`find $moab_src_dir -name '*.cpp' \( -exec $HASHPRGM "$PWD"/{} \; -o -print \) | $HASHPRGM | cut -d ' ' -f1`"
     # defaultshasum="`find $2 -type f -regex '.*\(hpp\|cpp\|c\|h\|f\|f90\)$' \( -exec $HASHPRGM {} \; -o -print \) | $HASHPRGM | cut -d ' ' -f1`"
     # defaultshasum="`find $2/src $2/Source $2/SRC $2/include $2/inc $2/INC -type f -regex '.*\(hpp\|cpp\|c\|h\|f\|f90\)$' | xargs ls -al | $HASHPRGM | cut -d ' ' -f1`"
-    defaultshasum="`cd $2/..; tar -tf $3 | xargs ls -l | $HASHPRGM | cut -d ' ' -f1`"
+    defaultshasum="`cd $2/..; tar -tf $3 | tr \\n \\0 | xargs -0 ls -l | $HASHPRGM | cut -d ' ' -f1`"
     AC_CACHE_VAL([ac_cv_sha_$1], [ac_cv_sha_$1="0"])
     if (test "$defaultshasum" != "$ac_cv_sha_$1" || test $need_configuration); then
       recompile_and_install=true
@@ -1566,6 +1566,180 @@ AC_DEFUN([AUSCM_UNLINK_PARMETIS_302],
   ECHO_EVAL($2, "rm -f $1/lib/libparmetis.a $1/include/parmetis.h")
   ECHO_EVAL($2, "rm -f $1/bin/mtest $1/bin/ptest $1/bin/pometis $1/bin/parmetis")
 ])
+
+##########################################
+### Zoltan AUTOMATED CONFIGURATION
+##########################################
+
+dnl
+dnl Arguments:
+dnl   1) Default Version Number,
+dnl   2) Download by default ?
+dnl
+AC_DEFUN([AUSCM_CONFIGURE_DOWNLOAD_ZOLTAN],[
+
+  # Check whether user wants to autodownload Zoltan
+  # Call package Download/Configure/Installation procedures for Zoltan, if requested by user
+  PPREFIX=Zoltan
+
+  # Set the default Zoltan download version
+  m4_pushdef([ZOLTAN_DOWNLOAD_VERSION],[$1])dnl
+
+  zoltan_repository_url="https://github.com/sandialabs/Zoltan.git"
+  zoltan_repository_branch="main"
+
+  # Invoke the download-zoltan command
+  m4_case( ZOLTAN_DOWNLOAD_VERSION, [3.9.1], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([Zoltan], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/zoltan-3_9_1.tar.gz], [$2] ) ],
+                                  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([Zoltan], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/zoltan/zoltan-3_9_1.tar.gz], [$2] ) ] )
+
+  if (test "x$downloadzoltan" == "xyes") ; then
+    # download the latest Zoltan sources, configure and install
+    ZOLTAN_SRCDIR="$zoltan_src_dir"
+    AC_SUBST(ZOLTAN_SRCDIR)
+    # The default ZOLTAN installation is under libraries
+    ZOLTAN_DIR="$zoltan_install_dir"
+    enablezoltan=yes
+  fi  # if (test "$downloadzoltan" != no)
+])
+
+
+dnl ---------------------------------------------------------------------------
+dnl AUSCM_AUTOMATED SETUP PREPROCESS Zoltan
+dnl   Prepares the system for an existing ZOLTAN install or sets flags to
+dnl   install a new copy of Zoltan
+dnl   Arguments: [PACKAGE, SRC_DIR, INSTALL_DIR, NEED_CONFIGURATION]
+dnl ---------------------------------------------------------------------------
+AC_DEFUN([AUSCM_AUTOMATED_SETUP_PREPROCESS_ZOLTAN],
+[
+  # configure PACKAGE
+  zoltan_src_dir="$2"
+  zoltan_build_dir="$2/build"
+  zoltan_install_dir="$3"
+  zoltan_archive_name="$4"
+
+  # Check if the Zoltan directory is valid
+  if (test ! -d "$zoltan_src_dir"); then
+    AC_MSG_ERROR([Invalid source configuration for Zoltan. Source directory $zoltan_src_dir is invalid])
+  fi
+
+  if ( test ! -f "$zoltan_src_dir/configure" ); then
+    eval `cd $zoltan_src_dir && autoreconf -fi > $zoltan_src_dir/bootstrap.log 2>&1`
+  fi
+
+  # Check if we need to configure, build, and/or install ZOLTAN
+  zoltan_configured=false
+  zoltan_made=false
+  zoltan_installed=false
+  if (test ! -d "$zoltan_build_dir" ); then
+   AS_MKDIR_P( $zoltan_build_dir )
+  else
+    if (test -f "$zoltan_build_dir/src/include/Zoltan_config.h" ); then
+      zoltan_configured=true
+      if (test -f "$zoltan_build_dir/src/libzoltan.a" || test -f "$zoltan_build_dir/src/libzoltan.so" || test -f "$zoltan_build_dir/src/libzoltan.dylib") ; then
+        zoltan_made=true
+        if (test -f "$zoltan_install_dir/include/zoltan.h"); then
+          zoltan_installed=true
+        fi
+      fi
+    fi
+  fi
+  AS_IF([ ! $zoltan_configured || $need_configuration ], [need_configuration=true], [need_configuration=false])
+  AS_IF([ ! $zoltan_made || $need_configuration ], [need_build=true], [need_build=false])
+  AS_IF([ ! $zoltan_installed || $need_configuration ], [need_installation=true], [need_installation=false])
+])
+
+
+dnl ---------------------------------------------------------------------------
+dnl AUSCM_AUTOMATED SETUP POSTPROCESS ZOLTAN
+dnl   Postprocessing for ZOLTAN is minimal.  Exists for standardization of all
+dnl   package macros.
+dnl   Arguments: [PACKAGE]
+dnl ---------------------------------------------------------------------------
+AC_DEFUN([AUSCM_AUTOMATED_SETUP_POSTPROCESS_ZOLTAN],
+[
+  # we have already checked configure/build/install logs for
+  # errors before getting here..
+  enablezoltan=yes
+  DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --with-zoltan=\"${zoltan_install_dir}\""
+])
+
+
+dnl ---------------------------------------------------------------------------
+dnl AUSCM_AUTOMATED CONFIGURE ZOLTAN
+dnl   Sets up the configure command and then ensures it ran correctly.
+dnl   Arguments: [NEED_CONFIGURATION)
+dnl ---------------------------------------------------------------------------
+AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_ZOLTAN],
+[
+  # configure ZOLTAN
+  if [ $1 ]; then
+    # configure PACKAGE with a minimal build: MPI, HDF5, ZOLTAN
+    compiler_opts="CC=$CC CXX=$CXX FC=$FC F90=$FC F77=$F77"
+    configure_command="$compiler_opts $zoltan_src_dir/configure --prefix=$zoltan_install_dir --libdir=$zoltan_install_dir/lib --with-pic=1 --enable-shared=$enable_shared --enable-static=$enable_static"
+    if (test "$enablempi" != "no"); then
+      configure_command="$configure_command --enable-mpi"
+    else
+      configure_command="$configure_command --disable-mpi"
+    fi
+    if (test "$enableparmetis" != "no"); then
+      configure_command="$configure_command --with-parmetis=yes --with-parmetis-libdir=$PARMETIS_DIR/lib --with-parmetis-incdir=$PARMETIS_DIR/include"
+      configure_command="$configure_command LDFLAGS=\"-L$METIS_DIR/lib $LDFLAGS\" CPPFLAGS=\"-I$METIS_DIR/include $CPPFLAGS\" LIBS=\"$LIBS\""
+    else
+      configure_command="$configure_command LDFLAGS=\"$LDFLAGS\" CPPFLAGS=\"$CPPFLAGS\" LIBS=\"$LIBS\""
+    fi
+
+    eval "echo 'Using configure command :==> cd $zoltan_build_dir && $configure_command > $zoltan_src_dir/../config_zoltan.log' > $zoltan_src_dir/../config_zoltan.log"
+    PREFIX_PRINT([Configuring with default options  (with-mpi=$enablempi with-parmetis=$enableparmetis shared=$enable_shared) ])
+    eval "cd $zoltan_build_dir && $configure_command >> $zoltan_src_dir/../config_zoltan.log 2>&1 && cd \"\$OLDPWD\""
+  fi
+
+  if (test ! -f "$zoltan_build_dir/src/include/Zoltan_config.h" ); then
+    AC_MSG_ERROR([Zoltan configuration was unsuccessful. Please refer to $zoltan_build_dir/config.log and $zoltan_src_dir/../config_zoltan.log for further details.])
+  fi
+  zoltan_configured=true
+])
+
+dnl ---------------------------------------------------------------------------
+dnl AUSCM_AUTOMATED BUILD ZOLTAN
+dnl   Builds ZOLTAN and looks for libZOLTAN.
+dnl   Arguments: [NEED_BUILD)
+dnl ---------------------------------------------------------------------------
+AC_DEFUN([AUSCM_AUTOMATED_BUILD_ZOLTAN],
+[
+  if [ $1 || $recompile_and_install ]; then
+    PREFIX_PRINT(Building the sources in parallel)
+    zoltan_makelog="`make --no-print-directory -C $zoltan_build_dir all -j4 > $zoltan_src_dir/../make_zoltan.log 2>&1`"
+  fi
+
+  if (test -f "$zoltan_build_dir/src/libzoltan.a" || test -f "$zoltan_build_dir/src/libzoltan.so" || test -f "$zoltan_build_dir/src/libzoltan.dylib") ; then
+    zoltan_made=true
+  else
+    AC_MSG_ERROR([Zoltan build was unsuccessful. Please refer to $zoltan_src_dir/../make_zoltan.log for further details.])
+  fi
+])
+
+dnl ---------------------------------------------------------------------------
+dnl AUSCM_AUTOMATED INSTALL ZOLTAN
+dnl   Installs ZOLTAN and checks headers.
+dnl   Arguments: [NEED_INSTALLATION)
+dnl ---------------------------------------------------------------------------
+AC_DEFUN([AUSCM_AUTOMATED_INSTALL_ZOLTAN],
+[
+  if [ $1 || $recompile_and_install ]; then
+    if [ $zoltan_installed ]; then
+      zoltan_installlog="`make --no-print-directory -C $zoltan_build_dir uninstall > $zoltan_src_dir/../uninstall_zoltan.log 2>&1`"
+    fi
+    PREFIX_PRINT(Installing the headers and libraries in to directory {$zoltan_install_dir} )
+    zoltan_installlog="`make --no-print-directory -C $zoltan_build_dir install > $zoltan_src_dir/../install_zoltan.log 2>&1`"
+  fi
+
+  if (test -f "$zoltan_install_dir/include/zoltan.h"); then
+    zoltan_installed=true
+  else
+    AC_MSG_ERROR([Zoltan installation was unsuccessful. Please refer to $zoltan_src_dir/../install_zoltan.log for further details.])
+  fi
+])
+
 
 
 ##########################################

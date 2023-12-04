@@ -2098,8 +2098,8 @@ AC_DEFUN([AUSCM_CONFIGURE_DOWNLOAD_EIGEN3],[
   m4_pushdef([EIGEN3_DOWNLOAD_VERSION],[$1])dnl
 
   # Invoke the download-eigen3 command
-  m4_case( EIGEN3_DOWNLOAD_VERSION, [3.4.0],  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([EIGEN3], [web.cels.anl.gov/projects/sigma/downloads/TPL/eigen-3_4_0.tar.gz], [$2] ) ],
-                                              [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([EIGEN3], [web.cels.anl.gov/projects/sigma/downloads/TPL/eigen-3_4_0.tar.gz], [$2] ) ] )
+  m4_case( EIGEN3_DOWNLOAD_VERSION, [3.4.0],  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([EIGEN3], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/eigen-3_4_0.tar.gz], [$2] ) ],
+                                              [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([EIGEN3], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/eigen-3_4_0.tar.gz], [$2] ) ] )
 
 
   if (test "x$downloadeigen3" == "xyes") ; then

@@ -1,3 +1,8 @@
+import os
+import sys
+
+sys.path.append("/opt/moab/seahorce/lib/python3.9/site-packages")
+
 import numpy as np
 from pymoab import core,types
 import netCDF4

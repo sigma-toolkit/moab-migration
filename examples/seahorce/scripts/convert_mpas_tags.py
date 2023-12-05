@@ -2,6 +2,11 @@
 # Convert: mbconvert mpasgrid.nc mpas_grid_raw.h5m
 # Preprocess: python convert_mpas_tags.py
 
+import os
+import sys
+
+sys.path.append("/opt/moab/seahorce/lib/python3.9/site-packages")
+
 import numpy as np
 from pymoab import core, types
 import netCDF4

@@ -8,6 +8,8 @@
 constexpr int mpas_zreflevels = 80;
 constexpr int mpas_zlevels    = 80;
 constexpr int roms_zlevels    = 100;
+constexpr int nstandardvars   = 2;
+constexpr int nforcingvars    = 6;
 constexpr int nvars           = 4;
 // constexpr double axial_scaling = 100000.0;
 // constexpr double axial_scaling = 6371220.0;
@@ -25,18 +27,21 @@ enum Fields
 };
 
 //
-const char* mpas_twod_standardtagnames[2] = { "bottomDepth", "timeDaily_avg_ssh" };
-const char* roms_twod_standardtagnames[2] = { "Bathymetry", "SSH" };
+const char* mpas_twod_standardtagnames[nstandardvars] = { "bottomDepth", "timeDaily_avg_ssh" };
+const char* roms_twod_standardtagnames[nstandardvars] = { "Bathymetry", "SSH" };
+
+// const char* mpas_twod_forcingtagnames[nforcingvars] = { "seaIcePressure", "atmosphericPressure", "windStressZonal", "windStressMeridional", "evaporationFlux", "rainFlux", "temperaturePistonVelocity", "salinityPistonVelocity", "temperatureSurfaceRestoringValue", "salinitySurfaceRestoringValue" };
+const char* mpas_twod_forcingtagnames[nforcingvars] = { "windStressZonal", "windStressMeridional", "temperaturePistonVelocity", "salinityPistonVelocity", "temperatureSurfaceRestoringValue", "salinitySurfaceRestoringValue" };
 
 // tag name data
 // const char* mpas_twod_tagnames[4] = { "salinity", "temperature", "VX", "VY" };
 // const char* mpas_threed_cum_tagnames[4] = { "salinity_3d", "temperature_3d", "velocityX",
 //                                                 "velocityY" };
-const char* mpas_tagnames[4] = { "timeDaily_avg_activeTracers_salinity_3d",
+const char* mpas_tagnames[nvars] = { "timeDaily_avg_activeTracers_salinity_3d",
                                  "timeDaily_avg_activeTracers_temperature_3d", "timeDaily_avg_velocityMeridional_3d",
                                  "timeDaily_avg_velocityZonal_3d" };
-const char* mpas_ele_tagnames[4] = { "MPAS_Salinity", "MPAS_Temperature", "MPAS_VelMeridional", "MPAS_VelZonal" };
-const char* roms_tagnames[4]     = { "ROMS_Salinity", "ROMS_Temperature", "ROMS_VelMeridional", "ROMS_VelZonal" };
+const char* mpas_ele_tagnames[nvars] = { "MPAS_Salinity", "MPAS_Temperature", "MPAS_VelMeridional", "MPAS_VelZonal" };
+const char* roms_tagnames[nvars]     = { "ROMS_Salinity", "ROMS_Temperature", "ROMS_VelMeridional", "ROMS_VelZonal" };
 
 // write the map file to disk; comment out to just compute in-memory
 #define VERTICAL_INTERPOLATION

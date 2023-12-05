@@ -224,6 +224,31 @@ int main( int argc, char** argv )
         {
             // Initialize all important data
 
+            // Project the bottom Bathymetry and SeaSurfaceHeight data from MPAS to ROMS so that we can impose it.
+            for (int iv=0; iv < nstandardvars; ++iv)
+            {
+                context.timer_push( "Project " + std::string(mpas_twod_standardtagnames[iv]) + " field" );
+                runchk( context.ComputeFieldProjections( 2, mpas_twod_standardtagnames[iv], roms_twod_standardtagnames[iv],
+                                                        mpas_elems, roms_elems ),
+                        "Can't project " + std::string(mpas_twod_standardtagnames[iv]) + " field" );
+                context.timer_pop();
+            }
+
+            // Next project the forcing functions from MPAS to ROMS so that we can impose it as boundary conditions
+            for (int iv=0; iv < nforcingvars; ++iv)
+            {
+                context.timer_push( "Project " + std::string(mpas_twod_forcingtagnames[iv]) + " field" );
+                runchk( context.ComputeFieldProjections( 2, mpas_twod_forcingtagnames[iv], mpas_twod_forcingtagnames[iv],
+                                                        mpas_elems, roms_elems ),
+                        "Can't project " + std::string(mpas_twod_forcingtagnames[iv]) + " field" );
+                context.timer_pop();
+            }
+
+        }
+
+        std::vector< double > zmh_xyz3d, zrh_xyz3d;
+        if( context.use_3dprojection || context.threetwooneD )
+        {
             // MPAS reference-z-levels
             {
                 // constexpr double mpas_ref_levels[] = {
@@ -246,23 +271,6 @@ int main( int argc, char** argv )
                 }
             }
 
-            // Project the bottom Bathymetry data from MPAS to ROMS so that we can impose it.
-            context.timer_push( "Project Bathymetry field" );
-            runchk( context.ComputeFieldProjections( 2, mpas_twod_standardtagnames[0], roms_twod_standardtagnames[0],
-                                                     mpas_elems, roms_elems, 2000.0 ),
-                    "Can't project Bathymetry field" );
-            context.timer_pop();
-
-            context.timer_push( "Project SeaSurfaceHeight field" );
-            runchk( context.ComputeFieldProjections( 2, mpas_twod_standardtagnames[1], roms_twod_standardtagnames[1],
-                                                     mpas_elems, roms_elems ),
-                    "Can't project SeaSurfaceHeight field" );
-            context.timer_pop();
-        }
-
-        std::vector< double > zmh_xyz3d, zrh_xyz3d;
-        if( context.use_3dprojection || context.threetwooneD )
-        {
             zmh_xyz3d.resize( mpas_elems.size() * src_zlayers );
             zrh_xyz3d.resize( roms_elems.size() * dst_zlayers );
 
@@ -860,20 +868,21 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( int dimension,
 
     moab::Interface* mbi = this->moab_interface;
 
-    const bool is_three_dimensional = ( !varProjectDst.compare( roms_twod_standardtagnames[0] ) ||
-                                                !varProjectDst.compare( roms_twod_standardtagnames[1] )
-                                            ? false
-                                            : (dimension == 3) );
+    // determine if this is either one of the standard 2D fields or forcing functions
+    bool standard_fields = false;
+    for (int iv = 0; iv < nstandardvars; ++iv)
+        if ( !varProjectDst.compare( roms_twod_standardtagnames[iv] ) ) standard_fields = true;
+    for (int iv = 0; iv < nforcingvars; ++iv)
+        if ( !varProjectDst.compare( mpas_twod_forcingtagnames[iv] ) ) standard_fields = true;
+
+    const bool is_three_dimensional = (dimension == 3);
     const bool normalize            = this->normalize;
     const RemappingMethod rmethod   = this->field_methods[varProjectDst].first;
     const int order                 = this->field_methods[varProjectDst].second;
-    // const std::vector< moab::EntityHandle >& source_range = is_three_dimensional ? *src3delems : srcelems;
-    // const std::vector< moab::EntityHandle >& target_range = is_three_dimensional ? *dst3delems : dstelems;
 
     // get the source data from tag
     std::vector< double > src_tdata( source_range.size() ), dst_tdata( target_range.size() );
-    if( is_three_dimensional || ( !varProjectDst.compare( roms_twod_standardtagnames[0] ) ||
-                                                !varProjectDst.compare( roms_twod_standardtagnames[1] ) ) )
+    if( standard_fields )
     {
         err = mbi->tag_get_handle( varProjectSrc.c_str(), 1, moab::MB_TYPE_DOUBLE, dmtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
         err = mbi->tag_get_data( dmtag, source_range.data(), source_range.size(), src_tdata.data() );MB_CHK_ERR( err );

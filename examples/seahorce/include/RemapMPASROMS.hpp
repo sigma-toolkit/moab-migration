@@ -269,8 +269,10 @@ struct RuntimeContext
         opts.parseCommandLine( argc, argv );
 
         {
-            field_methods["Bathymetry"]  = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
-            field_methods["SSH"]  = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
+            for (int iv = 0; iv < nstandardvars; ++iv)
+                field_methods[roms_twod_standardtagnames[iv]] = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
+            for (int iv = 0; iv < nforcingvars; ++iv)
+                field_methods[mpas_twod_forcingtagnames[iv]] = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
             for (int iv = 0; iv < nvars; ++iv)
                 field_methods[roms_tagnames[iv]] = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
 

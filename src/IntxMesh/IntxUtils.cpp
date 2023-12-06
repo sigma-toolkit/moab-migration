@@ -779,17 +779,19 @@ ErrorCode IntxUtils::ScaleToRadius( Interface* mb, EntityHandle set, double R )
     for( Range::iterator nit = nodes.begin(); nit != nodes.end(); ++nit )
     {
         EntityHandle nd = *nit;
-        CartVect pos;
-        rval = mb->get_coords( &nd, 1, (double*)&( pos[0] ) );
+	double a[3];
+        rval = mb->get_coords( &nd, 1, a );
         if( rval != moab::MB_SUCCESS ) return rval;
-        double len = pos.length();
+        double len = sqrt( a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
         if( len == 0. ) 
 	{
            std::cout << " node with index " << mb->id_from_handle(nd) << " is at the origin \n"; 
 	   continue;
 	}
-        pos  = R / len * pos;
-        rval = mb->set_coords( &nd, 1, (double*)&( pos[0] ) );
+        //pos  = R / len * pos;
+	for (int k=0; k<3; k++)
+           a[k] = R/len*a[k];
+        rval = mb->set_coords( &nd, 1, a );
         if( rval != moab::MB_SUCCESS ) return rval;
     }
     return MB_SUCCESS;

@@ -364,7 +364,7 @@ std::string get_file_read_options( ToolContext& ctx, std::string filename )
         size_t lastindex      = filename.find_last_of( "." );
         std::string extension = filename.substr( lastindex + 1, filename.size() );
         if( extension == "h5m" )
-            return "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;DEBUG_IO=2";
+            return "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;";
         else if( extension == "nc" )
         {
             // set default set of options
@@ -932,20 +932,24 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         // Load the source mesh and validate
         rval =
             remapper.LoadNativeMesh( ctx.inFilenames[0], ctx.meshsets[0], smetadata, additional_read_opts_src.c_str() );MB_CHK_ERR( rval );
+
+	std::stringstream ffs;
+        ffs << "source_rank0" << ctx.proc_id << ".h5m";
+        rval = ctx.mbcore->write_mesh( ffs.str().c_str(), &(ctx.meshsets[0]), 1 );MB_CHK_ERR( rval );
         if( smetadata.size() )
         {
             remapper.SetMeshType( moab::Remapper::SourceMesh, smetadata );
         }
         // Rescale the radius of both to compute the intersection
 	
-	std::cout <<" loaded source  mesh  on " << ctx.proc_id << "\n";
-	MPI_Barrier(ctx.pcomm->comm());
-	std::cout <<" after barrier 1 " << ctx.proc_id << "\n";
+//	std::cout <<" loaded source  mesh  on " << ctx.proc_id << "\n";
+//	MPI_Barrier(ctx.pcomm->comm());
+//	std::cout <<" after barrier 1 " << ctx.proc_id << "\n";
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[0], radius_src );MB_CHK_ERR( rval );
 	MPI_Barrier(ctx.pcomm->comm());
-	std::cout <<" scaled to radius src , after barrier 2 " << radius_src << " on " << ctx.proc_id << "\n";
+//	std::cout <<" scaled to radius src , after barrier 2 " << radius_src << " on " << ctx.proc_id << "\n";
         rval = remapper.ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( rval );
-	std::cout <<" converted to tempeste remap mesh on proc " << ctx.proc_id << "\n";
+//	std::cout <<" converted to tempeste remap mesh on proc " << ctx.proc_id << "\n";
 	MPI_Barrier(ctx.pcomm->comm());
         ctx.meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );
 
@@ -957,7 +961,12 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         {
             remapper.SetMeshType( moab::Remapper::TargetMesh, tmetadata );
         }
+	std::stringstream fft;
+        fft << "target_rank0" << ctx.proc_id << ".h5m";
+        rval = ctx.mbcore->write_mesh( fft.str().c_str(), &(ctx.meshsets[1]), 1 );MB_CHK_ERR( rval );
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[1], radius_dest );MB_CHK_ERR( rval );
+	MPI_Barrier(ctx.pcomm->comm());
+	std::cout <<" scaled to radius target , after barrier 2 " << radius_dest << " on " << ctx.proc_id << "\n";
         rval = remapper.ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
         ctx.meshes[1] = remapper.GetMesh( moab::Remapper::TargetMesh );
 

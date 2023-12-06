@@ -14,6 +14,7 @@
 #endif
 #include "MBParallelConventions.h"
 #include <iostream>
+#include <sstream>
 
 using namespace moab;
 using namespace std;
@@ -81,6 +82,10 @@ int main( int argc, char** argv )
 
     // Read the file with the specified options
     ErrorCode rval = mb->load_file( test_file_name.c_str(), 0, options.c_str() );MB_CHK_ERR( rval );
+
+    std::stringstream fft;
+    fft << "target_rank0" << rank << ".h5m";
+    rval = mb->write_mesh( fft.str().c_str() );MB_CHK_ERR( rval );
 
     Range shared_ents;
     // Get entities shared with all other processors

@@ -68,28 +68,6 @@ However, if these models were created through arbitrary workflows like say a geo
 
    This search procedure might need to happen for every point in the mesh first. Then edges, etc. For a mesh face (a triangle) for example, we could associate it with a geometry face only if all 3 points are "close" to the same geometry face. All those mesh entities associated to a geometry face needs to be put in a mesh set, with the dimension 2, and global id the same as the geometry entity itself. (or just simple relate). For 3d mesh elements, they should be in the interior of a geometry volume. One condition would be that all points are in the interior of the geometric volume.
 
-## Mesquite integration
-
-1. FileTokenizer is one example, used for reading vtk files; Maybe it would be good to unify this, to "maintain" only one; On a glimpse, Mesquite VTK reader allows more datasets. For example structured mesh and rectilinear grids, which are not supported in MOAB for now.
-```C
-switch( datatype )
-{
-  case 1: vtk_read_structured_points( tokens, err ); break;
-  case 2: vtk_read_structured_grid  ( tokens, err ); break;
-  case 3: vtk_read_unstructured_grid( tokens, err ); break;
-  case 4: vtk_read_polydata         ( tokens, err ); break;
-  case 5: vtk_read_rectilinear_grid ( tokens, err ); break;
-  case 6: vtk_read_field            ( tokens, err ); break;
-}
-```
-2. Consolidate usage of MBMesquite::Vector3D and MBMesquite::Matrix3D classes are similar to moab::CartVect and moab::Matrix3
-3. On a more general note, the MOAB database is array-based, while Mesquite is designed based on std::vector of elements/vertices. So in comparison, Mesquite is a more heterogeneous data structure, where each element has an explicit connectivity list, as indices in the vertex array, and there is a C++ object (struct) for each element and each vertex; i.e., each vertex stores its upward adjacency in a vector.
-4. There are several memory leaks in Mesquite tests and examples. These should be fixed and cleaned up. Valgrind is NOT happy.
-5. Add more examples showing Mesquite usage with MOAB
-6. Verify mesh optimization algorithms in both serial and parallel and see if all of the indicators work as they should
-7. Unify error propagation between MOAB and Mesquite
-8. Unify EntityHandle definition between MOAB and Mesquite (void\*)
-
 ## Hybrid computing
 
 1. Profile first and investigate algorithms that are amenable for OpenMP parallelism

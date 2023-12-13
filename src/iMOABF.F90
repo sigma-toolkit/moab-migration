@@ -342,6 +342,15 @@ module iMOAB
     character(kind=c_char), intent(in) :: prefix(*)
   end function iMOAB_WriteLocalMesh
 
+  integer(c_int) function iMOAB_AssignGlobalIDs(pid, start_id, largest_dim_only, parallel, owned_only) bind(C, name='iMOAB_AssignGlobalIDs')
+    use, intrinsic :: iso_c_binding, only : c_int
+    integer(c_int), intent(in) :: pid
+    integer(c_int), intent(in) :: start_id
+    integer(c_int), intent(in) :: largest_dim_only
+    integer(c_int), intent(in) :: parallel
+    integer(c_int), intent(in) :: owned_only
+  end function iMOAB_AssignGlobalIDs
+
 #ifdef MOAB_HAVE_MPI
 
       integer(c_int) function iMOAB_SendMesh(pid, joint_comm, receivingGroup, rcompid, method) bind(C, name='iMOAB_SendMesh')

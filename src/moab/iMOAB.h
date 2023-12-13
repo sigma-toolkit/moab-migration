@@ -385,6 +385,24 @@ ErrCode iMOAB_WriteMesh( iMOAB_AppID pid, const iMOAB_String filename, const iMO
 ErrCode iMOAB_WriteLocalMesh( iMOAB_AppID pid, iMOAB_String prefix );
 
 /**
+ * \brief Assign global ID numbering for entities.
+ *
+ * \note The routine will assign global ID numbers for entities belonging to given dimension. 
+ * We can also assign the entities in the parallel setting and specify whether only owned entities
+ * need to be renumbered.
+ *
+ * <B>Operations:</B> Collective.
+ *
+ * \param[in] pid (iMOAB_AppID)       The unique pointer to the application ID.
+ * \param[in] start_id (int*)         The starting number for entity global IDs.
+ * \param[in] largest_dim_only (int*) Flag to indicate whether high-dimensional entities alone be renumbered.
+ * \param[in] parallel (int*)         Specify whether the operation runs in parallel.
+ * \param[in] owned_only (int*)       Assign only owned entities (no shared entities).
+ * \return ErrCode                    The error code indicating success or failure.
+ */
+ErrCode iMOAB_AssignGlobalIDs( iMOAB_AppID pid, int* start_id, int* largest_dim_only, int* parallel, int* owned_only );
+
+  /**
  * \brief Update local mesh data structure, from file information.
  *
  * \note The method should be called after mesh modifications, for example reading a file or creating mesh in memory

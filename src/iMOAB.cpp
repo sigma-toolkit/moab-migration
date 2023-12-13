@@ -3160,6 +3160,46 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
 
 //#undef VERBOSE
 
+ErrCode iMOAB_AssignGlobalIDs( iMOAB_AppID pid, int* start_id, int* largest_dim_only, int* parallel, int* owned_only )
+{
+    // check whether we have a valid pid for input
+    assert( pid );
+    
+    ErrorCode rval;
+    int ent_start_id = ( start_id ? *start_id : 1 );
+    bool assign_parallel = ( parallel ? *parallel == 1 : true );
+    bool assign_owned_only = ( owned_only ? *owned_only == 1 : true );
+    bool ent_largest_dim_only = ( largest_dim_only ? *largest_dim_only == 1 : false );
+
+    appData& data     = context.appDatas[*pid];
+#ifdef MOAB_HAVE_MPI
+    ParallelComm* pco = context.pcomms[*pid];
+
+    // assign global ids only for vertices, cells have them fine
+    rval = pco->assign_global_ids( data.file_set, /*dim*/ data.dimension, ent_start_id, ent_largest_dim_only, assign_parallel, assign_owned_only );MB_CHK_ERR( rval );
+#else
+    Core* mbImpl = context.MBI;
+    // Assign global ids now
+    Tag gid_tag = mbImpl->globalId_tag();
+    int lowdim = ( ent_largest_dim_only ? data.dimension : 0 );
+    for( int dim = lowdim; dim <= data.dimension; dim++ )
+    {
+      moab::Range entities;
+      rval = mbImpl->get_entities_by_dimension( data.file_set, /* dim */ dim, entities );MB_CHK_SET_ERR( rval, "Failed to get vertices in assign_global_ids" );
+
+      if( entities.empty() ) continue;
+      std::vector<int> entids( entities.size() );
+      int entid = ent_start_id;
+      for (auto& i : entids)
+        i = entid++;
+ 
+      rval = mbImpl->tag_set_data( gid_tag, entities, entids.data() );MB_CHK_SET_ERR( result, "Failed to set global id tag in assign_global_ids" );
+    }
+#endif
+
+    return moab::MB_SUCCESS;
+}
+
 ErrCode iMOAB_MergeVertices( iMOAB_AppID pid )
 {
     appData& data     = context.appDatas[*pid];

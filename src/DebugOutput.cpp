@@ -205,7 +205,7 @@ void DebugOutput::print_real( const char* fmt, va_list args1, va_list args2 )
     const unsigned num_chars = 180;
     unsigned exp_size        = ( num_chars / 3 ) * strlen( fmt );
     lineBuffer.resize( idx + exp_size );
-    unsigned size = vsprintf( &lineBuffer[idx], fmt, args1 );
+    unsigned size = vsnprintf( &lineBuffer[idx], exp_size, fmt, args1 );
     ++size;  // trailing null
              // check if we overflowed the buffer
     if( size > exp_size )
@@ -213,7 +213,7 @@ void DebugOutput::print_real( const char* fmt, va_list args1, va_list args2 )
         // crap!
         fprintf( stderr, "ERROR: Buffer overflow at %s:%d\n", __FILE__, __LINE__ );
         lineBuffer.resize( idx + exp_size );
-        size = vsprintf( &lineBuffer[idx], fmt, args2 );
+        size = vsnprintf( &lineBuffer[idx], exp_size, fmt, args2 );
         ++size;  // trailing null
     }
 #endif
@@ -296,7 +296,7 @@ void DebugOutput::list_range_real( const char* pfx, const Range& range )
             lineBuffer.insert( lineBuffer.end(), name, name + strlen( name ) );
         }
         if( i->first == i->second )
-            sprintf( numbuf, " %lu,", (unsigned long)( ID_FROM_HANDLE( i->first ) ) );
+            snprintf( numbuf, 48, " %lu,", (unsigned long)( ID_FROM_HANDLE( i->first ) ) );
         else
             print_range( numbuf, ID_FROM_HANDLE( i->first ), ID_FROM_HANDLE( i->second ) );
         lineBuffer.insert( lineBuffer.end(), numbuf, numbuf + strlen( numbuf ) );
@@ -325,7 +325,7 @@ void DebugOutput::list_ints_real( const char* pfx, const Range& range )
     for( i = range.const_pair_begin(); i != range.const_pair_end(); ++i )
     {
         if( i->first == i->second )
-            sprintf( numbuf, " %lu,", (unsigned long)( i->first ) );
+            snprintf( numbuf, 48, " %lu,", (unsigned long)( i->first ) );
         else
             print_range( numbuf, (unsigned long)( i->first ), (unsigned long)( i->second ) );
         lineBuffer.insert( lineBuffer.end(), numbuf, numbuf + strlen( numbuf ) );
@@ -362,7 +362,7 @@ void DebugOutput::tprint()
 {
     size_t s = lineBuffer.size();
     lineBuffer.resize( s + 64 );
-    size_t ss = sprintf( &lineBuffer[s], "(%.2f s) ", cpuTi.time_since_birth() );
+    size_t ss = snprintf( &lineBuffer[s], 64, "(%.2f s) ", cpuTi.time_since_birth() );
     lineBuffer.resize( s + ss );
 }
 

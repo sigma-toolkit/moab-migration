@@ -292,7 +292,7 @@ ErrorCode ZoltanPartitioner::repartition( std::vector< double >& x,
 
     // set # requested partitions
     char buff[10];
-    sprintf( buff, "%d", nprocs );
+    snprintf( buff, 10, "%d", nprocs );
     int retval = myZZ->Set_Param( "NUM_GLOBAL_PARTITIONS", buff );
     if( ZOLTAN_OK != retval ) return MB_FAILURE;
 
@@ -627,7 +627,7 @@ ErrorCode ZoltanPartitioner::partition_mesh_and_geometry( const double part_geom
 
     // set # requested partitions
     char buff[10];
-    sprintf( buff, "%d", nparts );
+    snprintf( buff, 10, "%d", nparts );
     int retval = myZZ->Set_Param( "NUM_GLOBAL_PARTITIONS", buff );
     if( ZOLTAN_OK != retval ) return MB_FAILURE;
 
@@ -2400,7 +2400,7 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
 
     // set # requested partitions
     char buff[10];
-    sprintf( buff, "%d", numNewPartitions );
+    snprintf( buff, 10, "%d", numNewPartitions );
     int retval = myZZ->Set_Param( "NUM_GLOBAL_PARTITIONS", buff );
     if( ZOLTAN_OK != retval ) return MB_FAILURE;
 

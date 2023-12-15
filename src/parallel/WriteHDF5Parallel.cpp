@@ -252,7 +252,7 @@ static void print_type_sets( Interface* iFace, DebugOutput* str, Range& sets )
     for( int ii = 0; ii < 9; ++ii )
     {
         char tmp[64];
-        sprintf( tmp, "%s (%lu) ", typenames[ii], (unsigned long)typesets[ii].size() );
+        snprintf( tmp, 64, "%s (%lu) ", typenames[ii], (unsigned long)typesets[ii].size() );
         str->print( VB, tmp, typesets[ii] );
     }
     str->printf( VB, "Total: %lu\n", (unsigned long)sets.size() );

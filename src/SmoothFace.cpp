@@ -197,7 +197,7 @@ int SmoothFace::init_gradient()
     // they are at the feature edges
     unsigned long setId = _mb->id_from_handle( _set );
     char name[50]       = { 0 };
-    sprintf( name, "GRADIENT%lu",
+    snprintf( name, 50, "GRADIENT%lu",
              setId );  // name should be something like GRADIENT29, where 29 is the set ID of the face
     rval = _mb->tag_get_handle( name, 3, MB_TYPE_DOUBLE, _gradientTag, MB_TAG_DENSE | MB_TAG_CREAT, &defNormal );
     assert( rval == MB_SUCCESS );
@@ -205,7 +205,7 @@ int SmoothFace::init_gradient()
     double defPlane[4] = { 0., 0., 1., 0. };
     // also define a plane tag ; this will be for each triangle
     char namePlaneTag[50] = { 0 };
-    sprintf( namePlaneTag, "PLANE%lu", setId );
+    snprintf( namePlaneTag, 50, "PLANE%lu", setId );
     rval = _mb->tag_get_handle( "PLANE", 4, MB_TYPE_DOUBLE, _planeTag, MB_TAG_DENSE | MB_TAG_CREAT, &defPlane );
     assert( rval == MB_SUCCESS );
     // the fourth double is for weight, accumulated at each vertex so far
@@ -627,16 +627,16 @@ void SmoothFace::DumpModelControlPoints()
     // output a Point3D file (special visit format)
     unsigned long setId = _mb->id_from_handle( _set );
     char name[50]       = { 0 };
-    sprintf( name, "%lucontrol.Point3D", setId );  // name should be something 2control.Point3D
+    snprintf( name, 50, "%lucontrol.Point3D", setId );  // name should be something 2control.Point3D
     std::ofstream point3DFile;
     point3DFile.open( name );  //("control.Point3D");
     point3DFile << "# x y z \n";
     std::ofstream point3DEdgeFile;
-    sprintf( name, "%lucontrolEdge.Point3D", setId );  //
+    snprintf( name, 50, "%lucontrolEdge.Point3D", setId );  //
     point3DEdgeFile.open( name );                      //("controlEdge.Point3D");
     point3DEdgeFile << "# x y z \n";
     std::ofstream smoothPoints;
-    sprintf( name, "%lusmooth.Point3D", setId );  //
+    snprintf( name, 50, "%lusmooth.Point3D", setId );  //
     smoothPoints.open( name );                    //("smooth.Point3D");
     smoothPoints << "# x y z \n";
     CartVect controlPoints[3];  // edge control points

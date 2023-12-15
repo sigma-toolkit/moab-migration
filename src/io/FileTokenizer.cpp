@@ -353,7 +353,7 @@ int FileTokenizer::match_token( const char* const* list, bool print_error )
     // No match, constuct error message
     std::string message( "Parsing error at line " );
     char lineno[16];
-    sprintf( lineno, "%d", line_number() );
+    snprintf( lineno, 16, "%d", line_number() );
     message += lineno;
     message += ": expected one of {";
     for( ptr = list; *ptr; ++ptr )

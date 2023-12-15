@@ -143,7 +143,7 @@ ErrorCode HiReconstruction::reconstruct3D_surf_geom( int degree, bool interp, bo
     int ncoeffs = ( degree + 2 ) * ( degree + 1 ) / 2;
 
     // DBG
-    int dcount = 0;
+    // int dcount = 0;
 
     for( Range::iterator ivert = _verts2rec.begin(); ivert != _verts2rec.end(); ++ivert )
     {
@@ -164,7 +164,7 @@ ErrorCode HiReconstruction::reconstruct3D_surf_geom( int degree, bool interp, bo
                                             coeffs );MB_CHK_ERR( error );
 
         // DBG
-        if( degree_out[0] < degree ) dcount += 1;
+        // if( degree_out[0] < degree ) dcount += 1;
     }
 
     // DBG

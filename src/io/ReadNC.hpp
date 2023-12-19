@@ -233,6 +233,7 @@ class ReadNC : public ReaderIface
     bool spectralMesh;
     bool noMixedElements;
     bool noEdges;
+    bool culling;
     int gatherSetRank;
     int tStepBase;
     int trivialPartitionShift;

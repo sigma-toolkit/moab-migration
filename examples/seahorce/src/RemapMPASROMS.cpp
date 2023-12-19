@@ -104,7 +104,7 @@ int main( int argc, char** argv )
         std::vector< moab::EntityHandle > mpas3d_verts, mpas3d_elems;
         {
             dbgprint( "Reading MPAS file from disk" );
-            context.timer_push( "Load ROMS 2D mesh file" );
+            context.timer_push( "Load MPAS 2D mesh file" );
             runchk( mbi->load_file( context.mpas_filename.c_str(), &context.mpasset ),
                     "MOAB::load_file for MPAS mesh failed" );
             // Get all entities in the database
@@ -884,12 +884,14 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( int dimension,
     std::vector< double > src_tdata( source_range.size() ), dst_tdata( target_range.size() );
     if( standard_fields )
     {
-        err = mbi->tag_get_handle( varProjectSrc.c_str(), 1, moab::MB_TYPE_DOUBLE, dmtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+        err = mbi->tag_get_handle( varProjectSrc.c_str(), 1, moab::MB_TYPE_DOUBLE, dmtag, moab::MB_TAG_DENSE );//MB_CHK_ERR( err );
+        if (err != moab::MB_SUCCESS) { std::cout << "Could not retreive the tag handle: " << varProjectSrc << ". Skipping ...\n"; return moab::MB_SUCCESS;}
         err = mbi->tag_get_data( dmtag, source_range.data(), source_range.size(), src_tdata.data() );MB_CHK_ERR( err );
     }
     else
     {
-        err = mbi->tag_get_handle( varProjectSrc.c_str(), mpas_zreflevels, moab::MB_TYPE_DOUBLE, dmtag, moab::MB_TAG_DENSE );MB_CHK_ERR( err );
+        err = mbi->tag_get_handle( varProjectSrc.c_str(), mpas_zreflevels, moab::MB_TYPE_DOUBLE, dmtag, moab::MB_TAG_DENSE );//MB_CHK_ERR( err );
+        if (err != moab::MB_SUCCESS) { std::cout << "Could not retreive the tag handle: " << varProjectSrc << ". Skipping ...\n"; return moab::MB_SUCCESS;}
         std::vector< double > src_tdata_layers( source_range.size() * mpas_zreflevels );
         err = mbi->tag_get_data( dmtag, source_range.data(), source_range.size(), src_tdata_layers.data() );MB_CHK_ERR( err );
         for( size_t il = 0; il < source_range.size(); ++il )

@@ -32,6 +32,7 @@ from pymoab.rng import Range
 # moabInputFile = options.moabFile
 # romsOutputFile = options.romsFile
 
+niskine = False
 romsOutputFile = "roms_his.nc"
 
 # start a MOAB instance
@@ -60,14 +61,27 @@ except: pass
 ncfile = netCDF4.Dataset(romsOutputFile,mode='w',format='NETCDF4_CLASSIC')
 print(ncfile)
 
-# 2D elements: 154 * 142 rho points
-xi_rho_init = 154
-eta_rho_init = 142
-xi_u_init = 153
-eta_u_init = 142
-xi_v_init = 154
-eta_v_init = 141
-s_rho_init = int(ents3d.size()/ents2d.size())
+if niskine:
+    titlestr='Wind-Driven Upwelling/Downwelling for the Niskine test case'
+    # 2D elements: 154 * 142 rho points
+    xi_rho_init = 154
+    eta_rho_init = 142
+    xi_u_init = 153
+    eta_u_init = 142
+    xi_v_init = 154
+    eta_v_init = 141
+    s_rho_init = int(ents3d.size()/ents2d.size())
+else:
+    titlestr='Wind-Driven Upwelling/Downwelling for the North-Atlantic test case'
+    # 2D elements: 154 * 142 rho points
+    xi_rho_init = 413
+    eta_rho_init = 147
+    xi_u_init = 412
+    eta_u_init = 147
+    xi_v_init = 413
+    eta_v_init = 146
+    #s_rho_init = 100
+    s_rho_init = int(ents3d.size()/ents2d.size())
 
 assert(xi_rho_init*eta_rho_init == ents2d.size())
 # assert(s_rho_init == ents3d.size()/ents2d.size())
@@ -79,26 +93,21 @@ ssh_tag = mb1.tag_get_handle("SSH",1,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE)
 ssh = mb1.tag_get_data(ssh_tag, ents2d).reshape(eta_rho_init, xi_rho_init)
 
 salinity_tag = mb2.tag_get_handle("ROMS_Salinity",1,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE)
-# print("Salinity: ", salinity_tag)
-# make sure we can still get data for the write tag
-#salinity = mb2.tag_get_data(salinity_tag, ents3d).reshape(xi_rho_init, eta_rho_init, s_rho_init)
-salinity = mb2.tag_get_data(salinity_tag, ents3d).reshape(s_rho_init, xi_rho_init, eta_rho_init)
-# salinity = mb2.tag_get_data(salinity_tag, ents3d)
-# print("Salinity: ", salinity_tag, salinity.shape)
-# sal3d = salinity[:,0].reshape(xi_rho_init, eta_rho_init, s_rho_init)
+salinity = mb2.tag_get_data(salinity_tag, ents3d).reshape(s_rho_init, xi_rho_init, eta_rho_init)[::-1,:,:]
+# salinity = mb2.tag_get_data(salinity_tag, ents3d).reshape(s_rho_init, eta_rho_init, xi_rho_init)[::-1,:,:]
+print("Salinity: ", salinity.shape)
 
 temperature_tag = mb2.tag_get_handle("ROMS_Temperature",1,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE)
-#temperature = mb2.tag_get_data(temperature_tag, ents3d).reshape(xi_rho_init, eta_rho_init, s_rho_init)
-temperature = mb2.tag_get_data(temperature_tag, ents3d).reshape(s_rho_init, xi_rho_init, eta_rho_init)
+temperature = mb2.tag_get_data(temperature_tag, ents3d).reshape(s_rho_init, xi_rho_init, eta_rho_init)[::-1,:,:]
 
 velocityx_tag = mb2.tag_get_handle("ROMS_VelZonal",1,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE)
-velocityx = mb2.tag_get_data(velocityx_tag, ents3d).reshape(s_rho_init, eta_rho_init, xi_rho_init)
+velocityx = mb2.tag_get_data(velocityx_tag, ents3d).reshape(s_rho_init, eta_rho_init, xi_rho_init)[::-1,:,:]
 velocityxavg = 0.5 * ( velocityx[:,:,:-1] + velocityx[:,:,1:] )
 # velocityxavg = ( velocityx[:,:,:-1] )
 print("X velocity shape: ", velocityx.shape, velocityxavg.shape)
 
 velocityy_tag = mb2.tag_get_handle("ROMS_VelMeridional",1,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE)
-velocityy = mb2.tag_get_data(velocityy_tag, ents3d).reshape(s_rho_init, eta_rho_init, xi_rho_init)
+velocityy = mb2.tag_get_data(velocityy_tag, ents3d).reshape(s_rho_init, eta_rho_init, xi_rho_init)[::-1,:,:]
 velocityyavg = 0.5 * ( velocityy[:,:-1,:] + velocityy[:,1:,:] )
 # velocityyavg = ( velocityy[:,:-1,:] )
 print("Y velocity shape: ", velocityy.shape, velocityyavg.shape)
@@ -115,7 +124,7 @@ for dim in ncfile.dimensions.items():
   print(dim)
 
 # attributes
-ncfile.title='Wind-Driven Upwelling/Downwelling for the Niskine test case'
+ncfile.title=titlestr
 ncfile.type="ROMS/TOMS restart file"
 
 print(ncfile.title)
@@ -123,6 +132,51 @@ print(ncfile.type)
 # print(ncfile)
 
 ## variables
+theta_s = ncfile.createVariable('theta_s',np.float64,())
+theta_s.long_name = "S-coordinate surface control parameter"
+theta_s = 5.0
+
+theta_b = ncfile.createVariable('theta_b',np.float64,())
+theta_b.long_name = "S-coordinate bottom control parameter"
+theta_b = 0.5
+
+# Tcline = ncfile.createVariable('Tcline',np.float64,())
+# Tcline.long_name = "S-coordinate surface/bottom layer width"
+# Tcline.units = "meter"
+# Tcline = 0.5
+
+hc = ncfile.createVariable('hc',np.float64,())
+hc.long_name = "S-coordinate parameter, critical depth"
+hc.units = "meter"
+hc = 100.0
+
+        # double s_rho(s_rho) ;
+        #         s_rho:long_name = "S-coordinate at RHO-points" ;
+        #         s_rho:valid_min = -1. ;
+        #         s_rho:valid_max = 0. ;
+        #         s_rho:positive = "up" ;
+        #         s_rho:standard_name = "ocean_s_coordinate_g2" ;
+        #         s_rho:formula_terms = "s: s_rho C: Cs_r eta: zeta depth: h depth_c: hc" ;
+        #         s_rho:field = "s_rho, scalar" ;
+        # double s_w(s_w) ;
+        #         s_w:long_name = "S-coordinate at W-points" ;
+        #         s_w:valid_min = -1. ;
+        #         s_w:valid_max = 0. ;
+        #         s_w:positive = "up" ;
+        #         s_w:standard_name = "ocean_s_coordinate_g2" ;
+        #         s_w:formula_terms = "s: s_w C: Cs_w eta: zeta depth: h depth_c: hc" ;
+        #         s_w:field = "s_w, scalar" ;
+        # double Cs_r(s_rho) ;
+        #         Cs_r:long_name = "S-coordinate stretching curves at RHO-points" ;
+        #         Cs_r:valid_min = -1. ;
+        #         Cs_r:valid_max = 0. ;
+        #         Cs_r:field = "Cs_r, scalar" ;
+        # double Cs_w(s_w) ;
+        #         Cs_w:long_name = "S-coordinate stretching curves at W-points" ;
+        #         Cs_w:valid_min = -1. ;
+        #         Cs_w:valid_max = 0. ;
+        #         Cs_w:field = "Cs_w, scalar" ;
+
 
 # Bathymetry field: double h(eta_rho, xi_rho) ;
 bath = ncfile.createVariable('h',np.float64,('eta_rho','xi_rho'))
@@ -146,6 +200,41 @@ zeta.coordinates = "x_rho y_rho ocean_time" ;
 zeta.field = "free-surface, scalar, series" ;
 zeta[0,:,:] = ssh
 print(zeta)
+
+fieldvars = {
+             'salinityPistonVelocity': "m s^-1",
+             'temperaturePistonVelocity': "m s^-1",
+             'salinitySurfaceRestoringValue': "C",
+             'temperatureSurfaceRestoringValue': "C",
+             'windStressMeridional': "N m^-2",
+             'windStressZonal': "N m^-2"
+             }
+
+fielddesc = {
+             'salinityPistonVelocity': "A non-negative field controlling the rate at which salinity is restored to salinitySurfaceRestoringValue",
+             'temperaturePistonVelocity': "A non-negative field controlling the rate at which temperature is restored to temperatureSurfaceRestoringValue",
+             'salinitySurfaceRestoringValue': "Salinity is restored toward this field at a rate controlled by salinityPistonVelocity.",
+             'temperatureSurfaceRestoringValue': "Temperature is restored toward this field at a rate controlled by temperaturePistonVelocity.",
+             'windStressMeridional': "Meridional (northward) component of wind stress at cell centers from coupler. Positive northward.",
+             'windStressZonal': "Zonal (eastward) component of wind stress at cell centers from coupler. Positive eastward."
+             }
+
+# Bathymetry field: double h(eta_rho, xi_rho) ;
+for fieldname in fieldvars:
+
+    field_tag = mb1.tag_get_handle(fieldname,1,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE)
+    if field_tag:
+      fieldata = mb1.tag_get_data(field_tag, ents2d).reshape(eta_rho_init, xi_rho_init)
+
+      field = ncfile.createVariable(fieldname,np.float64,('eta_rho','xi_rho'))
+      field.long_name = fielddesc[fieldname] ;
+      field.units = fieldvars[fieldname] ;
+      field.grid = "grid" ;
+      field.location = "face" ;
+      field.coordinates = "lon_rho lat_rho" ;
+      field.field = fieldname + ", scalar" ;
+      field[:,:] = fieldata
+      print(field)
 
 # Temperature scalar field
 temp = ncfile.createVariable('temp',np.float64,('ocean_time','s_rho','eta_rho','xi_rho')) # note: unlimited dimension is leftmost

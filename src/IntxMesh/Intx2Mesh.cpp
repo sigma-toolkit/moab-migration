@@ -27,7 +27,7 @@ int Intx2Mesh::dbg_1 = 0;
 
 Intx2Mesh::Intx2Mesh( Interface* mbimpl )
     : mb( mbimpl ), mbs1( 0 ), mbs2( 0 ), outSet( 0 ), gid( 0 ), TgtFlagTag( 0 ), tgtParentTag( 0 ), srcParentTag( 0 ),
-      countTag( 0 ), srcNeighTag( 0 ), tgtNeighTag( 0 ), neighTgtEdgeTag( 0 ), orgSendProcTag( 0 ), tgtConn( NULL ),
+      countTag( 0 ), srcNeighTag( 0 ), tgtNeighTag( 0 ), neighTgtEdgeTag( 0 ), orgSendProcTag( 0 ), imaskTag(0), tgtConn( NULL ),
       srcConn( NULL ), epsilon_1( 0.0 ), epsilon_area( 0.0 ), box_error( 0.0 ), localRoot( 0 ), my_rank( 0 )
 #ifdef MOAB_HAVE_MPI
       ,
@@ -97,7 +97,6 @@ ErrorCode Intx2Mesh::createTags()
     // maybe the tgt tag is better to be deleted every time, and recreated;
     // or is it easy to set all values to something again? like 0?
     ErrorCode rval = mb->tag_get_handle( "tgtFlag", 1, MB_TYPE_BIT, TgtFlagTag, MB_TAG_CREAT, &def_data_bit );MB_CHK_SET_ERR( rval, "can't get tgt flag tag" );
-
     // create tgt edges if they do not exist yet; so when they are looked upon, they are found
     // this is the only call that is potentially NlogN, in the whole method
     rval = mb->get_adjacencies( rs2, 1, true, TgtEdges, Interface::UNION );MB_CHK_SET_ERR( rval, "can't get adjacent tgt edges" );
@@ -247,6 +246,11 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
     if( srcParentTag ) mb->tag_delete( srcParentTag );
     if( countTag ) mb->tag_delete( countTag );
 
+    // filter rs1 and rs2 by mask; remove everything with 0 mask
+    // get the mask tag if it exists; if not, leave it uninitialized (NULL)
+    mb->tag_get_handle( "GRID_IMASK", imaskTag);
+    rval = filterByMask(rs1);MB_CHK_ERR( rval );
+    rval = filterByMask(rs2);MB_CHK_ERR( rval );
     // create tgt edges if they do not exist yet; so when they are looked upon, they are found
     // this is the only call that is potentially NlogN, in the whole method
     rval = mb->get_adjacencies( rs2, 1, true, TgtEdges, Interface::UNION );MB_CHK_SET_ERR( rval, "can't get adjacent tgt edges" );
@@ -349,6 +353,12 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
             std::cout << " box overlap tolerance: " << box_error << "\n";
         }
     }
+#ifdef MOAB_HAVE_MPI
+    // reduce box tolerance on every task, if needed
+    double min_box_eps;
+    MPI_Allreduce( &box_error, &min_box_eps, 1, MPI_DOUBLE, MPI_MIN, parcomm->comm() );
+    box_error = min_box_eps;
+#endif
     for( Range::iterator it = rs2.begin(); it != rs2.end(); ++it )
     {
         EntityHandle tcell = *it;
@@ -455,6 +465,11 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
 
     rval = mb->get_entities_by_dimension( mbs1, 2, rs1 );MB_CHK_ERR( rval );
     rval = mb->get_entities_by_dimension( mbs2, 2, rs2 );MB_CHK_ERR( rval );
+    // filter rs1 and rs2 by mask; remove everything with 0 mask
+    // get the mask tag if it exists; if not, leave it uninitialized (NULL)
+    mb->tag_get_handle( "GRID_IMASK", imaskTag);
+    rval = filterByMask(rs1);MB_CHK_ERR( rval );
+    rval = filterByMask(rs2);MB_CHK_ERR( rval );
     // std::cout << "rs1.size() = " << rs1.size() << " and rs2.size() = "  << rs2.size() << "\n";
     // std::cout.flush();
 
@@ -790,7 +805,23 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
     this->clean();
     return MB_SUCCESS;
 }
-
+ErrorCode Intx2Mesh::filterByMask(Range & cells)
+{
+    if (!imaskTag) return MB_SUCCESS; // nothing to do
+    size_t sz = cells.size();
+    std::vector<int> masks;
+    masks.resize(sz);
+    ErrorCode rval = mb->tag_get_data(imaskTag, cells, &masks[0]); MB_CHK_ERR(rval);
+    Range cellsToRemove;
+    size_t indx=0;
+    for( Range::iterator eit = cells.begin(); eit != cells.end(); ++eit, ++indx)
+    {
+        if(masks[indx]) continue;
+        cellsToRemove.insert(*eit);
+    }
+    cells = subtract(cells, cellsToRemove);
+    return MB_SUCCESS;
+}
 // clean some memory allocated
 void Intx2Mesh::clean()
 {

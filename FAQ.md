@@ -20,12 +20,11 @@
     automake -a
 ```
 
-1. Why aren't the configure script and other generated files in the CVS repository?
+1. Why aren't the configure script and other generated files in the Git repository?
   
-    > Because they are generated files.  Why save a version history for them?  Further, some of the above commands get re-run automatically when Makefile.am's or other files are changed.  This could lead to compatibility problems if some of the generated files in the Git repository are from a different version of the GNU autotools.
+    > Because they are generated files and often machine dependent.  Why save a version history for them?  Further, some of the above commands get re-run automatically when Makefile.am's or other files are changed.  This could lead to compatibility problems if some of the generated files in the Git repository are from a different version of the GNU autotools.
 
-2. Aren't we requiring users to have GNU autotools installed in order 
-to configure MOAB?
+2. Aren't we requiring users to have GNU autotools installed in order to configure MOAB?
 
     > No.  Developers (or anyone else using source directly from the Git repository) must have the autotools installed.  When creating a tarball for distribution of MOAB, the commands below should be run. The resulting tarball will contain all necessary generated files, including the configure script.
 
@@ -35,35 +34,6 @@ to configure MOAB?
         - `autoreconf -fi`
         - `./configure`
     - To create a distributable tarball from a working source directory, do `make dist`
-
-------------------------------------------------
-MOAB iMesh Interface Implementation, iMesh v1.2
-------------------------------------------------
-
-##### A. The list of non-compliant iMesh functionality are enumerated below.
-
-  A. 1. Iterators for list-type entity sets: 
-
->  The iMesh 1.2 specification requires that iterators over list-type entity sets be updated in response to membership changes in the set.  Specifically, if entities are added to or removed from the set, the spec requires that added entities be iterated without needing to reset the iterator, and that removed entities not be iterated.  MOAB will not support this capability in the iMesh 1.2 release.  Future support will depend on whether this can be implemented efficiently, without degrading performance for static mesh applications.
-
-  A. 2. No support for septahedron entities:
-
->  MOAB does not support septahedron entities at this time (though such entities could be
-represented as general polyhedra).
-
-##### B. MOAB capabilities not accessible through iMesh:
-
-  B.1. `Dense tags`: MOAB supports two kinds of tag storage: dense tags, where tag values are stored in sequence for sequences of contiguous entity handles; and sparse tags, which are stored in (entity handle, tag value) tuples.  iMesh does not support creation of a tag with a default value, nor does it have a mechanism for passing general options to the tag creation function.  Therefore, MOAB's iMesh implementation creates sparse tags by default.  Alternatives for specifying the tag creation type will be explored for future iMesh releases.
-
-  B.2. `Variable-length tags`: MOAB supports a variable-length tag, where a tag value can have a different length for each entity to which it is assigned.  This functionality is not supported in iMesh.
-
-  B.3. `Direct access to tag data (tag_iterate functionality)`: MOAB 4.x introduced the ability for applications to get direct access to tag storage for dense-type tags (see the `tag_iterate` function in src/moab/Interface.hpp).  This functionality is not supported in iMesh.
-
-  B.4. `Corner vs. all vertices in connectivity list`: MOAB represents so-called "higher-order entities", e.g. quadratic tetrahedra, by allowing the connectivity list to be an application-specified size.  The connectivity array returned by MOAB's iMesh implementation will always be the total number of vertices, including any high-order vertices.  MOAB's interface allows applications to specify whether all or just corner vertices are requested.
-
-  B.5. `Retrieval of entity, set handles in order from list-type sets`: MOAB uses the same handle type for both entities and entity sets.  The order of addition of entities and entity sets to list-type sets is therefore preserved, since these handles are stored in the same list.  Since iMesh uses a different handle type for entities than for sets, and returns those handles in different API functions (`iMesh_getEntities` versus `iMesh_getEntSets`), the original order of addition in the case where entities and entity sets are interspersed cannot be recovered.
-
-  B.6. `No support for knife-type elements`: MOAB supports a seven-sided element referred to as a "`Knife`" element; this element results from collapsing a quadrilateral bounding a hexahedron by merging opposite nodes.  This element type is not supported in *iMesh*.
 
 -----------------------
 Supported File Formats
@@ -213,3 +183,4 @@ If reading only part of a file, specify whether or not child or contained sets (
 `HYPERSLAB_APPEND`: During partial or parallel read using a modified (i.e. hacked) HDF5 library, utilize hack for more efficient hyperslab selection construction. This option is deprecated.  Reader should automatically detect if `HYPERSLAB_APPEND` works and if not will default to `HYPERSLAB_OR`.
 
 `HYPERSLAB_SELECT_LIMIT=n`: Set upper bound on the number of HDF5 hyperslabs that can be combined for a single read from an dataset.  The default is defined by `DEFAULT_HYPERSLAB_SELECT_LIMIT` in `ReadHDF5Dataset.cpp`.  If `HYPERSLAB_APPEND` is specified and this option is not, then the default is no limit.  This limit should be removed for future HDF5 releases (> 1.8.x) as said future releases will no longer require the `HYPERSLAB_APPEND` hack in order to avoid O(n^2) hyperslab selection behavior.
+

@@ -6,7 +6,7 @@ storing, querying and manipulating unstructured finite element mesh data.
 The following copyright applies to each file in the MOAB distribution, 
 unless otherwise stated explicitly.
 
-Copyright (c) 2008-2017, UChicago Argonne, LLC (under contract 
+Copyright (c) 2008-2023, UChicago Argonne, LLC (under contract 
 DE-AC02-06CH11357), 2004-2008 Sandia Corporation (under contract 
 DE-AC04-94AL85000) and the MOAB Development Team. All rights reserved.
 
@@ -30,8 +30,7 @@ are as follows:
 
 Package             Copyright and attribution               License terms
 --------------------------------------------------------------------------
-**verdict**      Kitware and Sandia Corporation                 (BSD)
-**Mesquite**           Sandia Corporation                    (LGPL v2.1)
+**verdict**      Kitware and Sandia Corporation                (BSD)
 **PyMOAB**       Anthony Scopatz, Patrick Shriwise,            (BSD)
                  Guilherme Caminha, Vijay Mahadevan
 **TempestRemap**      Paul Ulrich (UCDavis)                    (GPL)

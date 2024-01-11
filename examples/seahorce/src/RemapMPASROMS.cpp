@@ -201,19 +201,19 @@ int main( int argc, char** argv )
 
         if( context.computeTRMaps )
         {
-            context.timer_push( "Compute TempestRemap weights for method: " +
-                                RuntimeContext::GetMethod( context.field_methods["Bathymetry"].first ) );
-            // call to compute the 2D map and store to disk
-            runchk( ComputeTempestRemapWeights( context, context.mpas_covering_set, context.romsset ),
-                    "Cannot compute 2D remapping weights" );
-            context.timer_pop();
-
-            // context.timer_push( "Load TempestRemap weights for method: " + context.bathymetryMethod );
-            // // load the computed 2D map files
-            // runchk( LoadTempestRemapWeights( context, context.mpas_covering_set, context.romsset,
-            //                                  context.bathymetryMethod ),
-            //         "Cannot load 2D remapping weights" );
+            // context.timer_push( "Compute TempestRemap weights for method: " +
+            //                     RuntimeContext::GetMethod( context.field_methods["Bathymetry"].first ) );
+            // // call to compute the 2D map and store to disk
+            // runchk( ComputeTempestRemapWeights( context, context.mpas_covering_set, context.romsset ),
+            //         "Cannot compute 2D remapping weights" );
             // context.timer_pop();
+
+            context.timer_push( "Load TempestRemap weights for method: mpas_roms_map_bilin.nc" );
+            // load the computed 2D map files
+            runchk( LoadTempestRemapWeights( context, context.mpas_covering_set, context.romsset,
+                                             "mpas_roms_map_bilin.nc" ),
+                    "Cannot load 2D remapping weights" );
+            context.timer_pop();
         }
 
         // let us perform 3D extrusions as needed

@@ -89,21 +89,21 @@ moab::ErrorCode CloneToTRMesh( moab::Interface* m_interface, Mesh& mesh, moab::E
 moab::ErrorCode LoadTempestRemapWeights( RuntimeContext& context,
                                          moab::EntityHandle src_set,
                                          moab::EntityHandle tgt_set,
-                                         std::string strMethod )
+                                         const std::string& map_output_filename )
 {
-    CloneToTRMesh( context.moab_interface, context.meshInput, src_set );
-    CloneToTRMesh( context.moab_interface, context.meshOutput, tgt_set );
+    // CloneToTRMesh( context.moab_interface, context.meshInput, src_set );
+    // CloneToTRMesh( context.moab_interface, context.meshOutput, tgt_set );
 
-    context.meshInput.ConstructEdgeMap();
-    context.meshOutput.ConstructEdgeMap();
+    // context.meshInput.ConstructEdgeMap();
+    // context.meshOutput.ConstructEdgeMap();
 
     // load the 2D intersection mesh from disk
     // context.meshOverlap = Mesh( "mesh_intersection.g" );
 
     // next read the map file
     NcError ncerror( NcError::silent_nonfatal );
-    std::string map_output_filename =
-        std::string( template_map_output_filename ) + ( strMethod.size() ? strMethod : "fv" ) + ".nc";
+    // std::string map_output_filename =
+    //     std::string( template_map_output_filename ) + ( strMethod.size() ? strMethod : "fv" ) + ".nc";
     std::cout << "Reading TempestRemap map file: " << map_output_filename << "\n";
     context.weightMap.Read( map_output_filename );
 

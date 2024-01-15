@@ -3,7 +3,7 @@ dnl Locate header files for the C++ linear algebra library Eigen.
 dnl Eigen is a header-only template library. By default we check for the
 dnl Eigen files in the --with-eigen-include=xxx argument provided to
 dnl configure, or if those don't exist in the $EIGEN3_DIR/Eigen directory,
-dnl or in /usr/include.  
+dnl or in /usr/include.
 dnl
 dnl Note: Eigen is installed (by default) at the location
 dnl /path/to/eigen/Eigen, i.e. with path ending in capital 'Eigen'.
@@ -14,7 +14,7 @@ dnl
 dnl - Modified lightly based on libMesh's version.
 dnl ----------------------------------------------------------------
 
-AC_DEFUN([FATHOM_CONFIGURE_EIGEN3], 
+AC_DEFUN([FATHOM_CONFIGURE_EIGEN3],
 [
   dnl User-specific include path
   AC_ARG_WITH(eigen3,
@@ -27,8 +27,9 @@ AC_DEFUN([FATHOM_CONFIGURE_EIGEN3],
   AUSCM_CONFIGURE_DOWNLOAD_EIGEN3([3.4.0], [no])
 
   dnl Fall back on default paths to Eigen's include files
-  if (test "x$eigen3_installed" != "xno" && test -f "$eigen3_install_dir/include/Eigen/Eigen"); then
-    EIGEN3_DIR="$eigen3_install_dir/include"
+  if (test "x$eigen3_installed" != "xno" && test -f "$eigen3_install_dir/include/eigen3/Eigen/Eigen"); then
+    EIGEN3_DIR="$eigen3_install_dir/include/eigen3"
+    enableeigen=yes
   else
     enableeigen=no;
     if (test "x$witheigeninc" != "xno"); then
@@ -45,7 +46,7 @@ AC_DEFUN([FATHOM_CONFIGURE_EIGEN3],
   fi
 
   if (test "x$EIGEN3_DIR" != "x"); then
- 
+
     dnl Check for existence of a header file in the specified location.  Note: here
     dnl we are checking for the header file "Eigen" in the Eigen directory.
     dnl AC_CHECK_FILE([$EIGEN3_DIR/Eigen], [eigenincFound="OK"], [eigenincFound="FAIL"])
@@ -80,9 +81,9 @@ AC_DEFUN([FATHOM_CONFIGURE_EIGEN3],
     fi
   fi
   AM_CONDITIONAL(HAVE_EIGEN3, [test "xno" != "x$enableeigen"])
-  
+
   dnl Substitute the substitution variables
-  AC_SUBST(EIGEN3_DIR) 
-  AC_SUBST(EIGEN3_INCLUDES) 
+  AC_SUBST(EIGEN3_DIR)
+  AC_SUBST(EIGEN3_INCLUDES)
   AC_SUBST(enableeigen)
 ])

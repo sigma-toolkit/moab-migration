@@ -756,6 +756,7 @@ AM_CONDITIONAL([ENABLE_DOCS],[test "x$ENABLE_DOCS" != "xno"])
 ################################################################################
 #                           Zoltan - Part 1 of 2
 ################################################################################
+
 WITH_ZOLTAN=no
 ZOLTAN_DIR=
 ZOLTAN_ARCH=
@@ -904,6 +905,20 @@ if (test "$enableptscotch" != "no"); then
        DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --with-ptscotch=\"${PTSCOTCH_DIR}\""
        ;;
   esac
+fi
+
+
+# Provide downloadable option for Zoltan library
+# Supported Zoltan versions: 3.9.1
+# Arguments: 1) Default Version Number, 2) Download by default ?
+AUSCM_CONFIGURE_DOWNLOAD_ZOLTAN([3.9.1], [no])
+
+dnl Fall back on default paths to Eigen's include files
+if (test "x$zoltan_installed" != "xno" && test -f "$zoltan_install_dir/include/zoltan.h"); then
+  WITH_ZOLTAN=yes
+  ZOLTAN_DIR="$zoltan_install_dir"
+  ZOLTAN_INC_FLAGS="-I$ZOLTAN_DIR/include"
+  enablezoltan=yes
 fi
 
 ################################################################################

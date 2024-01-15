@@ -114,7 +114,8 @@ endif
 
 if ENABLE_mbpart
   bin_PROGRAMS += mbpart
-  AM_CPPFLAGS += $(ZOLTAN_INC_FLAGS)
+  AM_CPPFLAGS += $(ZOLTAN_INC_FLAGS) 
+  AM_CPPFLAGS += $(METIS_INCLUDES) 
   AM_LDFLAGS += $(ZOLTAN_LIB_FLAGS)
   mbpart_SOURCES = mbpart.cpp
   mbpart_LDADD = $(top_builddir)/src/libMOAB.la $(ZOLTAN_LIBS) $(PARMETIS_LIBS) $(METIS_LIBS)

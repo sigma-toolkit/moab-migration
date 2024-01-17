@@ -53,7 +53,6 @@ int main( int argc, char* argv[] )
     std::string domainFile = TestDir + "unittest/io/domain.ocn.ne4np4_oQU240.160614.nc";
     std::string atmFile    = TestDir + "unittest/atm_c2x.h5m";
     std::string tagname( "Sa_pbot:Sa_dens" );
-    int ntags  = 2;
     int nghlay = 0;  // no ghosts
 
     ierr = iMOAB_Initialize( argc, argv );  // not really needed anything from argc, argv, yet; maybe we should
@@ -98,14 +97,14 @@ int main( int argc, char* argv[] )
     ierr                    = iMOAB_WriteMesh( cplOcnPID, outputFile, fileWriteOptions );
     CHECKIERR( ierr, "Cannot write ocean domain mesh from coupler pes" )
 
-    //    int sizeTag    = 1;
-    //    int tagIndex   = -1;
-    //    int tagType = DENSE_DOUBLE;
-    //    ierr = iMOAB_DefineTagStorage( cplAtmPID, tagname.c_str(), &tagType, &sizeTag, &tagIndex );
-    //    CHECKIERR( ierr, "Cannot define source tags tag" )
-    //
-    //    ierr = iMOAB_DefineTagStorage( cplOcnPID, tagname.c_str(), &tagType, &sizeTag, &tagIndex );
-    //    CHECKIERR( ierr, "Cannot define target tags tag" )
+    int sizeTag    = 1;
+    int tagIndex   = -1;
+    int tagType = DENSE_DOUBLE;
+    ierr = iMOAB_DefineTagStorage( cplAtmPID, tagname.c_str(), &tagType, &sizeTag, &tagIndex );
+    CHECKIERR( ierr, "Cannot define source tags tag" )
+
+    ierr = iMOAB_DefineTagStorage( cplOcnPID, tagname.c_str(), &tagType, &sizeTag, &tagIndex );
+    CHECKIERR( ierr, "Cannot define target tags tag" )
 
     int atmocnid = 618;
     // now compute intersection between OCNx and ATMx on coupler PEs
@@ -126,7 +125,8 @@ int main( int argc, char* argv[] )
 
     int type1 = 3, type2 = 3;
     ierr = iMOAB_ComputeCommGraph( cplAtmPID, cplAtmOcnPID, &dup_comm_world, &mpigrp_CPLID, &mpigrp_CPLID, &type1,
-                                   &type2, &cplocn, &atmocnid );
+                                   &type2, &cplatm, &atmocnid );
+    CHECKIERR( ierr, "failed to compute comm graph" );
     const std::string weights_identifiers[2] = { "scalar", "scalar-pc" };
     const std::string disc_methods[3]        = { "cgll", "fv", "pcloud" };
     const std::string dof_tag_names[3]       = { "GLOBAL_DOFS", "GLOBAL_ID", "GLOBAL_ID" };
@@ -146,6 +146,27 @@ int main( int argc, char* argv[] )
     ierr =
         iMOAB_WriteMappingWeightsToFile( cplAtmOcnPID, weights_identifiers[0].c_str(), atmocn_map_file_name.c_str() );
     CHECKIERR( ierr, "failed to write map file to disk" );
+
+    // as always, use nonblocking sends
+    // this is for projection to ocean:
+    ierr = iMOAB_SendElementTag( cplAtmPID, tagname.c_str(), &dup_comm_world, &atmocnid );
+    CHECKIERR( ierr, "cannot send tag values" )
+
+    // receive on atm on coupler pes, that was redistributed according to coverage
+    // receive in the coverage mesh, basically
+    ierr = iMOAB_ReceiveElementTag( cplAtmOcnPID, tagname.c_str(), &dup_comm_world, &cplatm );
+    CHECKIERR( ierr, "cannot receive tag values" )
+
+    ierr = iMOAB_FreeSenderBuffers( cplAtmPID, &atmocnid );  // context is intx external id
+    CHECKIERR( ierr, "cannot free buffers used to resend atm tag towards the coverage mesh" )
+
+    ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0].c_str(), tagname.c_str(),
+            tagname.c_str() );
+    CHECKIERR( ierr, "failed to compute projection weight application" );
+
+    char outputFile2[]       = "OcnDomMeshProj.h5m";
+    ierr                    = iMOAB_WriteMesh( cplOcnPID, outputFile2, fileWriteOptions );
+    CHECKIERR( ierr, "Cannot write ocean domain mesh from coupler pes" )
 
     ierr = iMOAB_DeregisterApplication( cplAtmOcnPID );
     CHECKIERR( ierr, "cannot deregister app LNDX2" )

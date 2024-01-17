@@ -69,8 +69,9 @@ if HAVE_TEMPESTREMAP
   imoab_read_map_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_map2_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_map_target_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
+  imoab_domain_culling_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
 if HAVE_NETCDF
-  HDF5_TESTS += imoab_read_map imoab_map2 imoab_map_target imoab_coupler_bilin
+  HDF5_TESTS += imoab_read_map imoab_map2 imoab_map_target imoab_coupler_bilin imoab_domain_culling
 endif
 if HAVE_EXTMESHES
   HDF5_TESTS +=  imoab_apg2_ol_coupler
@@ -202,6 +203,7 @@ ghost_thin_layers_SOURCES = ghost_thin_layers.cpp
 commgraph_test_SOURCES = commgraph_test.cpp
 test_mapweights_bcast_SOURCES = test_mapweights_bcast.cpp
 imoab_coupler_bilin_SOURCES = imoab_coupler_bilin.cpp
+imoab_domain_culling_SOURCES = imoab_domain_culling.cpp
 
 if ENABLE_imesh
 if HAVE_HDF5_PARALLEL
@@ -269,7 +271,8 @@ MOSTLYCLEANFILES = mhdf_ll.h5m \
                    OcnWithProjF.h5m OcnOnCplF.h5m AtmOnCplF.h5m atm_ocn_map_f.nc fOcnOnCpl4.h5m fOcnOnCpl5.h5m fOcnOnCpl6.h5m fOcnOnCpl7.h5m\
                    Ocn2WithProj.h5m recvAtm2CoupFull.h5m recvAtm2.h5m  atm2_ocn_map.nc atm_ocn_map2.nc fOcnOnCpl8.h5m fOcnOnCpl0.h5m fOcnOnCpl1.h5m \
                    afterSend.h5m readCplRof.h5m fOcnBilinOnCpl atm_ocn_bilin_map_p2.nc OcnWithProjBilin.h5m fOcnBilinOnCpl.h5m recvAtmx.h5m \
-		   test_esmf_rcbzoltan_no_mixed_elements.h5m test_esmf_rcbzoltan.h5m test_esmf_no_mixed_elements.h5m test_esmf.h5m
+		   test_esmf_rcbzoltan_no_mixed_elements.h5m test_esmf_rcbzoltan.h5m test_esmf_no_mixed_elements.h5m test_esmf.h5m \
+		   atmDOCN_map.nc OcnDomMesh.h5m
 
 EXTRA_DIST = imoab_coupler_utils.hpp
 FORTDEFS = $(FCDEFS)

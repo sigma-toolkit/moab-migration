@@ -32,7 +32,6 @@ int main( int argc, char* argv[] )
     int ierr;
     int rankInGlobalComm, numProcesses;
     std::string readoptsDomain( "PARALLEL=READ_PART;PARTITION_METHOD=SQIJ;NO_CULLING" );
-    std::string readoptsDomainOrg( "PARALLEL=READ_PART;PARTITION_METHOD=SQIJ" );
     // options for a regular atmosphere file
     std::string readopts( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS" );
 

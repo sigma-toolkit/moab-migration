@@ -241,6 +241,8 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     Tag& mGlobalIdTag = _readNC->mGlobalIdTag;
     // const Tag*& mpFileIdTag = _readNC->mpFileIdTag;
     DebugOutput& dbgOut = _readNC->dbgOut;
+
+    bool & culling = _readNC->culling;
     /*int& gatherSetRank = _readNC->gatherSetRank;
     int& trivialPartitionShift = _readNC->trivialPartitionShift;*/
     /*
@@ -348,7 +350,13 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     rval = mbImpl->tag_get_handle( "xc", 1, MB_TYPE_DOUBLE, xcTag, MB_TAG_DENSE | MB_TAG_CREAT );MB_CHK_SET_ERR( rval, "Trouble creating xc tag" );
     rval = mbImpl->tag_get_handle( "yc", 1, MB_TYPE_DOUBLE, ycTag, MB_TAG_DENSE | MB_TAG_CREAT );MB_CHK_SET_ERR( rval, "Trouble creating yc tag" );
 
-    //
+    // create tags for GRID_IMASK, which will be the same name as the Scrip helper tag that holds the mask
+    // create the maskTag GRID_IMASK, with default value of 1
+    Tag maskTag;
+    int def_val = 1;
+    rval =
+        mbImpl->tag_get_handle( "GRID_IMASK", 1, MB_TYPE_INTEGER, maskTag, MB_TAG_DENSE | MB_TAG_CREAT, &def_val );MB_CHK_SET_ERR( rval, "Trouble creating GRID_IMASK tag" );
+
     EntityHandle* conn_arr;
     EntityHandle vtx_handle;
     Range tmp_range;
@@ -365,16 +373,20 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
         mdb_type = MBPOLYGON;
     // for nv = 1 , type is vertex
 
-    if( nv > 1 && nb_with_mask1 > 0 )
+    int num_actual_cells = local_elems;
+    if (culling)
+        num_actual_cells = nb_with_mask1;
+
+    if( nv > 1 && num_actual_cells > 0 )
     {
-        rval = _readNC->readMeshIface->get_element_connect( nb_with_mask1, nv, mdb_type, 0, start_cell, conn_arr );MB_CHK_SET_ERR( rval, "Failed to create local cells" );
-        tmp_range.insert( start_cell, start_cell + nb_with_mask1 - 1 );
+        rval = _readNC->readMeshIface->get_element_connect( num_actual_cells, nv, mdb_type, 0, start_cell, conn_arr );MB_CHK_SET_ERR( rval, "Failed to create local cells" );
+        tmp_range.insert( start_cell, start_cell + num_actual_cells - 1 );
     }
 
     // Create vertices; first identify different ones, with a tolerance
     std::map< Node3D, EntityHandle > vertex_map;
 
-    if( nb_with_mask1 > 0 )
+    if( num_actual_cells > 0 )
     {
         // Set vertex coordinates
         // will read all xv, yv, but use only those with correct mask on
@@ -384,7 +396,7 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
 
         for( ; elem_index < local_elems; elem_index++ )
         {
-            if( 0 == mask[elem_index] ) continue;  // nothing to do, do not advance elem_index in actual moab arrays
+            if( culling && 0 == mask[elem_index] ) continue;  // nothing to do, do not advance elem_index in actual moab arrays
             // set area and fraction on those elements too
             for( int k = 0; k < nv; k++ )
             {
@@ -443,7 +455,7 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
             for( int i = lCDims[0]; i < lCDims[3]; i++ )
             {
                 elem_index++;
-                if( 0 == mask[elem_index] ) continue;  // nothing to do, do not advance elem_index in actual moab arrays
+                if( culling && 0 == mask[elem_index] ) continue;  // nothing to do, do not advance elem_index in actual moab arrays
                 // set area and fraction on those elements too
                 for( int k = 0; k < nv; k++ )
                 {
@@ -467,6 +479,7 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
                 rval = mbImpl->tag_set_data( ycTag, &cell, 1, &yc[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set yc tag" );
                 rval = mbImpl->tag_set_data( areaTag, &cell, 1, &area[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set area tag" );
                 rval = mbImpl->tag_set_data( fracTag, &cell, 1, &frac[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set frac tag" );
+                rval = mbImpl->tag_set_data( maskTag, &cell, 1, &mask[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set mask tag" );
 
                 // set the global id too:
                 int globalId = j * global_row_size + i + 1;
@@ -483,6 +496,7 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
         tagList.push_back( ycTag );
         tagList.push_back( areaTag );
         tagList.push_back( fracTag );
+        tagList.push_back( maskTag ); // not sure this is needed though ? on cells or on vertices?
         rval = IntxUtils::remove_padded_vertices( mbImpl, _fileSet, tagList );MB_CHK_SET_ERR( rval, "Failed to remove duplicate vertices" );
 
         rval = mbImpl->get_entities_by_dimension( _fileSet, 2, faces );MB_CHK_ERR( rval );

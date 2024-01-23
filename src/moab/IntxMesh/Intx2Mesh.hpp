@@ -114,6 +114,8 @@ class Intx2Mesh
 
     virtual ErrorCode createTags();
 
+    virtual ErrorCode filterByMask(Range & cells);
+
     ErrorCode DetermineOrderedNeighbors( EntityHandle inputSet, int max_edges, Tag& neighTag );
 
     void set_error_tolerance( double eps )
@@ -221,6 +223,7 @@ class Intx2Mesh
     Tag neighTgtEdgeTag;  // will store edge borders for each tgt cell
 
     Tag orgSendProcTag;  /// for coverage mesh, will store the original sender
+    Tag imaskTag;       // if it exists, use it for filtering the source or target cells
 
     // EntityType type; // this will be tri, quad or MBPOLYGON...
 

@@ -31,7 +31,8 @@ void test_read_fv_ghosting();
 #endif
 
 // Domain file
-void test_read_domain();
+void test_read_domain_culling();
+void test_read_domain_no_culling();
 // scrip file
 void test_read_scrip();
 
@@ -55,7 +56,8 @@ int main( int argc, char* argv[] )
     result += RUN_TEST( test_read_eul_onetimestep );
     result += RUN_TEST( test_read_eul_nomesh );
     result += RUN_TEST( test_read_eul_novars );
-    result += RUN_TEST( test_read_domain );
+    result += RUN_TEST( test_read_domain_culling );
+    result += RUN_TEST( test_read_domain_no_culling );
     result += RUN_TEST( test_read_scrip );
     // Exclude test_read_fv_all() since reading edge data is not implemented in MOAB yet
     // result += RUN_TEST(test_read_fv_all);
@@ -498,7 +500,7 @@ void test_read_fv_ghosting()
 }
 #endif
 
-void test_read_domain()
+void test_read_domain_culling()
 {
     Core moab;
     Interface& mb = moab;
@@ -511,6 +513,22 @@ void test_read_domain()
     rval = get_options( orig );CHECK_ERR( rval );
 
     opts = orig + std::string( ";VARIABLE=" );
+    rval = mb.load_file( example_domain.c_str(), &set, opts.c_str() );CHECK_ERR( rval );
+}
+
+void test_read_domain_no_culling()
+{
+    Core moab;
+    Interface& mb = moab;
+
+    // Need a set for nomesh to work right
+    EntityHandle set;
+    ErrorCode rval = mb.create_meshset( MESHSET_SET, set );CHECK_ERR( rval );
+
+    std::string orig, opts;
+    rval = get_options( orig );CHECK_ERR( rval );
+
+    opts = orig + std::string( ";VARIABLE=;NO_CULLING" );
     rval = mb.load_file( example_domain.c_str(), &set, opts.c_str() );CHECK_ERR( rval );
 }
 

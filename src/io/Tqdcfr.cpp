@@ -116,7 +116,7 @@ static inline void INT_IO_ERROR( bool condition, unsigned line )
     if( !condition )
     {
         char buffer[] = __FILE__ "             ";
-        sprintf( buffer, "%s:%u", __FILE__, line );
+        snprintf( buffer, strlen(buffer), "%s:%u", __FILE__, line );
         fflush( stderr );
         perror( buffer );
         abort();

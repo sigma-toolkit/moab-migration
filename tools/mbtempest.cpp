@@ -81,11 +81,10 @@ struct ToolContext
     ToolContext( moab::Core* icore )
         : mbcore( icore ), proc_id( 0 ), n_procs( 1 ), outputFormatter( std::cout, 0, 0 ),
 #endif
-          blockSize( 5 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "intxFile.h5m" ),
-          baselineFile( "" ), meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ), computeWeights( false ),
+          blockSize( 5 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "" ), baselineFile( "" ),
+          meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ), computeWeights( false ),
           verifyWeights( false ), enforceConvexity( false ), ensureMonotonicity( 0 ), rrmGrids( false ),
-          kdtreeSearch( true ), fCheck( n_procs > 1 ? false : true ), fVolumetric( false ),
-          useGnomonicProjection( false )
+          kdtreeSearch( true ), fCheck( false ), fVolumetric( false ), useGnomonicProjection( false )
     {
         inFilenames.resize( 2 );
         doftag_names.resize( 2 );
@@ -282,21 +281,23 @@ struct ToolContext
             opts.getOptAllArgs( "global_id,i", doftag_names );
 
             assert( inFilenames.size() == 2 );
-            assert( disc_orders.size() == 2 );
-            assert( disc_methods.size() == 2 );
             assert( ensureMonotonicity >= 0 && ensureMonotonicity <= 3 );
 
             // get discretization order parameters
             if( disc_orders.size() == 0 ) disc_orders.resize( 2, 1 );
-            if( disc_orders.size() == 1 ) disc_orders.push_back( 1 );
+            if( disc_orders.size() == 1 ) disc_orders.push_back( disc_orders[0] );
 
             // get discretization method parameters
             if( disc_methods.size() == 0 ) disc_methods.resize( 2, "fv" );
-            if( disc_methods.size() == 1 ) disc_methods.push_back( "fv" );
+            if( disc_methods.size() == 1 ) disc_methods.push_back( disc_methods[0] );
 
             // get DoF tagname parameters
             if( doftag_names.size() == 0 ) doftag_names.resize( 2, "GLOBAL_ID" );
-            if( doftag_names.size() == 1 ) doftag_names.push_back( "GLOBAL_ID" );
+            if( doftag_names.size() == 1 ) doftag_names.push_back( doftag_names[0] );
+
+            assert( disc_orders.size() == 2 );
+            assert( disc_methods.size() == 2 );
+            assert( doftag_names.size() == 2 );
 
             // for computing maps and overlaps, set discretization orders
             mapOptions.nPin           = disc_orders[0];
@@ -748,7 +749,7 @@ int main( int argc, char* argv[] )
 
             // Invoke the CheckMap routine on the TempestRemap serial interface directly, if running
             // on a single process
-            if( nprocs == 1 )
+            if( runCtx->fCheck )
             {
                 const double dNormalTolerance = 1.0E-8;
                 const double dStrictTolerance = 1.0E-12;
@@ -765,7 +766,7 @@ int main( int argc, char* argv[] )
                 attrMap["remap_options"] = runCtx->mapOptions.strMethod;
                 attrMap["domain_a"]      = runCtx->inFilenames[0];
                 attrMap["domain_b"]      = runCtx->inFilenames[1];
-                attrMap["domain_aUb"]    = runCtx->intxFilename;
+                if( runCtx->intxFilename.size() ) attrMap["domain_aUb"] = runCtx->intxFilename;
                 attrMap["map_aPb"]       = runCtx->outFilename;
                 attrMap["methodorder_a"] = runCtx->disc_methods[0] + ":" + std::to_string( runCtx->disc_orders[0] ) +
                                            ":" + std::string( runCtx->doftag_names[0] );

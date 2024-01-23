@@ -85,7 +85,7 @@ ErrorCode ScdInterface::find_boxes( Range& scd_boxes )
         {
             scdBoxes.resize( boxes.size() );
             rval        = mbImpl->tag_get_data( boxSetTag, boxes, &scdBoxes[0] );
-            ScdBox* dum = NULL;
+            ScdBox* dum = nullptr;
             // std::remove_if(scdBoxes.begin(), scdBoxes.end(),
             // std::bind2nd(std::equal_to<ScdBox*>(), dum) ) ;
             std::remove_if( scdBoxes.begin(), scdBoxes.end(),

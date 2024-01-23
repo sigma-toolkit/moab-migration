@@ -45,7 +45,7 @@
 namespace moab
 {
 
-#define INS_ID( stringvar, prefix, id ) sprintf( stringvar, prefix, id )
+#define INS_ID( stringvar, prefix, id, length ) snprintf( stringvar, length, prefix, id )
 
 #define GET_DIM( ncdim, name, val )                                                   \
     {                                                                                 \
@@ -66,7 +66,7 @@ namespace moab
     }
 
 #define GET_DIMB( ncdim, name, varname, id, val ) \
-    INS_ID( name, varname, id );                  \
+    INS_ID( name, varname, id, max_str_length + 1 );                  \
     GET_DIM( ncdim, name, val );
 
 #define GET_VAR( name, id, dims )                                                               \
@@ -678,7 +678,7 @@ ErrorCode ReadNCDF::read_polyhedra_faces()
         int num_nod_per_fa;
         GET_DIMB( temp_dim, temp_string, "num_nod_per_fa%d", fblock_seq_id, num_nod_per_fa );
         // Get the ncdf connect variable and the element type
-        INS_ID( temp_string, "fbconn%d", fblock_seq_id );
+        INS_ID( temp_string, "fbconn%d", fblock_seq_id, max_str_length + 1 );
         GET_VAR( temp_string, nc_var, dims );
         std::vector< int > fbconn;
         fbconn.resize( num_nod_per_fa );
@@ -691,7 +691,7 @@ ErrorCode ReadNCDF::read_polyhedra_faces()
         }
         std::vector< int > fbepecnt;
         fbepecnt.resize( num_fa_in_blk );
-        INS_ID( temp_string, "fbepecnt%d", fblock_seq_id );
+        INS_ID( temp_string, "fbepecnt%d", fblock_seq_id, max_str_length + 1 );
         GET_VAR( temp_string, nc_var, dims );
         count[0] = num_fa_in_blk;
         fail     = nc_get_vara_int( ncFile, nc_var, start, count, &fbepecnt[0] );
@@ -759,12 +759,12 @@ ErrorCode ReadNCDF::read_elements( const Tag* file_id_tag )
         EntityHandle* conn = 0;
 
         // Get the ncdf connect variable and the element type
-        INS_ID( temp_string, "connect%d", block_seq_id );
+        INS_ID( temp_string, "connect%d", block_seq_id, max_str_length + 1 );
         GET_VAR( temp_string, nc_var, dims );
         if( -1 == nc_var || 0 == nc_var )
         {  // try other var, for polyhedra blocks
             // it could be polyhedra block, defined by fbconn and NFACED attribute
-            INS_ID( temp_string, "facconn%d", block_seq_id );
+            INS_ID( temp_string, "facconn%d", block_seq_id, max_str_length + 1 );
             GET_VAR( temp_string, nc_var, dims );
 
             if( -1 == nc_var || 0 == nc_var )
@@ -811,7 +811,7 @@ ErrorCode ReadNCDF::read_elements( const Tag* file_id_tag )
             std::vector< int > ebec;
             ebec.resize( this_it->numElements );
             // Get the ncdf connect variable and the element type
-            INS_ID( temp_string, "ebepecnt%d", block_seq_id );
+            INS_ID( temp_string, "ebepecnt%d", block_seq_id, max_str_length + 1 );
             GET_VAR( temp_string, nc_var, dims );
             count[0] = this_it->numElements;
             fail     = nc_get_vara_int( ncFile, nc_var, start, count, &ebec[0] );
@@ -870,7 +870,7 @@ ErrorCode ReadNCDF::read_elements( const Tag* file_id_tag )
             std::vector< int > ebepecnt;
             ebepecnt.resize( this_it->numElements );
             // Get the ncdf connect variable and the element type
-            INS_ID( temp_string, "ebepecnt%d", block_seq_id );
+            INS_ID( temp_string, "ebepecnt%d", block_seq_id, max_str_length + 1 );
             GET_VAR( temp_string, nc_var, dims );
             count[0] = this_it->numElements;
             fail     = nc_get_vara_int( ncFile, nc_var, start, count, &ebepecnt[0] );
@@ -1083,7 +1083,7 @@ ErrorCode ReadNCDF::read_nodesets()
         std::vector< double > temp_dist_factor_vector( number_nodes_in_set );
         if( number_dist_factors_in_set != 0 )
         {
-            INS_ID( temp_string, "dist_fact_ns%d", i + 1 );
+            INS_ID( temp_string, "dist_fact_ns%d", i + 1, max_str_length + 1 );
             GET_1D_DBL_VAR( temp_string, temp_dim, temp_dist_factor_vector );
             if( -1 == temp_dim )
             {
@@ -1098,7 +1098,7 @@ ErrorCode ReadNCDF::read_nodesets()
             node_handles.resize( number_nodes_in_set );
         }
 
-        INS_ID( temp_string, "node_ns%d", i + 1 );
+        INS_ID( temp_string, "node_ns%d", i + 1, max_str_length + 1 );
         int temp_var = -1;
         GET_1D_INT_VAR( temp_string, temp_var, node_handles );
         if( -1 == temp_var )
@@ -1245,7 +1245,7 @@ ErrorCode ReadNCDF::read_sidesets()
         // Size new arrays and get element and side lists
         std::vector< int > side_list( number_sides_in_set );
         std::vector< int > element_list( number_sides_in_set );
-        INS_ID( temp_string, "side_ss%d", i + 1 );
+        INS_ID( temp_string, "side_ss%d", i + 1, max_str_length + 1 );
         temp_var = -1;
         GET_1D_INT_VAR( temp_string, temp_var, side_list );
         if( -1 == temp_var )
@@ -1253,7 +1253,7 @@ ErrorCode ReadNCDF::read_sidesets()
             MB_SET_ERR( MB_FAILURE, "ReadNCDF:: Problem getting sideset side variable" );
         }
 
-        INS_ID( temp_string, "elem_ss%d", i + 1 );
+        INS_ID( temp_string, "elem_ss%d", i + 1, max_str_length + 1 );
         temp_var = -1;
         GET_1D_INT_VAR( temp_string, temp_var, element_list );
         if( -1 == temp_var )
@@ -1374,7 +1374,7 @@ ErrorCode ReadNCDF::create_ss_elements( int* element_ids,
     int temp_var;
     if( num_dist_factors )
     {
-        INS_ID( temp_string, "dist_fact_ss%d", ss_seq_id );
+        INS_ID( temp_string, "dist_fact_ss%d", ss_seq_id, max_str_length + 1 );
         temp_var = -1;
         GET_1D_DBL_VAR( temp_string, temp_var, temp_dist_factor_vector );
         if( -1 == temp_var )

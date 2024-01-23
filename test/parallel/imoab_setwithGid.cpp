@@ -116,10 +116,8 @@ int main( int argc, char* argv[] )
 	 */
     ierr = iMOAB_GetMeshInfo( cplLnd2PID, nverts, nelem, 0, 0, 0 );
     CHECKIERR( ierr, "Cannot get info on mct mesh on coupler pes" )
-    std::vector< int > gids( nverts[0] );
-    int nvals = nverts[0] * ntags;
-    if (mctEntType == 1)
-        nvals = nelem[0] * ntags;
+
+    int nvals = ntags * ( (mctEntType == 1) ? nelem[0] :  nverts[0] );
     std::vector< double > fracts( nvals );
     ierr = iMOAB_DefineTagStorage( cplLnd2PID, tagname.c_str(), &tagType[0], &sizeTag, &tagIndex );
     CHECKIERR( ierr, "Cannot define frac tag" )
@@ -130,9 +128,8 @@ int main( int argc, char* argv[] )
     ierr           = iMOAB_GetDoubleTagStorage( cplLnd2PID, tagname.c_str(), &nvals, &mctEntType, &fracts[0] );
     CHECKIERR( ierr, "Cannot get tag on lnd2 on coupler pes" )
 
-    int ngids = nverts[0];
-    if (mctEntType == 1)
-        ngids = nelem[0];
+    int ngids = (mctEntType == 1) ? nelem[0] : nverts[0];
+    std::vector< int > gids( ngids );
     ierr = iMOAB_GetIntTagStorage( cplLnd2PID, "GLOBAL_ID", &ngids, &mctEntType, &gids[0] );
     CHECKIERR( ierr, "Cannot get global id tag on lnd2 on coupler pes" )
 

@@ -37,6 +37,7 @@
 # LICENSE
 #
 #   Copyright (c) 2009 Steven G. Johnson <stevenj@alum.mit.edu>
+#   Copyright (c) 2019 Geoffrey M. Oxberry <goxberry@gmail.com>
 #
 #   This program is free software: you can redistribute it and/or modify it
 #   under the terms of the GNU General Public License as published by the
@@ -64,7 +65,7 @@
 #   modified version of the Autoconf Macro, you may extend this special
 #   exception to the GPL to apply to your modified version as well.
 
-#serial 8
+#serial 10
 
 AU_ALIAS([ACX_LAPACK], [AX_LAPACK])
 AC_DEFUN([AX_LAPACK], [
@@ -76,18 +77,18 @@ AC_ARG_WITH(lapack,
 case $with_lapack in
         yes | "") ;;
         no) ax_lapack_ok=disable ;;
-        -* | */* | *.a | *.so | *.so.* | *.o) LAPACK_LIBS="$with_lapack" ;;
+        -* | */* | *.a | *.so | *.so.* | *.dylib | *.dylib.* | *.o)
+                 LAPACK_LIBS="$with_lapack"
+        ;;
         *) LAPACK_LIBS="-l$with_lapack" ;;
 esac
 
 # Get fortran linker name of LAPACK function to check for.
 if (test "x$ENABLE_FORTRAN" != "xno"); then
   AC_LANG_PUSH(Fortran)dnl
-  _AC_FC_FUNC(dgeev)
   _AC_FC_FUNC(cheev)
   AC_LANG_POP(Fortran)dnl
 else
-  dgeev="dgeev$FCMANGLE_SUFFIX" # Default
   cheev="cheev$FCMANGLE_SUFFIX"
 fi
 
@@ -97,26 +98,11 @@ if test "x$ax_blas_ok" != xyes; then
         LAPACK_LIBS=""
 fi
 
-# Next see if we are using Darwin/OSX
-# LAPACK in Apple vecLib library?
-if (test "x$target_vendor" = "xapple" && test "x$LAPACK_LIBS" = "x"); then
-
-  if test $ax_lapack_ok = no; then
-    AC_CHECK_LIB(lapack, [$dgeev], [ax_lapack_ok=yes], [ax_lapack_ok=no],
-    [-framework vecLib])
-  fi
-  if test $ax_lapack_ok = no; then
-    AC_CHECK_LIB(lapack, [$dgeev], [ax_lapack_ok=yes], [ax_lapack_ok=no],
-    [-framework accelerate])
-  fi
-
-fi
-
 # First, check LAPACK_LIBS environment variable
 if test "x$LAPACK_LIBS" != x; then
         save_LIBS="$LIBS"; LIBS="$LAPACK_LIBS $BLAS_LIBS $LIBS $FLIBS"
         AC_MSG_CHECKING([for $cheev in $LAPACK_LIBS])
-        AC_TRY_LINK_FUNC($cheev, [ax_lapack_ok=yes], [LAPACK_LIBS=""])
+        AC_LINK_IFELSE([AC_LANG_CALL([], [$cheev])], [ax_lapack_ok=yes], [LAPACK_LIBS=""])
         AC_MSG_RESULT($ax_lapack_ok)
         LIBS="$save_LIBS"
         if test $ax_lapack_ok = no; then
@@ -145,17 +131,16 @@ AC_SUBST(LAPACK_LIBS)
 
 # Finally, execute ACTION-IF-FOUND/ACTION-IF-NOT-FOUND:
 if test x"$ax_lapack_ok" = xyes; then
+        AC_MSG_NOTICE([Found LAPACK library])
         ifelse([$1],,AC_DEFINE(HAVE_LAPACK,1,[Define if you have LAPACK library.]),[$1])
         :
-        AC_MSG_NOTICE([Found LAPACK library])
 else
+        AC_MSG_ERROR([LAPACK library not found])
         ax_lapack_ok=no
         $2
-        AC_MSG_ERROR([LAPACK library not found])
 fi
 
 enablelapack=$ax_lapack_ok
 AC_SUBST(enablelapack)
 
 ])dnl AX_LAPACK
-

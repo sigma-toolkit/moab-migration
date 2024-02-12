@@ -36,6 +36,7 @@
 # LICENSE
 #
 #   Copyright (c) 2008 Steven G. Johnson <stevenj@alum.mit.edu>
+#   Copyright (c) 2019 Geoffrey M. Oxberry <goxberry@gmail.com>
 #
 #   This program is free software: you can redistribute it and/or modify it
 #   under the terms of the GNU General Public License as published by the
@@ -63,13 +64,13 @@
 #   modified version of the Autoconf Macro, you may extend this special
 #   exception to the GPL to apply to your modified version as well.
 
-#serial 15
+#serial 21
 
 AU_ALIAS([ACX_BLAS], [AX_BLAS])
 AC_DEFUN([AX_BLAS], [
-AC_PREREQ(2.50)
-# AC_REQUIRE([AC_F77_LIBRARY_LDFLAGS])
-# AC_REQUIRE([AC_CANONICAL_HOST])
+AC_PREREQ([2.55])
+AC_REQUIRE([AC_F77_LIBRARY_LDFLAGS])
+AC_REQUIRE([AC_CANONICAL_HOST])
 ax_blas_ok=no
 
 AC_ARG_WITH(blas,
@@ -77,22 +78,15 @@ AC_ARG_WITH(blas,
 case $with_blas in
 	yes | "") ;;
 	no) ax_blas_ok=disable ;;
-	-* | */* | *.a | *.so | *.so.* | *.o) BLAS_LIBS="$with_blas" ;;
+	-* | */* | *.a | *.so | *.so.* | *.dylib | *.dylib.* | *.o)
+		BLAS_LIBS="$with_blas"
+	;;
 	*) BLAS_LIBS="-l$with_blas" ;;
 esac
 
-OPENMP_LDFLAGS="$OPENMP_CXXFLAGS"
-
 # Get fortran linker names of BLAS functions to check for.
-if (test "x$ENABLE_FORTRAN" != "xno"); then
-  AC_LANG_PUSH(Fortran)dnl
-  _AC_FC_FUNC(sgemm)
-  _AC_FC_FUNC(dgemm)
-  AC_LANG_POP(Fortran)dnl
-else
-  sgemm="sgemm$FCMANGLE_SUFFIX" # Default
-  dgemm="dgemm$FCMANGLE_SUFFIX"
-fi
+AC_F77_FUNC(sgemm)
+AC_F77_FUNC(dgemm)
 
 ax_blas_save_LIBS="$LIBS"
 LIBS="$LIBS $FLIBS"
@@ -102,7 +96,7 @@ if test $ax_blas_ok = no; then
 if test "x$BLAS_LIBS" != x; then
 	save_LIBS="$LIBS"; LIBS="$BLAS_LIBS $LIBS"
 	AC_MSG_CHECKING([for $sgemm in $BLAS_LIBS])
-	AC_TRY_LINK_FUNC($sgemm, [ax_blas_ok=yes], [BLAS_LIBS=""])
+	AC_LINK_IFELSE([AC_LANG_CALL([], [$sgemm])], [ax_blas_ok=yes], [BLAS_LIBS=""])
 	AC_MSG_RESULT($ax_blas_ok)
 	LIBS="$save_LIBS"
 fi
@@ -112,35 +106,16 @@ fi
 if test $ax_blas_ok = no; then
 	save_LIBS="$LIBS"; LIBS="$LIBS"
 	AC_MSG_CHECKING([if $sgemm is being linked in already])
-	AC_TRY_LINK_FUNC($sgemm, [ax_blas_ok=yes])
+	AC_LINK_IFELSE([AC_LANG_CALL([], [$sgemm])], [ax_blas_ok=yes])
 	AC_MSG_RESULT($ax_blas_ok)
 	LIBS="$save_LIBS"
 fi
 
-# BLAS in Intel MKL library?
+# BLAS linked to by flexiblas? (Default on FC33+ and RHEL9+)
+
 if test $ax_blas_ok = no; then
-  case $host_os in
-    darwin*)
-      AC_CHECK_LIB(mkl_intel_lp64, $sgemm,
-                   [ax_blas_ok=yes;BLAS_LIBS="-lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread"; OPENMP_LDFLAGS=""],,
-                   [-lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread])
-      ;;
-    *)
-      if test $host_cpu = x86_64; then
-        AC_CHECK_LIB(mkl_intel_lp64, $sgemm,
-                     [ax_blas_ok=yes;BLAS_LIBS="-lmkl_intel_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl"],,
-                     [-lmkl_intel_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl])
-      elif test $host_cpu = i686; then
-        AC_CHECK_LIB(mkl_intel, $sgemm,
-                     [ax_blas_ok=yes;BLAS_LIBS="-lmkl_intel -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl"],,
-                     [-lmkl_intel -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl])
-      fi
-    ;;
-  esac
-fi
-# Old versions of MKL
-if test $ax_blas_ok = no; then
-	AC_CHECK_LIB(mkl, $sgemm, [ax_blas_ok=yes;BLAS_LIBS="-lmkl -lguide -lpthread"],,[-lguide -lpthread])
+	AC_CHECK_LIB(flexiblas, $sgemm, [ax_blas_ok=yes
+			                BLAS_LIBS="-lflexiblas"])
 fi
 
 # BLAS in OpenBLAS library? (http://xianyi.github.com/OpenBLAS/)
@@ -170,11 +145,46 @@ if test $ax_blas_ok = no; then
 			[], [-lblas])])
 fi
 
+# BLAS in Intel MKL library?
+if test $ax_blas_ok = no; then
+	# MKL for gfortran
+	if test x"$ac_cv_fc_compiler_gnu" = xyes; then
+		# 64 bit
+		if test $host_cpu = x86_64; then
+			AC_CHECK_LIB(mkl_gf_lp64, $sgemm,
+			[ax_blas_ok=yes;BLAS_LIBS="-lmkl_gf_lp64 -lmkl_sequential -lmkl_core -lpthread"],,
+			[-lmkl_gf_lp64 -lmkl_sequential -lmkl_core -lpthread])
+		# 32 bit
+		elif test $host_cpu = i686; then
+			AC_CHECK_LIB(mkl_gf, $sgemm,
+				[ax_blas_ok=yes;BLAS_LIBS="-lmkl_gf -lmkl_sequential -lmkl_core -lpthread"],,
+				[-lmkl_gf -lmkl_sequential -lmkl_core -lpthread])
+		fi
+	# MKL for other compilers (Intel, PGI, ...?)
+	else
+		# 64-bit
+		if test $host_cpu = x86_64; then
+			AC_CHECK_LIB(mkl_intel_lp64, $sgemm,
+				[ax_blas_ok=yes;BLAS_LIBS="-lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread"],,
+				[-lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread])
+		# 32-bit
+		elif test $host_cpu = i686; then
+			AC_CHECK_LIB(mkl_intel, $sgemm,
+				[ax_blas_ok=yes;BLAS_LIBS="-lmkl_intel -lmkl_sequential -lmkl_core -lpthread"],,
+				[-lmkl_intel -lmkl_sequential -lmkl_core -lpthread])
+		fi
+	fi
+fi
+# Old versions of MKL
+if test $ax_blas_ok = no; then
+	AC_CHECK_LIB(mkl, $sgemm, [ax_blas_ok=yes;BLAS_LIBS="-lmkl -lguide -lpthread"],,[-lguide -lpthread])
+fi
+
 # BLAS in Apple vecLib library?
 if test $ax_blas_ok = no; then
-	save_LIBS="$LIBS"; LIBS="-framework vecLib $LIBS"
-	AC_MSG_CHECKING([for $sgemm in -framework vecLib])
-	AC_TRY_LINK_FUNC($sgemm, [ax_blas_ok=yes;BLAS_LIBS="-framework vecLib"])
+	save_LIBS="$LIBS"; LIBS="-framework Accelerate $LIBS"
+	AC_MSG_CHECKING([for $sgemm in -framework Accelerate])
+	AC_LINK_IFELSE([AC_LANG_CALL([], [$sgemm])], [ax_blas_ok=yes;BLAS_LIBS="-framework Accelerate"])
 	AC_MSG_RESULT($ax_blas_ok)
 	LIBS="$save_LIBS"
 fi
@@ -224,7 +234,6 @@ if test $ax_blas_ok = no; then
 fi
 
 AC_SUBST(BLAS_LIBS)
-AC_SUBST(OPENMP_LDFLAGS)
 
 LIBS="$ax_blas_save_LIBS"
 
@@ -237,4 +246,3 @@ else
         $2
 fi
 ])dnl AX_BLAS
-

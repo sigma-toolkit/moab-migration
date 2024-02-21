@@ -26,6 +26,8 @@ cdef void* null = NULL
 
 cdef class Core(object):
 
+    _term_null_char = np.vectorize(lambda s: s.split(b'\x00')[0])
+
     def __cinit__(self):
         """ Constructor """
         self.inst = new moab.Core()
@@ -962,14 +964,14 @@ cdef class Core(object):
         #create array to hold data
         cdef np.ndarray data
         if tag_type is types.MB_TYPE_OPAQUE:
-            data = np.empty((ehs.size,),dtype='S'+str(length))
+            data = np.empty((ehs.size,), dtype='S'+str(length))
         else:
             data = np.empty((length*ehs.size,), dtype=np.dtype(np_tag_type(tag_type)))
         err = self.inst.tag_get_data(tag.inst, <eh.EntityHandle*> ehs.data, ehs.size, <void*> data.data)
         check_error(err, exceptions)
         # return data as user specifies
         if tag_type is types.MB_TYPE_OPAQUE:
-            data = data.astype('str')
+            data = self._term_null_char(data).astype('str')
         if flat:
             return data
         else:

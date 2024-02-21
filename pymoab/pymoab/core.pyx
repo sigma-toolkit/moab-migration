@@ -971,7 +971,7 @@ cdef class Core(object):
         check_error(err, exceptions)
         # return data as user specifies
         if tag_type is types.MB_TYPE_OPAQUE:
-            data = self._term_null_char(data).astype('str')
+            data = self._term_null_char(data).astype('S'+str(length)).astype('str')
         if flat:
             return data
         else:

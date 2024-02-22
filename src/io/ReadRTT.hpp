@@ -181,6 +181,8 @@ class ReadRTT : public ReaderIface
             std::cout << "coord_units: " << coord_units << std::endl;
             std::cout << "prob_time_units: " << prob_time_units << std::endl;
             std::cout << "ncell_defs: " << ncell_defs << std::endl;
+            std::cout << std::endl;
+            std::cout << "Node information: " << std::endl;
             std::cout << "nnodes_max: " << nnodes_max << std::endl;
             std::cout << "nsides_max: " << nsides_max << std::endl;
             std::cout << "nnodes_sides_max: " << nnodes_sides_max << std::endl;
@@ -188,27 +190,34 @@ class ReadRTT : public ReaderIface
             std::cout << "n_dim_topo: " << n_dim_topo << std::endl;
             std::cout << "nnodes: " << nnodes << std::endl;
             std::cout << "nnode_flag_types: " << nnode_flag_types << std::endl;
-            std::cout << "nnode_flags: " << std::endl;
+            std::cout << "nnode_flags: ";
             for (int i = 0; i < nnode_flags.size(); i++) {
                 std::cout << nnode_flags[i] << " ";
             }
             std::cout << std::endl;
             std::cout << "nnode_data: " << nnode_data << std::endl;
+
+            std::cout << std::endl;
+            std::cout << "Side information: " << std::endl;
             std::cout << "nsides: " << nsides << std::endl;
             std::cout << "nside_types: " << nside_types << std::endl;
             std::cout << "side_types: " << side_types << std::endl;
             std::cout << "nside_flag_types: " << nside_flag_types << std::endl;
-            std::cout << "nside_flags: " << std::endl;
+            std::cout << "nside_flags: ";
             for (int i = 0; i < nside_flags.size(); i++) {
                 std::cout << nside_flags[i] << " ";
             }
             std::cout << std::endl;
             std::cout << "nside_data: " << nside_data << std::endl;
+
+
+            std::cout << std::endl;
+            std::cout << "Cell information: " << std::endl;
             std::cout << "ncells: " << ncells << std::endl;
             std::cout << "ncell_types: " << ncell_types << std::endl;
             std::cout << "cell_types: " << cell_types << std::endl;
             std::cout << "ncell_flag_types: " << ncell_flag_types << std::endl;
-            std::cout << "ncell_flags: " << std::endl;
+            std::cout << "ncell_flags: ";
             for (int i = 0; i < ncell_flags.size(); i++) {
                 std::cout << ncell_flags[i] << " ";
             }

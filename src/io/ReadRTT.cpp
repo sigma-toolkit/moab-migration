@@ -358,6 +358,9 @@ ErrorCode ReadRTT::read_header( const char* filename )
             {
                 rval = get_header_data( input_file );
             }
+            if (line.compare("dims") == 0) {
+                parse_dims(input_file);
+            }
         }
         input_file.close();
     }
@@ -583,10 +586,85 @@ ErrorCode ReadRTT::get_header_data( std::ifstream& input_file )
             return MB_SUCCESS;
         }
     }
-
     // otherwise we never found the end_header keyword
     return MB_FAILURE;
 }
+
+ErrorCode ReadRTT::parse_dims(std::ifstream& input_file)
+{
+    if (!input_file.good() || !input_file.is_open())
+    {
+        std::cout << "Problems reading file" << std::endl;
+        return MB_FAILURE;
+    }
+
+    std::string line;
+    std::vector<std::string> tokens;
+    while(std::getline(input_file, line)) {
+        if (line == "") continue;
+        if (line.find("end_dims") != std::string::npos) break;
+
+        tokens = ReadRTT::split_string(line, ' ');
+        if (tokens[0] == "coord_units") {
+            dim_data.coord_units = tokens[1];
+        } else if (tokens[0] == "prob_time_units") {
+            dim_data.prob_time_units = tokens[1];
+        } else if (tokens[0] == "ncell_defs") {
+            dim_data.ncell_defs = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "nnodes_max") {
+            dim_data.nnodes_max = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "nsides_max") {
+            dim_data.nsides_max = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "nnodes_sides_max") {
+            dim_data.nnodes_sides_max = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "ndim") {
+            dim_data.ndim = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "n_dim_topo") {
+            dim_data.n_dim_topo = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "nnodes") {
+            dim_data.nnodes = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "nnode_flag_types") {
+            dim_data.nnode_flag_types = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "nnode_flags") {
+            for (int i = 1; i < tokens.size(); i++) {
+                dim_data.nnode_flags.push_back(std::atoi(tokens[i].c_str()));
+            }
+        } else if (tokens[0] == "nnode_data") {
+            dim_data.nnode_data = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "nsides") {
+            dim_data.nsides = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "nside_types") {
+            dim_data.nside_types = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "side_types") {
+            dim_data.side_types = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "nside_flag_types") {
+            dim_data.nside_flag_types = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "nside_flags") {
+            for (int i = 1; i < tokens.size(); i++) {
+                dim_data.nside_flags.push_back(std::atoi(tokens[i].c_str()));
+            }
+        } else if (tokens[0] == "nside_data") {
+            dim_data.nside_data = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "ncells") {
+            dim_data.ncells = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "ncell_types") {
+            dim_data.ncell_types = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "cell_types") {
+            dim_data.cell_types = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "ncell_flag_types") {
+            dim_data.ncell_flag_types = std::atoi(tokens[1].c_str());
+        } else if (tokens[0] == "ncell_flags") {
+            for (int i = 1; i < tokens.size(); i++) {
+                dim_data.ncell_flags.push_back(std::atoi(tokens[i].c_str()));
+            }
+        } else if (tokens[0] == "ncell_data") {
+            dim_data.ncell_data = std::atoi(tokens[1].c_str());
+        }
+    }
+    // Check that the data is valid and has the expected number of entries
+    dim_data.validate();
+}
+
 
 /*
  * given the string sidedata, get the id number, senses and names of the sides
@@ -679,7 +757,7 @@ ReadRTT::facet ReadRTT::get_facet_data( std::string facetdata )
     tokens = ReadRTT::split_string( facetdata, ' ' );
 
     // set the side id
-    if( tokens.size() != 7 )
+    if( tokens.size() > 7 )
     {
         MB_SET_ERR_RET_VAL( "Error, too many tokens found from get_facet_data", new_facet );
     }
@@ -720,10 +798,6 @@ ReadRTT::tet ReadRTT::get_tet_data( std::string tetdata )
     tokens = ReadRTT::split_string( tetdata, ' ' );
 
     // set the side id
-    if( tokens.size() != 7 )
-    {
-        MB_SET_ERR_RET_VAL( "Error, too many tokens found from get_tet_data", new_tet );
-    }
     new_tet.id = std::atoi( tokens[0].c_str() );
     // branch on the version number
     if( header_data.version == "v1.0.0" )

@@ -359,7 +359,7 @@ ErrorCode ReadRTT::read_header( const char* filename )
                 rval = get_header_data( input_file );
             }
             if (line.compare("dims") == 0) {
-                parse_dims(input_file);
+                rval = parse_dims(input_file);
             }
         }
         input_file.close();
@@ -663,6 +663,8 @@ ErrorCode ReadRTT::parse_dims(std::ifstream& input_file)
     }
     // Check that the data is valid and has the expected number of entries
     dim_data.validate();
+
+    return MB_SUCCESS;
 }
 
 

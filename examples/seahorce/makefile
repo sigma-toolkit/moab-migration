@@ -26,6 +26,12 @@ RemapMPASROMS: RemapMPASROMS.o ${MOAB_LIBDIR}/libMOAB.la lib/libtet.a lib/libTSF
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK} lib/libtet.a  lib/libTSFIT.a -L/opt/compadre/lib -lcompadre -lkokkoskernels -lkokkoscore external/alglib-cpp/src/libalglib.a
 
+readnc_roms.o: include/*.hpp
+readnc_roms: readnc_roms.o ${MOAB_LIBDIR}/libMOAB.la lib/libtet.a lib/libTSFIT.a
+	@echo "[CXXLD]  $@"
+	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK} lib/libtet.a  lib/libTSFIT.a -L/opt/compadre/lib -lcompadre -lkokkoskernels -lkokkoscore external/alglib-cpp/src/libalglib.a
+
+
 lib/libtet.a: src/tetgen.cxx predicates.o
 	${VERBOSE}${MOAB_CXX} ${CXXFLAGS} ${MOAB_CXXFLAGS} -c src/tetgen.cxx
 	ar r lib/libtet.a tetgen.o predicates.o

@@ -5,6 +5,22 @@
 #include "moab/Remapping/MBA.hpp"
 #include "ComputeNN.hpp"
 
+/**
+ * Computes the MBA interpolant for a given set of data points.
+ *
+ * @param context The runtime context.
+ * @param xyzd The input coordinates of the data points.
+ * @param fd The input function values at the data points.
+ * @param xyzi The output interpolated coordinates.
+ * @param fi The output interpolated function values.
+ * @param is_threed Flag indicating whether the data points are in 3D.
+ * @param order The order of the interpolant.
+ * @param grid The size of the grid used for interpolation.
+ * @param bbox_user The user-defined bounding box for the data points.
+ * @param nlevels The number of levels used for multilevel interpolation. Default is 7.
+ *
+ * @return The error code indicating the success or failure of the computation.
+ */
 moab::ErrorCode ComputeMBAInterpolant( RuntimeContext& context,
                                        std::vector< double >& xyzd,
                                        std::vector< double >& fd,

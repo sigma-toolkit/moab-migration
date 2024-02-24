@@ -6,6 +6,17 @@
 // Remapping related includes
 #include "FiniteVolumeTools.h"
 
+/**
+ * @brief Scales the coordinates of a set of nodes.
+ *
+ * This function scales the coordinates of a set of nodes by a given factor.
+ *
+ * @param mb The MOAB interface.
+ * @param nodes The vector of node handles.
+ * @param R The scaling factor.
+ * @param is_cartesian Flag indicating whether the coordinates are in Cartesian or spherical system.
+ * @return The MOAB error code.
+ */
 moab::ErrorCode ScaleCoords( moab::Interface* mb,
                              std::vector< moab::EntityHandle >& nodes,
                              double R,

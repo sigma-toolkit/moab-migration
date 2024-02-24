@@ -46,6 +46,16 @@ using KdTree = nanoflann::
     KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, PC3D< double > >, PC3D< double >, 3 /* dim */
                               >;
 
+/**
+ * Computes the nearest neighbor interpolant for the given source and destination data.
+ *
+ * @param context The runtime context.
+ * @param src_xyz The source coordinates.
+ * @param src_tdata The source data values.
+ * @param dst_xyz The destination coordinates.
+ * @param dst_tdata The interpolated destination data values.
+ * @return The error code indicating the success or failure of the computation.
+ */
 moab::ErrorCode ComputeNNInterpolant( RuntimeContext&,
                                       const std::vector< double >& src_xyz,
                                       const std::vector< double >& src_tdata,

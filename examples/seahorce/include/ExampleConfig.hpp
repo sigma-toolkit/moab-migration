@@ -1,3 +1,7 @@
+/**
+ * @file ExampleConfig.hpp
+ * @brief This file contains configuration settings for the example code.
+ */
 #ifndef __example_config_hpp__
 #define __example_config_hpp__
 

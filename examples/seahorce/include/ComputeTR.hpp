@@ -7,6 +7,17 @@
 
 const char* template_map_output_filename = "mpas_roms_map_";
 
+/**
+ * \brief Clones the given Mesh object to a TempestRemap mesh set in the MOAB interface.
+ *
+ * This function takes a Mesh object and clones it to a TR mesh set in the MOAB interface.
+ * The cloned mesh set is represented by the given entity handle.
+ *
+ * \param m_interface The MOAB interface.
+ * \param mesh The Mesh object to be cloned.
+ * \param mesh_set The entity handle representing the TR mesh set.
+ * \return The MOAB error code indicating the success or failure of the operation.
+ */
 moab::ErrorCode CloneToTRMesh( moab::Interface* m_interface, Mesh& mesh, moab::EntityHandle mesh_set )
 {
     using namespace moab;
@@ -86,6 +97,18 @@ moab::ErrorCode CloneToTRMesh( moab::Interface* m_interface, Mesh& mesh, moab::E
     return MB_SUCCESS;
 }
 
+/**
+ * @brief Loads TempestRemap weights for remapping between two sets.
+ *
+ * This function loads the TempestRemap weights for remapping between a source set and a target set.
+ * The weights are stored in a file specified by the map_output_filename parameter.
+ *
+ * @param context The runtime context.
+ * @param src_set The handle of the source set.
+ * @param tgt_set The handle of the target set.
+ * @param map_output_filename The filename of the TempestRemap weights file.
+ * @return The error code indicating the success or failure of the operation.
+ */
 moab::ErrorCode LoadTempestRemapWeights( RuntimeContext& context,
                                          moab::EntityHandle src_set,
                                          moab::EntityHandle tgt_set,
@@ -110,6 +133,16 @@ moab::ErrorCode LoadTempestRemapWeights( RuntimeContext& context,
     return moab::MB_SUCCESS;
 }
 
+/**
+ * @brief Computes the TempestRemap weights between the source and target sets.
+ *
+ * This function calculates the remap weights needed to interpolate data from the source set to the target set.
+ *
+ * @param context The runtime context.
+ * @param src_set The handle of the source set.
+ * @param tgt_set The handle of the target set.
+ * @return The error code indicating the success or failure of the computation.
+ */
 moab::ErrorCode ComputeTempestRemapWeights( RuntimeContext& context,
                                             moab::EntityHandle src_set,
                                             moab::EntityHandle tgt_set )
@@ -240,6 +273,18 @@ moab::ErrorCode ComputeTempestRemapWeights( RuntimeContext& context,
     return moab::MB_SUCCESS;
 }
 
+/**
+ * Applies the CAAS limiting algorithm to the given data.
+ *
+ * @param mapOperator The offline map operator.
+ * @param meshInput The input mesh.
+ * @param meshOverlap The overlap mesh.
+ * @param nPin The number of pins.
+ * @param dataInDouble The input data array.
+ * @param dataOutDouble The output data array.
+ * @param useCAASLocal Flag indicating whether to use CAAS local.
+ * @return global integral value (double)
+ */
 double ApplyCAASLimiting( OfflineMap& mapOperator,
                           Mesh& meshInput,
                           Mesh& meshOverlap,

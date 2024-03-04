@@ -399,15 +399,16 @@ class TempestOnlineMap : public OfflineMap
 
 #ifdef MOAB_HAVE_MPI
     int rearrange_arrays_by_dofs( const std::vector< unsigned int >& gdofmap,
-                                  DataArray1D< double >& vecFaceArea,
-                                  DataArray1D< double >& dCenterLon,
-                                  DataArray1D< double >& dCenterLat,
-                                  DataArray2D< double >& dVertexLat,
-                                  DataArray2D< double >& dVertexLon,
-                                  std::vector< int >& masks,
-                                  unsigned& N,  // this will be output too now
-                                  int nv,
-                                  int& maxdof );
+            DataArray1D< double >& vecFaceArea,
+            DataArray1D< double >& dCenterLon,
+            DataArray1D< double >& dCenterLat,
+            DataArray2D< double >& dVertexLon,
+            DataArray2D< double >& dVertexLat,
+            std::vector< int >& masks,
+            unsigned& N,  // will have the local, after dofMap.size () == N
+            int nv,
+            int * globals, // these will be output now, too, with global min and max dofs
+            std::map<int, int> & dofMap ) ;
 #endif
 
     ///	<summary>

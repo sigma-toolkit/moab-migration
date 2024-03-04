@@ -55,19 +55,72 @@ int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< unsigne
                                                       std::vector< int >& masks,
                                                       unsigned& N,  // will have the local, after
                                                       int nv,
-                                                      int& maxdof )
+                                                      int * globals,
+                                                      std::map<int, int> & dofMap )
 {
-    // first decide maxdof, for partitioning
-    unsigned int localmax = 0;
-    for( unsigned i = 0; i < N; i++ )
-        if( gdofmap[i] > localmax ) localmax = gdofmap[i];
+    // dofMap will take the dof to the local index dofMap [dof ] = index , where index is a local index in arrays that
+    // are returned
+    // first decide mindof and maxdof, for partitioning
+    // will participate in deciding min/max only if gdofmap.size() > 0
+    int localSize = 0;
+    int localmax = 0;
+    int localmin = 0;
+    if (gdofmap.size() > 0)
+    {
+        localmax = gdofmap[0];
+        localmin = gdofmap[0];
+        for( unsigned i = 0; i < N; i++ )
+        {
+            if( gdofmap[i] > localmax ) localmax = gdofmap[i];
+            if( gdofmap[i] < localmin ) localmin = gdofmap[i];
+        }
+        localSize = 2; // we do have min and max on this rank
+    }
+    // gather on root, localSize, min and max, then distribute to everybody the global max and min, even on
+    // those that have no data on them gdofmap.size() == 0
+    int * recvbuf =0;
+    if ( 0 == rank ) recvbuf = (int*)malloc (3 * size * sizeof(int)) ;
+    int sendbuf[3];
+    sendbuf[0] = localSize;
+    sendbuf[1] = localmin;
+    sendbuf[2] = localmax;
+    int n3 = 3 * size;
+    MPI_Gather( (void*)sendbuf, 3, MPI_INT, (void*)recvbuf, n3, MPI_INT, 0, m_pcomm->comm() );
+    // find out min and max of the global dof arrays
+    // int globals[2]; // min and max,
+    // recvbuf has values only on root, find out global min and max on root, then broadcast it
+    if ( 0 == rank )
+    {
+        bool first_values = true;
+        for (int i = 0; i < size; i++)
+        {
+            int nbValues = recvbuf[ 3 * rank ];
+            if (nbValues > 0)
+            {
+                if (first_values)
+                {
+                    globals[0] = recvbuf[ 3 * rank + 1];
+                    globals[1] = recvbuf[ 3 * rank + 2];
+                    first_values = false;
+                }
+                else
+                {
+                    globals[0] = (globals[0] <= recvbuf[ 3 * rank + 1]) ? globals[0] : recvbuf[ 3 * rank + 1];
+                    globals[1] = (globals[1] >= recvbuf[ 3 * rank + 2]) ? globals[1] : recvbuf[ 3 * rank + 2];
+                }
 
-    // decide partitioning based on maxdof/size
-    MPI_Allreduce( &localmax, &maxdof, 1, MPI_INT, MPI_MAX, m_pcomm->comm() );
-    // maxdof is 0 based, so actual number is +1
+            }
+        }
+    }
+    // broadcast now global_min and global_max, globals[2], from root = 0
+    MPI_Bcast(globals, 2, MPI_INT, 0, m_pcomm->comm() );
+
+    // dof is 0 based, so actual number is + 1
     // maxdof
-    int size_per_task = ( maxdof + 1 ) / size;  // based on this, processor to process dof x is x/size_per_task
-    // so we decide to reorder by actual dof, such that task 0 has dofs from [0 to size_per_task), etc
+    int size_per_task = ( globals[1] - globals[0] + 1 ) / size;
+    // based on this, processor to process dof x is (x - globals[0]) / size_per_task
+    // so we decide to reorder by actual dof, such that task k has dofs
+    //  from  [ globals[0] * size_per_task *k ) to  ... ( globals[0] + size_per_task * (k+1) )
     moab::TupleList tl;
     unsigned numr = 2 * nv + 3;         //  doubles: area, centerlon, center lat, nv (vertex lon, vertex lat)
     tl.initialize( 3, 0, 0, numr, N );  // to proc, dof, then
@@ -76,7 +129,7 @@ int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< unsigne
     for( unsigned i = 0; i < N; i++ )
     {
         int gdof    = gdofmap[i];
-        int to_proc = gdof / size_per_task;
+        int to_proc = ( gdof - globals[0] ) / size_per_task;
         int mask    = masks[i];
         if( to_proc >= size ) to_proc = size - 1;  // the last ones go to last proc
         int n                  = tl.get_n();
@@ -124,6 +177,7 @@ int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< unsigne
         dVertexLon[0][j] = tl.vr_wr[3 + j];
         dVertexLat[0][j] = tl.vr_wr[3 + nv + j];
     }
+    dofMap[ tl.vi_wr[1] ] = 0; // this is the first dof encountered in local arrays
     for( unsigned i = 0; i < tl.get_n() - 1; i++ )
     {
         int i1 = i + 1;
@@ -138,6 +192,7 @@ int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< unsigne
                 dVertexLat[current_size][j] = tl.vr_wr[i1 * numr + 3 + nv + j];
             }
             masks[current_size] = tl.vi_wr[3 * i1 + 2];
+            dofMap[ tl.vi_wr[3 * i + 4] ] = current_size; // current index, for the new dof that is encountered
             current_size++;
         }
         else
@@ -339,12 +394,15 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
 
     // first move data if in parallel
 #if defined( MOAB_HAVE_MPI )
-    int max_row_dof, max_col_dof;  // output; arrays will be re-distributed in chunks [maxdof/size]
+    int globals_col[2];  // output; arrays will be re-distributed in chunks [(maxdof-mindof)/size]
+    int globals_row[2];
+    // rows are for target, cols are for source dofs
+    std::map <int, int > dofRowMap, dofColMap;
     // if (size > 1)
     {
         int ierr = rearrange_arrays_by_dofs( srccol_gdofmap, vecSourceFaceArea, dSourceCenterLon, dSourceCenterLat,
                                              dSourceVertexLon, dSourceVertexLat, masksA, nA, nSourceNodesPerFace,
-                                             max_col_dof );  // now nA will be close to maxdof/size
+                                             globals_col, dofColMap );  // now nA will be close to maxdof/size
         if( ierr != 0 )
         {
             _EXCEPTION1( "Unable to arrange source data %d ", nA );
@@ -353,7 +411,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
         //
         ierr = rearrange_arrays_by_dofs( row_gdofmap, vecTargetFaceArea, dTargetCenterLon, dTargetCenterLat,
                                          dTargetVertexLon, dTargetVertexLat, masksB, nB, nTargetNodesPerFace,
-                                         max_row_dof );  // now nA will be close to maxdof/size
+                                         globals_row, dofRowMap );  // now nB will be close to maxdof/size
         if( ierr != 0 )
         {
             _EXCEPTION1( "Unable to arrange target data %d ", nB );
@@ -373,6 +431,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     MPI_Allreduce( &locbuf[3], &globuf[3], 2, MPI_INT, MPI_MAX, m_pcomm->comm() );
 
     // MPI_Scan is inclusive of data in current rank; modify accordingly.
+    // offbuf will have the start index for local arrays in the global array in pnetcdf
     offbuf[0] -= nA;
     offbuf[1] -= nB;
     offbuf[2] -= nS;
@@ -604,8 +663,8 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
      */
     int offset = 0;
 #if defined( MOAB_HAVE_MPI )
-    int nAbase = ( max_col_dof + 1 ) / size;  // it is nA, except last rank ( == size - 1 )
-    int nBbase = ( max_row_dof + 1 ) / size;  // it is nB, except last rank ( == size - 1 )
+    int nAbase = ( globals_col[1] - globals_col[0] + 1 ) / size;  // it is nA, except last rank ( == size - 1 )
+    int nBbase = ( globals_row[1] - globals_row[0] + 1 ) / size;  // it is nB, except last rank ( == size - 1 )
 #endif
     for( int i = 0; i < m_weightMatrix.outerSize(); ++i )
     {
@@ -618,9 +677,9 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
 #if defined( MOAB_HAVE_MPI )
             {
                 // value M(row, col) will contribute to procRow and procCol values for fracA and fracB
-                int procRow = ( vecRow[offset] - 1 ) / nBbase;
+                int procRow = ( vecRow[offset] - 1 - globals_row[0] ) / nBbase;
                 if( procRow >= size ) procRow = size - 1;
-                int procCol = ( vecCol[offset] - 1 ) / nAbase;
+                int procCol = ( vecCol[offset] - 1 - globals_col[0] ) / nAbase;
                 if( procCol >= size ) procCol = size - 1;
                 int nrInd                     = tlValRow.get_n();
                 tlValRow.vi_wr[2 * nrInd]     = procRow;

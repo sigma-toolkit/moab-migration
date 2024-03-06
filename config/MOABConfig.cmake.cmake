@@ -3,12 +3,25 @@
 #
 # This file defines the following variables:
 # MOAB_FOUND        - boolean indicating that MOAB is found
+# PACKAGE_VERSION   - version of MOAB
 # MOAB_INCLUDE_DIRS - include directories from which to pick up MOAB includes
 # MOAB_LIBRARIES    - libraries need to link to MOAB; use this in target_link_libraries for MOAB-dependent targets
 # MOAB_CXX, MOAB_CC, MOAB_F77, MOAB_FC - compilers used to compile MOAB
 # MOAB_CXXFLAGS, MOAB_CCFLAGS, MOAB_FFLAGS, MOAB_FCFLAGS - compiler flags used to compile MOAB; possibly need to use these in add_definitions or CMAKE_<LANG>_FLAGS_<MODE> 
 
 set(MOAB_FOUND 1)
+
+set(PACKAGE_VERSION @PACKAGE_VERSION@)
+
+# Check whether the requested PACKAGE_FIND_VERSION is compatible
+if("${PACKAGE_VERSION}" VERSION_LESS "${PACKAGE_FIND_VERSION}")
+  set(PACKAGE_VERSION_COMPATIBLE FALSE)
+else()
+  set(PACKAGE_VERSION_COMPATIBLE TRUE)
+  if("${PACKAGE_VERSION}" VERSION_EQUAL "${PACKAGE_FIND_VERSION}")
+    set(PACKAGE_VERSION_EXACT TRUE)
+  endif()
+endif()
 
 set(MOAB_CC "@CMAKE_C_COMPILER@")
 set(MOAB_CXX "@CMAKE_CXX_COMPILER@")

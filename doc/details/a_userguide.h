@@ -1123,12 +1123,9 @@ These steps are sufficient for building MOAB against HDF5 and netCDF.  By defaul
 
 <h2> PyMOAB </h2>
 
-  To install the PyMOAB module, add "--enable-pymoab" in the configuration step described above. PyMOAB will build using whatever version of Python is available on the system when the configuration command is executed. It requires the following packages to operate properly:
-    - Python's <a href=https://pypi.python.org/pypi/setuptools> setuptools </a> and <a href=https://docs.python.org/3/library/distutils.html> distutils </a> for building, linking, and distribution
+  To install the PyMOAB module, run “pip3 install .”. PyMOAB will build using whatever version of Python is available on the system when the configuration command is executed. It requires the following packages to operate properly:
+    - Python's <a href=https://https://scikit-build.readthedocs.io/> Scikit Build </a> for building, linking, and distribution
     - <a href=https://docs.python.org/3/library/distutils.html> NumPy </a> for management of data being passed into and out of the MOAB database
-
-  PyMOAB can be installed with a custom prefix path which can be set adding "PYMOAB_PREFIX=/path/to/custom/install/location" to the configuration command.
-
 
 
   \ref contents

@@ -19,7 +19,7 @@ echo "cd $MOAB_SRCDIR && autoreconf -fi && mkdir -p $MOAB_BUILDDIR && cd $MOAB_B
 cd $MOAB_SRCDIR && autoreconf -fi && mkdir -p $MOAB_BUILDDIR && cd $MOAB_BUILDDIR
 # All dependencies installed by spack are available under /opt/view
 $MOAB_SRCDIR/configure --prefix=$MOAB_INSTALLDIR LDFLAGS="-L$MOAB_TPLDIR/lib" --with-mpi=$MOAB_TPLDIR \
-  --enable-shared --enable-static --enable-pymoab PYTHON=python3 --enable-optimize \
+  --enable-shared --enable-static --enable-optimize \
   --enable-tools --with-hdf5=$MOAB_TPLDIR --with-netcdf=$MOAB_TPLDIR --with-pnetcdf=$MOAB_TPLDIR \
   --with-zoltan=$MOAB_TPLDIR --with-metis=$MOAB_TPLDIR --with-parmetis=$MOAB_TPLDIR \
   --with-eigen3=$MOAB_TPLDIR/include/eigen3 \

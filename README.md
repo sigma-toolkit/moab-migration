@@ -91,7 +91,6 @@ Detailed API documentation and user/development guides are available for the fol
   - If you have **HDF5** installed, use `-DENABLE_HDF5=ON -DHDF5_ROOT=$HDF5_DIR`
   - If you have **NetCDF** installed, use `-DENABLE_NETCDF=ON -DNETCDF_ROOT=$NETCDF_DIR`.
   - Similarly for **Metis** or **ParMetis** dependencies, use `-DENABLE_METIS=ON -DMETIS_DIR=$METIS_DIR` and `-DENABLE_PARMETIS=ON -DPARMETIS_DIR=$PARMETIS_DIR` respectively
-  -  In order to enable Python bindings (**PyMOAB**), you need to use `-DBUILD_SHARED_LIBS=ON -DENABLE_PYMOAB=ON` options
   - If you have **Zoltan** installed, use `-DENABLE_ZOLTAN=ON -DZOLTAN_DIR=$ZOLTAN_DIR` options
 
 * Once configuration with autotools or CMake is complete in the build directory, run the following to build the library:
@@ -99,6 +98,17 @@ Detailed API documentation and user/development guides are available for the fol
   - Verify configuration and build setup: `make check`
 * Next to install the compiled libraries, headers and tools, run `make install`
 * You can now use the `makefile` generated under the `build/examples` folder and modify it to compile downstream code with MOAB dependency
+
+### **Scikit Build (Python) based configuration workflow**
+
+  - Please ensure you have Python3 installed locally.
+  - Run `pip3 install .` or `python3 setup.py install` in the top source directory to install MOAB in your Python environment.
+  - If you would like to override the compiler used by default, use the following variables to override:
+    - Add environment variable `CMAKE_ARGS="-DCMAKE_C_COMPILER=mpicc -DCMAKE_CXX_COMPILER=mpicxx -DCMAKE_Fortran_COMPILER=mpif90"` before running pip or setup.py
+    - By directly passing the compiler command, use `python3 setup.py bdist_wheel -- -DENABLE_HDF5=ON -DHDF5_ROOT=$HDF5_DIR`
+
+Please note that, while install using setup.py, the folloing packages are needed to be installed manually using pip3: `pip3 install scikit-build ninja cmake cython numpy`.
+  
 
 ## Language Bindings
 

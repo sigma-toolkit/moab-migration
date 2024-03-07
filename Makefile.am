@@ -19,11 +19,7 @@ else
   itaps_dir = $(itaps_dir_fbigeom)
 endif
 
-if ENABLE_pymoab
-  pymoab_dir = pymoab
-else
-  pymoab_dir =
-endif
+pymoab_dir =
 
 # Utility target: build but don't run tests
 build-check:

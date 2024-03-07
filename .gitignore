@@ -140,6 +140,7 @@ test/file_options_test
 test/*.h5m
 test/*.g
 test/*.gen
+test/quads_test.vtk
 test/geom_util_test
 test/gttool_test
 test/h5file/dump_sets

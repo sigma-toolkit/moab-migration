@@ -21,9 +21,9 @@ pipelines:
                 - make all test VERBOSE=1
                 - make dist
                 # Now configure with Scikit Build System
-                - cd $BITBUCKET_CLONE_DIR && export CMAKE_ARGS="-DCMAKE_C_FLAGS=\"-fPIC -DPIC -Wno-cast-function-type\" -DCMAKE_CXX_FLAGS=\"-fPIC -DPIC -Wno-cast-function-type\" -DBUILD_SHARED_LIBS=ON -DCMAKE_SHARED_LINKER_FLAGS=\"-Wl,--no-undefined\" -DENABLE_MPI=ON -DENABLE_HDF5=ON -DHDF5_ROOT=/usr/lib/x86_64-linux-gnu/hdf5/openmpi -DENABLE_NETCDF=ON -DNETCDF_ROOT=/usr/lib/x86_64-linux-gnu/netcdf/mpi -DENABLE_METIS=ON -DMETIS_DIR=/usr -DEIGEN3_DIR=/usr/include/eigen3\""
-                - pip install .
-                # Successfully finished both Autotools and CMake checks
+                - cd $BITBUCKET_CLONE_DIR && export CMAKE_ARGS="-DBUILD_SHARED_LIBS=ON -DENABLE_MPI=ON -DENABLE_HDF5=ON -DHDF5_ROOT=/usr/lib/x86_64-linux-gnu/hdf5/openmpi -DENABLE_NETCDF=ON -DNETCDF_ROOT=/usr/lib/x86_64-linux-gnu/netcdf/mpi -DENABLE_METIS=ON -DMETIS_DIR=/usr -DEIGEN3_DIR=/usr/include/eigen3"
+                - pip install build
+                - python -m build --wheel                # Successfully finished both Autotools and CMake checks
                 - echo "All done!"
     branches:
       master:
@@ -44,9 +44,9 @@ pipelines:
                 - make all test VERBOSE=1
                 - make dist
                 # Now configure with Scikit Build System
-                - cd $BITBUCKET_CLONE_DIR && export CMAKE_ARGS="-DCMAKE_C_FLAGS=\"-fPIC -DPIC -Wno-cast-function-type\" -DCMAKE_CXX_FLAGS=\"-fPIC -DPIC -Wno-cast-function-type\" -DBUILD_SHARED_LIBS=ON -DCMAKE_SHARED_LINKER_FLAGS=\"-Wl,--no-undefined\" -DENABLE_MPI=ON -DENABLE_HDF5=ON -DHDF5_ROOT=/usr/lib/x86_64-linux-gnu/hdf5/openmpi -DENABLE_NETCDF=ON -DNETCDF_ROOT=/usr/lib/x86_64-linux-gnu/netcdf/mpi -DENABLE_METIS=ON -DMETIS_DIR=/usr -DEIGEN3_DIR=/usr/include/eigen3\""
-                - pip install .
-                # Successfully finished both Autotools and CMake checks
+                - cd $BITBUCKET_CLONE_DIR && export CMAKE_ARGS="-DBUILD_SHARED_LIBS=ON -DENABLE_MPI=ON -DENABLE_HDF5=ON -DHDF5_ROOT=/usr/lib/x86_64-linux-gnu/hdf5/openmpi -DENABLE_NETCDF=ON -DNETCDF_ROOT=/usr/lib/x86_64-linux-gnu/netcdf/mpi -DENABLE_METIS=ON -DMETIS_DIR=/usr -DEIGEN3_DIR=/usr/include/eigen3"
+                - pip install build
+                - python -m build --wheel                # Successfully finished both Autotools and CMake checks
                 - echo "All done!"
       develop:
         - step:
@@ -66,7 +66,8 @@ pipelines:
                 - make all test VERBOSE=1
                 - make dist
                 # Now configure with Scikit Build System
-                - cd $BITBUCKET_CLONE_DIR && export CMAKE_ARGS="-DCMAKE_C_FLAGS=\"-fPIC -DPIC -Wno-cast-function-type\" -DCMAKE_CXX_FLAGS=\"-fPIC -DPIC -Wno-cast-function-type\" -DBUILD_SHARED_LIBS=ON -DCMAKE_SHARED_LINKER_FLAGS=\"-Wl,--no-undefined\" -DENABLE_MPI=ON -DENABLE_HDF5=ON -DHDF5_ROOT=/usr/lib/x86_64-linux-gnu/hdf5/openmpi -DENABLE_NETCDF=ON -DNETCDF_ROOT=/usr/lib/x86_64-linux-gnu/netcdf/mpi -DENABLE_METIS=ON -DMETIS_DIR=/usr -DEIGEN3_DIR=/usr/include/eigen3\""
-                - pip install .
+                - cd $BITBUCKET_CLONE_DIR && export CMAKE_ARGS="-DBUILD_SHARED_LIBS=ON -DENABLE_MPI=ON -DENABLE_HDF5=ON -DHDF5_ROOT=/usr/lib/x86_64-linux-gnu/hdf5/openmpi -DENABLE_NETCDF=ON -DNETCDF_ROOT=/usr/lib/x86_64-linux-gnu/netcdf/mpi -DENABLE_METIS=ON -DMETIS_DIR=/usr -DEIGEN3_DIR=/usr/include/eigen3"
+                - pip install build
+                - python -m build --wheel
                 # Successfully finished both Autotools and CMake checks
                 - echo "All done!"

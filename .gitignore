@@ -32,6 +32,10 @@ configure
 cubit??.jou
 .deps
 .dirstamp
+.env
+_skbuild
+*.egg-info
+dist
 doc/config.tex
 doc/dev.dox
 doc/user/*
@@ -249,6 +253,8 @@ test/verdict_test
 test/xform_test
 test/imoab_test
 test/imoab_testF
+test/pymoab/*.pyc
+test/pymoab/__pycache__
 tools/dagmc/dagmc_preproc
 tools/dagmc/pt_vol_test
 tools/dagmc/quads_to_tris
@@ -308,5 +314,3 @@ tools/vtkMOABReaderNew/vtkMoabReaderPlugin_Plugin.cxx
 tools/vtkMOABReaderNew/vtkMoabReaderPlugin_Plugin.h
 tools/vtkMOABReaderNew/vtkSMvtkMoabReaderPluginInstantiator.cxx
 tools/vtkMOABReaderNew/vtkSMvtkMoabReaderPluginInstantiator.h
-pymoab/tests/*.pyc
-pymoab/tests/__pycache__

@@ -1,0 +1,47 @@
+[build-system]
+requires = [
+    "setuptools",
+    "setuptools_scm[toml]>=6.0",
+    "scikit-build",
+    "cmake",
+    "ninja",
+    "numpy",
+    "cython",
+]
+build-backend = "setuptools.build_meta"
+
+# Project Metadata
+[project]
+name = "pymoab"
+dynamic = ["version"]
+authors = [{ name = "SIGMA Team", email = "moab-dev@mcs.anl.gov" }]
+license = { file = "LICENSE" }
+description = "MOAB: Mesh-Oriented datABase"
+readme = "README.md"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GPL v3 License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+    "Programming Language :: Python :: 3",
+]
+requires-python = ">=3.8"
+dependencies = []
+
+# Optional Dependencies
+[project.optional-dependencies]
+test = ["pytest", "numpy"]
+
+# Project URLs
+[project.urls]
+"Homepage" = "https://sigma.mcs.anl.gov"
+"Documentation" = "https://web.cels.anl.gov/projects/sigma/docs/moab/index.html"
+"Bug Tracker" = "https://bitbucket.org/fathomteam/moab/issues"
+"Source Code" = "https://bitbucket.org/fathomteam/moab/"
+
+# Setuptools SCM Configuration
+[tool.setuptools_scm]

@@ -5,7 +5,7 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 ACLOCAL_AMFLAGS = -I config
 
 # Subdirectories to build
-SUBDIRS = src MeshFiles $(itaps_dir) tools test $(pymoab_dir)
+SUBDIRS = src MeshFiles $(itaps_dir) tools test
 
 if ENABLE_fbigeom
   itaps_dir_fbigeom = itaps
@@ -18,8 +18,6 @@ if ENABLE_imesh
 else
   itaps_dir = $(itaps_dir_fbigeom)
 endif
-
-pymoab_dir =
 
 # Utility target: build but don't run tests
 build-check:
@@ -121,7 +119,7 @@ CMAKE_CONFIGURATION_FILES = CMakeLists.txt \
    config/CMakeLibraryFuncs.cmake   config/FindHDF5_MOAB.cmake    config/FindParMetis.cmake      config/Findverdict.cmake    config/ResolveCompilerPaths.cmake \
    config/CheckCompilerFlags.cmake  config/FindMetis.cmake        config/FindTempestRemap.cmake  config/ForceAddFlags.cmake  config/TestBigEndian.cmake \
    config/CMakeReplicateConfig.sh   config/TemplateSpecialization.cxx   config/MOABConfig.cmake.h.in   config/cmake_uninstall.cmake.in moab.make.cmake  \
-   pymoab/CMakeLists.txt            pymoab/cmake/FindPythonDev.cmake  pymoab/setup.py.cmake.in     pymoab/install.sh.cmake
+   pymoab/CMakeLists.txt
 
 EXTRA_DIST = $(doc_DATA) \
 						 debian \

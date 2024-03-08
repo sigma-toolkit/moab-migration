@@ -44,13 +44,13 @@ COPY --from=builder /etc/profile.d/z10_spack_environment.sh /etc/profile.d/z10_s
 
 RUN apt -qq update \
     && apt install -y sudo wget pkg-config git \
-    python3 python3-pip rsync make cmake \
+    python3 python3-pip python3-venv rsync make cmake \
     autoconf automake libtool \
     clang gcc g++ gfortran vim \
     && apt clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && mkdir -p /home/moabuser/bin /opt/moab \
-    && pip3 install cython numpy nose 
+    && pip3 install cython numpy nose build
 
 ADD bootstrapMOAB /home/moabuser/bin/bootstrapMOAB
 ENV LD_LIBRARY_PATH="/opt/view/lib:/opt/view/lib64"

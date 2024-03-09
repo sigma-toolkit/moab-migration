@@ -50,7 +50,7 @@ RUN apt -qq update \
     && apt clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && mkdir -p /home/moabuser/bin /opt/moab \
-    && pip3 install cython numpy nose build
+    && pip3 install cython numpy nose
 
 ADD bootstrapMOAB /home/moabuser/bin/bootstrapMOAB
 ENV LD_LIBRARY_PATH="/opt/view/lib:/opt/view/lib64"

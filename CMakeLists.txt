@@ -125,6 +125,7 @@ option ( ENABLE_ZOLTAN     "Include Zoltan support for partitioning algorithms?"
 option ( ENABLE_TESTING    "Enable Testing"                                  ON  )
 option ( MOAB_FORCE_64_BIT_HANDLES "Force MBEntityHandle to be 64 bits (uint64_t)" OFF )
 option ( MOAB_FORCE_32_BIT_HANDLES "Force MBEntityHandle to be 32 bits (uint32_t)" OFF )
+option ( ENABLE_PYMOAB       "Build python interface to MOAB?" OFF )
 option ( ENABLE_IMESH        "Should build IMESH?"       OFF )
 option ( ENABLE_FBIGEOM      "Should build FBIGEOM?"     OFF )
 option ( ENABLE_IREL         "Should build IREL?"        OFF )
@@ -470,7 +471,7 @@ add_subdirectory( itaps )
 if (NOT WIN32 OR MSYS OR MINGW) # Need further work to prepare for windows
   add_subdirectory( tools )
 endif ()
-if (SKBUILD)
+if (SKBUILD OR ENABLE_PYMOAB)
   add_subdirectory( pymoab )
 endif()
 ################################################################################

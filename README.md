@@ -98,17 +98,15 @@ Detailed API documentation and user/development guides are available for the fol
 - Next to install the compiled libraries, headers and tools, run `make install`
 - You can now use the `makefile` generated under the `build/examples` folder and modify it to compile downstream code with MOAB dependency
 
-### **Scikit Build (Python) based configuration workflow**
+### **Python based configuration workflow**
 
 - Please ensure you have Python3 installed locally.
-- Run `pip3 install .` or `python3 setup.py install` in the top source directory to install MOAB in your Python environment.
-- If you would like to override the compiler used by default, use the following variables to override:
-  - Add environment variable `CMAKE_ARGS="-DCMAKE_C_COMPILER=mpicc -DCMAKE_CXX_COMPILER=mpicxx -DCMAKE_Fortran_COMPILER=mpif90"` before running pip or setup.py
-  - By directly passing the compiler command, use `python3 setup.py bdist_wheel -- -DENABLE_HDF5=ON -DHDF5_ROOT=$HDF5_DIR`
+- Run `python3 -m pip install .` in the top source directory to install MOAB in your Python environment.
+- If you would like to override the compiler used by default, use the following methods to override:
+  - Add environment variable `CMAKE_ARGS="-DCMAKE_C_COMPILER=mpicc -DCMAKE_CXX_COMPILER=mpicxx -DCMAKE_Fortran_COMPILER=mpif90"`, space separated, before running pip.
+  - By directly passing the compiler command, use `pip install . -C/--config-settings=cmake.args=-DSOME_DEFINE=ON;-DOTHER=OFF`
 
-Please note that, while install using setup.py, the folloing packages are needed to be installed manually using pip3: `pip3 install scikit-build ninja cmake cython numpy`.
-
-For more details, please refer to the [Scikit Build documentation](https://scikit-build.readthedocs.io/)
+There are many other ways available to configure the build, please refer to the [Scikit Build Core documentation](https://scikit-build-core.readthedocs.io/) for more details.
 
 ## Language Bindings
 

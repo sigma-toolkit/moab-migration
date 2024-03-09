@@ -7,6 +7,7 @@ autom4te.cache/
 bin
 bin/*
 *.ccm
+build/
 config/config.guess
 config/config.sub
 config/depcomp

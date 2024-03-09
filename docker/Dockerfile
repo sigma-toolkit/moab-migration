@@ -44,7 +44,7 @@ COPY --from=builder /etc/profile.d/z10_spack_environment.sh /etc/profile.d/z10_s
 
 RUN apt -qq update \
     && apt install -y sudo wget pkg-config git \
-    python3 python3-pip python3-venv rsync make cmake \
+    python3 python3-pip rsync make cmake \
     autoconf automake libtool \
     clang gcc g++ gfortran vim \
     && apt clean \

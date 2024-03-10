@@ -293,6 +293,18 @@ else
     PYTHON_VERSION=""
     fi
 
+    AC_MSG_CHECKING([for the setuptools Python package])
+    ac_setuptools_result=`$PYTHON -c "import setuptools" 2>&1`
+    if test $? -eq 0; then
+    AC_MSG_RESULT([yes])
+    else
+    AC_MSG_RESULT([no])
+    AC_MSG_ERROR([cannot import Python module "setuptools".
+    Please check your Python installation. The error was:
+    $ac_setuptools_result])
+    PYTHON_VERSION=""
+    fi
+
     # if enabling PyMOAB, turn cython file filter oni
     filter_sources="YES"
     filter_program=$PYTHON" cython_filter.py 2>/dev/null"
@@ -302,7 +314,7 @@ else
       # Developers updating the PyMOAB modules need Cython (> 0.25)
       AC_PYTHON_MODULE(cython)
       AC_MSG_CHECKING(for proper cython capabilities)
-      cython --cplus $srcdir/deprecated/cython_test.pyx --output-file ./.cython_test_out && rm .cython_test_out
+      cython --cplus $srcdir/deprecated/pymoab/cython_test.pyx --output-file ./.cython_test_out && rm .cython_test_out
       if test $? -ne 0 ; then
         AC_MSG_ERROR(cython is not the correct version for pymoab)
       fi
@@ -315,12 +327,12 @@ else
       fi
     fi
 
-    # link pyproject.toml and necessary files
+    AC_CONFIG_SRCDIR([
+      deprecated/pymoab/setup.py.in
+    ])
     AC_CONFIG_LINKS([
-      pyproject.toml:pyproject.toml
-      CMakeLists.txt:CMakeLists.txt
-      LICENSE:LICENSE
-      README.md:README.md
+      deprecated/pymoab/pyproject.toml:pyproject.toml
+      deprecated/pymoab/setup.py:setup.py
     ])
 
     # link source files to build location

@@ -263,12 +263,12 @@ python_patterns=""
 
 AC_MSG_CHECKING([if pymoab interface was requested by user])
 AC_ARG_ENABLE( [pymoab],
-[AS_HELP_STRING([--enable-pymoab],[Build support for pymoab interface (deprecated).])],
+[AS_HELP_STRING([--enable-pymoab],[Build support for pymoab interface (Deprecated).])],
 [enable_pymoab=$enableval],
 [enable_pymoab=no] )
 
 AC_ARG_VAR([PYMOAB_PREFIX],
-Custom location for install of PyMOAB module (deprecated))
+Custom location for install of PyMOAB module (Deprecated))
 
 pymoab_custom_install=no
 AC_MSG_RESULT([$enable_pymoab])

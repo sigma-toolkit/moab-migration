@@ -302,7 +302,7 @@ else
       # Developers updating the PyMOAB modules need Cython (> 0.25)
       AC_PYTHON_MODULE(cython)
       AC_MSG_CHECKING(for proper cython capabilities)
-      cython --cplus $srcdir/pymoab/cmake/cython_test.pyx --output-file ./.cython_test_out && rm .cython_test_out
+      cython --cplus $srcdir/deprecated/cython_test.pyx --output-file ./.cython_test_out && rm .cython_test_out
       if test $? -ne 0 ; then
         AC_MSG_ERROR(cython is not the correct version for pymoab)
       fi
@@ -314,6 +314,15 @@ else
           AC_SUBST(CYTHON)
       fi
     fi
+
+    # link pyproject.toml and necessary files
+    AC_CONFIG_LINKS([
+      pyproject.toml:pyproject.toml
+      CMakeLists.txt:CMakeLists.txt
+      LICENSE:LICENSE
+      README.md:README.md
+    ])
+
     # link source files to build location
     AC_CONFIG_LINKS([pymoab/moab.pxd:pymoab/moab.pxd
                      pymoab/eh.pxd:pymoab/eh.pxd
@@ -1469,9 +1478,10 @@ PRINT_CONFIGURATION_SUMMARY
 if test "x$enable_pymoab" != "xno"; then
 AC_MSG_NOTICE([
 *************************************************************************
-*     DEPRECATION NOTICE: Build of PyMOAB is no longer supported through
-*     Automake. Please use pip install moab instead. See the installation
-*     instructions in the MOAB README file.
+*    DEPRECATION NOTICE:                                                *
+*    Building PyMOAB using Autotools is no longer supported. Please     *
+*    install MOAB via pip instead. Refer to the MOAB README file for    *
+*    installation instructions.                                         *
 *************************************************************************])
 fi
 

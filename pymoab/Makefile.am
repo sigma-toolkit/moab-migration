@@ -1,19 +1,19 @@
 AUTOMAKE_OPTIONS=foreign
 EXTRA_DIST = $(top_srcdir)/deprecated/cython_test.pyx $(srcdir)/* $(top_srcdir)/test/pymoab/*
-EXTRA_DIST += $(srcdir)/interface_notes.txt $(top_srcdir)/pyproject.toml
+EXTRA_DIST += $(srcdir)/interface_notes.txt
 test_files = test_core.py test_hom.py test_scd.py test_range.py test_tag.py test_topo_util.py test_skinner.py
 local_install_path = $(subst $(prefix)/,,$(pythondir))
 all-local: local-install
 local-install:
 	$(MKDIR_P) $(abs_top_builddir)/pymoab/$(local_install_path)
 	(CFLAGS='-w -fPIC' PYTHONPATH=$(abs_top_builddir)/pymoab/$(local_install_path)/:$(PYTHONPATH) \
-		$(PYTHON) -m pip install -e ../. -C wheel.cmake=false -C wheel.install-dir=$(abs_top_builddir)/pymoab)
+		$(PYTHON) -m pip install -e ../. -C wheel.cmake=false --prefix $(abs_top_builddir)/pymoab)
 install-exec-local: all-local
 	$(MKDIR_P) $(DESTDIR)$(pythondir)
 	(PYTHONPATH=$(DESTDIR)$(pythondir):$(PYTHONPATH) $(PYTHON) -m pip install ../. \
-        -C wheel.cmake=false -C wheel.install-dir=$(DESTDIR)$(prefix) )
+        -C wheel.cmake=false --prefix $(DESTDIR)$(prefix) )
 check: all-local
-	cd tests; \
+	cd ../test/pymoab; \
 	for i in $(test_files); \
 	do \
 		(@SLIBENVPATH@=$(abs_top_builddir)/src/.libs/:$(@SLIBENVPATH@) PYTHONPATH=$(abs_top_builddir)/pymoab:$(PYTHONPATH) $(PYTHON) $$i) || exit 1; \

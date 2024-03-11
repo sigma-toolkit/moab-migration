@@ -59,7 +59,7 @@ test = ["pytest"]
 cmake.verbose = true
 logging.level = "INFO"
 wheel.packages = ["pymoab"]
-wheel.exclude = ["CMakeLists.txt", "*.pyx"]
+wheel.exclude = ["CMakeLists.txt", "Makefile.am", "*.pyx"]
 
 # Get version from CMakeLists
 [tool.scikit-build.metadata.version]

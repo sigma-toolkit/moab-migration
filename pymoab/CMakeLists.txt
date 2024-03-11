@@ -17,6 +17,35 @@ include_directories(
 # Get a list of all Cython files in the pymoab directory
 file(GLOB CYTHON_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.pyx")
 
+if (ENABLE_PYMOAB)
+    find_package(Python COMPONENTS NumPy REQUIRED)
+
+    # Get a list of all Python files in the pymoab directory
+    file(GLOB PY_FILES "${CMAKE_SOURCE_DIR}/pymoab/*.py")
+    file(GLOB PXD_FILES "${CMAKE_SOURCE_DIR}/pymoab/*.pxd")
+
+    # Set the PyMOAB prefix
+    if (NOT PYMOAB_PREFIX)
+        set(PYMOAB_PREFIX ${CMAKE_INSTALL_PREFIX})
+    endif()
+    message(STATUS "PyMOAB prefix: ${PYMOAB_PREFIX} (DEPRECATED)")
+
+    # Get the Python path directory name
+    execute_process(
+        COMMAND "${Python_EXECUTABLE}" -c "import sysconfig; print(sysconfig.get_paths()['purelib'].split('/')[-1])"
+                OUTPUT_VARIABLE python_path
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+    
+    # Set the where to copy the files
+    set(PYMOAB_PREFIX_LIB "${PYMOAB_PREFIX}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/${python_path}")
+    
+    # Copy the Python files to the PyMOAB prefix
+    file(COPY ${PY_FILES} ${PXD_FILES} DESTINATION ${PYMOAB_PREFIX_LIB}/pymoab)
+    
+    message(WARNING "ENABLE_PYMOAB is deprecated and will be removed in the next release. Consider installing PyMOAB via pip instead.")
+endif()
+
 # Set the MOAB library name
 set(MOAB_LIBS 
     ${CMAKE_BINARY_DIR}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}MOAB${CMAKE_SHARED_LIBRARY_SUFFIX}
@@ -47,37 +76,14 @@ foreach(CYTHON_FILE ${CYTHON_FILES})
         WITH_SOABI
     )
 
-    # Link the target with the MOAB library
-    target_link_libraries(${TARGET_NAME} PRIVATE ${MOAB_LIBS})
-
-    # Install the target in the pymoab directory
-    install(TARGETS ${TARGET_NAME} DESTINATION pymoab)
-endforeach()
-
-
-if (ENABLE_PYMOAB)
-    message(WARNING "ENABLE_PYMOAB is deprecated and will be removed in the next release.")
-    message(WARNING "Consider installing PyMOAB via pip instead.")
-
-    if (PYMOAB_PREFIX)
-        message(WARNING "PYMOAB_PREFIX is deprecated and will be removed in the next release.")
-        message(WARNING "Consider installing PyMOAB via pip instead.")
-        # Install PyMOAB in the specified prefix
-        execute_process(
-            COMMAND 
-            ${PYTHON_EXECUTABLE} -m pip install ../. -C wheel.cmake=false -C wheel.install-dir=${PYMOAB_PREFIX}
-            RESULT_VARIABLE PYMOAB_INSTALL_RESULT
-        )
+    if (SKBUILD)
+        # Link the target with the MOAB library
+        target_link_libraries(${TARGET_NAME} PRIVATE ${MOAB_LIBS})
+        
+        # Install the target in the pymoab directory
+        install(TARGETS ${TARGET_NAME} DESTINATION pymoab)
     else()
-        # Install PyMOAB in the default prefix
-        execute_process(
-            COMMAND 
-            ${PYTHON_EXECUTABLE} -m pip install ../. -C wheel.cmake=false
-            RESULT_VARIABLE PYMOAB_INSTALL_RESULT
-        )
+        # Install the target in the deprecated pymoab directory
+        install(TARGETS ${TARGET_NAME} DESTINATION ${PYMOAB_PREFIX_LIB})
     endif()
-
-    if(NOT PYMOAB_INSTALL_RESULT EQUAL 0)
-        message(FATAL_ERROR "Installation of PyMOAB failed. Stopping CMake build.")
-    endif()
-endif()
+endforeach()

@@ -327,12 +327,14 @@ else
       fi
     fi
 
-    AC_CONFIG_SRCDIR([
-      deprecated/pymoab/setup.py.in
+    # create setup.py from deprecated/pymoab
+    AC_CONFIG_FILES([
+      setup.py:deprecated/pymoab/setup.py.in
     ])
+
+    # create pyproject.toml from deprecated/pymoab
     AC_CONFIG_LINKS([
-      deprecated/pymoab/pyproject.toml:pyproject.toml
-      deprecated/pymoab/setup.py:setup.py
+      pyproject.toml:deprecated/pymoab/pyproject.toml
     ])
 
     # link source files to build location

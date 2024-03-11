@@ -7,11 +7,11 @@ all-local: local-install
 local-install:
 	$(MKDIR_P) $(abs_top_builddir)/$(local_install_path)
 	(CFLAGS='-w -fPIC' PYTHONPATH=$(abs_top_builddir)/$(local_install_path)/:$(PYTHONPATH) \
-		$(PYTHON) -m pip install -e ../. -C wheel.cmake=false --prefix $(abs_top_builddir)) -vvv
+		$(PYTHON) -m pip install -vvv -e ../. -C wheel.cmake=false --prefix $(abs_top_builddir))
 install-exec-local: all-local
 	$(MKDIR_P) $(DESTDIR)$(pythondir)
-	(PYTHONPATH=$(DESTDIR)$(pythondir):$(PYTHONPATH) $(PYTHON) -m pip install ../. \
-        -C wheel.cmake=false --prefix $(DESTDIR)$(prefix) -vvv )
+	(PYTHONPATH=$(DESTDIR)$(pythondir):$(PYTHONPATH) $(PYTHON) -m pip install -vvv ../. \
+        -C wheel.cmake=false --prefix $(DESTDIR)$(prefix) )
 check: all-local
 	cd ../test/pymoab; \
 	for i in $(test_files); \
@@ -19,7 +19,7 @@ check: all-local
 		(@SLIBENVPATH@=$(abs_top_builddir)/src/.libs/:$(@SLIBENVPATH@) PYTHONPATH=$(abs_top_builddir):$(PYTHONPATH) $(PYTHON) $$i) || exit 1; \
 	done
 clean-local:
-	-rm -rf build lib pymoab/*.cpp pymoab/__pycache__ pymoab/*.so pymoab/*.pyc $(top_srcdir)/test/pymoab/*.pyc pymoab.egg-info
+	-rm -rf ../build ../lib *.cpp __pycache__ *.so *.pyc ../test/pymoab/*.pyc ../pymoab.egg-info
 uninstall:
 	rm -rf $(DESTDIR)$(pythondir)/*
-CLEANFILES = $(top_srcdir)/test/pymoab/quads_test.vtk $(top_srcdir)/test/pymoab/outfile.h5m $(top_srcdir)/test/pymoab/write_tag_test.h5m $(local_install_path)/*
+CLEANFILES = ../test/pymoab/quads_test.vtk ../test/pymoab/outfile.h5m ../test/pymoab/write_tag_test.h5m $(local_install_path)/*

@@ -38,10 +38,13 @@ if (ENABLE_PYMOAB)
         )
     
     # Set the where to copy the files
-    set(PYMOAB_PREFIX_LIB "${PYMOAB_PREFIX}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/${python_path}")
+    set(PYMOAB_LIB "/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/${python_path}/pymoab")
     
-    # Copy the Python files to the PyMOAB prefix
-    file(COPY ${PY_FILES} ${PXD_FILES} DESTINATION ${PYMOAB_PREFIX_LIB}/pymoab)
+    # Copy the Python files to the Current binary directory
+    file(COPY ${PY_FILES} ${PXD_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/${PYMOAB_LIB})
+
+    # Install the files to the PyMOAB prefix
+    install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${PYMOAB_LIB} DESTINATION ${PYMOAB_PREFIX}/${PYMOAB_LIB})
     
     message(WARNING "ENABLE_PYMOAB is deprecated and will be removed in the next release. Consider installing PyMOAB via pip instead.")
 endif()
@@ -84,6 +87,11 @@ foreach(CYTHON_FILE ${CYTHON_FILES})
         install(TARGETS ${TARGET_NAME} DESTINATION pymoab)
     else()
         # Install the target in the deprecated pymoab directory
-        install(TARGETS ${TARGET_NAME} DESTINATION ${PYMOAB_PREFIX_LIB})
+        install(TARGETS ${TARGET_NAME} DESTINATION ${PYMOAB_PREFIX}/${PYMOAB_LIB})
+        
+        # Create shortcut in current binary directory for testing
+        add_custom_target(pymoab-local-install_${TARGET_NAME} ALL
+        COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/lib/${TARGET_NAME} ${CMAKE_CURRENT_BINARY_DIR}/${PYMOAB_LIB}/${TARGET_NAME}
+        DEPENDS ${TARGET_NAME})
     endif()
 endforeach()

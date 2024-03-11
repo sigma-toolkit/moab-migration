@@ -34,8 +34,8 @@ cubit??.jou
 .deps
 .dirstamp
 .env
-_skbuild
 *.egg-info
+__pycache__/
 dist
 doc/config.tex
 doc/dev.dox
@@ -256,7 +256,6 @@ test/xform_test
 test/imoab_test
 test/imoab_testF
 test/pymoab/*.pyc
-test/pymoab/__pycache__
 tools/dagmc/dagmc_preproc
 tools/dagmc/pt_vol_test
 tools/dagmc/quads_to_tris

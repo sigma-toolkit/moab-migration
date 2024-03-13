@@ -449,7 +449,7 @@ ErrorCode GeomTopoTool::construct_obb_tree( EntityHandle eh )
 
         if( tris.empty() )
         {
-            std::cerr << "WARNING: Surface has no facets" << std::endl;
+            std::cerr << "WARNING: Surface id " << global_id(eh) << " (handle: " << eh << ")" << "has no facets" << std::endl;
         }
 
         rval = obbTree->build( tris, root );MB_CHK_SET_ERR( rval, "Failed to build obb Tree for surface" );

@@ -17,11 +17,6 @@ include_directories(
 # Get a list of all Cython files in the pymoab directory
 file(GLOB CYTHON_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.pyx")
 
-# Set the MOAB library name
-set(MOAB_LIB
-    ${CMAKE_BINARY_DIR}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}MOAB${CMAKE_SHARED_LIBRARY_SUFFIX}
-)
-
 # Run a for loop to create a target for each Cython file
 foreach(CYTHON_FILE ${CYTHON_FILES})
     # Extract the base filename (without extension)
@@ -51,7 +46,7 @@ foreach(CYTHON_FILE ${CYTHON_FILES})
     add_dependencies(${TARGET_NAME} MOAB)
 
     # Link the target with the MOAB library
-    target_link_libraries(${TARGET_NAME} PRIVATE ${MOAB_LIB})
+    target_link_libraries(${TARGET_NAME} PRIVATE MOAB)
 
     # Install the target in the pymoab directory
     install(TARGETS ${TARGET_NAME} DESTINATION pymoab)

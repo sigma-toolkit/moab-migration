@@ -471,8 +471,57 @@ add_subdirectory( itaps )
 if (NOT WIN32 OR MSYS OR MINGW) # Need further work to prepare for windows
   add_subdirectory( tools )
 endif ()
-if (SKBUILD OR ENABLE_PYMOAB)
+
+###############################################################################
+# Python Module Build
+###############################################################################
+if(SKBUILD)
   add_subdirectory( pymoab )
+elseif(ENABLE_PYMOAB)
+  # Find necessary packages
+  find_package(
+    Python
+    COMPONENTS Interpreter Development.Module NumPy
+    REQUIRED
+  )
+  # Get a list of all Python files in the pymoab directory
+  file(GLOB PY_FILES "${CMAKE_SOURCE_DIR}/pymoab/*.py")
+  file(GLOB PXD_FILES "${CMAKE_SOURCE_DIR}/pymoab/*.pxd")
+  file(GLOB PYX_FILES "${CMAKE_SOURCE_DIR}/pymoab/*.pyx")
+
+  # Set the PyMOAB prefix
+  if (NOT PYMOAB_PREFIX)
+      set(PYMOAB_PREFIX ${CMAKE_INSTALL_PREFIX})
+  endif()
+
+  # Show PyMOAB prefix
+  message(STATUS "PyMOAB prefix: ${PYMOAB_PREFIX} (DEPRECATED)")
+
+  # Copy the Python files to the current binary directory
+  file( COPY ${PY_FILES} ${PXD_FILES} ${PYX_FILES} DESTINATION ${CMAKE_BINARY_DIR}/pymoab)
+
+  # Copy the pyproject.toml file to the binary directory
+  file( COPY ${CMAKE_SOURCE_DIR}/deprecated/pymoab/pyproject.toml DESTINATION ${CMAKE_BINARY_DIR})
+
+  # Configure the setup.py file
+  configure_file(${CMAKE_SOURCE_DIR}/deprecated/pymoab/setup.py.cmake ${CMAKE_BINARY_DIR}/setup.py)
+
+  # Install the PyMOAB package for testing
+  add_custom_target(
+    pymoab-local-install ALL
+    DEPENDS MOAB
+  )
+  add_custom_command(
+    TARGET pymoab-local-install
+    COMMAND ${Python_EXECUTABLE} -m pip install -vvv . --target ${CMAKE_BINARY_DIR}/Testing
+    COMMENT "Installing PyMOAB package for testing..."
+  )
+
+  # Install the PyMOAB package
+  install(CODE "execute_process(COMMAND ${Python_EXECUTABLE} -m pip install . --prefix ${PYMOAB_PREFIX})")
+  
+  # Print a deprecation warning
+  message(WARNING "ENABLE_PYMOAB is deprecated and will be removed in the next release. Consider installing PyMOAB via pip instead.")
 endif()
 ################################################################################
 # Testing Related Settings

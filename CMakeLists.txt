@@ -508,14 +508,15 @@ elseif(ENABLE_PYMOAB)
 
   # Install the PyMOAB package for testing
   add_custom_target(
-    pymoab-local-install ALL
+    pymoab-test-install
     DEPENDS MOAB
   )
   add_custom_command(
-    TARGET pymoab-local-install
+    TARGET pymoab-test-install
     COMMAND ${Python_EXECUTABLE} -m pip install -vvv . --target ${CMAKE_BINARY_DIR}/Testing
     COMMENT "Installing PyMOAB package for testing..."
   )
+  add_test(NAME pymoab_test COMMAND ${CMAKE_COMMAND} --build . --target pymoab-test-install)
 
   # Install the PyMOAB package
   install(CODE "execute_process(COMMAND ${Python_EXECUTABLE} -m pip install . --prefix ${PYMOAB_PREFIX})")

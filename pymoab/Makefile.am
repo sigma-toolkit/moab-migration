@@ -7,11 +7,11 @@ all-local: local-install
 local-install:
 	$(MKDIR_P) $(abs_top_builddir)/$(local_install_path)
 	(CFLAGS='-w -fPIC' PYTHONPATH=$(abs_top_builddir)/$(local_install_path)/:$(PYTHONPATH) \
-		$(PYTHON) -m pip install -vvv -e ../. -C wheel.cmake=false --prefix $(abs_top_builddir))
+		$(PYTHON) -m pip install -vvv -e ../. --prefix $(abs_top_builddir))
 install-exec-local: all-local
 	$(MKDIR_P) $(DESTDIR)$(pythondir)
 	(PYTHONPATH=$(DESTDIR)$(pythondir):$(PYTHONPATH) $(PYTHON) -m pip install -vvv ../. \
-        -C wheel.cmake=false --prefix $(DESTDIR)$(prefix) )
+        --prefix $(DESTDIR)$(prefix) )
 check: all-local
 	cd ../test/pymoab; \
 	for i in $(test_files); \

@@ -53,10 +53,10 @@ struct RuntimeContext
     int dimension{ 2 };                            /// dimensionality of the problem: 2 or 3
     bool ensureMonotonicity{ false };  /// flag indicating use of monotone approximations for projections (TempestRemap)
     bool computeTRMaps{ false };       /// flag indicating use of TempestRemap conservative schemes for projections
-    // bool computeShepardInterpolant{ false };      /// flag indicating use of Shepard approximations for projections
+    bool computeShepardInterpolant{ false };      /// flag indicating use of Shepard approximations for projections
     bool computeMBAInterpolant{ false };  /// flag indicating use of multilevel B-spline approximations for projections
-    // bool computeNNInterpolant{ false };  /// flag indicating use of nearest neighbor method for projections
-    // bool computeDelaunayInterpolant{ false };  ///flag indicating use of delaunay natural neighbor interpolant
+    bool computeNNInterpolant{ false };  /// flag indicating use of nearest neighbor method for projections
+    bool computeDelaunayInterpolant{ false };  ///flag indicating use of delaunay natural neighbor interpolant
     bool normalize{ false };           /// normalize the dataset to original source data integral
                                        /// (more relevant for 2D; not implemented for 3D at the moment)
     bool use_3dprojection{ false };    /// perform 2D projections (if false), else compute 3D projections
@@ -322,11 +322,19 @@ struct RuntimeContext
                     methodorder = atoi( optionStorage[2].c_str() );
 
                 field_methods[fieldname] = std::make_pair( rmethod, methodorder );
+            }
+
+            for ( auto const& fieldkv : field_methods )
+            {
+                const std::pair< RemappingMethod, int >& method_and_order = fieldkv.second;
+                RemappingMethod rmethod = method_and_order.first;
                 if( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear ||
                     rmethod == TempestRemapInvDist || rmethod == TempestRemapDelaunay ||
                     rmethod == TempestRemapIntegratedBilinear )
                     computeTRMaps = true;
                 if( rmethod == MultilevelBsplineApproximation ) computeMBAInterpolant = true;
+                if ( rmethod == ShepardInterpolant) computeShepardInterpolant = true;
+                if ( rmethod == NearestNeighborInterpolant) computeNNInterpolant = true;
             }
         }
 
@@ -417,6 +425,16 @@ struct RuntimeContext
                                              const std::vector< moab::EntityHandle >& source_range,
                                              const std::vector< moab::EntityHandle >& target_range,
                                              const double constantoffset = 0.0 );
+
+                                             moab::ErrorCode ComputeFieldProjectionsWithData( int dimension,
+                                                         std::string varProjectSrc,
+                                                         std::string varProjectDst,
+                                                         const std::vector< double >& src_xyz,
+                                                         const std::vector< double >& dst_xyz,
+                                                         const bool normalize,
+                                                         const double constantoffset,
+                                                         std::vector< double >& src_tdata,
+                                                         std::vector< double >& dst_tdata );
 
   private:
     moab::CpuTimer mTimer;

@@ -199,29 +199,29 @@ int main( int argc, char** argv )
                                                    << " vertices." );
         }
 
+// #define COMPUTE_MAPS
+#ifdef COMPUTE_MAPS
         if( context.computeTRMaps )
         {
-            /*
             context.timer_push( "Compute TempestRemap weights for method: " +
                                 RuntimeContext::GetMethod( context.field_methods["Bathymetry"].first ) );
             // call to compute the 2D map and store to disk
             runchk( ComputeTempestRemapWeights( context, context.mpas_covering_set, context.romsset ),
                     "Cannot compute 2D remapping weights" );
             context.timer_pop();
-            */
-
-            context.timer_push( "Load TempestRemap weights for method: mpas_roms_map_bilin.nc" );
-            // load the computed 2D map files
-            runchk( LoadTempestRemapWeights( context, context.mpas_covering_set, context.romsset,
-                                             "mpas_roms_map_bilin.nc" ),
-                    "Cannot load 2D remapping weights" );
-            context.timer_pop();
         }
+#else
+        context.timer_push( "Load TempestRemap weights for method: mpas_roms_map_bilin.nc" );
+        // load the computed 2D map files
+        runchk( LoadTempestRemapWeights( context, context.mpas_covering_set, context.romsset,
+                                            "mpas_roms_map_bilin.nc" ),
+                "Cannot load 2D remapping weights" );
+        context.timer_pop();
+#endif
 
         // let us perform 3D extrusions as needed
         EntityHandle root_set  = 0;
         EntityHandle mpasset3d = 0, romsset3d = 0;
-
 
         {
             // Initialize all important data
@@ -550,35 +550,94 @@ int main( int argc, char** argv )
                 const int tsvaroffset = romssize * mpas_zreflevels;
                 std::vector< double > tgtsrc_data( nvars * tsvaroffset );
 
+                std::vector<double> src_xyz(3*mpassize), dst_xyz(3*romssize);
+                runchk( mbi->get_coords( mpas_elems.data(), mpas_elems.size(), src_xyz.data() ) );
+                runchk( mbi->get_coords( roms_elems.data(), roms_elems.size(), dst_xyz.data() ) );
+
                 context.timer_push( "Compute 3D projection: 2Dx1D algorithm" );
-#pragma omp parallel for shared( tgtsrc_data, weights )
+#pragma omp parallel for shared( tgtsrc_data, weights, src_xyz, dst_xyz )
                 for( int ii = 0; ii < mpas_zlevels; ii++ )
                 {
+                    std::vector<double> src_twod(mpassize), dst_twod(romssize);
                     std::cout << "Computing projection for MPAS level: " + std::to_string( ii ) + "\n";
-
+                    unsigned offsetr = romssize * ii;
                     for( int iv = 0; iv < nvars; ++iv )
                     {
-                        DataArray1D< double > dataInDouble( mpassize );
-                        DataArray1D< double > dataOutDouble( romssize, false );
-                        unsigned offsetr = romssize * ii;
-
+                        // ensure that the data retains the last active cell data
                         for( size_t j = 0; j < mpassize; ++j )
                         {
                             const int offset = svaroffset * iv + j * mpas_zlevels;
-                            dataInDouble[j] = maxlevelFace[j] - 1 < ii || src_data[ii + offset] < 1e-8
-                                                   ? src_data[maxlevelFace[j] - 1 + offset]
-                                                   : src_data[ii + offset];
+                            src_twod[j] = maxlevelFace[j] - 1 < ii || src_data[ii + offset] < 1e-8
+                                                ? src_data[maxlevelFace[j] - 1 + offset]
+                                                : src_data[ii + offset];
                         }
 
-                        dataOutDouble.AttachToData( tgtsrc_data.data() + offsetr + tsvaroffset * iv );
+                        const RemappingMethod rmethod   = context.field_methods[roms_tagnames[iv]].first;
+                        if( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear || rmethod == TempestRemapInvDist ||
+                            rmethod == TempestRemapDelaunay || rmethod == TempestRemapIntegratedBilinear )
+                        // if ( context.computeTRMaps )
+                        {
+                            DataArray1D< double > dataInDouble( mpassize, false );
+                            DataArray1D< double > dataOutDouble( romssize, false );
 
-                        // Compute the projection for the salinity field
-                        weights.Apply( dataInDouble, dataOutDouble );
+                            // for( size_t j = 0; j < mpassize; ++j )
+                            // {
+                            //     const int offset = svaroffset * iv + j * mpas_zlevels;
+                            //     dataInDouble[j] = src_data[ii + offset];
+                            // }
 
-                        if( context.useCAAS )
-                            ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap,
-                                               context.field_methods["Bathymetry"].second /*nPin*/, dataInDouble,
-                                               dataOutDouble, true /*useCAASLocal*/ );
+                            dataInDouble.AttachToData( src_twod.data() );
+                            dataOutDouble.AttachToData( tgtsrc_data.data() + offsetr + tsvaroffset * iv );
+
+                            // Compute the projection for the field
+                            weights.Apply( dataInDouble, dataOutDouble );
+
+
+                            if( context.useCAAS )
+                                ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap,
+                                                context.field_methods["Bathymetry"].second /*nPin*/, dataInDouble,
+                                                dataOutDouble, true /*useCAASLocal*/ );
+                        }
+                        else
+                        {
+                            std::vector< double > src_tdata( mpassize );
+                            context.ComputeFieldProjectionsWithData( 2,
+                                                         mpas_ele_tagnames[iv],
+                                                         roms_tagnames[iv],
+                                                         src_xyz, dst_xyz,
+                                                         false, 0.0,
+                                                         src_twod,
+                                                         dst_twod );
+
+                            // copy the data back to the destination vector
+                            std::copy( dst_twod.begin(), dst_twod.end(), tgtsrc_data.data() + offsetr + tsvaroffset * iv );
+                            // if ( context.computeMBAInterpolant )
+                        }
+
+                        // Example usage of loop over variables
+                        //  for( int iv = 0; iv < nvars; ++iv )
+                        //     {
+                        //         if( context.use_3dprojection )
+                        //         {
+                        //             context.timer_push( "Compute 3D projection: " +
+                        //                                 RuntimeContext::GetMethod( context.field_methods[roms_tagnames[iv]].first ) +
+                        //                                 " algorithm" );
+                        //             // Now let us compute the 3D field projections for each field
+                        //             runchk( context.ComputeFieldProjections( 3, mpas_ele_tagnames[iv], roms_tagnames[iv], mpas3d_elems,
+                        //                                                     roms3d_elems ) );
+                        //         }
+                        //         else
+                        //         {
+                        //             context.timer_push( "Compute 2D projection: " +
+                        //                                 RuntimeContext::GetMethod( context.field_methods[roms_tagnames[iv]].first ) +
+                        //                                 " algorithm" );
+                        //             // Now let us compute the 2D field projections for each field
+                        //             runchk( context.ComputeFieldProjections( 2, mpas_tagnames[iv], roms_tagnames[iv], mpas_elems,
+                        //                                                     roms_elems ) );
+                        //         }
+                        //         context.timer_pop();
+                        //     }
+
                     }
                 }
 
@@ -879,8 +938,6 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( int dimension,
 
     const bool is_three_dimensional = (dimension == 3);
     const bool normalize            = this->normalize;
-    const RemappingMethod rmethod   = this->field_methods[varProjectDst].first;
-    const int order                 = this->field_methods[varProjectDst].second;
 
     // get the source data from tag
     std::vector< double > src_tdata( source_range.size() ), dst_tdata( target_range.size() );
@@ -892,22 +949,75 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( int dimension,
     }
     else
     {
-        err = mbi->tag_get_handle( varProjectSrc.c_str(), mpas_zreflevels, moab::MB_TYPE_DOUBLE, dmtag, moab::MB_TAG_DENSE );//MB_CHK_ERR( err );
-        if (err != moab::MB_SUCCESS) { std::cout << "Could not retreive the tag handle: " << varProjectSrc << ". Skipping ...\n"; return moab::MB_SUCCESS;}
-        std::vector< double > src_tdata_layers( source_range.size() * mpas_zreflevels );
-        err = mbi->tag_get_data( dmtag, source_range.data(), source_range.size(), src_tdata_layers.data() );MB_CHK_ERR( err );
-        for( size_t il = 0; il < source_range.size(); ++il )
-            src_tdata[il] = src_tdata_layers[il * mpas_zreflevels];
+        if (is_three_dimensional)
+            err = mbi->tag_get_handle( varProjectSrc.c_str(), 1, moab::MB_TYPE_DOUBLE, dmtag, moab::MB_TAG_DENSE );//MB_CHK_ERR( err );
+        else
+            err = mbi->tag_get_handle( varProjectSrc.c_str(), mpas_zreflevels, moab::MB_TYPE_DOUBLE, dmtag, moab::MB_TAG_DENSE );//MB_CHK_ERR( err );
+        if (err != moab::MB_SUCCESS) { std::cout << "Could not retreive the non-standard tag handle: " << varProjectSrc << ". Skipping ...\n"; return moab::MB_SUCCESS;}
+        if (is_three_dimensional)
+        {
+            err = mbi->tag_get_data( dmtag, source_range.data(), source_range.size(), src_tdata.data() );MB_CHK_ERR( err );
+        }
+        else
+        {
+            std::vector< double > src_tdata_layers( source_range.size() * mpas_zreflevels );
+            err = mbi->tag_get_data( dmtag, source_range.data(), source_range.size(), src_tdata_layers.data() );MB_CHK_ERR( err );
+            for( size_t il = 0; il < source_range.size(); ++il )
+                src_tdata[il] = src_tdata_layers[il * mpas_zreflevels];
+        }
     }
 
     // get the coordinates of the elements
-    std::vector< double > src_xyz( source_range.size() * 3 ), dst_xyz( target_range.size() * 3 );
+    std::vector< double > src_xyz, dst_xyz;
+    const RemappingMethod rmethod   = this->field_methods[varProjectDst].first;
     if( !( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear || rmethod == TempestRemapInvDist ||
            rmethod == TempestRemapDelaunay || rmethod == TempestRemapIntegratedBilinear ) )
     {
+        src_xyz.resize( source_range.size() * 3 );
+        dst_xyz.resize( target_range.size() * 3 );
         err = mbi->get_coords( source_range.data(), source_range.size(), src_xyz.data() );MB_CHK_ERR( err );
         err = mbi->get_coords( target_range.data(), target_range.size(), dst_xyz.data() );MB_CHK_ERR( err );
     }
+
+    err = this->ComputeFieldProjectionsWithData( dimension,
+                                                         varProjectSrc,
+                                                         varProjectDst,
+                                                         src_xyz,
+                                                         dst_xyz,
+                                                         normalize,
+                                                         constantoffset,
+                                                         src_tdata,
+                                                         dst_tdata );MB_CHK_ERR( err );
+
+    // now set the data on ROMS instance of MOAB tag
+    moab::Tag drtag;
+    err = mbi->tag_get_handle( varProjectDst.c_str(), 1, moab::MB_TYPE_DOUBLE, drtag,
+                               moab::MB_TAG_DENSE | moab::MB_TAG_CREAT );MB_CHK_ERR( err );
+
+    err = mbi->tag_set_data( drtag, target_range.data(), target_range.size(), dst_tdata.data() );MB_CHK_ERR( err );
+
+    return moab::MB_SUCCESS;
+}
+
+
+moab::ErrorCode RuntimeContext::ComputeFieldProjectionsWithData( int dimension,
+                                                         std::string varProjectSrc,
+                                                         std::string varProjectDst,
+                                                         const std::vector< double >& src_xyz,
+                                                         const std::vector< double >& dst_xyz,
+                                                         const bool normalize,
+                                                         const double constantoffset,
+                                                         std::vector< double >& src_tdata,
+                                                         std::vector< double >& dst_tdata )
+{
+    moab::ErrorCode err;
+    moab::Interface* mbi = this->moab_interface;
+
+    const bool is_three_dimensional = (dimension == 3);
+    const RemappingMethod rmethod   = this->field_methods[varProjectDst].first;
+    const int order                 = this->field_methods[varProjectDst].second;
+
+    // get the source data from tag
 
     // Loop over all Faces in meshOverlap
     double dTotalFieldIntegralIn = 0.0, dTotalFieldIntegralOut = 0.0, normFactor = 1.0;
@@ -933,9 +1043,9 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( int dimension,
     {
         // get the handle to the weight matrix
         const SparseMatrix< double >& weights = this->weightMap.GetSparseMatrix();
-        DataArray1D< double > dataInDouble( source_range.size(), false );
+        DataArray1D< double > dataInDouble( src_tdata.size(), false );
         dataInDouble.AttachToData( src_tdata.data() );
-        DataArray1D< double > dataOutDouble( target_range.size(), false );
+        DataArray1D< double > dataOutDouble( dst_tdata.size(), false );
         dataOutDouble.AttachToData( dst_tdata.data() );
 
         // Compute the projection for the Bathymetry field
@@ -955,7 +1065,7 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( int dimension,
     }
     else if( rmethod == MultilevelBsplineApproximation )
     {
-        if( this->dimension == 3 )
+        if( dimension == 3 )
         {
             // constexpr int nlevels         = 7;
             // std::array< size_t, 3 > grid = { 16, 16, mpas_zlevels };
@@ -963,7 +1073,7 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( int dimension,
             // std::array< size_t, 3 > grid = { 4, 4, mpas_zlevels / 4 };
             constexpr int nlevels        = 10;
             std::array< size_t, 3 > grid = { 2, 2, mpas_zlevels / 4 };
-            std::array< double, 6 > bbox = { -1.0, -1.0, -1E6, 1.0, 1.0, 5E2 };
+            std::array< double, 6 > bbox = { -2.0, -2.0, -1E6, 2.0, 2.0, 5E2 };
             // std::array< double, 6 > bbox = { -1.0, -1.0, -1.0, 1.0, 1.0, 1 };
             std::cout << "\nComputing MBA interpolant (order=4, degree=3) for field " << varProjectSrc << std::endl;
             err = ComputeMBAInterpolant( *this, src_xyz, src_tdata, dst_xyz, dst_tdata, is_three_dimensional, order,
@@ -971,9 +1081,9 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( int dimension,
         }
         else
         {
-            constexpr int nlevels        = 10;
-            std::array< size_t, 3 > grid = { 5, 5, 5 };
-            std::array< double, 6 > bbox = { -1.0, -1.0, -1E2, 1.0, 1.0, 1E2 };
+            constexpr int nlevels        = 15;
+            std::array< size_t, 3 > grid = { 2, 2, 2 };
+            std::array< double, 6 > bbox = { -4.0, -4.0, -1E2, 4.0, 4.0, 1E2 };
             std::cout << "\nComputing MBA interpolant (order=4, degree=3) for field " << varProjectSrc << std::endl;
             err = ComputeMBAInterpolant( *this, src_xyz, src_tdata, dst_xyz, dst_tdata, is_three_dimensional, order,
                                          grid, bbox, nlevels );MB_CHK_ERR( err );
@@ -1004,6 +1114,9 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( int dimension,
             dTotalFieldIntegralOut += dst_tdata[iTargetFace] * this->meshOverlap.vecFaceArea[j];
         }
 
+        for( size_t j = 0; j < src_tdata.size(); j++ )
+            src_tdata[j] += constantoffset;
+
         normFactor = dTotalFieldIntegralIn / dTotalFieldIntegralOut;
         for( size_t ind = 0; ind < dst_tdata.size(); ind++ )
         {
@@ -1012,12 +1125,6 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( int dimension,
         }
     }
 
-    // now set the data on ROMS instance of MOAB tag
-    moab::Tag drtag;
-    err = mbi->tag_get_handle( varProjectDst.c_str(), 1, moab::MB_TYPE_DOUBLE, drtag,
-                               moab::MB_TAG_DENSE | moab::MB_TAG_CREAT );MB_CHK_ERR( err );
-
-    err = mbi->tag_set_data( drtag, target_range.data(), target_range.size(), dst_tdata.data() );MB_CHK_ERR( err );
-
     return moab::MB_SUCCESS;
 }
+

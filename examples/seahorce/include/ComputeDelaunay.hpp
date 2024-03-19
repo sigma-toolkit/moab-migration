@@ -321,9 +321,9 @@ bool tetrahedron_barycentric( const double* ar,
 }
 
 moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
-                                            std::vector< double >& xyzd,
+                                            const std::vector< double >& xyzd,
                                             std::vector< double >& fd,
-                                            std::vector< double >& xyzi,
+                                            const std::vector< double >& xyzi,
                                             std::vector< double >& fi )
 {
     // runchk( SetupDelaunayInterpolant( context, xyzd ), "Computing delaunay 3D triangulation failed" );

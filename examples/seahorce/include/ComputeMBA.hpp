@@ -22,9 +22,9 @@
  * @return The error code indicating the success or failure of the computation.
  */
 moab::ErrorCode ComputeMBAInterpolant( RuntimeContext& context,
-                                       std::vector< double >& xyzd,
+                                       const std::vector< double >& xyzd,
                                        std::vector< double >& fd,
-                                       std::vector< double >& xyzi,
+                                       const std::vector< double >& xyzi,
                                        std::vector< double >& fi,
                                        bool is_threed,
                                        int order,

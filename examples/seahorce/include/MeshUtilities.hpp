@@ -164,14 +164,15 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( RuntimeContext& context,
                         int il = faces.index( eladjs[k] );
                         if( il < 0 ) continue;
 
+                        if( layer_thickness[il * nlayers + ii] < 0 )
+                        {
+                            // printf( "Thickness value for layer %d: element %zu  = %f\n", ii, k,
+                            //        layer_thickness[il * nlayers + ii] );
+                            // exit( 1 );
+                            continue;
+                        }
                         invweight += 1.0;
                         thickness += layer_thickness[il * nlayers + ii];
-                        if( thickness < 0 )
-                        {
-                            printf( "Thickness value for layer %d: element %zu  = %f\n", ii, k,
-                                    layer_thickness[il * nlayers + ii] );
-                            exit( 1 );
-                        }
                     }
                     thickness /= invweight;
 
@@ -179,7 +180,8 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( RuntimeContext& context,
                     {
                         printf( "Thickness value for layer %d: vertex %zu, adj = %zu = %f\n", ii, i, eladjs.size(),
                                 thickness );
-                        exit( 1 );
+                        // exit( 1 );
+                        thickness = 0.0;
                     }
 
                     // Subtract or Add depending on the z-Direction to extrude

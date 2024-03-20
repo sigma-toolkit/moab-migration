@@ -1,7 +1,7 @@
 # Find necessary packages
 find_package(
     Python
-    COMPONENTS Interpreter Development.Module
+    COMPONENTS Interpreter Development.Module NumPy
     REQUIRED
 )
 find_program(CYTHON "cython")
@@ -12,6 +12,7 @@ include_directories(
     ${CMAKE_BINARY_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
+    ${Python_NumPy_INCLUDE_DIRS}
 )
 
 # Get a list of all Cython files in the pymoab directory
@@ -27,11 +28,12 @@ foreach(CYTHON_FILE ${CYTHON_FILES})
         OUTPUT ${TARGET_NAME}.cxx
         DEPENDS ${CYTHON_FILE}
         VERBATIM
-        COMMAND "${CYTHON}" --cplus 
-                -I ${CMAKE_SOURCE_DIR}/src 
-                -I ${CMAKE_BINARY_DIR}/src 
-                -I ${CMAKE_CURRENT_SOURCE_DIR} 
-                -I ${CMAKE_CURRENT_BINARY_DIR} 
+        COMMAND "${CYTHON}" --cplus
+                -I ${CMAKE_SOURCE_DIR}/src
+                -I ${CMAKE_BINARY_DIR}/src
+                -I ${CMAKE_CURRENT_SOURCE_DIR}
+                -I ${CMAKE_CURRENT_BINARY_DIR}
+                -I ${Python_NumPy_INCLUDE_DIRS}
                 "${CMAKE_CURRENT_SOURCE_DIR}/${TARGET_NAME}.pyx" 
                 --output-file "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_NAME}.cxx"
     )

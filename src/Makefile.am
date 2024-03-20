@@ -433,10 +433,6 @@ if ENABLE_metis
 endif
 
 
-if HAVE_CGM
-  AM_CPPFLAGS += @CGM_CPPFLAGS@
-endif
-
 CLEANFILES = a.out imoab.mod
 EXTRA_DIST += CMakeLists.txt parallel/CMakeLists.txt IntxMesh/CMakeLists.txt
 

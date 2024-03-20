@@ -2,32 +2,12 @@ AUTOMAKE_OPTIONS = foreign
 AM_CPPFLAGS =  -I$(top_srcdir)/src \
                -I$(top_builddir)/src \
                -I$(top_srcdir)/src/parallel \
-               -I$(top_srcdir)/itaps \
-               -I$(top_builddir)/itaps/imesh \
                $(EIGEN3_INCLUDES)
 
 LDADD = $(top_builddir)/src/libMOAB.la
-if ENABLE_imesh
- LDADD+= $(top_builddir)/itaps/imesh/libiMesh.la
-endif
-
-if HAVE_CGM
-  AM_CPPFLAGS += $(CGM_CPPFLAGS)
-if USING_DEV_CGM
-  LDADD+=  ${CGM_DIR}/src/libcgm.la
-else
-  LDADD+=  ${CGM_DIR}/lib/libcgm.la
-endif
-endif
 
 if HAVE_TEMPESTREMAP
   LDADD += $(TEMPESTREMAP_LIBS)
-endif
-
-if HAVE_CGM
-  geometry_DIR = geometry
-else
-  geometry_DIR =
 endif
 
 # For old (pre 1.10.x) versions of Automake
@@ -119,9 +99,6 @@ if ENABLE_mbpart
   AM_LDFLAGS += $(ZOLTAN_LIB_FLAGS)
   mbpart_SOURCES = mbpart.cpp
   mbpart_LDADD = $(top_builddir)/src/libMOAB.la $(ZOLTAN_LIBS) $(PARMETIS_LIBS) $(METIS_LIBS)
-if HAVE_CGM
-  mbpart_LDADD += $(CGM_LIBS)
-endif
 else
 if ENABLE_metis
   bin_PROGRAMS += mbpart

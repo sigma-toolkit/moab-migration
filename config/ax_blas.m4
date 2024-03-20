@@ -166,12 +166,12 @@ if test $ax_blas_ok = no; then
 		if test $host_cpu = x86_64; then
 			AC_CHECK_LIB(mkl_intel_lp64, $sgemm,
 				[ax_blas_ok=yes;BLAS_LIBS="-lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread"],,
-				[-lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread])
+				[-lmkl_intel_lp64 -lmkl_sequential -lmkl_core -limf -lpthread])
 		# 32-bit
 		elif test $host_cpu = i686; then
 			AC_CHECK_LIB(mkl_intel, $sgemm,
 				[ax_blas_ok=yes;BLAS_LIBS="-lmkl_intel -lmkl_sequential -lmkl_core -lpthread"],,
-				[-lmkl_intel -lmkl_sequential -lmkl_core -lpthread])
+				[-lmkl_intel -lmkl_sequential -lmkl_core -limf -lpthread])
 		fi
 	fi
 fi

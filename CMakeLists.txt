@@ -461,21 +461,13 @@ string(STRIP "${CMAKE_EXE_LINKER_FLAGS} " CMAKE_EXE_LINKER_FLAGS)
 string(STRIP "${MOAB_CXX_FLAGS} " MOAB_CXX_FLAGS)
 string(STRIP "${MOAB_DEFINES} " MOAB_DEFINES)
 
-################################################################################
-# Add Directories
-################################################################################
-message(STATUS "Adding src subdirectory.")
-add_subdirectory( src )
-message(STATUS "Adding itaps subdirectory.")
-add_subdirectory( itaps )
-if (NOT WIN32 OR MSYS OR MINGW) # Need further work to prepare for windows
-  add_subdirectory( tools )
-endif ()
-
 ###############################################################################
 # Python Module Build
 ###############################################################################
 if(SKBUILD)
+  # Scikit-build installs MOAB to ${SKBUILD_PLATLIB_DIR}/pymoab/core
+  # So, set bin directory to root environment (install prefix/bin)
+  set (CMAKE_INSTALL_BINDIR ${SKBUILD_SCRIPTS_DIR})
   add_subdirectory( pymoab )
 elseif(ENABLE_PYMOAB)
   # Find necessary packages
@@ -524,6 +516,18 @@ elseif(ENABLE_PYMOAB)
   # Print a deprecation warning
   message(WARNING "ENABLE_PYMOAB is deprecated and will be removed in the next release. Consider installing PyMOAB via pip instead.")
 endif()
+
+################################################################################
+# Add Directories
+################################################################################
+message(STATUS "Adding src subdirectory.")
+add_subdirectory( src )
+message(STATUS "Adding itaps subdirectory.")
+add_subdirectory( itaps )
+if (NOT WIN32 OR MSYS OR MINGW) # Need further work to prepare for windows
+  add_subdirectory( tools )
+endif ()
+
 ################################################################################
 # Testing Related Settings
 ################################################################################

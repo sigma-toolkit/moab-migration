@@ -51,5 +51,5 @@ foreach(CYTHON_FILE ${CYTHON_FILES})
     target_link_libraries(${TARGET_NAME} PRIVATE MOAB)
 
     # Install the target in the pymoab directory
-    install(TARGETS ${TARGET_NAME} DESTINATION pymoab)
+    install(TARGETS ${TARGET_NAME} DESTINATION ../.)
 endforeach()

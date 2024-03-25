@@ -32,7 +32,6 @@ from pymoab.rng import Range
 # moabInputFile = options.moabFile
 # romsOutputFile = options.romsFile
 
-niskine = False
 romsOutputFile = "roms_his.nc"
 
 # start a MOAB instance
@@ -46,7 +45,7 @@ threed_set = mb2.create_meshset()
 mb2.load_file("roms_3d_projected.h5m", threed_set)
 
 # query the root set for all vertices
-verts2d = mb1.get_entities_by_type(twod_set, types.MBVERTEX, recur = True)
+verts2d = mb1.get_entities_by_type(twod_set, types.MBVERTEX, recur=True)
 print("Found " + str(verts2d.size()) + " vertices in this model.")
 
 ents2d = mb1.get_entities_by_dimension(twod_set, 2)
@@ -55,14 +54,22 @@ print("Found " + str(ents2d.size()) + " 2D faces in this model.")
 ents3d = mb2.get_entities_by_dimension(threed_set, 3)
 print("Found " + str(ents3d.size()) + " 3D elements in this model.")
 
-try: ncfile.close()  # just to be safe, make sure dataset is not already open.
-except: pass
+try:
+    ncfile.close()  # just to be safe, make sure dataset is not already open.
+except:
+    pass
 
-ncfile = netCDF4.Dataset(romsOutputFile,mode='w',format='NETCDF4_CLASSIC')
+ncfile = netCDF4.Dataset(romsOutputFile, mode="w", format="NETCDF4_CLASSIC")
 print(ncfile)
 
-if niskine:
-    titlestr='Wind-Driven Upwelling/Downwelling for the Niskine test case'
+# problem = 1 = Wind-Driven Upwelling/Downwelling for the Niskine test case
+# problem = 2 = Wind-Driven Upwelling/Downwelling for the North-Atlantic test case
+# problem = 3 = Bay of Bengal - rotated 4km grid
+# problem = 4 = Chesapeake Bay
+problem = 3
+
+if problem == 1:
+    titlestr = "Wind-Driven Upwelling/Downwelling for the Niskine test case"
     # 2D elements: 154 * 142 rho points
     xi_rho_init = 154
     eta_rho_init = 142
@@ -70,73 +77,116 @@ if niskine:
     eta_u_init = 142
     xi_v_init = 154
     eta_v_init = 141
-    s_rho_init = int(ents3d.size()/ents2d.size())
-else:
-    titlestr='Wind-Driven Upwelling/Downwelling for the North-Atlantic test case'
-    # 2D elements: 154 * 142 rho points
+elif problem == 2:
+    titlestr = "Wind-Driven Upwelling/Downwelling for the North-Atlantic test case"
+    # 2D elements: 413 * 147 rho points
     xi_rho_init = 413
     eta_rho_init = 147
     xi_u_init = 412
     eta_u_init = 147
     xi_v_init = 413
     eta_v_init = 146
-    #s_rho_init = 100
-    s_rho_init = int(ents3d.size()/ents2d.size())
+    # s_rho_init = 100
+elif problem == 3:
+    titlestr = "Bay of Bengal - rotated 4km grid"
+    # 2D elements: 362 * 222 rho points
+    xi_rho_init = 362
+    eta_rho_init = 222
+    xi_u_init = 361
+    eta_u_init = 222
+    xi_v_init = 362
+    eta_v_init = 221
+    # xi_psi = 361
+    # eta_psi = 221
+else:
+    titlestr = "Chesapeake Bay"
+    # 2D elements: 100 * 150 rho points
+    xi_rho_init = 100
+    eta_rho_init = 150
+    xi_u_init = 99
+    eta_u_init = 150
+    xi_v_init = 100
+    eta_v_init = 149
+    # xi_psi = 99
+    # eta_psi = 149
 
-assert(xi_rho_init*eta_rho_init == ents2d.size())
+# size of axial layers
+s_rho_init = int(ents3d.size() / ents2d.size())
+
+assert xi_rho_init * eta_rho_init == ents2d.size()
 # assert(s_rho_init == ents3d.size()/ents2d.size())
 
-bathmetry_tag = mb1.tag_get_handle("Bathymetry",1,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE)
+bathmetry_tag = mb1.tag_get_handle(
+    "Bathymetry", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_DENSE
+)
 bathymetry = mb1.tag_get_data(bathmetry_tag, ents2d).reshape(eta_rho_init, xi_rho_init)
 
-ssh_tag = mb1.tag_get_handle("SSH",1,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE)
+ssh_tag = mb1.tag_get_handle("SSH", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_DENSE)
 ssh = mb1.tag_get_data(ssh_tag, ents2d).reshape(eta_rho_init, xi_rho_init)
 
-salinity_tag = mb2.tag_get_handle("ROMS_Salinity",1,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE)
-salinity = mb2.tag_get_data(salinity_tag, ents3d).reshape(s_rho_init, xi_rho_init, eta_rho_init)[::-1,:,:]
+salinity_tag = mb2.tag_get_handle(
+    "ROMS_Salinity", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_DENSE
+)
+salinity = mb2.tag_get_data(salinity_tag, ents3d).reshape(
+    s_rho_init, xi_rho_init, eta_rho_init
+)[::-1, :, :]
 # salinity = mb2.tag_get_data(salinity_tag, ents3d).reshape(s_rho_init, eta_rho_init, xi_rho_init)[::-1,:,:]
 print("Salinity: ", salinity.shape)
 
-temperature_tag = mb2.tag_get_handle("ROMS_Temperature",1,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE)
-temperature = mb2.tag_get_data(temperature_tag, ents3d).reshape(s_rho_init, xi_rho_init, eta_rho_init)[::-1,:,:]
+temperature_tag = mb2.tag_get_handle(
+    "ROMS_Temperature", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_DENSE
+)
+temperature = mb2.tag_get_data(temperature_tag, ents3d).reshape(
+    s_rho_init, xi_rho_init, eta_rho_init
+)[::-1, :, :]
 
-velocityx_tag = mb2.tag_get_handle("ROMS_VelZonal",1,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE)
-velocityx = mb2.tag_get_data(velocityx_tag, ents3d).reshape(s_rho_init, eta_rho_init, xi_rho_init)[::-1,:,:]
-velocityxavg = 0.5 * ( velocityx[:,:,:-1] + velocityx[:,:,1:] )
+velocityx_tag = mb2.tag_get_handle(
+    "ROMS_VelZonal", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_DENSE
+)
+velocityx = mb2.tag_get_data(velocityx_tag, ents3d).reshape(
+    s_rho_init, eta_rho_init, xi_rho_init
+)[::-1, :, :]
+velocityxavg = 0.5 * (velocityx[:, :, :-1] + velocityx[:, :, 1:])
 # velocityxavg = ( velocityx[:,:,:-1] )
 print("X velocity shape: ", velocityx.shape, velocityxavg.shape)
 
-velocityy_tag = mb2.tag_get_handle("ROMS_VelMeridional",1,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE)
-velocityy = mb2.tag_get_data(velocityy_tag, ents3d).reshape(s_rho_init, eta_rho_init, xi_rho_init)[::-1,:,:]
-velocityyavg = 0.5 * ( velocityy[:,:-1,:] + velocityy[:,1:,:] )
+velocityy_tag = mb2.tag_get_handle(
+    "ROMS_VelMeridional", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_DENSE
+)
+velocityy = mb2.tag_get_data(velocityy_tag, ents3d).reshape(
+    s_rho_init, eta_rho_init, xi_rho_init
+)[::-1, :, :]
+velocityyavg = 0.5 * (velocityy[:, :-1, :] + velocityy[:, 1:, :])
 # velocityyavg = ( velocityy[:,:-1,:] )
 print("Y velocity shape: ", velocityy.shape, velocityyavg.shape)
 
-xi_rho = ncfile.createDimension('xi_rho', xi_rho_init) # longitude axis
-eta_rho = ncfile.createDimension('eta_rho', eta_rho_init) # longitude axis
-s_rho = ncfile.createDimension('s_rho', s_rho_init) # vertical axis
-xi_u = ncfile.createDimension('xi_u', xi_u_init) # longitude axis
-eta_u = ncfile.createDimension('eta_u', eta_u_init) # longitude axis
-xi_v = ncfile.createDimension('xi_v', xi_v_init) # longitude axis
-eta_v = ncfile.createDimension('eta_v', eta_v_init) # longitude axis
-time_dim = ncfile.createDimension('ocean_time', None) # unlimited axis (can be appended to).
+xi_rho = ncfile.createDimension("xi_rho", xi_rho_init)  # longitude axis
+eta_rho = ncfile.createDimension("eta_rho", eta_rho_init)  # longitude axis
+s_rho = ncfile.createDimension("s_rho", s_rho_init)  # vertical axis
+xi_u = ncfile.createDimension("xi_u", xi_u_init)  # longitude axis
+eta_u = ncfile.createDimension("eta_u", eta_u_init)  # longitude axis
+xi_v = ncfile.createDimension("xi_v", xi_v_init)  # longitude axis
+eta_v = ncfile.createDimension("eta_v", eta_v_init)  # longitude axis
+time_dim = ncfile.createDimension(
+    "ocean_time", None
+)  # unlimited axis (can be appended to).
 for dim in ncfile.dimensions.items():
-  print(dim)
+    print(dim)
 
 # attributes
-ncfile.title=titlestr
-ncfile.type="ROMS/TOMS restart file"
+ncfile.title = titlestr
+ncfile.type = "ROMS/TOMS restart file"
 
 print(ncfile.title)
 print(ncfile.type)
 # print(ncfile)
 
 ## variables
-theta_s = ncfile.createVariable('theta_s',np.float64,())
+theta_s = ncfile.createVariable("theta_s", np.float64, ())
 theta_s.long_name = "S-coordinate surface control parameter"
 theta_s = 5.0
 
-theta_b = ncfile.createVariable('theta_b',np.float64,())
+theta_b = ncfile.createVariable("theta_b", np.float64, ())
 theta_b.long_name = "S-coordinate bottom control parameter"
 theta_b = 0.5
 
@@ -145,153 +195,165 @@ theta_b = 0.5
 # Tcline.units = "meter"
 # Tcline = 0.5
 
-hc = ncfile.createVariable('hc',np.float64,())
+hc = ncfile.createVariable("hc", np.float64, ())
 hc.long_name = "S-coordinate parameter, critical depth"
 hc.units = "meter"
 hc = 100.0
 
-        # double s_rho(s_rho) ;
-        #         s_rho:long_name = "S-coordinate at RHO-points" ;
-        #         s_rho:valid_min = -1. ;
-        #         s_rho:valid_max = 0. ;
-        #         s_rho:positive = "up" ;
-        #         s_rho:standard_name = "ocean_s_coordinate_g2" ;
-        #         s_rho:formula_terms = "s: s_rho C: Cs_r eta: zeta depth: h depth_c: hc" ;
-        #         s_rho:field = "s_rho, scalar" ;
-        # double s_w(s_w) ;
-        #         s_w:long_name = "S-coordinate at W-points" ;
-        #         s_w:valid_min = -1. ;
-        #         s_w:valid_max = 0. ;
-        #         s_w:positive = "up" ;
-        #         s_w:standard_name = "ocean_s_coordinate_g2" ;
-        #         s_w:formula_terms = "s: s_w C: Cs_w eta: zeta depth: h depth_c: hc" ;
-        #         s_w:field = "s_w, scalar" ;
-        # double Cs_r(s_rho) ;
-        #         Cs_r:long_name = "S-coordinate stretching curves at RHO-points" ;
-        #         Cs_r:valid_min = -1. ;
-        #         Cs_r:valid_max = 0. ;
-        #         Cs_r:field = "Cs_r, scalar" ;
-        # double Cs_w(s_w) ;
-        #         Cs_w:long_name = "S-coordinate stretching curves at W-points" ;
-        #         Cs_w:valid_min = -1. ;
-        #         Cs_w:valid_max = 0. ;
-        #         Cs_w:field = "Cs_w, scalar" ;
+# double s_rho(s_rho) ;
+#         s_rho:long_name = "S-coordinate at RHO-points" ;
+#         s_rho:valid_min = -1. ;
+#         s_rho:valid_max = 0. ;
+#         s_rho:positive = "up" ;
+#         s_rho:standard_name = "ocean_s_coordinate_g2" ;
+#         s_rho:formula_terms = "s: s_rho C: Cs_r eta: zeta depth: h depth_c: hc" ;
+#         s_rho:field = "s_rho, scalar" ;
+# double s_w(s_w) ;
+#         s_w:long_name = "S-coordinate at W-points" ;
+#         s_w:valid_min = -1. ;
+#         s_w:valid_max = 0. ;
+#         s_w:positive = "up" ;
+#         s_w:standard_name = "ocean_s_coordinate_g2" ;
+#         s_w:formula_terms = "s: s_w C: Cs_w eta: zeta depth: h depth_c: hc" ;
+#         s_w:field = "s_w, scalar" ;
+# double Cs_r(s_rho) ;
+#         Cs_r:long_name = "S-coordinate stretching curves at RHO-points" ;
+#         Cs_r:valid_min = -1. ;
+#         Cs_r:valid_max = 0. ;
+#         Cs_r:field = "Cs_r, scalar" ;
+# double Cs_w(s_w) ;
+#         Cs_w:long_name = "S-coordinate stretching curves at W-points" ;
+#         Cs_w:valid_min = -1. ;
+#         Cs_w:valid_max = 0. ;
+#         Cs_w:field = "Cs_w, scalar" ;
 
 
 # Bathymetry field: double h(eta_rho, xi_rho) ;
-bath = ncfile.createVariable('h',np.float64,('eta_rho','xi_rho'))
-bath.long_name = "bathymetry at RHO-points" ;
-bath.units = "meter" ;
-bath.grid = "grid" ;
-bath.location = "face" ;
-bath.coordinates = "lon_rho lat_rho" ;
-bath.field = "bath, scalar" ;
-bath[:,:] = bathymetry
+bath = ncfile.createVariable("h", np.float64, ("eta_rho", "xi_rho"))
+bath.long_name = "bathymetry at RHO-points"
+bath.units = "meter"
+bath.grid = "grid"
+bath.location = "face"
+bath.coordinates = "lon_rho lat_rho"
+bath.field = "bath, scalar"
+bath[:, :] = bathymetry
 print(bath)
 
 # free surface height: double zeta(ocean_time, eta_rho, xi_rho) ;
-zeta = ncfile.createVariable('zeta', np.float64, ('ocean_time','eta_rho', 'xi_rho'))
-zeta.long_name = "free-surface" ;
-zeta.units = "meter" ;
-zeta.time = "ocean_time" ;
-zeta.grid = "grid" ;
-zeta.location = "face" ;
-zeta.coordinates = "x_rho y_rho ocean_time" ;
-zeta.field = "free-surface, scalar, series" ;
-zeta[0,:,:] = ssh
+zeta = ncfile.createVariable("zeta", np.float64, ("ocean_time", "eta_rho", "xi_rho"))
+zeta.long_name = "free-surface"
+zeta.units = "meter"
+zeta.time = "ocean_time"
+zeta.grid = "grid"
+zeta.location = "face"
+zeta.coordinates = "x_rho y_rho ocean_time"
+zeta.field = "free-surface, scalar, series"
+zeta[0, :, :] = ssh
 print(zeta)
 
 fieldvars = {
-             'salinityPistonVelocity': "m s^-1",
-             'temperaturePistonVelocity': "m s^-1",
-             'salinitySurfaceRestoringValue': "C",
-             'temperatureSurfaceRestoringValue': "C",
-             'windStressMeridional': "N m^-2",
-             'windStressZonal': "N m^-2"
-             }
+    "salinityPistonVelocity": "m s^-1",
+    "temperaturePistonVelocity": "m s^-1",
+    "salinitySurfaceRestoringValue": "C",
+    "temperatureSurfaceRestoringValue": "C",
+    "windStressMeridional": "N m^-2",
+    "windStressZonal": "N m^-2",
+}
 
 fielddesc = {
-             'salinityPistonVelocity': "A non-negative field controlling the rate at which salinity is restored to salinitySurfaceRestoringValue",
-             'temperaturePistonVelocity': "A non-negative field controlling the rate at which temperature is restored to temperatureSurfaceRestoringValue",
-             'salinitySurfaceRestoringValue': "Salinity is restored toward this field at a rate controlled by salinityPistonVelocity.",
-             'temperatureSurfaceRestoringValue': "Temperature is restored toward this field at a rate controlled by temperaturePistonVelocity.",
-             'windStressMeridional': "Meridional (northward) component of wind stress at cell centers from coupler. Positive northward.",
-             'windStressZonal': "Zonal (eastward) component of wind stress at cell centers from coupler. Positive eastward."
-             }
+    "salinityPistonVelocity": "A non-negative field controlling the rate at which salinity is restored to salinitySurfaceRestoringValue",
+    "temperaturePistonVelocity": "A non-negative field controlling the rate at which temperature is restored to temperatureSurfaceRestoringValue",
+    "salinitySurfaceRestoringValue": "Salinity is restored toward this field at a rate controlled by salinityPistonVelocity.",
+    "temperatureSurfaceRestoringValue": "Temperature is restored toward this field at a rate controlled by temperaturePistonVelocity.",
+    "windStressMeridional": "Meridional (northward) component of wind stress at cell centers from coupler. Positive northward.",
+    "windStressZonal": "Zonal (eastward) component of wind stress at cell centers from coupler. Positive eastward.",
+}
 
 # Bathymetry field: double h(eta_rho, xi_rho) ;
 for fieldname in fieldvars:
 
-    field_tag = mb1.tag_get_handle(fieldname,1,types.MB_TYPE_DOUBLE,types.MB_TAG_DENSE)
+    field_tag = mb1.tag_get_handle(
+        fieldname, 1, types.MB_TYPE_DOUBLE, types.MB_TAG_DENSE
+    )
     if field_tag:
-      fieldata = mb1.tag_get_data(field_tag, ents2d).reshape(eta_rho_init, xi_rho_init)
+        fieldata = mb1.tag_get_data(field_tag, ents2d).reshape(
+            eta_rho_init, xi_rho_init
+        )
 
-      field = ncfile.createVariable(fieldname,np.float64,('eta_rho','xi_rho'))
-      field.long_name = fielddesc[fieldname] ;
-      field.units = fieldvars[fieldname] ;
-      field.grid = "grid" ;
-      field.location = "face" ;
-      field.coordinates = "lon_rho lat_rho" ;
-      field.field = fieldname + ", scalar" ;
-      field[:,:] = fieldata
-      print(field)
+        field = ncfile.createVariable(fieldname, np.float64, ("eta_rho", "xi_rho"))
+        field.long_name = fielddesc[fieldname]
+        field.units = fieldvars[fieldname]
+        field.grid = "grid"
+        field.location = "face"
+        field.coordinates = "lon_rho lat_rho"
+        field.field = fieldname + ", scalar"
+        field[:, :] = fieldata
+        print(field)
 
 # Temperature scalar field
-temp = ncfile.createVariable('temp',np.float64,('ocean_time','s_rho','eta_rho','xi_rho')) # note: unlimited dimension is leftmost
-temp.units = 'Celsius' # degrees Celsius
-temp.long_name = 'potential temperature' # this is a CF standard name
-temp.time = "ocean_time" ;
-temp.grid = "grid" ;
-temp.location = "face" ;
-temp.coordinates = "x_rho y_rho s_rho ocean_time" ;
-temp.field = "temperature, scalar, series" ;
+temp = ncfile.createVariable(
+    "temp", np.float64, ("ocean_time", "s_rho", "eta_rho", "xi_rho")
+)  # note: unlimited dimension is leftmost
+temp.units = "Celsius"  # degrees Celsius
+temp.long_name = "potential temperature"  # this is a CF standard name
+temp.time = "ocean_time"
+temp.grid = "grid"
+temp.location = "face"
+temp.coordinates = "x_rho y_rho s_rho ocean_time"
+temp.field = "temperature, scalar, series"
 print("Temperature shape: ", temperature.shape)
-#print("Found shape: ", temperature.shape, np.einsum('ijk->kij', temperature).shape)
+# print("Found shape: ", temperature.shape, np.einsum('ijk->kij', temperature).shape)
 temp[0, :, :, :] = temperature
-#temp[0, :, :, :] = np.einsum('ijk->kij', temperature)
+# temp[0, :, :, :] = np.einsum('ijk->kij', temperature)
 print(temp)
 
 # Salinity scalar field
-salt = ncfile.createVariable('salt',np.float64,('ocean_time','s_rho','eta_rho','xi_rho')) # note: unlimited dimension is leftmost
-salt.long_name = 'salinity' # this is a CF standard name
-salt.time = "ocean_time" ;
-salt.grid = "grid" ;
-salt.location = "face" ;
-salt.coordinates = "x_rho y_rho s_rho ocean_time" ;
-salt.field = "salinity, scalar, series" ;
+salt = ncfile.createVariable(
+    "salt", np.float64, ("ocean_time", "s_rho", "eta_rho", "xi_rho")
+)  # note: unlimited dimension is leftmost
+salt.long_name = "salinity"  # this is a CF standard name
+salt.time = "ocean_time"
+salt.grid = "grid"
+salt.location = "face"
+salt.coordinates = "x_rho y_rho s_rho ocean_time"
+salt.field = "salinity, scalar, series"
 print("Salinity shape: ", salinity.shape)
 salt[0, :, :, :] = salinity
-#salt[0, :, :, :] = np.einsum('ijk->kij', salinity)
+# salt[0, :, :, :] = np.einsum('ijk->kij', salinity)
 print(salt)
 
 # Velocity fields
 # float u(ocean_time, s_rho, eta_u, xi_u) ;
-velu = ncfile.createVariable('u',np.float64,('ocean_time','s_rho','eta_u','xi_u')) # note: unlimited dimension is leftmost
+velu = ncfile.createVariable(
+    "u", np.float64, ("ocean_time", "s_rho", "eta_u", "xi_u")
+)  # note: unlimited dimension is leftmost
 # velu = ncfile.createVariable('u',np.float64,('ocean_time','s_rho','eta_rho','xi_rho')) # note: unlimited dimension is leftmost
-velu.long_name = "u-momentum component" ;
-velu.units = "meter second-1" ;
-velu.time = "ocean_time" ;
-velu.grid = "grid" ;
-velu.location = "edge1" ;
-velu.coordinates = "lon_u lat_u s_rho ocean_time" ;
-velu.field = "u-velocity, scalar, series" ;
+velu.long_name = "u-momentum component"
+velu.units = "meter second-1"
+velu.time = "ocean_time"
+velu.grid = "grid"
+velu.location = "edge1"
+velu.coordinates = "lon_u lat_u s_rho ocean_time"
+velu.field = "u-velocity, scalar, series"
 print("X velocity shape: ", velocityxavg.shape, np.delete(velocityx, 0, 1).shape)
 # velu[0, :, :, :] = velocityx
 # velu[0, :, :, :] = np.delete(velocityx, 0, 1)
 velu[0, :, :, :] = velocityxavg
-#velu[0, :, :, :] = np.einsum('ijk->ikj', velocityxavg)
+# velu[0, :, :, :] = np.einsum('ijk->ikj', velocityxavg)
 print(velu)
 
 # float v(ocean_time, s_rho, eta_v, xi_v) ;
-velv = ncfile.createVariable('v',np.float64,('ocean_time','s_rho','eta_v','xi_v')) # note: unlimited dimension is leftmost
+velv = ncfile.createVariable(
+    "v", np.float64, ("ocean_time", "s_rho", "eta_v", "xi_v")
+)  # note: unlimited dimension is leftmost
 # velv = ncfile.createVariable('v',np.float64,('ocean_time','s_rho','eta_rho','xi_rho')) # note: unlimited dimension is leftmost
-velv.long_name = "v-momentum component" ;
-velv.units = "meter second-1" ;
-velv.time = "ocean_time" ;
-velv.grid = "grid" ;
-velv.location = "edge2" ;
-velv.coordinates = "lon_v lat_v s_rho ocean_time" ;
-velv.field = "v-velocity, scalar, series" ;
+velv.long_name = "v-momentum component"
+velv.units = "meter second-1"
+velv.time = "ocean_time"
+velv.grid = "grid"
+velv.location = "edge2"
+velv.coordinates = "lon_v lat_v s_rho ocean_time"
+velv.field = "v-velocity, scalar, series"
 print("Y velocity shape: ", velocityyavg.shape, np.delete(velocityy, 0, 2).shape)
 print(velv)
 # velv[0, :, :, :] = velocityy
@@ -328,5 +390,5 @@ print(velv)
 # first print the Dataset object to see what we've got
 print("\n\n", ncfile)
 # close the Dataset.
-ncfile.close(); print('Dataset is closed!')
-
+ncfile.close()
+print("Dataset is closed!")

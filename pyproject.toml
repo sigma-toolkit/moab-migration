@@ -29,7 +29,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Intended Audience :: End Users/Desktop",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: GPL v3 License",
+    "License :: OSI Approved :: LGPLv3 License",
     "Natural Language :: English",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering",

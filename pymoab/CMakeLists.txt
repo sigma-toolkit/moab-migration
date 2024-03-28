@@ -1,9 +1,3 @@
-# Find necessary packages
-find_package(
-    Python
-    COMPONENTS Interpreter Development.Module NumPy
-    REQUIRED
-)
 find_program(CYTHON "cython")
 
 # Include the source and build directories
@@ -50,6 +44,12 @@ foreach(CYTHON_FILE ${CYTHON_FILES})
     # Link the target with the MOAB library
     target_link_libraries(${TARGET_NAME} PRIVATE MOAB)
 
+    # Set the install RPATH
+    if(APPLE)
+        set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH "@loader_path/core/${CMAKE_INSTALL_LIBDIR}")
+    elseif(UNIX)
+        set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH "$ORIGIN/core/${CMAKE_INSTALL_LIBDIR}")
+    endif()
     # Install the target in the pymoab directory
     install(TARGETS ${TARGET_NAME} DESTINATION ../.)
 endforeach()

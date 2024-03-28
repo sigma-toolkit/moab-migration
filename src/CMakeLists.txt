@@ -304,6 +304,27 @@ add_library(
   ${MOABPAR_OBJECTS}
   ${MDHF_OBJ}
   )
+
+if(SKBUILD)
+# Set the rpath
+  if(APPLE)
+    set_target_properties(MOAB PROPERTIES INSTALL_RPATH "@loader_path/.")
+  elseif(UNIX)
+    set_target_properties(MOAB PROPERTIES INSTALL_RPATH "$ORIGIN/.")
+  elseif(WIN32)
+    # Windows has no rpath support :(
+    # So, make a link to the Scripts directory and the pymoab directory
+    # TODO: NEEDS TESTING
+    install(CODE
+      "execute_process(
+        COMMAND
+          mklink /D \"${SKBUILD_PLATLIB_DIR}/pymoab/core/${CMAKE_INSTALL_LIBDIR}/libMOAB${CMAKE_SHARED_LIBRARY_SUFFIX}\" \"${SKBUILD_SCRIPTS_DIR}/libMOAB${CMAKE_SHARED_LIBRARY_SUFFIX}\")
+        COMMAND
+          mklink /D \"${SKBUILD_PLATLIB_DIR}/pymoab/core/${CMAKE_INSTALL_LIBDIR}/libMOAB${CMAKE_SHARED_LIBRARY_SUFFIX}\" \"${SKBUILD_PLATLIB_DIR}/pymoab/libMOAB${CMAKE_SHARED_LIBRARY_SUFFIX}\")
+        ")
+  endif()
+endif()
+
 include(CMakeLibraryFuncs)
 SciFixupLibrary(MOAB MOAB MOAB)
 
@@ -338,6 +359,12 @@ install(
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  )
+
+# Create a symbolic link (shortcut) to prefix/lib (Linux)
+install(CODE 
+  "execute_process(COMMAND 
+  ln -s ${CMAKE_INSTALL_LIBDIR}/libMOAB.so ${SKBUILD_DATA_DIR}/lib/libMOAB.so)"
   )
 list(APPEND MOAB_INSTALL_TARGETS  MOAB)
 include(AutoconfHeader)

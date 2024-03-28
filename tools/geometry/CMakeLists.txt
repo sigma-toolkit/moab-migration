@@ -31,6 +31,16 @@ if ( MOAB_HAVE_CGM )
     target_link_libraries( cub2h5m
                            MOAB
                            ${CGM_LIBRARIES} )
+    if(SKBUILD)
+      # Set the install RPATH
+      if(APPLE)
+          set_target_properties(cgm2moab PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
+          set_target_properties(cub2h5m PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
+      elseif(UNIX)
+          set_target_properties(cgm2moab PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
+          set_target_properties(cub2h5m PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
+      endif()
+    endif()
     install(
       TARGETS cgm2moab
       RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

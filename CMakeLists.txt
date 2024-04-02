@@ -511,7 +511,7 @@ if(SKBUILD OR ENABLE_PYMOAB)
     )
     add_custom_command(
       TARGET pymoab-test-install
-      COMMAND ${Python_EXECUTABLE} -m pip install -vvv . --target ${CMAKE_BINARY_DIR}/Testing
+      COMMAND ${Python_EXECUTABLE} -m pip install . --target ${CMAKE_BINARY_DIR}/Testing
       COMMENT "Installing PyMOAB package for testing..."
     )
     add_test(NAME pymoab_test COMMAND ${CMAKE_COMMAND} --build . --target pymoab-test-install)

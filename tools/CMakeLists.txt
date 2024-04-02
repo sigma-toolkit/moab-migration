@@ -47,11 +47,7 @@ if ( MOAB_HAVE_HDF5 )
   set( MOAB_HAVE_COMPAREFILES 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(compareFiles PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(compareFiles PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(compareFiles PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS compareFiles
@@ -69,11 +65,7 @@ if ( MOAB_BUILD_MBSIZE )
   set( MOAB_HAVE_MBSIZE 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(mbsize PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(mbsize PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(mbsize PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS mbsize
@@ -92,11 +84,7 @@ if ( MOAB_BUILD_MBMERGE )
   set( MOAB_HAVE_MBMERGE 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(mbmerge PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(mbmerge PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(mbmerge PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS mbmerge
@@ -116,11 +104,7 @@ if ( MOAB_BUILD_MBMEM )
   set( MOAB_HAVE_MBMEM 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(mbmem PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(mbmem PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(mbmem PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS mbmem
@@ -138,11 +122,7 @@ if ( MOAB_BUILD_MBCONVERT )
   set( MOAB_HAVE_MBCONVERT 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(mbconvert PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(mbconvert PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(mbconvert PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS mbconvert
@@ -162,11 +142,7 @@ if ( MOAB_BUILD_MBHONODES )
   set( MOAB_HAVE_MBHONODES 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(mbhonodes PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(mbhonodes PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(mbhonodes PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS mbhonodes
@@ -184,11 +160,7 @@ if ( MOAB_BUILD_MBDEPTH )
   set( MOAB_HAVE_MBDEPTH 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(mbdepth PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(mbdepth PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(mbdepth PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS mbdepth
@@ -206,11 +178,7 @@ if ( MOAB_BUILD_MBSKIN )
   set( MOAB_HAVE_MBSKIN 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(mbskin PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(mbskin PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(mbskin PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS mbskin
@@ -229,11 +197,7 @@ if ( MOAB_BUILD_MBSURFPLOT )
   set( MOAB_HAVE_MBSURFPLOT 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(mbsurfplot PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(mbsurfplot PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(mbsurfplot PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS mbsurfplot
@@ -252,11 +216,7 @@ if ( MOAB_BUILD_MBTAGPROP )
   set( MOAB_HAVE_MBTAGPROP 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(mbtagprop PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(mbtagprop PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(mbtagprop PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS mbtagprop
@@ -275,11 +235,7 @@ if ( MOAB_BUILD_MBGSETS )
   set( MOAB_HAVE_MBGSETS 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(mbgsets PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(mbgsets PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(mbgsets PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS mbgsets
@@ -297,11 +253,7 @@ if ( MOAB_BUILD_MBUMR )
   set( MOAB_HAVE_MBUMR 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(mbumr PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(mbumr PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(mbumr PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS mbumr
@@ -319,11 +271,7 @@ if ( MOAB_BUILD_MBSLAVEPART )
   set( MOAB_HAVE_MBSLAVEPART 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(mbslavepart PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(mbslavepart PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(mbslavepart PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS mbslavepart
@@ -341,11 +289,7 @@ if ( MOAB_BUILD_MBTEMPEST )
   set( MOAB_HAVE_MBTEMPEST 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(mbtempest PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(mbtempest PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(mbtempest PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS mbtempest
@@ -364,11 +308,7 @@ if ( MOAB_BUILD_MBQUALITY )
   set( MOAB_HAVE_MBQUALITY 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(mbquality PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(mbquality PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(mbquality PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS mbquality
@@ -392,11 +332,7 @@ if ( MOAB_BUILD_MBPART OR ( MOAB_HAVE_ZOLTAN OR MOAB_HAVE_METIS ) )
   set( MOAB_HAVE_MBPART 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(mbpart PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(mbpart PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(mbpart PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS mbpart
@@ -418,11 +354,7 @@ if( MOAB_BUILD_HEXMODOPS )
   set( MOAB_HAVE_HEXMODOPS 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(hexmodops PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(hexmodops PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(hexmodops PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS hexmodops
@@ -441,11 +373,7 @@ if ( MOAB_BUILD_SPHEREDECOMP )
   set( MOAB_HAVE_SPHEREDECOMP 1 )
   if(SKBUILD)
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(spheredecomp PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-    elseif(UNIX)
-        set_target_properties(spheredecomp PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-    endif()
+    set_target_properties(spheredecomp PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
   endif()
   install(
     TARGETS spheredecomp

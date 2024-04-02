@@ -45,11 +45,8 @@ foreach(CYTHON_FILE ${CYTHON_FILES})
     target_link_libraries(${TARGET_NAME} PRIVATE MOAB)
 
     # Set the install RPATH
-    if(APPLE)
-        set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH "@loader_path/core/${CMAKE_INSTALL_LIBDIR}")
-    elseif(UNIX)
-        set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH "$ORIGIN/core/${CMAKE_INSTALL_LIBDIR}")
-    endif()
+    set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH "${RPATH}/core/${CMAKE_INSTALL_LIBDIR}")
+
     # Install the target in the pymoab directory
     install(TARGETS ${TARGET_NAME} DESTINATION ../.)
 endforeach()

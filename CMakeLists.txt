@@ -480,6 +480,13 @@ if(SKBUILD OR ENABLE_PYMOAB)
     # So, set bin directory to root environment (install prefix/bin)
     set (CMAKE_INSTALL_BINDIR ${SKBUILD_SCRIPTS_DIR})
     set (SKBUILD_LIB_DIR ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/pymoab/core/${CMAKE_INSTALL_LIBDIR})
+    if(APPLE)
+      set(RPATH "@loader_path")
+    elseif(UNIX)
+      set(RPATH "$ORIGIN")
+    else()
+      set(RPATH OFF) # Windows
+    endif()
     add_subdirectory( pymoab )
   else()
     # Get a list of all Python files in the pymoab directory

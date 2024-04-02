@@ -306,12 +306,8 @@ add_library(
   )
 
 if(SKBUILD)
-# Set the rpath
-  if(APPLE)
-    set_target_properties(MOAB PROPERTIES INSTALL_RPATH "@loader_path/.")
-  elseif(UNIX)
-    set_target_properties(MOAB PROPERTIES INSTALL_RPATH "$ORIGIN/.")
-  elseif(WIN32)
+  # Set the rpath
+  if(WIN32)
     # Windows has no rpath support :(
     # So, make a link to the Scripts directory and the pymoab directory
     # TODO: NEEDS TESTING
@@ -322,6 +318,8 @@ if(SKBUILD)
         COMMAND
           mklink /D \"${SKBUILD_PLATLIB_DIR}/pymoab/core/${CMAKE_INSTALL_LIBDIR}/libMOAB${CMAKE_SHARED_LIBRARY_SUFFIX}\" \"${SKBUILD_PLATLIB_DIR}/pymoab/libMOAB${CMAKE_SHARED_LIBRARY_SUFFIX}\")
         ")
+  else()
+    set_target_properties(MOAB PROPERTIES INSTALL_RPATH "${RPATH}")
   endif()
 endif()
 

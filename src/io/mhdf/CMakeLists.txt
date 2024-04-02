@@ -24,11 +24,7 @@ add_executable( h5minfo include/mhdf.h example/info.c $<TARGET_OBJECTS:mhdf> )
 target_link_libraries( h5minfo ${HDF5_LIBRARIES} )
 if(SKBUILD)
   # Set the install RPATH
-  if(APPLE)
-      set_target_properties(h5minfo PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-  elseif(UNIX)
-      set_target_properties(h5minfo PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-  endif()
+  set_target_properties(h5minfo PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
 endif()
 install(
   TARGETS h5minfo
@@ -40,11 +36,7 @@ install(
 add_executable( h5mvalidate example/validate.c $<TARGET_OBJECTS:mhdf> )
 if(SKBUILD)
   # Set the install RPATH
-  if(APPLE)
-      set_target_properties(h5mvalidate PROPERTIES INSTALL_RPATH "@loader_path/../${SKBUILD_LIB_DIR}")
-  elseif(UNIX)
-      set_target_properties(h5mvalidate PROPERTIES INSTALL_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR}")
-  endif()
+  set_target_properties(h5mvalidate PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
 endif()
 install(
   TARGETS h5mvalidate

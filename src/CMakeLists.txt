@@ -359,11 +359,6 @@ install(
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   )
 
-# Create a symbolic link (shortcut) to prefix/lib (Linux)
-install(CODE 
-  "execute_process(COMMAND 
-  ln -s ${CMAKE_INSTALL_LIBDIR}/libMOAB.so ${SKBUILD_DATA_DIR}/lib/libMOAB.so)"
-  )
 list(APPEND MOAB_INSTALL_TARGETS  MOAB)
 include(AutoconfHeader)
 moab_install_headers(${MOAB_INSTALL_HEADERS})

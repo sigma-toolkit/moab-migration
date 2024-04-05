@@ -848,8 +848,8 @@ ErrorCode TempestRemapper::convert_overlap_mesh_sorted_by_source()
     coordz.clear();
     verts.clear();
 
-    m_overlap->RemoveZeroEdges();
     m_overlap->RemoveCoincidentNodes( false );
+    m_overlap->RemoveZeroEdges();
 
     // Generate reverse node array and edge map
     // if ( constructEdgeMap ) m_overlap->ConstructEdgeMap(false);
@@ -869,15 +869,18 @@ ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
         m_covering_source = new Mesh();
         rval = convert_mesh_to_tempest_private( m_covering_source, m_covering_source_set, m_covering_source_entities,
                                                 &m_covering_source_vertices );MB_CHK_SET_ERR( rval, "Can't convert source Tempest mesh" );
+        // printf("[%d]: Covering entities size = %d, Edgemap size = %d\n", rank, m_covering_source_entities.size(), m_covering_source->edgemap.size() );
 
         // std::cout << "ComputeGlobalLocalMaps: " << rank << ", "
         //           << " covering entities = [" << m_covering_source_vertices.size() << ", "
         //           << m_covering_source_entities.size() << "]\n";
     }
+
 #ifdef VERBOSE
     m_covering_source->Write( std::string( "coverage_TR_p" + std::to_string( rank ) + ".g" ) );
     m_target->Write( std::string( "target_TR_p" + std::to_string( rank ) + ".g" ) );
 #endif
+
     gid_to_lid_src.clear();
     lid_to_gid_src.clear();
     gid_to_lid_covsrc.clear();

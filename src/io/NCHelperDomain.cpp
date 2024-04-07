@@ -17,13 +17,13 @@ bool NCHelperDomain::can_read_file( ReadNC* readNC, int fileId )
     std::vector< std::string >& dimNames = readNC->dimNames;
 
     // If dimension names "n" AND "ni" AND "nj" AND "nv" exist then it should be the Domain grid
-    if( ( std::find( dimNames.begin(), dimNames.end(), std::string( "n" ) ) != dimNames.end() ) &&
+    if(  //(std::find( dimNames.begin(), dimNames.end(), std::string( "n" ) ) != dimNames.end() ) &&
         ( std::find( dimNames.begin(), dimNames.end(), std::string( "ni" ) ) != dimNames.end() ) &&
         ( std::find( dimNames.begin(), dimNames.end(), std::string( "nj" ) ) != dimNames.end() ) &&
         ( std::find( dimNames.begin(), dimNames.end(), std::string( "nv" ) ) != dimNames.end() ) )
     {
         // Make sure it is CAM grid
-        std::map< std::string, ReadNC::AttData >::iterator attIt = readNC->globalAtts.find( "source" );
+       /* std::map< std::string, ReadNC::AttData >::iterator attIt = readNC->globalAtts.find( "source" );
         if( attIt == readNC->globalAtts.end() ) return false;
         unsigned int sz = attIt->second.attLen;
         std::string att_data;
@@ -31,7 +31,7 @@ bool NCHelperDomain::can_read_file( ReadNC* readNC, int fileId )
         att_data[sz] = '\000';
         int success =
             NCFUNC( get_att_text )( fileId, attIt->second.attVarId, attIt->second.attName.c_str(), &att_data[0] );
-        if( success ) return false;
+        if( success ) return false;*/
         /*if (att_data.find("CAM") == std::string::npos)
           return false;*/
 
@@ -311,13 +311,30 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     std::string xvstr( "xv" );
     ReadNC::VarData& var_xv = _readNC->varInfo[xvstr];
     std::vector< double > xv( local_elems * nv );
-    success = NCFUNCAG( _vara_double )( _fileId, var_xv.varId, &startsv[0], &countsv[0], &xv[0] );
+
+    std::vector< NCDF_SIZE > starts_vv, counts_vv;
+    starts_vv.resize(3);
+    counts_vv.resize(3);
+    bool nv_last = true;
+    if ( _readNC->dimNames[var_xv.varDims[0]] == std::string("nv") ) // it means that nv is the first dimension
+    {
+        starts_vv[0]=0; starts_vv[1]=startsv[0]; starts_vv[2]=startsv[1];
+        counts_vv[0]=nv; counts_vv[1] = countsv[0]; counts_vv[2] = countsv[1];
+        nv_last = false;
+    }
+    else
+    {
+        starts_vv=startsv;
+        counts_vv=countsv;
+    }
+    dbgOut.tprintf( 1, " nv is the last dimension in xv array (0 or 1)  %d \n", (int)nv_last );
+    success = NCFUNCAG( _vara_double )( _fileId, var_xv.varId, &starts_vv[0], &counts_vv[0], &xv[0] );
     if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read double data for xv variable " );
 
     std::string yvstr( "yv" );
     ReadNC::VarData& var_yv = _readNC->varInfo[yvstr];
     std::vector< double > yv( local_elems * nv );
-    success = NCFUNCAG( _vara_double )( _fileId, var_yv.varId, &startsv[0], &countsv[0], &yv[0] );
+    success = NCFUNCAG( _vara_double )( _fileId, var_yv.varId, &starts_vv[0], &counts_vv[0], &yv[0] );
     if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read double data for yv variable " );
 
     // read other variables, like xc, yc, frac, area
@@ -336,11 +353,14 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     std::string fracstr( "frac" );
     ReadNC::VarData& var_frac = _readNC->varInfo[fracstr];
     std::vector< double > frac( local_elems );
-    success = NCFUNCAG( _vara_double )( _fileId, var_frac.varId, &vmask.readStarts[0], &vmask.readCounts[0], &frac[0] );
-    if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read double data for frac variable " );
+    if (var_frac.varId>=0)
+    {
+        success = NCFUNCAG( _vara_double )( _fileId, var_frac.varId, &vmask.readStarts[0], &vmask.readCounts[0], &frac[0] );
+        if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read double data for frac variable " );
+    }
     std::string areastr( "area" );
-    ReadNC::VarData& var_area = _readNC->varInfo[areastr];
     std::vector< double > area( local_elems );
+    ReadNC::VarData& var_area = _readNC->varInfo[areastr];
     success = NCFUNCAG( _vara_double )( _fileId, var_area.varId, &vmask.readStarts[0], &vmask.readCounts[0], &area[0] );
     if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read double data for area variable " );
     // create tags for them
@@ -398,9 +418,12 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
         {
             if( culling && 0 == mask[elem_index] ) continue;  // nothing to do, do not advance elem_index in actual moab arrays
             // set area and fraction on those elements too
+            dbgOut.tprintf( 3, "elem index  %d \n", elem_index );
             for( int k = 0; k < nv; k++ )
             {
                 int index_v_arr = nv * elem_index + k;
+                if (!nv_last)
+                    index_v_arr = k * local_elems + elem_index;
                 double x, y;
                 if( nv > 1 )
                 {
@@ -412,6 +435,7 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
                     double ymult  = cosphi * sin( x * pideg );
                     Node3D pt( xmult, ymult, zmult );
                     vertex_map[pt] = 0;
+                    dbgOut.tprintf( 3, "   %d  x=%5.1f y=%5.1f  pt: %f %f %f \n", k, x, y, pt.coords[0], pt.coords[1], pt.coords[2] );
                 }
                 else
                 {
@@ -460,6 +484,8 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
                 for( int k = 0; k < nv; k++ )
                 {
                     int index_v_arr = nv * elem_index + k;
+                    if (!nv_last)
+                        index_v_arr = k * local_elems + elem_index;
                     if( nv > 1 )
                     {
                         double x      = xv[index_v_arr];

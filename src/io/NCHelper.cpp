@@ -48,7 +48,7 @@ ReadNC::NCFormatType NCHelper::get_nc_format( ReadNC* readNC, int fileId )
         return ReadNC::NC_FORMAT_SCRIP;
     else if( NCHelperESMF::can_read_file( readNC ) )
         return ReadNC::NC_FORMAT_ESMF;
-    else if( NCHelperDomain::can_read_file( readNC, fileId ) && is_CF )
+    else if( NCHelperDomain::can_read_file( readNC, fileId ) ) // && is_CF )
         return ReadNC::NC_FORMAT_DOMAIN;
     else if( NCHelperHOMME::can_read_file( readNC, fileId ) )
         return ReadNC::NC_FORMAT_HOMME;

@@ -1544,9 +1544,10 @@ int moab::TempestOnlineMap::IsConservative( double dTolerance )
             rcount[ir] = nElementsInProc[ir * nDATA + 1];
             gsum += rcount[ir];
 
-            // printf("%d: nTotColumns: %d, Displs: %d, rcount: %d, gsum = %d\n", ir, nTotColumns,
-            // displs[ir], rcount[ir], gsum);
+            // printf( "%d: nTotColumns: %d, Displs: %d, rcount: %d, gsum = %d\n", ir, nTotColumns, displs[ir], rcount[ir], gsum );
         }
+
+        printf( "Total nnz: %d, global source elements = %d\n", nTotVals, gsum );
 
         dColumnIndices.resize( nTotColumns, -1 );
         dColumnSumsTotal.resize( nTotColumns, 0.0 );
@@ -1732,13 +1733,13 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
     const bool outputEnabled = ( is_root );
     int discOrder;
     DiscretizationType discMethod;
-    moab::EntityHandle meshset;
+    // moab::EntityHandle meshset;
     moab::Range entities;
     Mesh* trmesh;
     switch( ctx )
     {
         case Remapper::SourceMesh:
-            meshset    = m_remapper->m_covering_source_set;
+            // meshset    = m_remapper->m_covering_source_set;
             trmesh     = m_remapper->m_covering_source;
             entities   = ( m_remapper->point_cloud_source ? m_remapper->m_covering_source_vertices
                                                           : m_remapper->m_covering_source_entities );
@@ -1747,7 +1748,7 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
             break;
 
         case Remapper::TargetMesh:
-            meshset = m_remapper->m_target_set;
+            // meshset = m_remapper->m_target_set;
             trmesh  = m_remapper->m_target;
             entities =
                 ( m_remapper->point_cloud_target ? m_remapper->m_target_vertices : m_remapper->m_target_entities );
@@ -2092,28 +2093,28 @@ moab::ErrorCode moab::TempestOnlineMap::ComputeMetrics( moab::Remapper::Intersec
     moab::ErrorCode rval;
     const bool outputEnabled = ( is_root );
     int discOrder;
-    DiscretizationType discMethod;
-    moab::EntityHandle meshset;
+    // DiscretizationType discMethod;
+    // moab::EntityHandle meshset;
     moab::Range entities;
-    Mesh* trmesh;
+    // Mesh* trmesh;
     switch( ctx )
     {
         case Remapper::SourceMesh:
-            meshset    = m_remapper->m_covering_source_set;
-            trmesh     = m_remapper->m_covering_source;
+            // meshset    = m_remapper->m_covering_source_set;
+            // trmesh     = m_remapper->m_covering_source;
             entities   = ( m_remapper->point_cloud_source ? m_remapper->m_covering_source_vertices
                                                           : m_remapper->m_covering_source_entities );
             discOrder  = m_nDofsPEl_Src;
-            discMethod = m_eInputType;
+            // discMethod = m_eInputType;
             break;
 
         case Remapper::TargetMesh:
-            meshset = m_remapper->m_target_set;
-            trmesh  = m_remapper->m_target;
+            // meshset = m_remapper->m_target_set;
+            // trmesh  = m_remapper->m_target;
             entities =
                 ( m_remapper->point_cloud_target ? m_remapper->m_target_vertices : m_remapper->m_target_entities );
             discOrder  = m_nDofsPEl_Dest;
-            discMethod = m_eOutputType;
+            // discMethod = m_eOutputType;
             break;
 
         default:

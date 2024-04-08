@@ -877,15 +877,10 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         // For the overlap method, choose between: "fuzzy", "exact" or "mixed"
         err = GenerateOverlapMesh( ctx.inFilenames[0], ctx.inFilenames[1], *tempest_mesh, ctx.outFilename, "NetCDF4",
                                    "exact", true );
-
         if( err )
-        {
             rval = moab::MB_FAILURE;
-        }
         else
-        {
             ctx.meshes.push_back( tempest_mesh );
-        }
     }
     else if( ctx.meshType == moab::TempestRemapper::OVERLAP_MEMORY )
     {
@@ -910,9 +905,7 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
                                          "NetCDF4", "exact", false );
 
         if( err )
-        {
             rval = moab::MB_FAILURE;
-        }
         else
         {
             remapper.SetMesh( moab::Remapper::OverlapMesh, tempest_mesh );
@@ -938,9 +931,8 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         rval =
             remapper.LoadNativeMesh( ctx.inFilenames[0], ctx.meshsets[0], smetadata, additional_read_opts_src.c_str() );MB_CHK_ERR( rval );
         if( smetadata.size() )
-        {
             remapper.SetMeshType( moab::Remapper::SourceMesh, smetadata );
-        }
+
         // Rescale the radius of both to compute the intersection
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[0], radius_src );MB_CHK_ERR( rval );
 
@@ -949,9 +941,8 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         rval = remapper.LoadNativeMesh( ctx.inFilenames[1], ctx.meshsets[1], tmetadata,
                                         addititional_read_opts_tgt.c_str() );MB_CHK_ERR( rval );
         if( tmetadata.size() )
-        {
             remapper.SetMeshType( moab::Remapper::TargetMesh, tmetadata );
-        }
+
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[1], radius_dest );MB_CHK_ERR( rval );
 
         if( ctx.computeWeights )
@@ -970,13 +961,9 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         err = GenerateICOMesh( *tempest_mesh, ctx.blockSize, ctx.computeDual, ctx.outFilename, "NetCDF4" );
 
         if( err )
-        {
             rval = moab::MB_FAILURE;
-        }
         else
-        {
             ctx.meshes.push_back( tempest_mesh );
-        }
     }
     else if( ctx.meshType == moab::TempestRemapper::RLL )
     {
@@ -993,25 +980,17 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         );
 
         if( err )
-        {
             rval = moab::MB_FAILURE;
-        }
         else
-        {
             ctx.meshes.push_back( tempest_mesh );
-        }
     }
     else  // default
     {
         err = GenerateCSMesh( *tempest_mesh, ctx.blockSize, ctx.outFilename, "NetCDF4" );
         if( err )
-        {
             rval = moab::MB_FAILURE;
-        }
         else
-        {
             ctx.meshes.push_back( tempest_mesh );
-        }
     }
 
     if( ctx.meshType != moab::TempestRemapper::OVERLAP_MOAB && !tempest_mesh )

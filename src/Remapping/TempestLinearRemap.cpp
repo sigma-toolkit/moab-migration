@@ -366,6 +366,88 @@ void moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3()
 
 ///////////////////////////////////////////////////////////////////////////////
 
+static void CAASLimiter( DataArray1D< double >& dataCorrectedField,
+                         DataArray1D< double >& dataLowerBound,
+                         DataArray1D< double >& dataUpperBound,
+                         const DataArray1D< double >& dTargetAreas,
+                         double& dMass )
+{
+
+    DataArray1D< double > dataCorrection( dataLowerBound.GetRows() );
+    for( size_t i = 0; i < dataLowerBound.GetRows(); i++ )
+        dataCorrection[i] = fmax( dataLowerBound[i], fmin( dataUpperBound[i], 0.0 ) );
+
+    double dMassL = 0.0;
+    double dMassU = 0.0;
+    for( size_t i = 0; i < dataLowerBound.GetRows(); i++ )
+    {
+        dMassL += dTargetAreas[i] * dataLowerBound[i];
+        dMassU += dTargetAreas[i] * dataUpperBound[i];
+    }
+
+    double dMassDiff = dMass;
+    for( size_t i = 0; i < dataCorrectedField.GetRows(); i++ )
+        dMassDiff -= dTargetAreas[i] * dataCorrection[i];
+
+    double dLMinusU = abs( dataLowerBound[0] - dataUpperBound[0] );
+    for( size_t i = 0; i < dataLowerBound.GetRows(); i++ )
+    {
+        if( abs( dataLowerBound[i] - dataUpperBound[i] ) > dLMinusU )
+            dLMinusU = abs( dataLowerBound[i] - dataUpperBound[i] );
+    }
+
+    //If the upper and lower bounds are too close together, just clip
+    if( dMassDiff == 0 || ( dLMinusU < 1e-13 ) )
+    {
+        for( size_t i = 0; i < dataUpperBound.GetRows(); i++ )
+            dataCorrectedField[i] += dataCorrection[i];
+        return;
+    }
+    else if( dMassL > dMassDiff )
+    {
+        Announce( "Lower bound mass exceeds target mass by %1.15e: CAAS not applied", dMassL - dMassDiff );
+        return;
+    }
+    else if( dMassU < dMassDiff )
+    {
+        Announce( "Target mass exceeds upper bound mass by %1.15e: CAAS not applied", dMassDiff - dMassU );
+        return;
+    }
+    else
+    {
+        DataArray1D< double > dataMassVec( dataUpperBound.GetRows() );  //vector of mass redistribution
+        if( dMassDiff > 0.0 )
+        {
+            double dMassCorrectU = 0.0;
+            for( size_t i = 0; i < dataUpperBound.GetRows(); i++ )
+                dMassCorrectU += dTargetAreas[i] * ( dataUpperBound[i] - dataCorrection[i] );
+
+            for( size_t i = 0; i < dataUpperBound.GetRows(); i++ )
+            {
+                dataMassVec[i]    = ( dataUpperBound[i] - dataCorrection[i] ) / dMassCorrectU;
+                dataCorrection[i] = dataCorrection[i] + dMassDiff * dataMassVec[i];
+            }
+        }
+        else
+        {
+            double dMassCorrectL = 0.0;
+            for( size_t i = 0; i < dataUpperBound.GetRows(); i++ )
+                dMassCorrectL += dTargetAreas[i] * ( dataCorrection[i] - dataLowerBound[i] );
+
+            for( size_t i = 0; i < dataLowerBound.GetRows(); i++ )
+            {
+                dataMassVec[i]    = ( dataCorrection[i] - dataLowerBound[i] ) / dMassCorrectL;
+                dataCorrection[i] = dataCorrection[i] + dMassDiff * dataMassVec[i];
+            }
+        }
+
+        for( size_t i = 0; i < dataUpperBound.GetRows(); i++ )
+            dataCorrectedField[i] += dataCorrection[i];
+    }
+
+    return;
+}
+
 double moab::TempestOnlineMap::ApplyCAASLimiting( std::vector< double >& dataInDouble,
                                                   std::vector< double >& dataOutDouble,
                                                   bool useCAASLocal )
@@ -667,7 +749,7 @@ double moab::TempestOnlineMap::ApplyCAASLimiting( std::vector< double >& dataInD
         xDout.AttachToData( dataOutDouble.data() );
 
         // Invoke CAAS application on the offline map
-        this->CAAS( xDout, dataLowerBound, dataUpperBound, dMassDiff );
+        CAASLimiter( xDout, dataLowerBound, dataUpperBound, m_dTargetAreas, dMassDiff );
     }
 
     // Announce output mass
@@ -767,6 +849,8 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
     if( useCAAS )
     {
         double mismatch = this->ApplyCAASLimiting( srcVals, tgtVals, true );
+        if( m_remapper->verbose && is_root )
+            std::cout << "Mismatch after CAAS limiting: " << mismatch << "\n";
     }
 
 #ifdef VERBOSE

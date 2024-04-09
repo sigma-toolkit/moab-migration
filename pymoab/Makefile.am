@@ -13,7 +13,7 @@ install-exec-local: all-local
 	(PYTHONPATH=$(DESTDIR)$(pythondir):$(PYTHONPATH) $(PYTHON) -m pip install ../. \
         --prefix $(DESTDIR)$(prefix) )
 check: all-local
-	cd ../test/pymoab; \
+	cd $abs_top_srcdir/test/pymoab; \
 	for i in $(test_files); \
 	do \
 		(@SLIBENVPATH@=$(abs_top_builddir)/src/.libs/:$(@SLIBENVPATH@) PYTHONPATH=$(abs_top_builddir):$(PYTHONPATH) $(PYTHON) $$i) || exit 1; \

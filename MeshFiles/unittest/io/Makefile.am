@@ -22,6 +22,7 @@ EXTRA_DIST = HommeMapping.nc \
              ho_test.g \
              ho_test.cub \
              homme3x3458.t.3.nc \
+	     rof_domain.nc \
 	     singlecyl.cub \
 	     singlecyl.ccmg \
              test.cub \

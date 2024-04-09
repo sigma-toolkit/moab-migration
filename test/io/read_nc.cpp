@@ -6,6 +6,7 @@ using namespace moab;
 std::string example_eul    = TestDir + "unittest/io/eul3x48x96.t.3.nc";
 std::string example_fv     = TestDir + "unittest/io/fv3x46x72.t.3.nc";
 std::string example_domain = TestDir + "unittest/io/domain.ocn.ne4np4_oQU240.160614.nc";
+std::string example_domain2 = TestDir + "unittest/io/rof_domain.nc";
 std::string example_scrip  = TestDir + "unittest/io/ocean.QU.240km.scrip.151209.nc";
 
 #ifdef MOAB_HAVE_MPI
@@ -32,6 +33,7 @@ void test_read_fv_ghosting();
 
 // Domain file
 void test_read_domain_culling();
+void test_read_old_domain();
 void test_read_domain_no_culling();
 // scrip file
 void test_read_scrip();
@@ -57,6 +59,7 @@ int main( int argc, char* argv[] )
     result += RUN_TEST( test_read_eul_nomesh );
     result += RUN_TEST( test_read_eul_novars );
     result += RUN_TEST( test_read_domain_culling );
+    result += RUN_TEST( test_read_old_domain );
     result += RUN_TEST( test_read_domain_no_culling );
     result += RUN_TEST( test_read_scrip );
     // Exclude test_read_fv_all() since reading edge data is not implemented in MOAB yet
@@ -514,6 +517,22 @@ void test_read_domain_culling()
 
     opts = orig + std::string( ";VARIABLE=" );
     rval = mb.load_file( example_domain.c_str(), &set, opts.c_str() );CHECK_ERR( rval );
+}
+
+void test_read_old_domain()
+{
+    Core moab;
+    Interface& mb = moab;
+
+    // Need a set for nomesh to work right
+    EntityHandle set;
+    ErrorCode rval = mb.create_meshset( MESHSET_SET, set );CHECK_ERR( rval );
+
+    std::string orig, opts;
+    rval = get_options( orig );CHECK_ERR( rval );
+
+    opts = orig + std::string( ";VARIABLE=" );
+    rval = mb.load_file( example_domain2.c_str(), &set, opts.c_str() );CHECK_ERR( rval );
 }
 
 void test_read_domain_no_culling()

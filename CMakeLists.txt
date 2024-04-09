@@ -152,7 +152,9 @@ endif ()
 if(APPLE)
   option(CMAKE_MACOSX_RPATH "Use MacOSX RPATH" OFF)
   message(STATUS "CMAKE_MACOSX_RPATH = ${CMAKE_MACOSX_RPATH}")
-  option(CMAKE_INSTALL_NAME_DIR "Install Name Dir" ${CMAKE_INSTALL_PREFIX}/lib)
+  if(NOT CMAKE_INSTALL_NAME_DIR)
+    set(CMAKE_INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/lib)
+  endif()
   message(STATUS "CMAKE_INSTALL_NAME_DIR = ${CMAKE_INSTALL_NAME_DIR}")
 endif()
 
@@ -478,8 +480,8 @@ if(SKBUILD OR ENABLE_PYMOAB)
   if(SKBUILD)
     # Scikit-build installs MOAB to ${SKBUILD_PLATLIB_DIR}/pymoab/core
     # So, set bin directory to root environment (install prefix/bin)
-    set (CMAKE_INSTALL_BINDIR ${SKBUILD_SCRIPTS_DIR})
-    set (SKBUILD_LIB_DIR ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/pymoab/core/${CMAKE_INSTALL_LIBDIR})
+    set(CMAKE_INSTALL_BINDIR ${SKBUILD_SCRIPTS_DIR})
+    set(SKBUILD_LIB_DIR ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/pymoab/core/${CMAKE_INSTALL_LIBDIR})
     if(APPLE)
       set(RPATH "@loader_path")
     elseif(UNIX)
@@ -500,7 +502,7 @@ if(SKBUILD OR ENABLE_PYMOAB)
     endif()
 
     # Show PyMOAB prefix
-    message(STATUS "PyMOAB prefix: ${PYMOAB_PREFIX} (DEPRECATED)")
+    message(STATUS "PyMOAB prefix: ${PYMOAB_PREFIX}")
 
     # Copy the Python files to the current binary directory
     file( COPY ${PY_FILES} ${PXD_FILES} ${PYX_FILES} DESTINATION ${CMAKE_BINARY_DIR}/pymoab)
@@ -527,7 +529,10 @@ if(SKBUILD OR ENABLE_PYMOAB)
     install(CODE "execute_process(COMMAND ${Python_EXECUTABLE} -m pip install . --prefix ${PYMOAB_PREFIX})")
     
     # Print a deprecation warning
-    message(WARNING "ENABLE_PYMOAB is deprecated and will be removed in the next release. Consider installing PyMOAB via pip instead.")
+    message(WARNING "ENABLE_PYMOAB and PYMOAB_PREFIX is deprecated and will be removed in the next release. " 
+      "Consider installing PyMOAB via pip instead. "
+      "See README.md for more information."
+      )
   endif()
 endif()
 

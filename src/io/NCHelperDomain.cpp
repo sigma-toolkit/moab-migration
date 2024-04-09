@@ -23,7 +23,7 @@ bool NCHelperDomain::can_read_file( ReadNC* readNC, int fileId )
         ( std::find( dimNames.begin(), dimNames.end(), std::string( "nv" ) ) != dimNames.end() ) )
     {
         // Make sure it is CAM grid
-       /* std::map< std::string, ReadNC::AttData >::iterator attIt = readNC->globalAtts.find( "source" );
+        /* std::map< std::string, ReadNC::AttData >::iterator attIt = readNC->globalAtts.find( "source" );
         if( attIt == readNC->globalAtts.end() ) return false;
         unsigned int sz = attIt->second.attLen;
         std::string att_data;
@@ -242,7 +242,7 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     // const Tag*& mpFileIdTag = _readNC->mpFileIdTag;
     DebugOutput& dbgOut = _readNC->dbgOut;
 
-    bool & culling = _readNC->culling;
+    bool& culling = _readNC->culling;
     /*int& gatherSetRank = _readNC->gatherSetRank;
     int& trivialPartitionShift = _readNC->trivialPartitionShift;*/
     /*
@@ -313,19 +313,23 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     std::vector< double > xv( local_elems * nv );
 
     std::vector< NCDF_SIZE > starts_vv, counts_vv;
-    starts_vv.resize(3);
-    counts_vv.resize(3);
+    starts_vv.resize( 3 );
+    counts_vv.resize( 3 );
     bool nv_last = true;
-    if ( _readNC->dimNames[var_xv.varDims[0]] == std::string("nv") ) // it means that nv is the first dimension
+    if( _readNC->dimNames[var_xv.varDims[0]] == std::string( "nv" ) )  // it means that nv is the first dimension
     {
-        starts_vv[0]=0; starts_vv[1]=startsv[0]; starts_vv[2]=startsv[1];
-        counts_vv[0]=nv; counts_vv[1] = countsv[0]; counts_vv[2] = countsv[1];
-        nv_last = false;
+        starts_vv[0] = 0;
+        starts_vv[1] = startsv[0];
+        starts_vv[2] = startsv[1];
+        counts_vv[0] = nv;
+        counts_vv[1] = countsv[0];
+        counts_vv[2] = countsv[1];
+        nv_last      = false;
     }
     else
     {
-        starts_vv=startsv;
-        counts_vv=countsv;
+        starts_vv = startsv;
+        counts_vv = countsv;
     }
     dbgOut.tprintf( 1, " nv is the last dimension in xv array (0 or 1)  %d \n", (int)nv_last );
     success = NCFUNCAG( _vara_double )( _fileId, var_xv.varId, &starts_vv[0], &counts_vv[0], &xv[0] );
@@ -353,9 +357,10 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     std::string fracstr( "frac" );
     ReadNC::VarData& var_frac = _readNC->varInfo[fracstr];
     std::vector< double > frac( local_elems );
-    if (var_frac.varId>=0)
+    if( var_frac.varId >= 0 )
     {
-        success = NCFUNCAG( _vara_double )( _fileId, var_frac.varId, &vmask.readStarts[0], &vmask.readCounts[0], &frac[0] );
+        success =
+            NCFUNCAG( _vara_double )( _fileId, var_frac.varId, &vmask.readStarts[0], &vmask.readCounts[0], &frac[0] );
         if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read double data for frac variable " );
     }
     std::string areastr( "area" );
@@ -374,8 +379,7 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     // create the maskTag GRID_IMASK, with default value of 1
     Tag maskTag;
     int def_val = 1;
-    rval =
-        mbImpl->tag_get_handle( "GRID_IMASK", 1, MB_TYPE_INTEGER, maskTag, MB_TAG_DENSE | MB_TAG_CREAT, &def_val );MB_CHK_SET_ERR( rval, "Trouble creating GRID_IMASK tag" );
+    rval = mbImpl->tag_get_handle( "GRID_IMASK", 1, MB_TYPE_INTEGER, maskTag, MB_TAG_DENSE | MB_TAG_CREAT, &def_val );MB_CHK_SET_ERR( rval, "Trouble creating GRID_IMASK tag" );
 
     EntityHandle* conn_arr;
     EntityHandle vtx_handle;
@@ -394,8 +398,7 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     // for nv = 1 , type is vertex
 
     int num_actual_cells = local_elems;
-    if (culling)
-        num_actual_cells = nb_with_mask1;
+    if( culling ) num_actual_cells = nb_with_mask1;
 
     if( nv > 1 && num_actual_cells > 0 )
     {
@@ -416,14 +419,14 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
 
         for( ; elem_index < local_elems; elem_index++ )
         {
-            if( culling && 0 == mask[elem_index] ) continue;  // nothing to do, do not advance elem_index in actual moab arrays
+            if( culling && 0 == mask[elem_index] )
+                continue;  // nothing to do, do not advance elem_index in actual moab arrays
             // set area and fraction on those elements too
             dbgOut.tprintf( 3, "elem index  %d \n", elem_index );
             for( int k = 0; k < nv; k++ )
             {
                 int index_v_arr = nv * elem_index + k;
-                if (!nv_last)
-                    index_v_arr = k * local_elems + elem_index;
+                if( !nv_last ) index_v_arr = k * local_elems + elem_index;
                 double x, y;
                 if( nv > 1 )
                 {
@@ -435,7 +438,8 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
                     double ymult  = cosphi * sin( x * pideg );
                     Node3D pt( xmult, ymult, zmult );
                     vertex_map[pt] = 0;
-                    dbgOut.tprintf( 3, "   %d  x=%5.1f y=%5.1f  pt: %f %f %f \n", k, x, y, pt.coords[0], pt.coords[1], pt.coords[2] );
+                    dbgOut.tprintf( 3, "   %d  x=%5.1f y=%5.1f  pt: %f %f %f \n", k, x, y, pt.coords[0], pt.coords[1],
+                                    pt.coords[2] );
                 }
                 else
                 {
@@ -479,13 +483,13 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
             for( int i = lCDims[0]; i < lCDims[3]; i++ )
             {
                 elem_index++;
-                if( culling && 0 == mask[elem_index] ) continue;  // nothing to do, do not advance elem_index in actual moab arrays
+                if( culling && 0 == mask[elem_index] )
+                    continue;  // nothing to do, do not advance elem_index in actual moab arrays
                 // set area and fraction on those elements too
                 for( int k = 0; k < nv; k++ )
                 {
                     int index_v_arr = nv * elem_index + k;
-                    if (!nv_last)
-                        index_v_arr = k * local_elems + elem_index;
+                    if( !nv_last ) index_v_arr = k * local_elems + elem_index;
                     if( nv > 1 )
                     {
                         double x      = xv[index_v_arr];
@@ -522,7 +526,7 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
         tagList.push_back( ycTag );
         tagList.push_back( areaTag );
         tagList.push_back( fracTag );
-        tagList.push_back( maskTag ); // not sure this is needed though ? on cells or on vertices?
+        tagList.push_back( maskTag );  // not sure this is needed though ? on cells or on vertices?
         rval = IntxUtils::remove_padded_vertices( mbImpl, _fileSet, tagList );MB_CHK_SET_ERR( rval, "Failed to remove duplicate vertices" );
 
         rval = mbImpl->get_entities_by_dimension( _fileSet, 2, faces );MB_CHK_ERR( rval );

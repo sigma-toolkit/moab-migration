@@ -1089,22 +1089,22 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             if( strMapAlgorithm == "invdist" )
             {
                 if( is_root ) AnnounceStartBlock( "Calculating map (invdist)" );
-                LinearRemapFVtoFVInvDist( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
+                if( m_meshInputCov->faces.size() ) LinearRemapFVtoFVInvDist( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else if( strMapAlgorithm == "delaunay" )
             {
                 if( is_root ) AnnounceStartBlock( "Calculating map (delaunay)" );
-                LinearRemapTriangulation( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
+                if( m_meshInputCov->faces.size() ) LinearRemapTriangulation( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else if( strMapAlgorithm == "fvintbilin" )
             {
                 if( is_root ) AnnounceStartBlock( "Calculating map (intbilin)" );
-                LinearRemapIntegratedBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
+                if( m_meshInputCov->faces.size() ) LinearRemapIntegratedBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else if( strMapAlgorithm == "fvintbilingb" )
             {
                 if( is_root ) AnnounceStartBlock( "Calculating map (intbilingb)" );
-                LinearRemapIntegratedGeneralizedBarycentric( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
+                if( m_meshInputCov->faces.size() ) LinearRemapIntegratedGeneralizedBarycentric( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else if( strMapAlgorithm == "fvbilin" )
             {
@@ -1121,14 +1121,14 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                 }
 #endif
                 if( is_root ) AnnounceStartBlock( "Calculating map (bilin)" );
-                LinearRemapBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
+                if( m_meshInputCov->faces.size() ) LinearRemapBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else
             {
                 if( is_root ) AnnounceStartBlock( "Calculating map (default)" );
                 // LinearRemapFVtoFV( *m_meshInputCov, *m_meshOutput, *m_meshOverlap,
                 //                   ( mapOptions.fMonotone ) ? ( 1 ) : ( mapOptions.nPin ), *this );
-                LinearRemapFVtoFV_Tempest_MOAB( ( mapOptions.fMonotone ? 1 : mapOptions.nPin ) );
+                if( m_meshInputCov->faces.size() ) LinearRemapFVtoFV_Tempest_MOAB( ( mapOptions.fMonotone ? 1 : mapOptions.nPin ) );
             }
         }
         else if( eInputType == DiscretizationType_FV )

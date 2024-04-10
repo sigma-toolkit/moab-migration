@@ -401,6 +401,7 @@ int main( int argc, char** argv )
                runchk( context.parallel_communicator->correct_thin_ghost_layers(), "Thin layer correction failed" );
 	    }
         }
+	runchk( context.parallel_communicator->augment_default_sets_with_ghosts( context.fileset ), "Ghost cell data augment failed");
         if( context.debug_output )
         {
             dbgprint( "> Writing out the mesh after ghost exchange File = " << "ghosted_mesh.h5m" );

@@ -121,12 +121,6 @@ else
   parread =
 endif
 
-if ENABLE_mbcslam
-  mbcslam_DIR = mbcslam
-else
-  mbcslam_DIR =
-endif
-
 if ENABLE_mbquality
   AM_CPPFLAGS += -I$(top_srcdir)/src/verdict
   bin_PROGRAMS += mbquality
@@ -145,6 +139,8 @@ AM_CPPFLAGS += $(HYPRE_INCLUDES) -I$(top_srcdir)/src/HYPRE/moab
 AM_LDFLAGS += $(HYPRE_LIBS)
 
 endif
+
+geometry_DIR = geometry
 
 if ENABLE_mbtempest
   AM_CPPFLAGS += $(TEMPESTREMAP_INCLUDE) -I$(top_srcdir)/src/Remapping -I$(top_srcdir)/src/IntxMesh
@@ -166,7 +162,6 @@ noinst_PROGRAMS = $(parread)
 
 SUBDIRS = . \
           $(mbcoupler_DIR) \
-          $(mbcslam_DIR) \
           $(mcnpmit_DIR) \
           $(geometry_DIR)
 

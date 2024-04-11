@@ -1031,12 +1031,10 @@ MB_OPTIONAL_TOOL([mbdepth],      [yes], [yes])
 if test "x$enablempi" != "xno"; then
   MB_OPTIONAL_TOOL([mbcoupler],  [no], [yes] )
   MB_OPTIONAL_TOOL([mcnpmit],    [no], [yes])
-  MB_OPTIONAL_TOOL([mbcslam],    [no], [yes])
 else
-  AS_ECHO(["Disabling mbcoupler, mbcslam and mcnpmit since these tools require MPI/parallel configuration"])
+  AS_ECHO(["Disabling mbcoupler, and mcnpmit since these tools require MPI/parallel configuration"])
   MB_OPTIONAL_TOOL([mbcoupler],  [no], [no] )
   MB_OPTIONAL_TOOL([mcnpmit],    [no], [no])
-  MB_OPTIONAL_TOOL([mbcslam],    [no], [no])
 fi
 
 MB_OPTIONAL_TOOL([h5mtools],     [${enablehdf5}], [${enablehdf5}])
@@ -1155,15 +1153,14 @@ AC_CONFIG_FILES([Makefile
                  pymoab/setup.py
                  tools/Makefile
                  tools/mbcoupler/Makefile
-                 tools/mbcslam/Makefile
                  tools/mcnpmit/Makefile
+                 tools/geometry/Makefile
                  doc/user.dox
 		 doc/cython_filter.py
                  doc/config.tex
                  MeshFiles/Makefile
                  MeshFiles/unittest/Makefile
                  MeshFiles/unittest/io/Makefile
-                 MeshFiles/unittest/mbcslam/Makefile
                  MeshFiles/unittest/h5file/Makefile
                  MeshFiles/examples/Makefile
                  ])

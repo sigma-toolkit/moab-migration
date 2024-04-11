@@ -1162,6 +1162,7 @@ AC_CONFIG_FILES([Makefile
                  MeshFiles/unittest/Makefile
                  MeshFiles/unittest/io/Makefile
                  MeshFiles/unittest/h5file/Makefile
+                 MeshFiles/unittest/mbcslam/Makefile
                  MeshFiles/examples/Makefile
                  ])
 

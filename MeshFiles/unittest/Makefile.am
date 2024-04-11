@@ -1,4 +1,4 @@
-SUBDIRS = h5file io fbigeom irel mbcslam
+SUBDIRS = h5file io fbigeom irel 
 EXTRA_DIST = 125hex.g \
              16_unmerged_hex.h5m \
              merge_with_tag.h5m \

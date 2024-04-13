@@ -71,7 +71,7 @@ struct ToolContext
     bool fCheck;
     bool fVolumetric;
     bool useGnomonicProjection;
-    bool useCAAS;
+    moab::TempestOnlineMap::CAASType cassType;
     GenerateOfflineMapAlgorithmOptions mapOptions;
     bool print_diagnostics;
 
@@ -86,8 +86,8 @@ struct ToolContext
           blockSize( 5 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "" ), baselineFile( "" ),
           meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ), computeWeights( false ),
           verifyWeights( false ), enforceConvexity( false ), ensureMonotonicity( 0 ), rrmGrids( false ),
-          kdtreeSearch( true ), fCheck( false ), fVolumetric( false ), useGnomonicProjection( false ), useCAAS( false ),
-          print_diagnostics( true )
+          kdtreeSearch( true ), fCheck( false ), fVolumetric( false ), useGnomonicProjection( false ),
+          cassType( moab::TempestOnlineMap::CAAS_NONE ), print_diagnostics( true )
     {
         inFilenames.resize( 2 );
         doftag_names.resize( 2 );
@@ -147,6 +147,7 @@ struct ToolContext
         std::string expectedFVMethod   = "none";
         std::string expectedDofTagName = "GLOBAL_ID";
         int expectedOrder              = 1;
+        int useCAAS                    = 0;
 
         if( !proc_id )
         {
@@ -237,7 +238,8 @@ struct ToolContext
                              "grid by applying the maps",
                              &verifyWeights );
 
-        opts.addOpt< void >( "caas", "apply CAAS nonlinear filter after linear map application", &useCAAS );
+        opts.addOpt< int >( "caas", "apply CAAS nonlinear filter after linear map application",
+                             &useCAAS );
 
         opts.addOpt< std::string >( "baseline", "Output baseline file", &baselineFile );
 
@@ -275,6 +277,23 @@ struct ToolContext
 
             default:
                 meshType = moab::TempestRemapper::DEFAULT;
+                break;
+        }
+
+        // decipher whether we want to use CAAS filter when applying the projection
+        switch( useCAAS )
+        {
+            case moab::TempestOnlineMap::CAAS_GLOBAL:
+                cassType = moab::TempestOnlineMap::CAAS_GLOBAL;
+                break;
+            case moab::TempestOnlineMap::CAAS_LOCAL:
+                cassType = moab::TempestOnlineMap::CAAS_LOCAL;
+                break;
+            case moab::TempestOnlineMap::CAAS_LOCAL_ADJACENT:
+                cassType = moab::TempestOnlineMap::CAAS_LOCAL_ADJACENT;
+                break;
+            default:
+                cassType = moab::TempestOnlineMap::CAAS_NONE;
                 break;
         }
 
@@ -813,7 +832,7 @@ int main( int argc, char* argv[] )
                 runCtx->timer_pop();
 
                 runCtx->timer_push( "compute solution projection on target grid" );
-                rval = weightMap->ApplyWeights( srcAnalyticalFunction, tgtProjectedFunction, false, runCtx->useCAAS );MB_CHK_ERR( rval );
+                rval = weightMap->ApplyWeights( srcAnalyticalFunction, tgtProjectedFunction, false, runCtx->cassType );MB_CHK_ERR( rval );
                 runCtx->timer_pop();
 
                 rval = mbCore->write_file( "tgtWithSolnTag2.h5m", NULL, writeOptions, &runCtx->meshsets[1], 1 );MB_CHK_ERR( rval );

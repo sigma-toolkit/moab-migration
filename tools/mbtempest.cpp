@@ -794,7 +794,7 @@ int main( int argc, char* argv[] )
             {
                 // Let us pick a sampling test function for solution evaluation
                 moab::TempestOnlineMap::sample_function testFunction =
-                    &sample_fast_harmonic;  // sample_slow_harmonic, sample_stationary_vortex, sample_fast_harmonic;
+                    &sample_stationary_vortex;  // sample_slow_harmonic, sample_stationary_vortex, sample_fast_harmonic;
 
                 runCtx->timer_push( "describe a solution on source grid" );
                 moab::Tag srcAnalyticalFunction;

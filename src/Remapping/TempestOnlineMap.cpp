@@ -1700,7 +1700,7 @@ int moab::TempestOnlineMap::IsMonotone( double dTolerance )
 moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
                                                       moab::Tag tgtSolutionTag,
                                                       bool transpose,
-                                                      bool useCAAS )
+                                                      CAASType caasType )
 {
     moab::ErrorCode rval;
 
@@ -1756,7 +1756,7 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
     // Compute the application of weights on the suorce solution data and store it in the
     // destination solution vector data Optionally, can also perform the transpose application of
     // the weight matrix. Set the 3rd argument to true if this is needed
-    rval = this->ApplyWeights( solSTagVals, solTTagVals, transpose, useCAAS );MB_CHK_SET_ERR( rval, "Applying remap operator onto source vector data failed" );
+    rval = this->ApplyWeights( solSTagVals, solTTagVals, transpose, caasType );MB_CHK_SET_ERR( rval, "Applying remap operator onto source vector data failed" );
 
     // The tag data is np*np*n_el_dest
     rval = m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] );MB_CHK_SET_ERR( rval, "Setting local tag data failed" );

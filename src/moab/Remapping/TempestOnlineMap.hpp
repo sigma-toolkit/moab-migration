@@ -63,10 +63,19 @@ class TempestOnlineMap : public OfflineMap
     // Input / Output types
     enum DiscretizationType
     {
-        DiscretizationType_FV,
-        DiscretizationType_CGLL,
-        DiscretizationType_DGLL,
-        DiscretizationType_PCLOUD
+        DiscretizationType_FV     = 0,
+        DiscretizationType_CGLL   = 1,
+        DiscretizationType_DGLL   = 2,
+        DiscretizationType_PCLOUD = 3
+    };
+
+    // Input / Output types
+    enum CAASType
+    {
+        CAAS_NONE           = 0,
+        CAAS_GLOBAL         = 1,
+        CAAS_LOCAL          = 2,
+        CAAS_LOCAL_ADJACENT = 3
     };
 
     ///	<summary>
@@ -242,7 +251,7 @@ class TempestOnlineMap : public OfflineMap
 
     double ApplyCAASLimiting( std::vector< double >& dataInDouble,
                               std::vector< double >& dataOutDouble,
-                              bool useCAASLocal );
+                              CAASType caasType = CAAS_GLOBAL );
 
 #ifdef MOAB_HAVE_EIGEN3
 
@@ -343,7 +352,7 @@ class TempestOnlineMap : public OfflineMap
     moab::ErrorCode ApplyWeights( std::vector< double >& srcVals,
                                   std::vector< double >& tgtVals,
                                   bool transpose = false,
-                                  bool useCAAS   = false );
+                                  CAASType caasType = CAAS_NONE );
 
     ///	<summary>
     ///		Apply the weight matrix onto the source vector (tag) provided as input, and return the
@@ -354,7 +363,7 @@ class TempestOnlineMap : public OfflineMap
     moab::ErrorCode ApplyWeights( moab::Tag srcSolutionTag,
                                   moab::Tag tgtSolutionTag,
                                   bool transpose = false,
-                                  bool useCAAS   = false );
+                                  CAASType caasType = CAAS_NONE );
 
     typedef double ( *sample_function )( double, double );
 

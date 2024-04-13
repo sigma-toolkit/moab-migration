@@ -449,7 +449,7 @@ static void CAASLimiter( DataArray1D< double >& dataCorrectedField,
 
 double moab::TempestOnlineMap::ApplyCAASLimiting( std::vector< double >& dataInDouble,
                                                   std::vector< double >& dataOutDouble,
-                                                  bool useCAASLocal )
+                                                  CAASType caasType )
 {
     // Currently only implemented for FV to FV remapping
     // We should generalize this to other types of remapping
@@ -500,7 +500,7 @@ double moab::TempestOnlineMap::ApplyCAASLimiting( std::vector< double >& dataInD
         // Early exit if the values are monotone already.
         if( ( dTargetMax <= dSourceMax && dTargetMin <= dSourceMin ) || fabs( dMassDiff ) < 1e-14 ) return 0.0;
 
-        if( useCAASLocal )
+        if( caasType == CAAS_LOCAL )
         {
             double dMinI;
             double dMaxI;
@@ -529,7 +529,7 @@ double moab::TempestOnlineMap::ApplyCAASLimiting( std::vector< double >& dataInD
                         dMaxI       = fmax( dMaxI, dataInDouble[k] );  // max over intersecting source faces
                     }
 
-                    if( useCAASLocal )
+                    if( caasType == CAAS_LOCAL_ADJACENT )
                     {
                         double dMinIAdj = dMinI;
                         double dMaxIAdj = dMaxI;
@@ -564,8 +564,8 @@ double moab::TempestOnlineMap::ApplyCAASLimiting( std::vector< double >& dataInD
                 dataUpperBound[i] = vecLocalUpperBound[i] - dataOutDouble[i];
             }
 
-        }  // if( useCAASLocal )
-        else // useCAASGlobal
+        }  // if( caasType == CAAS_LOCAL )
+        else  // caasType == CAAS_GLOBAL
         {
             for( size_t i = 0; i < nTargetCount; i++ )
             {
@@ -602,7 +602,8 @@ double moab::TempestOnlineMap::ApplyCAASLimiting( std::vector< double >& dataInD
     }
     // Ideally should perform an AllReduce here to get the global mass difference across all processors
     // But if we satisfy the constraint on every task, essentially, the global mass difference should be zero!
-    printf( "-- Net mass defect before applying CAAS: %f, and after CAAS: %f\n", dMassDiff, dMassDiffPost );
+    if( m_remapper->verbose && is_root )
+        printf( "-- Net mass defect before applying CAAS: %f, and after CAAS: %f\n", dMassDiff, dMassDiffPost );
 
     return dMassDiffPost;
 }
@@ -611,7 +612,7 @@ double moab::TempestOnlineMap::ApplyCAASLimiting( std::vector< double >& dataInD
 moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& srcVals,
                                                       std::vector< double >& tgtVals,
                                                       bool transpose,
-                                                      bool useCAAS )
+                                                      CAASType caasType )
 {
     // Reset the source and target data first
     m_rowVector.setZero();
@@ -681,11 +682,11 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
         }
     }
 
-    if( useCAAS )
+    if( caasType != CAAS_NONE )
     {
-        double mismatch = this->ApplyCAASLimiting( srcVals, tgtVals, true );
+        double mismatch = this->ApplyCAASLimiting( srcVals, tgtVals, caasType );
         if( m_remapper->verbose && is_root )
-            std::cout << "Mismatch after CAAS limiting: " << mismatch << "\n";
+            std::cout << "-- Final mismatch after CAAS limiting: " << mismatch << "\n";
     }
 
 #ifdef VERBOSE

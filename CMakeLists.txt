@@ -159,8 +159,7 @@ endif()
 # Use external projects to download and build/configure projects for use
 # using CMake intrinsics 
 include(ExternalProject)
-#set(BASE_DOWNLOAD_PATH "https://ftp.mcs.anl.gov/pub/fathom/TPL")
-set(BASE_DOWNLOAD_PATH "/Users/mahadevan/Code/sigma/moab/build/TPLs")
+set(BASE_DOWNLOAD_PATH "https://ftp.mcs.anl.gov/pub/fathom/TPL")
 set(LIB_EXT ${CMAKE_CURRENT_BINARY_DIR}/sandbox)
 set(BUILD_EXT ${LIB_EXT}/builds)
 
@@ -186,15 +185,17 @@ if(DOWNLOAD_METIS)
 
   ExternalProject_Add(external_metis
     URL ${BASE_DOWNLOAD_PATH}/metis-${METIS_VERSION}.tar.gz
-    URL_HASH MD5=5465e67079419a69e0116de24fce58fe
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    URL_HASH SHA256=76faebe03f6c963127dbb73c13eab58c9a3faeae48779f049066a21c087c5db2
+
+    #DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     DOWNLOAD_NO_PROGRESS TRUE
     PREFIX ${METIS_ROOT}
     SOURCE_DIR ${LIB_EXT}/metis-${METIS_VERSION}
     BUILD_IN_SOURCE ON
+    BUILD_ALWAYS    OFF
     DOWNLOAD_DIR ${LIB_EXT}
     CONFIGURE_COMMAND make config cc=${CMAKE_C_COMPILER} cxx=${CMAKE_CXX_COMPILER} prefix=${METIS_ROOT} gklib_path=${LIB_EXT}/metis-${METIS_VERSION}/GKlib
-    BUILD_COMMAND make
+    BUILD_COMMAND make -j
     INSTALL_COMMAND make install
     )
 
@@ -221,14 +222,14 @@ if(DOWNLOAD_PARMETIS)
   ExternalProject_Add(external_parmetis
     URL ${BASE_DOWNLOAD_PATH}/parmetis-4.0.3.tar.gz
     URL_HASH MD5=f69c479586bf6bb7aff6a9bc0c739628
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    #DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     DOWNLOAD_NO_PROGRESS TRUE
     PREFIX ${PARMETIS_ROOT}
     SOURCE_DIR ${LIB_EXT}/parmetis-4.0.3
     BUILD_IN_SOURCE ON
     DOWNLOAD_DIR ${LIB_EXT}
     CONFIGURE_COMMAND make config cc=${CMAKE_C_COMPILER} cxx=${CMAKE_CXX_COMPILER} prefix=${PARMETIS_ROOT} ${PARMETIS_EXTRAOPTIONS} gklib_path=${LIB_EXT}/metis-5.1.0/GKlib metis_path=${LIB_EXT}/metis-5.1.0
-    BUILD_COMMAND make -j4
+    BUILD_COMMAND make -j
     INSTALL_COMMAND make install
     )
 

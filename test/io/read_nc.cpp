@@ -35,6 +35,8 @@ void test_read_fv_ghosting();
 void test_read_domain_culling();
 void test_read_old_domain();
 void test_read_domain_no_culling();
+// domain file with zoltan partitioner
+void test_read_domain_zoltan();
 // scrip file
 void test_read_scrip();
 
@@ -72,6 +74,7 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_MPI
     // Before ghosting issues with ownership were fixed, this test failed on 4 processors
     result += RUN_TEST( test_read_fv_ghosting );
+    result += RUN_TEST (test_read_domain_zoltan );
 #endif
 
 #ifdef MOAB_HAVE_MPI
@@ -550,6 +553,19 @@ void test_read_domain_no_culling()
     opts = orig + std::string( ";VARIABLE=;NO_CULLING" );
     rval = mb.load_file( example_domain.c_str(), &set, opts.c_str() );CHECK_ERR( rval );
 }
+
+void test_read_domain_zoltan()
+{
+    Core moab;
+    Interface& mb = moab;
+
+    EntityHandle set;
+    ErrorCode rval = mb.create_meshset( MESHSET_SET, set );CHECK_ERR( rval );
+
+    std::string opts = std::string( "PARALLEL=READ_PART;PARTITION_METHOD=SQIJ;REPARTITION;DEBUG_IO=2;");
+    rval = mb.load_file( example_domain.c_str(), &set, opts.c_str() );CHECK_ERR( rval );
+}
+
 
 void test_read_scrip()
 {

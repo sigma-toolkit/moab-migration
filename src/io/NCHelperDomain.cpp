@@ -6,6 +6,10 @@
 #ifdef MOAB_HAVE_MPI
 #include "moab/ParallelMergeMesh.hpp"
 #endif
+#ifdef MOAB_HAVE_ZOLTAN
+#include "moab/ZoltanPartitioner.hpp"
+#endif
+
 #include <cmath>
 #include <sstream>
 
@@ -243,6 +247,7 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     DebugOutput& dbgOut = _readNC->dbgOut;
 
     bool& culling = _readNC->culling;
+    bool& repartition = _readNC->repartition;
     /*int& gatherSetRank = _readNC->gatherSetRank;
     int& trivialPartitionShift = _readNC->trivialPartitionShift;*/
     /*
@@ -296,6 +301,17 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     int nb_with_mask1 = 0;
     for( int i = 0; i < local_elems; i++ )
         if( 1 == mask[i] ) nb_with_mask1++;
+
+    std::vector<int> gids(local_elems);
+    int elem_index = 0;
+    int global_row_size = gDims[3] - gDims[0];  // this is along first dimension in global decomposition
+    // create global id array for cells, for all cells, including those with 0 mask; which will be not used eventually
+    for( int j = lCDims[1]; j < lCDims[4]; j++ )
+        for( int i = lCDims[0]; i < lCDims[3]; i++ )
+        {
+            gids[elem_index] = j * global_row_size + i + 1;
+            elem_index++;
+        }
 
     dbgOut.tprintf( 1, "local cells with mask 1: %d \n", nb_with_mask1 );
     std::vector< NCDF_SIZE > startsv( 3 );
@@ -381,6 +397,28 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     int def_val = 1;
     rval = mbImpl->tag_get_handle( "GRID_IMASK", 1, MB_TYPE_INTEGER, maskTag, MB_TAG_DENSE | MB_TAG_CREAT, &def_val );MB_CHK_SET_ERR( rval, "Trouble creating GRID_IMASK tag" );
 
+    // will now look to repartition the cells, using zoltan, looking at the xc and yc coordinates in 2d, convert to 3d,
+    // and decide based on those partitioning info to what task to send each cell, along with its vertices, and global id
+#ifdef MOAB_HAVE_MPI
+    int rank              = 0;
+    int procs             = 1;
+    bool& isParallel      = _readNC->isParallel;
+    ParallelComm* myPcomm = NULL;
+    if( isParallel )
+    {
+        myPcomm = _readNC->myPcomm;
+        rank    = myPcomm->proc_config().proc_rank();
+        procs   = myPcomm->proc_config().proc_size();
+    }
+
+    if( procs >= 2 && repartition )
+    {
+        // Redistribute local cells after trivial partition (e.g. apply Zoltan partition)
+        rval = redistribute_cells( myPcomm, xc, yc, xv, yv, frac, mask, area, gids );MB_CHK_SET_ERR( rval, "Failed to redistribute local cells" );
+    }
+
+#endif
+
     EntityHandle* conn_arr;
     EntityHandle vtx_handle;
     Range tmp_range;
@@ -414,7 +452,7 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
         // Set vertex coordinates
         // will read all xv, yv, but use only those with correct mask on
 
-        int elem_index     = 0;  // total index in netcdf arrays
+        elem_index     = 0;  // total index in netcdf arrays
         const double pideg = acos( -1.0 ) / 180.0;
 
         for( ; elem_index < local_elems; elem_index++ )
@@ -474,7 +512,6 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
         // int nj = gDims[4]-gDims[1]; // is it about 1 in irregular cases
 
         // int local_row_size  = lCDims[3] - lCDims[0];
-        int global_row_size = gDims[3] - gDims[0];  // this is along
         elem_index          = -1;
         int index           = 0;  // consider the mask for advancing in moab arrays;
 
@@ -555,7 +592,7 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     }
 
 #ifdef MOAB_HAVE_MPI
-    ParallelComm*& myPcomm = _readNC->myPcomm;
+    myPcomm = _readNC->myPcomm;
     if( myPcomm )
     {
         double tol = 1.e-12;  // this is the same as static tolerance in NCHelper
@@ -571,4 +608,50 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
 
     return MB_SUCCESS;
 }
+
+#ifdef MOAB_HAVE_MPI
+ErrorCode NCHelperDomain::redistribute_cells( ParallelComm * myPcomm,
+                                  std::vector<double> & xc,
+                                  std::vector<double> & yc,
+                                  std::vector<double> & xv,
+                                  std::vector<double> & yv,
+                                  std::vector<double> & frac,
+                                  std::vector<int> & mask,
+                                  std::vector<double> & area,
+                                  std::vector<int> & gids )
+{
+
+#ifdef MOAB_HAVE_ZOLTAN
+    // use zoltan and
+    int num_local_cells=(int)gids.size();
+    std::vector<double> xi(num_local_cells), yi(num_local_cells), zi(num_local_cells);
+    const double pideg = acos( -1.0 ) / 180.0;
+    for (size_t i=0; i<xc.size(); i++)
+    {
+        double x = xc[i];
+        double y = yc[i];
+        double cosphi = cos( pideg * y );
+        double zmult  = sin( pideg * y );
+        double xmult  = cosphi * cos( x * pideg );
+        double ymult  = cosphi * sin( x * pideg );
+        xi[i] = xmult;
+        yi[i] = ymult;
+        zi[i] = zmult;
+    }
+    Interface*& mbImpl         = _readNC->mbImpl;
+    ZoltanPartitioner* mbZTool = new ZoltanPartitioner( mbImpl, myPcomm, false, 0, NULL );
+    int start_cell_idx = gids[0];
+    std::vector<int> dest(num_local_cells);
+    ErrorCode rval             = mbZTool->repartition_to_procs( xi, yi, zi, gids, "RCB", dest );MB_CHK_SET_ERR( rval, "Error in Zoltan partitioning" );
+    delete mbZTool;
+    return MB_SUCCESS;
+#else
+    return MB_FAILURE;
+#endif
+
+}
+
+#endif
+
+
 }  // namespace moab

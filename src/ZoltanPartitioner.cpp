@@ -239,6 +239,111 @@ ErrorCode ZoltanPartitioner::balance_mesh( const char* zmethod,
 
     return MB_SUCCESS;
 }
+ErrorCode  ZoltanPartitioner::repartition_to_procs(std::vector< double >& x,
+                               std::vector< double >& y,
+                               std::vector< double >& z,
+                               std::vector< int >& ids,
+                               const char* zmethod,
+                               std::vector< int >& dest )
+{
+    //
+    int nprocs = mbpc->proc_config().proc_size();
+    int rank   = mbpc->proc_config().proc_rank();
+    clock_t t  = clock();
+    // form pts and ids, as in assemble_graph
+    std::vector< double > pts;  // x[0], y[0], z[0], ... from MOAB
+    pts.resize( x.size() * 3 );
+    for( size_t i = 0; i < x.size(); i++ )
+    {
+        pts[3 * i]     = x[i];
+        pts[3 * i + 1] = y[i];
+        pts[3 * i + 2] = z[i];
+    }
+    // do not get out until done!
+
+    Points       = &pts[0];
+    GlobalIds    = &ids[0];
+    NumPoints    = (int)x.size();
+    NumEdges     = NULL;
+    NborGlobalId = NULL;
+    NborProcs    = NULL;
+    ObjWeights   = NULL;
+    EdgeWeights  = NULL;
+    Parts        = NULL;
+
+    float version;
+    if( rank == 0 ) std::cout << "Initializing zoltan..." << std::endl;
+
+    Zoltan_Initialize( argcArg, argvArg, &version );
+
+    // Create Zoltan object.  This calls Zoltan_Create.
+    if( NULL == myZZ ) myZZ = new Zoltan( mbpc->comm() );
+
+    if( NULL == zmethod || !strcmp( zmethod, "RCB" ) )
+        SetRCB_Parameters();
+    else if( !strcmp( zmethod, "RIB" ) )
+        SetRIB_Parameters();
+    else if( !strcmp( zmethod, "HSFC" ) )
+        SetHSFC_Parameters();
+
+    // set # requested partitions
+    char buff[10];
+    snprintf( buff, 10, "%d", nprocs );
+    int retval = myZZ->Set_Param( "NUM_GLOBAL_PARTITIONS", buff );
+    if( ZOLTAN_OK != retval ) return MB_FAILURE;
+
+    // request all, import and export
+    retval = myZZ->Set_Param( "RETURN_LISTS", "ALL" );
+    if( ZOLTAN_OK != retval ) return MB_FAILURE;
+
+    myZZ->Set_Num_Obj_Fn( mbGetNumberOfAssignedObjects, NULL );
+    myZZ->Set_Obj_List_Fn( mbGetObjectList, NULL );
+    myZZ->Set_Num_Geom_Fn( mbGetObjectSize, NULL );
+    myZZ->Set_Geom_Multi_Fn( mbGetObject, NULL );
+    myZZ->Set_Num_Edges_Multi_Fn( mbGetNumberOfEdges, NULL );
+    myZZ->Set_Edge_List_Multi_Fn( mbGetEdgeList, NULL );
+
+    // Perform the load balancing partitioning
+
+    int changes;
+    int numGidEntries;
+    int numLidEntries;
+    int num_import;
+    ZOLTAN_ID_PTR import_global_ids, import_local_ids;
+    int* import_procs;
+    int* import_to_part;
+    int num_export;
+    ZOLTAN_ID_PTR export_global_ids, export_local_ids;
+    int *assign_procs, *assign_parts;
+
+    if( rank == 0 )
+        std::cout << "Computing partition using " << ( zmethod ? zmethod : "RCB" ) << " method for " << nprocs
+                  << " processors..." << std::endl;
+
+    retval = myZZ->LB_Partition( changes, numGidEntries, numLidEntries, num_import, import_global_ids, import_local_ids,
+                                 import_procs, import_to_part, num_export, export_global_ids, export_local_ids,
+                                 assign_procs, assign_parts );
+
+    if( ZOLTAN_OK != retval ) return MB_FAILURE;
+
+    if( rank == 0 )
+    {
+        std::cout << " time to LB_partition " << ( clock() - t ) / (double)CLOCKS_PER_SEC << "s. \n";
+        t = clock();
+    }
+    for (int i=0; i<NumPoints; i++)
+        dest[i] = rank;
+    for (int i=0; i<num_export; i++)
+        dest[export_local_ids[i]] = assign_procs[i];
+
+    // Free data structures allocated by Zoltan::LB_Partition
+    retval = myZZ->LB_Free_Part( &import_global_ids, &import_local_ids, &import_procs, &import_to_part );
+    if( ZOLTAN_OK != retval ) return MB_FAILURE;
+    retval = myZZ->LB_Free_Part( &export_global_ids, &export_local_ids, &assign_procs, &assign_parts );
+    if( ZOLTAN_OK != retval ) return MB_FAILURE;
+    return MB_SUCCESS;
+
+}
 
 ErrorCode ZoltanPartitioner::repartition( std::vector< double >& x,
                                           std::vector< double >& y,

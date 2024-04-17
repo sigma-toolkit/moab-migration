@@ -115,5 +115,6 @@ MOSTLYCLEANFILES = dumped_acis.sat \
                    test_gcrm_vars.nc \
                    test_homme_T.nc \
                    test_mpas_vars.nc \
-                   rtttest.rtt
+                   rtttest.rtt \
+                   test_dom_zoltan.h5m
 DISTCLEANFILES = a.out

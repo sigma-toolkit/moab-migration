@@ -8,6 +8,7 @@
 #endif
 #ifdef MOAB_HAVE_ZOLTAN
 #include "moab/ZoltanPartitioner.hpp"
+#include "moab/TupleList.hpp"
 #endif
 
 #include <cmath>
@@ -298,10 +299,6 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     success = NCFUNCAG( _vara_int )( _fileId, vmask.varId, &vmask.readStarts[0], &vmask.readCounts[0], &mask[0] );
     if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read int data for mask variable " );
 
-    int nb_with_mask1 = 0;
-    for( int i = 0; i < local_elems; i++ )
-        if( 1 == mask[i] ) nb_with_mask1++;
-
     std::vector<int> gids(local_elems);
     int elem_index = 0;
     int global_row_size = gDims[3] - gDims[0];  // this is along first dimension in global decomposition
@@ -312,8 +309,6 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
             gids[elem_index] = j * global_row_size + i + 1;
             elem_index++;
         }
-
-    dbgOut.tprintf( 1, "local cells with mask 1: %d \n", nb_with_mask1 );
     std::vector< NCDF_SIZE > startsv( 3 );
     startsv[0] = vmask.readStarts[0];
     startsv[1] = vmask.readStarts[1];
@@ -414,10 +409,17 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     if( procs >= 2 && repartition )
     {
         // Redistribute local cells after trivial partition (e.g. apply Zoltan partition)
-        rval = redistribute_cells( myPcomm, xc, yc, xv, yv, frac, mask, area, gids );MB_CHK_SET_ERR( rval, "Failed to redistribute local cells" );
+        rval = redistribute_cells( myPcomm, xc, yc, xv, yv, frac, mask, area, gids, nv, nv_last );MB_CHK_SET_ERR( rval, "Failed to redistribute local cells" );
+        local_elems = (int) xc.size();
+        dbgOut.tprintf( 1, "local cells after repartition: %d \n", local_elems );
     }
 
 #endif
+
+    int nb_with_mask1 = 0;
+    for( int i = 0; i < local_elems; i++ )
+        if( 1 == mask[i] ) nb_with_mask1++;
+    dbgOut.tprintf( 1, "local cells with mask 1: %d \n", nb_with_mask1 );
 
     EntityHandle* conn_arr;
     EntityHandle vtx_handle;
@@ -452,10 +454,10 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
         // Set vertex coordinates
         // will read all xv, yv, but use only those with correct mask on
 
-        elem_index     = 0;  // total index in netcdf arrays
+          // total index in netcdf arrays
         const double pideg = acos( -1.0 ) / 180.0;
 
-        for( ; elem_index < local_elems; elem_index++ )
+        for(elem_index = 0; elem_index < local_elems; elem_index++ )
         {
             if( culling && 0 == mask[elem_index] )
                 continue;  // nothing to do, do not advance elem_index in actual moab arrays
@@ -512,47 +514,44 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
         // int nj = gDims[4]-gDims[1]; // is it about 1 in irregular cases
 
         // int local_row_size  = lCDims[3] - lCDims[0];
-        elem_index          = -1;
         int index           = 0;  // consider the mask for advancing in moab arrays;
 
         // create now vertex arrays, size vertex_map.size()
-        for( int j = lCDims[1]; j < lCDims[4]; j++ )
-            for( int i = lCDims[0]; i < lCDims[3]; i++ )
+        for( elem_index = 0; elem_index < local_elems; elem_index++)
+        {
+            if( culling && 0 == mask[elem_index] )
+                continue;  // nothing to do, do not advance elem_index in actual moab arrays
+            // set area and fraction on those elements too
+            for( int k = 0; k < nv; k++ )
             {
-                elem_index++;
-                if( culling && 0 == mask[elem_index] )
-                    continue;  // nothing to do, do not advance elem_index in actual moab arrays
-                // set area and fraction on those elements too
-                for( int k = 0; k < nv; k++ )
+                int index_v_arr = nv * elem_index + k;
+                if( !nv_last ) index_v_arr = k * local_elems + elem_index;
+                if( nv > 1 )
                 {
-                    int index_v_arr = nv * elem_index + k;
-                    if( !nv_last ) index_v_arr = k * local_elems + elem_index;
-                    if( nv > 1 )
-                    {
-                        double x      = xv[index_v_arr];
-                        double y      = yv[index_v_arr];
-                        double cosphi = cos( pideg * y );
-                        double zmult  = sin( pideg * y );
-                        double xmult  = cosphi * cos( x * pideg );
-                        double ymult  = cosphi * sin( x * pideg );
-                        Node3D pt( xmult, ymult, zmult );
-                        conn_arr[index * nv + k] = vertex_map[pt];
-                    }
+                    double x      = xv[index_v_arr];
+                    double y      = yv[index_v_arr];
+                    double cosphi = cos( pideg * y );
+                    double zmult  = sin( pideg * y );
+                    double xmult  = cosphi * cos( x * pideg );
+                    double ymult  = cosphi * sin( x * pideg );
+                    Node3D pt( xmult, ymult, zmult );
+                    conn_arr[index * nv + k] = vertex_map[pt];
                 }
-                EntityHandle cell = start_vertex + index;
-                if( nv > 1 ) cell = start_cell + index;
-                // set other tags, like xc, yc, frac, area
-                rval = mbImpl->tag_set_data( xcTag, &cell, 1, &xc[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set xc tag" );
-                rval = mbImpl->tag_set_data( ycTag, &cell, 1, &yc[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set yc tag" );
-                rval = mbImpl->tag_set_data( areaTag, &cell, 1, &area[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set area tag" );
-                rval = mbImpl->tag_set_data( fracTag, &cell, 1, &frac[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set frac tag" );
-                rval = mbImpl->tag_set_data( maskTag, &cell, 1, &mask[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set mask tag" );
-
-                // set the global id too:
-                int globalId = j * global_row_size + i + 1;
-                rval         = mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId );MB_CHK_SET_ERR( rval, "Failed to set global id tag" );
-                index++;
             }
+            EntityHandle cell = start_vertex + index;
+            if( nv > 1 ) cell = start_cell + index;
+            // set other tags, like xc, yc, frac, area
+            rval = mbImpl->tag_set_data( xcTag, &cell, 1, &xc[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set xc tag" );
+            rval = mbImpl->tag_set_data( ycTag, &cell, 1, &yc[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set yc tag" );
+            rval = mbImpl->tag_set_data( areaTag, &cell, 1, &area[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set area tag" );
+            rval = mbImpl->tag_set_data( fracTag, &cell, 1, &frac[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set frac tag" );
+            rval = mbImpl->tag_set_data( maskTag, &cell, 1, &mask[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set mask tag" );
+
+            // set the global id too:
+            int globalId = gids[elem_index];
+            rval         = mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId );MB_CHK_SET_ERR( rval, "Failed to set global id tag" );
+            index++;
+        }
 
         rval = mbImpl->add_entities( _fileSet, tmp_range );MB_CHK_SET_ERR( rval, "Failed to add new cells to current file set" );
 
@@ -592,15 +591,14 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     }
 
 #ifdef MOAB_HAVE_MPI
-    myPcomm = _readNC->myPcomm;
-    if( myPcomm )
+    myPcomm = _readNC->myPcomm; // we will have to set the global id on vertices in any case, even
+    if( myPcomm && procs >= 2)
     {
         double tol = 1.e-12;  // this is the same as static tolerance in NCHelper
         ParallelMergeMesh pmm( myPcomm, tol );
         rval = pmm.merge( _fileSet,
                           /* do not do local merge*/ false,
                           /*  2d cells*/ 2 );MB_CHK_SET_ERR( rval, "Failed to merge vertices in parallel" );
-
         // assign global ids only for vertices, cells have them fine
         rval = myPcomm->assign_global_ids( _fileSet, /*dim*/ 0 );MB_CHK_ERR( rval );
     }
@@ -611,14 +609,16 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
 
 #ifdef MOAB_HAVE_MPI
 ErrorCode NCHelperDomain::redistribute_cells( ParallelComm * myPcomm,
-                                  std::vector<double> & xc,
-                                  std::vector<double> & yc,
-                                  std::vector<double> & xv,
+                                  std::vector<double> & xc, // center x
+                                  std::vector<double> & yc, // center y
+                                  std::vector<double> & xv, // vertex coords
                                   std::vector<double> & yv,
-                                  std::vector<double> & frac,
-                                  std::vector<int> & mask,
-                                  std::vector<double> & area,
-                                  std::vector<int> & gids )
+                                  std::vector<double> & frac, // fractions
+                                  std::vector<int> & masks,    // mask
+                                  std::vector<double> & area, // area
+                                  std::vector<int> & gids,    // global ids
+                                  int nv,                     // number of vertices per cell
+                                  bool nv_last)               // type of xv, yv, first or last
 {
 
 #ifdef MOAB_HAVE_ZOLTAN
@@ -644,6 +644,70 @@ ErrorCode NCHelperDomain::redistribute_cells( ParallelComm * myPcomm,
     std::vector<int> dest(num_local_cells);
     ErrorCode rval             = mbZTool->repartition_to_procs( xi, yi, zi, gids, "RCB", dest );MB_CHK_SET_ERR( rval, "Error in Zoltan partitioning" );
     delete mbZTool;
+    // now use crystal router to send the arrays to the right places
+    moab::TupleList tl;
+    unsigned numr = 2 * nv + 4;         //  doubles: area, centerlon, centerlat, frac, xv, yv,
+    tl.initialize( 3, 0, 0, numr, num_local_cells );  // to proc, dof, mask
+    tl.enableWriteAccess();
+    // populate
+    for( unsigned i = 0; i < num_local_cells; i++ )
+    {
+        int gdof    = gids[i];
+        int to_proc = dest[i];
+        int mask    = masks[i];
+        int n                  = tl.get_n();
+        tl.vi_wr[3 * n]        = to_proc;
+        tl.vi_wr[3 * n + 1]    = gdof;
+        tl.vi_wr[3 * n + 2]    = mask;
+        tl.vr_wr[n * numr]     = area[i];
+        tl.vr_wr[n * numr + 1] = xc[i];
+        tl.vr_wr[n * numr + 2] = yc[i];
+        tl.vr_wr[n * numr + 3] = frac[i];
+        for( int k = 0; k < nv; k++ )
+        {
+            int index_v_arr = nv * i + k;
+            if( !nv_last ) index_v_arr = k * num_local_cells + n;
+            tl.vr_wr[ n * numr + 4 + k ]       = xv[index_v_arr];
+            tl.vr_wr[ n * numr + 4 + nv + k]   = yv[index_v_arr];
+        }
+        tl.inc_n();
+    }
+
+    // now do the heavy communication
+    ( myPcomm->proc_config().crystal_router() )->gs_transfer( 1, tl, 0 );
+
+    // after communication, on each processor we should have tuples coming in
+    // rearrange the vectors by global id
+    moab::TupleList::buffer sort_buffer;
+    int N = tl.get_n();
+    sort_buffer.buffer_init( N );
+    tl.sort( 1, &sort_buffer ); // 1 is the index for global id
+    xc.resize(N);
+    yc.resize(N);
+    xv.resize(N*nv);
+    yv.resize(N*nv);
+    frac.resize(N);
+    masks.resize(N);
+    area.resize(N);
+    gids.resize(N);
+    for (int n=0; n<N; n++)
+    {
+
+        gids[n]  = tl.vi_wr[3 * n + 1];
+        masks[n] = tl.vi_wr[3 * n + 2];
+        area[n]  = tl.vr_wr[n * numr];
+        xc[n]    = tl.vr_wr[n * numr + 1];
+        yc[n]    = tl.vr_wr[n * numr + 2];
+        frac[n]  = tl.vr_wr[n * numr + 3] ;
+        for( int k = 0; k < nv; k++ )
+        {
+            int index_v_arr = nv * n + k;
+            if( !nv_last ) index_v_arr = k * N + n;
+            xv[index_v_arr] = tl.vr_wr[ n * numr + 4 + k ];
+            yv[index_v_arr] = tl.vr_wr[ n * numr + 4 + nv + k];
+        }
+    }
+
     return MB_SUCCESS;
 #else
     return MB_FAILURE;

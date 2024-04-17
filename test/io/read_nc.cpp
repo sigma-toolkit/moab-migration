@@ -564,6 +564,12 @@ void test_read_domain_zoltan()
 
     std::string opts = std::string( "PARALLEL=READ_PART;PARTITION_METHOD=SQIJ;REPARTITION;DEBUG_IO=2;");
     rval = mb.load_file( example_domain.c_str(), &set, opts.c_str() );CHECK_ERR( rval );
+#ifdef MOAB_HAVE_MPI
+#ifdef MOAB_HAVE_HDF5
+    opts = "PARALLEL=WRITE_PART";
+    rval = mb.write_file("test_dom_zoltan.h5m", 0, opts.c_str(), &set, 1);CHECK_ERR( rval );
+#endif
+#endif
 }
 
 

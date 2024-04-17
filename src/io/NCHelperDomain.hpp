@@ -41,7 +41,9 @@ class NCHelperDomain : public ScdNCHelper
                                   std::vector<double> & frac,
                                   std::vector<int> & mask,
                                   std::vector<double> & area,
-                                  std::vector<int> & gids );
+                                  std::vector<int> & gids,
+                                  int nv,                     // number of vertices per cell
+                                  bool nv_last);
 #endif
     int nv;     // number of vertices per cell
     int nvDim;  // index of nv dim

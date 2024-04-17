@@ -239,12 +239,12 @@ ErrorCode ZoltanPartitioner::balance_mesh( const char* zmethod,
 
     return MB_SUCCESS;
 }
-ErrorCode  ZoltanPartitioner::repartition_to_procs(std::vector< double >& x,
-                               std::vector< double >& y,
-                               std::vector< double >& z,
-                               std::vector< int >& ids,
-                               const char* zmethod,
-                               std::vector< int >& dest )
+ErrorCode ZoltanPartitioner::repartition_to_procs( std::vector< double >& x,
+                                                   std::vector< double >& y,
+                                                   std::vector< double >& z,
+                                                   std::vector< int >& ids,
+                                                   const char* zmethod,
+                                                   std::vector< int >& dest )
 {
     //
     int nprocs = mbpc->proc_config().proc_size();
@@ -331,9 +331,9 @@ ErrorCode  ZoltanPartitioner::repartition_to_procs(std::vector< double >& x,
         std::cout << " time to LB_partition " << ( clock() - t ) / (double)CLOCKS_PER_SEC << "s. \n";
         t = clock();
     }
-    for (int i=0; i<NumPoints; i++)
+    for( int i = 0; i < NumPoints; i++ )
         dest[i] = rank;
-    for (int i=0; i<num_export; i++)
+    for( int i = 0; i < num_export; i++ )
         dest[export_local_ids[i]] = assign_procs[i];
 
     // Free data structures allocated by Zoltan::LB_Partition
@@ -342,7 +342,6 @@ ErrorCode  ZoltanPartitioner::repartition_to_procs(std::vector< double >& x,
     retval = myZZ->LB_Free_Part( &export_global_ids, &export_local_ids, &assign_procs, &assign_parts );
     if( ZOLTAN_OK != retval ) return MB_FAILURE;
     return MB_SUCCESS;
-
 }
 
 ErrorCode ZoltanPartitioner::repartition( std::vector< double >& x,

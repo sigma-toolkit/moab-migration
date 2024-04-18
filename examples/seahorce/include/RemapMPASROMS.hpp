@@ -268,13 +268,15 @@ struct RuntimeContext
 
         opts.parseCommandLine( argc, argv );
 
+        // constexpr std::pair defaultMethodParams = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
+        const std::pair< RemappingMethod, int > defaultMethodParams = std::make_pair< RemappingMethod, int >( ShepardInterpolant, 3 );
         {
             for (int iv = 0; iv < nstandardvars; ++iv)
-                field_methods[roms_twod_standardtagnames[iv]] = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
+                field_methods[roms_twod_standardtagnames[iv]] = defaultMethodParams;
             for (int iv = 0; iv < nforcingvars; ++iv)
-                field_methods[mpas_twod_forcingtagnames[iv]] = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
+                field_methods[mpas_twod_forcingtagnames[iv]] = defaultMethodParams;
             for (int iv = 0; iv < nvars; ++iv)
-                field_methods[roms_tagnames[iv]] = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
+                field_methods[roms_tagnames[iv]] = defaultMethodParams;
 
             std::vector< std::string > fieldmethods;
             opts.getOptAllArgs( "methodorder", fieldmethods );

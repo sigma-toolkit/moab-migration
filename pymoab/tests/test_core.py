@@ -222,6 +222,15 @@ def test_get_tag():
     def_tag_length = mb.tag_get_length(def_val_tag)
     assert def_tag_length == 2
 
+    nodef_val_tag_name = "nodef_val_tag"
+    def_val_tag = mb.tag_get_handle(def_val_tag_name,2,types.MB_TYPE_DOUBLE, types.MB_TAG_DENSE, True, default_value = None)
+
+    #look up tag by name only
+    tag = mb.tag_get_handle(nodef_val_tag_name)
+
+    def_val_chck = mb.tag_get_default_value(def_val_tag)
+    assert def_val_chck is None
+
 def test_integer_tag():
     mb = core.Core()
     vh = vertex_handle(mb)

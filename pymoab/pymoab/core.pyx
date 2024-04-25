@@ -1813,6 +1813,8 @@ cdef class Core(object):
             data = np.empty((length,),dtype=np.dtype(np_tag_type(tag_type)))
         err = self.inst.tag_get_default_value(tag.inst, <void*> data.data)
         check_error(err, exceptions)
+        if (data.data == NULL):
+            data = None
         return data
 
     def tag_get_length(self, Tag tag, exceptions = () ):

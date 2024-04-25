@@ -224,9 +224,10 @@ def test_get_tag():
 
     # check that when default tag value of None is converted back and forth to/from NULL
     nodef_val_tag_name = "nodef_val_tag"
-    nodef_val_tag = mb.tag_get_handle(nodef_val_tag_name,2,types.MB_TYPE_DOUBLE, types.MB_TAG_DENSE, True)
+    nodef_val_tag = mb.tag_get_handle(nodef_val_tag_name,1,types.MB_TYPE_DOUBLE,types.MB_TAG_SPARSE,True)
+    nodef_tag = mb.tag_get_handle(nodef_val_tag_name)
 
-    nodef_val_chck = mb.tag_get_default_value(nodef_val_tag)
+    nodef_val_chck = mb.tag_get_default_value(nodef_tag)
     assert nodef_val_chck is None
 
 def test_integer_tag():

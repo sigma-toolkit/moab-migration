@@ -222,11 +222,12 @@ def test_get_tag():
     def_tag_length = mb.tag_get_length(def_val_tag)
     assert def_tag_length == 2
 
+    # check that when default tag value of None is converted back and forth to/from NULL
     nodef_val_tag_name = "nodef_val_tag"
     nodef_val_tag = mb.tag_get_handle(nodef_val_tag_name,2,types.MB_TYPE_DOUBLE, types.MB_TAG_DENSE, True)
 
-    def_val_chck = mb.tag_get_default_value(nodef_val_tag)
-    assert def_val_chck is None
+    nodef_val_chck = mb.tag_get_default_value(nodef_val_tag)
+    assert nodef_val_chck is None
 
 def test_integer_tag():
     mb = core.Core()

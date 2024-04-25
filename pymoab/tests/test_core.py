@@ -228,7 +228,7 @@ def test_get_tag():
     #look up tag by name only
     tag = mb.tag_get_handle(nodef_val_tag_name)
 
-    def_val_chck = mb.tag_get_default_value(def_val_tag)
+    def_val_chck = mb.tag_get_default_value(tag)
     assert def_val_chck is None
 
 def test_integer_tag():

@@ -223,7 +223,7 @@ def test_get_tag():
     assert def_tag_length == 2
 
     nodef_val_tag_name = "nodef_val_tag"
-    def_val_tag = mb.tag_get_handle(def_val_tag_name,2,types.MB_TYPE_DOUBLE, types.MB_TAG_DENSE, True, default_value = None)
+    def_val_tag = mb.tag_get_handle(def_val_tag_name,2,types.MB_TYPE_DOUBLE, types.MB_TAG_DENSE, True)
 
     #look up tag by name only
     tag = mb.tag_get_handle(nodef_val_tag_name)

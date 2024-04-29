@@ -228,7 +228,8 @@ def test_get_tag():
     nodef_tag = mb.tag_get_handle(nodef_val_tag_name)
 
     nodef_val_chck = mb.tag_get_default_value(nodef_tag)
-    assert nodef_val_chck is None
+    assert len(nodef_val_chck) == 1
+    assert nodef_val_chck[0] == 1.0
 
 def test_integer_tag():
     mb = core.Core()

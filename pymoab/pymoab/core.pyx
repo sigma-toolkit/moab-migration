@@ -1812,14 +1812,10 @@ cdef class Core(object):
         else:
             data = np.empty((length,),dtype=np.dtype(np_tag_type(tag_type)))
         err = self.inst.tag_get_default_value(tag.inst, <void*> data.data)
-        try:
+        if err == MB_ENTITY_NOT_FOUND:
+            data = None
+        else:
             check_error(err, exceptions)
-        except RuntimeError as e:
-            # RuntimeError with "Entity not found" means no default
-            if "MB_ENTITY_NOT_FOUND" in e.args[0]:
-                data = None
-            else:
-                raise
         return data
 
     def tag_get_length(self, Tag tag, exceptions = () ):

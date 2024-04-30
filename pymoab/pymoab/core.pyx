@@ -1816,7 +1816,7 @@ cdef class Core(object):
             check_error(err, exceptions)
         except RuntimeError as e:
             # RuntimeError with "Entity not found" means no default
-            if "MB_ENTITY_NOT_FOUND" in e:
+            if "MB_ENTITY_NOT_FOUND" in e.args[0]:
                 data = None
             else:
                 raise

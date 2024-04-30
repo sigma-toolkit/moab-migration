@@ -1812,7 +1812,7 @@ cdef class Core(object):
         else:
             data = np.empty((length,),dtype=np.dtype(np_tag_type(tag_type)))
         err = self.inst.tag_get_default_value(tag.inst, <void*> data.data)
-        if err == MB_ENTITY_NOT_FOUND:
+        if err == types.MB_ENTITY_NOT_FOUND:
             data = None
         else:
             check_error(err, exceptions)

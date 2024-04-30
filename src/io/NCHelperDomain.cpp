@@ -22,24 +22,12 @@ bool NCHelperDomain::can_read_file( ReadNC* readNC, int fileId )
     std::vector< std::string >& dimNames = readNC->dimNames;
 
     // If dimension names "n" AND "ni" AND "nj" AND "nv" exist then it should be the Domain grid
-    if(  //(std::find( dimNames.begin(), dimNames.end(), std::string( "n" ) ) != dimNames.end() ) &&
-        ( std::find( dimNames.begin(), dimNames.end(), std::string( "ni" ) ) != dimNames.end() ) &&
+    // some files do not have n, which should be just ni*nj
+    if( ( std::find( dimNames.begin(), dimNames.end(), std::string( "ni" ) ) != dimNames.end() ) &&
         ( std::find( dimNames.begin(), dimNames.end(), std::string( "nj" ) ) != dimNames.end() ) &&
         ( std::find( dimNames.begin(), dimNames.end(), std::string( "nv" ) ) != dimNames.end() ) )
     {
-        // Make sure it is CAM grid
-        /* std::map< std::string, ReadNC::AttData >::iterator attIt = readNC->globalAtts.find( "source" );
-        if( attIt == readNC->globalAtts.end() ) return false;
-        unsigned int sz = attIt->second.attLen;
-        std::string att_data;
-        att_data.resize( sz + 1 );
-        att_data[sz] = '\000';
-        int success =
-            NCFUNC( get_att_text )( fileId, attIt->second.attVarId, attIt->second.attName.c_str(), &att_data[0] );
-        if( success ) return false;*/
-        /*if (att_data.find("CAM") == std::string::npos)
-          return false;*/
-
+        // we do not test anymore if it is an actual CAM file
         return true;
     }
 
@@ -680,7 +668,7 @@ ErrorCode NCHelperDomain::redistribute_cells( ParallelComm* myPcomm,
 
     return MB_SUCCESS;
 #else
-    return MB_FAILURE;
+    MB_CHK_SET_ERR( MB_FAILURE, "need to configure with Zoltan " );
 #endif
 }
 

@@ -181,6 +181,13 @@ class ZoltanPartitioner : public PartitionerBase< int >
                            const char* zmethod,
                            Range& localGIDs );
 
+    ErrorCode repartition_to_procs( std::vector< double >& x,
+                                    std::vector< double >& y,
+                                    std::vector< double >& z,
+                                    std::vector< int >& gids,
+                                    const char* zmethod,
+                                    std::vector< int >& dest );
+
     // partition owned cell in a new number of parts, based on adjacency
     // we might have some extra adjacencies expressed in extraAdjCellsId, which could point to a
     // cell on a different task

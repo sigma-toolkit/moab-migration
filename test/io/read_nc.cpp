@@ -36,7 +36,9 @@ void test_read_domain_culling();
 void test_read_old_domain();
 void test_read_domain_no_culling();
 // domain file with zoltan partitioner
+#ifdef MOAB_HAVE_ZOLTAN
 void test_read_domain_zoltan();
+#endif
 // scrip file
 void test_read_scrip();
 
@@ -74,7 +76,9 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_MPI
     // Before ghosting issues with ownership were fixed, this test failed on 4 processors
     result += RUN_TEST( test_read_fv_ghosting );
+#ifdef MOAB_HAVE_ZOLTAN
     result += RUN_TEST( test_read_domain_zoltan );
+#endif
 #endif
 
 #ifdef MOAB_HAVE_MPI
@@ -553,7 +557,7 @@ void test_read_domain_no_culling()
     opts = orig + std::string( ";VARIABLE=;NO_CULLING" );
     rval = mb.load_file( example_domain.c_str(), &set, opts.c_str() );CHECK_ERR( rval );
 }
-
+#ifdef MOAB_HAVE_ZOLTAN
 void test_read_domain_zoltan()
 {
     Core moab;
@@ -571,6 +575,7 @@ void test_read_domain_zoltan()
 #endif
 #endif
 }
+#endif
 
 void test_read_scrip()
 {

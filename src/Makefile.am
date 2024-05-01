@@ -346,7 +346,6 @@ if HAVE_HDF5
 endif
 
 if PARALLEL
-#  	 IntxMesh/wrap_intx.cpp
   libMOAB_la_SOURCES += \
      parallel/ParallelComm.cpp \
      parallel/ProcConfig.cpp \

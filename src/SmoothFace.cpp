@@ -409,7 +409,7 @@ ErrorCode SmoothFace::init_edge_control_points( CartVect& P0,
     Vi[3] = P3;
     CartVect P03( P3 - P0 );
     double di    = P03.length();
-    double ai    = N0 % N3;  // this is the dot operator, the same as in cgm for CubitVector
+    double ai    = N0 % N3;  // this is the dot operator
     double ai0   = N0 % T0;
     double ai3   = N3 % T3;
     double denom = 4 - ai * ai;

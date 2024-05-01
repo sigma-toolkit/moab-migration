@@ -313,17 +313,19 @@ else
     if (test "x$enable_devmode" != "xno"); then
       # Developers updating the PyMOAB modules need Cython (> 0.25)
       AC_PYTHON_MODULE(cython)
+      if test "x$CYTHON" = "x" ; then
+        AC_CHECK_PROG(CYTHON_AVAILABLE, cython, yes, no)
+        if test x"$CYTHON_AVAILABLE" != x"yes" ; then
+            AC_MSG_ERROR([Cython is not installed. Use 'easy_install cython'.])
+        else
+            CYTHON=`which cython`
+        fi
+        AC_SUBST(CYTHON)
+      fi
       AC_MSG_CHECKING(for proper cython capabilities)
-      cython --cplus $srcdir/pymoab/cmake/cython_test.pyx --output-file ./.cython_test_out && rm .cython_test_out
+      $CYTHON --cplus $srcdir/pymoab/cmake/cython_test.pyx --output-file ./.cython_test_out && rm .cython_test_out
       if test $? -ne 0 ; then
         AC_MSG_ERROR(cython is not the correct version for pymoab)
-      fi
-      AC_CHECK_PROG(CYTHON_AVAILABLE, cython, yes, no)
-      if test x"$CYTHON_AVAILABLE" != x"yes" ; then
-          AC_MSG_ERROR([Cython is not installed. Use 'easy_install cython'.])
-      else
-          CYTHON=`which cython`
-          AC_SUBST(CYTHON)
       fi
     fi
 

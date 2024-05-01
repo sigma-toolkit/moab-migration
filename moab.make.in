@@ -9,7 +9,9 @@ MOAB_HDF5_ENABLED = @enablehdf5@
 MOAB_NETCDF_ENABLED = @enablenetcdf@
 MOAB_PNETCDF_ENABLED = @enablepnetcdf@
 MOAB_TEMPESTREMAP_ENABLED = @enabletempestremap@
-MOAB_FBIGEOM_ENABLED = @HAVE_FBIGEOM@
+MOAB_METIS_ENABLED = @enablemetis@
+MOAB_PARMETIS_ENABLED = @enableparmetis@
+MOAB_ZOLTAN_ENABLED = @enablezoltan@
 
 # Library and Include paths
 MOAB_LIBDIR = @abs_builddir@/src/.libs

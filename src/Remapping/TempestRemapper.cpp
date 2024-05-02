@@ -665,8 +665,8 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     coordy.clear();
     coordz.clear();
 
-    mesh->RemoveZeroEdges();
     mesh->RemoveCoincidentNodes();
+    mesh->RemoveZeroEdges();
 
     // Generate reverse node array and edge map
     if( constructEdgeMap ) mesh->ConstructEdgeMap( false );

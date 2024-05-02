@@ -249,9 +249,9 @@ class TempestOnlineMap : public OfflineMap
                                           bool isTgtContinuous,
                                           DataArray3D< int >* tgtdataGLLNodes );
 
-    double ApplyCAASLimiting( std::vector< double >& dataInDouble,
-                              std::vector< double >& dataOutDouble,
-                              CAASType caasType = CAAS_GLOBAL );
+    std::pair< double, double > ApplyCAASLimiting( std::vector< double >& dataInDouble,
+                                                   std::vector< double >& dataOutDouble,
+                                                   CAASType caasType = CAAS_GLOBAL );
 
 #ifdef MOAB_HAVE_EIGEN3
 

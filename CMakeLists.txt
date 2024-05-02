@@ -129,8 +129,7 @@ option ( ENABLE_PYMOAB       "Build python interface to MOAB?" OFF )
 option ( ENABLE_IMESH        "Should build IMESH?"       OFF )
 option ( ENABLE_FBIGEOM      "Should build FBIGEOM?"     OFF )
 option ( ENABLE_IREL         "Should build IREL?"        OFF )
-# TODO: Turning this off for now. Lapack is making some issues setting RPATH for shared libs
-option ( ENABLE_BLASLAPACK   "Should require BLAS/LAPACK?" OFF )
+option ( ENABLE_BLASLAPACK   "Should require BLAS/LAPACK?" ON )
 option ( ENABLE_FORTRAN      "Should enable FORTRAN?" ON )
 option ( ENABLE_TEMPESTREMAP "Should enable TempestRemap dependency?" OFF )
 

@@ -60,6 +60,7 @@ struct ToolContext
     std::string outFilename;
     std::string intxFilename;
     std::string baselineFile;
+    std::string variableToVerify;
     moab::TempestRemapper::TempestMeshType meshType;
     bool computeDual;
     bool computeWeights;
@@ -84,10 +85,10 @@ struct ToolContext
         : mbcore( icore ), proc_id( 0 ), n_procs( 1 ), outputFormatter( std::cout, 0, 0 ),
 #endif
           blockSize( 5 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "" ), baselineFile( "" ),
-          meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ), computeWeights( false ),
-          verifyWeights( false ), enforceConvexity( false ), ensureMonotonicity( 0 ), rrmGrids( false ),
-          kdtreeSearch( true ), fCheck( false ), fVolumetric( false ), useGnomonicProjection( false ),
-          cassType( moab::TempestOnlineMap::CAAS_NONE ), print_diagnostics( true )
+          variableToVerify( "" ), meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ),
+          computeWeights( false ), verifyWeights( false ), enforceConvexity( false ), ensureMonotonicity( 0 ),
+          rrmGrids( false ), kdtreeSearch( true ), fCheck( false ), fVolumetric( false ),
+          useGnomonicProjection( false ), cassType( moab::TempestOnlineMap::CAAS_NONE ), print_diagnostics( true )
     {
         inFilenames.resize( 2 );
         doftag_names.resize( 2 );
@@ -107,6 +108,7 @@ struct ToolContext
         outFilename.clear();
         intxFilename.clear();
         baselineFile.clear();
+        variableToVerify.clear();
         meshsets.clear();
         delete timer;
     }
@@ -237,6 +239,11 @@ struct ToolContext
                              "from source to target "
                              "grid by applying the maps",
                              &verifyWeights );
+        ;
+        opts.addOpt< std::string >( "var",
+                                    "Tag name of the variable to use in the verification study "
+                                    "(error metrics for user defined variables may not be available)",
+                                    &variableToVerify );
 
         opts.addOpt< int >( "caas", "apply CAAS nonlinear filter after linear map application",
                              &useCAAS );
@@ -499,11 +506,7 @@ int main( int argc, char* argv[] )
     remapper.initialize();
 
     // Default area_method = lHuiller; Options: Girard, GaussQuadrature (if TR is available)
-#ifdef MOAB_HAVE_TEMPESTREMAP
     moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::GaussQuadrature );
-#else
-    moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::lHuiller );
-#endif
 
     Mesh* tempest_mesh = new Mesh();
     runCtx->timer_push( "create Tempest mesh" );
@@ -598,13 +601,14 @@ int main( int argc, char* argv[] )
             outputFormatter.printf( 0, "The intersection set contains %lu elements and %lu vertices \n",
                                     intxelems.size(), intxverts.size() );
 
+            moab::IntxAreaUtils areaAdaptorHuiller( moab::IntxAreaUtils::GaussQuadrature ); // lHuiller
             double initial_sarea =
-                areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0],
+                areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[0],
                                             radius_src );  // use the target to compute the initial area
             double initial_tarea =
-                areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[1],
+                areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[1],
                                             radius_dest );  // use the target to compute the initial area
-            double intx_area = areaAdaptor.area_on_sphere( mbCore, intxset, radius_src );
+            double intx_area = areaAdaptorHuiller.area_on_sphere( mbCore, intxset, radius_src );
 
             outputFormatter.printf( 0, "mesh areas: source = %12.10f, target = %12.10f, intersection = %12.10f \n",
                                     initial_sarea, initial_tarea, intx_area );
@@ -692,12 +696,13 @@ int main( int argc, char* argv[] )
         double dTotalOverlapArea = 0.0;
         if( runCtx->print_diagnostics )
         {
+            moab::IntxAreaUtils areaAdaptorHuiller( moab::IntxAreaUtils::GaussQuadrature ); // lHuiller
             double local_areas[3],
                 global_areas[3];  // Array for Initial area, and through Method 1 and Method 2
             // local_areas[0] = area_on_sphere_lHuiller ( mbCore, runCtx->meshsets[1], radius_src );
-            local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
-            local_areas[1] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[1], radius_dest );
-            local_areas[2] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[2], radius_src );
+            local_areas[0] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
+            local_areas[1] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[1], radius_dest );
+            local_areas[2] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[2], radius_src );
 
 #ifdef MOAB_HAVE_MPI
             MPI_Allreduce( &local_areas[0], &global_areas[0], 3, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
@@ -811,25 +816,49 @@ int main( int argc, char* argv[] )
             if( runCtx->verifyWeights )
             {
                 // Let us pick a sampling test function for solution evaluation
-                moab::TempestOnlineMap::sample_function testFunction =
-                    &sample_stationary_vortex;  // sample_slow_harmonic, sample_stationary_vortex, sample_fast_harmonic;
+                // SH, SV, FH, USERVAR
+                bool userVariable = false;
+                moab::TempestOnlineMap::sample_function testFunction;
+                if( !runCtx->variableToVerify.compare( "SH" ) )
+                    testFunction = &sample_slow_harmonic;
+                else if( !runCtx->variableToVerify.compare( "FH" ) )
+                    testFunction = &sample_fast_harmonic;
+                else if( !runCtx->variableToVerify.compare( "SV" ) )
+                    testFunction = &sample_stationary_vortex;
+                else
+                {
+                    userVariable = runCtx->variableToVerify.size() ? true : false;
+                    testFunction = runCtx->variableToVerify.size() ? nullptr : sample_stationary_vortex;
+                }
 
-                runCtx->timer_push( "describe a solution on source grid" );
                 moab::Tag srcAnalyticalFunction;
-                rval = weightMap->DefineAnalyticalSolution( srcAnalyticalFunction, "AnalyticalSolnSrcExact",
-                                                            moab::Remapper::SourceMesh, testFunction );MB_CHK_ERR( rval );
-                runCtx->timer_pop();
-                // rval = mbCore->write_file( "srcWithSolnTag.h5m", NULL, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
-
-                runCtx->timer_push( "describe a solution on target grid" );
                 moab::Tag tgtAnalyticalFunction;
                 moab::Tag tgtProjectedFunction;
-                rval = weightMap->DefineAnalyticalSolution( tgtAnalyticalFunction, "AnalyticalSolnTgtExact",
-                                                            moab::Remapper::TargetMesh, testFunction,
-                                                            &tgtProjectedFunction, "ProjectedSolnTgt" );MB_CHK_ERR( rval );
-                // rval = mbCore->write_file ( "tgtWithSolnTag.h5m", NULL, writeOptions,
-                // &runCtx->meshsets[1], 1 ); MB_CHK_ERR ( rval );
-                runCtx->timer_pop();
+                if (testFunction)
+                {
+                    runCtx->timer_push( "describe a solution on source grid" );
+                    rval = weightMap->DefineAnalyticalSolution( srcAnalyticalFunction, "AnalyticalSolnSrcExact",
+                                                                moab::Remapper::SourceMesh, testFunction );MB_CHK_ERR( rval );
+                    runCtx->timer_pop();
+
+                    runCtx->timer_push( "describe a solution on target grid" );
+
+                    rval = weightMap->DefineAnalyticalSolution( tgtAnalyticalFunction, "AnalyticalSolnTgtExact",
+                                                                moab::Remapper::TargetMesh, testFunction,
+                                                                &tgtProjectedFunction, "ProjectedSolnTgt" );MB_CHK_ERR( rval );
+                    // rval = mbCore->write_file ( "tgtWithSolnTag.h5m", NULL, writeOptions,
+                    // &runCtx->meshsets[1], 1 ); MB_CHK_ERR ( rval );
+                    runCtx->timer_pop();
+                }
+                else
+                {
+                    rval = mbCore->tag_get_handle(runCtx->variableToVerify.c_str(), srcAnalyticalFunction);MB_CHK_ERR( rval );
+
+                    rval = mbCore->tag_get_handle( "ProjectedSolnTgt", 1, moab::MB_TYPE_DOUBLE, tgtProjectedFunction,
+                                                   moab::MB_TAG_DENSE | moab::MB_TAG_CREAT );MB_CHK_ERR( rval );
+                }
+
+                rval = mbCore->write_file( "srcWithSolnTag.h5m", NULL, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
 
                 runCtx->timer_push( "compute solution projection on target grid" );
                 rval = weightMap->ApplyWeights( srcAnalyticalFunction, tgtProjectedFunction, false, runCtx->cassType );MB_CHK_ERR( rval );
@@ -861,11 +890,16 @@ int main( int argc, char* argv[] )
                     // it will be used later to test, along with a target file
                     rval = mbCore->write_file( "srcWithSolnTag.h5m", NULL, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
                 }
-                runCtx->timer_push( "compute error metrics against analytical solution on target grid" );
-                std::map< std::string, double > errMetrics;
-                rval = weightMap->ComputeMetrics( moab::Remapper::TargetMesh, tgtAnalyticalFunction,
-                                                  tgtProjectedFunction, errMetrics, true );MB_CHK_ERR( rval );
-                runCtx->timer_pop();
+
+                // compute error metrics if it is a known analytical functional
+                if( !userVariable )
+                {
+                    runCtx->timer_push( "compute error metrics against analytical solution on target grid" );
+                    std::map< std::string, double > errMetrics;
+                    rval = weightMap->ComputeMetrics( moab::Remapper::TargetMesh, tgtAnalyticalFunction,
+                                                    tgtProjectedFunction, errMetrics, true );MB_CHK_ERR( rval );
+                    runCtx->timer_pop();
+                }
             }
 
             delete weightMap;

@@ -5,21 +5,21 @@ test_files = test_core.py test_hom.py test_scd.py test_range.py test_tag.py test
 local_install_path = $(subst $(prefix)/,,$(pythondir))
 all-local: local-install
 local-install:
-	$(MKDIR_P) $(abs_top_builddir)/$(local_install_path)
-	(CFLAGS='-w -fPIC' PYTHONPATH=$(abs_top_builddir)/$(local_install_path)/:$(PYTHONPATH) \
-		$(PYTHON) -m pip install -e ../. --prefix $(abs_top_builddir))
+	$(MKDIR_P) $(top_builddir)/$(local_install_path)
+	(CFLAGS='-w -fPIC' PYTHONPATH=$(top_builddir)/$(local_install_path)/:$(PYTHONPATH) \
+		$(PYTHON) -m pip install -e $(top_builddir) --prefix $(top_builddir)/$(local_install_path))
 install-exec-local: all-local
 	$(MKDIR_P) $(DESTDIR)$(pythondir)
-	(PYTHONPATH=$(DESTDIR)$(pythondir):$(PYTHONPATH) $(PYTHON) -m pip install ../. \
+	(PYTHONPATH=$(DESTDIR)$(pythondir):$(PYTHONPATH) $(PYTHON) -m pip install $(top_builddir) \
         --prefix $(DESTDIR)$(prefix) )
 check: all-local
-	cd $abs_top_srcdir/test/pymoab; \
+	cd $(top_srcdir)/test/pymoab; \
 	for i in $(test_files); \
 	do \
-		(@SLIBENVPATH@=$(abs_top_builddir)/src/.libs/:$(@SLIBENVPATH@) PYTHONPATH=$(abs_top_builddir):$(PYTHONPATH) $(PYTHON) $$i) || exit 1; \
+		(@SLIBENVPATH@=$(top_builddir)/src/.libs/:$(@SLIBENVPATH@) PYTHONPATH=$(top_builddir):$(PYTHONPATH) $(PYTHON) $$i) || exit 1; \
 	done
 clean-local:
-	-rm -rf ../build ../lib *.cpp __pycache__ *.so *.pyc ../test/pymoab/*.pyc ../pymoab.egg-info
+	-rm -rf $(top_srcdir)/build $(top_srcdir)/lib *.cpp __pycache__ *.so *.pyc $(top_srcdir)/test/pymoab/*.pyc $(top_srcdir)/pymoab.egg-info
 uninstall:
 	rm -rf $(DESTDIR)$(pythondir)/*
-CLEANFILES = ../test/pymoab/quads_test.vtk ../test/pymoab/outfile.h5m ../test/pymoab/write_tag_test.h5m $(local_install_path)/*
+CLEANFILES = $(top_srcdir)/test/pymoab/quads_test.vtk $(top_srcdir)/test/pymoab/outfile.h5m $(top_srcdir)/test/pymoab/write_tag_test.h5m $(local_install_path)/*

@@ -510,11 +510,12 @@ module iMOAB
         character(kind=c_char), intent(in) :: target_solution_tag_dof_name(*)
       end function iMOAB_ComputeScalarProjectionWeights
 
-      integer(c_int) function iMOAB_ApplyScalarProjectionWeights(pid_intersection, solution_weights_identifier, &
+      integer(c_int) function iMOAB_ApplyScalarProjectionWeights(pid_intersection, filter_type, solution_weights_identifier, &
                                                                 source_solution_tag_name, target_solution_tag_name) &
                                                                 bind(C, name='iMOAB_ApplyScalarProjectionWeights')
         use, intrinsic :: iso_c_binding, only: c_int, c_char
         integer(c_int), intent(in) :: pid_intersection
+        integer(c_int), intent(in) :: filter_type
         character(kind=c_char), intent(in) :: solution_weights_identifier(*)
         character(kind=c_char), intent(in) :: source_solution_tag_name(*)
         character(kind=c_char), intent(in) :: target_solution_tag_name(*)

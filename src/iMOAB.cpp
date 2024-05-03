@@ -1115,7 +1115,7 @@ ErrCode iMOAB_GetVisibleElementsInfo( iMOAB_AppID pid,
 
 #else
         /* everything owned by task 0 */
-        ranks[i]             = 0;
+        ranks[i] = 0;
 #endif
     }
 
@@ -3620,32 +3620,32 @@ ErrCode iMOAB_WriteMappingWeightsToFile(
     std::string filename = std::string( remap_weights_filename );
 
     std::string metadataStr = data_intx.metadataMap[std::string( solution_weights_identifier )];
-    std::map<std::string, std::string> attrMap;
-    attrMap["title"] = "MOAB-TempestRemap Online Regridding Weight Generator";
+    std::map< std::string, std::string > attrMap;
+    attrMap["title"]         = "MOAB-TempestRemap Online Regridding Weight Generator";
     attrMap["normalization"] = "ovarea";
-    attrMap["map_aPb"] = filename;
+    attrMap["map_aPb"]       = filename;
 
     const std::string delim = ";";
     size_t pos = 0, index = 0;
-    std::vector<std::string> stringAttr(3);
+    std::vector< std::string > stringAttr( 3 );
     // use find() function to get the position of the delimiters
-    while (( pos = metadataStr.find (delim)) != std::string::npos)
+    while( ( pos = metadataStr.find( delim ) ) != std::string::npos )
     {
-      std::string token1 = metadataStr.substr(0, pos); // store the substring
-      if ( token1.size() > 0 || index == 0 )
-          stringAttr[index++] = token1;
-      metadataStr.erase(0, pos + delim.length());  /* erase() function store the current positon and move to next token. */
+        std::string token1 = metadataStr.substr( 0, pos );  // store the substring
+        if( token1.size() > 0 || index == 0 ) stringAttr[index++] = token1;
+        metadataStr.erase(
+            0, pos + delim.length() ); /* erase() function store the current positon and move to next token. */
     }
-    stringAttr[index] = metadataStr; // store the last token of the string.
-    assert(index == 2);
+    stringAttr[index] = metadataStr;  // store the last token of the string.
+    assert( index == 2 );
     attrMap["remap_options"] = stringAttr[0];
     attrMap["methodorder_b"] = stringAttr[1];
     attrMap["methodorder_a"] = stringAttr[2];
-    attrMap["concave_a"] = "false";  // defaults
-    attrMap["concave_b"] = "false";  // defaults
-    attrMap["bubble"] = "true";     // defaults
-    attrMap["MOABversion"] = std::string(MOAB_VERSION);
- 
+    attrMap["concave_a"]     = "false";  // defaults
+    attrMap["concave_b"]     = "false";  // defaults
+    attrMap["bubble"]        = "true";   // defaults
+    attrMap["MOABversion"]   = std::string( MOAB_VERSION );
+
     // Write the map file to disk in parallel using either HDF5 or SCRIP interface
     rval = weightMap->WriteParallelMap( filename, attrMap );MB_CHK_ERR( rval );
 
@@ -4376,9 +4376,10 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
     if( fVolumetric && *fVolumetric ) mapOptions.strMethod += "volumetric;";
     if( fInverseDistanceMap && *fInverseDistanceMap ) mapOptions.strMethod += "invdist;";
 
-    std::string metadataStr = mapOptions.strMethod + ";" + 
-                              std::string( disc_method_source ) + ":" + std::to_string(*disc_order_source) + ":" + std::string( source_solution_tag_dof_name ) + ";" + 
-                              std::string( disc_method_target ) + ":" + std::to_string(*disc_order_target) + ":" + std::string( target_solution_tag_dof_name );
+    std::string metadataStr = mapOptions.strMethod + ";" + std::string( disc_method_source ) + ":" +
+                              std::to_string( *disc_order_source ) + ":" + std::string( source_solution_tag_dof_name ) +
+                              ";" + std::string( disc_method_target ) + ":" + std::to_string( *disc_order_target ) +
+                              ":" + std::string( target_solution_tag_dof_name );
 
     data_intx.metadataMap[std::string( solution_weights_identifier )] = metadataStr;
 
@@ -4398,6 +4399,7 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
 
 ErrCode iMOAB_ApplyScalarProjectionWeights(
     iMOAB_AppID pid_intersection,
+    int* filter_type,
     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
     const iMOAB_String source_solution_tag_name,
     const iMOAB_String target_solution_tag_name )
@@ -4499,6 +4501,25 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         tents = tgtEnts;
     }
 
+    moab::TempestOnlineMap::CAASType caasType = moab::TempestOnlineMap::CAAS_NONE;
+    if( filter_type )
+    {
+        switch( *filter_type )
+        {
+            case 1:
+                caasType = moab::TempestOnlineMap::CAAS_GLOBAL;
+                break;
+            case 2:
+                caasType = moab::TempestOnlineMap::CAAS_LOCAL;
+                break;
+            case 3:
+                caasType = moab::TempestOnlineMap::CAAS_LOCAL_ADJACENT;
+                break;
+            default:
+                caasType = moab::TempestOnlineMap::CAAS_NONE;
+        }
+    }
+
     for( size_t i = 0; i < srcTagHandles.size(); i++ )
     {
         // The tag data is np*np*n_el_src
@@ -4509,7 +4530,7 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         // Compute the application of weights on the suorce solution data and store it in the
         // destination solution vector data Optionally, can also perform the transpose application
         // of the weight matrix. Set the 3rd argument to true if this is needed
-        rval = weightMap->ApplyWeights( solSTagVals, solTTagVals, false );MB_CHK_ERR( rval );
+        rval = weightMap->ApplyWeights( solSTagVals, solTTagVals, false, caasType );MB_CHK_ERR( rval );
 
         // The tag data is np*np*n_el_dest
         rval = context.MBI->tag_set_data( tsolnTag, tents, &solTTagVals[0] );MB_CHK_ERR( rval );

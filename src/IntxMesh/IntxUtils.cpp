@@ -3,18 +3,13 @@
  *
  *  Created on: Oct 3, 2012
  */
-#ifdef _MSC_VER            /* windows */
+#if defined(_MSC_VER) || defined(WIN32)            /* windows */
 #define _USE_MATH_DEFINES  // For M_PI
 #endif
 
-#ifdef WIN32               /* windows */
-#define _USE_MATH_DEFINES  // For M_PI
-#endif
 #include <cmath>
 #include <cassert>
 #include <iostream>
-// this is for sstream
-#include <sstream>
 
 #include "moab/IntxMesh/IntxUtils.hpp"
 // this is from mbcoupler; maybe it should be moved somewhere in moab src
@@ -35,19 +30,9 @@
 #include "GridElements.h"
 #endif
 
-#ifdef MOAB_HAVE_EIGEN3
-#ifdef NDEBUG
-#undef NDEBUG
-#define DEBUG_MODE
-#endif
 #define EIGEN_NO_DEBUG
 #define EIGEN_MAX_CPP_VER 11
 #include "Eigen/Dense"
-#ifdef DEBUG_MODE
-#undef DEBUG_MODE
-#define NDEBUG
-#endif
-#endif
 
 namespace moab
 {
@@ -950,10 +935,6 @@ double IntxAreaUtils::area_spherical_polygon_GQ( const double* A, int N )
     return area;
 }
 
-#ifdef NDEBUG
-#undef NDEBUG
-#define DEBUG_MODE
-#endif
 double IntxAreaUtils::area_spherical_triangle_GQ( const double* inode1, const double* inode2, const double* inode3 )
 {
 #if defined( MOAB_HAVE_EIGEN3 )
@@ -1033,10 +1014,6 @@ double IntxAreaUtils::area_spherical_triangle_GQ( const double* inode1, const do
     return CalculateFaceArea( face, nodes );
 #endif
 }
-#ifdef DEBUG_MODE
-#undef DEBUG_MODE
-#define NDEBUG
-#endif
 
 #endif
 
@@ -1103,7 +1080,6 @@ double IntxAreaUtils::area_spherical_triangle_lHuiller( const double* ptA, const
 
     return area;
 }
-#undef CHECKNEGATIVEAREA
 
 double IntxAreaUtils::area_on_sphere( Interface* mb, EntityHandle set, double R )
 {
@@ -1133,6 +1109,8 @@ double IntxAreaUtils::area_on_sphere( Interface* mb, EntityHandle set, double R 
         const double elem_area = this->area_spherical_element( mb, eh, R );
 
         // check whether the area of the spherical element is positive.
+        if (elem_area <= 0)
+          std::cout << "Area of element " << mb->id_from_handle(eh) << " is = " << elem_area << "\n"; 
         assert( elem_area > 0 );
 
         // sum up the contribution

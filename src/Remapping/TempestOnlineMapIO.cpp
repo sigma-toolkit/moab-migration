@@ -1191,7 +1191,6 @@ void print_progress( const int barWidth, const float progress, const char* messa
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
 moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
                                                          const std::vector< int >& owned_dof_ids,
                                                          bool row_partition )
@@ -1590,6 +1589,15 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     // Reset the source and target data first
     m_rowVector.setZero();
     m_colVector.setZero();
+
+    if (size == 1) // just in serial
+    {
+        Range rangeRow;
+        std::copy( row_gdofmap.begin(), row_gdofmap.end(), range_inserter( rangeRow ) );
+        Range allDofs;
+        allDofs.insert(1, nB);
+        Range missing = subtract(allDofs, rangeRow);
+    }
 
     return moab::MB_SUCCESS;
 }

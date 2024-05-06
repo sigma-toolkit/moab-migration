@@ -1590,15 +1590,6 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     m_rowVector.setZero();
     m_colVector.setZero();
 
-    if (size == 1) // just in serial
-    {
-        Range rangeRow;
-        std::copy( row_gdofmap.begin(), row_gdofmap.end(), range_inserter( rangeRow ) );
-        Range allDofs;
-        allDofs.insert(1, nB);
-        Range missing = subtract(allDofs, rangeRow);
-    }
-
     return moab::MB_SUCCESS;
 }
 

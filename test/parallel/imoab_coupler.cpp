@@ -526,6 +526,7 @@ int main( int argc, char* argv[] )
     int tagIndex[2];
     int tagTypes[2]  = { DENSE_DOUBLE, DENSE_DOUBLE };
     int atmCompNDoFs = disc_orders[0] * disc_orders[0], ocnCompNDoFs = 1 /*FV*/;
+    int filter_type = 0;
 
     const char* bottomFields          = "a2oTbot:a2oUbot:a2oVbot";
     const char* bottomProjectedFields = "a2oTbot_proj:a2oUbot_proj:a2oVbot_proj";
@@ -629,7 +630,7 @@ int main( int argc, char* argv[] )
             /* We have the remapping weights now. Let us apply the weights onto the tag we defined
                on the source mesh and get the projection on the target mesh */
             PUSH_TIMER( "Apply Scalar projection weights" )
-            ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0].c_str(), concat_fieldname,
+            ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0].c_str(), concat_fieldname,
                                                        concat_fieldnameT );
             CHECKIERR( ierr, "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )
@@ -757,7 +758,7 @@ int main( int argc, char* argv[] )
         if( couComm != MPI_COMM_NULL )
         {
             PUSH_TIMER( "Apply Scalar projection weights for land" )
-            ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmLndPID, weights_identifiers[1].c_str(), concat_fieldname,
+            ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmLndPID, &filter_type, weights_identifiers[1].c_str(), concat_fieldname,
                                                        concat_fieldnameT );
             CHECKIERR( ierr, "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )

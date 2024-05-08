@@ -2133,23 +2133,23 @@ ErrorCode AdaptiveKDTree::print()
     Range range;
 
     Range tree_sets, elem2d, elem3d, verts, all;
-    std::vector<EntityHandle> elem2d_vec, elem3d_vec, verts_vec;
     moab()->get_child_meshsets( myRoot, tree_sets, 0 );
-    for( Range::iterator rit = tree_sets.begin(); rit != tree_sets.end(); ++rit )
+
     {
-        moab()->get_entities_by_dimension( *rit, 2, elem2d_vec );
-        moab()->get_entities_by_dimension( *rit, 3, elem3d_vec );
-        moab()->get_entities_by_type( *rit, MBVERTEX, verts_vec );
+        std::vector<EntityHandle> elem2d_vec, elem3d_vec, verts_vec;
+        for( Range::iterator rit = tree_sets.begin(); rit != tree_sets.end(); ++rit )
+        {
+            moab()->get_entities_by_dimension( *rit, 2, elem2d_vec );
+            moab()->get_entities_by_dimension( *rit, 3, elem3d_vec );
+            moab()->get_entities_by_type( *rit, MBVERTEX, verts_vec );
+        }
+        std::sort(elem2d_vec.begin(), elem2d_vec.end());
+        std::copy( elem2d_vec.rbegin(), elem2d_vec.rend(), range_inserter( elem2d ) );
+        std::sort(elem3d_vec.begin(), elem3d_vec.end());
+        std::copy( elem3d_vec.rbegin(), elem3d_vec.rend(), range_inserter( elem3d ) );
+        std::sort(verts_vec.begin(), verts_vec.end());
+        std::copy( verts_vec.rbegin(), verts_vec.rend(), range_inserter( verts ) );
     }
-    std::sort(elem2d_vec.begin(), elem2d_vec.end());
-    std::copy( elem2d_vec.rbegin(), elem2d_vec.rend(), range_inserter( elem2d ) );
-    elem2d_vec = std::vector<EntityHandle>(); // frees the memory used by the std::vector
-    std::sort(elem3d_vec.begin(), elem3d_vec.end());
-    std::copy( elem3d_vec.rbegin(), elem3d_vec.rend(), range_inserter( elem3d ) );
-    elem3d_vec = std::vector<EntityHandle>();
-    std::sort(verts_vec.begin(), verts_vec.end());
-    std::copy( verts_vec.rbegin(), verts_vec.rend(), range_inserter( verts ) );
-    verts_vec = std::vector<EntityHandle>();
 
     all.merge( verts );
     all.merge( elem2d );

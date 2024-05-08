@@ -2038,7 +2038,6 @@ ErrorCode AdaptiveKDTree::compute_depth( EntityHandle root, unsigned int& min_de
     int num_of_elements = 0, max, min;
     moab()->get_number_entities_by_handle( iter.handle(), num_of_elements );
     max = min = num_of_elements;
-    int k     = 0;
     while( MB_SUCCESS == iter.step() )
     {
         int temp = 0;
@@ -2049,7 +2048,6 @@ ErrorCode AdaptiveKDTree::compute_depth( EntityHandle root, unsigned int& min_de
             max_depth = iter.depth();
         else if( iter.depth() < min_depth )
             min_depth = iter.depth();
-        ++k;
     }
     return MB_SUCCESS;
 }
@@ -2085,7 +2083,7 @@ static std::string mem_to_string( unsigned long mem )
         strcpy( unit, "GB" );
     }
     char buffer[256];
-    sprintf( buffer, "%lu %s", mem, unit );
+    snprintf( buffer, 256, "%lu %s", mem, unit );
     return buffer;
 }
 

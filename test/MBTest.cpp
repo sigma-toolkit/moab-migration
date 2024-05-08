@@ -3027,7 +3027,7 @@ ErrorCode mb_common_tag_test( TagType storage )
     if( MB_SUCCESS != result ) return result;
 
     char tagname[64];
-    sprintf( tagname, "t%d", rand() );
+    snprintf( tagname, 64, "t%d", rand() );
 
     Tag tag;
     const EntityHandle def_val = ~(EntityHandle)0;
@@ -4075,8 +4075,7 @@ ErrorCode mb_stress_test()
 
     float time  = static_cast< float >( stop - start ) / CLOCKS_PER_SEC;
     float speed = num_entities_local / time;
-    cout << "        Read " << num_entities_local << " entities"
-         << " in " << time << " seconds" << endl;
+    cout << "        Read " << num_entities_local << " entities" << " in " << time << " seconds" << endl;
     cout << "        at " << speed << " elements per second." << endl;
 
     cout << "\n        Transforming and copying elements" << endl;
@@ -4114,8 +4113,8 @@ ErrorCode mb_stress_test()
     stop = clock();
     time = static_cast< float >( stop - start ) / CLOCKS_PER_SEC;
 
-    cout << "        Transformed and created " << num_entities_local << " entities"
-         << " in " << time << " seconds" << endl;
+    cout << "        Transformed and created " << num_entities_local << " entities" << " in " << time << " seconds"
+         << endl;
 
     // Create mesh set
     cout << "\n        Creating meshset" << endl;
@@ -4135,8 +4134,7 @@ ErrorCode mb_stress_test()
     stop = clock();
     time = static_cast< float >( stop - start ) / CLOCKS_PER_SEC;
 
-    cout << "        Created meshset with " << hexes.size() << " entities"
-         << " in " << time << " seconds" << endl;
+    cout << "        Created meshset with " << hexes.size() << " entities" << " in " << time << " seconds" << endl;
 
     cout << "\n        Writing 512K element file . . ." << endl;
     start = clock();
@@ -4160,8 +4158,7 @@ ErrorCode mb_stress_test()
     stop = clock();
     time = static_cast< float >( stop - start ) / CLOCKS_PER_SEC;
 
-    cout << "        Wrote file with " << hexes.size() << " entities"
-         << " in " << time << " seconds" << endl;
+    cout << "        Wrote file with " << hexes.size() << " entities" << " in " << time << " seconds" << endl;
 
     clock_t total_stop = clock();
     time               = static_cast< float >( total_stop - total_start ) / CLOCKS_PER_SEC;
@@ -4285,9 +4282,8 @@ ErrorCode mb_canon_number_test()
                                                   dim, side, sense, offset );
                 if( 0 != temp_result )
                 {
-                    cout << "call to CN::side_number failed with non-success result"
-                         << " for type " << CN::EntityTypeName( this_type ) << " dimension " << dim << " side no "
-                         << side_no << endl;
+                    cout << "call to CN::side_number failed with non-success result" << " for type "
+                         << CN::EntityTypeName( this_type ) << " dimension " << dim << " side no " << side_no << endl;
                     return MB_FAILURE;
                 }
 
@@ -4552,7 +4548,7 @@ ErrorCode mb_topo_util_test()
 
     // make hexes
     int numv = 3, numv_sq = 9;
-#define VINDEX( i, j, k ) ( ( i ) + ( (j)*numv ) + ( (k)*numv_sq ) )
+#define VINDEX( i, j, k ) ( ( i ) + ( ( j ) * numv ) + ( ( k ) * numv_sq ) )
     EntityHandle connect[8];
     for( int j = 0; j < 2; j++ )
     {
@@ -4680,7 +4676,7 @@ ErrorCode mb_split_test()
 
     // make hexes
     int numv = 3, numv_sq = 9;
-#define VINDEX( i, j, k ) ( ( i ) + ( (j)*numv ) + ( (k)*numv_sq ) )
+#define VINDEX( i, j, k ) ( ( i ) + ( ( j ) * numv ) + ( ( k ) * numv_sq ) )
     EntityHandle connect[8];
     for( int k = 0; k < 2; k++ )
     {
@@ -5298,7 +5294,7 @@ ErrorCode mb_poly_adjacency_test2()
         2, 4,  6, 5, 3,                                         // poly 2
         4, 10, 8, 6,                                            // polygon 3...
         9, 10, 4, 2, 1, 7, 8, 10, 9, 5, 6, 8, 7, 1, 3, 5, 7, 9  // polygon 7
-    };                                                          // we know the handles directly
+    };  // we know the handles directly
 
     int num_verts[7] = { 3, 5, 4, 5, 4, 4, 5 };
     int start_indx[7];

@@ -273,6 +273,7 @@ int main( int argc, char* argv[] )
     int tagIndex[2];
     int tagTypes[2]  = { DENSE_DOUBLE, DENSE_DOUBLE };
     int atmCompNDoFs = disc_orders[0] * disc_orders[0], ocnCompNDoFs = disc_orders[1] * disc_orders[1] /*FV*/;
+    int filter_type = 0;
 
     const char* bottomTempField          = "AnalyticalSolnSrcExact";
     const char* bottomTempProjectedField = "Target_proj";
@@ -401,7 +402,7 @@ int main( int argc, char* argv[] )
             /* We have the remapping weights now. Let us apply the weights onto the tag we defined
                on the source mesh and get the projection on the target mesh */
             PUSH_TIMER( "Apply Scalar projection weights" )
-            ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, intx_from_file_identifier.c_str(),
+            ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, intx_from_file_identifier.c_str(),
                                                        concat_fieldname, concat_fieldnameT );
             CHECKIERR( ierr, "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )

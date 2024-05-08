@@ -33,9 +33,6 @@
 #include "ReadTetGen.hpp"
 #include "ReadSmf.hpp"
 #include "ReadTemplate.hpp"
-#ifdef MOAB_HAVE_CGM
-#include "ReadCGM.hpp"
-#endif
 
 #include "WriteAns.hpp"
 #include "WriteVtk.hpp"
@@ -129,18 +126,6 @@ ReaderWriterSet::ReaderWriterSet( Core* mdb ) : mbCore( mdb )
     register_factory( Tqdcfr::factory, NULL, "Cubit", "cub", "CUBIT" );
 
     register_factory( ReadSmf::factory, WriteSmf::factory, "QSlim format", "smf", "SMF" );
-#ifdef MOAB_HAVE_CGM_FACET
-    const char* facet_sufxs[] = { "facet", NULL };
-    register_factory( ReadCGM::factory, NULL, "Facet Engine Solid Model", facet_sufxs, "facet" );
-#endif
-#ifdef MOAB_HAVE_CGM_OCC
-    const char* occ_sufxs[]  = { "brep", "occ", NULL };
-    const char* step_sufxs[] = { "step", "stp", NULL };
-    const char* iges_sufxs[] = { "iges", "igs", NULL };
-    register_factory( ReadCGM::factory, NULL, "OpenCascade solid model", occ_sufxs, "OCC" );
-    register_factory( ReadCGM::factory, NULL, "STEP B-Rep exchange", step_sufxs, "STEP" );
-    register_factory( ReadCGM::factory, NULL, "IGES B-Rep exchange", iges_sufxs, "IGES" );
-#endif
 
 #ifdef MOAB_HAVE_NETCDF
     register_factory( NULL, WriteSLAC::factory, "SLAC", "slac", "SLAC" );

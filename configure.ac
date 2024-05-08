@@ -313,17 +313,19 @@ else
     if (test "x$enable_devmode" != "xno"); then
       # Developers updating the PyMOAB modules need Cython (> 0.25)
       AC_PYTHON_MODULE(cython)
+      if test "x$CYTHON" = "x" ; then
+        AC_CHECK_PROG(CYTHON_AVAILABLE, cython, yes, no)
+        if test x"$CYTHON_AVAILABLE" != x"yes" ; then
+            AC_MSG_ERROR([Cython is not installed. Use 'easy_install cython'.])
+        else
+            CYTHON=`which cython`
+        fi
+        AC_SUBST(CYTHON)
+      fi
       AC_MSG_CHECKING(for proper cython capabilities)
-      cython --cplus $srcdir/pymoab/cmake/cython_test.pyx --output-file ./.cython_test_out && rm .cython_test_out
+      $CYTHON --cplus $srcdir/pymoab/cmake/cython_test.pyx --output-file ./.cython_test_out && rm .cython_test_out
       if test $? -ne 0 ; then
         AC_MSG_ERROR(cython is not the correct version for pymoab)
-      fi
-      AC_CHECK_PROG(CYTHON_AVAILABLE, cython, yes, no)
-      if test x"$CYTHON_AVAILABLE" != x"yes" ; then
-          AC_MSG_ERROR([Cython is not installed. Use 'easy_install cython'.])
-      else
-          CYTHON=`which cython`
-          AC_SUBST(CYTHON)
       fi
     fi
 
@@ -412,89 +414,6 @@ AC_MSG_RESULT([$ENABLE_pymoab])
 AC_SUBST([filter_sources])
 AC_SUBST([filter_program])
 AC_SUBST([python_patterns])
-################################################################################
-#                           iMesh Part 1 of 2
-################################################################################
-AC_ARG_ENABLE( [imesh],
-[AS_HELP_STRING([--enable-imesh],[Build support for iMesh interface.])],
-[ENABLE_imesh=$enableval],
-[ENABLE_imesh=no] )
-
-DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --enable-imesh=$ENABLE_imesh"
-
-if (test "xno" != "x$ENABLE_imesh"); then
-  AC_MSG_WARN([ITAPS is deprecated and will be removed in the next major release.])
-  AC_MSG_WARN([Consider using iMOAB for a more flexible and scalable interface.])
-fi
-
-################################################################################
-#                           FBiGeom Part 1 of 2
-################################################################################
-AC_ARG_ENABLE( [fbigeom],
-[AS_HELP_STRING([--enable-fbigeom],[Build mesh-based (facets) iGeom implementation])],
-[enable_fbigeom=$enableval],[enable_fbigeom=no] )
-
-if (test "xyes" != "x$enable_fbigeom" && test "xno" != "x$enable_fbigeom"); then
-  AC_MSG_ERROR([Unknown argument --enable-fbigeom=$enableval])
-else
-  ENABLE_fbigeom=$enable_fbigeom
-  DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --enable-fbigeom=$enable_fbigeom"
-fi
-
-################################################################################
-#                           iMesh/FBiGeom Part 2 of 2
-################################################################################
-
-# The iMesh option must be checked before configuring the compilers
-# so that we know if we need Fortran.  This stuff has to be done
-# after configuring the compilers so that we know what size of
-# various types are.
-
-AC_MSG_CHECKING([size of EntityHandle])
-AC_MSG_RESULT([$SIZEOF_MBENTITYHANDLE])
-ITAPS_VALID_HANDLE_SIZE=yes
-if test $SIZEOF_VOID_P -ne $SIZEOF_MBENTITYHANDLE; then
-  ITAPS_VALID_HANDLE_SIZE=no
-  AC_MSG_WARN([Cannot build iMesh or FBiGeom API because sizeof(EntityHandle) != sizeof(void*)])
-  ENABLE_imesh=no
-  ENABLE_fbigeom=no
-fi
-
-AC_MSG_CHECKING([if FBiGeom support is to be built])
-AC_MSG_RESULT([$ENABLE_fbigeom])
-AM_CONDITIONAL([ENABLE_fbigeom],[test "xyes" = "x$ENABLE_fbigeom"])
-if test "x$ENABLE_fbigeom" = "xyes"; then
-  if test "x$ITAPS_VALID_HANDLE_SIZE" != "xyes"; then
-    AC_MSG_ERROR([Cannot build FBiGeom API with sizeof(EntityHandle) != sizeof(void*)])
-  fi
-  AC_DEFINE([HAVE_FBIGEOM],[1],[Define if configured with FBiGeom interfaces.])
-fi
-HAVE_FBIGEOM=$ENABLE_fbigeom
-AC_SUBST(HAVE_FBIGEOM)
-
-AC_MSG_CHECKING([if iMesh support is to be built])
-AC_MSG_RESULT([$ENABLE_imesh])
-AM_CONDITIONAL([ENABLE_imesh],[test "xyes" = "x$ENABLE_imesh"])
-if test "x$ENABLE_imesh" = "xyes"; then
-  if test "x$ITAPS_VALID_HANDLE_SIZE" != "xyes"; then
-    AC_MSG_ERROR([Cannot build iMesh API with sizeof(EntityHandle) != sizeof(void*)])
-  fi
-  AC_DEFINE([HAVE_IMESH],[1],[Define if configured with iMesh interfaces.])
-fi
-
-################################################################################
-#                           iRel/Lasso Part 1 of 2
-################################################################################
-AC_ARG_ENABLE( [irel],
-[AS_HELP_STRING([--enable-irel],[Build relational geometry-mesh query interface implementation])],
-[enable_irel=$enableval],[enable_irel=no] )
-
-if (test "xyes" != "x$enable_irel" && test "xno" != "x$enable_irel"); then
-  AC_MSG_ERROR([Unknown argument --enable-irel=$enableval])
-else
-  ENABLE_irel=$enable_irel
-  DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --enable-irel=$enable_irel"
-fi
 
 ################################################################################
 #                              Version Stuff
@@ -523,15 +442,6 @@ AC_DEFINE_UNQUOTED(VERSION_STRING,"${VERSION_STRING}",[MOAB Version String])
 LIBTOOL_CURRENT=`expr $VERSION_MAJOR + $VERSION_PATCH`
 LIBTOOL_VERSION="$LIBTOOL_CURRENT:$VERSION_MINOR:$VERSION_PATCH"
 AC_SUBST(LIBTOOL_VERSION)
-
-################################################################################
-#                Create libtool script
-################################################################################
-# We need the libtool script both for the calls to the ITAPS_LIBTOOL_VAR
-# macro and for us in testing for libraries.  If we're using a newer
-# version of libtool, the script normally isn't generated until AC_OUTPUT
-# at the end of the configure script.  Ask that it be created now instead.
-m4_ifdef([LT_OUTPUT],[LT_OUTPUT])
 
 ################################################################################
 #                              Extract libtool config
@@ -1066,165 +976,6 @@ AC_SUBST(ZOLTAN_LIB_FLAGS)
 AC_SUBST(ZOLTAN_INC_FLAGS)
 EXPORT_LDFLAGS="$ZOLTAN_LIB_FLAGS $EXPORT_LDFLAGS"
 
-################################################################################
-#                           CGM
-################################################################################
-USING_DEV_CGM=no
-AC_ARG_WITH(cgm,
-[AS_HELP_STRING([--with-cgm=DIR],[Specify directory containing CGM])],
-[CGM_DIR=$withval
- DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --with-cgm=\"${withval}\""
- ], [CGM_DIR=])
-
-case "x$CGM_DIR" in
-  xno|x)
-    CGM_MISSING=yes
-    ;;
-  xyes)
-    AC_MSG_ERROR([--with-cgm requires an argument])
-    ;;
-  *)
-    if ! test -d "$CGM_DIR"; then
-      AC_MSG_ERROR([$CGM_DIR : not a directory.])
-    fi
-    CGM_MISSING=no
-    CGM_MAKE=
-    AC_CHECK_FILE([${CGM_DIR}/lib/cgm.make],
-                  [CGM_MAKE="${CGM_DIR}/lib/cgm.make"
-                   IGEOM_DEFS="${CGM_DIR}/lib/iGeom-Defs.inc"],
-                  [AC_CHECK_FILE([${CGM_DIR}/cgm.make],
-                                 [CGM_MAKE="${CGM_DIR}/cgm.make";
-                                  IGEOM_DEFS="${CGM_DIR}/itaps/iGeom-Defs.inc";
-                                  USING_DEV_CGM=yes],
-                                 [AC_MSG_ERROR([$CGM_DIR : not a configured CGM]);
-                                  CGM_MISSING=yes])
-                  ])
-    ;;
-esac
-
-AC_SUBST(CGM_MAKE)
-AC_SUBST(IGEOM_DEFS)
-AC_SUBST(USING_DEV_CGM)
-
-if test "x$CGM_MISSING" = "xno"; then
-  CGM_CONFIG_OPTIONS="include $CGM_MAKE"
-
-  FATHOM_MAKE_INC_VAR([$CGM_MAKE],[CGM_DEFINES], [CGM_CPPFLAGS="$make_val"])
-  FATHOM_MAKE_INC_VAR([$CGM_MAKE],[CGM_INCLUDES],[CGM_CPPFLAGS="$CGM_CPPFLAGS $make_val"])
-  FATHOM_MAKE_INC_VAR([$CGM_MAKE],[CGM_LTFLAGS], [CGM_LTFLAGS="$make_val"])
-  FATHOM_MAKE_INC_VAR([$CGM_MAKE],[CGM_LDFLAGS], [CGM_LDFLAGS="$make_val"])
-  FATHOM_MAKE_INC_VAR([$CGM_MAKE],[CGM_LIBS],    [CGM_LIBS="$make_val"])
-
-  AC_LANG_PUSH([C++])
-  old_CPPFLAGS="$CPPFLAGS"
-  CPPFLAGS="$CGM_CPPFLAGS $CPPFLAGS"
-  HAVE_OCC=no
-  HAVE_FACET=no
-  AC_MSG_CHECKING([for underlying geometry engine in CGM])
-  AC_COMPILE_IFELSE(
-  [AC_LANG_PROGRAM([@%:@include <CGMConfig.h>],
-  [ #ifndef CGM_HAVE_FACET_ENGINE_ONLY
-  // Perfect!
-  #else
-  # error Only Facet engine available
-  #endif
-  ])
-  ],
-  [HAVE_OCC=yes
-   AC_DEFINE(HAVE_CGM_OCC, [1], [MOAB uses CGM configured with OpenCascade])
-   AC_MSG_RESULT(OCC)],
-  [HAVE_FACET=yes
-   AC_DEFINE(HAVE_CGM_FACET, [1], [MOAB uses CGM configured with Facet Engine only])
-  AC_MSG_RESULT(Facets)] )
-  CPPFLAGS="$old_CPPFLAGS"
-  AC_LANG_POP([C++])
-
-  AC_MSG_CHECKING([for GeometryQueryTool::ray_fire(RefFace*,...)])
-  AC_LANG_PUSH([C++])
-  old_CPPFLAGS="$CPPFLAGS"
-  old_LDFLAGS="$LDFLAGS"
-  old_LIBS="$LIBS"
-  CPPFLAGS="$CGM_CPPFLAGS $CPPFLAGS"
-  LDFLAGS="$CGM_LDFLAGS $CPPFLAGS"
-  LIBS="$CGM_LIBS $LIBS"
-  HAVE_CGM_FIRE_RAY=no
-  AC_LINK_IFELSE(
-    [AC_LANG_PROGRAM([#include "GeometryQueryTool.hpp"
-                      #include "CubitVector.hpp"],
-                    [CubitVector a,b;
-                    DLIList<double> c;
-                    GeometryQueryTool::instance()->fire_ray((RefFace*)0, a, b, c );
-                    ])],
-    [HAVE_CGM_FIRE_RAY=yes;
-    AC_MSG_RESULT(yes)],
-    [AC_MSG_RESULT(no)])
-  CPPFLAGS="$old_CPPFLAGS"
-  LDFLAGS="$old_LDFLAGS"
-  LIBS="$old_LIBS"
-  AC_LANG_POP([C++])
-
-  EXPORT_LDFLAGS="$EXPORT_LDFLAGS $CGM_LDFLAGS"
-  EXPORT_LTFLAGS="$EXPORT_LTFLAGS $CGM_LTFLAGS"
-
-  AC_CHECK_FILE([$IGEOM_DEFS],
-              [IGEOM_CONFIG_OPTIONS="include $IGEOM_DEFS";
-               FATHOM_MAKE_INC_VAR([$IGEOM_DEFS],[IGEOM_DEFINES], [IGEOM_DEFINES="$make_val"],[IGEOM_DEFINES=])
-               FATHOM_MAKE_INC_VAR([$IGEOM_DEFS],[IGEOM_INCLUDES], [IGEOM_INCLUDES="$make_val"],[IGEOM_INCLUDES=])
-               FATHOM_MAKE_INC_VAR([$IGEOM_DEFS],[IGEOM_LDFLAGS], [IGEOM_LDFLAGS="$make_val"],[IGEOM_LDFLAGS=])
-               FATHOM_MAKE_INC_VAR([$IGEOM_DEFS],[IGEOM_LIBS], [IGEOM_LIBS="$make_val"],[IGEOM_LIBS=]) ],
-               [AC_MSG_WARN([$CGM_DIR : not a configured iGeom])]
-              )
-
-fi
-
-AC_SUBST(CGM_CPPFLAGS)
-AC_SUBST(CGM_LDFLAGS)
-AC_SUBST(CGM_LTFLAGS)
-AC_SUBST(CGM_LIBS)
-AC_SUBST(CGM_DIR)
-AC_SUBST(IGEOM_DEFINES)
-AC_SUBST(IGEOM_INCLUDES)
-AC_SUBST(IGEOM_CONFIG_OPTIONS)
-AC_SUBST(IGEOM_LDFLAGS)
-AC_SUBST(IGEOM_LIBS)
-
-AM_CONDITIONAL( HAVE_CGM, [test "x$CGM_MISSING" = "xno"] )
-AM_CONDITIONAL( HAVE_OCC, [test "x$HAVE_OCC" = "xyes"] )
-
-if (test "x$CGM_MISSING" = "xno"); then
-  AC_DEFINE([HAVE_CGM],[1],["Define if configured with CGM support."])
-  if (test "x$HAVE_CGM_FIRE_RAY" != "xno"); then
-    AC_DEFINE([HAVE_CGM_FIRE_RAY],[1],["Define if configured with CGM and Ray fire support."])
-  fi
-fi
-
-
-################################################################################
-#                           iRel/Lasso Part 2 of 2
-################################################################################
-
-AC_MSG_CHECKING([if iRel support is to be built])
-AC_MSG_RESULT([$ENABLE_irel])
-AM_CONDITIONAL([ENABLE_irel],[test "xyes" = "x$ENABLE_irel"])
-
-if test "x$ENABLE_irel" = "xyes"; then
-  if (test "x$ENABLE_imesh" != "xyes" || test "x$CGM_MISSING" != "xno"); then
-    AC_MSG_ERROR([Cannot build iRel API. Enable both iGeom (CGM) and iMesh implementations.])
-  fi
-  AC_DEFINE([HAVE_IREL],[1],[Define if configured with iRel interfaces.])
-fi
-
-HAVE_IGEOM="no"
-HAVE_IMESH="no"
-HAVE_IREL="no"
-test "x$CGM_MISSING" != "xno" || HAVE_IGEOM="yes"
-test "x$ENABLE_imesh" != "xyes" || HAVE_IMESH="yes"
-test "x$ENABLE_irel" != "xyes" || HAVE_IREL="yes"
-AC_SUBST(HAVE_IGEOM)
-AC_SUBST(HAVE_IMESH)
-AC_SUBST(HAVE_IREL)
-AM_CONDITIONAL([USING_DEV_CGM],[test "xyes" = "x$USING_DEV_CGM"])
-
 ###############################################################################
 #                           Optional Tools
 ###############################################################################
@@ -1282,16 +1033,9 @@ MB_OPTIONAL_TOOL([mbdepth],      [yes], [yes])
 if test "x$enablempi" != "xno"; then
   MB_OPTIONAL_TOOL([mbcoupler],  [no], [yes] )
   MB_OPTIONAL_TOOL([mcnpmit],    [no], [yes])
-  MB_OPTIONAL_TOOL([mbcslam],    [no], [yes])
 else
-  AS_ECHO(["Disabling mbcoupler, mbcslam and mcnpmit since these tools require MPI/parallel configuration"])
+  AS_ECHO(["Disabling mbcoupler, and mcnpmit since these tools require MPI/parallel configuration"])
   MB_OPTIONAL_TOOL([mbcoupler],  [no], [no] )
-  MB_OPTIONAL_TOOL([mcnpmit],    [no], [no])
-  MB_OPTIONAL_TOOL([mbcslam],    [no], [no])
-fi
-
-if test "x$ENABLE_imesh" != "xyes"; then
-  MB_OPTIONAL_TOOL([mbcslam],    [no], [no])
   MB_OPTIONAL_TOOL([mcnpmit],    [no], [no])
 fi
 
@@ -1409,17 +1153,8 @@ AC_CONFIG_FILES([Makefile
                  test/parallel/Makefile
                  pymoab/Makefile
                  pymoab/setup.py
-                 itaps/iBase_f.h
-                 itaps/Makefile
-                 itaps/imesh/Makefile
-                 itaps/imesh/iMesh-Defs.inc
-                 itaps/fbigeom/Makefile
-                 itaps/fbigeom/FBiGeom-Defs.inc
-                 itaps/irel/Makefile
-                 itaps/irel/iRel-Defs.inc
                  tools/Makefile
                  tools/mbcoupler/Makefile
-                 tools/mbcslam/Makefile
                  tools/mcnpmit/Makefile
                  tools/geometry/Makefile
                  doc/user.dox
@@ -1428,10 +1163,8 @@ AC_CONFIG_FILES([Makefile
                  MeshFiles/Makefile
                  MeshFiles/unittest/Makefile
                  MeshFiles/unittest/io/Makefile
-                 MeshFiles/unittest/fbigeom/Makefile
-                 MeshFiles/unittest/irel/Makefile
-                 MeshFiles/unittest/mbcslam/Makefile
                  MeshFiles/unittest/h5file/Makefile
+                 MeshFiles/unittest/mbcslam/Makefile
                  MeshFiles/examples/Makefile
                  ])
 

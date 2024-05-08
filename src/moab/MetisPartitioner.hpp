@@ -50,8 +50,6 @@ class MetisPartitioner : public PartitionerBase< idx_t >
                                                    const bool write_as_tags     = false,
                                                    const int obj_weight         = 0,
                                                    const int edge_weight        = 0,
-                                                   const bool part_surf         = false,
-                                                   const bool ghost             = false,
                                                    const int projection_type    = 0,
                                                    const bool recompute_rcb_box = false,
                                                    const bool print_time        = false );
@@ -120,8 +118,6 @@ inline ErrorCode MetisPartitioner::partition_mesh_and_geometry( const double,
                                                                 const bool write_as_tags,
                                                                 const int,
                                                                 const int,
-                                                                const bool,
-                                                                const bool,
                                                                 const int,
                                                                 const bool,
                                                                 const bool print_time )

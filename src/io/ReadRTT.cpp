@@ -66,22 +66,13 @@ ReadRTT::ReadRTT( Interface* impl )
     double zero = 0.;
     ErrorCode rval;
     rval = MBI->tag_get_handle( GEOM_DIMENSION_TAG_NAME, 1, MB_TYPE_INTEGER, geom_tag, MB_TAG_SPARSE | MB_TAG_CREAT,
-                                &negone );
-    assert( !rval );
+                                &negone );MB_CHK_ERR_CONT(rval);
     id_tag = MBI->globalId_tag();
-    rval = MBI->tag_get_handle( NAME_TAG_NAME, NAME_TAG_SIZE, MB_TYPE_OPAQUE, name_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
-    assert( !rval );
+    rval = MBI->tag_get_handle( NAME_TAG_NAME, NAME_TAG_SIZE, MB_TYPE_OPAQUE, name_tag, MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_ERR_CONT(rval);
     rval = MBI->tag_get_handle( CATEGORY_TAG_NAME, CATEGORY_TAG_SIZE, MB_TYPE_OPAQUE, category_tag,
-                                MB_TAG_SPARSE | MB_TAG_CREAT );
-    assert( !rval );
+                                MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_ERR_CONT(rval);
     rval =
-        MBI->tag_get_handle( "FACETING_TOL", 1, MB_TYPE_DOUBLE, faceting_tol_tag, MB_TAG_SPARSE | MB_TAG_CREAT, &zero );
-    assert( !rval );
-#ifdef NDEBUG
-    if( !rval )
-    {
-    };  // Line to avoid compiler warning about variable set but not used
-#endif
+        MBI->tag_get_handle( "FACETING_TOL", 1, MB_TYPE_DOUBLE, faceting_tol_tag, MB_TAG_SPARSE | MB_TAG_CREAT, &zero );MB_CHK_ERR_CONT(rval);
 }
 
 // destructor

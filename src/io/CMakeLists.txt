@@ -108,15 +108,10 @@ if( MOAD_HAVE_DAMSEL )
           DamselUtil.hpp  DamselUtil.cpp )
 endif()
 
-if( MOAB_HAVE_CGM )
-  set( MOAB_CGM_SRCS ReadCGM.hpp ReadCGM.cpp )
-  include_directories(${CGM_INCLUDES})
-endif()
-
 add_library( moabio OBJECT ${MOABIO_LIB_SRCS} ${MOAB_NETCDF_SRCS}
                            ${MOAB_CGNS_SRCS}  ${MOAB_HDF5_SRCS}
                            ${MOAB_CCMIO_SRCS} ${MOAB_DAMSEL_SRCS}
-                           ${MOAB_CGM_SRCS}   ${MOABIO_INSTALL_HEADERS} )
+                           ${MOABIO_INSTALL_HEADERS} )
 set_target_properties( moabio PROPERTIES COMPILE_FLAGS "${MOABIO_DEFINES} ${MOAB_DEFINES}")
 include(AutoconfHeader)
 moab_install_headers(${MOABIO_INSTALL_HEADERS})

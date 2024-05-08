@@ -1799,9 +1799,6 @@ ErrorCode ReadNCDF::read_qa_string( char* temp_string, int record_number, int re
     return MB_SUCCESS;
 }
 
-// The cub_file_set contains the mesh to be updated. There could exist other
-// file sets that should be kept separate, such as the geometry file set from
-// ReadCGM.
 ErrorCode ReadNCDF::update( const char* exodus_file_name,
                             const FileOptions& opts,
                             const int num_blocks,

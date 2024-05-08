@@ -459,13 +459,13 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
 
     // Check if the source and target data are of the same size
     // const size_t nSourceCount                    = dataInDouble.size();
-    const size_t nTargetCount                    = dataOutDouble.size();
+    const size_t nTargetCount = dataOutDouble.size();
     // const DataArray1D< double >& m_dSourceAreas  = this->m_remapper->m_covering_source->vecFaceArea;
     const DataArray1D< double >& m_dTargetAreas  = this->m_remapper->m_target->vecFaceArea;
     const DataArray1D< double >& m_dOverlapAreas = this->m_remapper->m_overlap->vecFaceArea;
 
     // Apply the offline map to the data
-    double dMassDiff  = 0.0;
+    double dMassDiff = 0.0;
     DataArray1D< double > x( nTargetCount );
     DataArray1D< double > dataLowerBound( nTargetCount );
     DataArray1D< double > dataUpperBound( nTargetCount );
@@ -484,7 +484,7 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
 
         assert( m_dOverlapAreas[i] > 0.0 );
         assert( dataInDouble[ixS] > 0.0 );
-        if( dataOutDouble[ixT] < 0.0 ) printf( "%d: ixT: %d, dataOutDouble: %d\n", rank, ixT, dataOutDouble[ixT] );
+        if( dataOutDouble[ixT] < 0.0 ) printf( "%d: ixT: %d, dataOutDouble: %f\n", rank, ixT, dataOutDouble[ixT] );
 
         vecSourceOvTarget[ixT].push_back( ixS );  // map target face to source face
 
@@ -499,7 +499,7 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
         // Update the mass difference between source and target faces
         // linked to the overlap mesh element
         dMassDiff += ( dataInDouble[ixS] * m_dOverlapAreas[i] ) -  // source mass
-                        ( dataOutDouble[ixT] * m_dOverlapAreas[i] );  // target mass
+                     ( dataOutDouble[ixT] * m_dOverlapAreas[i] );  // target mass
     }
     // massDefect.first = fabs( dMassDiff / ( dSourceMax - dSourceMin ) );
     massDefect.first = fabs( dMassDiff );
@@ -509,13 +509,13 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
 
     if( caasType == CAAS_LOCAL )
     {
-        double dMinI;
-        double dMaxI;
         std::vector< double > vecLocalUpperBound( nTargetCount );
         std::vector< double > vecLocalLowerBound( nTargetCount );
 
         //FV to FV
         {
+            double dMinI;
+            double dMaxI;
             for( size_t i = 0; i < nTargetCount; i++ )
             {
                 if( vecSourceOvTarget[i].size() == 0 )
@@ -543,7 +543,7 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
                     AdjacentFaceVector vecAdjFaces;
 
                     GetAdjacentFaceVectorByEdge( *m_meshInputCov, vecSourceOvTarget[i][0],
-                                                    ( m_input_order + 1 ) * ( m_input_order + 1 ), vecAdjFaces );
+                                                 ( m_input_order + 1 ) * ( m_input_order + 1 ), vecAdjFaces );
 
                     //Compute max over neighboring faces
                     for( size_t j = 0; j < vecAdjFaces.size(); j++ )
@@ -692,11 +692,11 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
     if( caasType != CAAS_NONE )
     {
         double mismatch   = 1.0;
-        int caasIteration = 1;
-        while( mismatch > 1e-15 && caasIteration < 5 )  // iterate until convergence or a maximum of 5 iterations
+        int caasIteration = 0;
+        while( mismatch > 1e-15 && caasIteration++ < 5 )  // iterate until convergence or a maximum of 5 iterations
         {
-            std::pair<double,double> mDefect = this->ApplyCAASLimiting( srcVals, tgtVals, caasType );
-            // if( m_remapper->verbose && is_root )
+            std::pair< double, double > mDefect = this->ApplyCAASLimiting( srcVals, tgtVals, caasType );
+            if( m_remapper->verbose && is_root )
                 printf( "Rank %d: -- Iteration: %d, Net original mass defect: %3.4e, mass defect post-CAAS: %3.4e\n",
                         m_remapper->rank, caasIteration, mDefect.first, mDefect.second );
             mismatch = mDefect.second;

@@ -245,8 +245,7 @@ struct ToolContext
                                     "(error metrics for user defined variables may not be available)",
                                     &variableToVerify );
 
-        opts.addOpt< int >( "caas", "apply CAAS nonlinear filter after linear map application",
-                             &useCAAS );
+        opts.addOpt< int >( "caas", "apply CAAS nonlinear filter after linear map application", &useCAAS );
 
         opts.addOpt< std::string >( "baseline", "Output baseline file", &baselineFile );
 
@@ -505,8 +504,8 @@ int main( int argc, char* argv[] )
     remapper.constructEdgeMap = true;
     remapper.initialize();
 
-    // Default area_method = lHuiller; Options: Girard, GaussQuadrature (if TR is available)
-    moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::GaussQuadrature );
+    // Default area_method = lHuiller; Options: Girard, lHuiller, GaussQuadrature (if TR is available)
+    moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::lHuiller );
 
     Mesh* tempest_mesh = new Mesh();
     runCtx->timer_push( "create Tempest mesh" );
@@ -601,13 +600,13 @@ int main( int argc, char* argv[] )
             outputFormatter.printf( 0, "The intersection set contains %lu elements and %lu vertices \n",
                                     intxelems.size(), intxverts.size() );
 
-            moab::IntxAreaUtils areaAdaptorHuiller( moab::IntxAreaUtils::GaussQuadrature ); // lHuiller
+            moab::IntxAreaUtils areaAdaptorHuiller( moab::IntxAreaUtils::lHuiller );  // lHuiller
             double initial_sarea =
                 areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[0],
-                                            radius_src );  // use the target to compute the initial area
+                                                   radius_src );  // use the target to compute the initial area
             double initial_tarea =
                 areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[1],
-                                            radius_dest );  // use the target to compute the initial area
+                                                   radius_dest );  // use the target to compute the initial area
             double intx_area = areaAdaptorHuiller.area_on_sphere( mbCore, intxset, radius_src );
 
             outputFormatter.printf( 0, "mesh areas: source = %12.10f, target = %12.10f, intersection = %12.10f \n",
@@ -696,7 +695,7 @@ int main( int argc, char* argv[] )
         double dTotalOverlapArea = 0.0;
         if( runCtx->print_diagnostics )
         {
-            moab::IntxAreaUtils areaAdaptorHuiller( moab::IntxAreaUtils::GaussQuadrature ); // lHuiller
+            moab::IntxAreaUtils areaAdaptorHuiller( moab::IntxAreaUtils::lHuiller );  // lHuiller
             double local_areas[3],
                 global_areas[3];  // Array for Initial area, and through Method 1 and Method 2
             // local_areas[0] = area_on_sphere_lHuiller ( mbCore, runCtx->meshsets[1], radius_src );
@@ -834,7 +833,7 @@ int main( int argc, char* argv[] )
                 moab::Tag srcAnalyticalFunction;
                 moab::Tag tgtAnalyticalFunction;
                 moab::Tag tgtProjectedFunction;
-                if (testFunction)
+                if( testFunction )
                 {
                     runCtx->timer_push( "describe a solution on source grid" );
                     rval = weightMap->DefineAnalyticalSolution( srcAnalyticalFunction, "AnalyticalSolnSrcExact",
@@ -852,7 +851,7 @@ int main( int argc, char* argv[] )
                 }
                 else
                 {
-                    rval = mbCore->tag_get_handle(runCtx->variableToVerify.c_str(), srcAnalyticalFunction);MB_CHK_ERR( rval );
+                    rval = mbCore->tag_get_handle( runCtx->variableToVerify.c_str(), srcAnalyticalFunction );MB_CHK_ERR( rval );
 
                     rval = mbCore->tag_get_handle( "ProjectedSolnTgt", 1, moab::MB_TYPE_DOUBLE, tgtProjectedFunction,
                                                    moab::MB_TAG_DENSE | moab::MB_TAG_CREAT );MB_CHK_ERR( rval );
@@ -897,7 +896,7 @@ int main( int argc, char* argv[] )
                     runCtx->timer_push( "compute error metrics against analytical solution on target grid" );
                     std::map< std::string, double > errMetrics;
                     rval = weightMap->ComputeMetrics( moab::Remapper::TargetMesh, tgtAnalyticalFunction,
-                                                    tgtProjectedFunction, errMetrics, true );MB_CHK_ERR( rval );
+                                                      tgtProjectedFunction, errMetrics, true );MB_CHK_ERR( rval );
                     runCtx->timer_pop();
                 }
             }

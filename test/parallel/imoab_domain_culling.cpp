@@ -82,7 +82,7 @@ int main( int argc, char* argv[] )
     int cplocn = 18;
 
     int cplOcnAtmAppID       = -1;               // -1 means it is not initialized
-    iMOAB_AppID cplOcnAtmPID = &cplOcnAtmAppID;  // intx ocn - atm on coupler PEs
+    // iMOAB_AppID cplOcnAtmPID = &cplOcnAtmAppID;  // intx ocn - atm on coupler PEs
 
     ierr = iMOAB_RegisterApplication( "OCNX", &dup_comm_world, &cplocn,
                                       cplOcnPID );  // ocn on coupler pes
@@ -131,7 +131,7 @@ int main( int argc, char* argv[] )
     const std::string dof_tag_names[3]       = { "GLOBAL_DOFS", "GLOBAL_ID", "GLOBAL_ID" };
 
     int fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 0, fNoConserve = 0, fNoBubble = 1, fInverseDistanceMap = 0;
-
+    int filter_type = 0;
     int disc_orders[3] = { 4, 1, 1 };
     ierr = iMOAB_ComputeScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0].c_str(), disc_methods[1].c_str(),
                                                  &disc_orders[1], disc_methods[1].c_str(), &disc_orders[1], nullptr,
@@ -159,7 +159,7 @@ int main( int argc, char* argv[] )
     ierr = iMOAB_FreeSenderBuffers( cplAtmPID, &atmocnid );  // context is intx external id
     CHECKIERR( ierr, "cannot free buffers used to resend atm tag towards the coverage mesh" )
 
-    ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0].c_str(), tagname.c_str(),
+    ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0].c_str(), tagname.c_str(),
             tagname.c_str() );
     CHECKIERR( ierr, "failed to compute projection weight application" );
 

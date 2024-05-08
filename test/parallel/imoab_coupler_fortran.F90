@@ -56,6 +56,7 @@ program imoab_coupler_fortran
    integer :: cplAtmOcnPID ! intx pid
    integer :: nghlay, partScheme, context_id
    integer :: fNoBubble, fMonotoneTypeID, fVolumetric, fNoConserve, fValidate, fInverseDistanceMap
+   integer :: filter_type
 
    integer, dimension(2) ::  tagIndex
    integer, dimension (2) :: tagTypes!  { DENSE_DOUBLE, DENSE_DOUBLE }
@@ -69,7 +70,7 @@ program imoab_coupler_fortran
    character(:), allocatable :: concat_fieldname, concat_fieldnameT, outputFileOcn
    integer :: tagIndexIn2 ! not really needed
    integer :: dummyCpl, dummyRC, dummyType
-   real*8  :: boxeps
+   double precision  :: boxeps
    integer :: gnomonic
 
    cmpatm = 5
@@ -219,6 +220,7 @@ program imoab_coupler_fortran
    fNoConserve = 0
    fValidate = 0
    fInverseDistanceMap = 0
+   filter_type = 0
 
    if (cplComm .NE. MPI_COMM_NULL) then
 
@@ -329,7 +331,8 @@ program imoab_coupler_fortran
 
       ! We have the remapping weights now. Let us apply the weights onto the tag we defined
       ! on the source mesh and get the projection on the target mesh
-      ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, weights_identifier1, concat_fieldname, &
+      ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, weights_identifier1, &
+                                                concat_fieldname, &
                                                 concat_fieldnameT)
       call errorout(ierr, 'failed to compute projection weight application')
 

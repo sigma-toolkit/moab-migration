@@ -587,7 +587,7 @@ inline ErrorCode ElemEvaluator::reverse_eval( const double* posn,
 }
 
 /** \brief Evaluate the normal of the cached entity at a given facet */
-inline ErrorCode ElemEvaluator::get_normal( const int ientDim, const int facet, double normal[] ) const
+inline ErrorCode ElemEvaluator::get_normal( const int ientDim, const int facet, double normal[3] ) const
 {
     assert( entHandle && MBMAXTYPE != entType );
     return ( *evalSets[entType].normalFcn )( ientDim, facet, numVerts, vertPos[0].array(), normal );

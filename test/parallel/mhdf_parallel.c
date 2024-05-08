@@ -49,7 +49,7 @@ typedef int handle_id_t;
 #define id_type H5T_NATIVE_INT
 
 /* create file layout in serial */
-void create_file()
+void create_file(void)
 {
     const char* elem_types[1] = { elem_handle };
     const int num_elem_types  = sizeof( elem_types ) / sizeof( elem_types[0] );
@@ -114,7 +114,7 @@ void create_file()
     CHECK( status );
 }
 
-void write_file_data()
+void write_file_data(void)
 {
     const int total_num_nodes = 4 + 4 * NUM_PROC;
     const int total_num_hexes = NUM_PROC;

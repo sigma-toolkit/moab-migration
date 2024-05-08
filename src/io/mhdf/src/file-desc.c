@@ -25,7 +25,7 @@ static struct mhdf_FileDesc* alloc_file_desc( mhdf_Status* status )
     return result;
 }
 
-static void* realloc_data( struct mhdf_FileDesc** data, size_t append_bytes, mhdf_Status* status, int alignment)
+static void* realloc_data( struct mhdf_FileDesc** data, size_t append_bytes, mhdf_Status* status, int alignment )
 {
     void* result_ptr;
     struct mhdf_FileDesc* const input_ptr = *data;
@@ -33,7 +33,7 @@ static void* realloc_data( struct mhdf_FileDesc** data, size_t append_bytes, mhd
 
     size_t new_size, occupied_size = input_ptr->offset - mem_ptr;
 
-    int append_bytes_padded = append_bytes + alignment - 1;
+    size_t append_bytes_padded = append_bytes + alignment - 1;
     /* if the end of the allocated space is before the end of the required space */
     if( mem_ptr + input_ptr->total_size < input_ptr->offset + append_bytes_padded )
     {
@@ -58,11 +58,11 @@ static void* realloc_data( struct mhdf_FileDesc** data, size_t append_bytes, mhd
 
     result_ptr = ( *data )->offset;
     /* need to make this return pointer aligned */
-    uintptr_t  addr  = (uintptr_t)(( *data )->offset);
-    int pad = addr%alignment;
-    if (pad > 0)
+    uintptr_t addr = (uintptr_t)( ( *data )->offset );
+    int pad        = addr % alignment;
+    if( pad > 0 )
     {
-        ( *data )->offset += (alignment-pad);
+        ( *data )->offset += ( alignment - pad );
         result_ptr = ( *data )->offset;
     }
     /*printf("new address %p \n", result_ptr);*/
@@ -128,7 +128,7 @@ static struct mhdf_FileDesc* get_elem_desc( mhdf_FileHandle file_handle,
     void* ptr;
     long junk;
 
-    ptr = realloc_data( &result, strlen( elem_handle ) + 1, status, sizeof(char) );
+    ptr = realloc_data( &result, strlen( elem_handle ) + 1, status, sizeof( char ) );
     if( !ptr ) return NULL;
     strcpy( ptr, elem_handle );
     result->elems[idx].handle = ptr;
@@ -140,7 +140,7 @@ static struct mhdf_FileDesc* get_elem_desc( mhdf_FileHandle file_handle,
         return NULL;
     }
 
-    ptr = realloc_data( &result, strlen( buffer ) + 1, status, sizeof(char) );
+    ptr = realloc_data( &result, strlen( buffer ) + 1, status, sizeof( char ) );
     if( !ptr ) return NULL;
     strcpy( ptr, buffer );
     result->elems[idx].type = ptr;
@@ -212,7 +212,7 @@ static struct mhdf_FileDesc* get_tag_desc( mhdf_FileHandle file_handle,
     int valsize, size, close_type = 0;
     hsize_t array_len;
 
-    ptr = realloc_data( &result, strlen( name ) + 1, status, sizeof(char) );
+    ptr = realloc_data( &result, strlen( name ) + 1, status, sizeof( char ) );
     if( NULL == ptr ) return NULL;
     strcpy( ptr, name );
     result->tags[idx].name = ptr;
@@ -334,7 +334,7 @@ static struct mhdf_FileDesc* get_tag_desc( mhdf_FileHandle file_handle,
     {
         if( have_default )
         {
-            ptr = realloc_data( &result, have_default, status, sizeof(int) );
+            ptr = realloc_data( &result, have_default, status, sizeof( int ) );
             if( NULL == ptr )
             {
                 if( close_type )
@@ -347,7 +347,7 @@ static struct mhdf_FileDesc* get_tag_desc( mhdf_FileHandle file_handle,
         }
         if( have_global )
         {
-            ptr = realloc_data( &result, have_global, status, sizeof(int) );
+            ptr = realloc_data( &result, have_global, status, sizeof( int ) );
             if( NULL == ptr )
             {
                 if( close_type )

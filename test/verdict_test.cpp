@@ -292,9 +292,7 @@ void verdict_unit_tests()
     // loop through each test
     for( i = 0; testcases[i].testname != 0; i++ )
     {
-        cout << endl
-             << "[" << i << "]: "
-             << "Test case: " << testcases[i].testname << endl;
+        cout << endl << "[" << i << "]: " << "Test case: " << testcases[i].testname << endl;
 
         for( j = 0; testcases[i].function[j] != MB_UNDEFINED_QUALITY; j++ )
         {
@@ -314,7 +312,7 @@ void verdict_unit_tests()
                 MB_SET_ERR_RET( "Failed to compute the quality for an element" );
             }
 
-            sprintf( exponent, "%e", testcases[i].answer[j] );
+            snprintf( exponent, MAX_STR_LEN, "%e", testcases[i].answer[j] );
             base_ptr = strstr( exponent, "e" );
 
             base_ptr = &base_ptr[1];
@@ -327,8 +325,8 @@ void verdict_unit_tests()
             {
                 cout << "\t #" << j + 1 << " FAILED :: " << QualityType_ToString( testcases[i].function[j] ) << endl;
 
-                cout << "\t\t calculated ( " << answer_from_lib << " ) and "
-                     << "expected ( " << testcases[i].answer[j] << ") " << endl;
+                cout << "\t\t calculated ( " << answer_from_lib << " ) and " << "expected ( " << testcases[i].answer[j]
+                     << ") " << endl;
                 passed = false;
             }
             else

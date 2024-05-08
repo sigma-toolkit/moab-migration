@@ -2143,10 +2143,13 @@ ErrorCode AdaptiveKDTree::print()
     }
     std::sort(elem2d_vec.begin(), elem2d_vec.end());
     std::copy( elem2d_vec.rbegin(), elem2d_vec.rend(), range_inserter( elem2d ) );
+    elem2d_vec = std::vector<EntityHandle>(); // frees the memory used by the std::vector
     std::sort(elem3d_vec.begin(), elem3d_vec.end());
     std::copy( elem3d_vec.rbegin(), elem3d_vec.rend(), range_inserter( elem3d ) );
+    elem3d_vec = std::vector<EntityHandle>();
     std::sort(verts_vec.begin(), verts_vec.end());
     std::copy( verts_vec.rbegin(), verts_vec.rend(), range_inserter( verts ) );
+    verts_vec = std::vector<EntityHandle>();
 
     all.merge( verts );
     all.merge( elem2d );

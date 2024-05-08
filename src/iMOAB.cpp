@@ -4452,29 +4452,27 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         if( data_src.point_cloud )
         {
             moab::Range& covSrcEnts = remapper->GetMeshVertices( moab::Remapper::CoveringMesh );
-            solSTagVals.resize( covSrcEnts.size(), -1.0 );
+            solSTagVals.resize( covSrcEnts.size(), 0. );
             sents = covSrcEnts;
         }
         else
         {
             moab::Range& covSrcEnts = remapper->GetMeshEntities( moab::Remapper::CoveringMesh );
             solSTagVals.resize( covSrcEnts.size() * weightMap->GetSourceNDofsPerElement() *
-                                    weightMap->GetSourceNDofsPerElement(),
-                                -1.0 );
+                                    weightMap->GetSourceNDofsPerElement(), 0. );
             sents = covSrcEnts;
         }
         if( data_tgt.point_cloud )
         {
             moab::Range& tgtEnts = remapper->GetMeshVertices( moab::Remapper::TargetMesh );
-            solTTagVals.resize( tgtEnts.size(), -1.0 );
+            solTTagVals.resize( tgtEnts.size(), 0. );
             tents = tgtEnts;
         }
         else
         {
             moab::Range& tgtEnts = remapper->GetMeshEntities( moab::Remapper::TargetMesh );
             solTTagVals.resize( tgtEnts.size() * weightMap->GetDestinationNDofsPerElement() *
-                                    weightMap->GetDestinationNDofsPerElement(),
-                                -1.0 );
+                                    weightMap->GetDestinationNDofsPerElement(), 0. );
             tents = tgtEnts;
         }
     }
@@ -4485,8 +4483,7 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         solSTagVals.resize(
             covSrcEnts.size() * weightMap->GetSourceNDofsPerElement() * weightMap->GetSourceNDofsPerElement(), -1.0 );
         solTTagVals.resize( tgtEnts.size() * weightMap->GetDestinationNDofsPerElement() *
-                                weightMap->GetDestinationNDofsPerElement(),
-                            -1.0 );
+                                weightMap->GetDestinationNDofsPerElement(), 0. );
 
         sents = covSrcEnts;
         tents = tgtEnts;

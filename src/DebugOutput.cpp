@@ -229,17 +229,17 @@ void DebugOutput::tprint_real( const char* fmt, va_list args1, va_list args2 )
     print_real( fmt, args1, args2 );
 }
 
-static void print_range( char* buffer, unsigned long begin, unsigned long end )
+static void print_range( char* buffer, int len, unsigned long begin, unsigned long end )
 {
     assert( end > begin );
     // begin with a space
     *buffer  = ' ';
     char* b1 = buffer + 1;
     // print begin-end, but keep track of where each peice is written
-    char* e1 = b1 + sprintf( b1, "%lu", begin );
+    char* e1 = b1 + snprintf( b1, len, "%lu", begin );
     *e1      = '-';
     char* b2 = e1 + 1;
-    char* e2 = b2 + sprintf( b2, "%lu", end );
+    char* e2 = b2 + snprintf( b2, len, "%lu", end );
     // if the printed strings for both numbers don't contain the same
     // number of digits, don't do anything more
     if( e1 - b1 == e2 - b2 )
@@ -298,7 +298,7 @@ void DebugOutput::list_range_real( const char* pfx, const Range& range )
         if( i->first == i->second )
             snprintf( numbuf, 48, " %lu,", (unsigned long)( ID_FROM_HANDLE( i->first ) ) );
         else
-            print_range( numbuf, ID_FROM_HANDLE( i->first ), ID_FROM_HANDLE( i->second ) );
+            print_range( numbuf, 48, ID_FROM_HANDLE( i->first ), ID_FROM_HANDLE( i->second ) );
         lineBuffer.insert( lineBuffer.end(), numbuf, numbuf + strlen( numbuf ) );
     }
 
@@ -327,7 +327,7 @@ void DebugOutput::list_ints_real( const char* pfx, const Range& range )
         if( i->first == i->second )
             snprintf( numbuf, 48, " %lu,", (unsigned long)( i->first ) );
         else
-            print_range( numbuf, (unsigned long)( i->first ), (unsigned long)( i->second ) );
+            print_range( numbuf, 48, (unsigned long)( i->first ), (unsigned long)( i->second ) );
         lineBuffer.insert( lineBuffer.end(), numbuf, numbuf + strlen( numbuf ) );
     }
 

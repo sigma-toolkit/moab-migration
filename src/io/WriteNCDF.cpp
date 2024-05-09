@@ -1720,14 +1720,14 @@ ErrorCode WriteNCDF::initialize_exodus_file( ExodusMeshInfo& mesh_info,
     }
 
     // count how many are polyhedron blocks
-    int num_fa_blocks = 0, num_polyh_blocks = 0;
+    int num_fa_blocks = 0; //, num_polyh_blocks = 0;
     for( unsigned int i = 0; i < block_data.size(); i++ )
     {
         MaterialSetData& block = block_data[i];
         if( EXOII_POLYHEDRON == block.element_type )
         {
             num_fa_blocks++;
-            num_polyh_blocks++;
+            // num_polyh_blocks++;
         }
     }
     if( 0 == this->repeat_face_blocks && num_fa_blocks > 1 ) num_fa_blocks = 1;

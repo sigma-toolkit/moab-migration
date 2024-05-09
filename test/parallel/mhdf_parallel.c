@@ -121,7 +121,7 @@ void write_file_data()
     long first_node, first_elem, first_set, count, ntag;
     unsigned long ucount;
     mhdf_index_t set_desc[4] = { 0, -1, -1, 0 };
-    hid_t handle, handles[2];
+    hid_t handle, handles[3];
     mhdf_Status status;
     mhdf_FileHandle file;
     int num_node, offset, dim;

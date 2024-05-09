@@ -80,10 +80,6 @@ int main( int argc, char* argv[] )
     CHECKIERR( ierr, "Cannot load moab mesh on coupler pes" )
 
     int cplocn = 18;
-
-    int cplOcnAtmAppID       = -1;               // -1 means it is not initialized
-    // iMOAB_AppID cplOcnAtmPID = &cplOcnAtmAppID;  // intx ocn - atm on coupler PEs
-
     ierr = iMOAB_RegisterApplication( "OCNX", &dup_comm_world, &cplocn,
                                       cplOcnPID );  // ocn on coupler pes
     CHECKIERR( ierr, "Cannot register OCN over coupler PEs" )

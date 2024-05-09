@@ -17,7 +17,7 @@
 namespace moab
 {
 
-bool NCHelperDomain::can_read_file( ReadNC* readNC, int fileId )
+bool NCHelperDomain::can_read_file( ReadNC* readNC, int /*fileId*/ )
 {
     std::vector< std::string >& dimNames = readNC->dimNames;
 
@@ -354,14 +354,12 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     // will now look to repartition the cells, using zoltan, looking at the xc and yc coordinates in 2d, convert to 3d,
     // and decide based on those partitioning info to what task to send each cell, along with its vertices, and global id
 #ifdef MOAB_HAVE_MPI
-    int rank              = 0;
     int procs             = 1;
     bool& isParallel      = _readNC->isParallel;
     ParallelComm* myPcomm = NULL;
     if( isParallel )
     {
         myPcomm = _readNC->myPcomm;
-        rank    = myPcomm->proc_config().proc_rank();
         procs   = myPcomm->proc_config().proc_size();
     }
 
@@ -582,7 +580,7 @@ ErrorCode NCHelperDomain::redistribute_cells( ParallelComm* myPcomm,
 
 #ifdef MOAB_HAVE_ZOLTAN
     // use zoltan and
-    int num_local_cells = (int)gids.size();
+    size_t num_local_cells = gids.size();
     std::vector< double > xi( num_local_cells ), yi( num_local_cells ), zi( num_local_cells );
     const double pideg = acos( -1.0 ) / 180.0;
     for( size_t i = 0; i < xc.size(); i++ )
@@ -608,7 +606,7 @@ ErrorCode NCHelperDomain::redistribute_cells( ParallelComm* myPcomm,
     tl.initialize( 3, 0, 0, numr, num_local_cells );  // to proc, dof, mask
     tl.enableWriteAccess();
     // populate
-    for( unsigned i = 0; i < num_local_cells; i++ )
+    for( size_t i = 0; i < num_local_cells; i++ )
     {
         int gdof               = gids[i];
         int to_proc            = dest[i];

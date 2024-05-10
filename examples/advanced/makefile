@@ -4,7 +4,7 @@ include ../makefile.config
 default: all
 
 EXAMPLES =  ExtrudePoly
-PAREXAMPLES = LloydRelaxation CrystalRouterExample GenLargeMesh CoupleMGen
+PAREXAMPLES = LloydRelaxation CrystalRouterExample GenLargeMesh
 EXOIIEXAMPLES = VisTags
 ALLEXAMPLES = ${EXAMPLES}
 
@@ -15,6 +15,9 @@ endif
 ifeq ("$(MOAB_MPI_ENABLED)","yes")
 parallel: ${PAREXAMPLES}
 ALLEXAMPLES += ${PAREXAMPLES}
+ifeq ("$(ENABLE_mbcoupler)","yes")
+PAREXAMPLES += CoupleMGen
+endif
 else
 parallel:
 endif

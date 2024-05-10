@@ -131,7 +131,7 @@ class torus : public geomObject
         assert( aa > 0 && cc > 0 );
     }
     virtual ~torus() {}
-    void project_points2geom( int /*dim*/, double* oldcoords, double* newcoords, double* derivs ) const
+    void project_points2geom( int dim, double* oldcoords, double* newcoords, double* derivs ) const
     {
         assert( dim == 3 && oldcoords && newcoords );
         double transfer[3]   = { oldcoords[0] - centerx, oldcoords[1] - centery, oldcoords[2] - centerz };

@@ -1537,7 +1537,7 @@ int moab::TempestOnlineMap::IsConservative( double dTolerance )
     int rootProc = 0;
     std::vector< int > nElementsInProc;
     const int nDATA = 3;
-    if( !rank ) nElementsInProc.resize( size * nDATA );
+    nElementsInProc.resize( size * nDATA );
     int senddata[nDATA] = { nColumns, m_nTotDofs_SrcCov, m_nTotDofs_Src };
     ierr = MPI_Gather( senddata, nDATA, MPI_INT, nElementsInProc.data(), nDATA, MPI_INT, rootProc, m_pcomm->comm() );
     if( ierr != MPI_SUCCESS ) return -1;
@@ -2162,7 +2162,8 @@ moab::ErrorCode moab::TempestOnlineMap::ComputeMetrics( moab::Remapper::Intersec
 #ifdef MOAB_HAVE_MPI
     if( m_pcomm )
     {
-        MPI_Reduce( &ntotsize, &ntotsize_glob, 1, MPI_INT, MPI_SUM, 0, m_pcomm->comm() );
+        int ntotsize_nc = ntotsize;
+        MPI_Reduce( &ntotsize_nc, &ntotsize_glob, 1, MPI_INT, MPI_SUM, 0, m_pcomm->comm() );
         MPI_Reduce( &errnorms[0], &globerrnorms[0], 2, MPI_DOUBLE, MPI_SUM, 0, m_pcomm->comm() );
         MPI_Reduce( &errnorms[2], &globerrnorms[2], 1, MPI_DOUBLE, MPI_MAX, 0, m_pcomm->comm() );
     }

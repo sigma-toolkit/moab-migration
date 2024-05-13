@@ -255,12 +255,6 @@ set( MOAB_GENERATED_INSTALL_HEADERS
      ${CMAKE_CURRENT_BINARY_DIR}/moab_export.h
   )
 
-if( MOAB_HAVE_CGM )
-  set( MOAB_CGM_LIBS ${CGM_LIBRARIES} )
-  #message("src/cmake CGM_INCLUDES :: ${CGM_INCLUDES}")
-  include_directories(${CGM_INCLUDES})
-endif()
-
 if (MOAB_HAVE_ZOLTAN)
   set( MOAB_LIB_SOURCES ${MOAB_LIB_SOURCES}
           ZoltanPartitioner.cpp )
@@ -342,7 +336,7 @@ set_target_properties(
   )
 
 message(STATUS "MOAB_LIBS = ${MOAB_LIBS}.")
-set(MOAB_ALL_LIBS ${MOAB_DEP_LIBRARIES} ${MOAB_LIBS} ${MOAB_CGM_LIBS})
+set(MOAB_ALL_LIBS ${MOAB_DEP_LIBRARIES} ${MOAB_LIBS}) 
 list(APPEND MOAB_ALL_LIBS "${MPI_LIBRARIES}")
 list(APPEND MOAB_ALL_LIBS ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
 target_link_libraries(MOAB "${MOAB_ALL_LIBS}")

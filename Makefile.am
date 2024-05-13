@@ -5,19 +5,7 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 ACLOCAL_AMFLAGS = -I config
 
 # Subdirectories to build
-SUBDIRS = src MeshFiles $(itaps_dir) tools test $(pymoab_dir)
-
-if ENABLE_fbigeom
-  itaps_dir_fbigeom = itaps
-else
-  itaps_dir_fbigeom =
-endif
-
-if ENABLE_imesh
-  itaps_dir = itaps
-else
-  itaps_dir = $(itaps_dir_fbigeom)
-endif
+SUBDIRS = src MeshFiles tools test $(pymoab_dir)
 
 if ENABLE_pymoab
   pymoab_dir = pymoab

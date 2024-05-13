@@ -20,7 +20,7 @@ ReadNC::ReadNC( Interface* impl )
       myPcomm( NULL ),
 #endif
       noMesh( false ), noVars( false ), spectralMesh( false ), noMixedElements( false ), noEdges( false ), culling(true),
-      gatherSetRank( -1 ), tStepBase( -1 ), trivialPartitionShift( 0 ), myHelper( NULL )
+      repartition(false), gatherSetRank( -1 ), tStepBase( -1 ), trivialPartitionShift( 0 ), myHelper( NULL )
 {
     assert( impl != NULL );
     impl->query_interface( readMeshIface );
@@ -228,6 +228,9 @@ ErrorCode ReadNC::parse_options( const FileOptions& opts,
 
     rval = opts.get_null_option( "NO_CULLING" ); // used now only for domain nc convention
     if( MB_SUCCESS == rval ) culling = false;
+
+    rval = opts.get_null_option( "REPARTITION" ); // used now only for domain nc, to repartition with zoltan
+    if( MB_SUCCESS == rval ) repartition = true;
 
     if( 2 <= dbgOut.get_verbosity() )
     {

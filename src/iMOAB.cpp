@@ -1846,12 +1846,17 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
 
     if( serial )
     {
-        assert( total_tag_len * nents_to_be_set - *num_tag_storage_length == 0 );
+        // we do not assume anymore that the number of entities has to match
+        // we will set only what matches, and skip entities that do not have corresponding global ids
+        //assert( total_tag_len * nents_to_be_set - *num_tag_storage_length == 0 );
         // tags are unrolled, we loop over global ids first, then careful about tags
         for( int i = 0; i < nents_to_be_set; i++ )
         {
             int gid         = globalIds[i];
-            EntityHandle eh = eh_by_gid[gid];
+            std::map< int, EntityHandle >::iterator mapIt = eh_by_gid.find(gid);
+            if (mapIt == eh_by_gid.end())
+                continue;
+            EntityHandle eh = mapIt->second;
             // now loop over tags
             int indexInTagValues = 0;  //
             for( size_t j = 0; j < tagList.size(); j++ )
@@ -1869,8 +1874,10 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         // in this case, we have to use 2 crystal routers, to send data to the processor that needs it
         // we will create first a tuple to rendevous points, then from there send to the processor that requested it
         // it is a 2-hop global gather scatter
-        int nbLocalVals = *num_tag_storage_length / ( (int)tagNames.size() );
-        assert( nbLocalVals * tagNames.size() - *num_tag_storage_length == 0 );
+        // TODO: allow for tags of different length; this is wrong
+        int nbLocalVals = *num_tag_storage_length / ( (int)tagNames.size() ); // assumes all tags have the same length?
+        // we do not expect the sizes to match
+        //assert( nbLocalVals * tagNames.size() - *num_tag_storage_length == 0 );
         TupleList TLsend;
         TLsend.initialize( 2, 0, 0, total_tag_len, nbLocalVals );  //  to proc, marker(gid), total_tag_len doubles
         TLsend.enableWriteAccess();
@@ -1899,7 +1906,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
             TLsend.inc_n();
         }
 
-        assert( nbLocalVals * total_tag_len - indexInRealLocal == 0 );
+        //assert( nbLocalVals * total_tag_len - indexInRealLocal == 0 );
         // send now requests, basically inform the rendez-vous point who needs a particular global id
         // send the data to the other processors:
         ( pco->proc_config().crystal_router() )->gs_transfer( 1, TLsend, 0 );
@@ -2004,7 +2011,10 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         for( int i = 0; i < n1; i++ )
         {
             int gid         = TLBack.vi_rd[3 * i + 1];  // marker
-            EntityHandle eh = eh_by_gid[gid];
+            std::map< int, EntityHandle >::iterator mapIt = eh_by_gid.find(gid);
+            if (mapIt == eh_by_gid.end())
+                continue;
+            EntityHandle eh = mapIt->second;
             // now loop over tags
 
             for( size_t j = 0; j < tagList.size(); j++ )
@@ -4452,29 +4462,27 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         if( data_src.point_cloud )
         {
             moab::Range& covSrcEnts = remapper->GetMeshVertices( moab::Remapper::CoveringMesh );
-            solSTagVals.resize( covSrcEnts.size(), -1.0 );
+            solSTagVals.resize( covSrcEnts.size(), 0. );
             sents = covSrcEnts;
         }
         else
         {
             moab::Range& covSrcEnts = remapper->GetMeshEntities( moab::Remapper::CoveringMesh );
             solSTagVals.resize( covSrcEnts.size() * weightMap->GetSourceNDofsPerElement() *
-                                    weightMap->GetSourceNDofsPerElement(),
-                                -1.0 );
+                                    weightMap->GetSourceNDofsPerElement(), 0. );
             sents = covSrcEnts;
         }
         if( data_tgt.point_cloud )
         {
             moab::Range& tgtEnts = remapper->GetMeshVertices( moab::Remapper::TargetMesh );
-            solTTagVals.resize( tgtEnts.size(), -1.0 );
+            solTTagVals.resize( tgtEnts.size(), 0. );
             tents = tgtEnts;
         }
         else
         {
             moab::Range& tgtEnts = remapper->GetMeshEntities( moab::Remapper::TargetMesh );
             solTTagVals.resize( tgtEnts.size() * weightMap->GetDestinationNDofsPerElement() *
-                                    weightMap->GetDestinationNDofsPerElement(),
-                                -1.0 );
+                                    weightMap->GetDestinationNDofsPerElement(), 0. );
             tents = tgtEnts;
         }
     }
@@ -4485,8 +4493,7 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         solSTagVals.resize(
             covSrcEnts.size() * weightMap->GetSourceNDofsPerElement() * weightMap->GetSourceNDofsPerElement(), -1.0 );
         solTTagVals.resize( tgtEnts.size() * weightMap->GetDestinationNDofsPerElement() *
-                                weightMap->GetDestinationNDofsPerElement(),
-                            -1.0 );
+                                weightMap->GetDestinationNDofsPerElement(), 0. );
 
         sents = covSrcEnts;
         tents = tgtEnts;

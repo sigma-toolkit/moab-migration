@@ -34,10 +34,6 @@ if (MOAB_HAVE_TEMPESTREMAP)
 endif (MOAB_HAVE_TEMPESTREMAP)
 
 set( TOOLS_LINK_LIBS MOAB ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
-if ( MOAB_HAVE_CGM )
-  set( TOOLS_LINK_LIBS ${TOOLS_LINK_LIBS} ${CGM_LIBRARIES} )
-  add_subdirectory( geometry )
-endif ( MOAB_HAVE_CGM )
 
 # COMPAREFILES
 if ( MOAB_HAVE_HDF5 )
@@ -324,9 +320,6 @@ if ( MOAB_BUILD_MBPART OR ( MOAB_HAVE_ZOLTAN OR MOAB_HAVE_METIS ) )
   # Build the mbpart executable
   add_executable( mbpart mbpart.cpp )
   include_directories( ${ZOLTAN_INCLUDES} ${PARMETIS_INCLUDES} ${METIS_INCLUDES} )
-  if (MOAB_HAVE_CGM)
-    include_directories( ${CGM_INCLUDES} )
-  endif (MOAB_HAVE_CGM)
   set_source_files_properties( mbpart.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbpart ${TOOLS_LINK_LIBS} ${ZOLTAN_LIBRARIES} ${PARMETIS_LIBRARIES} ${METIS_LIBRARIES} )
   set( MOAB_HAVE_MBPART 1 )
@@ -343,7 +336,7 @@ if ( MOAB_BUILD_MBPART OR ( MOAB_HAVE_ZOLTAN OR MOAB_HAVE_METIS ) )
 endif ( MOAB_BUILD_MBPART OR ( MOAB_HAVE_ZOLTAN OR MOAB_HAVE_METIS ) )
 
 # MBCoupler
-if ( ENABLE_IMESH AND MOAB_HAVE_MPI AND MPI_FOUND AND MOAB_BUILD_MBCOUPLER )
+if ( MOAB_HAVE_MPI AND MPI_FOUND AND MOAB_BUILD_MBCOUPLER )
   add_subdirectory( mbcoupler )
 endif ( )
 

@@ -72,6 +72,8 @@ int main( int argc, char* argv[] )
     std::string ocnFilename = TestDir + "unittest/outTri15_8.h5m";
     std::string mapFilename = TestDir + "unittest/mapNE20_FV15.nc";  // this is a netcdf file!
 
+    std::string field_source = "AnalyticalSolnSrcExact";  // this is a tag name!
+
     std::string baseline = TestDir + "unittest/baseline2.txt";
     int rankInOcnComm    = -1;
     int cmpocn = 17, cplocn = 18,
@@ -117,6 +119,10 @@ int main( int argc, char* argv[] )
     opts.addOpt< int >( "orderTarget,v", "target oorder", &disc_orders[1] );
     bool analytic_field = false;
     opts.addOpt< void >( "analytic,q", "analytic field", &analytic_field );
+
+
+    opts.addOpt< std::string >( "field,f", "field to project using the map ", &field_source );
+
 
     bool no_regression_test = false;
     opts.addOpt< void >( "no_regression,r", "do not do regression test against baseline 1", &no_regression_test );
@@ -354,7 +360,7 @@ int main( int argc, char* argv[] )
         }
     }
 
-    const char* concat_fieldname  = "AnalyticalSolnSrcExact";
+    const char* concat_fieldname  = field_source.c_str();
     const char* concat_fieldnameT = "Target_proj";
 
     {
@@ -364,13 +370,13 @@ int main( int argc, char* argv[] )
         {
             // as always, use nonblocking sends
             // this is for projection to ocean:
-            ierr = iMOAB_SendElementTag( cmpAtmPID, "AnalyticalSolnSrcExact", &atmCouComm, &cplocn );
+            ierr = iMOAB_SendElementTag( cmpAtmPID, concat_fieldname, &atmCouComm, &cplocn );
             CHECKIERR( ierr, "cannot send tag values" )
         }
         if( couComm != MPI_COMM_NULL )
         {
             // receive on atm on coupler pes, that was redistributed according to coverage
-            ierr = iMOAB_ReceiveElementTag( cplAtmPID, "AnalyticalSolnSrcExact", &atmCouComm, &cmpatm );
+            ierr = iMOAB_ReceiveElementTag( cplAtmPID, concat_fieldname, &atmCouComm, &cmpatm );
             CHECKIERR( ierr, "cannot receive tag values" )
         }
 

@@ -111,7 +111,6 @@ set( MOAB_MESH_DIR        "${CMAKE_SOURCE_DIR}/MeshFiles/" )
 # Options that the user controls
 ################################################################################
 option ( BUILD_SHARED_LIBS   "Should shared or static libraries be created?"   ON  )
-option ( ENABLE_CGM        "Should build with CGM support?"                  OFF )
 option ( ENABLE_CGNS       "Should build with CGNS support?"                 OFF )
 option ( ENABLE_MPI        "Should MOAB be compiled with MPI support?"       OFF )
 option ( ENABLE_HDF5       "Include HDF I/O interfaces in the build?"                   OFF )
@@ -126,9 +125,6 @@ option ( ENABLE_TESTING    "Enable Testing"                                  ON 
 option ( MOAB_FORCE_64_BIT_HANDLES "Force MBEntityHandle to be 64 bits (uint64_t)" OFF )
 option ( MOAB_FORCE_32_BIT_HANDLES "Force MBEntityHandle to be 32 bits (uint32_t)" OFF )
 option ( ENABLE_PYMOAB       "Build python interface to MOAB?" OFF )
-option ( ENABLE_IMESH        "Should build IMESH?"       OFF )
-option ( ENABLE_FBIGEOM      "Should build FBIGEOM?"     OFF )
-option ( ENABLE_IREL         "Should build IREL?"        OFF )
 option ( ENABLE_BLASLAPACK   "Should require BLAS/LAPACK?" ON )
 option ( ENABLE_FORTRAN      "Should enable FORTRAN?" ON )
 option ( ENABLE_TEMPESTREMAP "Should enable TempestRemap dependency?" OFF )
@@ -141,9 +137,7 @@ mark_as_advanced(
   MOAB_FORCE_32_BIT_HANDLES
 )
 
-if ( ENABLE_IMESH OR ENABLE_FBIGEOM )
-  MESSAGE("WARNING: iMesh and ITAPS interfaces are now deprecated, and will be removed in the next release.")
-  MESSAGE("COMMENT: Consider using iMOAB for a more flexible and scalable interface.")
+if ( ENABLE_FORTRAN )
   include (${CMAKE_ROOT}/Modules/CMakeDetermineFortranCompiler.cmake)
 endif ()
 
@@ -441,19 +435,6 @@ if ( EIGEN3_FOUND AND ENABLE_TEMPESTREMAP )
 
 endif( EIGEN3_FOUND AND ENABLE_TEMPESTREMAP )
 
-# Check if user has asked for configuration with CGM
-set (MOAB_HAVE_CGM OFF CACHE INTERNAL "Found necessary CGM components. Configure MOAB with it." )
-if ( ENABLE_CGM )
-   find_package( CGM REQUIRED )
-   set( MOAB_DEFINES "${CGM_DEFINES} -DCGM ${MOAB_DEFINES}" )
-   set (MOAB_HAVE_CGM ON)
-   set (ENABLE_IREL ON)
-   set (ENABLE_FBIGEOM ON)
-   set_package_properties(CGM PROPERTIES
-                    TYPE OPTIONAL
-                    PURPOSE "CGM library interfaces for MOAB native-geometry support")
-endif (ENABLE_CGM)
-
 set (MOAB_HAVE_CGNS OFF CACHE INTERNAL "Found necessary CGNS components. Configure MOAB with it." )
 if (ENABLE_CGNS)
   set( MOABIO_LIBS ${MOABIO_LIBS} ${CGNS_LIBRARIES} )
@@ -540,8 +521,6 @@ endif()
 ################################################################################
 message(STATUS "Adding src subdirectory.")
 add_subdirectory( src )
-message(STATUS "Adding itaps subdirectory.")
-add_subdirectory( itaps )
 if (NOT WIN32 OR MSYS OR MINGW) # Need further work to prepare for windows
   add_subdirectory( tools )
 endif ()
@@ -623,7 +602,6 @@ file(GLOB_RECURSE MOAB_PROJECT_SOURCE_FILES
 			src/*.cpp src/*.c src/*.hpp
 			tools/*.cpp tools/*.hpp
 			test/*.cpp
-			itaps/*.cpp itaps/*.h itaps/*.hpp
 			examples/*.cpp
 		)
 
@@ -681,21 +659,6 @@ CONFIGURE_FILE(config/MOABConfig.cmake.h.in "${PROJECT_BINARY_DIR}/src/moab/MOAB
 
 CONFIGURE_FILE(config/MOABConfig.cmake.cmake "${PROJECT_BINARY_DIR}/MOABConfig.cmake" @ONLY)
 CONFIGURE_FILE(moab.make.cmake "${PROJECT_BINARY_DIR}/lib/moab.make" @ONLY)
-if ( MOAB_HAVE_FBIGEOM )
-  CONFIGURE_FILE(itaps/fbigeom/FBiGeom-Defs.inc.in "${PROJECT_BINARY_DIR}/lib/FBiGeom-Defs.inc" @ONLY)
-  install(
-    FILES "${PROJECT_BINARY_DIR}/lib/FBiGeom-Defs.inc"
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    )
-endif ( MOAB_HAVE_FBIGEOM )
-
-if ( MOAB_HAVE_IMESH )
-  CONFIGURE_FILE(itaps/imesh/iMesh-Defs.inc.in "${PROJECT_BINARY_DIR}/lib/iMesh-Defs.inc" @ONLY)
-  INSTALL(
-    FILES "${PROJECT_BINARY_DIR}/lib/iMesh-Defs.inc"
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    )
-endif ( MOAB_HAVE_IMESH )
 INSTALL(
   FILES "${PROJECT_BINARY_DIR}/lib/moab.make"
   DESTINATION ${CMAKE_INSTALL_LIBDIR}

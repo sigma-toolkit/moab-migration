@@ -3,10 +3,11 @@
 
 using namespace moab;
 
-std::string example_eul    = TestDir + "unittest/io/eul3x48x96.t.3.nc";
-std::string example_fv     = TestDir + "unittest/io/fv3x46x72.t.3.nc";
-std::string example_domain = TestDir + "unittest/io/domain.ocn.ne4np4_oQU240.160614.nc";
-std::string example_scrip  = TestDir + "unittest/io/ocean.QU.240km.scrip.151209.nc";
+std::string example_eul     = TestDir + "unittest/io/eul3x48x96.t.3.nc";
+std::string example_fv      = TestDir + "unittest/io/fv3x46x72.t.3.nc";
+std::string example_domain  = TestDir + "unittest/io/domain.ocn.ne4np4_oQU240.160614.nc";
+std::string example_domain2 = TestDir + "unittest/io/rof_domain.nc";
+std::string example_scrip   = TestDir + "unittest/io/ocean.QU.240km.scrip.151209.nc";
 
 #ifdef MOAB_HAVE_MPI
 #include "moab_mpi.h"
@@ -32,7 +33,12 @@ void test_read_fv_ghosting();
 
 // Domain file
 void test_read_domain_culling();
+void test_read_old_domain();
 void test_read_domain_no_culling();
+// domain file with zoltan partitioner
+#ifdef MOAB_HAVE_ZOLTAN
+void test_read_domain_zoltan();
+#endif
 // scrip file
 void test_read_scrip();
 
@@ -57,6 +63,7 @@ int main( int argc, char* argv[] )
     result += RUN_TEST( test_read_eul_nomesh );
     result += RUN_TEST( test_read_eul_novars );
     result += RUN_TEST( test_read_domain_culling );
+    result += RUN_TEST( test_read_old_domain );
     result += RUN_TEST( test_read_domain_no_culling );
     result += RUN_TEST( test_read_scrip );
     // Exclude test_read_fv_all() since reading edge data is not implemented in MOAB yet
@@ -69,6 +76,9 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_MPI
     // Before ghosting issues with ownership were fixed, this test failed on 4 processors
     result += RUN_TEST( test_read_fv_ghosting );
+#ifdef MOAB_HAVE_ZOLTAN
+    result += RUN_TEST( test_read_domain_zoltan );
+#endif
 #endif
 
 #ifdef MOAB_HAVE_MPI
@@ -516,6 +526,22 @@ void test_read_domain_culling()
     rval = mb.load_file( example_domain.c_str(), &set, opts.c_str() );CHECK_ERR( rval );
 }
 
+void test_read_old_domain()
+{
+    Core moab;
+    Interface& mb = moab;
+
+    // Need a set for nomesh to work right
+    EntityHandle set;
+    ErrorCode rval = mb.create_meshset( MESHSET_SET, set );CHECK_ERR( rval );
+
+    std::string orig, opts;
+    rval = get_options( orig );CHECK_ERR( rval );
+
+    opts = orig + std::string( ";VARIABLE=" );
+    rval = mb.load_file( example_domain2.c_str(), &set, opts.c_str() );CHECK_ERR( rval );
+}
+
 void test_read_domain_no_culling()
 {
     Core moab;
@@ -531,6 +557,25 @@ void test_read_domain_no_culling()
     opts = orig + std::string( ";VARIABLE=;NO_CULLING" );
     rval = mb.load_file( example_domain.c_str(), &set, opts.c_str() );CHECK_ERR( rval );
 }
+#ifdef MOAB_HAVE_ZOLTAN
+void test_read_domain_zoltan()
+{
+    Core moab;
+    Interface& mb = moab;
+
+    EntityHandle set;
+    ErrorCode rval = mb.create_meshset( MESHSET_SET, set );CHECK_ERR( rval );
+
+    std::string opts = std::string( "PARALLEL=READ_PART;PARTITION_METHOD=SQIJ;REPARTITION;DEBUG_IO=2;" );
+    rval             = mb.load_file( example_domain.c_str(), &set, opts.c_str() );CHECK_ERR( rval );
+#ifdef MOAB_HAVE_MPI
+#ifdef MOAB_HAVE_HDF5
+    opts = "PARALLEL=WRITE_PART";
+    rval = mb.write_file( "test_dom_zoltan.h5m", 0, opts.c_str(), &set, 1 );CHECK_ERR( rval );
+#endif
+#endif
+}
+#endif
 
 void test_read_scrip()
 {

@@ -234,6 +234,7 @@ class ReadNC : public ReaderIface
     bool noMixedElements;
     bool noEdges;
     bool culling;
+    bool repartition; // with zoltan rcb
     int gatherSetRank;
     int tStepBase;
     int trivialPartitionShift;

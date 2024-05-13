@@ -17,10 +17,6 @@ if ( MOAB_HAVE_TEMPESTREMAP )
 endif ( MOAB_HAVE_TEMPESTREMAP )
 
 set(MOAB_INTX_LIB_SRCS Intx2Mesh.cpp Intx2MeshInPlane.cpp Intx2MeshOnSphere.cpp IntxRllCssphere.cpp IntxUtils.cpp )
-#if(ENABLE_IMESH AND MOAB_HAVE_MPI AND MPI_FOUND)
-# include_directories( ${CMAKE_SOURCE_DIR}/itaps/imesh  ${CMAKE_SOURCE_DIR}/itaps )
-# set(MOAB_INTX_LIB_SRCS ${MOAB_INTX_LIB_SRCS} wrap_intx.cpp )
-#endif()
 
 add_library( moab_intx_mesh OBJECT ${MOAB_INTX_LIB_SRCS} ${MOAB_INTX_INC_HDRS} )
 set_target_properties( moab_intx_mesh

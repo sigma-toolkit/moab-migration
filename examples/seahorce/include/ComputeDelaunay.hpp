@@ -196,7 +196,8 @@ moab::ErrorCode SetupDelaunayInterpolant( RuntimeContext& context, std::vector< 
     int ntetrahedrons  = out.numberoftetrahedra;
     int ncorners       = out.numberofcorners;
 
-    printf( "Number of points: %d, triangles: %d, corners: %d, tetrahedra: %d\n", nvertices, ntrianglefaces, ncorners, ntetrahedrons );
+    printf( "Number of points: %d, triangles: %d, corners: %d, tetrahedra: %d\n", nvertices, ntrianglefaces, ncorners,
+            ntetrahedrons );
 
     // moab::ReadUtilIface* read_iface;
     // runchk( context.moab_interface->query_interface( read_iface ), "Error in query_interface" );
@@ -219,7 +220,7 @@ moab::ErrorCode SetupDelaunayInterpolant( RuntimeContext& context, std::vector< 
 
 #ifdef USE_DUAL_TETS
     std::vector< double > tetcentroids( ntetrahedrons * 3, 0.0 );
-// #pragma omp parallel for shared( tetcentroids, xyzd )
+    // #pragma omp parallel for shared( tetcentroids, xyzd )
     for( auto index = 0; index < ntetrahedrons; index++ )
     {
         const int offset = index * 3;
@@ -346,8 +347,8 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
 
     KdTree::BoundingBox bbox_src;
     tree.computeBoundingBox( bbox_src );
-    printf( "Source bounding boxes: (%f, %f), (%f, %f), (%3.10e, %3.10e)\n", bbox_src[0].low, bbox_src[0].high, bbox_src[1].low,
-            bbox_src[1].high, bbox_src[2].low, bbox_src[2].high );
+    printf( "Source bounding boxes: (%f, %f), (%f, %f), (%3.10e, %3.10e)\n", bbox_src[0].low, bbox_src[0].high,
+            bbox_src[1].low, bbox_src[1].high, bbox_src[2].low, bbox_src[2].high );
 
     nanoflann::SearchParameters sparams;
     nanoflann::KNNResultSet< double > resultSet( num_results );
@@ -377,10 +378,10 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
 
 #ifdef USE_DUAL_TETS
             const int* connectivity = context.tetrahedraconn.data() + element_index * 4;
-            const double* a = xyzld.data() + connectivity[0] * 3;
-            const double* b = xyzld.data() + connectivity[1] * 3;
-            const double* c = xyzld.data() + connectivity[2] * 3;
-            const double* d = xyzld.data() + connectivity[3] * 3;
+            const double* a         = xyzld.data() + connectivity[0] * 3;
+            const double* b         = xyzld.data() + connectivity[1] * 3;
+            const double* c         = xyzld.data() + connectivity[2] * 3;
+            const double* d         = xyzld.data() + connectivity[3] * 3;
 
             Vec4d bcoords;
             if( tetrahedron_barycentric2( a, b, c, d, query_pt,
@@ -407,17 +408,18 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
             }
 #else
             VecXi v2e =
-                context.vertex_to_element( element_index, Eigen::all );//.head( context.vertex_to_element( element_index, 0 ) + 1 );
+                context.vertex_to_element( element_index,
+                                           Eigen::all );  //.head( context.vertex_to_element( element_index, 0 ) + 1 );
 
             // printf( "%d: Found nearest vertex with element adjacencies: %d\n ", element_index, v2e( 0 ) );
 
-            for( int it = 0; it < context.nvertcache[element_index]; ++it)
+            for( int it = 0; it < context.nvertcache[element_index]; ++it )
             {
                 const int* connectivity = context.tetrahedraconn.data() + v2e( it ) * 4;
-                const double *a = xyzld.data() + connectivity[0] * 3;
-                const double* b = xyzld.data() + connectivity[1] * 3;
-                const double* c = xyzld.data() + connectivity[2] * 3;
-                const double* d = xyzld.data() + connectivity[3] * 3;
+                const double* a         = xyzld.data() + connectivity[0] * 3;
+                const double* b         = xyzld.data() + connectivity[1] * 3;
+                const double* c         = xyzld.data() + connectivity[2] * 3;
+                const double* d         = xyzld.data() + connectivity[3] * 3;
 
                 // printf( "Vertex{%d}: element=%d, connectivity=[%d, %d, %d, %d]\n", index, v2e( it ), connectivity[0],
                 //         connectivity[1], connectivity[2], connectivity[3] );
@@ -429,7 +431,7 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
                     Eigen::Map< const Eigen::Matrix< int, 1, 4 > > conn( connectivity, 1, 4 );
                     fi[index] = 0.0;
                     // std::cout << "Query point: " << query_pt[0] << ", " << query_pt[1] << ", " << query_pt[2]
-                            //   << std::endl;
+                    //   << std::endl;
                     for( auto ic = 0; ic < 4; ++ic )
                     {
                         // std::cout << "\t ic = " << connectivity[ic] << ", bcoords( ic ) = " << bcoords( ic )
@@ -470,7 +472,7 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
 
             // std::cin.get();
             const int* connectivity = context.tetrahedraconn.data() + minindex * 4;
-            fi[index]          = 1.0 / 4 *
+            fi[index]               = 1.0 / 4 *
                         ( fd[connectivity[0]] + fd[connectivity[1]] + fd[connectivity[2]] +
                           fd[connectivity[3]] );  // assign value of first vertex (extrapolant); this is arbitrary
             // fi[index] = fd[connectivity[0]];

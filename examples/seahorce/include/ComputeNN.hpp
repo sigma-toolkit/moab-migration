@@ -92,7 +92,7 @@ moab::ErrorCode ComputeNNInterpolant( RuntimeContext&,
             ( query_pt[0] > bbox_src[0].high && query_pt[1] > bbox_src[1].high && query_pt[2] > bbox_src[2].high ) )
         {
             // data needs to be extrapolated
-            if( query_pt[2] < bbox_src[2].low ) // point is below the MPAS sea bed
+            if( query_pt[2] < bbox_src[2].low )  // point is below the MPAS sea bed
                 dst_tdata[i] = src_tdata[srcindx[0]];
             else  // point is above the MPAS sea surface
                 dst_tdata[i] = src_tdata[srcindx[0]];

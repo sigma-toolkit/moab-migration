@@ -15,8 +15,8 @@ moab::ErrorCode ShepardInterpolatorAlgLib( int dimension,
                                            std::vector< double >& fi )
 {
     using namespace alglib;
-    size_t nd  = xyzd.size() / dimension;
-    size_t ni  = xyzi.size() / dimension;
+    size_t nd = xyzd.size() / dimension;
+    size_t ni = xyzi.size() / dimension;
 
     // NOTE: we can work with N-dimensional models and vector-valued functions too :)
     //

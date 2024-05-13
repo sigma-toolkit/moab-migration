@@ -33,14 +33,14 @@ moab::ErrorCode ComputeGMLSInterpolant( RuntimeContext&,
 
         // Kokkos::View< int**, Kokkos::DefaultExecutionSpace > neighbor_lists( "neighbor lists", number_target_coords,
         //                                                          max_neighbors + 1 );  // first column is # of neighbors
-        Kokkos::View< double**, Kokkos::DefaultExecutionSpace > source_coords( "neighbor coordinates", number_source_coords,
-                                                                   dimension );
+        Kokkos::View< double**, Kokkos::DefaultExecutionSpace > source_coords( "neighbor coordinates",
+                                                                               number_source_coords, dimension );
         Kokkos::View< double*, Kokkos::DefaultExecutionSpace > sampling_data( "samples of true solution",
-                                                                  source_coords.extent( 0 ) );
+                                                                              source_coords.extent( 0 ) );
 
         Kokkos::View< double*, Kokkos::DefaultExecutionSpace > epsilon( "h supports", number_target_coords );
-        Kokkos::View< double**, Kokkos::DefaultExecutionSpace > target_coords( "target coordinates", number_target_coords,
-                                                                   dimension );
+        Kokkos::View< double**, Kokkos::DefaultExecutionSpace > target_coords( "target coordinates",
+                                                                               number_target_coords, dimension );
 
         for( size_t i = 0; i < number_source_coords; i++ )
         {
@@ -56,7 +56,7 @@ moab::ErrorCode ComputeGMLSInterpolant( RuntimeContext&,
             target_coords( i, 0 ) = dst_xyz[offset + 0];
             target_coords( i, 1 ) = dst_xyz[offset + 1];
             target_coords( i, 2 ) = dst_xyz[offset + 2];
-            epsilon( i ) = 1e-3;
+            epsilon( i )          = 1e-3;
         }
 
         GMLS my_GMLS( order, dimension, solver_name.c_str(), problem_name.c_str(), constraint_name.c_str(),
@@ -65,7 +65,7 @@ moab::ErrorCode ComputeGMLSInterpolant( RuntimeContext&,
         // number_of_neighbors_list must be the same size as the number of target sites so that it can be populated
         // with the number of neighbors for each target site.
         Kokkos::View< int* > number_of_neighbors_list( "number of neighbor lists",
-                                                          number_target_coords );  // first column is # of neighbors
+                                                       number_target_coords );  // first column is # of neighbors
         // Point cloud construction for neighbor search
         // CreatePointCloudSearch constructs an object of type PointCloudSearch, but deduces the templates for you
         auto point_cloud_search( CreatePointCloudSearch( source_coords, dimension ) );
@@ -82,7 +82,7 @@ moab::ErrorCode ComputeGMLSInterpolant( RuntimeContext&,
         // Initially, we do a dry-run to calculate neighborhood sizes before actually storing the result. This is
         // why we can start with a neighbor_lists size of 0.
         Kokkos::View< int* > neighbor_lists( "neighbor lists",
-                                                0 );  // first column is # of neighbors
+                                             0 );  // first column is # of neighbors
 
         size_t storage_size =
             point_cloud_search.generateCRNeighborListsFromKNNSearch( true /*dry run*/, target_coords, neighbor_lists,
@@ -128,13 +128,14 @@ moab::ErrorCode ComputeGMLSInterpolant( RuntimeContext&,
         std::cout << "finished setting all parameters " << std::endl;
 
         // generate the alphas that to be combined with data for each target operation requested in lro
-        my_GMLS.generateAlphas( 16,
-                                false /* keep polynomial coefficients, only needed for a test later in this program */ );
+        my_GMLS.generateAlphas(
+            16, false /* keep polynomial coefficients, only needed for a test later in this program */ );
         std::cout << "finished generating alphas " << std::endl;
 
         Evaluator gmls_evaluator( &my_GMLS );
-        auto output_value = gmls_evaluator.applyAlphasToDataAllComponentsAllTargetSites< double*, Kokkos::DefaultExecutionSpace >(
-            sampling_data, ScalarPointEvaluation );
+        auto output_value =
+            gmls_evaluator.applyAlphasToDataAllComponentsAllTargetSites< double*, Kokkos::DefaultExecutionSpace >(
+                sampling_data, ScalarPointEvaluation );
         for( size_t i = 0; i < number_target_coords; i++ )
         {
             // dst_tdata[i] = gmls_evaluator.applyAlphasToDataSingleComponentSingleTargetSite(

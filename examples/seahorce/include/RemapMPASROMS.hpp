@@ -53,19 +53,19 @@ struct RuntimeContext
     int dimension{ 2 };                            /// dimensionality of the problem: 2 or 3
     bool ensureMonotonicity{ false };  /// flag indicating use of monotone approximations for projections (TempestRemap)
     bool computeTRMaps{ false };       /// flag indicating use of TempestRemap conservative schemes for projections
-    bool computeShepardInterpolant{ false };      /// flag indicating use of Shepard approximations for projections
+    bool computeShepardInterpolant{ false };  /// flag indicating use of Shepard approximations for projections
     bool computeMBAInterpolant{ false };  /// flag indicating use of multilevel B-spline approximations for projections
-    bool computeNNInterpolant{ false };  /// flag indicating use of nearest neighbor method for projections
+    bool computeNNInterpolant{ false };   /// flag indicating use of nearest neighbor method for projections
     bool computeDelaunayInterpolant{ false };  ///flag indicating use of delaunay natural neighbor interpolant
-    bool normalize{ false };           /// normalize the dataset to original source data integral
-                                       /// (more relevant for 2D; not implemented for 3D at the moment)
-    bool use_3dprojection{ false };    /// perform 2D projections (if false), else compute 3D projections
-    bool generateExtrusions{ false };  /// flag to indicate extruded 3D mesh computation
-                                       ///(as opposed to loading from disk)
-    bool threetwooneD{ false };        /// Perform 3D projections as 2Dx1D or 1Dx2D
-                                       /// (tensor product computations) as opposed to full 3D
-    bool oneDfirst{ false };           /// flag to specify that 1Dx2D should be performed as opposed
-                                       /// to 2Dx1D (only relevant when threetwooneD is true)
+    bool normalize{ false };                   /// normalize the dataset to original source data integral
+                                               /// (more relevant for 2D; not implemented for 3D at the moment)
+    bool use_3dprojection{ false };            /// perform 2D projections (if false), else compute 3D projections
+    bool generateExtrusions{ false };          /// flag to indicate extruded 3D mesh computation
+                                               ///(as opposed to loading from disk)
+    bool threetwooneD{ false };                /// Perform 3D projections as 2Dx1D or 1Dx2D
+                                               /// (tensor product computations) as opposed to full 3D
+    bool oneDfirst{ false };                   /// flag to specify that 1Dx2D should be performed as opposed
+                                               /// to 2Dx1D (only relevant when threetwooneD is true)
     // std::string strMethod{ "" };       /// remapping method used to other scalar fields (temperature, salinity)
     // std::string bathymetryMethod{ "" };  /// remapping method used for Bathymetry field
     // int bathymetryOrder{ 3 };                 /// order of the reconstruction for Bathymetry field
@@ -250,9 +250,12 @@ struct RuntimeContext
             "Re-normalize interpolant to preserve global field integral (only 2D and requires mesh intersection)",
             &normalize );
 
+        std::string defaultmethodorder = "";
+        opts.addOpt< std::string >( "defaultmethodorder", "Format: method:order", &defaultmethodorder );
+
         std::string fmethodorder = "";
         opts.addOpt< std::string >( "methodorder",
-                                    "Format: field:method, field: { Bathymetry, Temperature, Salinity }, "
+                                    "Format: field:method:order, field: { Bathymetry, Temperature, Salinity }, "
                                     "Method: { NearestNeighborInterpolant, "
                                     "TempestRemapFV, "
                                     "TempestRemapBilinear, "
@@ -263,19 +266,32 @@ struct RuntimeContext
                                     "ShepardInterpolant, "
                                     "TrilinearTensor2D1D, "
                                     "TrilinearTensor1D2D, "
-                                    "MultilevelBsplineApproximation }",
+                                    "MultilevelBsplineApproximation }, "
+                                    "Order: [1, 2, 3]",
                                     &fmethodorder );
 
         opts.parseCommandLine( argc, argv );
 
         // constexpr std::pair defaultMethodParams = std::make_pair< RemappingMethod, int >( TempestRemapBilinear, 1 );
-        const std::pair< RemappingMethod, int > defaultMethodParams = std::make_pair< RemappingMethod, int >( ShepardInterpolant, 3 );
+        std::pair< RemappingMethod, int > defaultMethodParams =
+            std::make_pair< RemappingMethod, int >( MultilevelBsplineApproximation, 3 );
+        if( defaultmethodorder.size() )
         {
-            for (int iv = 0; iv < nstandardvars; ++iv)
+            std::vector< std::string > optionStorage;
+            split_option( defaultmethodorder, optionStorage );
+            assert( optionStorage.size() > 0 );
+
+            defaultMethodParams.first = GetMethod( optionStorage[0] );
+            if( optionStorage.size() > 1 )  // order of the method
+                defaultMethodParams.second = atoi( optionStorage[1].c_str() );
+        }
+
+        {
+            for( int iv = 0; iv < nstandardvars; ++iv )
                 field_methods[roms_twod_standardtagnames[iv]] = defaultMethodParams;
-            for (int iv = 0; iv < nforcingvars; ++iv)
+            for( int iv = 0; iv < nforcingvars; ++iv )
                 field_methods[mpas_twod_forcingtagnames[iv]] = defaultMethodParams;
-            for (int iv = 0; iv < nvars; ++iv)
+            for( int iv = 0; iv < nvars; ++iv )
                 field_methods[roms_tagnames[iv]] = defaultMethodParams;
 
             std::vector< std::string > fieldmethods;
@@ -326,21 +342,21 @@ struct RuntimeContext
                 field_methods[fieldname] = std::make_pair( rmethod, methodorder );
             }
 
-            for ( auto const& fieldkv : field_methods )
+            for( auto const& fieldkv : field_methods )
             {
                 const std::pair< RemappingMethod, int >& method_and_order = fieldkv.second;
-                RemappingMethod rmethod = method_and_order.first;
-                if( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear ||
-                    rmethod == TempestRemapInvDist || rmethod == TempestRemapDelaunay ||
-                    rmethod == TempestRemapIntegratedBilinear )
+                RemappingMethod rmethod                                   = method_and_order.first;
+                if( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear || rmethod == TempestRemapInvDist ||
+                    rmethod == TempestRemapDelaunay || rmethod == TempestRemapIntegratedBilinear )
                     computeTRMaps = true;
                 if( rmethod == MultilevelBsplineApproximation ) computeMBAInterpolant = true;
-                if ( rmethod == ShepardInterpolant) computeShepardInterpolant = true;
-                if ( rmethod == NearestNeighborInterpolant) computeNNInterpolant = true;
+                if( rmethod == ShepardInterpolant ) computeShepardInterpolant = true;
+                if( rmethod == NearestNeighborInterpolant ) computeNNInterpolant = true;
             }
         }
 
         if( dimension == 3 ) use_3dprojection = true;
+        if( dimension < 3 ) threetwooneD = false;
     }
 
     /// @brief Method that prints out the runtime parameters in use for provenance
@@ -428,15 +444,15 @@ struct RuntimeContext
                                              const std::vector< moab::EntityHandle >& target_range,
                                              const double constantoffset = 0.0 );
 
-                                             moab::ErrorCode ComputeFieldProjectionsWithData( int dimension,
-                                                         std::string varProjectSrc,
-                                                         std::string varProjectDst,
-                                                         const std::vector< double >& src_xyz,
-                                                         const std::vector< double >& dst_xyz,
-                                                         const bool normalize,
-                                                         const double constantoffset,
-                                                         std::vector< double >& src_tdata,
-                                                         std::vector< double >& dst_tdata );
+    moab::ErrorCode ComputeFieldProjectionsWithData( int dimension,
+                                                     std::string varProjectSrc,
+                                                     std::string varProjectDst,
+                                                     const std::vector< double >& src_xyz,
+                                                     const std::vector< double >& dst_xyz,
+                                                     const bool normalize,
+                                                     const double constantoffset,
+                                                     std::vector< double >& src_tdata,
+                                                     std::vector< double >& dst_tdata );
 
   private:
     moab::CpuTimer mTimer;

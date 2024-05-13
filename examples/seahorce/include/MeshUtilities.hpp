@@ -280,8 +280,8 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( RuntimeContext& context,
 
         for( size_t it = 0; it < nvars; ++it )
         {
-            rval = mb->tag_get_handle( mpas_tagnames[it], mpas_zreflevels, moab::MB_TYPE_DOUBLE,
-                                       mpas_soltags[it], moab::MB_TAG_DENSE );MB_CHK_ERR( rval );
+            rval = mb->tag_get_handle( mpas_tagnames[it], mpas_zreflevels, moab::MB_TYPE_DOUBLE, mpas_soltags[it],
+                                       moab::MB_TAG_DENSE );MB_CHK_ERR( rval );
 
             rval = mb->tag_get_handle( mpas_ele_tagnames[it], 1, moab::MB_TYPE_DOUBLE, mpas_soltags_new[it],
                                        moab::MB_TAG_DENSE | moab::MB_TAG_CREAT );MB_CHK_ERR( rval );

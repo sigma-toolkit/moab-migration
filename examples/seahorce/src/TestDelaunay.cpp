@@ -1,4 +1,3 @@
-
 #include "RemapMPASROMS.hpp"
 #include "tetgen.h"  // Defined tetgenio, tetrahedralize().
 #include "ComputeNN.hpp"
@@ -111,8 +110,8 @@ void Setup( std::vector< double >& xyzd )
     {
         for( auto ic = 0; ic < 4; ic++ )
         {
-            const int iv                              = tetrahedraconn[ ie * 4 + ic ];
-            const int size                            = vertex_to_element( iv, 0 );
+            const int iv                      = tetrahedraconn[ie * 4 + ic];
+            const int size                    = vertex_to_element( iv, 0 );
             vertex_to_element( iv, size + 1 ) = ie;
             vertex_to_element( iv, 0 )        = size + 1;
         }
@@ -120,8 +119,7 @@ void Setup( std::vector< double >& xyzd )
 
     for( auto ie = 0; ie < nvertices; ++ie )
         if( ie < 10 )
-            std::cout << "Vertex: " << ie << ",  nAdjacentelements: " << vertex_to_element( ie, 0 )
-                      << std::endl;
+            std::cout << "Vertex: " << ie << ",  nAdjacentelements: " << vertex_to_element( ie, 0 ) << std::endl;
 
     // Output mesh to files 'mpasdel3d.node', 'mpasdel3d.ele' and 'mpasdel3d.face'.
     // out.save_nodes( "mpasdel3d" );
@@ -218,10 +216,10 @@ static bool bary_tet( const double vcoords[12], const double p[3], Vec4d& bcoord
     crossProduct( temp, vac, vad );
     v = dotProduct( vab, temp ) / 6.0;
 
-    bcoords(0) = va / v;
-    bcoords(1) = vb / v;
-    bcoords(2) = vc / v;
-    bcoords(3) = vd / v;
+    bcoords( 0 ) = va / v;
+    bcoords( 1 ) = vb / v;
+    bcoords( 2 ) = vc / v;
+    bcoords( 3 ) = vd / v;
 
     return !( ( bcoords.array() < 0 ).any() );
 }
@@ -270,8 +268,8 @@ void ComputeDelaunayInterpolant( std::vector< double >& xyzd,
 
     KdTree::BoundingBox bbox_src;
     tree.computeBoundingBox( bbox_src );
-    printf( "Source bounding boxes: (%f, %f), (%f, %f), (%3.10e, %3.10e)\n", bbox_src[0].low, bbox_src[0].high, bbox_src[1].low,
-            bbox_src[1].high, bbox_src[2].low, bbox_src[2].high );
+    printf( "Source bounding boxes: (%f, %f), (%f, %f), (%3.10e, %3.10e)\n", bbox_src[0].low, bbox_src[0].high,
+            bbox_src[1].low, bbox_src[1].high, bbox_src[2].low, bbox_src[2].high );
 
     const size_t num_results = 1;
     nanoflann::KNNResultSet< double > resultSet( num_results );
@@ -295,14 +293,14 @@ void ComputeDelaunayInterpolant( std::vector< double >& xyzd,
             // Perform the natural interpolation on the element
             size_t element_index = srcindx[jindex];
 
-            VecXi v2e =
-                vertex_to_element( element_index, Eigen::all );//.head( context.vertex_to_element( element_index, 0 ) + 1 );
+            VecXi v2e = vertex_to_element( element_index,
+                                           Eigen::all );  //.head( context.vertex_to_element( element_index, 0 ) + 1 );
 
             printf( "%d: Found nearest vertex with element adjacencies: %d\n ", element_index, v2e( 0 ) );
 
-            for (int it = 1; it < v2e(0)+1; ++it)
+            for( int it = 1; it < v2e( 0 ) + 1; ++it )
             {
-                const int* connectivity = &tetrahedraconn[ v2e( it ) * 4 ];
+                const int* connectivity = &tetrahedraconn[v2e( it ) * 4];
                 // int nnodes;
                 // runchk( context.moab_interface->get_connectivity( element, connectivity, nnodes, true ) );
                 // assert( nnodes == 4 ); // we are expecting only tetrahedrons
@@ -315,7 +313,7 @@ void ComputeDelaunayInterpolant( std::vector< double >& xyzd,
                 // runchk( context.moab_interface->get_coords( connectivity, nnodes, vcoords ) );
 
                 Vec4d bcoords;
-                if( bary_tet( vcoords, query_pt, bcoords ) ) // tetrahedron_barycentric
+                if( bary_tet( vcoords, query_pt, bcoords ) )  // tetrahedron_barycentric
                 {
                     Eigen::Map< const Eigen::Matrix< int, 1, 4 > > conn( connectivity, 1, 4 );
                     fi[index] = 0.0;
@@ -343,14 +341,14 @@ void ComputeDelaunayInterpolant( std::vector< double >& xyzd,
 
             // std::cin.get();
             const int* connectivity = &tetrahedraconn[minindex * 4];
-            fi[index]          = 1.0 / 4 *
+            fi[index]               = 1.0 / 4 *
                         ( fd[connectivity[0]] + fd[connectivity[1]] + fd[connectivity[2]] +
                           fd[connectivity[3]] );  // assign value of first vertex (extrapolant); this is arbitrary
             num_not_found++;
         }
     }
 
-    printf( "Number of query points not found = %d/%d\n", num_not_found,  ni );
+    printf( "Number of query points not found = %d/%d\n", num_not_found, ni );
 }
 
 int main()

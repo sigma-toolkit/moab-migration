@@ -199,7 +199,7 @@ int main( int argc, char** argv )
                                                    << " vertices." );
         }
 
-// #define COMPUTE_MAPS
+#define COMPUTE_MAPS
 #ifdef COMPUTE_MAPS
         if( context.computeTRMaps )
         {
@@ -214,7 +214,7 @@ int main( int argc, char** argv )
         context.timer_push( "Load TempestRemap weights for method: mpas_roms_map_bilin.nc" );
         // load the computed 2D map files
         runchk( LoadTempestRemapWeights( context, context.mpas_covering_set, context.romsset,
-                                            "mpas_roms_map_bilin.nc" ),
+                                         "mpas_roms_map_bilin.nc" ),
                 "Cannot load 2D remapping weights" );
         context.timer_pop();
 #endif
@@ -227,25 +227,24 @@ int main( int argc, char** argv )
             // Initialize all important data
 
             // Project the bottom Bathymetry and SeaSurfaceHeight data from MPAS to ROMS so that we can impose it.
-            for (int iv=0; iv < nstandardvars; ++iv)
+            for( int iv = 0; iv < nstandardvars; ++iv )
             {
-                context.timer_push( "Project " + std::string(mpas_twod_standardtagnames[iv]) + " field" );
-                runchk( context.ComputeFieldProjections( 2, mpas_twod_standardtagnames[iv], roms_twod_standardtagnames[iv],
-                                                        mpas_elems, roms_elems ),
-                        "Can't project " + std::string(mpas_twod_standardtagnames[iv]) + " field" );
+                context.timer_push( "Project " + std::string( mpas_twod_standardtagnames[iv] ) + " field" );
+                runchk( context.ComputeFieldProjections( 2, mpas_twod_standardtagnames[iv],
+                                                         roms_twod_standardtagnames[iv], mpas_elems, roms_elems ),
+                        "Can't project " + std::string( mpas_twod_standardtagnames[iv] ) + " field" );
                 context.timer_pop();
             }
 
             // Next project the forcing functions from MPAS to ROMS so that we can impose it as boundary conditions
-            for (int iv=0; iv < nforcingvars; ++iv)
+            for( int iv = 0; iv < nforcingvars; ++iv )
             {
-                context.timer_push( "Project " + std::string(mpas_twod_forcingtagnames[iv]) + " field" );
-                runchk( context.ComputeFieldProjections( 2, mpas_twod_forcingtagnames[iv], mpas_twod_forcingtagnames[iv],
-                                                        mpas_elems, roms_elems ),
-                        "Can't project " + std::string(mpas_twod_forcingtagnames[iv]) + " field" );
+                context.timer_push( "Project " + std::string( mpas_twod_forcingtagnames[iv] ) + " field" );
+                runchk( context.ComputeFieldProjections( 2, mpas_twod_forcingtagnames[iv],
+                                                         mpas_twod_forcingtagnames[iv], mpas_elems, roms_elems ),
+                        "Can't project " + std::string( mpas_twod_forcingtagnames[iv] ) + " field" );
                 context.timer_pop();
             }
-
         }
 
         std::vector< double > zmh_xyz3d, zrh_xyz3d;
@@ -360,13 +359,13 @@ int main( int argc, char** argv )
                     };
 
                     auto vtransform_1 = [&]( double s, double h ) {
-                        constexpr double hc = 100 / axial_scaling;  // hc has to be less than or equal to min(h)
+                        constexpr double hc = 25.0 / axial_scaling;  // hc has to be less than or equal to min(h)
                         double vstretch_val = vstretching_1( s );
                         return hc * ( s - vstretch_val ) + vstretch_val * h;
                     };
 
                     auto vtransform_2 = [&]( double s, double h ) {
-                        constexpr double hc = 100 / axial_scaling;  // hc has to be less than or equal to min(h)
+                        constexpr double hc = 25.0 / axial_scaling;  // hc has to be less than or equal to min(h)
                         double vstretch_val = vstretching_4( s );
                         return ( hc * s + vstretch_val * h ) / ( hc + h );
                     };
@@ -485,7 +484,7 @@ int main( int argc, char** argv )
 
             double defaultvalue = -1.0;
             moab::Tag mpas_soltags_3d[nvars], roms_soltags_elem[nvars];
-            for (int iv=0; iv < nvars; ++iv)
+            for( int iv = 0; iv < nvars; ++iv )
             {
                 runchk( mbi->tag_get_handle( mpas_tagnames[iv], mpas_zreflevels, moab::MB_TYPE_DOUBLE,
                                              mpas_soltags_3d[iv], moab::MB_TAG_DENSE ),
@@ -550,7 +549,7 @@ int main( int argc, char** argv )
                 const int tsvaroffset = romssize * mpas_zreflevels;
                 std::vector< double > tgtsrc_data( nvars * tsvaroffset );
 
-                std::vector<double> src_xyz(3*mpassize), dst_xyz(3*romssize);
+                std::vector< double > src_xyz( 3 * mpassize ), dst_xyz( 3 * romssize );
                 runchk( mbi->get_coords( mpas_elems.data(), mpas_elems.size(), src_xyz.data() ) );
                 runchk( mbi->get_coords( roms_elems.data(), roms_elems.size(), dst_xyz.data() ) );
 
@@ -558,7 +557,7 @@ int main( int argc, char** argv )
 #pragma omp parallel for shared( tgtsrc_data, weights, src_xyz, dst_xyz )
                 for( int ii = 0; ii < mpas_zlevels; ii++ )
                 {
-                    std::vector<double> src_twod(mpassize), dst_twod(romssize);
+                    std::vector< double > src_twod( mpassize ), dst_twod( romssize );
                     std::cout << "Computing projection for MPAS level: " + std::to_string( ii ) + "\n";
                     unsigned offsetr = romssize * ii;
                     for( int iv = 0; iv < nvars; ++iv )
@@ -567,14 +566,15 @@ int main( int argc, char** argv )
                         for( size_t j = 0; j < mpassize; ++j )
                         {
                             const int offset = svaroffset * iv + j * mpas_zlevels;
-                            src_twod[j] = maxlevelFace[j] - 1 < ii || src_data[ii + offset] < 1e-8
-                                                ? src_data[maxlevelFace[j] - 1 + offset]
-                                                : src_data[ii + offset];
+                            src_twod[j]      = maxlevelFace[j] - 1 < ii || src_data[ii + offset] < 1e-8
+                                                   ? src_data[maxlevelFace[j] - 1 + offset]
+                                                   : src_data[ii + offset];
                         }
 
-                        const RemappingMethod rmethod   = context.field_methods[roms_tagnames[iv]].first;
-                        if( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear || rmethod == TempestRemapInvDist ||
-                            rmethod == TempestRemapDelaunay || rmethod == TempestRemapIntegratedBilinear )
+                        const RemappingMethod rmethod = context.field_methods[roms_tagnames[iv]].first;
+                        if( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear ||
+                            rmethod == TempestRemapInvDist || rmethod == TempestRemapDelaunay ||
+                            rmethod == TempestRemapIntegratedBilinear )
                         // if ( context.computeTRMaps )
                         {
                             DataArray1D< double > dataInDouble( mpassize, false );
@@ -592,25 +592,20 @@ int main( int argc, char** argv )
                             // Compute the projection for the field
                             weights.Apply( dataInDouble, dataOutDouble );
 
-
                             if( context.useCAAS )
                                 ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap,
-                                                context.field_methods["Bathymetry"].second /*nPin*/, dataInDouble,
-                                                dataOutDouble, true /*useCAASLocal*/ );
+                                                   context.field_methods["Bathymetry"].second /*nPin*/, dataInDouble,
+                                                   dataOutDouble, true /*useCAASLocal*/ );
                         }
                         else
                         {
                             std::vector< double > src_tdata( mpassize );
-                            context.ComputeFieldProjectionsWithData( 2,
-                                                         mpas_ele_tagnames[iv],
-                                                         roms_tagnames[iv],
-                                                         src_xyz, dst_xyz,
-                                                         false, 0.0,
-                                                         src_twod,
-                                                         dst_twod );
+                            context.ComputeFieldProjectionsWithData( 2, mpas_ele_tagnames[iv], roms_tagnames[iv],
+                                                                     src_xyz, dst_xyz, false, 0.0, src_twod, dst_twod );
 
                             // copy the data back to the destination vector
-                            std::copy( dst_twod.begin(), dst_twod.end(), tgtsrc_data.data() + offsetr + tsvaroffset * iv );
+                            std::copy( dst_twod.begin(), dst_twod.end(),
+                                       tgtsrc_data.data() + offsetr + tsvaroffset * iv );
                             // if ( context.computeMBAInterpolant )
                         }
 
@@ -637,7 +632,6 @@ int main( int argc, char** argv )
                         //         }
                         //         context.timer_pop();
                         //     }
-
                     }
                 }
 
@@ -707,149 +701,149 @@ int main( int argc, char** argv )
 #endif
                 context.timer_pop();
             }
-//             else  // Vertical first and horizontal next
-//             {
-//                 std::vector< double > srctgt_salinity_data( mpassize * roms_zlevels ),
-//                     srctgt_temperature_data( mpassize * roms_zlevels );
+            //             else  // Vertical first and horizontal next
+            //             {
+            //                 std::vector< double > srctgt_salinity_data( mpassize * roms_zlevels ),
+            //                     srctgt_temperature_data( mpassize * roms_zlevels );
 
-// #ifdef VERTICAL_INTERPOLATION
-//                 // Now project each data layer in axial direction.
-//                 // NOTE: Embarassingly parallel
-//                 context.timer_push( "Compute 3D projection: 1Dx2D algorithm" );
-// #pragma omp parallel for shared( zrh_xyz3d, src_salinity_data, src_temperature_data, tgt_salinity_data, \
+            // #ifdef VERTICAL_INTERPOLATION
+            //                 // Now project each data layer in axial direction.
+            //                 // NOTE: Embarassingly parallel
+            //                 context.timer_push( "Compute 3D projection: 1Dx2D algorithm" );
+            // #pragma omp parallel for shared( zrh_xyz3d, src_salinity_data, src_temperature_data, tgt_salinity_data, \
 //                                      tgt_temperature_data, srctgt_salinity_data, srctgt_temperature_data )
-//                 for( size_t i = 0; i < mpassize; ++i )
-//                 {
-//                     std::vector< double > mpasroms_zvalsS( mpas_zlevels ),
-//                         mpasroms_zvalsT( mpas_zlevels );  // Data on MPAS 2D but ROMS 1D vertical
-//                     const size_t offset = i * mpas_zlevels;
-//                     for( int imzl = 0; imzl < mpas_zlevels; ++imzl )
-//                     {
-//                         mpasroms_zvalsS[imzl] = imzl + 1 > maxlevelFace[i] || src_salinity_data[imzl + offset] < 1e-8
-//                                                     ? src_salinity_data[maxlevelFace[i] - 1 + offset]
-//                                                     : src_salinity_data[imzl + offset];
-//                         mpasroms_zvalsT[imzl] = imzl + 1 > maxlevelFace[i] || src_temperature_data[imzl + offset] < 1e-8
-//                                                     ? src_temperature_data[maxlevelFace[i] - 1 + offset]
-//                                                     : src_temperature_data[imzl + offset];
-//                     }
+            //                 for( size_t i = 0; i < mpassize; ++i )
+            //                 {
+            //                     std::vector< double > mpasroms_zvalsS( mpas_zlevels ),
+            //                         mpasroms_zvalsT( mpas_zlevels );  // Data on MPAS 2D but ROMS 1D vertical
+            //                     const size_t offset = i * mpas_zlevels;
+            //                     for( int imzl = 0; imzl < mpas_zlevels; ++imzl )
+            //                     {
+            //                         mpasroms_zvalsS[imzl] = imzl + 1 > maxlevelFace[i] || src_salinity_data[imzl + offset] < 1e-8
+            //                                                     ? src_salinity_data[maxlevelFace[i] - 1 + offset]
+            //                                                     : src_salinity_data[imzl + offset];
+            //                         mpasroms_zvalsT[imzl] = imzl + 1 > maxlevelFace[i] || src_temperature_data[imzl + offset] < 1e-8
+            //                                                     ? src_temperature_data[maxlevelFace[i] - 1 + offset]
+            //                                                     : src_temperature_data[imzl + offset];
+            //                     }
 
-// #ifndef VERTICAL_INTERPOLANT_LINEAR
-//                     // tk::spline splS( zmh_z, mpasroms_zvalsS, tk::spline::cspline_hermite, true );
-//                     // tk::spline splT( zmh_z, mpasroms_zvalsT, tk::spline::cspline_hermite, true );
-//                     HermiteCubicCurve< double > splHC_S;
-//                     HermiteCubicCurve< double > splHC_T;
-//                     for( int imzl = 0; imzl < mpas_zlevels; imzl++ )
-//                     {
-//                         splHC_S.add( zmh_z[imzl], mpasroms_zvalsS[imzl] );
-//                         splHC_T.add( zmh_z[imzl], mpasroms_zvalsT[imzl] );
-//                     }
-//                     splHC_S.finish();
-//                     splHC_T.finish();
-// #endif
+            // #ifndef VERTICAL_INTERPOLANT_LINEAR
+            //                     // tk::spline splS( zmh_z, mpasroms_zvalsS, tk::spline::cspline_hermite, true );
+            //                     // tk::spline splT( zmh_z, mpasroms_zvalsT, tk::spline::cspline_hermite, true );
+            //                     HermiteCubicCurve< double > splHC_S;
+            //                     HermiteCubicCurve< double > splHC_T;
+            //                     for( int imzl = 0; imzl < mpas_zlevels; imzl++ )
+            //                     {
+            //                         splHC_S.add( zmh_z[imzl], mpasroms_zvalsS[imzl] );
+            //                         splHC_T.add( zmh_z[imzl], mpasroms_zvalsT[imzl] );
+            //                     }
+            //                     splHC_S.finish();
+            //                     splHC_T.finish();
+            // #endif
 
-//                     double rcoords[3] = { 0, 0, 0 };
+            //                     double rcoords[3] = { 0, 0, 0 };
 
-//                     // auto entROMS = roms_elems[i];
-//                     // mbi->get_coords( &entROMS, 1, rcoords );
-//                     // for( int irzl = 0; irzl < roms_zlevels; ++irzl )
-//                     // {
-//                     //     const double* zrh_xyz3d_loc = zrh_xyz3d.data() + i * roms_zlevels;
-//                     //     const int offset            = irzl * romssize;
-//                     //     // double roms_zlocation = ( irzl + 0.5 ) * delz;
-//                     //     double roms_zlocation = roms_ztotal + zrh_xyz3d_loc[irzl] / 2;
-//                     //     roms_ztotal += zrh_xyz3d_loc[irzl];
-//                     // }
+            //                     // auto entROMS = roms_elems[i];
+            //                     // mbi->get_coords( &entROMS, 1, rcoords );
+            //                     // for( int irzl = 0; irzl < roms_zlevels; ++irzl )
+            //                     // {
+            //                     //     const double* zrh_xyz3d_loc = zrh_xyz3d.data() + i * roms_zlevels;
+            //                     //     const int offset            = irzl * romssize;
+            //                     //     // double roms_zlocation = ( irzl + 0.5 ) * delz;
+            //                     //     double roms_zlocation = roms_ztotal + zrh_xyz3d_loc[irzl] / 2;
+            //                     //     roms_ztotal += zrh_xyz3d_loc[irzl];
+            //                     // }
 
-//                     const size_t offsetr = i * roms_zlevels;
-//                     double roms_ztotal   = rcoords[2];
-//                     for( size_t irzl = 0; irzl < roms_zlevels; ++irzl )
-//                     {
-//                         // const double pbathymetry = zrh_xyz2d[i];
-//                         // const double delz        = pbathymetry / dst_zlayers;
+            //                     const size_t offsetr = i * roms_zlevels;
+            //                     double roms_ztotal   = rcoords[2];
+            //                     for( size_t irzl = 0; irzl < roms_zlevels; ++irzl )
+            //                     {
+            //                         // const double pbathymetry = zrh_xyz2d[i];
+            //                         // const double delz        = pbathymetry / dst_zlayers;
 
-//                         // double roms_zlocation = ( irzl + 0.5 ) * delz;
-//                         double roms_zlocation = roms_ztotal + zrh_xyz3d[irzl] / 2;
-//                         roms_ztotal += zrh_xyz3d[irzl];
-//                         // Project data from zmh_z to zrh_z
-// #ifdef VERTICAL_INTERPOLANT_LINEAR
-//                         mlinterp::interp( &mpas_zlevels, 1,  // Number of points
-//                                           roms_zvalsS.data(), &srctgt_salinity_data[irzl + offsetr],  // Output axis (y)
-//                                           zmh_z.data(), &roms_zlocation                               // Input axis (x)
-//                         );
-//                         mlinterp::interp( &mpas_zlevels, 1,  // Number of points
-//                                           roms_zvalsT.data(),
-//                                           &srctgt_temperature_data[irzl + offsetr],  // Output axis (y)
-//                                           zmh_z.data(), &roms_zlocation              // Input axis (x)
-//                         );
-// #else
-//                         // srctgt_salinity_data[irzl + offsetr]    = splS( roms_zlocation );
-//                         // srctgt_temperature_data[irzl + offsetr] = splT( roms_zlocation );
-//                         srctgt_salinity_data[irzl + offsetr]    = splHC_S.at( roms_zlocation );
-//                         srctgt_temperature_data[irzl + offsetr] = splHC_T.at( roms_zlocation );
-// #endif
-//                         // srctgt_salinity_data[irzl + offsetr]    = pchipInterpolate( zmh_z, mpasroms_zvalsS, roms_zlocation );
-//                         // srctgt_temperature_data[irzl + offsetr] = pchipInterpolate( zmh_z, mpasroms_zvalsT, roms_zlocation );
-//                     }
-//                 }
-// #endif
+            //                         // double roms_zlocation = ( irzl + 0.5 ) * delz;
+            //                         double roms_zlocation = roms_ztotal + zrh_xyz3d[irzl] / 2;
+            //                         roms_ztotal += zrh_xyz3d[irzl];
+            //                         // Project data from zmh_z to zrh_z
+            // #ifdef VERTICAL_INTERPOLANT_LINEAR
+            //                         mlinterp::interp( &mpas_zlevels, 1,  // Number of points
+            //                                           roms_zvalsS.data(), &srctgt_salinity_data[irzl + offsetr],  // Output axis (y)
+            //                                           zmh_z.data(), &roms_zlocation                               // Input axis (x)
+            //                         );
+            //                         mlinterp::interp( &mpas_zlevels, 1,  // Number of points
+            //                                           roms_zvalsT.data(),
+            //                                           &srctgt_temperature_data[irzl + offsetr],  // Output axis (y)
+            //                                           zmh_z.data(), &roms_zlocation              // Input axis (x)
+            //                         );
+            // #else
+            //                         // srctgt_salinity_data[irzl + offsetr]    = splS( roms_zlocation );
+            //                         // srctgt_temperature_data[irzl + offsetr] = splT( roms_zlocation );
+            //                         srctgt_salinity_data[irzl + offsetr]    = splHC_S.at( roms_zlocation );
+            //                         srctgt_temperature_data[irzl + offsetr] = splHC_T.at( roms_zlocation );
+            // #endif
+            //                         // srctgt_salinity_data[irzl + offsetr]    = pchipInterpolate( zmh_z, mpasroms_zvalsS, roms_zlocation );
+            //                         // srctgt_temperature_data[irzl + offsetr] = pchipInterpolate( zmh_z, mpasroms_zvalsT, roms_zlocation );
+            //                     }
+            //                 }
+            // #endif
 
-// #pragma omp parallel for shared( srctgt_salinity_data, srctgt_temperature_data, tgt_salinity_data, \
+            // #pragma omp parallel for shared( srctgt_salinity_data, srctgt_temperature_data, tgt_salinity_data, \
 //                                      tgt_temperature_data, weights )
-//                 for( size_t ii = 0; ii < roms_zlevels; ii++ )
-//                 {
-//                     DataArray1D< double > dataInDoubleS( mpassize ), dataInDoubleT( mpassize );
-//                     std::cout << "Computing projection for ROMS level: " + std::to_string( ii ) + "\n";
+            //                 for( size_t ii = 0; ii < roms_zlevels; ii++ )
+            //                 {
+            //                     DataArray1D< double > dataInDoubleS( mpassize ), dataInDoubleT( mpassize );
+            //                     std::cout << "Computing projection for ROMS level: " + std::to_string( ii ) + "\n";
 
-//                     DataArray1D< double > dataOutDoubleS( romssize, false ), dataOutDoubleT( romssize, false );
+            //                     DataArray1D< double > dataOutDoubleS( romssize, false ), dataOutDoubleT( romssize, false );
 
-//                     const size_t offsetr = ii * romssize;
-//                     // std::vector< EntityHandle > mpas_slice( mpas3d_elems.begin() + offsetr,
-//                     //                                         mpas3d_elems.begin() + offsetr + mpassize );
-//                     std::vector< EntityHandle > roms_slice( roms3d_elems.begin() + offsetr,
-//                                                             roms3d_elems.begin() + offsetr + romssize );
+            //                     const size_t offsetr = ii * romssize;
+            //                     // std::vector< EntityHandle > mpas_slice( mpas3d_elems.begin() + offsetr,
+            //                     //                                         mpas3d_elems.begin() + offsetr + mpassize );
+            //                     std::vector< EntityHandle > roms_slice( roms3d_elems.begin() + offsetr,
+            //                                                             roms3d_elems.begin() + offsetr + romssize );
 
-//                     for( size_t j = 0; j < mpassize; ++j )
-//                     {
-//                         const size_t offset = j * roms_zlevels;
-//                         dataInDoubleS[j]    = srctgt_salinity_data[ii + offset];
-//                         dataInDoubleT[j]    = srctgt_temperature_data[ii + offset];
-//                     }
+            //                     for( size_t j = 0; j < mpassize; ++j )
+            //                     {
+            //                         const size_t offset = j * roms_zlevels;
+            //                         dataInDoubleS[j]    = srctgt_salinity_data[ii + offset];
+            //                         dataInDoubleT[j]    = srctgt_temperature_data[ii + offset];
+            //                     }
 
-//                     // dataInDoubleS.AttachToData( src_salinity_data.data() + offsetr );
-//                     dataOutDoubleS.AttachToData( tgt_salinity_data.data() + offsetr );
+            //                     // dataInDoubleS.AttachToData( src_salinity_data.data() + offsetr );
+            //                     dataOutDoubleS.AttachToData( tgt_salinity_data.data() + offsetr );
 
-//                     // Compute the projection for the salinity field
-//                     weights.Apply( dataInDoubleS, dataOutDoubleS );
+            //                     // Compute the projection for the salinity field
+            //                     weights.Apply( dataInDoubleS, dataOutDoubleS );
 
-//                     if( context.useCAAS )
-//                         ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap,
-//                                            context.field_methods["Bathymetry"].second /*nPin*/, dataInDoubleS,
-//                                            dataOutDoubleS, true /*useCAASLocal*/ );
+            //                     if( context.useCAAS )
+            //                         ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap,
+            //                                            context.field_methods["Bathymetry"].second /*nPin*/, dataInDoubleS,
+            //                                            dataOutDoubleS, true /*useCAASLocal*/ );
 
-// // #ifndef VERTICAL_INTERPOLATION
-// //                     runchk( mbi->tag_set_data( roms_soltags_elem[0], roms_slice.data(), roms_slice.size(),
-// //                                                dataOutDoubleS ),
-// //                             "Can't set salinity tag data" );
-// // #endif
-//                     // dataInDoubleT.AttachToData( src_temperature_data.data() + offsetr );
-//                     dataOutDoubleT.AttachToData( tgt_temperature_data.data() + offsetr );
+            // // #ifndef VERTICAL_INTERPOLATION
+            // //                     runchk( mbi->tag_set_data( roms_soltags_elem[0], roms_slice.data(), roms_slice.size(),
+            // //                                                dataOutDoubleS ),
+            // //                             "Can't set salinity tag data" );
+            // // #endif
+            //                     // dataInDoubleT.AttachToData( src_temperature_data.data() + offsetr );
+            //                     dataOutDoubleT.AttachToData( tgt_temperature_data.data() + offsetr );
 
-//                     // Compute the projection for the temperature field
-//                     weights.Apply( dataInDoubleT, dataOutDoubleT );
+            //                     // Compute the projection for the temperature field
+            //                     weights.Apply( dataInDoubleT, dataOutDoubleT );
 
-//                     if( context.useCAAS )
-//                         ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap,
-//                                            context.field_methods["Bathymetry"].second /*nPin*/, dataInDoubleT,
-//                                            dataOutDoubleT, true /*useCAASLocal*/ );
+            //                     if( context.useCAAS )
+            //                         ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap,
+            //                                            context.field_methods["Bathymetry"].second /*nPin*/, dataInDoubleT,
+            //                                            dataOutDoubleT, true /*useCAASLocal*/ );
 
-// // #ifndef VERTICAL_INTERPOLATION
-// //                     runchk( mbi->tag_set_data( roms_soltags_elem[1], roms_slice.data(), roms_slice.size(),
-// //                                                dataOutDoubleT ),
-// //                             "Can't set temperature tag data" );
-// // #endif
-//                 }
-//                 context.timer_pop();
-//             }
+            // // #ifndef VERTICAL_INTERPOLATION
+            // //                     runchk( mbi->tag_set_data( roms_soltags_elem[1], roms_slice.data(), roms_slice.size(),
+            // //                                                dataOutDoubleT ),
+            // //                             "Can't set temperature tag data" );
+            // // #endif
+            //                 }
+            //                 context.timer_pop();
+            //             }
 
 #ifdef VERTICAL_INTERPOLATION
             for( int iv = 0; iv < nvars; ++iv )
@@ -931,30 +925,41 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( int dimension,
 
     // determine if this is either one of the standard 2D fields or forcing functions
     bool standard_fields = false;
-    for (int iv = 0; iv < nstandardvars; ++iv)
-        if ( !varProjectDst.compare( roms_twod_standardtagnames[iv] ) ) standard_fields = true;
-    for (int iv = 0; iv < nforcingvars; ++iv)
-        if ( !varProjectDst.compare( mpas_twod_forcingtagnames[iv] ) ) standard_fields = true;
+    for( int iv = 0; iv < nstandardvars; ++iv )
+        if( !varProjectDst.compare( roms_twod_standardtagnames[iv] ) ) standard_fields = true;
+    for( int iv = 0; iv < nforcingvars; ++iv )
+        if( !varProjectDst.compare( mpas_twod_forcingtagnames[iv] ) ) standard_fields = true;
 
-    const bool is_three_dimensional = (dimension == 3);
+    const bool is_three_dimensional = ( dimension == 3 );
     const bool normalize            = this->normalize;
 
     // get the source data from tag
     std::vector< double > src_tdata( source_range.size() ), dst_tdata( target_range.size() );
     if( standard_fields )
     {
-        err = mbi->tag_get_handle( varProjectSrc.c_str(), 1, moab::MB_TYPE_DOUBLE, dmtag, moab::MB_TAG_DENSE );//MB_CHK_ERR( err );
-        if (err != moab::MB_SUCCESS) { std::cout << "Could not retreive the tag handle: " << varProjectSrc << ". Skipping ...\n"; return moab::MB_SUCCESS;}
+        err = mbi->tag_get_handle( varProjectSrc.c_str(), 1, moab::MB_TYPE_DOUBLE, dmtag,
+                                   moab::MB_TAG_DENSE );  //MB_CHK_ERR( err );
+        if( err != moab::MB_SUCCESS )
+        {
+            std::cout << "Could not retreive the tag handle: " << varProjectSrc << ". Skipping ...\n";
+            return moab::MB_SUCCESS;
+        }
         err = mbi->tag_get_data( dmtag, source_range.data(), source_range.size(), src_tdata.data() );MB_CHK_ERR( err );
     }
     else
     {
-        if (is_three_dimensional)
-            err = mbi->tag_get_handle( varProjectSrc.c_str(), 1, moab::MB_TYPE_DOUBLE, dmtag, moab::MB_TAG_DENSE );//MB_CHK_ERR( err );
+        if( is_three_dimensional )
+            err = mbi->tag_get_handle( varProjectSrc.c_str(), 1, moab::MB_TYPE_DOUBLE, dmtag,
+                                       moab::MB_TAG_DENSE );  //MB_CHK_ERR( err );
         else
-            err = mbi->tag_get_handle( varProjectSrc.c_str(), mpas_zreflevels, moab::MB_TYPE_DOUBLE, dmtag, moab::MB_TAG_DENSE );//MB_CHK_ERR( err );
-        if (err != moab::MB_SUCCESS) { std::cout << "Could not retreive the non-standard tag handle: " << varProjectSrc << ". Skipping ...\n"; return moab::MB_SUCCESS;}
-        if (is_three_dimensional)
+            err = mbi->tag_get_handle( varProjectSrc.c_str(), mpas_zreflevels, moab::MB_TYPE_DOUBLE, dmtag,
+                                       moab::MB_TAG_DENSE );  //MB_CHK_ERR( err );
+        if( err != moab::MB_SUCCESS )
+        {
+            std::cout << "Could not retreive the non-standard tag handle: " << varProjectSrc << ". Skipping ...\n";
+            return moab::MB_SUCCESS;
+        }
+        if( is_three_dimensional )
         {
             err = mbi->tag_get_data( dmtag, source_range.data(), source_range.size(), src_tdata.data() );MB_CHK_ERR( err );
         }
@@ -969,7 +974,7 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( int dimension,
 
     // get the coordinates of the elements
     std::vector< double > src_xyz, dst_xyz;
-    const RemappingMethod rmethod   = this->field_methods[varProjectDst].first;
+    const RemappingMethod rmethod = this->field_methods[varProjectDst].first;
     if( !( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear || rmethod == TempestRemapInvDist ||
            rmethod == TempestRemapDelaunay || rmethod == TempestRemapIntegratedBilinear ) )
     {
@@ -979,15 +984,8 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( int dimension,
         err = mbi->get_coords( target_range.data(), target_range.size(), dst_xyz.data() );MB_CHK_ERR( err );
     }
 
-    err = this->ComputeFieldProjectionsWithData( dimension,
-                                                         varProjectSrc,
-                                                         varProjectDst,
-                                                         src_xyz,
-                                                         dst_xyz,
-                                                         normalize,
-                                                         constantoffset,
-                                                         src_tdata,
-                                                         dst_tdata );MB_CHK_ERR( err );
+    err = this->ComputeFieldProjectionsWithData( dimension, varProjectSrc, varProjectDst, src_xyz, dst_xyz, normalize,
+                                                 constantoffset, src_tdata, dst_tdata );MB_CHK_ERR( err );
 
     // now set the data on ROMS instance of MOAB tag
     moab::Tag drtag;
@@ -999,21 +997,18 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( int dimension,
     return moab::MB_SUCCESS;
 }
 
-
 moab::ErrorCode RuntimeContext::ComputeFieldProjectionsWithData( int dimension,
-                                                         std::string varProjectSrc,
-                                                         std::string varProjectDst,
-                                                         const std::vector< double >& src_xyz,
-                                                         const std::vector< double >& dst_xyz,
-                                                         const bool normalize,
-                                                         const double constantoffset,
-                                                         std::vector< double >& src_tdata,
-                                                         std::vector< double >& dst_tdata )
+                                                                 std::string varProjectSrc,
+                                                                 std::string varProjectDst,
+                                                                 const std::vector< double >& src_xyz,
+                                                                 const std::vector< double >& dst_xyz,
+                                                                 const bool normalize,
+                                                                 const double constantoffset,
+                                                                 std::vector< double >& src_tdata,
+                                                                 std::vector< double >& dst_tdata )
 {
     moab::ErrorCode err;
-    moab::Interface* mbi = this->moab_interface;
-
-    const bool is_three_dimensional = (dimension == 3);
+    const bool is_three_dimensional = ( dimension == 3 );
     const RemappingMethod rmethod   = this->field_methods[varProjectDst].first;
     const int order                 = this->field_methods[varProjectDst].second;
 
@@ -1127,4 +1122,3 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjectionsWithData( int dimension,
 
     return moab::MB_SUCCESS;
 }
-

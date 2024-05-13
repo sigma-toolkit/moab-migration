@@ -346,7 +346,6 @@ if HAVE_HDF5
 endif
 
 if PARALLEL
-#  	 IntxMesh/wrap_intx.cpp
   libMOAB_la_SOURCES += \
      parallel/ParallelComm.cpp \
      parallel/ProcConfig.cpp \
@@ -432,10 +431,6 @@ if ENABLE_metis
   libMOAB_la_LIBADD += $(METIS_LIBS)
 endif
 
-
-if HAVE_CGM
-  AM_CPPFLAGS += @CGM_CPPFLAGS@
-endif
 
 CLEANFILES = a.out imoab.mod
 EXTRA_DIST += CMakeLists.txt parallel/CMakeLists.txt IntxMesh/CMakeLists.txt

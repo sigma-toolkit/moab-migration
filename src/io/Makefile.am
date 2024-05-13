@@ -103,17 +103,6 @@ else
   MOAB_DAMSEL_SRCS =
 endif
 
-if HAVE_CGM
-  AM_CPPFLAGS += @CGM_CPPFLAGS@
-if USING_DEV_CGM
-  AM_CPPFLAGS += -I$(CGM_DIR)/src
-endif
-  MOAB_CGM_SRCS =  ReadCGM.cpp  ReadCGM.hpp
-  libmoabio_la_LIBADD += @CGM_LIBS@
-else
-  MOAB_CGM_SRCS =
-endif
-
 # The list of source files, and any header files that do not need to be installed
 libmoabio_la_SOURCES = \
   exodus_order.h \
@@ -175,8 +164,7 @@ libmoabio_la_SOURCES = \
   $(MOAB_CGNS_SRCS) \
   $(MOAB_HDF5_SRCS) \
   $(MOAB_CCMIO_SRCS) \
-  $(MOAB_DAMSEL_SRCS) \
-  $(MOAB_CGM_SRCS)
+  $(MOAB_DAMSEL_SRCS)
 
 libmoabio_la_includedir = $(includedir)
 nobase_libmoabio_la_include_HEADERS = moab/ExoIIInterface.hpp moab/VtkUtil.hpp

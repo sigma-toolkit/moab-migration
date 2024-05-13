@@ -29,15 +29,6 @@ else
   CCMIO_TEST =
 endif
 
-if HAVE_CGM
-if HAVE_OCC
-  CGM_TEST = read_cgm_load_test read_cgm_basic_test read_cgm_senses_test read_cgm_connectivity_test \
-             read_cgm_group_test read_cgm_facet_test
-endif
-else
-  CGM_TEST =
-endif
-
 if HAVE_CGNS
   CGNS_TEST = cgns_test
   LDADD += $(CGNS_LIBS)
@@ -57,7 +48,6 @@ TESTS = readutil_test \
         stl_test \
         smf_test \
 	$(CCMIO_TEST) \
-	$(CGM_TEST) \
 	$(CGNS_TEST) \
 	readrtt_test \
 	read_obj_test
@@ -82,18 +72,6 @@ ideas_test_SOURCES = $(srcdir)/../TestUtil.hpp ideas_test.cpp
 stl_test_SOURCES = $(srcdir)/../TestUtil.hpp stl_test.cpp
 smf_test_SOURCES = $(srcdir)/../TestUtil.hpp smf_test.cpp
 ccmio_test_SOURCES = $(srcdir)/../TestUtil.hpp ccmio_test.cpp
-read_cgm_load_test_SOURCES = $(srcdir)/../TestUtil.hpp read_cgm_load_test.cpp
-read_cgm_load_test_CXXFLAGS = $(CGM_CPPFLAGS)  $(CXXFLAGS)
-read_cgm_basic_test_SOURCES = $(srcdir)/../TestUtil.hpp read_cgm_basic_test.cpp
-read_cgm_basic_test_CXXFLAGS = $(CGM_CPPFLAGS) $(CGM_LIBS)  $(CXXFLAGS)
-read_cgm_senses_test_SOURCES = $(srcdir)/../TestUtil.hpp read_cgm_senses_test.cpp
-read_cgm_senses_test_CXXFLAGS = $(CGM_CPPFLAGS) $(CGM_LIBS)  $(CXXFLAGS)
-read_cgm_connectivity_test_SOURCES = $(srcdir)/../TestUtil.hpp read_cgm_connectivity_test.cpp
-read_cgm_connectivity_test_CXXFLAGS = $(CGM_CPPFLAGS) $(CGM_LIBS)  $(CXXFLAGS)
-read_cgm_group_test_SOURCES = $(srcdir)/../TestUtil.hpp read_cgm_group_test.cpp
-read_cgm_group_test_CXXFLAGS = $(CGM_CPPFLAGS) $(CGM_LIBS)  $(CXXFLAGS)
-read_cgm_facet_test_SOURCES = $(srcdir)/../TestUtil.hpp read_cgm_facet_test.cpp
-read_cgm_facet_test_CXXFLAGS = $(CGM_CPPFLAGS) $(CGM_LIBS) $(CXXFLAGS)
 readutil_test_SOURCES = $(srcdir)/../TestUtil.hpp readutil_test.cpp
 cgns_test_SOURCES=$(srcdir)/../TestUtil.hpp cgns_test.cpp
 readrtt_test_SOURCES = $(srcdir)/../TestUtil.hpp readrtt_test.cpp
@@ -115,5 +93,6 @@ MOSTLYCLEANFILES = dumped_acis.sat \
                    test_gcrm_vars.nc \
                    test_homme_T.nc \
                    test_mpas_vars.nc \
-                   rtttest.rtt
+                   rtttest.rtt \
+                   test_dom_zoltan.h5m
 DISTCLEANFILES = a.out

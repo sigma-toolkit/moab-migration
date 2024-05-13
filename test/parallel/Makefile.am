@@ -39,7 +39,7 @@ TESTS = pcomm_unit \
         hireconst_test_parallel \
         $(NETCDF_TESTS) \
         $(HDF5_TESTS) \
-        $(MBCSLAM_TESTS) $(IMESH_TESTS) $(IMOAB_TESTS)
+        $(MBCSLAM_TESTS) $(IMOAB_TESTS)
 
 if HAVE_HDF5_PARALLEL
   HDF5_TESTS = parallel_hdf5_test mhdf_parallel parallel_write_test \
@@ -132,19 +132,6 @@ if HAVE_HDF5_PARALLEL
  IMOAB_TESTS += imoab_setwithGid
 endif
 
-IMESH_TESTS =
-if ENABLE_imesh
-if HAVE_HDF5_PARALLEL
-if ENABLE_FORTRAN
-   IMESH_TESTS += imeshp_test
-   FCFLAGS += -I$(top_srcdir)/itaps \
-              -I$(top_srcdir)/itaps/imesh \
-              -I$(top_builddir)/itaps \
-              -I$(top_builddir)/itaps/imesh
-endif
-endif
-endif
-
 if HAVE_HYPRE
 AM_CPPFLAGS += $(HYPRE_INCLUDES) -I$(top_srcdir)/src/HYPRE/moab
 AM_LDFLAGS += $(HYPRE_LIBS)
@@ -204,17 +191,6 @@ commgraph_test_SOURCES = commgraph_test.cpp
 test_mapweights_bcast_SOURCES = test_mapweights_bcast.cpp
 imoab_coupler_bilin_SOURCES = imoab_coupler_bilin.cpp
 imoab_domain_culling_SOURCES = imoab_domain_culling.cpp
-
-if ENABLE_imesh
-if HAVE_HDF5_PARALLEL
-if ENABLE_FORTRAN
-  imeshp_test_SOURCES = imeshp_test.F90
-  imeshp_test_LDADD =   $(top_builddir)/itaps/imesh/libiMesh.la $(LDADD) ${MOAB_CXX_LINKFLAGS} ${MOAB_CXX_LIBS} $(FCLIBS)
-endif
-endif
-endif
-
-
 par_intx_sph_SOURCES = par_intx_sph.cpp
 par_intx_sph_LDADD = $(LDADD)
 
@@ -272,7 +248,7 @@ MOSTLYCLEANFILES = mhdf_ll.h5m \
                    Ocn2WithProj.h5m recvAtm2CoupFull.h5m recvAtm2.h5m  atm2_ocn_map.nc atm_ocn_map2.nc fOcnOnCpl8.h5m fOcnOnCpl0.h5m fOcnOnCpl1.h5m \
                    afterSend.h5m readCplRof.h5m fOcnBilinOnCpl atm_ocn_bilin_map_p2.nc OcnWithProjBilin.h5m fOcnBilinOnCpl.h5m recvAtmx.h5m \
 		   test_esmf_rcbzoltan_no_mixed_elements.h5m test_esmf_rcbzoltan.h5m test_esmf_no_mixed_elements.h5m test_esmf.h5m \
-		   atmDOCN_map.nc OcnDomMesh.h5m OcnDomMeshProj.h5m
+		   atmDOCN_map.nc OcnDomMesh.h5m OcnDomMeshProj.h5m test_dom_zoltan.h5m
 
 EXTRA_DIST = imoab_coupler_utils.hpp
 FORTDEFS = $(FCDEFS)

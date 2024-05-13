@@ -11,7 +11,9 @@
 
 namespace moab
 {
-
+#ifdef MOAB_HAVE_MPI
+class ParallelComm;
+#endif
 //! Child helper class for Domain grid
 class NCHelperDomain : public ScdNCHelper
 {
@@ -30,7 +32,19 @@ class NCHelperDomain : public ScdNCHelper
     {
         return "DOMAIN";
     }
-
+#ifdef MOAB_HAVE_MPI
+    ErrorCode redistribute_cells( moab::ParallelComm* myPcomm,
+                                  std::vector< double >& xc,
+                                  std::vector< double >& yc,
+                                  std::vector< double >& xv,
+                                  std::vector< double >& yv,
+                                  std::vector< double >& frac,
+                                  std::vector< int >& mask,
+                                  std::vector< double >& area,
+                                  std::vector< int >& gids,
+                                  int nv,  // number of vertices per cell
+                                  bool nv_last );
+#endif
     int nv;     // number of vertices per cell
     int nvDim;  // index of nv dim
 };

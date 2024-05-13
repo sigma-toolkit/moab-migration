@@ -9,11 +9,6 @@
 #ifdef MOAB_HAVE_ZOLTAN
 #include "moab/ZoltanPartitioner.hpp"
 
-#ifdef MOAB_HAVE_CGM
-#include "InitCGMA.hpp"
-#include "CubitCompat.hpp"
-#endif
-
 #endif
 
 #ifdef MOAB_HAVE_METIS
@@ -123,15 +118,6 @@ int main( int argc, char* argv[] )
 
     double part_geom_mesh_size = -1.0;
 #ifdef MOAB_HAVE_ZOLTAN
-    bool part_surf = false;
-#ifdef MOAB_HAVE_CGM
-    opts.addOpt< double >( "geom,g", "(CGM) If partition geometry, specify mesh size.", &part_geom_mesh_size );
-    opts.addOpt< void >( "surf,f", "(CGM) Specify if partition geometry surface.", &part_surf );
-#endif  // MOAB_HAVE_CGM
-
-    bool ghost = false;
-    opts.addOpt< void >( "ghost,H", "(Zoltan) Specify if partition ghost geometry body." );
-
     int obj_weight = 0;
     opts.addOpt< int >( "vertex_w,v", "(Zoltan) Number of weights associated with a graph vertex." );
 
@@ -236,22 +222,7 @@ int main( int argc, char* argv[] )
         else
         {
             // partition geometry
-#ifdef MOAB_HAVE_CGM
-            CubitStatus status = InitCGMA::initialize_cgma();
-            if( CUBIT_SUCCESS != status )
-            {
-                std::cerr << "CGM couldn't be initialized." << std::endl << std::endl;
-                opts.printHelp();
-                return EXIT_FAILURE;
-            }
-            GeometryQueryTool* gti = GeometryQueryTool::instance();
-            // no ParallelComm so far
-            zoltan_tool = new ZoltanPartitioner( &mb, NULL, false, argc, argv, gti );
-#else
-            std::cerr << "CGM should be configured to partition geometry." << std::endl << std::endl;
-            opts.printHelp();
-            return EXIT_FAILURE;
-#endif  // MOAB_HAVE_CGM
+            MB_CHK_SET_ERR( MB_FAILURE, "Geometry will not be partitioned.\n" );
         }
         zoltan_tool->set_global_id_option( assign_global_ids );
     }
@@ -392,7 +363,7 @@ int main( int argc, char* argv[] )
             rval = zoltan_tool->partition_mesh_and_geometry(
                 part_geom_mesh_size, num_parts, zoltan_method.c_str(),
                 ( !parm_method.empty() ? parm_method.c_str() : oct_method.c_str() ), imbal_tol, part_dim, write_sets,
-                write_tags, obj_weight, edge_weight, part_surf, ghost, projection_type, recompute_box_rcb, print_time );MB_CHK_SET_ERR( rval, "Zoltan partitioner failed." );
+                write_tags, obj_weight, edge_weight, projection_type, recompute_box_rcb, print_time );MB_CHK_SET_ERR( rval, "Zoltan partitioner failed." );
         }
 #endif
 #ifdef MOAB_HAVE_METIS
@@ -473,38 +444,10 @@ int main( int argc, char* argv[] )
         {
             rval = mb.write_file( tmp_output_file.str().c_str() );MB_CHK_SET_ERR( rval, tmp_output_file.str() << " : failed to write file." << std::endl );
         }
-#ifdef MOAB_HAVE_ZOLTAN
-#ifdef MOAB_HAVE_CGM
         else
         {
-            std::string::size_type idx = output_file.find_last_of( "." );
-            int c_size                 = output_file.length() - idx;
-            const char* file_type      = NULL;
-            if( output_file.compare( idx, c_size, ".occ" ) == 0 || output_file.compare( idx, c_size, ".OCC" ) == 0 )
-                file_type = "OCC";
-            else if( output_file.compare( idx, c_size, ".sab" ) == 0 )
-                file_type = "ACIS_SAB";
-            else if( output_file.compare( idx, c_size, ".sat" ) == 0 )
-                file_type = "ACIS_SAT";
-            else
-            {
-                std::cerr << "File type for " << output_file.c_str() << " not supported." << std::endl;
-                return 1;
-            }
-
-            int num_ents_exported = 0;
-            DLIList< RefEntity* > ref_entity_list;
-            CubitStatus status =
-                CubitCompat_export_solid_model( ref_entity_list, tmp_output_file.str().c_str(), file_type,
-                                                num_ents_exported, CubitString( __FILE__ ) );
-            if( CUBIT_SUCCESS != status )
-            {
-                std::cerr << "CGM couldn't export models." << std::endl;
-                return 1;
-            }
+          MB_CHK_SET_ERR( MB_FAILURE, "Geometry will not be partitioned.\n" );
         }
-#endif
-#endif
 
         if( print_time )
             std::cout << "Wrote \"" << tmp_output_file.str() << "\" in " << ( clock() - t ) / (double)CLOCKS_PER_SEC

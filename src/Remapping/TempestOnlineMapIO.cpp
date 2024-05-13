@@ -1191,7 +1191,6 @@ void print_progress( const int barWidth, const float progress, const char* messa
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
 moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
                                                          const std::vector< int >& owned_dof_ids,
                                                          bool row_partition )

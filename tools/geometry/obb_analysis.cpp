@@ -373,7 +373,7 @@ static std::string make_property_string( DagMC& dag, EntityHandle eh, std::vecto
 
 ErrorCode obbstat_write( GeomTopoTool& gtt,
                          std::vector< int >& volumes,
-                         std::vector< std::string >& properties,
+                         std::vector< std::string >& /*properties*/,
                          std::ostream& out )
 {
 

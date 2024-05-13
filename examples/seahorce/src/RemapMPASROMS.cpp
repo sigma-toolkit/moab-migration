@@ -199,7 +199,7 @@ int main( int argc, char** argv )
                                                    << " vertices." );
         }
 
-#define COMPUTE_MAPS
+// #define COMPUTE_MAPS
 #ifdef COMPUTE_MAPS
         if( context.computeTRMaps )
         {
@@ -1066,7 +1066,7 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjectionsWithData( int dimension,
             // std::array< size_t, 3 > grid = { 16, 16, mpas_zlevels };
             // constexpr int nlevels        = 9;
             // std::array< size_t, 3 > grid = { 4, 4, mpas_zlevels / 4 };
-            constexpr int nlevels        = 10;
+            constexpr int nlevels        = 15;
             std::array< size_t, 3 > grid = { 2, 2, mpas_zlevels / 4 };
             std::array< double, 6 > bbox = { -2.0, -2.0, -1E6, 2.0, 2.0, 5E2 };
             // std::array< double, 6 > bbox = { -1.0, -1.0, -1.0, 1.0, 1.0, 1 };
@@ -1076,7 +1076,7 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjectionsWithData( int dimension,
         }
         else
         {
-            constexpr int nlevels        = 15;
+            constexpr int nlevels        = 18;
             std::array< size_t, 3 > grid = { 2, 2, 2 };
             std::array< double, 6 > bbox = { -4.0, -4.0, -1E2, 4.0, 4.0, 1E2 };
             std::cout << "\nComputing MBA interpolant (order=4, degree=3) for field " << varProjectSrc << std::endl;

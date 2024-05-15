@@ -2184,39 +2184,45 @@ moab::ErrorCode moab::TempestOnlineMap::ComputeMetrics( moab::Remapper::Intersec
     rval = m_interface->tag_get_name( approxTag, projTagName );MB_CHK_ERR( rval );
     rval = m_interface->tag_get_data( approxTag, entities, &projSolution[0] );MB_CHK_ERR( rval );
 
-    std::vector< double > errnorms( 3, 0.0 ), globerrnorms( 3, 0.0 );  //  L1Err, L2Err, LinfErr
-    for( int i = 0; i < ntotsize; ++i )
+    const auto& ovents = m_remapper->m_overlap_entities;
+
+    std::vector< double > errnorms( 4, 0.0 ), globerrnorms( 4, 0.0 );  //  L1Err, L2Err, LinfErr
+    double sumarea = 0.0;
+    for( size_t i = 0; i < ovents.size(); ++i )
     {
-        const double error = fabs( exactSolution[i] - projSolution[i] );
-        errnorms[0] += error;
-        errnorms[1] += error * error;
-        errnorms[2] = ( error > errnorms[2] ? error : errnorms[2] );
+        const int srcidx    = m_remapper->m_overlap->vecSourceFaceIx[i];
+        const int tgtidx    = m_remapper->m_overlap->vecTargetFaceIx[i];
+        const double ovarea = m_remapper->m_overlap->vecFaceArea[i];
+        const double error  = fabs( exactSolution[tgtidx] - projSolution[tgtidx] );
+        errnorms[0] += ovarea * error;
+        errnorms[1] += ovarea * error * error;
+        errnorms[3] = ( error > errnorms[3] ? error : errnorms[3] );
+        sumarea += ovarea;
     }
+    errnorms[2] = sumarea;
 #ifdef MOAB_HAVE_MPI
     if( m_pcomm )
     {
-        MPI_Reduce( &ntotsize, &ntotsize_glob, 1, MPI_INT, MPI_SUM, 0, m_pcomm->comm() );
-        MPI_Reduce( &errnorms[0], &globerrnorms[0], 2, MPI_DOUBLE, MPI_SUM, 0, m_pcomm->comm() );
-        MPI_Reduce( &errnorms[2], &globerrnorms[2], 1, MPI_DOUBLE, MPI_MAX, 0, m_pcomm->comm() );
+        MPI_Reduce( &errnorms[0], &globerrnorms[0], 3, MPI_DOUBLE, MPI_SUM, 0, m_pcomm->comm() );
+        MPI_Reduce( &errnorms[3], &globerrnorms[3], 1, MPI_DOUBLE, MPI_MAX, 0, m_pcomm->comm() );
     }
 #else
-    ntotsize_glob = ntotsize;
     globerrnorms  = errnorms;
 #endif
-    globerrnorms[0] = ( globerrnorms[0] / ntotsize_glob );
-    globerrnorms[1] = std::sqrt( globerrnorms[1] / ntotsize_glob );
+    globerrnorms[0] = ( globerrnorms[0] / globerrnorms[2] );
+    globerrnorms[1] = std::sqrt( globerrnorms[1] / globerrnorms[2] );
 
     metrics.clear();
     metrics["L1Error"]   = globerrnorms[0];
     metrics["L2Error"]   = globerrnorms[1];
-    metrics["LinfError"] = globerrnorms[2];
+    metrics["LinfError"] = globerrnorms[3];
 
     if( verbose && is_root )
     {
         std::cout << "Error metrics when comparing " << projTagName << " against " << exactTagName << std::endl;
         std::cout << "\t L_1 error   = " << globerrnorms[0] << std::endl;
         std::cout << "\t L_2 error   = " << globerrnorms[1] << std::endl;
-        std::cout << "\t L_inf error = " << globerrnorms[2] << std::endl;
+        std::cout << "\t L_inf error = " << globerrnorms[3] << std::endl;
     }
 
     return moab::MB_SUCCESS;

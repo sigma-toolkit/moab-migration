@@ -207,11 +207,11 @@ program imoab_coupler_fortran
    end if
 
    weights_identifier1 = 'scalar'//C_NULL_CHAR
-   disc_methods1 = 'cgll'//C_NULL_CHAR
+   disc_methods1 = 'fv'//C_NULL_CHAR
    disc_methods2 = 'fv'//C_NULL_CHAR
-   disc_orders1 = 4
+   disc_orders1 = 1
    disc_orders2 = 1
-   dof_tag_names1 = 'GLOBAL_DOFS'//C_NULL_CHAR
+   dof_tag_names1 = 'GLOBAL_ID'//C_NULL_CHAR
    dof_tag_names2 = 'GLOBAL_ID'//C_NULL_CHAR
    ! fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 1, fNoConserve = 0, fNoBubble = 1
    fNoBubble = 1

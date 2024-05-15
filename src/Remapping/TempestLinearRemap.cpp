@@ -691,9 +691,10 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
 
     if( caasType != CAAS_NONE )
     {
+        constexpr int nmax_caas_iterations = 1;
         double mismatch   = 1.0;
         int caasIteration = 0;
-        while( mismatch > 1e-15 && caasIteration++ < 5 )  // iterate until convergence or a maximum of 5 iterations
+        while( mismatch > 1e-15 && caasIteration++ < nmax_caas_iterations )  // iterate until convergence or a maximum of 5 iterations
         {
             std::pair< double, double > mDefect = this->ApplyCAASLimiting( srcVals, tgtVals, caasType );
             if( m_remapper->verbose && is_root )

@@ -2190,7 +2190,7 @@ moab::ErrorCode moab::TempestOnlineMap::ComputeMetrics( moab::Remapper::Intersec
     double sumarea = 0.0;
     for( size_t i = 0; i < ovents.size(); ++i )
     {
-        const int srcidx    = m_remapper->m_overlap->vecSourceFaceIx[i];
+        // const int srcidx    = m_remapper->m_overlap->vecSourceFaceIx[i];
         const int tgtidx    = m_remapper->m_overlap->vecTargetFaceIx[i];
         const double ovarea = m_remapper->m_overlap->vecFaceArea[i];
         const double error  = fabs( exactSolution[tgtidx] - projSolution[tgtidx] );

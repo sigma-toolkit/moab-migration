@@ -190,7 +190,7 @@ program imoab_coupler_fortran
       call errorout(ierr, 'cannot compute intersection')
       ierr = iMOAB_WriteLocalMesh(cplAtmOcnPID, 'intx_ao')
       call errorout(ierr, 'could not write intersection mesh to disk')
-      
+
    end if
 
    if (atmCouComm .NE. MPI_COMM_NULL) then
@@ -357,7 +357,7 @@ program imoab_coupler_fortran
 
       ! We have the remapping weights now. Let us apply the weights onto the tag we defined
       ! on the source mesh and get the projection on the target mesh
-      filter_type = 1 ! local CAAS operator application
+      filter_type = 3 ! local CAAS operator application
       ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, "secondorder"//C_NULL_CHAR, &
                                                 fields, &
                                                 projectedFieldsCAAS)

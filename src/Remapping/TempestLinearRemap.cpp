@@ -464,6 +464,7 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
     const DataArray1D< double >& m_dTargetAreas  = this->m_remapper->m_target->vecFaceArea;
     const DataArray1D< double >& m_dOverlapAreas = this->m_remapper->m_overlap->vecFaceArea;
 
+
     // Apply the offline map to the data
     double dMassDiff = 0.0;
     DataArray1D< double > x( nTargetCount );
@@ -475,16 +476,20 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
     double dSourceMax = dataInDouble[0];
     double dTargetMin = dataOutDouble[0];
     double dTargetMax = dataOutDouble[0];
+    printf( "%d: nTargetCount: %lu\n", rank, nTargetCount );
     std::vector< std::vector< int > > vecSourceOvTarget( nTargetCount );
     for( size_t i = 0; i < m_meshOverlap->faces.size(); i++ )
     {
         const int ixS = m_meshOverlap->vecSourceFaceIx[i];
         const int ixT = m_meshOverlap->vecTargetFaceIx[i];
-        // printf("ixT: %d, ixS: %d\n", ixT, ixS);
+
+        if( ixS < 0 || ixT < 0 ) printf( "%d: overlap: %lu, ixT: %d, ixS: %d\n", rank, i, ixT, ixS );
 
         assert( m_dOverlapAreas[i] > 0.0 );
-        assert( dataInDouble[ixS] > 0.0 );
-        if( dataOutDouble[ixT] < 0.0 ) printf( "%d: ixT: %d, dataOutDouble: %f\n", rank, ixT, dataOutDouble[ixT] );
+        assert( ixS >= 0 );
+        assert( ixT >= 0 );
+        // assert( dataInDouble[ixS] > 0.0 );
+        // if( dataOutDouble[ixT] < 0.0 ) printf( "%d: ixT: %d, dataOutDouble: %f\n", rank, ixT, dataOutDouble[ixT] );
 
         vecSourceOvTarget[ixT].push_back( ixS );  // map target face to source face
 
@@ -501,13 +506,16 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
         dMassDiff += ( dataInDouble[ixS] * m_dOverlapAreas[i] ) -  // source mass
                      ( dataOutDouble[ixT] * m_dOverlapAreas[i] );  // target mass
     }
+
+    printf( "Rank %d: -- source max: %3.5e, min: %3.5e\n", m_remapper->rank, dSourceMax, dSourceMin );
+    printf( "Rank %d: -- target max: %3.5e, min: %3.5e\n", m_remapper->rank, dTargetMax, dTargetMin );
     // massDefect.first = fabs( dMassDiff / ( dSourceMax - dSourceMin ) );
     massDefect.first = fabs( dMassDiff );
 
     // Early exit if the values are monotone already.
     if( ( dTargetMax <= dSourceMax && dTargetMin <= dSourceMin ) || fabs( dMassDiff ) < 1e-16 ) return massDefect;
 
-    if( caasType == CAAS_LOCAL )
+    if( caasType == CAAS_LOCAL || caasType == CAAS_LOCAL_ADJACENT )
     {
         std::vector< double > vecLocalUpperBound( nTargetCount );
         std::vector< double > vecLocalLowerBound( nTargetCount );
@@ -535,6 +543,8 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
                     dMinI       = fmin( dMinI, dataInDouble[k] );  // min over intersecting source faces
                     dMaxI       = fmax( dMaxI, dataInDouble[k] );  // max over intersecting source faces
                 }
+
+                // printf( "Rank %d: -- targetcount: %d, target-local max: %3.5e, min: %3.5e\n", m_remapper->rank, i, dMaxI, dMinI );
 
                 if( caasType == CAAS_LOCAL_ADJACENT )
                 {
@@ -696,8 +706,10 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
         int caasIteration = 0;
         while( mismatch > 1e-15 && caasIteration++ < nmax_caas_iterations )  // iterate until convergence or a maximum of 5 iterations
         {
+            printf( "Rank %d: -- Iteration: %d, entering CAAS filter computing\n",
+                    m_remapper->rank, caasIteration );
             std::pair< double, double > mDefect = this->ApplyCAASLimiting( srcVals, tgtVals, caasType );
-            if( m_remapper->verbose && is_root )
+            // if( m_remapper->verbose && is_root )
                 printf( "Rank %d: -- Iteration: %d, Net original mass defect: %3.4e, mass defect post-CAAS: %3.4e\n",
                         m_remapper->rank, caasIteration, mDefect.first, mDefect.second );
             mismatch = mDefect.second;

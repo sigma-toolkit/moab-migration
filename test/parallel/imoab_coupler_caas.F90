@@ -188,16 +188,9 @@ program imoab_coupler_fortran
       ! basically, atm was redistributed according to target (ocean) partition, to "cover" the
       !ocean partitions check if intx valid, write some h5m intx file
       call errorout(ierr, 'cannot compute intersection')
-
-      ! if (my_id .eq. 0) then
-      !    print *, ' Writing intersection mesh file to disk: ', outputFileOcn
-      !    outputFileOcn = "intxMesh.h5m"//C_NULL_CHAR
-      !    ! fileWriteOptions = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
-      !    fileWriteOptions = C_NULL_CHAR
-      !    ierr = iMOAB_WriteMesh(cplAtmOcnPID, outputFileOcn, fileWriteOptions)
-      !    call errorout(ierr, 'could not write coupled intersection mesh to disk')
-      ! end if
-
+      ierr = iMOAB_WriteLocalMesh(cplAtmOcnPID, 'intx_ao')
+      call errorout(ierr, 'could not write intersection mesh to disk')
+      
    end if
 
    if (atmCouComm .NE. MPI_COMM_NULL) then

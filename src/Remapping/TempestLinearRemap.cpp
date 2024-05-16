@@ -476,12 +476,13 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
     double dSourceMax = dataInDouble[0];
     double dTargetMin = dataOutDouble[0];
     double dTargetMax = dataOutDouble[0];
-    printf( "%d: nTargetCount: %lu\n", rank, nTargetCount );
     std::vector< std::vector< int > > vecSourceOvTarget( nTargetCount );
     for( size_t i = 0; i < m_meshOverlap->faces.size(); i++ )
     {
         const int ixS = m_meshOverlap->vecSourceFaceIx[i];
         const int ixT = m_meshOverlap->vecTargetFaceIx[i];
+
+        if( ixT < 0 ) continue;  // skip ghost target faces
 
         if( ixS < 0 || ixT < 0 ) printf( "%d: overlap: %lu, ixT: %d, ixS: %d\n", rank, i, ixT, ixS );
 
@@ -507,10 +508,10 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
                      ( dataOutDouble[ixT] * m_dOverlapAreas[i] );  // target mass
     }
 
-    printf( "Rank %d: -- source max: %3.5e, min: %3.5e\n", m_remapper->rank, dSourceMax, dSourceMin );
-    printf( "Rank %d: -- target max: %3.5e, min: %3.5e\n", m_remapper->rank, dTargetMax, dTargetMin );
-    // massDefect.first = fabs( dMassDiff / ( dSourceMax - dSourceMin ) );
-    massDefect.first = fabs( dMassDiff );
+    // printf( "Rank %d: -- source max: %3.5e, min: %3.5e\n", m_remapper->rank, dSourceMax, dSourceMin );
+    // printf( "Rank %d: -- target max: %3.5e, min: %3.5e\n", m_remapper->rank, dTargetMax, dTargetMin );
+    massDefect.first = fabs( dMassDiff / ( dSourceMax - dSourceMin ) );
+    // massDefect.first = fabs( dMassDiff );
 
     // Early exit if the values are monotone already.
     if( ( dTargetMax <= dSourceMax && dTargetMin <= dSourceMin ) || fabs( dMassDiff ) < 1e-16 ) return massDefect;
@@ -607,6 +608,8 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
         const int ixS = m_meshOverlap->vecSourceFaceIx[i];
         const int ixT = m_meshOverlap->vecTargetFaceIx[i];
 
+        if( ixT < 0 ) continue;  // skip ghost target faces
+
         // Update the mass difference between source and target faces
         // linked to the overlap mesh element
         dMassDiffPost += ( dataInDouble[ixS] * m_dOverlapAreas[i] ) -  // source mass
@@ -616,8 +619,8 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
         // dTargetMin = fmin( dTargetMin, dataOutDouble[ixT] );
         // dTargetMax = fmax( dTargetMax, dataOutDouble[ixT] );
     }
-    // massDefect.second = fabs( dMassDiffPost / ( dSourceMax - dSourceMin ) );
-    massDefect.second = fabs( dMassDiffPost );
+    massDefect.second = fabs( dMassDiffPost / ( dSourceMax - dSourceMin ) );
+    // massDefect.second = fabs( dMassDiffPost );
 
     // Ideally should perform an AllReduce here to get the global mass difference across all processors
     // But if we satisfy the constraint on every task, essentially, the global mass difference should be zero!
@@ -701,15 +704,13 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
 
     if( caasType != CAAS_NONE )
     {
-        constexpr int nmax_caas_iterations = 1;
+        constexpr int nmax_caas_iterations = 3;
         double mismatch   = 1.0;
         int caasIteration = 0;
         while( mismatch > 1e-15 && caasIteration++ < nmax_caas_iterations )  // iterate until convergence or a maximum of 5 iterations
         {
-            printf( "Rank %d: -- Iteration: %d, entering CAAS filter computing\n",
-                    m_remapper->rank, caasIteration );
             std::pair< double, double > mDefect = this->ApplyCAASLimiting( srcVals, tgtVals, caasType );
-            // if( m_remapper->verbose && is_root )
+            if( m_remapper->verbose )
                 printf( "Rank %d: -- Iteration: %d, Net original mass defect: %3.4e, mass defect post-CAAS: %3.4e\n",
                         m_remapper->rank, caasIteration, mDefect.first, mDefect.second );
             mismatch = mDefect.second;

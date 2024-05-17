@@ -372,11 +372,11 @@ static void CAASLimiter( DataArray1D< double >& dataCorrectedField,
                          const DataArray1D< double >& dTargetAreas,
                          double& dMass )
 {
-    // const size_t nrows = dataCorrectedField.GetRows();
+    const size_t nrows = dataCorrectedField.GetRows();
     double dMassL = 0.0;
     double dMassU = 0.0;
-    DataArray1D< double > dataCorrection( dataLowerBound.GetRows() );
-    for( size_t i = 0; i < dataLowerBound.GetRows(); i++ )
+    DataArray1D< double > dataCorrection( nrows );
+    for( size_t i = 0; i < nrows; i++ )
     {
         dataCorrection[i] = fmax( dataLowerBound[i], fmin( dataUpperBound[i], 0.0 ) );
         dMassL += dTargetAreas[i] * dataLowerBound[i];
@@ -384,11 +384,11 @@ static void CAASLimiter( DataArray1D< double >& dataCorrectedField,
     }
 
     double dMassDiff = dMass;
-    for( size_t i = 0; i < dataCorrectedField.GetRows(); i++ )
+    for( size_t i = 0; i < nrows; i++ )
         dMassDiff -= dTargetAreas[i] * dataCorrection[i];
 
     double dLMinusU = fabs( dataUpperBound[0] - dataLowerBound[0] );
-    for( size_t i = 0; i < dataLowerBound.GetRows(); i++ )
+    for( size_t i = 0; i < nrows; i++ )
     {
         if( fabs( dataUpperBound[i] - dataLowerBound[i] ) > dLMinusU )
             dLMinusU = fabs( dataUpperBound[i] - dataLowerBound[i] );
@@ -401,27 +401,35 @@ static void CAASLimiter( DataArray1D< double >& dataCorrectedField,
             dataCorrectedField[i] += dataCorrection[i];
         return;
     }
-    else if( dMassL > dMassDiff )
-    {
-        Announce( "Lower bound mass exceeds target mass by %1.15e: CAAS not applied", dMassL - dMassDiff );
-        return;
-    }
-    else if( dMassU < dMassDiff )
-    {
-        Announce( "Target mass exceeds upper bound mass by %1.15e: CAAS not applied", dMassDiff - dMassU );
-        return;
-    }
     else
     {
+        double excessMass = 0.0;
+        if( dMassL > dMassDiff )
+        {
+            Announce( "Lower bound mass exceeds target mass by %1.15e: CAAS will need another iteration",
+                      dMassL - dMassDiff );
+            dMassDiff = dMassL;
+            excessMass -= dMassL;
+            // return;
+        }
+        else if( dMassU < dMassDiff )
+        {
+            Announce( "Target mass exceeds upper bound mass by %1.15e: CAAS will need another iteration",
+                      dMassDiff - dMassU );
+            dMassDiff = dMassU;
+            excessMass -= dMassU;
+            // return;
+        }
+
         // TODO: optimize away dataMassVec by a simple transient double within the loop
-        DataArray1D< double > dataMassVec( dataUpperBound.GetRows() );  //vector of mass redistribution
+        DataArray1D< double > dataMassVec( nrows );  //vector of mass redistribution
         if( dMassDiff > 0.0 )
         {
             double dMassCorrectU = 0.0;
-            for( size_t i = 0; i < dataCorrection.GetRows(); i++ )
+            for( size_t i = 0; i < nrows; i++ )
                 dMassCorrectU += dTargetAreas[i] * ( dataUpperBound[i] - dataCorrection[i] );
 
-            for( size_t i = 0; i < dataCorrection.GetRows(); i++ )
+            for( size_t i = 0; i < nrows; i++ )
             {
                 dataMassVec[i] = ( dataUpperBound[i] - dataCorrection[i] ) / dMassCorrectU;
                 dataCorrection[i] += dMassDiff * dataMassVec[i];
@@ -430,18 +438,20 @@ static void CAASLimiter( DataArray1D< double >& dataCorrectedField,
         else
         {
             double dMassCorrectL = 0.0;
-            for( size_t i = 0; i < dataCorrection.GetRows(); i++ )
+            for( size_t i = 0; i < nrows; i++ )
                 dMassCorrectL += dTargetAreas[i] * ( dataCorrection[i] - dataLowerBound[i] );
 
-            for( size_t i = 0; i < dataCorrection.GetRows(); i++ )
+            for( size_t i = 0; i < nrows; i++ )
             {
                 dataMassVec[i] = ( dataCorrection[i] - dataLowerBound[i] ) / dMassCorrectL;
                 dataCorrection[i] += dMassDiff * dataMassVec[i];
             }
         }
 
-        for( size_t i = 0; i < dataCorrection.GetRows(); i++ )
+        for( size_t i = 0; i < nrows; i++ )
             dataCorrectedField[i] += dataCorrection[i];
+
+        if( excessMass > 0.0 ) dMassDiff = excessMass;
     }
 
     return;
@@ -527,25 +537,24 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
             double dMaxI;
             for( size_t i = 0; i < nTargetCount; i++ )
             {
-                if( vecSourceOvTarget[i].size() == 0 )
-                {
-                    // set to global source min/max bounds
-                    vecLocalLowerBound[i] = dSourceMin;
-                    vecLocalUpperBound[i] = dSourceMax;
-                    continue;
-                }
+                assert( vecSourceOvTarget[i].size() );
+                // if( vecSourceOvTarget[i].size() == 0 )
+                // {
+                //     // set to global source min/max bounds
+                //     vecLocalLowerBound[i] = dSourceMin;
+                //     vecLocalUpperBound[i] = dSourceMax;
+                //     continue;
+                // }
 
                 dMinI = dataInDouble[vecSourceOvTarget[i][0]];
                 dMaxI = dataInDouble[vecSourceOvTarget[i][0]];
                 // Compute max over intersecting source faces
-                for( size_t j = 0; j < vecSourceOvTarget[i].size(); j++ )
+                for( size_t j = 1; j < vecSourceOvTarget[i].size(); j++ )
                 {
                     const int k = vecSourceOvTarget[i][j];         // source face index
                     dMinI       = fmin( dMinI, dataInDouble[k] );  // min over intersecting source faces
                     dMaxI       = fmax( dMaxI, dataInDouble[k] );  // max over intersecting source faces
                 }
-
-                // printf( "Rank %d: -- targetcount: %d, target-local max: %3.5e, min: %3.5e\n", m_remapper->rank, i, dMaxI, dMinI );
 
                 if( caasType == CAAS_LOCAL_ADJACENT )
                 {
@@ -704,7 +713,7 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
 
     if( caasType != CAAS_NONE )
     {
-        constexpr int nmax_caas_iterations = 3;
+        constexpr int nmax_caas_iterations = 5;
         double mismatch   = 1.0;
         int caasIteration = 0;
         while( mismatch > 1e-15 && caasIteration++ < nmax_caas_iterations )  // iterate until convergence or a maximum of 5 iterations

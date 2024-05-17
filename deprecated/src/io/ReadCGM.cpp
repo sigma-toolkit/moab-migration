@@ -392,7 +392,7 @@ ErrorCode ReadCGM::create_group_entsets( std::map< RefEntity*, EntityHandle >& g
         {
             for( int j = extra_name_tags.size(); j < name_list.size(); ++j )
             {
-                sprintf( namebuf, "EXTRA_%s%d", NAME_TAG_NAME, j );
+                snprintf( namebuf, NAME_TAG_SIZE, "EXTRA_%s%d", NAME_TAG_NAME, j );
                 Tag t;
                 rval =
                     mdbImpl->tag_get_handle( namebuf, NAME_TAG_SIZE, MB_TYPE_OPAQUE, t, MB_TAG_SPARSE | MB_TAG_CREAT );

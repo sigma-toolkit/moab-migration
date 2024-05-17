@@ -44,8 +44,6 @@
 namespace moab
 {
 
-#define INS_ID( stringvar, prefix, id ) sprintf( stringvar, prefix, id )
-
 WriterIface* WriteTemplate::factory( Interface* iface )
 {
     return new WriteTemplate( iface );

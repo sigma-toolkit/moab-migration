@@ -143,38 +143,38 @@ static const char* string_tag_value( const void* value, enum mhdf_TagDataType ty
                 strcpy( offset, "0x" );
                 offset += 2;
                 for( i = 0; i < size; ++i )
-                    offset += sprintf( offset, "%02x", (unsigned int)data[i] );
+                    offset += snprintf( offset, 1024, "%02x", (unsigned int)data[i] );
             }
             break;
         case mhdf_INTEGER:
             if( size == 1 )
             {
-                offset += sprintf( offset, "%d", intptr[0] );
+                offset += snprintf( offset, 1024, "%d", intptr[0] );
             }
             else
             {
-                offset += sprintf( offset, "{%d", intptr[0] );
+                offset += snprintf( offset, 1024, "{%d", intptr[0] );
                 for( i = 1; i < size; ++i )
-                    offset += sprintf( offset, ",%d", intptr[i] );
-                offset += sprintf( offset, "}" );
+                    offset += snprintf( offset, 1024, ",%d", intptr[i] );
+                offset += snprintf( offset, 1024, "}" );
             }
             break;
         case mhdf_FLOAT:
             if( size == 1 )
             {
-                offset += sprintf( offset, "%g", dblptr[0] );
+                offset += snprintf( offset, 1024, "%g", dblptr[0] );
             }
             else
             {
-                offset += sprintf( offset, "{%g", dblptr[0] );
+                offset += snprintf( offset, 1024, "{%g", dblptr[0] );
                 for( i = 1; i < size; ++i )
-                    offset += sprintf( offset, ",%g", dblptr[i] );
-                offset += sprintf( offset, "}" );
+                    offset += snprintf( offset, 1024, ",%g", dblptr[i] );
+                offset += snprintf( offset, 1024, "}" );
             }
             break;
         case mhdf_BITFIELD:
             if( size > 8 )
-                offset += sprintf( offset, "(more than 8 bits)" );
+                offset += snprintf( offset, 1024, "(more than 8 bits)" );
             else
             {
                 for( i = size - 1; i >= 0; --i )
@@ -185,27 +185,27 @@ static const char* string_tag_value( const void* value, enum mhdf_TagDataType ty
         case mhdf_BOOLEAN:
             if( size == 1 )
             {
-                offset += sprintf( offset, "%s", data[0] ? "true" : "false" );
+                offset += snprintf( offset, 1024, "%s", data[0] ? "true" : "false" );
             }
             else
             {
-                offset += sprintf( offset, "{%s", data[0] ? "true" : "false" );
+                offset += snprintf( offset, 1024, "{%s", data[0] ? "true" : "false" );
                 for( i = 1; i < size; ++i )
-                    offset += sprintf( offset, ",%s", data[i] ? "true" : "false" );
-                offset += sprintf( offset, "}" );
+                    offset += snprintf( offset, 1024, ",%s", data[i] ? "true" : "false" );
+                offset += snprintf( offset, 1024, "}" );
             }
             break;
         case mhdf_ENTITY_ID:
             if( size == 1 )
             {
-                offset += sprintf( offset, "%lu", idptr[0] );
+                offset += snprintf( offset, 1024, "%lu", idptr[0] );
             }
             else
             {
-                offset += sprintf( offset, "{%lu", idptr[0] );
+                offset += snprintf( offset, 1024, "{%lu", idptr[0] );
                 for( i = 1; i < size; ++i )
-                    offset += sprintf( offset, ",%lu", idptr[i] );
-                offset += sprintf( offset, "}" );
+                    offset += snprintf( offset, 1024, ",%lu", idptr[i] );
+                offset += snprintf( offset, 1024, "}" );
             }
             break;
         default:

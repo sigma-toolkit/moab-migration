@@ -49,8 +49,6 @@
 namespace moab
 {
 
-#define INS_ID( stringvar, prefix, id ) sprintf( stringvar, prefix, id )
-
 #define GET_VAR( name, id, dims )                                     \
     {                                                                 \
         ( id )     = -1;                                              \

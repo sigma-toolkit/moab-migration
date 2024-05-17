@@ -38,8 +38,6 @@
 
 int ncFile1;
 
-#define INS_ID( stringvar, prefix, id ) sprintf( stringvar, prefix, id )
-
 #define GET_DIM1( ncdim, name, val )                            \
     {                                                           \
         int gdfail = nc_inq_dimid( ncFile1, name, &( ncdim ) ); \
@@ -57,10 +55,6 @@ int ncFile1;
         else                                                    \
             ( val ) = 0;                                        \
     }
-
-#define GET_DIMB1( ncdim, name, varname, id, val ) \
-    INS_ID( name, varname, id );                   \
-    GET_DIM1( ncdim, name, val );
 
 #define GET_VAR1( name, id, dims )                                     \
     {                                                                  \

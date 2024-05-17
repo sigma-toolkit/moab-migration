@@ -366,16 +366,16 @@ void moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static void CAASLimiter( DataArray1D< double >& dataCorrectedField,
-                         DataArray1D< double >& dataLowerBound,
-                         DataArray1D< double >& dataUpperBound,
+static void CAASLimiter( std::vector< double >& dataCorrectedField,
+                         std::vector< double >& dataLowerBound,
+                         std::vector< double >& dataUpperBound,
                          const DataArray1D< double >& dTargetAreas,
                          double& dMass )
 {
-    const size_t nrows = dataCorrectedField.GetRows();
+    const size_t nrows = dataCorrectedField.size();
     double dMassL = 0.0;
     double dMassU = 0.0;
-    DataArray1D< double > dataCorrection( nrows );
+    std::vector< double > dataCorrection( nrows );
     for( size_t i = 0; i < nrows; i++ )
     {
         dataCorrection[i] = fmax( dataLowerBound[i], fmin( dataUpperBound[i], 0.0 ) );
@@ -397,7 +397,7 @@ static void CAASLimiter( DataArray1D< double >& dataCorrectedField,
     //If the upper and lower bounds are too close together, just clip
     if( dMassDiff == 0 || dLMinusU < 1e-13 )
     {
-        for( size_t i = 0; i < dataUpperBound.GetRows(); i++ )
+        for( size_t i = 0; i < nrows; i++ )
             dataCorrectedField[i] += dataCorrection[i];
         return;
     }
@@ -410,7 +410,6 @@ static void CAASLimiter( DataArray1D< double >& dataCorrectedField,
                       dMassL - dMassDiff );
             dMassDiff = dMassL;
             excessMass -= dMassL;
-            // return;
         }
         else if( dMassU < dMassDiff )
         {
@@ -418,7 +417,6 @@ static void CAASLimiter( DataArray1D< double >& dataCorrectedField,
                       dMassDiff - dMassU );
             dMassDiff = dMassU;
             excessMass -= dMassU;
-            // return;
         }
 
         // TODO: optimize away dataMassVec by a simple transient double within the loop
@@ -451,7 +449,7 @@ static void CAASLimiter( DataArray1D< double >& dataCorrectedField,
         for( size_t i = 0; i < nrows; i++ )
             dataCorrectedField[i] += dataCorrection[i];
 
-        if( excessMass > 0.0 ) dMassDiff = excessMass;
+        if( excessMass > 0.0 ) dMass = excessMass;
     }
 
     return;
@@ -477,9 +475,9 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
 
     // Apply the offline map to the data
     double dMassDiff = 0.0;
-    DataArray1D< double > x( nTargetCount );
-    DataArray1D< double > dataLowerBound( nTargetCount );
-    DataArray1D< double > dataUpperBound( nTargetCount );
+    std::vector< double > x( nTargetCount );
+    std::vector< double > dataLowerBound( nTargetCount );
+    std::vector< double > dataUpperBound( nTargetCount );
 
     // Initialize the bounds on the given source and target data
     double dSourceMin = dataInDouble[0];
@@ -494,7 +492,8 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
 
         if( ixT < 0 ) continue;  // skip ghost target faces
 
-        if( ixS < 0 || ixT < 0 ) printf( "%d: overlap: %lu, ixT: %d, ixS: %d\n", rank, i, ixT, ixS );
+        if( m_remapper->verbose && ( ixS < 0 || ixT < 0 ) )
+            printf( "%d: overlap: %lu, ixT: %d, ixS: %d\n", rank, i, ixT, ixS );
 
         assert( m_dOverlapAreas[i] > 0.0 );
         assert( ixS >= 0 );
@@ -533,21 +532,12 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
 
         //FV to FV
         {
-            double dMinI;
-            double dMaxI;
             for( size_t i = 0; i < nTargetCount; i++ )
             {
                 assert( vecSourceOvTarget[i].size() );
-                // if( vecSourceOvTarget[i].size() == 0 )
-                // {
-                //     // set to global source min/max bounds
-                //     vecLocalLowerBound[i] = dSourceMin;
-                //     vecLocalUpperBound[i] = dSourceMax;
-                //     continue;
-                // }
 
-                dMinI = dataInDouble[vecSourceOvTarget[i][0]];
-                dMaxI = dataInDouble[vecSourceOvTarget[i][0]];
+                double dMinI = dataInDouble[vecSourceOvTarget[i][0]];
+                double dMaxI = dataInDouble[vecSourceOvTarget[i][0]];
                 // Compute max over intersecting source faces
                 for( size_t j = 1; j < vecSourceOvTarget[i].size(); j++ )
                 {
@@ -585,7 +575,7 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
             }
         }
 
-        for( size_t i = 0; i < dataLowerBound.GetRows(); i++ )
+        for( size_t i = 0; i < nTargetCount; i++ )
         {
             dataLowerBound[i] = vecLocalLowerBound[i] - dataOutDouble[i];
             dataUpperBound[i] = vecLocalUpperBound[i] - dataOutDouble[i];
@@ -601,12 +591,8 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
         }
     }
 
-    DataArray1D< double > xDout;
-    xDout.SetSize( nTargetCount );
-    xDout.AttachToData( dataOutDouble.data() );
-
     // Invoke CAAS application on the offline map
-    CAASLimiter( xDout, dataLowerBound, dataUpperBound, m_dTargetAreas, dMassDiff );
+    CAASLimiter( dataOutDouble, dataLowerBound, dataUpperBound, m_dTargetAreas, dMassDiff );
 
     // Announce output mass
     double dMassDiffPost = 0.0;

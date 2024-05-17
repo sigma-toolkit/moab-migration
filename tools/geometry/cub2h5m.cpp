@@ -1253,7 +1253,7 @@ int main( int argc, char* argv[] )
     // Read the ACIS file with ReadCGM
     char cgm_options[256];
     std::cout << "  facet tolerance=" << dist_tol << std::endl;
-    sprintf( cgm_options,
+    snprintf( cgm_options, 256,
              "CGM_ATTRIBS=yes;FACET_DISTANCE_TOLERANCE=%g;FACET_NORMAL_TOLERANCE=%d;MAX_FACET_EDGE_"
              "LENGTH=%g;",
              dist_tol, norm_tol, len_tol );

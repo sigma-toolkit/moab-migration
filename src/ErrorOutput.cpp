@@ -110,7 +110,6 @@ void ErrorOutput::print_real( const std::string& str )
 void ErrorOutput::print_real( const char* fmt, va_list args1, va_list args2 )
 {
     size_t idx = lineBuffer.size();
-#ifdef MOAB_HAVE_VSNPRINTF
     // try once with remaining space in buffer
     lineBuffer.resize( lineBuffer.capacity() );
     unsigned size = vsnprintf( &lineBuffer[idx], lineBuffer.size() - idx, fmt, args1 );
@@ -122,25 +121,6 @@ void ErrorOutput::print_real( const char* fmt, va_list args1, va_list args2 )
         size = vsnprintf( &lineBuffer[idx], lineBuffer.size() - idx, fmt, args2 );
         ++size;  // trailing null
     }
-#else
-    // Guess how much space might be required.
-    // If every character is a format code then there are len/3 format codes.
-    // Guess a random large value of num_chars characters per formatted argument.
-    const unsigned num_chars = 180;
-    unsigned exp_size        = ( num_chars / 3 ) * strlen( fmt );
-    lineBuffer.resize( idx + exp_size );
-    unsigned size = vsprintf( &lineBuffer[idx], fmt, args1 );
-    ++size;  // trailing null
-    // check if we overflowed the buffer
-    if( size > exp_size )
-    {
-        // crap!
-        fprintf( stderr, "ERROR: Buffer overflow at %s:%d\n", __FILE__, __LINE__ );
-        lineBuffer.resize( idx + exp_size );
-        size = vsprintf( &lineBuffer[idx], fmt, args2 );
-        ++size;  // trailing null
-    }
-#endif
 
     // less one because we don't want the trailing '\0'
     lineBuffer.resize( idx + size - 1 );

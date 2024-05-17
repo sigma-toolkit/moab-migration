@@ -42,8 +42,6 @@
 #include "Internals.hpp"
 #include "moab/FileOptions.hpp"
 
-#define INS_ID( stringvar, prefix, id ) sprintf( stringvar, prefix, id )
-
 namespace moab
 {
 

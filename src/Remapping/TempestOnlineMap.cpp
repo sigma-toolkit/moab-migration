@@ -1568,7 +1568,7 @@ int moab::TempestOnlineMap::IsConservative( double dTolerance )
     int rootProc = 0;
     std::vector< int > nElementsInProc;
     const int nDATA = 3;
-    if( !rank ) nElementsInProc.resize( size * nDATA );
+    nElementsInProc.resize( size * nDATA );
     int senddata[nDATA] = { nColumns, m_nTotDofs_SrcCov, m_nTotDofs_Src };
     ierr = MPI_Gather( senddata, nDATA, MPI_INT, nElementsInProc.data(), nDATA, MPI_INT, rootProc, m_pcomm->comm() );
     if( ierr != MPI_SUCCESS ) return -1;
@@ -1765,6 +1765,29 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
     // destination solution vector data Optionally, can also perform the transpose application of
     // the weight matrix. Set the 3rd argument to true if this is needed
     rval = this->ApplyWeights( solSTagVals, solTTagVals, transpose, caasType );MB_CHK_SET_ERR( rval, "Applying remap operator onto source vector data failed" );
+
+    if( caasType != CAAS_NONE )
+    {
+        constexpr int nmax_caas_iterations = 5;
+        double mismatch                    = 1.0;
+        int caasIteration                  = 0;
+        while( mismatch > 1e-15 &&
+               caasIteration++ < nmax_caas_iterations )  // iterate until convergence or a maximum of 5 iterations
+        {
+
+            // The tag data is np*np*n_el_dest
+            rval = m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] );MB_CHK_SET_ERR( rval, "Setting local tag data failed" );
+
+            rval = m_pcomm->exchange_tags( tgtSolutionTag, tents );MB_CHK_SET_ERR( rval, "Tag exchange failed" );
+
+            std::pair< double, double > mDefect =
+                this->ApplyCAASLimiting( solSTagVals, solTTagVals, caasType, caasIteration );
+            if( m_remapper->verbose )
+                printf( "Rank %d: -- Iteration: %d, Net original mass defect: %3.4e, mass defect post-CAAS: %3.4e\n",
+                        m_remapper->rank, caasIteration, mDefect.first, mDefect.second );
+            mismatch = mDefect.second;
+        }
+    }
 
     // The tag data is np*np*n_el_dest
     rval = m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] );MB_CHK_SET_ERR( rval, "Setting local tag data failed" );
@@ -2177,7 +2200,6 @@ moab::ErrorCode moab::TempestOnlineMap::ComputeMetrics( moab::Remapper::Intersec
     // (DoF space)
     std::string exactTagName, projTagName;
     const int ntotsize = entities.size() * discOrder * discOrder;
-    int ntotsize_glob  = 0;
     std::vector< double > exactSolution( ntotsize, 0.0 ), projSolution( ntotsize, 0.0 );
     rval = m_interface->tag_get_name( exactTag, exactTagName );MB_CHK_ERR( rval );
     rval = m_interface->tag_get_data( exactTag, entities, &exactSolution[0] );MB_CHK_ERR( rval );

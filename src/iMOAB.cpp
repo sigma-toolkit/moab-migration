@@ -4515,18 +4515,10 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
 
     for( size_t i = 0; i < srcTagHandles.size(); i++ )
     {
-        // The tag data is np*np*n_el_src
-        Tag ssolnTag = srcTagHandles[i];
-        Tag tsolnTag = tgtTagHandles[i];
-        rval         = context.MBI->tag_get_data( ssolnTag, sents, &solSTagVals[0] );MB_CHK_ERR( rval );
-
         // Compute the application of weights on the suorce solution data and store it in the
         // destination solution vector data Optionally, can also perform the transpose application
         // of the weight matrix. Set the 3rd argument to true if this is needed
-        rval = weightMap->ApplyWeights( solSTagVals, solTTagVals, false, caasType );MB_CHK_ERR( rval );
-
-        // The tag data is np*np*n_el_dest
-        rval = context.MBI->tag_set_data( tsolnTag, tents, &solTTagVals[0] );MB_CHK_ERR( rval );
+        rval = weightMap->ApplyWeights( srcTagHandles[i], tgtTagHandles[i], false, caasType );MB_CHK_ERR( rval );
     }
 
 // #define VERBOSE

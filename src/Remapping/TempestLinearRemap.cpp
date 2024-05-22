@@ -403,20 +403,19 @@ static void CAASLimiter( std::vector< double >& dataCorrectedField,
     }
     else
     {
-        double excessMass = 0.0;
         if( dMassL > dMassDiff )
         {
             Announce( "Lower bound mass exceeds target mass by %1.15e: CAAS will need another iteration",
                       dMassL - dMassDiff );
             dMassDiff = dMassL;
-            excessMass -= dMassL;
+            dMass -= dMassL;
         }
         else if( dMassU < dMassDiff )
         {
             Announce( "Target mass exceeds upper bound mass by %1.15e: CAAS will need another iteration",
                       dMassDiff - dMassU );
             dMassDiff = dMassU;
-            excessMass -= dMassU;
+            dMass -= dMassU;
         }
 
         // TODO: optimize away dataMassVec by a simple transient double within the loop
@@ -448,8 +447,6 @@ static void CAASLimiter( std::vector< double >& dataCorrectedField,
 
         for( size_t i = 0; i < nrows; i++ )
             dataCorrectedField[i] += dataCorrection[i];
-
-        if( excessMass > 0.0 ) dMass = excessMass;
     }
 
     return;
@@ -457,7 +454,8 @@ static void CAASLimiter( std::vector< double >& dataCorrectedField,
 
 std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vector< double >& dataInDouble,
                                                                        std::vector< double >& dataOutDouble,
-                                                                       CAASType caasType )
+                                                                       CAASType caasType,
+                                                                       int caasIteration )
 {
     // Currently only implemented for FV to FV remapping
     // We should generalize this to other types of remapping
@@ -527,6 +525,7 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
 
     if( caasType == CAAS_LOCAL || caasType == CAAS_LOCAL_ADJACENT )
     {
+        // Compute the local min and max values of the target data
         std::vector< double > vecLocalUpperBound( nTargetCount );
         std::vector< double > vecLocalLowerBound( nTargetCount );
 
@@ -551,24 +550,27 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
                     double dMinIAdj = dMinI;
                     double dMaxIAdj = dMaxI;
                     AdjacentFaceVector vecAdjFaces;
-
+                    // Compute the adjacent faces to the target face
                     GetAdjacentFaceVectorByEdge( *m_meshInputCov, vecSourceOvTarget[i][0],
-                                                 ( m_input_order + 1 ) * ( m_input_order + 1 ), vecAdjFaces );
+                                                 ( caasIteration + 1 ) * ( m_input_order + 1 ) * ( m_input_order + 1 ),
+                                                 vecAdjFaces );
 
                     //Compute max over neighboring faces
                     for( size_t j = 0; j < vecAdjFaces.size(); j++ )
                     {
                         int k = vecAdjFaces[j].first;
 
-                        dMaxIAdj = fmax( dMaxIAdj, dataInDouble[k] );
-                        dMinIAdj = fmin( dMinIAdj, dataInDouble[k] );
+                        dMaxIAdj = fmax( dMaxIAdj, dataInDouble[k] ); // compute max over neighboring faces
+                        dMinIAdj = fmin( dMinIAdj, dataInDouble[k] ); // compute min over neighboring faces
                     }
 
+                    // Update the min and max values of the target data
                     vecLocalLowerBound[i] = dMinIAdj;
                     vecLocalUpperBound[i] = dMaxIAdj;
                 }
                 else
                 {
+                    // Update the min and max values of the target data
                     vecLocalLowerBound[i] = dMinI;
                     vecLocalUpperBound[i] = dMaxI;
                 }
@@ -697,20 +699,21 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
         }
     }
 
-    if( caasType != CAAS_NONE )
-    {
-        constexpr int nmax_caas_iterations = 5;
-        double mismatch   = 1.0;
-        int caasIteration = 0;
-        while( mismatch > 1e-15 && caasIteration++ < nmax_caas_iterations )  // iterate until convergence or a maximum of 5 iterations
-        {
-            std::pair< double, double > mDefect = this->ApplyCAASLimiting( srcVals, tgtVals, caasType );
-            if( m_remapper->verbose )
-                printf( "Rank %d: -- Iteration: %d, Net original mass defect: %3.4e, mass defect post-CAAS: %3.4e\n",
-                        m_remapper->rank, caasIteration, mDefect.first, mDefect.second );
-            mismatch = mDefect.second;
-        }
-    }
+    // if( caasType != CAAS_NONE )
+    // {
+    //     constexpr int nmax_caas_iterations = 5;
+    //     double mismatch                    = 1.0;
+    //     int caasIteration                  = 0;
+    //     while( mismatch > 1e-15 &&
+    //            caasIteration++ < nmax_caas_iterations )  // iterate until convergence or a maximum of 5 iterations
+    //     {
+    //         std::pair< double, double > mDefect = this->ApplyCAASLimiting( srcVals, tgtVals, caasType );
+    //         if( m_remapper->verbose )
+    //             printf( "Rank %d: -- Iteration: %d, Net original mass defect: %3.4e, mass defect post-CAAS: %3.4e\n",
+    //                     m_remapper->rank, caasIteration, mDefect.first, mDefect.second );
+    //         mismatch = mDefect.second;
+    //     }
+    // }
 
 #ifdef VERBOSE
     output_file.flush();  // required here

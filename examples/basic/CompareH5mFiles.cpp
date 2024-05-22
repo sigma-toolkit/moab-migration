@@ -52,9 +52,25 @@ int main( int argc, char** argv )
     rval = mb2->get_entities_by_dimension( 0, dim, cells2 );MB_CHK_SET_ERR( rval, "can't get cells 2" );
 
     if( cells1.size() != cells2.size() ) MB_CHK_SET_ERR( MB_FAILURE, "different size models " );
+
+    Tag tagid1 = mb->globalId_tag();
+    Tag tagid2 = mb2->globalId_tag();
+    vector< int > ids1, ids2;
+    ids1.resize( cells1.size() );
+    ids2.resize( cells2.size() );
+    rval = mb->tag_get_data( tagid1, cells1, &ids1[0] );MB_CHK_SET_ERR( rval, "can't get global ids on model 1" );
+    rval = mb2->tag_get_data( tagid2, cells2, &ids2[0] );MB_CHK_SET_ERR( rval, "can't get global ids on model 2" );
+
     vector< double > vals1, vals2;
     vals1.resize( cells1.size() );
     vals2.resize( cells2.size() );
+
+    std::map<int, int> idMap1;
+    for (size_t i=0; i<ids1.size(); i++)
+    {
+        idMap1[ids1[i]] = i;
+    }
+
     int k  = 0;  // number of different fields
     int k1 = 0;  // number of exactly the same fields
     std::cout << " compare files: " << file1 << " and " << file2 << " dimension entity: " << dim << "\n";
@@ -90,9 +106,11 @@ int main( int argc, char** argv )
         double sum = 0;
         for( int j = 0; j < vals1.size(); j++ )
         {
-            sum += fabs( vals1[j] - vals2[j] );
-            if( vals1[j] < minv1 ) minv1 = vals1[j];
-            if( vals1[j] > maxv1 ) maxv1 = vals1[j];
+            int gid2 = ids2[j];
+            int index1 = idMap1[gid2];
+            sum += fabs( vals1[index1] - vals2[j] );
+            if( vals1[j] < minv1 ) minv1 = vals1[index1];
+            if( vals1[j] > maxv1 ) maxv1 = vals1[index1];
             if( vals2[j] < minv2 ) minv2 = vals2[j];
             if( vals2[j] > maxv2 ) maxv2 = vals2[j];
         }

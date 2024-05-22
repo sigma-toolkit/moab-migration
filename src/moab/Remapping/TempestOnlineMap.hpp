@@ -251,7 +251,8 @@ class TempestOnlineMap : public OfflineMap
 
     std::pair< double, double > ApplyCAASLimiting( std::vector< double >& dataInDouble,
                                                    std::vector< double >& dataOutDouble,
-                                                   CAASType caasType = CAAS_GLOBAL );
+                                                   CAASType caasType = CAAS_GLOBAL,
+                                                   int caasIteration = 0 );
 
 #ifdef MOAB_HAVE_EIGEN3
 
@@ -344,17 +345,6 @@ class TempestOnlineMap : public OfflineMap
     inline int GetIndexOfColGlobalDoF( int globalColDoF ) const;
 
     ///	<summary>
-    ///		Apply the weight matrix onto the source vector provided as input, and return the column
-    /// vector (solution projection) after the map application
-    ///     Compute:        \p tgtVals = A(S->T) * \srcVals, or
-    ///     if (transpose)  \p tgtVals = [A(T->S)]^T * \srcVals
-    ///	</summary>
-    moab::ErrorCode ApplyWeights( std::vector< double >& srcVals,
-                                  std::vector< double >& tgtVals,
-                                  bool transpose = false,
-                                  CAASType caasType = CAAS_NONE );
-
-    ///	<summary>
     ///		Apply the weight matrix onto the source vector (tag) provided as input, and return the
     /// column vector (solution projection) in a tag, after the map application
     ///     Compute:        \p tgtVals = A(S->T) * \srcVals, or
@@ -415,6 +405,17 @@ class TempestOnlineMap : public OfflineMap
 
   private:
     void setup_sizes_dimensions();
+
+    ///	<summary>
+    ///		Apply the weight matrix onto the source vector provided as input, and return the column
+    /// vector (solution projection) after the map application
+    ///     Compute:        \p tgtVals = A(S->T) * \srcVals, or
+    ///     if (transpose)  \p tgtVals = [A(T->S)]^T * \srcVals
+    ///	</summary>
+    moab::ErrorCode ApplyWeights( std::vector< double >& srcVals,
+                                  std::vector< double >& tgtVals,
+                                  bool transpose    = false,
+                                  CAASType caasType = CAAS_NONE );
 
 #ifdef MOAB_HAVE_MPI
     int rearrange_arrays_by_dofs( const std::vector< unsigned int >& gdofmap,

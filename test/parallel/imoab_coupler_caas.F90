@@ -1,10 +1,19 @@
-!      This program shows how to do an imoab_coupler type test in fortran 90
-!      the atm and ocean files are read from repo, meshes are migrated to coupler pes,
-!      the intx is caried on, weight generation,; tag migration and projection,
-!      migrate back to ocean pes, and compare against baseline1.txt
-!      cannot change source/target files, or the layout, just test the imoab
-!       calls, that need to give the same results as C=++ equivalent test (imoab_coupler)
-!          between atm SE and ocn FV
+!   This program shows how to do perform FV-FV projections in multiple ways in Fortran90
+!
+!   The program workflows is as follows:
+!        - Setup a source (ATM) and a target (OCN) mesh in some PEs
+!        - Next migrate the meshes to the coupler PEs and compute source coverage mesh
+!        - Then compute the intersection mesh between the source and target meshes
+!        - Next compute the weights for the projection for 4 different methods
+!            * First order projection
+!            * Bilinear projection
+!            * Second order projection
+!            * Second order projection with CAAS operator
+!        - Then apply the weights to the source mesh and get the projected fields for
+!          all the different methods
+!        - Finally send all the projected fields back to the target PEs
+!
+!   The program uses iMOAB Fortran90 interface to MOAB
 
 SUBROUTINE errorout(ierr, message)
    integer ierr
@@ -251,23 +260,14 @@ program imoab_coupler_fortran
    atmCompNDoFs = disc_orders1*disc_orders1
    ocnCompNDoFs = 1 ! /*FV*/
 
-   ! fields = 'Sa_dens:Sa_pbot'//C_NULL_CHAR
-   ! projectedFields = 'Sa_dens_proj:Sa_pbot_proj'//C_NULL_CHAR
-   ! projectedFieldsBilin = 'Sa_dens_bilin_proj:Sa_pbot_bilin_proj'//C_NULL_CHAR
-   ! projectedFieldsSecond = 'Sa_dens_o2_proj:Sa_pbot_o2_proj'//C_NULL_CHAR
-   ! projectedFieldsCAAS = 'Sa_dens_o2_caas_proj:Sa_pbot_o2_caas_proj'//C_NULL_CHAR
-   ! !transferFields = projectedFields//':'//projectedFieldsBilin//':'//projectedFieldsSecond//':'//projectedFieldsCAAS
-   ! transferFields = 'Sa_dens_proj:Sa_pbot_proj:Sa_dens_bilin_proj:Sa_pbot_bilin_proj:Sa_dens_o2_proj:'//&
-   !                  'Sa_pbot_o2_proj:Sa_dens_o2_caas_proj:Sa_pbot_o2_caas_proj'//C_NULL_CHAR
-
-   fields = 'Sa_dens'//C_NULL_CHAR
-   projectedFields = 'Sa_dens_proj'//C_NULL_CHAR
-   projectedFieldsBilin = 'Sa_dens_bilin_proj'//C_NULL_CHAR
-   projectedFieldsSecond = 'Sa_dens_o2_proj'//C_NULL_CHAR
-   projectedFieldsCAAS = 'Sa_dens_o2_caas_proj'//C_NULL_CHAR
+   fields = 'Sa_dens:Sa_pbot'//C_NULL_CHAR
+   projectedFields = 'Sa_dens_proj:Sa_pbot_proj'//C_NULL_CHAR
+   projectedFieldsBilin = 'Sa_dens_bilin_proj:Sa_pbot_bilin_proj'//C_NULL_CHAR
+   projectedFieldsSecond = 'Sa_dens_o2_proj:Sa_pbot_o2_proj'//C_NULL_CHAR
+   projectedFieldsCAAS = 'Sa_dens_o2_caas_proj:Sa_pbot_o2_caas_proj'//C_NULL_CHAR
    !transferFields = projectedFields//':'//projectedFieldsBilin//':'//projectedFieldsSecond//':'//projectedFieldsCAAS
-   transferFields = 'Sa_dens_proj:Sa_dens_bilin_proj:Sa_dens_o2_proj:'//&
-                    'Sa_dens_o2_caas_proj'//C_NULL_CHAR
+   transferFields = 'Sa_dens_proj:Sa_pbot_proj:Sa_dens_bilin_proj:Sa_pbot_bilin_proj:Sa_dens_o2_proj:'//&
+                    'Sa_pbot_o2_proj:Sa_dens_o2_caas_proj:Sa_pbot_o2_caas_proj'//C_NULL_CHAR
 
    if (cplComm .NE. MPI_COMM_NULL) then
       ierr = iMOAB_DefineTagStorage(cplAtmPID, fields, tagTypes(1), atmCompNDoFs, tagIndex(1))
@@ -357,7 +357,7 @@ program imoab_coupler_fortran
 
       ! We have the remapping weights now. Let us apply the weights onto the tag we defined
       ! on the source mesh and get the projection on the target mesh
-      filter_type = 3 ! local CAAS operator application
+      filter_type = 1 ! local CAAS operator application
       ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, "secondorder"//C_NULL_CHAR, &
                                                 fields, &
                                                 projectedFieldsCAAS)

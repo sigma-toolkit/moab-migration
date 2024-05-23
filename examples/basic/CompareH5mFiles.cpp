@@ -109,8 +109,8 @@ int main( int argc, char** argv )
             int gid2 = ids2[j];
             int index1 = idMap1[gid2];
             sum += fabs( vals1[index1] - vals2[j] );
-            if( vals1[j] < minv1 ) minv1 = vals1[index1];
-            if( vals1[j] > maxv1 ) maxv1 = vals1[index1];
+            if( vals1[index1] < minv1 ) minv1 = vals1[index1];
+            if( vals1[index1] > maxv1 ) maxv1 = vals1[index1];
             if( vals2[j] < minv2 ) minv2 = vals2[j];
             if( vals2[j] > maxv2 ) maxv2 = vals2[j];
         }

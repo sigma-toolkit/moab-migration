@@ -100,8 +100,7 @@ endif
 
 check_PROGRAMS = $(TESTS) \
 		 kd_tree_tool \
-		 kd_tree_time \
-		 check-pymoab
+		 kd_tree_time
 
 MOSTLYCLEANFILES = mb_write.g \
                    mb_write2.g \
@@ -260,7 +259,7 @@ test_files = test_core.py \
 						 test_tag.py \
 						 test_topoutil.py
 
-check-pymoab:
+check-local:
 	cd $(builddir)/pymoab; \
 	for i in $(test_files); \
 	do \
@@ -324,5 +323,4 @@ DISTCLEANFILES = a.out
 
 # Utility target: build but don't run tests
 build-check:
-	$(MAKE) 'TESTS_ENVIRONMENT=: ' check check-pymoab
-
+	$(MAKE) 'TESTS_ENVIRONMENT=: ' check 

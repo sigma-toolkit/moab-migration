@@ -5,25 +5,7 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 ACLOCAL_AMFLAGS = -I config
 
 # Subdirectories to build
-SUBDIRS = src MeshFiles $(itaps_dir) tools test $(pymoab_dir)
-
-if ENABLE_fbigeom
-  itaps_dir_fbigeom = itaps
-else
-  itaps_dir_fbigeom =
-endif
-
-if ENABLE_imesh
-  itaps_dir = itaps
-else
-  itaps_dir = $(itaps_dir_fbigeom)
-endif
-
-if ENABLE_pymoab
-  pymoab_dir = pymoab
-else
-  pymoab_dir =
-endif
+SUBDIRS = src MeshFiles $(itaps_dir) tools test
 
 # Utility target: build but don't run tests
 build-check:
@@ -178,3 +160,36 @@ moab.config: config.status Makefile.am
 
 CLEANFILES = moab.config configs.sed
 DISTCLEANFILES = a.out
+
+if ENABLE_pymoab
+
+test_files = $(top_srcdir)/test/pymoab/test_core.py \
+						 $(top_srcdir)/test/pymoab/test_hom.py \
+						 $(top_srcdir)/test/pymoab/test_range.py \
+						 $(top_srcdir)/test/pymoab/test_scd.py \
+						 $(top_srcdir)/test/pymoab/test_skinner.py \
+						 $(top_srcdir)/test/pymoab/test_tag.py \
+						 $(top_srcdir)/test/pymoab/test_topoutil.py
+
+all-local: install-exec-local
+install-exec-local:
+	$(PYTHON) -m pip install -e $(abs_top_builddir)
+
+check: all-local
+	cd $(top_srcdir)/test/pymoab; \
+	for i in $(test_files); \
+	do \
+		(@SLIBENVPATH@=$(top_builddir)/src/.libs/:$(@SLIBENVPATH@) $(PYTHON) $$i) || exit 1; \
+	done
+
+clean-local:
+	-rm -rf *.cpp __pycache__ *.so *.pyc $(top_builddir)/test/pymoab/*.pyc $(top_builddir)/pymoab.egg-info
+
+uninstall:
+	$(PYTHON) -m pip uninstall -y pymoab
+
+EXTRA_DIST += $(srcdir)/pymoab/* $(top_srcdir)/test/pymoab/* $(top_srcdir)/pymoab/interface_notes.txt
+CLEANFILES += $(top_builddir)/test/pymoab/quads_test.vtk $(top_builddir)/test/pymoab/outfile.h5m $(top_builddir)/test/pymoab/write_tag_test.h5m
+
+endif
+

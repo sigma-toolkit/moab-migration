@@ -279,7 +279,6 @@ else
   if (test "x$enable_pymoab" != "xno"); then
     ENABLE_pymoab=yes
     AM_PATH_PYTHON([3.1],,[:])
-    AX_PYTHON_DEVEL()
 
     AC_MSG_CHECKING([for the numpy Python package])
     ac_numpy_result=`$PYTHON -c "import numpy" 2>&1`
@@ -313,17 +312,19 @@ else
     if (test "x$enable_devmode" != "xno"); then
       # Developers updating the PyMOAB modules need Cython (> 0.25)
       AC_PYTHON_MODULE(cython)
+      if test "x$CYTHON" = "x" ; then
+        AC_CHECK_PROG(CYTHON_AVAILABLE, cython, yes, no)
+        if test x"$CYTHON_AVAILABLE" != x"yes" ; then
+            AC_MSG_ERROR([Cython is not installed. Use 'easy_install cython'.])
+        else
+            CYTHON=`which cython`
+        fi
+        AC_SUBST(CYTHON)
+      fi
       AC_MSG_CHECKING(for proper cython capabilities)
-      cython --cplus $srcdir/deprecated/pymoab/cython_test.pyx --output-file ./.cython_test_out && rm .cython_test_out
+      $CYTHON --cplus $srcdir/deprecated/pymoab/cython_test.pyx --output-file ./.cython_test_out && rm .cython_test_out
       if test $? -ne 0 ; then
         AC_MSG_ERROR(cython is not the correct version for pymoab)
-      fi
-      AC_CHECK_PROG(CYTHON_AVAILABLE, cython, yes, no)
-      if test x"$CYTHON_AVAILABLE" != x"yes" ; then
-          AC_MSG_ERROR([Cython is not installed. Use 'easy_install cython'.])
-      else
-          CYTHON=`which cython`
-          AC_SUBST(CYTHON)
       fi
     fi
 
@@ -1417,22 +1418,12 @@ AC_CONFIG_FILES([Makefile
                  test/perf/point_location/Makefile
                  test/io/Makefile
                  test/parallel/Makefile
-                 pymoab/Makefile
-                 itaps/iBase_f.h
-                 itaps/Makefile
-                 itaps/imesh/Makefile
-                 itaps/imesh/iMesh-Defs.inc
-                 itaps/fbigeom/Makefile
-                 itaps/fbigeom/FBiGeom-Defs.inc
-                 itaps/irel/Makefile
-                 itaps/irel/iRel-Defs.inc
                  tools/Makefile
                  tools/mbcoupler/Makefile
-                 tools/mbcslam/Makefile
                  tools/mcnpmit/Makefile
                  tools/geometry/Makefile
                  doc/user.dox
-		 doc/cython_filter.py
+                 doc/cython_filter.py
                  doc/config.tex
                  MeshFiles/Makefile
                  MeshFiles/unittest/Makefile

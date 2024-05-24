@@ -257,7 +257,7 @@ test_files = test_core.py \
 						 test_scd.py \
 						 test_skinner.py \
 						 test_tag.py \
-						 test_topoutil.py
+						 test_topo_util.py
 
 check-local:
 	cd $(builddir)/pymoab; \

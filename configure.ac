@@ -279,7 +279,6 @@ else
   if (test "x$enable_pymoab" != "xno"); then
     ENABLE_pymoab=yes
     AM_PATH_PYTHON([3.1],,[:])
-    AX_PYTHON_DEVEL()
 
     AC_MSG_CHECKING([for the numpy Python package])
     ac_numpy_result=`$PYTHON -c "import numpy" 2>&1`
@@ -323,7 +322,7 @@ else
         AC_SUBST(CYTHON)
       fi
       AC_MSG_CHECKING(for proper cython capabilities)
-      $CYTHON --cplus $srcdir/deprecated/pymoab/cmake/cython_test.pyx --output-file ./.cython_test_out && rm .cython_test_out
+      $CYTHON --cplus $srcdir/deprecated/pymoab/cython_test.pyx --output-file ./.cython_test_out && rm .cython_test_out
       if test $? -ne 0 ; then
         AC_MSG_ERROR(cython is not the correct version for pymoab)
       fi
@@ -1160,13 +1159,12 @@ AC_CONFIG_FILES([Makefile
                  test/perf/point_location/Makefile
                  test/io/Makefile
                  test/parallel/Makefile
-                 pymoab/Makefile
                  tools/Makefile
                  tools/mbcoupler/Makefile
                  tools/mcnpmit/Makefile
                  tools/geometry/Makefile
                  doc/user.dox
-		 doc/cython_filter.py
+                 doc/cython_filter.py
                  doc/config.tex
                  MeshFiles/Makefile
                  MeshFiles/unittest/Makefile

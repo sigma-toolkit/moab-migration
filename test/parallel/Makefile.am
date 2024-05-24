@@ -274,7 +274,8 @@ MOSTLYCLEANFILES = mhdf_ll.h5m \
                    Ocn2WithProj.h5m recvAtm2CoupFull.h5m recvAtm2.h5m  atm2_ocn_map.nc atm_ocn_map2.nc fOcnOnCpl8.h5m fOcnOnCpl0.h5m fOcnOnCpl1.h5m \
                    afterSend.h5m readCplRof.h5m fOcnBilinOnCpl atm_ocn_bilin_map_p2.nc OcnWithProjBilin.h5m fOcnBilinOnCpl.h5m recvAtmx.h5m \
 		   test_esmf_rcbzoltan_no_mixed_elements.h5m test_esmf_rcbzoltan.h5m test_esmf_no_mixed_elements.h5m test_esmf.h5m \
-		   atmDOCN_map.nc OcnDomMesh.h5m OcnDomMeshProj.h5m test_dom_zoltan.h5m
+		   atmDOCN_map.nc OcnDomMesh.h5m OcnDomMeshProj.h5m test_dom_zoltan.h5m OcnOnCplF_n02.h5m atm_ocn_map_second_n02.nc \
+		   intx_ao_2_0.h5m intx_ao_2_1.h5m
 
 EXTRA_DIST = imoab_coupler_utils.hpp
 FORTDEFS = $(FCDEFS)

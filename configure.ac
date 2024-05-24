@@ -322,7 +322,7 @@ else
         AC_SUBST(CYTHON)
       fi
       AC_MSG_CHECKING(for proper cython capabilities)
-      $CYTHON --cplus $srcdir/deprecated/pymoab/cmake/cython_test.pyx --output-file ./.cython_test_out && rm .cython_test_out
+      $CYTHON --cplus $srcdir/config/cython_test.pyx --output-file ./.cython_test_out && rm .cython_test_out
       if test $? -ne 0 ; then
         AC_MSG_ERROR(cython is not the correct version for pymoab)
       fi

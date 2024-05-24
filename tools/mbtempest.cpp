@@ -681,13 +681,24 @@ int main( int argc, char* argv[] )
         // First compute the covering set such that the target elements are fully covered by the
         // lcoal source grid
         runCtx->timer_push( "construct covering set for intersection" );
-        rval =
-            remapper.ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, runCtx->rrmGrids, runCtx->useGnomonicProjection );MB_CHK_ERR( rval );
+        rval = remapper.ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, runCtx->rrmGrids, runCtx->useGnomonicProjection,
+               runCtx->disc_orders[0]);MB_CHK_ERR( rval );
+        int nlayers = 0;
+#ifdef MOAB_HAVE_MPI
+        if (runCtx->disc_orders[0]>=2 && runCtx->n_procs > 1)
+           nlayers = runCtx->disc_orders[0] - 1; // this should work if no holes and order not too high
+#endif
+        if (nlayers>=1)
+        {
+           remapper.ResetMeshSet( moab::Remapper::SourceMesh,  runCtx->meshsets[3]);
+           runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh ); //  ?
+        }
+
         runCtx->timer_pop();
 
         // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm
         runCtx->timer_push( "setup and compute mesh intersections" );
-        rval = remapper.ComputeOverlapMesh( runCtx->kdtreeSearch, false );MB_CHK_ERR( rval );
+        rval = remapper.ComputeOverlapMesh( runCtx->kdtreeSearch, false, nlayers );MB_CHK_ERR( rval );
         runCtx->timer_pop();
 
         // print some diagnostic checks to see if the overlap grid resolved the input meshes
@@ -699,7 +710,18 @@ int main( int argc, char* argv[] )
             double local_areas[3],
                 global_areas[3];  // Array for Initial area, and through Method 1 and Method 2
             // local_areas[0] = area_on_sphere_lHuiller ( mbCore, runCtx->meshsets[1], radius_src );
-            local_areas[0] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
+#ifdef MOAB_HAVE_MPI
+            if (nlayers > 0)
+            {
+                // compute area of original source set, without ghosts
+                local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[3], radius_src );
+            }
+            else
+                local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
+#else
+            local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
+#endif
+
             local_areas[1] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[1], radius_dest );
             local_areas[2] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[2], radius_src );
 
@@ -744,9 +766,26 @@ int main( int argc, char* argv[] )
                 moab::Range ghostedEnts;
                 rval = remapper.GetOverlapAugmentedEntities( ghostedEnts );MB_CHK_ERR( rval );
                 ovEnts = moab::subtract( ovEnts, ghostedEnts );
+#ifdef MOAB_DBG
+                std::stringstream filename;
+                filename << "aug_overlap" << runCtx->pcomm->rank() << ".h5m";
+                rval = runCtx->mbcore->write_file( filename.str().c_str(), 0, 0, &meshOverlapSet, 1 );MB_CHK_ERR( rval );
+#endif
+
             }
 #endif
-            rval = mbCore->add_entities( writableOverlapSet, ovEnts );MB_CHK_SET_ERR( rval, "Deleting ghosted entities failed" );
+            rval = mbCore->add_entities( writableOverlapSet, ovEnts );MB_CHK_SET_ERR( rval, "adding local intx cells failed" );
+
+#ifdef MOAB_HAVE_MPI
+#ifdef MOAB_DBG
+            if( nprocs > 1 )
+            {
+                std::stringstream filename;
+                filename << "writable_intx_" << runCtx->pcomm->rank() << ".h5m";
+                rval = runCtx->mbcore->write_file( filename.str().c_str(), 0, 0, &writableOverlapSet, 1 );MB_CHK_ERR( rval );
+            }
+#endif
+#endif
 
             size_t lastindex = runCtx->intxFilename.find_last_of( "." );
             sstr.str( "" );
@@ -809,6 +848,15 @@ int main( int argc, char* argv[] )
                 attrMap["history"]   = historyStr;
 
                 // Write the map file to disk in parallel using either HDF5 or SCRIP interface
+                // in extra case; maybe need a better solution, just create it with the right meshset
+                // from the beginning;
+                if (nlayers >= 1) //
+                {
+                    remapper.ResetMeshSet( moab::Remapper::SourceMesh,  runCtx->meshsets[3]);
+                    runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh ); //  ?
+                    weightMap -> SetMeshInput (runCtx->meshes[0]);
+                }
+
                 rval = weightMap->WriteParallelMap( runCtx->outFilename.c_str(), attrMap );MB_CHK_ERR( rval );
             }
 
@@ -989,6 +1037,26 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
 
         // Rescale the radius of both to compute the intersection
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[0], radius_src );MB_CHK_ERR( rval );
+        // if order >=2, ghost at least this many layers (order -1) it may be too much
+#ifdef MOAB_HAVE_MPI
+        int nlayers = ctx.disc_orders[0] - 1; // this should work if no holes and order not too high
+        if (nlayers >= 1 && ctx.n_procs > 1)
+        {
+            // get order -1 ghost layers; actually it should be decided by the mesh
+            // if the mesh has holes, it could be more
+
+            moab::EntityHandle originalSourceSet;
+            rval = remapper.GhostLayers( ctx.meshsets[0], nlayers, originalSourceSet); MB_CHK_ERR( rval );
+            ctx.meshsets.push_back(originalSourceSet); // so ctx.meshsets[3] will have the original source set
+#ifdef MOAB_DBG
+            // write the new source sets, after layers were decided, should see the ghosts now
+            std::stringstream filename;
+            filename << "expand_source" << ctx.pcomm->rank() << ".h5m";
+            rval = ctx.mbcore->write_file( filename.str().c_str(), 0, 0, &(ctx.meshsets[0]), 1 );MB_CHK_ERR( rval );
+#endif
+
+        }
+#endif
 
         // Load the target mesh and validate
         std::string addititional_read_opts_tgt = get_file_read_options( ctx, ctx.inFilenames[1] );

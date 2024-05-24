@@ -22,6 +22,7 @@
 #include "DebugOutput.hpp"
 #include "moab/Remapping/TempestRemapper.hpp"
 #include "moab/ReadUtilIface.hpp"
+// needed for higher order mapping, retrieve additional layers of cells with bridge methods
 #include "moab/MeshTopoUtil.hpp"
 #include "AEntityFactory.hpp"
 
@@ -1216,12 +1217,14 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
 
 ///////////////////////////////////////////////////////////////////////////////////
 
+#define MOAB_DBG
 ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
                                                  double radius_src,
                                                  double radius_tgt,
                                                  double boxeps,
                                                  bool regional_mesh,
-                                                 bool gnomonic )
+                                                 bool gnomonic,
+                                                 int order )
 {
     ErrorCode rval;
 
@@ -1253,7 +1256,16 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
 
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_covering_source_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
 
-        rval = mbintx->construct_covering_set( m_source_set, m_covering_source_set, gnomonic );MB_CHK_ERR( rval );
+        rval = mbintx->construct_covering_set( m_source_set, m_covering_source_set, gnomonic, order );MB_CHK_ERR( rval );
+#ifdef MOAB_DBG
+        std::stringstream filename;
+        filename << "covering" << rank << ".h5m";
+        rval = m_interface->write_file( filename.str().c_str(), 0, 0, &m_covering_source_set, 1 );MB_CHK_ERR( rval );
+        std::stringstream targetFile;
+        targetFile << "target" << rank << ".h5m";
+        rval = m_interface->write_file( targetFile.str().c_str(), 0, 0, &m_target_set, 1 );MB_CHK_ERR( rval );
+#endif
+
     }
     else
     {
@@ -1348,7 +1360,7 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
     return rval;
 }
 
-ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_tempest )
+ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_tempest, int nLayers )
 {
     ErrorCode rval;
     const bool outputEnabled = ( this->rank == 0 );
@@ -1483,6 +1495,13 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                     assert( srcParent >= 0 );
                     intxCov.insert( covEnts[loc_gid_to_lid_covsrc[srcParent]] );
                 }
+		if ( nLayers )
+		{
+                    // add to the intxCov range the ghost layers we used for coverage for higher order maps
+                    Range extraCovCells;
+                    rval  = MeshTopoUtil( m_interface ).get_bridge_adjacencies( intxCov, 1, 2, extraCovCells, nLayers ); MB_CHK_SET_ERR( rval, "Failed to get bridge adjacencies" );
+                    intxCov.merge(extraCovCells);
+		}
 
                 Range notNeededCovCells = moab::subtract( covEnts, intxCov );
 
@@ -1583,6 +1602,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
 }
 
 #ifdef MOAB_HAVE_MPI
+
 // this function is called only in parallel
 ///////////////////////////////////////////////////////////////////////////////////
 ErrorCode TempestRemapper::augment_overlap_set()
@@ -1613,7 +1633,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
     Range boundaryCells;  // these will be filtered from target_set
     rval = m_interface->get_adjacencies( boundaryEdges, 2, false, boundaryCells, Interface::UNION );MB_CHK_ERR( rval );
     boundaryCells = intersect( boundaryCells, targetCells );
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     EntityHandle tmpSet;
     rval = m_interface->create_meshset( MESHSET_SET, tmpSet );MB_CHK_SET_ERR( rval, "Can't create temporary set" );
     // add the boundary set and edges, and save it to a file
@@ -1624,7 +1644,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
     rval = m_interface->write_mesh( ffs.str().c_str(), &tmpSet, 1 );MB_CHK_ERR( rval );
 #endif
 
-    // now that we have the boundary cells, see which overlap polys have have these as parents;
+    // now that we have the boundary cells, see which overlap polys have these as parents;
     //   find the ids of the boundary cells;
     Tag gid = m_interface->globalId_tag();
     std::set< int > targetBoundaryIds;
@@ -1735,11 +1755,11 @@ ErrorCode TempestRemapper::augment_overlap_set()
     else
         globalMaxEdges = maxEdges;
 
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     if( is_root ) std::cout << "maximum number of edges for polygons to send is " << globalMaxEdges << "\n";
 #endif
 
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     EntityHandle tmpSet2;
     rval = m_interface->create_meshset( MESHSET_SET, tmpSet2 );MB_CHK_SET_ERR( rval, "Can't create temporary set2" );
     // add the affected source and overlap elements
@@ -1879,7 +1899,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
 
     // send first the vertices and overlap cells to original task for coverage cells
     // now we are done populating the tuples; route them to the appropriate processors
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     std::stringstream ff1;
     ff1 << "TLc_" << rank << ".txt";
     TLc.print_to_file( ff1.str().c_str() );
@@ -1890,7 +1910,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
     ( m_pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLv, 0 );
     ( m_pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLc, 0 );
 
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     TLc.print_to_file( ff1.str().c_str() );  // will append to existing file
     TLv.print_to_file( ffv.str().c_str() );
 #endif
@@ -1900,7 +1920,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
     TupleList::buffer buffer;
     buffer.buffer_init( sizeTuple * TLc.get_n() * 2 );  // allocate memory for sorting !! double
     TLc.sort( 1, &buffer );
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     TLc.print_to_file( ff1.str().c_str() );
 #endif
 
@@ -2000,7 +2020,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
     // begin a loop to send the needed cells to the processes; also mark the vertices that need to
     // be sent, put them in a set
 
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     std::cout << " need to initialize TLc2 with " << sizeOfTLc2 << " cells\n ";
 #endif
 
@@ -2114,7 +2134,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
     ( m_pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLc2, 0 );
     // now, look at vertices from TLv2, and create them
     // we should have in TLv2 only vertices with orgProc different from current task
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     std::stringstream ff2;
     ff2 << "TLc2_" << rank << ".txt";
     TLc2.print_to_file( ff2.str().c_str() );
@@ -2173,7 +2193,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
         rval = m_interface->tag_set_data( ghostTag, &polyNew, 1, &orgProc );MB_CHK_ERR( rval );
     }
 
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     EntityHandle tmpSet3;
     rval = m_interface->create_meshset( MESHSET_SET, tmpSet3 );MB_CHK_SET_ERR( rval, "Can't create temporary set3" );
     // add the boundary set and edges, and save it to a file
@@ -2189,8 +2209,9 @@ ErrorCode TempestRemapper::augment_overlap_set()
     rval = m_interface->add_entities( m_overlap_set, newPolygons );MB_CHK_ERR( rval );
     return MB_SUCCESS;
 }
-
 #endif
+
+#undef MOAB_DBG
 
 ErrorCode TempestRemapper::GetIMasks( Remapper::IntersectionContext ctx, std::vector< int >& masks )
 {

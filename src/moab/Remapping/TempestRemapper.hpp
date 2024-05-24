@@ -100,7 +100,8 @@ class TempestRemapper : public Remapper
                                           double radius_tgt  = 1.0,
                                           double boxeps      = 0.1,
                                           bool regional_mesh = false,
-                                          bool gnomonic      = true );
+                                          bool gnomonic      = true,
+		                          int order          = 1 );
 
     /// <summary>
     ///     Compute the intersection mesh between the source and target grids that have been
@@ -108,7 +109,7 @@ class TempestRemapper : public Remapper
     ///     intersection algorithm internally for spherical meshes and can handle arbitrary
     ///     unstructured grids (CS, RLL, ICO, MPAS) with and without holes.
     /// </summary>
-    moab::ErrorCode ComputeOverlapMesh( bool kdtree_search = true, bool use_tempest = false );
+    moab::ErrorCode ComputeOverlapMesh( bool kdtree_search = true, bool use_tempest = false, int nLayers = 0 );
 
     /* Converters between MOAB and Tempest representations */
 
@@ -184,6 +185,11 @@ class TempestRemapper : public Remapper
     ///     Set the mesh type corresponding to the intersection context
     /// </summary>
     void SetMeshType( Remapper::IntersectionContext ctx, const std::vector< int >& metadata );
+
+    /// <summary>
+    ///     reconstruct mesh, used now only for IO; need a better solution maybe
+    /// </summary>
+    void ResetMeshSet( Remapper::IntersectionContext ctx, moab::EntityHandle meshSet );
 
     /// <summary>
     ///     Get the mesh type corresponding to the intersection context
@@ -382,6 +388,33 @@ inline void TempestRemapper::SetMesh( Remapper::IntersectionContext ctx, Mesh* m
             break;
     }
 }
+
+inline void TempestRemapper::ResetMeshSet( Remapper::IntersectionContext ctx, moab::EntityHandle meshSet )
+{
+    switch( ctx )
+    {
+        case Remapper::SourceMesh:
+            delete m_source;
+            m_source = new Mesh;
+            m_source_set = meshSet;
+            convert_mesh_to_tempest_private( m_source, m_source_set, m_source_entities, &m_source_vertices );
+            m_source->CalculateFaceAreas( false ); // fInputConcave is false ?
+            break;
+        case Remapper::TargetMesh:
+            // not needed yet
+            break;
+        case Remapper::OverlapMesh:
+            // not needed yet
+            break;
+        case Remapper::CoveringMesh:
+            // not needed yet
+            break;
+        case Remapper::DEFAULT:
+        default:
+            break;
+    }
+}
+
 
 inline moab::EntityHandle& TempestRemapper::GetMeshSet( Remapper::IntersectionContext ctx )
 {

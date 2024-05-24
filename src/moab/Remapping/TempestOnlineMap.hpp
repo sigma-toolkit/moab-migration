@@ -403,6 +403,8 @@ class TempestOnlineMap : public OfflineMap
 
     moab::ErrorCode set_row_dc_dofs( std::vector< int >& values_entities );
 
+    // hack
+    void SetMeshInput (Mesh * imesh) { m_meshInput = imesh;};
   private:
     void setup_sizes_dimensions();
 

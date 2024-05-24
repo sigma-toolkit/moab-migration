@@ -120,7 +120,7 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_Tempest_MOAB( int nOrder )
     // Verify ReverseNodeArray has been calculated
     if( m_meshInputCov->faces.size() > 0 && m_meshInputCov->revnodearray.size() == 0 )
     {
-        _EXCEPTIONT( "ReverseNodeArray has not been calculated for m_meshInput" );
+        _EXCEPTIONT( "ReverseNodeArray has not been calculated for m_meshInputCov" );
     }
 
     // Triangular quadrature rule
@@ -140,7 +140,7 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_Tempest_MOAB( int nOrder )
     // Fit weight exponent
     const int nFitWeightsExponent = nOrder + 2;
 
-    // Announcemnets
+    // Announcements
     moab::DebugOutput dbgprint( std::cout, this->rank, 0 );
     dbgprint.set_prefix( "[LinearRemapFVtoFV_Tempest_MOAB]: " );
     if( is_root )
@@ -160,7 +160,7 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_Tempest_MOAB( int nOrder )
     DataArray2D< double > dIntArray;
     DataArray1D< double > dConstraint( nCoefficients );
 
-    // Loop through all faces on m_meshInput
+    // Loop through all faces on m_meshInputCov
     for( size_t ixFirst = 0; ixFirst < m_meshInputCov->faces.size(); ixFirst++ )
     {
         // Output every 1000 elements
@@ -1239,7 +1239,7 @@ void moab::TempestOnlineMap::LinearRemapGLLtoGLL2_MOAB( const DataArray3D< int >
     // Area of each overlap element in the output basis
     DataArray2D< double > dOverlapOutputArea( m_meshOverlap->faces.size(), nPout * nPout );
 
-    // Loop through all faces on m_meshInput
+    // Loop through all faces on m_meshInputCov
     ixOverlap = 0;
 #ifdef VERBOSE
     const unsigned outputFrequency = ( m_meshInputCov->faces.size() / 10 ) + 1;

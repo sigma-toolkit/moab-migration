@@ -163,24 +163,9 @@ DISTCLEANFILES = a.out
 
 if ENABLE_pymoab
 
-test_files = $(top_srcdir)/test/pymoab/test_core.py \
-						 $(top_srcdir)/test/pymoab/test_hom.py \
-						 $(top_srcdir)/test/pymoab/test_range.py \
-						 $(top_srcdir)/test/pymoab/test_scd.py \
-						 $(top_srcdir)/test/pymoab/test_skinner.py \
-						 $(top_srcdir)/test/pymoab/test_tag.py \
-						 $(top_srcdir)/test/pymoab/test_topoutil.py
-
 all-local: install-exec-local
 install-exec-local:
 	$(PYTHON) -m pip install -e $(abs_top_builddir)
-
-check: all-local
-	cd $(top_srcdir)/test/pymoab; \
-	for i in $(test_files); \
-	do \
-		(@SLIBENVPATH@=$(top_builddir)/src/.libs/:$(@SLIBENVPATH@) $(PYTHON) $$i) || exit 1; \
-	done
 
 clean-local:
 	-rm -rf *.cpp __pycache__ *.so *.pyc $(top_builddir)/test/pymoab/*.pyc $(top_builddir)/pymoab.egg-info

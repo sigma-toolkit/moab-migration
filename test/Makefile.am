@@ -266,7 +266,6 @@ check-local:
 		(@SLIBENVPATH@=$(top_builddir)/src/.libs/:$(@SLIBENVPATH@) $(PYTHON) $$i) || exit 1; \
 	done
 
-PYMOAB_DIST = $(srcdir)/pymoab/*
 PYCLEANFILES = $(builddir)/pymoab/quads_test.vtk $(builddir)/pymoab/outfile.h5m $(builddir)/pymoab/write_tag_test.h5m
 
 endif
@@ -291,7 +290,7 @@ LTPPF77COMPILE = $(LIBTOOL) $(AM_V_lt) --tag=F77 $(AM_LIBTOOLFLAGS) \
 
 CMAKELISTS_FILES = CMakeLists.txt dual/CMakeLists.txt h5file/CMakeLists.txt io/CMakeLists.txt obb/CMakeLists.txt perf/CMakeLists.txt perf/point_location/CMakeLists.txt
 
-EXTRA_DIST = TestUtil.hpp TestRunner.hpp $(CMAKELISTS_FILES) $(PYMOAB_DIST)
+EXTRA_DIST = TestUtil.hpp TestRunner.hpp $(CMAKELISTS_FILES)
 
 mb_big_test.g: $(MESHDIR)/mb_big_test.g.gz
 	$(AM_V_GEN)$(ZCAT) $< > $@

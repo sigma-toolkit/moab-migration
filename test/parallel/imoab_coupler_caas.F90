@@ -49,6 +49,7 @@ program imoab_coupler_fortran
    character(:), allocatable :: ocnFileName
    character(:), allocatable :: readopts, fileWriteOptions
    character :: appname*128
+   character(30) :: nproc
    character(:), allocatable :: weights_identifier1
    character(:), allocatable :: disc_methods1, disc_methods2, dof_tag_names1, dof_tag_names2
    integer :: disc_orders1, disc_orders2
@@ -252,6 +253,13 @@ program imoab_coupler_fortran
              fValidate, "GLOBAL_ID"//C_NULL_CHAR, "GLOBAL_ID"//C_NULL_CHAR)
       call errorout(ierr, 'cannot compute scalar 2nd order projection weights')
 
+#ifdef MOAB_HAVE_NETCDF
+      write(nproc,"(I0.2)")num_procs !
+      atmocn_map_file_name = 'atm_ocn_map_second_n'//trim(nproc)//'.nc'//C_NULL_CHAR
+      ierr = iMOAB_WriteMappingWeightsToFile( cplAtmOcnPID, "secondorder"//C_NULL_CHAR, atmocn_map_file_name)
+      call errorout(ierr, 'failed to write map file to disk')
+#endif
+
    end if
 
    ! start copy
@@ -363,8 +371,8 @@ program imoab_coupler_fortran
                                                 projectedFieldsCAAS)
       call errorout(ierr, 'failed to compute second order with CAAS projection weight application')
 
-
-      outputFileOcn = "OcnOnCplF.h5m"//C_NULL_CHAR
+      write(nproc,"(I0.2)")num_procs !
+      outputFileOcn = "OcnOnCplF_n"//trim(nproc)//".h5m"//C_NULL_CHAR
       fileWriteOptions = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
       ierr = iMOAB_WriteMesh(cplOcnPID, outputFileOcn, fileWriteOptions)
       call errorout(ierr, 'could not write OcnOnCpl.h5m to disk')

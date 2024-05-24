@@ -1764,7 +1764,7 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
     // Compute the application of weights on the suorce solution data and store it in the
     // destination solution vector data Optionally, can also perform the transpose application of
     // the weight matrix. Set the 3rd argument to true if this is needed
-    rval = this->ApplyWeights( solSTagVals, solTTagVals, transpose, caasType );MB_CHK_SET_ERR( rval, "Applying remap operator onto source vector data failed" );
+    rval = this->ApplyWeights( solSTagVals, solTTagVals, transpose );MB_CHK_SET_ERR( rval, "Applying remap operator onto source vector data failed" );
 
     if( caasType != CAAS_NONE )
     {
@@ -1778,7 +1778,9 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
             // The tag data is np*np*n_el_dest
             rval = m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] );MB_CHK_SET_ERR( rval, "Setting local tag data failed" );
 
+#ifdef MOAB_HAVE_MPI
             rval = m_pcomm->exchange_tags( tgtSolutionTag, tents );MB_CHK_SET_ERR( rval, "Tag exchange failed" );
+#endif
 
             std::pair< double, double > mDefect =
                 this->ApplyCAASLimiting( solSTagVals, solTTagVals, caasType, caasIteration );
@@ -2229,7 +2231,7 @@ moab::ErrorCode moab::TempestOnlineMap::ComputeMetrics( moab::Remapper::Intersec
         MPI_Reduce( &errnorms[3], &globerrnorms[3], 1, MPI_DOUBLE, MPI_MAX, 0, m_pcomm->comm() );
     }
 #else
-    globerrnorms  = errnorms;
+    globerrnorms = errnorms;
 #endif
     globerrnorms[0] = ( globerrnorms[0] / globerrnorms[2] );
     globerrnorms[1] = std::sqrt( globerrnorms[1] / globerrnorms[2] );

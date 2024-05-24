@@ -295,13 +295,13 @@ else
     AC_MSG_CHECKING([for the setuptools Python package])
     ac_setuptools_result=`$PYTHON -c "import setuptools" 2>&1`
     if test $? -eq 0; then
-    AC_MSG_RESULT([yes])
+      AC_MSG_RESULT([yes])
     else
-    AC_MSG_RESULT([no])
-    AC_MSG_ERROR([cannot import Python module "setuptools".
-    Please check your Python installation. The error was:
-    $ac_setuptools_result])
-    PYTHON_VERSION=""
+      AC_MSG_RESULT([no])
+      AC_MSG_ERROR([cannot import Python module "setuptools".
+      Please check your Python installation. The error was:
+      $ac_setuptools_result])
+      PYTHON_VERSION=""
     fi
 
     # if enabling PyMOAB, turn cython file filter oni
@@ -309,24 +309,29 @@ else
     filter_program=$PYTHON" cython_filter.py 2>/dev/null"
     python_patterns="*.py *.pyx"
 
-    if (test "x$enable_devmode" != "xno"); then
-      # Developers updating the PyMOAB modules need Cython (> 0.25)
-      AC_PYTHON_MODULE(cython)
-      if test "x$CYTHON" = "x" ; then
-        AC_CHECK_PROG(CYTHON_AVAILABLE, cython, yes, no)
-        if test x"$CYTHON_AVAILABLE" != x"yes" ; then
-            AC_MSG_ERROR([Cython is not installed. Use 'easy_install cython'.])
-        else
-            CYTHON=`which cython`
-        fi
-        AC_SUBST(CYTHON)
+    AC_ARG_VAR([CYTHON], [Cython compiler command])
+    # Developers updating the PyMOAB modules need Cython (> 0.25)
+    AC_PYTHON_MODULE(cython)
+    if test "x$CYTHON" = "x" ; then
+      AC_CHECK_PROG(CYTHON_AVAILABLE, cython, yes, no)
+      if test x"$CYTHON_AVAILABLE" != x"yes" ; then
+          AC_MSG_ERROR([Cython is not installed. Use 'easy_install cython'.])
+      else
+          CYTHON=`which cython`
       fi
-      AC_MSG_CHECKING(for proper cython capabilities)
-      $CYTHON --cplus $srcdir/config/cython_test.pyx --output-file ./.cython_test_out && rm .cython_test_out
-      if test $? -ne 0 ; then
-        AC_MSG_ERROR(cython is not the correct version for pymoab)
-      fi
+      AC_SUBST(CYTHON)
+    else
+      AC_CHECK_PROG(CYTHON_AVAILABLE, ${CYTHON}, yes, no)
     fi
+    AC_MSG_CHECKING(for proper cython capabilities)
+    ac_cython_result=`$CYTHON --cplus config/cython_test.pyx --output-file .cython_test_out 2>&1 && rm .cython_test_out`
+    ac_cython_result=`pwd && $CYTHON --cplus ${project_abstopsrcdir}/config/cython_test.pyx --output-file .cython_test_out && rm .cython_test_out`
+    if test $? -ne 0 ; then
+      AC_MSG_ERROR(cython is not the correct version for pymoab)
+    else
+      AC_MSG_RESULT([yes])
+    fi
+    DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS CYTHON=$CYTHON PYTHON=$PYTHON"
 
     # create setup.py from deprecated/pymoab
     AC_CONFIG_FILES([

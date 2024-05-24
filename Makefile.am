@@ -107,7 +107,7 @@ CMAKE_CONFIGURATION_FILES = CMakeLists.txt \
    config/CMakeLibraryFuncs.cmake   config/FindHDF5_MOAB.cmake    config/FindParMetis.cmake      config/Findverdict.cmake    config/ResolveCompilerPaths.cmake \
    config/CheckCompilerFlags.cmake  config/FindMetis.cmake        config/FindTempestRemap.cmake  config/ForceAddFlags.cmake  config/TestBigEndian.cmake \
    config/CMakeReplicateConfig.sh   config/TemplateSpecialization.cxx   config/MOABConfig.cmake.h.in   config/cmake_uninstall.cmake.in moab.make.cmake  \
-   pymoab/CMakeLists.txt
+   pymoab/CMakeLists.txt            config/cython_test.pyx
 
 EXTRA_DIST = $(doc_DATA) \
 						 debian \

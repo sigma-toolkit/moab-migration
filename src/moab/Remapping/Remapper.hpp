@@ -60,7 +60,8 @@ class Remapper
         SourceMesh   = 0,
         TargetMesh   = 1,
         OverlapMesh  = 2,
-        CoveringMesh = 3
+        CoveringMesh = 3,
+        InitialSourceMesh = 4  // this is needed to reset source for writing the map, for parallel cases mostly
     };
 
     moab::Interface* get_interface()

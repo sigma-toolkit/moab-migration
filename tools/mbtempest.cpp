@@ -519,7 +519,7 @@ int main( int argc, char* argv[] )
                                                // TempestOnlineMap.hpp is included in this file, and is part of MOAB
     // Some constant parameters
 
-    const double boxeps = 1e-1;
+    const double boxeps = 1e-6;
 
     if( runCtx->meshType == moab::TempestRemapper::OVERLAP_MEMORY )
     {
@@ -690,8 +690,8 @@ int main( int argc, char* argv[] )
 #endif
         if( nlayers >= 1 )
         {
-            remapper.ResetMeshSet( moab::Remapper::SourceMesh, runCtx->meshsets[3] );
-            runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );  //  ?
+           remapper.ResetMeshSet( moab::Remapper::SourceMesh);
+           runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh ); //  ?
         }
 
         runCtx->timer_pop();
@@ -714,7 +714,8 @@ int main( int argc, char* argv[] )
             if( nlayers > 0 )
             {
                 // compute area of original source set, without ghosts
-                local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[3], radius_src );
+                moab::EntityHandle initialSourceSet = remapper.GetMeshSet(moab::Remapper::InitialSourceMesh);
+                local_areas[0] = areaAdaptor.area_on_sphere( mbCore, initialSourceSet, radius_src );
             }
             else
                 local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
@@ -851,9 +852,9 @@ int main( int argc, char* argv[] )
                 // from the beginning;
                 if( nlayers >= 1 )  //
                 {
-                    remapper.ResetMeshSet( moab::Remapper::SourceMesh, runCtx->meshsets[3] );
-                    runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );  //  ?
-                    weightMap->SetMeshInput( runCtx->meshes[0] );
+                    remapper.ResetMeshSet( moab::Remapper::SourceMesh);
+                    runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh ); //  ?
+                    weightMap -> SetMeshInput (runCtx->meshes[0]);
                 }
 
                 rval = weightMap->WriteParallelMap( runCtx->outFilename.c_str(), attrMap );MB_CHK_ERR( rval );
@@ -1045,8 +1046,9 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
             // if the mesh has holes, it could be more
 
             moab::EntityHandle originalSourceSet;
-            rval = remapper.GhostLayers( ctx.meshsets[0], nlayers, originalSourceSet );MB_CHK_ERR( rval );
-            ctx.meshsets.push_back( originalSourceSet );  // so ctx.meshsets[3] will have the original source set
+            rval = remapper.GhostLayers( ctx.meshsets[0], nlayers, originalSourceSet); MB_CHK_ERR( rval );
+            moab::Range dummy;
+            remapper.SetMeshSet(moab::Remapper::InitialSourceMesh, originalSourceSet, dummy);
 #ifdef MOAB_DBG
             // write the new source sets, after layers were decided, should see the ghosts now
             std::stringstream filename;

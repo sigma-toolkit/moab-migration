@@ -998,9 +998,13 @@ void TempestRemapper::SetMeshSet( Remapper::IntersectionContext ctx /* Remapper:
         m_covering_source_entities = entities;
         m_covering_source_set      = mset;
     }
+    else if( ctx == Remapper::InitialSourceMesh )
+    {
+        m_initial_source_set = mset; // entities not used
+    }
     else
     {
-        // some error
+        // error out properly
     }
     return;
 }

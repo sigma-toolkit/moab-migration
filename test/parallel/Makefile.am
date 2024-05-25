@@ -221,61 +221,7 @@ par_intx_sph_SOURCES = par_intx_sph.cpp
 par_intx_sph_LDADD = $(LDADD)
 
 # Other files to clean up (e.g. output from tests)
-MOSTLYCLEANFILES = mhdf_ll.h5m \
-		   tmp0.0.h5m tmp1.0.h5m tmp2.0.h5m tmp3.0.h5m \
-		   tmp0.1.h5m tmp1.1.h5m tmp2.1.h5m tmp3.1.h5m \
-                   partial0.vtk \
-                   partial1.vtk  \
-                   partialConvex1.vtk \
-                   partialConvex0.vtk \
-                   initial0.vtk \
-                   intersect1.h5m \
-                   intersect0.h5m \
-                   test.h5m \
-                   initial1.vtk \
-                   test_mpas.h5m \
-                   dum.h5m \
-                   test_gcrm.h5m \
-                   test_gcrm_rcbzoltan.h5m \
-                   test_mpas_no_mixed_elements.h5m \
-                   test_mpas_rcbzoltan.h5m \
-                   test_mpas_rcbzoltan_no_mixed_elements.h5m \
-                   test_par_eul_across_files.nc \
-                   test_par_eul_append.nc \
-                   test_par_eul_ghosting.nc \
-                   test_par_eul_T2.nc \
-                   test_par_eul_T.nc \
-                   test_par_fv_T.nc \
-                   test_par_gcrm_vars.nc \
-                   test_par_homme_T.nc \
-                   test_par_mpas_vars.nc \
-                   test2.h5m  \
-                   testpm.h5m \
-                   newfile.h5m \
-                   TaskMesh_n2.0.h5m \
-                   TaskMesh_n2.1.h5m \
-                   testReadGhost_n2.0.h5m \
-                   testReadGhost_n2.1.h5m \
-                   whole.h5m wholeF.h5m \
-                   recvMesh.h5m \
-                   migrate12.h5m migrate21.h5m migrate11.h5m migrate22.h5m \
-                   migrate11_tag.h5m migrate21_tag.h5m migrate12_tag.h5m migrate22_tag.h5m \
-                   intx_00.h5m intx_01.h5m fIntxTarget.h5m recvTarget.h5m OcnWithProj.h5m \
-                   migrate_graph.h5m migrate_geom.h5m \
-                   recvLnd.h5m LndWithProj.h5m fOcnOnCpl.h5m recvOcn.h5m outPhys.h5m wholeATM_new.h5m \
-                   outLnd.h5m wholeATM_lnd.h5m physAtm_lnd.h5m physBack_lnd.h5m \
-                   fOcnOnCpl2.h5m recvOcn2.h5m  OcnWithProj2.h5m recvLnd2.h5m LndWithProj2.h5m \
-                   LndWithProj3.h5m  fLndOnCpl3.h5m  OcnWithProj3.h5m  fOcnOnCpl3.h5m  recvLnd3.h5m  recvOcn3.h5m \
-                   AtmPhysProj.h5m fAtm2OnCpl2.h5m recvOcnCpl.h5m \
-                   AtmPhysProj3.h5m fAtm3OnCpl.h5m recvLndCpl.h5m  recvLnd4.h5m \
-                   atm_ocn_map.nc file_set7rk_0.h5m file_set7rk_1.h5m \
-                   atmcov_withdata_1.h5m atmcov_withdata_0.h5m CoupOcn.h5m ocntgt_1.h5m ocntgt_0.h5m atmcov_0.h5m atmcov_1.h5m \
-                   OcnWithProjF.h5m OcnOnCplF.h5m AtmOnCplF.h5m atm_ocn_map_f.nc fOcnOnCpl4.h5m fOcnOnCpl5.h5m fOcnOnCpl6.h5m fOcnOnCpl7.h5m\
-                   Ocn2WithProj.h5m recvAtm2CoupFull.h5m recvAtm2.h5m  atm2_ocn_map.nc atm_ocn_map2.nc fOcnOnCpl8.h5m fOcnOnCpl0.h5m fOcnOnCpl1.h5m \
-                   afterSend.h5m readCplRof.h5m fOcnBilinOnCpl atm_ocn_bilin_map_p2.nc OcnWithProjBilin.h5m fOcnBilinOnCpl.h5m recvAtmx.h5m \
-		   test_esmf_rcbzoltan_no_mixed_elements.h5m test_esmf_rcbzoltan.h5m test_esmf_no_mixed_elements.h5m test_esmf.h5m \
-		   atmDOCN_map.nc OcnDomMesh.h5m OcnDomMeshProj.h5m test_dom_zoltan.h5m OcnOnCplF_n02.h5m atm_ocn_map_second_n02.nc \
-		   intx_ao_2_0.h5m intx_ao_2_1.h5m
+MOSTLYCLEANFILES = *.h5m *.nc *.vtk *.txt
 
 EXTRA_DIST = imoab_coupler_utils.hpp
 FORTDEFS = $(FCDEFS)

@@ -690,10 +690,10 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
 
 bool IntPairComparator( const std::array< int, 3 >& a, const std::array< int, 3 >& b )
 {
-    if( std::get<1>(a) == std::get<1>(b) )
-        return std::get<2>(a) < std::get<2>(b);
+    if( std::get< 1 >( a ) == std::get< 1 >( b ) )
+        return std::get< 2 >( a ) < std::get< 2 >( b );
     else
-        return std::get<1>(a) < std::get<1>(b);
+        return std::get< 1 >( a ) < std::get< 1 >( b );
 }
 
 moab::ErrorCode moab::TempestRemapper::GetOverlapAugmentedEntities( moab::Range& sharedGhostEntities )
@@ -764,10 +764,11 @@ ErrorCode TempestRemapper::convert_overlap_mesh_sorted_by_source()
         rval = m_interface->tag_get_data( tgtParentTag, m_overlap_entities, &rbids_tgt[0] );MB_CHK_ERR( rval );
         for( size_t ix = 0; ix < n_overlap_entitites; ++ix )
         {
-            std::get<0>(sorted_overlap_order[ix]) = ix;
-            std::get<1>(sorted_overlap_order[ix]) =
+            std::get< 0 >( sorted_overlap_order[ix] ) = ix;
+            std::get< 1 >( sorted_overlap_order[ix] ) =
                 ( gid_to_lid_covsrc.size() ? gid_to_lid_covsrc[rbids_src[ix]] : rbids_src[ix] - 1 );
-            std::get<2>(sorted_overlap_order[ix]) = ( gid_to_lid_tgt.size() ? gid_to_lid_tgt[rbids_tgt[ix]] : rbids_tgt[ix] - 1 );
+            std::get< 2 >( sorted_overlap_order[ix] ) =
+                ( gid_to_lid_tgt.size() ? gid_to_lid_tgt[rbids_tgt[ix]] : rbids_tgt[ix] - 1 );
         }
         std::sort( sorted_overlap_order.begin(), sorted_overlap_order.end(), IntPairComparator );
         // sorted_overlap_order[ie].second , ie=0,nOverlap-1 is the order such that overlap elems
@@ -783,12 +784,12 @@ ErrorCode TempestRemapper::convert_overlap_mesh_sorted_by_source()
         }
         for( unsigned ie = 0; ie < n_overlap_entitites; ++ie )
         {
-            int ix                         = std::get<0>(sorted_overlap_order[ie]);  // original index of the element
-            m_overlap->vecSourceFaceIx[ie] = std::get<1>(sorted_overlap_order[ie]);
+            int ix = std::get< 0 >( sorted_overlap_order[ie] );  // original index of the element
+            m_overlap->vecSourceFaceIx[ie] = std::get< 1 >( sorted_overlap_order[ie] );
             if( is_parallel && size > 1 && ghFlags[ix] >= 0 )  // it means it is a ghost overlap element
                 m_overlap->vecTargetFaceIx[ie] = -1;           // this should not participate in smat!
             else
-                m_overlap->vecTargetFaceIx[ie] = std::get<2>(sorted_overlap_order[ie]);
+                m_overlap->vecTargetFaceIx[ie] = std::get< 2 >( sorted_overlap_order[ie] );
         }
     }
 
@@ -810,7 +811,7 @@ ErrorCode TempestRemapper::convert_overlap_mesh_sorted_by_source()
 
     for( unsigned ifac = 0; ifac < m_overlap_entities.size(); ++ifac )
     {
-        const unsigned iface = std::get<0>(sorted_overlap_order[ifac]);
+        const unsigned iface = std::get< 0 >( sorted_overlap_order[ifac] );
         Face& face           = faces[ifac];
         EntityHandle ehandle = m_overlap_entities[iface];
 
@@ -1265,7 +1266,6 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
         targetFile << "target" << rank << ".h5m";
         rval = m_interface->write_file( targetFile.str().c_str(), 0, 0, &m_target_set, 1 );MB_CHK_ERR( rval );
 #endif
-
     }
     else
     {
@@ -1495,13 +1495,13 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                     assert( srcParent >= 0 );
                     intxCov.insert( covEnts[loc_gid_to_lid_covsrc[srcParent]] );
                 }
-		if ( nLayers )
-		{
+                if( nLayers )
+                {
                     // add to the intxCov range the ghost layers we used for coverage for higher order maps
                     Range extraCovCells;
-                    rval  = MeshTopoUtil( m_interface ).get_bridge_adjacencies( intxCov, 1, 2, extraCovCells, nLayers ); MB_CHK_SET_ERR( rval, "Failed to get bridge adjacencies" );
-                    intxCov.merge(extraCovCells);
-		}
+                    rval = MeshTopoUtil( m_interface ).get_bridge_adjacencies( intxCov, 1, 2, extraCovCells, nLayers );MB_CHK_SET_ERR( rval, "Failed to get bridge adjacencies" );
+                    intxCov.merge( extraCovCells );
+                }
 
                 Range notNeededCovCells = moab::subtract( covEnts, intxCov );
 

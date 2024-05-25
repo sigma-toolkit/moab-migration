@@ -373,8 +373,8 @@ static void CAASLimiter( std::vector< double >& dataCorrectedField,
                          double& dMass )
 {
     const size_t nrows = dataCorrectedField.size();
-    double dMassL = 0.0;
-    double dMassU = 0.0;
+    double dMassL      = 0.0;
+    double dMassU      = 0.0;
     std::vector< double > dataCorrection( nrows );
     for( size_t i = 0; i < nrows; i++ )
     {
@@ -470,7 +470,6 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
     const DataArray1D< double >& m_dTargetAreas  = this->m_remapper->m_target->vecFaceArea;
     const DataArray1D< double >& m_dOverlapAreas = this->m_remapper->m_overlap->vecFaceArea;
 
-
     // Apply the offline map to the data
     double dMassDiff = 0.0;
     std::vector< double > x( nTargetCount );
@@ -560,8 +559,8 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
                     {
                         int k = vecAdjFaces[j].first;
 
-                        dMaxIAdj = fmax( dMaxIAdj, dataInDouble[k] ); // compute max over neighboring faces
-                        dMinIAdj = fmin( dMinIAdj, dataInDouble[k] ); // compute min over neighboring faces
+                        dMaxIAdj = fmax( dMaxIAdj, dataInDouble[k] );  // compute max over neighboring faces
+                        dMinIAdj = fmin( dMinIAdj, dataInDouble[k] );  // compute min over neighboring faces
                     }
 
                     // Update the min and max values of the target data
@@ -628,8 +627,7 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
 //#define VERBOSE
 moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& srcVals,
                                                       std::vector< double >& tgtVals,
-                                                      bool transpose,
-                                                      CAASType caasType )
+                                                      bool transpose )
 {
     // Reset the source and target data first
     m_rowVector.setZero();

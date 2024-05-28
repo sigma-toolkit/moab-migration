@@ -101,7 +101,7 @@ class TempestRemapper : public Remapper
                                           double boxeps      = 0.1,
                                           bool regional_mesh = false,
                                           bool gnomonic      = true,
-		                                  int order          = 1 );
+                                          int order          = 1 );
 
     /// <summary>
     ///     Compute the intersection mesh between the source and target grids that have been
@@ -336,7 +336,7 @@ class TempestRemapper : public Remapper
     IntxAreaUtils::AreaMethod m_area_method;
 
     // this is a deep copy of the original source set
-    moab::EntityHandle m_initial_source_set; // created for parallel cases; mostly a placeholder
+    moab::EntityHandle m_initial_source_set;  // created for parallel cases; mostly a placeholder
 
     bool rrmgrids;
     bool is_parallel, is_root;
@@ -356,7 +356,7 @@ inline Mesh* TempestRemapper::GetMesh( Remapper::IntersectionContext ctx )
             return m_overlap;
         case Remapper::CoveringMesh:
             return m_covering_source;
-        case Remapper::DEFAULT: // Remapper::InitialSourceMesh does not need one
+        case Remapper::DEFAULT:  // Remapper::InitialSourceMesh does not need one
         default:
             return NULL;
     }
@@ -386,22 +386,22 @@ inline void TempestRemapper::SetMesh( Remapper::IntersectionContext ctx, Mesh* m
             if( overwrite && m_covering_source ) delete m_covering_source;
             m_covering_source = mesh;
             break;
-        case Remapper::DEFAULT: // Remapper::InitialSourceMesh does not need one
+        case Remapper::DEFAULT:  // Remapper::InitialSourceMesh does not need one
         default:
             break;
     }
 }
 // this is needed in parallel, right before writing the map file
-inline void TempestRemapper::ResetMeshSet( Remapper::IntersectionContext ctx)
+inline void TempestRemapper::ResetMeshSet( Remapper::IntersectionContext ctx )
 {
     switch( ctx )
     {
         case Remapper::SourceMesh:
             delete m_source;
-            m_source = new Mesh;
+            m_source     = new Mesh;
             m_source_set = m_initial_source_set;
             convert_mesh_to_tempest_private( m_source, m_source_set, m_source_entities, &m_source_vertices );
-            m_source->CalculateFaceAreas( false ); // fInputConcave is false ?
+            m_source->CalculateFaceAreas( false );  // fInputConcave is false ?
             break;
         case Remapper::TargetMesh:
             // not needed yet
@@ -420,7 +420,6 @@ inline void TempestRemapper::ResetMeshSet( Remapper::IntersectionContext ctx)
             break;
     }
 }
-
 
 inline moab::EntityHandle& TempestRemapper::GetMeshSet( Remapper::IntersectionContext ctx )
 {

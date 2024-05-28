@@ -690,8 +690,8 @@ int main( int argc, char* argv[] )
 #endif
         if( nlayers >= 1 )
         {
-           remapper.ResetMeshSet( moab::Remapper::SourceMesh);
-           runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh ); //  ?
+            remapper.ResetMeshSet( moab::Remapper::SourceMesh );
+            runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );  //  ?
         }
 
         runCtx->timer_pop();
@@ -714,13 +714,13 @@ int main( int argc, char* argv[] )
             if( nlayers > 0 )
             {
                 // compute area of original source set, without ghosts
-                moab::EntityHandle initialSourceSet = remapper.GetMeshSet(moab::Remapper::InitialSourceMesh);
+                moab::EntityHandle initialSourceSet = remapper.GetMeshSet( moab::Remapper::InitialSourceMesh );
                 local_areas[0] = areaAdaptor.area_on_sphere( mbCore, initialSourceSet, radius_src );
             }
             else
                 local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
 #else
-            local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
+            local_areas[0]                  = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
 #endif
 
             local_areas[1] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[1], radius_dest );
@@ -729,9 +729,9 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_MPI
             MPI_Allreduce( &local_areas[0], &global_areas[0], 3, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
 #else
-            global_areas[0] = local_areas[0];
-            global_areas[1] = local_areas[1];
-            global_areas[2] = local_areas[2];
+            global_areas[0]                 = local_areas[0];
+            global_areas[1]                 = local_areas[1];
+            global_areas[2]                 = local_areas[2];
 #endif
             if( !proc_id )
             {
@@ -852,9 +852,9 @@ int main( int argc, char* argv[] )
                 // from the beginning;
                 if( nlayers >= 1 )  //
                 {
-                    remapper.ResetMeshSet( moab::Remapper::SourceMesh);
-                    runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh ); //  ?
-                    weightMap -> SetMeshInput (runCtx->meshes[0]);
+                    remapper.ResetMeshSet( moab::Remapper::SourceMesh );
+                    runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );  //  ?
+                    weightMap->SetMeshInput( runCtx->meshes[0] );
                 }
 
                 rval = weightMap->WriteParallelMap( runCtx->outFilename.c_str(), attrMap );MB_CHK_ERR( rval );
@@ -1046,9 +1046,9 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
             // if the mesh has holes, it could be more
 
             moab::EntityHandle originalSourceSet;
-            rval = remapper.GhostLayers( ctx.meshsets[0], nlayers, originalSourceSet); MB_CHK_ERR( rval );
+            rval = remapper.GhostLayers( ctx.meshsets[0], nlayers, originalSourceSet );MB_CHK_ERR( rval );
             moab::Range dummy;
-            remapper.SetMeshSet(moab::Remapper::InitialSourceMesh, originalSourceSet, dummy);
+            remapper.SetMeshSet( moab::Remapper::InitialSourceMesh, originalSourceSet, dummy );
 #ifdef MOAB_DBG
             // write the new source sets, after layers were decided, should see the ghosts now
             std::stringstream filename;

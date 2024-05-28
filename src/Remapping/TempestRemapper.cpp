@@ -1000,7 +1000,7 @@ void TempestRemapper::SetMeshSet( Remapper::IntersectionContext ctx /* Remapper:
     }
     else if( ctx == Remapper::InitialSourceMesh )
     {
-        m_initial_source_set = mset; // entities not used
+        m_initial_source_set = mset;  // entities not used
     }
     else
     {

@@ -56,11 +56,11 @@ class Remapper
 
     enum IntersectionContext
     {
-        DEFAULT      = -1,
-        SourceMesh   = 0,
-        TargetMesh   = 1,
-        OverlapMesh  = 2,
-        CoveringMesh = 3,
+        DEFAULT           = -1,
+        SourceMesh        = 0,
+        TargetMesh        = 1,
+        OverlapMesh       = 2,
+        CoveringMesh      = 3,
         InitialSourceMesh = 4  // this is needed to reset source for writing the map, for parallel cases mostly
     };
 
@@ -82,32 +82,31 @@ class Remapper
     {
         // meshset contains the mesh set distributed already
         //
-        moab::ErrorCode rval = m_interface -> create_meshset(MESHSET_SET, original); MB_CHK_ERR(rval);
+        moab::ErrorCode rval = m_interface->create_meshset( MESHSET_SET, original );MB_CHK_ERR( rval );
         // copy original content of mesh set here; we will use it later for local area, for example
         // it will not have any ghosts in it
         moab::Range orgEnts;
-        rval = m_interface -> get_entities_by_handle(meshset, orgEnts); MB_CHK_ERR(rval);
-        rval = m_interface -> add_entities(original, orgEnts); MB_CHK_ERR(rval);
-        rval = m_pcomm->exchange_ghost_cells( 2, 1, 1, 0, true, true, &meshset ); MB_CHK_ERR(rval);
-        for (int i=2; i<=ngh_layers; i++ )
+        rval = m_interface->get_entities_by_handle( meshset, orgEnts );MB_CHK_ERR( rval );
+        rval = m_interface->add_entities( original, orgEnts );MB_CHK_ERR( rval );
+        rval = m_pcomm->exchange_ghost_cells( 2, 1, 1, 0, true, true, &meshset );MB_CHK_ERR( rval );
+        for( int i = 2; i <= ngh_layers; i++ )
         {
-            rval = m_pcomm->correct_thin_ghost_layers(); MB_CHK_ERR(rval);
-            rval = m_pcomm->exchange_ghost_cells( 2, 1, i, 0, true, true, &meshset ); MB_CHK_ERR(rval);
+            rval = m_pcomm->correct_thin_ghost_layers();MB_CHK_ERR( rval );
+            rval = m_pcomm->exchange_ghost_cells( 2, 1, i, 0, true, true, &meshset );MB_CHK_ERR( rval );
         }
 
         // need to set global id tags
         // need also to propagate global id to ghost cells; it is not done by default :(
         moab::Tag gtag = m_interface->globalId_tag();
         moab::Range entities;
-        rval = m_interface->get_entities_by_dimension(meshset, 2, entities); MB_CHK_ERR(rval);
+        rval = m_interface->get_entities_by_dimension( meshset, 2, entities );MB_CHK_ERR( rval );
         // get all vertices too, need to exchange global ids for vertices too
         moab::Range vertices;
-        rval = m_interface->get_connectivity(entities, vertices);MB_CHK_ERR(rval);
-        entities.merge(vertices);
-        rval = m_pcomm->exchange_tags( gtag, entities ); MB_CHK_ERR(rval);
+        rval = m_interface->get_connectivity( entities, vertices );MB_CHK_ERR( rval );
+        entities.merge( vertices );
+        rval = m_pcomm->exchange_tags( gtag, entities );MB_CHK_ERR( rval );
         return rval;
     }
-
 
 #endif
 

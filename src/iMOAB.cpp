@@ -1115,7 +1115,7 @@ ErrCode iMOAB_GetVisibleElementsInfo( iMOAB_AppID pid,
 
 #else
         /* everything owned by task 0 */
-        ranks[i] = 0;
+        ranks[i]             = 0;
 #endif
     }
 
@@ -4149,27 +4149,26 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
 
     // First, compute the covering source set.
-    int order = 2; // we will handle at least order 2, which should be good for bilinear too
+    int order = 2;  // we will handle at least order 2, which should be good for bilinear too
     // eventually, we should pass order as an input to this iMOAB_ComputeMeshIntersectionOnSphere
     // repeat what we do in mbtempest case
     int nlayers = 0;
 #ifdef MOAB_HAVE_MPI
-    if ( is_parallel )
-       nlayers = order - 1; // this should work if no holes and order not too high
+    if( is_parallel ) nlayers = order - 1;  // this should work if no holes and order not too high
 #endif
-    if ( nlayers >= 1 )
+    if( nlayers >= 1 )
     {
         moab::EntityHandle originalSourceSet;
-        rval = tdata.remapper->GhostLayers( data_src.file_set, nlayers, originalSourceSet); MB_CHK_ERR( rval );
+        rval = tdata.remapper->GhostLayers( data_src.file_set, nlayers, originalSourceSet );MB_CHK_ERR( rval );
         moab::Range dummy;
-        tdata.remapper->SetMeshSet(moab::Remapper::InitialSourceMesh, originalSourceSet, dummy);
+        tdata.remapper->SetMeshSet( moab::Remapper::InitialSourceMesh, originalSourceSet, dummy );
     }
 
     rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, order );MB_CHK_ERR( rval );
 
-    if (nlayers>=1)
+    if( nlayers >= 1 )
     {
-        tdata.remapper->ResetMeshSet( moab::Remapper::SourceMesh);
+        tdata.remapper->ResetMeshSet( moab::Remapper::SourceMesh );
         // runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh ); //  ?
     }
     // Next, compute intersections with MOAB.

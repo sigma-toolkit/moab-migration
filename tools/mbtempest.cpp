@@ -687,6 +687,8 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_MPI
         if( runCtx->disc_orders[0] >= 2 && runCtx->n_procs > 1 )
             nlayers = runCtx->disc_orders[0] - 1;  // this should work if no holes and order not too high
+        if ( runCtx->fvMethod == "bilin")
+            if (nlayers == 0) nlayers = 1;
 #endif
         if( nlayers >= 1 )
         {
@@ -1040,6 +1042,7 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         // if order >=2, ghost at least this many layers (order -1) it may be too much
 #ifdef MOAB_HAVE_MPI
         int nlayers = ctx.disc_orders[0] - 1;  // this should work if no holes and order not too high
+        if (ctx.fvMethod == "bilin" && nlayers == 0) nlayers = 1;
         if( nlayers >= 1 && ctx.n_procs > 1 )
         {
             // get order -1 ghost layers; actually it should be decided by the mesh

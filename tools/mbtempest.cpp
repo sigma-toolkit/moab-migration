@@ -519,7 +519,7 @@ int main( int argc, char* argv[] )
                                                // TempestOnlineMap.hpp is included in this file, and is part of MOAB
     // Some constant parameters
 
-    const double boxeps = 1e-1;
+    const double boxeps = 1e-6;
 
     if( runCtx->meshType == moab::TempestRemapper::OVERLAP_MEMORY )
     {
@@ -1038,8 +1038,8 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[0], radius_src );MB_CHK_ERR( rval );
         // if order >=2, ghost at least this many layers (order -1) it may be too much
 #ifdef MOAB_HAVE_MPI
-        int nlayers = ctx.disc_orders[0] - 1;  // this should work if no holes and order not too high
-        if( nlayers >= 1 && ctx.n_procs > 1 )
+        int nlayers = std::max(1, ctx.disc_orders[0] - 1);  // this should work if no holes and order not too high
+        if( ctx.n_procs > 1 )
         {
             // get order -1 ghost layers; actually it should be decided by the mesh
             // if the mesh has holes, it could be more

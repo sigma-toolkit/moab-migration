@@ -2214,8 +2214,10 @@ moab::ErrorCode moab::TempestOnlineMap::ComputeMetrics( moab::Remapper::Intersec
     double sumarea = 0.0;
     for( size_t i = 0; i < ovents.size(); ++i )
     {
-        // const int srcidx    = m_remapper->m_overlap->vecSourceFaceIx[i];
+        const int srcidx    = m_remapper->m_overlap->vecSourceFaceIx[i];
+        if( srcidx < 0 ) continue;  // Skip non-overlapping entities
         const int tgtidx    = m_remapper->m_overlap->vecTargetFaceIx[i];
+        if( tgtidx < 0 ) continue;  // skip ghost target faces
         const double ovarea = m_remapper->m_overlap->vecFaceArea[i];
         const double error  = fabs( exactSolution[tgtidx] - projSolution[tgtidx] );
         errnorms[0] += ovarea * error;
@@ -2231,8 +2233,10 @@ moab::ErrorCode moab::TempestOnlineMap::ComputeMetrics( moab::Remapper::Intersec
         MPI_Reduce( &errnorms[3], &globerrnorms[3], 1, MPI_DOUBLE, MPI_MAX, 0, m_pcomm->comm() );
     }
 #else
-    globerrnorms = errnorms;
+    for( int i = 0; i < 4; ++i )
+        globerrnorms[i] = errnorms[i];
 #endif
+
     globerrnorms[0] = ( globerrnorms[0] / globerrnorms[2] );
     globerrnorms[1] = std::sqrt( globerrnorms[1] / globerrnorms[2] );
 
@@ -2244,6 +2248,7 @@ moab::ErrorCode moab::TempestOnlineMap::ComputeMetrics( moab::Remapper::Intersec
     if( verbose && is_root )
     {
         std::cout << "Error metrics when comparing " << projTagName << " against " << exactTagName << std::endl;
+        std::cout << "\t Total Intersection area = " << globerrnorms[2] << std::endl;
         std::cout << "\t L_1 error   = " << globerrnorms[0] << std::endl;
         std::cout << "\t L_2 error   = " << globerrnorms[1] << std::endl;
         std::cout << "\t L_inf error = " << globerrnorms[3] << std::endl;

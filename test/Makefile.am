@@ -266,7 +266,6 @@ check-local:
 		(@SLIBENVPATH@=$(top_builddir)/src/.libs/:$(@SLIBENVPATH@) $(PYTHON) $$i) || exit 1; \
 	done
 
-PYMOAB_DIST = $(srcdir)/pymoab/*
 PYCLEANFILES = $(builddir)/pymoab/quads_test.vtk $(builddir)/pymoab/outfile.h5m $(builddir)/pymoab/write_tag_test.h5m
 
 endif

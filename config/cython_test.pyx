@@ -1,3 +1,5 @@
+#cython: language_level=3
+
 # Test that numpy works in Cython:
 from numpy cimport ndarray
 cimport numpy as np

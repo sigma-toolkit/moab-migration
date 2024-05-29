@@ -88,7 +88,7 @@ struct ToolContext
     ToolContext( moab::Core* icore )
         : mbcore( icore ), proc_id( 0 ), n_procs( 1 ), outputFormatter( std::cout, 0, 0 ),
 #endif
-          blockSize( 5 ), nlayers( 2 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "" ),
+          blockSize( 5 ), nlayers( 3 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "" ),
           baselineFile( "" ), variableToVerify( "" ), meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ),
           computeWeights( false ), verifyWeights( false ), enforceConvexity( false ), ensureMonotonicity( 0 ),
           rrmGrids( false ), kdtreeSearch( true ), fCheck( false ), fVolumetric( false ),
@@ -377,8 +377,8 @@ struct ToolContext
             if( fVolumetric ) mapOptions.strMethod += "volumetric;";
 
             // this should work if no holes and order not too high
-            // nlayers = std::max( nlayer_input, disc_orders[0] - 1 );
-            nlayers = nlayer_input;
+            nlayers = std::max( nlayer_input, nlayers );
+            // nlayers = nlayer_input;
         }
 
         // clear temporary string name
@@ -598,7 +598,7 @@ int main( int argc, char* argv[] )
                 velist[5] = cintxelems.size();
             }
 
-            MPI_Reduce(velist, gvelist, 6, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+            MPI_Reduce( velist, gvelist, 6, MPI_UINT64_T, MPI_SUM, 0, MPI_COMM_WORLD );
 
 #else
             moab::EntityHandle covering_set = runCtx->meshsets[0];

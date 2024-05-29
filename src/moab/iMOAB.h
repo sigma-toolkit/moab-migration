@@ -156,7 +156,7 @@ ErrCode iMOAB_Initialize( int argc, iMOAB_String* argv );
  *
  * \return ErrCode    The error code indicating success or failure.
  */
-ErrCode iMOAB_InitializeFortran();
+ErrCode iMOAB_InitializeFortran( void );
 
 /**
  * \brief Finalize the iMOAB interface implementation.
@@ -167,7 +167,7 @@ ErrCode iMOAB_InitializeFortran();
  *
  * \return ErrCode    The error code indicating success or failure.
  */
-ErrCode iMOAB_Finalize();
+ErrCode iMOAB_Finalize( void );
 
 /**
  * \brief Register application - Create a unique application ID and bootstrap interfaces for further queries.

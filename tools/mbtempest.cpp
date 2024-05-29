@@ -47,34 +47,38 @@ struct ToolContext
 #ifdef MOAB_HAVE_MPI
     moab::ParallelComm* pcomm;
 #endif
-    const int proc_id, n_procs;
-    moab::DebugOutput outputFormatter;
-    int blockSize;
-    std::vector< std::string > inFilenames;
-    std::vector< Mesh* > meshes;
-    std::vector< moab::EntityHandle > meshsets;
-    std::vector< int > disc_orders;
-    std::vector< std::string > disc_methods;
-    std::vector< std::string > doftag_names;
-    std::string fvMethod;
-    std::string outFilename;
-    std::string intxFilename;
-    std::string baselineFile;
-    std::string variableToVerify;
-    moab::TempestRemapper::TempestMeshType meshType;
-    bool computeDual;
-    bool computeWeights;
-    bool verifyWeights;
-    bool enforceConvexity;
-    int ensureMonotonicity;
-    bool rrmGrids;
-    bool kdtreeSearch;
-    bool fCheck;
-    bool fVolumetric;
-    bool useGnomonicProjection;
-    moab::TempestOnlineMap::CAASType cassType;
-    GenerateOfflineMapAlgorithmOptions mapOptions;
-    bool print_diagnostics;
+    const int proc_id, n_procs;                  // MPI process id and number of processes
+    moab::DebugOutput outputFormatter;           // Output formatter
+    int blockSize;                               // Resolution of the mesh
+    int nlayers;                                 // Number of ghost layers in the source mesh
+    std::vector< std::string > inFilenames;      // Input mesh filenames
+    std::vector< Mesh* > meshes;                 // Mesh references in TempestRemap format
+    std::vector< moab::EntityHandle > meshsets;  // Meshsets in MOAB format
+    std::vector< int > disc_orders;              // Discretization orders
+    std::vector< std::string > disc_methods;     // Discretization method names (fv, cgll, dgll, etc.)
+    std::vector< std::string > doftag_names;     // DoF tag names (GLOBAL_ID, etc.)
+    std::string fvMethod;          // FV method name (invdist, delaunay, bilin, intbilin, intbilingb, none)
+    std::string outFilename;       // Output filename
+    std::string intxFilename;      // Output intersection mesh filename
+    std::string baselineFile;      // Output baseline file (for verification)
+    std::string variableToVerify;  // Variable name for verification
+    moab::TempestRemapper::TempestMeshType
+        meshType;            // Mesh type (CS, RLL, ICO, OVERLAP_FILES, OVERLAP_MEMORY, OVERLAP_MOAB)
+    bool computeDual;        // Compute the dual of the mesh
+    bool computeWeights;     // Compute the projection weights
+    bool verifyWeights;      // Verify the projection weights
+    bool enforceConvexity;   // Enforce convexity of the input meshes
+    int ensureMonotonicity;  // Ensure monotonicity in the weight generation process
+    bool rrmGrids;      // Flag specifying that we are dealing with regionally refined grids (possibly nonoverlapping)
+    bool kdtreeSearch;  // Use Kd-tree based search for computing mesh intersections instead of advancing front
+    bool fCheck;        // Check the generated map for conservation and consistency
+    bool fVolumetric;   // Apply a volumetric projection to compute the weights
+    bool useGnomonicProjection;                     // Use Gnomonic plane projections to compute coverage mesh
+    moab::TempestOnlineMap::CAASType cassType;      // CAAS filter type
+    GenerateOfflineMapAlgorithmOptions mapOptions;  // Offline map options
+    bool print_diagnostics;                         // Print diagnostics
+    double boxeps;                                  // Box error tolerance
+    double epsrel;                                  // Relative error tolerance
 
 #ifdef MOAB_HAVE_MPI
     ToolContext( moab::Core* icore, moab::ParallelComm* p_pcomm )
@@ -84,11 +88,13 @@ struct ToolContext
     ToolContext( moab::Core* icore )
         : mbcore( icore ), proc_id( 0 ), n_procs( 1 ), outputFormatter( std::cout, 0, 0 ),
 #endif
-          blockSize( 5 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "" ), baselineFile( "" ),
-          variableToVerify( "" ), meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ),
+          blockSize( 5 ), nlayers( 2 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "" ),
+          baselineFile( "" ), variableToVerify( "" ), meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ),
           computeWeights( false ), verifyWeights( false ), enforceConvexity( false ), ensureMonotonicity( 0 ),
           rrmGrids( false ), kdtreeSearch( true ), fCheck( false ), fVolumetric( false ),
-          useGnomonicProjection( false ), cassType( moab::TempestOnlineMap::CAAS_NONE ), print_diagnostics( true )
+          useGnomonicProjection( false ), cassType( moab::TempestOnlineMap::CAAS_NONE ), print_diagnostics( true ),
+          boxeps( 1e-7 ),               // Box error tolerance default value
+          epsrel( ReferenceTolerance )  // ReferenceTolerance is defined in Defines.h in TempestRemap
     {
         inFilenames.resize( 2 );
         doftag_names.resize( 2 );
@@ -150,6 +156,7 @@ struct ToolContext
         std::string expectedDofTagName = "GLOBAL_ID";
         int expectedOrder              = 1;
         int useCAAS                    = 0;
+        int nlayer_input               = 2;
 
         if( !proc_id )
         {
@@ -165,6 +172,10 @@ struct ToolContext
                             &imeshType );
 
         opts.addOpt< int >( "res,r", "Resolution of the mesh (default=5)", &blockSize );
+
+        opts.addOpt< int >( "ghost", "Number of ghost layers in coverage mesh (default=1)", &nlayer_input );
+
+        opts.addOpt< double >( "boxeps", "The tolerance for boxes (default=1e-7)", &boxeps );
 
         opts.addOpt< void >( "dual,d", "Output the dual of the mesh (relevant only for ICO mesh type)", &computeDual );
 
@@ -364,6 +375,10 @@ struct ToolContext
 
             //assert( fVolumetric && fInverseDistanceMap == false );  // both options cannot be active
             if( fVolumetric ) mapOptions.strMethod += "volumetric;";
+
+            // this should work if no holes and order not too high
+            // nlayers = std::max( nlayer_input, disc_orders[0] - 1 );
+            nlayers = nlayer_input;
         }
 
         // clear temporary string name
@@ -512,15 +527,6 @@ int main( int argc, char* argv[] )
     rval = CreateTempestMesh( *runCtx, remapper, tempest_mesh );MB_CHK_ERR( rval );
     runCtx->timer_pop();
 
-    const double epsrel = ReferenceTolerance;  // ReferenceTolerance is defined in Defines.h in tempestremap;
-                                               // Defines.h is included in SparseMatrix.h
-                                               // SparseMatrix.h is included in OfflineMap.h
-                                               // OfflineMap.h is included in TempestOnlineMap.hpp
-                                               // TempestOnlineMap.hpp is included in this file, and is part of MOAB
-    // Some constant parameters
-
-    const double boxeps = 1e-6;
-
     if( runCtx->meshType == moab::TempestRemapper::OVERLAP_MEMORY )
     {
         // Compute intersections with MOAB
@@ -538,18 +544,19 @@ int main( int argc, char* argv[] )
         rval = mbCore->write_mesh( "tempest_intersection.h5m", &runCtx->meshsets[2], 1 );MB_CHK_ERR( rval );
 
         // print verbosely about the problem setting
+        size_t velist[6], gvelist[6];
         {
             moab::Range rintxverts, rintxelems;
             rval = mbCore->get_entities_by_dimension( runCtx->meshsets[0], 0, rintxverts );MB_CHK_ERR( rval );
             rval = mbCore->get_entities_by_dimension( runCtx->meshsets[0], 2, rintxelems );MB_CHK_ERR( rval );
-            outputFormatter.printf( 0, "The source set contains %lu vertices and %lu elements \n", rintxverts.size(),
-                                    rintxelems.size() );
+            velist[0] = rintxverts.size();
+            velist[1] = rintxelems.size();
 
             moab::Range bintxverts, bintxelems;
             rval = mbCore->get_entities_by_dimension( runCtx->meshsets[1], 0, bintxverts );MB_CHK_ERR( rval );
             rval = mbCore->get_entities_by_dimension( runCtx->meshsets[1], 2, bintxelems );MB_CHK_ERR( rval );
-            outputFormatter.printf( 0, "The target set contains %lu vertices and %lu elements \n", bintxverts.size(),
-                                    bintxelems.size() );
+            velist[2] = bintxverts.size();
+            velist[3] = bintxelems.size();
         }
 
         moab::EntityHandle intxset;  // == remapper.GetMeshSet(moab::Remapper::OverlapMesh);
@@ -560,8 +567,8 @@ int main( int argc, char* argv[] )
             runCtx->timer_push( "setup the intersector" );
 
             moab::Intx2MeshOnSphere* mbintx = new moab::Intx2MeshOnSphere( mbCore );
-            mbintx->set_error_tolerance( epsrel );
-            mbintx->set_box_error( boxeps );
+            mbintx->set_error_tolerance( runCtx->epsrel );
+            mbintx->set_box_error( runCtx->boxeps );
             mbintx->set_radius_source_mesh( radius_src );
             mbintx->set_radius_destination_mesh( radius_dest );
 #ifdef MOAB_HAVE_MPI
@@ -579,9 +586,35 @@ int main( int argc, char* argv[] )
             runCtx->timer_push( "communicate the mesh" );
             rval = mbintx->construct_covering_set( runCtx->meshsets[0], covering_set );MB_CHK_ERR( rval );  // lots of communication if mesh is distributed very differently
             runCtx->timer_pop();
+
+            // print verbosely about the problem setting
+            {
+                moab::Range cintxverts, cintxelems;
+                rval = mbCore->get_entities_by_dimension( covering_set, 0, cintxverts );
+                MB_CHK_ERR( rval );
+                rval = mbCore->get_entities_by_dimension( covering_set, 2, cintxelems );
+                MB_CHK_ERR( rval );
+                velist[4] = cintxverts.size();
+                velist[5] = cintxelems.size();
+            }
+
+            MPI_Reduce(velist, gvelist, 6, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
 #else
             moab::EntityHandle covering_set = runCtx->meshsets[0];
+            for( int i = 0; i < 6; i++ ) gvelist[i] = velist[i];
 #endif
+
+            if( !proc_id )
+            {
+                outputFormatter.printf( 0, "The source set contains %lu vertices and %lu elements \n", gvelist[0],
+                                        gvelist[0] );
+                outputFormatter.printf( 0, "The covering set contains %lu vertices and %lu elements \n", gvelist[2],
+                                        gvelist[2] );
+                outputFormatter.printf( 0, "The target set contains %lu vertices and %lu elements \n", gvelist[1],
+                                        gvelist[1] );
+            }
+
             // Now let's invoke the MOAB intersection algorithm in parallel with a
             // source and target mesh set representing two different decompositions
             runCtx->timer_push( "compute intersections with MOAB" );
@@ -647,7 +680,9 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_MPI
         rval = pcomm->check_all_shared_handles();MB_CHK_ERR( rval );
 #endif
+
         // print verbosely about the problem setting
+        size_t velist[6]={}, gvelist[6]={};
         {
             moab::Range srcverts, srcelems;
             rval = mbCore->get_entities_by_dimension( runCtx->meshsets[0], 0, srcverts );MB_CHK_ERR( rval );
@@ -658,9 +693,11 @@ int main( int argc, char* argv[] )
                 rval = moab::IntxUtils::enforce_convexity( mbCore, runCtx->meshsets[0], proc_id );MB_CHK_ERR( rval );
             }
             rval = areaAdaptor.positive_orientation( mbCore, runCtx->meshsets[0], radius_src );MB_CHK_ERR( rval );
-            if( !proc_id )
-                outputFormatter.printf( 0, "The source set contains %lu vertices and %lu elements \n", srcverts.size(),
-                                        srcelems.size() );
+            // if( !proc_id )
+            //     outputFormatter.printf( 0, "The source set contains %lu vertices and %lu elements \n", srcverts.size(),
+            //                             srcelems.size() );
+            velist[0] = srcverts.size();
+            velist[1] = srcelems.size();
 
             moab::Range tgtverts, tgtelems;
             rval = mbCore->get_entities_by_dimension( runCtx->meshsets[1], 0, tgtverts );MB_CHK_ERR( rval );
@@ -671,34 +708,49 @@ int main( int argc, char* argv[] )
                 rval = moab::IntxUtils::enforce_convexity( mbCore, runCtx->meshsets[1], proc_id );MB_CHK_ERR( rval );
             }
             rval = areaAdaptor.positive_orientation( mbCore, runCtx->meshsets[1], radius_dest );MB_CHK_ERR( rval );
-            if( !proc_id )
-                outputFormatter.printf( 0, "The target set contains %lu vertices and %lu elements \n", tgtverts.size(),
-                                        tgtelems.size() );
+            // if( !proc_id )
+            //     outputFormatter.printf( 0, "The target set contains %lu vertices and %lu elements \n", tgtverts.size(),
+            //                             tgtelems.size() );
+            velist[2] = tgtverts.size();
+            velist[3] = tgtelems.size();
         }
         //rval = mbCore->write_file( "source_mesh.h5m", NULL, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
         //rval = mbCore->write_file( "target_mesh.h5m", NULL, writeOptions, &runCtx->meshsets[1], 1 );MB_CHK_ERR( rval );
 
+        // if( runCtx->nlayers && nprocs > 1 )
+        // {
+        //     remapper.ResetMeshSet( moab::Remapper::SourceMesh, runCtx->meshsets[3] );
+        //     runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );  //  ?
+        // }
+
         // First compute the covering set such that the target elements are fully covered by the
         // lcoal source grid
         runCtx->timer_push( "construct covering set for intersection" );
-        rval = remapper.ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, runCtx->rrmGrids, runCtx->useGnomonicProjection,
-                                              runCtx->disc_orders[0] );MB_CHK_ERR( rval );
-        int nlayers = 0;
-#ifdef MOAB_HAVE_MPI
-        if( runCtx->disc_orders[0] >= 2 && runCtx->n_procs > 1 )
-            nlayers = runCtx->disc_orders[0] - 1;  // this should work if no holes and order not too high
-#endif
-        if( nlayers >= 1 )
-        {
-            remapper.ResetMeshSet( moab::Remapper::SourceMesh, runCtx->meshsets[3] );
-            runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );  //  ?
-        }
-
+        rval = remapper.ConstructCoveringSet( runCtx->epsrel, 1.0, 1.0, runCtx->boxeps, runCtx->rrmGrids,
+                                              runCtx->useGnomonicProjection, runCtx->nlayers );MB_CHK_ERR( rval );
         runCtx->timer_pop();
+
+#ifdef MOAB_HAVE_MPI
+        MPI_Reduce( velist, gvelist, 6, MPI_UINT64_T, MPI_SUM, 0, MPI_COMM_WORLD );
+#else
+        for( int i = 0; i < 6; i++ )
+            gvelist[i] = velist[i];
+#endif
+
+        if( !proc_id )
+        {
+            outputFormatter.printf( 0, "The source set contains %lu vertices and %lu elements \n", gvelist[0],
+                                    gvelist[1] );
+            outputFormatter.printf( 0, "The covering set contains %lu vertices and %lu elements \n", gvelist[2],
+                                    gvelist[3] );
+            if( nprocs > 1 )
+                outputFormatter.printf( 0, "The target set contains %lu vertices and %lu elements \n", gvelist[4],
+                                        gvelist[5] );
+        }
 
         // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm
         runCtx->timer_push( "setup and compute mesh intersections" );
-        rval = remapper.ComputeOverlapMesh( runCtx->kdtreeSearch, false, nlayers );MB_CHK_ERR( rval );
+        rval = remapper.ComputeOverlapMesh( runCtx->kdtreeSearch, false, runCtx->nlayers );MB_CHK_ERR( rval );
         runCtx->timer_pop();
 
         // print some diagnostic checks to see if the overlap grid resolved the input meshes
@@ -711,7 +763,7 @@ int main( int argc, char* argv[] )
                 global_areas[3];  // Array for Initial area, and through Method 1 and Method 2
             // local_areas[0] = area_on_sphere_lHuiller ( mbCore, runCtx->meshsets[1], radius_src );
 #ifdef MOAB_HAVE_MPI
-            if( nlayers > 0 )
+            if( runCtx->nlayers > 0 )
             {
                 // compute area of original source set, without ghosts
                 local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[3], radius_src );
@@ -849,7 +901,7 @@ int main( int argc, char* argv[] )
                 // Write the map file to disk in parallel using either HDF5 or SCRIP interface
                 // in extra case; maybe need a better solution, just create it with the right meshset
                 // from the beginning;
-                if( nlayers >= 1 )  //
+                if( runCtx->nlayers && nprocs > 1 )
                 {
                     remapper.ResetMeshSet( moab::Remapper::SourceMesh, runCtx->meshsets[3] );
                     runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );  //  ?
@@ -1038,14 +1090,13 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[0], radius_src );MB_CHK_ERR( rval );
         // if order >=2, ghost at least this many layers (order -1) it may be too much
 #ifdef MOAB_HAVE_MPI
-        int nlayers = std::max(1, ctx.disc_orders[0] - 1);  // this should work if no holes and order not too high
         if( ctx.n_procs > 1 )
         {
             // get order -1 ghost layers; actually it should be decided by the mesh
             // if the mesh has holes, it could be more
 
             moab::EntityHandle originalSourceSet;
-            rval = remapper.GhostLayers( ctx.meshsets[0], nlayers, originalSourceSet );MB_CHK_ERR( rval );
+            rval = remapper.GhostLayers( ctx.meshsets[0], ctx.nlayers, originalSourceSet );MB_CHK_ERR( rval );
             ctx.meshsets.push_back( originalSourceSet );  // so ctx.meshsets[3] will have the original source set
 #ifdef MOAB_DBG
             // write the new source sets, after layers were decided, should see the ghosts now

@@ -9,21 +9,23 @@
 #define _TEMPESTONLINEMAP_H_
 
 #include "moab/MOABConfig.h"
-
-// Tempest includes
-#ifdef MOAB_HAVE_TEMPESTREMAP
-#include "moab/Remapping/TempestRemapper.hpp"
-#include "OfflineMap.h"
-#else
+#ifndef MOAB_HAVE_TEMPESTREMAP
 #error Re-configure with TempestRemap
 #endif
 
-#include <string>
-#include <vector>
+#include "moab/Remapping/TempestRemapper.hpp"
+
+// Tempest includes
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#include "OfflineMap.h"
 
 #ifdef MOAB_HAVE_EIGEN3
 #include <Eigen/Sparse>
 #endif
+
+#pragma GCC diagnostic pop
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -32,10 +34,10 @@
 // #define TRIANGULAR_TRUNCATION
 #endif
 
-///////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////
 
-// Forward declarations
-class Mesh;
+    // Forward declarations
+    class Mesh;
 
 ///////////////////////////////////////////////////////////////////////////////
 

@@ -8,14 +8,17 @@
 #ifdef WIN32               /* windows */
 #define _USE_MATH_DEFINES  // For M_PI
 #endif
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy-with-user-provided-copy"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+
 #include "Announce.h"
 #include "DataArray3D.h"
 #include "FiniteElementTools.h"
 #include "FiniteVolumeTools.h"
 #include "GaussLobattoQuadrature.h"
 #include "TriangularQuadrature.h"
-#include "MeshUtilitiesFuzzy.h"
-#include "MeshUtilitiesExact.h"
 #include "MathHelper.h"
 #include "SparseMatrix.h"
 #include "OverlapMesh.h"
@@ -26,9 +29,7 @@
 #include "moab/Remapping/TempestOnlineMap.hpp"
 #include "moab/TupleList.hpp"
 
-#ifdef MOAB_HAVE_EIGEN3
-#include <Eigen/Dense>
-#endif
+#pragma GCC diagnostic pop
 
 #include <fstream>
 #include <cmath>

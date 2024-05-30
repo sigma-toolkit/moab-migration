@@ -91,7 +91,8 @@ int main( int argc, char** argv )
         if( 1 != length ) continue;
         Tag tag2;
         rval = mb2->tag_get_handle( name.c_str(), tag2 );MB_CHK_SET_ERR( rval, "can't get tag on second model" );
-        rval = mb->tag_get_data( tag, cells1, &vals1[0] );MB_CHK_SET_ERR( rval, "can't get values on tag on model 1" );
+        rval = mb->tag_get_data( tag, cells1, &vals1[0] );
+        if (MB_SUCCESS != rval) continue; // do not bother with tags without values	
         rval = mb2->tag_get_data( tag2, cells2, &vals2[0] );MB_CHK_SET_ERR( rval, "can't get values on tag on model 2" );
         double minv1, maxv1, minv2, maxv2;
         if( vals1.size() > 0 )

@@ -452,7 +452,7 @@ std::string get_file_read_options( ToolContext& ctx, std::string filename )
     }
     return opts;
 }
-
+#define MOAB_DBG
 int main( int argc, char* argv[] )
 {
     moab::ErrorCode rval;
@@ -687,10 +687,10 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_MPI
         if( runCtx->disc_orders[0] >= 2 && runCtx->n_procs > 1 )
             nlayers = runCtx->disc_orders[0] - 1;  // this should work if no holes and order not too high
-        if ( runCtx->fvMethod == "bilin")
+        if ( runCtx->fvMethod == "bilin"  && runCtx->n_procs > 1 )
             if (nlayers == 0) nlayers = 1;
 #endif
-        if( nlayers >= 1 )
+        if( nlayers >= 1  && runCtx->n_procs > 1 )
         {
             remapper.ResetMeshSet( moab::Remapper::SourceMesh );
             runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );  //  ?
@@ -1126,6 +1126,7 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
     return rval;
 }
 
+#undef MOAB_DBG
 ///////////////////////////////////////////////
 //         Test functions
 

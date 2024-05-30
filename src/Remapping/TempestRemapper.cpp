@@ -1222,7 +1222,7 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-//#define MOAB_DBG
+#define MOAB_DBG
 ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
                                                  double radius_src,
                                                  double radius_tgt,
@@ -2215,7 +2215,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
 }
 #endif
 
-//#undef MOAB_DBG
+#undef MOAB_DBG
 
 ErrorCode TempestRemapper::GetIMasks( Remapper::IntersectionContext ctx, std::vector< int >& masks )
 {

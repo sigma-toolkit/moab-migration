@@ -697,22 +697,6 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
         }
     }
 
-    // if( caasType != CAAS_NONE )
-    // {
-    //     constexpr int nmax_caas_iterations = 5;
-    //     double mismatch                    = 1.0;
-    //     int caasIteration                  = 0;
-    //     while( mismatch > 1e-15 &&
-    //            caasIteration++ < nmax_caas_iterations )  // iterate until convergence or a maximum of 5 iterations
-    //     {
-    //         std::pair< double, double > mDefect = this->ApplyCAASLimiting( srcVals, tgtVals, caasType );
-    //         if( m_remapper->verbose )
-    //             printf( "Rank %d: -- Iteration: %d, Net original mass defect: %3.4e, mass defect post-CAAS: %3.4e\n",
-    //                     m_remapper->rank, caasIteration, mDefect.first, mDefect.second );
-    //         mismatch = mDefect.second;
-    //     }
-    // }
-
 #ifdef VERBOSE
     output_file.flush();  // required here
     output_file.close();

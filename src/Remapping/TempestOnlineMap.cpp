@@ -1768,10 +1768,10 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
 
     if( caasType != CAAS_NONE )
     {
-        constexpr int nmax_caas_iterations = 5;
+        constexpr int nmax_caas_iterations = 10;
         double mismatch                    = 1.0;
         int caasIteration                  = 0;
-        while( mismatch > 1e-15 &&
+        while( fabs( mismatch ) > 1e-15 &&
                caasIteration++ < nmax_caas_iterations )  // iterate until convergence or a maximum of 5 iterations
         {
 

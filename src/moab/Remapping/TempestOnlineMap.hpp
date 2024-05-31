@@ -77,7 +77,8 @@ class TempestOnlineMap : public OfflineMap
         CAAS_NONE           = 0,
         CAAS_GLOBAL         = 1,
         CAAS_LOCAL          = 2,
-        CAAS_LOCAL_ADJACENT = 3
+        CAAS_LOCAL_ADJACENT = 3,
+        CAAS_QLT            = 4
     };
 
     ///	<summary>
@@ -411,6 +412,16 @@ class TempestOnlineMap : public OfflineMap
   private:
 
     void setup_sizes_dimensions();
+
+    void CAASLimiter( std::vector< double >& dataCorrectedField,
+                      std::vector< double >& dataLowerBound,
+                      std::vector< double >& dataUpperBound,
+                      double& dMass );
+    double QLTLimiter( int caasIteration,
+                       std::vector< double >& dataCorrectedField,
+                       std::vector< double >& dataLowerBound,
+                       std::vector< double >& dataUpperBound,
+                       std::vector< double >& dMassDefect );
 
     ///	<summary>
     ///		Apply the weight matrix onto the source vector provided as input, and return the column

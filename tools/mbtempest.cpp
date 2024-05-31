@@ -309,6 +309,9 @@ struct ToolContext
             case moab::TempestOnlineMap::CAAS_LOCAL_ADJACENT:
                 cassType = moab::TempestOnlineMap::CAAS_LOCAL_ADJACENT;
                 break;
+            case moab::TempestOnlineMap::CAAS_QLT:
+                cassType = moab::TempestOnlineMap::CAAS_QLT;
+                break;
             default:
                 cassType = moab::TempestOnlineMap::CAAS_NONE;
                 break;

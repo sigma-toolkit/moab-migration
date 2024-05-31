@@ -452,7 +452,7 @@ std::string get_file_read_options( ToolContext& ctx, std::string filename )
     }
     return opts;
 }
-#define MOAB_DBG
+//#define MOAB_DBG
 int main( int argc, char* argv[] )
 {
     moab::ErrorCode rval;
@@ -679,10 +679,7 @@ int main( int argc, char* argv[] )
         //rval = mbCore->write_file( "target_mesh.h5m", NULL, writeOptions, &runCtx->meshsets[1], 1 );MB_CHK_ERR( rval );
 
         // First compute the covering set such that the target elements are fully covered by the
-        // lcoal source grid
-        runCtx->timer_push( "construct covering set for intersection" );
-        rval = remapper.ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, runCtx->rrmGrids, runCtx->useGnomonicProjection,
-                                              runCtx->disc_orders[0] );MB_CHK_ERR( rval );
+        // local source grid
         int nlayers = 0;
 #ifdef MOAB_HAVE_MPI
         if( runCtx->disc_orders[0] >= 2 && runCtx->n_procs > 1 )
@@ -690,6 +687,10 @@ int main( int argc, char* argv[] )
         if ( runCtx->fvMethod == "bilin"  && runCtx->n_procs > 1 )
             if (nlayers == 0) nlayers = 1;
 #endif
+        int new_order = nlayers+1;
+        runCtx->timer_push( "construct covering set for intersection" );
+                rval = remapper.ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, runCtx->rrmGrids, runCtx->useGnomonicProjection,
+                                                      new_order );MB_CHK_ERR( rval );
         if( nlayers >= 1  && runCtx->n_procs > 1 )
         {
             remapper.ResetMeshSet( moab::Remapper::SourceMesh );

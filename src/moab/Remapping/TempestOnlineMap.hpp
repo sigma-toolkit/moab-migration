@@ -352,7 +352,7 @@ class TempestOnlineMap : public OfflineMap
     ///	</summary>
     moab::ErrorCode ApplyWeights( moab::Tag srcSolutionTag,
                                   moab::Tag tgtSolutionTag,
-                                  bool transpose = false,
+                                  bool transpose    = false,
                                   CAASType caasType = CAAS_NONE );
 
     typedef double ( *sample_function )( double, double );
@@ -404,10 +404,12 @@ class TempestOnlineMap : public OfflineMap
     moab::ErrorCode set_row_dc_dofs( std::vector< int >& values_entities );
 
     // hack
-    void SetMeshInput (Mesh * imesh) { m_meshInput = imesh;};
+    void SetMeshInput( Mesh* imesh )
+    {
+        m_meshInput = imesh;
+    };
 
   private:
-
     void setup_sizes_dimensions();
 
     ///	<summary>
@@ -418,7 +420,7 @@ class TempestOnlineMap : public OfflineMap
     ///	</summary>
     moab::ErrorCode ApplyWeights( std::vector< double >& srcVals,
                                   std::vector< double >& tgtVals,
-                                  bool transpose    = false );
+                                  bool transpose = false );
 
 #ifdef MOAB_HAVE_MPI
     int rearrange_arrays_by_dofs( const std::vector< unsigned int >& gdofmap,

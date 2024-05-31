@@ -1222,7 +1222,7 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-#define MOAB_DBG
+//#define MOAB_DBG
 ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
                                                  double radius_src,
                                                  double radius_tgt,
@@ -1501,10 +1501,13 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                 }
                 if( nLayers )
                 {
-                    // add to the intxCov range the ghost layers we used for coverage for higher order maps
-                    Range extraCovCells;
-                    rval = MeshTopoUtil( m_interface ).get_bridge_adjacencies( intxCov, 1, 2, extraCovCells, nLayers );MB_CHK_SET_ERR( rval, "Failed to get bridge adjacencies" );
-                    intxCov.merge( extraCovCells );
+                    if (!intxCov.empty())
+                    {
+                        // add to the intxCov range the ghost layers we used for coverage for higher order maps
+                        Range extraCovCells;
+                        rval = MeshTopoUtil( m_interface ).get_bridge_adjacencies( intxCov, 0, 2, extraCovCells, nLayers );MB_CHK_SET_ERR( rval, "Failed to get bridge adjacencies" );
+                        intxCov.merge( extraCovCells );
+                    }
                 }
 
                 Range notNeededCovCells = moab::subtract( covEnts, intxCov );

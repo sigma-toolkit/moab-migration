@@ -854,7 +854,7 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
 ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distributed_set,
                                                      EntityHandle& covering_set,
                                                      bool gnomonic,
-	                                             int order )
+	                                                 int order )
 {
     // primary element came from, in the joint communicator ; this will be forwarded by coverage
     // mesh needed for tag migrate later on
@@ -1082,7 +1082,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
             // Need to get layers of bridge-adj entities
             if( originalSend.empty() ) continue;
             Range extraCells;
-            rval  = MeshTopoUtil( mb ).get_bridge_adjacencies( originalSend, 1, 2, extraCells, order - 1 ); MB_CHK_SET_ERR( rval, "Failed to get bridge adjacencies" );
+            rval  = MeshTopoUtil( mb ).get_bridge_adjacencies( originalSend, 0, 2, extraCells, order - 1 ); MB_CHK_SET_ERR( rval, "Failed to get bridge adjacencies" );
             Rto[p].merge(extraCells);
         }
     }

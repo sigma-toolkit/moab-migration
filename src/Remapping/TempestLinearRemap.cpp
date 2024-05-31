@@ -582,7 +582,7 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
             dataUpperBound[i] = vecLocalUpperBound[i] - dataOutDouble[i];
         }
 
-    }  // if( caasType == CAAS_LOCAL )
+    }     // if( caasType == CAAS_LOCAL )
     else  // caasType == CAAS_GLOBAL
     {
         for( size_t i = 0; i < nTargetCount; i++ )

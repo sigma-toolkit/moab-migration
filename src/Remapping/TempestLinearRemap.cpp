@@ -469,15 +469,15 @@ double moab::TempestOnlineMap::QLTLimiter( int caasIteration,
                 for( auto it = neighbors.begin(); it != neighbors.end(); ++it )
                     dMassCorrectU += dTargetAreas[*it] * ( dataUpperBound[*it] - dataCorrection[*it] );
 
-                double dMassDiffCumOld = dMassDiff[index];
+                // double dMassDiffCumOld = dMassDiff[index];
                 for (auto it = neighbors.begin(); it != neighbors.end(); ++it)
                 {
                     size_t j = *it;
                     dataCorrection[j] += dMassDiff[index] * ( dataUpperBound[j] - dataCorrection[j] ) / dMassCorrectU;
                     // dMassDiffCumOld += dMassDiff[index] * ( dataUpperBound[j] - dataCorrection[j] ) / dMassCorrectU;
-                    // printf( "Element %lu, j %d, dMassDiff %1.15e, dataUpperBound %1.15e, dataCorrection %1.15e, "
+                    // printf( "rank: %d, Element %lu, j %d, dMassDiff %1.15e, dataUpperBound %1.15e, dataCorrection %1.15e, "
                     //         "dMassCorrectU %1.15e, dMassDiffCumOld %1.15e\n",
-                    //         index, j, dMassDiff[index], dataUpperBound[j], dataCorrection[j], dMassCorrectU,
+                    //         rank, index, j, dMassDiff[index], dataUpperBound[j], dataCorrection[j], dMassCorrectU,
                     //         dMassDiffCumOld );
                     // if( fabs( dMassDiffCumOld ) < 1e-15 ) break;
                 }
@@ -488,15 +488,15 @@ double moab::TempestOnlineMap::QLTLimiter( int caasIteration,
                 for( auto it = neighbors.begin(); it != neighbors.end(); ++it )
                     dMassCorrectL += dTargetAreas[*it] * ( dataCorrection[*it] - dataLowerBound[*it] );
 
-                double dMassDiffCumOld = dMassDiff[index];
+                // double dMassDiffCumOld = dMassDiff[index];
                 for( auto it = neighbors.begin(); it != neighbors.end(); ++it )
                 {
                     size_t j = *it;
                     dataCorrection[j] += dMassDiff[index] * ( dataCorrection[j] - dataLowerBound[j] ) / dMassCorrectL;
                     // dMassDiffCumOld += dMassDiff[index] * ( dataCorrection[j] - dataLowerBound[j] ) / dMassCorrectL;
-                    // printf( "Element %lu, j %d, dMassDiff %1.15e, dataUpperBound %1.15e, dataCorrection %1.15e, "
+                    // printf( "rank: %d, Element %lu, j %d, dMassDiff %1.15e, dataUpperBound %1.15e, dataCorrection %1.15e, "
                     //         "dMassCorrectL %1.15e, dMassDiffCumOld %1.15e\n",
-                    //         index, j, dMassDiff[index], dataUpperBound[j], dataCorrection[j], dMassCorrectL,
+                    //         rank, index, j, dMassDiff[index], dataUpperBound[j], dataCorrection[j], dMassCorrectL,
                     //         dMassDiffCumOld );
                     // if( fabs( dMassDiffCumOld ) < 1e-15 ) break;
                 }
@@ -522,6 +522,8 @@ void moab::TempestOnlineMap::CAASLimiter( std::vector< double >& dataCorrectedFi
     const DataArray1D< double >& dTargetAreas = this->m_remapper->m_target->vecFaceArea;
     double dMassDiff                          = dMass;
     double dLMinusU = fabs( dataUpperBound[0] - dataLowerBound[0] );
+    double dMassCorrectU                      = 0.0;
+    double dMassCorrectL                      = 0.0;
     for( size_t i = 0; i < nrows; i++ )
     {
         dataCorrection[i] = fmax( dataLowerBound[i], fmin( dataUpperBound[i], 0.0 ) );
@@ -529,7 +531,26 @@ void moab::TempestOnlineMap::CAASLimiter( std::vector< double >& dataCorrectedFi
         dMassU += dTargetAreas[i] * dataUpperBound[i];
         dMassDiff -= dTargetAreas[i] * dataCorrection[i];
         dLMinusU = fmax( dLMinusU, fabs( dataUpperBound[i] - dataLowerBound[i] ) );
+        dMassCorrectL += dTargetAreas[i] * ( dataCorrection[i] - dataLowerBound[i] );
+        dMassCorrectU += dTargetAreas[i] * ( dataUpperBound[i] - dataCorrection[i] );
     }
+
+#ifdef MOAB_HAVE_MPI
+    std::vector< double > localDefects( 5, 0.0 ), globalDefects( 5, 0.0 );
+    localDefects[0] = dMassL;
+    localDefects[1] = dMassU;
+    localDefects[2] = dMassDiff;
+    localDefects[3] = dMassCorrectL;
+    localDefects[4] = dMassCorrectU;
+
+    MPI_Allreduce( localDefects.data(), globalDefects.data(), 5, MPI_DOUBLE, MPI_SUM, m_pcomm->comm() );
+
+    dMassL     = globalDefects[0];
+    dMassU     = globalDefects[1];
+    dMassDiff  = globalDefects[2];
+    dMassCorrectL = globalDefects[3];
+    dMassCorrectU = globalDefects[4];
+#endif
 
     //If the upper and lower bounds are too close together, just clip
     if( dMassDiff == 0 || dLMinusU < 1e-13 )
@@ -559,10 +580,6 @@ void moab::TempestOnlineMap::CAASLimiter( std::vector< double >& dataCorrectedFi
         DataArray1D< double > dataMassVec( nrows );  //vector of mass redistribution
         if( dMassDiff > 0.0 )
         {
-            double dMassCorrectU = 0.0;
-            for( size_t i = 0; i < nrows; i++ )
-                dMassCorrectU += dTargetAreas[i] * ( dataUpperBound[i] - dataCorrection[i] );
-
             for( size_t i = 0; i < nrows; i++ )
             {
                 dataMassVec[i] = ( dataUpperBound[i] - dataCorrection[i] ) / dMassCorrectU;
@@ -571,10 +588,6 @@ void moab::TempestOnlineMap::CAASLimiter( std::vector< double >& dataCorrectedFi
         }
         else
         {
-            double dMassCorrectL = 0.0;
-            for( size_t i = 0; i < nrows; i++ )
-                dMassCorrectL += dTargetAreas[i] * ( dataCorrection[i] - dataLowerBound[i] );
-
             for( size_t i = 0; i < nrows; i++ )
             {
                 dataMassVec[i] = ( dataCorrection[i] - dataLowerBound[i] ) / dMassCorrectL;
@@ -666,13 +679,6 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
         massVector[ixT] += locMassDiff;
     }
 
-    // for( size_t i = 0; i < nTargetCount; i++ )
-    // {
-    //     std::vector< int >& vT = vecSourceOvTarget[i];
-    //     std::sort( vT.begin(), vT.end() );
-    //     std::unique( vT.begin(), vT.end() );
-    // }
-
 #ifdef MOAB_HAVE_MPI
     std::vector< double > localMinMaxDefects( 5, 0.0 ), globalMinMaxDefects( 5, 0.0 );
     localMinMaxDefects[0] = dSourceMin;
@@ -692,7 +698,7 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyCAASLimiting( std::vect
     // dTargetMin = globalMinMaxDefects[1];
     // dTargetMax = globalMinMaxDefects[3];
     // dMassDiff = localMinMaxDefects[4];
-    massDefect.first = localMinMaxDefects[4];
+    // massDefect.first = localMinMaxDefects[4];
     massDefect.first = globalMinMaxDefects[4];
 #else
 

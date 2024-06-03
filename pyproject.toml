@@ -18,7 +18,7 @@ authors = [
     { name = "Paul Wilson", email = "paul.wilson@wisc.edu" },
     { name = "Guilherme Caminha", email = "gpkc@cin.ufpe.br" },
     { name = "Anthony Scopatz", email = "scopatz@gmail.com" },
-    { name = "Ahnaf Chowdhury", email = "ahnaf-tahmid@outlook.com" },
+    { name = "Ahnaf Chowdhury", email = "tahmid@nukehub.org" },
 ]
 maintainers = [{ name = "SIGMA Team", email = "moab-dev@mcs.anl.gov" }]
 license = { file = "LICENSE" }

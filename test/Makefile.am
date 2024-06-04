@@ -252,12 +252,12 @@ endif
 if ENABLE_pymoab
 
 test_files = test_core.py \
-						 test_hom.py \
-						 test_range.py \
-						 test_scd.py \
-						 test_skinner.py \
-						 test_tag.py \
-						 test_topo_util.py
+             test_hom.py \
+             test_range.py \
+             test_scd.py \
+             test_skinner.py \
+             test_tag.py \
+             test_topo_util.py
 
 check-local:
 	cd $(builddir)/pymoab; \

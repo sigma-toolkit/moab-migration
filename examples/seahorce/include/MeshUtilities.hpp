@@ -3,6 +3,8 @@
 
 #include "RemapMPASROMS.hpp"
 
+#include "moab/MeshTopoUtil.hpp"
+
 // Remapping related includes
 #include "FiniteVolumeTools.h"
 
@@ -438,6 +440,110 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( RuntimeContext& context,
         std::cout << "\tNumber of Vertices = " << nverts * ( nlayers + 1 ) << std::endl;
         std::cout << "\t          Elements = " << gidElem - 1 << std::endl;
     }
+
+    return moab::MB_SUCCESS;
+}
+
+#define USE_EXPONENTIAL_SMOOTHING 1
+moab::ErrorCode SmoothBathymetry( RuntimeContext& context,
+                                  const std::string& bathymetry_tagname,
+                                  std::pair< double, double >& bathymetry_minmax,
+                                  std::vector< moab::EntityHandle >& entities,
+                                  int maxIterations )
+{
+    using namespace moab;
+    using namespace std;
+    Interface* mbi = context.moab_interface;
+
+    constexpr double r1_tolerance = 0.08;
+
+    const size_t nents = entities.size();
+    std::vector<double> roms_bathymetry( nents ), roms_bathymetry_old( nents );
+    moab::Tag rhtag;
+    runchk( mbi->tag_get_handle( bathymetry_tagname.c_str(), 1, moab::MB_TYPE_DOUBLE, rhtag, moab::MB_TAG_DENSE ),
+            "Can't get Bathymetry tag" );
+    runchk( mbi->tag_get_data( rhtag, entities.data(), nents, roms_bathymetry.data() ),
+            "Can't get Bathymetry tag data" );
+
+#ifdef USE_EXPONENTIAL_SMOOTHING
+#pragma omp parallel for shared( roms_bathymetry, roms_bathymetry_old )
+    for( size_t index = 0; index < nents; ++index )
+    {
+        roms_bathymetry[index] = log( roms_bathymetry[index] );
+        roms_bathymetry_old[index] = roms_bathymetry[index];
+    }
+#else
+    std::copy( roms_bathymetry.begin(), roms_bathymetry.end(), roms_bathymetry_old.begin() );
+#endif
+
+    std::vector< std::unordered_set< int > > vecAdjFaces( nents );
+    moab::MeshTopoUtil mtu( mbi );
+#pragma omp parallel for shared( entities, vecAdjFaces, mtu )
+    for( size_t index = 0; index < nents; ++index )
+    {
+        auto& adjFaces = vecAdjFaces[index];
+        // Loop over the entities and perform smoothing based on 1-ring neighborhood
+        // ents.insert( m_remapper->m_target_entities.index( m_remapper->m_target_entities[index] ) );
+        // ents.insert( entities[index] );
+        moab::Range adjEnts;
+        // runchk( mtu.get_bridge_adjacencies( ents, 0, 2, adjEnts, 1 ), "Failed to get adjacent faces" );
+        mtu.get_bridge_adjacencies( entities[index], 0, 2, adjEnts );
+        for( auto jit = adjEnts.begin(); jit != adjEnts.end(); ++jit )
+        {
+            auto jind = std::find( entities.begin(), entities.end(), *jit );
+            if( jind != entities.end() ) adjFaces.insert( std::distance( entities.begin(), jind ) );
+        }
+    }
+
+    for( int iter = 0; iter < maxIterations; ++iter )
+    {
+        double r1diff = 0.0;
+        // check for bounds and update the bathymetry values
+#pragma omp parallel for shared( vecAdjFaces, roms_bathymetry ) \
+    reduction( max : r1diff )
+        for( size_t index = 0; index < nents; ++index )
+        {
+            const auto& adjFaces = vecAdjFaces[index];
+            for( auto jit = adjFaces.begin(); jit != adjFaces.end(); ++jit )
+                r1diff = fmax( ( roms_bathymetry[index] - roms_bathymetry[*jit] ) /
+                                   ( roms_bathymetry[index] + roms_bathymetry[*jit] ),
+                               r1diff );
+        }
+        // print and check for convergence
+        printf( "Smoothing Iteration %d: Max R1diff = %f\n", iter, r1diff );
+        if ( r1diff < r1_tolerance ) break;
+
+        // Loop over the entities and perform smoothing based on 1-ring neighborhood
+#pragma omp parallel for shared( vecAdjFaces, roms_bathymetry, roms_bathymetry_old, bathymetry_minmax )
+        for( size_t index = 0; index < nents; ++index )
+        {
+            const auto& adjFaces = vecAdjFaces[index];
+            roms_bathymetry[index] = 0.0;
+            for( auto jit = adjFaces.begin(); jit != adjFaces.end(); ++jit )
+            {
+                roms_bathymetry[index] += roms_bathymetry_old[*jit];
+            }
+            roms_bathymetry[index] /= (adjFaces.size()); // average of the neighbors
+
+            // clip the bathymetry values if they are out of bounds compared to MPAS
+            if( roms_bathymetry[index] < bathymetry_minmax.first ) roms_bathymetry[index] = bathymetry_minmax.first;
+            if( roms_bathymetry[index] > bathymetry_minmax.second ) roms_bathymetry[index] = bathymetry_minmax.second;
+
+        }
+
+        // update the bathymetry values
+        std::copy( roms_bathymetry.begin(), roms_bathymetry.end(), roms_bathymetry_old.begin() );
+    }
+
+#ifdef USE_EXPONENTIAL_SMOOTHING
+#pragma omp parallel for shared( roms_bathymetry )
+    for( size_t index = 0; index < nents; ++index )
+    {
+        roms_bathymetry[index]     = exp( roms_bathymetry[index] );
+    }
+#endif
+    runchk( mbi->tag_set_data( rhtag, entities.data(), entities.size(), roms_bathymetry.data() ),
+            "Can't get Bathymetry tag data" );
 
     return moab::MB_SUCCESS;
 }

@@ -70,6 +70,7 @@ struct RuntimeContext
     // std::string bathymetryMethod{ "" };  /// remapping method used for Bathymetry field
     // int bathymetryOrder{ 3 };                 /// order of the reconstruction for Bathymetry field
     // int fieldOrder{ 3 };         /// order of the reconstruction for other scalar fields (temperature, salinity)
+    int smoothBathymetry{ 0 };  /// number of smoothing iterations for projected ROMS Bathymetry
     int proc_id{ 1 };            /// process identifier
     int num_procs{ 1 };          /// total number of processes
     double last_counter{ 0.0 };  /// last time counter between push/pop timer
@@ -239,6 +240,7 @@ struct RuntimeContext
 
         // Problem setup
         opts.addOpt< int >( "dimension", "Compute 2D surface or 3D volumetric coupling (default=2)", &dimension );
+        opts.addOpt< int >( "smoothBathymetry", "Number of smoothing iterations for projected ROMS Bathymetry (default=0)", &smoothBathymetry );
         opts.addOpt< void >( "setup", "Compute full mesh extrusions needed for coupling in 3D", &generateExtrusions );
         opts.addOpt< void >( "mono", "Ensure monotonicity in the weight generation (only for TR-FV)",
                              &ensureMonotonicity );

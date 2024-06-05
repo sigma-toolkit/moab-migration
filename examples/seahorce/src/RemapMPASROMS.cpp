@@ -247,6 +247,33 @@ int main( int argc, char** argv )
             }
         }
 
+        if( context.smoothBathymetry )
+        {
+            std::vector< double > mpas_bathymetry( mpas_elems.size() );
+            moab::Tag mhtag;
+            runchk( mbi->tag_get_handle( "bottomDepth", 1, moab::MB_TYPE_DOUBLE, mhtag, moab::MB_TAG_DENSE ),
+                    "Can't get bottomDepth tag" );
+            runchk( mbi->tag_get_data( mhtag, mpas_elems.data(), mpas_elems.size(), mpas_bathymetry.data() ),
+                    "Can't get bottomDepth tag data" );
+
+            std::pair< double, double > bathymetry_minmax( 1E10, -1E10 );
+            for (size_t i = 0; i < mpas_elems.size(); ++i)
+            {
+                bathymetry_minmax.first = std::min( bathymetry_minmax.first, mpas_bathymetry[i] );
+                bathymetry_minmax.second = std::max( bathymetry_minmax.second, mpas_bathymetry[i] );
+            }
+            mpas_bathymetry.clear();
+#ifdef USE_EXPONENTIAL_SMOOTHING
+            bathymetry_minmax.first = log( bathymetry_minmax.first );
+            bathymetry_minmax.second = log( bathymetry_minmax.second );
+#endif
+            // Smooth the Bathymetry data on ROMS mesh
+            context.timer_push( "Smooth Bathymetry data on ROMS mesh" );
+            runchk( SmoothBathymetry( context, "Bathymetry", bathymetry_minmax, roms_elems, context.smoothBathymetry ),
+                    "Can't smooth Bathymetry data" );
+            context.timer_pop();
+        }
+
         std::vector< double > zmh_xyz3d, zrh_xyz3d;
         if( context.use_3dprojection || context.threetwooneD )
         {

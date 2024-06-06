@@ -1051,9 +1051,9 @@ double IntxAreaUtils::area_spherical_triangle_lHuiller( const double* ptA, const
 
     // now, a is angle BOC, O is origin
     CartVect vA( ptA ), vB( ptB ), vC( ptC );
-    double a = angle( vB, vC );
-    double b = angle( vC, vA );
-    double c = angle( vA, vB );
+    double a = angle_robust( vB, vC );
+    double b = angle_robust( vC, vA );
+    double c = angle_robust( vA, vB );
     int sign = 1;
     if( ( vA * vB ) % vC < 0 ) sign = -1;
     double s   = ( a + b + c ) / 2;
@@ -1111,8 +1111,10 @@ double IntxAreaUtils::area_on_sphere( Interface* mb, EntityHandle set, double R 
         const double elem_area = this->area_spherical_element( mb, eh, R );
 
         // check whether the area of the spherical element is positive.
-        if (elem_area <= 0)
+        if (elem_area <= 0){
           std::cout << "Area of element " << mb->id_from_handle(eh) << " is = " << elem_area << "\n"; 
+          mb->list_entity(eh);
+        }
         assert( elem_area > 0 );
 
         // sum up the contribution

@@ -956,7 +956,7 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                 {
                     if( is_root ) dbgprint.printf( 0, "Overlap mesh forward correspondence found\n" );
                 }
-                else if( m_meshOutput->faces.size() - ixSourceFaceMax == 0 )
+                else if( m_meshOutput->faces.size() - ixTargetFaceMax == 0 )
                 {  // Check for reverse correspondence in overlap mesh
                     if( is_root ) dbgprint.printf( 0, "Overlap mesh reverse correspondence found (reversing)\n" );
 

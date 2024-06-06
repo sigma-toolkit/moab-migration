@@ -212,6 +212,23 @@ inline double angle( const CartVect& u, const CartVect& v )
     return std::acos( tmp );
 }
 
+//! Interior angle between two vectors
+inline double angle_robust( CartVect u, CartVect v )
+{
+    u.normalize();
+    v.normalize();
+
+    double tmp = ( u % v ) ;
+    if( tmp - 1.  >= - 1.e-12 )
+    {
+        double dist = (u - v).length();
+        return dist; // approximate sin(x) with x for very small dist
+    }
+
+    if( tmp < -1. ) tmp = -1.;
+    return std::acos( tmp );
+}
+
 inline CartVect operator-( const CartVect& v )
 {
     return CartVect( -v[0], -v[1], -v[2] );

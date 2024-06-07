@@ -25,6 +25,8 @@
 #include <Eigen/Sparse>
 #endif
 
+#include <unordered_set>
+
 #pragma GCC diagnostic pop
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -252,10 +254,16 @@ class TempestOnlineMap : public OfflineMap
                                           bool isTgtContinuous,
                                           DataArray3D< int >* tgtdataGLLNodes );
 
-    std::pair< double, double > ApplyCAASLimiting( std::vector< double >& dataInDouble,
-                                                   std::vector< double >& dataOutDouble,
-                                                   CAASType caasType = CAAS_GLOBAL,
-                                                   int caasIteration = 0 );
+    std::pair< double, double > ApplyBoundsLimiting( std::vector< double >& dataInDouble,
+                                                     std::vector< double >& dataOutDouble,
+                                                     CAASType caasType = CAAS_GLOBAL,
+                                                     int caasIteration = 0 );
+
+    moab::ErrorCode ComputeAdjacencyRelations( std::vector< std::unordered_set< int > >& vecAdjFaces,
+                                               int nrings,
+                                               const Range& entities,
+                                               bool useMOABAdjacencies = true,
+                                               Mesh* trMesh            = nullptr );
 
 #ifdef MOAB_HAVE_EIGEN3
 

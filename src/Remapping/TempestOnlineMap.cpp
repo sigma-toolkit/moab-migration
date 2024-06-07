@@ -14,6 +14,7 @@
 
 #include "Announce.h"
 #include "DataArray3D.h"
+#include "FiniteVolumeTools.h"
 #include "FiniteElementTools.h"
 #include "TriangularQuadrature.h"
 #include "GaussQuadrature.h"
@@ -28,10 +29,13 @@
 #include "moab/Remapping/TempestOnlineMap.hpp"
 #include "DebugOutput.hpp"
 #include "moab/TupleList.hpp"
+#include "moab/MeshTopoUtil.hpp"
 
 #include <fstream>
 #include <cmath>
 #include <cstdlib>
+#include <numeric>
+#include <algorithm>
 
 #ifdef MOAB_HAVE_NETCDFPAR
 #include "netcdfcpp_par.hpp"
@@ -1705,6 +1709,56 @@ int moab::TempestOnlineMap::IsMonotone( double dTolerance )
 
 ///////////////////////////////////////////////////////////////////////////////
 
+moab::ErrorCode moab::TempestOnlineMap::ComputeAdjacencyRelations(
+    std::vector< std::unordered_set< int > >& vecAdjFaces,
+    int nrings,
+    const Range& entities,
+    bool useMOABAdjacencies,
+    Mesh* trMesh )
+{
+    assert( nrings > 0 );
+    assert( useMOABAdjacencies || trMesh != nullptr );
+
+    const size_t nrows = vecAdjFaces.size();
+    moab::MeshTopoUtil mtu( m_interface );
+    for( size_t index = 0; index < nrows; index++ )
+    {
+        vecAdjFaces[index].insert( index );  // add self target face first
+        {
+            // Compute the adjacent faces to the target face
+            if( useMOABAdjacencies )
+            {
+                moab::Range ents;
+                // ents.insert( entities.index( entities[index] ) );
+                ents.insert( entities[index] );
+                moab::Range adjEnts;
+                moab::ErrorCode rval = mtu.get_bridge_adjacencies( ents, 0, 2, adjEnts, nrings );MB_CHK_SET_ERR_CONT( rval, "Failed to get adjacent faces" );
+                for( moab::Range::iterator it = adjEnts.begin(); it != adjEnts.end(); ++it )
+                {
+                    // int adjIndex = m_interface->id_from_handle(*it)-1;
+                    int adjIndex = entities.index( *it );
+                    // printf("rank: %d, Element %lu, entity: %lu, adjIndex %d\n", rank, index, *it, adjIndex);
+                    if( adjIndex >= 0 ) vecAdjFaces[index].insert( adjIndex );
+                }
+            }
+            else
+            {
+                ///  Vector storing adjacent Faces.
+                typedef std::pair< int, int > FaceDistancePair;
+                typedef std::vector< FaceDistancePair > AdjacentFaceVector;
+                AdjacentFaceVector adjFaces;
+                Face& face = trMesh->faces[index];
+                GetAdjacentFaceVectorByEdge( *trMesh, index, nrings * face.edges.size(), adjFaces );
+
+                // Add the adjacent faces to the target face list
+                for( auto adjFace : adjFaces )
+                    if( adjFace.first >= 0 )
+                        vecAdjFaces[index].insert( adjFace.first );  // map target face to source face
+            }
+        }
+    }
+}
+
 moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
                                                       moab::Tag tgtSolutionTag,
                                                       bool transpose,
@@ -1783,10 +1837,10 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
 #endif
 
             std::pair< double, double > mDefect =
-                this->ApplyCAASLimiting( solSTagVals, solTTagVals, caasType, caasIteration );
-            if( m_remapper->verbose )
-                printf( "Rank %d: -- Iteration: %d, Net original mass defect: %3.4e, mass defect post-CAAS: %3.4e\n",
-                        m_remapper->rank, caasIteration, mDefect.first, mDefect.second );
+                this->ApplyBoundsLimiting( solSTagVals, solTTagVals, caasType, caasIteration );
+            if( m_remapper->verbose && is_root )
+                printf( "CAAS Iteration: %d, Net original mass defect: %3.4e, mass defect post-CAAS: %3.4e\n",
+                        caasIteration, mDefect.first, mDefect.second );
             mismatch = mDefect.second;
         }
     }

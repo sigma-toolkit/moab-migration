@@ -414,6 +414,7 @@ std::string get_file_read_options( ToolContext& ctx, std::string filename )
         std::string extension = filename.substr( lastindex + 1, filename.size() );
         if( extension == "h5m" )
             return "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;";
+                //    "PARALLEL_GHOSTS=2.0.3;PARALLEL_THIN_GHOST_LAYER;";
         else if( extension == "nc" )
         {
             // set default set of options
@@ -766,12 +767,12 @@ int main( int argc, char* argv[] )
                 global_areas[3];  // Array for Initial area, and through Method 1 and Method 2
             // local_areas[0] = area_on_sphere_lHuiller ( mbCore, runCtx->meshsets[1], radius_src );
 #ifdef MOAB_HAVE_MPI
-            if( runCtx->nlayers > 0 )
-            {
-                // compute area of original source set, without ghosts
-                local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[3], radius_src );
-            }
-            else
+            // if( runCtx->nlayers > 0 )
+            // {
+            //     // compute area of original source set, without ghosts
+            //     local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[3], radius_src );
+            // }
+            // else
                 local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
 #else
             local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
@@ -1101,6 +1102,11 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
             moab::EntityHandle originalSourceSet;
             rval = remapper.GhostLayers( ctx.meshsets[0], ctx.nlayers, originalSourceSet );MB_CHK_ERR( rval );
             ctx.meshsets.push_back( originalSourceSet );  // so ctx.meshsets[3] will have the original source set
+
+
+            // moab::EntityHandle originalSourceSet;
+            // rval = remapper.GhostLayers( ctx.meshsets[1], ctx.nlayers, ctx.meshsets[1] );MB_CHK_ERR( rval );
+            // ctx.meshsets.push_back( originalSourceSet );  // so ctx.meshsets[3] will have the original source set
 #ifdef MOAB_DBG
             // write the new source sets, after layers were decided, should see the ghosts now
             std::stringstream filename;
@@ -1112,9 +1118,17 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
 
         // Load the target mesh and validate
         std::string addititional_read_opts_tgt = get_file_read_options( ctx, ctx.inFilenames[1] );
+        // addititional_read_opts_tgt += "PARALLEL_GHOSTS=2.0.3;PARALLEL_THIN_GHOST_LAYER;";
+
         rval = remapper.LoadNativeMesh( ctx.inFilenames[1], ctx.meshsets[1], tmetadata,
                                         addititional_read_opts_tgt.c_str() );MB_CHK_ERR( rval );
         if( tmetadata.size() ) remapper.SetMeshType( moab::Remapper::TargetMesh, tmetadata );
+
+        // moab::EntityHandle originalTargetSet;
+        // rval = remapper.GhostLayers( ctx.meshsets[1], ctx.nlayers, originalTargetSet );MB_CHK_ERR( rval );
+        // ctx.meshsets[1] =
+        //     originalTargetSet;
+        // remapper.GetMeshSet( moab::Remapper::TargetMesh ) = originalTargetSet;
 
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[1], radius_dest );MB_CHK_ERR( rval );
 

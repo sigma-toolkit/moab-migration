@@ -36,10 +36,10 @@
 // #define TRIANGULAR_TRUNCATION
 #endif
 
-    ///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
-    // Forward declarations
-    class Mesh;
+// Forward declarations
+class Mesh;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -73,7 +73,7 @@ class TempestOnlineMap : public OfflineMap
         DiscretizationType_PCLOUD = 3
     };
 
-    // Input / Output types
+    // Type of limiter
     enum CAASType
     {
         CAAS_NONE           = 0,
@@ -235,14 +235,25 @@ class TempestOnlineMap : public OfflineMap
 
   public:
     ///	<summary>
-    ///		Store the tag names associated with global DoF ids for source and target meshes
+    ///	   Store the tag names associated with global DoF ids for source and target meshes to be used for mapping.
+    ///   <param name="srcDofTagName">The tag name associated with global DoF ids for the source mesh</param>
+    ///   <param name="tgtDofTagName">The tag name associated with global DoF ids for the target mesh</param>
     ///	</summary>
     moab::ErrorCode SetDOFmapTags( const std::string srcDofTagName, const std::string tgtDofTagName );
 
     ///	<summary>
-    ///		Compute the association between the solution tag global DoF numbering and
+    ///     @brief Compute the association between the solution tag global DoF numbering and
     ///		the local matrix numbering so that matvec operations can be performed
     ///     consistently.
+    ///    <param name="srcType">The discretization type of the source mesh</param>
+    ///    <param name="srcOrder">The order of the discretization on the source mesh</param>
+    ///    <param name="isSrcContinuous">The continuity of the discretization on the source mesh</param>
+    ///    <param name="srcdataGLLNodes">The GLL nodes on the source mesh</param>
+    ///    <param name="srcdataGLLNodesSrc">The GLL nodes on the source mesh</param>
+    ///    <param name="destType">The discretization type of the destination mesh</param>
+    ///    <param name="destOrder">The order of the discretization on the destination mesh</param>
+    ///    <param name="isTgtContinuous">The continuity of the discretization on the destination mesh</param>
+    ///    <param name="tgtdataGLLNodes">The GLL nodes on the destination mesh</param>
     ///	</summary>
     moab::ErrorCode SetDOFmapAssociation( DiscretizationType srcType,
                                           int srcOrder,
@@ -254,11 +265,26 @@ class TempestOnlineMap : public OfflineMap
                                           bool isTgtContinuous,
                                           DataArray3D< int >* tgtdataGLLNodes );
 
+    ///	<summary>
+    /// @brief ApplyBoundsLimiting - Apply bounds limiting to the data field
+    /// @param dataInDouble - input data field
+    /// @param dataOutDouble - output data field
+    /// @param caasType - type of limiter
+    /// @param caasIteration - iteration number of limiter
+    /// @return - pair of mass defect pre and post limiter application
+    ///	</summary>
     std::pair< double, double > ApplyBoundsLimiting( std::vector< double >& dataInDouble,
                                                      std::vector< double >& dataOutDouble,
                                                      CAASType caasType = CAAS_GLOBAL,
                                                      int caasIteration = 0 );
 
+    /// @brief
+    /// @param vecAdjFaces
+    /// @param nrings
+    /// @param entities
+    /// @param useMOABAdjacencies
+    /// @param trMesh
+    /// @return
     moab::ErrorCode ComputeAdjacencyRelations( std::vector< std::unordered_set< int > >& vecAdjFaces,
                                                int nrings,
                                                const Range& entities,
@@ -363,7 +389,7 @@ class TempestOnlineMap : public OfflineMap
     ///	</summary>
     moab::ErrorCode ApplyWeights( moab::Tag srcSolutionTag,
                                   moab::Tag tgtSolutionTag,
-                                  bool transpose = false,
+                                  bool transpose    = false,
                                   CAASType caasType = CAAS_NONE );
 
     typedef double ( *sample_function )( double, double );
@@ -415,10 +441,12 @@ class TempestOnlineMap : public OfflineMap
     moab::ErrorCode set_row_dc_dofs( std::vector< int >& values_entities );
 
     // hack
-    void SetMeshInput (Mesh * imesh) { m_meshInput = imesh;};
+    void SetMeshInput( Mesh* imesh )
+    {
+        m_meshInput = imesh;
+    };
 
   private:
-
     void setup_sizes_dimensions();
 
     void CAASLimiter( std::vector< double >& dataCorrectedField,
@@ -439,7 +467,7 @@ class TempestOnlineMap : public OfflineMap
     ///	</summary>
     moab::ErrorCode ApplyWeights( std::vector< double >& srcVals,
                                   std::vector< double >& tgtVals,
-                                  bool transpose    = false );
+                                  bool transpose = false );
 
 #ifdef MOAB_HAVE_MPI
     int rearrange_arrays_by_dofs( const std::vector< unsigned int >& gdofmap,

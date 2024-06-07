@@ -21,7 +21,7 @@
 #include <cassert>
 
 // #define ENABLE_DEBUG
-//#define CHECK_CONVEXITY
+#define CHECK_CONVEXITY
 namespace moab
 {
 
@@ -274,6 +274,7 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
     int npBefore1 = nP;
     int oldNodes  = 0;
     int otherIntx = 0;
+    moab::IntxAreaUtils areaAdaptor;
 #endif
     for( int i = 0; i < nP; i++ )
     {
@@ -472,8 +473,7 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
         {
             int k1 = ( k + 1 ) % nP;
             int k2 = ( k1 + 1 ) % nP;
-            double orientedArea =
-                area_spherical_triangle_lHuiller( &coords[3 * k], &coords[3 * k1], &coords[3 * k2], Rdest );
+            double orientedArea = areaAdaptor. area_spherical_triangle( &coords[3 * k], &coords[3 * k1], &coords[3 * k2], Rdest );
             if( orientedArea < 0 )
             {
                 std::cout << " np before 1 , 2, current " << npBefore1 << " " << npBefore2 << " " << nP << "\n";

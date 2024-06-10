@@ -885,6 +885,8 @@ int main( int argc, char* argv[] )
             );MB_CHK_ERR( rval );
             runCtx->timer_pop();
 
+            weightMap->PrintMapStatistics();
+
             // Invoke the CheckMap routine on the TempestRemap serial interface directly, if running
             // on a single process
             if( runCtx->fCheck )

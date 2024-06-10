@@ -139,6 +139,8 @@ class TempestOnlineMap : public OfflineMap
     ///	</summary>
     const DataArray1D< double >& GetGlobalTargetAreas() const;
 
+    void PrintMapStatistics();
+
   private:
     ///	<summary>
     ///		Compute the remapping weights as a permutation matrix that relates DoFs on the source
@@ -276,7 +278,8 @@ class TempestOnlineMap : public OfflineMap
     std::pair< double, double > ApplyBoundsLimiting( std::vector< double >& dataInDouble,
                                                      std::vector< double >& dataOutDouble,
                                                      CAASType caasType = CAAS_GLOBAL,
-                                                     int caasIteration = 0 );
+                                                     int caasIteration = 0,
+                                                     double mismatch = 0.0 );
 
     /// @brief
     /// @param vecAdjFaces

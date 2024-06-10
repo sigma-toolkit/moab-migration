@@ -1836,7 +1836,7 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
 
             double dMassDiffPostGlobal;
             std::pair< double, double > mDefect =
-                this->ApplyBoundsLimiting( solSTagVals, solTTagVals, caasType, caasIteration );
+                this->ApplyBoundsLimiting( solSTagVals, solTTagVals, caasType, caasIteration, mismatch );
 #ifdef MOAB_HAVE_MPI
             double dMassDiffPost = mDefect.second;
             MPI_Allreduce( &dMassDiffPost, &dMassDiffPostGlobal, 1, MPI_DOUBLE, MPI_SUM, m_pcomm->comm() );

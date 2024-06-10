@@ -281,6 +281,29 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_Tempest_MOAB( int nOrder )
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void moab::TempestOnlineMap::PrintMapStatistics()
+{
+    int nrows = m_weightMatrix.rows();      // Number of rows
+    int ncols = m_weightMatrix.cols();      // Number of columns
+    int NNZ   = m_weightMatrix.nonZeros();  // Number of non zero values
+#ifdef MOAB_HAVE_MPI
+    // find out min/max for NNZ, ncols, nrows
+    // should work on std c++ 11
+    int arr3[6] = { NNZ, nrows, ncols, -NNZ, -nrows, -ncols };
+    int rarr3[6];
+    MPI_Reduce( arr3, rarr3, 6, MPI_INT, MPI_MIN, 0, m_pcomm->comm() );
+
+    int total[3];
+    MPI_Reduce( arr3, total, 3, MPI_INT, MPI_SUM, 0, m_pcomm->comm() );
+    if( !rank )
+        std::cout << "-> Rows (min/max/sum): (" << rarr3[1] << " / " << -rarr3[4] << " / " << total[1] << "), "
+                  << " Cols (min/max/sum): (" << rarr3[2] << " / " << -rarr3[5] << " / " << total[2] << "), "
+                  << " NNZ (min/max/sum): (" << rarr3[0] << " / " << -rarr3[3] << " / " << total[0] << ")\n";
+#else
+    std::cout << "-> Rows: " << nrows << ", Cols: " << ncols << ", NNZ: " << NNZ << "\n";
+#endif
+}
+
 #ifdef MOAB_HAVE_EIGEN3
 void moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3()
 {
@@ -325,26 +348,6 @@ void moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3()
 
     m_weightMatrix.setFromTriplets( tripletList.begin(), tripletList.end() );
     m_weightMatrix.makeCompressed();
-
-    int nrows = m_weightMatrix.rows();      // Number of rows
-    int ncols = m_weightMatrix.cols();      // Number of columns
-    int NNZ   = m_weightMatrix.nonZeros();  // Number of non zero values
-#ifdef MOAB_HAVE_MPI
-    // find out min/max for NNZ, ncols, nrows
-    // should work on std c++ 11
-    int arr3[6] = { NNZ, nrows, ncols, -NNZ, -nrows, -ncols };
-    int rarr3[6];
-    MPI_Reduce( arr3, rarr3, 6, MPI_INT, MPI_MIN, 0, m_pcomm->comm() );
-
-    int total[2];
-    MPI_Reduce( arr3, total, 2, MPI_INT, MPI_SUM, 0, m_pcomm->comm() );
-    if( !rank )
-        std::cout << " Rows:(" << rarr3[1] << ", " << -rarr3[4] << "), Cols:(" << rarr3[2] << ", " << -rarr3[5]
-                  << "), NNZ:(" << rarr3[0] << ", " << -rarr3[3] << "),  total NNZ:" << total[0]
-                  << " total rows:" << total[1] << "\n";
-#else
-    std::cout << "nr rows: " << nrows << " cols: " << ncols << " non-zeros: " << NNZ << "\n";
-#endif
 
 #ifdef VERBOSE
     std::stringstream sstr;
@@ -641,7 +644,8 @@ void moab::TempestOnlineMap::CAASLimiter( std::vector< double >& dataCorrectedFi
 std::pair< double, double > moab::TempestOnlineMap::ApplyBoundsLimiting( std::vector< double >& dataInDouble,
                                                                          std::vector< double >& dataOutDouble,
                                                                          CAASType caasType,
-                                                                         int caasIteration )
+                                                                         int caasIteration,
+                                                                         double mismatch )
 {
     // Currently only implemented for FV to FV remapping
     // We should generalize this to other types of remapping
@@ -667,7 +671,7 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyBoundsLimiting( std::ve
     // Compute the adjacent faces to the source face
     // However, calling MOAB to do this does not work correctly as we need ixS to be the index
     // Cannot just iterate over all entities in the source covering mesh
-    if( caasType == CAAS_QLT || caasType == CAAS_LOCAL )
+    if( caasType == CAAS_QLT || caasType == CAAS_LOCAL_ADJACENT )
     {
         if( useMOABAdjacencies )
         {
@@ -769,8 +773,11 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyBoundsLimiting( std::ve
         dTargetMin = globalMinMaxDefects[1];
         dTargetMax = globalMinMaxDefects[3];
     }
-    MPI_Allreduce( localMinMaxDefects.data() + 4, globalMinMaxDefects.data() + 4, 1, MPI_DOUBLE, MPI_SUM,
-                   m_pcomm->comm() );
+    if( caasIteration == 1 )
+        MPI_Allreduce( localMinMaxDefects.data() + 4, globalMinMaxDefects.data() + 4, 1, MPI_DOUBLE, MPI_SUM,
+                       m_pcomm->comm() );
+    else
+        globalMinMaxDefects[4] = mismatch;
 
     dMassDiff  = localMinMaxDefects[4];
     // massDefect.first = localMinMaxDefects[4];

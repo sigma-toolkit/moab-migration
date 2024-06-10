@@ -1827,20 +1827,28 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
         while( fabs( mismatch ) > 1e-15 &&
                caasIteration++ < nmax_caas_iterations )  // iterate until convergence or a maximum of 5 iterations
         {
-
             // The tag data is np*np*n_el_dest
             rval = m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] );MB_CHK_SET_ERR( rval, "Setting local tag data failed" );
 
-#ifdef MOAB_HAVE_MPI
-            rval = m_pcomm->exchange_tags( tgtSolutionTag, tents );MB_CHK_SET_ERR( rval, "Tag exchange failed" );
-#endif
+// #ifdef MOAB_HAVE_MPI
+//             rval = m_pcomm->exchange_tags( tgtSolutionTag, tents );MB_CHK_SET_ERR( rval, "Tag exchange failed" );
+// #endif
 
+            double dMassDiffPostGlobal;
             std::pair< double, double > mDefect =
                 this->ApplyBoundsLimiting( solSTagVals, solTTagVals, caasType, caasIteration );
+#ifdef MOAB_HAVE_MPI
+            double dMassDiffPost = mDefect.second;
+            MPI_Allreduce( &dMassDiffPost, &dMassDiffPostGlobal, 1, MPI_DOUBLE, MPI_SUM, m_pcomm->comm() );
+#else
+            dMassDiffPostGlobal = mDefect.second;
+#endif
             if( m_remapper->verbose && is_root )
+            {
                 printf( "CAAS Iteration: %d, Net original mass defect: %3.4e, mass defect post-CAAS: %3.4e\n",
-                        caasIteration, mDefect.first, mDefect.second );
-            mismatch = mDefect.second;
+                        caasIteration, mDefect.first, dMassDiffPostGlobal );
+            }
+            mismatch = dMassDiffPostGlobal;
         }
     }
 

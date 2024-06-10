@@ -1709,12 +1709,11 @@ int moab::TempestOnlineMap::IsMonotone( double dTolerance )
 
 ///////////////////////////////////////////////////////////////////////////////
 
-moab::ErrorCode moab::TempestOnlineMap::ComputeAdjacencyRelations(
-    std::vector< std::unordered_set< int > >& vecAdjFaces,
-    int nrings,
-    const Range& entities,
-    bool useMOABAdjacencies,
-    Mesh* trMesh )
+void moab::TempestOnlineMap::ComputeAdjacencyRelations( std::vector< std::unordered_set< int > >& vecAdjFaces,
+                                                        int nrings,
+                                                        const Range& entities,
+                                                        bool useMOABAdjacencies,
+                                                        Mesh* trMesh )
 {
     assert( nrings > 0 );
     assert( useMOABAdjacencies || trMesh != nullptr );

@@ -63,7 +63,8 @@ struct ToolContext
     std::string baselineFile;      // Output baseline file (for verification)
     std::string variableToVerify;  // Variable name for verification
     moab::TempestRemapper::TempestMeshType
-        meshType;            // Mesh type (CS, RLL, ICO, OVERLAP_FILES, OVERLAP_MEMORY, OVERLAP_MOAB)
+        meshType;  // Mesh type (CS, RLL, ICO, OVERLAP_FILES, OVERLAP_MEMORY, OVERLAP_MOAB)
+    bool skip_io;  // Skip I/O operations; strictly to measure the performance of the intersection/map/SpMV algorithms
     bool computeDual;        // Compute the dual of the mesh
     bool computeWeights;     // Compute the projection weights
     bool verifyWeights;      // Verify the projection weights
@@ -89,9 +90,9 @@ struct ToolContext
         : mbcore( icore ), proc_id( 0 ), n_procs( 1 ), outputFormatter( std::cout, 0, 0 ),
 #endif
           blockSize( 5 ), nlayers( 3 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "" ),
-          baselineFile( "" ), variableToVerify( "" ), meshType( moab::TempestRemapper::DEFAULT ), computeDual( false ),
-          computeWeights( false ), verifyWeights( false ), enforceConvexity( false ), ensureMonotonicity( 0 ),
-          rrmGrids( false ), kdtreeSearch( true ), fCheck( false ), fVolumetric( false ),
+          baselineFile( "" ), variableToVerify( "" ), meshType( moab::TempestRemapper::DEFAULT ), skip_io( false ),
+          computeDual( false ), computeWeights( false ), verifyWeights( false ), enforceConvexity( false ),
+          ensureMonotonicity( 0 ), rrmGrids( false ), kdtreeSearch( true ), fCheck( false ), fVolumetric( false ),
           useGnomonicProjection( false ), cassType( moab::TempestOnlineMap::CAAS_NONE ), print_diagnostics( true ),
           boxeps( 1e-7 ),               // Box error tolerance default value
           epsrel( ReferenceTolerance )  // ReferenceTolerance is defined in Defines.h in TempestRemap
@@ -218,6 +219,8 @@ struct ToolContext
 
         opts.addOpt< int >( "monotonicity", "Ensure monotonicity in the weight generation. Options=[0,1,2,3]",
                             &ensureMonotonicity );
+
+        opts.addOpt< void >( "skip_output", "For performance studies, skip all I/O operations.", &skip_io );
 
         opts.addOpt< void >( "gnomonic", "Use Gnomonic plane projections to compute coverage mesh.",
                              &useGnomonicProjection );
@@ -412,9 +415,8 @@ std::string get_file_read_options( ToolContext& ctx, std::string filename )
     {
         size_t lastindex      = filename.find_last_of( "." );
         std::string extension = filename.substr( lastindex + 1, filename.size() );
-        if( extension == "h5m" )
-            return "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;";
-                //    "PARALLEL_GHOSTS=2.0.3;PARALLEL_THIN_GHOST_LAYER;";
+        if( extension == "h5m" ) return "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;";
+        //    "PARALLEL_GHOSTS=2.0.3;PARALLEL_THIN_GHOST_LAYER;";
         else if( extension == "nc" )
         {
             // set default set of options
@@ -545,7 +547,10 @@ int main( int argc, char* argv[] )
         rval = remapper.ConvertTempestMesh( moab::Remapper::SourceMesh );MB_CHK_ERR( rval );
         rval = remapper.ConvertTempestMesh( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
         rval = remapper.ConvertTempestMesh( moab::Remapper::OverlapMesh );MB_CHK_ERR( rval );
-        rval = mbCore->write_mesh( "tempest_intersection.h5m", &runCtx->meshsets[2], 1 );MB_CHK_ERR( rval );
+        if( !runCtx->skip_io )
+        {
+            rval = mbCore->write_mesh( "tempest_intersection.h5m", &runCtx->meshsets[2], 1 );MB_CHK_ERR( rval );
+        }
 
         // print verbosely about the problem setting
         size_t velist[6], gvelist[6];
@@ -594,10 +599,8 @@ int main( int argc, char* argv[] )
             // print verbosely about the problem setting
             {
                 moab::Range cintxverts, cintxelems;
-                rval = mbCore->get_entities_by_dimension( covering_set, 0, cintxverts );
-                MB_CHK_ERR( rval );
-                rval = mbCore->get_entities_by_dimension( covering_set, 2, cintxelems );
-                MB_CHK_ERR( rval );
+                rval = mbCore->get_entities_by_dimension( covering_set, 0, cintxverts );MB_CHK_ERR( rval );
+                rval = mbCore->get_entities_by_dimension( covering_set, 2, cintxelems );MB_CHK_ERR( rval );
                 velist[4] = cintxverts.size();
                 velist[5] = cintxelems.size();
             }
@@ -606,7 +609,8 @@ int main( int argc, char* argv[] )
 
 #else
             moab::EntityHandle covering_set = runCtx->meshsets[0];
-            for( int i = 0; i < 6; i++ ) gvelist[i] = velist[i];
+            for( int i = 0; i < 6; i++ )
+                gvelist[i] = velist[i];
 #endif
 
             if( !proc_id )
@@ -654,7 +658,10 @@ int main( int argc, char* argv[] )
         }
 
         // Write out our computed intersection file
-        rval = mbCore->write_mesh( "moab_intersection.h5m", &intxset, 1 );MB_CHK_ERR( rval );
+        if( !runCtx->skip_io )
+        {
+            rval = mbCore->write_mesh( "moab_intersection.h5m", &intxset, 1 );MB_CHK_ERR( rval );
+        }
 
         if( runCtx->computeWeights )
         {
@@ -674,7 +681,7 @@ int main( int argc, char* argv[] )
             }
             else
             {
-                weightMap.Write( "outWeights.nc", mapAttributes );
+                if( !runCtx->skip_io ) weightMap.Write( "outWeights.nc", mapAttributes );
             }
         }
     }
@@ -686,7 +693,7 @@ int main( int argc, char* argv[] )
 #endif
 
         // print verbosely about the problem setting
-        size_t velist[6]={}, gvelist[6]={};
+        size_t velist[6] = {}, gvelist[6] = {};
         {
             moab::Range srcverts, srcelems;
             rval = mbCore->get_entities_by_dimension( runCtx->meshsets[0], 0, srcverts );MB_CHK_ERR( rval );
@@ -773,7 +780,7 @@ int main( int argc, char* argv[] )
             //     local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[3], radius_src );
             // }
             // else
-                local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
+            local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
 #else
             local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
 #endif
@@ -823,9 +830,12 @@ int main( int argc, char* argv[] )
                 rval = remapper.GetOverlapAugmentedEntities( ghostedEnts );MB_CHK_ERR( rval );
                 ovEnts = moab::subtract( ovEnts, ghostedEnts );
 #ifdef MOAB_DBG
-                std::stringstream filename;
-                filename << "aug_overlap" << runCtx->pcomm->rank() << ".h5m";
-                rval = runCtx->mbcore->write_file( filename.str().c_str(), 0, 0, &meshOverlapSet, 1 );MB_CHK_ERR( rval );
+                if( !runCtx->skip_io )
+                {
+                    std::stringstream filename;
+                    filename << "aug_overlap" << runCtx->pcomm->rank() << ".h5m";
+                    rval = runCtx->mbcore->write_file( filename.str().c_str(), 0, 0, &meshOverlapSet, 1 );MB_CHK_ERR( rval );
+                }
 #endif
             }
 #endif
@@ -833,7 +843,7 @@ int main( int argc, char* argv[] )
 
 #ifdef MOAB_HAVE_MPI
 #ifdef MOAB_DBG
-            if( nprocs > 1 )
+            if( nprocs > 1 && !runCtx->skip_io )
             {
                 std::stringstream filename;
                 filename << "writable_intx_" << runCtx->pcomm->rank() << ".h5m";
@@ -849,7 +859,10 @@ int main( int argc, char* argv[] )
                 std::cout << "Writing out the MOAB intersection mesh file to " << sstr.str() << std::endl;
 
             // Write out our computed intersection file
-            rval = mbCore->write_file( sstr.str().c_str(), NULL, writeOptions, &writableOverlapSet, 1 );MB_CHK_ERR( rval );
+            if( !runCtx->skip_io )
+            {
+                rval = mbCore->write_file( sstr.str().c_str(), NULL, writeOptions, &writableOverlapSet, 1 );MB_CHK_ERR( rval );
+            }
         }
 
         if( runCtx->computeWeights )
@@ -912,7 +925,10 @@ int main( int argc, char* argv[] )
                     weightMap->SetMeshInput( runCtx->meshes[0] );
                 }
 
-                rval = weightMap->WriteParallelMap( runCtx->outFilename.c_str(), attrMap );MB_CHK_ERR( rval );
+                if( !runCtx->skip_io )
+                {
+                    rval = weightMap->WriteParallelMap( runCtx->outFilename.c_str(), attrMap );MB_CHK_ERR( rval );
+                }
             }
 
             if( runCtx->verifyWeights )
@@ -960,13 +976,19 @@ int main( int argc, char* argv[] )
                                                    moab::MB_TAG_DENSE | moab::MB_TAG_CREAT );MB_CHK_ERR( rval );
                 }
 
-                rval = mbCore->write_file( "srcWithSolnTag.h5m", NULL, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
+                if( !runCtx->skip_io )
+                {
+                    rval = mbCore->write_file( "srcWithSolnTag.h5m", NULL, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
+                }
 
                 runCtx->timer_push( "compute solution projection on target grid" );
                 rval = weightMap->ApplyWeights( srcAnalyticalFunction, tgtProjectedFunction, false, runCtx->cassType );MB_CHK_ERR( rval );
                 runCtx->timer_pop();
 
-                rval = mbCore->write_file( "tgtWithSolnTag2.h5m", NULL, writeOptions, &runCtx->meshsets[1], 1 );MB_CHK_ERR( rval );
+                if( !runCtx->skip_io )
+                {
+                    rval = mbCore->write_file( "tgtWithSolnTag2.h5m", NULL, writeOptions, &runCtx->meshsets[1], 1 );MB_CHK_ERR( rval );
+                }
 
                 if( nprocs == 1 && runCtx->baselineFile.size() )
                 {
@@ -990,7 +1012,10 @@ int main( int argc, char* argv[] )
                     fs.close();
                     // for good measure, save the source file too, with the tag AnalyticalSolnSrcExact
                     // it will be used later to test, along with a target file
-                    rval = mbCore->write_file( "srcWithSolnTag.h5m", NULL, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
+                    if( !runCtx->skip_io )
+                    {
+                        rval = mbCore->write_file( "srcWithSolnTag.h5m", NULL, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
+                    }
                 }
 
                 // compute error metrics if it is a known analytical functional
@@ -1103,15 +1128,17 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
             rval = remapper.GhostLayers( ctx.meshsets[0], ctx.nlayers, originalSourceSet );MB_CHK_ERR( rval );
             ctx.meshsets.push_back( originalSourceSet );  // so ctx.meshsets[3] will have the original source set
 
-
             // moab::EntityHandle originalSourceSet;
             // rval = remapper.GhostLayers( ctx.meshsets[1], ctx.nlayers, ctx.meshsets[1] );MB_CHK_ERR( rval );
             // ctx.meshsets.push_back( originalSourceSet );  // so ctx.meshsets[3] will have the original source set
 #ifdef MOAB_DBG
-            // write the new source sets, after layers were decided, should see the ghosts now
-            std::stringstream filename;
-            filename << "expand_source" << ctx.pcomm->rank() << ".h5m";
-            rval = ctx.mbcore->write_file( filename.str().c_str(), 0, 0, &( ctx.meshsets[0] ), 1 );MB_CHK_ERR( rval );
+            if( !runCtx->skip_io )
+            {
+                // write the new source sets, after layers were decided, should see the ghosts now
+                std::stringstream filename;
+                filename << "expand_source" << ctx.pcomm->rank() << ".h5m";
+                rval = ctx.mbcore->write_file( filename.str().c_str(), 0, 0, &( ctx.meshsets[0] ), 1 );MB_CHK_ERR( rval );
+            }
 #endif
         }
 #endif

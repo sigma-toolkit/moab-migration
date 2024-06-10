@@ -285,11 +285,11 @@ class TempestOnlineMap : public OfflineMap
     /// @param useMOABAdjacencies
     /// @param trMesh
     /// @return
-    moab::ErrorCode ComputeAdjacencyRelations( std::vector< std::unordered_set< int > >& vecAdjFaces,
-                                               int nrings,
-                                               const Range& entities,
-                                               bool useMOABAdjacencies = true,
-                                               Mesh* trMesh            = nullptr );
+    void ComputeAdjacencyRelations( std::vector< std::unordered_set< int > >& vecAdjFaces,
+                                    int nrings,
+                                    const Range& entities,
+                                    bool useMOABAdjacencies = true,
+                                    Mesh* trMesh            = nullptr );
 
 #ifdef MOAB_HAVE_EIGEN3
 

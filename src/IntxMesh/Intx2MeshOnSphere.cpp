@@ -291,7 +291,7 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
         {
             // int node = tgtTri.v[j];
             double d2 = IntxUtils::dist2( pp, &tgtCoords2D[2 * j] );
-            if( d2 < epsilon_1 )
+            if( d2 < epsilon_1 / 1000 ) // two orders of magnitude smaller than it should, to avoid concave polygons
             {
 
                 foundIds[i] = tgtConn[j];  // no new node
@@ -312,7 +312,7 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
         {
             // int node = srcTri.v[j];
             double d2 = IntxUtils::dist2( pp, &srcCoords2D[2 * j] );
-            if( d2 < epsilon_1 )
+            if( d2 < epsilon_1 / 1000 )
             {
                 // suspect is srcConn[j] corresponding in mbOut
 

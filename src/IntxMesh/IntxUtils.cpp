@@ -1057,7 +1057,21 @@ double IntxAreaUtils::area_spherical_triangle_lHuiller( const double* ptA, const
     int sign = 1;
     if( ( vA * vB ) % vC < 0 ) sign = -1;
     double s   = ( a + b + c ) / 2;
-    double tmp = tan( s / 2 ) * tan( ( s - a ) / 2 ) * tan( ( s - b ) / 2 ) * tan( ( s - c ) / 2 );
+    double a1 = ( s - a ) / 2;
+    double b1 = ( s - b ) / 2;
+    double c1 = ( s - c ) / 2;
+#ifdef MOAB_HAVE_TEMPESTREMAP
+    if ( fabs(a1) < 1.e-14 || fabs (b1) < 1.e-14 || fabs(c1) < 1.e-14 )
+    {
+        double area = area_spherical_triangle_GQ( ptA, ptB, ptC ) * sign;
+#ifdef VERBOSE
+        std::cout << " very obtuse angle, use TR to compute area " << " a1:" << a1 << " b1:" <<  b1 << " c1:"  << c1 << "\n";
+        std::cout << " area with TR: " << area << "\n";
+#endif
+        return area;
+    }
+#endif
+    double tmp = tan( s / 2 ) * tan( a1 ) * tan( b1 ) * tan( c1 );
     if( tmp < 0. ) tmp = 0.;
 
     double E = 4 * atan( sqrt( tmp ) );

@@ -855,7 +855,7 @@ double IntxAreaUtils::area_spherical_polygon( const double* A, int N, double Rad
             return area_spherical_polygon_girard( A, N, Radius );
 #ifdef MOAB_HAVE_TEMPESTREMAP
         case GaussQuadrature:
-            return area_spherical_polygon_GQ( A, N );
+            return area_spherical_polygon_GQ( A, N ) * Radius * Radius; //area_spherical_polygon_GQ normalizes  
 #endif
         case lHuiller:
         default:

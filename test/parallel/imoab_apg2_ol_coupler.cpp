@@ -103,7 +103,7 @@ int main( int argc, char* argv[] )
         ocnatmid = 1806;  // component ids are unique over all pes, and established in advance;
 #endif
 #ifdef ENABLE_ATMLND_COUPLING
-    std::string lndFilename = "../../sandbox/MeshFiles/e3sm/ne4pg2_o240/land_p8.h5m";
+    std::string lndFilename = TestDir + "unittest/land_p8_mod.h5m";
     int rankInLndComm       = -1;
     int cpllnd = 10, cmplnd = 9, atmlndid = 610,
         lndatmid = 1006;  // component ids are unique over all pes, and established in advance;

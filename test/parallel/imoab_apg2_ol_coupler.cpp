@@ -388,12 +388,6 @@ int main( int argc, char* argv[] )
         // check if intx valid, write some h5m intx file
         CHECKIERR( ierr, "cannot compute intersection" )
         POP_TIMER( couComm, rankInCouComm )
-
-        PUSH_TIMER( "Compute OCN-ATM mesh intersection" )
-        ierr =
-            iMOAB_ComputeMeshIntersectionOnSphere( cplOcnPID, cplAtmPID, cplOcnAtmPID );  // coverage mesh was computed
-        CHECKIERR( ierr, "cannot compute intersection" )
-        POP_TIMER( couComm, rankInCouComm )
     }
 
     if( atmCouComm != MPI_COMM_NULL )
@@ -410,22 +404,6 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "cannot recompute direct coverage graph for ocean" )
         POP_TIMER( atmCouComm, rankInAtmComm )  // hijack this rank
     }
-    if( ocnCouComm != MPI_COMM_NULL )
-    {
-        // now for the second intersection, ocn-atm; will be sending data from ocean to atm
-        // Can we reuse the intx atm-ocn? Not sure yet; we will compute everything again :(
-        // the new graph will be for sending data from ocn comp to coverage mesh over atm;
-        // it involves initial ocn app; cmpOcnPID; also migrated ocn mesh on coupler pes, cplOcnPID
-        // results are in cplOcnAtmPID, intx mesh; remapper also has some info about coverage mesh
-        // after this, the sending of tags from ocn pes to coupler pes will use the new par comm graph, that has more
-        // precise info about what to send for atm cover ; every time, we will
-        //  use the element global id, which should uniquely identify the element
-        PUSH_TIMER( "Compute ATM coverage graph for OCN mesh" )
-        ierr = iMOAB_CoverageGraph( &ocnCouComm, cmpOcnPID, cplOcnPID, cplOcnAtmPID, &cmpocn, &cplocn,
-                                    &cplatm );  // it happens over joint communicator, ocean + coupler
-        CHECKIERR( ierr, "cannot recompute direct coverage graph for atm" )
-        POP_TIMER( ocnCouComm, rankInOcnComm )  // hijack this rank
-    }
 
     // need to compute graph between phys atm and atm/ocn intx coverage
     if( atmCouComm != MPI_COMM_NULL )
@@ -437,15 +415,6 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "cannot compute graph between phys grid on atm and intx between FV atm and ocn" )
     }
 
-    // also
-    // need to compute graph between ocn/atm intx and phys atm mesh
-    /*if( atmCouComm != MPI_COMM_NULL )
-    {
-        int typeA = 3;  // cells of atmosphere, dof based; maybe need another type for ParCommGraph graphtype ?
-        int typeB = 2;  // point cloud, phys mesh
-        ierr = iMOAB_ComputeCommGraph( cplOcnAtmPID, cmpPhAtmPID, &atmCouComm, &couPEGroup, &atmPEGroup, &typeA, &typeB,
-                                       &ocnatmid, &cmpatm );
-    }*/
     // need to compute graph between atm on coupler and phys atm mesh on component
     if( atmCouComm != MPI_COMM_NULL )
     {
@@ -542,6 +511,33 @@ int main( int argc, char* argv[] )
                                                      dof_tag_names[1] );
         CHECKIERR( ierr, "cannot compute scalar projection weights" )
         POP_TIMER( couComm, rankInCouComm )
+    }
+
+    // start ocn atm intx after we are done with atm ocn
+    if( couComm != MPI_COMM_NULL )
+    {
+        PUSH_TIMER( "Compute OCN-ATM mesh intersection" )
+        ierr =
+            iMOAB_ComputeMeshIntersectionOnSphere( cplOcnPID, cplAtmPID, cplOcnAtmPID );  // coverage mesh was computed
+        CHECKIERR( ierr, "cannot compute intersection" )
+        POP_TIMER( couComm, rankInCouComm )
+    }
+
+    if( ocnCouComm != MPI_COMM_NULL )
+    {
+        // now for the second intersection, ocn-atm; will be sending data from ocean to atm
+        // Can we reuse the intx atm-ocn? Not sure yet; we will compute everything again :(
+        // the new graph will be for sending data from ocn comp to coverage mesh over atm;
+        // it involves initial ocn app; cmpOcnPID; also migrated ocn mesh on coupler pes, cplOcnPID
+        // results are in cplOcnAtmPID, intx mesh; remapper also has some info about coverage mesh
+        // after this, the sending of tags from ocn pes to coupler pes will use the new par comm graph, that has more
+        // precise info about what to send for atm cover ; every time, we will
+        //  use the element global id, which should uniquely identify the element
+        PUSH_TIMER( "Compute ATM coverage graph for OCN mesh" )
+        ierr = iMOAB_CoverageGraph( &ocnCouComm, cmpOcnPID, cplOcnPID, cplOcnAtmPID, &cmpocn, &cplocn,
+                                    &cplatm );  // it happens over joint communicator, ocean + coupler
+        CHECKIERR( ierr, "cannot recompute direct coverage graph for atm" )
+        POP_TIMER( ocnCouComm, rankInOcnComm )  // hijack this rank
     }
 
     // now compute weight maps for ocn to atm mapping;

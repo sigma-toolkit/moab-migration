@@ -89,11 +89,11 @@ struct ToolContext
     ToolContext( moab::Core* icore )
         : mbcore( icore ), proc_id( 0 ), n_procs( 1 ), outputFormatter( std::cout, 0, 0 ),
 #endif
-          blockSize( 5 ), nlayers( 3 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "" ),
+          blockSize( 5 ), nlayers( 0 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "" ),
           baselineFile( "" ), variableToVerify( "" ), meshType( moab::TempestRemapper::DEFAULT ), skip_io( false ),
           computeDual( false ), computeWeights( false ), verifyWeights( false ), enforceConvexity( false ),
           ensureMonotonicity( 0 ), rrmGrids( false ), kdtreeSearch( true ), fCheck( false ), fVolumetric( false ),
-          useGnomonicProjection( false ), cassType( moab::TempestOnlineMap::CAAS_NONE ), print_diagnostics( true ),
+          useGnomonicProjection( false ), cassType( moab::TempestOnlineMap::CAAS_NONE ), print_diagnostics( false ),
           boxeps( 1e-7 ),               // Box error tolerance default value
           epsrel( ReferenceTolerance )  // ReferenceTolerance is defined in Defines.h in TempestRemap
     {
@@ -174,10 +174,6 @@ struct ToolContext
 
         opts.addOpt< int >( "res,r", "Resolution of the mesh (default=5)", &blockSize );
 
-        opts.addOpt< int >( "ghost", "Number of ghost layers in coverage mesh (default=1)", &nlayer_input );
-
-        opts.addOpt< double >( "boxeps", "The tolerance for boxes (default=1e-7)", &boxeps );
-
         opts.addOpt< void >( "dual,d", "Output the dual of the mesh (relevant only for ICO mesh type)", &computeDual );
 
         opts.addOpt< std::string >( "file,f", "Output computed mesh or remapping weights to specified filename",
@@ -197,6 +193,10 @@ struct ToolContext
                              "relevant only for OVERLAP mesh)",
                              &computeWeights );
 
+        opts.addOpt< void >( "verbose,v",
+                             "Print verbose diagnostic messages during intersection and map computation (default=false)",
+                             &print_diagnostics );
+
         opts.addOpt< std::string >( "method,m", "Discretization method for the source and target solution fields",
                                     &expectedMethod );
 
@@ -206,6 +206,11 @@ struct ToolContext
         opts.addOpt< std::string >( "global_id,g",
                                     "Tag name that contains the global DoF IDs for source and target solution fields",
                                     &expectedDofTagName );
+
+        opts.addOpt< std::string >( "fvmethod",
+                                    "Sub-type method for FV-FV projections (invdist, delaunay, bilin, "
+                                    "intbilin, intbilingb, none. Default: none)",
+                                    &expectedFVMethod );
 
         opts.addOpt< void >( "noconserve",
                              "Do not apply conservation to the resultant weights (relevant only "
@@ -217,18 +222,10 @@ struct ToolContext
                              "when computing weights)",
                              &fVolumetric );
 
-        opts.addOpt< int >( "monotonicity", "Ensure monotonicity in the weight generation. Options=[0,1,2,3]",
-                            &ensureMonotonicity );
-
         opts.addOpt< void >( "skip_output", "For performance studies, skip all I/O operations.", &skip_io );
 
         opts.addOpt< void >( "gnomonic", "Use Gnomonic plane projections to compute coverage mesh.",
                              &useGnomonicProjection );
-
-        opts.addOpt< std::string >( "fvmethod",
-                                    "Sub-type method for FV-FV projections (invdist, delaunay, bilin, "
-                                    "intbilin, intbilingb, none. Default: none)",
-                                    &expectedFVMethod );
 
         opts.addOpt< void >( "enforce_convexity", "check convexity of input meshes to compute mesh intersections",
                              &enforceConvexity );
@@ -258,6 +255,13 @@ struct ToolContext
                                     "Tag name of the variable to use in the verification study "
                                     "(error metrics for user defined variables may not be available)",
                                     &variableToVerify );
+
+        opts.addOpt< int >( "monotonicity", "Ensure monotonicity in the weight generation. Options=[0,1,2,3]",
+                            &ensureMonotonicity );
+
+        opts.addOpt< int >( "ghost", "Number of ghost layers in coverage mesh (default=1)", &nlayer_input );
+
+        opts.addOpt< double >( "boxeps", "The tolerance for boxes (default=1e-7)", &boxeps );
 
         opts.addOpt< int >( "caas", "apply CAAS nonlinear filter after linear map application", &useCAAS );
 
@@ -490,7 +494,7 @@ int main( int argc, char* argv[] )
 
     moab::Core* mbCore = new( std::nothrow ) moab::Core;
 
-    if( NULL == mbCore )
+    if( nullptr == mbCore )
     {
         return 1;
     }
@@ -526,7 +530,7 @@ int main( int argc, char* argv[] )
     remapper.initialize();
 
     // Default area_method = lHuiller; Options: Girard, lHuiller, GaussQuadrature (if TR is available)
-    moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::lHuiller );
+    moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::GaussQuadrature );
 
     Mesh* tempest_mesh = new Mesh();
     runCtx->timer_push( "create Tempest mesh" );
@@ -641,7 +645,7 @@ int main( int argc, char* argv[] )
             outputFormatter.printf( 0, "The intersection set contains %lu elements and %lu vertices \n",
                                     intxelems.size(), intxverts.size() );
 
-            moab::IntxAreaUtils areaAdaptorHuiller( moab::IntxAreaUtils::lHuiller );  // lHuiller
+            moab::IntxAreaUtils areaAdaptorHuiller( moab::IntxAreaUtils::lHuiller );  // lHuiller, GaussQuadrature
             double initial_sarea =
                 areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[0],
                                                    radius_src );  // use the target to compute the initial area
@@ -693,7 +697,7 @@ int main( int argc, char* argv[] )
 #endif
 
         // print verbosely about the problem setting
-        size_t velist[6] = {}, gvelist[6] = {};
+        size_t velist[4] = {}, gvelist[4] = {};
         {
             moab::Range srcverts, srcelems;
             rval = mbCore->get_entities_by_dimension( runCtx->meshsets[0], 0, srcverts );MB_CHK_ERR( rval );
@@ -725,8 +729,8 @@ int main( int argc, char* argv[] )
             velist[2] = tgtverts.size();
             velist[3] = tgtelems.size();
         }
-        //rval = mbCore->write_file( "source_mesh.h5m", NULL, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
-        //rval = mbCore->write_file( "target_mesh.h5m", NULL, writeOptions, &runCtx->meshsets[1], 1 );MB_CHK_ERR( rval );
+        //rval = mbCore->write_file( "source_mesh.h5m", nullptr, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
+        //rval = mbCore->write_file( "target_mesh.h5m", nullptr, writeOptions, &runCtx->meshsets[1], 1 );MB_CHK_ERR( rval );
 
         // if( runCtx->nlayers && nprocs > 1 )
         // {
@@ -742,21 +746,18 @@ int main( int argc, char* argv[] )
         runCtx->timer_pop();
 
 #ifdef MOAB_HAVE_MPI
-        MPI_Reduce( velist, gvelist, 6, MPI_UINT64_T, MPI_SUM, 0, MPI_COMM_WORLD );
+        MPI_Reduce( velist, gvelist, 4, MPI_UINT64_T, MPI_SUM, 0, MPI_COMM_WORLD );
 #else
-        for( int i = 0; i < 6; i++ )
+        for( int i = 0; i < 4; i++ )
             gvelist[i] = velist[i];
 #endif
 
-        if( !proc_id )
+        if( !proc_id && runCtx->print_diagnostics )
         {
             outputFormatter.printf( 0, "The source set contains %lu vertices and %lu elements \n", gvelist[0],
                                     gvelist[1] );
-            outputFormatter.printf( 0, "The covering set contains %lu vertices and %lu elements \n", gvelist[2],
+            outputFormatter.printf( 0, "The target set contains %lu vertices and %lu elements \n", gvelist[2],
                                     gvelist[3] );
-            if( nprocs > 1 )
-                outputFormatter.printf( 0, "The target set contains %lu vertices and %lu elements \n", gvelist[4],
-                                        gvelist[5] );
         }
 
         // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm
@@ -769,7 +770,8 @@ int main( int argc, char* argv[] )
         double dTotalOverlapArea = 0.0;
         if( runCtx->print_diagnostics )
         {
-            moab::IntxAreaUtils areaAdaptorHuiller( moab::IntxAreaUtils::lHuiller );  // lHuiller
+            moab::IntxAreaUtils areaAdaptorHuiller(
+                moab::IntxAreaUtils::GaussQuadrature );  // lHuiller, GaussQuadrature
             double local_areas[3],
                 global_areas[3];  // Array for Initial area, and through Method 1 and Method 2
             // local_areas[0] = area_on_sphere_lHuiller ( mbCore, runCtx->meshsets[1], radius_src );
@@ -861,7 +863,7 @@ int main( int argc, char* argv[] )
             // Write out our computed intersection file
             if( !runCtx->skip_io )
             {
-                rval = mbCore->write_file( sstr.str().c_str(), NULL, writeOptions, &writableOverlapSet, 1 );MB_CHK_ERR( rval );
+                rval = mbCore->write_file( sstr.str().c_str(), nullptr, writeOptions, &writableOverlapSet, 1 );MB_CHK_ERR( rval );
             }
         }
 
@@ -966,7 +968,7 @@ int main( int argc, char* argv[] )
                     rval = weightMap->DefineAnalyticalSolution( tgtAnalyticalFunction, "AnalyticalSolnTgtExact",
                                                                 moab::Remapper::TargetMesh, testFunction,
                                                                 &tgtProjectedFunction, "ProjectedSolnTgt" );MB_CHK_ERR( rval );
-                    // rval = mbCore->write_file ( "tgtWithSolnTag.h5m", NULL, writeOptions,
+                    // rval = mbCore->write_file ( "tgtWithSolnTag.h5m", nullptr, writeOptions,
                     // &runCtx->meshsets[1], 1 ); MB_CHK_ERR ( rval );
                     runCtx->timer_pop();
                 }
@@ -980,7 +982,7 @@ int main( int argc, char* argv[] )
 
                 if( !runCtx->skip_io )
                 {
-                    rval = mbCore->write_file( "srcWithSolnTag.h5m", NULL, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
+                    rval = mbCore->write_file( "srcWithSolnTag.h5m", nullptr, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
                 }
 
                 runCtx->timer_push( "compute solution projection on target grid" );
@@ -989,7 +991,7 @@ int main( int argc, char* argv[] )
 
                 if( !runCtx->skip_io )
                 {
-                    rval = mbCore->write_file( "tgtWithSolnTag2.h5m", NULL, writeOptions, &runCtx->meshsets[1], 1 );MB_CHK_ERR( rval );
+                    rval = mbCore->write_file( "tgtWithSolnTag2.h5m", nullptr, writeOptions, &runCtx->meshsets[1], 1 );MB_CHK_ERR( rval );
                 }
 
                 if( nprocs == 1 && runCtx->baselineFile.size() )
@@ -1016,7 +1018,7 @@ int main( int argc, char* argv[] )
                     // it will be used later to test, along with a target file
                     if( !runCtx->skip_io )
                     {
-                        rval = mbCore->write_file( "srcWithSolnTag.h5m", NULL, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
+                        rval = mbCore->write_file( "srcWithSolnTag.h5m", nullptr, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
                     }
                 }
 

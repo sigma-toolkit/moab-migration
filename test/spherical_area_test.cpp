@@ -32,11 +32,17 @@ int main( int /* argc*/, char** /* argv[]*/ )
     const double area_sphere = R * R * M_PI * 4.;
     std::cout << "total area of the sphere        :  " << area_sphere << "\n";
 
+    // these points are with y ~= 0, so the area should be very small, almost a straight line
+       moab::CartVect A ( 0.7559216072813667, 1.3869640030799363e-12, 0.6546621446556653 );
+       moab::CartVect B ( 0.73293621004279086,  0,                     0.6802973702786963 );
+       moab::CartVect C ( 0.71518048029913428, -1.0371405131037345e-12, 0.69893982616467032);
     {
         moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::Girard );  // use_lHuiller = true
         double area1 = areaAdaptor.area_on_sphere( mb, sf, R );
         std::cout << "total area with Girard          :  " << area1
                   << " rel error:" << fabs( ( area1 - area_sphere ) / area_sphere ) << "\n";
+
+        std::cout<< "  area triangle: " << areaAdaptor.area_spherical_triangle(A.array(), B.array(), C.array(), 1.) << "\n";
     }
 
     {
@@ -44,7 +50,9 @@ int main( int /* argc*/, char** /* argv[]*/ )
         double area2 = areaAdaptor.area_on_sphere( mb, sf, R );
         std::cout << "total area with l'Huiller       : " << area2
                   << " rel error:" << fabs( ( area2 - area_sphere ) / area_sphere ) << "\n";
+        std::cout<< "  area triangle: " << areaAdaptor.area_spherical_triangle(A.array(), B.array(), C.array(), 1.) << "\n";
     }
+
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
     {
@@ -52,7 +60,9 @@ int main( int /* argc*/, char** /* argv[]*/ )
         double area3 = areaAdaptor.area_on_sphere( mb, sf, R );
         std::cout << "total area with GaussQuadrature : " << area3
                   << " rel error:" << fabs( ( area3 - area_sphere ) / area_sphere ) << "\n";
+        std::cout<< "  area triangle: " << areaAdaptor.area_spherical_triangle(A.array(), B.array(), C.array(), 1.) << "\n";
     }
+
 #endif
 
     return 0;

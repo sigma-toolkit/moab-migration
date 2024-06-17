@@ -38,6 +38,7 @@
 #include "MBParallelConventions.h"
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
+#include "Announce.h"
 #include "FiniteElementTools.h"
 #include "GaussLobattoQuadrature.h"
 #endif
@@ -81,6 +82,7 @@ ErrorCode TempestRemapper::initialize( bool initialize_fsets )
         is_parallel = ( size > 1 );
         // is_parallel = true;
     }
+    AnnounceOnlyOutputOnRankZero();
 #endif
 
     m_source          = nullptr;
@@ -617,7 +619,6 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     }
 
     std::vector< int > globIds( nelems );
-
     moab::Tag gid = m_interface->globalId_tag();
     rval          = m_interface->tag_get_data( gid, elems, &globIds[0] );MB_CHK_ERR( rval );
     // initialize original index locations

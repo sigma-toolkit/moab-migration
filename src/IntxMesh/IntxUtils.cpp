@@ -18,8 +18,8 @@
 #include "moab/MergeMesh.hpp"
 #include "moab/ReadUtilIface.hpp"
 #include "MBTagConventions.hpp"
-#define CHECKNEGATIVEAREA
 
+#define CHECKNEGATIVEAREA
 #ifdef CHECKNEGATIVEAREA
 #include <iomanip>
 #endif
@@ -38,10 +38,33 @@
 
 namespace moab
 {
+/**
+ * This code defines several utility functions for computing edge intersections and performing geometric operations.
+ *
+ * - `borderPointsOfXinY2`: Computes the border points of a set of points `X` inside another set of points `Y`.
+ * - `SortAndRemoveDoubles2`: Sorts a set of points `P` according to their angles and removes duplicate points.
+ * - `EdgeIntersections2`: Computes the intersections between the edges of two sets of points `blue` and `red`.
+ * - `EdgeIntxRllCs`: Computes the intersections between the edges of a set of points `blue` and a set of points `red` on a specific plane.
+ *
+ * The code also defines some helper structs and functions used by these utility functions.
+ */
+
 
 #define CORRTAGNAME "__correspondent"
 #define MAXEDGES    10
 
+/**
+ * Computes the border points of X in Y2.
+ *
+ * @param X The array of points representing X.
+ * @param nX The number of points in X.
+ * @param Y The array of points representing Y.
+ * @param nY The number of points in Y.
+ * @param P The array to store the border points of X in Y2.
+ * @param side The array to store the side information for each point in X.
+ * @param epsilon_area The epsilon value for area comparison.
+ * @return The number of extra points found.
+ */
 int IntxUtils::borderPointsOfXinY2( double* X, int nX, double* Y, int nY, double* P, int* side, double epsilon_area )
 {
     // 2 triangles, 3 corners, is the corner of X in Y?
@@ -95,7 +118,16 @@ bool angleCompare( angleAndIndex lhs, angleAndIndex rhs )
     return lhs.angle < rhs.angle;
 }
 
-// nP might be modified too, we will remove duplicates if found
+/**
+ * Sorts and removes duplicate points in the given array.
+ *
+ * Note: nP might be modified too, we will remove duplicates if found
+ *
+ * @param P The array of points to be sorted and checked for duplicates.
+ * @param nP The number of points in P.
+ * @param epsilon_1 The epsilon value for distance comparison.
+ * @return 0 if successful.
+ */
 int IntxUtils::SortAndRemoveDoubles2( double* P, int& nP, double epsilon_1 )
 {
     if( nP < 2 ) return 0;  // nothing to do
@@ -175,8 +207,19 @@ int IntxUtils::SortAndRemoveDoubles2( double* P, int& nP, double epsilon_1 )
     return 0;
 }
 
-// the marks will show what edges of blue intersect the red
-
+/**
+ * Computes the edge intersections of two elements.
+ *
+ * @param blue The array of points representing the blue element.
+ * @param nsBlue The number of points in the blue element.
+ * @param red The array of points representing the red element.
+ * @param nsRed The number of points in the red element.
+ * @param markb The array to mark the intersecting edges of the blue element.
+ * @param markr The array to mark the intersecting edges of the red element.
+ * @param points The array to store the intersection points.
+ * @param nPoints The number of intersection points found.
+ * @return The error code.
+ */
 ErrorCode IntxUtils::EdgeIntersections2( double* blue,
                                          int nsBlue,
                                          double* red,
@@ -241,7 +284,26 @@ ErrorCode IntxUtils::EdgeIntersections2( double* blue,
     return MB_SUCCESS;
 }
 
-// special one, for intersection between rll (constant latitude)  and cs quads
+/**
+ * Computes the edge intersections between a RLL and CS quad.
+ *
+ * Note: Special function.
+ *
+ * @param blue The array of points representing the blue element.
+ * @param bluec The array of Cartesian coordinates for the blue element.
+ * @param blueEdgeType The array of edge types for the blue element.
+ * @param nsBlue The number of points in the blue element.
+ * @param red The array of points representing the red element.
+ * @param redc The array of Cartesian coordinates for the red element.
+ * @param nsRed The number of points in the red element.
+ * @param markb The array to mark the intersecting edges of the blue element.
+ * @param markr The array to mark the intersecting edges of the red element.
+ * @param plane The plane of intersection.
+ * @param R The radius of the sphere.
+ * @param points The array to store the intersection points.
+ * @param nPoints The number of intersection points found.
+ * @return The error code.
+ */
 ErrorCode IntxUtils::EdgeIntxRllCs( double* blue,
                                     CartVect* bluec,
                                     int* blueEdgeType,
@@ -937,6 +999,24 @@ double IntxAreaUtils::area_spherical_polygon_GQ( const double* A, int N )
     return area;
 }
 
+template < typename Derived >
+Eigen::Array< typename Derived::Scalar, Derived::RowsAtCompileTime, Derived::ColsAtCompileTime > shift(
+    const Eigen::ArrayBase< Derived >& array, int positions )
+{
+    Eigen::Array< typename Derived::Scalar, Derived::RowsAtCompileTime, Derived::ColsAtCompileTime > result = array;
+    if( positions > 0 )
+    {
+        result.segment( positions, array.size() - positions ) = array.head( array.size() - positions );
+        result.head( positions ).setZero();
+    }
+    else if( positions < 0 )
+    {
+        result.head( array.size() + positions ) = array.tail( array.size() + positions );
+        result.tail( -positions ).setZero();
+    }
+    return result;
+}
+
 double IntxAreaUtils::area_spherical_triangle_GQ( const double* inode1, const double* inode2, const double* inode3 )
 {
 #if defined( MOAB_HAVE_EIGEN3 )
@@ -977,13 +1057,31 @@ double IntxAreaUtils::area_spherical_triangle_GQ( const double* inode1, const do
 
             const double dDenomTerm = std::pow( dF.norm(), -3.0 );
 
-            dDaG << dDaF( 0 ) * ( dF2( 1 ) + dF2( 2 ) ) - dF( 0 ) * ( dDaF( 1 ) * dF( 1 ) + dDaF( 2 ) * dF( 2 ) ),
-                dDaF( 1 ) * ( dF2( 0 ) + dF2( 2 ) ) - dF( 1 ) * ( dDaF( 0 ) * dF( 0 ) + dDaF( 2 ) * dF( 2 ) ),
-                dDaF( 2 ) * ( dF2( 0 ) + dF2( 1 ) ) - dF( 2 ) * ( dDaF( 0 ) * dF( 0 ) + dDaF( 1 ) * dF( 1 ) );
+            // Eigen::Vector3d temp1 = dF2;
+            // temp1( 2 ) += dF2( 0 );                           // temp1 = [dF2(0), dF2(1), dF2(0)+dF2(2)]
+            // Eigen::Vector3d temp2 = dDaF.cwiseProduct( dF );  // temp2 = [dDaF(0)*dF(0), dDaF(1)*dF(1), dDaF(2)*dF(2)]
+            // dDaG                  = dDaF.cwiseProduct( temp1.segment( 1, 2 ) ) - temp2.segment( 1, 2 );
+            // Eigen::Vector3d temp3 = dDbF.cwiseProduct( dF );  // temp3 = [dDbF(0)*dF(0), dDbF(1)*dF(1), dDbF(2)*dF(2)]
+            // dDbG                  = dDbF.cwiseProduct( temp1.segment( 1, 2 ) ) - temp3.segment( 1, 2 );
 
-            dDbG << dDbF( 0 ) * ( dF2( 1 ) + dF2( 2 ) ) - dF( 0 ) * ( dDbF( 1 ) * dF( 1 ) + dDbF( 2 ) * dF( 2 ) ),
-                dDbF( 1 ) * ( dF2( 0 ) + dF2( 2 ) ) - dF( 1 ) * ( dDbF( 0 ) * dF( 0 ) + dDbF( 2 ) * dF( 2 ) ),
-                dDbF( 2 ) * ( dF2( 0 ) + dF2( 1 ) ) - dF( 2 ) * ( dDbF( 0 ) * dF( 0 ) + dDbF( 1 ) * dF( 1 ) );
+            // Eigen::Vector3d dF2_shifted = dF2 + Eigen::Vector3d( dF2( 1 ), dF2( 2 ), dF2( 0 ) );
+            // Eigen::Vector3d dDaF_shifted = Eigen::Vector3d( dDaF( 1 ), dDaF( 2 ), dDaF( 0 ) ).cwiseProduct( dF );
+
+            // dDaG = dDaF.cwiseProduct( dF2_shifted ) - dF.cwiseProduct( dDaF_shifted );
+
+            // Eigen::Vector3d dDbF_shifted = Eigen::Vector3d( dDbF( 1 ), dDbF( 2 ), dDbF( 0 ) ).cwiseProduct( dF );
+
+            // dDbG = dDbF.cwiseProduct( dF2_shifted ) - dF.cwiseProduct( dDbF_shifted );
+
+            dDaG( 0 ) = dDaF( 0 ) * ( dF2( 1 ) + dF2( 2 ) ) - dF( 0 ) * ( dDaF( 1 ) * dF( 1 ) + dDaF( 2 ) * dF( 2 ) );
+            dDaG( 1 ) = dDaF( 1 ) * ( dF2( 0 ) + dF2( 2 ) ) - dF( 1 ) * ( dDaF( 0 ) * dF( 0 ) + dDaF( 2 ) * dF( 2 ) );
+            dDaG( 2 ) = dDaF( 2 ) * ( dF2( 0 ) + dF2( 1 ) ) - dF( 2 ) * ( dDaF( 0 ) * dF( 0 ) + dDaF( 1 ) * dF( 1 ) );
+
+            // dDbG      = dDbF.cwiseProduct( ( dF2.array().shift( -1 ) + dF2.array().shift( -2 ) ) ) + dF.cwiseProduct( dDbF );
+            dDbG( 0 ) = dDbF( 0 ) * ( dF2( 1 ) + dF2( 2 ) ) - dF( 0 ) * ( dDbF( 1 ) * dF( 1 ) + dDbF( 2 ) * dF( 2 ) );
+            dDbG( 1 ) = dDbF( 1 ) * ( dF2( 0 ) + dF2( 2 ) ) - dF( 1 ) * ( dDbF( 0 ) * dF( 0 ) + dDbF( 2 ) * dF( 2 ) );
+            dDbG( 2 ) = dDbF( 2 ) * ( dF2( 0 ) + dF2( 1 ) ) - dF( 2 ) * ( dDbF( 0 ) * dF( 0 ) + dDbF( 1 ) * dF( 1 ) );
+
 
             // Scale the vectors by the denominator
             dDaG *= dDenomTerm;
@@ -1112,7 +1210,7 @@ double IntxAreaUtils::area_on_sphere( Interface* mb, EntityHandle set, double R 
 
         // check whether the area of the spherical element is positive.
         if (elem_area <= 0)
-          std::cout << "Area of element " << mb->id_from_handle(eh) << " is = " << elem_area << "\n"; 
+          std::cout << "Area of element " << mb->id_from_handle(eh) << " is = " << elem_area << "\n";
         assert( elem_area > 0 );
 
         // sum up the contribution
@@ -1142,6 +1240,8 @@ double IntxAreaUtils::area_spherical_element( Interface* mb, EntityHandle elem, 
     return area_spherical_polygon( &coords[0], nsides, R );
 }
 
+
+
 double IntxUtils::distance_on_great_circle( CartVect& p1, CartVect& p2 )
 {
     SphereCoords sph1 = cart_to_spherical( p1 );
@@ -1151,19 +1251,21 @@ double IntxUtils::distance_on_great_circle( CartVect& p1, CartVect& p2 )
            acos( sin( sph1.lon ) * sin( sph2.lon ) + cos( sph1.lat ) * cos( sph2.lat ) * cos( sph2.lon - sph2.lon ) );
 }
 
-// break the nonconvex quads into triangles; remove the quad from the set? yes.
-// maybe radius is not needed;
 //
+/**
+ * @brief Enforces convexity for a given set of polygons.
+ *
+ * This function checks each polygon in the input set and computes the angles of each vertex.
+ * If a reflex angle is found, the polygon is broken into triangles and added back to the set.
+ * This process continues until all polygons in the set are convex.
+ *
+ * @param mb The interface to the MOAB instance.
+ * @param lset The handle of the input set containing the polygons.
+ * @param my_rank The rank of the local process.
+ * @return The error code indicating the success or failure of the operation.
+ */
 ErrorCode IntxUtils::enforce_convexity( Interface* mb, EntityHandle lset, int my_rank )
 {
-    // look at each polygon; compute all angles; if one is reflex, break that angle with
-    // the next triangle; put the 2 new polys in the set;
-    // still look at the next poly
-    // replace it with 2 triangles, and remove from set;
-    // it should work for all polygons / tested first for case 1, with dt 0.5 (too much deformation)
-    // get all entities of dimension 2
-    // then get the connectivity, etc
-
     Range inputRange;
     ErrorCode rval = mb->get_entities_by_dimension( lset, 2, inputRange );MB_CHK_ERR( rval );
 

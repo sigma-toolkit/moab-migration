@@ -4282,6 +4282,9 @@ ErrCode iMOAB_ComputePointDoFIntersection( iMOAB_AppID pid_src, iMOAB_AppID pid_
     tdata.remapper->GetMeshSet( moab::Remapper::TargetMesh )  = data_tgt.file_set;
     tdata.remapper->GetMeshSet( moab::Remapper::OverlapMesh ) = data_intx.file_set;
 
+    // needed in parallel
+    tdata.remapper->GetMeshSet( moab::Remapper::SourceMeshWithGhosts ) = data_src.file_set;
+
     /* Let make sure that the radius match for source and target meshes. If not, rescale now and
      * unscale later. */
     if( fabs( radius_source - radius_target ) > 1e-10 )

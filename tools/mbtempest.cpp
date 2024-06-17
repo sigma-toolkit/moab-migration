@@ -691,11 +691,6 @@ int main( int argc, char* argv[] )
         runCtx->timer_push( "construct covering set for intersection" );
         rval = remapper.ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, runCtx->rrmGrids, runCtx->useGnomonicProjection,
                                               new_order );MB_CHK_ERR( rval );
-        if( nlayers >= 1 && runCtx->n_procs > 1 )
-        {
-            remapper.ResetMeshSet( moab::Remapper::SourceMesh );
-            runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );  //  ?
-        }
 
         runCtx->timer_pop();
 
@@ -713,19 +708,8 @@ int main( int argc, char* argv[] )
             double local_areas[3],
                 global_areas[3];  // Array for Initial area, and through Method 1 and Method 2
             // local_areas[0] = area_on_sphere_lHuiller ( mbCore, runCtx->meshsets[1], radius_src );
-#ifdef MOAB_HAVE_MPI
-            if( nlayers > 0 )
-            {
-                // compute area of original source set, without ghosts
-                moab::EntityHandle initialSourceSet = remapper.GetMeshSet( moab::Remapper::InitialSourceMesh );
-                local_areas[0] = areaAdaptor.area_on_sphere( mbCore, initialSourceSet, radius_src );
-            }
-            else
-                local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
-#else
-            local_areas[0]                  = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
-#endif
 
+            local_areas[0] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
             local_areas[1] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[1], radius_dest );
             local_areas[2] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[2], radius_src );
 
@@ -851,14 +835,6 @@ int main( int argc, char* argv[] )
                 attrMap["history"]   = historyStr;
 
                 // Write the map file to disk in parallel using either HDF5 or SCRIP interface
-                // in extra case; maybe need a better solution, just create it with the right meshset
-                // from the beginning;
-                if( nlayers >= 1 )  //
-                {
-                    remapper.ResetMeshSet( moab::Remapper::SourceMesh );
-                    runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );  //  ?
-                    weightMap->SetMeshInput( runCtx->meshes[0] );
-                }
 
                 rval = weightMap->WriteParallelMap( runCtx->outFilename.c_str(), attrMap );MB_CHK_ERR( rval );
             }
@@ -1049,10 +1025,10 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
             // get order -1 ghost layers; actually it should be decided by the mesh
             // if the mesh has holes, it could be more
 
-            moab::EntityHandle originalSourceSet;
-            rval = remapper.GhostLayers( ctx.meshsets[0], nlayers, originalSourceSet );MB_CHK_ERR( rval );
+            moab::EntityHandle set_with_ghosts;
+            rval = remapper.GhostLayers( ctx.meshsets[0], nlayers, set_with_ghosts );MB_CHK_ERR( rval );
             moab::Range dummy;
-            remapper.SetMeshSet( moab::Remapper::InitialSourceMesh, originalSourceSet, dummy );
+            remapper.SetMeshSet( moab::Remapper::SourceMeshWithGhosts, set_with_ghosts, dummy );
 #ifdef MOAB_DBG
             // write the new source sets, after layers were decided, should see the ghosts now
             std::stringstream filename;

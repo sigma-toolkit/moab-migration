@@ -4148,19 +4148,14 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
 #endif
     if( nlayers >= 1 )
     {
-        moab::EntityHandle originalSourceSet;
-        rval = tdata.remapper->GhostLayers( data_src.file_set, nlayers, originalSourceSet );MB_CHK_ERR( rval );
+        moab::EntityHandle set_with_ghosts;
+        rval = tdata.remapper->GhostLayers( data_src.file_set, nlayers, set_with_ghosts );MB_CHK_ERR( rval );
         moab::Range dummy;
-        tdata.remapper->SetMeshSet( moab::Remapper::InitialSourceMesh, originalSourceSet, dummy );
+        tdata.remapper->SetMeshSet( moab::Remapper::SourceMeshWithGhosts, set_with_ghosts, dummy );
     }
 
     rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, order );MB_CHK_ERR( rval );
 
-    if( nlayers >= 1 )
-    {
-        tdata.remapper->ResetMeshSet( moab::Remapper::SourceMesh );
-        // runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh ); //  ?
-    }
     // Next, compute intersections with MOAB.
     // for bilinear, this is an overkill
     rval = tdata.remapper->ComputeOverlapMesh( use_kdtree_search, false );MB_CHK_ERR( rval );

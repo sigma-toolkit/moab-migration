@@ -1083,6 +1083,9 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
             if( originalSend.empty() ) continue;
             Range extraCells;
             rval  = MeshTopoUtil( mb ).get_bridge_adjacencies( originalSend, 0, 2, extraCells, order - 1 ); MB_CHK_SET_ERR( rval, "Failed to get bridge adjacencies" );
+            // big miss : need to merge only cells from initial source (ghost) set;
+            // get_bridge adj will get all cells adjacent to a vertex
+            extraCells = intersect(extraCells, meshCells);
             Rto[p].merge(extraCells);
         }
     }

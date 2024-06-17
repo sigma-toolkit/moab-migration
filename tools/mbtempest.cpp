@@ -521,9 +521,9 @@ int main( int argc, char* argv[] )
     moab::DebugOutput& outputFormatter = runCtx->outputFormatter;
 
 #ifdef MOAB_HAVE_MPI
-    moab::TempestRemapper remapper( mbCore, pcomm );
+    moab::TempestRemapper remapper( mbCore, pcomm, true );
 #else
-    moab::TempestRemapper remapper( mbCore );
+    moab::TempestRemapper remapper( mbCore, true );
 #endif
     remapper.meshValidate     = true;
     remapper.constructEdgeMap = true;
@@ -533,9 +533,7 @@ int main( int argc, char* argv[] )
     moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::GaussQuadrature );
 
     Mesh* tempest_mesh = new Mesh();
-    runCtx->timer_push( "create Tempest mesh" );
     rval = CreateTempestMesh( *runCtx, remapper, tempest_mesh );MB_CHK_ERR( rval );
-    runCtx->timer_pop();
 
     if( runCtx->meshType == moab::TempestRemapper::OVERLAP_MEMORY )
     {
@@ -1061,6 +1059,7 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
 
     if( ctx.meshType == moab::TempestRemapper::OVERLAP_FILES )
     {
+        ctx.timer_push( "create Tempest OverlapMesh" );
         // For the overlap method, choose between: "fuzzy", "exact" or "mixed"
         err = GenerateOverlapMesh( ctx.inFilenames[0], ctx.inFilenames[1], *tempest_mesh, ctx.outFilename, "NetCDF4",
                                    "exact", true );
@@ -1068,6 +1067,7 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
             rval = moab::MB_FAILURE;
         else
             ctx.meshes.push_back( tempest_mesh );
+        ctx.timer_pop();
     }
     else if( ctx.meshType == moab::TempestRemapper::OVERLAP_MEMORY )
     {
@@ -1078,19 +1078,24 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         ctx.meshsets[1] = remapper.GetMeshSet( moab::Remapper::TargetMesh );
         ctx.meshsets[2] = remapper.GetMeshSet( moab::Remapper::OverlapMesh );
 
+        ctx.timer_push( "load MOAB Source mesh" );
         // First the source
         rval = remapper.LoadMesh( moab::Remapper::SourceMesh, ctx.inFilenames[0], moab::TempestRemapper::DEFAULT );MB_CHK_ERR( rval );
         ctx.meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );
+        ctx.timer_pop();
 
+        ctx.timer_push( "load MOAB Target mesh" );
         // Next the target
         rval = remapper.LoadMesh( moab::Remapper::TargetMesh, ctx.inFilenames[1], moab::TempestRemapper::DEFAULT );MB_CHK_ERR( rval );
         ctx.meshes[1] = remapper.GetMesh( moab::Remapper::TargetMesh );
+        ctx.timer_pop();
 
+        ctx.timer_push( "generate TempestRemap OverlapMesh" );
         // Now let us construct the overlap mesh, by calling TempestRemap interface directly
         // For the overlap method, choose between: "fuzzy", "exact" or "mixed"
         err = GenerateOverlapWithMeshes( *ctx.meshes[0], *ctx.meshes[1], *tempest_mesh, "" /*ctx.outFilename*/,
                                          "NetCDF4", "exact", false );
-
+        ctx.timer_pop();
         if( err )
             rval = moab::MB_FAILURE;
         else
@@ -1114,11 +1119,15 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         std::vector< int > smetadata, tmetadata;
         //const char* additional_read_opts = ( ctx.n_procs > 1 ? "NO_SET_CONTAINING_PARENTS;" : "" );
         std::string additional_read_opts_src = get_file_read_options( ctx, ctx.inFilenames[0] );
+
+        ctx.timer_push( "load MOAB Source mesh" );
         // Load the source mesh and validate
         rval =
             remapper.LoadNativeMesh( ctx.inFilenames[0], ctx.meshsets[0], smetadata, additional_read_opts_src.c_str() );MB_CHK_ERR( rval );
         if( smetadata.size() ) remapper.SetMeshType( moab::Remapper::SourceMesh, smetadata );
+        ctx.timer_pop();
 
+        ctx.timer_push( "preprocess MOAB Source mesh" );
         // Rescale the radius of both to compute the intersection
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[0], radius_src );MB_CHK_ERR( rval );
         // if order >=2, ghost at least this many layers (order -1) it may be too much
@@ -1146,25 +1155,30 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
 #endif
         }
 #endif
+        ctx.timer_pop();
 
         // Load the target mesh and validate
         std::string addititional_read_opts_tgt = get_file_read_options( ctx, ctx.inFilenames[1] );
         // addititional_read_opts_tgt += "PARALLEL_GHOSTS=2.0.3;PARALLEL_THIN_GHOST_LAYER;";
 
+        ctx.timer_push( "load MOAB Target mesh" );
         rval = remapper.LoadNativeMesh( ctx.inFilenames[1], ctx.meshsets[1], tmetadata,
                                         addititional_read_opts_tgt.c_str() );MB_CHK_ERR( rval );
         if( tmetadata.size() ) remapper.SetMeshType( moab::Remapper::TargetMesh, tmetadata );
+        ctx.timer_pop();
 
         // moab::EntityHandle originalTargetSet;
         // rval = remapper.GhostLayers( ctx.meshsets[1], ctx.nlayers, originalTargetSet );MB_CHK_ERR( rval );
         // ctx.meshsets[1] =
         //     originalTargetSet;
         // remapper.GetMeshSet( moab::Remapper::TargetMesh ) = originalTargetSet;
-
+        ctx.timer_push( "preprocess MOAB Target mesh" );
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[1], radius_dest );MB_CHK_ERR( rval );
+        ctx.timer_pop();
 
         if( ctx.computeWeights )
         {
+            ctx.timer_push( "convert MOAB meshes to TempestRemap meshes in memory" );
             // convert MOAB representation to TempestRemap's Mesh for source
             rval = remapper.ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( rval );
             ctx.meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );
@@ -1172,11 +1186,14 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
             // convert MOAB representation to TempestRemap's Mesh for target
             rval = remapper.ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
             ctx.meshes[1] = remapper.GetMesh( moab::Remapper::TargetMesh );
+            ctx.timer_pop();
         }
     }
     else if( ctx.meshType == moab::TempestRemapper::ICO )
     {
+        ctx.timer_push( "generate ICO mesh with TempestRemap" );
         err = GenerateICOMesh( *tempest_mesh, ctx.blockSize, ctx.computeDual, ctx.outFilename, "NetCDF4" );
+        ctx.timer_pop();
 
         if( err )
             rval = moab::MB_FAILURE;
@@ -1185,6 +1202,7 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
     }
     else if( ctx.meshType == moab::TempestRemapper::RLL )
     {
+        ctx.timer_push( "generate RLL mesh with TempestRemap" );
         err = GenerateRLLMesh( *tempest_mesh,                     // Mesh& meshOut,
                                ctx.blockSize * 2, ctx.blockSize,  // int nLongitudes, int nLatitudes,
                                0.0, 360.0,                        // double dLonBegin, double dLonEnd,
@@ -1196,6 +1214,7 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
                                ctx.outFilename, "NetCDF4",  // std::string strOutputFile, std::string strOutputFormat
                                true                         // bool fVerbose
         );
+        ctx.timer_pop();
 
         if( err )
             rval = moab::MB_FAILURE;
@@ -1204,7 +1223,9 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
     }
     else  // default
     {
+        ctx.timer_push( "generate CS mesh with TempestRemap" );
         err = GenerateCSMesh( *tempest_mesh, ctx.blockSize, ctx.outFilename, "NetCDF4" );
+        ctx.timer_pop();
         if( err )
             rval = moab::MB_FAILURE;
         else

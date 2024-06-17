@@ -57,6 +57,7 @@ ErrorCode TempestRemapper::initialize( bool initialize_fsets )
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_source_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_target_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_overlap_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
+        m_source_set_with_ghosts = m_source_set; // eventually, this will be overwritten by a new set, with ghosts
     }
     else
     {
@@ -998,9 +999,9 @@ void TempestRemapper::SetMeshSet( Remapper::IntersectionContext ctx /* Remapper:
         m_covering_source_entities = entities;
         m_covering_source_set      = mset;
     }
-    else if( ctx == Remapper::InitialSourceMesh )
+    else if( ctx == Remapper::SourceMeshWithGhosts )
     {
-        m_initial_source_set = mset;  // entities not used
+        m_source_set_with_ghosts = mset;  // entities not used
     }
     else
     {
@@ -1261,7 +1262,7 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
 
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_covering_source_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
 
-        rval = mbintx->construct_covering_set( m_source_set, m_covering_source_set, gnomonic, order );MB_CHK_ERR( rval );
+        rval = mbintx->construct_covering_set( m_source_set_with_ghosts, m_covering_source_set, gnomonic, order );MB_CHK_ERR( rval );
 #ifdef MOAB_DBG
         std::stringstream filename;
         filename << "covering" << rank << ".h5m";

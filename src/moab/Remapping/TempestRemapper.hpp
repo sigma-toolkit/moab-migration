@@ -187,11 +187,6 @@ class TempestRemapper : public Remapper
     void SetMeshType( Remapper::IntersectionContext ctx, const std::vector< int >& metadata );
 
     /// <summary>
-    ///     reconstruct mesh, used now only for IO; need a better solution maybe
-    /// </summary>
-    void ResetMeshSet( Remapper::IntersectionContext ctx );
-
-    /// <summary>
     ///     Get the mesh type corresponding to the intersection context
     /// </summary>
     TempestMeshType GetMeshType( Remapper::IntersectionContext ctx ) const;
@@ -335,8 +330,8 @@ class TempestRemapper : public Remapper
 
     IntxAreaUtils::AreaMethod m_area_method;
 
-    // this is a deep copy of the original source set
-    moab::EntityHandle m_initial_source_set;  // created for parallel cases; mostly a placeholder
+    // this is a deep copy of the original source set, plus some ghosts
+    moab::EntityHandle m_source_set_with_ghosts;  // created for parallel cases
 
     bool rrmgrids;
     bool is_parallel, is_root;
@@ -356,7 +351,7 @@ inline Mesh* TempestRemapper::GetMesh( Remapper::IntersectionContext ctx )
             return m_overlap;
         case Remapper::CoveringMesh:
             return m_covering_source;
-        case Remapper::DEFAULT:  // Remapper::InitialSourceMesh does not need one
+        case Remapper::DEFAULT:  // Remapper::SourceMeshWithGhosts does not need one
         default:
             return NULL;
     }
@@ -386,36 +381,7 @@ inline void TempestRemapper::SetMesh( Remapper::IntersectionContext ctx, Mesh* m
             if( overwrite && m_covering_source ) delete m_covering_source;
             m_covering_source = mesh;
             break;
-        case Remapper::DEFAULT:  // Remapper::InitialSourceMesh does not need one
-        default:
-            break;
-    }
-}
-// this is needed in parallel, right before writing the map file
-inline void TempestRemapper::ResetMeshSet( Remapper::IntersectionContext ctx )
-{
-    switch( ctx )
-    {
-        case Remapper::SourceMesh:
-            delete m_source;
-            m_source     = new Mesh;
-            m_source_set = m_initial_source_set;
-            convert_mesh_to_tempest_private( m_source, m_source_set, m_source_entities, &m_source_vertices );
-            m_source->CalculateFaceAreas( false );  // fInputConcave is false ?
-            break;
-        case Remapper::TargetMesh:
-            // not needed yet
-            break;
-        case Remapper::OverlapMesh:
-            // not needed yet
-            break;
-        case Remapper::CoveringMesh:
-            // not needed yet
-            break;
-        case Remapper::InitialSourceMesh:
-            // not needed yet
-            break;
-        case Remapper::DEFAULT:
+        case Remapper::DEFAULT:  // Remapper::SourceMeshWithGhosts does not need one
         default:
             break;
     }
@@ -433,8 +399,8 @@ inline moab::EntityHandle& TempestRemapper::GetMeshSet( Remapper::IntersectionCo
             return m_overlap_set;
         case Remapper::CoveringMesh:
             return m_covering_source_set;
-        case Remapper::InitialSourceMesh:
-            return m_initial_source_set;
+        case Remapper::SourceMeshWithGhosts:
+            return m_source_set_with_ghosts;
         case Remapper::DEFAULT:
         default:
             MB_SET_ERR_RET_VAL( "Invalid context passed to GetMeshSet", m_overlap_set );
@@ -453,8 +419,8 @@ inline moab::EntityHandle TempestRemapper::GetMeshSet( Remapper::IntersectionCon
             return m_overlap_set;
         case Remapper::CoveringMesh:
             return m_covering_source_set;
-        case Remapper::InitialSourceMesh:
-            return m_initial_source_set;
+        case Remapper::SourceMeshWithGhosts:
+            return m_source_set_with_ghosts;
         case Remapper::DEFAULT:
         default:
             MB_SET_ERR_RET_VAL( "Invalid context passed to GetMeshSet", m_overlap_set );
@@ -578,7 +544,7 @@ inline TempestRemapper::TempestMeshType TempestRemapper::GetMeshType( Remapper::
             return m_target_type;
         case Remapper::OverlapMesh:
             return m_overlap_type;
-        case Remapper::DEFAULT:  // not need yet case Remapper::InitialSourceMesh
+        case Remapper::DEFAULT:  // not need yet case Remapper::SourceMeshWithGhosts
         default:
             return TempestRemapper::DEFAULT;
     }
@@ -605,7 +571,7 @@ inline int TempestRemapper::GetGlobalID( Remapper::IntersectionContext ctx, int 
         case Remapper::CoveringMesh:
             return lid_to_gid_covsrc[localID];
         case Remapper::OverlapMesh:
-        case Remapper::InitialSourceMesh:
+        case Remapper::SourceMeshWithGhosts:
         case Remapper::DEFAULT:
         default:
             return -1;
@@ -624,7 +590,7 @@ inline int TempestRemapper::GetLocalID( Remapper::IntersectionContext ctx, int g
             return gid_to_lid_covsrc[globalID];
         case Remapper::DEFAULT:
         case Remapper::OverlapMesh:
-        case Remapper::InitialSourceMesh:
+        case Remapper::SourceMeshWithGhosts:
         default:
             return -1;
     }

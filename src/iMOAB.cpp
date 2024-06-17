@@ -4144,6 +4144,8 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     tdata.remapper->GetMeshSet( moab::Remapper::SourceMesh )  = data_src.file_set;
     tdata.remapper->GetMeshSet( moab::Remapper::TargetMesh )  = data_tgt.file_set;
     tdata.remapper->GetMeshSet( moab::Remapper::OverlapMesh ) = data_intx.file_set;
+    // this one needs to be initialized too with source set
+    tdata.remapper->GetMeshSet( moab::Remapper::SourceMeshWithGhosts ) = data_src.file_set;
 
     rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( rval );
     rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );

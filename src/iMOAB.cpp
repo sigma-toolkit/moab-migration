@@ -4031,7 +4031,7 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     double radius_source = 1.0;
     double radius_target = 1.0;
     const double epsrel  = ReferenceTolerance;  // ReferenceTolerance is defined in Defines.h in tempestremap source ;
-    constexpr double boxeps = 1.e-1;
+    constexpr double boxeps = 1.e-6;
     constexpr bool gnomonic = false;
 
     // Get the source and target data and pcomm objects
@@ -4144,12 +4144,29 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     tdata.remapper->GetMeshSet( moab::Remapper::SourceMesh )  = data_src.file_set;
     tdata.remapper->GetMeshSet( moab::Remapper::TargetMesh )  = data_tgt.file_set;
     tdata.remapper->GetMeshSet( moab::Remapper::OverlapMesh ) = data_intx.file_set;
+    // this one needs to be initialized too with source set
+    tdata.remapper->GetMeshSet( moab::Remapper::SourceMeshWithGhosts ) = data_src.file_set;
 
     rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( rval );
     rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
 
     // First, compute the covering source set.
-    rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic );MB_CHK_ERR( rval );
+    int order = 2;  // we will handle at least order 2, which should be good for bilinear too
+    // eventually, we should pass order as an input to this iMOAB_ComputeMeshIntersectionOnSphere
+    // repeat what we do in mbtempest case
+    int nlayers = 0;
+#ifdef MOAB_HAVE_MPI
+    if( is_parallel ) nlayers = order - 1;  // this should work if no holes and order not too high
+#endif
+    if( nlayers >= 1 )
+    {
+        moab::EntityHandle set_with_ghosts;
+        rval = tdata.remapper->GhostLayers( data_src.file_set, nlayers, set_with_ghosts );MB_CHK_ERR( rval );
+        moab::Range dummy;
+        tdata.remapper->SetMeshSet( moab::Remapper::SourceMeshWithGhosts, set_with_ghosts, dummy );
+    }
+
+    rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, order );MB_CHK_ERR( rval );
 
     // Next, compute intersections with MOAB.
     // for bilinear, this is an overkill
@@ -4274,6 +4291,9 @@ ErrCode iMOAB_ComputePointDoFIntersection( iMOAB_AppID pid_src, iMOAB_AppID pid_
     tdata.remapper->GetMeshSet( moab::Remapper::SourceMesh )  = data_src.file_set;
     tdata.remapper->GetMeshSet( moab::Remapper::TargetMesh )  = data_tgt.file_set;
     tdata.remapper->GetMeshSet( moab::Remapper::OverlapMesh ) = data_intx.file_set;
+
+    // needed in parallel
+    tdata.remapper->GetMeshSet( moab::Remapper::SourceMeshWithGhosts ) = data_src.file_set;
 
     /* Let make sure that the radius match for source and target meshes. If not, rescale now and
      * unscale later. */

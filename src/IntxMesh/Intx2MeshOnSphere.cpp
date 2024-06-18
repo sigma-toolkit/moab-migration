@@ -21,7 +21,7 @@
 #include <cassert>
 
 // #define ENABLE_DEBUG
-//#define CHECK_CONVEXITY
+#define CHECK_CONVEXITY
 namespace moab
 {
 
@@ -274,6 +274,7 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
     int npBefore1 = nP;
     int oldNodes  = 0;
     int otherIntx = 0;
+    moab::IntxAreaUtils areaAdaptor;
 #endif
     for( int i = 0; i < nP; i++ )
     {
@@ -290,7 +291,7 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
         {
             // int node = tgtTri.v[j];
             double d2 = IntxUtils::dist2( pp, &tgtCoords2D[2 * j] );
-            if( d2 < epsilon_1 )
+            if( d2 < epsilon_1 / 1000 ) // two orders of magnitude smaller than it should, to avoid concave polygons
             {
 
                 foundIds[i] = tgtConn[j];  // no new node
@@ -311,7 +312,7 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
         {
             // int node = srcTri.v[j];
             double d2 = IntxUtils::dist2( pp, &srcCoords2D[2 * j] );
-            if( d2 < epsilon_1 )
+            if( d2 < epsilon_1 / 1000 )
             {
                 // suspect is srcConn[j] corresponding in mbOut
 
@@ -472,8 +473,7 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
         {
             int k1 = ( k + 1 ) % nP;
             int k2 = ( k1 + 1 ) % nP;
-            double orientedArea =
-                area_spherical_triangle_lHuiller( &coords[3 * k], &coords[3 * k1], &coords[3 * k2], Rdest );
+            double orientedArea = areaAdaptor. area_spherical_triangle( &coords[3 * k], &coords[3 * k1], &coords[3 * k2], Rdest );
             if( orientedArea < 0 )
             {
                 std::cout << " np before 1 , 2, current " << npBefore1 << " " << npBefore2 << " " << nP << "\n";
@@ -854,7 +854,7 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
 ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distributed_set,
                                                      EntityHandle& covering_set,
                                                      bool gnomonic,
-	                                             int order )
+                                                     int order )
 {
     // primary element came from, in the joint communicator ; this will be forwarded by coverage
     // mesh needed for tag migrate later on
@@ -1082,7 +1082,10 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
             // Need to get layers of bridge-adj entities
             if( originalSend.empty() ) continue;
             Range extraCells;
-            rval  = MeshTopoUtil( mb ).get_bridge_adjacencies( originalSend, 1, 2, extraCells, order - 1 ); MB_CHK_SET_ERR( rval, "Failed to get bridge adjacencies" );
+            rval  = MeshTopoUtil( mb ).get_bridge_adjacencies( originalSend, 0, 2, extraCells, order - 1 ); MB_CHK_SET_ERR( rval, "Failed to get bridge adjacencies" );
+            // big miss : need to merge only cells from initial source (ghost) set;
+            // get_bridge adj will get all cells adjacent to a vertex
+            extraCells = intersect(extraCells, meshCells);
             Rto[p].merge(extraCells);
         }
     }

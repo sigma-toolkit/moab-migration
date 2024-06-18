@@ -917,7 +917,7 @@ double IntxAreaUtils::area_spherical_polygon( const double* A, int N, double Rad
             return area_spherical_polygon_girard( A, N, Radius );
 #ifdef MOAB_HAVE_TEMPESTREMAP
         case GaussQuadrature:
-            return area_spherical_polygon_GQ( A, N );
+            return area_spherical_polygon_GQ( A, N ) * Radius * Radius; //area_spherical_polygon_GQ normalizes  
 #endif
         case lHuiller:
         default:
@@ -1082,7 +1082,6 @@ double IntxAreaUtils::area_spherical_triangle_GQ( const double* inode1, const do
             dDbG( 1 ) = dDbF( 1 ) * ( dF2( 0 ) + dF2( 2 ) ) - dF( 1 ) * ( dDbF( 0 ) * dF( 0 ) + dDbF( 2 ) * dF( 2 ) );
             dDbG( 2 ) = dDbF( 2 ) * ( dF2( 0 ) + dF2( 1 ) ) - dF( 2 ) * ( dDbF( 0 ) * dF( 0 ) + dDbF( 1 ) * dF( 1 ) );
 
-
             // Scale the vectors by the denominator
             dDaG *= dDenomTerm;
             dDbG *= dDenomTerm;
@@ -1149,13 +1148,27 @@ double IntxAreaUtils::area_spherical_triangle_lHuiller( const double* ptA, const
 
     // now, a is angle BOC, O is origin
     CartVect vA( ptA ), vB( ptB ), vC( ptC );
-    double a = angle( vB, vC );
-    double b = angle( vC, vA );
-    double c = angle( vA, vB );
+    double a = angle_robust( vB, vC );
+    double b = angle_robust( vC, vA );
+    double c = angle_robust( vA, vB );
     int sign = 1;
     if( ( vA * vB ) % vC < 0 ) sign = -1;
     double s   = ( a + b + c ) / 2;
-    double tmp = tan( s / 2 ) * tan( ( s - a ) / 2 ) * tan( ( s - b ) / 2 ) * tan( ( s - c ) / 2 );
+    double a1 = ( s - a ) / 2;
+    double b1 = ( s - b ) / 2;
+    double c1 = ( s - c ) / 2;
+#ifdef MOAB_HAVE_TEMPESTREMAP
+    if ( fabs(a1) < 1.e-14 || fabs (b1) < 1.e-14 || fabs(c1) < 1.e-14 )
+    {
+        double area = area_spherical_triangle_GQ( ptA, ptB, ptC ) * sign;
+#ifdef VERBOSE
+        std::cout << " very obtuse angle, use TR to compute area " << " a1:" << a1 << " b1:" <<  b1 << " c1:"  << c1 << "\n";
+        std::cout << " area with TR: " << area << "\n";
+#endif
+        return area;
+    }
+#endif
+    double tmp = tan( s / 2 ) * tan( a1 ) * tan( b1 ) * tan( c1 );
     if( tmp < 0. ) tmp = 0.;
 
     double E = 4 * atan( sqrt( tmp ) );
@@ -1210,7 +1223,10 @@ double IntxAreaUtils::area_on_sphere( Interface* mb, EntityHandle set, double R 
 
         // check whether the area of the spherical element is positive.
         if (elem_area <= 0)
-          std::cout << "Area of element " << mb->id_from_handle(eh) << " is = " << elem_area << "\n";
+        {
+          std::cout << "Area of element " << mb->id_from_handle(eh) << " is = " << elem_area << "\n"; 
+          mb->list_entity(eh);
+        }
         assert( elem_area > 0 );
 
         // sum up the contribution

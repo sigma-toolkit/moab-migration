@@ -157,7 +157,7 @@ struct ToolContext
         std::string expectedDofTagName = "GLOBAL_ID";
         int expectedOrder              = 1;
         int useCAAS                    = 0;
-        int nlayer_input               = 2;
+        int nlayer_input               = 0;
 
         if( !proc_id )
         {
@@ -477,7 +477,7 @@ std::string get_file_read_options( ToolContext& ctx, std::string filename )
     }
     return opts;
 }
-
+//#define MOAB_DBG
 int main( int argc, char* argv[] )
 {
     moab::ErrorCode rval;
@@ -737,10 +737,18 @@ int main( int argc, char* argv[] )
         // }
 
         // First compute the covering set such that the target elements are fully covered by the
-        // lcoal source grid
+        // local source grid
+        int nlayers = 0;
+#ifdef MOAB_HAVE_MPI
+        if( runCtx->disc_orders[0] >= 2 && runCtx->n_procs > 1 )
+            nlayers = runCtx->disc_orders[0] - 1;  // this should work if no holes and order not too high
+        if( runCtx->fvMethod == "bilin" && runCtx->n_procs > 1 )
+            if( nlayers == 0 ) nlayers = 1;
+#endif
+        int new_order = nlayers + 1;
         runCtx->timer_push( "construct covering set for intersection" );
         rval = remapper.ConstructCoveringSet( runCtx->epsrel, 1.0, 1.0, runCtx->boxeps, runCtx->rrmGrids,
-                                              runCtx->useGnomonicProjection, runCtx->nlayers );MB_CHK_ERR( rval );
+                                              runCtx->useGnomonicProjection, new_order /*runCtx->nlayers*/ );MB_CHK_ERR( rval );
         runCtx->timer_pop();
 
 #ifdef MOAB_HAVE_MPI
@@ -773,18 +781,7 @@ int main( int argc, char* argv[] )
             double local_areas[3],
                 global_areas[3];  // Array for Initial area, and through Method 1 and Method 2
             // local_areas[0] = area_on_sphere_lHuiller ( mbCore, runCtx->meshsets[1], radius_src );
-#ifdef MOAB_HAVE_MPI
-            // if( runCtx->nlayers > 0 )
-            // {
-            //     // compute area of original source set, without ghosts
-            //     local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[3], radius_src );
-            // }
-            // else
-            local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
-#else
-            local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
-#endif
-
+            local_areas[0] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
             local_areas[1] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[1], radius_dest );
             local_areas[2] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[2], radius_src );
 
@@ -920,12 +917,12 @@ int main( int argc, char* argv[] )
                 // Write the map file to disk in parallel using either HDF5 or SCRIP interface
                 // in extra case; maybe need a better solution, just create it with the right meshset
                 // from the beginning;
-                if( runCtx->nlayers && nprocs > 1 )
-                {
-                    remapper.ResetMeshSet( moab::Remapper::SourceMesh, runCtx->meshsets[3] );
-                    runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );  //  ?
-                    weightMap->SetMeshInput( runCtx->meshes[0] );
-                }
+                //if( runCtx->nlayers && nprocs > 1 )
+                //{
+                //    remapper.ResetMeshSet( moab::Remapper::SourceMesh, runCtx->meshsets[3] );
+                //    runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );  //  ?
+                //    weightMap->SetMeshInput( runCtx->meshes[0] );
+                //}
 
                 if( !runCtx->skip_io )
                 {
@@ -1132,18 +1129,17 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[0], radius_src );MB_CHK_ERR( rval );
         // if order >=2, ghost at least this many layers (order -1) it may be too much
 #ifdef MOAB_HAVE_MPI
-        if( ctx.n_procs > 1 )
+        int nlayers = ctx.disc_orders[0] - 1;  // this should work if no holes and order not too high
+        if( ctx.fvMethod == "bilin" && nlayers == 0 ) nlayers = 1;
+        if( nlayers >= 1 && ctx.n_procs > 1 )
         {
             // get order -1 ghost layers; actually it should be decided by the mesh
             // if the mesh has holes, it could be more
 
-            moab::EntityHandle originalSourceSet;
-            rval = remapper.GhostLayers( ctx.meshsets[0], ctx.nlayers, originalSourceSet );MB_CHK_ERR( rval );
-            ctx.meshsets.push_back( originalSourceSet );  // so ctx.meshsets[3] will have the original source set
-
-            // moab::EntityHandle originalSourceSet;
-            // rval = remapper.GhostLayers( ctx.meshsets[1], ctx.nlayers, ctx.meshsets[1] );MB_CHK_ERR( rval );
-            // ctx.meshsets.push_back( originalSourceSet );  // so ctx.meshsets[3] will have the original source set
+            moab::EntityHandle set_with_ghosts;
+            rval = remapper.GhostLayers( ctx.meshsets[0], nlayers, set_with_ghosts );MB_CHK_ERR( rval );
+            moab::Range dummy;
+            remapper.SetMeshSet( moab::Remapper::SourceMeshWithGhosts, set_with_ghosts, dummy );
 #ifdef MOAB_DBG
             if( !runCtx->skip_io )
             {
@@ -1167,11 +1163,6 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         if( tmetadata.size() ) remapper.SetMeshType( moab::Remapper::TargetMesh, tmetadata );
         ctx.timer_pop();
 
-        // moab::EntityHandle originalTargetSet;
-        // rval = remapper.GhostLayers( ctx.meshsets[1], ctx.nlayers, originalTargetSet );MB_CHK_ERR( rval );
-        // ctx.meshsets[1] =
-        //     originalTargetSet;
-        // remapper.GetMeshSet( moab::Remapper::TargetMesh ) = originalTargetSet;
         ctx.timer_push( "preprocess MOAB Target mesh" );
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[1], radius_dest );MB_CHK_ERR( rval );
         ctx.timer_pop();
@@ -1241,6 +1232,7 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
     return rval;
 }
 
+#undef MOAB_DBG
 ///////////////////////////////////////////////
 //         Test functions
 

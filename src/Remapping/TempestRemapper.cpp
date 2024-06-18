@@ -1239,7 +1239,7 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
     moab::Range local_verts;
 
     // Initialize intersection context
-    mbintx = new moab::Intx2MeshOnSphere( m_interface );
+    mbintx = new moab::Intx2MeshOnSphere( m_interface, moab::IntxAreaUtils::GaussQuadrature );
 
     mbintx->set_error_tolerance( tolerance );
     mbintx->set_radius_source_mesh( radius_src );

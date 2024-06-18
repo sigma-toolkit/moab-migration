@@ -1228,9 +1228,10 @@ if test "x$enable_pymoab" != "xno"; then
 AC_MSG_NOTICE([
 *************************************************************************
 *    DEPRECATION NOTICE:                                                *
-*    Building PyMOAB using Autotools is no longer supported. Please     *
-*    install MOAB via pip instead. Refer to the MOAB README file for    *
-*    installation instructions.                                         *
+*    Building PyMOAB using Autotools is planned to be deprecated in a   *
+*    future major version release. Please consider installing MOAB via  *
+*    pip instead. Refer to the MOAB README file for installation        *
+*    instructions.                                                      *
 *************************************************************************])
 fi
 

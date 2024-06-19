@@ -250,7 +250,7 @@ struct ToolContext
                              "from source to target "
                              "grid by applying the maps",
                              &verifyWeights );
-        ;
+
         opts.addOpt< std::string >( "var",
                                     "Tag name of the variable to use in the verification study "
                                     "(error metrics for user defined variables may not be available)",
@@ -387,7 +387,10 @@ struct ToolContext
             if( fVolumetric ) mapOptions.strMethod += "volumetric;";
 
             // this should work if no holes and order not too high
-            nlayers = std::max( nlayer_input, nlayers );
+            if( !fvMethod.compare( "bilin" ) ) nlayers = 2;
+            else nlayers = mapOptions.nPin - 1;  // this should work if no holes and order not too high
+            if ( nlayer_input )
+              nlayers = std::max( nlayer_input, nlayers );
             // nlayers = nlayer_input;
         }
 
@@ -738,17 +741,9 @@ int main( int argc, char* argv[] )
 
         // First compute the covering set such that the target elements are fully covered by the
         // local source grid
-        int nlayers = 0;
-#ifdef MOAB_HAVE_MPI
-        if( runCtx->disc_orders[0] >= 2 && runCtx->n_procs > 1 )
-            nlayers = runCtx->disc_orders[0] - 1;  // this should work if no holes and order not too high
-        if( runCtx->fvMethod == "bilin" && runCtx->n_procs > 1 )
-            if( nlayers == 0 ) nlayers = 1;
-#endif
-        int new_order = nlayers + 1;
         runCtx->timer_push( "construct covering set for intersection" );
         rval = remapper.ConstructCoveringSet( runCtx->epsrel, 1.0, 1.0, runCtx->boxeps, runCtx->rrmGrids,
-                                              runCtx->useGnomonicProjection, new_order /*runCtx->nlayers*/ );MB_CHK_ERR( rval );
+                                              runCtx->useGnomonicProjection, runCtx->nlayers );MB_CHK_ERR( rval );
         runCtx->timer_pop();
 
 #ifdef MOAB_HAVE_MPI
@@ -1129,15 +1124,13 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[0], radius_src );MB_CHK_ERR( rval );
         // if order >=2, ghost at least this many layers (order -1) it may be too much
 #ifdef MOAB_HAVE_MPI
-        int nlayers = ctx.disc_orders[0] - 1;  // this should work if no holes and order not too high
-        if( ctx.fvMethod == "bilin" && nlayers == 0 ) nlayers = 1;
-        if( nlayers >= 1 && ctx.n_procs > 1 )
+        if( ctx.nlayers && ctx.n_procs > 1 )
         {
             // get order -1 ghost layers; actually it should be decided by the mesh
             // if the mesh has holes, it could be more
 
             moab::EntityHandle set_with_ghosts;
-            rval = remapper.GhostLayers( ctx.meshsets[0], nlayers, set_with_ghosts );MB_CHK_ERR( rval );
+            rval = remapper.GhostLayers( ctx.meshsets[0], ctx.nlayers, set_with_ghosts );MB_CHK_ERR( rval );
             moab::Range dummy;
             remapper.SetMeshSet( moab::Remapper::SourceMeshWithGhosts, set_with_ghosts, dummy );
 #ifdef MOAB_DBG

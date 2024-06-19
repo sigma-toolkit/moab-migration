@@ -1086,25 +1086,25 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             // Construct OfflineMap
             if( strMapAlgorithm == "invdist" )
             {
-                if( is_root ) AnnounceStartBlock( "Calculating map (invdist)" );
+                if( is_root ) dbgprint.printf( 0, "Calculating map (invdist)\n" );
                 if( m_meshInputCov->faces.size() )
                     LinearRemapFVtoFVInvDist( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else if( strMapAlgorithm == "delaunay" )
             {
-                if( is_root ) AnnounceStartBlock( "Calculating map (delaunay)" );
+                if( is_root ) dbgprint.printf( 0, "Calculating map (delaunay)\n" );
                 if( m_meshInputCov->faces.size() )
                     LinearRemapTriangulation( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else if( strMapAlgorithm == "fvintbilin" )
             {
-                if( is_root ) AnnounceStartBlock( "Calculating map (intbilin)" );
+                if( is_root ) dbgprint.printf( 0, "Calculating map (intbilin)\n" );
                 if( m_meshInputCov->faces.size() )
                     LinearRemapIntegratedBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else if( strMapAlgorithm == "fvintbilingb" )
             {
-                if( is_root ) AnnounceStartBlock( "Calculating map (intbilingb)" );
+                if( is_root ) dbgprint.printf( 0, "Calculating map (intbilingb)\n" );
                 if( m_meshInputCov->faces.size() )
                     LinearRemapIntegratedGeneralizedBarycentric( *m_meshInputCov, *m_meshOutput, *m_meshOverlap,
                                                                  *this );
@@ -1123,13 +1123,13 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                     m_meshOutput->Write( "TargetMeshMBTR" + std::to_string( rank ) + ".g" );
                 }
 #endif
-                if( is_root ) AnnounceStartBlock( "Calculating map (bilin)" );
+                if( is_root ) dbgprint.printf( 0, "Calculating map (bilin)\n" );
                 if( m_meshInputCov->faces.size() )
                     LinearRemapBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
             }
             else
             {
-                if( is_root ) AnnounceStartBlock( "Calculating conservative FV-FV map" );
+                if( is_root ) dbgprint.printf( 0, "Calculating conservative FV-FV map\n" );
                 if( m_meshInputCov->faces.size() )
                 {
 #ifdef USE_NATIVE_TEMPESTREMAP_ROUTINES

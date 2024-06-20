@@ -386,12 +386,12 @@ struct ToolContext
             //assert( fVolumetric && fInverseDistanceMap == false );  // both options cannot be active
             if( fVolumetric ) mapOptions.strMethod += "volumetric;";
 
-            // this should work if no holes and order not too high
-            if( !fvMethod.compare( "bilin" ) ) nlayers = 2;
-            else nlayers = mapOptions.nPin - 1;  // this should work if no holes and order not too high
+            // For global meshes, this default should work out of the box.
+            if( !fvMethod.compare( "bilin" ) ) nlayers = 3;
+            else
+                nlayers = ( mapOptions.nPin > 1 ? mapOptions.nPin + 1 : 1 );
             if ( nlayer_input )
               nlayers = std::max( nlayer_input, nlayers );
-            // nlayers = nlayer_input;
         }
 
         // clear temporary string name

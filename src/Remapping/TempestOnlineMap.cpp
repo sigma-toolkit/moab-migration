@@ -1821,10 +1821,15 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
 
     if( caasType != CAAS_NONE )
     {
+        std::string tgtSolutionTagName;
+        rval = m_interface->tag_get_name( tgtSolutionTag, tgtSolutionTagName );MB_CHK_SET_ERR( rval, "Getting tag name failed" );
+
+        // Perform CAAS iterations iteratively until convergence
         constexpr int nmax_caas_iterations = 10;
         double mismatch                    = 1.0;
         int caasIteration                  = 0;
-        while( fabs( mismatch ) > 1e-15 &&
+        double initialMismatch = 0.0;
+        while( ( fabs( mismatch / initialMismatch ) > 1e-15 && fabs( mismatch ) > 1e-15 ) &&
                caasIteration++ < nmax_caas_iterations )  // iterate until convergence or a maximum of 5 iterations
         {
             // The tag data is np*np*n_el_dest
@@ -1843,10 +1848,11 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
 #else
             dMassDiffPostGlobal = mDefect.second;
 #endif
+            if( caasIteration == 1 ) initialMismatch = mDefect.first;
             if( m_remapper->verbose && is_root )
             {
-                printf( "CAAS Iteration: %d, Net original mass defect: %3.4e, mass defect post-CAAS: %3.4e\n",
-                        caasIteration, mDefect.first, dMassDiffPostGlobal );
+                printf( "Field {%s} -> CAAS iteration: %d, mass defect: %3.4e, post-CAAS: %3.4e\n",
+                        tgtSolutionTagName.c_str(), caasIteration, mDefect.first, dMassDiffPostGlobal );
             }
             mismatch = dMassDiffPostGlobal;
         }

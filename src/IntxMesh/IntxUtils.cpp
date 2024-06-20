@@ -3,8 +3,8 @@
  *
  *  Created on: Oct 3, 2012
  */
-#if defined(_MSC_VER) || defined(WIN32)            /* windows */
-#define _USE_MATH_DEFINES  // For M_PI
+#if defined( _MSC_VER ) || defined( WIN32 ) /* windows */
+#define _USE_MATH_DEFINES                   // For M_PI
 #endif
 
 #include <cmath>
@@ -48,7 +48,6 @@ namespace moab
  *
  * The code also defines some helper structs and functions used by these utility functions.
  */
-
 
 #define CORRTAGNAME "__correspondent"
 #define MAXEDGES    10
@@ -917,7 +916,7 @@ double IntxAreaUtils::area_spherical_polygon( const double* A, int N, double Rad
             return area_spherical_polygon_girard( A, N, Radius );
 #ifdef MOAB_HAVE_TEMPESTREMAP
         case GaussQuadrature:
-            return area_spherical_polygon_GQ( A, N ) * Radius * Radius; //area_spherical_polygon_GQ normalizes  
+            return area_spherical_polygon_GQ( A, N ) * Radius * Radius;  //area_spherical_polygon_GQ normalizes
 #endif
         case lHuiller:
         default:
@@ -1001,7 +1000,8 @@ double IntxAreaUtils::area_spherical_polygon_GQ( const double* A, int N )
 
 template < typename Derived >
 Eigen::Array< typename Derived::Scalar, Derived::RowsAtCompileTime, Derived::ColsAtCompileTime > shift(
-    const Eigen::ArrayBase< Derived >& array, int positions )
+    const Eigen::ArrayBase< Derived >& array,
+    int positions )
 {
     Eigen::Array< typename Derived::Scalar, Derived::RowsAtCompileTime, Derived::ColsAtCompileTime > result = array;
     if( positions > 0 )
@@ -1142,7 +1142,9 @@ double IntxAreaUtils::area_spherical_triangle_GQ( const double* inode1, const do
  *
  *  E = 4*atan(sqrt(tan(s/2)*tan((s-a)/2)*tan((s-b)/2)*tan((s-c)/2)))
  */
-double IntxAreaUtils::area_spherical_triangle_lHuiller( const double* ptA, const double* ptB, const double* ptC,
+double IntxAreaUtils::area_spherical_triangle_lHuiller( const double* ptA,
+                                                        const double* ptB,
+                                                        const double* ptC,
                                                         double Radius )
 {
 
@@ -1152,17 +1154,19 @@ double IntxAreaUtils::area_spherical_triangle_lHuiller( const double* ptA, const
     double b = angle_robust( vC, vA );
     double c = angle_robust( vA, vB );
     int sign = 1;
+    // if( fabs( ( vA * vB ) % vC ) < 1e-17 ) sign = -1;
     if( ( vA * vB ) % vC < 0 ) sign = -1;
-    double s   = ( a + b + c ) / 2;
+    double s  = ( a + b + c ) / 2;
     double a1 = ( s - a ) / 2;
     double b1 = ( s - b ) / 2;
     double c1 = ( s - c ) / 2;
 #ifdef MOAB_HAVE_TEMPESTREMAP
-    if ( fabs(a1) < 1.e-14 || fabs (b1) < 1.e-14 || fabs(c1) < 1.e-14 )
+    if( fabs( a1 ) < 1.e-14 || fabs( b1 ) < 1.e-14 || fabs( c1 ) < 1.e-14 )
     {
         double area = area_spherical_triangle_GQ( ptA, ptB, ptC ) * sign;
 #ifdef VERBOSE
-        std::cout << " very obtuse angle, use TR to compute area " << " a1:" << a1 << " b1:" <<  b1 << " c1:"  << c1 << "\n";
+        std::cout << " very obtuse angle, use TR to compute area " << " a1:" << a1 << " b1:" << b1 << " c1:" << c1
+                  << "\n";
         std::cout << " area with TR: " << area << "\n";
 #endif
         return area;
@@ -1222,10 +1226,10 @@ double IntxAreaUtils::area_on_sphere( Interface* mb, EntityHandle set, double R 
         const double elem_area = this->area_spherical_element( mb, eh, R );
 
         // check whether the area of the spherical element is positive.
-        if (elem_area <= 0)
+        if( elem_area <= 0 )
         {
-          std::cout << "Area of element " << mb->id_from_handle(eh) << " is = " << elem_area << "\n"; 
-          mb->list_entity(eh);
+            std::cout << "Area of element " << mb->id_from_handle( eh ) << " is = " << elem_area << "\n";
+            mb->list_entity( eh );
         }
         assert( elem_area > 0 );
 
@@ -1255,8 +1259,6 @@ double IntxAreaUtils::area_spherical_element( Interface* mb, EntityHandle elem, 
     // compute and return the area of the polygonal element
     return area_spherical_polygon( &coords[0], nsides, R );
 }
-
-
 
 double IntxUtils::distance_on_great_circle( CartVect& p1, CartVect& p2 )
 {
@@ -1460,20 +1462,17 @@ ErrorCode IntxUtils::fix_degenerate_quads( Interface* mb, EntityHandle set )
 ErrorCode IntxAreaUtils::positive_orientation( Interface* mb, EntityHandle set, double R )
 {
     Range cells2d;
-    ErrorCode rval = mb->get_entities_by_dimension( set, 2, cells2d );
-    if( MB_SUCCESS != rval ) return rval;
+    ErrorCode rval = mb->get_entities_by_dimension( set, 2, cells2d );MB_CHK_ERR( rval );
     for( Range::iterator qit = cells2d.begin(); qit != cells2d.end(); ++qit )
     {
         EntityHandle cell        = *qit;
         const EntityHandle* conn = NULL;
         int num_nodes            = 0;
-        rval                     = mb->get_connectivity( cell, conn, num_nodes );
-        if( MB_SUCCESS != rval ) return rval;
+        rval                     = mb->get_connectivity( cell, conn, num_nodes );MB_CHK_ERR( rval );
         if( num_nodes < 3 ) return MB_FAILURE;
 
         double coords[9];
-        rval = mb->get_coords( conn, 3, coords );
-        if( MB_SUCCESS != rval ) return rval;
+        rval = mb->get_coords( conn, 3, coords );MB_CHK_ERR( rval );
 
         double area;
         if( R > 0 )
@@ -1485,8 +1484,7 @@ ErrorCode IntxAreaUtils::positive_orientation( Interface* mb, EntityHandle set, 
             // compute all area, do not revert if total area is positive
             std::vector< double > coords2( 3 * num_nodes );
             // get coordinates
-            rval = mb->get_coords( conn, num_nodes, &coords2[0] );
-            if( MB_SUCCESS != rval ) return MB_FAILURE;
+            rval = mb->get_coords( conn, num_nodes, &coords2[0] );MB_CHK_ERR( rval );
             double totArea = area_spherical_polygon_lHuiller( &coords2[0], num_nodes, R );
             if( totArea < 0 )
             {
@@ -1495,8 +1493,7 @@ ErrorCode IntxAreaUtils::positive_orientation( Interface* mb, EntityHandle set, 
                 {
                     newconn[num_nodes - 1 - i] = conn[i];
                 }
-                rval = mb->set_connectivity( cell, &newconn[0], num_nodes );
-                if( MB_SUCCESS != rval ) return rval;
+                rval = mb->set_connectivity( cell, &newconn[0], num_nodes );MB_CHK_ERR( rval );
             }
             else
             {

@@ -384,6 +384,7 @@ class MOAB_EXPORT Range
 
     EntityHandle operator[]( EntityID index ) const;
 
+    // note: this index should be size_t at some point; int is looking for trouble when we have locally 2 B vertices :(
     int index( EntityHandle handle ) const;
 
   protected:

@@ -2157,4 +2157,48 @@ ErrorCode IntxUtils::remove_padded_vertices( Interface* mb, EntityHandle file_se
     return MB_SUCCESS;
 }
 
+
+ErrorCode IntxUtils::compute_longest_cell_diagonal( Interface* mb, EntityHandle file_set, double & oMaxDiagonal )
+{
+
+    Range cells;
+    ErrorCode rval = mb->get_entities_by_dimension( file_set, 2, cells );MB_CHK_ERR( rval );
+
+    Range verts;
+    rval = mb->get_connectivity( cells, verts );MB_CHK_ERR( rval );
+
+    // get coordinates
+    std::vector< CartVect > coord_vect( verts.size() );
+    rval = mb->get_coords( verts, &(coord_vect[0][0]) );MB_CHK_ERR( rval ); // put in an array of CartVect, to compute lengths easier
+    // find out max edge on source mesh;
+    oMaxDiagonal = 0;
+    for ( Range::iterator it = cells.begin(); it != cells.end(); it++ )
+    {
+        const EntityHandle* conn = NULL;
+        int nnodes;
+        rval = mb->get_connectivity( *it, conn, nnodes );MB_CHK_SET_ERR( rval, "can't get connectivity" );
+        while( conn[nnodes - 2] == conn[nnodes - 1] && nnodes > 3 )
+            nnodes--;
+        std::vector<int>  indices(nnodes);
+        for (int i=0; i<nnodes; i++)
+            indices[i] = verts.index(conn[i]);
+
+        // compute all edges and diagonals, once
+        for (int i=0; i< nnodes - 1; i++)
+        {
+            CartVect & v1 = coord_vect[indices[i]];
+            for (int j = i + 1; j < nnodes ; j++)
+            {
+
+                CartVect & v2 = coord_vect[indices[j]];
+                double dist = (v1 - v2).length_squared();
+                if (dist > oMaxDiagonal) oMaxDiagonal = dist;
+            }
+        }
+    }
+    oMaxDiagonal = std::sqrt (oMaxDiagonal);
+
+    return MB_SUCCESS;
+}
+
 }  // namespace moab

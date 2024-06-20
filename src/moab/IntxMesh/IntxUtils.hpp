@@ -193,7 +193,7 @@ class IntxUtils
                                       int* side,
                                       double epsil );
 
-    // used only by homme
+    // used only by homme; to remove, it is deprecated
     static ErrorCode deep_copy_set_with_quads( Interface* mb, EntityHandle source_set, EntityHandle dest_set );
 
     // used to 'repair' scrip-like meshes
@@ -203,6 +203,9 @@ class IntxUtils
                                                 std::vector< Tag >& tagList );
 
     static ErrorCode remove_padded_vertices( Interface* mb, EntityHandle file_set, std::vector< Tag >& tagList );
+
+    // this will look at all diagonals and edges of a convex input cell, to find out the maximum length (diameter of the cell)
+    static ErrorCode compute_longest_cell_diagonal( Interface* mb, EntityHandle file_set, double & oMaxDiagonal ) ;
 };
 
 class IntxAreaUtils

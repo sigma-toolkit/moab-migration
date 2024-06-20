@@ -28,7 +28,8 @@ int Intx2Mesh::dbg_1 = 0;
 Intx2Mesh::Intx2Mesh( Interface* mbimpl )
     : mb( mbimpl ), mbs1( 0 ), mbs2( 0 ), outSet( 0 ), gid( 0 ), TgtFlagTag( 0 ), tgtParentTag( 0 ), srcParentTag( 0 ),
       countTag( 0 ), srcNeighTag( 0 ), tgtNeighTag( 0 ), neighTgtEdgeTag( 0 ), orgSendProcTag( 0 ), imaskTag( 0 ),
-      tgtConn( NULL ), srcConn( NULL ), epsilon_1( 0.0 ), epsilon_area( 0.0 ), box_error( 0.0 ), localRoot( 0 ),
+      tgtConn( NULL ), srcConn( NULL ), epsilon_1( 0.0 ), epsilon_area( 0.0 ), box_error( 0.0 ), box_error_estimated_coverage_3d( false),
+      localRoot( 0 ),
       my_rank( 0 )
 #ifdef MOAB_HAVE_MPI
       ,
@@ -309,53 +310,22 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
         rval = mb->tag_set_data( neighTgtEdgeTag, &tgtCell, 1, &( zeroh[0] ) );MB_CHK_SET_ERR( rval, "can't set edge tgt tag" );
     }
 
-    // find out max edge on source mesh;
-    double max_length = 0;
+    // box error computed in parallel for coverage in 3d should be OK for kd tree tolerance
+    double tolerance = 0;
+    if (box_error_estimated_coverage_3d) // this can be true only in parallel, if 3d coverage was used (not gnomonic)
+        tolerance = box_error;
+    else
     {
-        std::vector< double > coords( 3 * max_edges_1, 0.0 );
-        for( Range::iterator it = rs1.begin(); it != rs1.end(); it++ )
-        {
-            const EntityHandle* conn = NULL;
-            int nnodes;
-            rval = mb->get_connectivity( *it, conn, nnodes );MB_CHK_SET_ERR( rval, "can't get connectivity" );
-            while( conn[nnodes - 2] == conn[nnodes - 1] && nnodes > 3 )
-                nnodes--;
-            rval = mb->get_coords( conn, nnodes, &coords[0] );MB_CHK_SET_ERR( rval, "can't get coordinates" );
-            for( int j = 0; j < nnodes; j++ )
-            {
-                int next = ( j + 1 ) % nnodes;
-                double edge_length =
-                    ( coords[3 * j] - coords[3 * next] ) * ( coords[3 * j] - coords[3 * next] ) +
-                    ( coords[3 * j + 1] - coords[3 * next + 1] ) * ( coords[3 * j + 1] - coords[3 * next + 1] ) +
-                    ( coords[3 * j + 2] - coords[3 * next + 2] ) * ( coords[3 * j + 2] - coords[3 * next + 2] );
-                if( edge_length > max_length ) max_length = edge_length;
-            }
-        }
-        max_length = std::sqrt( max_length );
-    }
+        // we need to compute the local tolerance for kd tree with the method
 
-    // maximum sag on a spherical mesh make sense only for intx on a sphere, with radius 1 :(
-    double tolerance = 1.e-15;
-    if( max_length < 1. )
-    {
-        // basically, the sag for an arc of length max_length on a circle of radius 1
-        tolerance = 1. - sqrt( 1 - max_length * max_length / 4 );
-        if( box_error < tolerance ) box_error = tolerance;
-        tolerance = 3 * tolerance;  // we use it for gnomonic plane too, projected sag could be =* sqrt(2.)
-        // be more generous, use 1.5 ~= sqrt(2.)
-
-        if( !my_rank )
-        {
-            std::cout << " max edge length: " << max_length << "  tolerance for kd tree: " << tolerance << "\n";
-            std::cout << " box overlap tolerance: " << box_error << "\n";
-        }
+        double max_diagonal = 0;
+        IntxUtils::compute_longest_cell_diagonal( mb, mbset1, max_diagonal );
+        double max_sag = 1.0 - std::sqrt(1.0 - max_diagonal*max_diagonal/4); // assume radius is 1. at this point; is it true or not ?
+        // a safety factor about 25%
+        tolerance = max_sag * 1.25;
+        // now find out maximum over all processes
+        // now reduce over all processors
     }
-#ifdef MOAB_HAVE_MPI
-    // reduce box tolerance on every task, if needed
-    double min_box_eps;
-    MPI_Allreduce( &box_error, &min_box_eps, 1, MPI_DOUBLE, MPI_MIN, parcomm->comm() );
-    box_error = min_box_eps;
-#endif
 
     // create the kd tree on source cells, and intersect all targets in an expensive loop
     // build a kd tree with the rs1 (source) cells
@@ -959,7 +929,8 @@ ErrorCode Intx2Mesh::build_processor_euler_boxes( EntityHandle euler_set, Range&
 
     return MB_SUCCESS;
 }
-
+// this should be deprecated too, along with par_intx_sph.cpp test
+// it is used in mbcslam only
 ErrorCode Intx2Mesh::create_departure_mesh_2nd_alg( EntityHandle& euler_set, EntityHandle& covering_lagr_set )
 {
     // compute the bounding box on each proc
@@ -1229,6 +1200,8 @@ ErrorCode Intx2Mesh::create_departure_mesh_2nd_alg( EntityHandle& euler_set, Ent
 // we need to keep in a tuple list the remote cells from other procs, because we need to send back
 // the intersection info (like area of the intx polygon, and the current concentration) maybe total
 // mass in that intx
+// this should be removed when we remove mbcslam (already marked for deprecation)
+// how do we mark for deprecation?
 ErrorCode Intx2Mesh::create_departure_mesh_3rd_alg( EntityHandle& lagr_set, EntityHandle& covering_set )
 {
     EntityHandle dum = 0;

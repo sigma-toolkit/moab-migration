@@ -27,6 +27,8 @@ end
 !
 #include "moab/MOABConfig.h"
 
+#define VERBOSE
+
 #ifndef MOAB_MESH_DIR
 #error Specify MOAB_MESH_DIR path
 #endif
@@ -198,8 +200,11 @@ program imoab_coupler_fortran
       ! basically, atm was redistributed according to target (ocean) partition, to "cover" the
       !ocean partitions check if intx valid, write some h5m intx file
       call errorout(ierr, 'cannot compute intersection')
+
+#ifdef VERBOSE
       ierr = iMOAB_WriteLocalMesh(cplAtmOcnPID, 'intx_ao')
       call errorout(ierr, 'could not write intersection mesh to disk')
+#endif
 
    end if
 
@@ -253,7 +258,7 @@ program imoab_coupler_fortran
              fValidate, "GLOBAL_ID"//C_NULL_CHAR, "GLOBAL_ID"//C_NULL_CHAR)
       call errorout(ierr, 'cannot compute scalar 2nd order projection weights')
 
-#ifdef MOAB_HAVE_NETCDF
+#if defined(MOAB_HAVE_NETCDF) && defined(VERBOSE)
       write(nproc,"(I0.2)")num_procs !
       atmocn_map_file_name = 'atm_ocn_map_second_n'//trim(nproc)//'.nc'//C_NULL_CHAR
       ierr = iMOAB_WriteMappingWeightsToFile( cplAtmOcnPID, "secondorder"//C_NULL_CHAR, atmocn_map_file_name)
@@ -284,33 +289,7 @@ program imoab_coupler_fortran
       call errorout(ierr, 'failed to define the field tags a2oTbot_proj:a2oUbot_proj:a2oVbot_proj')
    end if
 
-   ! make the tag 0, to check we are actually sending needed data
-   if (cplAtmPID .ge. 0) then
-
-      !  Each process in the communicator will have access to a local mesh instance, which
-      !  will contain the original cells in the local partition and ghost entities. Number of
-      !  vertices, primary cells, visible blocks, number of sidesets and nodesets boundary
-      !  conditions will be returned in numProcesses 3 arrays, for local, ghost and total
-      !  numbers.
-
-      ierr = iMOAB_GetMeshInfo(cplAtmPID, nverts, nelem, nblocks, nsbc, ndbc)
-      call errorout(ierr, 'failed to get num primary elems')
-      storLeng = nelem(3)*atmCompNDoFs*3 ! 3 tags
-      allocate (vals(storLeng))
-      eetype = 1 ! double type
-
-      do i = 1, storLeng
-         vals(:) = 0.
-      end do
-
-      ! set the tag values to 0.0
-      ierr = iMOAB_SetDoubleTagStorage(cplAtmPID, fields, storLeng, eetype, vals)
-      call errorout(ierr, 'cannot make tag nul')
-
-   end if
-
    if (atmComm .NE. MPI_COMM_NULL) then
-
       ! As always, use nonblocking sends
       ! this is for projection to ocean:
       ierr = iMOAB_SendElementTag(cmpAtmPID, fields, atmCouComm, cplocn)
@@ -326,11 +305,10 @@ program imoab_coupler_fortran
 
    ! we can now free the sender buffers
    if (atmComm .NE. MPI_COMM_NULL) then
-
       ierr = iMOAB_FreeSenderBuffers(cmpAtmPID, cplocn) !context is for ocean
       call errorout(ierr, 'cannot free buffers used to resend atm tag towards the coverage mesh')
-
    end if
+
    if (cplComm .ne. MPI_COMM_NULL) then
 
       outputFileOcn = "AtmOnCplF.h5m"//C_NULL_CHAR
@@ -365,7 +343,7 @@ program imoab_coupler_fortran
 
       ! We have the remapping weights now. Let us apply the weights onto the tag we defined
       ! on the source mesh and get the projection on the target mesh
-      filter_type = 1 ! local CAAS operator application
+      filter_type = 1 ! global CAAS operator application
       ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, "secondorder"//C_NULL_CHAR, &
                                                 fields, &
                                                 projectedFieldsCAAS)

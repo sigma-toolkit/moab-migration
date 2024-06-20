@@ -380,9 +380,6 @@ int main( int argc, char* argv[] )
         }
     }
 
-    const char* concat_fieldname  = "Sa_dens:Sa_pbot";
-    const char* concat_fieldnameT = "Sa_dens:Sa_pbot";
-
 #ifdef ENABLE_ATMOCN_COUPLING
     // first hop
     PUSH_TIMER( "Send/receive data from atm component to coupler in atm context" )
@@ -431,8 +428,8 @@ int main( int argc, char* argv[] )
         /* We have the remapping weights now. Let us apply the weights onto the tag we defined
 		   on the source mesh and get the projection on the target mesh */
         PUSH_TIMER( "Apply Scalar projection weights" )
-        ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0].c_str(), concat_fieldname,
-                                                   concat_fieldnameT );
+        ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0].c_str(), bottomFields,
+                                                   bottomProjectedFields );
         CHECKIERR( ierr, "failed to compute projection weight application" );
         POP_TIMER( couComm, rankInCouComm )
         {
@@ -457,8 +454,6 @@ int main( int argc, char* argv[] )
         ierr       = iMOAB_ReceiveElementTag( cmpOcnPID, "Sa_dens:Sa_pbot", &ocnCouComm, &context_id );
         CHECKIERR( ierr, "cannot receive tag values from ocean mesh on coupler pes" )
     }
-
-    MPI_Barrier( MPI_COMM_WORLD );
 
     if( couComm != MPI_COMM_NULL )
     {

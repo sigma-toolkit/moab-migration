@@ -4024,15 +4024,22 @@ static ErrCode ComputeSphereRadius( iMOAB_AppID pid, double* radius )
 
 ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMOAB_AppID pid_intx )
 {
+    // Default constant parameters
+    constexpr bool validate          = true;
+    constexpr bool use_kdtree_search = true;
+    constexpr bool gnomonic          = false;
+    constexpr int nghostlayers       = 3;
+    constexpr double defaultradius   = 1.0;
+    constexpr double boxeps          = 1.e-3;
+
+    // Other constant parameters
+    const double epsrel = ReferenceTolerance;  // ReferenceTolerance is defined in Defines.h in tempestremap source ;
+    double radius_source       = 1.0;
+    double radius_target       = 1.0;
+
+    // Error code definitions
     ErrorCode rval;
     ErrCode ierr;
-    bool validate = true;
-
-    double radius_source = 1.0;
-    double radius_target = 1.0;
-    const double epsrel  = ReferenceTolerance;  // ReferenceTolerance is defined in Defines.h in tempestremap source ;
-    constexpr double boxeps = 1.e-6;
-    constexpr bool gnomonic = false;
 
     // Get the source and target data and pcomm objects
     appData& data_src  = context.appDatas[*pid_src];
@@ -4065,8 +4072,8 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     ierr = iMOAB_UpdateMeshInfo( pid_tgt );MB_CHK_ERR( ierr );
 
     // Rescale the radius of both to compute the intersection
-    ComputeSphereRadius( pid_src, &radius_source );
-    ComputeSphereRadius( pid_tgt, &radius_target );
+    rval = ComputeSphereRadius( pid_src, &radius_source );MB_CHK_ERR( rval );
+    rval = ComputeSphereRadius( pid_tgt, &radius_target );MB_CHK_ERR( rval );
 #ifdef VERBOSE
     if( is_root )
         outputFormatter.printf( 0, "Radius of spheres: source = %12.14f, and target = %12.14f\n", radius_source,
@@ -4075,7 +4082,6 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
 
     /* Let make sure that the radius match for source and target meshes. If not, rescale now and
      * unscale later. */
-    double defaultradius = 1.0;
     if( fabs( radius_source - radius_target ) > 1e-10 )
     { /* the radii are different */
         rval = IntxUtils::ScaleToRadius( context.MBI, data_src.file_set, defaultradius );MB_CHK_ERR( rval );
@@ -4090,40 +4096,33 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
 #endif
 
     // print verbosely about the problem setting
-    bool use_kdtree_search = false;
-    double srctgt_areas[2], srctgt_areas_glb[2];
+    rval = areaAdaptor.positive_orientation( context.MBI, data_src.file_set, defaultradius /*radius_source*/ );MB_CHK_ERR( rval );
+    rval = areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ );MB_CHK_ERR( rval );
+#ifdef VERBOSE
     {
         moab::Range rintxverts, rintxelems;
         rval = context.MBI->get_entities_by_dimension( data_src.file_set, 0, rintxverts );MB_CHK_ERR( rval );
         rval = context.MBI->get_entities_by_dimension( data_src.file_set, data_src.dimension, rintxelems );MB_CHK_ERR( rval );
         rval = IntxUtils::fix_degenerate_quads( context.MBI, data_src.file_set );MB_CHK_ERR( rval );
-        rval = areaAdaptor.positive_orientation( context.MBI, data_src.file_set, defaultradius /*radius_source*/ );MB_CHK_ERR( rval );
-        srctgt_areas[0] = areaAdaptor.area_on_sphere( context.MBI, data_src.file_set, defaultradius /*radius_source*/ );
-#ifdef VERBOSE
-        if( is_root )
-            outputFormatter.printf( 0, "The red set contains %d vertices and %d elements \n", rintxverts.size(),
-                                    rintxelems.size() );
-#endif
+
 
         moab::Range bintxverts, bintxelems;
         rval = context.MBI->get_entities_by_dimension( data_tgt.file_set, 0, bintxverts );MB_CHK_ERR( rval );
         rval = context.MBI->get_entities_by_dimension( data_tgt.file_set, data_tgt.dimension, bintxelems );MB_CHK_ERR( rval );
         rval = IntxUtils::fix_degenerate_quads( context.MBI, data_tgt.file_set );MB_CHK_ERR( rval );
-        rval = areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ );MB_CHK_ERR( rval );
-        srctgt_areas[1] = areaAdaptor.area_on_sphere( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ );
-#ifdef VERBOSE
+
         if( is_root )
-            outputFormatter.printf( 0, "The blue set contains %d vertices and %d elements \n", bintxverts.size(),
+        {
+            outputFormatter.printf( 0, "The source set contains %d vertices and %d elements \n", rintxverts.size(),
+                                    rintxelems.size() );
+            outputFormatter.printf( 0, "The target set contains %d vertices and %d elements \n", bintxverts.size(),
                                     bintxelems.size() );
-#endif
-#ifdef MOAB_HAVE_MPI
-        MPI_Allreduce( &srctgt_areas[0], &srctgt_areas_glb[0], 2, MPI_DOUBLE, MPI_SUM, pco_intx->comm() );
-#else
-        srctgt_areas_glb[0] = srctgt_areas[0];
-        srctgt_areas_glb[1] = srctgt_areas[1];
-#endif
-        use_kdtree_search = ( srctgt_areas_glb[0] < srctgt_areas_glb[1] );
+        }
+        // use_kdtree_search = ( srctgt_areas_glb[0] < srctgt_areas_glb[1] );
+        // advancing front method will fail unless source mesh has no holes (area = 4 * pi) on unit sphere
+        // use_kdtree_search = true;
     }
+#endif
 
     data_intx.dimension = data_tgt.dimension;
     // set the context for the source and destination applications
@@ -4147,53 +4146,44 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     // this one needs to be initialized too with source set
     tdata.remapper->GetMeshSet( moab::Remapper::SourceMeshWithGhosts ) = data_src.file_set;
 
+#ifdef MOAB_HAVE_MPI
+    if( is_parallel && nghostlayers )
+    {
+        moab::EntityHandle augmentedSourceSet;
+        // get order -1 ghost layers; actually it should be decided by the mesh
+        // if the mesh has holes, it could be more
+        rval = tdata.remapper->GhostLayers( data_src.file_set, nghostlayers, augmentedSourceSet );MB_CHK_ERR( rval );
+        // tdata.remapper->GetMeshSet( moab::Remapper::SourceMesh )  = augmentedSourceSet;
+        moab::Range dummy;
+        tdata.remapper->SetMeshSet( moab::Remapper::SourceMeshWithGhosts, augmentedSourceSet, dummy );
+    }
+#endif
+
     rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( rval );
     rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
 
     // First, compute the covering source set.
-    int order = 2;  // we will handle at least order 2, which should be good for bilinear too
-    // eventually, we should pass order as an input to this iMOAB_ComputeMeshIntersectionOnSphere
-    // repeat what we do in mbtempest case
-    int nlayers = 0;
-#ifdef MOAB_HAVE_MPI
-    if( is_parallel ) nlayers = order - 1;  // this should work if no holes and order not too high
-#endif
-    if( nlayers >= 1 )
-    {
-        moab::EntityHandle set_with_ghosts;
-        rval = tdata.remapper->GhostLayers( data_src.file_set, nlayers, set_with_ghosts );MB_CHK_ERR( rval );
-        moab::Range dummy;
-        tdata.remapper->SetMeshSet( moab::Remapper::SourceMeshWithGhosts, set_with_ghosts, dummy );
-    }
-
-    rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, order );MB_CHK_ERR( rval );
+    rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, nghostlayers );MB_CHK_ERR( rval );
 
     // Next, compute intersections with MOAB.
     // for bilinear, this is an overkill
-    rval = tdata.remapper->ComputeOverlapMesh( use_kdtree_search, false );MB_CHK_ERR( rval );
+    rval = tdata.remapper->ComputeOverlapMesh( use_kdtree_search, false, nghostlayers );MB_CHK_ERR( rval );
 
     // Mapping computation done
     if( validate )
     {
-        double local_area,
-            global_areas[3];  // Array for Initial area, and through Method 1 and Method 2
-        local_area = areaAdaptor.area_on_sphere( context.MBI, data_intx.file_set, radius_source );
-
-        global_areas[0] = srctgt_areas_glb[0];
-        global_areas[1] = srctgt_areas_glb[1];
-
+        double local_areas[3], global_areas[3];
+        local_areas[0] = areaAdaptor.area_on_sphere( context.MBI, data_src.file_set, defaultradius /*radius_source*/ );
+        local_areas[1] = areaAdaptor.area_on_sphere( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ );
+        local_areas[2] = areaAdaptor.area_on_sphere( context.MBI, data_intx.file_set, radius_source );
 #ifdef MOAB_HAVE_MPI
-        if( is_parallel )
-        {
-            MPI_Reduce( &local_area, &global_areas[2], 1, MPI_DOUBLE, MPI_SUM, 0, pco_intx->comm() );
-        }
-        else
-        {
-            global_areas[2] = local_area;
-        }
+        MPI_Reduce( &local_areas[0], &global_areas[0], 3, MPI_DOUBLE, MPI_SUM, 0, pco_intx->comm() );
 #else
-        global_areas[2] = local_area;
+        global_areas[0] = local_areas[0];
+        global_areas[1] = local_areas[1];
+        global_areas[2] = local_areas[2];
 #endif
+
         if( is_root )
         {
             outputFormatter.printf( 0,

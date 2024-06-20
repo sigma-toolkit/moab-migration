@@ -622,13 +622,17 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     std::vector< int > globIds( nelems );
     moab::Tag gid = m_interface->globalId_tag();
     rval          = m_interface->tag_get_data( gid, elems, &globIds[0] );MB_CHK_ERR( rval );
-    // initialize original index locations
-    std::vector< size_t > sortedIdx( nelems );
-    std::iota( sortedIdx.begin(), sortedIdx.end(), 0 );
-    // sort indexes based on comparing values in v, using std::stable_sort instead of std::sort
-    // to avoid unnecessary index re-orderings when v contains elements of equal values
-    std::sort( sortedIdx.begin(), sortedIdx.end(),
-               [&globIds]( size_t i1, size_t i2 ) { return globIds[i1] < globIds[i2]; } );
+    std::vector< size_t > sortedIdx;
+    if( offlineWorkflow )
+    {
+        sortedIdx.resize( nelems );
+        // initialize original index locations
+        std::iota( sortedIdx.begin(), sortedIdx.end(), 0 );
+        // sort indexes based on comparing values in v, using std::stable_sort instead of std::sort
+        // to avoid unnecessary index re-orderings when v contains elements of equal values
+        std::sort( sortedIdx.begin(), sortedIdx.end(),
+                   [&globIds]( size_t i1, size_t i2 ) { return globIds[i1] < globIds[i2]; } );
+    }
 
     for( unsigned iface = 0; iface < nelems; ++iface )
     {

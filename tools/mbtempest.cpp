@@ -524,9 +524,9 @@ int main( int argc, char* argv[] )
     moab::DebugOutput& outputFormatter = runCtx->outputFormatter;
 
 #ifdef MOAB_HAVE_MPI
-    moab::TempestRemapper remapper( mbCore, pcomm, true );
+    moab::TempestRemapper remapper( mbCore, pcomm );
 #else
-    moab::TempestRemapper remapper( mbCore, true );
+    moab::TempestRemapper remapper( mbCore );
 #endif
     remapper.meshValidate     = true;
     remapper.constructEdgeMap = true;

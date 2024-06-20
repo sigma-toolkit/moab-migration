@@ -981,6 +981,33 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
             gnplane[i] = pl;
         }
     }
+    else
+    {
+        // if not gnomonic, decide what is the longest local diagonal, which will be reduced to
+        // compute the maximum sag, which will be used to compute the maximum sag; box error might be increased
+        // because of that
+        double max_diagonal = 0;
+        IntxUtils::compute_longest_cell_diagonal( mb, initial_distributed_set, max_diagonal );
+        double max_sag = 1.0-std::sqrt(1.-max_diagonal*max_diagonal/4); // assume radius is 1. at this point; is it true or not ?
+        // a safety factor about 25%
+        max_sag = max_sag * 1.25;
+        // now find out maximum over all processes
+        // now reduce over all processors
+        double global_max_sag = 0;
+        int mpi_err =
+            MPI_Allreduce( &max_sag, &global_max_sag, 1, MPI_DOUBLE, MPI_MAX, parcomm->proc_config().proc_comm() );
+        if( MPI_SUCCESS != mpi_err ) return MB_FAILURE;
+        if (box_error < global_max_sag)
+        {
+            if (!my_rank)
+                std::cout << " initial box_error " << box_error << " increased: ";
+            box_error = global_max_sag;
+        }
+        if (!my_rank)
+            std::cout << " box_error used for 3d coverage:" <<  box_error << "  max_global_sag:" << global_max_sag << "\n";
+        box_error_estimated_coverage_3d = true; // so we do not recompute it during kdtree
+
+    }
 
     std::vector< int > gids( num_mesh_verts );
     rval = mb->tag_get_data( gid, mesh_verts, &gids[0] );MB_CHK_SET_ERR( rval, "can't get vertices gids" );

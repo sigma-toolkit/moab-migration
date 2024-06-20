@@ -252,6 +252,7 @@ class Intx2Mesh
 
     std::vector< double > allBoxes;
     double box_error;
+    bool box_error_estimated_coverage_3d;
     /* \brief Local root of the kdtree */
     EntityHandle localRoot;
     Range localEnts;  // this range is for local elements of interest, euler cells, or "first mesh"

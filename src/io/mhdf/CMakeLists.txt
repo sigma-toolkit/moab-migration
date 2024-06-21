@@ -22,6 +22,10 @@ if (NOT WIN32) # Need further work to prepare for windows
 
 add_executable( h5minfo include/mhdf.h example/info.c $<TARGET_OBJECTS:mhdf> )
 target_link_libraries( h5minfo ${HDF5_LIBRARIES} )
+if(SKBUILD)
+  # Set the install RPATH
+  set_target_properties(h5minfo PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+endif()
 install(
   TARGETS h5minfo
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -30,6 +34,10 @@ install(
   )
 
 add_executable( h5mvalidate example/validate.c $<TARGET_OBJECTS:mhdf> )
+if(SKBUILD)
+  # Set the install RPATH
+  set_target_properties(h5mvalidate PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+endif()
 install(
   TARGETS h5mvalidate
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

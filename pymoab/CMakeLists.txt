@@ -1,95 +1,52 @@
-SET( CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_LIST_DIR}/cmake )
+find_program(CYTHON "cython")
 
-find_package(PythonInterp 3.1 REQUIRED)
-#find_package(PythonDev 3.1 REQUIRED)
-
-if(MOAB_FORCE_32_BIT_HANDLES)
-  MESSAGE( SEND_ERROR "Cannot build pymoab with 32bit EntityHandles enabled. Please remove the --enable-32bit-handles configuration option or build without MOAB's python interface.")
-endif()
-
-if(NOT BUILD_SHARED_LIBS)
-  MESSAGE( SEND_ERROR "Cannot build static libraries and the python interface. Please build with shared libraries (-DBUILD_SHARED_LIBS=ON) or build without MOAB's python interface.")
-endif()
-
-mark_as_advanced(CLEAR PYTHON_EXECUTABLE parent_scope)
-
-# make sure that specific python modules are installed
-SET(NUMPY_MODULE_MISSING false)
-SET(SETUPTOOLS_MODULE_MISSING false)
-
-EXECUTE_PROCESS(COMMAND "${PYTHON_EXECUTABLE}" "-c" "import numpy" RESULT_VARIABLE NUMPY_MODULE_MISSING)
-if (NUMPY_MODULE_MISSING)
-  MESSAGE( SEND_ERROR "Python numpy module is missing.")
-endif()
-EXECUTE_PROCESS(COMMAND "${PYTHON_EXECUTABLE}" "-c" "import setuptools" RESULT_VARIABLE SETUPTOOLS_MODULE_MISSING)
-if (SETUPTOOLS_MODULE_MISSING)
-  MESSAGE( SEND_ERROR "Python setuptools module is missing.")
-endif()
-find_package(Cython)
-
+# Include the source and build directories
 include_directories(
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_BINARY_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/pymoab
-    ${CMAKE_CURRENT_BINARY_DIR}/pymoab
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR}
+    ${Python_NumPy_INCLUDE_DIRS}
 )
 
-# if all is well go ahead and build/install pymoab interface
-if (PYTHON_EXECUTABLE AND NOT NUMPY_MODULE_MISSING AND CYTHON_EXECUTABLE)
+# Get a list of all Cython files in the pymoab directory
+file(GLOB CYTHON_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.pyx")
 
-  ADD_SUBDIRECTORY(pymoab)
-  ADD_SUBDIRECTORY(tests)
+# Run a for loop to create a target for each Cython file
+foreach(CYTHON_FILE ${CYTHON_FILES})
+    # Extract the base filename (without extension)
+    get_filename_component(TARGET_NAME ${CYTHON_FILE} NAME_WE)
 
-  #assume a standard install location to start
-  SET(PYMOAB_RELATIVE_INSTALL "/python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}/site-packages/")
-  SET(PYMOAB_USER_INSTALL_LOCATION YES)
+    # Build C++ file
+    add_custom_command(
+        OUTPUT ${TARGET_NAME}.cxx
+        DEPENDS ${CYTHON_FILE}
+        VERBATIM
+        COMMAND "${CYTHON}" --cplus
+                -I ${CMAKE_SOURCE_DIR}/src
+                -I ${CMAKE_BINARY_DIR}/src
+                -I ${CMAKE_CURRENT_SOURCE_DIR}
+                -I ${CMAKE_CURRENT_BINARY_DIR}
+                -I ${Python_NumPy_INCLUDE_DIRS}
+                "${CMAKE_CURRENT_SOURCE_DIR}/${TARGET_NAME}.pyx" 
+                --output-file "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_NAME}.cxx"
+    )
 
-if(NOT PYMOAB_PREFIX)
-  if(NOT CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-    SET(PYMOAB_PREFIX "\${DESTDIR}/${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
-    #set custom install indicator to true
-    SET(PYMOAB_USER_INSTALL_LOCATION YES)
-  else()
-    # if no prefix is supplied, install to system location
-    SET(PYMOAB_PREFIX "\${DESTDIR}/usr/local/lib")
-    SET(PYMOAB_RELATIVE_INSTALL "/python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}/dist-packages/")
-    SET(PYMOAB_USER_INSTALL_LOCATION NO)
-  endif(NOT CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-endif(NOT PYMOAB_PREFIX)
+    # Creating a Python module
+    python_add_library(
+        ${TARGET_NAME} MODULE "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_NAME}.cxx"
+        WITH_SOABI
+    )
 
-set(PYMOAB_INSTALL_PREFIX "${PYMOAB_PREFIX}/${PYMOAB_RELATIVE_INSTALL}" CACHE FILEPATH "Location of PyMOAB installation" FORCE)
+    # Add the MOAB library as a dependency
+    add_dependencies(${TARGET_NAME} MOAB)
 
-if(PYMOAB_USER_INSTALL_LOCATION)
-      MESSAGE(WARNING "\
-The PyMOAB interface has been installed to a custom location. \
-In order to access this module from a python intpreter, please add \
-its install location to the PYTHONPATH environment variable: \
-PYTHONPATH=${PYMOAB_INSTALL_PREFIX}/:\$PYTHONPATH \
-")
-endif()
+    # Link the target with the MOAB library
+    target_link_libraries(${TARGET_NAME} PRIVATE MOAB)
 
-  # configure the setup script
-  SET(SETUP_PY_IN "${CMAKE_CURRENT_SOURCE_DIR}/setup.py.cmake.in")
-  SET(SETUP_PY    "${CMAKE_CURRENT_BINARY_DIR}/setup.py")
-  FILE(COPY "${CMAKE_CURRENT_SOURCE_DIR}/pyproject.toml" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
-  CONFIGURE_FILE(${SETUP_PY_IN} ${SETUP_PY})
+    # Set the install RPATH
+    set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH "${RPATH}/core/${CMAKE_INSTALL_LIBDIR}")
 
-  # setup dependencies of the build command
-  SET(DEPS   "${CMAKE_CURRENT_SOURCE_DIR}/pymoab/__init__.py")
-  SET(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/build")
-
-  # python setuptools build/install local version of pymoab for testing
-  # add test install path to PYTHONPATH for compatibility with newer versions of pip/setuptools
-  ADD_CUSTOM_TARGET(pymoab-local-install ALL
-    COMMAND export CFLAGS='-w' &&
-    PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}:${CMAKE_CURRENT_BINARY_DIR}/lib/${PYMOAB_RELATIVE_INSTALL}:${PYTHONPATH}
-               ${PYTHON_EXECUTABLE} -m pip install -e ${CMAKE_CURRENT_BINARY_DIR} --prefix ${CMAKE_CURRENT_BINARY_DIR}
-    DEPENDS ${DEPS} MOAB)
-
-  # move pymoab egg into the correct location for a --user setuptools install based on username
-  SET(INSTALL_SCRIPT_IN "${CMAKE_CURRENT_SOURCE_DIR}/install.sh.cmake")
-  SET(INSTALL_SCRIPT    "${CMAKE_CURRENT_BINARY_DIR}/install.sh")
-  CONFIGURE_FILE(${INSTALL_SCRIPT_IN} ${INSTALL_SCRIPT})
-  INSTALL(CODE "EXECUTE_PROCESS(COMMAND bash ${INSTALL_SCRIPT})")
-
-endif()
+    # Install the target in the pymoab directory
+    install(TARGETS ${TARGET_NAME} DESTINATION ../.)
+endforeach()

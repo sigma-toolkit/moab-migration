@@ -1,0 +1,76 @@
+[build-system]
+requires = [
+    "scikit-build-core",
+    "cython",
+    "numpy",
+]
+build-backend = "scikit_build_core.build"
+
+# Project Metadata
+[project]
+name = "MOAB"
+dynamic = ["version"]
+authors = [
+    { name = "Vijay Mahadevan", email = "vijay.m@gmail.com" },
+    { name = "Iulian Grindeanu", email = "iulian.grindeanu@gmail.com" },
+    { name = "Rajeev Jain", email = "rajeeja@gmail.com" },
+    { name = "Patrick Shriwise", email = "pshriwise@gmail.com" },
+    { name = "Paul Wilson", email = "paul.wilson@wisc.edu" },
+    { name = "Guilherme Caminha", email = "gpkc@cin.ufpe.br" },
+    { name = "Anthony Scopatz", email = "scopatz@gmail.com" },
+    { name = "Ahnaf Chowdhury", email = "tahmid@nukehub.org" },
+]
+maintainers = [{ name = "SIGMA Team", email = "moab-dev@mcs.anl.gov" }]
+license = { file = "LICENSE" }
+description = "MOAB: Mesh-Oriented datABase"
+readme = "README.md"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: LGPLv3 License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+requires-python = ">=3.8"
+dependencies = ["numpy"]
+
+# Optional Dependencies
+[project.optional-dependencies]
+test = ["pytest"]
+
+# Project URLs
+[project.urls]
+"Homepage" = "https://sigma.mcs.anl.gov"
+"Documentation" = "https://web.cels.anl.gov/projects/sigma/docs/moab/index.html"
+"Bug Tracker" = "https://bitbucket.org/fathomteam/moab/issues"
+"Source Code" = "https://bitbucket.org/fathomteam/moab/"
+
+# Scikit-Build Configuration
+[tool.scikit-build]
+cmake.verbose = true
+logging.level = "INFO"
+wheel.install-dir = "pymoab/core"
+wheel.packages = ["pymoab"]
+wheel.exclude = ["CMakeLists.txt", "Makefile.am", "*.pyx"]
+
+# Get version from CMakeLists
+[tool.scikit-build.metadata.version]
+provider = "scikit_build_core.metadata.regex"
+input = "CMakeLists.txt"
+regex = 'SET\(PACKAGE_VERSION "(?P<value>[0-9.]+)"\)'
+
+# Add the version to the package
+[[tool.scikit-build.generate]]
+path = "pymoab/_version.py"
+template = '''
+version = "${version}"
+'''

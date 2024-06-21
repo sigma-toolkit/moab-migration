@@ -249,6 +249,27 @@ if HAVE_TEMPESTREMAP
 endif
 endif
 
+if ENABLE_pymoab
+
+test_files = test_core.py \
+             test_hom.py \
+             test_range.py \
+             test_scd.py \
+             test_skinner.py \
+             test_tag.py \
+             test_topo_util.py
+
+check-local:
+	cd $(builddir)/pymoab; \
+	for i in $(test_files); \
+	do \
+		(@SLIBENVPATH@=$(top_builddir)/src/.libs/:$(@SLIBENVPATH@) $(PYTHON) $$i) || exit 1; \
+	done
+
+PYCLEANFILES = $(builddir)/pymoab/quads_test.vtk $(builddir)/pymoab/outfile.h5m $(builddir)/pymoab/write_tag_test.h5m
+
+endif
+
 FCDEFS += $(FC_DEFINE)SRCDIR=$(srcdir) \
           $(FC_DEFINE)MESHDIR=$(MESHDIR)
 
@@ -269,7 +290,7 @@ LTPPF77COMPILE = $(LIBTOOL) $(AM_V_lt) --tag=F77 $(AM_LIBTOOLFLAGS) \
 
 CMAKELISTS_FILES = CMakeLists.txt dual/CMakeLists.txt h5file/CMakeLists.txt io/CMakeLists.txt obb/CMakeLists.txt perf/CMakeLists.txt perf/point_location/CMakeLists.txt
 
-EXTRA_DIST = TestUtil.hpp TestRunner.hpp $(CMAKELISTS_FILES)
+EXTRA_DIST = TestUtil.hpp TestRunner.hpp $(CMAKELISTS_FILES) $(PYMOAB_DIST)
 
 mb_big_test.g: $(MESHDIR)/mb_big_test.g.gz
 	$(AM_V_GEN)$(ZCAT) $< > $@
@@ -294,9 +315,11 @@ CLEANFILES = mb_big_test.g \
              fIntxLndTarget.h5m \
              fIntxAtmTarget.h5m \
              fIntxOcnTarget.h5m \
-             atm_ocn_map.nc fOcnOnCpl.h5m fOcnOnCpl2.h5m
+             atm_ocn_map.nc fOcnOnCpl.h5m fOcnOnCpl2.h5m \
+             $(PYCLEANFILES)
+
 DISTCLEANFILES = a.out
 
 # Utility target: build but don't run tests
 build-check:
-	$(MAKE) 'TESTS_ENVIRONMENT=: ' check
+	$(MAKE) 'TESTS_ENVIRONMENT=: ' check 

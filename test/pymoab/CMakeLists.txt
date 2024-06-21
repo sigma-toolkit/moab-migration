@@ -1,5 +1,3 @@
-
-
 # create symlinks for all fiels in directory
 FILE(GLOB PYMOAB_TEST_FILES ${CMAKE_CURRENT_SOURCE_DIR} "*")
 IF(NOT ${CMAKE_SOURCE_DIR} MATCHES ${CMAKE_BINARY_DIR})

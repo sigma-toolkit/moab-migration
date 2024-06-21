@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import glob
 import os
 import sys
@@ -8,13 +7,11 @@ import numpy as np  # needed for numpy include paths
 import Cython
 from setuptools import setup, Extension, find_packages
 from Cython.Distutils import build_ext
-
 # make sure cython isn't too old
 if version.parse(Cython.__version__) < version.parse("0.26"):
     sys.exit(
         "Cython version is old. Upgrade to Cython 0.29 using pip install cython==0.29 [--user]"
     )
-
 # setup moab include paths
 moab_root = "${CMAKE_SOURCE_DIR}"
 moab_source_include = moab_root + "/src/moab/"
@@ -29,16 +26,13 @@ include_paths = [
     np.get_include(),
     pymoab_src_dir,
 ]
-
 os.environ["CC"] = "${CMAKE_C_COMPILER}"
 os.environ["CXX"] = "${CMAKE_CXX_COMPILER}"
-
 if "--preinstall" in sys.argv:
     moab_rpath = "\${DESTDIR}/${CMAKE_INSTALL_PREFIX}/lib"
     sys.argv.remove("--preinstall")
 else:
     moab_rpath = moab_lib_path
-
 # set values for each module
 ext_modules = []
 for f in os.listdir(pymoab_src_dir):
@@ -62,7 +56,6 @@ for f in os.listdir(pymoab_src_dir):
             ],
         )
         ext_modules.append(ext)
-
 # setup pymoab
 setup(
     name="pymoab",

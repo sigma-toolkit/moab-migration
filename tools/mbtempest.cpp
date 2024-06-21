@@ -389,7 +389,7 @@ struct ToolContext
             // For global meshes, this default should work out of the box.
             if( !fvMethod.compare( "bilin" ) ) nlayers = 3;
             else
-                nlayers = ( mapOptions.nPin > 1 ? mapOptions.nPin + 1 : 1 );
+                nlayers = ( mapOptions.nPin > 1 ? mapOptions.nPin + 1 : 0 );
             if ( nlayer_input )
               nlayers = std::max( nlayer_input, nlayers );
         }

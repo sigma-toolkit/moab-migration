@@ -112,7 +112,7 @@ moab::ErrorCode moab::TempestOnlineMap::LinearRemapNN_MOAB( bool use_GID_matchin
     {
         /* Create a Kd-tree to perform local queries to find nearest neighbors */
 
-        return moab::MB_SUCCESS;
+        return moab::MB_FAILURE;
     }
 }
 
@@ -311,12 +311,6 @@ void moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3()
 #define VERBOSE_ACTIVATED
 // #define VERBOSE
 #endif
-    if( m_nTotDofs_Dest <= 0 || m_nTotDofs_SrcCov <= 0 )
-    {
-        // std::cout << rank << ": rowsize = " <<  m_nTotDofs_Dest << ", colsize = " <<
-        // m_nTotDofs_SrcCov << "\n";
-        // return;  // No need to allocate if either rows or cols size are zero
-    }
 
     /* Should the columns be the global size of the matrix ? */
     m_weightMatrix.resize( m_nTotDofs_Dest, m_nTotDofs_SrcCov );
@@ -345,7 +339,6 @@ void moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3()
     {
         tripletList.push_back( Triplet( lrows[iv], lcols[iv], lvals[iv] ) );
     }
-
     m_weightMatrix.setFromTriplets( tripletList.begin(), tripletList.end() );
     m_weightMatrix.makeCompressed();
 

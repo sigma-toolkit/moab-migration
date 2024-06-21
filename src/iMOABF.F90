@@ -439,6 +439,12 @@ module iMOAB
         integer(c_int), intent(in) :: direction
       end function iMOAB_MigrateMapMesh
 
+      integer(c_int) function iMOAB_SetGhostLayers(pid, num_layers) bind(C, name='iMOAB_SetGhostLayers')
+        use, intrinsic :: iso_c_binding, only: c_int
+        integer(c_int), intent(in) :: pid
+        integer(c_int), intent(in) :: num_layers
+      end function iMOAB_SetGhostLayers
+
 ! closing endif: MOAB_HAVE_MPI
 #endif
 

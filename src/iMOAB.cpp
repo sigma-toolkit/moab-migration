@@ -78,6 +78,7 @@ struct appData
                                // reading or from reduce
     long num_global_vertices;  // reunion of all nodes, after sharing is resolved; it could be
                                // determined from hdf5 reading
+    int num_ghost_layers;  // number of ghost layers
     Range mat_sets;
     std::map< int, int > matIndex;  // map from global block id to index in mat_sets
     Range neu_sets;
@@ -274,6 +275,7 @@ ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
     app_data.tempestData.remapper = NULL;  // Only allocate as needed
 #endif
 
+    app_data.num_ghost_layers = 0;
     app_data.point_cloud = false;
     app_data.is_fortran  = false;
 
@@ -609,6 +611,7 @@ ErrCode iMOAB_LoadMesh( iMOAB_AppID pid,
 {
     IMOAB_CHECKPOINTER( filename, 2 );
     IMOAB_ASSERT( strlen( filename ), "Invalid filename length." );
+    IMOAB_CHECKPOINTER( num_ghost_layers, 4 );
 
     // make sure we use the file set and pcomm associated with the *pid
     std::ostringstream newopts;
@@ -685,6 +688,9 @@ ErrCode iMOAB_LoadMesh( iMOAB_AppID pid,
     // write in serial the file, to see what tags are missing
     rval = context.MBI->write_file( outfile.str().c_str() );MB_CHK_ERR( rval );  // everything on current task, written in serial
 #endif
+
+    // Update ghost layer information
+    context.appDatas[*pid].num_ghost_layers = *num_ghost_layers;
 
     // Update mesh information
     return iMOAB_UpdateMeshInfo( pid );
@@ -2379,7 +2385,7 @@ ErrCode iMOAB_DetermineGhostEntities( iMOAB_AppID pid, int* ghost_dim, int* num_
     ErrorCode rval;
 
     // verify we have valid ghost layers input specified. If invalid, exit quick.
-    if( *num_ghost_layers <= 0 )
+    if( num_ghost_layers && *num_ghost_layers <= 0 )
     {
         return moab::MB_SUCCESS;
     }  // nothing to do
@@ -2387,10 +2393,19 @@ ErrCode iMOAB_DetermineGhostEntities( iMOAB_AppID pid, int* ghost_dim, int* num_
     appData& data     = context.appDatas[*pid];
     ParallelComm* pco = context.pcomms[*pid];
 
-    int addl_ents =
-        0;  // maybe we should be passing this too; most of the time we do not need additional ents collective call
-    rval =
-        pco->exchange_ghost_cells( *ghost_dim, *bridge_dim, *num_ghost_layers, addl_ents, true, true, &data.file_set );MB_CHK_ERR( rval );
+    // maybe we should be passing this too; most of the time we do not need additional ents collective call
+    constexpr int addl_ents = 0;
+    rval = pco->exchange_ghost_cells( *ghost_dim, *bridge_dim, 1,  // get only one layer of ghost entities
+                                      addl_ents, true, true, &data.file_set );MB_CHK_ERR( rval );
+    for( int i = 2; i <= *num_ghost_layers; i++ )
+    {
+        rval = pco->correct_thin_ghost_layers();MB_CHK_ERR( rval );  // correct for thin layers
+        rval = pco->exchange_ghost_cells( *ghost_dim, *bridge_dim, i,  // iteratively get one extra layer
+                                          addl_ents, true, true, &data.file_set );MB_CHK_ERR( rval );
+    }
+
+    // Update ghost layer information
+    data.num_ghost_layers = *num_ghost_layers;
 
     // now re-establish all mesh info; will reconstruct mesh info, based solely on what is in the file set
     return iMOAB_UpdateMeshInfo( pid );
@@ -3575,14 +3590,14 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
         if( row_based_partition )
         {
             tdata.pid_dest = pid_cpl;
-            tdata.remapper->SetMeshSet( Remapper::TargetMesh, fset1, ents_of_interest );
+            tdata.remapper->SetMeshSet( Remapper::TargetMesh, fset1, &ents_of_interest );
             weightMap->SetDestinationNDofsPerElement( ndofPerEl );
             weightMap->set_row_dc_dofs( dofValues );  // will set row_dtoc_dofmap
         }
         else
         {
             tdata.pid_src = pid_cpl;
-            tdata.remapper->SetMeshSet( Remapper::SourceMesh, fset1, ents_of_interest );
+            tdata.remapper->SetMeshSet( Remapper::SourceMesh, fset1, &ents_of_interest );
             weightMap->SetSourceNDofsPerElement( ndofPerEl );
             weightMap->set_col_dc_dofs( dofValues );  // will set col_dtoc_dofmap
         }
@@ -3983,7 +3998,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         if( 1 == *direction )
         {
             tdata.pid_src = pid3;
-            tdata.remapper->SetMeshSet( Remapper::CoveringMesh, fset3, primary_ents3 );
+            tdata.remapper->SetMeshSet( Remapper::CoveringMesh, fset3, &primary_ents3 );
             weightMap->SetSourceNDofsPerElement( ndofPerEl );
             weightMap->set_col_dc_dofs( values_entities );  // will set col_dtoc_dofmap
         }
@@ -3991,7 +4006,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         else
         {
             tdata.pid_dest = pid3;
-            tdata.remapper->SetMeshSet( Remapper::TargetMesh, fset3, primary_ents3 );
+            tdata.remapper->SetMeshSet( Remapper::TargetMesh, fset3, &primary_ents3 );
             weightMap->SetDestinationNDofsPerElement( ndofPerEl );
             weightMap->set_row_dc_dofs( values_entities );  // will set row_dtoc_dofmap
         }
@@ -4022,15 +4037,25 @@ static ErrCode ComputeSphereRadius( iMOAB_AppID pid, double* radius )
     return moab::MB_SUCCESS;
 }
 
+ErrCode iMOAB_SetGhostLayers( iMOAB_AppID pid, int* nghost_layers )
+{
+    appData& data = context.appDatas[*pid];
+
+    // Set the number of ghost layers
+    data.num_ghost_layers = *nghost_layers;  // number of ghost layers
+
+    return moab::MB_SUCCESS;
+}
+
 ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMOAB_AppID pid_intx )
 {
     // Default constant parameters
     constexpr bool validate          = true;
+    constexpr bool enforceConvexity  = true;
     constexpr bool use_kdtree_search = true;
-    constexpr bool gnomonic          = false;
-    constexpr int nghostlayers       = 3;
+    constexpr bool gnomonic          = true;
     constexpr double defaultradius   = 1.0;
-    constexpr double boxeps          = 1.e-3;
+    constexpr double boxeps          = 1.e-10;
 
     // Other constant parameters
     const double epsrel = ReferenceTolerance;  // ReferenceTolerance is defined in Defines.h in tempestremap source ;
@@ -4104,12 +4129,21 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
         rval = context.MBI->get_entities_by_dimension( data_src.file_set, 0, rintxverts );MB_CHK_ERR( rval );
         rval = context.MBI->get_entities_by_dimension( data_src.file_set, data_src.dimension, rintxelems );MB_CHK_ERR( rval );
         rval = IntxUtils::fix_degenerate_quads( context.MBI, data_src.file_set );MB_CHK_ERR( rval );
-
+        if( enforceConvexity )
+        {
+            rval = moab::IntxUtils::enforce_convexity( context.MBI, data_src.file_set, rank );MB_CHK_ERR( rval );
+        }
+        rval = areaAdaptor.positive_orientation( context.MBI, data_src.file_set, defaultradius );MB_CHK_ERR( rval );
 
         moab::Range bintxverts, bintxelems;
         rval = context.MBI->get_entities_by_dimension( data_tgt.file_set, 0, bintxverts );MB_CHK_ERR( rval );
         rval = context.MBI->get_entities_by_dimension( data_tgt.file_set, data_tgt.dimension, bintxelems );MB_CHK_ERR( rval );
         rval = IntxUtils::fix_degenerate_quads( context.MBI, data_tgt.file_set );MB_CHK_ERR( rval );
+        if( enforceConvexity )
+        {
+            rval = moab::IntxUtils::enforce_convexity( context.MBI, data_tgt.file_set, rank );MB_CHK_ERR( rval );
+        }
+        rval = areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, defaultradius );MB_CHK_ERR( rval );
 
         if( is_root )
         {
@@ -4135,7 +4169,7 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
 #else
     tdata.remapper = new moab::TempestRemapper( context.MBI );
 #endif
-    tdata.remapper->meshValidate     = true;
+    tdata.remapper->meshValidate     = validate;
     tdata.remapper->constructEdgeMap = true;
 
     // Do not create new filesets; Use the sets from our respective applications
@@ -4143,31 +4177,58 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     tdata.remapper->GetMeshSet( moab::Remapper::SourceMesh )  = data_src.file_set;
     tdata.remapper->GetMeshSet( moab::Remapper::TargetMesh )  = data_tgt.file_set;
     tdata.remapper->GetMeshSet( moab::Remapper::OverlapMesh ) = data_intx.file_set;
-    // this one needs to be initialized too with source set
-    tdata.remapper->GetMeshSet( moab::Remapper::SourceMeshWithGhosts ) = data_src.file_set;
 
 #ifdef MOAB_HAVE_MPI
-    if( is_parallel && nghostlayers )
+    if( is_parallel && data_src.num_ghost_layers )
     {
+        if( is_root )
+            outputFormatter.printf( 0, "Generating %d ghost layers for the source mesh\n", data_src.num_ghost_layers );
         moab::EntityHandle augmentedSourceSet;
         // get order -1 ghost layers; actually it should be decided by the mesh
         // if the mesh has holes, it could be more
-        rval = tdata.remapper->GhostLayers( data_src.file_set, nghostlayers, augmentedSourceSet );MB_CHK_ERR( rval );
-        // tdata.remapper->GetMeshSet( moab::Remapper::SourceMesh )  = augmentedSourceSet;
-        moab::Range dummy;
-        tdata.remapper->SetMeshSet( moab::Remapper::SourceMeshWithGhosts, augmentedSourceSet, dummy );
+        rval = tdata.remapper->GhostLayers( data_src.file_set, data_src.num_ghost_layers, augmentedSourceSet );MB_CHK_ERR( rval );
+        tdata.remapper->SetMeshSet( moab::Remapper::SourceMeshWithGhosts, augmentedSourceSet );
     }
+    else
+    {
+        // this one needs to be initialized too with source set
+        tdata.remapper->GetMeshSet( moab::Remapper::SourceMeshWithGhosts ) = data_src.file_set;
+    }
+#else
+    // this one needs to be initialized too with source set
+    tdata.remapper->GetMeshSet( moab::Remapper::SourceMeshWithGhosts ) = data_src.file_set;
+#endif
+
+#ifdef MOAB_HAVE_MPI
+    if( is_parallel && data_tgt.num_ghost_layers )
+    {
+        if( is_root )
+            outputFormatter.printf( 0, "Generating %d ghost layers for the target mesh\n", data_src.num_ghost_layers );
+        moab::EntityHandle augmentedTargetSet;
+        // get order -1 ghost layers; actually it should be decided by the mesh
+        // if the mesh has holes, it could be more
+        rval = tdata.remapper->GhostLayers( data_tgt.file_set, data_tgt.num_ghost_layers, augmentedTargetSet );MB_CHK_ERR( rval );
+        tdata.remapper->SetMeshSet( moab::Remapper::TargetMeshWithGhosts, augmentedTargetSet );
+    }
+    else
+    {
+        // this one needs to be initialized too with source set
+        tdata.remapper->GetMeshSet( moab::Remapper::TargetMeshWithGhosts ) = data_tgt.file_set;
+    }
+#else
+    // this one needs to be initialized too with source set
+    tdata.remapper->GetMeshSet( moab::Remapper::SourceMeshWithGhosts ) = data_tgt.file_set;
 #endif
 
     rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( rval );
     rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
 
     // First, compute the covering source set.
-    rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, nghostlayers );MB_CHK_ERR( rval );
+    rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, data_src.num_ghost_layers );MB_CHK_ERR( rval );
 
     // Next, compute intersections with MOAB.
     // for bilinear, this is an overkill
-    rval = tdata.remapper->ComputeOverlapMesh( use_kdtree_search, false, nghostlayers );MB_CHK_ERR( rval );
+    rval = tdata.remapper->ComputeOverlapMesh( use_kdtree_search, false, data_src.num_ghost_layers );MB_CHK_ERR( rval );
 
     // Mapping computation done
     if( validate )
@@ -4382,7 +4443,8 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
     mapOptions.fNoBubble       = ( fNoBubble ? *fNoBubble : false );
     mapOptions.fNoConservation = ( fNoConservation ? *fNoConservation > 0 : false );
     mapOptions.fNoCorrectAreas = false;
-    mapOptions.fNoCheck        = !( fValidate ? *fValidate : true );
+    // mapOptions.fNoCheck        = !( fValidate ? *fValidate : true );
+    mapOptions.fNoCheck        = true;
     if( fVolumetric && *fVolumetric ) mapOptions.strMethod += "volumetric;";
     if( fInverseDistanceMap && *fInverseDistanceMap ) mapOptions.strMethod += "invdist;";
 
@@ -4403,6 +4465,19 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
         std::string( source_solution_tag_dof_name ),  // const std::string& srcDofTagName = "GLOBAL_ID"
         std::string( target_solution_tag_dof_name )   // const std::string& tgtDofTagName = "GLOBAL_ID"
     );MB_CHK_ERR( rval );
+
+    // print some map statistics
+    weightMap->PrintMapStatistics();
+
+    if( fValidate && *fValidate )
+    {
+        const double dNormalTolerance = 1.0E-8;
+        const double dStrictTolerance = 1.0E-12;
+        double dTotalOverlapArea = 0.0;
+        weightMap->CheckMap( true, true, ( fMonotoneTypeID && *fMonotoneTypeID ), dNormalTolerance, dStrictTolerance,
+                             dTotalOverlapArea );
+        assert( dTotalOverlapArea > 0.0 );
+    }
 
     return moab::MB_SUCCESS;
 }

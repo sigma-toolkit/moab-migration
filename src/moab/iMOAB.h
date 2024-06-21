@@ -1056,6 +1056,15 @@ ErrCode iMOAB_DumpCommGraph( iMOAB_AppID pid, int* context_id, int* is_sender, c
  */
 ErrCode iMOAB_MergeVertices( iMOAB_AppID pid );
 
+/**
+ * @brief Set the number of ghost layers for the mesh.
+ *
+ * @param[in] pid (iMOAB_AppID) The unique pointer to the application ID.
+ * @param[in] nghost_layers (int*) The number of ghost layers to set.
+ * @return ErrCode The error code indicating success or failure.
+ */
+ErrCode iMOAB_SetGhostLayers( iMOAB_AppID pid, int* nghost_layers );
+
 #endif /* #ifdef MOAB_HAVE_MPI */
 
 #ifdef MOAB_HAVE_TEMPESTREMAP

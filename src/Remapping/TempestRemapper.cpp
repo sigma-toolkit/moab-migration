@@ -1429,15 +1429,15 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
 #ifdef MOAB_HAVE_MPI
         if( is_parallel || rrmgrids )
         {
-#ifdef VERBOSE
+//#ifdef VERBOSE
             std::stringstream ffc, fft, ffo;
-            ffc << "cover_" << rank << ".h5m";
-            fft << "target_" << rank << ".h5m";
-            ffo << "intx_" << rank << ".h5m";
+            ffc << "cover_" << size << "_" << rank << ".h5m";
+            fft << "target_" << size << "_" << rank << ".h5m";
+            ffo << "intx_" << size << "_" << rank << ".h5m";
             rval = m_interface->write_mesh( ffc.str().c_str(), &m_covering_source_set, 1 );MB_CHK_ERR( rval );
             rval = m_interface->write_mesh( fft.str().c_str(), &m_target_set, 1 );MB_CHK_ERR( rval );
             rval = m_interface->write_mesh( ffo.str().c_str(), &m_overlap_set, 1 );MB_CHK_ERR( rval );
-#endif
+//#endif
             // because we do not want to work with elements in coverage set that do not participate
             // in intersection, remove them from the coverage set we will not delete them yet, just
             // remove from the set !

@@ -39,7 +39,7 @@ using namespace moab;
 #endif
 
 #define ENABLE_ATMOCN_COUPLING
-#define ENABLE_ATMLND_COUPLING
+//#define ENABLE_ATMLND_COUPLING
 
 #if( !defined( ENABLE_ATMOCN_COUPLING ) && !defined( ENABLE_ATMLND_COUPLING ) )
 #error Enable either OCN (ENABLE_ATMOCN_COUPLING) and/or LND (ENABLE_ATMLND_COUPLING) for coupling
@@ -148,6 +148,7 @@ int main( int argc, char* argv[] )
         std::cout << " atm file: " << atmFilename << "\n   on tasks : " << startG1 << ":" << endG1 <<
 #ifdef ENABLE_ATMOCN_COUPLING
             "\n ocn file: " << ocnFilename << "\n     on tasks : " << startG2 << ":" << endG2 <<
+			" baseline atm-ocn: " << baseline << "\n" <<
 #endif
 #ifdef ENABLE_ATMLND_COUPLING
             "\n lnd file: " << lndFilename << "\n     on tasks : " << startG3 << ":" << endG3 <<
@@ -326,14 +327,14 @@ int main( int argc, char* argv[] )
 
     MPI_Barrier( MPI_COMM_WORLD );
 
-#ifdef VERBOSE
-    if( couComm != MPI_COMM_NULL && 1 == n )
-    {  // write only for n==1 case
-        char outputFileTgt3[] = "recvOcn.h5m";
+
+    if( couComm != MPI_COMM_NULL )
+    {
+        char outputFileTgt3[] = "recvOcn_ic.h5m";
         ierr                  = iMOAB_WriteMesh( cplOcnPID, outputFileTgt3, fileWriteOptions );
         CHECKIERR( ierr, "cannot write ocn mesh after receiving" )
     }
-#endif
+
 #endif  // #ifdef ENABLE_ATMOCN_COUPLING
 
 #ifdef ENABLE_ATMLND_COUPLING
@@ -470,7 +471,9 @@ int main( int argc, char* argv[] )
         // Let us now write the map file to disk and then read it back to test the I/O API in iMOAB
 #ifdef MOAB_HAVE_NETCDF
         {
-            const std::string atmocn_map_file_name = "atm_ocn_map.nc";
+            std::stringstream outf;
+            outf << "atm_ocn_map_p" << endG4 - startG4 +1 << ".nc"; // these are number of tasks of the coupler
+            const std::string atmocn_map_file_name = outf.str();
             ierr = iMOAB_WriteMappingWeightsToFile( cplAtmOcnPID, weights_identifiers[0].c_str(),
                                                     atmocn_map_file_name.c_str() );
             CHECKIERR( ierr, "failed to write map file to disk" );
@@ -636,6 +639,36 @@ int main( int argc, char* argv[] )
                 ierr                 = iMOAB_WriteMesh( cplOcnPID, outputFileTgt, fileWriteOptions );
                 CHECKIERR( ierr, "could not write fOcnOnCpl.h5m to disk" )
             }
+            // check baseline on coupler directly
+            // do not wait until we send back to component
+            if( !no_regression_test )
+			{
+				// the same as remap test
+				// get temp field on ocean, from conservative, the global ids, and dump to the baseline file
+				// first get GlobalIds from cpl ocn, and fields:
+				int nverts[3], nelem[3];
+				ierr = iMOAB_GetMeshInfo( cplOcnPID, nverts, nelem, 0, 0, 0 );
+				CHECKIERR( ierr, "failed to get ocn mesh info" );
+				std::vector< int > gidElems;
+				gidElems.resize( nelem[2] );
+				std::vector< double > tempElems;
+				tempElems.resize( nelem[2] );
+				// get global id storage
+				const std::string GidStr = "GLOBAL_ID";  // hard coded too
+				int tag_type = DENSE_INTEGER, ncomp = 1, tagInd = 0;
+				ierr = iMOAB_DefineTagStorage( cplOcnPID, GidStr.c_str(), &tag_type, &ncomp, &tagInd );
+				CHECKIERR( ierr, "failed to define global id tag" );
+
+				int ent_type = 1;
+				ierr         = iMOAB_GetIntTagStorage( cplOcnPID, GidStr.c_str(), &nelem[2], &ent_type, &gidElems[0] );
+				CHECKIERR( ierr, "failed to get global ids" );
+				ierr = iMOAB_GetDoubleTagStorage( cplOcnPID, "a2oTbot_proj", &nelem[2], &ent_type, &tempElems[0] );
+				CHECKIERR( ierr, "failed to get temperature field" );
+				int err_code = 1;
+				check_baseline_file( baseline, gidElems, tempElems, 1.e-9, err_code );
+				if( 0 == err_code )
+					std::cout << " passed baseline test atm2ocn on coupler task for ocn " << rankInCouComm << "\n";
+			}
         }
 
         // send the projected tag back to ocean pes, with send/receive tag

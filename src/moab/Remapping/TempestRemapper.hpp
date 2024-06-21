@@ -137,7 +137,7 @@ class TempestRemapper : public Remapper
 
     void SetMeshSet( Remapper::IntersectionContext ctx /* Remapper::CoveringMesh*/,
                      moab::EntityHandle mset,
-                     moab::Range& entities );
+                     moab::Range* entities = nullptr );
     /// <summary>
     ///     Get the covering mesh (TempestRemap) object.
     /// </summary>
@@ -335,8 +335,10 @@ class TempestRemapper : public Remapper
 
     IntxAreaUtils::AreaMethod m_area_method;
 
-    // this is a deep copy of the original source set, plus some ghosts
-    moab::EntityHandle m_source_set_with_ghosts;  // created for parallel cases
+    // this is a copy of the original source/target set,
+    // with some ghosts created for parallel cases
+    moab::EntityHandle m_source_set_with_ghosts;  // source+ghost
+    moab::EntityHandle m_target_set_with_ghosts;  // target+ghost
 
     bool rrmgrids;
     bool is_parallel, is_root;
@@ -433,6 +435,8 @@ inline moab::EntityHandle& TempestRemapper::GetMeshSet( Remapper::IntersectionCo
             return m_covering_source_set;
         case Remapper::SourceMeshWithGhosts:
             return m_source_set_with_ghosts;
+        case Remapper::TargetMeshWithGhosts:
+            return m_target_set_with_ghosts;
         case Remapper::DEFAULT:
         default:
             MB_SET_ERR_RET_VAL( "Invalid context passed to GetMeshSet", m_overlap_set );
@@ -453,6 +457,8 @@ inline moab::EntityHandle TempestRemapper::GetMeshSet( Remapper::IntersectionCon
             return m_covering_source_set;
         case Remapper::SourceMeshWithGhosts:
             return m_source_set_with_ghosts;
+        case Remapper::TargetMeshWithGhosts:
+            return m_target_set_with_ghosts;
         case Remapper::DEFAULT:
         default:
             MB_SET_ERR_RET_VAL( "Invalid context passed to GetMeshSet", m_overlap_set );

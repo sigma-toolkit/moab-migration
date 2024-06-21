@@ -912,13 +912,6 @@ int main( int argc, char* argv[] )
                 // Write the map file to disk in parallel using either HDF5 or SCRIP interface
                 // in extra case; maybe need a better solution, just create it with the right meshset
                 // from the beginning;
-                //if( runCtx->nlayers && nprocs > 1 )
-                //{
-                //    remapper.ResetMeshSet( moab::Remapper::SourceMesh, runCtx->meshsets[3] );
-                //    runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );  //  ?
-                //    weightMap->SetMeshInput( runCtx->meshes[0] );
-                //}
-
                 if( !runCtx->skip_io )
                 {
                     rval = weightMap->WriteParallelMap( runCtx->outFilename.c_str(), attrMap );MB_CHK_ERR( rval );
@@ -1131,8 +1124,7 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
 
             moab::EntityHandle set_with_ghosts;
             rval = remapper.GhostLayers( ctx.meshsets[0], ctx.nlayers, set_with_ghosts );MB_CHK_ERR( rval );
-            moab::Range dummy;
-            remapper.SetMeshSet( moab::Remapper::SourceMeshWithGhosts, set_with_ghosts, dummy );
+            remapper.SetMeshSet( moab::Remapper::SourceMeshWithGhosts, set_with_ghosts );
 #ifdef MOAB_DBG
             if( !runCtx->skip_io )
             {

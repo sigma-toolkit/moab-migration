@@ -984,36 +984,42 @@ moab::ErrorCode moab::TempestRemapper::WriteTempestIntersectionMesh( std::string
 
     return moab::MB_SUCCESS;
 }
+
 void TempestRemapper::SetMeshSet( Remapper::IntersectionContext ctx /* Remapper::CoveringMesh*/,
                                   moab::EntityHandle mset,
-                                  moab::Range& entities )
+                                  moab::Range* entities )
 {
 
     if( ctx == Remapper::SourceMesh )  // should not be used
     {
-        m_source_entities = entities;
         m_source_set      = mset;
+        if( entities ) m_source_entities = *entities;
     }
     else if( ctx == Remapper::TargetMesh )
     {
-        m_target_entities = entities;
         m_target_set      = mset;
+        if( entities ) m_target_entities = *entities;
     }
     else if( ctx == Remapper::CoveringMesh )
     {
-        m_covering_source_entities = entities;
         m_covering_source_set      = mset;
+        if( entities ) m_covering_source_entities = *entities;
     }
     else if( ctx == Remapper::SourceMeshWithGhosts )
     {
         m_source_set_with_ghosts = mset;  // entities not used
     }
+    else if( ctx == Remapper::TargetMeshWithGhosts )
+    {
+        m_target_set_with_ghosts = mset;  // entities not used
+    }
     else
     {
-        // error out properly
+        // nothing to do really..
+        return;
     }
-    return;
 }
+
 ///////////////////////////////////////////////////////////////////////////////////
 
 #ifndef MOAB_HAVE_MPI
@@ -1407,46 +1413,6 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
     }
     else
     {
-        Tag gidtag = m_interface->globalId_tag();
-        moab::EntityHandle subrange[2];
-        int gid[2];
-        if( m_source_entities.size() > 1 )
-        {  // Let us do some sanity checking to fix ID if they have are setup incorrectly
-            subrange[0] = m_source_entities[0];
-            subrange[1] = m_source_entities[1];
-            rval        = m_interface->tag_get_data( gidtag, subrange, 2, gid );MB_CHK_ERR( rval );
-
-            // Check if we need to impose Global ID numbering for vertices and elements. This may be
-            // needed if we load the meshes from exodus or some other formats that may not have a
-            // numbering forced.
-            if( gid[0] + gid[1] == 0 )  // this implies first two elements have GID = 0
-            {
-#ifdef MOAB_HAVE_MPI
-                rval = m_pcomm->assign_global_ids( m_source_set, 2, 1, false, true, false );MB_CHK_ERR( rval );
-#else
-                rval = this->assign_vertex_element_IDs( gidtag, m_source_set, 2, 1 );MB_CHK_ERR( rval );
-#endif
-            }
-        }
-        if( m_target_entities.size() > 1 )
-        {
-            subrange[0] = m_target_entities[0];
-            subrange[1] = m_target_entities[1];
-            rval        = m_interface->tag_get_data( gidtag, subrange, 2, gid );MB_CHK_ERR( rval );
-
-            // Check if we need to impose Global ID numbering for vertices and elements. This may be
-            // needed if we load the meshes from exodus or some other formats that may not have a
-            // numbering forced.
-            if( gid[0] + gid[1] == 0 )  // this implies first two elements have GID = 0
-            {
-#ifdef MOAB_HAVE_MPI
-                rval = m_pcomm->assign_global_ids( m_target_set, 2, 1, false, true, false );MB_CHK_ERR( rval );
-#else
-                rval = this->assign_vertex_element_IDs( gidtag, m_target_set, 2, 1 );MB_CHK_ERR( rval );
-#endif
-            }
-        }
-
         // Now perform the actual parallel intersection between the source and the target meshes
         if( kdtree_search )
         {

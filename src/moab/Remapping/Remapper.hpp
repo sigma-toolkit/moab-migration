@@ -56,12 +56,13 @@ class Remapper
 
     enum IntersectionContext
     {
-        DEFAULT              = -1,
-        SourceMesh           = 0,
-        TargetMesh           = 1,
-        OverlapMesh          = 2,
-        CoveringMesh         = 3,
-        SourceMeshWithGhosts = 4  // this is needed to compute coverage in high order case or bilin
+        DEFAULT              = -1,  // default context
+        SourceMesh           = 0,   // source mesh
+        TargetMesh           = 1,   // target mesh
+        OverlapMesh          = 2,   // overlap/intersection mesh
+        CoveringMesh         = 3,   // source mesh covering target mesh
+        SourceMeshWithGhosts = 4,   // mesh with extra ghost layers to compute coverage in high order case or bilin
+        TargetMeshWithGhosts = 5    // mesh with extra ghost layers to impose target data limiting
     };
 
     moab::Interface* get_interface()

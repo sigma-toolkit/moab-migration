@@ -1,6 +1,6 @@
 from pymoab.hcoord import HomCoord
 from math import sqrt
-from driver import test_driver, CHECK_EQ
+from driver import run_tests, CHECK_EQ
 
 
 def test_homcoord():
@@ -56,4 +56,4 @@ def test_homcoord():
     
 if __name__ == "__main__":
     tests = [test_homcoord,]
-    test_driver(tests)
+    run_tests(tests)

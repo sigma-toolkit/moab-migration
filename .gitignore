@@ -235,6 +235,9 @@ test/perf/point_location/elem_eval_time
 test/perf/point_location/point_location
 test/perf/point_location/sploc_searching_perf
 test/perf/point_location/tree_searching_perf
+test/pymoab/outfile.h5m
+test/pymoab/quads_test.vtk
+test/pymoab/write_tag_test.h5m
 test/range_test
 test/reorder_test
 test/scdseq_test

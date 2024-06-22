@@ -1,7 +1,7 @@
 from pymoab import core
 from pymoab import types
 from pymoab.rng import Range
-from driver import test_driver, CHECK, CHECK_EQ, CHECK_NOT_EQ, CHECK_ITER_EQ
+from driver import run_tests, CHECK, CHECK_EQ, CHECK_NOT_EQ, CHECK_ITER_EQ
 import numpy as np
 import os, sys
 
@@ -547,39 +547,39 @@ def test_adj():
     CHECK_EQ(len(adjs), 0)
 
 def test_get_conn():
-
     mb = core.Core()
     coords = np.array((0,0,0,1,0,0,1,1,1),dtype='float64')
     verts = mb.create_vertices(coords)
-    #create elements
-    verts = np.array(((verts[0],verts[1],verts[2]),),dtype='uint64')
-    tris = mb.create_elements(types.MBTRI,verts)
-    #get the adjacencies of the triangle of dim 1 (should return the vertices)
-    conn = mb.get_connectivity(tris, 0, False)
-    CHECK_EQ(len(conn),3)
+    # create elements
+    verts = np.array((verts[0],verts[1],verts[2]),dtype='uint64')
+    tris = mb.create_elements(types.MBTRI, [verts])
+    
+    # get the adjacencies of the triangle of dim 1 (should return the vertices)
+    conn = mb.get_connectivity(tris)
+    CHECK_EQ(len(conn), 3)
 
-    #check that the entities are of the correct type
+    # check that the entities are of the correct type
     for c in conn:
         type = mb.type_from_handle(c)
         assert type is types.MBVERTEX
 
     conn = mb.get_connectivity(tris[0])
-    CHECK_EQ(len(conn),3)
+    CHECK_EQ(len(conn), 3)
     CHECK_EQ(conn, verts)
 
     conn = mb.get_connectivity(Range(tris))
-    CHECK_EQ(len(conn),3)
+    CHECK_EQ(len(conn), 3)
     CHECK_EQ(conn, verts)
 
     msh = mb.create_meshset()
 
     try:
         mb.get_connectivity(msh)
-    except IndexError:
+    except TypeError:
         pass
     else:
         print("Shouldn't be here. Test fails.")
-        raise(IndexError)
+        raise TypeError
 
 def test_set_conn():
 
@@ -1005,7 +1005,7 @@ def test_unordered_tagging():
     reordered_data =  [int_data[1], int_data[2], int_data[0]]
 
     # check that data array is correct for reordered vertex handles
-    data = mb.tag_get_data(int_tag, reordered_verts)
+    data = mb.tag_get_data(int_tag, reordered_verts).flatten().tolist()
     CHECK_EQ(data, reordered_data)
 
 
@@ -1169,4 +1169,4 @@ if __name__ == "__main__":
              test_create_elements_iterable,
              test_tag_root_set,
              test_entity_handle_tags]
-    test_driver(tests)
+    run_tests(tests)

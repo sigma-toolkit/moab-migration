@@ -1,7 +1,7 @@
 from ctypes import *
 
 from pymoab import core, types, skinner
-from driver import test_driver, CHECK_EQ
+from driver import run_tests, CHECK_EQ
 import numpy as np
 
 def test_get_geometric_skin():
@@ -80,4 +80,4 @@ if __name__ == "__main__":
     tests = [
              test_get_geometric_skin,
              test_get_skin]
-    test_driver(tests)
+    run_tests(tests)

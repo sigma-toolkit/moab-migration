@@ -472,6 +472,12 @@ if(SKBUILD OR ENABLE_PYMOAB)
     else()
       set(RPATH OFF) # Windows
     endif()
+
+    # Auditwheel and Delocate need this when repairing the wheel
+    # Since MOAB libs are installed in the pymoab/core subdirectory
+    # Auditwheel and Delocate need this to find the MOAB libs for pymoab.data
+    # It's a bit of a hack, but it works
+    set(SKBUILD_REPAIR_WHEEL_PATCH ../../pymoab/core/${CMAKE_INSTALL_LIBDIR})
     add_subdirectory( pymoab )
   else()
     # Get a list of all Python files in the pymoab directory

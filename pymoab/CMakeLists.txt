@@ -45,7 +45,7 @@ foreach(CYTHON_FILE ${CYTHON_FILES})
     target_link_libraries(${TARGET_NAME} PRIVATE MOAB)
 
     # Set the install RPATH
-    set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH "${RPATH}/core/${CMAKE_INSTALL_LIBDIR}")
+    set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH "${PYMOAB_PYTHON_MODULE_RPATH}")
 
     # Install the target in the pymoab directory
     install(TARGETS ${TARGET_NAME} DESTINATION ../.)

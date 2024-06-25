@@ -78,7 +78,7 @@ struct appData
                                // reading or from reduce
     long num_global_vertices;  // reunion of all nodes, after sharing is resolved; it could be
                                // determined from hdf5 reading
-    int num_ghost_layers;  // number of ghost layers
+    int num_ghost_layers;      // number of ghost layers
     Range mat_sets;
     std::map< int, int > matIndex;  // map from global block id to index in mat_sets
     Range neu_sets;
@@ -276,8 +276,8 @@ ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
 #endif
 
     app_data.num_ghost_layers = 0;
-    app_data.point_cloud = false;
-    app_data.is_fortran  = false;
+    app_data.point_cloud      = false;
+    app_data.is_fortran       = false;
 
     context.appDatas.push_back(
         app_data );  // it will correspond to app_FileSets[*pid] will be the file set of interest
@@ -1858,10 +1858,9 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         // tags are unrolled, we loop over global ids first, then careful about tags
         for( int i = 0; i < nents_to_be_set; i++ )
         {
-            int gid         = globalIds[i];
-            std::map< int, EntityHandle >::iterator mapIt = eh_by_gid.find(gid);
-            if (mapIt == eh_by_gid.end())
-                continue;
+            int gid                                       = globalIds[i];
+            std::map< int, EntityHandle >::iterator mapIt = eh_by_gid.find( gid );
+            if( mapIt == eh_by_gid.end() ) continue;
             EntityHandle eh = mapIt->second;
             // now loop over tags
             int indexInTagValues = 0;  //
@@ -1881,7 +1880,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         // we will create first a tuple to rendevous points, then from there send to the processor that requested it
         // it is a 2-hop global gather scatter
         // TODO: allow for tags of different length; this is wrong
-        int nbLocalVals = *num_tag_storage_length / ( (int)tagNames.size() ); // assumes all tags have the same length?
+        int nbLocalVals = *num_tag_storage_length / ( (int)tagNames.size() );  // assumes all tags have the same length?
         // we do not expect the sizes to match
         //assert( nbLocalVals * tagNames.size() - *num_tag_storage_length == 0 );
         TupleList TLsend;
@@ -2016,10 +2015,9 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         double* ptrVal = &TLBack.vr_rd[0];  //
         for( int i = 0; i < n1; i++ )
         {
-            int gid         = TLBack.vi_rd[3 * i + 1];  // marker
-            std::map< int, EntityHandle >::iterator mapIt = eh_by_gid.find(gid);
-            if (mapIt == eh_by_gid.end())
-                continue;
+            int gid                                       = TLBack.vi_rd[3 * i + 1];  // marker
+            std::map< int, EntityHandle >::iterator mapIt = eh_by_gid.find( gid );
+            if( mapIt == eh_by_gid.end() ) continue;
             EntityHandle eh = mapIt->second;
             // now loop over tags
 
@@ -2399,7 +2397,7 @@ ErrCode iMOAB_DetermineGhostEntities( iMOAB_AppID pid, int* ghost_dim, int* num_
                                       addl_ents, true, true, &data.file_set );MB_CHK_ERR( rval );
     for( int i = 2; i <= *num_ghost_layers; i++ )
     {
-        rval = pco->correct_thin_ghost_layers();MB_CHK_ERR( rval );  // correct for thin layers
+        rval = pco->correct_thin_ghost_layers();MB_CHK_ERR( rval );                                            // correct for thin layers
         rval = pco->exchange_ghost_cells( *ghost_dim, *bridge_dim, i,  // iteratively get one extra layer
                                           addl_ents, true, true, &data.file_set );MB_CHK_ERR( rval );
     }
@@ -4058,9 +4056,9 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     constexpr double boxeps          = 1.e-10;
 
     // Other constant parameters
-    const double epsrel = ReferenceTolerance;  // ReferenceTolerance is defined in Defines.h in tempestremap source ;
-    double radius_source       = 1.0;
-    double radius_target       = 1.0;
+    const double epsrel  = ReferenceTolerance;  // ReferenceTolerance is defined in Defines.h in tempestremap source ;
+    double radius_source = 1.0;
+    double radius_target = 1.0;
 
     // Error code definitions
     ErrorCode rval;
@@ -4444,7 +4442,7 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
     mapOptions.fNoConservation = ( fNoConservation ? *fNoConservation > 0 : false );
     mapOptions.fNoCorrectAreas = false;
     // mapOptions.fNoCheck        = !( fValidate ? *fValidate : true );
-    mapOptions.fNoCheck        = true;
+    mapOptions.fNoCheck = true;
     if( fVolumetric && *fVolumetric ) mapOptions.strMethod += "volumetric;";
     if( fInverseDistanceMap && *fInverseDistanceMap ) mapOptions.strMethod += "invdist;";
 
@@ -4473,7 +4471,7 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
     {
         const double dNormalTolerance = 1.0E-8;
         const double dStrictTolerance = 1.0E-12;
-        double dTotalOverlapArea = 0.0;
+        double dTotalOverlapArea      = 0.0;
         weightMap->CheckMap( true, true, ( fMonotoneTypeID && *fMonotoneTypeID ), dNormalTolerance, dStrictTolerance,
                              dTotalOverlapArea );
         assert( dTotalOverlapArea > 0.0 );
@@ -4555,8 +4553,8 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         else
         {
             moab::Range& covSrcEnts = remapper->GetMeshEntities( moab::Remapper::CoveringMesh );
-            solSTagVals.resize( covSrcEnts.size() * weightMap->GetSourceNDofsPerElement() *
-                                    weightMap->GetSourceNDofsPerElement(), 0. );
+            solSTagVals.resize(
+                covSrcEnts.size() * weightMap->GetSourceNDofsPerElement() * weightMap->GetSourceNDofsPerElement(), 0. );
             sents = covSrcEnts;
         }
         if( data_tgt.point_cloud )
@@ -4569,7 +4567,8 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         {
             moab::Range& tgtEnts = remapper->GetMeshEntities( moab::Remapper::TargetMesh );
             solTTagVals.resize( tgtEnts.size() * weightMap->GetDestinationNDofsPerElement() *
-                                    weightMap->GetDestinationNDofsPerElement(), 0. );
+                                    weightMap->GetDestinationNDofsPerElement(),
+                                0. );
             tents = tgtEnts;
         }
     }
@@ -4580,7 +4579,8 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         solSTagVals.resize(
             covSrcEnts.size() * weightMap->GetSourceNDofsPerElement() * weightMap->GetSourceNDofsPerElement(), -1.0 );
         solTTagVals.resize( tgtEnts.size() * weightMap->GetDestinationNDofsPerElement() *
-                                weightMap->GetDestinationNDofsPerElement(), 0. );
+                                weightMap->GetDestinationNDofsPerElement(),
+                            0. );
 
         sents = covSrcEnts;
         tents = tgtEnts;

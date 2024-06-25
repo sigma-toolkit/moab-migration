@@ -1,17 +1,17 @@
-!   This program shows how to do perform FV-FV projections in multiple ways in Fortran90
+!This program shows how to do perform FV-FV projections in multiple ways in Fortran90
 !
-!   The program workflows is as follows:
-!        - Setup a source (ATM) and a target (OCN) mesh in some PEs
-!        - Next migrate the meshes to the coupler PEs and compute source coverage mesh
-!        - Then compute the intersection mesh between the source and target meshes
-!        - Next compute the weights for the projection for 4 different methods
-!            * First order projection
-!            * Bilinear projection
-!            * Second order projection
-!            * Second order projection with CAAS operator
-!        - Then apply the weights to the source mesh and get the projected fields for
-!          all the different methods
-!        - Finally send all the projected fields back to the target PEs
+!The program workflows is as follows :
+! - Setup a source( ATM ) and a target( OCN ) mesh in some PEs
+! - Next migrate the meshes to the coupler PEs and compute source coverage mesh
+! - Then compute the intersection mesh between the source and target meshes
+! - Next compute the weights for the projection for 4 different methods
+!    * First order projection
+!    * Bilinear projection
+!    * Second order projection
+!    * Second order projection with CAAS operator
+! - Then apply the weights to the source mesh and get the projected fields
+!   for all the different methods
+! - Finally send all the projected fields back to the target PEs
 !
 !   The program uses iMOAB Fortran90 interface to MOAB
 
@@ -91,14 +91,14 @@ program imoab_coupler_fortran
    atmocnid = 618
 
    call mpi_init(ierr)
-   call errorout(ierr,'mpi_init')
-   call mpi_comm_rank (MPI_COMM_WORLD, my_id, ierr)
-   call errorout(ierr, 'fail to get MPI rank')
+   call errorout( ierr, 'mpi_init' )
+   call mpi_comm_rank( MPI_COMM_WORLD, my_id, ierr )
+   call errorout( ierr, 'fail to get MPI rank' )
 
-   call mpi_comm_size (MPI_COMM_WORLD, num_procs, ierr)
-   call errorout(ierr, 'fail to get MPI size')
-   call mpi_comm_dup(MPI_COMM_WORLD, global_comm, ierr)
-   call errorout(ierr, 'fail to get global comm duplicate')
+   call mpi_comm_size( MPI_COMM_WORLD, num_procs, ierr )
+   call errorout( ierr, 'fail to get MPI size' )
+   call mpi_comm_dup( MPI_COMM_WORLD, global_comm, ierr )
+   call errorout( ierr, 'fail to get global comm duplicate' )
 
    call MPI_Comm_group( global_comm, jgroup, ierr );  !  all processes in jgroup
    call errorout(ierr, 'fail to get joint group')
@@ -118,10 +118,10 @@ program imoab_coupler_fortran
    atmCouComm = MPI_COMM_NULL
    ocnCouComm = MPI_COMM_NULL
    call mpi_comm_dup(global_comm, atmComm, ierr)
-   call mpi_comm_dup(global_comm, ocnComm, ierr)
-   call mpi_comm_dup(global_comm, cplComm, ierr)
-   call mpi_comm_dup(global_comm, atmCouComm, ierr)
-   call mpi_comm_dup(global_comm, ocnCouComm, ierr)
+   call mpi_comm_dup( global_comm, ocnComm, ierr )
+   call mpi_comm_dup( global_comm, cplComm, ierr )
+   call mpi_comm_dup( global_comm, atmCouComm, ierr )
+   call mpi_comm_dup( global_comm, ocnCouComm, ierr )
 
    ! all groups of interest are easy breezy
    call MPI_Comm_group( atmComm, atmGroup, ierr )
@@ -195,6 +195,12 @@ program imoab_coupler_fortran
    end if
 
    if (cplComm .NE. MPI_COMM_NULL) then
+
+      ! set the ghost layers on the coupler for the source mesh
+      nghlay = 3 ! number of ghost layers
+      ierr = iMOAB_SetGhostLayers( cplAtmPID, nghlay )
+      call errorout(ierr, 'failed to set number of ghost layers on ATM mesh')
+
       ierr = iMOAB_ComputeMeshIntersectionOnSphere(cplAtmPID, cplOcnPID, cplAtmOcnPID)
       ! coverage mesh was computed here, for cplAtmPID, atm on coupler pes
       ! basically, atm was redistributed according to target (ocean) partition, to "cover" the
@@ -210,7 +216,7 @@ program imoab_coupler_fortran
 
    if (atmCouComm .NE. MPI_COMM_NULL) then
       ! the new graph will be for sending data from atm comp to coverage mesh.
-      ! it involves initial atm app; cmpAtmPID; also migrate atm mesh on coupler pes, cplAtmPID
+      ! it involves initial atm app; also migrate atm mesh on coupler pes, cplAtmPID
       ! results are in cplAtmOcnPID, intx mesh; remapper also has some info about coverage mesh
       ! after this, the sending of tags from atm pes to coupler pes will use the new par comm
       ! graph, that has more precise info about what to send for ocean cover ; every time, we
@@ -258,7 +264,7 @@ program imoab_coupler_fortran
              fValidate, "GLOBAL_ID"//C_NULL_CHAR, "GLOBAL_ID"//C_NULL_CHAR)
       call errorout(ierr, 'cannot compute scalar 2nd order projection weights')
 
-#if defined(MOAB_HAVE_NETCDF) && defined(VERBOSE)
+#if defined( MOAB_HAVE_NETCDF ) && defined( VERBOSE )
       write(nproc,"(I0.2)")num_procs !
       atmocn_map_file_name = 'atm_ocn_map_second_n'//trim(nproc)//'.nc'//C_NULL_CHAR
       ierr = iMOAB_WriteMappingWeightsToFile( cplAtmOcnPID, "secondorder"//C_NULL_CHAR, atmocn_map_file_name)

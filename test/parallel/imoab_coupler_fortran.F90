@@ -319,10 +319,10 @@ program imoab_coupler_fortran
    end if
    if (cplComm .ne. MPI_COMM_NULL) then
 
-      outputFileOcn = "AtmOnCplF.h5m"//C_NULL_CHAR
+      outputFileOcn = "AtmOnCplF2.h5m"//C_NULL_CHAR
       fileWriteOptions = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
       ierr = iMOAB_WriteMesh(cplAtmPID, outputFileOcn, fileWriteOptions)
-      call errorout(ierr, 'could not write AtmOnCpl.h5m to disk')
+      call errorout(ierr, 'could not write AtmOnCpl2.h5m to disk')
 
    end if
    if (cplComm .ne. MPI_COMM_NULL) then
@@ -373,13 +373,13 @@ program imoab_coupler_fortran
 
    if (ocnComm .ne. MPI_COMM_NULL) then
 
-      outputFileOcn = "OcnWithProjF.h5m"//C_NULL_CHAR
+      outputFileOcn = "OcnWithProjF2.h5m"//C_NULL_CHAR
       fileWriteOptions = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
       if (my_id .eq. 0) then
          print *, ' Writing ocean mesh file with projected solution to disk: ', outputFileOcn
       end if
       ierr = iMOAB_WriteMesh(cmpOcnPID, outputFileOcn, fileWriteOptions)
-      call errorout(ierr, 'could not write OcnWithProjF.h5m to disk')
+      call errorout(ierr, 'could not write OcnWithProjF2.h5m to disk')
 
    end if
 

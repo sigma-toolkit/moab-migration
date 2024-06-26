@@ -410,7 +410,7 @@ int main( int argc, char* argv[] )
             {
                 char outputFileTgt[] = "fOcnOnCpl5.h5m";
                 ierr                 = iMOAB_WriteMesh( cplOcnPID, outputFileTgt, fileWriteOptions );
-                CHECKIERR( ierr, "could not write fOcnOnCpl.h5m to disk" )
+                CHECKIERR( ierr, "could not write fOcnOnCpl5.h5m to disk" )
             }
         }
 
@@ -454,9 +454,9 @@ int main( int argc, char* argv[] )
         if( ocnComm != MPI_COMM_NULL )
         {
 #ifdef VERBOSE
-            char outputFileOcn[] = "OcnWithProj.h5m";
+            char outputFileOcn[] = "OcnWithProj6.h5m";
             ierr                 = iMOAB_WriteMesh( cmpOcnPID, outputFileOcn, fileWriteOptions );
-            CHECKIERR( ierr, "could not write OcnWithProj.h5m to disk" )
+            CHECKIERR( ierr, "could not write OcnWithProj6.h5m to disk" )
 #endif
             // test results only for n == 1, for bottomTempProjectedField
             if( !no_regression_test )

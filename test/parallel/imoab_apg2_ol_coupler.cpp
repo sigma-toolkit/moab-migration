@@ -343,7 +343,7 @@ int main( int argc, char* argv[] )
 
     if( couComm != MPI_COMM_NULL )
     {  // write only for n==1 case
-        char outputFileLnd[] = "recvLnd.h5m";
+        char outputFileLnd[] = "recvLnd2.h5m";
         ierr                 = iMOAB_WriteMesh( cplLndPID, outputFileLnd, fileWriteOptions );
         CHECKIERR( ierr, "cannot write lnd mesh after receiving" )
     }

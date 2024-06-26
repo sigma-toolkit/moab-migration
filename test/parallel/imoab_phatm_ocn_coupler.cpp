@@ -595,6 +595,7 @@ int main( int argc, char* argv[] )
     {
         char outputFileOcn[] = "OcnWithProj2.h5m";
         ierr                 = iMOAB_WriteMesh( cmpOcnPID, outputFileOcn, fileWriteOptions );
+        CHECKIERR( ierr, "cannot write OcnWithProj2.h5m")
     }
 
 #endif

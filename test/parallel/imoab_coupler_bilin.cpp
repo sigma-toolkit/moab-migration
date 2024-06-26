@@ -440,7 +440,7 @@ int main( int argc, char* argv[] )
         {
             char outputFileTgt[] = "fOcnBilinOnCpl.h5m";
             ierr                 = iMOAB_WriteMesh( cplOcnPID, outputFileTgt, fileWriteOptions );
-            CHECKIERR( ierr, "could not write fOcnOnCpl.h5m to disk" )
+            CHECKIERR( ierr, "could not write fOcnBilinOnCpl.h5m to disk" )
         }
     }
 
@@ -470,7 +470,7 @@ int main( int argc, char* argv[] )
     {
         char outputFileOcn[] = "OcnWithProjBilin.h5m";
         ierr                 = iMOAB_WriteMesh( cmpOcnPID, outputFileOcn, fileWriteOptions );
-        CHECKIERR( ierr, "could not write OcnWithProj.h5m to disk" )
+        CHECKIERR( ierr, "could not write OcnWithProjBilin.h5m to disk" )
     }
     // do a check agains a baseline test
     if( !no_regression_test && ( ocnComm != MPI_COMM_NULL ) )

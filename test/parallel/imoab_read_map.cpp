@@ -430,9 +430,9 @@ int main( int argc, char* argv[] )
         if( ocnComm != MPI_COMM_NULL && 1 == n )  // write only for n==1 case
         {
 #ifdef VERBOSE
-            char outputFileOcn[] = "OcnWithProj.h5m";
+            char outputFileOcn[] = "OcnWithProj3.h5m";
             ierr                 = iMOAB_WriteMesh( cmpOcnPID, outputFileOcn, fileWriteOptions );
-            CHECKIERR( ierr, "could not write OcnWithProj.h5m to disk" )
+            CHECKIERR( ierr, "could not write OcnWithProj3.h5m to disk" )
 #endif
             // test results only for n == 1, for bottomTempProjectedField = "a2oTbot_proj"
             if( !no_regression_test )

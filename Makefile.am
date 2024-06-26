@@ -5,13 +5,7 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 ACLOCAL_AMFLAGS = -I config
 
 # Subdirectories to build
-SUBDIRS = src MeshFiles tools test $(pymoab_dir)
-
-if ENABLE_pymoab
-  pymoab_dir = pymoab
-else
-  pymoab_dir =
-endif
+SUBDIRS = src MeshFiles $(itaps_dir) tools test
 
 # Utility target: build but don't run tests
 build-check:
@@ -113,7 +107,7 @@ CMAKE_CONFIGURATION_FILES = CMakeLists.txt \
    config/CMakeLibraryFuncs.cmake   config/FindHDF5_MOAB.cmake    config/FindParMetis.cmake      config/Findverdict.cmake    config/ResolveCompilerPaths.cmake \
    config/CheckCompilerFlags.cmake  config/FindMetis.cmake        config/FindTempestRemap.cmake  config/ForceAddFlags.cmake  config/TestBigEndian.cmake \
    config/CMakeReplicateConfig.sh   config/TemplateSpecialization.cxx   config/MOABConfig.cmake.h.in   config/cmake_uninstall.cmake.in moab.make.cmake  \
-   pymoab/CMakeLists.txt            pymoab/cmake/FindPythonDev.cmake  pymoab/setup.py.cmake.in     pymoab/install.sh.cmake
+   pymoab/CMakeLists.txt            config/cython_test.pyx
 
 EXTRA_DIST = $(doc_DATA) \
 						 debian \
@@ -166,3 +160,21 @@ moab.config: config.status Makefile.am
 
 CLEANFILES = moab.config configs.sed
 DISTCLEANFILES = a.out
+
+if ENABLE_pymoab
+
+all-local: install-exec-local
+install-exec-local:
+	$(PYTHON) -m pip install -e $(abs_top_builddir)
+
+clean-local:
+	-rm -rf *.cpp __pycache__ *.so *.pyc $(top_builddir)/test/pymoab/*.pyc $(top_builddir)/pymoab.egg-info
+
+uninstall:
+	$(PYTHON) -m pip uninstall -y pymoab
+
+EXTRA_DIST += $(srcdir)/pymoab/* $(top_srcdir)/test/pymoab/* $(top_srcdir)/pymoab/interface_notes.txt
+CLEANFILES += $(top_builddir)/test/pymoab/quads_test.vtk $(top_builddir)/test/pymoab/outfile.h5m $(top_builddir)/test/pymoab/write_tag_test.h5m
+
+endif
+

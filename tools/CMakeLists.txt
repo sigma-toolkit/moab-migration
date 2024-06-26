@@ -41,6 +41,10 @@ if ( MOAB_HAVE_HDF5 )
   set_source_files_properties( compareFiles.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( compareFiles ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_COMPAREFILES 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(compareFiles PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS compareFiles
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -55,6 +59,10 @@ if ( MOAB_BUILD_MBSIZE )
   set_source_files_properties( size.cpp measure.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbsize ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBSIZE 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(mbsize PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS mbsize
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -70,6 +78,10 @@ if ( MOAB_BUILD_MBMERGE )
   set_source_files_properties( merge.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbmerge ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBMERGE 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(mbmerge PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS mbmerge
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -86,6 +98,10 @@ if ( MOAB_BUILD_MBMEM )
   set_source_files_properties( mbmem.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbmem ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBMEM 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(mbmem PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS mbmem
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -100,6 +116,10 @@ if ( MOAB_BUILD_MBCONVERT )
   set_source_files_properties( convert.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbconvert ${TOOLS_LINK_LIBS} ${TEMPESTREMAP_LIBRARIES} )
   set( MOAB_HAVE_MBCONVERT 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(mbconvert PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS mbconvert
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -116,6 +136,10 @@ if ( MOAB_BUILD_MBHONODES )
   set_source_files_properties( honodes.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbhonodes ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBHONODES 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(mbhonodes PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS mbhonodes
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -130,6 +154,10 @@ if ( MOAB_BUILD_MBDEPTH )
   set_source_files_properties( depth.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbdepth ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBDEPTH 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(mbdepth PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS mbdepth
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -144,6 +172,10 @@ if ( MOAB_BUILD_MBSKIN )
   set_source_files_properties( skin.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbskin ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBSKIN 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(mbskin PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS mbskin
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -159,6 +191,10 @@ if ( MOAB_BUILD_MBSURFPLOT )
   set_source_files_properties( surfplot.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbsurfplot ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBSURFPLOT 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(mbsurfplot PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS mbsurfplot
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -174,6 +210,10 @@ if ( MOAB_BUILD_MBTAGPROP )
   set_source_files_properties( parse.cpp propagate_tags.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbtagprop ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBTAGPROP 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(mbtagprop PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS mbtagprop
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -189,6 +229,10 @@ if ( MOAB_BUILD_MBGSETS )
   set_source_files_properties( gsets.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbgsets ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBGSETS 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(mbgsets PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS mbgsets
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -203,6 +247,10 @@ if ( MOAB_BUILD_MBUMR )
   set_source_files_properties( umr.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbumr ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBUMR 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(mbumr PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS mbumr
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -217,6 +265,10 @@ if ( MOAB_BUILD_MBSLAVEPART )
   set_source_files_properties( mbslavepart.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbslavepart ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBSLAVEPART 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(mbslavepart PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS mbslavepart
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -231,6 +283,10 @@ if ( MOAB_BUILD_MBTEMPEST )
   set_source_files_properties( mbtempest.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbtempest ${TOOLS_LINK_LIBS} ${TEMPESTREMAP_LIBRARIES} )
   set( MOAB_HAVE_MBTEMPEST 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(mbtempest PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS mbtempest
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -246,6 +302,10 @@ if ( MOAB_BUILD_MBQUALITY )
   set_source_files_properties( quality.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbquality ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBQUALITY 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(mbquality PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS mbquality
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -263,6 +323,10 @@ if ( MOAB_BUILD_MBPART OR ( MOAB_HAVE_ZOLTAN OR MOAB_HAVE_METIS ) )
   set_source_files_properties( mbpart.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbpart ${TOOLS_LINK_LIBS} ${ZOLTAN_LIBRARIES} ${PARMETIS_LIBRARIES} ${METIS_LIBRARIES} )
   set( MOAB_HAVE_MBPART 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(mbpart PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS mbpart
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -281,6 +345,10 @@ if( MOAB_BUILD_HEXMODOPS )
   add_executable( hexmodops makeops.cpp )
   target_link_libraries( hexmodops ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_HEXMODOPS 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(hexmodops PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS hexmodops
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -296,6 +364,10 @@ if ( MOAB_BUILD_SPHEREDECOMP )
   set_source_files_properties( SphereDecomp.cpp SphereDecomp.hpp sphere_decomp.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( spheredecomp ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_SPHEREDECOMP 1 )
+  if(SKBUILD)
+    # Set the install RPATH
+    set_target_properties(spheredecomp PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+  endif()
   install(
     TARGETS spheredecomp
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

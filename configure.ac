@@ -263,12 +263,12 @@ python_patterns=""
 
 AC_MSG_CHECKING([if pymoab interface was requested by user])
 AC_ARG_ENABLE( [pymoab],
-[AS_HELP_STRING([--enable-pymoab],[Build support for pymoab interface.])],
+[AS_HELP_STRING([--enable-pymoab],[Build support for pymoab interface (Deprecated).])],
 [enable_pymoab=$enableval],
 [enable_pymoab=no] )
 
 AC_ARG_VAR([PYMOAB_PREFIX],
-Custom location for install of PyMOAB module)
+Custom location for install of PyMOAB module (Deprecated))
 
 pymoab_custom_install=no
 AC_MSG_RESULT([$enable_pymoab])
@@ -279,7 +279,6 @@ else
   if (test "x$enable_pymoab" != "xno"); then
     ENABLE_pymoab=yes
     AM_PATH_PYTHON([3.1],,[:])
-    AX_PYTHON_DEVEL()
 
     AC_MSG_CHECKING([for the numpy Python package])
     ac_numpy_result=`$PYTHON -c "import numpy" 2>&1`
@@ -296,13 +295,13 @@ else
     AC_MSG_CHECKING([for the setuptools Python package])
     ac_setuptools_result=`$PYTHON -c "import setuptools" 2>&1`
     if test $? -eq 0; then
-    AC_MSG_RESULT([yes])
+      AC_MSG_RESULT([yes])
     else
-    AC_MSG_RESULT([no])
-    AC_MSG_ERROR([cannot import Python module "setuptools".
-    Please check your Python installation. The error was:
-    $ac_setuptools_result])
-    PYTHON_VERSION=""
+      AC_MSG_RESULT([no])
+      AC_MSG_ERROR([cannot import Python module "setuptools".
+      Please check your Python installation. The error was:
+      $ac_setuptools_result])
+      PYTHON_VERSION=""
     fi
 
     # if enabling PyMOAB, turn cython file filter oni
@@ -310,58 +309,72 @@ else
     filter_program=$PYTHON" cython_filter.py 2>/dev/null"
     python_patterns="*.py *.pyx"
 
-    if (test "x$enable_devmode" != "xno"); then
-      # Developers updating the PyMOAB modules need Cython (> 0.25)
-      AC_PYTHON_MODULE(cython)
-      if test "x$CYTHON" = "x" ; then
-        AC_CHECK_PROG(CYTHON_AVAILABLE, cython, yes, no)
-        if test x"$CYTHON_AVAILABLE" != x"yes" ; then
-            AC_MSG_ERROR([Cython is not installed. Use 'easy_install cython'.])
-        else
-            CYTHON=`which cython`
-        fi
-        AC_SUBST(CYTHON)
+    AC_ARG_VAR([CYTHON], [Cython compiler command])
+    # Developers updating the PyMOAB modules need Cython (> 0.25)
+    AC_PYTHON_MODULE(cython)
+    if test "x$CYTHON" = "x" ; then
+      AC_CHECK_PROG(CYTHON_AVAILABLE, cython, yes, no)
+      if test x"$CYTHON_AVAILABLE" != x"yes" ; then
+          AC_MSG_ERROR([Cython is not installed. Use 'easy_install cython'.])
+      else
+          CYTHON=`which cython`
       fi
-      AC_MSG_CHECKING(for proper cython capabilities)
-      $CYTHON --cplus $srcdir/pymoab/cmake/cython_test.pyx --output-file ./.cython_test_out && rm .cython_test_out
-      if test $? -ne 0 ; then
-        AC_MSG_ERROR(cython is not the correct version for pymoab)
-      fi
+      AC_SUBST(CYTHON)
+    else
+      AC_CHECK_PROG(CYTHON_AVAILABLE, ${CYTHON}, yes, no)
     fi
+    AC_MSG_CHECKING(for proper cython capabilities)
+    ac_cython_result=`$CYTHON --cplus config/cython_test.pyx --output-file .cython_test_out 2>&1 && rm .cython_test_out`
+    ac_cython_result=`pwd && $CYTHON --cplus ${project_abstopsrcdir}/config/cython_test.pyx --output-file .cython_test_out && rm .cython_test_out`
+    if test $? -ne 0 ; then
+      AC_MSG_ERROR(cython is not the correct version for pymoab)
+    else
+      AC_MSG_RESULT([yes])
+    fi
+    DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS CYTHON=$CYTHON PYTHON=$PYTHON"
 
-    AC_CONFIG_SRCDIR([pymoab/setup.py.in])
+    # create setup.py from deprecated/pymoab
+    AC_CONFIG_FILES([
+      setup.py:deprecated/pymoab/setup.py.in
+    ])
+
+    # create pyproject.toml from deprecated/pymoab
+    AC_CONFIG_LINKS([
+      pyproject.toml:deprecated/pymoab/pyproject.toml
+    ])
+
     # link source files to build location
-    AC_CONFIG_LINKS([pymoab/pymoab/moab.pxd:pymoab/pymoab/moab.pxd
-                     pymoab/pymoab/eh.pxd:pymoab/pymoab/eh.pxd
-                     pymoab/pymoab/tag.pyx:pymoab/pymoab/tag.pyx
-                     pymoab/pymoab/tag.pxd:pymoab/pymoab/tag.pxd
-                     pymoab/pymoab/core.pyx:pymoab/pymoab/core.pyx
-		     pymoab/pymoab/core.pxd:pymoab/pymoab/core.pxd
-		     pymoab/pymoab/rng.pyx:pymoab/pymoab/rng.pyx
-		     pymoab/pymoab/rng.pxd:pymoab/pymoab/rng.pxd
-		     pymoab/pymoab/hcoord.pyx:pymoab/pymoab/hcoord.pyx
-		     pymoab/pymoab/hcoord.pxd:pymoab/pymoab/hcoord.pxd
-		     pymoab/pymoab/types.pyx:pymoab/pymoab/types.pyx
-		     pymoab/pymoab/topo_util.pyx:pymoab/pymoab/topo_util.pyx
-		     pymoab/pymoab/topo_util.pxd:pymoab/pymoab/topo_util.pxd
-		     pymoab/pymoab/scd.pyx:pymoab/pymoab/scd.pyx
-		     pymoab/pymoab/scd.pxd:pymoab/pymoab/scd.pxd
-		     pymoab/pymoab/skinner.pyx:pymoab/pymoab/skinner.pyx
-		     pymoab/pymoab/skinner.pxd:pymoab/pymoab/skinner.pxd
-		     pymoab/pymoab/tag_conventions.pxd:pymoab/pymoab/tag_conventions.pxd
-		     pymoab/pymoab/__init__.pxd:pymoab/pymoab/__init__.pxd
-		     pymoab/pymoab/__init__.py:pymoab/pymoab/__init__.py])
+    AC_CONFIG_LINKS([pymoab/moab.pxd:pymoab/moab.pxd
+                     pymoab/eh.pxd:pymoab/eh.pxd
+                     pymoab/tag.pyx:pymoab/tag.pyx
+                     pymoab/tag.pxd:pymoab/tag.pxd
+                     pymoab/core.pyx:pymoab/core.pyx
+		     pymoab/core.pxd:pymoab/core.pxd
+		     pymoab/rng.pyx:pymoab/rng.pyx
+		     pymoab/rng.pxd:pymoab/rng.pxd
+		     pymoab/hcoord.pyx:pymoab/hcoord.pyx
+		     pymoab/hcoord.pxd:pymoab/hcoord.pxd
+		     pymoab/types.pyx:pymoab/types.pyx
+		     pymoab/topo_util.pyx:pymoab/topo_util.pyx
+		     pymoab/topo_util.pxd:pymoab/topo_util.pxd
+		     pymoab/scd.pyx:pymoab/scd.pyx
+		     pymoab/scd.pxd:pymoab/scd.pxd
+		     pymoab/skinner.pyx:pymoab/skinner.pyx
+		     pymoab/skinner.pxd:pymoab/skinner.pxd
+		     pymoab/tag_conventions.pxd:pymoab/tag_conventions.pxd
+		     pymoab/__init__.pxd:pymoab/__init__.pxd
+		     pymoab/__init__.py:pymoab/__init__.py])
     # link test files to build location
-    AC_CONFIG_LINKS([pymoab/tests/driver.py:pymoab/tests/driver.py
-                     pymoab/tests/test_core.py:pymoab/tests/test_core.py
-		     pymoab/tests/test_tag.py:pymoab/tests/test_tag.py
-		     pymoab/tests/test_scd.py:pymoab/tests/test_scd.py
-		     pymoab/tests/test_hom.py:pymoab/tests/test_hom.py
-		     pymoab/tests/test_topo_util.py:pymoab/tests/test_topo_util.py
-		     pymoab/tests/test_range.py:pymoab/tests/test_range.py
-		     pymoab/tests/test_skinner.py:pymoab/tests/test_skinner.py
-		     pymoab/tests/cyl_grps.h5m:pymoab/tests/cyl_grps.h5m
-		     pymoab/tests/cyl_grps.vtk:pymoab/tests/cyl_grps.vtk])
+    AC_CONFIG_LINKS([test/pymoab/driver.py:test/pymoab/driver.py
+                     test/pymoab/test_core.py:test/pymoab/test_core.py
+		     test/pymoab/test_tag.py:test/pymoab/test_tag.py
+		     test/pymoab/test_scd.py:test/pymoab/test_scd.py
+		     test/pymoab/test_hom.py:test/pymoab/test_hom.py
+		     test/pymoab/test_topo_util.py:test/pymoab/test_topo_util.py
+		     test/pymoab/test_range.py:test/pymoab/test_range.py
+		     test/pymoab/test_skinner.py:test/pymoab/test_skinner.py
+		     test/pymoab/cyl_grps.h5m:test/pymoab/cyl_grps.h5m
+		     test/pymoab/cyl_grps.vtk:test/pymoab/cyl_grps.vtk])
     # if a python install location is specified, use that
     if (test "x$PYMOAB_PREFIX" != "x"); then
       pymoab_custom_install=yes
@@ -1151,14 +1164,12 @@ AC_CONFIG_FILES([Makefile
                  test/perf/point_location/Makefile
                  test/io/Makefile
                  test/parallel/Makefile
-                 pymoab/Makefile
-                 pymoab/setup.py
                  tools/Makefile
                  tools/mbcoupler/Makefile
                  tools/mcnpmit/Makefile
                  tools/geometry/Makefile
                  doc/user.dox
-		 doc/cython_filter.py
+                 doc/cython_filter.py
                  doc/config.tex
                  MeshFiles/Makefile
                  MeshFiles/unittest/Makefile
@@ -1213,6 +1224,16 @@ PRINT_CONFIGURATION_SUMMARY
 # echo "Zlib: $enablezlib"
 # echo "SZip: $enableszip"
 
+if test "x$enable_pymoab" != "xno"; then
+AC_MSG_NOTICE([
+*************************************************************************
+*    DEPRECATION NOTICE:                                                *
+*    Building PyMOAB using Autotools is planned to be deprecated in a   *
+*    future major version release. Please consider installing MOAB via  *
+*    pip instead. Refer to the MOAB README file for installation        *
+*    instructions.                                                      *
+*************************************************************************])
+fi
 
 if test "x$enable_pymoab" != "xno" && test "x$pymoab_custom_install" = "xyes" ; then
 AC_MSG_NOTICE([

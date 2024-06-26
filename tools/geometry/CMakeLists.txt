@@ -24,6 +24,11 @@ if ( MOAB_HAVE_CGM )
     target_link_libraries( cgm2moab
                            MOAB
                            ${CGM_LIBRARIES} )
+
+    if(SKBUILD)
+      # Set the install RPATH
+      set_target_properties(cgm2moab PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+    endif()
     install(
       TARGETS cgm2moab
       RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

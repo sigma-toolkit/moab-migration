@@ -143,8 +143,15 @@ endif ()
 
 # patch added to ensure libs have a full-path ID set on Mac
 if(APPLE)
-  set(CMAKE_MACOSX_RPATH FALSE)
-  set(CMAKE_INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/lib)
+  option(CMAKE_MACOSX_RPATH "Use MacOSX RPATH" OFF)
+  if(SKBUILD)
+    set(CMAKE_MACOSX_RPATH ON)
+  endif()
+  message(STATUS "CMAKE_MACOSX_RPATH = ${CMAKE_MACOSX_RPATH}")
+  if(NOT CMAKE_INSTALL_NAME_DIR AND NOT CMAKE_MACOSX_RPATH)
+    set(CMAKE_INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/lib)
+  endif()
+  message(STATUS "CMAKE_INSTALL_NAME_DIR = ${CMAKE_INSTALL_NAME_DIR}")
 endif()
 
 ################################################################################
@@ -442,6 +449,76 @@ string(STRIP "${CMAKE_EXE_LINKER_FLAGS} " CMAKE_EXE_LINKER_FLAGS)
 string(STRIP "${MOAB_CXX_FLAGS} " MOAB_CXX_FLAGS)
 string(STRIP "${MOAB_DEFINES} " MOAB_DEFINES)
 
+###############################################################################
+# Python Module Build
+###############################################################################
+if(SKBUILD OR ENABLE_PYMOAB)
+
+  # Find necessary packages
+  find_package(
+      Python
+      COMPONENTS Interpreter Development.Module NumPy
+      REQUIRED
+  )
+  if(SKBUILD)
+    # Scikit-build installs MOAB to ${SKBUILD_PLATLIB_DIR}/pymoab/core
+    # So, set bin directory to root environment (install prefix/bin)
+    set(CMAKE_INSTALL_BINDIR ${SKBUILD_SCRIPTS_DIR})
+    set(SKBUILD_LIB_DIR ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/pymoab/core/${CMAKE_INSTALL_LIBDIR})
+    if(APPLE)
+      set(RPATH "@loader_path")
+    elseif(UNIX)
+      set(RPATH "$ORIGIN")
+    else()
+      set(RPATH OFF) # Windows
+    endif()
+    add_subdirectory( pymoab )
+  else()
+    # Get a list of all Python files in the pymoab directory
+    file(GLOB PY_FILES "${CMAKE_SOURCE_DIR}/pymoab/*.py")
+    file(GLOB PXD_FILES "${CMAKE_SOURCE_DIR}/pymoab/*.pxd")
+    file(GLOB PYX_FILES "${CMAKE_SOURCE_DIR}/pymoab/*.pyx")
+
+    # Set the PyMOAB prefix
+    if (NOT PYMOAB_PREFIX)
+        set(PYMOAB_PREFIX ${CMAKE_INSTALL_PREFIX})
+    endif()
+
+    # Show PyMOAB prefix
+    message(STATUS "PyMOAB prefix: ${PYMOAB_PREFIX}")
+
+    # Copy the Python files to the current binary directory
+    file( COPY ${PY_FILES} ${PXD_FILES} ${PYX_FILES} DESTINATION ${CMAKE_BINARY_DIR}/pymoab)
+
+    # Copy the pyproject.toml file to the binary directory
+    file( COPY ${CMAKE_SOURCE_DIR}/deprecated/pymoab/pyproject.toml DESTINATION ${CMAKE_BINARY_DIR})
+
+    # Configure the setup.py file
+    configure_file(${CMAKE_SOURCE_DIR}/deprecated/pymoab/setup.py.cmake ${CMAKE_BINARY_DIR}/setup.py)
+
+    # Install the PyMOAB package for testing
+    add_custom_target(
+      pymoab-test-install
+      DEPENDS MOAB
+    )
+    add_custom_command(
+      TARGET pymoab-test-install
+      COMMAND ${Python_EXECUTABLE} -m pip install . --target ${CMAKE_BINARY_DIR}/Testing
+      COMMENT "Installing PyMOAB package for testing..."
+    )
+    add_test(NAME pymoab_test COMMAND ${CMAKE_COMMAND} --build . --target pymoab-test-install)
+
+    # Install the PyMOAB package
+    install(CODE "execute_process(COMMAND ${Python_EXECUTABLE} -m pip install . --prefix ${PYMOAB_PREFIX})")
+    
+    # Print a deprecation warning
+    message(WARNING "ENABLE_PYMOAB and PYMOAB_PREFIX is deprecated and will be removed in the next release. " 
+      "Consider installing PyMOAB via pip instead. "
+      "See README.md for more information."
+      )
+  endif()
+endif()
+
 ################################################################################
 # Add Directories
 ################################################################################
@@ -450,9 +527,7 @@ add_subdirectory( src )
 if (NOT WIN32 OR MSYS OR MINGW) # Need further work to prepare for windows
   add_subdirectory( tools )
 endif ()
-if (ENABLE_PYMOAB)
-  add_subdirectory( pymoab )
-endif()
+
 ################################################################################
 # Testing Related Settings
 ################################################################################

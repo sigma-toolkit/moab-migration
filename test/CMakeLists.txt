@@ -82,11 +82,17 @@ foreach( fname ${TESTS} )
 endforeach()
 
 if(ENABLE_PYMOAB)
+  ADD_SUBDIRECTORY(pymoab)
+  find_package(
+    Python
+    COMPONENTS Interpreter
+    REQUIRED
+  )
   SET(PYMOAB_TESTS test_core test_hom test_scd test_range test_tag test_topo_util test_skinner)
   FOREACH(pymoab_test ${PYMOAB_TESTS})
     ADD_TEST(NAME pymoab_${pymoab_test}
-      COMMAND "env" "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/lib/:$ENV{LD_LIBRARY_PATH}" "PYTHONPATH=${PROJECT_BINARY_DIR}/pymoab:$ENV{PYTHONPATH}" "${PYTHON_EXECUTABLE}" "${pymoab_test}.py"
-      WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/pymoab/tests/")
+      COMMAND "env" "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/lib/:$ENV{LD_LIBRARY_PATH}" "PYTHONPATH=${PROJECT_BINARY_DIR}/Testing:$ENV{PYTHONPATH}" "${Python_EXECUTABLE}" "${pymoab_test}.py"
+      WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/test/pymoab/")
   ENDFOREACH(pymoab_test)
 endif()
 

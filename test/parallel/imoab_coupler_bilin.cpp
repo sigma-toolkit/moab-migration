@@ -263,6 +263,11 @@ int main( int argc, char* argv[] )
 #ifdef ENABLE_ATMOCN_COUPLING
     if( couComm != MPI_COMM_NULL )
     {
+        // set the ghost layers on the coupler for the source mesh
+        nghlay = 3; // number of ghost layers
+        ierr = iMOAB_SetGhostLayers( cplAtmPID, &nghlay );
+        CHECKIERR( ierr, "cannot set ghost layers" )
+
         PUSH_TIMER( "Compute ATM-OCN mesh intersection" )
         ierr = iMOAB_ComputeMeshIntersectionOnSphere( cplAtmPID, cplOcnPID, cplAtmOcnPID );
         // coverage mesh was computed here, for cplAtmPID, atm on coupler pes

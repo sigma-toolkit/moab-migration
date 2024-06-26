@@ -330,8 +330,9 @@ int main( int argc, char* argv[] )
 
     if( couComm != MPI_COMM_NULL )
     {
-        char outputFileTgt3[] = "recvOcn_ic.h5m";
-        ierr                  = iMOAB_WriteMesh( cplOcnPID, outputFileTgt3, fileWriteOptions );
+        std::stringstream outf;
+        outf << "recvOcn_" << endG4 - startG4 +1 << ".h5m"; // these are number of tasks of the coupler
+        ierr                  = iMOAB_WriteMesh( cplOcnPID, outf.str().c_str(), fileWriteOptions );
         CHECKIERR( ierr, "cannot write ocn mesh after receiving" )
     }
 
@@ -477,7 +478,7 @@ int main( int argc, char* argv[] )
             ierr = iMOAB_WriteMappingWeightsToFile( cplAtmOcnPID, weights_identifiers[0].c_str(),
                                                     atmocn_map_file_name.c_str() );
             CHECKIERR( ierr, "failed to write map file to disk" );
-
+/*
             const std::string intx_from_file_identifier = "map-from-file";
             int dummyCpl                                = -1;
             int dummy_rowcol                            = -1;
@@ -485,6 +486,7 @@ int main( int argc, char* argv[] )
             ierr = iMOAB_LoadMappingWeightsFromFile( cplAtmOcnPID, &dummyCpl, &dummy_rowcol, &dummyType,
                                                      intx_from_file_identifier.c_str(), atmocn_map_file_name.c_str() );
             CHECKIERR( ierr, "failed to load map file from disk" );
+            */
         }
 #endif
     }
@@ -635,8 +637,9 @@ int main( int argc, char* argv[] )
             POP_TIMER( couComm, rankInCouComm )
             if( 1 == n )  // write only for n==1 case
             {
-                char outputFileTgt[] = "fOcnOnCpl.h5m";
-                ierr                 = iMOAB_WriteMesh( cplOcnPID, outputFileTgt, fileWriteOptions );
+                std::stringstream outf;
+                outf << "fOcnOnCpl_" << endG4-startG4+1 << ".h5m";
+                ierr                 = iMOAB_WriteMesh( cplOcnPID, outf.str().c_str(), fileWriteOptions );
                 CHECKIERR( ierr, "could not write fOcnOnCpl.h5m to disk" )
             }
             // check baseline on coupler directly
@@ -710,8 +713,9 @@ int main( int argc, char* argv[] )
         }
         if( ocnComm != MPI_COMM_NULL && 1 == n )  // write only for n==1 case
         {
-            char outputFileOcn[] = "OcnWithProj.h5m";
-            ierr                 = iMOAB_WriteMesh( cmpOcnPID, outputFileOcn, fileWriteOptions );
+            std::stringstream outf;
+            outf << "OcnWithProj_" << endG2 - startG2 +1 << ".h5m"; // these are number of tasks of the ocean
+            ierr                 = iMOAB_WriteMesh( cmpOcnPID, outf.str().c_str(), fileWriteOptions );
             CHECKIERR( ierr, "could not write OcnWithProj.h5m to disk" )
             // test results only for n == 1, for bottomTempProjectedField
             if( !no_regression_test )

@@ -326,7 +326,18 @@ int main( int argc, char* argv[] )
     CHECKIERR( ierr, "Cannot load and migrate ocn mesh" )
 
     MPI_Barrier( MPI_COMM_WORLD );
-
+    if( ocnComm != MPI_COMM_NULL )
+    {
+         int is_sender = 1;
+         int context   = cplocn;
+         iMOAB_DumpCommGraph( cmpOcnPID, &context, &is_sender, "OcnMigS" );
+    }
+    if( couComm != MPI_COMM_NULL )
+    {
+    	int is_sender = 0;
+        int context   = cmpocn;
+        iMOAB_DumpCommGraph( cplOcnPID, &context, &is_sender, "OcnMigR" );
+    }
 
     if( couComm != MPI_COMM_NULL )
     {

@@ -1625,6 +1625,7 @@ ErrorCode ParCommGraph::dump_comm_information( std::string prefix, int is_send )
                 int receiver_proc = mit->first;
                 Range& eids       = mit->second;
                 dbfile << "receiver: " << receiver_proc << " size:" << eids.size() << "\n";
+                eids.print(dbfile, 0);
             }
         }
         else if( graph_type == DOF_BASED )  // just after migration, or from computeGraph
@@ -1663,6 +1664,7 @@ ErrorCode ParCommGraph::dump_comm_information( std::string prefix, int is_send )
                 int sender_proc = mit->first;
                 Range& eids     = mit->second;
                 dbfile << "sender: " << sender_proc << " size:" << eids.size() << "\n";
+                eids.print(dbfile, 0);
             }
         }
         else if( graph_type == DOF_BASED )  // just after migration

@@ -38,6 +38,9 @@ foreach(CYTHON_FILE ${CYTHON_FILES})
         WITH_SOABI
     )
 
+    # Add the macro definition for the specific target
+    target_compile_definitions(${TARGET_NAME} PRIVATE NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION)
+
     # Add the MOAB library as a dependency
     add_dependencies(${TARGET_NAME} MOAB)
 

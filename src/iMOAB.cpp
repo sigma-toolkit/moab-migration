@@ -4471,10 +4471,7 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
     {
         const double dNormalTolerance = 1.0E-8;
         const double dStrictTolerance = 1.0E-12;
-        double dTotalOverlapArea      = 0.0;
-        weightMap->CheckMap( true, true, ( fMonotoneTypeID && *fMonotoneTypeID ), dNormalTolerance, dStrictTolerance,
-                             dTotalOverlapArea );
-        assert( dTotalOverlapArea > 0.0 );
+        weightMap->CheckMap( true, true, ( fMonotoneTypeID && *fMonotoneTypeID ), dNormalTolerance, dStrictTolerance );
     }
 
     return moab::MB_SUCCESS;

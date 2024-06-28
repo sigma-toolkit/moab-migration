@@ -338,6 +338,13 @@ int main( int argc, char* argv[] )
         int context   = cmpocn;
         iMOAB_DumpCommGraph( cplOcnPID, &context, &is_sender, "OcnMigR" );
     }
+    if( ocnComm != MPI_COMM_NULL )
+	{
+    	std::stringstream outf;
+		outf << "origOcn_" << endG2 - startG2 +1 << ".h5m"; // these are number of tasks of the ocn comp
+		ierr                  = iMOAB_WriteMesh( cmpOcnPID, outf.str().c_str(), fileWriteOptions );
+		CHECKIERR( ierr, "cannot write ocn mesh after receiving" )
+	}
 
     if( couComm != MPI_COMM_NULL )
     {

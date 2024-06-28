@@ -1598,7 +1598,7 @@ ErrorCode ParCommGraph::send_graph_partition( ParallelComm* pco, MPI_Comm jcomm 
 }
 // method to expose local graph info: sender id, receiver id, sizes of elements to send, after or
 // before intersection
-ErrorCode ParCommGraph::dump_comm_information( std::string prefix, int is_send )
+ErrorCode ParCommGraph::dump_comm_information( Interface * mb, std::string prefix, int is_send )
 {
     //
     if( -1 != rankInGroup1 && 1 == is_send )  // it is a sender task
@@ -1626,6 +1626,15 @@ ErrorCode ParCommGraph::dump_comm_information( std::string prefix, int is_send )
                 Range& eids       = mit->second;
                 dbfile << "receiver: " << receiver_proc << " size:" << eids.size() << "\n";
                 eids.print(dbfile, 0);
+                std::vector<int> gids;
+                gids.resize(eids.size());
+                mb->tag_get_data(mb->globalId_tag(), eids, &gids[0]);
+                for (int i=0; i< (int) gids.size(); i++)
+                {
+                	dbfile << gids[i] << " ";
+                	if ( i%10 == 9 ) dbfile << "\n";
+                }
+                dbfile << "\n";
             }
         }
         else if( graph_type == DOF_BASED )  // just after migration, or from computeGraph
@@ -1665,6 +1674,15 @@ ErrorCode ParCommGraph::dump_comm_information( std::string prefix, int is_send )
                 Range& eids     = mit->second;
                 dbfile << "sender: " << sender_proc << " size:" << eids.size() << "\n";
                 eids.print(dbfile, 0);
+                std::vector<int> gids;
+                gids.resize(eids.size());
+				mb->tag_get_data(mb->globalId_tag(), eids, &gids[0]);
+				for (int i=0; i< (int) gids.size(); i++)
+				{
+					dbfile << gids[i] << " ";
+					if ( i%10 == 9 ) dbfile << "\n";
+				}
+				dbfile << "\n";
             }
         }
         else if( graph_type == DOF_BASED )  // just after migration

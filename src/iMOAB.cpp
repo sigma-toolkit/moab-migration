@@ -3469,7 +3469,7 @@ ErrCode iMOAB_DumpCommGraph( iMOAB_AppID pid, int* context_id, int* is_sender, c
     std::string prefix_str( prefix );
 
     if( NULL != cgraph )
-        cgraph->dump_comm_information( prefix_str, *is_sender );
+        cgraph->dump_comm_information( context.MBI, prefix_str, *is_sender );
     else
     {
         std::cout << " cannot find ParCommGraph on app with pid " << *pid << " name: " << context.appDatas[*pid].name

@@ -246,7 +246,7 @@ class ParCommGraph
     ErrorCode compute_partition( ParallelComm* pco, Range& owned, int met );
 
     // dump local information about graph
-    ErrorCode dump_comm_information( std::string prefix, int is_send );
+    ErrorCode dump_comm_information( Interface* mb, std::string prefix, int is_send );
 
   private:
     /**

@@ -383,7 +383,7 @@ const char* WriteHDF5::ExportSet::name() const
         case MBENTITYSET:
             return mhdf_set_type_handle();
         default:
-            sprintf( buffer, "%s%d", CN::EntityTypeName( type ), num_nodes );
+            snprintf( buffer, 128, "%s%d", CN::EntityTypeName( type ), num_nodes );
             return buffer;
     }
 }

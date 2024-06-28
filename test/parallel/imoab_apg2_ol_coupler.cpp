@@ -103,7 +103,7 @@ int main( int argc, char* argv[] )
         ocnatmid = 1806;  // component ids are unique over all pes, and established in advance;
 #endif
 #ifdef ENABLE_ATMLND_COUPLING
-    std::string lndFilename = "../../sandbox/MeshFiles/e3sm/ne4pg2_o240/land_p8.h5m";
+    std::string lndFilename = TestDir + "unittest/land_p8_mod.h5m";
     int rankInLndComm       = -1;
     int cpllnd = 10, cmplnd = 9, atmlndid = 610,
         lndatmid = 1006;  // component ids are unique over all pes, and established in advance;
@@ -343,7 +343,7 @@ int main( int argc, char* argv[] )
 
     if( couComm != MPI_COMM_NULL )
     {  // write only for n==1 case
-        char outputFileLnd[] = "recvLnd.h5m";
+        char outputFileLnd[] = "recvLnd2.h5m";
         ierr                 = iMOAB_WriteMesh( cplLndPID, outputFileLnd, fileWriteOptions );
         CHECKIERR( ierr, "cannot write lnd mesh after receiving" )
     }
@@ -388,12 +388,6 @@ int main( int argc, char* argv[] )
         // check if intx valid, write some h5m intx file
         CHECKIERR( ierr, "cannot compute intersection" )
         POP_TIMER( couComm, rankInCouComm )
-
-        PUSH_TIMER( "Compute OCN-ATM mesh intersection" )
-        ierr =
-            iMOAB_ComputeMeshIntersectionOnSphere( cplOcnPID, cplAtmPID, cplOcnAtmPID );  // coverage mesh was computed
-        CHECKIERR( ierr, "cannot compute intersection" )
-        POP_TIMER( couComm, rankInCouComm )
     }
 
     if( atmCouComm != MPI_COMM_NULL )
@@ -410,22 +404,6 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "cannot recompute direct coverage graph for ocean" )
         POP_TIMER( atmCouComm, rankInAtmComm )  // hijack this rank
     }
-    if( ocnCouComm != MPI_COMM_NULL )
-    {
-        // now for the second intersection, ocn-atm; will be sending data from ocean to atm
-        // Can we reuse the intx atm-ocn? Not sure yet; we will compute everything again :(
-        // the new graph will be for sending data from ocn comp to coverage mesh over atm;
-        // it involves initial ocn app; cmpOcnPID; also migrated ocn mesh on coupler pes, cplOcnPID
-        // results are in cplOcnAtmPID, intx mesh; remapper also has some info about coverage mesh
-        // after this, the sending of tags from ocn pes to coupler pes will use the new par comm graph, that has more
-        // precise info about what to send for atm cover ; every time, we will
-        //  use the element global id, which should uniquely identify the element
-        PUSH_TIMER( "Compute ATM coverage graph for OCN mesh" )
-        ierr = iMOAB_CoverageGraph( &ocnCouComm, cmpOcnPID, cplOcnPID, cplOcnAtmPID, &cmpocn, &cplocn,
-                                    &cplatm );  // it happens over joint communicator, ocean + coupler
-        CHECKIERR( ierr, "cannot recompute direct coverage graph for atm" )
-        POP_TIMER( ocnCouComm, rankInOcnComm )  // hijack this rank
-    }
 
     // need to compute graph between phys atm and atm/ocn intx coverage
     if( atmCouComm != MPI_COMM_NULL )
@@ -437,15 +415,6 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "cannot compute graph between phys grid on atm and intx between FV atm and ocn" )
     }
 
-    // also
-    // need to compute graph between ocn/atm intx and phys atm mesh
-    /*if( atmCouComm != MPI_COMM_NULL )
-    {
-        int typeA = 3;  // cells of atmosphere, dof based; maybe need another type for ParCommGraph graphtype ?
-        int typeB = 2;  // point cloud, phys mesh
-        ierr = iMOAB_ComputeCommGraph( cplOcnAtmPID, cmpPhAtmPID, &atmCouComm, &couPEGroup, &atmPEGroup, &typeA, &typeB,
-                                       &ocnatmid, &cmpatm );
-    }*/
     // need to compute graph between atm on coupler and phys atm mesh on component
     if( atmCouComm != MPI_COMM_NULL )
     {
@@ -544,6 +513,33 @@ int main( int argc, char* argv[] )
         POP_TIMER( couComm, rankInCouComm )
     }
 
+    // start ocn atm intx after we are done with atm ocn
+    if( couComm != MPI_COMM_NULL )
+    {
+        PUSH_TIMER( "Compute OCN-ATM mesh intersection" )
+        ierr =
+            iMOAB_ComputeMeshIntersectionOnSphere( cplOcnPID, cplAtmPID, cplOcnAtmPID );  // coverage mesh was computed
+        CHECKIERR( ierr, "cannot compute intersection" )
+        POP_TIMER( couComm, rankInCouComm )
+    }
+
+    if( ocnCouComm != MPI_COMM_NULL )
+    {
+        // now for the second intersection, ocn-atm; will be sending data from ocean to atm
+        // Can we reuse the intx atm-ocn? Not sure yet; we will compute everything again :(
+        // the new graph will be for sending data from ocn comp to coverage mesh over atm;
+        // it involves initial ocn app; cmpOcnPID; also migrated ocn mesh on coupler pes, cplOcnPID
+        // results are in cplOcnAtmPID, intx mesh; remapper also has some info about coverage mesh
+        // after this, the sending of tags from ocn pes to coupler pes will use the new par comm graph, that has more
+        // precise info about what to send for atm cover ; every time, we will
+        //  use the element global id, which should uniquely identify the element
+        PUSH_TIMER( "Compute ATM coverage graph for OCN mesh" )
+        ierr = iMOAB_CoverageGraph( &ocnCouComm, cmpOcnPID, cplOcnPID, cplOcnAtmPID, &cmpocn, &cplocn,
+                                    &cplatm );  // it happens over joint communicator, ocean + coupler
+        CHECKIERR( ierr, "cannot recompute direct coverage graph for atm" )
+        POP_TIMER( ocnCouComm, rankInOcnComm )  // hijack this rank
+    }
+
     // now compute weight maps for ocn to atm mapping;
     if( couComm != MPI_COMM_NULL )
     {
@@ -590,6 +586,7 @@ int main( int argc, char* argv[] )
     int tagIndex[2];
     int tagTypes[2]  = { DENSE_DOUBLE, DENSE_DOUBLE };
     int atmCompNDoFs = 1 /* FV disc_orders[0]*disc_orders[0] */, ocnCompNDoFs = 1 /*FV*/;
+    int filter_type = 0;
 
     const char* bottomFields = "T_ph:u_ph:v_ph";  // same as on phys atm mesh
 
@@ -697,7 +694,7 @@ int main( int argc, char* argv[] )
         /* We have the remapping weights now. Let us apply the weights onto the tag we defined
            on the source mesh and get the projection on the target mesh */
         PUSH_TIMER( "Apply Scalar projection weights" )
-        ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0], concat_fieldname,
+        ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0], concat_fieldname,
                                                    concat_fieldnameT );
         CHECKIERR( ierr, "failed to compute projection weight application" );
         POP_TIMER( couComm, rankInCouComm )
@@ -791,7 +788,7 @@ int main( int argc, char* argv[] )
         /* We have the remapping weights now. Let us apply the weights onto the tag we defined
            on the source mesh and get the projection on the target mesh */
         PUSH_TIMER( "Apply Scalar projection weights" )
-        ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmLndPID, weights_identifiers[0], concat_fieldname,
+        ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmLndPID, &filter_type, weights_identifiers[0], concat_fieldname,
                                                    concat_fieldnameT );
         CHECKIERR( ierr, "failed to compute projection weight application" );
         POP_TIMER( couComm, rankInCouComm )
@@ -893,7 +890,7 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "failed to define the field tags T2_ph, u2_ph, v2_ph" );
 
         PUSH_TIMER( "Apply Scalar projection weights" )
-        ierr = iMOAB_ApplyScalarProjectionWeights( cplLndAtmPID, weights_identifiers[0], concat_fieldname,
+        ierr = iMOAB_ApplyScalarProjectionWeights( cplLndAtmPID, &filter_type, weights_identifiers[0], concat_fieldname,
                                                    concat_fieldnameT );
         CHECKIERR( ierr, "failed to compute projection weight application" );
         POP_TIMER( couComm, rankInCouComm )
@@ -997,7 +994,7 @@ int main( int argc, char* argv[] )
         ierr = iMOAB_DefineTagStorage( cplAtmPID, bottomFields3, &tagTypes[0], &atmCompNDoFs, &tagIndex[0] );
         CHECKIERR( ierr, "failed to define the field tag T3_ph" );
 
-        ierr = iMOAB_ApplyScalarProjectionWeights( cplLndAtmPID, weights_identifiers[0], concat_fieldname,
+        ierr = iMOAB_ApplyScalarProjectionWeights( cplLndAtmPID, &filter_type, weights_identifiers[0], concat_fieldname,
                                                    concat_fieldnameT );
         CHECKIERR( ierr, "failed to compute projection weight application from lnd to atm " );
         POP_TIMER( couComm, rankInCouComm )

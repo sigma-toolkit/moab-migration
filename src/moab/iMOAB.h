@@ -156,7 +156,7 @@ ErrCode iMOAB_Initialize( int argc, iMOAB_String* argv );
  *
  * \return ErrCode    The error code indicating success or failure.
  */
-ErrCode iMOAB_InitializeFortran();
+ErrCode iMOAB_InitializeFortran( void );
 
 /**
  * \brief Finalize the iMOAB interface implementation.
@@ -167,7 +167,7 @@ ErrCode iMOAB_InitializeFortran();
  *
  * \return ErrCode    The error code indicating success or failure.
  */
-ErrCode iMOAB_Finalize();
+ErrCode iMOAB_Finalize( void );
 
 /**
  * \brief Register application - Create a unique application ID and bootstrap interfaces for further queries.
@@ -1056,6 +1056,15 @@ ErrCode iMOAB_DumpCommGraph( iMOAB_AppID pid, int* context_id, int* is_sender, c
  */
 ErrCode iMOAB_MergeVertices( iMOAB_AppID pid );
 
+/**
+ * @brief Set the number of ghost layers for the mesh.
+ *
+ * @param[in] pid (iMOAB_AppID) The unique pointer to the application ID.
+ * @param[in] nghost_layers (int*) The number of ghost layers to set.
+ * @return ErrCode The error code indicating success or failure.
+ */
+ErrCode iMOAB_SetGhostLayers( iMOAB_AppID pid, int* nghost_layers );
+
 #endif /* #ifdef MOAB_HAVE_MPI */
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
@@ -1231,6 +1240,8 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
  * \note <B>Operations:</B> Collective
  *
  * \param[in] pid_intersection (iMOAB_AppID)                The unique pointer to the intersection application ID.
+ * \param[in] filter_type (int)                             Value specifying whether to use a nonlinear filter for property preservation.
+                                                            default (none) = 0, global = 1, local = 2, patch = 3
  * \param[in] solution_weights_identifier  (iMOAB_String)   The unique identifier used to store the computed projection weights locally. Typically,
  *                                                          values could be identifiers such as "scalar", "flux" or "custom".
  * \param[in] source_solution_tag_name   (iMOAB_String)     list of tag names corresponding to participating degrees-of-freedom for the source discretization;
@@ -1241,6 +1252,7 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
 */
 ErrCode iMOAB_ApplyScalarProjectionWeights(
     iMOAB_AppID pid_intersection,
+    int* filter_type, /*  CAAS_NONE = 0, CAAS_GLOBAL = 1, CAAS_LOCAL = 2, CAAS_LOCAL_ADJACENT = 3 */
     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
     const iMOAB_String source_solution_tag_name,
     const iMOAB_String target_solution_tag_name );

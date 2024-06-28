@@ -19,7 +19,7 @@ static void tprint( const char* A )
     int rank;
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );
     char buffer[128];
-    sprintf( buffer, "%02d: %6.2f: %s\n", rank, (double)clock() / CLOCKS_PER_SEC, A );
+    snprintf( buffer, 128, "%02d: %6.2f: %s\n", rank, (double)clock() / CLOCKS_PER_SEC, A );
     fputs( buffer, stderr );
 }
 
@@ -206,7 +206,7 @@ int main( int argc, char* argv[] )
         TPRINT( "Writing individual file" );
         char buffer[64];
         int width = (int)ceil( log10( size ) );
-        sprintf( buffer, "%0*d-", width, rank );
+        snprintf( buffer, 64, "%0*d-", width, rank );
         std::string name( buffer );
         name += indiv_file_name;
         rval = moab.write_file( name.c_str() );

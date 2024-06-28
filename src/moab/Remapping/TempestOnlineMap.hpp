@@ -9,21 +9,25 @@
 #define _TEMPESTONLINEMAP_H_
 
 #include "moab/MOABConfig.h"
-
-// Tempest includes
-#ifdef MOAB_HAVE_TEMPESTREMAP
-#include "moab/Remapping/TempestRemapper.hpp"
-#include "OfflineMap.h"
-#else
+#ifndef MOAB_HAVE_TEMPESTREMAP
 #error Re-configure with TempestRemap
 #endif
 
-#include <string>
-#include <vector>
+#include "moab/Remapping/TempestRemapper.hpp"
+
+// Tempest includes
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#include "OfflineMap.h"
 
 #ifdef MOAB_HAVE_EIGEN3
 #include <Eigen/Sparse>
 #endif
+
+#include <unordered_set>
+
+#pragma GCC diagnostic pop
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -63,10 +67,20 @@ class TempestOnlineMap : public OfflineMap
     // Input / Output types
     enum DiscretizationType
     {
-        DiscretizationType_FV,
-        DiscretizationType_CGLL,
-        DiscretizationType_DGLL,
-        DiscretizationType_PCLOUD
+        DiscretizationType_FV     = 0,
+        DiscretizationType_CGLL   = 1,
+        DiscretizationType_DGLL   = 2,
+        DiscretizationType_PCLOUD = 3
+    };
+
+    // Type of limiter
+    enum CAASType
+    {
+        CAAS_NONE           = 0,
+        CAAS_GLOBAL         = 1,
+        CAAS_LOCAL          = 2,
+        CAAS_LOCAL_ADJACENT = 3,
+        CAAS_QLT            = 4
     };
 
     ///	<summary>
@@ -124,6 +138,8 @@ class TempestOnlineMap : public OfflineMap
     /// in the mesh
     ///	</summary>
     const DataArray1D< double >& GetGlobalTargetAreas() const;
+
+    void PrintMapStatistics();
 
   private:
     ///	<summary>
@@ -221,22 +237,62 @@ class TempestOnlineMap : public OfflineMap
 
   public:
     ///	<summary>
-    ///		Store the tag names associated with global DoF ids for source and target meshes
+    ///	   Store the tag names associated with global DoF ids for source and target meshes to be used for mapping.
+    ///   <param name="srcDofTagName">The tag name associated with global DoF ids for the source mesh</param>
+    ///   <param name="tgtDofTagName">The tag name associated with global DoF ids for the target mesh</param>
     ///	</summary>
     moab::ErrorCode SetDOFmapTags( const std::string srcDofTagName, const std::string tgtDofTagName );
 
     ///	<summary>
-    ///		Compute the association between the solution tag global DoF numbering and
+    ///     @brief Compute the association between the solution tag global DoF numbering and
     ///		the local matrix numbering so that matvec operations can be performed
     ///     consistently.
+    ///    <param name="srcType">The discretization type of the source mesh</param>
+    ///    <param name="srcOrder">The order of the discretization on the source mesh</param>
+    ///    <param name="isSrcContinuous">The continuity of the discretization on the source mesh</param>
+    ///    <param name="srcdataGLLNodes">The GLL nodes on the source mesh</param>
+    ///    <param name="srcdataGLLNodesSrc">The GLL nodes on the source mesh</param>
+    ///    <param name="destType">The discretization type of the destination mesh</param>
+    ///    <param name="destOrder">The order of the discretization on the destination mesh</param>
+    ///    <param name="isTgtContinuous">The continuity of the discretization on the destination mesh</param>
+    ///    <param name="tgtdataGLLNodes">The GLL nodes on the destination mesh</param>
     ///	</summary>
     moab::ErrorCode SetDOFmapAssociation( DiscretizationType srcType,
+                                          int srcOrder,
                                           bool isSrcContinuous,
                                           DataArray3D< int >* srcdataGLLNodes,
                                           DataArray3D< int >* srcdataGLLNodesSrc,
                                           DiscretizationType destType,
-                                          bool isDestContinuous,
+                                          int destOrder,
+                                          bool isTgtContinuous,
                                           DataArray3D< int >* tgtdataGLLNodes );
+
+    ///	<summary>
+    /// @brief ApplyBoundsLimiting - Apply bounds limiting to the data field
+    /// @param dataInDouble - input data field
+    /// @param dataOutDouble - output data field
+    /// @param caasType - type of limiter
+    /// @param caasIteration - iteration number of limiter
+    /// @return - pair of mass defect pre and post limiter application
+    ///	</summary>
+    std::pair< double, double > ApplyBoundsLimiting( std::vector< double >& dataInDouble,
+                                                     std::vector< double >& dataOutDouble,
+                                                     CAASType caasType = CAAS_GLOBAL,
+                                                     int caasIteration = 0,
+                                                     double mismatch = 0.0 );
+
+    /// @brief
+    /// @param vecAdjFaces
+    /// @param nrings
+    /// @param entities
+    /// @param useMOABAdjacencies
+    /// @param trMesh
+    /// @return
+    void ComputeAdjacencyRelations( std::vector< std::unordered_set< int > >& vecAdjFaces,
+                                    int nrings,
+                                    const Range& entities,
+                                    bool useMOABAdjacencies = true,
+                                    Mesh* trMesh            = nullptr );
 
 #ifdef MOAB_HAVE_EIGEN3
 
@@ -329,22 +385,15 @@ class TempestOnlineMap : public OfflineMap
     inline int GetIndexOfColGlobalDoF( int globalColDoF ) const;
 
     ///	<summary>
-    ///		Apply the weight matrix onto the source vector provided as input, and return the column
-    /// vector (solution projection) after the map application
-    ///     Compute:        \p tgtVals = A(S->T) * \srcVals, or
-    ///     if (transpose)  \p tgtVals = [A(T->S)]^T * \srcVals
-    ///	</summary>
-    moab::ErrorCode ApplyWeights( std::vector< double >& srcVals,
-                                  std::vector< double >& tgtVals,
-                                  bool transpose = false );
-
-    ///	<summary>
     ///		Apply the weight matrix onto the source vector (tag) provided as input, and return the
     /// column vector (solution projection) in a tag, after the map application
     ///     Compute:        \p tgtVals = A(S->T) * \srcVals, or
     ///     if (transpose)  \p tgtVals = [A(T->S)]^T * \srcVals
     ///	</summary>
-    moab::ErrorCode ApplyWeights( moab::Tag srcSolutionTag, moab::Tag tgtSolutionTag, bool transpose = false );
+    moab::ErrorCode ApplyWeights( moab::Tag srcSolutionTag,
+                                  moab::Tag tgtSolutionTag,
+                                  bool transpose    = false,
+                                  CAASType caasType = CAAS_NONE );
 
     typedef double ( *sample_function )( double, double );
 
@@ -394,8 +443,34 @@ class TempestOnlineMap : public OfflineMap
 
     moab::ErrorCode set_row_dc_dofs( std::vector< int >& values_entities );
 
+    // hack
+    void SetMeshInput( Mesh* imesh )
+    {
+        m_meshInput = imesh;
+    };
+
   private:
     void setup_sizes_dimensions();
+
+    void CAASLimiter( std::vector< double >& dataCorrectedField,
+                      std::vector< double >& dataLowerBound,
+                      std::vector< double >& dataUpperBound,
+                      double& dMass );
+    double QLTLimiter( int caasIteration,
+                       std::vector< double >& dataCorrectedField,
+                       std::vector< double >& dataLowerBound,
+                       std::vector< double >& dataUpperBound,
+                       std::vector< double >& dMassDefect );
+
+    ///	<summary>
+    ///		Apply the weight matrix onto the source vector provided as input, and return the column
+    /// vector (solution projection) after the map application
+    ///     Compute:        \p tgtVals = A(S->T) * \srcVals, or
+    ///     if (transpose)  \p tgtVals = [A(T->S)]^T * \srcVals
+    ///	</summary>
+    moab::ErrorCode ApplyWeights( std::vector< double >& srcVals,
+                                  std::vector< double >& tgtVals,
+                                  bool transpose = false );
 
 #ifdef MOAB_HAVE_MPI
     int rearrange_arrays_by_dofs( const std::vector< unsigned int >& gdofmap,
@@ -445,6 +520,7 @@ class TempestOnlineMap : public OfflineMap
     std::vector< int > row_dtoc_dofmap, col_dtoc_dofmap, srccol_dtoc_dofmap;
 
     std::map< int, int > rowMap, colMap;
+    int m_input_order, m_output_order;
 
     DataArray3D< int > dataGLLNodesSrc, dataGLLNodesSrcCov, dataGLLNodesDest;
     DiscretizationType m_srcDiscType, m_destDiscType;

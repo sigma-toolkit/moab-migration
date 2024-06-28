@@ -31,12 +31,15 @@
  *
  */
 // MOAB includes
+#include "moab/Core.hpp"
 #include "moab/ParallelComm.hpp"
 #include "MBParallelConventions.h"
-#include "moab/Core.hpp"
+#ifdef MOAB_HAVE_MBCOUPLER
 #include "mbcoupler/Coupler.hpp"
-#include "moab_mpi.h"
 #include "mbcoupler/ElemUtil.hpp"
+#else
+#error Requires MOAB to be built with MBCoupler
+#endif
 #include "moab/MeshGeneration.hpp"
 #include "moab/ProgOptions.hpp"
 

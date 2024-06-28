@@ -655,7 +655,7 @@ ErrorCode project_exact_torus( Interface* mbImpl,
                                int dim,
                                const double R,
                                const double r,
-                               const double center[] )
+                               const double center[3] )
 {
     ErrorCode error;
     Range elems, verts;
@@ -690,7 +690,7 @@ ErrorCode project_exact_torus( Interface* mbImpl,
 
 ErrorCode exact_error_torus( const double R,
                              const double r,
-                             const double center[],
+                             const double center[3],
                              int npnts,
                              double* pnts,
                              double& error_l1,

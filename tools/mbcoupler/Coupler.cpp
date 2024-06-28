@@ -417,10 +417,10 @@ ErrorCode Coupler::locate_points( double* xyz,
 
     }  // end for (unsigned int i = 0; ..
 
+#ifdef VERBOSE
     int num_to_me = 0;
     for( unsigned int i = 0; i < target_pts.get_n(); i++ )
         if( target_pts.vi_rd[2 * i] == (int)my_rank ) num_to_me++;
-#ifdef VERBOSE
     printf( "rank: %u local points: %u, nb sent target pts: %u mappedPts: %u num to me: %d \n", my_rank, num_points,
             target_pts.get_n(), mappedPts->get_n(), num_to_me );
 #endif
@@ -429,12 +429,12 @@ ErrorCode Coupler::locate_points( double* xyz,
     {
         ( myPc->proc_config().crystal_router() )->gs_transfer( 1, target_pts, 0 );
 
+#ifdef VERBOSE
         num_to_me = 0;
         for( unsigned int i = 0; i < target_pts.get_n(); i++ )
         {
             if( target_pts.vi_rd[2 * i] == (int)my_rank ) num_to_me++;
         }
-#ifdef VERBOSE
         printf( "rank: %u after first gs nb received_pts: %u; num_from_me = %d\n", my_rank, target_pts.get_n(),
                 num_to_me );
 #endif
@@ -536,10 +536,8 @@ ErrorCode Coupler::locate_points( double* xyz,
         else if( tl_tmp->vi_rd[3 * i] == (int)my_rank )
             local_pts++;
     }
-#ifdef VERBOSE
     printf( "rank: %u point location: wanted %u got %u locally, %u remote, missing %u\n", my_rank, num_points,
             local_pts, num_points - missing_pts - local_pts, missing_pts );
-#endif
     assert( 0 == missing_pts );  // Will likely break on curved geometries
 
     // No longer need source_pts

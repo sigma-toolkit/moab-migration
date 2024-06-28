@@ -49,8 +49,6 @@
 namespace moab
 {
 
-#define INS_ID( stringvar, prefix, id ) sprintf( stringvar, prefix, id )
-
 #define GET_VAR( name, id, dims )                                     \
     {                                                                 \
         ( id )     = -1;                                              \
@@ -383,7 +381,6 @@ ErrorCode WriteSLAC::gather_mesh_information( MeshInfo& mesh_info,
         iter     = node_vector.begin();
         end_iter = node_vector.end();
 
-        int j                     = 0;
         unsigned char node_marked = 0;
         ErrorCode result;
         for( ; iter != end_iter; ++iter )
@@ -392,7 +389,6 @@ ErrorCode WriteSLAC::gather_mesh_information( MeshInfo& mesh_info,
             result = mbImpl->tag_get_data( mEntityMark, &( *iter ), 1, &node_marked );MB_CHK_SET_ERR( result, "Couldn't get mark data" );
 
             if( 0x1 == node_marked ) dirset_data.nodes.push_back( *iter );
-            j++;
         }
 
         dirset_data.number_nodes = dirset_data.nodes.size();

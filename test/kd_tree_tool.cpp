@@ -445,7 +445,7 @@ std::string clock_to_string( clock_t t )
     //  dt /= 24;
     //  strcpy( unit, "days" );
     //}
-    sprintf( buffer, "%0.2f%s", dt, unit );
+    snprintf( buffer, 256, "%0.2f%s", dt, unit );
     return buffer;
 }
 

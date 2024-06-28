@@ -32,8 +32,6 @@ using namespace moab;
 
 int ncFile;
 
-#define INS_ID( stringvar, prefix, id ) sprintf( stringvar, prefix, id )
-
 #define GET_DIM( ncdim, name, val )                                                    \
     {                                                                                  \
         int gdfail = nc_inq_dimid( ncFile, name, &( ncdim ) );                         \
@@ -51,10 +49,6 @@ int ncFile;
         else                                                                           \
             ( val ) = 0;                                                               \
     }
-
-#define GET_DIMB( ncdim, name, varname, id, val ) \
-    INS_ID( name, varname, id );                  \
-    GET_DIM( ncdim, name, val );
 
 #define GET_VAR( name, id, dims )                                                                \
     {                                                                                            \

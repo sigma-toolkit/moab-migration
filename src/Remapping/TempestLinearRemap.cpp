@@ -8,14 +8,17 @@
 #ifdef WIN32               /* windows */
 #define _USE_MATH_DEFINES  // For M_PI
 #endif
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy-with-user-provided-copy"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+
 #include "Announce.h"
 #include "DataArray3D.h"
 #include "FiniteElementTools.h"
 #include "FiniteVolumeTools.h"
 #include "GaussLobattoQuadrature.h"
 #include "TriangularQuadrature.h"
-#include "MeshUtilitiesFuzzy.h"
-#include "MeshUtilitiesExact.h"
 #include "MathHelper.h"
 #include "SparseMatrix.h"
 #include "OverlapMesh.h"
@@ -25,17 +28,20 @@
 
 #include "moab/Remapping/TempestOnlineMap.hpp"
 #include "moab/TupleList.hpp"
+#include "moab/MeshTopoUtil.hpp"
 
-#ifdef MOAB_HAVE_EIGEN3
-#include <Eigen/Dense>
-#endif
+#pragma GCC diagnostic pop
 
 #include <fstream>
 #include <cmath>
 #include <cstdlib>
 #include <sstream>
+#include <numeric>
+#include <algorithm>
+#include <unordered_set>
 
 // #define VERBOSE
+#define USE_ComputeAdjacencyRelations
 
 /// <summary>
 ///     Face index and distance metric pair.
@@ -106,7 +112,7 @@ moab::ErrorCode moab::TempestOnlineMap::LinearRemapNN_MOAB( bool use_GID_matchin
     {
         /* Create a Kd-tree to perform local queries to find nearest neighbors */
 
-        return moab::MB_SUCCESS;
+        return moab::MB_FAILURE;
     }
 }
 
@@ -120,7 +126,7 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_Tempest_MOAB( int nOrder )
     // Verify ReverseNodeArray has been calculated
     if( m_meshInputCov->faces.size() > 0 && m_meshInputCov->revnodearray.size() == 0 )
     {
-        _EXCEPTIONT( "ReverseNodeArray has not been calculated for m_meshInput" );
+        _EXCEPTIONT( "ReverseNodeArray has not been calculated for m_meshInputCov" );
     }
 
     // Triangular quadrature rule
@@ -140,7 +146,7 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_Tempest_MOAB( int nOrder )
     // Fit weight exponent
     const int nFitWeightsExponent = nOrder + 2;
 
-    // Announcemnets
+    // Announcements
     moab::DebugOutput dbgprint( std::cout, this->rank, 0 );
     dbgprint.set_prefix( "[LinearRemapFVtoFV_Tempest_MOAB]: " );
     if( is_root )
@@ -160,7 +166,7 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_Tempest_MOAB( int nOrder )
     DataArray2D< double > dIntArray;
     DataArray1D< double > dConstraint( nCoefficients );
 
-    // Loop through all faces on m_meshInput
+    // Loop through all faces on m_meshInputCov
     for( size_t ixFirst = 0; ixFirst < m_meshInputCov->faces.size(); ixFirst++ )
     {
         // Output every 1000 elements
@@ -275,6 +281,29 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_Tempest_MOAB( int nOrder )
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void moab::TempestOnlineMap::PrintMapStatistics()
+{
+    int nrows = m_weightMatrix.rows();      // Number of rows
+    int ncols = m_weightMatrix.cols();      // Number of columns
+    int NNZ   = m_weightMatrix.nonZeros();  // Number of non zero values
+#ifdef MOAB_HAVE_MPI
+    // find out min/max for NNZ, ncols, nrows
+    // should work on std c++ 11
+    int arr3[6] = { NNZ, nrows, ncols, -NNZ, -nrows, -ncols };
+    int rarr3[6];
+    MPI_Reduce( arr3, rarr3, 6, MPI_INT, MPI_MIN, 0, m_pcomm->comm() );
+
+    int total[3];
+    MPI_Reduce( arr3, total, 3, MPI_INT, MPI_SUM, 0, m_pcomm->comm() );
+    if( !rank )
+        std::cout << "-> Rows (min/max/sum): (" << rarr3[1] << " / " << -rarr3[4] << " / " << total[1] << "), "
+                  << " Cols (min/max/sum): (" << rarr3[2] << " / " << -rarr3[5] << " / " << total[2] << "), "
+                  << " NNZ (min/max/sum): (" << rarr3[0] << " / " << -rarr3[3] << " / " << total[0] << ")\n";
+#else
+    std::cout << "-> Rows: " << nrows << ", Cols: " << ncols << ", NNZ: " << NNZ << "\n";
+#endif
+}
+
 #ifdef MOAB_HAVE_EIGEN3
 void moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3()
 {
@@ -282,12 +311,6 @@ void moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3()
 #define VERBOSE_ACTIVATED
 // #define VERBOSE
 #endif
-    if( m_nTotDofs_Dest <= 0 || m_nTotDofs_SrcCov <= 0 )
-    {
-        // std::cout << rank << ": rowsize = " <<  m_nTotDofs_Dest << ", colsize = " <<
-        // m_nTotDofs_SrcCov << "\n";
-        // return;  // No need to allocate if either rows or cols size are zero
-    }
 
     /* Should the columns be the global size of the matrix ? */
     m_weightMatrix.resize( m_nTotDofs_Dest, m_nTotDofs_SrcCov );
@@ -316,29 +339,8 @@ void moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3()
     {
         tripletList.push_back( Triplet( lrows[iv], lcols[iv], lvals[iv] ) );
     }
-
     m_weightMatrix.setFromTriplets( tripletList.begin(), tripletList.end() );
     m_weightMatrix.makeCompressed();
-
-    int nrows = m_weightMatrix.rows();      // Number of rows
-    int ncols = m_weightMatrix.cols();      // Number of columns
-    int NNZ   = m_weightMatrix.nonZeros();  // Number of non zero values
-#ifdef MOAB_HAVE_MPI
-    // find out min/max for NNZ, ncols, nrows
-    // should work on std c++ 11
-    int arr3[6] = { NNZ, nrows, ncols, -NNZ, -nrows, -ncols };
-    int rarr3[6];
-    MPI_Reduce( arr3, rarr3, 6, MPI_INT, MPI_MIN, 0, m_pcomm->comm() );
-
-    int total[2];
-    MPI_Reduce( arr3, total, 2, MPI_INT, MPI_SUM, 0, m_pcomm->comm() );
-    if( !rank )
-        std::cout << " Rows:(" << rarr3[1] << ", " << -rarr3[4] << "), Cols:(" << rarr3[2] << ", " << -rarr3[5]
-                  << "), NNZ:(" << rarr3[0] << ", " << -rarr3[3] << "),  total NNZ:" << total[0]
-                  << " total rows:" << total[1] << "\n";
-#else
-    std::cout << "nr rows: " << nrows << " cols: " << ncols << " non-zeros: " << NNZ << "\n";
-#endif
 
 #ifdef VERBOSE
     std::stringstream sstr;
@@ -365,6 +367,497 @@ void moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3()
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+template < typename T >
+static std::vector< size_t > sort_indexes( const std::vector< T >& v )
+{
+    // initialize original index locations
+    std::vector< size_t > idx( v.size() );
+    std::iota( idx.begin(), idx.end(), 0 );
+
+    // sort indexes based on comparing values in v
+    // using std::stable_sort instead of std::sort
+    // to avoid unnecessary index re-orderings
+    // when v contains elements of equal values
+    std::stable_sort( idx.begin(), idx.end(), [&v]( size_t i1, size_t i2 ) { return fabs( v[i1] ) > fabs( v[i2] ); } );
+
+    return idx;
+}
+
+double moab::TempestOnlineMap::QLTLimiter( int caasIteration,
+                                           std::vector< double >& dataCorrectedField,
+                                           std::vector< double >& dataLowerBound,
+                                           std::vector< double >& dataUpperBound,
+                                           std::vector< double >& dMassDefect )
+{
+    const size_t nrows = dataCorrectedField.size();
+    double dMassL      = 0.0;
+    double dMassU      = 0.0;
+    std::vector< double > dataCorrection( nrows );
+    double dMassDiffCum                       = 0.0;
+    double dLMinusU                           = fabs( dataUpperBound[0] - dataLowerBound[0] );
+    const DataArray1D< double >& dTargetAreas = this->m_remapper->m_target->vecFaceArea;
+
+    // std::vector< size_t > sortedIdx = sort_indexes( dMassDefect );
+    std::vector< std::unordered_set< int > > vecAdjTargetFaces( nrows );
+    constexpr bool useMOABAdjacencies = true;
+#ifdef USE_ComputeAdjacencyRelations
+    if( useMOABAdjacencies )
+        ComputeAdjacencyRelations( vecAdjTargetFaces, caasIteration, m_remapper->m_target_entities,
+                                   useMOABAdjacencies );
+    else
+        ComputeAdjacencyRelations( vecAdjTargetFaces, caasIteration, m_remapper->m_target_entities, useMOABAdjacencies,
+                                   this->m_remapper->m_target );
+#else
+    moab::MeshTopoUtil mtu( m_interface );
+    ;
+#endif
+
+    for( size_t i = 0; i < nrows; i++ )
+    {
+        // size_t index = sortedIdx[i];
+        size_t index          = i;
+        dataCorrection[index] = fmax( dataLowerBound[index], fmin( dataUpperBound[index], 0.0 ) );
+        // dMassDiff[index] = dMassDefect[index] - dTargetAreas[index] * dataCorrection[index];
+        // dMassDiff[index] = dMassDefect[index];
+
+        dMassL += dTargetAreas[index] * dataLowerBound[index];
+        dMassU += dTargetAreas[index] * dataUpperBound[index];
+        dLMinusU = fmax( dLMinusU, fabs( dataUpperBound[index] - dataLowerBound[index] ) );
+        dMassDiffCum += dMassDefect[index] - dTargetAreas[index] * dataCorrection[index];
+
+#ifndef USE_ComputeAdjacencyRelations
+        vecAdjTargetFaces[index].insert( index );  // add self target face first
+        {
+            // Compute the adjacent faces to the target face
+            if( useMOABAdjacencies )
+            {
+                moab::Range ents;
+                // ents.insert( m_remapper->m_target_entities.index( m_remapper->m_target_entities[index] ) );
+                ents.insert( m_remapper->m_target_entities[index] );
+                moab::Range adjEnts;
+                moab::ErrorCode rval = mtu.get_bridge_adjacencies( ents, 0, 2, adjEnts, caasIteration );MB_CHK_SET_ERR_CONT( rval, "Failed to get adjacent faces" );
+                for( moab::Range::iterator it = adjEnts.begin(); it != adjEnts.end(); ++it )
+                {
+                    // int adjIndex = m_interface->id_from_handle(*it)-1;
+                    int adjIndex = m_remapper->m_target_entities.index( *it );
+                    // printf("rank: %d, Element %lu, entity: %lu, adjIndex %d\n", rank, index, *it, adjIndex);
+                    if( adjIndex >= 0 ) vecAdjTargetFaces[index].insert( adjIndex );
+                }
+            }
+            else
+            {
+                AdjacentFaceVector vecAdjFaces;
+                GetAdjacentFaceVectorByEdge( *this->m_remapper->m_target, index,
+                                             ( m_output_order + 1 ) * ( m_output_order + 1 ) * ( m_output_order + 1 ),
+                                             //  ( m_output_order + 1 ) * ( m_output_order + 1 ),
+                                             //  ( 4 ) * ( m_output_order + 1 ) * ( m_output_order + 1 ),
+                                             vecAdjFaces );
+
+                // Add the adjacent faces to the target face list
+                for( auto adjFace : vecAdjFaces )
+                    if( adjFace.first >= 0 )
+                        vecAdjTargetFaces[index].insert( adjFace.first );  // map target face to source face
+            }
+        }
+#endif
+    }
+
+#ifdef MOAB_HAVE_MPI
+    std::vector< double > localDefects( 5, 0.0 ), globalDefects( 5, 0.0 );
+    localDefects[0] = dMassL;
+    localDefects[1] = dMassU;
+    localDefects[2] = dMassDiffCum;
+    localDefects[3] = dLMinusU;
+    // localDefects[4] = dMassCorrectU;
+
+    MPI_Allreduce( localDefects.data(), globalDefects.data(), 4, MPI_DOUBLE, MPI_SUM, m_pcomm->comm() );
+
+    dMassL       = globalDefects[0];
+    dMassU       = globalDefects[1];
+    dMassDiffCum = globalDefects[2];
+    dLMinusU     = globalDefects[3];
+    // dMassCorrectU = globalDefects[4];
+#endif
+
+    //If the upper and lower bounds are too close together, just clip
+    if( fabs( dMassDiffCum ) < 1e-15 || dLMinusU < 1e-15 )
+    {
+        for( size_t i = 0; i < nrows; i++ )
+            dataCorrectedField[i] += dataCorrection[i];
+        return dMassDiffCum;
+    }
+    else
+    {
+        if( dMassL > dMassDiffCum )
+        {
+            Announce( "Lower bound mass exceeds target mass by %1.15e: CAAS will need another iteration",
+                      dMassL - dMassDiffCum );
+            dMassDiffCum = dMassL;
+            // dMass -= dMassL;
+        }
+        else if( dMassU < dMassDiffCum )
+        {
+            Announce( "Target mass exceeds upper bound mass by %1.15e: CAAS will need another iteration",
+                      dMassDiffCum - dMassU );
+            dMassDiffCum = dMassU;
+            // dMass -= dMassU;
+        }
+
+        // TODO: optimize away dataMassVec by a simple transient double within the loop
+        // DataArray1D< double > dataMassVec( nrows );  //vector of mass redistribution
+        for( size_t i = 0; i < nrows; i++ )
+        {
+            // size_t index   = sortedIdx[i];
+            size_t index                               = i;
+            const std::unordered_set< int >& neighbors = vecAdjTargetFaces[index];
+            if( dMassDefect[index] > 0.0 )
+            {
+                double dMassCorrectU = 0.0;
+                for( auto it : neighbors )
+                    dMassCorrectU += dTargetAreas[it] * ( dataUpperBound[it] - dataCorrection[it] );
+
+                // double dMassDiffCumOld = dMassDefect[index];
+                for( auto it : neighbors )
+                    dataCorrection[it] +=
+                        dMassDefect[index] * ( dataUpperBound[it] - dataCorrection[it] ) / dMassCorrectU;
+            }
+            else
+            {
+                double dMassCorrectL = 0.0;
+                for( auto it : neighbors )
+                    dMassCorrectL += dTargetAreas[it] * ( dataCorrection[it] - dataLowerBound[it] );
+
+                // double dMassDiffCumOld = dMassDefect[index];
+                for( auto it : neighbors )
+                    dataCorrection[it] +=
+                        dMassDefect[index] * ( dataCorrection[it] - dataLowerBound[it] ) / dMassCorrectL;
+            }
+        }
+
+        for( size_t i = 0; i < nrows; i++ )
+            dataCorrectedField[i] += dataCorrection[i];
+    }
+
+    return dMassDiffCum;
+}
+
+void moab::TempestOnlineMap::CAASLimiter( std::vector< double >& dataCorrectedField,
+                                          std::vector< double >& dataLowerBound,
+                                          std::vector< double >& dataUpperBound,
+                                          double& dMass )
+{
+    const size_t nrows = dataCorrectedField.size();
+    double dMassL      = 0.0;
+    double dMassU      = 0.0;
+    std::vector< double > dataCorrection( nrows );
+    const DataArray1D< double >& dTargetAreas = this->m_remapper->m_target->vecFaceArea;
+    double dMassDiff                          = dMass;
+    double dLMinusU                           = fabs( dataUpperBound[0] - dataLowerBound[0] );
+    double dMassCorrectU                      = 0.0;
+    double dMassCorrectL                      = 0.0;
+    for( size_t i = 0; i < nrows; i++ )
+    {
+        dataCorrection[i] = fmax( dataLowerBound[i], fmin( dataUpperBound[i], 0.0 ) );
+        dMassL += dTargetAreas[i] * dataLowerBound[i];
+        dMassU += dTargetAreas[i] * dataUpperBound[i];
+        dMassDiff -= dTargetAreas[i] * dataCorrection[i];
+        dLMinusU = fmax( dLMinusU, fabs( dataUpperBound[i] - dataLowerBound[i] ) );
+        dMassCorrectL += dTargetAreas[i] * ( dataCorrection[i] - dataLowerBound[i] );
+        dMassCorrectU += dTargetAreas[i] * ( dataUpperBound[i] - dataCorrection[i] );
+    }
+
+#ifdef MOAB_HAVE_MPI
+    std::vector< double > localDefects( 5, 0.0 ), globalDefects( 5, 0.0 );
+    localDefects[0] = dMassL;
+    localDefects[1] = dMassU;
+    localDefects[2] = dMassDiff;
+    localDefects[3] = dMassCorrectL;
+    localDefects[4] = dMassCorrectU;
+
+    MPI_Allreduce( localDefects.data(), globalDefects.data(), 5, MPI_DOUBLE, MPI_SUM, m_pcomm->comm() );
+
+    dMassL        = globalDefects[0];
+    dMassU        = globalDefects[1];
+    dMassDiff     = globalDefects[2];
+    dMassCorrectL = globalDefects[3];
+    dMassCorrectU = globalDefects[4];
+#endif
+
+    //If the upper and lower bounds are too close together, just clip
+    if( fabs( dMassDiff ) < 1e-15 || fabs( dLMinusU ) < 1e-15 )
+    {
+        for( size_t i = 0; i < nrows; i++ )
+            dataCorrectedField[i] += dataCorrection[i];
+        return;
+    }
+    else
+    {
+        if( dMassL > dMassDiff )
+        {
+            Announce( "%d: Lower bound mass exceeds target mass by %1.15e: CAAS will need another iteration", rank,
+                      dMassL - dMassDiff );
+            dMassDiff = dMassL;
+            dMass -= dMassL;
+        }
+        else if( dMassU < dMassDiff )
+        {
+            Announce( "%d: Target mass exceeds upper bound mass by %1.15e: CAAS will need another iteration", rank,
+                      dMassDiff - dMassU );
+            dMassDiff = dMassU;
+            dMass -= dMassU;
+        }
+
+        // TODO: optimize away dataMassVec by a simple transient double within the loop
+        DataArray1D< double > dataMassVec( nrows );  //vector of mass redistribution
+        if( dMassDiff > 0.0 )
+        {
+            for( size_t i = 0; i < nrows; i++ )
+            {
+                dataMassVec[i] = ( dataUpperBound[i] - dataCorrection[i] ) / dMassCorrectU;
+                dataCorrection[i] += dMassDiff * dataMassVec[i];
+            }
+        }
+        else
+        {
+            for( size_t i = 0; i < nrows; i++ )
+            {
+                dataMassVec[i] = ( dataCorrection[i] - dataLowerBound[i] ) / dMassCorrectL;
+                dataCorrection[i] += dMassDiff * dataMassVec[i];
+            }
+        }
+
+        for( size_t i = 0; i < nrows; i++ )
+            dataCorrectedField[i] += dataCorrection[i];
+    }
+
+    return;
+}
+
+std::pair< double, double > moab::TempestOnlineMap::ApplyBoundsLimiting( std::vector< double >& dataInDouble,
+                                                                         std::vector< double >& dataOutDouble,
+                                                                         CAASType caasType,
+                                                                         int caasIteration,
+                                                                         double mismatch )
+{
+    // Currently only implemented for FV to FV remapping
+    // We should generalize this to other types of remapping
+    assert( !dataGLLNodesSrcCov.IsAttached() && !dataGLLNodesDest.IsAttached() );
+
+    std::pair< double, double > massDefect( 0.0, 0.0 );
+
+    // Check if the source and target data are of the same size
+    const size_t nTargetCount                    = dataOutDouble.size();
+    const DataArray1D< double >& m_dOverlapAreas = this->m_remapper->m_overlap->vecFaceArea;
+
+    // Apply the offline map to the data
+    double dMassDiff = 0.0;
+    std::vector< double > x( nTargetCount );
+    std::vector< double > dataLowerBound( nTargetCount );
+    std::vector< double > dataUpperBound( nTargetCount );
+    std::vector< double > massVector( nTargetCount );
+    std::vector< std::unordered_set< int > > vecSourceOvTarget( nTargetCount );
+
+#undef USE_ComputeAdjacencyRelations
+    constexpr bool useMOABAdjacencies = true;
+#ifdef USE_ComputeAdjacencyRelations
+    // Compute the adjacent faces to the source face
+    // However, calling MOAB to do this does not work correctly as we need ixS to be the index
+    // Cannot just iterate over all entities in the source covering mesh
+    if( caasType == CAAS_QLT || caasType == CAAS_LOCAL_ADJACENT )
+    {
+        if( useMOABAdjacencies )
+        {
+            moab::ErrorCode rval =
+                ComputeAdjacencyRelations( vecSourceOvTarget, caasIteration, m_remapper->m_covering_source_entities,
+                                           useMOABAdjacencies );MB_CHK_SET_ERR_CONT( rval, "Failed to get adjacent faces" );
+        }
+        else
+        {
+            moab::ErrorCode rval =
+                ComputeAdjacencyRelations( vecSourceOvTarget, caasIteration, m_remapper->m_covering_source_entities,
+                                           useMOABAdjacencies, m_meshInputCov );MB_CHK_SET_ERR_CONT( rval, "Failed to get adjacent faces" );
+        }
+    }
+#else
+    moab::MeshTopoUtil mtu( m_interface );
+#endif
+
+    // Initialize the bounds on the given source and target data
+    double dSourceMin = dataInDouble[0];
+    double dSourceMax = dataInDouble[0];
+    double dTargetMin = dataOutDouble[0];
+    double dTargetMax = dataOutDouble[0];
+    for( size_t i = 0; i < m_meshOverlap->faces.size(); i++ )
+    {
+        const int ixS = m_meshOverlap->vecSourceFaceIx[i];
+        const int ixT = m_meshOverlap->vecTargetFaceIx[i];
+
+        if( ixT < 0 ) continue;  // skip ghost target faces
+
+        assert( m_dOverlapAreas[i] > 0.0 );
+        assert( ixS >= 0 );
+        assert( ixT >= 0 );
+
+#ifndef USE_ComputeAdjacencyRelations
+        // Compute the adjacent faces to the target face
+        vecSourceOvTarget[ixT].insert( ixS );  // map target face to source face
+        if( ( caasType == CAAS_QLT || caasType == CAAS_LOCAL_ADJACENT ) )
+        {
+            if( useMOABAdjacencies )
+            {
+                moab::Range ents;
+                ents.insert( m_remapper->m_covering_source_entities[ixS] );
+                moab::Range adjEnts;
+                moab::ErrorCode rval = mtu.get_bridge_adjacencies( ents, 0, 2, adjEnts, caasIteration );MB_CHK_SET_ERR_CONT( rval, "Failed to get adjacent faces" );
+                for( moab::Range::iterator it = adjEnts.begin(); it != adjEnts.end(); ++it )
+                {
+                    int adjIndex = m_remapper->m_covering_source_entities.index( *it );
+                    if( adjIndex >= 0 ) vecSourceOvTarget[ixT].insert( adjIndex );
+                }
+            }
+            else
+            {
+                // Compute the adjacent faces to the target face
+                AdjacentFaceVector vecAdjFaces;
+                GetAdjacentFaceVectorByEdge( *m_meshInputCov, ixS,
+                                             ( caasIteration ) * ( m_input_order + 1 ) * ( m_input_order + 1 ),
+                                             vecAdjFaces );
+
+                //Compute min/max over neighboring faces
+                for( size_t iadj = 0; iadj < vecAdjFaces.size(); iadj++ )
+                    vecSourceOvTarget[ixT].insert( vecAdjFaces[iadj].first );  // map target face to source face
+            }
+        }
+#endif
+
+        // Update the min and max values of the source data
+        dSourceMax = fmax( dSourceMax, dataInDouble[ixS] );
+        dSourceMin = fmin( dSourceMin, dataInDouble[ixS] );
+
+        // Update the min and max values of the target data
+        dTargetMin = fmin( dTargetMin, dataOutDouble[ixT] );
+        dTargetMax = fmax( dTargetMax, dataOutDouble[ixT] );
+
+        const double locMassDiff = ( dataInDouble[ixS] * m_dOverlapAreas[i] ) -  // source mass
+                                   ( dataOutDouble[ixT] * m_dOverlapAreas[i] );  // target mass
+
+        // Update the mass difference between source and target faces
+        // linked to the overlap mesh element
+        dMassDiff += locMassDiff;  // target mass
+        massVector[ixT] += locMassDiff;
+    }
+
+#ifdef MOAB_HAVE_MPI
+    std::vector< double > localMinMaxDefects( 5, 0.0 ), globalMinMaxDefects( 5, 0.0 );
+    localMinMaxDefects[0] = dSourceMin;
+    localMinMaxDefects[1] = dTargetMin;
+    localMinMaxDefects[2] = dSourceMax;
+    localMinMaxDefects[3] = dTargetMax;
+    localMinMaxDefects[4] = dMassDiff;
+
+    if( caasType == CAAS_GLOBAL )
+    {
+        MPI_Allreduce( localMinMaxDefects.data(), globalMinMaxDefects.data(), 2, MPI_DOUBLE, MPI_MIN, m_pcomm->comm() );
+        MPI_Allreduce( localMinMaxDefects.data() + 2, globalMinMaxDefects.data() + 2, 2, MPI_DOUBLE, MPI_MAX,
+                       m_pcomm->comm() );
+        dSourceMin = globalMinMaxDefects[0];
+        dSourceMax = globalMinMaxDefects[2];
+        dTargetMin = globalMinMaxDefects[1];
+        dTargetMax = globalMinMaxDefects[3];
+    }
+    if( caasIteration == 1 )
+        MPI_Allreduce( localMinMaxDefects.data() + 4, globalMinMaxDefects.data() + 4, 1, MPI_DOUBLE, MPI_SUM,
+                       m_pcomm->comm() );
+    else
+        globalMinMaxDefects[4] = mismatch;
+
+    dMassDiff  = localMinMaxDefects[4];
+    // massDefect.first = localMinMaxDefects[4];
+    massDefect.first = globalMinMaxDefects[4];
+#else
+
+    // massDefect.first = fabs( dMassDiff / ( dSourceMax - dSourceMin ) );
+    massDefect.first = dMassDiff;
+#endif
+
+    // Early exit if the values are monotone already.
+    // if( ( dTargetMax <= dSourceMax && dTargetMin <= dSourceMin ) || fabs( massDefect.first ) < 1e-16 )
+    if( fabs( massDefect.first ) > 1e-20 )
+    {
+        if( caasType == CAAS_GLOBAL )
+        {
+            for( size_t i = 0; i < nTargetCount; i++ )
+            {
+                dataLowerBound[i] = dSourceMin - dataOutDouble[i];
+                dataUpperBound[i] = dSourceMax - dataOutDouble[i];
+            }
+        }  // if( caasType == CAAS_GLOBAL )
+        else  // caasType == CAAS_LOCAL
+        {
+            // Compute the local min and max values of the target data
+            std::vector< double > vecLocalUpperBound( nTargetCount );
+            std::vector< double > vecLocalLowerBound( nTargetCount );
+            // Loop over the target faces and compute the min and max values
+            // of the source data linked to the target faces
+            for( size_t i = 0; i < nTargetCount; i++ )
+            {
+                assert( vecSourceOvTarget[i].size() );
+
+                double dMinI = 1E10;   // dataInDouble[vecSourceOvTarget[i][0]];
+                double dMaxI = -1E10;  // dataInDouble[vecSourceOvTarget[i][0]];
+
+                // Compute max over intersecting source faces
+                for( const auto& srcElem : vecSourceOvTarget[i] )
+                {
+                    dMinI = fmin( dMinI, dataInDouble[srcElem] );  // min over intersecting source faces
+                    dMaxI = fmax( dMaxI, dataInDouble[srcElem] );  // max over intersecting source faces
+                }
+
+                // Update the min and max values of the target data
+                vecLocalLowerBound[i] = dMinI;
+                vecLocalUpperBound[i] = dMaxI;
+            }
+
+            for( size_t i = 0; i < nTargetCount; i++ )
+            {
+                dataLowerBound[i] = vecLocalLowerBound[i] - dataOutDouble[i];
+                dataUpperBound[i] = vecLocalUpperBound[i] - dataOutDouble[i];
+            }
+        }  // caasType == CAAS_LOCAL
+
+        // Invoke CAAS or QLT application on the map
+        if( fabs( dMassDiff ) > 1e-20 )
+        {
+            if( caasType == CAAS_QLT )
+                dMassDiff = QLTLimiter( caasIteration, dataOutDouble, dataLowerBound, dataUpperBound, massVector );
+            else
+                CAASLimiter( dataOutDouble, dataLowerBound, dataUpperBound, dMassDiff );
+        }
+
+        // Announce output mass
+        double dMassDiffPost = 0.0;
+        for( size_t i = 0; i < m_meshOverlap->faces.size(); i++ )
+        {
+            const int ixS = m_meshOverlap->vecSourceFaceIx[i];
+            const int ixT = m_meshOverlap->vecTargetFaceIx[i];
+
+            if( ixT < 0 ) continue;  // skip ghost target faces
+
+            // Update the mass difference between source and target faces
+            // linked to the overlap mesh element
+            dMassDiffPost += ( dataInDouble[ixS] * m_dOverlapAreas[i] ) -  // source mass
+                             ( dataOutDouble[ixT] * m_dOverlapAreas[i] );  // target mass
+        }
+        // massDefect.second = fabs( dMassDiffPost / ( dSourceMax - dSourceMin ) );
+        massDefect.second = dMassDiffPost;
+    }
+
+    // Ideally should perform an AllReduce here to get the global mass difference across all processors
+    // But if we satisfy the constraint on every task, essentially, the global mass difference should be zero!
+    return massDefect;
+}
+
 //#define VERBOSE
 moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& srcVals,
                                                       std::vector< double >& tgtVals,
@@ -437,6 +930,22 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
             }
         }
     }
+
+    // if( caasType != CAAS_NONE )
+    // {
+    //     constexpr int nmax_caas_iterations = 5;
+    //     double mismatch                    = 1.0;
+    //     int caasIteration                  = 0;
+    //     while( mismatch > 1e-15 &&
+    //            caasIteration++ < nmax_caas_iterations )  // iterate until convergence or a maximum of 5 iterations
+    //     {
+    //         std::pair< double, double > mDefect = this->ApplyCAASLimiting( srcVals, tgtVals, caasType );
+    //         if( m_remapper->verbose )
+    //             printf( "Rank %d: -- Iteration: %d, Net original mass defect: %3.4e, mass defect post-CAAS: %3.4e\n",
+    //                     m_remapper->rank, caasIteration, mDefect.first, mDefect.second );
+    //         mismatch = mDefect.second;
+    //     }
+    // }
 
 #ifdef VERBOSE
     output_file.flush();  // required here
@@ -565,11 +1074,9 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
         size_t ixOverlapTemp = ixOverlap;
         for( ; ixOverlapTemp < m_meshOverlap->faces.size(); ixOverlapTemp++ )
         {
+            // if( m_meshOverlap->vecTargetFaceIx[ixOverlapTemp] < 0 ) continue;  // skip ghost target faces
             // const Face & faceOverlap = m_meshOverlap->faces[ixOverlapTemp];
-            if( ixFirst - m_meshOverlap->vecSourceFaceIx[ixOverlapTemp] != 0 )
-            {
-                break;
-            }
+            if( ixFirst - m_meshOverlap->vecSourceFaceIx[ixOverlapTemp] != 0 ) break;
 
             nOverlapFaces++;
         }
@@ -962,7 +1469,7 @@ void moab::TempestOnlineMap::LinearRemapGLLtoGLL2_MOAB( const DataArray3D< int >
     // Area of each overlap element in the output basis
     DataArray2D< double > dOverlapOutputArea( m_meshOverlap->faces.size(), nPout * nPout );
 
-    // Loop through all faces on m_meshInput
+    // Loop through all faces on m_meshInputCov
     ixOverlap = 0;
 #ifdef VERBOSE
     const unsigned outputFrequency = ( m_meshInputCov->faces.size() / 10 ) + 1;

@@ -15,12 +15,14 @@
 #include <string>
 #include <iostream>
 #include <cassert>
+#include <array>
 #include <numeric>    // std::iota
 #include <algorithm>  // std::sort, std::stable_sort
 
 #include "DebugOutput.hpp"
 #include "moab/Remapping/TempestRemapper.hpp"
 #include "moab/ReadUtilIface.hpp"
+// needed for higher order mapping, retrieve additional layers of cells with bridge methods
 #include "moab/MeshTopoUtil.hpp"
 #include "AEntityFactory.hpp"
 
@@ -36,6 +38,8 @@
 #include "MBParallelConventions.h"
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
+#include "Announce.h"
+#include "FiniteElementTools.h"
 #include "GaussLobattoQuadrature.h"
 #endif
 
@@ -54,6 +58,7 @@ ErrorCode TempestRemapper::initialize( bool initialize_fsets )
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_source_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_target_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_overlap_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
+        m_source_set_with_ghosts = m_source_set; // eventually, this will be overwritten by a new set, with ghosts
     }
     else
     {
@@ -78,6 +83,7 @@ ErrorCode TempestRemapper::initialize( bool initialize_fsets )
         is_parallel = ( size > 1 );
         // is_parallel = true;
     }
+    AnnounceOnlyOutputOnRankZero();
 #endif
 
     m_source          = nullptr;
@@ -247,14 +253,13 @@ ErrorCode TempestRemapper::ConvertTempestMesh( Remapper::IntersectionContext ctx
 #define NEW_CONVERT_LOGIC
 
 #ifdef NEW_CONVERT_LOGIC
-ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType meshType,
+ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType /*meshType*/,
                                                          Mesh* mesh,
                                                          EntityHandle& mesh_set,
                                                          Range& entities,
                                                          Range* vertices )
 {
     ErrorCode rval;
-
     const bool outputEnabled = ( TempestRemapper::verbose && is_root );
     const NodeVector& nodes  = mesh->nodes;
     const FaceVector& faces  = mesh->faces;
@@ -615,16 +620,19 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     }
 
     std::vector< int > globIds( nelems );
-
     moab::Tag gid = m_interface->globalId_tag();
     rval          = m_interface->tag_get_data( gid, elems, &globIds[0] );MB_CHK_ERR( rval );
-    // initialize original index locations
-    std::vector< size_t > sortedIdx( nelems );
-    std::iota( sortedIdx.begin(), sortedIdx.end(), 0 );
-    // sort indexes based on comparing values in v, using std::stable_sort instead of std::sort
-    // to avoid unnecessary index re-orderings when v contains elements of equal values
-    std::sort( sortedIdx.begin(), sortedIdx.end(),
-               [&globIds]( size_t i1, size_t i2 ) { return globIds[i1] < globIds[i2]; } );
+    std::vector< size_t > sortedIdx;
+    if( offlineWorkflow )
+    {
+        sortedIdx.resize( nelems );
+        // initialize original index locations
+        std::iota( sortedIdx.begin(), sortedIdx.end(), 0 );
+        // sort indexes based on comparing values in v, using std::stable_sort instead of std::sort
+        // to avoid unnecessary index re-orderings when v contains elements of equal values
+        std::sort( sortedIdx.begin(), sortedIdx.end(),
+                   [&globIds]( size_t i1, size_t i2 ) { return globIds[i1] < globIds[i2]; } );
+    }
 
     for( unsigned iface = 0; iface < nelems; ++iface )
     {
@@ -665,8 +673,8 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     coordy.clear();
     coordz.clear();
 
-    mesh->RemoveZeroEdges();
     mesh->RemoveCoincidentNodes();
+    mesh->RemoveZeroEdges();
 
     // Generate reverse node array and edge map
     if( constructEdgeMap ) mesh->ConstructEdgeMap( false );
@@ -686,12 +694,12 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-bool IntPairComparator( const std::pair< int, int >& a, const std::pair< int, int >& b )
+bool IntPairComparator( const std::array< int, 3 >& a, const std::array< int, 3 >& b )
 {
-    if( a.first == b.first )
-        return a.second < b.second;
+    if( std::get< 1 >( a ) == std::get< 1 >( b ) )
+        return std::get< 2 >( a ) < std::get< 2 >( b );
     else
-        return a.first < b.first;
+        return std::get< 1 >( a ) < std::get< 1 >( b );
 }
 
 moab::ErrorCode moab::TempestRemapper::GetOverlapAugmentedEntities( moab::Range& sharedGhostEntities )
@@ -746,7 +754,8 @@ ErrorCode TempestRemapper::convert_overlap_mesh_sorted_by_source()
 
     size_t n_overlap_entitites = m_overlap_entities.size();
 
-    std::vector< std::pair< int, int > > sorted_overlap_order( n_overlap_entitites );
+    std::vector< std::array< int, 3 > > sorted_overlap_order( n_overlap_entitites,
+                                                              std::array< int, 3 >( { -1, -1, -1 } ) );
     {
         Tag srcParentTag, tgtParentTag;
         rval = m_interface->tag_get_handle( "SourceParent", srcParentTag );MB_CHK_ERR( rval );
@@ -761,9 +770,11 @@ ErrorCode TempestRemapper::convert_overlap_mesh_sorted_by_source()
         rval = m_interface->tag_get_data( tgtParentTag, m_overlap_entities, &rbids_tgt[0] );MB_CHK_ERR( rval );
         for( size_t ix = 0; ix < n_overlap_entitites; ++ix )
         {
-            sorted_overlap_order[ix].first =
-                ( gid_to_lid_covsrc.size() ? gid_to_lid_covsrc[rbids_src[ix]] : rbids_src[ix] );
-            sorted_overlap_order[ix].second = ix;
+            std::get< 0 >( sorted_overlap_order[ix] ) = ix;
+            std::get< 1 >( sorted_overlap_order[ix] ) =
+                ( gid_to_lid_covsrc.size() ? gid_to_lid_covsrc[rbids_src[ix]] : rbids_src[ix] - 1 );
+            std::get< 2 >( sorted_overlap_order[ix] ) =
+                ( gid_to_lid_tgt.size() ? gid_to_lid_tgt[rbids_tgt[ix]] : rbids_tgt[ix] - 1 );
         }
         std::sort( sorted_overlap_order.begin(), sorted_overlap_order.end(), IntPairComparator );
         // sorted_overlap_order[ie].second , ie=0,nOverlap-1 is the order such that overlap elems
@@ -779,14 +790,12 @@ ErrorCode TempestRemapper::convert_overlap_mesh_sorted_by_source()
         }
         for( unsigned ie = 0; ie < n_overlap_entitites; ++ie )
         {
-            int ix = sorted_overlap_order[ie].second;  // original index of the element
-            m_overlap->vecSourceFaceIx[ie] =
-                ( gid_to_lid_covsrc.size() ? gid_to_lid_covsrc[rbids_src[ix]] : rbids_src[ix] - 1 );
+            int ix = std::get< 0 >( sorted_overlap_order[ie] );  // original index of the element
+            m_overlap->vecSourceFaceIx[ie] = std::get< 1 >( sorted_overlap_order[ie] );
             if( is_parallel && size > 1 && ghFlags[ix] >= 0 )  // it means it is a ghost overlap element
                 m_overlap->vecTargetFaceIx[ie] = -1;           // this should not participate in smat!
             else
-                m_overlap->vecTargetFaceIx[ie] =
-                    ( gid_to_lid_tgt.size() ? gid_to_lid_tgt[rbids_tgt[ix]] : rbids_tgt[ix] - 1 );
+                m_overlap->vecTargetFaceIx[ie] = std::get< 2 >( sorted_overlap_order[ie] );
         }
     }
 
@@ -800,18 +809,15 @@ ErrorCode TempestRemapper::convert_overlap_mesh_sorted_by_source()
     // compactness = " << verts.compactness() << std::endl;
 
     std::map< EntityHandle, int > indxMap;
-    bool useRange = true;
-    if( verts.compactness() > 0.01 )
     {
         int j = 0;
         for( Range::iterator it = verts.begin(); it != verts.end(); ++it )
             indxMap[*it] = j++;
-        useRange = false;
     }
 
     for( unsigned ifac = 0; ifac < m_overlap_entities.size(); ++ifac )
     {
-        const unsigned iface = sorted_overlap_order[ifac].second;
+        const unsigned iface = std::get< 0 >( sorted_overlap_order[ifac] );
         Face& face           = faces[ifac];
         EntityHandle ehandle = m_overlap_entities[iface];
 
@@ -823,11 +829,14 @@ ErrorCode TempestRemapper::convert_overlap_mesh_sorted_by_source()
         face.edges.resize( nnodesf );
         for( int iverts = 0; iverts < nnodesf; ++iverts )
         {
-            int indx = ( useRange ? verts.index( connectface[iverts] ) : indxMap[connectface[iverts]] );
+            int indx = indxMap[connectface[iverts]];
             assert( indx >= 0 );
             face.SetNode( iverts, indx );
         }
     }
+    indxMap.clear();
+
+    sorted_overlap_order.clear();
 
     unsigned nnodes   = verts.size();
     NodeVector& nodes = m_overlap->nodes;
@@ -848,14 +857,14 @@ ErrorCode TempestRemapper::convert_overlap_mesh_sorted_by_source()
     coordz.clear();
     verts.clear();
 
-    m_overlap->RemoveCoincidentNodes( false );
-    m_overlap->RemoveZeroEdges();
+    // m_overlap->RemoveZeroEdges();
+    // m_overlap->RemoveCoincidentNodes( false );
 
     // Generate reverse node array and edge map
     // if ( constructEdgeMap ) m_overlap->ConstructEdgeMap(false);
     // m_overlap->ConstructReverseNodeArray();
 
-    // m_overlap->Validate();
+    m_overlap->Validate();
     return MB_SUCCESS;
 }
 
@@ -869,11 +878,6 @@ ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
         m_covering_source = new Mesh();
         rval = convert_mesh_to_tempest_private( m_covering_source, m_covering_source_set, m_covering_source_entities,
                                                 &m_covering_source_vertices );MB_CHK_SET_ERR( rval, "Can't convert source Tempest mesh" );
-        // printf("[%d]: Covering entities size = %d, Edgemap size = %d\n", rank, m_covering_source_entities.size(), m_covering_source->edgemap.size() );
-
-        // std::cout << "ComputeGlobalLocalMaps: " << rank << ", "
-        //           << " covering entities = [" << m_covering_source_vertices.size() << ", "
-        //           << m_covering_source_entities.size() << "]\n";
     }
 
 #ifdef VERBOSE
@@ -980,32 +984,42 @@ moab::ErrorCode moab::TempestRemapper::WriteTempestIntersectionMesh( std::string
 
     return moab::MB_SUCCESS;
 }
+
 void TempestRemapper::SetMeshSet( Remapper::IntersectionContext ctx /* Remapper::CoveringMesh*/,
                                   moab::EntityHandle mset,
-                                  moab::Range& entities )
+                                  moab::Range* entities )
 {
 
     if( ctx == Remapper::SourceMesh )  // should not be used
     {
-        m_source_entities = entities;
         m_source_set      = mset;
+        if( entities ) m_source_entities = *entities;
     }
     else if( ctx == Remapper::TargetMesh )
     {
-        m_target_entities = entities;
         m_target_set      = mset;
+        if( entities ) m_target_entities = *entities;
     }
     else if( ctx == Remapper::CoveringMesh )
     {
-        m_covering_source_entities = entities;
         m_covering_source_set      = mset;
+        if( entities ) m_covering_source_entities = *entities;
+    }
+    else if( ctx == Remapper::SourceMeshWithGhosts )
+    {
+        m_source_set_with_ghosts = mset;  // entities not used
+    }
+    else if( ctx == Remapper::TargetMeshWithGhosts )
+    {
+        m_target_set_with_ghosts = mset;  // entities not used
     }
     else
     {
-        // some error
+        // nothing to do really..
+        return;
     }
-    return;
 }
+
 ///////////////////////////////////////////////////////////////////////////////////
 
 #ifndef MOAB_HAVE_MPI
@@ -1051,16 +1065,13 @@ ErrorCode TempestRemapper::GenerateCSMeshMetadata( const int ntot_elements,
     int err;
     moab::ErrorCode rval;
 
-    const int res = std::sqrt( ntot_elements / 6 );
+    const int csResolution = std::sqrt( ntot_elements / 6.0 );
 
-    // create a temporary CS mesh
+    if( csResolution * csResolution * 6 != ntot_elements ) return MB_INVALID_SIZE;
+
+    // Create a temporary Cubed-Sphere mesh
     // NOTE: This will not work for RRM grids. Need to run HOMME for that case anyway
-    err = GenerateCSMesh( csMesh, res, "", "NetCDF4" );
-    if( err )
-    {
-        MB_CHK_SET_ERR( MB_FAILURE, "Failed to generate CS mesh through TempestRemap" );
-        ;
-    }
+    err = GenerateCSMesh( csMesh, csResolution, "", "NetCDF4" );MB_CHK_SET_ERR( err ? MB_FAILURE : MB_SUCCESS, "Failed to generate CS mesh through TempestRemap" );
 
     rval = this->GenerateMeshMetadata( csMesh, ntot_elements, ents, secondary_ents, dofTagName, nP );MB_CHK_SET_ERR( rval, "Failed in call to GenerateMeshMetadata" );
 
@@ -1223,12 +1234,14 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
 
 ///////////////////////////////////////////////////////////////////////////////////
 
+//#define MOAB_DBG
 ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
                                                  double radius_src,
                                                  double radius_tgt,
                                                  double boxeps,
                                                  bool regional_mesh,
-                                                 bool gnomonic )
+                                                 bool gnomonic,
+                                                 int order )
 {
     ErrorCode rval;
 
@@ -1236,7 +1249,7 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
     moab::Range local_verts;
 
     // Initialize intersection context
-    mbintx = new moab::Intx2MeshOnSphere( m_interface );
+    mbintx = new moab::Intx2MeshOnSphere( m_interface, moab::IntxAreaUtils::GaussQuadrature );
 
     mbintx->set_error_tolerance( tolerance );
     mbintx->set_radius_source_mesh( radius_src );
@@ -1260,7 +1273,15 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
 
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_covering_source_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
 
-        rval = mbintx->construct_covering_set( m_source_set, m_covering_source_set, gnomonic );MB_CHK_ERR( rval );
+        rval = mbintx->construct_covering_set( m_source_set_with_ghosts, m_covering_source_set, gnomonic, order );MB_CHK_ERR( rval );
+#ifdef MOAB_DBG
+        std::stringstream filename;
+        filename << "covering" << rank << ".h5m";
+        rval = m_interface->write_file( filename.str().c_str(), 0, 0, &m_covering_source_set, 1 );MB_CHK_ERR( rval );
+        std::stringstream targetFile;
+        targetFile << "target" << rank << ".h5m";
+        rval = m_interface->write_file( targetFile.str().c_str(), 0, 0, &m_target_set, 1 );MB_CHK_ERR( rval );
+#endif
     }
     else
     {
@@ -1355,7 +1376,7 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
     return rval;
 }
 
-ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_tempest )
+ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_tempest, int nLayers )
 {
     ErrorCode rval;
     const bool outputEnabled = ( this->rank == 0 );
@@ -1392,46 +1413,6 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
     }
     else
     {
-        Tag gidtag = m_interface->globalId_tag();
-        moab::EntityHandle subrange[2];
-        int gid[2];
-        if( m_source_entities.size() > 1 )
-        {  // Let us do some sanity checking to fix ID if they have are setup incorrectly
-            subrange[0] = m_source_entities[0];
-            subrange[1] = m_source_entities[1];
-            rval        = m_interface->tag_get_data( gidtag, subrange, 2, gid );MB_CHK_ERR( rval );
-
-            // Check if we need to impose Global ID numbering for vertices and elements. This may be
-            // needed if we load the meshes from exodus or some other formats that may not have a
-            // numbering forced.
-            if( gid[0] + gid[1] == 0 )  // this implies first two elements have GID = 0
-            {
-#ifdef MOAB_HAVE_MPI
-                rval = m_pcomm->assign_global_ids( m_source_set, 2, 1, false, true, false );MB_CHK_ERR( rval );
-#else
-                rval = this->assign_vertex_element_IDs( gidtag, m_source_set, 2, 1 );MB_CHK_ERR( rval );
-#endif
-            }
-        }
-        if( m_target_entities.size() > 1 )
-        {
-            subrange[0] = m_target_entities[0];
-            subrange[1] = m_target_entities[1];
-            rval        = m_interface->tag_get_data( gidtag, subrange, 2, gid );MB_CHK_ERR( rval );
-
-            // Check if we need to impose Global ID numbering for vertices and elements. This may be
-            // needed if we load the meshes from exodus or some other formats that may not have a
-            // numbering forced.
-            if( gid[0] + gid[1] == 0 )  // this implies first two elements have GID = 0
-            {
-#ifdef MOAB_HAVE_MPI
-                rval = m_pcomm->assign_global_ids( m_target_set, 2, 1, false, true, false );MB_CHK_ERR( rval );
-#else
-                rval = this->assign_vertex_element_IDs( gidtag, m_target_set, 2, 1 );MB_CHK_ERR( rval );
-#endif
-            }
-        }
-
         // Now perform the actual parallel intersection between the source and the target meshes
         if( kdtree_search )
         {
@@ -1464,13 +1445,16 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
             {
                 Range covEnts;
                 rval = m_interface->get_entities_by_dimension( m_covering_source_set, 2, covEnts );MB_CHK_ERR( rval );
-                Tag gidtag = m_interface->globalId_tag();
 
                 std::map< int, int > loc_gid_to_lid_covsrc;
                 std::vector< int > gids( covEnts.size(), -1 );
-                rval = m_interface->tag_get_data( gidtag, covEnts, &gids[0] );MB_CHK_ERR( rval );
+
+                Tag gidtag = m_interface->globalId_tag();
+                rval       = m_interface->tag_get_data( gidtag, covEnts, gids.data() );MB_CHK_ERR( rval );
+
                 for( unsigned ie = 0; ie < gids.size(); ++ie )
                 {
+                    assert( gids[ie] > 0 );
                     loc_gid_to_lid_covsrc[gids[ie]] = ie;
                 }
 
@@ -1483,10 +1467,20 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                     EntityHandle intxCell = *it;
                     int srcParent         = -1;
                     rval                  = m_interface->tag_get_data( srcParentTag, &intxCell, 1, &srcParent );MB_CHK_ERR( rval );
-                    // if (is_root) std::cout << "Found intersecting element: " << srcParent << ",
-                    // " << gid_to_lid_covsrc[srcParent] << "\n";
+
                     assert( srcParent >= 0 );
                     intxCov.insert( covEnts[loc_gid_to_lid_covsrc[srcParent]] );
+                }
+                if( nLayers )
+                {
+                    if( !intxCov.empty() )
+                    {
+                        // add to the intxCov range the ghost layers we used for coverage for higher order maps
+                        Range extraCovCells;
+                        rval =
+                            MeshTopoUtil( m_interface ).get_bridge_adjacencies( intxCov, 0, 2, extraCovCells, nLayers );MB_CHK_SET_ERR( rval, "Failed to get bridge adjacencies" );
+                        intxCov.merge( extraCovCells );
+                    }
                 }
 
                 Range notNeededCovCells = moab::subtract( covEnts, intxCov );
@@ -1550,18 +1544,18 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
 #endif
                 if( size > 1 )
                 {
+
                     // some source elements cover multiple target partitions; the conservation logic
                     // requires to know all overlap elements for a source element; they need to be
                     // communicated from the other target partitions
                     //
                     // so first we have to identify source (coverage) elements that cover multiple
                     // target partitions
-
+                    //
                     // we will then mark the source, we will need to migrate the overlap elements
                     // that cover this to the original source for the source element; then
                     // distribute the overlap elements to all processors that have the coverage mesh
                     // used
-
                     rval = augment_overlap_set();MB_CHK_ERR( rval );
                 }
             }
@@ -1588,6 +1582,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
 }
 
 #ifdef MOAB_HAVE_MPI
+
 // this function is called only in parallel
 ///////////////////////////////////////////////////////////////////////////////////
 ErrorCode TempestRemapper::augment_overlap_set()
@@ -1618,7 +1613,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
     Range boundaryCells;  // these will be filtered from target_set
     rval = m_interface->get_adjacencies( boundaryEdges, 2, false, boundaryCells, Interface::UNION );MB_CHK_ERR( rval );
     boundaryCells = intersect( boundaryCells, targetCells );
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     EntityHandle tmpSet;
     rval = m_interface->create_meshset( MESHSET_SET, tmpSet );MB_CHK_SET_ERR( rval, "Can't create temporary set" );
     // add the boundary set and edges, and save it to a file
@@ -1629,7 +1624,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
     rval = m_interface->write_mesh( ffs.str().c_str(), &tmpSet, 1 );MB_CHK_ERR( rval );
 #endif
 
-    // now that we have the boundary cells, see which overlap polys have have these as parents;
+    // now that we have the boundary cells, see which overlap polys have these as parents;
     //   find the ids of the boundary cells;
     Tag gid = m_interface->globalId_tag();
     std::set< int > targetBoundaryIds;
@@ -1740,11 +1735,11 @@ ErrorCode TempestRemapper::augment_overlap_set()
     else
         globalMaxEdges = maxEdges;
 
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     if( is_root ) std::cout << "maximum number of edges for polygons to send is " << globalMaxEdges << "\n";
 #endif
 
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     EntityHandle tmpSet2;
     rval = m_interface->create_meshset( MESHSET_SET, tmpSet2 );MB_CHK_SET_ERR( rval, "Can't create temporary set2" );
     // add the affected source and overlap elements
@@ -1884,7 +1879,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
 
     // send first the vertices and overlap cells to original task for coverage cells
     // now we are done populating the tuples; route them to the appropriate processors
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     std::stringstream ff1;
     ff1 << "TLc_" << rank << ".txt";
     TLc.print_to_file( ff1.str().c_str() );
@@ -1895,7 +1890,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
     ( m_pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLv, 0 );
     ( m_pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLc, 0 );
 
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     TLc.print_to_file( ff1.str().c_str() );  // will append to existing file
     TLv.print_to_file( ffv.str().c_str() );
 #endif
@@ -1905,7 +1900,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
     TupleList::buffer buffer;
     buffer.buffer_init( sizeTuple * TLc.get_n() * 2 );  // allocate memory for sorting !! double
     TLc.sort( 1, &buffer );
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     TLc.print_to_file( ff1.str().c_str() );
 #endif
 
@@ -2005,7 +2000,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
     // begin a loop to send the needed cells to the processes; also mark the vertices that need to
     // be sent, put them in a set
 
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     std::cout << " need to initialize TLc2 with " << sizeOfTLc2 << " cells\n ";
 #endif
 
@@ -2119,7 +2114,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
     ( m_pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLc2, 0 );
     // now, look at vertices from TLv2, and create them
     // we should have in TLv2 only vertices with orgProc different from current task
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     std::stringstream ff2;
     ff2 << "TLc2_" << rank << ".txt";
     TLc2.print_to_file( ff2.str().c_str() );
@@ -2178,7 +2173,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
         rval = m_interface->tag_set_data( ghostTag, &polyNew, 1, &orgProc );MB_CHK_ERR( rval );
     }
 
-#ifdef VERBOSE
+#ifdef MOAB_DBG
     EntityHandle tmpSet3;
     rval = m_interface->create_meshset( MESHSET_SET, tmpSet3 );MB_CHK_SET_ERR( rval, "Can't create temporary set3" );
     // add the boundary set and edges, and save it to a file
@@ -2194,8 +2189,9 @@ ErrorCode TempestRemapper::augment_overlap_set()
     rval = m_interface->add_entities( m_overlap_set, newPolygons );MB_CHK_ERR( rval );
     return MB_SUCCESS;
 }
-
 #endif
+
+#undef MOAB_DBG
 
 ErrorCode TempestRemapper::GetIMasks( Remapper::IntersectionContext ctx, std::vector< int >& masks )
 {

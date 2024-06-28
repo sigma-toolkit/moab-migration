@@ -47,12 +47,14 @@
 #error Attempt to compile WriteNCDF with NetCDF support disabled
 #endif
 
+#define CHAR_STR_LEN 128
+
 namespace moab
 {
 
 const int TIME_STR_LEN = 11;
 
-#define INS_ID( stringvar, prefix, id ) sprintf( stringvar, prefix, id )
+#define INS_ID( stringvar, prefix, id ) snprintf( stringvar, CHAR_STR_LEN, prefix, id )
 
 #define GET_DIM( ncdim, name, val )                                                    \
     {                                                                                  \
@@ -73,7 +75,7 @@ const int TIME_STR_LEN = 11;
     }
 
 #define GET_DIMB( ncdim, name, varname, id, val ) \
-    INS_ID( name, varname, id );                  \
+    INS_ID( name, CHAR_STR_LEN, varname, id );    \
     GET_DIM( ncdim, name, val );
 
 #define GET_VAR( name, id, dims )                                     \
@@ -936,7 +938,7 @@ ErrorCode WriteNCDF::write_poly_faces( ExodusMeshInfo& mesh_info )
                 fbepecnt1:entity_type2 = "FACE" ;
      */
     if( pfaces.empty() ) return MB_SUCCESS;
-    char wname[80];
+    char wname[CHAR_STR_LEN];
     int nc_var = -1;
     std::vector< int > dims;
 
@@ -1096,7 +1098,7 @@ ErrorCode WriteNCDF::write_elementblocks( ExodusMeshInfo& mesh_info, std::vector
         if( reorder )
             WriteUtilIface::reorder( reorder, connectivity, block.number_elements, block.number_nodes_per_element );
 
-        char wname[80];
+        char wname[CHAR_STR_LEN];
         int nc_var = -1;
         std::vector< int > dims;
         if( block.element_type != EXOII_POLYHEDRON )
@@ -1416,7 +1418,7 @@ ErrorCode WriteNCDF::write_BCs( std::vector< NeumannSetData >& sidesets, std::ve
         result = write_exodus_integer_variable( "ns_status", &status, ns_index, num_values );MB_CHK_SET_ERR_RET_VAL( result, "Problem writing node set status", MB_FAILURE );
 
         // Write it out
-        char wname[80];
+        char wname[CHAR_STR_LEN];
         int nc_var = -1;
         std::vector< int > dims;
         INS_ID( wname, "node_ns%d", ns_index + 1 );
@@ -1515,7 +1517,7 @@ ErrorCode WriteNCDF::write_BCs( std::vector< NeumannSetData >& sidesets, std::ve
             // while the following use a one-based index.
             ++ss_index;
 
-            char wname[80];
+            char wname[CHAR_STR_LEN];
             int nc_var;
             std::vector< int > dims;
             INS_ID( wname, "elem_ss%d", ss_index );
@@ -1718,18 +1720,18 @@ ErrorCode WriteNCDF::initialize_exodus_file( ExodusMeshInfo& mesh_info,
     }
 
     // count how many are polyhedron blocks
-    int num_fa_blocks = 0, num_polyh_blocks = 0;
+    int num_fa_blocks = 0; //, num_polyh_blocks = 0;
     for( unsigned int i = 0; i < block_data.size(); i++ )
     {
         MaterialSetData& block = block_data[i];
         if( EXOII_POLYHEDRON == block.element_type )
         {
             num_fa_blocks++;
-            num_polyh_blocks++;
+            // num_polyh_blocks++;
         }
     }
     if( 0 == this->repeat_face_blocks && num_fa_blocks > 1 ) num_fa_blocks = 1;
-    char wname[80];
+    char wname[CHAR_STR_LEN];
 
     if( num_fa_blocks > 0 )
     {

@@ -39,7 +39,7 @@ class LinearHex
                                 const int facet,
                                 const int nverts,
                                 const double* verts,
-                                double normal[] );
+                                double normal[3] );
 
     /** \brief Evaluate the jacobian at a specified parametric position */
     static ErrorCode jacobianFcn( const double* params,

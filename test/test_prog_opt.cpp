@@ -308,7 +308,7 @@ void test_string_rank_subst()
         width++;
         size /= 10;
     }
-    sprintf( buffer, "%0*d", width, rank );
+    snprintf( buffer, 64, "%0*d", width, rank );
     exp2  = buffer;
     exp2b = std::string( "foo" ) + buffer + "bar";
     exp4  = std::string( "file." ) + buffer;

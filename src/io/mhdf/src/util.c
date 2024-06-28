@@ -154,7 +154,7 @@ hid_t mhdf_elem_group_from_handle( FileHandle* file_ptr, const char* elem_handle
 #if defined( H5Gopen_vers ) && H5Gopen_vers > 1
     result = H5Gopen2( file_ptr->hdf_handle, path, H5P_DEFAULT );
 #else
-    result  = H5Gopen( file_ptr->hdf_handle, path );
+    result = H5Gopen( file_ptr->hdf_handle, path );
 #endif
     free( path );
     if( result < 0 ) mhdf_setFail( status, "Failed to open element group: \"%s\"", elem_handle );
@@ -262,7 +262,7 @@ int mhdf_find_attribute( hid_t object, const char* attrib_name, unsigned int* in
     *index_out = (unsigned int)idx;
 #else
     *index_out = 0;
-    rval = H5Aiterate( object, index_out, &find_attr_by_name, (void*)attrib_name );
+    rval       = H5Aiterate( object, index_out, &find_attr_by_name, (void*)attrib_name );
 #endif
     if( rval < 0 ) mhdf_setFail( status, "Internal error calling H5Aiterate." );
     return (int)rval;
@@ -842,7 +842,7 @@ int mhdf_write_max_id( FileHandle* file_ptr, mhdf_Status* status )
 
 static int mhdf_api_handle_count = 0;
 
-static int num_open()
+static int num_open( void )
 {
     hid_t list[64];
     int nf, rval, i, count = 0;
@@ -859,7 +859,7 @@ static int num_open()
     return count;
 }
 
-void mhdf_api_begin_internal()
+void mhdf_api_begin_internal( void )
 {
     /* HDF5 docs are incorrect.  Passing H5F_OBJ_ALL as the first
        arg to H5Fget_obj_count returns the total number of open

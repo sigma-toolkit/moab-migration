@@ -96,8 +96,6 @@ static char const kStateName[] = "default";
   };
 */
 
-#define INS_ID( stringvar, prefix, id ) sprintf( stringvar, prefix, id )
-
 #define CHK_SET_CCMERR( ccm_err_code, ccm_err_msg )                                  \
     {                                                                                \
         if( kCCMIONoErr != ( ccm_err_code ) ) MB_SET_ERR( MB_FAILURE, ccm_err_msg ); \

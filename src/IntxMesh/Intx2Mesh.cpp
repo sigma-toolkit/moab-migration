@@ -4,6 +4,10 @@
  *  Created on: Oct 2, 2012
  */
 
+#include <limits>
+#include <queue>
+#include <sstream>
+//
 #include "moab/IntxMesh/Intx2Mesh.hpp"
 #ifdef MOAB_HAVE_MPI
 #include "moab/ParallelComm.hpp"
@@ -11,10 +15,6 @@
 #include "moab/ParallelMergeMesh.hpp"
 #endif /* MOAB_HAVE_MPI */
 #include "MBTagConventions.hpp"
-// this is for DBL_MAX
-#include <cfloat>
-#include <queue>
-#include <sstream>
 #include "moab/GeomUtil.hpp"
 #include "moab/AdaptiveKDTree.hpp"
 
@@ -51,6 +51,7 @@ Intx2Mesh::~Intx2Mesh()
     }
 #endif
 }
+
 ErrorCode Intx2Mesh::FindMaxEdgesInSet( EntityHandle eset, int& max_edges )
 {
     Range cells;
@@ -80,6 +81,7 @@ ErrorCode Intx2Mesh::FindMaxEdgesInSet( EntityHandle eset, int& max_edges )
 
     return MB_SUCCESS;
 }
+
 ErrorCode Intx2Mesh::FindMaxEdges( EntityHandle set1, EntityHandle set2 )
 {
     ErrorCode rval = FindMaxEdgesInSet( set1, max_edges_1 );MB_CHK_SET_ERR( rval, "can't determine max_edges in set 1" );
@@ -257,16 +259,15 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
     // this is the only call that is potentially NlogN, in the whole method
     rval = mb->get_adjacencies( rs2, 1, true, TgtEdges, Interface::UNION );MB_CHK_SET_ERR( rval, "can't get adjacent tgt edges" );
 
-    int indx = 0;
+    int index = 0;
     extraNodesVec.resize( TgtEdges.size() );
-    for( Range::iterator eit = TgtEdges.begin(); eit != TgtEdges.end(); ++eit, indx++ )
+    for( Range::iterator eit = TgtEdges.begin(); eit != TgtEdges.end(); ++eit, index++ )
     {
         std::vector< EntityHandle >* nv = new std::vector< EntityHandle >;
-        extraNodesVec[indx]             = nv;
+        extraNodesVec[index]            = nv;
     }
 
     int defaultInt = -1;
-
     rval = mb->tag_get_handle( "TargetParent", 1, MB_TYPE_INTEGER, tgtParentTag, MB_TAG_DENSE | MB_TAG_CREAT,
                                &defaultInt );MB_CHK_SET_ERR( rval, "can't create positive tag" );
 
@@ -283,6 +284,7 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
     std::vector< EntityHandle > zeroh( max_edges_2, 0 );
     rval = mb->tag_get_handle( "__tgtEdgeNeighbors", max_edges_2, MB_TYPE_HANDLE, neighTgtEdgeTag,
                                MB_TAG_DENSE | MB_TAG_CREAT, &zeroh[0] );MB_CHK_SET_ERR( rval, "can't create tgt edge neighbors tag" );
+
     for( Range::iterator rit = rs2.begin(); rit != rs2.end(); rit++ )
     {
         EntityHandle tgtCell = *rit;
@@ -292,8 +294,7 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
         while( tgtConn[num_nodes - 2] == tgtConn[num_nodes - 1] && num_nodes > 3 )
             num_nodes--;
 
-        int i = 0;
-        for( i = 0; i < num_nodes; i++ )
+        for( int i = 0; i < num_nodes; i++ )
         {
             EntityHandle v[2] = { tgtConn[i],
                                   tgtConn[( i + 1 ) % num_nodes] };  // this is fine even for padded polygons
@@ -308,17 +309,10 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
         rval = mb->tag_set_data( neighTgtEdgeTag, &tgtCell, 1, &( zeroh[0] ) );MB_CHK_SET_ERR( rval, "can't set edge tgt tag" );
     }
 
-    // create the kd tree on source cells, and intersect all targets in an expensive loop
-    // build a kd tree with the rs1 (source) cells
-    AdaptiveKDTree kd( mb );
-    EntityHandle tree_root = 0;
-    rval                   = kd.build_tree( rs1, &tree_root );MB_CHK_ERR( rval );
-
     // find out max edge on source mesh;
     double max_length = 0;
     {
-        std::vector< double > coords;
-        coords.resize( 3 * max_edges_1 );
+        std::vector< double > coords( 3 * max_edges_1, 0.0 );
         for( Range::iterator it = rs1.begin(); it != rs1.end(); it++ )
         {
             const EntityHandle* conn = NULL;
@@ -330,15 +324,16 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
             for( int j = 0; j < nnodes; j++ )
             {
                 int next = ( j + 1 ) % nnodes;
-                double leng;
-                leng = ( coords[3 * j] - coords[3 * next] ) * ( coords[3 * j] - coords[3 * next] ) +
-                       ( coords[3 * j + 1] - coords[3 * next + 1] ) * ( coords[3 * j + 1] - coords[3 * next + 1] ) +
-                       ( coords[3 * j + 2] - coords[3 * next + 2] ) * ( coords[3 * j + 2] - coords[3 * next + 2] );
-                leng = sqrt( leng );
-                if( leng > max_length ) max_length = leng;
+                double edge_length =
+                    ( coords[3 * j] - coords[3 * next] ) * ( coords[3 * j] - coords[3 * next] ) +
+                    ( coords[3 * j + 1] - coords[3 * next + 1] ) * ( coords[3 * j + 1] - coords[3 * next + 1] ) +
+                    ( coords[3 * j + 2] - coords[3 * next + 2] ) * ( coords[3 * j + 2] - coords[3 * next + 2] );
+                if( edge_length > max_length ) max_length = edge_length;
             }
         }
+        max_length = std::sqrt( max_length );
     }
+
     // maximum sag on a spherical mesh make sense only for intx on a sphere, with radius 1 :(
     double tolerance = 1.e-15;
     if( max_length < 1. )
@@ -361,6 +356,15 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
     MPI_Allreduce( &box_error, &min_box_eps, 1, MPI_DOUBLE, MPI_MIN, parcomm->comm() );
     box_error = min_box_eps;
 #endif
+
+    // create the kd tree on source cells, and intersect all targets in an expensive loop
+    // build a kd tree with the rs1 (source) cells
+    FileOptions kdOpts("PLANE_SET=1;SPLITS_PER_DIR=2;SPHERICAL;RADIUS=1.0;");
+    AdaptiveKDTree kd( mb );
+    kd.parse_options( kdOpts );
+    EntityHandle tree_root = 0;
+    rval                   = kd.build_tree( rs1, &tree_root );MB_CHK_ERR( rval );
+
     for( Range::iterator it = rs2.begin(); it != rs2.end(); ++it )
     {
         EntityHandle tcell = *it;
@@ -445,6 +449,7 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
     this->clean();
     return MB_SUCCESS;
 }
+
 // main interface; this will do the advancing front trick
 // some are triangles, some are quads, some are polygons ...
 ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2, EntityHandle& outputSet )
@@ -467,6 +472,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
 
     rval = mb->get_entities_by_dimension( mbs1, 2, rs1 );MB_CHK_ERR( rval );
     rval = mb->get_entities_by_dimension( mbs2, 2, rs2 );MB_CHK_ERR( rval );
+
     // filter rs1 and rs2 by mask; remove everything with 0 mask
     // get the mask tag if it exists; if not, leave it uninitialized (NULL)
     mb->tag_get_handle( "GRID_IMASK", imaskTag );
@@ -474,8 +480,6 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
 
     rval = filterByMask( rs1 );MB_CHK_ERR( rval );
     rval = filterByMask( rs2 );MB_CHK_ERR( rval );
-    // std::cout << "rs1.size() = " << rs1.size() << " and rs2.size() = "  << rs2.size() << "\n";
-    // std::cout.flush();
 
     createTags();  // will also determine max_edges_1, max_edges_2 (for src and tgt meshes)
 
@@ -488,7 +492,9 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
     // early from contention
 
     // build a kd tree with the rs1 (source) cells
+    FileOptions kdOpts("PLANE_SET=1;SPLITS_PER_DIR=2;SPHERICAL;RADIUS=1.0;");
     AdaptiveKDTree kd( mb );
+    kd.parse_options( kdOpts );
     EntityHandle tree_root = 0;
     rval                   = kd.build_tree( rs1, &tree_root );MB_CHK_ERR( rval );
 
@@ -524,7 +530,6 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
             std::vector< EntityHandle > leaves;
             for( int i = 0; i < nnodes; i++ )
             {
-
                 leaves.clear();
                 rval = kd.distance_search( &positions[3 * i], epsilon_1, leaves, epsilon_1, epsilon_1 );MB_CHK_ERR( rval );
 
@@ -574,8 +579,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
         std::queue< EntityHandle > tgtQueue;
         tgtQueue.push( startTgt );
 
-        Range toResetSrcs;  // will be used to reset src flags for every tgt quad
-        // processed
+        Range toResetSrcs;  // will be used to reset src flags for every tgt element processed
 
         /*if (my_rank==0)
           dbg_1 = 1;*/
@@ -809,6 +813,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
     this->clean();
     return MB_SUCCESS;
 }
+
 ErrorCode Intx2Mesh::filterByMask( Range& cells )
 {
     if( !imaskTag ) return MB_SUCCESS;  // nothing to do
@@ -826,6 +831,7 @@ ErrorCode Intx2Mesh::filterByMask( Range& cells )
     cells = subtract( cells, cellsToRemove );
     return MB_SUCCESS;
 }
+
 // clean some memory allocated
 void Intx2Mesh::clean()
 {
@@ -841,6 +847,7 @@ void Intx2Mesh::clean()
     mb->tag_delete( TgtFlagTag );
     counting = 0;  // reset counting to original value
 }
+
 // this method will reduce number of nodes, collapse edges that are of length 0
 // so a polygon like 428 431 431 will become a line 428 431
 // or something like 428 431 431 531 -> 428 431 531
@@ -877,7 +884,9 @@ void Intx2Mesh::correct_polygon( EntityHandle* nodes, int& nP )
     }
     return;
 }
+
 #ifdef MOAB_HAVE_MPI
+
 ErrorCode Intx2Mesh::build_processor_euler_boxes( EntityHandle euler_set, Range& local_verts, bool gnomonic )
 {
     // if it comes here, we want regular 3d boxes
@@ -892,8 +901,8 @@ ErrorCode Intx2Mesh::build_processor_euler_boxes( EntityHandle euler_set, Range&
     assert( parcomm != NULL );
 
     // get the position of local vertices, and decide local boxes (allBoxes...)
-    double bmin[3] = { DBL_MAX, DBL_MAX, DBL_MAX };
-    double bmax[3] = { -DBL_MAX, -DBL_MAX, -DBL_MAX };
+    double bmin[3] = { std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max() };
+    double bmax[3] = { -std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(), -std::numeric_limits<double>::max() };
 
     std::vector< double > coords( 3 * num_local_verts );
     rval = mb->get_coords( local_verts, &coords[0] );ERRORR( rval, "can't get coords of vertices " );
@@ -950,6 +959,7 @@ ErrorCode Intx2Mesh::build_processor_euler_boxes( EntityHandle euler_set, Range&
 
     return MB_SUCCESS;
 }
+
 ErrorCode Intx2Mesh::create_departure_mesh_2nd_alg( EntityHandle& euler_set, EntityHandle& covering_lagr_set )
 {
     // compute the bounding box on each proc
@@ -989,8 +999,8 @@ ErrorCode Intx2Mesh::create_departure_mesh_2nd_alg( EntityHandle& euler_set, Ent
         const EntityHandle* conn4;
         int num_nodes;
         rval = mb->get_connectivity( q, conn4, num_nodes );ERRORR( rval, "can't get DP tag values" );
-        CartVect qbmin( DBL_MAX );
-        CartVect qbmax( -DBL_MAX );
+        CartVect qbmin( std::numeric_limits<double>::max() );
+        CartVect qbmax( -std::numeric_limits<double>::max() );
         for( int i = 0; i < num_nodes; i++ )
         {
             EntityHandle v = conn4[i];
@@ -1265,8 +1275,8 @@ ErrorCode Intx2Mesh::create_departure_mesh_3rd_alg( EntityHandle& lagr_set, Enti
         const EntityHandle* conn4;
         int num_nodes;
         rval = mb->get_connectivity( q, conn4, num_nodes );ERRORR( rval, "can't get DP tag values" );
-        CartVect qbmin( DBL_MAX );
-        CartVect qbmax( -DBL_MAX );
+        CartVect qbmin( std::numeric_limits<double>::max() );
+        CartVect qbmax( -std::numeric_limits<double>::max() );
         for( int i = 0; i < num_nodes; i++ )
         {
             EntityHandle v = conn4[i];

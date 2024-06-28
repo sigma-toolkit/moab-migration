@@ -284,7 +284,6 @@ program imoab_coupler_fortran
    projectedFieldsBilin = 'Sa_dens_bilin_proj:Sa_pbot_bilin_proj'//C_NULL_CHAR
    projectedFieldsSecond = 'Sa_dens_o2_proj:Sa_pbot_o2_proj'//C_NULL_CHAR
    projectedFieldsCAAS = 'Sa_dens_o2_caas_proj:Sa_pbot_o2_caas_proj'//C_NULL_CHAR
-   !transferFields = projectedFields//':'//projectedFieldsBilin//':'//projectedFieldsSecond//':'//projectedFieldsCAAS
    transferFields = 'Sa_dens_proj:Sa_pbot_proj:Sa_dens_bilin_proj:Sa_pbot_bilin_proj:Sa_dens_o2_proj:'//&
                     'Sa_pbot_o2_proj:Sa_dens_o2_caas_proj:Sa_pbot_o2_caas_proj'//C_NULL_CHAR
 

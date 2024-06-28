@@ -73,6 +73,7 @@ struct ToolContext
     bool rrmGrids;      // Flag specifying that we are dealing with regionally refined grids (possibly nonoverlapping)
     bool kdtreeSearch;  // Use Kd-tree based search for computing mesh intersections instead of advancing front
     bool fCheck;        // Check the generated map for conservation and consistency
+    bool fEdgeMap;      // Compute conservative edge maps for projection
     bool fVolumetric;   // Apply a volumetric projection to compute the weights
     bool useGnomonicProjection;                     // Use Gnomonic plane projections to compute coverage mesh
     moab::TempestOnlineMap::CAASType cassType;      // CAAS filter type
@@ -92,10 +93,10 @@ struct ToolContext
           blockSize( 5 ), nlayers( 0 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "" ),
           baselineFile( "" ), variableToVerify( "" ), meshType( moab::TempestRemapper::DEFAULT ), skip_io( false ),
           computeDual( false ), computeWeights( false ), verifyWeights( false ), enforceConvexity( false ),
-          ensureMonotonicity( 0 ), rrmGrids( false ), kdtreeSearch( true ), fCheck( false ), fVolumetric( false ),
-          useGnomonicProjection( false ), cassType( moab::TempestOnlineMap::CAAS_NONE ), print_diagnostics( false ),
-          boxeps( 1e-7 ),               // Box error tolerance default value
-          epsrel( ReferenceTolerance )  // ReferenceTolerance is defined in Defines.h in TempestRemap
+          ensureMonotonicity( 0 ), rrmGrids( false ), kdtreeSearch( true ), fCheck( false ), fEdgeMap( false ),
+          fVolumetric( false ), useGnomonicProjection( false ), cassType( moab::TempestOnlineMap::CAAS_NONE ),
+          print_diagnostics( false ), boxeps( 1e-7 ),  // Box error tolerance default value
+          epsrel( ReferenceTolerance )                 // ReferenceTolerance is defined in Defines.h in TempestRemap
     {
         inFilenames.resize( 2 );
         doftag_names.resize( 2 );
@@ -244,6 +245,8 @@ struct ToolContext
                              &rrmGrids );
 
         opts.addOpt< void >( "checkmap", "Check the generated map for conservation and consistency", &fCheck );
+
+        opts.addOpt< void >( "edgemap", "Compute conservative edge maps for projection", &fEdgeMap );
 
         opts.addOpt< void >( "verify",
                              "Verify the accuracy of the maps by projecting analytical functions "
@@ -709,9 +712,7 @@ int main( int argc, char* argv[] )
                 rval = moab::IntxUtils::enforce_convexity( mbCore, runCtx->meshsets[0], proc_id );MB_CHK_ERR( rval );
             }
             rval = areaAdaptor.positive_orientation( mbCore, runCtx->meshsets[0], radius_src );MB_CHK_ERR( rval );
-            // if( !proc_id )
-            //     outputFormatter.printf( 0, "The source set contains %lu vertices and %lu elements \n", srcverts.size(),
-            //                             srcelems.size() );
+
             velist[0] = srcverts.size();
             velist[1] = srcelems.size();
 
@@ -724,20 +725,12 @@ int main( int argc, char* argv[] )
                 rval = moab::IntxUtils::enforce_convexity( mbCore, runCtx->meshsets[1], proc_id );MB_CHK_ERR( rval );
             }
             rval = areaAdaptor.positive_orientation( mbCore, runCtx->meshsets[1], radius_dest );MB_CHK_ERR( rval );
-            // if( !proc_id )
-            //     outputFormatter.printf( 0, "The target set contains %lu vertices and %lu elements \n", tgtverts.size(),
-            //                             tgtelems.size() );
+
             velist[2] = tgtverts.size();
             velist[3] = tgtelems.size();
         }
         //rval = mbCore->write_file( "source_mesh.h5m", nullptr, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
         //rval = mbCore->write_file( "target_mesh.h5m", nullptr, writeOptions, &runCtx->meshsets[1], 1 );MB_CHK_ERR( rval );
-
-        // if( runCtx->nlayers && nprocs > 1 )
-        // {
-        //     remapper.ResetMeshSet( moab::Remapper::SourceMesh, runCtx->meshsets[3] );
-        //     runCtx->meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );  //  ?
-        // }
 
         // First compute the covering set such that the target elements are fully covered by the
         // local source grid

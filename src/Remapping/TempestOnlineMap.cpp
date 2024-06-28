@@ -1761,7 +1761,8 @@ void moab::TempestOnlineMap::ComputeAdjacencyRelations( std::vector< std::unorde
 moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
                                                       moab::Tag tgtSolutionTag,
                                                       bool transpose,
-                                                      CAASType caasType )
+                                                      CAASType caasType,
+                                                      bool edgeMap )
 {
     moab::ErrorCode rval;
 

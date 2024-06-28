@@ -472,7 +472,7 @@ ErrorCode TreeValidator::visit( EntityHandle node, int depth, bool& descend )
             //        ++child_outside_count;
             //        print( children[i], "Parent box does not contain child box." );
             //        char string[64];
-            //        sprintf(string, "     Volume ratio is %f", other_box.volume()/box.volume() );
+            //        snprintf(string, 64, "     Volume ratio is %f", other_box.volume()/box.volume() );
             //        print( children [i], string );
             //      }
             else
@@ -481,9 +481,9 @@ ErrorCode TreeValidator::visit( EntityHandle node, int depth, bool& descend )
                 if( vol_ratio > 2.0 )
                 {
                     char string[64];
-                    sprintf( string, "child/parent volume ratio is %f", vol_ratio );
+                    snprintf( string, 64, "child/parent volume ratio is %f", vol_ratio );
                     print( children[i], string );
-                    sprintf( string, "   child/parent area ratio is %f", other_box.area() / box.area() );
+                    snprintf( string, 64, "   child/parent area ratio is %f", other_box.area() / box.area() );
                     print( children[i], string );
                 }
             }
@@ -585,7 +585,7 @@ ErrorCode TreeValidator::visit( EntityHandle node, int depth, bool& descend )
     if( depth + 1 < settings.max_depth && contents.size() > (unsigned)( 4 * settings.max_leaf_entities ) )
     {
         char string[64];
-        sprintf( string, "leaf at depth %d with %u entities", depth, (unsigned)contents.size() );
+        snprintf( string, 64, "leaf at depth %d with %u entities", depth, (unsigned)contents.size() );
         print( node, string );
     }
 
@@ -709,7 +709,7 @@ ErrorCode VtkWriter::visit( EntityHandle node, int, bool& descend )
 
     int id = instance->id_from_handle( node );
     char id_str[32];
-    sprintf( id_str, "%d", id );
+    snprintf( id_str, 32, "%d", id );
 
     std::string file_name( baseName );
     file_name += ".";

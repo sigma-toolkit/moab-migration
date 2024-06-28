@@ -1044,7 +1044,7 @@ MB_OPTIONAL_TOOL([gsets],        [yes], [yes])
 MB_OPTIONAL_TOOL([mbmerge],      [yes], [yes])
 MB_OPTIONAL_TOOL([mbdepth],      [yes], [yes])
 if test "x$enablempi" != "xno"; then
-  MB_OPTIONAL_TOOL([mbcoupler],  [no], [yes] )
+  MB_OPTIONAL_TOOL([mbcoupler],  [yes], [yes] )
   MB_OPTIONAL_TOOL([mcnpmit],    [no], [yes])
 else
   AS_ECHO(["Disabling mbcoupler, and mcnpmit since these tools require MPI/parallel configuration"])

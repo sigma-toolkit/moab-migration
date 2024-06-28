@@ -353,7 +353,7 @@ std::string clock_to_string( clock_t t )
     //  dt /= 24;
     //  strcpy( unit, "days" );
     //}
-    sprintf( buffer, "%0.2f%s", dt, unit );
+    snprintf( buffer, 256, "%0.2f%s", dt, unit );
     return buffer;
 }
 
@@ -376,7 +376,7 @@ std::string mem_to_string( unsigned long mem )
         strcpy( unit, "GB" );
     }
     char buffer[256];
-    sprintf( buffer, "%lu %s", mem, unit );
+    snprintf( buffer, 256, "%lu %s", mem, unit );
     return buffer;
 }
 

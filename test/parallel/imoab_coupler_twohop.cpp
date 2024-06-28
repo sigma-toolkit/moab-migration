@@ -464,6 +464,7 @@ int main( int argc, char* argv[] )
     int tagIndex[2];
     int tagTypes[2]  = { DENSE_DOUBLE, DENSE_DOUBLE };
     int atmCompNDoFs = disc_orders[0] * disc_orders[0], ocnCompNDoFs = 1 /*FV*/;
+    int filter_type = 0;
 
     const char* bottomFields           = "a2oTbot:a2oUbot:a2oVbot";
     const char* bottomProjectedFields  = "a2oTbot_proj:a2oUbot_proj:a2oVbot_proj";
@@ -590,7 +591,7 @@ int main( int argc, char* argv[] )
             /* We have the remapping weights now. Let us apply the weights onto the tag we defined
                on the source mesh and get the projection on the target mesh */
             PUSH_TIMER( "Apply Scalar projection weights" )
-            ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0].c_str(), bottomFields,
+            ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0].c_str(), bottomFields,
                                                        bottomProjectedFields );
             CHECKIERR( ierr, "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )
@@ -641,9 +642,9 @@ int main( int argc, char* argv[] )
         }
         if( ocnComm != MPI_COMM_NULL && 1 == n )  // write only for n==1 case
         {
-            char outputFileOcn[] = "OcnWithProj.h5m";
+            char outputFileOcn[] = "OcnWithProj4.h5m";
             ierr                 = iMOAB_WriteMesh( cmpOcnPID, outputFileOcn, fileWriteOptions );
-            CHECKIERR( ierr, "could not write OcnWithProj.h5m to disk" )
+            CHECKIERR( ierr, "could not write OcnWithProj4.h5m to disk" )
             // test results only for n == 1, for bottomTempProjectedField
             if( !no_regression_test )
             {
@@ -744,7 +745,7 @@ int main( int argc, char* argv[] )
             /* We have the remapping weights now. Let us apply the weights onto the tag we defined
                on the source mesh and get the projection on the target mesh */
             PUSH_TIMER( "Apply Scalar projection weights" )
-            ierr = iMOAB_ApplyScalarProjectionWeights( cplAtm2OcnPID, weights_identifiers[0].c_str(),
+            ierr = iMOAB_ApplyScalarProjectionWeights( cplAtm2OcnPID, &filter_type, weights_identifiers[0].c_str(),
                                                        bottomSourceFields2, bottomProjectedFields3 );
             CHECKIERR( ierr, "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )

@@ -302,21 +302,7 @@ cell2.gen: $(MESHDIR)/cell2.gen.gz
 	$(AM_V_GEN)$(ZCAT) $< > $@
 
 
-CLEANFILES = mb_big_test.g \
-             cell1.gen \
-             cell2.gen \
-             outTempestCS.g \
-             outTempestRLL.g \
-             outTempestICO.g \
-             outTempestICOD.g \
-             outTempestOV.g \
-             geom_missing_obb.h5m \
-             geom_w_obbs.h5m \
-             fIntxLndTarget.h5m \
-             fIntxAtmTarget.h5m \
-             fIntxOcnTarget.h5m \
-             atm_ocn_map.nc fOcnOnCpl.h5m fOcnOnCpl2.h5m \
-             $(PYCLEANFILES)
+CLEANFILES = *.g *.gen *.nc *.h5m $(PYCLEANFILES)
 
 DISTCLEANFILES = a.out
 

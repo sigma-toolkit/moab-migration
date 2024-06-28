@@ -1229,7 +1229,7 @@ inline ErrorCode ScdInterface::compute_partition_sqjk( int np,
             int ind = vit - ppfactors.begin();
 
             pj = 1;
-            if( ind >= 0 && !pfactors.empty() ) pfactors[ind];
+            if( ind >= 0 && !pfactors.empty() ) pj = pfactors[ind];
             pk = np / pj;
         }
 

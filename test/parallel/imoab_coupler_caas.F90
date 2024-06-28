@@ -1,10 +1,19 @@
-!      This program shows how to do an imoab_coupler type test in fortran 90
-!      the atm and ocean files are read from repo, meshes are migrated to coupler pes,
-!      the intx is caried on, weight generation,; tag migration and projection,
-!      migrate back to ocean pes, and compare against baseline1.txt
-!      cannot change source/target files, or the layout, just test the imoab
-!       calls, that need to give the same results as C=++ equivalent test (imoab_coupler)
-!          between atm SE and ocn FV
+!This program shows how to do perform FV-FV projections in multiple ways in Fortran90
+!
+!The program workflows is as follows :
+! - Setup a source( ATM ) and a target( OCN ) mesh in some PEs
+! - Next migrate the meshes to the coupler PEs and compute source coverage mesh
+! - Then compute the intersection mesh between the source and target meshes
+! - Next compute the weights for the projection for 4 different methods
+!    * First order projection
+!    * Bilinear projection
+!    * Second order projection
+!    * Second order projection with CAAS operator
+! - Then apply the weights to the source mesh and get the projected fields
+!   for all the different methods
+! - Finally send all the projected fields back to the target PEs
+!
+!   The program uses iMOAB Fortran90 interface to MOAB
 
 SUBROUTINE errorout(ierr, message)
    integer ierr
@@ -18,6 +27,8 @@ end
 !
 #include "moab/MOABConfig.h"
 
+#define VERBOSE
+
 #ifndef MOAB_MESH_DIR
 #error Specify MOAB_MESH_DIR path
 #endif
@@ -26,10 +37,10 @@ program imoab_coupler_fortran
 
    use iso_c_binding
    use iMOAB
+   implicit none
 
 #include "mpif.h"
 #include "moab/MOABConfig.h"
-   !implicit none
    integer :: m ! for number of arguments ; if less than 1, exit
    integer :: global_comm
    integer :: rankInGlobalComm, numProcesses
@@ -38,9 +49,9 @@ program imoab_coupler_fortran
    integer :: jgroup   ! group for global comm
    character(:), allocatable :: atmFileName
    character(:), allocatable :: ocnFileName
-   character(:), allocatable :: baselineFileName
    character(:), allocatable :: readopts, fileWriteOptions
    character :: appname*128
+   character(30) :: nproc
    character(:), allocatable :: weights_identifier1
    character(:), allocatable :: disc_methods1, disc_methods2, dof_tag_names1, dof_tag_names2
    integer :: disc_orders1, disc_orders2
@@ -62,14 +73,16 @@ program imoab_coupler_fortran
    integer, dimension (2) :: tagTypes!  { DENSE_DOUBLE, DENSE_DOUBLE }
    integer :: atmCompNDoFs ! = disc_orders[0] * disc_orders[0],
    integer :: ocnCompNDoFs !  = 1 /*FV*/
-   character(:), allocatable :: bottomFields, bottomProjectedFields
+   character(:), allocatable :: fields, projectedFields, projectedFieldsBilin, projectedFieldsSecond, projectedFieldsCAAS
    integer, dimension(3) ::  nverts, nelem, nblocks, nsbc, ndbc
    double precision, allocatable :: vals(:) ! to set the double values to 0
    integer :: i ! for loops
    integer :: storLeng, eetype ! for tags defs
-   character(:), allocatable :: concat_fieldname, concat_fieldnameT, outputFileOcn
+   character(:), allocatable :: transferFields, outputFileOcn
    integer :: tagIndexIn2 ! not really needed
    integer :: dummyCpl, dummyRC, dummyType
+   double precision  :: boxeps
+   integer :: gnomonic
 
    cmpatm = 5
    cplatm = 6
@@ -78,14 +91,14 @@ program imoab_coupler_fortran
    atmocnid = 618
 
    call mpi_init(ierr)
-   call errorout(ierr,'mpi_init')
-   call mpi_comm_rank (MPI_COMM_WORLD, my_id, ierr)
-   call errorout(ierr, 'fail to get MPI rank')
+   call errorout( ierr, 'mpi_init' )
+   call mpi_comm_rank( MPI_COMM_WORLD, my_id, ierr )
+   call errorout( ierr, 'fail to get MPI rank' )
 
-   call mpi_comm_size (MPI_COMM_WORLD, num_procs, ierr)
-   call errorout(ierr, 'fail to get MPI size')
-   call mpi_comm_dup(MPI_COMM_WORLD, global_comm, ierr)
-   call errorout(ierr, 'fail to get global comm duplicate')
+   call mpi_comm_size( MPI_COMM_WORLD, num_procs, ierr )
+   call errorout( ierr, 'fail to get MPI size' )
+   call mpi_comm_dup( MPI_COMM_WORLD, global_comm, ierr )
+   call errorout( ierr, 'fail to get global comm duplicate' )
 
    call MPI_Comm_group( global_comm, jgroup, ierr );  !  all processes in jgroup
    call errorout(ierr, 'fail to get joint group')
@@ -93,13 +106,10 @@ program imoab_coupler_fortran
    ! readoptsLnd( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION" )
    atmFileName = &
      MOAB_MESH_DIR &
-     //'unittest/wholeATM_T.h5m'//C_NULL_CHAR
+     //'unittest/atm_c2x.h5m'//C_NULL_CHAR
    ocnFileName = &
      MOAB_MESH_DIR &
      //'unittest/recMeshOcn.h5m'//C_NULL_CHAR
-   baselineFileName = &
-     MOAB_MESH_DIR &
-     //'unittest/baseline1.txt'//C_NULL_CHAR
 
    ! all comms span the whole world, for simplicity
    atmComm = MPI_COMM_NULL
@@ -108,10 +118,10 @@ program imoab_coupler_fortran
    atmCouComm = MPI_COMM_NULL
    ocnCouComm = MPI_COMM_NULL
    call mpi_comm_dup(global_comm, atmComm, ierr)
-   call mpi_comm_dup(global_comm, ocnComm, ierr)
-   call mpi_comm_dup(global_comm, cplComm, ierr)
-   call mpi_comm_dup(global_comm, atmCouComm, ierr)
-   call mpi_comm_dup(global_comm, ocnCouComm, ierr)
+   call mpi_comm_dup( global_comm, ocnComm, ierr )
+   call mpi_comm_dup( global_comm, cplComm, ierr )
+   call mpi_comm_dup( global_comm, atmCouComm, ierr )
+   call mpi_comm_dup( global_comm, ocnCouComm, ierr )
 
    ! all groups of interest are easy breezy
    call MPI_Comm_group( atmComm, atmGroup, ierr )
@@ -130,7 +140,6 @@ program imoab_coupler_fortran
       print *, ' number of tasks: ', num_procs
       print *, ' Atm file: ', atmFileName
       print *, ' Ocn file: ', ocnFileName
-      print *, ' baseline file: ', baselineFileName
       print *, ' using partitioner: ', partScheme
    end if
 
@@ -186,16 +195,28 @@ program imoab_coupler_fortran
    end if
 
    if (cplComm .NE. MPI_COMM_NULL) then
+
+      ! set the ghost layers on the coupler for the source mesh
+      nghlay = 3 ! number of ghost layers
+      ierr = iMOAB_SetGhostLayers( cplAtmPID, nghlay )
+      call errorout(ierr, 'failed to set number of ghost layers on ATM mesh')
+
       ierr = iMOAB_ComputeMeshIntersectionOnSphere(cplAtmPID, cplOcnPID, cplAtmOcnPID)
       ! coverage mesh was computed here, for cplAtmPID, atm on coupler pes
       ! basically, atm was redistributed according to target (ocean) partition, to "cover" the
       !ocean partitions check if intx valid, write some h5m intx file
       call errorout(ierr, 'cannot compute intersection')
+
+#ifdef VERBOSE
+      ierr = iMOAB_WriteLocalMesh(cplAtmOcnPID, 'intx_ao')
+      call errorout(ierr, 'could not write intersection mesh to disk')
+#endif
+
    end if
 
    if (atmCouComm .NE. MPI_COMM_NULL) then
       ! the new graph will be for sending data from atm comp to coverage mesh.
-      ! it involves initial atm app; cmpAtmPID; also migrate atm mesh on coupler pes, cplAtmPID
+      ! it involves initial atm app; also migrate atm mesh on coupler pes, cplAtmPID
       ! results are in cplAtmOcnPID, intx mesh; remapper also has some info about coverage mesh
       ! after this, the sending of tags from atm pes to coupler pes will use the new par comm
       ! graph, that has more precise info about what to send for ocean cover ; every time, we
@@ -205,11 +226,11 @@ program imoab_coupler_fortran
    end if
 
    weights_identifier1 = 'scalar'//C_NULL_CHAR
-   disc_methods1 = 'cgll'//C_NULL_CHAR
+   disc_methods1 = 'fv'//C_NULL_CHAR
    disc_methods2 = 'fv'//C_NULL_CHAR
-   disc_orders1 = 4
+   disc_orders1 = 1
    disc_orders2 = 1
-   dof_tag_names1 = 'GLOBAL_DOFS'//C_NULL_CHAR
+   dof_tag_names1 = 'GLOBAL_ID'//C_NULL_CHAR
    dof_tag_names2 = 'GLOBAL_ID'//C_NULL_CHAR
    ! fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 1, fNoConserve = 0, fNoBubble = 1
    fNoBubble = 1
@@ -227,27 +248,29 @@ program imoab_coupler_fortran
              disc_methods2, disc_orders2, ""//C_NULL_CHAR, fNoBubble, fMonotoneTypeID, fVolumetric, &
              fInverseDistanceMap, fNoConserve, &
              fValidate, dof_tag_names1, dof_tag_names2)
-      call errorout(ierr, 'cannot compute scalar projection weights')
+      call errorout(ierr, 'cannot compute scalar first order projection weights')
 
       ierr = iMOAB_ComputeScalarProjectionWeights( &
-             cplAtmOcnPID, "bilinear"//C_NULL_CHAR, "fv"//C_NULL_CHAR, 1, &
-             "fv"//C_NULL_CHAR, 1, "bilin"//C_NULL_CHAR, fNoBubble, fMonotoneTypeID, fVolumetric, &
+             cplAtmOcnPID, "bilinear"//C_NULL_CHAR, disc_methods1, 1, &
+             disc_methods2, 1, "bilin"//C_NULL_CHAR, fNoBubble, fMonotoneTypeID, fVolumetric, &
              fInverseDistanceMap, fNoConserve, &
              fValidate, "GLOBAL_ID"//C_NULL_CHAR, "GLOBAL_ID"//C_NULL_CHAR)
-      call errorout(ierr, 'cannot compute scalar projection weights')
+      call errorout(ierr, 'cannot compute scalar bilinear projection weights')
 
-#ifdef MOAB_HAVE_NETCDF
-      atmocn_map_file_name = 'atm_ocn_map_f.nc'//C_NULL_CHAR
-      ierr = iMOAB_WriteMappingWeightsToFile( cplAtmOcnPID, weights_identifier1, atmocn_map_file_name)
+      ierr = iMOAB_ComputeScalarProjectionWeights( &
+             cplAtmOcnPID, "secondorder"//C_NULL_CHAR, disc_methods1, 2, &
+             disc_methods2, 2, ""//C_NULL_CHAR, fNoBubble, fMonotoneTypeID, fVolumetric, &
+             fInverseDistanceMap, fNoConserve, &
+             fValidate, "GLOBAL_ID"//C_NULL_CHAR, "GLOBAL_ID"//C_NULL_CHAR)
+      call errorout(ierr, 'cannot compute scalar 2nd order projection weights')
+
+#if defined( MOAB_HAVE_NETCDF ) && defined( VERBOSE )
+      write(nproc,"(I0.2)")num_procs !
+      atmocn_map_file_name = 'atm_ocn_map_second_n'//trim(nproc)//'.nc'//C_NULL_CHAR
+      ierr = iMOAB_WriteMappingWeightsToFile( cplAtmOcnPID, "secondorder"//C_NULL_CHAR, atmocn_map_file_name)
       call errorout(ierr, 'failed to write map file to disk')
-      intx_from_file_identifier = 'map-from-file'//C_NULL_CHAR
-      dummyCpl = -1
-      dummyRC = -1
-      dummyType = 0
-      ierr = iMOAB_LoadMappingWeightsFromFile( cplAtmOcnPID, dummyCpl, dummyRC, dummyType, &
-         intx_from_file_identifier, atmocn_map_file_name)
-      call errorout(ierr, 'failed to load map file from disk')
 #endif
+
    end if
 
    ! start copy
@@ -256,73 +279,47 @@ program imoab_coupler_fortran
    atmCompNDoFs = disc_orders1*disc_orders1
    ocnCompNDoFs = 1 ! /*FV*/
 
-   bottomFields = 'a2oTbot:a2oUbot:a2oVbot'//C_NULL_CHAR
-   bottomProjectedFields = 'a2oTbot_proj:a2oUbot_proj:a2oVbot_proj'//C_NULL_CHAR
+   fields = 'Sa_dens:Sa_pbot'//C_NULL_CHAR
+   projectedFields = 'Sa_dens_proj:Sa_pbot_proj'//C_NULL_CHAR
+   projectedFieldsBilin = 'Sa_dens_bilin_proj:Sa_pbot_bilin_proj'//C_NULL_CHAR
+   projectedFieldsSecond = 'Sa_dens_o2_proj:Sa_pbot_o2_proj'//C_NULL_CHAR
+   projectedFieldsCAAS = 'Sa_dens_o2_caas_proj:Sa_pbot_o2_caas_proj'//C_NULL_CHAR
+   transferFields = 'Sa_dens_proj:Sa_pbot_proj:Sa_dens_bilin_proj:Sa_pbot_bilin_proj:Sa_dens_o2_proj:'//&
+                    'Sa_pbot_o2_proj:Sa_dens_o2_caas_proj:Sa_pbot_o2_caas_proj'//C_NULL_CHAR
 
    if (cplComm .NE. MPI_COMM_NULL) then
-      ierr = iMOAB_DefineTagStorage(cplAtmPID, bottomFields, tagTypes(1), atmCompNDoFs, tagIndex(1))
+      ierr = iMOAB_DefineTagStorage(cplAtmPID, fields, tagTypes(1), atmCompNDoFs, tagIndex(1))
       call errorout(ierr, 'failed to define the field tags a2oTbot:a2oUbot:a2oVbot ')
-      ierr = iMOAB_DefineTagStorage(cplOcnPID, bottomProjectedFields, tagTypes(2), ocnCompNDoFs, tagIndex(2))
+      ierr = iMOAB_DefineTagStorage(cplOcnPID, transferFields, tagTypes(2), ocnCompNDoFs, tagIndex(2))
       call errorout(ierr, 'failed to define the field tags a2oTbot_proj:a2oUbot_proj:a2oVbot_proj')
    end if
 
-   ! make the tag 0, to check we are actually sending needed data
-   if (cplAtmPID .ge. 0) then
-
-      !  Each process in the communicator will have access to a local mesh instance, which
-      !  will contain the original cells in the local partition and ghost entities. Number of
-      !  vertices, primary cells, visible blocks, number of sidesets and nodesets boundary
-      !  conditions will be returned in numProcesses 3 arrays, for local, ghost and total
-      !  numbers.
-
-      ierr = iMOAB_GetMeshInfo(cplAtmPID, nverts, nelem, nblocks, nsbc, ndbc)
-      call errorout(ierr, 'failed to get num primary elems')
-      storLeng = nelem(3)*atmCompNDoFs*3 ! 3 tags
-      allocate (vals(storLeng))
-      eetype = 1 ! double type
-
-      do i = 1, storLeng
-         vals(:) = 0.
-      end do
-
-      ! set the tag values to 0.0
-      ierr = iMOAB_SetDoubleTagStorage(cplAtmPID, bottomFields, storLeng, eetype, vals)
-      call errorout(ierr, 'cannot make tag nul')
-
-   end if
-
-   ! Define the field variables to project
-   concat_fieldname = 'a2oTbot:a2oUbot:a2oVbot'//C_NULL_CHAR
-   concat_fieldnameT = 'a2oTbot_proj:a2oUbot_proj:a2oVbot_proj'//C_NULL_CHAR
-
    if (atmComm .NE. MPI_COMM_NULL) then
-
       ! As always, use nonblocking sends
       ! this is for projection to ocean:
-      ierr = iMOAB_SendElementTag(cmpAtmPID, concat_fieldname, atmCouComm, cplocn)
+      ierr = iMOAB_SendElementTag(cmpAtmPID, fields, atmCouComm, cplocn)
       call errorout(ierr, 'cannot send tag values')
 
    end if
 
    if (cplComm .NE. MPI_COMM_NULL) then
       !// receive on atm on coupler pes, that was redistributed according to coverage
-      ierr = iMOAB_ReceiveElementTag(cplAtmPID, concat_fieldname, atmCouComm, cplocn)
+      ierr = iMOAB_ReceiveElementTag(cplAtmPID, fields, atmCouComm, cplocn)
       call errorout(ierr, 'cannot receive tag values')
    end if
 
    ! we can now free the sender buffers
    if (atmComm .NE. MPI_COMM_NULL) then
-
       ierr = iMOAB_FreeSenderBuffers(cmpAtmPID, cplocn) !context is for ocean
       call errorout(ierr, 'cannot free buffers used to resend atm tag towards the coverage mesh')
-
    end if
+
    if (cplComm .ne. MPI_COMM_NULL) then
 
-      outputFileOcn = "AtmOnCplF2.h5m"//C_NULL_CHAR
+      outputFileOcn = "AtmOnCplF.h5m"//C_NULL_CHAR
       fileWriteOptions = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
       ierr = iMOAB_WriteMesh(cplAtmPID, outputFileOcn, fileWriteOptions)
-      call errorout(ierr, 'could not write AtmOnCpl2.h5m to disk')
+      call errorout(ierr, 'could not write AtmOnCpl.h5m to disk')
 
    end if
    if (cplComm .ne. MPI_COMM_NULL) then
@@ -330,11 +327,35 @@ program imoab_coupler_fortran
       ! We have the remapping weights now. Let us apply the weights onto the tag we defined
       ! on the source mesh and get the projection on the target mesh
       ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, weights_identifier1, &
-                                                concat_fieldname, &
-                                                concat_fieldnameT)
-      call errorout(ierr, 'failed to compute projection weight application')
+                                                fields, &
+                                                projectedFields)
+      call errorout(ierr, 'failed to compute first order projection weight application')
 
-      outputFileOcn = "OcnOnCplF.h5m"//C_NULL_CHAR
+      ! We have the remapping weights now. Let us apply the weights onto the tag we defined
+      ! on the source mesh and get the projection on the target mesh
+      ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, "bilinear"//C_NULL_CHAR, &
+                                                fields, &
+                                                projectedFieldsBilin)
+      call errorout(ierr, 'failed to compute bilinear projection weight application')
+
+
+      ! We have the remapping weights now. Let us apply the weights onto the tag we defined
+      ! on the source mesh and get the projection on the target mesh
+      ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, "secondorder"//C_NULL_CHAR, &
+                                                fields, &
+                                                projectedFieldsSecond)
+      call errorout(ierr, 'failed to compute second order projection weight application')
+
+      ! We have the remapping weights now. Let us apply the weights onto the tag we defined
+      ! on the source mesh and get the projection on the target mesh
+      filter_type = 1 ! global CAAS operator application
+      ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, "secondorder"//C_NULL_CHAR, &
+                                                fields, &
+                                                projectedFieldsCAAS)
+      call errorout(ierr, 'failed to compute second order with CAAS projection weight application')
+
+      write(nproc,"(I0.2)")num_procs !
+      outputFileOcn = "OcnOnCplF_n"//trim(nproc)//".h5m"//C_NULL_CHAR
       fileWriteOptions = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
       ierr = iMOAB_WriteMesh(cplOcnPID, outputFileOcn, fileWriteOptions)
       call errorout(ierr, 'could not write OcnOnCpl.h5m to disk')
@@ -344,7 +365,7 @@ program imoab_coupler_fortran
    ! first makje sure the tags are defined, otherwise they cannot be received
    if (ocnComm .ne. MPI_COMM_NULL) then
 
-      ierr = iMOAB_DefineTagStorage(cmpOcnPID, bottomProjectedFields, tagTypes(2), ocnCompNDoFs, tagIndexIn2)
+      ierr = iMOAB_DefineTagStorage(cmpOcnPID, transferFields, tagTypes(2), ocnCompNDoFs, tagIndexIn2)
       call errorout(ierr, 'failed to define the field tag for receiving back the tag a2oTbot_proj,  on ocn pes')
 
    end if
@@ -355,13 +376,13 @@ program imoab_coupler_fortran
    !  original graph (context is -1_
    if (cplComm .ne. MPI_COMM_NULL) then
       context_id = cmpocn
-      ierr = iMOAB_SendElementTag(cplOcnPID, concat_fieldnameT, ocnCouComm, context_id)
+      ierr = iMOAB_SendElementTag(cplOcnPID, transferFields, ocnCouComm, context_id)
       call errorout(ierr, 'cannot send tag values back to ocean pes')
    end if
 
    if (ocnComm .ne. MPI_COMM_NULL) then
       context_id = cplocn
-      ierr = iMOAB_ReceiveElementTag(cmpOcnPID, concat_fieldnameT, ocnCouComm, context_id)
+      ierr = iMOAB_ReceiveElementTag(cmpOcnPID, transferFields, ocnCouComm, context_id)
       call errorout(ierr, 'cannot receive tag values from ocean mesh on coupler pes')
    end if
 
@@ -373,13 +394,13 @@ program imoab_coupler_fortran
 
    if (ocnComm .ne. MPI_COMM_NULL) then
 
-      outputFileOcn = "OcnWithProjF2.h5m"//C_NULL_CHAR
+      outputFileOcn = "OcnWithProjF.h5m"//C_NULL_CHAR
       fileWriteOptions = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
       if (my_id .eq. 0) then
          print *, ' Writing ocean mesh file with projected solution to disk: ', outputFileOcn
       end if
       ierr = iMOAB_WriteMesh(cmpOcnPID, outputFileOcn, fileWriteOptions)
-      call errorout(ierr, 'could not write OcnWithProjF2.h5m to disk')
+      call errorout(ierr, 'could not write OcnWithProjF.h5m to disk')
 
    end if
 

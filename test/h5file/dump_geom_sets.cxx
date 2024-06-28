@@ -135,7 +135,7 @@ std::string ent_from_handle( const std::map<long,long>& dimmap,
   }
   
   char buffer[128];
-  sprintf(buffer, "%ld", i_iter->second );
+  snprintf(buffer, 128, "%ld", i_iter->second );
   result += buffer;
   return result;
 }

@@ -9436,8 +9436,9 @@ ErrorCode ParallelComm::correct_thin_ghost_layers()
             {
                 // so we did not find on proc
 #ifndef NDEBUG
-                std::cout << "THIN GHOST: we did not find on proc " << rank() << " for shared ent " << eh
-                          << " the proc " << proc_remote << "\n";
+                if( myDebug->get_verbosity() == 3 )
+                    std::cout << "THIN GHOST: we did not find on proc " << rank() << " for shared ent " << eh
+                              << " the proc " << proc_remote << "\n";
 #endif
                 // increase num_sharing, and set the multi-shared tags
                 if( num_sharing >= MAX_SHARING_PROCS ) return MB_FAILURE;

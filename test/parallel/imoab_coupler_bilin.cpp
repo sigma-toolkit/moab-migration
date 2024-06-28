@@ -263,6 +263,11 @@ int main( int argc, char* argv[] )
 #ifdef ENABLE_ATMOCN_COUPLING
     if( couComm != MPI_COMM_NULL )
     {
+        // set the ghost layers on the coupler for the source mesh
+        nghlay = 3;  // number of ghost layers
+        ierr   = iMOAB_SetGhostLayers( cplAtmPID, &nghlay );
+        CHECKIERR( ierr, "cannot set ghost layers" )
+
         PUSH_TIMER( "Compute ATM-OCN mesh intersection" )
         ierr = iMOAB_ComputeMeshIntersectionOnSphere( cplAtmPID, cplOcnPID, cplAtmOcnPID );
         // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
@@ -323,6 +328,7 @@ int main( int argc, char* argv[] )
     int tagIndex[2];
     int tagTypes[2]  = { DENSE_DOUBLE, DENSE_DOUBLE };
     int atmCompNDoFs = disc_orders[0] * disc_orders[0], ocnCompNDoFs = 1 /*FV*/;
+    int filter_type = 0;
 
     const char* bottomFields          = "Sa_dens:Sa_pbot";
     const char* bottomProjectedFields = "Sa_dens:Sa_pbot";
@@ -379,9 +385,6 @@ int main( int argc, char* argv[] )
         }
     }
 
-    const char* concat_fieldname  = "Sa_dens:Sa_pbot";
-    const char* concat_fieldnameT = "Sa_dens:Sa_pbot";
-
 #ifdef ENABLE_ATMOCN_COUPLING
     // first hop
     PUSH_TIMER( "Send/receive data from atm component to coupler in atm context" )
@@ -430,14 +433,14 @@ int main( int argc, char* argv[] )
         /* We have the remapping weights now. Let us apply the weights onto the tag we defined
 		   on the source mesh and get the projection on the target mesh */
         PUSH_TIMER( "Apply Scalar projection weights" )
-        ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0].c_str(), concat_fieldname,
-                                                   concat_fieldnameT );
+        ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0].c_str(),
+                                                   bottomFields, bottomProjectedFields );
         CHECKIERR( ierr, "failed to compute projection weight application" );
         POP_TIMER( couComm, rankInCouComm )
         {
             char outputFileTgt[] = "fOcnBilinOnCpl.h5m";
             ierr                 = iMOAB_WriteMesh( cplOcnPID, outputFileTgt, fileWriteOptions );
-            CHECKIERR( ierr, "could not write fOcnOnCpl.h5m to disk" )
+            CHECKIERR( ierr, "could not write fOcnBilinOnCpl.h5m to disk" )
         }
     }
 
@@ -445,7 +448,7 @@ int main( int argc, char* argv[] )
     {
         // need to use ocean comp id for context
         context_id = cmpocn;  // id for ocean on comp
-        ierr       = iMOAB_SendElementTag( cplOcnPID, "Sa_dens:Sa_pbot", &ocnCouComm, &context_id );
+        ierr       = iMOAB_SendElementTag( cplOcnPID, bottomProjectedFields, &ocnCouComm, &context_id );
         CHECKIERR( ierr, "cannot send tag values back to ocean pes" )
     }
 
@@ -453,11 +456,9 @@ int main( int argc, char* argv[] )
     if( ocnComm != MPI_COMM_NULL )
     {
         context_id = cplocn;  // id for ocean on coupler
-        ierr       = iMOAB_ReceiveElementTag( cmpOcnPID, "Sa_dens:Sa_pbot", &ocnCouComm, &context_id );
+        ierr       = iMOAB_ReceiveElementTag( cmpOcnPID, bottomProjectedFields, &ocnCouComm, &context_id );
         CHECKIERR( ierr, "cannot receive tag values from ocean mesh on coupler pes" )
     }
-
-    MPI_Barrier( MPI_COMM_WORLD );
 
     if( couComm != MPI_COMM_NULL )
     {
@@ -469,7 +470,7 @@ int main( int argc, char* argv[] )
     {
         char outputFileOcn[] = "OcnWithProjBilin.h5m";
         ierr                 = iMOAB_WriteMesh( cmpOcnPID, outputFileOcn, fileWriteOptions );
-        CHECKIERR( ierr, "could not write OcnWithProj.h5m to disk" )
+        CHECKIERR( ierr, "could not write OcnWithProjBilin.h5m to disk" )
     }
     // do a check agains a baseline test
     if( !no_regression_test && ( ocnComm != MPI_COMM_NULL ) )

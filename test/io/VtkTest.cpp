@@ -511,7 +511,7 @@ bool test_structured_grid_2d()
                       "POINTS 16 double\n";
     int len         = strlen( file );
     for( unsigned i = 0; i < 16; ++i )
-        len += sprintf( file + len, "%f %f %f\n", grid_3x3[3 * i], grid_3x3[3 * i + 1], grid_3x3[3 * i + 2] );
+        len += snprintf( file + len, 4096, "%f %f %f\n", grid_3x3[3 * i], grid_3x3[3 * i + 1], grid_3x3[3 * i + 2] );
 
     return test_structured_2d( file );
 }
@@ -553,7 +553,7 @@ bool test_structured_grid_3d()
 
     int len = strlen( file );
     for( unsigned i = 0; i < 27; ++i )
-        len += sprintf( file + len, "%f %f %f\n", grid_2x2x2[3 * i], grid_2x2x2[3 * i + 1], grid_2x2x2[3 * i + 2] );
+        len += snprintf( file + len, 4096, "%f %f %f\n", grid_2x2x2[3 * i], grid_2x2x2[3 * i + 1], grid_2x2x2[3 * i + 2] );
 
     return test_structured_3d( file );
 }
@@ -955,24 +955,24 @@ bool test_read_write_element( const double* coords,
                       "DATASET UNSTRUCTURED_GRID\n";
     size_t len      = strlen( file );
 
-    len += sprintf( file + len, "POINTS %u double\n", num_verts );
+    len += snprintf( file + len, 4096, "POINTS %u double\n", num_verts );
     for( unsigned i = 0; i < num_verts; ++i )
-        len += sprintf( file + len, "%f %f %f\n", coords[3 * i], coords[3 * i + 1], coords[3 * i + 2] );
+        len += snprintf( file + len, 4096, "%f %f %f\n", coords[3 * i], coords[3 * i + 1], coords[3 * i + 2] );
 
-    len += sprintf( file + len, "CELLS %u %u\n", num_elem, num_conn + num_elem );
+    len += snprintf( file + len, 4096, "CELLS %u %u\n", num_elem, num_conn + num_elem );
     assert( num_conn % num_elem == 0 );
     unsigned conn_len = num_conn / num_elem;
     for( unsigned i = 0; i < num_elem; ++i )
     {
-        len += sprintf( file + len, "%u", conn_len );
+        len += snprintf( file + len, 4096, "%u", conn_len );
         for( unsigned j = 0; j < conn_len; ++j )
-            len += sprintf( file + len, " %u", vtk_conn[conn_len * i + j] );
-        len += sprintf( file + len, "\n" );
+            len += snprintf( file + len, 4096, " %u", vtk_conn[conn_len * i + j] );
+        len += snprintf( file + len, 4096, "\n" );
     }
 
-    len += sprintf( file + len, "CELL_TYPES %u\n", num_elem );
+    len += snprintf( file + len, 4096, "CELL_TYPES %u\n", num_elem );
     for( unsigned i = 0; i < num_elem; ++i )
-        len += sprintf( file + len, "%u\n", vtk_type );
+        len += snprintf( file + len, 4096, "%u\n", vtk_type );
 
     // read VTK file and check results
     Core instance1, instance2;
@@ -1045,19 +1045,19 @@ void write_data( char* file, size_t& len, DataType type, unsigned count, const i
     {
         case MB_TYPE_BIT:
             for( unsigned i = 0; i < count; ++i )
-                len += sprintf( file + len, "%d\n", abs( vals[i] ) % 2 );
+                len += snprintf( file + len, 4096, "%d\n", abs( vals[i] ) % 2 );
             break;
         case MB_TYPE_INTEGER:
             for( unsigned i = 0; i < count; ++i )
-                len += sprintf( file + len, "%d\n", vals[i] );
+                len += snprintf( file + len, 4096, "%d\n", vals[i] );
             break;
         case MB_TYPE_DOUBLE:
             for( unsigned i = 0; i < count; ++i )
-                len += sprintf( file + len, "%f\n", (double)vals[i] );
+                len += snprintf( file + len, 4096, "%f\n", (double)vals[i] );
             break;
         case MB_TYPE_OPAQUE:
             for( unsigned i = 0; i < count; ++i )
-                len += sprintf( file + len, "%d\n", abs( vals[i] % 256 ) );
+                len += snprintf( file + len, 4096, "%d\n", abs( vals[i] % 256 ) );
             break;
         default:
             assert( false /* VTK files cannot handle this type */ );
@@ -1169,13 +1169,13 @@ bool test_scalar_attrib( const char* vtk_type, DataType mb_type, int count )
     char file[4096];
     strcpy( file, two_quad_mesh );
     size_t len = strlen( file );
-    len += sprintf( file + len, "POINT_DATA 6\n" );
-    len += sprintf( file + len, "SCALARS data %s %d\n", vtk_type, count );
-    len += sprintf( file + len, "LOOKUP_TABLE default\n" );
+    len += snprintf( file + len, 4096, "POINT_DATA 6\n" );
+    len += snprintf( file + len, 4096, "SCALARS data %s %d\n", vtk_type, count );
+    len += snprintf( file + len, 4096, "LOOKUP_TABLE default\n" );
     write_data( file, len, mb_type, 6 * count, vertex_values );
-    len += sprintf( file + len, "CELL_DATA 2\n" );
-    len += sprintf( file + len, "SCALARS data %s %d\n", vtk_type, count );
-    len += sprintf( file + len, "LOOKUP_TABLE default\n" );
+    len += snprintf( file + len, 4096, "CELL_DATA 2\n" );
+    len += snprintf( file + len, 4096, "SCALARS data %s %d\n", vtk_type, count );
+    len += snprintf( file + len, 4096, "LOOKUP_TABLE default\n" );
     write_data( file, len, mb_type, 2 * count, element_values );
 
     return check_tag_data( file, mb_type, count );
@@ -1186,11 +1186,11 @@ bool test_vector_attrib( const char* vtk_type, DataType mb_type )
     char file[4096];
     strcpy( file, two_quad_mesh );
     size_t len = strlen( file );
-    len += sprintf( file + len, "POINT_DATA 6\n" );
-    len += sprintf( file + len, "VECTORS data %s\n", vtk_type );
+    len += snprintf( file + len, 4096, "POINT_DATA 6\n" );
+    len += snprintf( file + len, 4096, "VECTORS data %s\n", vtk_type );
     write_data( file, len, mb_type, 6 * 3, vertex_values );
-    len += sprintf( file + len, "CELL_DATA 2\n" );
-    len += sprintf( file + len, "VECTORS data %s\n", vtk_type );
+    len += snprintf( file + len, 4096, "CELL_DATA 2\n" );
+    len += snprintf( file + len, 4096, "VECTORS data %s\n", vtk_type );
     write_data( file, len, mb_type, 2 * 3, element_values );
 
     return check_tag_data( file, mb_type, 3 );
@@ -1201,11 +1201,11 @@ bool test_tensor_attrib( const char* vtk_type, DataType mb_type )
     char file[4096];
     strcpy( file, two_quad_mesh );
     size_t len = strlen( file );
-    len += sprintf( file + len, "POINT_DATA 6\n" );
-    len += sprintf( file + len, "TENSORS data %s\n", vtk_type );
+    len += snprintf( file + len, 4096, "POINT_DATA 6\n" );
+    len += snprintf( file + len, 4096, "TENSORS data %s\n", vtk_type );
     write_data( file, len, mb_type, 6 * 9, vertex_values );
-    len += sprintf( file + len, "CELL_DATA 2\n" );
-    len += sprintf( file + len, "TENSORS data %s\n", vtk_type );
+    len += snprintf( file + len, 4096, "CELL_DATA 2\n" );
+    len += snprintf( file + len, 4096, "TENSORS data %s\n", vtk_type );
     write_data( file, len, mb_type, 2 * 9, element_values );
 
     return check_tag_data( file, mb_type, 9 );

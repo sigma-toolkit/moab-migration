@@ -25,7 +25,7 @@
 
 using namespace moab;
 
-//#define GRAPH_INFO
+#define GRAPH_INFO
 
 #define CHECKRC( rc, message )            \
     if( 0 != ( rc ) )                     \

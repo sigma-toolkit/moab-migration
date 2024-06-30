@@ -1866,8 +1866,8 @@ ErrorCode ParallelComm::pack_entity_seq( const int nodes_per_entity,
         PACK_EH( buff->buff_ptr, &connect[0], connect.size() );
     }
 
-    myDebug->tprintf( 3, "Packed %lu ents of type %s\n", (unsigned long)these_ents.size(),
-                      CN::EntityTypeName( TYPE_FROM_HANDLE( *these_ents.begin() ) ) );
+    myDebug->tprintf( 3, "Packed %lu ents of type %s with %d nodes per entity \n", (unsigned long)these_ents.size(),
+                      CN::EntityTypeName( TYPE_FROM_HANDLE( *these_ents.begin() ) ), nodes_per_entity);
 
     return result;
 }
@@ -2156,7 +2156,8 @@ ErrorCode ParallelComm::unpack_entities( unsigned char*& buff_ptr,
         {
             UNPACK_INT( buff_ptr, verts_per_entity );
         }
-
+        myDebug->tprintf( 4, "Start unpacking  %d ents of type %s with %d verts per entity \n", num_ents2, CN::EntityTypeName( this_type ),
+                verts_per_entity);
         std::vector< int > ps( MAX_SHARING_PROCS, -1 );
         std::vector< EntityHandle > hs( MAX_SHARING_PROCS, 0 );
         for( int e = 0; e < num_ents2; e++ )
@@ -2343,12 +2344,14 @@ ErrorCode ParallelComm::unpack_entities( unsigned char*& buff_ptr,
             }
         }
 
-        myDebug->tprintf( 4, "Unpacked %d ents of type %s", num_ents2, CN::EntityTypeName( this_type ) );
+        myDebug->tprintf( 4, "Unpacked %d ents of type %s\n", num_ents2, CN::EntityTypeName( this_type ) );
     }
 
     myDebug->tprintf( 4, "Done unpacking entities.\n" );
 
     // Need to sort here, to enable searching
+    // keep a deep copy order of entities created
+    original_new_ents = new_ents;
     std::sort( new_ents.begin(), new_ents.end() );
 
     return MB_SUCCESS;

@@ -1479,6 +1479,9 @@ class ParallelComm
 
     //! Data about shared sets
     SharedSetData* sharedSetData;
+
+    // added
+    std::vector<EntityHandle> original_new_ents; // after unpacking, keep the original list in order, without sorting
 };
 
 inline ParallelComm::Buffer::Buffer( const Buffer& other_buff )

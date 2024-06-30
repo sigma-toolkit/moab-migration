@@ -1631,10 +1631,17 @@ ErrorCode ParCommGraph::dump_comm_information( Interface * mb, std::string prefi
                 mb->tag_get_data(mb->globalId_tag(), eids, &gids[0]);
                 for (int i=0; i< (int) gids.size(); i++)
                 {
-                	dbfile << gids[i] << " ";
-                	if ( i%10 == 9 ) dbfile << "\n";
+                    EntityHandle eh=eids[i];
+                    int nnodes;
+                    const EntityHandle  *conn = NULL;
+                    mb->get_connectivity (eh, conn, nnodes);
+                    std::vector<int> vids(nnodes);
+                    mb->tag_get_data(mb->globalId_tag(), conn, nnodes, &vids[0]);
+                    dbfile << mb->id_from_handle(eh) << "\t :" << gids[i] << "\t v: ";
+                    for (int j=0; j<nnodes; j++)
+                        dbfile << vids[j] << " " ;
+                    dbfile << "\n";
                 }
-                dbfile << "\n";
             }
         }
         else if( graph_type == DOF_BASED )  // just after migration, or from computeGraph
@@ -1673,16 +1680,25 @@ ErrorCode ParCommGraph::dump_comm_information( Interface * mb, std::string prefi
                 int sender_proc = mit->first;
                 Range& eids     = mit->second;
                 dbfile << "sender: " << sender_proc << " size:" << eids.size() << "\n";
-                eids.print(dbfile, 0);
+
+                //eids.print(dbfile, 0);
                 std::vector<int> gids;
                 gids.resize(eids.size());
 				mb->tag_get_data(mb->globalId_tag(), eids, &gids[0]);
 				for (int i=0; i< (int) gids.size(); i++)
 				{
-					dbfile << gids[i] << " ";
-					if ( i%10 == 9 ) dbfile << "\n";
+				    EntityHandle eh=eids[i];
+				    int nnodes;
+				    const EntityHandle  *conn = NULL;
+				    mb->get_connectivity (eh, conn, nnodes);
+				    std::vector<int> vids(nnodes);
+				    mb->tag_get_data(mb->globalId_tag(), conn, nnodes, &vids[0]);
+					dbfile << mb->id_from_handle(eh) << "\t :" << gids[i] << "\t v: ";
+					for (int j=0; j<nnodes; j++)
+					    dbfile << vids[j] << " " ;
+					dbfile << "\n";
 				}
-				dbfile << "\n";
+				//dbfile << "\n";
             }
         }
         else if( graph_type == DOF_BASED )  // just after migration

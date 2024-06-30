@@ -2419,6 +2419,8 @@ ErrCode iMOAB_SendMesh( iMOAB_AppID pid, MPI_Comm* join, MPI_Group* receivingGro
     int ierr;
     appData& data     = context.appDatas[*pid];
     ParallelComm* pco = context.pcomms[*pid];
+    //
+    pco->set_debug_verbosity(4);
 
     MPI_Comm global = ( data.is_fortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( join ) ) : *join );
     MPI_Group recvGroup =
@@ -2509,6 +2511,8 @@ ErrCode iMOAB_ReceiveMesh( iMOAB_AppID pid, MPI_Comm* join, MPI_Group* sendingGr
     ErrorCode rval;
     appData& data          = context.appDatas[*pid];
     ParallelComm* pco      = context.pcomms[*pid];
+    // temporarily
+    pco->set_debug_verbosity(4);
     MPI_Comm receive       = pco->comm();
     EntityHandle local_set = data.file_set;
 

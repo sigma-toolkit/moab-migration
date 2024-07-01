@@ -1851,7 +1851,7 @@ ErrorCode ParallelComm::pack_entity_seq( const int nodes_per_entity,
 
     // Pack the nodes per entity
     PACK_INT( buff->buff_ptr, nodes_per_entity );
-    myDebug->tprintf( 3, "after some pack int  %d \n", buff->get_current_size() );
+    myDebug->tprintf( 3, "pack seq start, buff size:  %d \n", buff->get_current_size() );
 
     // Pack the connectivity
     std::vector< EntityHandle > connect;
@@ -2349,7 +2349,7 @@ ErrorCode ParallelComm::unpack_entities( unsigned char*& buff_ptr,
     myDebug->tprintf( 4, "Done unpacking entities.\n" );
 
     // Need to sort here, to enable searching
-    std::sort( new_ents.begin(), new_ents.end() );
+    // std::sort( new_ents.begin(), new_ents.end() );
 
     return MB_SUCCESS;
 }
@@ -3442,7 +3442,7 @@ ErrorCode ParallelComm::unpack_sets( unsigned char*& buff_ptr,
         result = update_remote_data( new_sets, dum_range, from_proc, 0 );MB_CHK_SET_ERR( result, "Failed to set sharing data for sets" );
     }
 
-    myDebug->tprintf( 4, "Done unpacking sets." );
+    myDebug->tprintf( 4, "Done unpacking sets.\n" );
 
     return MB_SUCCESS;
 }
@@ -3503,7 +3503,7 @@ ErrorCode ParallelComm::pack_tags( Range& entities,
         if( MB_SUCCESS != result ) return result;
     }
 
-    myDebug->tprintf( 4, "Done packing tags." );
+    myDebug->tprintf( 4, "Done packing tags.\n" );
 
     buff->set_stored_size();
 

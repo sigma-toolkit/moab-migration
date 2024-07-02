@@ -183,8 +183,9 @@ int main( int argc, char* argv[] )
         // we are now on joint pes, compute comm graph between rof and coupler model
         int typeA = 2;  // point cloud on component PEs
         int typeB = 3;  // full mesh on coupler pes, we just read it
+        int force_rec = 0;
         ierr      = iMOAB_ComputeCommGraph( rofPID, cplRofPID, &rofCouComm, &rofPEGroup, &couPEGroup, &typeA, &typeB,
-                                            &cmpRof, &cplRof );
+                                            &cmpRof, &cplRof, &force_rec );
         CHECKIERR( ierr, "cannot compute comm graph for mosart " )
     }
 

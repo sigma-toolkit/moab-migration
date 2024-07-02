@@ -119,8 +119,9 @@ int main( int argc, char* argv[] )
 #endif
 
     int type1 = 3, type2 = 3;
+    int force_rec = 0;
     ierr = iMOAB_ComputeCommGraph( cplAtmPID, cplAtmOcnPID, &dup_comm_world, &mpigrp_CPLID, &mpigrp_CPLID, &type1,
-                                   &type2, &cplatm, &atmocnid );
+                                   &type2, &cplatm, &atmocnid, &force_rec );
     CHECKIERR( ierr, "failed to compute comm graph" );
     const std::string weights_identifiers[2] = { "scalar", "scalar-pc" };
     const std::string disc_methods[3]        = { "cgll", "fv", "pcloud" };

@@ -410,8 +410,9 @@ int main( int argc, char* argv[] )
     {
         int typeA = 2;  // point cloud, phys mesh
         int typeB = 3;  // cells of atmosphere, dof based; maybe need another type for ParCommGraph graphtype ?
+        int force_rec = 0;
         ierr = iMOAB_ComputeCommGraph( cmpPhAtmPID, cplAtmOcnPID, &atmCouComm, &atmPEGroup, &couPEGroup, &typeA, &typeB,
-                                       &cmpPhysAtm, &atmocnid );
+                                       &cmpPhysAtm, &atmocnid, &force_rec );
         CHECKIERR( ierr, "cannot compute graph between phys grid on atm and intx between FV atm and ocn" )
     }
 
@@ -420,8 +421,9 @@ int main( int argc, char* argv[] )
     {
         int typeA = 2;  // point cloud, phys mesh
         int typeB = 3;  // cells of atmosphere, dof based; need another type for ParCommGraph graphtype ?
+        int force_rec = 0;
         ierr = iMOAB_ComputeCommGraph( cmpPhAtmPID, cplAtmPID, &atmCouComm, &atmPEGroup, &couPEGroup, &typeA, &typeB,
-                                       &cmpPhysAtm, &cplatm );
+                                       &cmpPhysAtm, &cplatm, &force_rec );
         CHECKIERR( ierr, "cannot compute graph between phys grid on atm and FV atm on coupler" )
     }
 #endif
@@ -460,8 +462,9 @@ int main( int argc, char* argv[] )
     {
         int typeA = 2;  // point cloud
         int typeB = 3;  // type 3 for land on coupler, based on global ids for land cells ?
+        int force_rec = 0;
         ierr = iMOAB_ComputeCommGraph( cmpPhAtmPID, cplAtmLndPID, &atmCouComm, &atmPEGroup, &couPEGroup, &typeA, &typeB,
-                                       &cmpPhysAtm, &atmlndid );
+                                       &cmpPhysAtm, &atmlndid, &force_rec );
         CHECKIERR( ierr, "cannot compute comm graph between atm and atm/lnd intersection" )
     }
 

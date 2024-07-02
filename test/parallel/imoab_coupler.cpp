@@ -323,7 +323,16 @@ int main( int argc, char* argv[] )
         setup_component_coupler_meshes( cmpOcnPID, cmpocn, cplOcnPID, cplocn, &ocnComm, &ocnPEGroup, &couComm,
                                         &couPEGroup, &ocnCouComm, ocnFilename, readopts, nghlay, repartitioner_scheme );
     CHECKIERR( ierr, "Cannot load and migrate ocn mesh" )
-
+//
+    if( ocnCouComm != MPI_COMM_NULL )
+    {
+        int typeA = 3;  // point cloud, phys mesh
+        int typeB = 3;  // cells of atmosphere, dof based; maybe need another type for ParCommGraph graphtype ?
+        int force_recompute = 1;
+        ierr = iMOAB_ComputeCommGraph( cmpOcnPID, cplOcnPID, &ocnCouComm, &ocnPEGroup, &couPEGroup, &typeA, &typeB,
+                                       &cmpocn, &cplocn, &force_recompute );
+        CHECKIERR( ierr, "cannot compute graph between ocn comp and ocn migrated to coupler" )
+    }
     MPI_Barrier( MPI_COMM_WORLD );
 
 #ifdef VERBOSE

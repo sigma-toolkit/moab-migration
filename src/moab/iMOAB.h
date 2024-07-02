@@ -990,6 +990,7 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid,
  * \param[in]  type2 (int *)                          The type of mesh used by pid2 (point cloud with GLOBAL_ID, etc).
  * \param[in]  comp1 (int*)                           The unique identifier of the first component.
  * \param[in]  comp2 (int*)                           The unique identifier of the second component.
+ * \param[in]  force_recompute (int*)                 Force recomputation of graph and delete old one if existing
  * \return ErrCode                                    The error code indicating success or failure.
  */
 ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
@@ -1000,7 +1001,8 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
                                 int* type1,
                                 int* type2,
                                 int* comp1,
-                                int* comp2 );
+                                int* comp2,
+                                int* force_recompute);
 
 /**
  * \brief Recompute the communication graph between component and coupler, considering intersection coverage.

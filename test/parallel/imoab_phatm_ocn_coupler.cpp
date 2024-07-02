@@ -385,8 +385,9 @@ int main( int argc, char* argv[] )
     {
         int typeA = 2;  // point cloud
         int typeB = 1;  // quads in coverage set
+        int force_rec = 0;
         ierr = iMOAB_ComputeCommGraph( cmpPhAtmPID, cplAtmOcnPID, &atmCouComm, &atmPEGroup, &couPEGroup, &typeA, &typeB,
-                                       &cmpatm, &atmocnid );
+                                       &cmpatm, &atmocnid, &force_rec );
     }
 #endif
 
@@ -398,8 +399,9 @@ int main( int argc, char* argv[] )
     {
         int typeA = 2;  // point cloud
         int typeB = 2;  // point cloud for land on coupler, too
+        int force_rec = 0;
         ierr = iMOAB_ComputeCommGraph( cmpPhAtmPID, cplLndPID, &atmCouComm, &atmPEGroup, &couPEGroup, &typeA, &typeB,
-                                       &cmpatm, &cpllnd );
+                                       &cmpatm, &cpllnd, &force_rec);
     }
 #endif
     MPI_Barrier( MPI_COMM_WORLD );

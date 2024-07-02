@@ -285,8 +285,9 @@ int main( int argc, char* argv[] )
         // &cplocn );  // it happens over joint communicator
         int type1 = 3;
         int type2 = 3;
+        int force_rec = 0;
         ierr      = iMOAB_ComputeCommGraph( cplAtmPID, cplAtmOcnPID, &couComm, &couPEGroup, &couPEGroup, &type1, &type2,
-                                            &cplatm, &atmocnid );
+                                            &cplatm, &atmocnid, &force_rec );
         CHECKIERR( ierr, "cannot recompute direct coverage graph for ocean from atm" )
         POP_TIMER( couComm, rankInCouComm )  // hijack this rank
     }

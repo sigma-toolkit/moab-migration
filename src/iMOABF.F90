@@ -386,7 +386,7 @@ module iMOAB
       end function iMOAB_ReceiveElementTag
 
       integer(c_int) function iMOAB_ComputeCommGraph(pid1, pid2, joint_comm, group1, group2, type1, type2, &
-                                                     comp1, comp2) bind(C, name='iMOAB_ComputeCommGraph')
+                                                     comp1, comp2, force_rec) bind(C, name='iMOAB_ComputeCommGraph')
         use, intrinsic :: iso_c_binding, only: c_int, c_ptr
         integer(c_int), intent(in) :: pid1
         integer(c_int), intent(in) :: pid2
@@ -397,6 +397,7 @@ module iMOAB
         integer(c_int), intent(in) :: type2
         integer(c_int), intent(in) :: comp1
         integer(c_int), intent(in) :: comp2
+        integer(c_int), intent(in) :: force_rec
       end function iMOAB_ComputeCommGraph
 
       integer(c_int) function iMOAB_CoverageGraph(joint_comm, pid_source, pid_migration, pid_intx, source_id, &

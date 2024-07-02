@@ -221,8 +221,9 @@ int commgraphtest()
 
     if( MPI_COMM_NULL != joinComm )
     {
+        int force_rec = 0;
         ierr = iMOAB_ComputeCommGraph( cmpAtmPID, physAtmPID, &joinComm, &atmPEGroup, &atmPhysGroup, &typeA, &typeB,
-                                       &cmpatm, &physatm );
+                                       &cmpatm, &physatm, &force_rec );
         // it will generate parcomm graph between atm and atmPhys models
         // 2 meshes, that are distributed in parallel
         CHECKIERR( ierr, "Cannot compute comm graph between the two apps " )

@@ -2845,7 +2845,8 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
                                 int* type1,
                                 int* type2,
                                 int* comp1,
-                                int* comp2 )
+                                int* comp2,
+                                int* force_recompute)
 {
     assert( join );
     assert( group1 );
@@ -2872,13 +2873,35 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
     {
         appData& data                               = context.appDatas[*pid1];
         std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *comp2 );
-        if( mt != data.pgraph.end() ) already_exists = true;
+        if( mt != data.pgraph.end() )
+        {
+           if (force_recompute)
+           {
+               delete mt->second;
+               mt->second = nullptr;
+           }
+           else
+           {
+               already_exists = true;
+           }
+        }
     }
     if( *pid2 >= 0 )
     {
         appData& data                               = context.appDatas[*pid2];
         std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *comp1 );
-        if( mt != data.pgraph.end() ) already_exists = true;
+        if( mt != data.pgraph.end() )
+        {
+           if (force_recompute)
+           {
+               delete mt->second;
+               mt->second = nullptr;
+           }
+           else
+           {
+               already_exists = true;
+           }
+        }
     }
     // nothing to do if it already exists
     if( already_exists )

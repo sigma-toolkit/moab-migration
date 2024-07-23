@@ -18,6 +18,15 @@
 #include "moab/GeomUtil.hpp"
 #include "moab/AdaptiveKDTree.hpp"
 
+#ifdef MOAB_HAVE_ARBORX
+#include <ArborX.hpp>
+#include <ArborX_Version.hpp>
+#include <Kokkos_Core.hpp>
+using ExecutionSpace = Kokkos::DefaultExecutionSpace;
+using MemorySpace = ExecutionSpace::memory_space;
+#include <set>
+#endif
+
 namespace moab
 {
 
@@ -357,6 +366,117 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
     box_error = min_box_eps;
 #endif
 
+#ifdef MOAB_HAVE_ARBORX
+    // Create the View for the bounding boxes, on device
+    Kokkos::View<ArborX::Box*, MemorySpace> bounding_boxes("bounding_boxes", rs1.size());
+
+    // with MemorySpace=Kokkos::CudaSpace, BoundingVolume=ArborX::Box, Enable=void
+    //Kokkos::View<ArborX::Box*> bounding_boxes("bounding_boxes", elems.size());
+    // mirror view on host, will be populated
+    if (my_rank == 0)
+        std::cout << " Execution space : " << ExecutionSpace::name() << "\n";
+    auto h_bounding_boxes = Kokkos::create_mirror_view(bounding_boxes);
+    std::vector<CartVect>  coords;
+    coords.resize(27);// max possible
+    for (size_t i=0; i<rs1.size(); i++)
+    {
+        EntityHandle cell=rs1[i];
+        const EntityHandle *conn ;
+        int nnodes;
+        rval = mb->get_connectivity(cell, conn, nnodes); MB_CHK_ERR( rval );
+        rval = mb->get_coords(conn, nnodes, &coords[0][0] );MB_CHK_SET_ERR( rval, "can't get coordinates" );
+        for (int j=0; j<nnodes; j++)
+        {
+            ArborX::Details::expand(h_bounding_boxes(i),
+                    ArborX::Point{ (float)coords[j][0], (float)coords[j][1], (float)coords[j][2]}  );
+        }
+    }
+    Kokkos::deep_copy(bounding_boxes, h_bounding_boxes);
+    // Create the bounding volume hierarchy
+    ArborX::BVH<MemorySpace> bvh(ExecutionSpace{}, bounding_boxes);
+
+    // Create the View for the spatial-based queries
+
+    Kokkos::View< decltype(ArborX::intersects(ArborX::Box{})) * , MemorySpace> queries_ar("queries", rs2.size());
+
+    // Fill in the queries on host mirror, then copy to device
+
+    float tolF = (float)tolerance;
+
+    auto h_queries_ar = create_mirror_view(queries_ar);
+    for (size_t i=0; i<rs2.size(); i++)
+    {
+        ArborX::Box bbox;
+        EntityHandle cell=rs2[i];
+        const EntityHandle *conn ;
+        int nnodes;
+        rval = mb->get_connectivity(cell, conn, nnodes); MB_CHK_ERR( rval );
+        rval = mb->get_coords(conn, nnodes, &coords[0][0] );MB_CHK_SET_ERR( rval, "can't get coordinates" );
+        for (int j=0; j<nnodes; j++)
+        {
+            ArborX::Details::expand(bbox,
+                    ArborX::Point{ (float)coords[j][0], (float)coords[j][1], (float)coords[j][2]}  );
+        }
+        ArborX::Point minc= bbox.minCorner();
+        ArborX::Point maxc= bbox.maxCorner();
+        bbox += ArborX::Point{ minc[0] - tolF, minc[1] - tolF, minc[2] - tolF };
+        bbox += ArborX::Point{ maxc[0] + tolF, maxc[1] + tolF, maxc[2] + tolF };
+        /*bbox += ArborX::Point{ (bbox.minCorner[0] - tolF), (bbox.minCorner[1] - tolF),(bbox.minCorner[2] - tolF) };
+        bbox += (bbox.maxCorner + tolPoint);*/
+        h_queries_ar(i) = ArborX::intersects(bbox);
+    }
+
+    // copy from host to device
+    Kokkos::deep_copy(queries_ar, h_queries_ar);
+
+    // Perform the search
+    Kokkos::View<int*, ExecutionSpace> offsets("offset", 0);
+    Kokkos::View<int*, ExecutionSpace> indices("indices", 0);
+    ArborX::query(bvh, ExecutionSpace{}, queries_ar, indices, offsets);
+
+    // create mirror and copy at the same time does not work, somehow
+    auto host_indices=Kokkos::create_mirror_view( indices);
+    auto host_offsets=Kokkos::create_mirror_view( offsets);
+    Kokkos::deep_copy(host_indices, indices);
+    Kokkos::deep_copy(host_offsets, offsets);
+
+    // now loop over all target cells, and intersect with close by source cells
+    for (size_t i=0; i<rs2.size(); i++)
+    {
+        EntityHandle tcell=rs2[i];
+        std::set<EntityHandle> close_by;
+        for (int j=host_offsets(i); j<host_offsets(i+1); j++)
+        {
+            int index = host_indices(j);
+            close_by.insert(rs1[index]);
+        }
+        int nnodes               = 0;
+        double areaTgtCell   = setup_tgt_cell( tcell, nnodes );  // this is the area in the gnomonic plane
+        double recoveredArea = 0;
+        for( auto it2 = close_by.begin(); it2 != close_by.end(); ++it2 )
+        {
+            EntityHandle startSrc = *it2;
+            double area           = 0;
+            // if area is > 0 , we have intersections
+            double P[10 * MAXEDGES];  // max 8 intx points + 8 more in the polygon
+            //
+            int nP = 0;
+            int nb[MAXEDGES], nr[MAXEDGES];  // sides 3 or 4? also, check boxes first
+            int nsTgt, nsSrc;
+            rval = computeIntersectionBetweenTgtAndSrc( tcell, startSrc, P, nP, area, nb, nr, nsSrc, nsTgt, true );MB_CHK_ERR( rval );
+            if( area > 0 )
+            {
+                if( nP > 1 )
+                {  // this will also construct triangles/polygons in the new mesh, if needed
+                    rval = findNodes( tcell, nnodes, startSrc, nsSrc, P, nP );MB_CHK_ERR( rval );
+                }
+                recoveredArea += area;
+            }
+        }
+        recoveredArea = ( recoveredArea - areaTgtCell ) / areaTgtCell;  // replace now with recovery fract
+    }
+#else
+
     // create the kd tree on source cells, and intersect all targets in an expensive loop
     // build a kd tree with the rs1 (source) cells
     FileOptions kdOpts("PLANE_SET=1;SPLITS_PER_DIR=2;SPHERICAL;RADIUS=1.0;");
@@ -439,6 +559,8 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
         }
         recoveredArea = ( recoveredArea - areaTgtCell ) / areaTgtCell;  // replace now with recovery fract
     }
+#endif
+
     // before cleaning up , we need to settle the position of the intersection points
     // on the boundary edges
     // this needs to be collective, so we should maybe wait something

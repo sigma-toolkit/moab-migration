@@ -14,11 +14,43 @@
 #ifdef MOAB_HAVE_MPI
 #include "moab/ParallelComm.hpp"
 #endif
+
+#ifdef MOAB_HAVE_ARBORX
+#include <Kokkos_Core.hpp>
+#endif
 #include "moab/IntxMesh/Intx2MeshOnSphere.hpp"
 #include "moab/IntxMesh/IntxUtils.hpp"
 #include "TestUtil.hpp"
 #include "moab/ProgOptions.hpp"
+#include "moab/NestedRefine.hpp"
 #include <cmath>
+
+#include <chrono>
+typedef std::chrono::high_resolution_clock Clock;
+typedef std::chrono::high_resolution_clock::time_point Timer;
+using std::chrono::duration_cast;
+
+Timer start;
+std::map< std::string, std::chrono::nanoseconds > timeLog;
+
+
+#define PUSH_TIMER()          \
+    {                         \
+        start = Clock::now(); \
+    }
+
+#define POP_TIMER( EventName )                                                                                \
+    {                                                                                                         \
+        std::chrono::nanoseconds elapsed = duration_cast< std::chrono::nanoseconds >( Clock::now() - start ); \
+        timeLog[EventName]               = elapsed;                                                           \
+    }
+
+#define PRINT_TIMER( EventName )                                                                                       \
+    {                                                                                                                  \
+        std::cout << "[ " << EventName                                                                                 \
+                  << " ]: elapsed = " << static_cast< double >( timeLog[EventName].count() / 1e6 ) << " milli-seconds" \
+                  << std::endl;                                                                                        \
+    }
 
 using namespace moab;
 
@@ -27,12 +59,12 @@ int main( int argc, char* argv[] )
 
     std::string firstModel, secondModel, outputFile;
 
-    firstModel  = TestDir + "unittest/mbcslam/lagrangeHomme.vtk";
-    secondModel = TestDir + "unittest/mbcslam/eulerHomme.vtk";
+    firstModel  = TestDir + "/mbcslam/lagrangeHomme.vtk";
+    secondModel = TestDir + "/mbcslam/eulerHomme.vtk";
 
     ProgOptions opts;
-    opts.addOpt< std::string >( "first,t", "first mesh filename (source)", &firstModel );
-    opts.addOpt< std::string >( "second,m", "second mesh filename (target)", &secondModel );
+    opts.addOpt< std::string >( "source,s", "first mesh filename (source)", &firstModel );
+    opts.addOpt< std::string >( "target,t", "second mesh filename (target)", &secondModel );
     opts.addOpt< std::string >( "outputFile,o", "output intersection file", &outputFile );
 
     double R      = 1.;  // input
@@ -42,37 +74,45 @@ int main( int argc, char* argv[] )
     opts.addOpt< double >( "radius,R", "radius for model intx", &R );
     opts.addOpt< double >( "epsilon,e", "relative error in intx", &epsrel );
     opts.addOpt< double >( "boxerror,b", "relative error for box boundaries", &boxeps );
+    int uniformRefinementLevels = 0;
+    opts.addOpt< int >( "refine,r", "Number of levels of uniform refinements to perform on the meshes (default=0)",
+                            &uniformRefinementLevels );
 
     int output_fraction  = 0;
     int write_files_rank = 0;
     int brute_force      = 0;
 
+    bool write_intx_file = false;
     opts.addOpt< int >( "outputFraction,f", "output fraction of areas", &output_fraction );
     opts.addOpt< int >( "writeFiles,w", "write files of interest", &write_files_rank );
+    opts.addOpt< void >( "writeIntxFile,W", "write intersection file ", &write_intx_file );
     opts.addOpt< int >( "kdtreeOption,k", "use kd tree for intersection", &brute_force );
 
     opts.parseCommandLine( argc, argv );
     int rank = 0, size = 1;
-#ifdef MOAB_HAVE_MPI
-    MPI_Init( &argc, &argv );
-    MPI_Comm_rank( MPI_COMM_WORLD, &rank );
-    MPI_Comm_size( MPI_COMM_WORLD, &size );
-#endif
-
-    // check command line arg second grid is red, arrival, first mesh is blue, departure
-    // will will keep the
-    std::string optsRead = ( size == 1 ? ""
-                                       : std::string( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION" ) +
-                                             std::string( ";PARALLEL_RESOLVE_SHARED_ENTS" ) );
-
     // read meshes in 2 file sets
     ErrorCode rval;
     Core moab;
     Interface* mb = &moab;  // global
     EntityHandle sf1, sf2, outputSet;
 
-    // create meshsets and load files
+#ifdef MOAB_HAVE_MPI
+    MPI_Init( &argc, &argv );
+    MPI_Comm_rank( MPI_COMM_WORLD, &rank );
+    MPI_Comm_size( MPI_COMM_WORLD, &size );
+#endif
 
+#ifdef MOAB_HAVE_ARBORX
+    Kokkos::initialize(argc, argv);
+    {
+#endif
+    // check command line arg second grid is red, arrival, first mesh is blue, departure
+    // will will keep the
+    std::string optsRead = ( size == 1 ? ""
+                                       : std::string( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION" ) +
+                                             std::string( ";PARALLEL_RESOLVE_SHARED_ENTS" ) );
+
+    // create meshsets and load files
     rval = mb->create_meshset( MESHSET_SET, sf1 );MB_CHK_ERR( rval );
     rval = mb->create_meshset( MESHSET_SET, sf2 );MB_CHK_ERR( rval );
     if( 0 == rank ) std::cout << "Loading mesh file " << firstModel << "\n";
@@ -89,10 +129,37 @@ int main( int argc, char* argv[] )
     }
     rval = mb->create_meshset( MESHSET_SET, outputSet );MB_CHK_ERR( rval );
 
-    // fix radius of both meshes, to be consistent with input R
+    if( uniformRefinementLevels )
+    {
+        moab::NestedRefine uref( &moab, nullptr, sf1 );
+        std::vector< int > uniformRefinementDegree( uniformRefinementLevels, 2 );
+        std::vector< EntityHandle > level_sets;
+        rval = uref.generate_mesh_hierarchy( uniformRefinementLevels,
+                                                uniformRefinementDegree.data(),
+                                                level_sets, true );MB_CHK_ERR( rval );
+        assert( (int)level_sets.size() == uniformRefinementLevels + 1 );
+        sf1 = level_sets[uniformRefinementLevels];
+        moab::NestedRefine uref2( &moab, nullptr, sf2 );
+
+        std::vector< EntityHandle > level_sets2;
+        rval = uref2.generate_mesh_hierarchy( uniformRefinementLevels,
+                                                       uniformRefinementDegree.data(),
+                                                       level_sets2, true );MB_CHK_ERR( rval );
+        sf2 = level_sets2[uniformRefinementLevels];
+    }
+    // fix radius of both meshes, to be consistent with input R, after eventual refinement
     rval = moab::IntxUtils::ScaleToRadius( mb, sf1, R );MB_CHK_ERR( rval );
     rval = moab::IntxUtils::ScaleToRadius( mb, sf2, R );MB_CHK_ERR( rval );
 
+    if (uniformRefinementLevels)
+    {
+        std::stringstream ffs;
+        ffs << "source_R" << uniformRefinementLevels << ".vtk";
+        rval = mb->write_mesh( ffs.str().c_str(), &sf1, 1 );MB_CHK_ERR( rval );
+        std::stringstream ffs2;
+        ffs2 << "target_R" << uniformRefinementLevels << ".vtk";
+        rval = mb->write_mesh( ffs2.str().c_str(), &sf2, 1 );MB_CHK_ERR( rval );
+    }
 #if 0
   // std::cout << "Fix orientation etc ..\n";
   //IntxUtils; those calls do nothing for a good mesh
@@ -140,7 +207,8 @@ int main( int argc, char* argv[] )
         rval           = mb->create_meshset( moab::MESHSET_SET, covering_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
         bool gnomonic = true;
         int nb_ghost_layers = 0;
-        rval          = worker.construct_covering_set( sf1, covering_set, gnomonic, nb_ghost_layers );MB_CHK_ERR( rval );  // lots of communication if mesh is distributed very differently
+        // lots of communication if mesh is distributed very differently
+        MB_CHK_ERR( worker.construct_covering_set( sf1, covering_set, gnomonic, nb_ghost_layers ) );
         elapsed = MPI_Wtime() - elapsed;
         if( 0 == rank ) std::cout << "\nTime to communicate the mesh = " << elapsed << std::endl;
         // area fraction of the covering set that needed to be communicated from other processors
@@ -195,6 +263,8 @@ int main( int argc, char* argv[] )
 #endif
         covering_set = sf1;
 
+    PUSH_TIMER()
+
     if( 0 == rank ) std::cout << "Computing intersections ..\n";
 #ifdef MOAB_HAVE_MPI
     double elapsed = MPI_Wtime();
@@ -211,6 +281,8 @@ int main( int argc, char* argv[] )
     elapsed = MPI_Wtime() - elapsed;
     if( 0 == rank ) std::cout << "\nTime to compute the intersection between meshes = " << elapsed << std::endl;
 #endif
+    POP_TIMER( "Intersection time" )
+    PRINT_TIMER( "Intersection time"  )
     // the output set does not have the intx vertices on the boundary shared, so they will be
     // duplicated right now we write this file just for checking it looks OK
 
@@ -236,19 +308,33 @@ int main( int argc, char* argv[] )
     std::cout << "On rank : " << rank << " arrival area: " << arrival_area << "  intersection area:" << intx_area
               << " rel error: " << fabs( ( intx_area - arrival_area ) / arrival_area ) << "\n";
 
+#ifdef MOAB_HAVE_ARBORX
+    }
+    Kokkos::finalize();
+#endif
+    if (write_intx_file)
+    {
 #ifdef MOAB_HAVE_MPI
 #ifdef MOAB_HAVE_HDF5_PARALLEL
-    rval = mb->write_file( outputFile.c_str(), 0, "PARALLEL=WRITE_PART", &outputSet, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
+        outputFile = "intx.h5m";
+        rval = mb->write_file( outputFile.c_str(), 0, "PARALLEL=WRITE_PART", &outputSet, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
 #else
-    // write intx set on rank 0, in serial; we cannot write in parallel
-    if( 0 == rank )
-    {
+       // write intx set on rank 0, in serial; we cannot write in parallel
+        if( 0 == rank )
+        {
+            rval = mb->write_file( outputFile.c_str(), 0, 0, &outputSet, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
+        }
+#endif
+
+#else
         rval = mb->write_file( outputFile.c_str(), 0, 0, &outputSet, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
+#endif
     }
-#endif
+
+#ifdef MOAB_HAVE_MPI
     MPI_Finalize();
-#else
-    rval = mb->write_file( outputFile.c_str(), 0, 0, &outputSet, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
 #endif
+
     return 0;
 }
+

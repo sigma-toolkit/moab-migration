@@ -330,8 +330,12 @@ else()
     )
 endif()
 
-set(MOAB_ALL_LIBS ${MOAB_DEP_LIBRARIES} ${MOAB_LIBS}) 
-list(APPEND MOAB_ALL_LIBS ${MPI_LIBRARIES})
+if ( MOAB_HAVE_ARBORX )
+  set(MOAB_KOKKOS_LIBS  ArborX::ArborX )
+endif (MOAB_HAVE_ARBORX )
+
+set(MOAB_ALL_LIBS ${MOAB_DEP_LIBRARIES} ${MOAB_LIBS} ${MOAB_KOKKOS_LIBS}) 
+list(APPEND MOAB_ALL_LIBS "${MPI_LIBRARIES}")
 list(APPEND MOAB_ALL_LIBS ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
 target_link_libraries(MOAB ${MOAB_ALL_LIBS})
 message(STATUS "MOAB_ALL_LIBS = ${MOAB_ALL_LIBS}.")
@@ -339,7 +343,6 @@ message(STATUS "MOAB_ALL_LIBS = ${MOAB_ALL_LIBS}.")
 # If using clang-tidy, set the target property so that
 # reformatting code does not use full fledged C++11 semantics
 # set_property(TARGET MOAB PROPERTY CXX_STANDARD 98)
-
 install(
   TARGETS MOAB
   EXPORT MOABTargets

@@ -169,6 +169,9 @@
 /* Define if configured with support for parallel computations. */
 #cmakedefine MOAB_HAVE_MPI @MOAB_HAVE_MPI@
 
+/* "Define if configured with ArborX support." */
+#cmakedefine MOAB_HAVE_ARBORX @MOAB_HAVE_ARBORX@
+
 /* "Define if configured with NetCDF support." */
 #cmakedefine MOAB_HAVE_NETCDF @MOAB_HAVE_NETCDF@
 

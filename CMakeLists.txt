@@ -134,6 +134,7 @@ option ( ENABLE_BLASLAPACK   "Should require BLAS/LAPACK?" ON )
 option ( ENABLE_EIGEN3       "Should require Eigen3 header-only library?" OFF )
 option ( ENABLE_FORTRAN      "Should enable FORTRAN?" ON )
 option ( ENABLE_TEMPESTREMAP "Should enable TempestRemap dependency?" OFF )
+option ( ENABLE_ARBORX       "Should enable ArborX ?" OFF )
 
 add_feature_info(SharedLibs BUILD_SHARED_LIBS "Should shared or static libraries be created?")
 add_feature_info(EnableFortran ENABLE_FORTRAN "Should FORTRAN support be enabled?")
@@ -485,6 +486,14 @@ if (ENABLE_CGNS)
   set( MOABIO_LIBS ${MOABIO_LIBS} ${CGNS_LIBRARIES} )
   set (MOAB_HAVE_CGNS ON)
 endif(ENABLE_CGNS)
+
+# If ArborX is to be enabled, check Kokkos and ArborX installations
+set (MOAB_HAVE_ARBORX OFF CACHE INTERNAL "Found necessary ArborX components. Configure MOAB with it." )
+if ( ENABLE_ARBORX )
+  find_package( ArborX REQUIRED )
+  set(MOAB_HAVE_ARBORX ON)
+  message(STATUS "ArborX cmake found at  ${ArborX_DIR} ")
+endif( ENABLE_ARBORX )
 
 # Strip our custom flags
 string(STRIP "${CMAKE_EXE_LINKER_FLAGS} " CMAKE_EXE_LINKER_FLAGS)

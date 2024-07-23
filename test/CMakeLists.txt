@@ -74,6 +74,11 @@ foreach( fname ${HDF5_C_TESTS} )
   add_test( ${base} ${EXECUTABLE_OUTPUT_PATH}/${base} )
 endforeach()
 
+if (MOAB_HAVE_ARBORX)
+  set (TESTS ${TESTS}
+              kdtree_arborx_test.cpp )
+endif()
+
 foreach( fname ${TESTS} )
   string( REPLACE ".cpp" "" base ${fname} )
   add_executable( ${base} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname})

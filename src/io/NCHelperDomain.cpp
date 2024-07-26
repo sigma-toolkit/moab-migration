@@ -592,6 +592,7 @@ ErrorCode NCHelperDomain::redistribute_cells( ParallelComm* myPcomm,
     }
 
     std::vector< double > xi( num_local_cells ), yi( num_local_cells ), zi( num_local_cells );
+    std::vector< int > gids2( num_local_cells );
     const double pideg = acos( -1.0 ) / 180.0;
     size_t actual_index = 0;
     for( size_t i = 0; i < xc.size(); i++ )
@@ -607,12 +608,13 @@ ErrorCode NCHelperDomain::redistribute_cells( ParallelComm* myPcomm,
         xi[actual_index]         = xmult;
         yi[actual_index]         = ymult;
         zi[actual_index]         = zmult;
+        gids2[actual_index]      = gids[i];
         actual_index++;
     }
     Interface*& mbImpl         = _readNC->mbImpl;
     ZoltanPartitioner* mbZTool = new ZoltanPartitioner( mbImpl, myPcomm, false, 0, NULL );
     std::vector< int > dest( num_local_cells );
-    ErrorCode rval = mbZTool->repartition_to_procs( xi, yi, zi, gids, "RCB", dest );MB_CHK_SET_ERR( rval, "Error in Zoltan partitioning" );
+    ErrorCode rval = mbZTool->repartition_to_procs( xi, yi, zi, gids2, "RCB", dest );MB_CHK_SET_ERR( rval, "Error in Zoltan partitioning" );
     delete mbZTool;
     // now use crystal router to send the arrays to the right places
     moab::TupleList tl;
@@ -620,13 +622,14 @@ ErrorCode NCHelperDomain::redistribute_cells( ParallelComm* myPcomm,
     tl.initialize( 3, 0, 0, numr, num_local_cells );  // to proc, dof, mask
     tl.enableWriteAccess();
     // populate
+    int index_in_dest = 0;
     for( size_t i = 0; i < xc.size(); i++ )
     {
     	if (culling && 0 == masks[i])
     	    continue;
-        int gdof               = gids[i];
-        int to_proc            = dest[i];
-        int mask               = masks[i];
+        int gdof               = gids2[index_in_dest];
+        int to_proc            = dest[index_in_dest];
+        int mask               = masks[i]; // should be 1 if culling
         int n                  = tl.get_n();
         tl.vi_wr[3 * n]        = to_proc;
         tl.vi_wr[3 * n + 1]    = gdof;
@@ -643,6 +646,7 @@ ErrorCode NCHelperDomain::redistribute_cells( ParallelComm* myPcomm,
             tl.vr_wr[n * numr + 4 + nv + k] = yv[index_v_arr];
         }
         tl.inc_n();
+        index_in_dest++;
     }
 
     // now do the heavy communication

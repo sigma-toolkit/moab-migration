@@ -1,7 +1,7 @@
 
 from pymoab import core
 from pymoab import types
-from driver import test_driver, CHECK_EQ
+from driver import run_tests, CHECK_EQ
 
 def test_tag_properties():
     mb = core.Core()
@@ -28,7 +28,7 @@ def test_tag_conventions():
 
 if __name__ == "__main__":
     tests = [test_tag_properties, test_tag_conventions]
-    test_driver(tests)
+    run_tests(tests)
 
 
     

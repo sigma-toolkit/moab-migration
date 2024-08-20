@@ -1,5 +1,6 @@
 import sys
 import traceback
+import numpy as np
 
 if sys.version_info < (3, 0):
     from collections import Iterable
@@ -16,7 +17,7 @@ class colors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-def test_driver(test_list):
+def run_tests(test_list):
     ret_val = 0
     for test in test_list:
         try:
@@ -43,7 +44,10 @@ def CHECK_ITER_EQ(actual_value, expected_value):
 def CHECK_EQ(actual_value, expected_value):
     err_msg = "Expected value: {} Actual value: {}"
     err_msg = err_msg.format(expected_value, actual_value)
-    result = expected_value == actual_value
+    if isinstance(actual_value, np.ndarray) and isinstance(expected_value, np.ndarray):
+        result = np.array_equal(actual_value, expected_value)
+    else:
+        result = actual_value == expected_value
     assert result, err_msg
 
 def CHECK(actual_value):

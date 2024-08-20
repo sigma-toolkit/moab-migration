@@ -1,7 +1,7 @@
 from pymoab import core
 from pymoab import types
 from pymoab import topo_util
-from driver import test_driver
+from driver import run_tests
 from driver import CHECK_EQ, CHECK_NOT_EQ, CHECK_ITER_EQ
 import numpy as np
 
@@ -65,5 +65,5 @@ if __name__ == "__main__":
     tests = [test_get_bridge_adjacencies,
              test_get_average_position,
              test_construct_aentities]
-    test_driver(tests)
+    run_tests(tests)
 

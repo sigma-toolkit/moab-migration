@@ -2,7 +2,7 @@ from pymoab import core
 from pymoab import types
 from pymoab.scd import ScdInterface
 from pymoab.hcoord import HomCoord
-from driver import test_driver, CHECK_EQ, CHECK_ITER_EQ, CHECK_TYPE
+from driver import run_tests, CHECK_EQ, CHECK_ITER_EQ, CHECK_TYPE
 import numpy as np
 from pymoab.types import _eh_py_type
 
@@ -167,4 +167,4 @@ def evaluate_sequence(box):
 
 if __name__ == "__main__":
     tests = [test_scds, test_w_coordinates]
-    test_driver(tests)
+    run_tests(tests)

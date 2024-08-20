@@ -4024,6 +4024,9 @@ static ErrCode ComputeSphereRadius( iMOAB_AppID pid, double* radius )
     moab::CartVect pos;
 
     Range& verts                   = context.appDatas[*pid].all_verts;
+    *radius = 1.0;
+    if (verts.empty())
+    	return moab::MB_SUCCESS;
     moab::EntityHandle firstVertex = ( verts[0] );
 
     // coordinate data

@@ -80,8 +80,8 @@ int main( int argc, char* argv[] )
     CHECKIERR( ierr, "Cannot load moab mesh on coupler pes" )
 
     int cplocn = 18;
-    ierr = iMOAB_RegisterApplication( "OCNX", &dup_comm_world, &cplocn,
-                                      cplOcnPID );  // ocn on coupler pes
+    ierr       = iMOAB_RegisterApplication( "OCNX", &dup_comm_world, &cplocn,
+                                            cplOcnPID );  // ocn on coupler pes
     CHECKIERR( ierr, "Cannot register OCN over coupler PEs" )
     // use domain file options
     ierr = iMOAB_LoadMesh( cplOcnPID, domainFile.c_str(), readoptsDomain.c_str(), &nghlay );  // moab mesh can be cells
@@ -92,10 +92,29 @@ int main( int argc, char* argv[] )
     ierr                    = iMOAB_WriteMesh( cplOcnPID, outputFile, fileWriteOptions );
     CHECKIERR( ierr, "Cannot write ocean domain mesh from coupler pes" )
 
-    int sizeTag    = 1;
-    int tagIndex   = -1;
-    int tagType = DENSE_DOUBLE;
-    ierr = iMOAB_DefineTagStorage( cplAtmPID, tagname.c_str(), &tagType, &sizeTag, &tagIndex );
+    // add a second read with repartitioning and culling, in another iMOAB app, just to test
+    // the option of culling + repartitioning
+    // this will be used for land mesh actually in e3sm,
+    // but will use it on this ocean mesh because we do not want to
+    // add another input file to the repository
+    int cplLndAppID       = -1;            // -1 means it is not initialized
+    iMOAB_AppID cplLndPID = &cplLndAppID;  // lnd on coupler PEs
+    int cpllnd            = 9;
+    ierr                  = iMOAB_RegisterApplication( "LNDX", &dup_comm_world, &cpllnd,
+                                                       cplLndPID );  // lnd on coupler pes
+    CHECKIERR( ierr, "Cannot register LND over coupler PEs" )
+    // use domain file options as for land domain on coupler
+    std::string readoptsDomain2( "PARALLEL=READ_PART;PARTITION_METHOD=SQIJ;VARIABLE=;REPARTITION" );
+    ierr = iMOAB_LoadMesh( cplLndPID, domainFile.c_str(), readoptsDomain2.c_str(), &nghlay );
+    CHECKIERR( ierr, "Cannot load land domain mesh on coupler pes" )
+    char outputFileLnd[] = "LndDomMesh.h5m";
+    ierr                 = iMOAB_WriteMesh( cplLndPID, outputFileLnd, fileWriteOptions );
+    CHECKIERR( ierr, "Cannot write land domain mesh from coupler pes" )
+
+    int sizeTag  = 1;
+    int tagIndex = -1;
+    int tagType  = DENSE_DOUBLE;
+    ierr         = iMOAB_DefineTagStorage( cplAtmPID, tagname.c_str(), &tagType, &sizeTag, &tagIndex );
     CHECKIERR( ierr, "Cannot define source tags tag" )
 
     ierr = iMOAB_DefineTagStorage( cplOcnPID, tagname.c_str(), &tagType, &sizeTag, &tagIndex );
@@ -127,7 +146,7 @@ int main( int argc, char* argv[] )
     const std::string dof_tag_names[3]       = { "GLOBAL_DOFS", "GLOBAL_ID", "GLOBAL_ID" };
 
     int fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 0, fNoConserve = 0, fNoBubble = 1, fInverseDistanceMap = 0;
-    int filter_type = 0;
+    int filter_type    = 0;
     int disc_orders[3] = { 4, 1, 1 };
     ierr = iMOAB_ComputeScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0].c_str(), disc_methods[1].c_str(),
                                                  &disc_orders[1], disc_methods[1].c_str(), &disc_orders[1], nullptr,
@@ -155,12 +174,12 @@ int main( int argc, char* argv[] )
     ierr = iMOAB_FreeSenderBuffers( cplAtmPID, &atmocnid );  // context is intx external id
     CHECKIERR( ierr, "cannot free buffers used to resend atm tag towards the coverage mesh" )
 
-    ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0].c_str(), tagname.c_str(),
-            tagname.c_str() );
+    ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0].c_str(),
+                                               tagname.c_str(), tagname.c_str() );
     CHECKIERR( ierr, "failed to compute projection weight application" );
 
-    char outputFile2[]       = "OcnDomMeshProj.h5m";
-    ierr                    = iMOAB_WriteMesh( cplOcnPID, outputFile2, fileWriteOptions );
+    char outputFile2[] = "OcnDomMeshProj.h5m";
+    ierr               = iMOAB_WriteMesh( cplOcnPID, outputFile2, fileWriteOptions );
     CHECKIERR( ierr, "Cannot write ocean domain mesh from coupler pes" )
 
     ierr = iMOAB_DeregisterApplication( cplAtmOcnPID );

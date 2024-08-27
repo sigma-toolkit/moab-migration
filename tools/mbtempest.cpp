@@ -93,8 +93,8 @@ struct ToolContext
           baselineFile( "" ), variableToVerify( "" ), meshType( moab::TempestRemapper::DEFAULT ), skip_io( false ),
           computeDual( false ), computeWeights( false ), verifyWeights( false ), enforceConvexity( false ),
           ensureMonotonicity( 0 ), rrmGrids( false ), kdtreeSearch( true ), fCheck( false ), fVolumetric( false ),
-          useGnomonicProjection( false ), cassType( moab::TempestOnlineMap::CAAS_NONE ), print_diagnostics( false ),
-          boxeps( 1e-7 ),               // Box error tolerance default value
+          useGnomonicProjection( true ), cassType( moab::TempestOnlineMap::CAAS_NONE ), print_diagnostics( false ),
+          boxeps( 1e-8 ),               // Box error tolerance default value
           epsrel( ReferenceTolerance )  // ReferenceTolerance is defined in Defines.h in TempestRemap
     {
         inFilenames.resize( 2 );
@@ -158,6 +158,7 @@ struct ToolContext
         int expectedOrder              = 1;
         int useCAAS                    = 0;
         int nlayer_input               = -1;
+        bool localgnomonic             = false;
 
         if( !proc_id )
         {
@@ -225,7 +226,9 @@ struct ToolContext
         opts.addOpt< void >( "skip_output", "For performance studies, skip all I/O operations.", &skip_io );
 
         opts.addOpt< void >( "gnomonic", "Use Gnomonic plane projections to compute coverage mesh.",
-                             &useGnomonicProjection );
+                             &localgnomonic );
+
+        opts.addOpt< void >( "3D", "Use 3D schemes to compute coverage mesh (not usually robust)." );
 
         opts.addOpt< void >( "enforce_convexity", "check convexity of input meshes to compute mesh intersections",
                              &enforceConvexity );
@@ -272,6 +275,7 @@ struct ToolContext
         // By default - use Kd-tree based search; if user asks for advancing front, disable Kd-tree
         // algorithm
         kdtreeSearch = opts.numOptSet( "advfront,a" ) == 0;
+        useGnomonicProjection = localgnomonic || ( opts.numOptSet( "3D" ) == 0 );
 
         switch( imeshType )
         {
@@ -392,7 +396,7 @@ struct ToolContext
             if( fVolumetric ) mapOptions.strMethod += "volumetric;";
 
             // For global meshes, this default should work out of the box.
-            if( fvMethod.size() ) nlayers = 1;
+            if( fvMethod.compare("none") ) nlayers = 1;
             else if( !disc_methods[0].compare("fv") && !disc_methods[1].compare("fv") && mapOptions.nPin > 1 )
                 nlayers = mapOptions.nPin + 1; // high-order FV-FV
             else if( disc_methods[1].compare("fv") && mapOptions.nPout > 1 )
@@ -405,7 +409,23 @@ struct ToolContext
               nlayers = nlayer_input;
         }
 
-        if ( !proc_id ) std::cout << "Using ghost layers = " << nlayers << std::endl;
+        // verbose output to screen so that we understand all parameters being used in the run
+        if ( !proc_id && imeshType > 2 )
+        {
+            std::cout << "\t----------------------------------------------" << std::endl;
+            std::cout << "\t      mbtempest runtime parameters      " << std::endl;
+            std::cout << "\t----------------------------------------------" << std::endl << std::endl;
+            std::cout << "\t Number of processes     = " << n_procs << std::endl;
+            std::cout << "\t Input method:order:dof  = " << disc_methods[0] << ":" << mapOptions.nPin  << ":" << doftag_names[0] << std::endl;
+            std::cout << "\t Output method:order:dof = " << disc_methods[1] << ":" << mapOptions.nPout << ":" << doftag_names[1] << std::endl;
+            std::cout << "\t Number of ghost layers  = " << nlayers << std::endl;
+            std::cout << "\t Intersection scheme     = " << ( kdtreeSearch ? "Kd-tree" : "Advancing-Front" ) << std::endl;
+            std::cout << "\t Coverage scheme         = " << ( useGnomonicProjection ? "gnomonic" : "3D" ) << std::endl;
+            std::cout << "\t Bounding-box Epsilon    = " << boxeps << std::endl;
+            if ( fvMethod.size() ) std::cout << "\t FV sub-scheme           = " << fvMethod << std::endl;
+            if ( mapOptions.strMethod.size() ) std::cout << "\t Additional params       = " << mapOptions.strMethod << std::endl;
+            std::cout << "\t----------------------------------------------" << std::endl << std::endl;
+        }
 
         // clear temporary string name
         expectedFName.clear();
@@ -922,6 +942,7 @@ int main( int argc, char* argv[] )
                                            ":" + std::string( runCtx->doftag_names[1] );
                 attrMap["concave_b"] = runCtx->mapOptions.fTargetConcave ? "true" : "false";
                 attrMap["bubble"]    = runCtx->mapOptions.fNoBubble ? "false" : "true";
+                attrMap["nprocesses"]    = std::to_string( runCtx->n_procs );
                 attrMap["history"]   = historyStr;
 
                 // Write the map file to disk in parallel using either HDF5 or SCRIP interface

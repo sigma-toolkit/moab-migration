@@ -157,7 +157,7 @@ struct ToolContext
         std::string expectedDofTagName = "GLOBAL_ID";
         int expectedOrder              = 1;
         int useCAAS                    = 0;
-        int nlayer_input               = 0;
+        int nlayer_input               = -1;
 
         if( !proc_id )
         {
@@ -358,7 +358,8 @@ struct ToolContext
 
             mapOptions.strMethod = "";
 
-            if( expectedFVMethod != "none" )
+            // check FV sub-methodology
+            if( expectedFVMethod.compare("none") )
             {
                 mapOptions.strMethod += expectedFVMethod + ";";
                 fvMethod = expectedFVMethod;
@@ -366,6 +367,8 @@ struct ToolContext
                 // These FV projection methods are non-conservative; specify it explicitly
                 mapOptions.fNoConservation = true;
             }
+
+            // check monotonicity flag
             switch( ensureMonotonicity )
             {
                 case 0:
@@ -380,6 +383,8 @@ struct ToolContext
                 default:
                     mapOptions.fMonotone = true;
             }
+
+            // correct areas always by default
             mapOptions.fNoCorrectAreas = false;
             mapOptions.fNoCheck        = !fCheck;
 
@@ -387,12 +392,20 @@ struct ToolContext
             if( fVolumetric ) mapOptions.strMethod += "volumetric;";
 
             // For global meshes, this default should work out of the box.
-            if( !fvMethod.compare( "bilin" ) ) nlayers = 3;
+            if( fvMethod.size() ) nlayers = 1;
+            else if( !disc_methods[0].compare("fv") && !disc_methods[1].compare("fv") && mapOptions.nPin > 1 )
+                nlayers = mapOptions.nPin + 1; // high-order FV-FV
+            else if( disc_methods[1].compare("fv") && mapOptions.nPout > 1 )
+                nlayers = mapOptions.nPout + 1; // high-order FV-SE or SE-SE
             else
-                nlayers = ( mapOptions.nPin > 1 ? mapOptions.nPin + 1 : 0 );
-            if ( nlayer_input )
-              nlayers = std::max( nlayer_input, nlayers );
+                nlayers = 0;
+
+            // if user specified the number of ghost layers, override the default value
+            if ( nlayer_input >= 0 )
+              nlayers = nlayer_input;
         }
+
+        if ( !proc_id ) std::cout << "Using ghost layers = " << nlayers << std::endl;
 
         // clear temporary string name
         expectedFName.clear();
@@ -558,7 +571,7 @@ int main( int argc, char* argv[] )
         }
 
         // print verbosely about the problem setting
-        size_t velist[6], gvelist[6];
+        size_t velist[6];
         {
             moab::Range rintxverts, rintxelems;
             rval = mbCore->get_entities_by_dimension( runCtx->meshsets[0], 0, rintxverts );MB_CHK_ERR( rval );
@@ -590,6 +603,7 @@ int main( int argc, char* argv[] )
 #endif
             rval = mbintx->FindMaxEdges( runCtx->meshsets[0], runCtx->meshsets[1] );MB_CHK_ERR( rval );
 
+            size_t gvelist[6] = { 0, 0, 0, 0, 0, 0 };
 #ifdef MOAB_HAVE_MPI
             moab::Range local_verts;
             rval = mbintx->build_processor_euler_boxes( runCtx->meshsets[1], local_verts );MB_CHK_ERR( rval );
@@ -698,7 +712,7 @@ int main( int argc, char* argv[] )
 #endif
 
         // print verbosely about the problem setting
-        size_t velist[4] = {}, gvelist[4] = {};
+        size_t velist[4] = { 0, 0, 0, 0 };
         {
             moab::Range srcverts, srcelems;
             rval = mbCore->get_entities_by_dimension( runCtx->meshsets[0], 0, srcverts );MB_CHK_ERR( rval );
@@ -746,6 +760,7 @@ int main( int argc, char* argv[] )
                                               runCtx->useGnomonicProjection, runCtx->nlayers );MB_CHK_ERR( rval );
         runCtx->timer_pop();
 
+        size_t gvelist[4] = { 0, 0, 0, 0 };
 #ifdef MOAB_HAVE_MPI
         MPI_Reduce( velist, gvelist, 4, MPI_UINT64_T, MPI_SUM, 0, MPI_COMM_WORLD );
 #else
@@ -774,7 +789,7 @@ int main( int argc, char* argv[] )
             moab::IntxAreaUtils areaAdaptorHuiller(
                 moab::IntxAreaUtils::GaussQuadrature );  // lHuiller, GaussQuadrature
             double local_areas[3],
-                global_areas[3];  // Array for Initial area, and through Method 1 and Method 2
+                global_areas[3] = { 0.0, 0.0, 0.0 };  // Array for Initial area, and through Method 1 and Method 2
             // local_areas[0] = area_on_sphere_lHuiller ( mbCore, runCtx->meshsets[1], radius_src );
             local_areas[0] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
             local_areas[1] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[1], radius_dest );
@@ -1126,7 +1141,7 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
             rval = remapper.GhostLayers( ctx.meshsets[0], ctx.nlayers, set_with_ghosts );MB_CHK_ERR( rval );
             remapper.SetMeshSet( moab::Remapper::SourceMeshWithGhosts, set_with_ghosts );
 #ifdef MOAB_DBG
-            if( !runCtx->skip_io )
+            if( !ctx.skip_io )
             {
                 // write the new source sets, after layers were decided, should see the ghosts now
                 std::stringstream filename;

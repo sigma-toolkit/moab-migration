@@ -22,6 +22,7 @@
 #include "MathHelper.h"
 #include "SparseMatrix.h"
 #include "OverlapMesh.h"
+#include "MeshUtilitiesFuzzy.h"
 
 #include "DebugOutput.hpp"
 #include "moab/AdaptiveKDTree.hpp"
@@ -1038,16 +1039,6 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
 #ifdef VERBOSE
     const unsigned outputFrequency = ( m_meshInputCov->faces.size() / 10 ) + 1;
 #endif
-    // generic triangle used for area computation, for triangles around the center of overlap face;
-    // used for overlap faces with more than 4 edges;
-    // nodes array will be set for each triangle;
-    // these triangles are not part of the mesh structure, they are just temporary during
-    //   aforementioned decomposition.
-    Face faceTri( 3 );
-    NodeVector nodes( 3 );
-    faceTri.SetNode( 0, 0 );
-    faceTri.SetNode( 1, 1 );
-    faceTri.SetNode( 2, 2 );
 
     // Loop over all input Faces
     for( size_t ixFirst = 0; ixFirst < m_meshInputCov->faces.size(); ixFirst++ )
@@ -1082,10 +1073,7 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
         }
 
         // No overlaps
-        if( nOverlapFaces == 0 )
-        {
-            continue;
-        }
+        if( nOverlapFaces == 0 ) continue;
 
         // Allocate remap coefficients array for meshFirst Face
         DataArray3D< double > dRemapCoeff( nP, nP, nOverlapFaces );
@@ -1108,26 +1096,21 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
                 continue;
             }
 
-            // #ifdef VERBOSE
-            // if ( is_root )
-            //     Announce ( "\tLocal ID: %i/%i = %i, areas = %2.8e", j + ixOverlap, nOverlapFaces,
-            //     m_remapper->lid_to_gid_covsrc[m_meshOverlap->vecSourceFaceIx[ixOverlap + j]],
-            //     m_meshOverlap->vecFaceArea[ixOverlap + j] );
-            // #endif
-
             int nbEdges           = faceOverlap.edges.size();
             int nOverlapTriangles = 1;
-            Node center;  // not used if nbEdges == 3
+            Node nodeCenter;  // not used if nbEdges == 3
             if( nbEdges > 3 )
-            {  // decompose from center in this case
+            {  // decompose from nodeCenter in this case
                 nOverlapTriangles = nbEdges;
                 for( int k = 0; k < nbEdges; k++ )
                 {
                     const Node& node = nodesOverlap[faceOverlap[k]];
-                    center           = center + node;
+                    nodeCenter       = nodeCenter + node;
                 }
-                center = center / nbEdges;
-                center = center.Normalized();  // project back on sphere of radius 1
+                nodeCenter = nodeCenter / nbEdges;
+                double dMagni =
+                    sqrt( nodeCenter.x * nodeCenter.x + nodeCenter.y * nodeCenter.y + nodeCenter.z * nodeCenter.z );
+                nodeCenter = nodeCenter / dMagni;  // project back on sphere of radius 1
             }
 
             Node node0, node1, node2;
@@ -1143,17 +1126,15 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
                     node2         = nodesOverlap[faceOverlap[2]];
                     dTriangleArea = CalculateFaceArea( faceOverlap, nodesOverlap );
                 }
-                else  // decompose polygon in triangles around the center
-                {
-                    node0         = center;
-                    node1         = nodesOverlap[faceOverlap[k]];
-                    int k1        = ( k + 1 ) % nbEdges;
-                    node2         = nodesOverlap[faceOverlap[k1]];
-                    nodes[0]      = center;
-                    nodes[1]      = node1;
-                    nodes[2]      = node2;
-                    dTriangleArea = CalculateFaceArea( faceTri, nodes );
+                else
+                {  // decompose polygon in triangles around the nodeCenter
+                    node0  = nodeCenter;
+                    node1  = nodesOverlap[faceOverlap[k]];
+                    int k1 = ( k + 1 ) % nbEdges;
+                    node2  = nodesOverlap[faceOverlap[k1]];
                 }
+                dTriangleArea = CalculateTriangleAreaQuadratureMethod( node0, node1, node2 );
+
                 // Coordinates of quadrature Node
                 for( int l = 0; l < TriQuadraturePoints; l++ )
                 {
@@ -1167,7 +1148,12 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
                     nodeQuadrature.z = TriQuadratureG[l][0] * node0.z + TriQuadratureG[l][1] * node1.z +
                                        TriQuadratureG[l][2] * node2.z;
 
-                    nodeQuadrature = nodeQuadrature.Normalized();
+                    double dMag = sqrt( nodeQuadrature.x * nodeQuadrature.x + nodeQuadrature.y * nodeQuadrature.y +
+                                        nodeQuadrature.z * nodeQuadrature.z );
+
+                    nodeQuadrature.x /= dMag;
+                    nodeQuadrature.y /= dMag;
+                    nodeQuadrature.z /= dMag;
 
                     // Find components of quadrature point in basis
                     // of the first Face
@@ -1177,12 +1163,25 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
                     ApplyInverseMap( faceFirst, nodesFirst, nodeQuadrature, dAlpha, dBeta );
 
                     // Check inverse map value
-                    if( ( dAlpha < -1.0e-13 ) || ( dAlpha > 1.0 + 1.0e-13 ) || ( dBeta < -1.0e-13 ) ||
-                        ( dBeta > 1.0 + 1.0e-13 ) )
+                    if( ( dAlpha < -InverseMapTolerance ) || ( dAlpha > 1.0 + InverseMapTolerance ) ||
+                        ( dBeta < -InverseMapTolerance ) || ( dBeta > 1.0 + InverseMapTolerance ) )
                     {
-                        _EXCEPTION4( "Inverse Map for element %d and subtriangle %d out of range "
-                                     "(%1.5e %1.5e)",
-                                     j, l, dAlpha, dBeta );
+                        printf( "\n==== BEGIN DEBUGGING INFO ====\n" );
+                        printf( "WARNING (%s, Line %u) Inverse map out of range\n", __FILE__, __LINE__ );
+                        int ixSecond = m_meshOverlap->vecTargetFaceIx[ixOverlap + j];
+                        printf( "Source face ix %zu, Target face ix %i, Overlap face ix %i\n", ixFirst, ixSecond,
+                                ixOverlap + j );
+                        printf( "Face nodes:\n" );
+                        for( size_t x = 0; x < faceFirst.edges.size(); x++ )
+                        {
+                            nodesFirst[faceFirst[x]].Print( "" );
+                        }
+                        printf( "Quadrature node:\n" );
+                        nodeQuadrature.Print( "" );
+                        printf( "Alpha, Beta: %1.15e %1.15e\n", dAlpha, dBeta );
+                        printf( "==== END DEBUGGING INFO ====\n" );
+                        //_EXCEPTION2("Inverse Map out of range (%1.5e %1.5e)",
+                        //     dAlpha, dBeta);
                     }
 
                     // Sample the finite element at this point
@@ -1233,9 +1232,8 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
                 }
             }
 
-            const double areaTolerance = 1e-10;
             // Source elements are completely covered by target volumes
-            if( fabs( m_meshInputCov->vecFaceArea[ixFirst] - dTargetArea ) <= areaTolerance )
+            if( fabs( m_meshInputCov->vecFaceArea[ixFirst] - dTargetArea ) <= HighTolerance )
             {
                 vecTargetArea.Allocate( nOverlapFaces );
                 for( int j = 0; j < nOverlapFaces; j++ )
@@ -1255,10 +1253,9 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
                         }
                     }
                 }
-
                 // Target volumes only partially cover source elements
             }
-            else if( m_meshInputCov->vecFaceArea[ixFirst] - dTargetArea > areaTolerance )
+            else if( m_meshInputCov->vecFaceArea[ixFirst] - dTargetArea > HighTolerance )
             {
                 double dExtraneousArea = m_meshInputCov->vecFaceArea[ixFirst] - dTargetArea;
 
@@ -1315,18 +1312,46 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
                         dCoeff[nOverlapFaces][p * nP + q] /= dExtraneousArea;
                     }
                 }
-
-                // Source elements only partially cover target volumes
             }
-            else
+            else  // Source elements only partially cover target volumes
             {
-                Announce( "Coverage area: %1.10e, and target element area: %1.10e)", ixFirst,
-                          m_meshInputCov->vecFaceArea[ixFirst], dTargetArea );
-                _EXCEPTIONT( "Target grid must be a subset of source grid" );
-            }
+                printf( "\n==== BEGIN DEBUGGING INFO ====\n" );
+                printf( "EXCEPTION (%s, Line %u) Target grid must be a subset of source grid\n", __FILE__, __LINE__ );
+                printf( "Source face ix %zu, Overlap face ix [%i,%i]\n", ixFirst, ixOverlap,
+                        ixOverlap + nOverlapFaces - 1 );
+                printf( "Target faces / overlap area:\n" );
+                for( int j = 0; j < nOverlapFaces; j++ )
+                {
+                    printf( "  (%i) (%i) %1.15e\n", ixOverlap + j, m_meshOverlap->vecTargetFaceIx[ixOverlap + j],
+                            m_meshOverlap->vecFaceArea[ixOverlap + j] );
+                }
+                printf( "Source nodes / source area:\n" );
+                for( int p = 0; p < nP; p++ )
+                {
+                    for( int q = 0; q < nP; q++ )
+                    {
+                        printf( "  (%i,%i) %1.15e\n", p, q, dataGLLJacobian[p][q][ixFirst] );
+                    }
+                }
+                printf( "==== END DEBUGGING INFO ====\n" );
 
-            ForceConsistencyConservation3( vecSourceArea, vecTargetArea, dCoeff, ( nMonotoneType > 0 )
-                                           /*, m_remapper->lid_to_gid_covsrc[ixFirst]*/ );
+                _EXCEPTION2( "Target grid must be a subset of source grid:"
+                             "\nInput mesh area (%1.15e) Target area (%1.15e)",
+                             m_meshInputCov->vecFaceArea[ixFirst], dTargetArea );
+            }
+            // else
+            // {
+            //     Announce( "Coverage area: %1.10e, and target element area: %1.10e)", ixFirst,
+            //               m_meshInputCov->vecFaceArea[ixFirst], dTargetArea );
+            //     _EXCEPTIONT( "Target grid must be a subset of source grid" );
+            // }
+
+            // Force consistency and conservation (over all coefficients)
+            // If too many target faces are included this can greatly slow down the computation and
+            // require a high memory footprint.
+            // So we will always use the sparse constraints to be true to tackle all cases.
+            ForceConsistencyConservation3( vecSourceArea, vecTargetArea, dCoeff, ( nMonotoneType > 0 ),
+                                           true /*fSparseConstraints*/ );
 
             for( int j = 0; j < nOverlapFaces; j++ )
             {
@@ -1367,10 +1392,12 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
             {
                 for( int q = 0; q < nP; q++ )
                 {
+                    if( fabs(dRemapCoeff[p][q][j]) < 1e-20 )
+                        continue;
+
                     if( fContinuousIn )
                     {
                         int ixFirstNode = dataGLLNodes[p][q][ixFirst] - 1;
-
                         smatMap( ixSecondFace, ixFirstNode ) += dRemapCoeff[p][q][j] *
                                                                 m_meshOverlap->vecFaceArea[ixOverlap + j] /
                                                                 m_meshOutput->vecFaceArea[ixSecondFace];
@@ -1378,7 +1405,6 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
                     else
                     {
                         int ixFirstNode = ixFirst * nP * nP + p * nP + q;
-
                         smatMap( ixSecondFace, ixFirstNode ) += dRemapCoeff[p][q][j] *
                                                                 m_meshOverlap->vecFaceArea[ixOverlap + j] /
                                                                 m_meshOutput->vecFaceArea[ixSecondFace];

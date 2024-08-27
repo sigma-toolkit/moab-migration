@@ -1260,20 +1260,19 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
         }
         else if( ( eInputType != DiscretizationType_FV ) && ( eOutputType == DiscretizationType_FV ) )
         {
+            // Generate the continuous Jacobian for input mesh
+            bool fContinuousIn = ( eInputType == DiscretizationType_CGLL );
+
             DataArray3D< double > dataGLLJacobianSrc, dataGLLJacobian;
 
             if( is_root ) dbgprint.printf( 0, "Generating input mesh meta data\n" );
-            // double dNumericalAreaCov_loc =
             GenerateMetaData( *m_meshInputCov, mapOptions.nPin, mapOptions.fNoBubble, dataGLLNodesSrcCov,
-                              dataGLLJacobian );
+                              dataGLLJacobian, fContinuousIn );
 
             double dNumericalArea_loc = GenerateMetaData( *m_meshInput, mapOptions.nPin, mapOptions.fNoBubble,
-                                                          dataGLLNodesSrc, dataGLLJacobianSrc );
+                                                          dataGLLNodesSrc, dataGLLJacobianSrc, fContinuousIn );
 
-            // if ( is_root ) dbgprint.printf ( 0, "Input Mesh: Coverage Area: %1.15e, Output Area:
-            // %1.15e\n", dNumericalAreaCov_loc, dTotalAreaOutput_loc );
             // assert(dNumericalAreaCov_loc >= dTotalAreaOutput_loc);
-
             double dNumericalArea = dNumericalArea_loc;
 #ifdef MOAB_HAVE_MPI
             if( m_pcomm )
@@ -1299,9 +1298,6 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             // Initialize coordinates for map
             this->InitializeSourceCoordinatesFromMeshFE( *m_meshInputCov, mapOptions.nPin, dataGLLNodesSrcCov );
             this->InitializeTargetCoordinatesFromMeshFV( *m_meshOutput );
-
-            // Generate the continuous Jacobian for input mesh
-            bool fContinuousIn = ( eInputType == DiscretizationType_CGLL );
 
             if( eInputType == DiscretizationType_CGLL )
             {

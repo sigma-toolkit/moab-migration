@@ -96,8 +96,7 @@ class Remapper
             rval = m_pcomm->exchange_ghost_cells( 2, 0, i, 0, true, true, &set_with_ghosts );MB_CHK_ERR( rval );
         }
 
-        // need to set global id tags
-        // need also to propagate global id to ghost cells; it is not done by default :(
+        // propagate GLOBAL_ID tag to ghost cells since this is not done by default
         moab::Range entities;
         rval = m_interface->get_entities_by_dimension( set_with_ghosts, 2, entities );MB_CHK_ERR( rval );
 
@@ -105,7 +104,8 @@ class Remapper
         rval = m_interface->tag_get_handle( "GLOBAL_DOFS", doftag );
         if ( rval == MB_SUCCESS )
         {
-            rval = m_pcomm->exchange_tags( doftag, entities );MB_CHK_ERR( rval );
+            moab::Range quads = entities.subset_by_type(moab::MBQUAD);
+            rval = m_pcomm->exchange_tags( doftag, quads );MB_CHK_ERR( rval );
         }
 
         // get all vertices too, need to exchange global ids for vertices too
@@ -114,7 +114,8 @@ class Remapper
         entities.merge( vertices );
         moab::Tag gtag = m_interface->globalId_tag();
         rval = m_pcomm->exchange_tags( gtag, entities );MB_CHK_ERR( rval );
-        return rval;
+
+        return moab::MB_SUCCESS;
     }
 
 #endif

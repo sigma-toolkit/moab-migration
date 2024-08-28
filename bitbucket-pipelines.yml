@@ -22,7 +22,7 @@ pipelines:
                 - make dist
                 # Now configure with Scikit Build System
                 - cd $BITBUCKET_CLONE_DIR && export SKBUILD_CMAKE_ARGS="-DBUILD_SHARED_LIBS=ON;-DENABLE_MPI=ON;-DENABLE_HDF5=ON;-DHDF5_ROOT=/usr/lib/x86_64-linux-gnu/hdf5/openmpi;-DENABLE_NETCDF=ON;-DNETCDF_ROOT=/usr/lib/x86_64-linux-gnu/netcdf/mpi;-DENABLE_METIS=ON;-DMETIS_DIR=/usr;-DEIGEN3_DIR=/usr/include/eigen3"
-                - python -m pip wheel . -vvv
+                - python -m pip -v install .
                 - python -m pip install pytest
                 - cd test/pymoab
                 - pytest -ra
@@ -47,7 +47,7 @@ pipelines:
                 - make dist
                 # Now configure with Scikit Build System
                 - cd $BITBUCKET_CLONE_DIR && export SKBUILD_CMAKE_ARGS="-DBUILD_SHARED_LIBS=ON;-DENABLE_MPI=ON;-DENABLE_HDF5=ON;-DHDF5_ROOT=/usr/lib/x86_64-linux-gnu/hdf5/openmpi;-DENABLE_NETCDF=ON;-DNETCDF_ROOT=/usr/lib/x86_64-linux-gnu/netcdf/mpi;-DENABLE_METIS=ON;-DMETIS_DIR=/usr;-DEIGEN3_DIR=/usr/include/eigen3"
-                - python -m pip wheel . -vvv
+                - python -m pip -v install .
                 - python -m pip install pytest
                 - cd test/pymoab
                 - pytest -ra
@@ -71,7 +71,7 @@ pipelines:
                 - make dist
                 # Now configure with Scikit Build System
                 - cd $BITBUCKET_CLONE_DIR && export SKBUILD_CMAKE_ARGS="-DBUILD_SHARED_LIBS=ON;-DENABLE_MPI=ON;-DENABLE_HDF5=ON;-DHDF5_ROOT=/usr/lib/x86_64-linux-gnu/hdf5/openmpi;-DENABLE_NETCDF=ON;-DNETCDF_ROOT=/usr/lib/x86_64-linux-gnu/netcdf/mpi;-DENABLE_METIS=ON;-DMETIS_DIR=/usr;-DEIGEN3_DIR=/usr/include/eigen3"
-                - python -m pip wheel . -vvv
+                - python -m pip -v install .
                 - python -m pip install pytest
                 - cd test/pymoab
                 - pytest -ra

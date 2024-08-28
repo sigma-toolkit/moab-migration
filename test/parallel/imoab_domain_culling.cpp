@@ -92,6 +92,7 @@ int main( int argc, char* argv[] )
     ierr                    = iMOAB_WriteMesh( cplOcnPID, outputFile, fileWriteOptions );
     CHECKIERR( ierr, "Cannot write ocean domain mesh from coupler pes" )
 
+#ifdef MOAB_HAVE_ZOLTAN
     // add a second read with repartitioning and culling, in another iMOAB app, just to test
     // the option of culling + repartitioning
     // this will be used for land mesh actually in e3sm,
@@ -110,7 +111,7 @@ int main( int argc, char* argv[] )
     char outputFileLnd[] = "LndDomMesh.h5m";
     ierr                 = iMOAB_WriteMesh( cplLndPID, outputFileLnd, fileWriteOptions );
     CHECKIERR( ierr, "Cannot write land domain mesh from coupler pes" )
-
+#endif
     int sizeTag  = 1;
     int tagIndex = -1;
     int tagType  = DENSE_DOUBLE;
@@ -183,9 +184,13 @@ int main( int argc, char* argv[] )
     CHECKIERR( ierr, "Cannot write ocean domain mesh from coupler pes" )
 
     ierr = iMOAB_DeregisterApplication( cplAtmOcnPID );
-    CHECKIERR( ierr, "cannot deregister app LNDX2" )
+    CHECKIERR( ierr, "cannot deregister app ATMOCN" )
+#ifdef MOAB_HAVE_ZOLTAN
+    ierr = iMOAB_DeregisterApplication( cplLndPID );
+    CHECKIERR( ierr, "cannot deregister app LNDX" )
+#endif
     ierr = iMOAB_DeregisterApplication( cplOcnPID );
-    CHECKIERR( ierr, "cannot deregister app LNDX2" )
+    CHECKIERR( ierr, "cannot deregister app OCNX" )
     ierr = iMOAB_DeregisterApplication( cplAtmPID );
     CHECKIERR( ierr, "cannot deregister app LNDX" )
 

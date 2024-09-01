@@ -730,6 +730,35 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
 
     return MB_SUCCESS;
 }
+
+ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle intx_set, bool sourceMap)
+{
+    Tag parentTag;
+    ErrorCode rval;
+    if (sourceMap)
+    {
+        rval = mb->tag_get_handle("SourceParent", parentTag);MB_CHK_SET_ERR( rval, "can't get parent source tag in edge map" );
+    }
+    else
+    {
+        rval = mb->tag_get_handle("TargetParent", parentTag);MB_CHK_SET_ERR( rval, "can't get parent target tag in edge map" );
+    }
+    // get all polygons in the intx set
+    Range cells;
+    rval = mb->get_entities_by_dimension(intx_set, 2, cells);MB_CHK_SET_ERR( rval, "can't get intersection cells" );
+    // create all edges adjacent to the cells in the intx set
+    // some might be original edges from edge or target meshes
+    Range intxEdges;
+    rval = mb->get_adjacencies(cells, 1, true, intxEdges, Interface::UNION);MB_CHK_SET_ERR( rval, "can't get intersection edges" );
+    std::cout << " number of intx edges:" << intxEdges.size() << "\n";
+    Range parentCells;
+    rval = mb->get_entities_by_dimension(inputSet, 2, parentCells);MB_CHK_SET_ERR( rval, "can't get intersection cells" );
+    Range initialEdges;
+    rval = mb->get_adjacencies(parentCells, 1, true, initialEdges, Interface::UNION);MB_CHK_SET_ERR( rval, "can't get intersection edges" );
+    std::cout << " number of original input edges:" << initialEdges.size() << "\n";
+    return MB_SUCCESS;
+}
+
 void IntxUtils::transform_coordinates( double* avg_position, int projection_type )
 {
     if( projection_type == 1 )

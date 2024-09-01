@@ -203,6 +203,8 @@ class IntxUtils
                                                 std::vector< Tag >& tagList );
 
     static ErrorCode remove_padded_vertices( Interface* mb, EntityHandle file_set, std::vector< Tag >& tagList );
+
+    static ErrorCode EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle intx_set, bool sourceMap);
 };
 
 class IntxAreaUtils

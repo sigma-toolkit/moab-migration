@@ -86,6 +86,10 @@ if HAVE_HDF5
 	gqt_pointinvol_test \
 	gqt_findvol_test
 
+if HAVE_EXTMESHES
+  TESTS +=  edge_maps_test
+endif
+
 # imoab tests
 if HAVE_32BIT
 
@@ -188,6 +192,7 @@ spherical_area_test_SOURCES = spherical_area_test.cpp
 arc_intx_tests_SOURCES = arc_intx_tests.cpp
 intx_rll_cs_sphere_test_SOURCES = intx_rll_cs_sphere_test.cpp
 gnom_project_test_SOURCES = gnom_project_test.cpp
+edge_maps_test_SOURCES = edge_maps_test.cpp
 
 #mbcn_test_SOURCES = $(top_srcdir)/src/moab/CN.hpp \
 #                    $(top_srcdir)/src/CN.cpp \

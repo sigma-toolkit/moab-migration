@@ -236,8 +236,19 @@ int main( int argc, char* argv[] )
     rval = mb->write_file( intersectionFile.c_str(), 0, 0, &outputSet, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
 #endif
     bool sourceEdgeMap = true;
+    moab::Tag fractionTag;
+    moab::Tag numSubTag;
+    double defVal = 0.;
+    rval = mb->tag_get_handle( "EdgeRecoveryFraction", 1, MB_TYPE_DOUBLE, fractionTag, MB_TAG_DENSE | MB_TAG_CREAT,
+                                   &defVal );MB_CHK_SET_ERR( rval, "can't create fraction tag" );
+    rval = mb->tag_get_handle( "NumSubEdges", 1, MB_TYPE_DOUBLE, numSubTag, MB_TAG_DENSE | MB_TAG_CREAT,
+                                       &defVal );MB_CHK_SET_ERR( rval, "can't create fraction tag" );
     rval = moab::IntxUtils::EdgeMap(mb, sf1, outputSet, sourceEdgeMap);MB_CHK_SET_ERR( rval, "failed to compute edge map for source" );
+
+    //rval = mb->write_file("source_withEdges.h5m", 0, 0, &sf1, 1);MB_CHK_SET_ERR( rval, "failed rewrite initial source" );
+
     sourceEdgeMap = false;
     rval = moab::IntxUtils::EdgeMap(mb, sf2, outputSet, sourceEdgeMap);MB_CHK_SET_ERR( rval, "failed to compute edge map for target" );
+    //rval = mb->write_file("target_withEdges.h5m", 0, 0, &sf2, 1);MB_CHK_SET_ERR( rval, "failed rewrite initial target" );
     return 0;
 }

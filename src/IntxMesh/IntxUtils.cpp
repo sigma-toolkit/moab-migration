@@ -743,6 +743,10 @@ ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle 
     {
         rval = mb->tag_get_handle("TargetParent", parentTag);MB_CHK_SET_ERR( rval, "can't get parent target tag in edge map" );
     }
+    Tag fractionTag;
+    rval = mb->tag_get_handle( "EdgeRecoveryFraction", fractionTag);
+    Tag subTag;
+    rval = mb->tag_get_handle( "NumSubEdges", subTag);
     // get all polygons in the intx set
     Range cells;
     rval = mb->get_entities_by_dimension(intx_set, 2, cells);MB_CHK_SET_ERR( rval, "can't get intersection cells" );
@@ -820,6 +824,7 @@ ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle 
 
     // now recover each edge, looking at intx polygons forming one of the adjacent cells, that is in initial recoverable set
     int recoveredEdges = 0;
+    int unrecovered = 0;
     int identity_edges = 0; // edges that are formed by one intx edge, itself, the original
     std::map<EntityHandle, std::vector<EntityHandle>> mapEdges;
     for (Range::iterator eit=recoverableEdges.begin(); eit!=recoverableEdges.end(); eit++)
@@ -882,10 +887,18 @@ ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle 
                 mapEdges[initialEdge].push_back(subedge);
             }
         }
-        if ( fabs(edgeLength-recoveredLength) < 1.e-10) recoveredEdges++;
+        if ( fabs(edgeLength-recoveredLength) < 1.e-10)
+            recoveredEdges++;
+        else
+            unrecovered++;
+        double fraction = recoveredLength/edgeLength;
+        rval = mb->tag_set_data(fractionTag, &initialEdge, 1, &fraction);MB_CHK_SET_ERR( rval, "can't set fraction on initial edge" );
+        fraction = double(mapEdges[initialEdge].size());
+        rval = mb->tag_set_data(subTag, &initialEdge, 1, &fraction);MB_CHK_SET_ERR( rval, "can't set number of subedges on initial edge" );
     }
 
-    std::cout << " recoveredEdges:"  << recoveredEdges << " identity edges:" << identity_edges << "\n";
+    std::cout << " recoveredEdges:"  << recoveredEdges << " identity edges:" << identity_edges <<  " unrecovered edges:" <<
+            unrecovered << "\n";
     return MB_SUCCESS;
 }
 

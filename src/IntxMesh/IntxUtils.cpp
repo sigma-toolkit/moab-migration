@@ -756,6 +756,136 @@ ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle 
     Range initialEdges;
     rval = mb->get_adjacencies(parentCells, 1, true, initialEdges, Interface::UNION);MB_CHK_SET_ERR( rval, "can't get intersection edges" );
     std::cout << " number of original input edges:" << initialEdges.size() << "\n";
+
+    // first, identify input polygons that are recovered fully
+    // get global ids of the initial cells
+    std::vector<int> parentGids(parentCells.size());
+    Tag gidTag = mb->globalId_tag();
+    rval = mb->tag_get_data(gidTag, parentCells, &parentGids[0]);MB_CHK_SET_ERR( rval, "can't get parent global ids" );
+    std::map< int, double > initAreas; // get areas of those initial cells
+    int i=0;
+    std::vector< double > coords( 3 * 20 );// enough vertices, at most 30, good for intx polygons too
+    int num_nodes = 0; // num nodes in cells
+    const EntityHandle* verts;
+    IntxAreaUtils areaAdaptor( IntxAreaUtils::lHuiller );
+    std::map< int, double > recoveredAreas; // get areas of from intersection cells
+    std::map<int, EntityHandle> mapFromGIDToParent;
+    std::map<int, std::vector<EntityHandle>> mapFromParentGIDToIntxCells;
+    for (Range::iterator it=parentCells.begin(); it!=parentCells.end(); it++, i++)
+    {
+        EntityHandle parentCell=*it;
+        rval = mb->get_connectivity( parentCell, verts, num_nodes );MB_CHK_SET_ERR( rval, "can't get connectivity of parent cell" );
+        // get coordinates
+        rval = mb->get_coords( verts, num_nodes, &coords[0] );MB_CHK_SET_ERR( rval, "can't get coords of parent cell" );
+
+        double area = areaAdaptor.area_spherical_polygon( &coords[0], num_nodes, 1. );
+        int parentID = parentGids[i];
+        initAreas[parentID] = area;
+        recoveredAreas[parentID] = 0.;
+        mapFromGIDToParent[parentID] = parentCell;
+        mapFromParentGIDToIntxCells[parentID]; // just initialize it with empty vector
+    }
+
+
+    for (Range::iterator it=cells.begin(); it!=cells.end(); it++)
+    {
+        EntityHandle cell=*it;
+        rval = mb->get_connectivity( cell, verts, num_nodes );MB_CHK_SET_ERR( rval, "can't get connectivity of intx cell" );
+        // get coordinates
+        rval = mb->get_coords( verts, num_nodes, &coords[0] );MB_CHK_SET_ERR( rval, "can't get coods of intx cell" );
+        double intx_area = areaAdaptor.area_spherical_polygon( &coords[0], num_nodes, 1. );
+        int parentID = 0;
+        rval = mb->tag_get_data(parentTag, &cell, 1, &parentID);MB_CHK_SET_ERR( rval, "can't get parent Tag" );
+        recoveredAreas[parentID] += intx_area;
+        mapFromParentGIDToIntxCells[parentID].push_back(cell);
+    }
+    int recovered = 0, notRecovered =0;
+    Range recoveredCells;
+    for (size_t j=0; j<parentGids.size(); j++)
+    {
+        int parentID = parentGids[j];
+        double areaDiff = fabs(initAreas[parentID] - recoveredAreas[parentID]);
+        if (areaDiff < 1.e-12)
+        {
+            recovered++;
+            recoveredCells.insert(parentCells[j]); // should we use a std::vector, that will be ordered already ?
+        }
+        else
+            notRecovered++;
+    }
+    std::cout << "recovered initial cells: " << recovered << " vs:" << notRecovered << " not recovered \n";
+    // initial edges that should be decomposable from intx edges
+    Range recoverableEdges;
+    rval = mb->get_adjacencies(recoveredCells, 1, false, recoverableEdges,  Interface::UNION);MB_CHK_SET_ERR( rval, "can't get recoverable edges" );
+
+    // now recover each edge, looking at intx polygons forming one of the adjacent cells, that is in initial recoverable set
+    int recoveredEdges = 0;
+    int identity_edges = 0; // edges that are formed by one intx edge, itself, the original
+    std::map<EntityHandle, std::vector<EntityHandle>> mapEdges;
+    for (Range::iterator eit=recoverableEdges.begin(); eit!=recoverableEdges.end(); eit++)
+    {
+        EntityHandle initialEdge = *eit;
+        // if this edge is among intxEdges, we are done
+        int index = intxEdges.index(initialEdge);
+        if (index>=0)
+        {
+            mapEdges[initialEdge].push_back(initialEdge);
+            identity_edges++;
+            recoveredEdges++;
+            continue; // no need to sweat it anymore
+        }
+        // get adjacent polygons; if there is an adj polygon in intx cells, we are done; if not, get one in the initial recoveredCells range
+        Range initialAdjCells;
+        rval = mb-> get_adjacencies(&initialEdge, 1, 2, false, initialAdjCells, Interface::UNION);MB_CHK_SET_ERR( rval, "can't get adjacent initial cells" );
+        if (initialAdjCells.size()==0) MB_CHK_SET_ERR( MB_FAILURE, "no adjacent initial cells" );
+        // intersect with recoveredCells
+        Range adjRecoveredInitialCell = intersect(initialAdjCells, recoveredCells);
+        if(adjRecoveredInitialCell.size() == 0) MB_CHK_SET_ERR( MB_FAILURE, "no adjacent initial cells that are recovered" );
+        // get all edges adjacent to intersection polygons that form one of the recovered initial cell
+        EntityHandle recoveredCell = adjRecoveredInitialCell[0]; // first one
+        int cellGlobalId = 0;
+        rval = mb->tag_get_data(gidTag, &recoveredCell, 1, &cellGlobalId);MB_CHK_SET_ERR( rval, "can't get id of parent cell" );
+        // list of intx polygons in it:
+        std::vector<EntityHandle>  & listIntxCells = mapFromParentGIDToIntxCells[cellGlobalId];
+        std::vector<EntityHandle> candidateEdges;
+        rval = mb->get_adjacencies(&listIntxCells[0], listIntxCells.size(), 1, false, candidateEdges,  Interface::UNION);MB_CHK_SET_ERR( rval, "can't get adj edges" );
+        // add all edges that have both vertices on the original edge
+        CartVect verticesOriginal[2];
+        const EntityHandle *connEdge;
+        int numVerts = 0;
+        rval = mb->get_connectivity(initialEdge, connEdge, numVerts);MB_CHK_SET_ERR( rval, "can't get connectivity of initial edge" );
+        rval = mb->get_coords( connEdge, numVerts,  verticesOriginal[0].array() );MB_CHK_SET_ERR( rval, "can't get coordinates of vertices of initial edge" );
+        double edgeLength = angle( verticesOriginal[0], verticesOriginal[1] ); // distance on sphere of radius 1 is the angle
+        // loop now over candidateEdges
+        double recoveredLength = 0.;
+        for (size_t i=0; i< candidateEdges.size(); i++)
+        {
+            EntityHandle subedge = candidateEdges[i];
+            // get its vertex coordinates:
+            rval = mb->get_connectivity(subedge, connEdge, numVerts);MB_CHK_SET_ERR( rval, "can't get connectivity of candidate edge" );
+            CartVect verticesSubEdge[2];
+            rval = mb->get_coords( connEdge, numVerts,  verticesSubEdge[0].array() );MB_CHK_SET_ERR( rval, "can't get coordinates of vertices of initial edge" );
+            // decide if they are on the initial edge (form an angle)
+            bool onEdge = true;
+            for (int j=0; j<2 && onEdge; j++)
+            {
+                double dist0 = angle_robust(verticesOriginal[0], verticesSubEdge[j]);
+                double dist1 = angle_robust(verticesOriginal[1], verticesSubEdge[j]);
+                if (dist0 < 1.e-11 || dist1 < 1.e-11) continue;
+                double angle = oriented_spherical_angle( verticesOriginal[0].array(), verticesOriginal[1].array(), verticesSubEdge[j].array() );
+                if (fabs(angle) > 1.e-10) onEdge = false;
+            }
+            if (onEdge)
+            {
+                double subEdgeLen = angle_robust(verticesSubEdge[0], verticesSubEdge[1]);
+                recoveredLength += subEdgeLen;
+                mapEdges[initialEdge].push_back(subedge);
+            }
+        }
+        if ( fabs(edgeLength-recoveredLength) < 1.e-10) recoveredEdges++;
+    }
+
+    std::cout << " recoveredEdges:"  << recoveredEdges << " identity edges:" << identity_edges << "\n";
     return MB_SUCCESS;
 }
 

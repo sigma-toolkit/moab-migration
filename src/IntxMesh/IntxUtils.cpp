@@ -772,6 +772,7 @@ ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle 
     int num_nodes = 0; // num nodes in cells
     const EntityHandle* verts;
     IntxAreaUtils areaAdaptor( IntxAreaUtils::lHuiller ); // GaussQuadrature , lHuiller
+    IntxAreaUtils areaAdaptor2( IntxAreaUtils::GaussQuadrature );
     std::map< int, double > recoveredAreas; // get areas of from intersection cells
     std::map<int, EntityHandle> mapFromGIDToParent;
     std::map<int, std::vector<EntityHandle>> mapFromParentGIDToIntxCells;
@@ -911,7 +912,7 @@ ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle 
                     continue;
                 }
 
-                double areaTriangle = areaAdaptor.area_spherical_triangle( verticesOriginal[0].array(), verticesSubEdge[j].array(), verticesOriginal[1].array() , 1.0 );
+                double areaTriangle = areaAdaptor2.area_spherical_triangle( verticesOriginal[1].array(), verticesSubEdge[j].array(), verticesOriginal[0].array() , 1.0 );
                 //double angle = IntxUtils::oriented_spherical_angle( verticesOriginal[0].array(), verticesOriginal[1].array(), verticesSubEdge[j].array() );
                 if ( fabs(areaTriangle) > 1.e-11 ) onEdge = false;
             }

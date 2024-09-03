@@ -905,15 +905,15 @@ ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle 
                 double dist0 = angle_robust(verticesOriginal[0], verticesSubEdge[j]);
                 double dist1 = angle_robust(verticesOriginal[1], verticesSubEdge[j]);
                 if (dist0 < 1.e-11 || dist1 < 1.e-11) continue; // end  points
-                if (dist1+dist0 - edgeLength > 1.e-11) // triangle inequality
+                if (dist1+dist0 - edgeLength > 1.e-10) // triangle inequality
                 {
                     onEdge = false;
                     continue;
                 }
 
-                double areaTriangle = areaAdaptor.area_spherical_triangle( verticesOriginal[0].array(), verticesOriginal[1].array(), verticesSubEdge[j].array() , 1.0 );
+                double areaTriangle = areaAdaptor.area_spherical_triangle( verticesOriginal[0].array(), verticesSubEdge[j].array(), verticesOriginal[1].array() , 1.0 );
                 //double angle = IntxUtils::oriented_spherical_angle( verticesOriginal[0].array(), verticesOriginal[1].array(), verticesSubEdge[j].array() );
-                if ( fabs(areaTriangle) > 1.e-12 ) onEdge = false;
+                if ( fabs(areaTriangle) > 1.e-11 ) onEdge = false;
             }
             if (onEdge)
             {

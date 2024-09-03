@@ -772,7 +772,6 @@ ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle 
     int num_nodes = 0; // num nodes in cells
     const EntityHandle* verts;
     IntxAreaUtils areaAdaptor( IntxAreaUtils::lHuiller ); // GaussQuadrature , lHuiller
-    IntxAreaUtils areaAdaptor2( IntxAreaUtils::GaussQuadrature );
     std::map< int, double > recoveredAreas; // get areas of from intersection cells
     std::map<int, EntityHandle> mapFromGIDToParent;
     std::map<int, std::vector<EntityHandle>> mapFromParentGIDToIntxCells;
@@ -863,32 +862,15 @@ ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle 
         const EntityHandle *connEdge;
         int numVerts = 0;
         rval = mb->get_connectivity(initialEdge, connEdge, numVerts);MB_CHK_SET_ERR( rval, "can't get connectivity of initial edge" );
-        // need to find out if edge oriented positive
-        bool found = false;
-        bool reverted = false;
-        for (int k=0; k<nv && !found; k++)
-        {
-            EntityHandle v1=connCell[k];
-            EntityHandle v2=connCell[ (k+1)%nv ];
-            if (connEdge[0] == v1 && connEdge[1] == v2)
-            {
-                found = true; // positive
-            }
-            else if(connEdge[0] == v2 && connEdge[1] == v1)
-            {
-                found = true; // positive
-                reverted = true;
-            }
-        }
-        if (!found) MB_CHK_SET_ERR( MB_FAILURE, "can't get orientation of adjacent edge" );
+
         rval = mb->get_coords( connEdge, numVerts,  verticesOriginal[0].array() );MB_CHK_SET_ERR( rval, "can't get coordinates of vertices of initial edge" );
-        if (reverted)
-        {
-            // change vertices cart coord , so we will always have positive areas when computing
-            CartVect tmp  = verticesOriginal[0];
-            verticesOriginal[0] = verticesOriginal[1];
-            verticesOriginal[1] = tmp;
-        }
+        // get gnomonic plane for the start of the edge
+        int gnomonicPlane = 0;
+        IntxUtils::decide_gnomonic_plane(verticesOriginal[0], gnomonicPlane);
+        double coords2D[6]; // coords in gnomonic plane, for interior point decision
+        rval = IntxUtils::gnomonic_projection(verticesOriginal[0], 1.0, gnomonicPlane, coords2D[0], coords2D[1] );MB_CHK_SET_ERR( rval, "can't get gnomonic coords" );
+        rval = IntxUtils::gnomonic_projection(verticesOriginal[1], 1.0, gnomonicPlane, coords2D[2], coords2D[3] );MB_CHK_SET_ERR( rval, "can't get gnomonic coords" );
+
         double edgeLength = angle( verticesOriginal[0], verticesOriginal[1] ); // distance on sphere of radius 1 is the angle
         // loop now over candidateEdges
         double recoveredLength = 0.;
@@ -903,18 +885,11 @@ ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle 
             bool onEdge = true;
             for (int j=0; j<2 && onEdge; j++)
             {
-                double dist0 = angle_robust(verticesOriginal[0], verticesSubEdge[j]);
-                double dist1 = angle_robust(verticesOriginal[1], verticesSubEdge[j]);
-                if (dist0 < 1.e-11 || dist1 < 1.e-11) continue; // end  points
-                if (dist1+dist0 - edgeLength > 1.e-10) // triangle inequality
-                {
-                    onEdge = false;
-                    continue;
-                }
+                rval = IntxUtils::gnomonic_projection(verticesSubEdge[j], 1.0, gnomonicPlane, coords2D[4], coords2D[5] );MB_CHK_SET_ERR( rval, "can't get gnomonic coords of subedge" );
+                // area of triangle in gnomonic plane should be 0
+                double areaAbs = fabs(IntxUtils::area2D( &coords2D[0], &coords2D[2], &coords2D[4] ));
 
-                double areaTriangle = areaAdaptor2.area_spherical_triangle( verticesOriginal[1].array(), verticesSubEdge[j].array(), verticesOriginal[0].array() , 1.0 );
-                //double angle = IntxUtils::oriented_spherical_angle( verticesOriginal[0].array(), verticesOriginal[1].array(), verticesSubEdge[j].array() );
-                if ( fabs(areaTriangle) > 1.e-11 ) onEdge = false;
+                if (areaAbs > 1.e-11) onEdge = false;
             }
             if (onEdge)
             {

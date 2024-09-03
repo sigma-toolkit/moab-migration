@@ -245,7 +245,7 @@ int main( int argc, char* argv[] )
                                        &defVal );MB_CHK_SET_ERR( rval, "can't create fraction tag" );
     rval = moab::IntxUtils::EdgeMap(mb, sf1, outputSet, sourceEdgeMap);MB_CHK_SET_ERR( rval, "failed to compute edge map for source" );
 
-    rval = mb->write_file("source_withEdges.h5m", 0, "DEBUG_IO=2", &sf1, 1);MB_CHK_SET_ERR( rval, "failed rewrite initial source" );
+    rval = mb->write_file("source_withEdges.h5m", 0, 0, &sf1, 1);MB_CHK_SET_ERR( rval, "failed rewrite initial source" );
 
     sourceEdgeMap = false;
     rval = moab::IntxUtils::EdgeMap(mb, sf2, outputSet, sourceEdgeMap);MB_CHK_SET_ERR( rval, "failed to compute edge map for target" );

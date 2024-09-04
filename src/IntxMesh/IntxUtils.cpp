@@ -889,7 +889,7 @@ ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle 
                 // area of triangle in gnomonic plane should be 0
                 double areaAbs = fabs(IntxUtils::area2D( &coords2D[0], &coords2D[2], &coords2D[4] ));
 
-                if (areaAbs > 1.e-11) onEdge = false;
+                if (areaAbs > 1.e-14) onEdge = false;
             }
             if (onEdge)
             {
@@ -898,14 +898,20 @@ ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle 
                 mapEdges[initialEdge].push_back(subedge);
             }
         }
+        double fraction = recoveredLength/edgeLength;
+        rval = mb->tag_set_data(fractionTag, &initialEdge, 1, &fraction);MB_CHK_SET_ERR( rval, "can't set fraction on initial edge" );
+        double numSubEdge = double(mapEdges[initialEdge].size());
+        rval = mb->tag_set_data(subTag, &initialEdge, 1, &numSubEdge);MB_CHK_SET_ERR( rval, "can't set number of subedges on initial edge" );
         if ( fabs(edgeLength-recoveredLength) < 1.e-10)
             recoveredEdges++;
         else
+        {
+            mb->list_entity(initialEdge);
+            std::cout << " edge length:" << edgeLength << " diff:" << edgeLength-recoveredLength << " fraction:" << fraction <<
+                    " subedges:" << numSubEdge << "\n";
             unrecovered++;
-        double fraction = recoveredLength/edgeLength;
-        rval = mb->tag_set_data(fractionTag, &initialEdge, 1, &fraction);MB_CHK_SET_ERR( rval, "can't set fraction on initial edge" );
-        fraction = double(mapEdges[initialEdge].size());
-        rval = mb->tag_set_data(subTag, &initialEdge, 1, &fraction);MB_CHK_SET_ERR( rval, "can't set number of subedges on initial edge" );
+        }
+
     }
 
     std::cout << " recoveredEdges:"  << recoveredEdges << " identity edges:" << identity_edges <<  " unrecovered edges:" <<

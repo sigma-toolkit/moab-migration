@@ -616,6 +616,12 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
 {
     std::string parTagName( "PARALLEL_PARTITION" );
     Tag part_tag;
+    Tag gidTag = mb->globalId_tag();
+    Tag targetParentTag, sourceParentTag;
+    mb->tag_get_handle( "TargetParent", targetParentTag );
+    mb->tag_get_handle( "SourceParent", sourceParentTag );
+    bool intxMesh = false;
+    if (targetParentTag!=NULL  && sourceParentTag!=NULL) intxMesh = true; // interested in soure and target parent tags then
     Range partSets;
     ErrorCode rval = mb->tag_get_handle( parTagName.c_str(), part_tag );
     if( MB_SUCCESS == rval && part_tag != 0 )
@@ -660,6 +666,11 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
             CartVect center;
             EntityHandle cell = *it;
             rval              = mb->get_coords( &cell, 1, center.array() );MB_CHK_ERR( rval );
+            int globalID = 0;
+            if (!intxMesh)
+            {
+                rval = mb->tag_get_data(gidTag,&cell, 1, &globalID );MB_CHK_SET_ERR( rval, "can't get id tag on cell" );
+            }
             int plane;
             decide_gnomonic_plane( center, plane );
             double c[3];
@@ -670,6 +681,10 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
 
             EntityHandle vertex;
             rval = mb->create_vertex( c, vertex );MB_CHK_ERR( rval );
+            if (!intxMesh)
+            {
+                rval = mb->tag_set_data(gidTag,&vertex, 1, &globalID );MB_CHK_SET_ERR( rval, "can't set id tag on center" );
+            }
             rval = mb->add_entities( outSet, &vertex, 1 );MB_CHK_ERR( rval );
         }
     }
@@ -684,7 +699,7 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
             rval              = mb->get_coords( &cell, 1, center.array() );MB_CHK_ERR( rval );
             int plane;
             decide_gnomonic_plane( center, plane );
-            subranges[plane - 1].insert( cell );
+            subranges[plane - 1].insert( cell ); // includes edges if they exist
         }
         for( int i = 1; i <= 6; i++ )
         {
@@ -702,6 +717,13 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
                 gnomonic_unroll( c[0], c[1], R, i );
                 EntityHandle vertex;
                 rval = mb->create_vertex( c, vertex );MB_CHK_ERR( rval );
+                int vID;
+                if (!intxMesh)
+                {
+                    rval = mb->tag_get_data(gidTag,&v, 1, &vID );MB_CHK_SET_ERR( rval, "can't get id tag on vertex" );
+                    // new vertex will get old ID
+                    rval = mb->tag_set_data(gidTag,&vertex, 1, &vID );MB_CHK_SET_ERR( rval, "can't get id tag on vertex" );
+                }
                 corr[v] = vertex;  // for new connectivity
             }
             EntityHandle new_conn[20];  // max edges in 2d ?
@@ -718,6 +740,24 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
                 EntityHandle newCell;
                 rval = mb->create_element( type, new_conn, num_nodes, newCell );MB_CHK_ERR( rval );
                 rval = mb->add_entities( outSet, &newCell, 1 );MB_CHK_ERR( rval );
+                int eID;
+                if (!intxMesh)
+                {
+                    rval = mb->tag_get_data(gidTag,&eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get id tag on entity handle" );
+                    // new vertex will get old ID
+                    rval = mb->tag_set_data(gidTag,&newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set id tag on new cell" );
+                }
+                else
+                {
+                    // look for parent tags if intx mesh targetParentTag  ,  sourceParentTag
+                    if (type >= moab::MBPOLYGON)
+                    {
+                        rval = mb->tag_get_data(targetParentTag,&eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get parent tag on entity handle" );
+                        rval = mb->tag_set_data(targetParentTag,&newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set parent tag on entity handle" );
+                        rval = mb->tag_get_data(sourceParentTag,&eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get parent tag on entity handle" );
+                        rval = mb->tag_set_data(sourceParentTag,&newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set parent tag on entity handle" );
+                    }
+                }
                 std::map< EntityHandle, int >::iterator mit = partsAssign.find( eh );
                 if( mit != partsAssign.end() )
                 {

@@ -207,6 +207,8 @@ class IntxUtils
     static ErrorCode max_diagonal(Interface* mb, Range cells, int max_edges, double & diagonal);
 
     // compute edge decomposition after intersection
+    static ErrorCode orderSubEdges(std::vector<EntityHandle> & subEdges, std::vector<EntityHandle> & VerticesSubEdges, const EntityHandle * connEdge);
+
     static ErrorCode EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle intx_set, bool sourceMap);
 };
 

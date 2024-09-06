@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cassert>
 #include <iostream>
+#include <iomanip>
 
 #include "moab/IntxMesh/IntxUtils.hpp"
 // this is from mbcoupler; maybe it should be moved somewhere in moab src
@@ -770,7 +771,47 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
 
     return MB_SUCCESS;
 }
+ErrorCode IntxUtils::orderSubEdges(std::vector<EntityHandle> & subEdges, std::vector<EntityHandle> & VerticesSubEdges, const EntityHandle * connEdge)
+{
+    int numEdges = (int) subEdges.size();
+    if (numEdges == 1)
+        return MB_SUCCESS; // nothing to do
 
+    EntityHandle currentVertex= connEdge[0]; // start vertex
+    EntityHandle endVertex = connEdge[1];
+    std::vector<EntityHandle> chain;
+    std::vector<int> markedEdge(numEdges, 0);// 0 means not found yet; -1 or +1 for orientation
+    // start finding the current vertex, until we close the chain; double loop, we could be smarter :)
+    for (int i = 0; i < numEdges; i++)
+    {
+        for (int j = 0; j< numEdges; j++)
+        {
+            if (0 != markedEdge[j])
+                continue; // do not use it anymore
+            if (VerticesSubEdges[j*2] == currentVertex)
+            {
+                currentVertex = VerticesSubEdges[j*2+1];
+                chain.push_back(subEdges[j]);
+                markedEdge[j] = 1; // positive
+                break; // break the j loop
+            }
+            if (VerticesSubEdges[j*2+1] == currentVertex)
+            {
+                currentVertex = VerticesSubEdges[j*2];
+                chain.push_back(subEdges[j]);
+                markedEdge[j] = -1; // reversed
+                break; // break the j loop
+            }
+        }
+    }
+    if ((int) chain.size() == numEdges && currentVertex == endVertex)
+    {
+        subEdges = chain; // reordered list, no orientation saved; maybe we should ?
+        return MB_SUCCESS;
+    }
+    else
+        return MB_FAILURE; // we did not find a chain, do not change anything
+}
 ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle intx_set, bool sourceMap)
 {
     Tag parentTag;
@@ -911,16 +952,18 @@ ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle 
         rval = IntxUtils::gnomonic_projection(verticesOriginal[0], 1.0, gnomonicPlane, coords2D[0], coords2D[1] );MB_CHK_SET_ERR( rval, "can't get gnomonic coords" );
         rval = IntxUtils::gnomonic_projection(verticesOriginal[1], 1.0, gnomonicPlane, coords2D[2], coords2D[3] );MB_CHK_SET_ERR( rval, "can't get gnomonic coords" );
 
-        double edgeLength = angle( verticesOriginal[0], verticesOriginal[1] ); // distance on sphere of radius 1 is the angle
+        double edgeLength = angle_robust( verticesOriginal[0], verticesOriginal[1] ); // distance on sphere of radius 1 is the angle
         // loop now over candidateEdges
         double recoveredLength = 0.;
+        std::vector<EntityHandle>  VerticesSubEdges; // push all vertices here, so we can order the subedges later
         for (size_t i=0; i< candidateEdges.size(); i++)
         {
             EntityHandle subedge = candidateEdges[i];
             // get its vertex coordinates:
-            rval = mb->get_connectivity(subedge, connEdge, numVerts);MB_CHK_SET_ERR( rval, "can't get connectivity of candidate edge" );
+            const EntityHandle *connEdge2;
+            rval = mb->get_connectivity(subedge, connEdge2, numVerts);MB_CHK_SET_ERR( rval, "can't get connectivity of candidate edge" );
             CartVect verticesSubEdge[2];
-            rval = mb->get_coords( connEdge, numVerts,  verticesSubEdge[0].array() );MB_CHK_SET_ERR( rval, "can't get coordinates of vertices of initial edge" );
+            rval = mb->get_coords( connEdge2, numVerts,  verticesSubEdge[0].array() );MB_CHK_SET_ERR( rval, "can't get coordinates of vertices of initial edge" );
             // decide if they are on the initial edge (form an angle)
             bool onEdge = true;
             for (int j=0; j<2 && onEdge; j++)
@@ -936,20 +979,48 @@ ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle 
                 double subEdgeLen = angle_robust(verticesSubEdge[0], verticesSubEdge[1]);
                 recoveredLength += subEdgeLen;
                 mapEdges[initialEdge].push_back(subedge);
+                VerticesSubEdges.push_back(connEdge2[0]);
+                VerticesSubEdges.push_back(connEdge2[1]);
             }
         }
         double fraction = recoveredLength/edgeLength;
         rval = mb->tag_set_data(fractionTag, &initialEdge, 1, &fraction);MB_CHK_SET_ERR( rval, "can't set fraction on initial edge" );
         double numSubEdge = double(mapEdges[initialEdge].size());
         rval = mb->tag_set_data(subTag, &initialEdge, 1, &numSubEdge);MB_CHK_SET_ERR( rval, "can't set number of subedges on initial edge" );
-        if ( fabs(edgeLength-recoveredLength) < 1.e-10)
+        // now , reorder the subedges to create a chain along the original edge
+        // if we cannot form a chain, it means we have a problem
+        // order subedges on the original edge, and find out their orientation
+        // set also the parent tag on the edge, either source or target parent
+        // in some cases, the parents can be both
+        rval = IntxUtils::orderSubEdges(mapEdges[initialEdge], VerticesSubEdges, connEdge);
+        if ( fabs(edgeLength-recoveredLength) < 1.e-10 || rval == MB_SUCCESS)
             recoveredEdges++;
         else
         {
             mb->list_entity(initialEdge);
+            std::vector<EntityHandle> &listSubEdges = mapEdges[initialEdge];
+            double newCheckLength = 0;
+            CartVect vertices[2];
+            const EntityHandle *conn2;
+            int numVerts2 = 0;
+            rval = mb->get_connectivity(initialEdge, conn2, numVerts2);MB_CHK_SET_ERR( rval, "can't get connectivity of initial edge " );
+            rval = mb->get_coords( conn2, numVerts2,  vertices[0].array() );MB_CHK_SET_ERR( rval, "can't get coordinates of vertices of initial edge" );
+            double length2 = angle_robust(vertices[0], vertices[1]);
+            std::cout << std::setprecision(14) ;
+            std::cout <<" initial edge:" << mb->id_from_handle(initialEdge) << " v: " << conn2[0] << ", " << conn2[1] << " len: "<< length2 << "\n";
+            for (size_t j=0; j<listSubEdges.size(); j++)
+            {
+                EntityHandle subEdge = listSubEdges[j];
+                rval = mb->get_connectivity(subEdge, conn2, numVerts2);MB_CHK_SET_ERR( rval, "can't get connectivity of subedge " );
+                rval = mb->get_coords( conn2, numVerts2,  vertices[0].array() );MB_CHK_SET_ERR( rval, "can't get coordinates of vertices of subedge" );
+                length2 = angle_robust(vertices[0], vertices[1]);
+                newCheckLength += length2;
+                std::cout <<"     sub edge:" << mb->id_from_handle(subEdge) << " v: " << conn2[0] << ", " << conn2[1] << " len: "<< length2 << "\n";
+            }
             std::cout << " edge length:" << edgeLength << " diff:" << edgeLength-recoveredLength << " fraction:" << fraction <<
                     " subedges:" << numSubEdge << "\n";
             unrecovered++;
+            std::cout << std::setprecision(7) ;
         }
 
     }

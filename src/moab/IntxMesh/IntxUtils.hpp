@@ -204,6 +204,8 @@ class IntxUtils
 
     static ErrorCode remove_padded_vertices( Interface* mb, EntityHandle file_set, std::vector< Tag >& tagList );
 
+    static ErrorCode orderSubEdges(std::vector<EntityHandle> & subEdges, std::vector<EntityHandle> & VerticesSubEdges, const EntityHandle * connEdge);
+
     static ErrorCode EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle intx_set, bool sourceMap);
 };
 

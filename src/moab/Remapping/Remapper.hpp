@@ -101,6 +101,15 @@ class Remapper
         moab::Tag gtag = m_interface->globalId_tag();
         moab::Range entities;
         rval = m_interface->get_entities_by_dimension( set_with_ghosts, 2, entities );MB_CHK_ERR( rval );
+
+        moab::Tag doftag;
+        rval = m_interface->tag_get_handle( "GLOBAL_DOFS", doftag );
+        if ( rval == MB_SUCCESS )
+        {
+            moab::Range quads = entities.subset_by_type(moab::MBQUAD);
+            rval = m_pcomm->exchange_tags( doftag, quads );MB_CHK_ERR( rval );
+        }
+
         // get all vertices too, need to exchange global ids for vertices too
         moab::Range vertices;
         rval = m_interface->get_connectivity( entities, vertices );MB_CHK_ERR( rval );

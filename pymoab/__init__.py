@@ -21,7 +21,6 @@ constructs such as lists, tuples, etc.
 from importlib.metadata import version, PackageNotFoundError
 
 try:
-    __version__ = version('pymoab')
+    __version__ = version('MOAB')
 except PackageNotFoundError:
     __version__ = 'Please install this project with pip'
-

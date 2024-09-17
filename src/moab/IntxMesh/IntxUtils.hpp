@@ -96,6 +96,15 @@ class IntxUtils
                                                  bool centers_only,
                                                  EntityHandle& outSet );
 
+    // given a point P, |P| > 0, find u,v directions for the gnomonic projection plane perpendicular to OP
+    // the result will be a cartesian coordinate system centered at P, and 2 unit vectors at P that
+    // define the gnomonic plane orientation around P, such as a positive oriented triangle on a sphere will
+    // remain positive oriented after projection in the plane.
+    // all vertices in this projection will be on one hemisphere to the side of P
+    // the orientation of u and v uniquely determine the gnomonic plane orientation, and u x v should be in OP direction
+    // also, u and v are in plane, and perpendicular to each other
+    static ErrorCode gnomonic_projection_plane_at_point(CartVect P, CartVect& u, CartVect& v);
+
     static void transform_coordinates( double* avg_position, int projection_type );
     /*
     *   other methods to convert from spherical coord to cartesian, and back

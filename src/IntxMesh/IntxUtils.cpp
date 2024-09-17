@@ -453,6 +453,94 @@ void IntxUtils::decide_gnomonic_plane( const CartVect& pos, int& plane )
     return;
 }
 
+ErrorCode IntxUtils::gnomonic_projection_plane_at_point(CartVect P, CartVect& u, CartVect& v)
+{
+
+	double d = P.length();
+	if (d == 0.0)
+	{
+		MB_CHK_SET_ERR( MB_FAILURE, "point P is at the origin" );
+	}
+	double x = P[0];
+	double y = P[1];
+	double z = P[2];
+	// easy cases
+	if (x == 0.0 && y == 0.0)
+	{
+		if (z > 0.)
+		{
+			u = CartVect(1., 0., 0.);
+			v = CartVect(0., 1., 0.); // gnomonic plane 6
+		}
+		else
+		{
+			u = CartVect(0., 1., 0.);
+			v = CartVect(1., 0., 0.); // gnomonic plane 5
+		}
+		return MB_SUCCESS;
+	}
+	if (x == 0.0 && z == 0.0)
+	{
+		if (y > 0.)
+		{
+			u = CartVect(-1., 0., 0.);
+			v = CartVect( 0., 0., 1.); // gnomonic plane 2
+		}
+		else
+		{
+			u = CartVect(0., 0., 1.);
+			v = CartVect(-1., 0., 0.); // gnomonic plane 4
+		}
+		return MB_SUCCESS;
+	}
+	if (z == 0.0 && y == 0.0)
+	{
+		if (x > 0.)
+		{
+			u = CartVect(0., 1., 0.);
+			v = CartVect(0., 0., 1.); // gnomonic plane 1
+		}
+		else
+		{
+			u = CartVect(0., 0., 1.);
+			v = CartVect(0., 1., 0.); // gnomonic plane 3
+		}
+		return MB_SUCCESS;
+	}
+	int plane;
+	IntxUtils::decide_gnomonic_plane( P, plane );
+	if (1 == plane) // towards x > 0
+	{
+		u = CartVect( 1., 0., 0.) * P;
+	}
+
+	if (2 == plane) // towards y > 0
+	{
+		u = CartVect( 0., 1., 0.) * P;
+	}
+	if (3 == plane) // towards x < 0
+	{
+		u = CartVect( -1., 0., 0.) * P;
+	}
+	if (4 == plane) // towards y < 0
+	{
+		u = CartVect( 0., -1., 0.) * P;
+	}
+	if (5 == plane) // towards z < 0
+	{
+		u = CartVect( 0., 0., -1.) * P;
+	}
+	if (6 == plane) // towards z > 0
+	{
+		u = CartVect( 0., 0., 1.) * P;
+	}
+	v = P * u;
+	u.normalize();
+	v.normalize();
+
+	return MB_SUCCESS;
+}
+
 // point on a sphere is projected on one of six planes, decided earlier
 ErrorCode IntxUtils::gnomonic_projection( const CartVect& pos, double R, int plane, double& c1, double& c2 )
 {

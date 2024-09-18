@@ -29,8 +29,10 @@ LloydRelaxation: LloydRelaxation.o ${MOAB_LIBDIR}/libMOAB.la
 CrystalRouterExample: CrystalRouterExample.o ${MOAB_LIBDIR}/libMOAB.la
 VisTags: VisTags.o ${MOAB_LIBDIR}/libMOAB.la
 GenLargeMesh: GenLargeMesh.o ${MOAB_LIBDIR}/libMOAB.la
+ChangeGlobalID: ChangeGlobalID.o ${MOAB_LIBDIR}/libMOAB.la
+ModifyMap: ModifyMap.o ${MOAB_LIBDIR}/libMOAB.la
 
-ExtrudePoly LloydRelaxation CrystalRouterExample VisTags GenLargeMesh:
+ExtrudePoly LloydRelaxation CrystalRouterExample VisTags GenLargeMesh ChangeGlobalID ModifyMap:
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 

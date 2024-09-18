@@ -79,6 +79,17 @@ class IntxUtils
 
     static ErrorCode gnomonic_projection( const CartVect& pos, double R, int plane, double& c1, double& c2 );
 
+    // point on a sphere is projected on plane decided by gnomonic center P, and u, v computed in a previous method
+    // these points are in a list axis[3], P, u and v
+
+    static ErrorCode gnomonic_projection_generalized( const CartVect& pos, const CartVect axis[3], double& c1, double& c2 );
+
+    // given a mesh on a hemisphere, and a point P that defines the hemisphere, project the mesh
+    // on a plane tangent at P (gnomonic plane at P)
+    static ErrorCode global_gnomonic_projection_general( Interface* mb,
+                                                         EntityHandle inSet,
+                                                         CartVect P,
+                                                         EntityHandle& outSet );
     // given the position on plane (one out of 6), find out the position on sphere
     static ErrorCode reverse_gnomonic_projection( const double& c1,
                                                   const double& c2,

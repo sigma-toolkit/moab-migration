@@ -6,6 +6,7 @@
 
 #include "netcdf.h"
 #include <iostream>
+#include <fstream>
 
 #include "moab/Core.hpp"
 #include "moab/Interface.hpp"
@@ -138,6 +139,19 @@ int main( int argc, char* argv[] )
 	size_t start=0;
 	size_t count =ns1;
 	int ierr = nc_put_vara_int(ncFile1, idcol1, &start, &count,  &col1[0]);
+
+	std::ofstream outFile;
+
+	// Open column file for col1
+	outFile.open("col1.txt");
+	outFile << " col = ";
+	for (int i=0; i<ns1; i++)
+	{
+		outFile << col1[i] << ", ";
+		if (i%11==10) outFile << "\n";
+	}
+	outFile.close();
+
 	std::cout << " to put new val for col:  ierr:" << ierr << "\n";
 	// now rewrite the col variable, such that col will have old values
 	ierr = nc_close(ncFile1);

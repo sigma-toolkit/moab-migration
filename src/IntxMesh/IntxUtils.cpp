@@ -453,104 +453,107 @@ void IntxUtils::decide_gnomonic_plane( const CartVect& pos, int& plane )
     return;
 }
 
-ErrorCode IntxUtils::gnomonic_projection_plane_at_point(CartVect P, CartVect& u, CartVect& v)
+ErrorCode IntxUtils::gnomonic_projection_plane_at_point( CartVect P, CartVect& u, CartVect& v )
 {
 
-	double d = P.length();
-	if (d == 0.0)
-	{
-		MB_CHK_SET_ERR( MB_FAILURE, "point P is at the origin" );
-	}
-	double x = P[0];
-	double y = P[1];
-	double z = P[2];
-	// easy cases
-	if (x == 0.0 && y == 0.0)
-	{
-		if (z > 0.)
-		{
-			u = CartVect(1., 0., 0.);
-			v = CartVect(0., 1., 0.); // gnomonic plane 6
-		}
-		else
-		{
-			u = CartVect(0., 1., 0.);
-			v = CartVect(1., 0., 0.); // gnomonic plane 5
-		}
-		return MB_SUCCESS;
-	}
-	if (x == 0.0 && z == 0.0)
-	{
-		if (y > 0.)
-		{
-			u = CartVect(-1., 0., 0.);
-			v = CartVect( 0., 0., 1.); // gnomonic plane 2
-		}
-		else
-		{
-			u = CartVect(0., 0., 1.);
-			v = CartVect(-1., 0., 0.); // gnomonic plane 4
-		}
-		return MB_SUCCESS;
-	}
-	if (z == 0.0 && y == 0.0)
-	{
-		if (x > 0.)
-		{
-			u = CartVect(0., 1., 0.);
-			v = CartVect(0., 0., 1.); // gnomonic plane 1
-		}
-		else
-		{
-			u = CartVect(0., 0., 1.);
-			v = CartVect(0., 1., 0.); // gnomonic plane 3
-		}
-		return MB_SUCCESS;
-	}
-	int plane;
-	IntxUtils::decide_gnomonic_plane( P, plane );
-	if (1 == plane) // towards x > 0
-	{
-		u = CartVect( 1., 0., 0.) * P;
-	}
+    double d = P.length();
+    if( d == 0.0 )
+    {
+        MB_CHK_SET_ERR( MB_FAILURE, "point P is at the origin" );
+    }
+    double x = P[0];
+    double y = P[1];
+    double z = P[2];
+    // easy cases
+    if( x == 0.0 && y == 0.0 )
+    {
+        if( z > 0. )
+        {
+            u = CartVect( 1., 0., 0. );
+            v = CartVect( 0., 1., 0. );  // gnomonic plane 6
+        }
+        else
+        {
+            u = CartVect( 0., 1., 0. );
+            v = CartVect( 1., 0., 0. );  // gnomonic plane 5
+        }
+        return MB_SUCCESS;
+    }
+    if( x == 0.0 && z == 0.0 )
+    {
+        if( y > 0. )
+        {
+            u = CartVect( -1., 0., 0. );
+            v = CartVect( 0., 0., 1. );  // gnomonic plane 2
+        }
+        else
+        {
+            u = CartVect( 0., 0., 1. );
+            v = CartVect( -1., 0., 0. );  // gnomonic plane 4
+        }
+        return MB_SUCCESS;
+    }
+    if( z == 0.0 && y == 0.0 )
+    {
+        if( x > 0. )
+        {
+            u = CartVect( 0., 1., 0. );
+            v = CartVect( 0., 0., 1. );  // gnomonic plane 1
+        }
+        else
+        {
+            u = CartVect( 0., 0., 1. );
+            v = CartVect( 0., 1., 0. );  // gnomonic plane 3
+        }
+        return MB_SUCCESS;
+    }
+    int plane;
+    IntxUtils::decide_gnomonic_plane( P, plane );
+    if( 1 == plane )  // towards x > 0
+    {
+        u = CartVect( 1., 0., 0. ) * P;
+    }
 
-	if (2 == plane) // towards y > 0
-	{
-		u = CartVect( 0., 1., 0.) * P;
-	}
-	if (3 == plane) // towards x < 0
-	{
-		u = CartVect( -1., 0., 0.) * P;
-	}
-	if (4 == plane) // towards y < 0
-	{
-		u = CartVect( 0., -1., 0.) * P;
-	}
-	if (5 == plane) // towards z < 0
-	{
-		u = CartVect( 0., 0., -1.) * P;
-	}
-	if (6 == plane) // towards z > 0
-	{
-		u = CartVect( 0., 0., 1.) * P;
-	}
-	v = P * u;
-	u.normalize();
-	v.normalize();
+    if( 2 == plane )  // towards y > 0
+    {
+        u = CartVect( 0., 1., 0. ) * P;
+    }
+    if( 3 == plane )  // towards x < 0
+    {
+        u = CartVect( -1., 0., 0. ) * P;
+    }
+    if( 4 == plane )  // towards y < 0
+    {
+        u = CartVect( 0., -1., 0. ) * P;
+    }
+    if( 5 == plane )  // towards z < 0
+    {
+        u = CartVect( 0., 0., -1. ) * P;
+    }
+    if( 6 == plane )  // towards z > 0
+    {
+        u = CartVect( 0., 0., 1. ) * P;
+    }
+    v = P * u;
+    u.normalize();
+    v.normalize();
 
-	return MB_SUCCESS;
+    return MB_SUCCESS;
 }
 
-ErrorCode IntxUtils::gnomonic_projection_generalized( const CartVect& pos, const CartVect axis[3], double& c1, double& c2 )
+ErrorCode IntxUtils::gnomonic_projection_generalized( const CartVect& pos,
+                                                      const CartVect axis[3],
+                                                      double& c1,
+                                                      double& c2 )
 {
-    double ang = angle(pos, axis[0]);
-    if (ang > 1.57) // pi/2 do not project if very close to hemisphere
+    double ang = angle( pos, axis[0] );
+    if( ang > 1.57 )  // pi/2 do not project if very close to hemisphere
         return MB_FAILURE;
     // solve the equation in plane, (alfa * pos - axis[0]) % axis[0] = 0.0
-    double alpha = axis[0]%axis[0] / (pos % axis[0]); // we know this denominator is greater than 0
-    CartVect planeVect = alpha * pos - axis[0]; // axis[0] is P
-    c1 = planeVect % axis[1];
-    c2 = planeVect % axis[2];
+    double alpha       = axis[0] % axis[0] / ( pos % axis[0] );  // we know this denominator is greater than 0
+    CartVect planeVect = alpha * pos - axis[0];                  // axis[0] is P
+    c1                 = planeVect % axis[1];
+    c2                 = planeVect % axis[2];
     return MB_SUCCESS;
 }
 
@@ -724,7 +727,8 @@ ErrorCode IntxUtils::global_gnomonic_projection_general( Interface* mb,
     mb->tag_get_handle( "TargetParent", targetParentTag );
     mb->tag_get_handle( "SourceParent", sourceParentTag );
     bool intxMesh = false;
-    if (targetParentTag!=NULL  && sourceParentTag!=NULL) intxMesh = true; // interested in source and target parent tags then
+    if( targetParentTag != NULL && sourceParentTag != NULL )
+        intxMesh = true;  // interested in source and target parent tags then
     Range partSets;
     ErrorCode rval = mb->tag_get_handle( parTagName.c_str(), part_tag );
     if( MB_SUCCESS == rval && part_tag != 0 )
@@ -765,7 +769,7 @@ ErrorCode IntxUtils::global_gnomonic_projection_general( Interface* mb,
     // decide gnomonic plane
     CartVect axis[3];
     axis[0] = P;
-    IntxUtils::gnomonic_projection_plane_at_point(axis[0], axis[1], axis[2]);
+    IntxUtils::gnomonic_projection_plane_at_point( axis[0], axis[1], axis[2] );
     // project all vertices, and then create new cells
 
     Range verts;
@@ -783,53 +787,53 @@ ErrorCode IntxUtils::global_gnomonic_projection_general( Interface* mb,
         EntityHandle vertex;
         rval = mb->create_vertex( c, vertex );MB_CHK_ERR( rval );
         int vID;
-        if (!intxMesh)
+        if( !intxMesh )
         {
-            rval = mb->tag_get_data(gidTag,&v, 1, &vID );MB_CHK_SET_ERR( rval, "can't get id tag on vertex" );
+            rval = mb->tag_get_data( gidTag, &v, 1, &vID );MB_CHK_SET_ERR( rval, "can't get id tag on vertex" );
             // new vertex will get old ID
-            rval = mb->tag_set_data(gidTag,&vertex, 1, &vID );MB_CHK_SET_ERR( rval, "can't get id tag on vertex" );
+            rval = mb->tag_set_data( gidTag, &vertex, 1, &vID );MB_CHK_SET_ERR( rval, "can't get id tag on vertex" );
         }
         corr[v] = vertex;  // for new connectivity
     }
-	EntityHandle new_conn[20];  // max edges in 2d ?
-	for( Range::iterator eit = inputRange.begin(); eit != inputRange.end(); ++eit )
-	{
-		EntityHandle eh          = *eit;
-		const EntityHandle* conn = NULL;
-		int num_nodes;
-		rval = mb->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
-		// build a new vertex array
-		for( int j = 0; j < num_nodes; j++ )
-			new_conn[j] = corr[conn[j]];
-		EntityType type = mb->type_from_handle( eh );
-		EntityHandle newCell;
-		rval = mb->create_element( type, new_conn, num_nodes, newCell );MB_CHK_ERR( rval );
-		rval = mb->add_entities( outSet, &newCell, 1 );MB_CHK_ERR( rval );
-		int eID;
-		if (!intxMesh)
-		{
-			rval = mb->tag_get_data(gidTag,&eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get id tag on entity handle" );
-			// new vertex will get old ID
-			rval = mb->tag_set_data(gidTag,&newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set id tag on new cell" );
-		}
-		else
-		{
-			// look for parent tags if intx mesh targetParentTag  ,  sourceParentTag
-			if (type >= moab::MBPOLYGON)
-			{
-				rval = mb->tag_get_data(targetParentTag,&eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get parent tag on entity handle" );
-				rval = mb->tag_set_data(targetParentTag,&newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set parent tag on entity handle" );
-				rval = mb->tag_get_data(sourceParentTag,&eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get parent tag on entity handle" );
-				rval = mb->tag_set_data(sourceParentTag,&newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set parent tag on entity handle" );
-			}
-		}
-		std::map< EntityHandle, int >::iterator mit = partsAssign.find( eh );
-		if( mit != partsAssign.end() )
-		{
-			int val = mit->second;
-			rval    = mb->add_entities( newPartSets[val], &newCell, 1 );MB_CHK_ERR( rval );
-		}
-	}
+    EntityHandle new_conn[20];  // max edges in 2d ?
+    for( Range::iterator eit = inputRange.begin(); eit != inputRange.end(); ++eit )
+    {
+        EntityHandle eh          = *eit;
+        const EntityHandle* conn = NULL;
+        int num_nodes;
+        rval = mb->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
+        // build a new vertex array
+        for( int j = 0; j < num_nodes; j++ )
+            new_conn[j] = corr[conn[j]];
+        EntityType type = mb->type_from_handle( eh );
+        EntityHandle newCell;
+        rval = mb->create_element( type, new_conn, num_nodes, newCell );MB_CHK_ERR( rval );
+        rval = mb->add_entities( outSet, &newCell, 1 );MB_CHK_ERR( rval );
+        int eID;
+        if( !intxMesh )
+        {
+            rval = mb->tag_get_data( gidTag, &eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get id tag on entity handle" );
+            // new vertex will get old ID
+            rval = mb->tag_set_data( gidTag, &newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set id tag on new cell" );
+        }
+        else
+        {
+            // look for parent tags if intx mesh targetParentTag  ,  sourceParentTag
+            if( type >= moab::MBPOLYGON )
+            {
+                rval = mb->tag_get_data( targetParentTag, &eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get parent tag on entity handle" );
+                rval = mb->tag_set_data( targetParentTag, &newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set parent tag on entity handle" );
+                rval = mb->tag_get_data( sourceParentTag, &eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get parent tag on entity handle" );
+                rval = mb->tag_set_data( sourceParentTag, &newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set parent tag on entity handle" );
+            }
+        }
+        std::map< EntityHandle, int >::iterator mit = partsAssign.find( eh );
+        if( mit != partsAssign.end() )
+        {
+            int val = mit->second;
+            rval    = mb->add_entities( newPartSets[val], &newCell, 1 );MB_CHK_ERR( rval );
+        }
+    }
     return MB_SUCCESS;
 }
 
@@ -847,7 +851,8 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
     mb->tag_get_handle( "TargetParent", targetParentTag );
     mb->tag_get_handle( "SourceParent", sourceParentTag );
     bool intxMesh = false;
-    if (targetParentTag!=NULL  && sourceParentTag!=NULL) intxMesh = true; // interested in source and target parent tags then
+    if( targetParentTag != NULL && sourceParentTag != NULL )
+        intxMesh = true;  // interested in source and target parent tags then
     Range partSets;
     ErrorCode rval = mb->tag_get_handle( parTagName.c_str(), part_tag );
     if( MB_SUCCESS == rval && part_tag != 0 )
@@ -893,9 +898,9 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
             EntityHandle cell = *it;
             rval              = mb->get_coords( &cell, 1, center.array() );MB_CHK_ERR( rval );
             int globalID = 0;
-            if (!intxMesh)
+            if( !intxMesh )
             {
-                rval = mb->tag_get_data(gidTag,&cell, 1, &globalID );MB_CHK_SET_ERR( rval, "can't get id tag on cell" );
+                rval = mb->tag_get_data( gidTag, &cell, 1, &globalID );MB_CHK_SET_ERR( rval, "can't get id tag on cell" );
             }
             int plane;
             decide_gnomonic_plane( center, plane );
@@ -907,9 +912,9 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
 
             EntityHandle vertex;
             rval = mb->create_vertex( c, vertex );MB_CHK_ERR( rval );
-            if (!intxMesh)
+            if( !intxMesh )
             {
-                rval = mb->tag_set_data(gidTag,&vertex, 1, &globalID );MB_CHK_SET_ERR( rval, "can't set id tag on center" );
+                rval = mb->tag_set_data( gidTag, &vertex, 1, &globalID );MB_CHK_SET_ERR( rval, "can't set id tag on center" );
             }
             rval = mb->add_entities( outSet, &vertex, 1 );MB_CHK_ERR( rval );
         }
@@ -925,7 +930,7 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
             rval              = mb->get_coords( &cell, 1, center.array() );MB_CHK_ERR( rval );
             int plane;
             decide_gnomonic_plane( center, plane );
-            subranges[plane - 1].insert( cell ); // includes edges if they exist
+            subranges[plane - 1].insert( cell );  // includes edges if they exist
         }
         for( int i = 1; i <= 6; i++ )
         {
@@ -944,11 +949,11 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
                 EntityHandle vertex;
                 rval = mb->create_vertex( c, vertex );MB_CHK_ERR( rval );
                 int vID;
-                if (!intxMesh)
+                if( !intxMesh )
                 {
-                    rval = mb->tag_get_data(gidTag,&v, 1, &vID );MB_CHK_SET_ERR( rval, "can't get id tag on vertex" );
+                    rval = mb->tag_get_data( gidTag, &v, 1, &vID );MB_CHK_SET_ERR( rval, "can't get id tag on vertex" );
                     // new vertex will get old ID
-                    rval = mb->tag_set_data(gidTag,&vertex, 1, &vID );MB_CHK_SET_ERR( rval, "can't get id tag on vertex" );
+                    rval = mb->tag_set_data( gidTag, &vertex, 1, &vID );MB_CHK_SET_ERR( rval, "can't get id tag on vertex" );
                 }
                 corr[v] = vertex;  // for new connectivity
             }
@@ -967,21 +972,21 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
                 rval = mb->create_element( type, new_conn, num_nodes, newCell );MB_CHK_ERR( rval );
                 rval = mb->add_entities( outSet, &newCell, 1 );MB_CHK_ERR( rval );
                 int eID;
-                if (!intxMesh)
+                if( !intxMesh )
                 {
-                    rval = mb->tag_get_data(gidTag,&eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get id tag on entity handle" );
+                    rval = mb->tag_get_data( gidTag, &eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get id tag on entity handle" );
                     // new vertex will get old ID
-                    rval = mb->tag_set_data(gidTag,&newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set id tag on new cell" );
+                    rval = mb->tag_set_data( gidTag, &newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set id tag on new cell" );
                 }
                 else
                 {
                     // look for parent tags if intx mesh targetParentTag  ,  sourceParentTag
-                    if (type >= moab::MBPOLYGON)
+                    if( type >= moab::MBPOLYGON )
                     {
-                        rval = mb->tag_get_data(targetParentTag,&eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get parent tag on entity handle" );
-                        rval = mb->tag_set_data(targetParentTag,&newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set parent tag on entity handle" );
-                        rval = mb->tag_get_data(sourceParentTag,&eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get parent tag on entity handle" );
-                        rval = mb->tag_set_data(sourceParentTag,&newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set parent tag on entity handle" );
+                        rval = mb->tag_get_data( targetParentTag, &eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get parent tag on entity handle" );
+                        rval = mb->tag_set_data( targetParentTag, &newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set parent tag on entity handle" );
+                        rval = mb->tag_get_data( sourceParentTag, &eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get parent tag on entity handle" );
+                        rval = mb->tag_set_data( sourceParentTag, &newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set parent tag on entity handle" );
                     }
                 }
                 std::map< EntityHandle, int >::iterator mit = partsAssign.find( eh );
@@ -996,129 +1001,128 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
 
     return MB_SUCCESS;
 }
-ErrorCode IntxUtils::orderSubEdges(std::vector<EntityHandle> & subEdges, std::vector<EntityHandle> & VerticesSubEdges, const EntityHandle * connEdge)
+ErrorCode IntxUtils::orderSubEdges( std::vector< EntityHandle >& subEdges,
+                                    std::vector< EntityHandle >& VerticesSubEdges,
+                                    const EntityHandle* connEdge )
 {
-    int numEdges = (int) subEdges.size();
-    if (numEdges == 1)
-        return MB_SUCCESS; // nothing to do
+    int numEdges = (int)subEdges.size();
+    if( numEdges == 1 ) return MB_SUCCESS;  // nothing to do
 
-    EntityHandle currentVertex= connEdge[0]; // start vertex
-    EntityHandle endVertex = connEdge[1];
-    std::vector<EntityHandle> chain;
-    std::vector<int> markedEdge(numEdges, 0);// 0 means not found yet; -1 or +1 for orientation
+    EntityHandle currentVertex = connEdge[0];  // start vertex
+    EntityHandle endVertex     = connEdge[1];
+    std::vector< EntityHandle > chain;
+    std::vector< int > markedEdge( numEdges, 0 );  // 0 means not found yet; -1 or +1 for orientation
     // start finding the current vertex, until we close the chain; double loop, we could be smarter :)
-    for (int i = 0; i < numEdges; i++)
+    for( int i = 0; i < numEdges; i++ )
     {
-        for (int j = 0; j< numEdges; j++)
+        for( int j = 0; j < numEdges; j++ )
         {
-            if (0 != markedEdge[j])
-                continue; // do not use it anymore
-            if (VerticesSubEdges[j*2] == currentVertex)
+            if( 0 != markedEdge[j] ) continue;  // do not use it anymore
+            if( VerticesSubEdges[j * 2] == currentVertex )
             {
-                currentVertex = VerticesSubEdges[j*2+1];
-                chain.push_back(subEdges[j]);
-                markedEdge[j] = 1; // positive
-                break; // break the j loop
+                currentVertex = VerticesSubEdges[j * 2 + 1];
+                chain.push_back( subEdges[j] );
+                markedEdge[j] = 1;  // positive
+                break;              // break the j loop
             }
-            if (VerticesSubEdges[j*2+1] == currentVertex)
+            if( VerticesSubEdges[j * 2 + 1] == currentVertex )
             {
-                currentVertex = VerticesSubEdges[j*2];
-                chain.push_back(subEdges[j]);
-                markedEdge[j] = -1; // reversed
-                break; // break the j loop
+                currentVertex = VerticesSubEdges[j * 2];
+                chain.push_back( subEdges[j] );
+                markedEdge[j] = -1;  // reversed
+                break;               // break the j loop
             }
         }
     }
-    if ((int) chain.size() == numEdges && currentVertex == endVertex)
+    if( (int)chain.size() == numEdges && currentVertex == endVertex )
     {
-        subEdges = chain; // reordered list, no orientation saved; maybe we should ?
+        subEdges = chain;  // reordered list, no orientation saved; maybe we should ?
         return MB_SUCCESS;
     }
     else
-        return MB_FAILURE; // we did not find a chain, do not change anything
+        return MB_FAILURE;  // we did not find a chain, do not change anything
 }
-ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle intx_set, bool sourceMap)
+ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle intx_set, bool sourceMap )
 {
     Tag parentTag;
     ErrorCode rval;
-    if (sourceMap)
+    if( sourceMap )
     {
-        rval = mb->tag_get_handle("SourceParent", parentTag);MB_CHK_SET_ERR( rval, "can't get parent source tag in edge map" );
+        rval = mb->tag_get_handle( "SourceParent", parentTag );MB_CHK_SET_ERR( rval, "can't get parent source tag in edge map" );
     }
     else
     {
-        rval = mb->tag_get_handle("TargetParent", parentTag);MB_CHK_SET_ERR( rval, "can't get parent target tag in edge map" );
+        rval = mb->tag_get_handle( "TargetParent", parentTag );MB_CHK_SET_ERR( rval, "can't get parent target tag in edge map" );
     }
     Tag fractionTag;
-    rval = mb->tag_get_handle( "EdgeRecoveryFraction", fractionTag);
+    rval = mb->tag_get_handle( "EdgeRecoveryFraction", fractionTag );
     Tag subTag;
-    rval = mb->tag_get_handle( "NumSubEdges", subTag);
+    rval = mb->tag_get_handle( "NumSubEdges", subTag );
     // get all polygons in the intx set
     Range cells;
-    rval = mb->get_entities_by_dimension(intx_set, 2, cells);MB_CHK_SET_ERR( rval, "can't get intersection cells" );
+    rval = mb->get_entities_by_dimension( intx_set, 2, cells );MB_CHK_SET_ERR( rval, "can't get intersection cells" );
     // create all edges adjacent to the cells in the intx set
     // some might be original edges from edge or target meshes
     Range intxEdges;
-    rval = mb->get_adjacencies(cells, 1, true, intxEdges, Interface::UNION);MB_CHK_SET_ERR( rval, "can't get intersection edges" );
+    rval = mb->get_adjacencies( cells, 1, true, intxEdges, Interface::UNION );MB_CHK_SET_ERR( rval, "can't get intersection edges" );
     std::cout << " number of intx edges:" << intxEdges.size() << "\n";
     Range parentCells;
-    rval = mb->get_entities_by_dimension(inputSet, 2, parentCells);MB_CHK_SET_ERR( rval, "can't get intersection cells" );
+    rval = mb->get_entities_by_dimension( inputSet, 2, parentCells );MB_CHK_SET_ERR( rval, "can't get intersection cells" );
     Range initialEdges;
-    rval = mb->get_adjacencies(parentCells, 1, true, initialEdges, Interface::UNION);MB_CHK_SET_ERR( rval, "can't get intersection edges" );
+    rval = mb->get_adjacencies( parentCells, 1, true, initialEdges, Interface::UNION );MB_CHK_SET_ERR( rval, "can't get intersection edges" );
     std::cout << " number of original input edges:" << initialEdges.size() << "\n";
 
     // first, identify input polygons that are recovered fully
     // get global ids of the initial cells
-    std::vector<int> parentGids(parentCells.size());
+    std::vector< int > parentGids( parentCells.size() );
     Tag gidTag = mb->globalId_tag();
-    rval = mb->tag_get_data(gidTag, parentCells, &parentGids[0]);MB_CHK_SET_ERR( rval, "can't get parent global ids" );
-    std::map< int, double > initAreas; // get areas of those initial cells
-    int i=0;
-    std::vector< double > coords( 3 * 20 );// enough vertices, at most 30, good for intx polygons too
-    int num_nodes = 0; // num nodes in cells
+    rval       = mb->tag_get_data( gidTag, parentCells, &parentGids[0] );MB_CHK_SET_ERR( rval, "can't get parent global ids" );
+    std::map< int, double > initAreas;  // get areas of those initial cells
+    int i = 0;
+    std::vector< double > coords( 3 * 20 );  // enough vertices, at most 30, good for intx polygons too
+    int num_nodes = 0;                       // num nodes in cells
     const EntityHandle* verts;
-    IntxAreaUtils areaAdaptor( IntxAreaUtils::lHuiller ); // GaussQuadrature , lHuiller
-    std::map< int, double > recoveredAreas; // get areas of from intersection cells
-    std::map<int, EntityHandle> mapFromGIDToParent;
-    std::map<int, std::vector<EntityHandle>> mapFromParentGIDToIntxCells;
-    for (Range::iterator it=parentCells.begin(); it!=parentCells.end(); it++, i++)
+    IntxAreaUtils areaAdaptor( IntxAreaUtils::lHuiller );  // GaussQuadrature , lHuiller
+    std::map< int, double > recoveredAreas;                // get areas of from intersection cells
+    std::map< int, EntityHandle > mapFromGIDToParent;
+    std::map< int, std::vector< EntityHandle > > mapFromParentGIDToIntxCells;
+    for( Range::iterator it = parentCells.begin(); it != parentCells.end(); it++, i++ )
     {
-        EntityHandle parentCell=*it;
-        rval = mb->get_connectivity( parentCell, verts, num_nodes );MB_CHK_SET_ERR( rval, "can't get connectivity of parent cell" );
+        EntityHandle parentCell = *it;
+        rval                    = mb->get_connectivity( parentCell, verts, num_nodes );MB_CHK_SET_ERR( rval, "can't get connectivity of parent cell" );
         // get coordinates
         rval = mb->get_coords( verts, num_nodes, &coords[0] );MB_CHK_SET_ERR( rval, "can't get coords of parent cell" );
 
-        double area = areaAdaptor.area_spherical_polygon( &coords[0], num_nodes, 1. );
-        int parentID = parentGids[i];
-        initAreas[parentID] = area;
-        recoveredAreas[parentID] = 0.;
+        double area                  = areaAdaptor.area_spherical_polygon( &coords[0], num_nodes, 1. );
+        int parentID                 = parentGids[i];
+        initAreas[parentID]          = area;
+        recoveredAreas[parentID]     = 0.;
         mapFromGIDToParent[parentID] = parentCell;
-        mapFromParentGIDToIntxCells[parentID]; // just initialize it with empty vector
+        mapFromParentGIDToIntxCells[parentID];  // just initialize it with empty vector
     }
 
-
-    for (Range::iterator it=cells.begin(); it!=cells.end(); it++)
+    for( Range::iterator it = cells.begin(); it != cells.end(); it++ )
     {
-        EntityHandle cell=*it;
-        rval = mb->get_connectivity( cell, verts, num_nodes );MB_CHK_SET_ERR( rval, "can't get connectivity of intx cell" );
+        EntityHandle cell = *it;
+        rval              = mb->get_connectivity( cell, verts, num_nodes );MB_CHK_SET_ERR( rval, "can't get connectivity of intx cell" );
         // get coordinates
         rval = mb->get_coords( verts, num_nodes, &coords[0] );MB_CHK_SET_ERR( rval, "can't get coods of intx cell" );
         double intx_area = areaAdaptor.area_spherical_polygon( &coords[0], num_nodes, 1. );
-        int parentID = 0;
-        rval = mb->tag_get_data(parentTag, &cell, 1, &parentID);MB_CHK_SET_ERR( rval, "can't get parent Tag" );
+        int parentID     = 0;
+        rval             = mb->tag_get_data( parentTag, &cell, 1, &parentID );MB_CHK_SET_ERR( rval, "can't get parent Tag" );
         recoveredAreas[parentID] += intx_area;
-        mapFromParentGIDToIntxCells[parentID].push_back(cell);
+        mapFromParentGIDToIntxCells[parentID].push_back( cell );
     }
-    int recovered = 0, notRecovered =0;
+    int recovered = 0, notRecovered = 0;
     Range recoveredCells;
-    for (size_t j=0; j<parentGids.size(); j++)
+    for( size_t j = 0; j < parentGids.size(); j++ )
     {
-        int parentID = parentGids[j];
-        double areaDiff = fabs(initAreas[parentID] - recoveredAreas[parentID]);
-        if (areaDiff < 1.e-12)
+        int parentID    = parentGids[j];
+        double areaDiff = fabs( initAreas[parentID] - recoveredAreas[parentID] );
+        if( areaDiff < 1.e-12 )
         {
             recovered++;
-            recoveredCells.insert(parentCells[j]); // should we use a std::vector, that will be ordered already ?
+            recoveredCells.insert( parentCells[j] );  // should we use a std::vector, that will be ordered already ?
         }
         else
             notRecovered++;
@@ -1126,132 +1130,137 @@ ErrorCode IntxUtils::EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle 
     std::cout << "recovered initial cells: " << recovered << " vs:" << notRecovered << " not recovered \n";
     // initial edges that should be decomposable from intx edges
     Range recoverableEdges;
-    rval = mb->get_adjacencies(recoveredCells, 1, false, recoverableEdges,  Interface::UNION);MB_CHK_SET_ERR( rval, "can't get recoverable edges" );
+    rval = mb->get_adjacencies( recoveredCells, 1, false, recoverableEdges, Interface::UNION );MB_CHK_SET_ERR( rval, "can't get recoverable edges" );
 
     // now recover each edge, looking at intx polygons forming one of the adjacent cells, that is in initial recoverable set
     int recoveredEdges = 0;
-    int unrecovered = 0;
-    int identity_edges = 0; // edges that are formed by one intx edge, itself, the original
-    std::map<EntityHandle, std::vector<EntityHandle>> mapEdges;
-    for (Range::iterator eit=recoverableEdges.begin(); eit!=recoverableEdges.end(); eit++)
+    int unrecovered    = 0;
+    int identity_edges = 0;  // edges that are formed by one intx edge, itself, the original
+    std::map< EntityHandle, std::vector< EntityHandle > > mapEdges;
+    for( Range::iterator eit = recoverableEdges.begin(); eit != recoverableEdges.end(); eit++ )
     {
         EntityHandle initialEdge = *eit;
         // if this edge is among intxEdges, we are done
-        int index = intxEdges.index(initialEdge);
-        if (index>=0)
+        int index = intxEdges.index( initialEdge );
+        if( index >= 0 )
         {
-            mapEdges[initialEdge].push_back(initialEdge);
+            mapEdges[initialEdge].push_back( initialEdge );
             identity_edges++;
             recoveredEdges++;
-            continue; // no need to sweat it anymore
+            continue;  // no need to sweat it anymore
         }
         // get adjacent polygons; if there is an adj polygon in intx cells, we are done; if not, get one in the initial recoveredCells range
         Range initialAdjCells;
-        rval = mb-> get_adjacencies(&initialEdge, 1, 2, false, initialAdjCells, Interface::UNION);MB_CHK_SET_ERR( rval, "can't get adjacent initial cells" );
-        if (initialAdjCells.size()==0) MB_CHK_SET_ERR( MB_FAILURE, "no adjacent initial cells" );
+        rval = mb->get_adjacencies( &initialEdge, 1, 2, false, initialAdjCells, Interface::UNION );MB_CHK_SET_ERR( rval, "can't get adjacent initial cells" );
+        if( initialAdjCells.size() == 0 ) MB_CHK_SET_ERR( MB_FAILURE, "no adjacent initial cells" );
         // intersect with recoveredCells
-        Range adjRecoveredInitialCell = intersect(initialAdjCells, recoveredCells);
-        if(adjRecoveredInitialCell.size() == 0) MB_CHK_SET_ERR( MB_FAILURE, "no adjacent initial cells that are recovered" );
+        Range adjRecoveredInitialCell = intersect( initialAdjCells, recoveredCells );
+        if( adjRecoveredInitialCell.size() == 0 )
+            MB_CHK_SET_ERR( MB_FAILURE, "no adjacent initial cells that are recovered" );
         // get all edges adjacent to intersection polygons that form one of the recovered initial cell
-        EntityHandle recoveredCell = adjRecoveredInitialCell[0]; // first one
-        int nv = 0;
-        const EntityHandle * connCell;
-        rval = mb->get_connectivity(recoveredCell, connCell, nv);MB_CHK_SET_ERR( rval, "can't get connectivity of parent cell" );
+        EntityHandle recoveredCell = adjRecoveredInitialCell[0];  // first one
+        int nv                     = 0;
+        const EntityHandle* connCell;
+        rval = mb->get_connectivity( recoveredCell, connCell, nv );MB_CHK_SET_ERR( rval, "can't get connectivity of parent cell" );
         int cellGlobalId = 0;
-        rval = mb->tag_get_data(gidTag, &recoveredCell, 1, &cellGlobalId);MB_CHK_SET_ERR( rval, "can't get id of parent cell" );
+        rval             = mb->tag_get_data( gidTag, &recoveredCell, 1, &cellGlobalId );MB_CHK_SET_ERR( rval, "can't get id of parent cell" );
         // list of intx polygons in it:
-        std::vector<EntityHandle>  & listIntxCells = mapFromParentGIDToIntxCells[cellGlobalId];
-        std::vector<EntityHandle> candidateEdges;
-        rval = mb->get_adjacencies(&listIntxCells[0], listIntxCells.size(), 1, false, candidateEdges,  Interface::UNION);MB_CHK_SET_ERR( rval, "can't get adj edges" );
+        std::vector< EntityHandle >& listIntxCells = mapFromParentGIDToIntxCells[cellGlobalId];
+        std::vector< EntityHandle > candidateEdges;
+        rval =
+            mb->get_adjacencies( &listIntxCells[0], listIntxCells.size(), 1, false, candidateEdges, Interface::UNION );MB_CHK_SET_ERR( rval, "can't get adj edges" );
         // add all edges that have both vertices on the original edge
         CartVect verticesOriginal[2];
-        const EntityHandle *connEdge;
+        const EntityHandle* connEdge;
         int numVerts = 0;
-        rval = mb->get_connectivity(initialEdge, connEdge, numVerts);MB_CHK_SET_ERR( rval, "can't get connectivity of initial edge" );
+        rval         = mb->get_connectivity( initialEdge, connEdge, numVerts );MB_CHK_SET_ERR( rval, "can't get connectivity of initial edge" );
 
-        rval = mb->get_coords( connEdge, numVerts,  verticesOriginal[0].array() );MB_CHK_SET_ERR( rval, "can't get coordinates of vertices of initial edge" );
+        rval = mb->get_coords( connEdge, numVerts, verticesOriginal[0].array() );MB_CHK_SET_ERR( rval, "can't get coordinates of vertices of initial edge" );
         // get gnomonic plane for the start of the edge
         int gnomonicPlane = 0;
-        IntxUtils::decide_gnomonic_plane(verticesOriginal[0], gnomonicPlane);
-        double coords2D[6]; // coords in gnomonic plane, for interior point decision
-        rval = IntxUtils::gnomonic_projection(verticesOriginal[0], 1.0, gnomonicPlane, coords2D[0], coords2D[1] );MB_CHK_SET_ERR( rval, "can't get gnomonic coords" );
-        rval = IntxUtils::gnomonic_projection(verticesOriginal[1], 1.0, gnomonicPlane, coords2D[2], coords2D[3] );MB_CHK_SET_ERR( rval, "can't get gnomonic coords" );
+        IntxUtils::decide_gnomonic_plane( verticesOriginal[0], gnomonicPlane );
+        double coords2D[6];  // coords in gnomonic plane, for interior point decision
+        rval = IntxUtils::gnomonic_projection( verticesOriginal[0], 1.0, gnomonicPlane, coords2D[0], coords2D[1] );MB_CHK_SET_ERR( rval, "can't get gnomonic coords" );
+        rval = IntxUtils::gnomonic_projection( verticesOriginal[1], 1.0, gnomonicPlane, coords2D[2], coords2D[3] );MB_CHK_SET_ERR( rval, "can't get gnomonic coords" );
 
-        double edgeLength = angle_robust( verticesOriginal[0], verticesOriginal[1] ); // distance on sphere of radius 1 is the angle
+        double edgeLength =
+            angle_robust( verticesOriginal[0], verticesOriginal[1] );  // distance on sphere of radius 1 is the angle
         // loop now over candidateEdges
         double recoveredLength = 0.;
-        std::vector<EntityHandle>  VerticesSubEdges; // push all vertices here, so we can order the subedges later
-        for (size_t i=0; i< candidateEdges.size(); i++)
+        std::vector< EntityHandle > VerticesSubEdges;  // push all vertices here, so we can order the subedges later
+        for( size_t i = 0; i < candidateEdges.size(); i++ )
         {
             EntityHandle subedge = candidateEdges[i];
             // get its vertex coordinates:
-            const EntityHandle *connEdge2;
-            rval = mb->get_connectivity(subedge, connEdge2, numVerts);MB_CHK_SET_ERR( rval, "can't get connectivity of candidate edge" );
+            const EntityHandle* connEdge2;
+            rval = mb->get_connectivity( subedge, connEdge2, numVerts );MB_CHK_SET_ERR( rval, "can't get connectivity of candidate edge" );
             CartVect verticesSubEdge[2];
-            rval = mb->get_coords( connEdge2, numVerts,  verticesSubEdge[0].array() );MB_CHK_SET_ERR( rval, "can't get coordinates of vertices of initial edge" );
+            rval = mb->get_coords( connEdge2, numVerts, verticesSubEdge[0].array() );MB_CHK_SET_ERR( rval, "can't get coordinates of vertices of initial edge" );
             // decide if they are on the initial edge (form an angle)
             bool onEdge = true;
-            for (int j=0; j<2 && onEdge; j++)
+            for( int j = 0; j < 2 && onEdge; j++ )
             {
-                rval = IntxUtils::gnomonic_projection(verticesSubEdge[j], 1.0, gnomonicPlane, coords2D[4], coords2D[5] );MB_CHK_SET_ERR( rval, "can't get gnomonic coords of subedge" );
+                rval =
+                    IntxUtils::gnomonic_projection( verticesSubEdge[j], 1.0, gnomonicPlane, coords2D[4], coords2D[5] );MB_CHK_SET_ERR( rval, "can't get gnomonic coords of subedge" );
                 // area of triangle in gnomonic plane should be 0
-                double areaAbs = fabs(IntxUtils::area2D( &coords2D[0], &coords2D[2], &coords2D[4] ));
+                double areaAbs = fabs( IntxUtils::area2D( &coords2D[0], &coords2D[2], &coords2D[4] ) );
 
-                if (areaAbs > 1.e-14) onEdge = false;
+                if( areaAbs > 1.e-14 ) onEdge = false;
             }
-            if (onEdge)
+            if( onEdge )
             {
-                double subEdgeLen = angle_robust(verticesSubEdge[0], verticesSubEdge[1]);
+                double subEdgeLen = angle_robust( verticesSubEdge[0], verticesSubEdge[1] );
                 recoveredLength += subEdgeLen;
-                mapEdges[initialEdge].push_back(subedge);
-                VerticesSubEdges.push_back(connEdge2[0]);
-                VerticesSubEdges.push_back(connEdge2[1]);
+                mapEdges[initialEdge].push_back( subedge );
+                VerticesSubEdges.push_back( connEdge2[0] );
+                VerticesSubEdges.push_back( connEdge2[1] );
             }
         }
-        double fraction = recoveredLength/edgeLength;
-        rval = mb->tag_set_data(fractionTag, &initialEdge, 1, &fraction);MB_CHK_SET_ERR( rval, "can't set fraction on initial edge" );
-        double numSubEdge = double(mapEdges[initialEdge].size());
-        rval = mb->tag_set_data(subTag, &initialEdge, 1, &numSubEdge);MB_CHK_SET_ERR( rval, "can't set number of subedges on initial edge" );
+        double fraction = recoveredLength / edgeLength;
+        rval            = mb->tag_set_data( fractionTag, &initialEdge, 1, &fraction );MB_CHK_SET_ERR( rval, "can't set fraction on initial edge" );
+        double numSubEdge = double( mapEdges[initialEdge].size() );
+        rval              = mb->tag_set_data( subTag, &initialEdge, 1, &numSubEdge );MB_CHK_SET_ERR( rval, "can't set number of subedges on initial edge" );
         // now , reorder the subedges to create a chain along the original edge
         // if we cannot form a chain, it means we have a problem
         // order subedges on the original edge, and find out their orientation
         // set also the parent tag on the edge, either source or target parent
         // in some cases, the parents can be both
-        rval = IntxUtils::orderSubEdges(mapEdges[initialEdge], VerticesSubEdges, connEdge);
-        if ( fabs(edgeLength-recoveredLength) < 1.e-10 || rval == MB_SUCCESS)
+        rval = IntxUtils::orderSubEdges( mapEdges[initialEdge], VerticesSubEdges, connEdge );
+        if( fabs( edgeLength - recoveredLength ) < 1.e-10 || rval == MB_SUCCESS )
             recoveredEdges++;
         else
         {
-            mb->list_entity(initialEdge);
-            std::vector<EntityHandle> &listSubEdges = mapEdges[initialEdge];
-            double newCheckLength = 0;
+            mb->list_entity( initialEdge );
+            std::vector< EntityHandle >& listSubEdges = mapEdges[initialEdge];
+            double newCheckLength                     = 0;
             CartVect vertices[2];
-            const EntityHandle *conn2;
+            const EntityHandle* conn2;
             int numVerts2 = 0;
-            rval = mb->get_connectivity(initialEdge, conn2, numVerts2);MB_CHK_SET_ERR( rval, "can't get connectivity of initial edge " );
-            rval = mb->get_coords( conn2, numVerts2,  vertices[0].array() );MB_CHK_SET_ERR( rval, "can't get coordinates of vertices of initial edge" );
-            double length2 = angle_robust(vertices[0], vertices[1]);
-            std::cout << std::setprecision(14) ;
-            std::cout <<" initial edge:" << mb->id_from_handle(initialEdge) << " v: " << conn2[0] << ", " << conn2[1] << " len: "<< length2 << "\n";
-            for (size_t j=0; j<listSubEdges.size(); j++)
+            rval          = mb->get_connectivity( initialEdge, conn2, numVerts2 );MB_CHK_SET_ERR( rval, "can't get connectivity of initial edge " );
+            rval = mb->get_coords( conn2, numVerts2, vertices[0].array() );MB_CHK_SET_ERR( rval, "can't get coordinates of vertices of initial edge" );
+            double length2 = angle_robust( vertices[0], vertices[1] );
+            std::cout << std::setprecision( 14 );
+            std::cout << " initial edge:" << mb->id_from_handle( initialEdge ) << " v: " << conn2[0] << ", " << conn2[1]
+                      << " len: " << length2 << "\n";
+            for( size_t j = 0; j < listSubEdges.size(); j++ )
             {
                 EntityHandle subEdge = listSubEdges[j];
-                rval = mb->get_connectivity(subEdge, conn2, numVerts2);MB_CHK_SET_ERR( rval, "can't get connectivity of subedge " );
-                rval = mb->get_coords( conn2, numVerts2,  vertices[0].array() );MB_CHK_SET_ERR( rval, "can't get coordinates of vertices of subedge" );
-                length2 = angle_robust(vertices[0], vertices[1]);
+                rval                 = mb->get_connectivity( subEdge, conn2, numVerts2 );MB_CHK_SET_ERR( rval, "can't get connectivity of subedge " );
+                rval = mb->get_coords( conn2, numVerts2, vertices[0].array() );MB_CHK_SET_ERR( rval, "can't get coordinates of vertices of subedge" );
+                length2 = angle_robust( vertices[0], vertices[1] );
                 newCheckLength += length2;
-                std::cout <<"     sub edge:" << mb->id_from_handle(subEdge) << " v: " << conn2[0] << ", " << conn2[1] << " len: "<< length2 << "\n";
+                std::cout << "     sub edge:" << mb->id_from_handle( subEdge ) << " v: " << conn2[0] << ", " << conn2[1]
+                          << " len: " << length2 << "\n";
             }
-            std::cout << " edge length:" << edgeLength << " diff:" << edgeLength-recoveredLength << " fraction:" << fraction <<
-                    " subedges:" << numSubEdge << "\n";
+            std::cout << " edge length:" << edgeLength << " diff:" << edgeLength - recoveredLength
+                      << " fraction:" << fraction << " subedges:" << numSubEdge << "\n";
             unrecovered++;
-            std::cout << std::setprecision(7) ;
+            std::cout << std::setprecision( 7 );
         }
-
     }
 
-    std::cout << " recoveredEdges:"  << recoveredEdges << " identity edges:" << identity_edges <<  " unrecovered edges:" <<
-            unrecovered << "\n";
+    std::cout << " recoveredEdges:" << recoveredEdges << " identity edges:" << identity_edges
+              << " unrecovered edges:" << unrecovered << "\n";
     return MB_SUCCESS;
 }
 
@@ -1690,8 +1699,8 @@ double IntxAreaUtils::area_spherical_triangle_lHuiller( const double* ptA,
     {
         double area = area_spherical_triangle_GQ( ptA, ptB, ptC ) * sign;
 #ifdef VERBOSE
-        std::cout << " very obtuse angle, use TR to compute area " << " a1:" << a1 << " b1:" << b1 << " c1:" << c1
-                  << "\n";
+        std::cout << " very obtuse angle, use TR to compute area "
+                  << " a1:" << a1 << " b1:" << b1 << " c1:" << c1 << "\n";
         std::cout << " area with TR: " << area << "\n";
 #endif
         return area;

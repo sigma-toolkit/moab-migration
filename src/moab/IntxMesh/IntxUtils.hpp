@@ -82,7 +82,10 @@ class IntxUtils
     // point on a sphere is projected on plane decided by gnomonic center P, and u, v computed in a previous method
     // these points are in a list axis[3], P, u and v
 
-    static ErrorCode gnomonic_projection_generalized( const CartVect& pos, const CartVect axis[3], double& c1, double& c2 );
+    static ErrorCode gnomonic_projection_generalized( const CartVect& pos,
+                                                      const CartVect axis[3],
+                                                      double& c1,
+                                                      double& c2 );
 
     // given a mesh on a hemisphere, and a point P that defines the hemisphere, project the mesh
     // on a plane tangent at P (gnomonic plane at P)
@@ -114,7 +117,7 @@ class IntxUtils
     // all vertices in this projection will be on one hemisphere to the side of P
     // the orientation of u and v uniquely determine the gnomonic plane orientation, and u x v should be in OP direction
     // also, u and v are in plane, and perpendicular to each other
-    static ErrorCode gnomonic_projection_plane_at_point(CartVect P, CartVect& u, CartVect& v);
+    static ErrorCode gnomonic_projection_plane_at_point( CartVect P, CartVect& u, CartVect& v );
 
     static void transform_coordinates( double* avg_position, int projection_type );
     /*
@@ -228,8 +231,11 @@ class IntxUtils
 
     // compute edge decomposition after intersection
     static ErrorCode orderSubEdges(std::vector<EntityHandle> & subEdges, std::vector<EntityHandle> & VerticesSubEdges, const EntityHandle * connEdge);
+    static ErrorCode orderSubEdges( std::vector< EntityHandle >& subEdges,
+                                    std::vector< EntityHandle >& VerticesSubEdges,
+                                    const EntityHandle* connEdge );
 
-    static ErrorCode EdgeMap(Interface* mb, EntityHandle inputSet, EntityHandle intx_set, bool sourceMap);
+    static ErrorCode EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle intx_set, bool sourceMap );
 };
 
 class IntxAreaUtils

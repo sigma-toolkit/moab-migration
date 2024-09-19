@@ -37,13 +37,13 @@ int main( int argc, char* argv[] )
     EntityHandle outSet;
     rval = mb->create_meshset( MESHSET_SET, outSet );MB_CHK_ERR( rval );
     // get the coords of the first vertex entity handle
-    EntityHandle v1=1; // we know it must exist; we could get a specific one too :)
+    EntityHandle v1 = 1;  // we know it must exist; we could get a specific one too :)
 
     CartVect P;
-    rval = mb->get_coords(&v1, 1, P.array() );MB_CHK_ERR( rval );
+    rval = mb->get_coords( &v1, 1, P.array() );MB_CHK_ERR( rval );
 
     rval = IntxUtils::global_gnomonic_projection_general( mb, sf, P, outSet );MB_CHK_ERR( rval );
-    std::cout <<"writing output file " << fileout.c_str() << "\n";
+    std::cout << "writing output file " << fileout.c_str() << "\n";
     rval = mb->write_file( fileout.c_str(), 0, 0, &outSet, 1 );MB_CHK_ERR( rval );
 
     return 0;

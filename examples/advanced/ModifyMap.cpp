@@ -96,7 +96,7 @@ int main( int argc, char* argv[] )
     opts.parseCommandLine( argc, argv );
 
     // Open netcdf/exodus file to read/write
-    int fail = nc_open( inputfile1.c_str(), NC_NOWRITE, &ncFile1 );
+    int fail = nc_open( inputfile1.c_str(), NC_WRITE, &ncFile1 );
     if( NC_NOWRITE != fail )
     {
         ERR_NC( fail )

@@ -278,6 +278,8 @@ class TempestRemapper : public Remapper
 
     static const bool verbose = true;
 
+    bool source_renumbered, target_renumbered;
+
   private:
     moab::ErrorCode convert_overlap_mesh_sorted_by_source();
 
@@ -336,6 +338,8 @@ class TempestRemapper : public Remapper
     /* local to glboal and global to local ID maps */
     std::map< int, int > gid_to_lid_src, gid_to_lid_covsrc, gid_to_lid_tgt;
     std::map< int, int > lid_to_gid_src, lid_to_gid_covsrc, lid_to_gid_tgt;
+
+    std::map< int, int > ngid_to_ogid_src, ngid_to_ogid_tgt;
 
     IntxAreaUtils::AreaMethod m_area_method;
 

@@ -94,6 +94,9 @@ ErrorCode TempestRemapper::initialize( bool initialize_fsets )
     point_cloud_source = false;
     point_cloud_target = false;
 
+    source_renumbered = false;
+    target_renumbered = false;
+
     return MB_SUCCESS;
 }
 
@@ -701,16 +704,20 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
 
 moab::ErrorCode moab::TempestRemapper::renumber_entity_space( Remapper::IntersectionContext ctx )
 {
+    if( ctx != Remapper::SourceMesh && ctx != Remapper::TargetMesh )
+        return MB_SUCCESS;  // do nothing for overlap meshes or other contexts yet
+
     ErrorCode rval;
-    moab::EntityHandle& meshset = this->GetMeshSet( ctx );
+    moab::EntityHandle& meshset  = this->GetMeshSet( ctx );
     const moab::Range& mesh_ents = GetMeshEntities( ctx );
-    const moab::Range& mesh_vtxs = GetMeshVertices( ctx );
+    // const moab::Range& mesh_vtxs = GetMeshVertices( ctx );
 
     // get the current GLOBAL_ID tag data and copy it elsewhere
     moab::Tag gid = m_interface->globalId_tag();
-    std::vector< int > globIds( mesh_ents.size() + mesh_vtxs.size() );
+    // std::vector< int > globIds( mesh_ents.size() + mesh_vtxs.size() );
+    std::vector< int > globIds( mesh_ents.size() );
     rval = m_interface->tag_get_data( gid, mesh_ents, &globIds[0] );MB_CHK_ERR( rval );
-    rval = m_interface->tag_get_data( gid, mesh_vtxs, &globIds[mesh_ents.size()] );MB_CHK_ERR( rval );
+    // rval = m_interface->tag_get_data( gid, mesh_vtxs, &globIds[mesh_ents.size()] );MB_CHK_ERR( rval );
 
     const int negone = -1;
     // copy the current GLOBAL_ID tag data to tag with name "GLOBAL_ID_ORIGINAL"
@@ -718,7 +725,7 @@ moab::ErrorCode moab::TempestRemapper::renumber_entity_space( Remapper::Intersec
     rval = m_interface->tag_get_handle( "GLOBAL_ID_ORIGINAL", 1, MB_TYPE_INTEGER, gidDuplicate,
                                         MB_TAG_CREAT | MB_TAG_DENSE, &negone );MB_CHK_ERR( rval );
     rval = m_interface->tag_set_data( gidDuplicate, mesh_ents, &globIds[0] );MB_CHK_ERR( rval );
-    rval = m_interface->tag_set_data( gidDuplicate, mesh_vtxs, &globIds[mesh_ents.size()] );MB_CHK_ERR( rval );
+    // rval = m_interface->tag_set_data( gidDuplicate, mesh_vtxs, &globIds[mesh_ents.size()] );MB_CHK_ERR( rval );
 
 #ifdef MOAB_HAVE_MPI
     // now let us recompute the global ID for all entities
@@ -726,6 +733,29 @@ moab::ErrorCode moab::TempestRemapper::renumber_entity_space( Remapper::Intersec
 #else
     rval = assign_vertex_element_IDs( gidDuplicate, meshset, 2, 1 );MB_CHK_ERR( rval );
 #endif
+
+    // get back the newly assigned data references again
+    // std::vector< int > globIdsNew( mesh_ents.size() + mesh_vtxs.size() );
+    std::vector< int > globIdsNew( mesh_ents.size() );
+    rval = m_interface->tag_get_data( gid, mesh_ents, &globIdsNew[0] );MB_CHK_ERR( rval );
+    // rval = m_interface->tag_get_data( gid, mesh_vtxs, &globIds[mesh_ents.size()] );MB_CHK_ERR( rval );
+
+    // now generate the mapping from new to original numbering - only for elements?
+    std::map<int,int> new_to_old_gids;
+    for( size_t ient = 0; ient < mesh_ents.size(); ++ient )
+        new_to_old_gids[globIdsNew[ient]] = globIds[ient];
+
+    if( ctx == Remapper::SourceMesh )
+    {
+        source_renumbered = true;
+        ngid_to_ogid_src = new_to_old_gids;
+    }
+    else
+    {
+        target_renumbered = true;
+        ngid_to_ogid_tgt = new_to_old_gids;
+    }
+
     return MB_SUCCESS;
 }
 

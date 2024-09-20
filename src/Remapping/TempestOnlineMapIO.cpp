@@ -744,6 +744,17 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     ncMap.enable_var_par_access( varS, is_independent );
 #endif
 
+    // Now that we are ready to write the data to disk,
+    // let us perform the transformation in case we renumbered
+    // the entities
+    const bool source_renumbered = m_remapper->source_renumbered;
+    const bool target_renumbered = m_remapper->target_renumbered;
+    for( int innz = 0; innz < nS; ++innz )
+    {
+        if( target_renumbered ) vecRow[innz] = m_remapper->ngid_to_ogid_tgt[vecRow[innz]];
+        if( source_renumbered ) vecCol[innz] = m_remapper->ngid_to_ogid_src[vecCol[innz]];
+    }
+
     varRow->set_cur( (long)offbuf[2] );
     varRow->put( vecRow, nS );
 

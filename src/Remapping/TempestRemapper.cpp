@@ -699,6 +699,36 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     return MB_SUCCESS;
 }
 
+moab::ErrorCode moab::TempestRemapper::renumber_entity_space( Remapper::IntersectionContext ctx )
+{
+    ErrorCode rval;
+    moab::EntityHandle& meshset = this->GetMeshSet( ctx );
+    const moab::Range& mesh_ents = GetMeshEntities( ctx );
+    const moab::Range& mesh_vtxs = GetMeshVertices( ctx );
+
+    // get the current GLOBAL_ID tag data and copy it elsewhere
+    moab::Tag gid = m_interface->globalId_tag();
+    std::vector< int > globIds( mesh_ents.size() + mesh_vtxs.size() );
+    rval = m_interface->tag_get_data( gid, mesh_ents, &globIds[0] );MB_CHK_ERR( rval );
+    rval = m_interface->tag_get_data( gid, mesh_vtxs, &globIds[mesh_ents.size()] );MB_CHK_ERR( rval );
+
+    const int negone = -1;
+    // copy the current GLOBAL_ID tag data to tag with name "GLOBAL_ID_ORIGINAL"
+    moab::Tag gidDuplicate;
+    rval = m_interface->tag_get_handle( "GLOBAL_ID_ORIGINAL", 1, MB_TYPE_INTEGER, gidDuplicate,
+                                        MB_TAG_CREAT | MB_TAG_DENSE, &negone );MB_CHK_ERR( rval );
+    rval = m_interface->tag_set_data( gidDuplicate, mesh_ents, &globIds[0] );MB_CHK_ERR( rval );
+    rval = m_interface->tag_set_data( gidDuplicate, mesh_vtxs, &globIds[mesh_ents.size()] );MB_CHK_ERR( rval );
+
+#ifdef MOAB_HAVE_MPI
+    // now let us recompute the global ID for all entities
+    rval = m_pcomm->assign_global_ids( meshset, 2, 1, true, true, false );MB_CHK_ERR( rval );
+#else
+    rval = assign_vertex_element_IDs( gidDuplicate, meshset, 2, 1 );MB_CHK_ERR( rval );
+#endif
+    return MB_SUCCESS;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////
 
 bool IntPairComparator( const std::array< int, 3 >& a, const std::array< int, 3 >& b )
@@ -1048,6 +1078,7 @@ ErrorCode TempestRemapper::assign_vertex_element_IDs( Tag idtag,
     for( unsigned i = 0; i < entities.size(); ++i )
         gid[i] = idoffset++;
 
+    // this is serial - no need to worry about communication/exchange etc.
     rval = m_interface->tag_set_data( idtag, entities, &gid[0] );MB_CHK_ERR( rval );
 
     return moab::MB_SUCCESS;

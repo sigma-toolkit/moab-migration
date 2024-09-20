@@ -266,6 +266,10 @@ class TempestRemapper : public Remapper
     ///	</summary>
     ErrorCode GetIMasks( Remapper::IntersectionContext ctx, std::vector< int >& masks );
 
+    /// @brief  Renumber entities in the given context
+    /// @return
+    moab::ErrorCode renumber_entity_space( Remapper::IntersectionContext ctx );
+
   public:                        // public members
     const bool offlineWorkflow;  // check whether we are in an offline workflow context (mbtempest)
     bool meshValidate;           // Validate the mesh after loading from file

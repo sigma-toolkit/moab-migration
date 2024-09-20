@@ -182,6 +182,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
                                                            const std::map< std::string, std::string >& attrMap )
 {
     NcError error( NcError::silent_nonfatal );
+    ErrorCode rval;
 
 #ifdef MOAB_HAVE_NETCDFPAR
     bool is_independent = true;
@@ -221,14 +222,14 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     DataArray2D< double > dSourceVertexLon, dSourceVertexLat, dTargetVertexLon, dTargetVertexLat;
     if( m_srcDiscType == DiscretizationType_FV || m_srcDiscType == DiscretizationType_PCLOUD )
     {
+        vecSourceFaceArea.Allocate( m_meshInput->vecFaceArea.GetRows() );
+        for( unsigned i = 0; i < m_meshInput->vecFaceArea.GetRows(); ++i )
+            vecSourceFaceArea[i] = m_meshInput->vecFaceArea[i];
+
         this->InitializeCoordinatesFromMeshFV(
             *m_meshInput, dSourceCenterLon, dSourceCenterLat, dSourceVertexLon, dSourceVertexLat,
             ( this->m_remapper->m_source_type == moab::TempestRemapper::RLL ), /* fLatLon = false */
             m_remapper->max_source_edges );
-
-        vecSourceFaceArea.Allocate( m_meshInput->vecFaceArea.GetRows() );
-        for( unsigned i = 0; i < m_meshInput->vecFaceArea.GetRows(); ++i )
-            vecSourceFaceArea[i] = m_meshInput->vecFaceArea[i];
     }
     else
     {
@@ -240,27 +241,24 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
         GenerateMetaData( *m_meshInput, m_nDofsPEl_Src, false /* fBubble */, dataGLLNodesSrc, dataGLLJacobianSrc );
 
         if( m_srcDiscType == DiscretizationType_CGLL )
-        {
             GenerateUniqueJacobian( dataGLLNodesSrc, dataGLLJacobianSrc, vecSourceFaceArea );
-        }
         else
-        {
             GenerateDiscontinuousJacobian( dataGLLJacobianSrc, vecSourceFaceArea );
-        }
     }
 
     if( m_destDiscType == DiscretizationType_FV || m_destDiscType == DiscretizationType_PCLOUD )
     {
+        vecTargetFaceArea.Allocate( m_meshOutput->vecFaceArea.GetRows() );
+        for( unsigned i = 0; i < m_meshOutput->vecFaceArea.GetRows(); ++i )
+            vecTargetFaceArea[i] = m_meshOutput->vecFaceArea[i];
+
+        printf( "Found vecTargetFaceArea values: %2.14f %2.14f %2.14f %2.14f %2.14f\n", vecTargetFaceArea[0], vecTargetFaceArea[1],
+                vecTargetFaceArea[2], vecTargetFaceArea[3], vecTargetFaceArea[4] );
+
         this->InitializeCoordinatesFromMeshFV(
             *m_meshOutput, dTargetCenterLon, dTargetCenterLat, dTargetVertexLon, dTargetVertexLat,
             ( this->m_remapper->m_target_type == moab::TempestRemapper::RLL ), /* fLatLon = false */
             m_remapper->max_target_edges );
-
-        vecTargetFaceArea.Allocate( m_meshOutput->vecFaceArea.GetRows() );
-        for( unsigned i = 0; i < m_meshOutput->vecFaceArea.GetRows(); ++i )
-        {
-            vecTargetFaceArea[i] = m_meshOutput->vecFaceArea[i];
-        }
     }
     else
     {
@@ -272,13 +270,9 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
         GenerateMetaData( *m_meshOutput, m_nDofsPEl_Dest, false /* fBubble */, dataGLLNodesDest, dataGLLJacobianDest );
 
         if( m_destDiscType == DiscretizationType_CGLL )
-        {
             GenerateUniqueJacobian( dataGLLNodesDest, dataGLLJacobianDest, vecTargetFaceArea );
-        }
         else
-        {
             GenerateDiscontinuousJacobian( dataGLLJacobianDest, vecTargetFaceArea );
-        }
     }
 
     // Map dimensions
@@ -286,7 +280,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     unsigned nB = ( vecTargetFaceArea.GetRows() );
 
     std::vector< int > masksA, masksB;
-    ErrorCode rval = m_remapper->GetIMasks( moab::Remapper::SourceMesh, masksA );MB_CHK_SET_ERR( rval, "Trouble getting masks for source" );
+    rval = m_remapper->GetIMasks( moab::Remapper::SourceMesh, masksA );MB_CHK_SET_ERR( rval, "Trouble getting masks for source" );
     rval = m_remapper->GetIMasks( moab::Remapper::TargetMesh, masksB );MB_CHK_SET_ERR( rval, "Trouble getting masks for target" );
 
     // Number of nodes per Face
@@ -350,7 +344,6 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
             _EXCEPTION1( "Unable to arrange source data %d ", nA );
         }
         // rearrange target data: (nB)
-        //
         ierr = rearrange_arrays_by_dofs( row_gdofmap, vecTargetFaceArea, dTargetCenterLon, dTargetCenterLat,
                                          dTargetVertexLon, dTargetVertexLat, masksB, nB, nTargetNodesPerFace,
                                          max_row_dof );  // now nA will be close to maxdof/size
@@ -597,23 +590,20 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     tlValCol.initialize( 3, 0, 0, numr, nS );  // to proc(col),  global row / col, value
     tlValRow.enableWriteAccess();
     tlValCol.enableWriteAccess();
-    /*
-     *
-             dFracA[ col ] += val / vecSourceFaceArea[ col ] * vecTargetFaceArea[ row ];
-             dFracB[ row ] += val ;
-     */
-    int offset = 0;
+
 #if defined( MOAB_HAVE_MPI )
     int nAbase = ( max_col_dof + 1 ) / size;  // it is nA, except last rank ( == size - 1 )
     int nBbase = ( max_row_dof + 1 ) / size;  // it is nB, except last rank ( == size - 1 )
 #endif
+
+    int offset = 0;
     for( int i = 0; i < m_weightMatrix.outerSize(); ++i )
     {
         for( WeightMatrix::InnerIterator it( m_weightMatrix, i ); it; ++it )
         {
-            vecRow[offset] = 1 + this->GetRowGlobalDoF( it.row() );  // row index
-            vecCol[offset] = 1 + this->GetColGlobalDoF( it.col() );  // col index
-            vecS[offset]   = it.value();                             // value
+            vecRow[offset]             = 1 + this->GetRowGlobalDoF( it.row() );  // row index
+            vecCol[offset]             = 1 + this->GetColGlobalDoF( it.col() );  // col index
+            vecS[offset]               = it.value();                             // value
 
 #if defined( MOAB_HAVE_MPI )
             {
@@ -639,7 +629,9 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
             offset++;
         }
     }
+
 #if defined( MOAB_HAVE_MPI )
+
     // need to send values for their row and col processors, to compute fractions there
     // now do the heavy communication
     ( m_pcomm->proc_config().crystal_router() )->gs_transfer( 1, tlValCol, 0 );
@@ -659,15 +651,16 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
         assert( nB - localIndexRow > 0 );
         dFracB[localIndexRow] += wgt;
     }
-    // to compute dFracA we need vecTargetFaceArea[ row ]; we know the row, and we can get the proc we need it from
 
+    // to compute dFracA we need vecTargetFaceArea[ row ]; we know the row, and we can get the proc we need it from
     std::set< int > neededRows;
     for( unsigned i = 0; i < tlValCol.get_n(); i++ )
     {
         int rRowInd = tlValCol.vi_wr[3 * i + 1];
-        neededRows.insert( rRowInd );
         // we need vecTargetFaceAreaGlobal[ rRowInd ]; this exists on proc procRow
+        neededRows.insert( rRowInd );
     }
+
     moab::TupleList tgtAreaReq;
     tgtAreaReq.initialize( 2, 0, 0, 0, neededRows.size() );
     tgtAreaReq.enableWriteAccess();
@@ -729,7 +722,15 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
             dFracA[localColInd] += val / vecSourceFaceArea[localColInd] * areaRow;
         }
     }
-
+#else
+    for( unsigned j = 0; j < m_remapper->m_overlap_entities.size(); j++ )
+    {
+        const int row      = m_remapper->m_overlap->vecTargetFaceIx[j];
+        const int col      = m_remapper->m_overlap->vecSourceFaceIx[j];
+        const double coeff = m_weightMatrix.coeff( row, col );
+        dFracA[col] += coeff * vecTargetFaceArea[row] / vecSourceFaceArea[col];
+        dFracB[row] += coeff;
+    }
 #endif
     // Load in data
     NcDim* dimNS = ncMap.add_dim( "n_s", globuf[2] );

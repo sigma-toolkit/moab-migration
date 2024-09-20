@@ -1172,6 +1172,9 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
 
         if( ctx.computeWeights )
         {
+            rval = remapper.renumber_entity_space( moab::Remapper::SourceMesh );MB_CHK_ERR( rval );
+            rval = remapper.renumber_entity_space( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
+
             ctx.timer_push( "convert MOAB meshes to TempestRemap meshes in memory" );
             // convert MOAB representation to TempestRemap's Mesh for source
             rval = remapper.ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( rval );

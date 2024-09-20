@@ -552,10 +552,6 @@ inline int moab::TempestOnlineMap::GetRowGlobalDoF( int localRowID ) const
     return row_gdofmap[localRowID];
 }
 
-inline int moab::TempestOnlineMap::GetIndexOfRowGlobalDoF( int globalRowDoF ) const /* 0 based */
-{
-    return globalRowDoF + 1;
-}
 ///////////////////////////////////////////////////////////////////////////////
 
 inline int moab::TempestOnlineMap::GetColGlobalDoF( int localColID ) const
@@ -563,10 +559,6 @@ inline int moab::TempestOnlineMap::GetColGlobalDoF( int localColID ) const
     return col_gdofmap[localColID];
 }
 
-inline int moab::TempestOnlineMap::GetIndexOfColGlobalDoF( int globalColDoF ) const /* 0 based */
-{
-    return globalColDoF + 1;  // temporary
-}
 ///////////////////////////////////////////////////////////////////////////////
 
 inline int moab::TempestOnlineMap::GetSourceNDofsPerElement()

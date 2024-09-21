@@ -464,7 +464,7 @@ if(SKBUILD OR ENABLE_PYMOAB)
     # Scikit-build installs MOAB to ${SKBUILD_PLATLIB_DIR}/pymoab/core
     # So, set bin directory to root environment (install prefix/bin)
     set(CMAKE_INSTALL_BINDIR ${SKBUILD_SCRIPTS_DIR})
-    set(SKBUILD_LIB_DIR ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/pymoab/core/${CMAKE_INSTALL_LIBDIR})
+    set(SKBUILD_LIB_DIR pymoab/core/${CMAKE_INSTALL_LIBDIR})
 
     # Auditwheel and Delocate need this when repairing the wheel
     # Since MOAB libs are installed in the pymoab/core subdirectory

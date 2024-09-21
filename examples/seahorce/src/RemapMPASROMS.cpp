@@ -47,6 +47,8 @@
 #include "ComputeMBA.hpp"
 // #include "ComputeRBF.hpp"
 
+#include "moab/IntxMesh/IntxUtils.hpp"
+
 #ifdef USE_GMLS
 #include "ComputeGMLS.hpp"
 #endif
@@ -199,7 +201,7 @@ int main( int argc, char** argv )
                                                    << " vertices." );
         }
 
-// #define COMPUTE_MAPS
+#define COMPUTE_MAPS
 #ifdef COMPUTE_MAPS
         if( context.computeTRMaps )
         {
@@ -579,6 +581,7 @@ int main( int argc, char** argv )
                 std::vector< double > src_xyz( 3 * mpassize ), dst_xyz( 3 * romssize );
                 runchk( mbi->get_coords( mpas_elems.data(), mpas_elems.size(), src_xyz.data() ) );
                 runchk( mbi->get_coords( roms_elems.data(), roms_elems.size(), dst_xyz.data() ) );
+                IntxAreaUtils areaAdaptor (IntxAreaUtils::GaussQuadrature);
 
                 context.timer_push( "Compute 3D projection: 2Dx1D algorithm" );
 #pragma omp parallel for shared( tgtsrc_data, weights, src_xyz, dst_xyz )
@@ -587,6 +590,10 @@ int main( int argc, char** argv )
                     std::vector< double > src_twod( mpassize ), dst_twod( romssize );
                     std::cout << "Computing projection for MPAS level: " + std::to_string( ii ) + "\n";
                     unsigned offsetr = romssize * ii;
+                    std::vector< double > mpas_velocity_data( (ii ? 0 : mpassize * 2) );
+                    std::vector< double > mpas_areas( (ii ? 0 : mpassize ) );
+                    std::vector< double > roms_velocity_data( (ii ? 0 : romssize * 2) );
+                    std::vector< double > roms_areas( (ii ? 0 : romssize ) );
                     for( int iv = 0; iv < nvars; ++iv )
                     {
                         // ensure that the data retains the last active cell data
@@ -621,12 +628,12 @@ int main( int argc, char** argv )
 
                             if( context.useCAAS )
                                 ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap,
-                                                   context.field_methods["Bathymetry"].second /*nPin*/, dataInDouble,
+                                                   context.field_methods[roms_tagnames[iv]].second /*nPin*/, dataInDouble,
                                                    dataOutDouble, true /*useCAASLocal*/ );
                         }
                         else
                         {
-                            std::vector< double > src_tdata( mpassize );
+                            //std::vector< double > src_tdata( mpassize );
                             context.ComputeFieldProjectionsWithData( 2, mpas_ele_tagnames[iv], roms_tagnames[iv],
                                                                      src_xyz, dst_xyz, false, 0.0, src_twod, dst_twod );
 
@@ -636,6 +643,13 @@ int main( int argc, char** argv )
                             // if ( context.computeMBAInterpolant )
                         }
 
+                        if (ii == 0 && iv > 1)
+                        {
+                            std::copy( src_twod.data(), src_twod.data() + mpassize, 
+                                       mpas_velocity_data.begin() + (iv-2)*mpassize );
+                            std::copy( tgtsrc_data.data() + offsetr + tsvaroffset * iv, tgtsrc_data.data() + offsetr + tsvaroffset * iv + romssize, 
+                                       roms_velocity_data.begin() + (iv-2)*romssize );
+                        }
                         // Example usage of loop over variables
                         //  for( int iv = 0; iv < nvars; ++iv )
                         //     {
@@ -659,6 +673,37 @@ int main( int argc, char** argv )
                         //         }
                         //         context.timer_pop();
                         //     }
+                    }
+
+                    if (ii == 0) // first level, compute the energy metric
+                    {
+
+                      // KE = 0.5 * rho0 * speed**2
+                      // compute the kinetic energy
+                      double KE_mpas = 0.0, KE_roms = 0.0;
+
+                      for(int iter=0; iter < mpassize; ++iter)
+                      {
+                        const EntityHandle elem = mpas_elems[iter];
+                        // Get the areas of the mesh elements
+                        const double area = areaAdaptor.area_spherical_element(mbi, elem, 1.0);
+                        KE_mpas += area * ( std::pow(mpas_velocity_data[iter], 2.0) + std::pow(mpas_velocity_data[iter+mpassize], 2.0) );
+                      }
+                      // KE_mpas /= mpassize;
+                      for(int iter=0; iter < romssize; ++iter)
+                      {
+                        const EntityHandle elem = roms_elems[iter];
+                        // Get the areas of the mesh elements
+                        const double area = areaAdaptor.area_spherical_element(mbi, elem, 1.0);
+                        KE_roms += area * ( std::pow(roms_velocity_data[iter], 2.0) + std::pow(roms_velocity_data[iter+romssize], 2.0) );
+                      }
+                      // KE_roms /= romssize;
+
+                      std::cout << "MPAS Kinetic energy estimate for top surface = " << KE_mpas << std::endl;
+                      std::cout << "ROMS Kinetic energy estimate for top surface = " << KE_roms << std::endl;
+
+                      exit(1);
+
                     }
                 }
 

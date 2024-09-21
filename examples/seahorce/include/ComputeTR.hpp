@@ -180,22 +180,24 @@ moab::ErrorCode ComputeTempestRemapWeights( RuntimeContext& context,
     context.meshInput.ConstructEdgeMap();
     context.meshOutput.ConstructEdgeMap();
 
-    context.meshOverlap.Read( "mesh_intersection.g" );
+#define COMPUTE_INTERSECTIONS
+#ifdef COMPUTE_INTERSECTIONS
 
-    int ierr = 0;
     // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm
-    // if( context.proc_id == 0 )
-    //     std::cout << "Setup and compute mesh intersections between source (MPAS) and target (ROMS) meshes" << std::endl;
-    // // err = remapper.ComputeOverlapMesh( true, false );MB_CHK_ERR( err );
-    // constexpr bool concaveMeshA = false, concaveMeshB = false, allowNoOverlap = true, verbose = false;
-    // int ierr =
-    //     GenerateOverlapWithMeshes( context.meshOutput, context.meshInput, context.meshOverlap, "" /*outFilename*/,
-    //                                "Netcdf4", "exact", concaveMeshA, concaveMeshB, allowNoOverlap, verbose );
-    // if( ierr )
-    // {
-    //     MB_CHK_SET_ERR( moab::MB_FAILURE, "TempestRemap: Can't compute the intersection of meshes on the sphere" );
-    // }
-
+    if( context.proc_id == 0 )
+        std::cout << "Setup and compute mesh intersections between source (MPAS) and target (ROMS) meshes" << std::endl;
+    // err = remapper.ComputeOverlapMesh( true, false );MB_CHK_ERR( err );
+    constexpr bool concaveMeshA = false, concaveMeshB = false, allowNoOverlap = true, verbose = false;
+    int ierr =
+        GenerateOverlapWithMeshes( context.meshOutput, context.meshInput, context.meshOverlap, "mesh_intersection.g" /*outFilename*/,
+                                   "Netcdf4", "exact", concaveMeshA, concaveMeshB, allowNoOverlap, verbose );
+    if( ierr )
+    {
+        MB_CHK_SET_ERR( moab::MB_FAILURE, "TempestRemap: Can't compute the intersection of meshes on the sphere" );
+    }
+#else
+    context.meshOverlap.Read( "mesh_intersection.g" );
+#endif
     if( context.proc_id == 0 ) std::cout << "\nSetup computation of weights" << std::endl;
 
     // Call to generate the remapping weights with the tempest meshes

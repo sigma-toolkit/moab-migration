@@ -252,9 +252,6 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
         for( unsigned i = 0; i < m_meshOutput->vecFaceArea.GetRows(); ++i )
             vecTargetFaceArea[i] = m_meshOutput->vecFaceArea[i];
 
-        printf( "Found vecTargetFaceArea values: %2.14f %2.14f %2.14f %2.14f %2.14f\n", vecTargetFaceArea[0], vecTargetFaceArea[1],
-                vecTargetFaceArea[2], vecTargetFaceArea[3], vecTargetFaceArea[4] );
-
         this->InitializeCoordinatesFromMeshFV(
             *m_meshOutput, dTargetCenterLon, dTargetCenterLat, dTargetVertexLon, dTargetVertexLat,
             ( this->m_remapper->m_target_type == moab::TempestRemapper::RLL ), /* fLatLon = false */

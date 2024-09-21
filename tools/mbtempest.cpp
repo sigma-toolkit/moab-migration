@@ -1021,8 +1021,8 @@ int main( int argc, char* argv[] )
                 moab::EntityHandle meshset_source = remapper.GetMeshSet( moab::Remapper::CoveringMesh );
                 moab::EntityHandle meshset_target = remapper.GetMeshSet( moab::Remapper::TargetMesh );
                 rval =
-                    compute_mba_set< 2 >( mbCore, remapper, meshset_source, meshset_target, srcAnalyticalFunction,
-                                          "ProjectedSolnTgtMBA", tgtProjectedFunctionMBA, true /* bool normalize */ );MB_CHK_ERR( rval );
+                    compute_mba_set< 3 >( mbCore, remapper, meshset_source, meshset_target, srcAnalyticalFunction,
+                                          "ProjectedSolnTgtMBA", tgtProjectedFunctionMBA, false /* bool normalize */ );MB_CHK_ERR( rval );
 
                 std::map< std::string, double > errMetricsMBA;
                 rval = weightMap->ComputeMetrics( moab::Remapper::TargetMesh, tgtAnalyticalFunction,

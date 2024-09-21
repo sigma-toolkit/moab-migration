@@ -709,8 +709,10 @@ moab::ErrorCode moab::TempestRemapper::renumber_entity_space( Remapper::Intersec
 
     ErrorCode rval;
     moab::EntityHandle& meshset  = this->GetMeshSet( ctx );
-    const moab::Range& mesh_ents = GetMeshEntities( ctx );
+    // const moab::Range& mesh_ents = GetMeshEntities( ctx );
     // const moab::Range& mesh_vtxs = GetMeshVertices( ctx );
+    moab::Range mesh_ents;
+    rval = m_interface->get_entities_by_dimension( meshset, 2, mesh_ents );MB_CHK_ERR( rval );
 
     // get the current GLOBAL_ID tag data and copy it elsewhere
     moab::Tag gid = m_interface->globalId_tag();

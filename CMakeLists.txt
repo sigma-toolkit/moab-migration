@@ -1,4 +1,4 @@
-cmake_minimum_required( VERSION 3.10 )
+cmake_minimum_required( VERSION 3.5 )
 SET(PACKAGE_NAME "MOAB")
 SET(PACKAGE_VERSION "5.5.1")
 

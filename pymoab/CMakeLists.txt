@@ -38,6 +38,9 @@ foreach(CYTHON_FILE ${CYTHON_FILES})
         WITH_SOABI
     )
 
+    # Add the macro definition for the specific target
+    target_compile_definitions(${TARGET_NAME} PRIVATE NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION)
+
     # Add the MOAB library as a dependency
     add_dependencies(${TARGET_NAME} MOAB)
 
@@ -45,7 +48,7 @@ foreach(CYTHON_FILE ${CYTHON_FILES})
     target_link_libraries(${TARGET_NAME} PRIVATE MOAB)
 
     # Set the install RPATH
-    set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH "${RPATH}/core/${CMAKE_INSTALL_LIBDIR}")
+    set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH "${PYMOAB_PYTHON_MODULE_RPATH}")
 
     # Install the target in the pymoab directory
     install(TARGETS ${TARGET_NAME} DESTINATION ../.)

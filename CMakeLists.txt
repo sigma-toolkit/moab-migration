@@ -465,14 +465,26 @@ if(SKBUILD OR ENABLE_PYMOAB)
     # So, set bin directory to root environment (install prefix/bin)
     set(CMAKE_INSTALL_BINDIR ${SKBUILD_SCRIPTS_DIR})
     set(SKBUILD_LIB_DIR ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/pymoab/core/${CMAKE_INSTALL_LIBDIR})
+
+    # Auditwheel and Delocate need this when repairing the wheel
+    # Since MOAB libs are installed in the pymoab/core subdirectory
+    # Auditwheel and Delocate need this to find the MOAB libs for pymoab.data
+    # It's a bit of a hack, but it works
+    set(SKBUILD_REPAIR_WHEEL_PATCH pymoab/core/${CMAKE_INSTALL_LIBDIR})
     if(APPLE)
-      set(RPATH "@loader_path")
+      set(PYMOAB_LIBRARY_RPATH "@loader_path")
+      set(PYMOAB_PYTHON_MODULE_RPATH "@loader_path/core/${CMAKE_INSTALL_LIBDIR}")
+      set(PYMOAB_BINARY_RPATH "@loader_path/../${SKBUILD_LIB_DIR};@loader_path/${SKBUILD_REPAIR_WHEEL_PATCH}")
     elseif(UNIX)
-      set(RPATH "$ORIGIN")
+      set(PYMOAB_LIBRARY_RPATH "$ORIGIN")
+      set(PYMOAB_PYTHON_MODULE_RPATH "$ORIGIN/core/${CMAKE_INSTALL_LIBDIR}")
+      set(PYMOAB_BINARY_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR};$ORIGIN/../${SKBUILD_REPAIR_WHEEL_PATCH};$ORIGIN/../../${SKBUILD_REPAIR_WHEEL_PATCH}")
     else()
-      set(RPATH OFF) # Windows
+      set(PYMOAB_LIBRARY_RPATH OFF)
+      set(PYMOAB_PYTHON_MODULE_RPATH OFF)
+      set(PYMOAB_BINARY_RPATH OFF)
     endif()
-    add_subdirectory( pymoab )
+    add_subdirectory(pymoab)
   else()
     # Get a list of all Python files in the pymoab directory
     file(GLOB PY_FILES "${CMAKE_SOURCE_DIR}/pymoab/*.py")

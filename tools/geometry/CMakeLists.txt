@@ -27,7 +27,7 @@ if ( MOAB_HAVE_CGM )
 
     if(SKBUILD)
       # Set the install RPATH
-      set_target_properties(cgm2moab PROPERTIES INSTALL_RPATH "${RPATH}/../${SKBUILD_LIB_DIR}")
+      set_target_properties(cgm2moab PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
     endif()
     install(
       TARGETS cgm2moab

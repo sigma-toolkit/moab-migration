@@ -103,7 +103,7 @@ Detailed API documentation and user/development guides are available for the fol
 - Please ensure you have Python3 installed locally.
 - Run `python3 -m pip install .` in the top source directory to install MOAB in your Python environment.
 - If you would like to override the compiler used by default, use the following methods to override:
-  - Add environment variable `CMAKE_ARGS="-DCMAKE_C_COMPILER=mpicc -DCMAKE_CXX_COMPILER=mpicxx -DCMAKE_Fortran_COMPILER=mpif90"`, space separated, before running pip.
+  - Add environment variable `SKBUILD_CMAKE_ARGS="-DCMAKE_C_COMPILER=mpicc;-DCMAKE_CXX_COMPILER=mpicxx;-DCMAKE_Fortran_COMPILER=mpif90"`, separated by semicolon, before running pip.
   - By directly passing the compiler command, use `pip install . -C/--config-settings=cmake.args=-DSOME_DEFINE=ON;-DOTHER=OFF`
 
 There are many other ways available to configure the build, please refer to the [Scikit Build Core documentation](https://scikit-build-core.readthedocs.io/) for more details.

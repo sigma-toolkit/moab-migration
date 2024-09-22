@@ -299,24 +299,6 @@ add_library(
   ${MDHF_OBJ}
   )
 
-if(SKBUILD)
-  # Set the rpath
-  if(WIN32)
-    # Windows has no rpath support :(
-    # So, make a link to the Scripts directory and the pymoab directory
-    # TODO: NEEDS TESTING
-    install(CODE
-      "execute_process(
-        COMMAND
-          mklink /D \"${SKBUILD_PLATLIB_DIR}/pymoab/core/${CMAKE_INSTALL_LIBDIR}/libMOAB${CMAKE_SHARED_LIBRARY_SUFFIX}\" \"${SKBUILD_SCRIPTS_DIR}/libMOAB${CMAKE_SHARED_LIBRARY_SUFFIX}\")
-        COMMAND
-          mklink /D \"${SKBUILD_PLATLIB_DIR}/pymoab/core/${CMAKE_INSTALL_LIBDIR}/libMOAB${CMAKE_SHARED_LIBRARY_SUFFIX}\" \"${SKBUILD_PLATLIB_DIR}/pymoab/libMOAB${CMAKE_SHARED_LIBRARY_SUFFIX}\")
-        ")
-  else()
-    set_target_properties(MOAB PROPERTIES INSTALL_RPATH "${RPATH}")
-  endif()
-endif()
-
 include(CMakeLibraryFuncs)
 SciFixupLibrary(MOAB MOAB MOAB)
 
@@ -326,14 +308,24 @@ target_include_directories(MOAB
 
 generate_export_header(MOAB)
 
-set_target_properties(
-  MOAB
-  PROPERTIES
-  COMPILE_FLAGS "-DIS_BUILDING_MB ${MOAB_DEFINES}"
-  CMAKE_SHARED_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}"
-  VERSION ${MOAB_VERSION}
-  SOVERSION ${MOAB_VERSION_MAJOR}
-  )
+if(SKBUILD)
+  set_target_properties(
+    MOAB
+    PROPERTIES
+    COMPILE_FLAGS "-DIS_BUILDING_MB ${MOAB_DEFINES}"
+    CMAKE_SHARED_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}"
+    INSTALL_RPATH "${PYMOAB_LIBRARY_RPATH}"
+    )
+else()
+  set_target_properties(
+    MOAB
+    PROPERTIES
+    COMPILE_FLAGS "-DIS_BUILDING_MB ${MOAB_DEFINES}"
+    CMAKE_SHARED_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}"
+    VERSION ${MOAB_VERSION}
+    SOVERSION ${MOAB_VERSION_MAJOR}
+    )
+endif()
 
 message(STATUS "MOAB_LIBS = ${MOAB_LIBS}.")
 set(MOAB_ALL_LIBS ${MOAB_DEP_LIBRARIES} ${MOAB_LIBS}) 

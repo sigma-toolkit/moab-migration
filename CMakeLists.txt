@@ -126,6 +126,7 @@ option ( MOAB_FORCE_64_BIT_HANDLES "Force MBEntityHandle to be 64 bits (uint64_t
 option ( MOAB_FORCE_32_BIT_HANDLES "Force MBEntityHandle to be 32 bits (uint32_t)" OFF )
 option ( ENABLE_PYMOAB       "Build python interface to MOAB?" OFF )
 option ( ENABLE_BLASLAPACK   "Should require BLAS/LAPACK?" ON )
+option ( ENABLE_EIGEN3       "Should require Eigen3 header-only library?" OFF )
 option ( ENABLE_FORTRAN      "Should enable FORTRAN?" ON )
 option ( ENABLE_TEMPESTREMAP "Should enable TempestRemap dependency?" OFF )
 
@@ -228,6 +229,7 @@ set (MOAB_HAVE_BLAS OFF CACHE INTERNAL "Configured MOAB with BLAS library suppor
 set (MOAB_HAVE_LAPACK OFF CACHE INTERNAL "Configured MOAB with LAPACK library support." )
 
 if ( ENABLE_BLASLAPACK  )
+
   # Find BLAS
   FIND_PACKAGE(BLAS REQUIRED)
   if (BLAS_FOUND)
@@ -241,6 +243,7 @@ if ( ENABLE_BLASLAPACK  )
   FIND_PACKAGE(LAPACK REQUIRED)
   if (LAPACK_FOUND)
     set(MOAB_HAVE_LAPACK ON)
+    set(ENABLE_FORTRAN ON)
   endif(LAPACK_FOUND)
 
   set_package_properties(LAPACK PROPERTIES
@@ -249,9 +252,8 @@ if ( ENABLE_BLASLAPACK  )
 
 endif (ENABLE_BLASLAPACK)
 
-if ( LAPACK_FOUND )
-
-  SET (ENABLE_FORTRAN ON)
+set (MOAB_HAVE_EIGEN3 OFF CACHE INTERNAL "Configured MOAB with Eigen3 library support." )
+if ( ENABLE_EIGEN3 )
 
   # Eigen3 is optional if LAPACK has been found
   FIND_PACKAGE(Eigen3 OPTIONAL_COMPONENTS)
@@ -260,25 +262,16 @@ if ( LAPACK_FOUND )
                        TYPE RECOMMENDED
                        PURPOSE "Eigen3 headers as supplement to BLAS/LAPACK implementations")
 
-else ( LAPACK_FOUND )
+  if ( EIGEN3_FOUND )
+    INCLUDE_DIRECTORIES ( "${EIGEN3_DIR}" )
+    SET(MOAB_DEFINES "${MOAB_DEFINES} ${EIGEN3_INCLUDES}")
+    SET(MOAB_HAVE_EIGEN3 ON)
+  endif (EIGEN3_FOUND)
 
-  # Find Eigen3 is required if LAPACK is not found (or requested)
-  FIND_PACKAGE(Eigen3 REQUIRED)
+endif ( ENABLE_EIGEN3 )
 
-  set_package_properties(Eigen3 PROPERTIES
-                        TYPE REQUIRED
-                       PURPOSE "Eigen3 headers as replacement for BLAS/LAPACK implementations")
 
-endif ( LAPACK_FOUND )
-
-set (MOAB_HAVE_EIGEN3 OFF CACHE INTERNAL "Configured MOAB with Eigen3 library support." )
-if ( EIGEN3_FOUND )
-  INCLUDE_DIRECTORIES ( "${EIGEN3_DIR}" )
-  SET(MOAB_DEFINES "${MOAB_DEFINES} ${EIGEN3_INCLUDES}")
-  SET(MOAB_HAVE_EIGEN3 ON)
-endif (EIGEN3_FOUND)
-
-if (ENABLE_FORTRAN)
+if ( ENABLE_FORTRAN )
   enable_language(Fortran)
 
   # Include CMake's Fortran mangling evaluation macros
@@ -300,7 +293,7 @@ if (ENABLE_FORTRAN)
   set(MOAB_F77_FUNC_ "${FortranCInterface_GLOBAL__PREFIX} ${FC_CASE} ${FortranCInterface_GLOBAL__SUFFIX}")
   set(MOAB_FC_FUNC   "${FortranCInterface_GLOBAL_PREFIX} ${FC_CASE} ${FortranCInterface_GLOBAL_SUFFIX}")
   set(MOAB_FC_FUNC_  "${FortranCInterface_GLOBAL__PREFIX} ${FC_CASE} ${FortranCInterface_GLOBAL__SUFFIX}")
-endif (ENABLE_FORTRAN)
+endif ( ENABLE_FORTRAN )
 
 # check for MPI package
 set (MOAB_HAVE_MPI OFF CACHE INTERNAL "Found necessary MPI components. Configure MOAB with it." )

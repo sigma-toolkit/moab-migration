@@ -38,11 +38,6 @@
 
 #ifdef MOAB_HAVE_EIGEN3
 
-#if !defined( MOAB_HAVE_EIGEN3 ) && !defined( MOAB_HAVE_LAPACK )
-// If we want unshifted QR iteration, uncomment below
-// #define MOAB_EIGEN_DECOMPOSITION_UNSHIFTEDQR
-#endif
-
 #ifdef __GNUC__
 // save diagnostic state
 #pragma GCC diagnostic push
@@ -60,7 +55,7 @@
 #pragma GCC diagnostic pop
 #endif
 
-#else  // ifdef MOAB_HAVE_LAPACK
+#endif  // ifdef MOAB_HAVE_EIGEN3
 
 #ifdef MOAB_HAVE_LAPACK
 
@@ -125,10 +120,7 @@ void MOAB_dgeev( char* jobvl,
 
 #endif  // ifdef MOAB_HAVE_LAPACK
 
-#include <cstring>
 #define MOAB_DMEMZERO( a, b ) memset( a, 0, ( b ) * sizeof( double ) )
-
-#endif
 
 namespace moab
 {
@@ -551,8 +543,12 @@ class Matrix3
             char dgeev_opts[2] = { 'N', 'V' };
             int N = 3, LWORK = 102, NL = 1, NR = N;
             std::vector< double > devmat( 9 );
-            memcpy( devmat.data(), _mat, size * sizeof( double ) );
+#ifdef MOAB_HAVE_EIGEN3
             // devmat.assign( _mat, _mat + size );
+            std::copy( _mat.data(), _mat.data() + size, devmat.data() );
+#else
+            memcpy( devmat.data(), _mat, size * sizeof( double ) );
+#endif
             MOAB_dgeev( &dgeev_opts[0], &dgeev_opts[1], &N, &devmat[0], &N, devreal, devimag, dlevecs, &NL, drevecs,
                         &NR, dwork, &LWORK, &info );
             // The result eigenvalues are ordered as high-->low

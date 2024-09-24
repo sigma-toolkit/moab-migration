@@ -28,6 +28,7 @@
 #include <iosfwd>
 #include <limits>
 #include <cmath>
+#include <array>
 #include <cassert>
 
 #include "moab/MOABConfig.h"

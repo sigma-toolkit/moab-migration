@@ -38,9 +38,10 @@
 
 #ifdef MOAB_HAVE_EIGEN3
 
-//#ifndef MOAB_HAVE_EIGEN3
-//#error Need either Eigen3 or BLAS/LAPACK libraries
-//#endif
+#if !defined( MOAB_HAVE_EIGEN3 ) && !defined( MOAB_HAVE_LAPACK )
+// If we want unshifted QR iteration, uncomment below
+// #define MOAB_EIGEN_DECOMPOSITION_UNSHIFTEDQR
+#endif
 
 #ifdef __GNUC__
 // save diagnostic state
@@ -81,12 +82,12 @@
 #define MOAB_dsyevd MOAB_FC_FUNC( dsyevd, DSYEVD )
 #define MOAB_dgeev  MOAB_FC_FUNC( dgeev, DGEEV )
 
-#else // ifndef WIN32  
+#else // ifndef WIN32
 
 #define MOAB_dsyevd MOAB_FC_WRAPPER( dsyevd, DSYEVD )
 #define MOAB_dgeev  MOAB_FC_WRAPPER( dgeev, DGEEV )
 
-#endif // ifdef WIN32  
+#endif // ifdef WIN32
 
 extern "C" {
 
@@ -169,10 +170,10 @@ namespace Matrix
     template < typename Vector, typename Matrix >
     inline Vector matrix_vector( const Matrix& m, const Vector& v )
     {
-        Vector res = v;
-        res[0]     = v[0] * m( 0, 0 ) + v[1] * m( 0, 1 ) + v[2] * m( 0, 2 );
-        res[1]     = v[0] * m( 1, 0 ) + v[1] * m( 1, 1 ) + v[2] * m( 1, 2 );
-        res[2]     = v[0] * m( 2, 0 ) + v[1] * m( 2, 1 ) + v[2] * m( 2, 2 );
+        Vector res;
+        res[0] = v[0] * m( 0, 0 ) + v[1] * m( 0, 1 ) + v[2] * m( 0, 2 );
+        res[1] = v[0] * m( 1, 0 ) + v[1] * m( 1, 1 ) + v[2] * m( 1, 2 );
+        res[2] = v[0] * m( 2, 0 ) + v[1] * m( 2, 1 ) + v[2] * m( 2, 2 );
         return res;
     }
 
@@ -180,7 +181,6 @@ namespace Matrix
 
 class Matrix3
 {
-
   public:
     const static int size = 9;
 
@@ -541,35 +541,10 @@ class Matrix3
 #endif
     }
 
+#ifdef MOAB_HAVE_LAPACK
     template < typename Vector >
-    inline ErrorCode eigen_decomposition( Vector& evals, Matrix3& evecs )
+    inline ErrorCode eigen_decomposition_lapack( bool bisSymmetric, Vector& evals, Matrix3& evecs )
     {
-#ifdef MOAB_HAVE_EIGEN3
-        const bool bisSymmetric = this->is_symmetric();
-        if( bisSymmetric )
-        {
-            Eigen::SelfAdjointEigenSolver< Eigen::Matrix3d > eigensolver( this->_mat );
-            if( eigensolver.info() != Eigen::Success ) return MB_FAILURE;
-            const Eigen::SelfAdjointEigenSolver< Eigen::Matrix3d >::RealVectorType& e3evals = eigensolver.eigenvalues();
-            evals[0]                                                                        = e3evals( 0 );
-            evals[1]                                                                        = e3evals( 1 );
-            evals[2]                                                                        = e3evals( 2 );
-            evecs._mat = eigensolver.eigenvectors();  //.col(1)
-            return MB_SUCCESS;
-        }
-        else
-        {
-            MB_CHK_SET_ERR( MB_FAILURE, "Unsymmetric matrix implementation with Eigen3 is currently not provided." );
-            // Eigen::EigenSolver<Eigen::Matrix3d> eigensolver(this->_mat, true);
-            // if (eigensolver.info() != Eigen::Success)
-            //   return MB_FAILURE;
-            // const Eigen::EigenSolver<Eigen::Matrix3d>::EigenvalueType& e3evals =
-            // eigensolver.eigenvalues().real(); evals[0] = e3evals(0); evals[1] = e3evals(1);
-            // evals[2] = e3evals(2); evecs._mat = eigensolver.eigenvectors().real(); //.col(1)
-            // return MB_SUCCESS;
-        }
-#elif MOAB_HAVE_LAPACK
-        const bool bisSymmetric = this->is_symmetric();
         int info;
         /* Solve eigenproblem */
         double devreal[3], drevecs[9];
@@ -578,8 +553,9 @@ class Matrix3
             double devimag[3], dlevecs[9], dwork[102];
             char dgeev_opts[2] = { 'N', 'V' };
             int N = 3, LWORK = 102, NL = 1, NR = N;
-            std::vector< double > devmat;
-            devmat.assign( _mat, _mat + size );
+            std::vector< double > devmat(9);
+            memcpy( devmat.data(), _mat, size * sizeof( double ) );
+            // devmat.assign( _mat, _mat + size );
             MOAB_dgeev( &dgeev_opts[0], &dgeev_opts[1], &N, &devmat[0], &N, devreal, devimag, dlevecs, &NL, drevecs,
                         &NR, dwork, &LWORK, &info );
             // The result eigenvalues are ordered as high-->low
@@ -657,22 +633,65 @@ class Matrix3
             std::cout << "Failed with error = " << info << ".\n";
             return MB_FAILURE;
         }
-#else
+    }
+#endif
+
+// #define TEST_NEWEIGEN
+    template < typename Vector >
+    inline ErrorCode eigen_decomposition( Vector& evals, Matrix3& evecs )
+    {
+#if defined( MOAB_HAVE_EIGEN3 )
+        const bool bisSymmetric = this->is_symmetric();
+        if( bisSymmetric )
+        {
+            Eigen::SelfAdjointEigenSolver< Eigen::Matrix3d > eigensolver( this->_mat );
+            if( eigensolver.info() != Eigen::Success ) return MB_FAILURE;
+            const Eigen::SelfAdjointEigenSolver< Eigen::Matrix3d >::RealVectorType& e3evals = eigensolver.eigenvalues();
+            evals[0]                                                                        = e3evals( 0 );
+            evals[1]                                                                        = e3evals( 1 );
+            evals[2]                                                                        = e3evals( 2 );
+            evecs._mat = eigensolver.eigenvectors();  //.col(1)
+            return MB_SUCCESS;
+        }
+        else
+        {
+            MB_CHK_SET_ERR( MB_FAILURE, "Unsymmetric matrix implementation with Eigen3 is currently not provided." );
+            // Eigen::EigenSolver<Eigen::Matrix3d> eigensolver(this->_mat, true);
+            // if (eigensolver.info() != Eigen::Success)
+            //   return MB_FAILURE;
+            // const Eigen::EigenSolver<Eigen::Matrix3d>::EigenvalueType& e3evals =
+            // eigensolver.eigenvalues().real(); evals[0] = e3evals(0); evals[1] = e3evals(1);
+            // evals[2] = e3evals(2); evecs._mat = eigensolver.eigenvectors().real(); //.col(1)
+            // return MB_SUCCESS;
+        }
+#elif defined( MOAB_HAVE_LAPACK )
+        const bool bisSymmetric = this->is_symmetric();
+        return eigen_decomposition_lapack( bisSymmetric, evals, evecs );
+        // return eigen_decomposition_native( evals, evecs );
+        // eigen_decomposition_lapack( bisSymmetric, evals, evecs );
+        // Vector evals_native;
+        // Matrix3 evecs_native;
+        // eigen_decomposition_native( evals_native, evecs_native );
+        // // std::cout << "LAPACK: " << evals << " NATIVE: " << evals_native << " Error: " << evals-evals_native << std::endl;
+        // evals = evals_native;
+        // evecs = evecs_native;
+        // return MB_SUCCESS;
+#elif defined( TEST_NEWEIGEN )
         // Helper function to compute the absolute maximum off-diagonal element
         auto maxOffDiagonal = [] (double* matrix) -> std::pair<int, int> {
-            int p = 0, q = 0;
+            // int p = 0, q = 0;
+            std::pair<int,int> pq;
             double maxVal = 0.0;
             for (int i = 0; i < 3; ++i) {
                 for (int j = i + 1; j < 3; ++j) {
                     double absVal = std::abs(matrix[i * 3 + j]);
                     if (absVal > maxVal) {
                         maxVal = absVal;
-                        p = i;
-                        q = j;
+                        pq     = std::pair< int, int >( i, j );
                     }
                 }
             }
-            return std::pair<int,int>(p, q);
+            return pq;
         };
 
         // Jacobi rotation for 3x3 matrix
@@ -710,9 +729,8 @@ class Matrix3
         };
 
         // Initialize the matrix and eigenvector matrix
-    evecs = Matrix3(1.0, 0.0, 0.0,   // Identity matrix
-                    0.0, 1.0, 0.0,
-                    0.0, 0.0, 1.0);
+    evecs = Matrix3::identity();
+    Matrix3 A = *this; // make a copy
 
     const double tolerance = std::numeric_limits<double>::epsilon();
     const int maxIterations = 100;
@@ -720,25 +738,918 @@ class Matrix3
 
     for (int iter = 0; iter < maxIterations; ++iter) {
         // Find the largest off-diagonal element
-        auto pqpair = maxOffDiagonal(_mat);
-        if (std::abs(_mat[pqpair.first * 3 + pqpair.second]) < tolerance) {
+        auto pqpair = maxOffDiagonal( A._mat );
+        if( std::abs( A._mat[pqpair.first * 3 + pqpair.second] ) < tolerance )
+        {
+            converged = true;
             break;  // Converged
         }
 
         // Apply Jacobi rotation
-        jacobiRotate(_mat, evecs._mat, pqpair.first, pqpair.second);
+        jacobiRotate( A._mat, evecs._mat, pqpair.first, pqpair.second );
     }
 
     // Eigenvalues are now on the diagonal
-    evals[0] = _mat[0 * 3 + 0];
-    evals[1] = _mat[1 * 3 + 1];
-    evals[2] = _mat[2 * 3 + 2];
+    evals[0] = A._mat[0];
+    evals[1] = A._mat[4];
+    evals[2] = A._mat[8];
 
     // compute the transpose of the vector
-    evecs.transpose_inplace();
+    // evecs.transpose_inplace();
+
+    Vector eval_native;
+    Matrix3 evec_native;
+    eigen_decomposition_native(eval_native, evec_native);
+
+    if( !converged )
+    {
+        std::cout << "Eigen decomposition not converged \n";
+        A.print( std::cout );
+        std::cout << evals << std::endl;
+        evecs.print( std::cout );
+
+        std::cout << eval_native << std::endl;
+        evec_native.print( std::cout );
+        evals = eval_native;
+        evecs = evec_native;
+        return MB_FAILURE;
+    }
 
     return (converged ? MB_SUCCESS : MB_FAILURE);
+
+#elif defined(MOAB_EIGEN_DECOMPOSITION_UNSHIFTEDQR)
+
+    // QR decomposition using Gram-Schmidt process
+    auto qrDecomposition = []( const Matrix3& A, Matrix3& Q, Matrix3& R ) {
+        // Matrix3 q, a;
+        moab::CartVect q[3], a[3];
+
+        // Extract columns of A as vectors and copy to a
+        for( int i = 0; i < 3; ++i )
+        {
+            a[i] = A.vcol<moab::CartVect>( i );
+            // a[i][0] = A._mat[0 + i];
+            // a[i][1] = A._mat[3 + i];
+            // a[i][2] = A._mat[6 + i];
+        }
+
+        // Gram-Schmidt process
+        for( int i = 0; i < 3; ++i )
+        {
+            q[i] = a[i];
+            for( int j = 0; j < i; ++j )
+            {
+                double dot = q[j] % a[i];  // Dot product
+                q[i] -= dot * q[j];
+            }
+            q[i].normalize();
+        }
+
+        // Form Q matrix (from q vectors)
+        for( int i = 0; i < 3; ++i )
+        {
+            Q._mat[0 + i] = q[i][0];
+            Q._mat[3 + i] = q[i][1];
+            Q._mat[6 + i] = q[i][2];
+        }
+
+        // Form R matrix
+        for( int i = 0; i < 3; ++i )
+        {
+            for( int j = i; j < 3; ++j )
+            {
+                R( i, j ) = q[i] % a[j];  // Dot product
+            }
+        }
+
+    };
+
+    // QR algorithm to compute eigenvalues and eigenvectors
+    Matrix3& A = *this;
+    // qrAlgorithm
+    int maxIter = 100;
+    double tol  = 1e-8;
+    bool converged = false;
+    {
+        Matrix3 Q( 0.0 );  // Orthogonal matrix
+        Matrix3 R( 0.0 );  // Upper triangular matrix
+
+        // Initialize eigenvectors as identity matrix
+        evecs = Matrix3( 1.0, 0.0, 0.0,  // Identity matrix
+                         0.0, 1.0, 0.0,  // Orthogonal
+                         0.0, 0.0, 1.0 );
+
+        for( int iter = 0; iter < maxIter; ++iter )
+        {
+            // QR decomposition of A
+            qrDecomposition( A, Q, R );
+
+            // Compute A = R * Q
+            A = R * Q;
+
+            // Update eigenvectors (accumulate Q)
+            evecs = evecs * Q;
+
+            // Check convergence by looking at the off-diagonal elements
+            double offDiagonal = std::abs( A( 1, 0 ) ) + std::abs( A( 2, 0 ) ) + std::abs( A( 2, 1 ) );
+            if( offDiagonal < tol )
+            {
+                converged = true;
+                break;
+            }
+        }
+
+        // Extract eigenvalues (diagonal elements of A)
+        evals[0] = A( 0, 0 );
+        evals[1] = A( 1, 1 );
+        evals[2] = A( 2, 2 );
+    }
+
+    if( !converged )
+    {
+        std::cout << "Eigen decomposition not converged \n";
+        A.print(std::cout);
+        std::cout << evals << std::endl;
+        evecs.print(std::cout);
+        exit( 1 );
+    }
+
+    return ( converged ? MB_SUCCESS : MB_FAILURE );
+#else
+    return eigen_decomposition_native( evals, evecs );
 #endif
+    }
+
+    // Function to perform a Jacobi rotation
+    void jacobiRotate( moab::Matrix3& A, moab::Matrix3& V, int p, int q )
+    {
+        if( A(p,q) == 0 ) return;
+
+        double theta, t, c, s;
+        theta = ( A(q,q) - A(p,p) ) / ( 2.0 * A(p,q) );
+        t     = ( theta >= 0 ) ? 1.0 / ( theta + std::sqrt( 1.0 + theta * theta ) )
+                               : 1.0 / ( theta - std::sqrt( 1.0 + theta * theta ) );
+        c     = 1.0 / std::sqrt( 1.0 + t * t );
+        s     = t * c;
+
+        double app = A(p,p), aqq = A(q,q), apq = A(p,q);
+        A(p,p) = c * c * app - 2.0 * c * s * apq + s * s * aqq;
+        A(q,q) = s * s * app + 2.0 * c * s * apq + c * c * aqq;
+        A(p,q) = A(q,p) = 0.0;  // Zero the off-diagonal element
+
+        // Update other elements
+        for( int i = 0; i < 3; i++ )
+        {
+            if( i != p && i != q )
+            {
+                double aip = A(i,p), aiq = A(i,q);
+                A(i,p) = A(p,i) = c * aip - s * aiq;
+                A(i,q) = A(q,i) = s * aip + c * aiq;
+            }
+        }
+
+        // Update the eigenvector matrix
+        for( int i = 0; i < 3; i++ )
+        {
+            double vip = V(i,p), viq = V(i,q);
+            V(i,p) = c * vip - s * viq;
+            V(i,q) = s * vip + c * viq;
+        }
+    }
+
+    // Jacobi's method to find eigenvalues and eigenvectors of a symmetric 3x3 matrix
+    moab::ErrorCode jacobiEigenDecomposition( moab::Matrix3& A, moab::CartVect& eigenvalues, moab::Matrix3& eigenvectors )
+    {
+        constexpr double EPSILON = 1e-14;  // Tolerance for stopping the iteration
+        constexpr int maxiters   = 500;
+        constexpr int n = 3;
+
+        // Initialize the eigenvector matrix as the identity matrix
+        eigenvectors = moab::Matrix3::identity();
+
+        // Iterate to apply Jacobi rotations
+        bool converged = false;
+        for( int iter = 0; iter < maxiters; ++iter )
+        {
+            // Find the largest off-diagonal element
+            int p = 0, q = 1;
+            double maxOffDiag = std::abs( A(p,q) );
+            for( int i = 0; i < n; ++i )
+            {
+                for( int j = i + 1; j < n; ++j )
+                {
+                    if( std::abs( A(i,j) ) > maxOffDiag )
+                    {
+                        maxOffDiag = std::abs( A(i,j) );
+                        p          = i;
+                        q          = j;
+                    }
+                }
+            }
+
+            // If the largest off-diagonal element is smaller than tolerance, stop
+            if( maxOffDiag < EPSILON )
+            {
+                converged = true;
+                break;
+            }
+
+            // Apply Jacobi rotation to zero out A[p][q]
+            jacobiRotate( A, eigenvectors, p, q );
+        }
+
+        // The diagonal elements of A are the eigenvalues
+        for( int i = 0; i < n; ++i )
+        {
+            // Extract eigenvalues (diagonal elements of A)
+            eigenvalues[i] = A( i, i );
+            eigenvectors.col(i).normalize();
+        }
+
+        if( !converged )
+        {
+            std::cerr << "Jacobi method did not converge within " << maxiters << " iterations\n";
+        }
+        else
+        {
+            auto sortIndices = []( const CartVect& vec ) -> std::array< int, 3 > {
+                // Initialize the index array with values 0, 1, 2
+                std::array< int, 3 > indices = { 0, 1, 2 };
+
+                // Sort the indices based on the values in the original vector
+                std::sort( indices.begin(), indices.end(), [&]( int i, int j ) { return vec[i] < vec[j]; } );
+
+                return indices;
+            };
+
+            auto newIndices = sortIndices( eigenvalues );
+
+            // eigenvectors.transpose_inplace();
+            CartVect teigenvalues = eigenvalues;
+            Matrix3 teigenvectors = eigenvectors;
+            for( int i = 0; i < 3; i++ )
+            {
+                eigenvalues[i]       = teigenvalues[newIndices[i]];
+                eigenvectors( i, 0 ) = teigenvectors( i, newIndices[0] );
+                eigenvectors( i, 1 ) = teigenvectors( i, newIndices[1] );
+                eigenvectors( i, 2 ) = teigenvectors( i, newIndices[2] );
+            }
+        }
+
+        return ( converged ? MB_SUCCESS : MB_FAILURE );
+    }
+
+    template < typename Vector >
+    inline ErrorCode eigen_decomposition_native( Vector& evals, Matrix3& evecs )
+    {
+        // return eigen_decomposition_native_arnoldiqr( evals, evecs );
+        // return eigen_decomposition_native_shiftedqr( evals, evecs );
+        // eigen_decomposition_native_analytical( evals, evecs );
+
+        Matrix3 A = *this;
+        return jacobiEigenDecomposition( A, evals, evecs );
+
+        // if( !converged )
+        // if (false)
+        // {
+        //     std::cout.precision( 16 );
+
+        //     std::cout << "\nMatrix \n";
+        //     this->print( std::cout );
+
+        //     Vector evals_lap;
+        //     Matrix3 evecs_lap;
+        //     eigen_decomposition_lapack( true, evals_lap, evecs_lap );
+        //     std::cout << "\nEigenvalues and eigenvectors LAPACK \n";
+        //     std::cout << evals_lap << std::endl;
+        //     std::cout << "\nEigenvectors \n";
+        //     evecs_lap.print( std::cout );
+
+        //     std::cout << "\nEigenvalues and eigenvectors Native \n";
+        //     std::cout << evals << std::endl;
+        //     std::cout << "\nEigenvectors \n";
+        //     evecs.print( std::cout );
+        //     // A.print( std::cout );
+        // }
+        return MB_SUCCESS;
+    }
+
+    template < typename Vector >
+    inline ErrorCode eigen_decomposition_native_arnoldiqr( Vector& evals, Matrix3& evecs )
+    {
+        // Function to perform the Modified Gram-Schmidt orthogonalization
+        // auto modifiedGramSchmidt = []( const std::vector< moab::CartVect >& Q, moab::CartVect& v, int k ) {
+        //     for( int i = 0; i < k; ++i )
+        //     {
+        //         double dot_product = Q[i] % v;  // Dot product between v and Q[i]
+        //         v -= dot_product * Q[i];        // Orthogonalize
+        //     }
+        // };
+
+        // Arnoldi Iteration to approximate the eigenvalues and eigenvectors of a 3x3 matrix
+        auto arnoldiIteration = []( const moab::Matrix3& A, std::vector< moab::CartVect >& Q, moab::Matrix3& H ) {
+            constexpr int maxIter = 3;
+
+            // Initialize the first vector (random start, here using a simple vector)
+            moab::CartVect v0( 1.0, 1.0, 1.0 );
+            v0.normalize();
+            Q.push_back( v0 );  // Orthonormal basis, first vector
+
+            // Iterate and build the Hessenberg matrix H
+            for( int k = 0; k < maxIter; ++k )
+            {
+                // Multiply the matrix A by the current vector Q[k]
+                // moab::CartVect v = A * Q[k];
+                auto v = Matrix::matrix_vector( A, Q[k] );
+
+                // Modified Gram-Schmidt orthogonalization
+                // modifiedGramSchmidt( Q, v, k + 1 );
+                for( int im = 0; im < k+1; ++im )
+                {
+                    double dot_product = Q[im] % v;  // Dot product between v and Q[i]
+                    v -= dot_product * Q[im];        // Orthogonalize
+                }
+
+                // Compute the norm of v
+                double norm_v = v.length();
+
+                // Store in Hessenberg matrix
+                if( k < 2 )
+                {
+                    H( k + 1, k ) = norm_v;
+                }
+
+                if( norm_v > 1e-9 )
+                {
+                    v /= norm_v;       // Normalize the new vector
+                    Q.push_back( v );  // Add it to the orthonormal basis
+                }
+
+                // Fill the upper part of Hessenberg matrix H
+                for( int i = 0; i <= k; ++i )
+                    H( i, k ) = Q[i] % Matrix::matrix_vector( A, Q[k] );
+            }
+        };
+
+        // QR decomposition using Gram-Schmidt process
+        auto qrDecomposition = []( const Matrix3& A, Matrix3& Q, Matrix3& R ) {
+            moab::CartVect q[3], a[3];
+
+            // Extract columns of A as vectors and copy to a
+            for( int i = 0; i < 3; ++i )
+            {
+                a[i] = A.vcol< moab::CartVect >( i );
+            }
+
+            // Gram-Schmidt process
+            for( int i = 0; i < 3; ++i )
+            {
+                q[i] = a[i];
+                for( int j = 0; j < i; ++j )
+                {
+                    double dot = q[j] % a[i];  // Dot product
+                    q[i] -= dot * q[j];
+                }
+                q[i].normalize();
+            }
+
+            // Form Q matrix (from q vectors)
+            for( int i = 0; i < 3; ++i )
+            {
+                Q( 0, i ) = q[i][0];
+                Q( 1, i ) = q[i][1];
+                Q( 2, i ) = q[i][2];
+            }
+
+            // Form R matrix
+            for( int i = 0; i < 3; ++i )
+                for( int j = i; j < 3; ++j )
+                    R( i, j ) = q[i] % a[j];  // Dot product
+        };
+
+        auto qrAlgorithm =
+            [&qrDecomposition]( const moab::Matrix3& matrix, moab::CartVect& eigenvalues,
+                                moab::Matrix3& eigenvectors ) {
+                // Initialize eigenvectors as identity matrix
+                eigenvectors = moab::Matrix3( 1.0 );
+
+                // QR algorithm to compute eigenvalues and eigenvectors
+                // Matrix3 A = *this;
+                // Start the shifted-QR iteration
+                int maxIter    = 5000;
+                double tol     = 1e-8;
+                bool converged = false;
+
+                moab::Matrix3 Q( 0.0 );  // Orthogonal matrix
+                moab::Matrix3 R( 0.0 );  // Upper triangular matrix
+
+                double d, mu;
+                moab::Matrix3 A = matrix, Ap = matrix;
+                for( int iter = 0; iter < maxIter; ++iter )
+                {
+                    // Wilkinson shift: use bottom-right 2x2 submatrix to compute shift
+                    d = ( A( 1, 1 ) - A( 2, 2 ) ) / 2.0;
+                    if( fabs( d ) < tol )  // possible multiplicity; skip shift
+                        mu = 0.0;          // disable shift
+                    else
+                        mu = A( 2, 2 ) - ( d / std::abs( d ) ) * A( 2, 1 ) * A( 2, 1 ) /
+                                             ( std::abs( d ) + std::sqrt( d * d + A( 2, 1 ) * A( 2, 1 ) ) );
+
+
+                    //  mu = 0.0;
+
+                    // Apply the shift
+                    moab::Matrix3 A_shifted = A - Matrix3( mu );
+
+                    // QR decomposition of A
+                    qrDecomposition( A_shifted, Q, R );
+
+                    // Compute A = R * Q + mu * I (undo the shift)
+                    A = R * Q + Matrix3( mu );
+
+                    // Update eigenvectors (accumulate Q)
+                    eigenvectors = eigenvectors * Q;
+
+                    // Check convergence by looking at the off-diagonal elements
+                    Ap -= A;
+                    double offDiagonal =
+                        std::sqrt( Ap( 1, 0 ) * Ap( 1, 0 ) + Ap( 2, 0 ) * Ap( 2, 0 ) + Ap( 2, 1 ) * Ap( 2, 1 ) );
+                    if( offDiagonal < tol )
+                    {
+                        converged = true;
+                        break;
+                    }
+                    else
+                        Ap = A;
+                }
+
+                auto sortIndices = []( const Vector& vec ) -> std::array< int, 3 > {
+                    // Initialize the index array with values 0, 1, 2
+                    std::array< int, 3 > indices = { 0, 1, 2 };
+
+                    // Sort the indices based on the values in the original vector
+                    std::sort( indices.begin(), indices.end(), [&]( int i, int j ) { return vec[i] < vec[j]; } );
+
+                    return indices;
+                };
+
+                // Extract eigenvalues (diagonal elements of A)
+                eigenvalues[0] = A( 0, 0 );
+                eigenvalues[1] = A( 1, 1 );
+                eigenvalues[2] = A( 2, 2 );
+
+                if( converged )
+                {
+                    auto newIndices = sortIndices( eigenvalues );
+
+                    // eigenvectors.transpose_inplace();
+                    Vector teigenvalues   = eigenvalues;
+                    Matrix3 teigenvectors = eigenvectors;
+                    for( int i = 0; i < 3; i++ )
+                    {
+                        eigenvalues[i]       = teigenvalues[newIndices[i]];
+                        eigenvectors( i, 0 ) = teigenvectors( i, newIndices[0] );
+                        eigenvectors( i, 1 ) = teigenvectors( i, newIndices[1] );
+                        eigenvectors( i, 2 ) = teigenvectors( i, newIndices[2] );
+                    }
+                }
+
+                return converged;
+            };
+
+        auto computeEigenvectors = []( const std::vector< moab::CartVect >& Q, const moab::Matrix3& eigenvectors_H,
+                                       moab::Matrix3& eigenvectors ) {
+            // Eigenvectors of the original matrix A are Q * y (where y is an eigenvector of H)
+            for( int i = 0; i < 3; ++i )
+            {
+                moab::CartVect eigenvector( 0.0, 0.0, 0.0 );
+                for( int j = 0; j < 3; ++j )
+                {
+                    eigenvector += eigenvectors_H( j, i ) * Q[j];  // Map back to original space
+                }
+                eigenvector.normalize();
+                eigenvectors( 0, i ) = eigenvector[0];
+                eigenvectors( 1, i ) = eigenvector[1];
+                eigenvectors( 2, i ) = eigenvector[2];
+            }
+        };
+
+        // Vectors to hold the orthonormal basis (Q) and Hessenberg matrix (H)
+        std::vector< moab::CartVect > Q;
+        moab::Matrix3 H( 0.0 );  // Initialize the Hessenberg matrix to zero
+
+        // Perform Arnoldi iteration
+        arnoldiIteration( *this, Q, H );
+
+        // Compute eigenvalues from Hessenberg matrix
+        moab::Matrix3 eigenvectors_h( 1.0 );
+        bool converged = qrAlgorithm( H, evals, eigenvectors_h );
+
+        if( !converged )
+        {
+            std::cout << "\nEigen decomposition not converged \n";
+            std::cout.precision( 16 );
+
+            std::cout << "\nMatrix \n";
+            this->print( std::cout );
+
+            Vector evals_lap;
+            Matrix3 evecs_lap;
+            eigen_decomposition_lapack( true, evals_lap, evecs_lap );
+            std::cout << "\nEigenvalues and eigenvectors LAPACK \n";
+            std::cout << evals_lap << std::endl;
+            std::cout << "\nEigenvectors \n";
+            evecs_lap.print( std::cout );
+
+            std::cout << "\nEigenvalues and eigenvectors Native \n";
+            std::cout << evals << std::endl;
+            std::cout << "\nEigenvectors \n";
+            evecs.print( std::cout );
+            // A.print( std::cout );
+            return MB_FAILURE;
+        }
+        else
+        {
+            // std::cout << "\nEigenvalues of the matrix:" << std::endl;
+            // std::cout << eigenvalues[0] << " " << eigenvalues[1] << " " << eigenvalues[2] << std::endl;
+
+            // Compute the eigenvectors of the original matrix
+            computeEigenvectors( Q, eigenvectors_h, evecs );
+            return MB_SUCCESS;
+        }
+    }
+//
+    template < typename Vector >
+    inline ErrorCode eigen_decomposition_native_analytical( Vector& evals, Matrix3& evecs )
+    {
+        // taken from Eigen3: struct direct_selfadjoint_eigenvalues<SolverType,3,false>
+        typedef double Scalar;
+        Matrix3 m = *this;
+
+        // Shift the matrix to the mean eigenvalue and map the matrix coefficients to [-1:1] to avoid over- and underflow.
+        Scalar shift = m.trace() / Scalar( 3 );
+        // TODO Avoid this copy. Currently it is necessary to suppress bogus values when determining maxCoeff and for computing the eigenvectors later
+        Matrix3 scaledMat = m;
+        // scaledMat.diagonal().array() -= shift;
+        scaledMat._mat[0] -= shift;
+        scaledMat._mat[4] -= shift;
+        scaledMat._mat[8] -= shift;
+        Scalar scale = std::numeric_limits<double>::min();
+        // scale = scaledMat.cwiseAbs().maxCoeff();
+        for( unsigned i = 0; i < 9; ++i )
+            if( scale < fabs( scaledMat._mat[i] ) ) scale = fabs( scaledMat._mat[i] );
+        if( scale > 0 ) scaledMat /= scale;  // TODO for scale==0 we could save the remaining operations
+
+        // Now let us analytically compute the eigenvalues
+        const Scalar s_inv3  = Scalar( 1 ) / Scalar( 3 );
+        const Scalar s_sqrt3 = std::sqrt( Scalar( 3 ) );
+
+        // The characteristic equation is x^3 - c2*x^2 + c1*x - c0 = 0.  The
+        // eigenvalues are the roots to this equation, all guaranteed to be
+        // real-valued, because the matrix is symmetric.
+        Scalar c0 = m( 0, 0 ) * m( 1, 1 ) * m( 2, 2 ) + Scalar( 2 ) * m( 1, 0 ) * m( 2, 0 ) * m( 2, 1 ) -
+                    m( 0, 0 ) * m( 2, 1 ) * m( 2, 1 ) - m( 1, 1 ) * m( 2, 0 ) * m( 2, 0 ) -
+                    m( 2, 2 ) * m( 1, 0 ) * m( 1, 0 );
+        Scalar c1 = m( 0, 0 ) * m( 1, 1 ) - m( 1, 0 ) * m( 1, 0 ) + m( 0, 0 ) * m( 2, 2 ) - m( 2, 0 ) * m( 2, 0 ) +
+                    m( 1, 1 ) * m( 2, 2 ) - m( 2, 1 ) * m( 2, 1 );
+        Scalar c2 = m( 0, 0 ) + m( 1, 1 ) + m( 2, 2 );
+
+#define MATRIX_MAXI(x,y) (x < y ? y : x)
+        // Construct the parameters used in classifying the roots of the equation
+        // and in solving the equation for the roots in closed form.
+        Scalar c2_over_3 = c2 * s_inv3;
+        Scalar a_over_3  = ( c2 * c2_over_3 - c1 ) * s_inv3;
+        a_over_3         = MATRIX_MAXI( a_over_3, Scalar( 0 ) );
+
+        Scalar half_b = Scalar( 0.5 ) * ( c0 + c2_over_3 * ( Scalar( 2 ) * c2_over_3 * c2_over_3 - c1 ) );
+
+        Scalar q = a_over_3 * a_over_3 * a_over_3 - half_b * half_b;
+        q        = MATRIX_MAXI( q, Scalar( 0 ) );
+
+        // Compute the eigenvalues by solving for the roots of the polynomial.
+        Scalar rho = sqrt( a_over_3 );
+        Scalar theta =
+            atan2( sqrt( q ), half_b ) * s_inv3;  // since sqrt(q) > 0, atan2 is in [0, pi] and theta is in [0, pi/3]
+        Scalar cos_theta = cos( theta );
+        Scalar sin_theta = sin( theta );
+        // roots are already sorted, since cos is monotonically decreasing on [0, pi]
+        evals[0] = c2_over_3 - rho * ( cos_theta + s_sqrt3 * sin_theta );  // == 2*rho*cos(theta+2pi/3)
+        evals[1] = c2_over_3 - rho * ( cos_theta - s_sqrt3 * sin_theta );  // == 2*rho*cos(theta+ pi/3)
+        evals[2] = c2_over_3 + Scalar( 2 ) * rho * cos_theta;
+
+        // Rescale back to the original size.
+        evals *= scale;
+        evals += shift;
+        return moab::MB_SUCCESS;
+
+        /// Now let us compute eigenvectors
+
+        // auto extract_kernel = []( moab::Matrix3& mat, CartVect& res, CartVect& representative ) -> bool {
+        //     int i0;
+        //     // Find non-zero column i0 (by construction, there must exist a non zero coefficient on the diagonal):
+        //     mat.diagonal().cwiseAbs().maxCoeff( &i0 );
+        //     // mat.col(i0) is a good candidate for an orthogonal vector to the current eigenvector,
+        //     // so let's save it:
+        //     representative = mat.col( i0 );
+        //     Scalar n0, n1;
+        //     moab::CartVect c0, c1;
+        //     n0 = ( c0 = representative.cross( mat.col( ( i0 + 1 ) % 3 ) ) ).squaredNorm();
+        //     n1 = ( c1 = representative.cross( mat.col( ( i0 + 2 ) % 3 ) ) ).squaredNorm();
+        //     if( n0 > n1 )
+        //         res = c0 / std::sqrt( n0 );
+        //     else
+        //         res = c1 / std::sqrt( n1 );
+
+        //     return true;
+        // };
+
+        // Function to extract an orthogonal vector based on the matrix and representative vector
+        // bool extract_kernel( moab::Matrix3 & mat, moab::CartVect & res, moab::CartVect & representative )
+        auto extract_kernel = []( moab::Matrix3& mat, CartVect& res, CartVect& representative ) -> bool {
+            int i0 = -1;
+
+            // Find the index of the largest absolute diagonal element of the matrix
+            moab::CartVect diag( mat( 0, 0 ), mat( 1, 1 ), mat( 2, 2 ) );  // Get the diagonal elements
+            double maxVal = std::abs( diag[0] );
+            i0            = 0;
+
+            for( int i = 1; i < 3; ++i )
+            {
+                if( std::abs( diag[i] ) > maxVal )
+                {
+                    maxVal = std::abs( diag[i] );
+                    i0     = i;
+                }
+            }
+
+            // Extract the column of the matrix corresponding to the index `i0`
+            representative = mat.vcol< moab::CartVect >( i0 );
+
+            // Variables to store cross product results and their norms
+            moab::CartVect c0, c1;
+            double n0, n1;
+
+            // Compute the cross products between the representative vector and other matrix columns
+            moab::CartVect col1 = mat.vcol< moab::CartVect >( ( i0 + 1 ) % 3 );
+            moab::CartVect col2 = mat.vcol< moab::CartVect >( ( i0 + 2 ) % 3 );
+
+            // Cross product of representative with col1 and col2
+            c0 = representative * col1;
+            c1 = representative * col2;
+
+            // Compute the squared norms of the cross products
+            n0 = c0.length_squared();
+            n1 = c1.length_squared();
+
+            // Select the larger norm cross product and normalize the result
+            if( n0 > n1 )
+            {
+                res = c0 / std::sqrt( n0 );
+            }
+            else
+            {
+                res = c1 / std::sqrt( n1 );
+            }
+
+            return true;
+        };
+
+        if( ( fabs( evals[2] - evals[0] ) ) <= std::numeric_limits< double >::min() )
+        {
+            // All three eigenvalues are numerically the same
+            evecs = moab::Matrix3( 1.0 );
+            }
+            else
+            {
+                Matrix3 tmp;
+                tmp = scaledMat;
+
+                // Compute the eigenvector of the most distinct eigenvalue
+                Scalar d0 = evals[2] - evals[1];
+                Scalar d1 = evals[1] - evals[0];
+                int k( 0 ), l( 2 );
+                if( d0 > d1 )
+                {
+                    int t = l;
+                    l     = k;
+                    k     = t;
+                    d0    = d1;
+                }
+
+                // Compute the eigenvector of index k
+                {
+                    // tmp.diagonal().array() -= evals( k );
+                    tmp._mat[0] -= evals[k];
+                    tmp._mat[4] -= evals[k];
+                    tmp._mat[8] -= evals[k];
+                    // By construction, 'tmp' is of rank 2, and its kernel corresponds to the respective eigenvector.
+                    moab::CartVect col_k = evecs.col( k );
+                    moab::CartVect col_l = evecs.col( l );
+                    extract_kernel( tmp, col_k, col_l );
+                    evecs( 0, l ) = col_l[0];
+                    evecs( 1, l ) = col_l[1];
+                    evecs( 2, l ) = col_l[2];
+                    evecs( 0, k ) = col_k[0];
+                    evecs( 1, k ) = col_k[1];
+                    evecs( 2, k ) = col_k[2];
+                }
+
+                // Compute eigenvector of index l
+                if( d0 <= 2 * std::numeric_limits< double >::min() * d1 )
+                {
+                    // If d0 is too small, then the two other eigenvalues are numerically the same,
+                    // and thus we only have to ortho-normalize the near orthogonal vector we saved above.
+                    evecs.col( l ) -= ( evecs.col( k ) % evecs.col( l ) ) * evecs.col( l );
+                    evecs.col( l ).normalize();
+                }
+                else
+                {
+                    tmp = scaledMat;
+                    // tmp.diagonal().array() -= evals( l );
+                    tmp._mat[0] -= evals[l];
+                    tmp._mat[4] -= evals[l];
+                    tmp._mat[8] -= evals[l];
+
+                    moab::CartVect dummy;
+                    moab::CartVect col_l = evecs.col( l );
+                    extract_kernel( tmp, col_l, dummy );
+                    evecs( 0, l ) = col_l[0];
+                    evecs( 1, l ) = col_l[1];
+                    evecs( 2, l ) = col_l[2];
+                }
+                // Compute last eigenvector from the other two
+                CartVect lev = ( evecs.col( 2 ) * evecs.col( 0 ) );
+                lev.normalize(); evecs.col( 1 ) = lev;
+            }
+
+            // Rescale back to the original size.
+            evals *= scale;
+            evals += shift;
+
+            return moab::MB_SUCCESS;
+        }
+
+        template < typename Vector >
+        inline ErrorCode eigen_decomposition_native_shiftedqr( Vector & evals, Matrix3 & evecs )
+        {
+            // QR decomposition using Gram-Schmidt process
+            auto qrDecomposition = []( const Matrix3& A, Matrix3& Q, Matrix3& R ) {
+                moab::CartVect q[3], a[3];
+
+                // Extract columns of A as vectors and copy to a
+                for( int i = 0; i < 3; ++i )
+                {
+                    a[i] = A.vcol< moab::CartVect >( i );
+                    // a[i][0] = A._mat[0 + i];
+                    // a[i][1] = A._mat[3 + i];
+                    // a[i][2] = A._mat[6 + i];
+                }
+
+                // Gram-Schmidt process
+                for( int i = 0; i < 3; ++i )
+                {
+                    q[i] = a[i];
+                    for( int j = 0; j < i; ++j )
+                    {
+                        double dot = q[j] % a[i];  // Dot product
+                        q[i] -= dot * q[j];
+                    }
+                    q[i].normalize();
+                }
+
+                // Form Q matrix (from q vectors)
+                for( int i = 0; i < 3; ++i )
+                {
+                    Q._mat[0 + i] = q[i][0];
+                    Q._mat[3 + i] = q[i][1];
+                    Q._mat[6 + i] = q[i][2];
+                }
+
+                // Form R matrix
+                for( int i = 0; i < 3; ++i )
+                    for( int j = i; j < 3; ++j )
+                        R( i, j ) = q[i] % a[j];  // Dot product
+            };
+
+            const Matrix3 I = moab::Matrix3( 1.0 );
+
+            // QR algorithm to compute eigenvalues and eigenvectors
+            Matrix3 A = *this;
+            // Start the shifted-QR iteration
+            int maxIter    = 2000;
+            double tol     = 1e-10;
+            bool converged = false;
+            {
+                Matrix3 Q( 0.0 );  // Orthogonal matrix
+                Matrix3 R( 0.0 );  // Upper triangular matrix
+
+                // Initialize eigenvectors as identity matrix
+                evecs = I;
+
+                double d, mu;
+                Matrix3 Ap = A;
+                for( int iter = 0; iter < maxIter; ++iter )
+                {
+                    // Wilkinson shift: use bottom-right 2x2 submatrix to compute shift
+                    d = ( A( 1, 1 ) - A( 2, 2 ) ) / 2.0;
+                    if( fabs( d ) < tol )  // possible multiplicity; skip shift
+                        mu = 0.0;          // disable shift
+                    else
+                        mu = A( 2, 2 ) - ( d / std::abs( d ) ) * A( 2, 1 ) * A( 2, 1 ) /
+                                             ( std::abs( d ) + std::sqrt( d * d + A( 2, 1 ) * A( 2, 1 ) ) );
+
+                    //  mu = 0.0;
+
+                    // Apply the shift
+                    moab::Matrix3 A_shifted = A - Matrix3( mu );
+
+                    // QR decomposition of A
+                    qrDecomposition( A_shifted, Q, R );
+
+                    // Compute A = R * Q + mu * I (undo the shift)
+                    A = R * Q + Matrix3( mu );
+
+                    // Update eigenvectors (accumulate Q)
+                    evecs = evecs * Q;
+
+                    // Check convergence by looking at the off-diagonal elements
+                    Ap -= A;
+                    double offDiagonal =
+                        std::sqrt( Ap( 1, 0 ) * Ap( 1, 0 ) + Ap( 2, 0 ) * Ap( 2, 0 ) + Ap( 2, 1 ) * Ap( 2, 1 ) );
+                    if( offDiagonal < tol )
+                    {
+                        converged = true;
+                        break;
+                    }
+                    else
+                        Ap = A;
+                }
+
+                auto sortIndices = []( const Vector& vec ) -> std::array< int, 3 > {
+                    // Initialize the index array with values 0, 1, 2
+                    std::array< int, 3 > indices = { 0, 1, 2 };
+
+                    // Sort the indices based on the values in the original vector
+                    std::sort( indices.begin(), indices.end(), [&]( int i, int j ) { return vec[i] < vec[j]; } );
+
+                    return indices;
+                };
+
+                // Extract eigenvalues (diagonal elements of A)
+                evals[0] = A( 0, 0 );
+                evals[1] = A( 1, 1 );
+                evals[2] = A( 2, 2 );
+
+                auto newIndices = sortIndices( evals );
+
+                // evecs.transpose_inplace();
+
+                Vector tevals  = evals;
+                Matrix3 tevecs = evecs;
+                for( int i = 0; i < 3; i++ )
+                {
+                    evals[i]      = tevals[newIndices[i]];
+                    evecs( i, 0 ) = tevecs( i, newIndices[0] );
+                    evecs( i, 1 ) = tevecs( i, newIndices[1] );
+                    evecs( i, 2 ) = tevecs( i, newIndices[2] );
+
+                    // evecs( 0, i ) = tevecs( newIndices[0], i );
+                    // evecs( 1, i ) = tevecs( newIndices[1], i );
+                    // evecs( 2, i ) = tevecs( newIndices[2], i );
+                }
+            }
+
+            if( !converged )
+            {
+                std::cout << "\nEigen decomposition not converged \n";
+                std::cout.precision( 16 );
+
+                std::cout << "\nMatrix \n";
+                this->print( std::cout );
+
+                Vector evals_lap;
+                Matrix3 evecs_lap;
+                eigen_decomposition_lapack( true, evals_lap, evecs_lap );
+                std::cout << "\nEigenvalues and eigenvectors LAPACK \n";
+                std::cout << evals_lap << std::endl;
+                std::cout << "\nEigenvectors \n";
+                evecs_lap.print( std::cout );
+
+                std::cout << "\nEigenvalues and eigenvectors Native \n";
+                std::cout << evals << std::endl;
+                std::cout << "\nEigenvectors \n";
+                evecs.print( std::cout );
+                // A.print( std::cout );
+                return MB_FAILURE;
+            }
+
+            return ( converged ? MB_SUCCESS : MB_FAILURE );
+    }
+
+    inline static Matrix3 identity()
+    {
+        // Identity matrix
+        return Matrix3( 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 );
     }
 
     inline void transpose_inplace()
@@ -961,6 +1872,24 @@ class Matrix3
 #endif
     }
 
+    inline CartVect diagonal( ) const
+    {
+#ifdef MOAB_HAVE_EIGEN3
+        return CartVect( _mat( 0, 0 ), _mat( 1, 1 ), _mat( 2, 2 ) );
+#else
+        return CartVect( _mat[0], _mat[4], _mat[8] );
+#endif
+    }
+
+    inline double trace() const
+    {
+#ifdef MOAB_HAVE_EIGEN3
+        return _mat.trace();
+#else
+        return _mat[0] + _mat[4] + _mat[8];
+#endif
+    }
+
     friend Matrix3 operator+( const Matrix3& a, const Matrix3& b );
     friend Matrix3 operator-( const Matrix3& a, const Matrix3& b );
     friend Matrix3 operator*( const Matrix3& a, const Matrix3& b );
@@ -1131,4 +2060,5 @@ inline std::ostream& operator<<( std::ostream& s, const moab::Matrix3& m )
              << " " << m( 1, 2 ) << " | " << m( 2, 0 ) << " " << m( 2, 1 ) << " " << m( 2, 2 ) << " |";
 }
 #endif  // MOAB_MATRIX3_OPERATORLESS
+
 #endif  // MOAB_MATRIX3_HPP

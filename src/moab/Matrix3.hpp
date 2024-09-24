@@ -29,6 +29,7 @@
 #include <limits>
 #include <cmath>
 #include <array>
+#include <algorithm>
 #include <cassert>
 
 #include "moab/MOABConfig.h"

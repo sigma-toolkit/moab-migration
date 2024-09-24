@@ -60,7 +60,7 @@
 #pragma GCC diagnostic pop
 #endif
 
-#else // ifdef MOAB_HAVE_LAPACK
+#else  // ifdef MOAB_HAVE_LAPACK
 
 #ifdef MOAB_HAVE_LAPACK
 
@@ -72,7 +72,6 @@
 #define MOAB_FC_WRAPPER( name, NAME ) name##_
 #endif
 
-
 // We will rely on LAPACK directly
 #ifdef WIN32
 
@@ -82,12 +81,12 @@
 #define MOAB_dsyevd MOAB_FC_FUNC( dsyevd, DSYEVD )
 #define MOAB_dgeev  MOAB_FC_FUNC( dgeev, DGEEV )
 
-#else // ifndef WIN32
+#else  // ifndef WIN32
 
 #define MOAB_dsyevd MOAB_FC_WRAPPER( dsyevd, DSYEVD )
 #define MOAB_dgeev  MOAB_FC_WRAPPER( dgeev, DGEEV )
 
-#endif // ifdef WIN32
+#endif  // ifdef WIN32
 
 extern "C" {
 
@@ -106,7 +105,6 @@ void MOAB_dsyevd( char* jobz,
                   int* liwork,
                   int* info );
 
-
 // Computes for an N-by-N real nonsymmetric matrix A, the
 // eigenvalues and, optionally, the left and/or right eigenvectors.
 void MOAB_dgeev( char* jobvl,
@@ -123,10 +121,9 @@ void MOAB_dgeev( char* jobvl,
                  double* work,
                  int* lwork,
                  int* info );
-
 }
 
-#endif // ifdef MOAB_HAVE_LAPACK
+#endif  // ifdef MOAB_HAVE_LAPACK
 
 #include <cstring>
 #define MOAB_DMEMZERO( a, b ) memset( a, 0, ( b ) * sizeof( double ) )
@@ -553,7 +550,7 @@ class Matrix3
             double devimag[3], dlevecs[9], dwork[102];
             char dgeev_opts[2] = { 'N', 'V' };
             int N = 3, LWORK = 102, NL = 1, NR = N;
-            std::vector< double > devmat(9);
+            std::vector< double > devmat( 9 );
             memcpy( devmat.data(), _mat, size * sizeof( double ) );
             // devmat.assign( _mat, _mat + size );
             MOAB_dgeev( &dgeev_opts[0], &dgeev_opts[1], &N, &devmat[0], &N, devreal, devimag, dlevecs, &NL, drevecs,
@@ -636,7 +633,6 @@ class Matrix3
     }
 #endif
 
-// #define TEST_NEWEIGEN
     template < typename Vector >
     inline ErrorCode eigen_decomposition( Vector& evals, Matrix3& evecs )
     {
@@ -646,14 +642,14 @@ class Matrix3
             MB_CHK_SET_ERR( MB_FAILURE, "Unsymmetric matrix implementation with Matrix3 are currently not supported." );
         }
 #if defined( MOAB_HAVE_EIGEN3 )
-            Eigen::SelfAdjointEigenSolver< Eigen::Matrix3d > eigensolver( this->_mat );
-            if( eigensolver.info() != Eigen::Success ) return MB_FAILURE;
-            const Eigen::SelfAdjointEigenSolver< Eigen::Matrix3d >::RealVectorType& e3evals = eigensolver.eigenvalues();
-            evals[0]                                                                        = e3evals( 0 );
-            evals[1]                                                                        = e3evals( 1 );
-            evals[2]                                                                        = e3evals( 2 );
-            evecs._mat = eigensolver.eigenvectors();  //.col(1)
-            return MB_SUCCESS;
+        Eigen::SelfAdjointEigenSolver< Eigen::Matrix3d > eigensolver( this->_mat );
+        if( eigensolver.info() != Eigen::Success ) return MB_FAILURE;
+        const Eigen::SelfAdjointEigenSolver< Eigen::Matrix3d >::RealVectorType& e3evals = eigensolver.eigenvalues();
+        evals[0]                                                                        = e3evals( 0 );
+        evals[1]                                                                        = e3evals( 1 );
+        evals[2]                                                                        = e3evals( 2 );
+        evecs._mat = eigensolver.eigenvectors();  //.col(1)
+        return MB_SUCCESS;
 
 #elif defined( MOAB_HAVE_LAPACK )
         return eigen_decomposition_lapack( bisSymmetric, evals, evecs );
@@ -664,7 +660,7 @@ class Matrix3
         // // std::cout << "LAPACK: " << evals << " NATIVE: " << evals_native << " Error: " << evals-evals_native << std::endl;
         // return MB_SUCCESS;
 #else
-    return eigen_decomposition_native( evals, evecs );
+        return eigen_decomposition_native( evals, evecs );
 #endif
     }
 
@@ -674,14 +670,13 @@ class Matrix3
         constexpr int n          = 3;
         constexpr double EPSILON = 1e-14;  // Tolerance for stopping the iteration
         constexpr int maxiters   = 500;
-        Matrix3 matrix = *this;
+        Matrix3 matrix           = *this;
 
         // Initialize the eigenvector matrix as the identity matrix
         eigenvectors = moab::Matrix3::identity();
 
         // Function to perform a Jacobi rotation
         auto jacobiRotate = []( moab::Matrix3& A, moab::Matrix3& V, int p, int q ) {
-
             double theta, t, c, s;
             theta = ( A( q, q ) - A( p, p ) ) / ( 2.0 * A( p, q ) );
             t     = ( theta >= 0 ) ? 1.0 / ( theta + std::sqrt( 1.0 + theta * theta ) )
@@ -1013,7 +1008,7 @@ class Matrix3
 #endif
     }
 
-    inline CartVect diagonal( ) const
+    inline CartVect diagonal() const
     {
 #ifdef MOAB_HAVE_EIGEN3
         return CartVect( _mat( 0, 0 ), _mat( 1, 1 ), _mat( 2, 2 ) );
@@ -1082,15 +1077,15 @@ class Matrix3
         d_determinant = 1.0 / d_determinant;  // invert the determinant
         std::vector< double > _m;
         _m.assign( _mat, _mat + size );
-        _mat[0]      = d_determinant * ( _m[4] * _m[8] - _m[5] * _m[7] );
-        _mat[1]      = d_determinant * ( _m[2] * _m[7] - _m[8] * _m[1] );
-        _mat[2]      = d_determinant * ( _m[1] * _m[5] - _m[4] * _m[2] );
-        _mat[3]      = d_determinant * ( _m[5] * _m[6] - _m[8] * _m[3] );
-        _mat[4]      = d_determinant * ( _m[0] * _m[8] - _m[6] * _m[2] );
-        _mat[5]      = d_determinant * ( _m[2] * _m[3] - _m[5] * _m[0] );
-        _mat[6]      = d_determinant * ( _m[3] * _m[7] - _m[6] * _m[4] );
-        _mat[7]      = d_determinant * ( _m[1] * _m[6] - _m[7] * _m[0] );
-        _mat[8]      = d_determinant * ( _m[0] * _m[4] - _m[3] * _m[1] );
+        _mat[0] = d_determinant * ( _m[4] * _m[8] - _m[5] * _m[7] );
+        _mat[1] = d_determinant * ( _m[2] * _m[7] - _m[8] * _m[1] );
+        _mat[2] = d_determinant * ( _m[1] * _m[5] - _m[4] * _m[2] );
+        _mat[3] = d_determinant * ( _m[5] * _m[6] - _m[8] * _m[3] );
+        _mat[4] = d_determinant * ( _m[0] * _m[8] - _m[6] * _m[2] );
+        _mat[5] = d_determinant * ( _m[2] * _m[3] - _m[5] * _m[0] );
+        _mat[6] = d_determinant * ( _m[3] * _m[7] - _m[6] * _m[4] );
+        _mat[7] = d_determinant * ( _m[1] * _m[6] - _m[7] * _m[0] );
+        _mat[8] = d_determinant * ( _m[0] * _m[4] - _m[3] * _m[1] );
 #endif
         return invertible;
     }

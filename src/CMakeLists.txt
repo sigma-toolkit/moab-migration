@@ -7,7 +7,6 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${MOAB_BINARY_DIR}/src/parallel )
 
 if(MOAB_HAVE_MPI AND MPI_FOUND)
-  message(STATUS "Adding parallel subdirectory.")
   add_subdirectory(parallel)
   set( MOAB_MPI moabpar )
   set( MOABPAR_OBJECTS $<TARGET_OBJECTS:moabpar> )
@@ -26,9 +25,7 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/moab/EntityHandle.hpp.in" "${outstring2}
 configure_file(${CMAKE_CURRENT_BINARY_DIR}/moab/EntityHandle.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/moab/EntityHandle.hpp)
 
 set(moab_link_lib)
-message(STATUS "Adding io subdirectory.")
 add_subdirectory(io)
-message(STATUS "Adding IntxMesh subdirectory.")
 add_subdirectory(IntxMesh)
 
 if( MOAB_HAVE_HDF5 )
@@ -71,7 +68,7 @@ set(MOAB_LIB_SOURCES
         FileOptions.cpp
         GeomUtil.cpp
         GeomTopoTool.cpp
-	GeomQueryTool.cpp
+        GeomQueryTool.cpp
         HalfFacetRep.cpp
         HigherOrderFactory.cpp
         HomXform.cpp
@@ -269,6 +266,12 @@ if (MOAB_HAVE_METIS)
         MetisPartitioner.cpp )
   set( MOAB_INSTALL_HEADERS ${MOAB_INSTALL_HEADERS}
         moab/MetisPartitioner.hpp )
+
+  if (MOAB_HAVE_PARMETIS)
+    include_directories( ${PARMETIS_INCLUDES} )
+    list(APPEND MOAB_DEP_LIBRARIES ${PARMETIS_LIBRARIES})
+  endif()
+  
   include_directories( ${METIS_INCLUDES} )
   list(APPEND MOAB_DEP_LIBRARIES ${METIS_LIBRARIES})
 endif()
@@ -327,11 +330,11 @@ else()
     )
 endif()
 
-message(STATUS "MOAB_LIBS = ${MOAB_LIBS}.")
 set(MOAB_ALL_LIBS ${MOAB_DEP_LIBRARIES} ${MOAB_LIBS}) 
-list(APPEND MOAB_ALL_LIBS "${MPI_LIBRARIES}")
+list(APPEND MOAB_ALL_LIBS ${MPI_LIBRARIES})
 list(APPEND MOAB_ALL_LIBS ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
-target_link_libraries(MOAB "${MOAB_ALL_LIBS}")
+target_link_libraries(MOAB ${MOAB_ALL_LIBS})
+message(STATUS "MOAB_ALL_LIBS = ${MOAB_ALL_LIBS}.")
 
 # If using clang-tidy, set the target property so that
 # reformatting code does not use full fledged C++11 semantics

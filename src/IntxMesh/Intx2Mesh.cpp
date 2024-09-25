@@ -276,6 +276,12 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
 
     rval = mb->tag_get_handle( "Counting", 1, MB_TYPE_INTEGER, countTag, MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );MB_CHK_SET_ERR( rval, "can't create Counting tag" );
 
+    Tag edgeWeightTag;
+    int defaultDouble = 0.0;
+    rval = mb->tag_get_handle( "EdgeWeight", 1, MB_TYPE_DOUBLE, edgeWeightTag, MB_TAG_DENSE | MB_TAG_CREAT,
+                               &defaultDouble );MB_CHK_SET_ERR( rval, "can't create edge weight tag" );
+
+
     // for tgt cells, save a dense tag with the bordering edges, so we do not have to search for
     // them each time edges were for sure created before (tgtEdges)
     // if we have a tag with this name, it could be of a different size, so delete it

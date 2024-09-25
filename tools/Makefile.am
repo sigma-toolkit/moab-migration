@@ -144,9 +144,10 @@ geometry_DIR = geometry
 
 if ENABLE_mbtempest
   AM_CPPFLAGS += $(TEMPESTREMAP_INCLUDE) -I$(top_srcdir)/src/Remapping -I$(top_srcdir)/src/IntxMesh
-  bin_PROGRAMS += mbtempest h5mtoscrip
+  bin_PROGRAMS += mbtempest h5mtoscrip edgeweights
 mbtempest_SOURCES = mbtempest.cpp
 h5mtoscrip_SOURCES = h5mtoscrip.cpp
+edgeweights_SOURCES = edgeWeights.cpp
 endif
 
 if ENABLE_mbmerge

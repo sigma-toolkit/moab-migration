@@ -260,13 +260,15 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
 
     // get the edges for the target triangle; the extra points will be on those edges, saved as
     // lists (unordered)
-
     // first get the list of edges adjacent to the target cell
     // use the neighTgtEdgeTag
     EntityHandle adjTgtEdges[MAXEDGES];
     ErrorCode rval = mb->tag_get_data( neighTgtEdgeTag, &tgt, 1, &( adjTgtEdges[0] ) );MB_CHK_SET_ERR( rval, "can't get edge target tag" );
     // we know that we have only nsTgt edges here; [nsTgt, MAXEDGES) are ignored, but it is small
     // potatoes some of them will be handles to the initial vertices from source or target meshes
+
+    Tag edgeWeightTag;
+    rval = mb->tag_get_handle( "EdgeWeight", edgeWeightTag );MB_CHK_SET_ERR( rval, "can't get edge weight tag" );
 
     std::vector< EntityHandle > foundIds;
     foundIds.resize( nP );
@@ -473,20 +475,24 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
         {
             int k1 = ( k + 1 ) % nP;
             int k2 = ( k1 + 1 ) % nP;
-            double orientedArea = areaAdaptor. area_spherical_triangle( &coords[3 * k], &coords[3 * k1], &coords[3 * k2], Rdest );
+            double orientedArea = areaAdaptor.area_spherical_triangle( &coords[3 * k], &coords[3 * k1], &coords[3 * k2], Rdest );
             if( orientedArea < 0 )
             {
-                std::cout << " np before 1 , 2, current " << npBefore1 << " " << npBefore2 << " " << nP << "\n";
-                for( int i = 0; i < nP; i++ )
+                double newOrientedArea = IntxAreaUtils( IntxAreaUtils::GaussQuadrature ).area_spherical_triangle( &coords[3 * k], &coords[3 * k1], &coords[3 * k2], Rdest );
+                if( newOrientedArea < 0 )
                 {
-                    int nexti         = ( i + 1 ) % nP;
-                    double lengthEdge = ( posi[i] - posi[nexti] ).length();
-                    std::cout << " " << foundIds[i] << " edge en:" << lengthEdge << "\n";
-                }
-                std::cout << " old verts: " << oldNodes << " other intx:" << otherIntx << "\n";
+                    std::cout << " np before 1 , 2, current " << npBefore1 << " " << npBefore2 << " " << nP << "\n";
+                    for( int i = 0; i < nP; i++ )
+                    {
+                        int nexti         = ( i + 1 ) % nP;
+                        double lengthEdge = ( posi[i] - posi[nexti] ).length();
+                        std::cout << " " << foundIds[i] << " edge en:" << lengthEdge << "\n";
+                    }
+                    std::cout << " old verts: " << oldNodes << " other intx:" << otherIntx << "\n";
 
-                std::cout << "rank:" << my_rank << " oriented area in 3d is negative: " << orientedArea << " k:" << k
-                          << " target, src:" << tgt << " " << src << " \n";
+                    std::cout << "rank:" << my_rank << " oriented area in 3d is negative: " << newOrientedArea << " k:" << k
+                              << " target, src:" << tgt << " " << src << " \n";
+                }
             }
         }
 #endif

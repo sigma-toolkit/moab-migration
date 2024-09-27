@@ -735,24 +735,26 @@ class Matrix3
                 break;
             }
 
-            // Apply Jacobi rotation to zero out A[p][q]
+            // Apply Jacobi rotation to zero out matrix[p][q]
             if( fabs( matrix( p, q ) ) > EPSILON ) jacobiRotate( matrix, eigenvectors, p, q );
         }
 
         // The diagonal elements of A are the eigenvalues
         for( int i = 0; i < n; ++i )
         {
-            // Extract eigenvalues (diagonal elements of A)
+            // Extract eigenvalues (diagonal elements of the matrix)
             eigenvalues[i] = matrix( i, i );
             eigenvectors.col( i ).normalize();
         }
 
         if( !converged )
         {
+            // if iterative scheme did not converge, show warning and return with failure
             std::cerr << "Jacobi method did not converge within " << maxiters << " iterations\n";
         }
         else
         {
+            // iterative method converged; let us sort the eigenvalues and eigenvectors in increasing order
             auto sortIndices = []( const CartVect& vec ) -> std::array< int, 3 > {
                 // Initialize the index array with values 0, 1, 2
                 std::array< int, 3 > indices = { 0, 1, 2 };

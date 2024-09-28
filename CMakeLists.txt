@@ -348,8 +348,8 @@ if ( ENABLE_HDF5 )
     set(HDF5_PREFER_PARALLEL TRUE)
   endif( MOAB_HAVE_MPI )
 
-  # Call CMake-native FindHDF5 module 
-  find_package( HDF5 REQUIRED )
+  # Call CMake-native FindHDF5 module and specify the components to check
+  find_package( HDF5 REQUIRED COMPONENTS C HL )
 
   if ( HDF5_FOUND )
     # print some HDF5 configuration details

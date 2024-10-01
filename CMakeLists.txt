@@ -341,32 +341,38 @@ if ( ENABLE_SZIP )
   set (MOAB_HAVE_SZIP ON)
 endif (ENABLE_SZIP)
 
-find_package( CURL )
-
 set (MOAB_HAVE_HDF5 OFF CACHE INTERNAL "Found necessary HDF5 components. Configure MOAB with it." )
 set (MOAB_HAVE_HDF5_PARALLEL OFF CACHE INTERNAL "Found necessary parallel HDF5 components. Configure MOAB with it." )
 if ( ENABLE_HDF5 )
-  if (MOAB_HAVE_MPI)
-    set(HDF5_PREFER_PARALLEL TRUE)
-  endif()
-
-  #TODO: test on all architectures with CMake-native FindHDF5 module instead of a custom one
-  IF(WIN32)
-    find_package( HDF5 REQUIRED )
-  ELSE(WIN32)
-    find_package( HDF5_MOAB REQUIRED )
-  ENDIF(WIN32)
-
-  set (MOAB_HAVE_HDF5 ON)
-  # if ( HDF5_IS_PARALLEL AND MOAB_HAVE_MPI )
   if ( MOAB_HAVE_MPI )
-    set (MOAB_HAVE_HDF5_PARALLEL ON)
-  endif ( )
-  if ( CURL_FOUND )
-    set( HDF5_LIBRARIES ${HDF5_LIBRARIES} ${CURL_LIBRARIES} )
-  endif ( CURL_FOUND )
-  set( MOAB_LIBS ${HDF5_LIBRARIES} ${MOAB_LIBS} )
-  include_directories( ${HDF5_INCLUDE_DIR} src/io/mhdf/include )
+    set(HDF5_PREFER_PARALLEL TRUE)
+  endif( MOAB_HAVE_MPI )
+
+  # Call CMake-native FindHDF5 module and specify the components to check
+  find_package( HDF5 REQUIRED COMPONENTS C HL )
+
+  if ( HDF5_FOUND )
+    # print some HDF5 configuration details
+    message (STATUS "   HDF5 Configuration ::")
+    message (STATUS "        PARALLEL     : ${HDF5_IS_PARALLEL}")
+    message (STATUS "        INCLUDES     : ${HDF5_INCLUDE_DIRS}")
+    message (STATUS "        LIBRARIES    : ${HDF5_LIBRARIES}")
+
+    set (MOAB_HAVE_HDF5 ON)
+    # if ( HDF5_IS_PARALLEL AND MOAB_HAVE_MPI )
+    if ( HDF5_IS_PARALLEL )
+      set (MOAB_HAVE_HDF5_PARALLEL ON)
+    endif ( HDF5_IS_PARALLEL )
+
+    # check for CURL as well
+    find_package( CURL )
+
+    if ( CURL_FOUND )
+      set( HDF5_LIBRARIES ${HDF5_LIBRARIES} ${CURL_LIBRARIES} )
+    endif ( CURL_FOUND )
+    set( MOAB_LIBS ${HDF5_HL_LIBRARIES} ${HDF5_LIBRARIES} ${MOAB_LIBS} )
+    include_directories( ${HDF5_INCLUDE_DIRS} src/io/mhdf/include )
+  endif ( HDF5_FOUND )
 endif ( ENABLE_HDF5 )
 set_package_properties(HDF5 PROPERTIES
                     TYPE RECOMMENDED
@@ -376,11 +382,20 @@ set_package_properties(HDF5 PROPERTIES
 set (MOAB_HAVE_NETCDF OFF CACHE INTERNAL "Found necessary NetCDF components. Configure MOAB with it." )
 if ( ENABLE_NETCDF )
   find_package( NetCDF REQUIRED )
-  # set( MOAB_DEFINES "-DNETCDF_FILE ${MOAB_DEFINES}" )
-  set (MOAB_HAVE_NETCDF ON)
-  set (MOAB_HAVE_NETCDF_H 1)
-  include_directories( ${NETCDF_INCLUDES} )
-  set( MOAB_LIBS ${NETCDF_LIBRARIES} ${MOAB_LIBS} )
+
+  if ( NETCDF_FOUND )
+    # set( MOAB_DEFINES "-DNETCDF_FILE ${MOAB_DEFINES}" )
+    set (MOAB_HAVE_NETCDF ON)
+    set (MOAB_HAVE_NETCDF_H 1)
+
+    # print some NetCDF configuration details
+    message (STATUS "   NetCDF Configuration ::")
+    message (STATUS "        INCLUDES     : ${NETCDF_INCLUDES}")
+    message (STATUS "        LIBRARIES    : ${NETCDF_LIBRARIES}")
+
+    include_directories( ${NETCDF_INCLUDES} )
+    set( MOAB_LIBS ${NETCDF_LIBRARIES} ${MOAB_LIBS} )
+  endif ( NETCDF_FOUND )
 endif ( ENABLE_NETCDF )
 set_package_properties(NetCDF PROPERTIES
                     TYPE RECOMMENDED
@@ -391,6 +406,12 @@ set (MOAB_HAVE_PNETCDF OFF CACHE INTERNAL "Found necessary PNetCDF components. C
 if ( ENABLE_PNETCDF AND MOAB_HAVE_NETCDF )
 	find_package( PNetCDF REQUIRED )
 	set (MOAB_HAVE_PNETCDF ON)
+
+  # print some PNetCDF configuration details
+  message (STATUS "   PNetCDF Configuration ::")
+  message (STATUS "        INCLUDES     : ${PNETCDF_INCLUDES}")
+  message (STATUS "        LIBRARIES    : ${PNETCDF_LIBRARIES}")
+
 	include_directories( ${PNETCDF_INCLUDES} )
 	set( MOAB_LIBS ${PNETCDF_LIBRARIES} ${MOAB_LIBS} )
 endif ( ENABLE_PNETCDF AND MOAB_HAVE_NETCDF )
@@ -403,6 +424,12 @@ set (MOAB_HAVE_METIS OFF CACHE INTERNAL "Found necessary Metis components. Confi
 if ( ENABLE_METIS )
   find_package( Metis REQUIRED )
   set (MOAB_HAVE_METIS ON)
+
+  # print some Metis configuration details
+  message (STATUS "   Metis Configuration ::")
+  message (STATUS "        INCLUDES  : ${METIS_INCLUDES}")
+  message (STATUS "        LIBRARIES : ${METIS_LIBRARIES}")
+
 endif (ENABLE_METIS )
 set_package_properties(Metis PROPERTIES
                     TYPE RECOMMENDED
@@ -413,6 +440,12 @@ set (MOAB_HAVE_PARMETIS OFF CACHE INTERNAL "Found necessary ParMetis components.
 if ( ENABLE_PARMETIS AND ENABLE_METIS AND METIS_FOUND )
   find_package( ParMetis REQUIRED )
   set (MOAB_HAVE_PARMETIS ON)
+
+  # print some ParMetis configuration details
+  message (STATUS "   ParMetis Configuration ::")
+  message (STATUS "        INCLUDES  : ${PARMETIS_INCLUDES}")
+  message (STATUS "        LIBRARIES : ${PARMETIS_LIBRARIES}")
+
 endif ( ENABLE_PARMETIS AND ENABLE_METIS AND METIS_FOUND )
 set_package_properties(ParMetis PROPERTIES
                     TYPE RECOMMENDED
@@ -423,6 +456,12 @@ set (MOAB_HAVE_ZOLTAN OFF CACHE INTERNAL "Found necessary Zoltan components. Con
 if ( ENABLE_ZOLTAN )
   find_package( Zoltan REQUIRED )
   set (MOAB_HAVE_ZOLTAN ON)
+
+  # print some Zoltan configuration details
+  message (STATUS "   Zoltan Configuration ::")
+  message (STATUS "        INCLUDES  : ${ZOLTAN_INCLUDES}")
+  message (STATUS "        LIBRARIES : ${ZOLTAN_LIBRARIES}")
+
 endif (ENABLE_ZOLTAN )
 set_package_properties(Zoltan PROPERTIES
                     TYPE RECOMMENDED
@@ -435,6 +474,11 @@ if ( EIGEN3_FOUND AND ENABLE_TEMPESTREMAP )
   set_package_properties(TempestRemap PROPERTIES
                     TYPE OPTIONAL
                     PURPOSE "TempestRemap library interfaces for MOAB climate remapping support")
+
+  # print some TempestRemap configuration details
+  message (STATUS "   TempestRemap Configuration ::")
+  message (STATUS "        INCLUDES  : ${TEMPESTREMAP_INCLUDES}")
+  message (STATUS "        LIBRARIES : ${TEMPESTREMAP_LIBRARIES}")
 
 endif( EIGEN3_FOUND AND ENABLE_TEMPESTREMAP )
 
@@ -534,7 +578,6 @@ endif()
 ################################################################################
 # Add Directories
 ################################################################################
-message(STATUS "Adding src subdirectory.")
 add_subdirectory( src )
 if (NOT WIN32 OR MSYS OR MINGW) # Need further work to prepare for windows
   add_subdirectory( tools )

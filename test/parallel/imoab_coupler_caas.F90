@@ -82,7 +82,7 @@ program imoab_coupler_fortran
    integer :: tagIndexIn2 ! not really needed
    integer :: dummyCpl, dummyRC, dummyType
    double precision  :: boxeps
-   integer :: gnomonic
+   integer :: gnomonic, typeA, typeB
 
    cmpatm = 5
    cplatm = 6
@@ -194,6 +194,17 @@ program imoab_coupler_fortran
       call errorout(ierr, 'fail to free ocn buffers')
    end if
 
+    ! this model (recMeshOcn.h5m) has mixed meshes in it, we need to repair the comm graph
+    ! first delete the one created with migration, then compute a new one
+    if( ocnCouComm .NE. MPI_COMM_NULL ) then
+        ierr = iMOAB_DeleteCommGraph( cmpOcnPID, cplOcnPID, cmpocn, cplocn )
+        call errorout(ierr, 'cannot delete graph between ocn comp and ocn migrated to coupler')
+        typeA = 3 ! point cloud, phys mesh
+        typeB = 3 ! cells of atmosphere, dof based; maybe need another type for ParCommGraph graphtype ?
+        ierr = iMOAB_ComputeCommGraph( cmpOcnPID, cplOcnPID, ocnCouComm, ocnGroup, cplGroup, typeA, typeB, &
+             cmpocn, cplocn )
+        call errorout(ierr, 'cannot compute graph between ocn comp and ocn migrated to coupler' )
+    end if
    if (cplComm .NE. MPI_COMM_NULL) then
 
       ! set the ghost layers on the coupler for the source mesh

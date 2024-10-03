@@ -251,6 +251,19 @@ int main( int argc, char* argv[] )
                                         &couPEGroup, &ocnCouComm, ocnFilename, readopts, nghlay, repartitioner_scheme );
     CHECKIERR( ierr, "Cannot load and migrate ocn mesh" )
 
+    // this model (recMeshOcn.h5m) has mixed meshes in it, we need to repair the comm graph
+    // first delete the one created with migration, then compute a new one
+    if( ocnCouComm != MPI_COMM_NULL )
+    {
+        ierr = iMOAB_DeleteCommGraph( cmpOcnPID, cplOcnPID, &cmpocn, &cplocn );
+        CHECKIERR( ierr, "cannot delete graph between ocn comp and ocn migrated to coupler" )
+        int typeA = 3;  // point cloud, phys mesh
+        int typeB = 3;  // cells of atmosphere, dof based; maybe need another type for ParCommGraph graphtype ?
+        ierr = iMOAB_ComputeCommGraph( cmpOcnPID, cplOcnPID, &ocnCouComm, &ocnPEGroup, &couPEGroup, &typeA, &typeB,
+             &cmpocn, &cplocn );
+        CHECKIERR( ierr, "cannot compute graph between ocn comp and ocn migrated to coupler" )
+    }
+
 #endif  // #ifdef ENABLE_ATMOCN_COUPLING
 
 #ifdef ENABLE_ATMCPLOCN_COUPLING
@@ -767,7 +780,7 @@ int main( int argc, char* argv[] )
             CHECKIERR( ierr, "failed to define the field tag for receiving back the tags "
                              "a2oTbot_proj, a2oUbot_proj, a2oVbot_proj on ocn pes" );
         }
-        std::cout << "defined tag agian on ocn\n";
+        std::cout << "defined tag again on ocn\n";
         // send the tag to ocean pes, from ocean mesh on coupler pes
         //   from couComm, using common joint comm ocn_coupler
         // as always, use nonblocking sends

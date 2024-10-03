@@ -69,7 +69,7 @@ program imoab_coupler_fortran
    integer :: storLeng, eetype ! for tags defs
    character(:), allocatable :: concat_fieldname, concat_fieldnameT, outputFileOcn
    integer :: tagIndexIn2 ! not really needed
-   integer :: dummyCpl, dummyRC, dummyType
+   integer :: dummyCpl, dummyRC, dummyType, typeA, typeB
 
    cmpatm = 5
    cplatm = 6
@@ -184,6 +184,18 @@ program imoab_coupler_fortran
       ierr = iMOAB_FreeSenderBuffers(cmpocnPid, context_id)
       call errorout(ierr, 'fail to free ocn buffers')
    end if
+
+    ! this model (recMeshOcn.h5m) has mixed meshes in it, we need to repair the comm graph
+    ! first delete the one created with migration, then compute a new one
+    if( ocnCouComm .NE. MPI_COMM_NULL ) then
+        ierr = iMOAB_DeleteCommGraph( cmpOcnPID, cplOcnPID, cmpocn, cplocn )
+        call errorout(ierr, 'cannot delete graph between ocn comp and ocn migrated to coupler')
+        typeA = 3 ! point cloud, phys mesh
+        typeB = 3 ! cells of atmosphere, dof based; maybe need another type for ParCommGraph graphtype ?
+        ierr = iMOAB_ComputeCommGraph( cmpOcnPID, cplOcnPID, ocnCouComm, ocnGroup, cplGroup, typeA, typeB, &
+             cmpocn, cplocn )
+        call errorout(ierr, 'cannot compute graph between ocn comp and ocn migrated to coupler' )
+    end if
 
    if (cplComm .NE. MPI_COMM_NULL) then
       ierr = iMOAB_ComputeMeshIntersectionOnSphere(cplAtmPID, cplOcnPID, cplAtmOcnPID)

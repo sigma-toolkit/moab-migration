@@ -1001,6 +1001,21 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
                                 int* type2,
                                 int* comp1,
                                 int* comp2 );
+/**
+ * \brief Delete a communication graph between 2 iMOAB applications.
+ *
+ * \note <B>Operations:</B> Collective
+ *
+ * \param[in]  pid1 (iMOAB_AppID)                     The unique pointer to the first application ID.
+ * \param[in]  pid2 (iMOAB_AppID)                     The unique pointer to the second application ID.
+ * \param[in]  comp1 (int*)                           The unique identifier of the first component.
+ * \param[in]  comp2 (int*)                           The unique identifier of the second component.
+ * \return ErrCode                                    The error code indicating success or failure.
+ */
+ErrCode iMOAB_DeleteCommGraph( iMOAB_AppID pid1,
+                                iMOAB_AppID pid2,
+                                int* comp1,
+                                int* comp2 );
 
 /**
  * \brief Recompute the communication graph between component and coupler, considering intersection coverage.

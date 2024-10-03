@@ -2827,6 +2827,39 @@ ErrCode iMOAB_FreeSenderBuffers( iMOAB_AppID pid, int* context_id )
     mt->second->release_send_buffers();
     return moab::MB_SUCCESS;
 }
+/**
+ * \brief Delete a communication graph between 2 iMOAB applications
+ */
+ErrCode iMOAB_DeleteCommGraph( iMOAB_AppID pid1,
+                                iMOAB_AppID pid2,
+                                int* comp1,
+                                int* comp2 )
+{
+
+    if( *pid1 >= 0 )
+    {
+        appData& data                               = context.appDatas[*pid1];
+        std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *comp2 );
+        if( mt != data.pgraph.end() )
+        {
+            delete mt->second; // delete the par comm graph object
+            mt->second = nullptr;
+            data.pgraph.erase(mt); // delete the map entry
+        }
+    }
+    if( *pid2 >= 0 )
+    {
+        appData& data                               = context.appDatas[*pid2];
+        std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *comp1 );
+        if( mt != data.pgraph.end() )
+        {
+            delete mt->second; // delete the par comm graph object
+            mt->second = nullptr;
+            data.pgraph.erase(mt); // delete the map entry
+        }
+    }
+    return moab::MB_SUCCESS;
+}
 
 /**
 \brief compute a comm graph between 2 moab apps, based on ID matching

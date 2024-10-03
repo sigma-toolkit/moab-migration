@@ -325,6 +325,19 @@ int main( int argc, char* argv[] )
     CHECKIERR( ierr, "Cannot load and migrate ocn mesh" )
 
     MPI_Barrier( MPI_COMM_WORLD );
+    // this model (recMeshOcn.h5m) has mixed meshes in it, we need to repair the comm graph
+    // first delete the one created with migration, then compute a new one
+    if( ocnCouComm != MPI_COMM_NULL )
+    {
+        ierr = iMOAB_DeleteCommGraph( cmpOcnPID, cplOcnPID, &cmpocn, &cplocn );
+        CHECKIERR( ierr, "cannot delete graph between ocn comp and ocn migrated to coupler" )
+        int typeA = 3;  // point cloud, phys mesh
+        int typeB = 3;  // cells of atmosphere, dof based; maybe need another type for ParCommGraph graphtype ?
+        ierr = iMOAB_ComputeCommGraph( cmpOcnPID, cplOcnPID, &ocnCouComm, &ocnPEGroup, &couPEGroup, &typeA, &typeB,
+             &cmpocn, &cplocn );
+        CHECKIERR( ierr, "cannot compute graph between ocn comp and ocn migrated to coupler" )
+    }
+
 
 #ifdef VERBOSE
     if( couComm != MPI_COMM_NULL && 1 == n )

@@ -399,6 +399,15 @@ module iMOAB
         integer(c_int), intent(in) :: comp2
       end function iMOAB_ComputeCommGraph
 
+      integer(c_int) function iMOAB_DeleteCommGraph(pid1, pid2, &
+                                                     comp1, comp2) bind(C, name='iMOAB_DeleteCommGraph')
+        use, intrinsic :: iso_c_binding, only: c_int, c_ptr
+        integer(c_int), intent(in) :: pid1
+        integer(c_int), intent(in) :: pid2
+        integer(c_int), intent(in) :: comp1
+        integer(c_int), intent(in) :: comp2
+      end function iMOAB_DeleteCommGraph
+
       integer(c_int) function iMOAB_CoverageGraph(joint_comm, pid_source, pid_migration, pid_intx, source_id, &
                                                   migration_id, context_id) bind(C, name='iMOAB_CoverageGraph')
         use, intrinsic :: iso_c_binding, only: c_int, c_ptr

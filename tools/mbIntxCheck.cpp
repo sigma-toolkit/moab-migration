@@ -35,14 +35,7 @@ int main( int argc, char* argv[] )
 {
     std::stringstream sstr;
     // Default area_method = lHuiller; Options: Girard, GaussQuadrature (if TR is available)
-    const IntxAreaUtils::AreaMethod areaMethod = IntxAreaUtils::GaussQuadrature;
-
-    int rank = 0, size = 1;
-#ifdef MOAB_HAVE_MPI
-    MPI_Init( &argc, &argv );
-    MPI_Comm_rank( MPI_COMM_WORLD, &rank );
-    MPI_Comm_size( MPI_COMM_WORLD, &size );
-#endif
+    IntxAreaUtils::AreaMethod areaMethod = IntxAreaUtils::lHuiller;
 
     std::string sourceFile, targetFile, intxFile;
     std::string source_verif( "outS.h5m" ), target_verif( "outt.h5m" );
@@ -50,6 +43,13 @@ int main( int argc, char* argv[] )
     int oldNamesParents  = 0;
     double areaErrSource = -1;
     double areaErrTarget = -1;
+    int method           = 0;  // for area computation;
+                               /*    enum AreaMethod
+    {
+        lHuiller        = 0,
+        Girard          = 1,
+        GaussQuadrature = 2
+    };*/
     ProgOptions opts;
 
     opts.addOpt< std::string >( "source,s", "source file ", &sourceFile );
@@ -62,13 +62,11 @@ int main( int argc, char* argv[] )
 
     opts.addOpt< int >( "sphere,p", "mesh on a sphere", &sphere );
     opts.addOpt< int >( "old_convention,n", "old names for parent tags", &oldNamesParents );
+    opts.addOpt< int >( "areaMethod,a", "area method (0 lHuiller, 1 Girard, 2 Gauss) ", &method );
 
     opts.parseCommandLine( argc, argv );
-    // load meshes in parallel if needed
-    std::string opts_read = ( size == 1 ? ""
-                                        : std::string( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION" ) +
-                                              std::string( ";PARALLEL_RESOLVE_SHARED_ENTS" ) );
 
+    areaMethod = (moab::IntxAreaUtils::AreaMethod)method;
     // read meshes in 3 file sets
     ErrorCode rval;
     Core moab;
@@ -79,12 +77,13 @@ int main( int argc, char* argv[] )
     rval = mb->create_meshset( MESHSET_SET, sset );MB_CHK_ERR( rval );
     rval = mb->create_meshset( MESHSET_SET, tset );MB_CHK_ERR( rval );
     rval = mb->create_meshset( MESHSET_SET, ixset );MB_CHK_ERR( rval );
-    if( 0 == rank ) std::cout << "Loading source file " << sourceFile << "\n";
+    std::string opts_read;  // no options
+    std::cout << "Loading source file " << sourceFile << "\n";
     rval = mb->load_file( sourceFile.c_str(), &sset, opts_read.c_str() );MB_CHK_SET_ERR( rval, "failed reading source file" );
-    if( 0 == rank ) std::cout << "Loading target file " << targetFile << "\n";
+    std::cout << "Loading target file " << targetFile << "\n";
     rval = mb->load_file( targetFile.c_str(), &tset, opts_read.c_str() );MB_CHK_SET_ERR( rval, "failed reading target file" );
 
-    if( 0 == rank ) std::cout << "Loading intersection file " << intxFile << "\n";
+    std::cout << "Loading intersection file " << intxFile << "\n";
     rval = mb->load_file( intxFile.c_str(), &ixset, opts_read.c_str() );MB_CHK_SET_ERR( rval, "failed reading intersection file" );
     double R = 1.;
     if( sphere )
@@ -146,7 +145,11 @@ int main( int argc, char* argv[] )
         const EntityHandle* verts;
         int num_nodes;
         rval = mb->get_connectivity( cell, verts, num_nodes );MB_CHK_ERR( rval );
+        //
         if( MB_SUCCESS != rval ) return -1;
+        // account for padded polygons
+        while( verts[num_nodes - 2] == verts[num_nodes - 1] && num_nodes > 3 )
+            num_nodes--;
         std::vector< double > coords( 3 * num_nodes );
         // get coordinates
         rval = mb->get_coords( verts, num_nodes, &coords[0] );
@@ -165,6 +168,9 @@ int main( int argc, char* argv[] )
         int num_nodes;
         rval = mb->get_connectivity( cell, verts, num_nodes );MB_CHK_ERR( rval );
         if( MB_SUCCESS != rval ) return -1;
+        // account for padded polygons
+        while( verts[num_nodes - 2] == verts[num_nodes - 1] && num_nodes > 3 )
+            num_nodes--;
         std::vector< double > coords( 3 * num_nodes );
         // get coordinates
         rval = mb->get_coords( verts, num_nodes, &coords[0] );
@@ -260,7 +266,7 @@ int main( int argc, char* argv[] )
             rval = mb->add_entities( errorSourceSet, &cell, 1 );MB_CHK_ERR( rval );
         }
     }
-    if( 0 == rank ) std::cout << "write source verification file " << source_verif << "\n";
+    std::cout << "write source verification file " << source_verif << "\n";
     rval = mb->write_file( source_verif.c_str(), 0, 0, &sset, 1 );MB_CHK_ERR( rval );
     if( areaErrSource > 0 )
     {
@@ -317,7 +323,7 @@ int main( int argc, char* argv[] )
             rval = mb->add_entities( errorTargetSet, &cell, 1 );MB_CHK_ERR( rval );
         }
     }
-    if( 0 == rank ) std::cout << "write target verification file " << target_verif << "\n";
+    std::cout << "write target verification file " << target_verif << "\n";
     rval = mb->write_file( target_verif.c_str(), 0, 0, &tset, 1 );MB_CHK_ERR( rval );
     if( areaErrTarget > 0 )
     {

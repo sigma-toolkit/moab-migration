@@ -60,7 +60,7 @@ build.verbose = true
 logging.level = "INFO"
 wheel.install-dir = "pymoab/core"
 wheel.packages = ["pymoab"]
-wheel.exclude = ["CMakeLists.txt", "Makefile.am", "*.pyx"]
+wheel.exclude = ["CMakeLists.txt", "Makefile.am", "*.pyx", "*.pxd"]
 
 # Get version from CMakeLists
 [tool.scikit-build.metadata.version]

@@ -145,15 +145,13 @@ int main( int argc, char* argv[] )
         const EntityHandle* verts;
         int num_nodes;
         rval = mb->get_connectivity( cell, verts, num_nodes );MB_CHK_ERR( rval );
-        //
-        if( MB_SUCCESS != rval ) return -1;
         // account for padded polygons
         while( verts[num_nodes - 2] == verts[num_nodes - 1] && num_nodes > 3 )
             num_nodes--;
         std::vector< double > coords( 3 * num_nodes );
         // get coordinates
-        rval = mb->get_coords( verts, num_nodes, &coords[0] );
-        if( MB_SUCCESS != rval ) return -1;
+        rval = mb->get_coords( verts, num_nodes, &coords[0] );MB_CHK_ERR( rval );
+
         double area = areaAdaptor.area_spherical_polygon( &coords[0], num_nodes, R );
         int sourceID;
         rval = mb->tag_get_data( gidTag, &cell, 1, &sourceID );MB_CHK_ERR( rval );
@@ -167,14 +165,14 @@ int main( int argc, char* argv[] )
         const EntityHandle* verts;
         int num_nodes;
         rval = mb->get_connectivity( cell, verts, num_nodes );MB_CHK_ERR( rval );
-        if( MB_SUCCESS != rval ) return -1;
+
         // account for padded polygons
         while( verts[num_nodes - 2] == verts[num_nodes - 1] && num_nodes > 3 )
             num_nodes--;
         std::vector< double > coords( 3 * num_nodes );
         // get coordinates
-        rval = mb->get_coords( verts, num_nodes, &coords[0] );
-        if( MB_SUCCESS != rval ) return -1;
+        rval = mb->get_coords( verts, num_nodes, &coords[0] );MB_CHK_ERR( rval );
+
         double area = areaAdaptor.area_spherical_polygon( &coords[0], num_nodes, R );
         int targetID;
         rval = mb->tag_get_data( gidTag, &cell, 1, &targetID );MB_CHK_ERR( rval );
@@ -189,16 +187,14 @@ int main( int argc, char* argv[] )
         const EntityHandle* verts;
         int num_nodes;
         rval = mb->get_connectivity( cell, verts, num_nodes );MB_CHK_ERR( rval );
-        if( MB_SUCCESS != rval ) return -1;
+
         std::vector< double > coords( 3 * num_nodes );
         // get coordinates
-        rval = mb->get_coords( verts, num_nodes, &coords[0] );
-        if( MB_SUCCESS != rval ) return -1;
+        rval = mb->get_coords( verts, num_nodes, &coords[0] );MB_CHK_ERR( rval );
         int check_sign   = 1;
         double intx_area = areaAdaptor.area_spherical_polygon( &coords[0], num_nodes, R, &check_sign );
 
-        rval = mb->tag_set_data( areaTag, &cell, 1, &intx_area );
-        ;MB_CHK_ERR( rval );
+        rval = mb->tag_set_data( areaTag, &cell, 1, &intx_area );MB_CHK_ERR( rval );
         int sourceID, targetID;
         rval = mb->tag_get_data( sourceParentTag, &cell, 1, &sourceID );MB_CHK_ERR( rval );
         rval = mb->tag_get_data( targetParentTag, &cell, 1, &targetID );MB_CHK_ERR( rval );
@@ -289,8 +285,7 @@ int main( int argc, char* argv[] )
                 std::vector< int >::iterator j = std::lower_bound( sourceIDs.begin(), sourceIDs.end(), sourceID );
                 if( ( j != sourceIDs.end() ) && ( *j == sourceID ) )
                 {
-                    rval = mb->add_entities( errorSourceIntxSet, &cell, 1 );
-                    ;MB_CHK_ERR( rval );
+                    rval = mb->add_entities( errorSourceIntxSet, &cell, 1 );MB_CHK_ERR( rval );
                 }
             }
             std::string filtersource     = std::string( "filt_" ) + source_verif;
@@ -315,8 +310,8 @@ int main( int argc, char* argv[] )
             countIntxCells = targetNbIntx[targetID];
         }
 
-        rval = mb->tag_set_data( diffTag, &cell, 1, &areaDiff );
-        rval = mb->tag_set_data( countIntxCellsTag, &cell, 1, &countIntxCells );
+        rval = mb->tag_set_data( diffTag, &cell, 1, &areaDiff );MB_CHK_ERR( rval );
+        rval = mb->tag_set_data( countIntxCellsTag, &cell, 1, &countIntxCells );MB_CHK_ERR( rval );
         // add to errorTargetSet set if needed
         if( ( areaErrTarget > 0 ) && ( fabs( areaDiff ) > areaErrTarget ) )
         {
@@ -346,8 +341,7 @@ int main( int argc, char* argv[] )
                 std::vector< int >::iterator j = std::lower_bound( targetIDs.begin(), targetIDs.end(), targetID );
                 if( ( j != targetIDs.end() ) && ( *j == targetID ) )
                 {
-                    rval = mb->add_entities( errorTargetIntxSet, &cell, 1 );
-                    ;MB_CHK_ERR( rval );
+                    rval = mb->add_entities( errorTargetIntxSet, &cell, 1 );MB_CHK_ERR( rval );
                 }
             }
             std::string filterTarget     = std::string( "filt_" ) + target_verif;
@@ -373,19 +367,19 @@ int main( int argc, char* argv[] )
         }
         EntityHandle nonConvexSet;
         rval = mb->create_meshset( MESHSET_SET, nonConvexSet );MB_CHK_ERR( rval );
-        rval = mb->add_entities( nonConvexSet, non_convex_intx_cells );
+        rval = mb->add_entities( nonConvexSet, non_convex_intx_cells );MB_CHK_ERR( rval );
         rval = mb->write_file( "nonConvex.h5m", 0, 0, &nonConvexSet, 1 );MB_CHK_ERR( rval );
 
         EntityHandle sSet;
         rval = mb->create_meshset( MESHSET_SET, sSet );MB_CHK_ERR( rval );
-        rval = mb->add_entities( sSet, sourceCells );
+        rval = mb->add_entities( sSet, sourceCells );MB_CHK_ERR( rval );
         rval = mb->write_file( "nonConvexSource.h5m", 0, 0, &sSet, 1 );MB_CHK_ERR( rval );
         EntityHandle tSet;
         rval = mb->create_meshset( MESHSET_SET, tSet );MB_CHK_ERR( rval );
-        rval = mb->add_entities( tSet, targetCells );
+        rval = mb->add_entities( tSet, targetCells );MB_CHK_ERR( rval );
         rval = mb->write_file( "nonConvexTarget.h5m", 0, 0, &tSet, 1 );MB_CHK_ERR( rval );
-        rval = mb->add_entities( nonConvexSet, sourceCells );
-        rval = mb->add_entities( nonConvexSet, targetCells );
+        rval = mb->add_entities( nonConvexSet, sourceCells );MB_CHK_ERR( rval );
+        rval = mb->add_entities( nonConvexSet, targetCells );MB_CHK_ERR( rval );
         rval = mb->write_file( "nonConvexAll.h5m", 0, 0, &nonConvexSet, 1 );MB_CHK_ERR( rval );
     }
     return 0;

@@ -1774,27 +1774,27 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
         if( m_remapper->point_cloud_source )
         {
             moab::Range& covSrcEnts = m_remapper->GetMeshVertices( moab::Remapper::CoveringMesh );
-            solSTagVals.resize( covSrcEnts.size(), -1.0 );
+            solSTagVals.resize( covSrcEnts.size(), 0.0 );
             sents = covSrcEnts;
         }
         else
         {
             moab::Range& covSrcEnts = m_remapper->GetMeshEntities( moab::Remapper::CoveringMesh );
             solSTagVals.resize( covSrcEnts.size() * this->GetSourceNDofsPerElement() * this->GetSourceNDofsPerElement(),
-                                -1.0 );
+                                 0.0 );
             sents = covSrcEnts;
         }
         if( m_remapper->point_cloud_target )
         {
             moab::Range& tgtEnts = m_remapper->GetMeshVertices( moab::Remapper::TargetMesh );
-            solTTagVals.resize( tgtEnts.size(), -1.0 );
+            solTTagVals.resize( tgtEnts.size(),  0.0 );
             tents = tgtEnts;
         }
         else
         {
             moab::Range& tgtEnts = m_remapper->GetMeshEntities( moab::Remapper::TargetMesh );
             solTTagVals.resize(
-                tgtEnts.size() * this->GetDestinationNDofsPerElement() * this->GetDestinationNDofsPerElement(), -1.0 );
+                tgtEnts.size() * this->GetDestinationNDofsPerElement() * this->GetDestinationNDofsPerElement(),  0.0 );
             tents = tgtEnts;
         }
     }
@@ -1803,9 +1803,9 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
         moab::Range& covSrcEnts = m_remapper->GetMeshEntities( moab::Remapper::CoveringMesh );
         moab::Range& tgtEnts    = m_remapper->GetMeshEntities( moab::Remapper::TargetMesh );
         solSTagVals.resize( covSrcEnts.size() * this->GetSourceNDofsPerElement() * this->GetSourceNDofsPerElement(),
-                            -1.0 );
+                             0.0 );
         solTTagVals.resize(
-            tgtEnts.size() * this->GetDestinationNDofsPerElement() * this->GetDestinationNDofsPerElement(), -1.0 );
+            tgtEnts.size() * this->GetDestinationNDofsPerElement() * this->GetDestinationNDofsPerElement(),  0.0 );
 
         sents = covSrcEnts;
         tents = tgtEnts;

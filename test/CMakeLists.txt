@@ -211,6 +211,15 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
   add_test( TestParallel
     ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/parallel_unit_tests ${MPIEXEC_POSTFLAGS} )
 
+  if (ENABLE_FORTRAN)
+    set_source_files_properties( parallel/imoab_exchange_tags.F90
+      COMPILE_FLAGS "-DTEST ${MOAB_DEFINES} ${TEST_COMP_FLAGS}" )
+    add_executable ( imoab_exchange_tags parallel/imoab_exchange_tags.F90 )
+    target_link_libraries( imoab_exchange_tags MOAB ${MPI_LIBRARIES} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
+    add_test( iMOAB_ExchangeTags
+      ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/imoab_exchange_tags ${MPIEXEC_POSTFLAGS} )
+  endif (ENABLE_FORTRAN)
+
   set_source_files_properties( parallel/pcomm_serial.cpp
     COMPILE_FLAGS "-DTEST ${MOAB_DEFINES} ${TEST_COMP_FLAGS}" )
   add_executable ( pcomm_serial parallel/pcomm_serial.cpp )

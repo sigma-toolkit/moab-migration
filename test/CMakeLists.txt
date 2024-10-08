@@ -18,6 +18,7 @@ set(TEST_COMP_FLAGS "-DMESHDIR=${MOAB_ABSSRC_DIR}/MeshFiles/unittest")
 
 set( TESTS range_test.cpp
            verdict_test.cpp
+           test_Matrix3.cpp
            scdseq_test.cpp
            scd_test_partn.cpp
            test_adj.cpp

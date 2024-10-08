@@ -123,7 +123,6 @@ int main( int argc, char* argv[] )
 
     try
     {
-
         // Temporarily change rval reporting
         NcError error_temp( NcError::verbose_fatal );
 

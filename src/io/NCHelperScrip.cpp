@@ -25,7 +25,6 @@ bool NCHelperScrip::can_read_file( ReadNC* readNC, int /*fileId*/ )
         ( std::find( dimNames.begin(), dimNames.end(), std::string( "grid_corners" ) ) != dimNames.end() ) &&
         ( std::find( dimNames.begin(), dimNames.end(), std::string( "grid_rank" ) ) != dimNames.end() ) )
     {
-
         return true;
     }
 

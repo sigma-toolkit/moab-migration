@@ -231,7 +231,7 @@ fi
 
 ### Check for BLAS and Lapack dense solvers
 AC_ARG_ENABLE( [blaslapack],
-              [AS_HELP_STRING([--disable-blaslapack], [Enable/disable external BLAS/LAPACK interface; If disabled, Eigen3 should be enabled.])],
+              [AS_HELP_STRING([--disable-blaslapack], [Enable/disable external BLAS/LAPACK interface])],
 [enable_blaslapack=no],
 [enable_blaslapack=yes] )
 
@@ -549,10 +549,6 @@ fi
 ################################################################################
 
 FATHOM_CONFIGURE_EIGEN3
-
-if (test "x$enable_blaslapack" != "xyes" && test "x$enableeigen" != "xyes"); then
-  AC_MSG_ERROR("Either external BLAS/LAPACK libraries or Eigen headers need to be provided.")
-fi
 
 ################################################################################
 #                              HYPRE OPTIONS

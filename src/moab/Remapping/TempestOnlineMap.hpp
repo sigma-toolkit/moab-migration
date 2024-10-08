@@ -393,7 +393,8 @@ class TempestOnlineMap : public OfflineMap
     moab::ErrorCode ApplyWeights( moab::Tag srcSolutionTag,
                                   moab::Tag tgtSolutionTag,
                                   bool transpose    = false,
-                                  CAASType caasType = CAAS_NONE );
+                                  CAASType caasType = CAAS_NONE,
+								  double default_projection = 0.0);
 
     typedef double ( *sample_function )( double, double );
 

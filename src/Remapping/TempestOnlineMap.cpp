@@ -610,8 +610,9 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
 #if defined( MOAB_HAVE_EIGEN3 ) && defined( VERBOSE )
     if( vprint )
     {
-        std::cout << "[" << rank << "]" << "DoFs: row = " << m_nTotDofs_Dest << ", " << row_gdofmap.size()
-                  << ", col = " << m_nTotDofs_Src << ", " << m_nTotDofs_SrcCov << ", " << col_gdofmap.size() << "\n";
+        std::cout << "[" << rank << "]"
+                  << "DoFs: row = " << m_nTotDofs_Dest << ", " << row_gdofmap.size() << ", col = " << m_nTotDofs_Src
+                  << ", " << m_nTotDofs_SrcCov << ", " << col_gdofmap.size() << "\n";
         // std::cout << "Max col_dofmap: " << maxcol << ", Min col_dofmap" << mincol << "\n";
     }
 #endif
@@ -1519,7 +1520,7 @@ int moab::TempestOnlineMap::IsConsistent( double dTolerance )
 
     int ierr;
     int fConsistentGlobal = 0;
-    ierr                  = MPI_Allreduce( &fConsistent, &fConsistentGlobal, 1, MPI_INT, MPI_SUM, m_pcomm->comm() );
+    ierr = MPI_Allreduce( &fConsistent, &fConsistentGlobal, 1, MPI_INT, MPI_SUM, m_pcomm->comm() );
     if( ierr != MPI_SUCCESS ) return -1;
 
     return fConsistentGlobal;
@@ -1700,7 +1701,7 @@ int moab::TempestOnlineMap::IsMonotone( double dTolerance )
 
     int ierr;
     int fMonotoneGlobal = 0;
-    ierr                = MPI_Allreduce( &fMonotone, &fMonotoneGlobal, 1, MPI_INT, MPI_SUM, m_pcomm->comm() );
+    ierr = MPI_Allreduce( &fMonotone, &fMonotoneGlobal, 1, MPI_INT, MPI_SUM, m_pcomm->comm() );
     if( ierr != MPI_SUCCESS ) return -1;
 
     return fMonotoneGlobal;
@@ -1761,7 +1762,8 @@ void moab::TempestOnlineMap::ComputeAdjacencyRelations( std::vector< std::unorde
 moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
                                                       moab::Tag tgtSolutionTag,
                                                       bool transpose,
-                                                      CAASType caasType )
+                                                      CAASType caasType,
+                                                      double default_projection )
 {
     moab::ErrorCode rval;
 
@@ -1774,27 +1776,28 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
         if( m_remapper->point_cloud_source )
         {
             moab::Range& covSrcEnts = m_remapper->GetMeshVertices( moab::Remapper::CoveringMesh );
-            solSTagVals.resize( covSrcEnts.size(), 0.0 );
+            solSTagVals.resize( covSrcEnts.size(), default_projection );
             sents = covSrcEnts;
         }
         else
         {
             moab::Range& covSrcEnts = m_remapper->GetMeshEntities( moab::Remapper::CoveringMesh );
             solSTagVals.resize( covSrcEnts.size() * this->GetSourceNDofsPerElement() * this->GetSourceNDofsPerElement(),
-                                 0.0 );
+                                default_projection );
             sents = covSrcEnts;
         }
         if( m_remapper->point_cloud_target )
         {
             moab::Range& tgtEnts = m_remapper->GetMeshVertices( moab::Remapper::TargetMesh );
-            solTTagVals.resize( tgtEnts.size(),  0.0 );
+            solTTagVals.resize( tgtEnts.size(), default_projection );
             tents = tgtEnts;
         }
         else
         {
             moab::Range& tgtEnts = m_remapper->GetMeshEntities( moab::Remapper::TargetMesh );
-            solTTagVals.resize(
-                tgtEnts.size() * this->GetDestinationNDofsPerElement() * this->GetDestinationNDofsPerElement(),  0.0 );
+            solTTagVals.resize( tgtEnts.size() * this->GetDestinationNDofsPerElement() *
+                                    this->GetDestinationNDofsPerElement(),
+                                default_projection );
             tents = tgtEnts;
         }
     }
@@ -1803,9 +1806,10 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
         moab::Range& covSrcEnts = m_remapper->GetMeshEntities( moab::Remapper::CoveringMesh );
         moab::Range& tgtEnts    = m_remapper->GetMeshEntities( moab::Remapper::TargetMesh );
         solSTagVals.resize( covSrcEnts.size() * this->GetSourceNDofsPerElement() * this->GetSourceNDofsPerElement(),
-                             0.0 );
-        solTTagVals.resize(
-            tgtEnts.size() * this->GetDestinationNDofsPerElement() * this->GetDestinationNDofsPerElement(),  0.0 );
+                            default_projection );
+        solTTagVals.resize( tgtEnts.size() * this->GetDestinationNDofsPerElement() *
+                                this->GetDestinationNDofsPerElement(),
+                            default_projection );
 
         sents = covSrcEnts;
         tents = tgtEnts;
@@ -1828,16 +1832,12 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
         constexpr int nmax_caas_iterations = 10;
         double mismatch                    = 1.0;
         int caasIteration                  = 0;
-        double initialMismatch = 0.0;
+        double initialMismatch             = 0.0;
         while( ( fabs( mismatch / initialMismatch ) > 1e-15 && fabs( mismatch ) > 1e-15 ) &&
                caasIteration++ < nmax_caas_iterations )  // iterate until convergence or a maximum of 5 iterations
         {
             // The tag data is np*np*n_el_dest
             rval = m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] );MB_CHK_SET_ERR( rval, "Setting local tag data failed" );
-
-// #ifdef MOAB_HAVE_MPI
-//             rval = m_pcomm->exchange_tags( tgtSolutionTag, tents );MB_CHK_SET_ERR( rval, "Tag exchange failed" );
-// #endif
 
             double dMassDiffPostGlobal;
             std::pair< double, double > mDefect =

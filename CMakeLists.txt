@@ -768,7 +768,7 @@ install(FILES ${MOAB_DOCS} DESTINATION ${CMAKE_INSTALL_DOCDIR})
 
 CONFIGURE_FILE(examples/makefile.config.cmake "${PROJECT_BINARY_DIR}/share/examples/makefile.config" @ONLY)
 install(FILES ${PROJECT_BINARY_DIR}/share/examples/makefile.config
-  DESTINATION ${CMAKE_INSTALL_DOCDIR}/examples)
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/examples)
 
 SET(MOAB_EXAMPLES
   examples/makefile

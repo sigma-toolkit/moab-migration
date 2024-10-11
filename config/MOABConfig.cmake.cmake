@@ -108,4 +108,10 @@ else()
     OUTPUT_VARIABLE MOAB_LIBRARY_DIRS
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
+  execute_process(COMMAND ${Python_EXECUTABLE} -c "import pymoab.core; print(pymoab.core.get_shared_libraries())"
+    OUTPUT_VARIABLE MOAB_PACKAGE_LIBS
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  set(MOAB_LIBS "-lMOAB")
+  set(MOAB_LIBRARIES "-L${MOAB_LIBRARY_DIRS} ${MOAB_LIBS} ${MOAB_PACKAGE_LIBS}")
 endif()

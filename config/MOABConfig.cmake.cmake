@@ -100,18 +100,26 @@ if(NOT @SKBUILD@)
   set(MOAB_LIBRARIES "-L@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@ ${MOAB_LIBS} ${MOAB_PACKAGE_LIBS}")
 else()
   find_package(Python COMPONENTS Interpreter REQUIRED)
-  execute_process(COMMAND ${Python_EXECUTABLE} -c "import pymoab.core; print(pymoab.core.get_include_path())"
+  execute_process(COMMAND ${Python_EXECUTABLE} -c "import pymoab; print(pymoab.include_path)"
     OUTPUT_VARIABLE MOAB_INCLUDE_DIRS
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
-  execute_process(COMMAND ${Python_EXECUTABLE} -c "import pymoab.core; print(pymoab.core.get_library_path())"
+  execute_process(COMMAND ${Python_EXECUTABLE} -c "import pymoab; print(pymoab.lib_path)"
     OUTPUT_VARIABLE MOAB_LIBRARY_DIRS
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
-  execute_process(COMMAND ${Python_EXECUTABLE} -c "import pymoab.core; print(pymoab.core.get_shared_libraries())"
-    OUTPUT_VARIABLE MOAB_PACKAGE_LIBS
+  execute_process(COMMAND ${Python_EXECUTABLE} -c "import pymoab; print(' '.join(pymoab.extra_lib))"
+    OUTPUT_VARIABLE MOAB_EXTRA_LIBRARIES
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
-  set(MOAB_LIBS "-lMOAB")
-  set(MOAB_LIBRARIES "-L${MOAB_LIBRARY_DIRS} ${MOAB_LIBS} ${MOAB_PACKAGE_LIBS}")
+  if(MOAB_EXTRA_LIBRARIES)
+    message(FATAL_ERROR
+        "This build of MOAB is not supported. "
+        "It appears that the wheel was repaired using tools like auditwheel or delocate, "
+        "that modifies the shared libraries, which may cause problems.\n"
+        "MOAB_EXTRA_LIBRARIES is not empty: ${MOAB_EXTRA_LIBRARIES}.\n"
+        "To resolve this, please build MOAB from scratch. "
+        "For more information, visit: https://bitbucket.org/fathomteam/moab\n"
+    )
+  endif()
 endif()

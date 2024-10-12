@@ -22,7 +22,7 @@ if (NOT WIN32) # Need further work to prepare for windows
 
 add_executable( h5minfo include/mhdf.h example/info.c $<TARGET_OBJECTS:mhdf> )
 target_link_libraries( h5minfo ${HDF5_LIBRARIES} )
-if(SKBUILD)
+if(PYMOAB_BINARY_RPATH)
   # Set the install RPATH
   set_target_properties(h5minfo PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
 endif()
@@ -34,7 +34,7 @@ install(
   )
 
 add_executable( h5mvalidate example/validate.c $<TARGET_OBJECTS:mhdf> )
-if(SKBUILD)
+if(PYMOAB_BINARY_RPATH)
   # Set the install RPATH
   set_target_properties(h5mvalidate PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
 endif()

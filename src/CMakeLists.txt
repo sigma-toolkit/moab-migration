@@ -311,7 +311,7 @@ target_include_directories(MOAB
 
 generate_export_header(MOAB)
 
-if(SKBUILD)
+if(PYMOAB_LIBRARY_RPATH)
   set_target_properties(
     MOAB
     PROPERTIES

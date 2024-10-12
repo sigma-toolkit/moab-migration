@@ -18,14 +18,14 @@ constructs such as lists, tuples, etc.
 """
 
 import os
+import sys
 import glob
-import sysconfig
 from importlib.metadata import version, PackageNotFoundError
 
 try:
     __version__ = version('MOAB')
 except PackageNotFoundError:
-    __version__ = 'Please install this project with pip'
+    __version__ = "unknown"
 
 def get_path(subdir, pattern="*"):
     """Helper function to return paths that match a given pattern within a subdirectory."""
@@ -44,7 +44,7 @@ def get_core_libraries():
 
 def get_extra_libraries():
     """List all the extra libraries of MOAB."""
-    libs_path = os.path.join(sysconfig.get_paths()['platlib'], "moab.libs")
+    libs_path = os.path.join(__path__[0], ".dylibs") if sys.platform == "darwin" else os.path.join(__path__[0], "..", "moab.libs")
     return (glob.glob(os.path.join(libs_path, "*")), libs_path) if os.path.exists(libs_path) else ([], [])
 
 # Setup variables

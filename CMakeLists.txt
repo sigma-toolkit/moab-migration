@@ -760,7 +760,11 @@ ADD_CUSTOM_TARGET(
 SET(MOAB_DOCS ${MOAB_DOCS}
   LICENSE README.md RELEASE_NOTES.md TODO.md
 )
-install(FILES ${MOAB_DOCS} DESTINATION ${CMAKE_INSTALL_DOCDIR})
+set(MOABDocLocation share/doc/moab)
+if(SKBUILD)
+  set(MOABDocLocation ${SKBUILD_DATA_DIR}/${MOABDocLocation})
+endif()
+install(FILES ${MOAB_DOCS} DESTINATION ${MOABDocLocation})
 
 CONFIGURE_FILE(examples/makefile.config.cmake "${PROJECT_BINARY_DIR}/share/examples/makefile.config" @ONLY)
 install(FILES ${PROJECT_BINARY_DIR}/share/examples/makefile.config

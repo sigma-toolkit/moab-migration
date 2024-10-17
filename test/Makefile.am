@@ -1,7 +1,7 @@
 # Don't require GNU-standard files (Changelog, README, etc.)
 AUTOMAKE_OPTIONS = foreign subdir-objects no-dependencies
 
-SUBDIRS = . io dual obb perf
+SUBDIRS = . io obb perf
 if HAVE_HDF5
   SUBDIRS += h5file
 endif
@@ -30,6 +30,7 @@ endif
 
 TESTS = range_test \
         moab_test \
+        dual_test \
         homxform_test \
         scdseq_test \
         scd_test_partn \
@@ -152,6 +153,7 @@ moab_test_DEPENDENCIES = \
 	cell2.gen \
 	$(LDADD)
 
+dual_test_SOURCES = dual_test.cpp
 homxform_test_SOURCES = homxform_test.cpp
 scdseq_test_SOURCES = scdseq_test.cpp
 scd_test_partn_SOURCES = scd_test_partn.cpp
@@ -288,7 +290,7 @@ LTPPF77COMPILE = $(LIBTOOL) $(AM_V_lt) --tag=F77 $(AM_LIBTOOLFLAGS) \
    $(AM_FFLAGS) $(FFLAGS)
 
 
-CMAKELISTS_FILES = CMakeLists.txt dual/CMakeLists.txt h5file/CMakeLists.txt io/CMakeLists.txt obb/CMakeLists.txt perf/CMakeLists.txt perf/point_location/CMakeLists.txt
+CMAKELISTS_FILES = CMakeLists.txt h5file/CMakeLists.txt io/CMakeLists.txt obb/CMakeLists.txt perf/CMakeLists.txt perf/point_location/CMakeLists.txt
 
 EXTRA_DIST = TestUtil.hpp TestRunner.hpp $(CMAKELISTS_FILES) $(PYMOAB_DIST)
 
@@ -302,7 +304,7 @@ cell2.gen: $(MESHDIR)/cell2.gen.gz
 	$(AM_V_GEN)$(ZCAT) $< > $@
 
 
-CLEANFILES = *.g *.gen *.nc *.h5m $(PYCLEANFILES)
+CLEANFILES = *.g *.gen *.nc *.h5m *.vtk $(PYCLEANFILES)
 
 DISTCLEANFILES = a.out
 

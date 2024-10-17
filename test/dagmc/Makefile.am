@@ -19,10 +19,10 @@ endif
 check_PROGRAMS = $(TESTS)
 
 dagmc_simple_test_SOURCES = $(srcdir)/../TestUtil.hpp dagmc_simple_test.cpp
-dagmc_simple_test_CXXFLAGS = $(CGM_CPPFLAGS) $(CXXFLAGS) $(CGM_LIBS)
+dagmc_simple_test_CXXFLAGS = $(CXXFLAGS)
 dagmc_rayfire_test_SOURCES = $(srcdir)/../TestUtil.hpp dagmc_rayfire_test.cpp
-dagmc_rayfire_test_CXXFLAGS = $(CGM_CPPFLAGS) $(CXXFLAGS) $(CGM_LIBS)
+dagmc_rayfire_test_CXXFLAGS = $(CXXFLAGS)
 dagmc_pointinvol_test_SOURCES = $(srcdir)/../TestUtil.hpp dagmc_pointinvol_test.cpp
-dagmc_pointinvol_test_CXXFLAGS = $(CGM_CPPFLAGS) $(CXXFLAGS) $(CGM_LIBS)
+dagmc_pointinvol_test_CXXFLAGS = $(CXXFLAGS)
 
 

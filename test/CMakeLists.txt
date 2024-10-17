@@ -7,7 +7,6 @@ include_directories(
     ${CMAKE_BINARY_DIR}/src/parallel )
 
 add_subdirectory(io)
-add_subdirectory(dual)
 if( MOAB_HAVE_HDF5 )
   add_subdirectory(h5file)
 endif()
@@ -41,7 +40,8 @@ set( TESTS range_test.cpp
            spherical_area_test.cpp
            arc_intx_tests.cpp
            intx_in_plane_test.cpp
-           intx_on_sphere_test.cpp )
+           intx_on_sphere_test.cpp
+           dual_test.cpp )
 
 if(MOAB_HAVE_HDF5)
   set( TESTS ${TESTS}

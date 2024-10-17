@@ -102,7 +102,7 @@ examples_apps_earth_DATA = \
                examples/apps/earth/copyPartition.cpp
 
 CMAKE_CONFIGURATION_FILES = CMakeLists.txt \
-   config/AutoconfHeader.cmake      config/FindCGM.cmake          config/FindNetCDF.cmake        config/FindZoltan.cmake     config/GetAcInitVersion.cmake \
+   config/AutoconfHeader.cmake      config/FindNetCDF.cmake        config/FindZoltan.cmake     config/GetAcInitVersion.cmake \
    config/CMakeDistCheck.cmake      config/FindEigen3.cmake       config/FindPNetCDF.cmake       config/Findgraphviz.cmake   config/MOABConfig.cmake.cmake \
    config/CMakeLibraryFuncs.cmake   config/FindParMetis.cmake      config/Findverdict.cmake    config/ResolveCompilerPaths.cmake \
    config/CheckCompilerFlags.cmake  config/FindMetis.cmake        config/FindTempestRemap.cmake  config/ForceAddFlags.cmake  config/TestBigEndian.cmake \

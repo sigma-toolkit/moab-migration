@@ -99,19 +99,33 @@ if(NOT @SKBUILD@)
   set(MOAB_LIBS "-lMOAB")
   set(MOAB_LIBRARIES "-L@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@ ${MOAB_LIBS} ${MOAB_PACKAGE_LIBS}")
 else()
+
+  # Find the Python interpreter and ensure it's available.
   find_package(Python COMPONENTS Interpreter REQUIRED)
-  execute_process(COMMAND ${Python_EXECUTABLE} -c "import pymoab; print(pymoab.include_path)"
-    OUTPUT_VARIABLE MOAB_INCLUDE_DIRS
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
-  execute_process(COMMAND ${Python_EXECUTABLE} -c "import pymoab; print(pymoab.lib_path)"
-    OUTPUT_VARIABLE MOAB_LIBRARY_DIRS
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
-  execute_process(COMMAND ${Python_EXECUTABLE} -c "import pymoab; print(' '.join(pymoab.extra_lib))"
-    OUTPUT_VARIABLE MOAB_EXTRA_LIBRARIES
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
+
+  # Function to run Python commands and validate their execution.
+  function(run_python_command output_var command)
+    execute_process(
+      COMMAND ${Python_EXECUTABLE} -c "${command}"
+      OUTPUT_VARIABLE ${output_var}
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      RESULT_VARIABLE result
+    )
+    # Check if the command was successful
+    if(NOT result EQUAL 0)
+      message(FATAL_ERROR "Failed to run Python command: ${command}")
+    else()
+      # Add the output variable to the parent scope
+      set(${output_var} "${${output_var}}" PARENT_SCOPE)
+    endif()
+  endfunction()
+
+  # Extract MOAB include paths, library paths, and extra libraries
+  run_python_command(MOAB_INCLUDE_DIRS "import pymoab; print(pymoab.include_path)")
+  run_python_command(MOAB_LIBRARY_DIRS "import pymoab; print(pymoab.lib_path)")
+  run_python_command(MOAB_EXTRA_LIBRARIES "import pymoab; print(' '.join(pymoab.extra_lib))")
+
+# Check if the wheel was repaired using auditwheel or delocate
   if(MOAB_EXTRA_LIBRARIES)
     message(FATAL_ERROR
         "This build of MOAB is not supported. "
@@ -122,4 +136,90 @@ else()
         "For more information, visit: https://bitbucket.org/fathomteam/moab\n"
     )
   endif()
+
+  # Find the core library
+  find_library(MOAB_LIBRARY
+    NAMES MOAB
+    HINTS ${MOAB_LIBRARY_DIRS}
+    NO_DEFAULT_PATH
+  )
+
+  # Add the core library as an imported target
+  add_library(MOAB::MOAB UNKNOWN IMPORTED)
+  set_target_properties(MOAB::MOAB PROPERTIES
+      INTERFACE_INCLUDE_DIRECTORIES "${MOAB_INCLUDE_DIRS}"
+      IMPORTED_LOCATION "${MOAB_LIBRARY}"
+  )
+
+  # Add the core library to the list of libraries
+  set(MOAB_LIBRARIES ${MOAB_LIBRARY})
+
+  if(MOAB_USE_MPI)
+    find_package(MPI REQUIRED)
+    set(MOAB_LIBRARIES ${MOAB_LIBRARIES} ${MPI_CXX_LIBRARIES})
+  endif()
+
+  if(MOAB_USE_HDF5)
+    find_package(HDF5 REQUIRED)
+    set(MOAB_LIBRARIES ${MOAB_LIBRARIES} ${HDF5_LIBRARIES})
+  endif()
+
+  if(MOAB_USE_ZLIB)
+    find_package(ZLIB REQUIRED)
+    set(MOAB_LIBRARIES ${MOAB_LIBRARIES} ${ZLIB_LIBRARIES})
+  endif()
+
+  if(MOAB_USE_SZIP)
+    find_package(SZIP REQUIRED)
+    set(MOAB_LIBRARIES ${MOAB_LIBRARIES} ${SZIP_LIBRARIES})
+  endif()
+
+  if(MOAB_USE_NETCDF)
+    find_package(NetCDF REQUIRED)
+    set(MOAB_LIBRARIES ${MOAB_LIBRARIES} ${NETCDF_LIBRARIES})
+  endif()
+
+  if(MOAB_USE_PNETCDF)
+    find_package(Pnetcdf REQUIRED)
+    set(MOAB_LIBRARIES ${MOAB_LIBRARIES} ${PNETCDF_LIBRARIES})
+  endif()
+
+  if(MOAB_USE_METIS)
+    find_package(METIS REQUIRED)
+    set(MOAB_LIBRARIES ${MOAB_LIBRARIES} ${METIS_LIBRARIES})
+  endif()
+
+  if(MOAB_USE_PARMETIS)
+    find_package(ParMETIS REQUIRED)
+    set(MOAB_LIBRARIES ${MOAB_LIBRARIES} ${PARMETIS_LIBRARIES})
+  endif()
+
+  if(MOAB_USE_ZOLTAN)
+    find_package(Zoltan REQUIRED)
+    set(MOAB_LIBRARIES ${MOAB_LIBRARIES} ${ZOLTAN_LIBRARIES})
+  endif()
+
+  if(MOAB_USE_BLAS)
+    find_package(BLAS REQUIRED)
+    set(MOAB_LIBRARIES ${MOAB_LIBRARIES} ${BLAS_LIBRARIES})
+  endif()
+
+  if(MOAB_USE_LAPACK)
+    find_package(LAPACK REQUIRED)
+    set(MOAB_LIBRARIES ${MOAB_LIBRARIES} ${LAPACK_LIBRARIES})
+  endif()
+
+  if(MOAB_USE_TEMPESTREMAP)
+    find_package(TempestRemap REQUIRED)
+    set(MOAB_LIBRARIES ${MOAB_LIBRARIES} ${TEMPESTREMAP_LIBRARIES})
+  endif()
 endif()
+
+# Include standard argument handling for finding packages
+include(FindPackageHandleStandardArgs)
+
+# Validates that the necessary variables are set
+find_package_handle_standard_args(MOAB
+  REQUIRED_VARS MOAB_LIBRARIES MOAB_INCLUDE_DIRS
+  VERSION_VAR MOAB_VERSION
+  )

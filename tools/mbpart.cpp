@@ -64,7 +64,7 @@ int main( int argc, char* argv[] )
     bool moab_use_metis = false;
 #endif
 
-    LONG_DESC << "This utility invokes the ZoltanPartitioner or MetisPartitioner component of MOAB/CGM "
+    LONG_DESC << "This utility invokes the ZoltanPartitioner or MetisPartitioner component of MOAB"
                  "to partition a mesh/geometry."
               << std::endl
               << "If no partitioning method is specified, the defaults are: "

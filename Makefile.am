@@ -104,7 +104,7 @@ examples_apps_earth_DATA = \
 CMAKE_CONFIGURATION_FILES = CMakeLists.txt \
    config/AutoconfHeader.cmake      config/FindCGM.cmake          config/FindNetCDF.cmake        config/FindZoltan.cmake     config/GetAcInitVersion.cmake \
    config/CMakeDistCheck.cmake      config/FindEigen3.cmake       config/FindPNetCDF.cmake       config/Findgraphviz.cmake   config/MOABConfig.cmake.cmake \
-   config/CMakeLibraryFuncs.cmake   config/FindHDF5_MOAB.cmake    config/FindParMetis.cmake      config/Findverdict.cmake    config/ResolveCompilerPaths.cmake \
+   config/CMakeLibraryFuncs.cmake   config/FindParMetis.cmake      config/Findverdict.cmake    config/ResolveCompilerPaths.cmake \
    config/CheckCompilerFlags.cmake  config/FindMetis.cmake        config/FindTempestRemap.cmake  config/ForceAddFlags.cmake  config/TestBigEndian.cmake \
    config/CMakeReplicateConfig.sh   config/TemplateSpecialization.cxx   config/MOABConfig.cmake.h.in   config/cmake_uninstall.cmake.in moab.make.cmake  \
    pymoab/CMakeLists.txt            config/cython_test.pyx
@@ -142,7 +142,7 @@ cmake_DATA = MOABConfig.cmake config/ResolveCompilerPaths.cmake
 # directory until we're doing the install.
 install-data-hook:
 	$(AM_V_at)echo "MOAB_LIBDIR=${libdir}" >> $(DESTDIR)$(cfgdir)/moab.make
-	$(AM_V_at)echo "MOAB_INCLUDES=-I${includedir}" >> $(DESTDIR)$(cfgdir)/moab.make
+	$(AM_V_at)echo "MOAB_INCLUDES=-I${includedir} ${MOAB_INCLUDES}" >> $(DESTDIR)$(cfgdir)/moab.make
 
 # Generate a file to be installed in $libdir containing the configuration
 # options used for this MOAB build.

@@ -33,20 +33,20 @@ def get_core_path(subdir, pattern="*"):
     return glob.glob(os.path.join(path, pattern)) if os.path.exists(path) else []
 
 def get_include_path():
-    """Return the include directory path for MOAB headers."""
+    """Return includes and include path for MOAB headers."""
     include = get_core_path("include")
     include_path = get_core_path("include", "")
     return include, include_path
 
 def get_core_libraries():
-    """Return library paths and library directory paths."""
+    """Return libraries and library paths for MOAB."""
     lib = [libs for lib in ["lib", "lib64"] for libs in get_core_path(lib)]
     lib_paths = [libs for lib in ["lib", "lib64"] for libs in get_core_path(lib, "")]
     return lib, lib_paths
 
 def get_extra_libraries():
-    """List all the extra libraries."""
-    libs_path = os.path.join(__path__[0], ".dylibs") if sys.platform == "darwin" else os.path.join(__path__[0], "..", "moab.libs")
+    """Return the extra libraries installed by auditwheel or delocate."""
+    libs_path = os.path.join(__path__[0], ".dylibs") if sys.platform == "darwin" else os.path.normpath(os.path.join(__path__[0], "..", "moab.libs"))
     return (glob.glob(os.path.join(libs_path, "*")), libs_path) if os.path.exists(libs_path) else ([], [])
 
 # Setup variables

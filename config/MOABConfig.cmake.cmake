@@ -149,6 +149,6 @@ include(FindPackageHandleStandardArgs)
 
 # Validates that the necessary variables are set
 find_package_handle_standard_args(MOAB
-  REQUIRED_VARS MOAB_LIBRARY MOAB_INCLUDE_DIRS
+  REQUIRED_VARS MOAB_LIBRARIES MOAB_INCLUDE_DIRS
   VERSION_VAR MOAB_VERSION
   )

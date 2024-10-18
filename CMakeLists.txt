@@ -712,6 +712,7 @@ endif(CLANG_TIDY_EXE)
 #  )
 CONFIGURE_FILE(config/MOABConfig.cmake.h.in "${PROJECT_BINARY_DIR}/src/moab/MOABConfig.h" @ONLY)
 CONFIGURE_FILE(config/MOABConfig.cmake.cmake "${PROJECT_BINARY_DIR}/MOABConfig.cmake" @ONLY)
+CONFIGURE_FILE(config/MOABConfigVersion.cmake.cmake "${PROJECT_BINARY_DIR}/MOABConfigVersion.cmake" @ONLY)
 CONFIGURE_FILE(moab.make.cmake "${PROJECT_BINARY_DIR}/lib/moab.make" @ONLY)
 CONFIGURE_FILE(config/MOAB.pc.cmake.in "${PROJECT_BINARY_DIR}/MOAB.pc" @ONLY)
 
@@ -730,7 +731,7 @@ install(
   DESTINATION ${MOABMakeLocation}
   )
 install(
-  FILES "${PROJECT_BINARY_DIR}/MOABConfig.cmake"
+  FILES "${PROJECT_BINARY_DIR}/MOABConfig.cmake" "${PROJECT_BINARY_DIR}/MOABConfigVersion.cmake"
   DESTINATION ${MOABConfigLocation}
   )
 install(

@@ -9,19 +9,7 @@
 # MOAB_CXX, MOAB_CC, MOAB_F77, MOAB_FC - compilers used to compile MOAB
 # MOAB_CXXFLAGS, MOAB_CCFLAGS, MOAB_FFLAGS, MOAB_FCFLAGS - compiler flags used to compile MOAB; possibly need to use these in add_definitions or CMAKE_<LANG>_FLAGS_<MODE> 
 
-set(MOAB_FOUND 1)
-
 set(MOAB_VERSION @PACKAGE_VERSION@)
-
-# Check whether the requested PACKAGE_FIND_VERSION is compatible
-if("${MOAB_VERSION}" VERSION_LESS "${PACKAGE_FIND_VERSION}")
-  set(PACKAGE_VERSION_COMPATIBLE FALSE)
-else()
-  set(PACKAGE_VERSION_COMPATIBLE TRUE)
-  if("${MOAB_VERSION}" VERSION_EQUAL "${PACKAGE_FIND_VERSION}")
-    set(PACKAGE_VERSION_EXACT TRUE)
-  endif()
-endif()
 
 set(MOAB_CC "@CMAKE_C_COMPILER@")
 set(MOAB_CXX "@CMAKE_CXX_COMPILER@")

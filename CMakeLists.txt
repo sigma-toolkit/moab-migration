@@ -508,6 +508,7 @@ if(SKBUILD OR ENABLE_PYMOAB)
     set(CMAKE_INSTALL_DOCDIR ${SKBUILD_DATA_DIR}/${CMAKE_INSTALL_DOCDIR})
     set(CMAKE_INSTALL_MANDIR ${SKBUILD_DATA_DIR}/${CMAKE_INSTALL_MANDIR})
     set(SKBUILD_LIB_DIR ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/pymoab/core/${CMAKE_INSTALL_LIBDIR})
+    set(MOABDocLocation ${SKBUILD_DATA_DIR}/${MOABDocLocation})
 
     # Auditwheel and Delocate need this when repairing the wheel
     # Since MOAB libs are installed in the pymoab/core subdirectory
@@ -595,7 +596,7 @@ export(
   FILE "${PROJECT_BINARY_DIR}/MOABTargets.cmake"
   )
 set(MOABTargetLocation ${CMAKE_INSTALL_LIBDIR}/cmake/MOAB)
-if(NOT SKBUILD)
+if(SKBUILD)
   install(
     EXPORT MOABTargets
     DESTINATION ${MOABTargetLocation}
@@ -764,9 +765,6 @@ ADD_CUSTOM_TARGET(
 SET(MOAB_DOCS ${MOAB_DOCS}
   LICENSE README.md RELEASE_NOTES.md TODO.md
 )
-if(SKBUILD)
-  set(MOABDocLocation ${SKBUILD_DATA_DIR}/${MOABDocLocation})
-endif()
 install(FILES ${MOAB_DOCS} DESTINATION ${MOABDocLocation})
 
 CONFIGURE_FILE(examples/makefile.config.cmake "${PROJECT_BINARY_DIR}/share/examples/makefile.config" @ONLY)

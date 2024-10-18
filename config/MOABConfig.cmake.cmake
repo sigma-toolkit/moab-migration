@@ -125,7 +125,9 @@ else()
       )
   endif()
 
-  include(${MOAB_LIBRARY_DIRS}/cmake/MOAB/MOABTargets.cmake)
+  # Add MOAB targets
+  file(TO_CMAKE_PATH "${MOAB_LIBRARY_DIRS}/cmake/MOAB/MOABTargets.cmake" MOAB_TARGETS_FILE)
+  include(${MOAB_TARGETS_FILE})
 
   # Add the core library to the list of libraries
   set(MOAB_INCLUDE_DIRS ${MOAB_INCLUDE_DIRS} ${MOAB_PACKAGE_INCLUDES})

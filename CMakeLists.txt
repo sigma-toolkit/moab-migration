@@ -596,7 +596,7 @@ export(
   FILE "${PROJECT_BINARY_DIR}/MOABTargets.cmake"
   )
 set(MOABTargetLocation ${CMAKE_INSTALL_LIBDIR}/cmake/MOAB)
-if(SKBUILD)
+if(NOT SKBUILD)
   install(
     EXPORT MOABTargets
     DESTINATION ${MOABTargetLocation}

@@ -596,13 +596,10 @@ export(
   FILE "${PROJECT_BINARY_DIR}/MOABTargets.cmake"
   )
 set(MOABTargetLocation ${CMAKE_INSTALL_LIBDIR}/cmake/MOAB)
-if(NOT SKBUILD)
-  install(
-    EXPORT MOABTargets
-    DESTINATION ${MOABTargetLocation}
-  )
-endif()
-# Create some custom command
+install(
+  EXPORT MOABTargets
+  DESTINATION ${MOABTargetLocation}
+)
 
 # For consistency with autoconf, create a "make check" equivalent to "ctest"
 ADD_CUSTOM_TARGET( check COMMAND ctest DEPENDS )

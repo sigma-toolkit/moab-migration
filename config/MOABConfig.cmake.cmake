@@ -98,7 +98,7 @@ else()
       OUTPUT_VARIABLE ${output_var}
       OUTPUT_STRIP_TRAILING_WHITESPACE
       RESULT_VARIABLE result
-    )
+      )
     # Check if the command was successful
     if(NOT result EQUAL 0)
       message(FATAL_ERROR "Failed to run Python command: ${command}")
@@ -109,8 +109,8 @@ else()
   endfunction()
 
   # Extract MOAB include paths, library paths, and extra libraries
-  run_python_command(MOAB_INCLUDE_DIRS "import pymoab; print(' '.join(pymoab.include_path))")
-  run_python_command(MOAB_LIBRARY_DIRS "import pymoab; print(' '.join(pymoab.lib_path))")
+  run_python_command(MOAB_INCLUDE_DIRS "import pymoab; print(pymoab.include_path[0])")
+  run_python_command(MOAB_LIBRARY_DIRS "import pymoab; print(pymoab.lib_path[0])")
   run_python_command(MOAB_EXTRA_LIBRARIES "import pymoab; print(' '.join(pymoab.extra_lib))")
 
 # Check if the wheel was repaired using auditwheel or delocate
@@ -122,22 +122,10 @@ else()
         "MOAB_EXTRA_LIBRARIES is not empty: ${MOAB_EXTRA_LIBRARIES}.\n"
         "To resolve this, please build MOAB from scratch. "
         "For more information, visit: https://bitbucket.org/fathomteam/moab\n"
-    )
+      )
   endif()
 
-  # Find the core library
-  find_library(MOAB_LIBRARY
-    NAMES MOAB
-    HINTS ${MOAB_LIBRARY_DIRS}
-    NO_DEFAULT_PATH
-  )
-
-  # Add the core library as an imported target
-  add_library(MOAB::MOAB UNKNOWN IMPORTED)
-  set_target_properties(MOAB::MOAB PROPERTIES
-      INTERFACE_INCLUDE_DIRECTORIES "${MOAB_INCLUDE_DIRS}"
-      IMPORTED_LOCATION "${MOAB_LIBRARY}"
-  )
+  include(${MOAB_LIBRARY_DIRS}/cmake/MOAB/MOABTargets.cmake)
 
   # Add the core library to the list of libraries
   set(MOAB_INCLUDE_DIRS ${MOAB_INCLUDE_DIRS} ${MOAB_PACKAGE_INCLUDES})

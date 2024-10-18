@@ -107,6 +107,9 @@ set( MOAB_LIBS )
 set( MOAB_INSTALL_TARGETS )
 set( MOAB_MESH_DIR        "${CMAKE_SOURCE_DIR}/MeshFiles/" )
 
+# TODO: Need to update this to GNUInstallDirs
+set(MOABDocLocation share/doc/moab)
+
 ################################################################################
 # Options that the user controls
 ################################################################################
@@ -760,7 +763,6 @@ ADD_CUSTOM_TARGET(
 SET(MOAB_DOCS ${MOAB_DOCS}
   LICENSE README.md RELEASE_NOTES.md TODO.md
 )
-set(MOABDocLocation share/doc/moab)
 if(SKBUILD)
   set(MOABDocLocation ${SKBUILD_DATA_DIR}/${MOABDocLocation})
 endif()

@@ -27,22 +27,33 @@ try:
 except PackageNotFoundError:
     __version__ = "unknown"
 
-def get_core_path(subdir, pattern="*"):
-    """Helper function to return paths that match a given pattern within a subdirectory."""
+def get_core_path(subdir, pattern="*", recursive=False):
+    """
+    Helper function to return paths that match a given pattern within a subdirectory.
+
+    Args:
+        subdir (str): The subdirectory within the 'core' directory.
+        pattern (str): The pattern to match files or directories.
+        recursive (bool): Whether to search recursively in subdirectories.
+
+    Returns:
+        list: A list of matched paths.
+    """
     path = os.path.join(__path__[0], "core", subdir)
-    return glob.glob(os.path.join(path, pattern)) if os.path.exists(path) else []
+    search_pattern = os.path.join(path, "**", pattern) if recursive else os.path.join(path, pattern)
+    return glob.glob(search_pattern, recursive=recursive) if os.path.exists(path) else []
 
 def get_include_path():
     """Return includes and include path for MOAB headers."""
-    include = get_core_path("include")
-    include_path = get_core_path("include", "")
+    include = get_core_path("include", "*", recursive=True)
+    include_path = get_core_path("include", "", recursive=False)
     return include, include_path
 
 def get_core_libraries():
     """Return libraries and library paths for MOAB."""
-    lib = [libs for lib in ["lib", "lib64"] for libs in get_core_path(lib)]
-    lib_paths = [libs for lib in ["lib", "lib64"] for libs in get_core_path(lib, "")]
-    return lib, lib_paths
+    lib = [lib_file for lib in ["lib", "lib64"] for lib_file in get_core_path(lib, "libMOAB*", recursive=True)]
+    lib_path = [lib_file for lib in ["lib", "lib64"] for lib_file in get_core_path(lib, "", recursive=False)]
+    return lib, lib_path
 
 def get_extra_libraries():
     """Return the extra libraries installed by auditwheel or delocate."""

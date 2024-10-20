@@ -78,16 +78,7 @@ if(MOAB_USE_HDF5)
   endif()
 endif()
 
-if(NOT @SKBUILD@)
-  if(NOT TARGET MOAB AND NOT MOAB_BINARY_DIR)
-    include("${MOAB_CMAKE_DIR}/MOABTargets.cmake")
-  endif()
-  set(MOAB_LIBRARY_DIRS "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@")
-  set(MOAB_INCLUDE_DIRS "@CMAKE_INSTALL_PREFIX@/include" ${MOAB_PACKAGE_INCLUDES})
-  set(MOAB_LIBS "-lMOAB")
-  set(MOAB_LIBRARIES "-L@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@ ${MOAB_LIBS} ${MOAB_PACKAGE_LIBS}")
-else()
-
+if(@SKBUILD@)
   # Find the Python interpreter and ensure it's available.
   find_package(Python COMPONENTS Interpreter REQUIRED)
 
@@ -132,6 +123,14 @@ else()
   # Add the core library to the list of libraries
   set(MOAB_INCLUDE_DIRS ${MOAB_INCLUDE_DIRS} ${MOAB_PACKAGE_INCLUDES})
   set(MOAB_LIBRARIES ${MOAB_LIBRARY} ${MOAB_PACKAGE_LIBS})
+else()
+  if(NOT TARGET MOAB AND NOT MOAB_BINARY_DIR)
+  include("${MOAB_CMAKE_DIR}/MOABTargets.cmake")
+  endif()
+  set(MOAB_LIBRARY_DIRS "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@")
+  set(MOAB_INCLUDE_DIRS "@CMAKE_INSTALL_PREFIX@/include" ${MOAB_PACKAGE_INCLUDES})
+  set(MOAB_LIBS "-lMOAB")
+  set(MOAB_LIBRARIES "-L@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@ ${MOAB_LIBS} ${MOAB_PACKAGE_LIBS}")
 endif()
 
 # Include standard argument handling for finding packages

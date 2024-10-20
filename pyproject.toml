@@ -58,7 +58,7 @@ test = ["pytest"]
 [tool.scikit-build]
 build.verbose = true
 logging.level = "INFO"
-wheel.install-dir = "pymoab/core"
+wheel.install-dir = "pymoab"
 wheel.packages = ["pymoab"]
 wheel.exclude = ["CMakeLists.txt", "Makefile.am", "*.pyx", "*.pxd"]
 

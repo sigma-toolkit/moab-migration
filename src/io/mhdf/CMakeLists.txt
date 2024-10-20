@@ -32,7 +32,7 @@ install(
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   )
-
+generate_and_install_python_script(h5minfo)
 add_executable( h5mvalidate example/validate.c $<TARGET_OBJECTS:mhdf> )
 if(PYMOAB_BINARY_RPATH)
   # Set the install RPATH
@@ -44,6 +44,7 @@ install(
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   )
+generate_and_install_python_script(h5mvalidate)
 target_link_libraries( h5mvalidate ${HDF5_LIBRARIES} )
 
 endif ()

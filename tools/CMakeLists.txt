@@ -51,6 +51,7 @@ if ( MOAB_HAVE_HDF5 )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(compareFiles)
 endif ( MOAB_HAVE_HDF5 )
 
 # MBSIZE
@@ -69,6 +70,7 @@ if ( MOAB_BUILD_MBSIZE )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbsize)
   SET(MOAB_DOCS ${MOAB_DOCS} README.mbsize)
 endif ( )
 
@@ -88,6 +90,7 @@ if ( MOAB_BUILD_MBMERGE )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbmerge)
 endif ( )
 
 
@@ -108,6 +111,7 @@ if ( MOAB_BUILD_MBMEM )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbmem)
 endif ( )
 
 # MBCONVERT
@@ -126,6 +130,7 @@ if ( MOAB_BUILD_MBCONVERT )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbconvert)
   SET(MOAB_DOCS ${MOAB_DOCS} README.mbconvert)
   INSTALL(FILES mbconvert.man DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 RENAME mbconvert.1)
 endif ( )
@@ -146,6 +151,7 @@ if ( MOAB_BUILD_MBHONODES )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbhonodes)
 endif ( )
 
 # MBDEPTH
@@ -164,6 +170,7 @@ if ( MOAB_BUILD_MBDEPTH )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbdepth)
 endif ( )
 
 # MBSKIN
@@ -182,6 +189,7 @@ if ( MOAB_BUILD_MBSKIN )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbskin)
   SET(MOAB_DOCS ${MOAB_DOCS} README.mbskin)
 endif ( )
 
@@ -201,6 +209,7 @@ if ( MOAB_BUILD_MBSURFPLOT )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbsurfplot)
   SET(MOAB_DOCS ${MOAB_DOCS} README.mbsurfplot)
 endif ( )
 
@@ -220,6 +229,7 @@ if ( MOAB_BUILD_MBTAGPROP )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbtagprop)
   SET(MOAB_DOCS ${MOAB_DOCS} README.mbtagprop)
 endif ( )
 
@@ -239,6 +249,7 @@ if ( MOAB_BUILD_MBGSETS )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbgsets)
 endif( )
 
 # MBUMR
@@ -257,6 +268,7 @@ if ( MOAB_BUILD_MBUMR )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbumr)
 endif( )
 
 # MBSLAVEPART
@@ -275,6 +287,7 @@ if ( MOAB_BUILD_MBSLAVEPART )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbslavepart)
 endif( )
 
 # MBTEMPEST
@@ -293,6 +306,7 @@ if ( MOAB_BUILD_MBTEMPEST )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbtempest)
 
 endif( )
 
@@ -312,6 +326,7 @@ if ( MOAB_BUILD_MBQUALITY )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbquality)
 endif( )
 
 # Zoltan
@@ -333,6 +348,7 @@ if ( MOAB_BUILD_MBPART OR ( MOAB_HAVE_ZOLTAN OR MOAB_HAVE_METIS ) )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbpart)
 endif ( MOAB_BUILD_MBPART OR ( MOAB_HAVE_ZOLTAN OR MOAB_HAVE_METIS ) )
 
 # MBCoupler
@@ -355,6 +371,7 @@ if( MOAB_BUILD_HEXMODOPS )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(hexmodops)
   SET(MOAB_DOCS ${MOAB_DOCS} README.hexmodops)
 endif()
 
@@ -374,6 +391,7 @@ if ( MOAB_BUILD_SPHEREDECOMP )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(spheredecomp)
   SET(MOAB_DOCS ${MOAB_DOCS} README.spheredecomp)
 endif ( )
 

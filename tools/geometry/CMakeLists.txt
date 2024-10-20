@@ -35,6 +35,7 @@ if ( MOAB_HAVE_CGM )
       LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
       ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
       )
+    generate_and_install_python_script(cgm2moab)
   endif()
 endif( )
 

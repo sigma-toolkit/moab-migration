@@ -973,7 +973,7 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_NETCDF],
     compiler_opts="CC=\"$CC\" CXX=\"$CXX\""
     configure_command="$compiler_opts $netcdf_src_dir/configure --prefix=$netcdf_install_dir --libdir=$netcdf_install_dir/lib --with-pic=1 --enable-shared=$enable_shared"
     if (test "$enablehdf5" != "no"); then
-      configure_command="$configure_command --enable-netcdf-4 LDFLAGS=\"$HDF5_LDFLAGS $LDFLAGS\" CPPFLAGS=\"$HDF5_CPPFLAGS\" LIBS=\"$HDF5_LIBS -ldl -lm -lz\""
+      configure_command="$configure_command --enable-netcdf-4 LDFLAGS=\"$HDF5_LDFLAGS $LDFLAGS\" CPPFLAGS=\"$HDF5_CPPFLAGS\" LIBS=\"$HDF5_LIBS\""
     else
       configure_command="$configure_command --disable-netcdf-4 LDFLAGS=\"$LDFLAGS\" CPPFLAGS=\"$CPPFLAGS\" LIBS=\"$LIBS\""
     fi

@@ -225,9 +225,6 @@ AM_CONDITIONAL( HAVE_32BIT, [ test "x$enable_32bit_handles" != "x" ] )
 
 AC_CHECK_LIB(dl, dlopen, LIBS="$LIBS -ldl")
 AC_CHECK_LIB(z, compress, LIBS="$LIBS -lz")
-if (test "$cxx_compiler" != "Intel"); then
-  AC_CHECK_LIB(m, pow, LIBS="$LIBS -lm")
-fi
 
 ### Check for BLAS and Lapack dense solvers
 AC_ARG_ENABLE( [blaslapack],
@@ -465,8 +462,6 @@ MOAB_CXX_LIBS=
 for lib in $MOAB_CXX_LIBS_TMP; do
   case $lib in
     -lgcc_s)
-      ;;
-    -lm)
       ;;
     -lc)
       ;;

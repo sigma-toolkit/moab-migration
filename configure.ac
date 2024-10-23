@@ -1154,7 +1154,6 @@ AC_CONFIG_FILES([Makefile
                  src/io/mhdf/Makefile
                  test/Makefile
                  test/h5file/Makefile
-                 test/dual/Makefile
                  test/obb/Makefile
                  test/perf/Makefile
                  test/perf/point_location/Makefile

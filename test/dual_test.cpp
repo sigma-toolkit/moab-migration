@@ -4,7 +4,7 @@
 #include "moab/Range.hpp"
 #include "moab/MeshTopoUtil.hpp"
 #include "moab/DualTool.hpp"
-#include "../TestUtil.hpp"
+#include "TestUtil.hpp"
 #include <iostream>
 #include <string>
 

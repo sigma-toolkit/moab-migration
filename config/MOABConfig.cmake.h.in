@@ -55,18 +55,6 @@
 /* Define to 1 if you have the <ccmio.h> header file. */
 #cmakedefine MOAB_HAVE_CCMIO_H @MOAB_HAVE_CCMIO_H@
 
-/* "Define if configured with CGM support." */
-#cmakedefine MOAB_HAVE_CGM @MOAB_HAVE_CGM@
-
-/* MOAB uses CGM configured with Facet Engine */
-#cmakedefine MOAB_HAVE_CGM_FACET @MOAB_HAVE_CGM_FACET@
-
-/* "Define if configured with CGM and Ray fire support." */
-#cmakedefine MOAB_HAVE_CGM_FIRE_RAY @MOAB_HAVE_CGM_FIRE_RAY@
-
-/* MOAB uses CGM configured with OpenCascade */
-#cmakedefine MOAB_HAVE_CGM_OCC @MOAB_HAVE_CGM_OCC@
-
 /* "Define if configured with CGNS support." */
 #cmakedefine MOAB_HAVE_CGNS @MOAB_HAVE_CGNS@
 

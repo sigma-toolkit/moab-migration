@@ -258,33 +258,20 @@ int main( int argc, char* argv[] )
         }
 #endif
     }
-
 #endif
-
-    // Migrate meshes between component and coupler
-    // ATM
-    // ierr =
-    //     setup_component_coupler_meshes( cmpAtmPID, cmpatm, cplAtmPID, cplatmm, &atmComm, &atmPEGroup, &couComm,
-    //                                     &couPEGroup, &atmCouComm, atmFilename, readopts, nghlay, repartitioner_scheme );
-    // CHECKIERR( ierr, "Cannot load and migrate atm mesh" )
-
-    // // OCN
-    // ierr =
-    //     setup_component_coupler_meshes( cmpOcnPID, cmpocn, cplOcnPID, cplocnm, &ocnComm, &ocnPEGroup, &couComm,
-    //                                     &couPEGroup, &ocnCouComm, ocnFilename, readopts, nghlay, repartitioner_scheme );
-    // CHECKIERR( ierr, "Cannot load and migrate ocn mesh" )
-
-    // ---------
 
 #ifdef COMPUTE_ONLINE_MAP
     // --------- ATM and OCN mesh migration ---------
-    int repartitioner_scheme = 2;
+    int repartitioner_scheme = 0;
+#ifdef MOAB_HAVE_ZOLTAN
+    repartitioner_scheme = 2;  // use the RCB/geometric partitioner
+#endif
     if( atmComm != MPI_COMM_NULL )
     {
         // then send mesh to second coupler pes
         // send to  coupler pes
         CHECKIERR( iMOAB_SendMesh( cmpAtmPID, &atmCouComm, &couPEGroup, &cplatmm, &repartitioner_scheme ),
-                   "cannot send elements to coupler-2" )
+                   "cannot send atmosphere elements to coupler" )
     }
 
     if( ocnComm != MPI_COMM_NULL )
@@ -292,7 +279,7 @@ int main( int argc, char* argv[] )
         // then send mesh to second coupler pes
         // send to  coupler pes
         CHECKIERR( iMOAB_SendMesh( cmpOcnPID, &ocnCouComm, &couPEGroup, &cplocnm, &repartitioner_scheme ),
-                   "cannot send elements to coupler-2" )
+                   "cannot send ocean elements to coupler" )
     }
 
     // now, receive mesh, on coupler communicator; first mesh 1, atm
@@ -310,13 +297,13 @@ int main( int argc, char* argv[] )
     // we can now free the sender buffers
     if( atmComm != MPI_COMM_NULL )
     {
-        CHECKIERR( iMOAB_FreeSenderBuffers( cmpAtmPID, &cplatmm ), "cannot free buffers used to send atm mesh" )
+        CHECKIERR( iMOAB_FreeSenderBuffers( cmpAtmPID, &cplatmm ), "cannot free buffers used to send atmosphere mesh" )
     }
 
     // we can now free the sender buffers
     if( ocnComm != MPI_COMM_NULL )
     {
-        CHECKIERR( iMOAB_FreeSenderBuffers( cmpOcnPID, &cplocnm ), "cannot free buffers used to send ocn mesh" )
+        CHECKIERR( iMOAB_FreeSenderBuffers( cmpOcnPID, &cplocnm ), "cannot free buffers used to send ocean mesh" )
     }
 
     // this model (recMeshOcn.h5m) has mixed meshes in it, we need to repair the comm graph
@@ -341,7 +328,7 @@ int main( int argc, char* argv[] )
         CHECKIERR( iMOAB_ComputeCommGraph( cmpOcnPID, cplOcnMemPID, &ocnCouComm, &ocnPEGroup, &couPEGroup, &type,
                                            &type, &cmpocn, &cplocnm ),
                    "cannot compute graph between ocn comp and ocn migrated to coupler" )
-    }
+     }
 
     // write only for n==1 case
     if( couComm != MPI_COMM_NULL && 1 == number_iterations )
@@ -363,7 +350,7 @@ int main( int argc, char* argv[] )
         // basically, atm was redistributed according to target (ocean) partition, to "cover" the
         // ocean partitions check if intx valid, write some h5m intx file
         CHECKIERR( iMOAB_ComputeMeshIntersectionOnSphere( cplAtmMemPID, cplOcnMemPID, cplAtmOcnMemPID ),
-                   "cannot compute intersection for atm/ocn" )
+                   "cannot compute intersection for ATM/OCN" )
         POP_TIMER( couComm, rankInCouComm )
     }
     if( atmCouComm != MPI_COMM_NULL )
@@ -373,8 +360,7 @@ int main( int argc, char* argv[] )
         // results are in cplAtmOcnPID, intx mesh; remapper also has some info about coverage mesh
         // after this, the sending of tags from atm pes to coupler pes will use the new par comm
         // graph, that has more precise info about what to send for ocean cover ; every time, we
-        // will
-        //  use the element global id, which should uniquely identify the element
+        // will use the element global id, which should uniquely identify the element
         PUSH_TIMER( "Compute OCN coverage graph for ATM mesh" )
         CHECKIERR( iMOAB_CoverageGraph( &atmCouComm, cmpAtmPID, cplAtmMemPID, cplAtmOcnMemPID, &cmpatm, &cplatmm,
                                         &cplocnm ),
@@ -406,14 +392,6 @@ int main( int argc, char* argv[] )
             CHECKIERR( iMOAB_WriteMappingWeightsToFile( cplAtmOcnMemPID, map_from_mem_identifier.c_str(),
                                                         atmocn_map_file_name.c_str() ),
                        "failed to write map file to disk" );
-
-            // const std::string intx_from_file_identifier = "map-from-file";
-            // int dummyCpl                                = -1;
-            // int dummy_rowcol                            = -1;
-            // int dummyType                               = 0;
-            // ierr = iMOAB_LoadMappingWeightsFromFile( cplAtmOcnMemPID, &dummyCpl, &dummy_rowcol, &dummyType,
-            //                                          intx_from_file_identifier.c_str(), atmocn_map_file_name.c_str() );
-            // CHECKIERR( ierr, "failed to load map file from disk" );
         }
     }
 #endif
@@ -443,67 +421,6 @@ int main( int argc, char* argv[] )
                    "failed to define the field tags a2oTbot_proj:a2oUbot_proj:a2oVbot_proj" );
 #endif
     }
-
-    // need to make sure that the coverage mesh (created during intx method) received the tag that
-    // need to be projected to target so far, the coverage mesh has only the ids and global dofs;
-    // need to change the migrate method to accommodate any GLL tag
-    // now send a tag from original atmosphere (cmpAtmPID) towards migrated coverage mesh
-    // (cplAtmFilePID), using the new coverage graph communicator
-
-    // make the tag 0, to check we are actually sending needed data
-
-// #ifdef COMPUTE_FILE_MAP
-//     if( couComm != MPI_COMM_NULL && cplAtmFileAppID >= 0 )
-//     {
-//         int nverts[3], nelem[3], nblocks[3], nsbc[3], ndbc[3];
-//         CHECKIERR( iMOAB_GetMeshInfo( cplAtmFilePID, nverts, nelem, nblocks, nsbc, ndbc ),
-//                    "failed to get num primary elems" );
-
-//         int eetype = 1;
-//         int storLeng;
-//         std::vector< double > vals;
-//         /*
-//              * Each process in the communicator will have access to a local mesh instance, which
-//              * will contain the original cells in the local partition and ghost entities. Number of
-//              * vertices, primary cells, visible blocks, number of sidesets and nodesets boundary
-//              * conditions will be returned in numProcesses 3 arrays, for local, ghost and total
-//              * numbers.
-//              */
-//         storLeng = atmCompNDoFs * nelem[2] * 3;  // 3 tags
-//         vals.resize( storLeng, 0.0 );
-//         CHECKIERR( iMOAB_SetDoubleTagStorage( cplAtmFilePID, bottomFields, &storLeng, &eetype, &vals[0] ),
-//                    "cannot make tag nul" )
-//     }
-// #endif
-
-// #ifdef COMPUTE_ONLINE_MAP
-//     if( couComm != MPI_COMM_NULL && cplAtmMemAppID >= 0 )
-//     {
-//         int nverts[3], nelem[3], nblocks[3], nsbc[3], ndbc[3];
-//         CHECKIERR( iMOAB_GetMeshInfo( cplAtmMemPID, nverts, nelem, nblocks, nsbc, ndbc ),
-//                    "failed to get num primary elems" );
-
-//         int eetype = 1;
-//         int storLeng;
-//         std::vector< double > vals;
-//         /*
-//              * Each process in the communicator will have access to a local mesh instance, which
-//              * will contain the original cells in the local partition and ghost entities. Number of
-//              * vertices, primary cells, visible blocks, number of sidesets and nodesets boundary
-//              * conditions will be returned in numProcesses 3 arrays, for local, ghost and total
-//              * numbers.
-//              */
-//         storLeng = atmCompNDoFs * nelem[2] * 3;  // 3 tags
-//         vals.resize( storLeng, 0.0 );
-//         CHECKIERR( iMOAB_SetDoubleTagStorage( cplAtmMemPID, bottomFields, &storLeng, &eetype, &vals[0] ),
-//                    "cannot make tag nul" )
-//                    {
-//                        char outputFileRecvd[] = "cmpAtmFileZeros.h5m";
-//                        CHECKIERR( iMOAB_WriteMesh( cplAtmMemPID, outputFileRecvd, fileWriteOptions ),
-//                                   "could not write cmpAtmFileZeros.h5m to disk" )
-//                    }
-//     }
-// #endif
 
     // start a virtual loop for number of iterations
     for( int iters = 0; iters < number_iterations; iters++ )

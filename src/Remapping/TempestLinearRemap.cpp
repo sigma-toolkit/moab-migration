@@ -858,7 +858,7 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyBoundsLimiting( std::ve
     return massDefect;
 }
 
-//#define VERBOSE
+
 moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& srcVals,
                                                       std::vector< double >& tgtVals,
                                                       bool transpose )
@@ -957,7 +957,7 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
 }
 
 #endif
-//#undef VERBOSE
+
 ///////////////////////////////////////////////////////////////////////////////
 
 extern void ForceConsistencyConservation3( const DataArray1D< double >& vecSourceArea,

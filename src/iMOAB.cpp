@@ -89,6 +89,7 @@ struct appData
     bool is_fortran;
 
 #ifdef MOAB_HAVE_MPI
+    ParallelComm* pcomm;
     // constructor for this ParCommGraph takes the joint comm and the MPI groups for each
     // application
     std::map< int, ParCommGraph* > pgraph;  // map from context () to the parcommgraph*
@@ -115,11 +116,11 @@ struct GlobalContext
     std::map< std::string, int > appIdMap;  // from app string (uppercase) to app id
     std::map< int, int > appIdCompMap;      // from component id to app id
 
-#ifdef MOAB_HAVE_MPI
-    std::vector< ParallelComm* > pcomms;  // created in order of applications, one moab::ParallelComm for each
-#endif
+// #ifdef MOAB_HAVE_MPI
+    // std::map< int, ParallelComm* > pcomms;  // created in order of applications, one moab::ParallelComm for each
+// #endif
 
-    std::vector< appData > appDatas;  // the same order as pcomms
+    std::map< int, appData > appDatas;  // the same order as pcomms
     int globalrank, worldprocs;
     bool MPI_initialized;
 
@@ -242,26 +243,6 @@ ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
 
     context.appIdCompMap[*compid] = *pid;
 
-    // now create ParallelComm and a file set for this application
-#ifdef MOAB_HAVE_MPI
-    if( *comm )
-    {
-        ParallelComm* pco = new ParallelComm( context.MBI, *comm );
-
-#ifndef NDEBUG
-        int index = pco->get_id();  // it could be useful to get app id from pcomm instance ...
-        assert( index == *pid );
-        // here, we assert the the pid is the same as the id of the ParallelComm instance
-        // useful for writing in parallel
-#endif
-        context.pcomms.push_back( pco );
-    }
-    else
-    {
-        context.pcomms.push_back( 0 );
-    }
-#endif
-
     // create now the file set that will be used for loading the model in
     EntityHandle file_set;
     ErrorCode rval = context.MBI->create_meshset( MESHSET_SET, file_set );MB_CHK_ERR( rval );
@@ -272,15 +253,33 @@ ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
     app_data.name      = name;     // save the name of application
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
-    app_data.tempestData.remapper = NULL;  // Only allocate as needed
+    app_data.tempestData.remapper = nullptr;  // Only allocate as needed
 #endif
 
     app_data.num_ghost_layers = 0;
     app_data.point_cloud      = false;
     app_data.is_fortran       = false;
 
-    context.appDatas.push_back(
-        app_data );  // it will correspond to app_FileSets[*pid] will be the file set of interest
+    // now create ParallelComm and a file set for this application
+#ifdef MOAB_HAVE_MPI
+    if( *comm )
+    {
+        app_data.pcomm = new ParallelComm( context.MBI, *comm  );
+
+#ifndef NDEBUG
+        int index = app_data.pcomm->get_id();  // it could be useful to get app id from pcomm instance ...
+        assert( index == *pid );
+        // here, we assert the the pid is the same as the id of the ParallelComm instance
+        // useful for writing in parallel
+#endif
+    }
+    else
+    {
+        app_data.pcomm = nullptr;
+    }
+#endif
+
+    context.appDatas[*pid] = app_data;  // it will correspond to app_FileSets[*pid] will be the file set of interest
     return moab::MB_SUCCESS;
 }
 
@@ -333,10 +332,15 @@ ErrCode iMOAB_DeregisterApplication( iMOAB_AppID pid )
     // the file set , parallel comm are all in vectors indexed by *pid
     // assume we did not delete anything yet
     // *pid will not be reused if we register another application
-    appData& data = context.appDatas[*pid];
+    auto appIterator = context.appDatas.find( *pid );
+    if( appIterator == context.appDatas.end() )
+        return MB_FAILURE;
+
+    // we found the application
+    appData& data = appIterator->second;
     int rankHere  = 0;
 #ifdef MOAB_HAVE_MPI
-    ParallelComm* pco = context.pcomms[*pid];
+    ParallelComm* pco = data.pcomm;
     rankHere          = pco->rank();
 #endif
     if( !rankHere )
@@ -363,13 +367,17 @@ ErrCode iMOAB_DeregisterApplication( iMOAB_AppID pid )
     // ParallelComm * pcomm = ParallelComm::get_pcomm(context.MBI, *pid);
 
     std::map< int, ParCommGraph* >& pargs = data.pgraph;
+    std::cout << "";
 
     // free the parallel comm graphs associated with this app
-    for( std::map< int, ParCommGraph* >::iterator mt = pargs.begin(); mt != pargs.end(); mt++ )
+    for( std::map< int, ParCommGraph* >::iterator mt = pargs.begin(); mt != pargs.end(); ++mt )
     {
         ParCommGraph* pgr = mt->second;
-        delete pgr;
-        pgr = NULL;
+        if( pgr != nullptr )
+        {
+            delete pgr;
+            pgr = nullptr;
+        }
     }
     if( pco ) delete pco;
 #endif
@@ -421,11 +429,18 @@ ErrCode iMOAB_DeregisterApplication( iMOAB_AppID pid )
 
     context.appIdCompMap.erase( mit1 );
 
-    context.unused_pid--;  // we have to go backwards always TODO
-    context.appDatas.pop_back();
 #ifdef MOAB_HAVE_MPI
-    context.pcomms.pop_back();
+    // context.pcomms.pop_back();
+    // if( data.pcomm )
+    // {
+    //     delete data.pcomm;
+    //     data.pcomm = nullptr;
+    // }
 #endif
+    // context.unused_pid--;  // we have to go backwards always TODO
+    // context.appDatas.pop_back();
+    context.appDatas.erase( appIterator );
+
     return moab::MB_SUCCESS;
 }
 
@@ -678,8 +693,9 @@ ErrCode iMOAB_LoadMesh( iMOAB_AppID pid,
     // some debugging stuff
     std::ostringstream outfile;
 #ifdef MOAB_HAVE_MPI
-    int rank   = context.pcomms[*pid]->rank();
-    int nprocs = context.pcomms[*pid]->size();
+    ParallelComm* pco = context.appDatas[*pid].pcomm;
+    int rank   = pco->rank();
+    int nprocs = pco->size();
     outfile << "TaskMesh_n" << nprocs << "." << rank << ".h5m";
 #else
     outfile << "TaskMesh_n1.0.h5m";
@@ -765,8 +781,9 @@ ErrCode iMOAB_WriteLocalMesh( iMOAB_AppID pid, iMOAB_String prefix )
     std::ostringstream file_name;
     int rank = 0, size = 1;
 #ifdef MOAB_HAVE_MPI
-    rank = context.pcomms[*pid]->rank();
-    size = context.pcomms[*pid]->size();
+    ParallelComm* pcomm = context.appDatas[*pid].pcomm;
+    rank = pcomm->rank();
+    size = pcomm->size();
 #endif
     file_name << prefix << "_" << size << "_" << rank << ".h5m";
     // Now let us actually write the file to disk with appropriate options
@@ -827,7 +844,7 @@ ErrCode iMOAB_UpdateMeshInfo( iMOAB_AppID pid )
 
     if( context.MPI_initialized )
     {
-        ParallelComm* pco = context.pcomms[*pid];
+        ParallelComm* pco = context.appDatas[*pid].pcomm;
 
         // filter ghost vertices, from local
         rval = pco->filter_pstatus( data.all_verts, PSTATUS_GHOST, PSTATUS_NOT, -1, &data.local_verts );MB_CHK_ERR( rval );
@@ -988,7 +1005,7 @@ ErrCode iMOAB_GetVertexOwnership( iMOAB_AppID pid, int* vertices_length, int* vi
     Range& verts = context.appDatas[*pid].all_verts;
     int i        = 0;
 #ifdef MOAB_HAVE_MPI
-    ParallelComm* pco = context.pcomms[*pid];
+    ParallelComm* pco = context.appDatas[*pid].pcomm;
 
     for( Range::iterator vit = verts.begin(); vit != verts.end(); vit++, i++ )
     {
@@ -1089,7 +1106,7 @@ ErrCode iMOAB_GetBlockInfo( iMOAB_AppID pid,
         return moab::MB_FAILURE;
     }  // not all of same  type
 
-    const EntityHandle* conn = NULL;
+    const EntityHandle* conn = nullptr;
     int num_verts            = 0;
     rval                     = context.MBI->get_connectivity( blo_elems[0], conn, num_verts );MB_CHK_ERR( rval );
 
@@ -1107,7 +1124,7 @@ ErrCode iMOAB_GetVisibleElementsInfo( iMOAB_AppID pid,
 {
     appData& data = context.appDatas[*pid];
 #ifdef MOAB_HAVE_MPI
-    ParallelComm* pco = context.pcomms[*pid];
+    ParallelComm* pco = context.appDatas[*pid].pcomm;
 #endif
 
     ErrorCode rval = context.MBI->tag_get_data( context.globalID_tag, data.primary_elems, element_global_IDs );MB_CHK_ERR( rval );
@@ -1282,7 +1299,7 @@ ErrCode iMOAB_GetElementOwnership( iMOAB_AppID pid,
 
     int i = 0;
 #ifdef MOAB_HAVE_MPI
-    ParallelComm* pco = context.pcomms[*pid];
+    ParallelComm* pco = context.appDatas[*pid].pcomm;
 #endif
 
     for( Range::iterator vit = elems.begin(); vit != elems.end(); vit++, i++ )
@@ -1478,7 +1495,7 @@ ErrCode iMOAB_DefineTagStorage( iMOAB_AppID pid,
 
     DataType tagDataType;
     TagType tagType;
-    void* defaultVal        = NULL;
+    void* defaultVal        = nullptr;
     int* defInt             = new int[*components_per_entity];
     double* defDouble       = new double[*components_per_entity];
     EntityHandle* defHandle = new EntityHandle[*components_per_entity];
@@ -1586,7 +1603,7 @@ ErrCode iMOAB_DefineTagStorage( iMOAB_AppID pid,
     // we don't need default values anymore, avoid leaks
     int rankHere = 0;
 #ifdef MOAB_HAVE_MPI
-    ParallelComm* pco = context.pcomms[*pid];
+    ParallelComm* pco = context.appDatas[*pid].pcomm;
     rankHere          = pco->rank();
 #endif
     if( !rankHere && already_defined_tags )
@@ -1728,7 +1745,7 @@ ErrCode iMOAB_SetDoubleTagStorage( iMOAB_AppID pid,
     split_tag_names( tag_names, separator, tagNames );
 
     appData& data      = context.appDatas[*pid];
-    Range* ents_to_set = NULL;
+    Range* ents_to_set = nullptr;
 
     if( *ent_type == 0 )  // vertices
     {
@@ -1789,7 +1806,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
     split_tag_names( tag_names, separator, tagNames );
 
     appData& data      = context.appDatas[*pid];
-    Range* ents_to_set = NULL;
+    Range* ents_to_set = nullptr;
 
     if( *ent_type == 0 )  // vertices
     {
@@ -1845,7 +1862,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
     }
     bool serial = true;
 #ifdef MOAB_HAVE_MPI
-    ParallelComm* pco  = context.pcomms[*pid];
+    ParallelComm* pco  = context.appDatas[*pid].pcomm;
     unsigned num_procs = pco->size();
     if( num_procs > 1 ) serial = false;
 #endif
@@ -2050,7 +2067,7 @@ ErrCode iMOAB_GetDoubleTagStorage( iMOAB_AppID pid,
     appData& data = context.appDatas[*pid];
 
     // set it on a subset of entities, based on type and length
-    Range* ents_to_get = NULL;
+    Range* ents_to_get = nullptr;
 
     if( *ent_type == 0 )  // vertices
     {
@@ -2122,7 +2139,7 @@ ErrCode iMOAB_SynchronizeTags( iMOAB_AppID pid, int* num_tag, int* tag_indices, 
         return moab::MB_FAILURE;
     }  // unexpected type
 
-    ParallelComm* pco = context.pcomms[*pid];
+    ParallelComm* pco = context.appDatas[*pid].pcomm;
 
     ErrorCode rval = pco->exchange_tags( tags, tags, ent_exchange );MB_CHK_ERR( rval );
 
@@ -2163,7 +2180,7 @@ ErrCode iMOAB_ReduceTagsMax( iMOAB_AppID pid, int* tag_index, int* ent_type )
         return moab::MB_FAILURE;
     }  // unexpected type
 
-    ParallelComm* pco = context.pcomms[*pid];
+    ParallelComm* pco = context.appDatas[*pid].pcomm;
     // we could do different MPI_Op; do not bother now, we will call from fortran
     ErrorCode rval = pco->reduce_tags( tagh, MPI_MAX, ent_exchange );MB_CHK_ERR( rval );
 
@@ -2251,7 +2268,7 @@ ErrCode iMOAB_CreateElements( iMOAB_AppID pid,
 
     EntityType mbtype = (EntityType)( *type );
     EntityHandle actual_start_handle;
-    EntityHandle* array = NULL;
+    EntityHandle* array = nullptr;
     rval = read_iface->get_element_connect( *num_elem, *num_nodes_per_element, mbtype, 1, actual_start_handle, array );MB_CHK_ERR( rval );
 
     // fill up with actual connectivity from input; assume the vertices are in order, and start
@@ -2312,11 +2329,11 @@ ErrCode iMOAB_SetGlobalInfo( iMOAB_AppID pid, int* num_global_verts, int* num_gl
 ErrCode iMOAB_GetGlobalInfo( iMOAB_AppID pid, int* num_global_verts, int* num_global_elems )
 {
     appData& data = context.appDatas[*pid];
-    if( NULL != num_global_verts )
+    if( nullptr != num_global_verts )
     {
         *num_global_verts = data.num_global_vertices;
     }
-    if( NULL != num_global_elems )
+    if( nullptr != num_global_elems )
     {
         *num_global_elems = data.num_global_elements;
     }
@@ -2330,7 +2347,7 @@ ErrCode iMOAB_GetGlobalInfo( iMOAB_AppID pid, int* num_global_verts, int* num_gl
 ErrCode iMOAB_ResolveSharedEntities( iMOAB_AppID pid, int* num_verts, int* marker )
 {
     appData& data     = context.appDatas[*pid];
-    ParallelComm* pco = context.pcomms[*pid];
+    ParallelComm* pco = context.appDatas[*pid].pcomm;
     EntityHandle cset = data.file_set;
     int dum_id        = 0;
     ErrorCode rval;
@@ -2365,7 +2382,7 @@ ErrCode iMOAB_ResolveSharedEntities( iMOAB_AppID pid, int* num_verts, int* marke
     rval   = context.MBI->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_tag,
                                           MB_TAG_CREAT | MB_TAG_SPARSE, &dum_id );
 
-    if( part_tag == NULL || ( ( rval != MB_SUCCESS ) && ( rval != MB_ALREADY_ALLOCATED ) ) )
+    if( part_tag == nullptr || ( ( rval != MB_SUCCESS ) && ( rval != MB_ALREADY_ALLOCATED ) ) )
     {
         std::cout << " can't get par part tag.\n";
         return moab::MB_FAILURE;
@@ -2389,7 +2406,7 @@ ErrCode iMOAB_DetermineGhostEntities( iMOAB_AppID pid, int* ghost_dim, int* num_
     }  // nothing to do
 
     appData& data     = context.appDatas[*pid];
-    ParallelComm* pco = context.pcomms[*pid];
+    ParallelComm* pco = context.appDatas[*pid].pcomm;
 
     // maybe we should be passing this too; most of the time we do not need additional ents collective call
     constexpr int addl_ents = 0;
@@ -2418,7 +2435,7 @@ ErrCode iMOAB_SendMesh( iMOAB_AppID pid, MPI_Comm* join, MPI_Group* receivingGro
     ErrorCode rval;
     int ierr;
     appData& data     = context.appDatas[*pid];
-    ParallelComm* pco = context.pcomms[*pid];
+    ParallelComm* pco = context.appDatas[*pid].pcomm;
 
     MPI_Comm global = ( data.is_fortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( join ) ) : *join );
     MPI_Group recvGroup =
@@ -2508,7 +2525,7 @@ ErrCode iMOAB_ReceiveMesh( iMOAB_AppID pid, MPI_Comm* join, MPI_Group* sendingGr
 
     ErrorCode rval;
     appData& data          = context.appDatas[*pid];
-    ParallelComm* pco      = context.pcomms[*pid];
+    ParallelComm* pco      = context.appDatas[*pid].pcomm;
     MPI_Comm receive       = pco->comm();
     EntityHandle local_set = data.file_set;
 
@@ -2626,7 +2643,7 @@ ErrCode iMOAB_ReceiveMesh( iMOAB_AppID pid, MPI_Comm* join, MPI_Group* sendingGr
         // if partition tag exists, set it to current rank; just to make it visible in VisIt
         Tag densePartTag;
         rval = context.MBI->tag_get_handle( "partition", densePartTag );
-        if( NULL != densePartTag && MB_SUCCESS == rval )
+        if( nullptr != densePartTag && MB_SUCCESS == rval )
         {
             Range local_verts;
             rval = context.MBI->get_entities_by_dimension( local_set, 0, local_verts );MB_CHK_ERR( rval );
@@ -2642,7 +2659,7 @@ ErrCode iMOAB_ReceiveMesh( iMOAB_AppID pid, MPI_Comm* join, MPI_Group* sendingGr
     rval       = context.MBI->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_tag,
                                               MB_TAG_CREAT | MB_TAG_SPARSE, &dum_id );
 
-    if( part_tag == NULL || ( ( rval != MB_SUCCESS ) && ( rval != MB_ALREADY_ALLOCATED ) ) )
+    if( part_tag == nullptr || ( ( rval != MB_SUCCESS ) && ( rval != MB_ALREADY_ALLOCATED ) ) )
     {
         std::cout << " can't get par part tag.\n";
         return moab::MB_FAILURE;
@@ -2674,7 +2691,7 @@ ErrCode iMOAB_SendElementTag( iMOAB_AppID pid, const iMOAB_String tag_storage_na
         return moab::MB_FAILURE;
     }
     ParCommGraph* cgraph = mt->second;
-    ParallelComm* pco    = context.pcomms[*pid];
+    ParallelComm* pco    = context.appDatas[*pid].pcomm;
     Range owned          = data.owned_elems;
     ErrorCode rval;
     EntityHandle cover_set;
@@ -2689,7 +2706,7 @@ ErrCode iMOAB_SendElementTag( iMOAB_AppID pid, const iMOAB_String tag_storage_na
     // after atm ocn intx, from phys (case from imoab_phatm_ocn_coupler.cpp) get then the cover set
     // from ints remapper
 #ifdef MOAB_HAVE_TEMPESTREMAP
-    if( data.tempestData.remapper != NULL )  // this is the case this is part of intx;;
+    if( data.tempestData.remapper != nullptr )  // this is the case this is part of intx;;
     {
         cover_set = data.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
         rval      = context.MBI->get_entities_by_dimension( cover_set, 2, owned );MB_CHK_ERR( rval );
@@ -2722,7 +2739,7 @@ ErrCode iMOAB_SendElementTag( iMOAB_AppID pid, const iMOAB_String tag_storage_na
     {
         Tag tagHandle;
         rval = context.MBI->tag_get_handle( tagNames[i].c_str(), tagHandle );
-        if( MB_SUCCESS != rval || NULL == tagHandle )
+        if( MB_SUCCESS != rval || nullptr == tagHandle )
         {
             std::cout << " can't get tag handle for tag named:" << tagNames[i].c_str() << " at index " << i << "\n";MB_CHK_SET_ERR( rval, "can't get tag handle" );
         }
@@ -2749,7 +2766,7 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid, const iMOAB_String tag_storage
     ParCommGraph* cgraph = mt->second;
 
     MPI_Comm global   = ( data.is_fortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( join ) ) : *join );
-    ParallelComm* pco = context.pcomms[*pid];
+    ParallelComm* pco = context.appDatas[*pid].pcomm;
     Range owned       = data.owned_elems;
 
     // how do I know if this receiver already participated in an intersection driven by coupler?
@@ -2770,7 +2787,7 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid, const iMOAB_String tag_storage
     // after atm ocn intx, from phys (case from imoab_phatm_ocn_coupler.cpp) get then the cover set
     // from ints remapper
 #ifdef MOAB_HAVE_TEMPESTREMAP
-    if( data.tempestData.remapper != NULL )  // this is the case this is part of intx;;
+    if( data.tempestData.remapper != nullptr )  // this is the case this is part of intx;;
     {
         cover_set = data.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
         rval      = context.MBI->get_entities_by_dimension( cover_set, 2, owned );MB_CHK_ERR( rval );
@@ -2794,7 +2811,7 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid, const iMOAB_String tag_storage
     {
         Tag tagHandle;
         rval = context.MBI->tag_get_handle( tagNames[i].c_str(), tagHandle );
-        if( MB_SUCCESS != rval || NULL == tagHandle )
+        if( MB_SUCCESS != rval || nullptr == tagHandle )
         {
             std::cout << " can't get tag handle for tag named:" << tagNames[i].c_str() << " at index " << i << "\n";MB_CHK_SET_ERR( rval, "can't get tag handle" );
         }
@@ -2863,35 +2880,24 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
 
     // we should search if we have another pcomm with the same comp ids in the list already
     // sort of check existing comm graphs in the map context.appDatas[*pid].pgraph
-    bool already_exists = false;
     if( *pid1 >= 0 )
     {
         appData& data                               = context.appDatas[*pid1];
         std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *comp2 );
-        if( mt != data.pgraph.end() ) already_exists = true;
+        if( mt != data.pgraph.end() ) data.pgraph.erase( mt );
     }
     if( *pid2 >= 0 )
     {
         appData& data                               = context.appDatas[*pid2];
         std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *comp1 );
-        if( mt != data.pgraph.end() ) already_exists = true;
-    }
-    // nothing to do if it already exists
-    if( already_exists )
-    {
-#ifdef VERBOSE
-        if( !localRank )
-            std::cout << " parcomgraph already existing between components " << *comp1 << " and " << *comp2
-                      << ". Do not compute again\n";
-#endif
-        return moab::MB_SUCCESS;
+        if( mt != data.pgraph.end() ) data.pgraph.erase( mt );
     }
 
     // ParCommGraph::ParCommGraph(MPI_Comm joincomm, MPI_Group group1, MPI_Group group2, int coid1,
     // int coid2)
-    ParCommGraph* cgraph = NULL;
+    ParCommGraph* cgraph = nullptr;
     if( *pid1 >= 0 ) cgraph = new ParCommGraph( global, srcGroup, tgtGroup, *comp1, *comp2 );
-    ParCommGraph* cgraph_rev = NULL;
+    ParCommGraph* cgraph_rev = nullptr;
     if( *pid2 >= 0 ) cgraph_rev = new ParCommGraph( global, tgtGroup, srcGroup, *comp2, *comp1 );
 
     if( *pid1 >= 0 ) context.appDatas[*pid1].pgraph[*comp2] = cgraph;      // the context will be the other comp
@@ -2925,7 +2931,7 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
         EntityHandle fset1 = data1.file_set;
         // in case of tempest remap, get the coverage set
 #ifdef MOAB_HAVE_TEMPESTREMAP
-        if( data1.tempestData.remapper != NULL )  // this is the case this is part of intx;;
+        if( data1.tempestData.remapper != nullptr )  // this is the case this is part of intx;;
         {
             fset1 = data1.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
             // should still have only quads ?
@@ -2999,7 +3005,7 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
         EntityHandle fset2 = data2.file_set;
         // in case of tempest remap, get the coverage set
 #ifdef MOAB_HAVE_TEMPESTREMAP
-        if( data2.tempestData.remapper != NULL )  // this is the case this is part of intx;;
+        if( data2.tempestData.remapper != nullptr )  // this is the case this is part of intx;;
         {
             fset2 = data2.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
             // should still have only quads ?
@@ -3186,7 +3192,7 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
 ErrCode iMOAB_MergeVertices( iMOAB_AppID pid )
 {
     appData& data     = context.appDatas[*pid];
-    ParallelComm* pco = context.pcomms[*pid];
+    ParallelComm* pco = context.appDatas[*pid].pcomm;
     // collapse vertices and transform cells into triangles/quads /polys
     // tags we care about: area, frac, global id
     std::vector< Tag > tagsList;
@@ -3232,7 +3238,7 @@ ErrCode iMOAB_MergeVertices( iMOAB_AppID pid )
     rval       = context.MBI->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_tag,
                                               MB_TAG_CREAT | MB_TAG_SPARSE, &dum_id );
 
-    if( part_tag == NULL || ( ( rval != MB_SUCCESS ) && ( rval != MB_ALREADY_ALLOCATED ) ) )
+    if( part_tag == nullptr || ( ( rval != MB_SUCCESS ) && ( rval != MB_ALREADY_ALLOCATED ) ) )
     {
         std::cout << " can't get par part tag.\n";
         return moab::MB_FAILURE;
@@ -3264,7 +3270,7 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* join,
     ErrorCode rval;
     std::vector< int > srcSenders;
     std::vector< int > receivers;
-    ParCommGraph* sendGraph = NULL;
+    ParCommGraph* sendGraph = nullptr;
     int ierr;
     int default_context_id  = -1;
     bool is_fortran_context = false;
@@ -3286,7 +3292,7 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* join,
 #endif
     }
 
-    ParCommGraph* recvGraph = NULL;  // will be non null on receiver tasks (intx tasks)
+    ParCommGraph* recvGraph = nullptr;  // will be non null on receiver tasks (intx tasks)
     if( *pid_migr >= 0 )
     {
         is_fortran_context = context.appDatas[*pid_migr].is_fortran || is_fortran_context;
@@ -3416,7 +3422,7 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* join,
         }
         dbfile.close();
 #endif
-        if( NULL != recvGraph )
+        if( nullptr != recvGraph )
         {
             ParCommGraph* recvGraph1 = new ParCommGraph( *recvGraph );  // just copy
             recvGraph1->set_context_id( *context_id );
@@ -3449,7 +3455,7 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* join,
     // for each task from receiver
 
     // a test to know if we are on the sender tasks (original component, in this case, atmosphere)
-    if( NULL != sendGraph )
+    if( nullptr != sendGraph )
     {
         // collect TLcovIDs tuple, will set in a local map/set, the ids that are sent to each
         // receiver task
@@ -3468,7 +3474,7 @@ ErrCode iMOAB_DumpCommGraph( iMOAB_AppID pid, int* context_id, int* is_sender, c
     ParCommGraph* cgraph = context.appDatas[*pid].pgraph[*context_id];
     std::string prefix_str( prefix );
 
-    if( NULL != cgraph )
+    if( nullptr != cgraph )
         cgraph->dump_comm_information( prefix_str, *is_sender );
     else
     {
@@ -3504,11 +3510,11 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
     TempestMapAppData& tdata = data_intx.tempestData;
 
     // Get the handle to the remapper object
-    if( tdata.remapper == NULL )
+    if( tdata.remapper == nullptr )
     {
         // Now allocate and initialize the remapper object
 #ifdef MOAB_HAVE_MPI
-        ParallelComm* pco = context.pcomms[*pid_intersection];
+        ParallelComm* pco = context.appDatas[*pid_intersection].pcomm;
         tdata.remapper    = new moab::TempestRemapper( context.MBI, pco );
 #else
         tdata.remapper = new moab::TempestRemapper( context.MBI );
@@ -3526,7 +3532,7 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
 
     // Now allocate and initialize the remapper object
     moab::TempestOnlineMap* weightMap = tdata.weightMaps[std::string( solution_weights_identifier )];
-    assert( weightMap != NULL );
+    assert( weightMap != nullptr );
 
     if( *pid_cpl >= 0 )  // it means we are looking for how to distribute the degrees of freedom, new map reader
     {
@@ -3624,11 +3630,11 @@ ErrCode iMOAB_WriteMappingWeightsToFile(
     TempestMapAppData& tdata = data_intx.tempestData;
 
     // Get the handle to the remapper object
-    assert( tdata.remapper != NULL );
+    assert( tdata.remapper != nullptr );
 
     // Now get online weights object and ensure it is valid
     moab::TempestOnlineMap* weightMap = tdata.weightMaps[std::string( solution_weights_identifier )];
-    assert( weightMap != NULL );
+    assert( weightMap != nullptr );
 
     std::string filename = std::string( remap_weights_filename );
 
@@ -3700,10 +3706,10 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     // Next instantiate the par comm graph
     // here we need to look at direction
     // this direction is good for atm source -> ocn target coupler example
-    ParCommGraph* cgraph = NULL;
+    ParCommGraph* cgraph = nullptr;
     if( *pid1 >= 0 ) cgraph = new ParCommGraph( joint_communicator, group_first, group_second, *comp1, *comp2 );
 
-    ParCommGraph* cgraph_rev = NULL;
+    ParCommGraph* cgraph_rev = nullptr;
     if( *pid3 >= 0 ) cgraph_rev = new ParCommGraph( joint_communicator, group_second, group_first, *comp2, *comp1 );
 
     // we should search if we have another pcomm with the same comp ids in the list already
@@ -3803,7 +3809,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     // start copy
     TLcomp2.enableWriteAccess();
 
-    moab::TempestOnlineMap* weightMap = NULL;  // declare it outside, but it will make sense only for *pid >= 0
+    moab::TempestOnlineMap* weightMap = nullptr;  // declare it outside, but it will make sense only for *pid >= 0
     // we know that :) (or *pid2 >= 0, it means we are on the coupler PEs, read map exists, and coupler procs exist)
     // populate second tuple with ids  from read map: we need row_gdofmap and col_gdofmap
     std::vector< int > valuesComp2;
@@ -4072,12 +4078,12 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     appData& data_tgt  = context.appDatas[*pid_tgt];
     appData& data_intx = context.appDatas[*pid_intx];
 #ifdef MOAB_HAVE_MPI
-    ParallelComm* pco_intx = context.pcomms[*pid_intx];
+    ParallelComm* pco_intx      = context.appDatas[*pid_intx].pcomm;
 #endif
 
-    // Mesh intersection has already been computed; Return early.
-    TempestMapAppData& tdata = data_intx.tempestData;
-    if( tdata.remapper != NULL ) return moab::MB_SUCCESS;  // nothing to do
+        // Mesh intersection has already been computed; Return early.
+        TempestMapAppData& tdata = data_intx.tempestData;
+    if( tdata.remapper != nullptr ) return moab::MB_SUCCESS;  // nothing to do
 
     bool is_parallel = false, is_root = true;
     int rank = 0;
@@ -4241,7 +4247,7 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
         local_areas[1] = areaAdaptor.area_on_sphere( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ );
         local_areas[2] = areaAdaptor.area_on_sphere( context.MBI, data_intx.file_set, radius_source );
 #ifdef MOAB_HAVE_MPI
-	global_areas[0] = global_areas[1] = global_areas[2] = 0.0; 
+	global_areas[0] = global_areas[1] = global_areas[2] = 0.0;
         MPI_Reduce( &local_areas[0], &global_areas[0], 3, MPI_DOUBLE, MPI_SUM, 0, pco_intx->comm() );
 #else
         global_areas[0] = local_areas[0];
@@ -4279,12 +4285,12 @@ ErrCode iMOAB_ComputePointDoFIntersection( iMOAB_AppID pid_src, iMOAB_AppID pid_
     appData& data_tgt  = context.appDatas[*pid_tgt];
     appData& data_intx = context.appDatas[*pid_intx];
 #ifdef MOAB_HAVE_MPI
-    ParallelComm* pco_intx = context.pcomms[*pid_intx];
+    ParallelComm* pco_intx = context.appDatas[*pid_intx].pcomm;
 #endif
 
     // Mesh intersection has already been computed; Return early.
     TempestMapAppData& tdata = data_intx.tempestData;
-    if( tdata.remapper != NULL ) return moab::MB_SUCCESS;  // nothing to do
+    if( tdata.remapper != nullptr ) return moab::MB_SUCCESS;  // nothing to do
 
 #ifdef MOAB_HAVE_MPI
     if( pco_intx )
@@ -4414,7 +4420,7 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
 
     // Call to generate the remap weights with the tempest meshes
     moab::TempestOnlineMap* weightMap = tdata.weightMaps[std::string( solution_weights_identifier )];
-    assert( weightMap != NULL );
+    assert( weightMap != nullptr );
 
     GenerateOfflineMapAlgorithmOptions mapOptions;
     mapOptions.nPin           = *disc_order_source;
@@ -4500,13 +4506,11 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
     appData& data_intx       = context.appDatas[*pid_intersection];
     TempestMapAppData& tdata = data_intx.tempestData;
 
-    // Now allocate and initialize the remapper object
-    moab::TempestRemapper* remapper = tdata.remapper;
     if( !tdata.weightMaps.count( std::string( solution_weights_identifier ) ) )  // key does not exist
         return moab::MB_INDEX_OUT_OF_RANGE;
     moab::TempestOnlineMap* weightMap = tdata.weightMaps[std::string( solution_weights_identifier )];
 
-    // we assume that there are separators ";" between the tag names
+    // we assume that there are separators ":" between the tag names
     std::vector< std::string > srcNames;
     std::vector< std::string > tgtNames;
     std::vector< Tag > srcTagHandles;
@@ -4522,23 +4526,30 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         return moab::MB_FAILURE;
     }
 
+    // get both source and target tag handles
     for( size_t i = 0; i < srcNames.size(); i++ )
     {
         Tag tagHandle;
+        // get source tag handles and arrange in order
         rval = context.MBI->tag_get_handle( srcNames[i].c_str(), tagHandle );
-        if( MB_SUCCESS != rval || NULL == tagHandle )
+        if( MB_SUCCESS != rval || nullptr == tagHandle )
         {
-            return moab::MB_FAILURE;
+            return moab::MB_TAG_NOT_FOUND;
         }
         srcTagHandles.push_back( tagHandle );
+
+        // get corresponding target handles and arrange in the same order
         rval = context.MBI->tag_get_handle( tgtNames[i].c_str(), tagHandle );
-        if( MB_SUCCESS != rval || NULL == tagHandle )
+        if( MB_SUCCESS != rval || nullptr == tagHandle )
         {
-            return moab::MB_FAILURE;
+            return moab::MB_TAG_NOT_FOUND;
         }
         tgtTagHandles.push_back( tagHandle );
     }
 
+#ifdef VERBOSE
+    // Now get reference to the remapper object
+    moab::TempestRemapper* remapper = tdata.remapper;
     std::vector< double > solSTagVals;
     std::vector< double > solTTagVals;
 
@@ -4588,6 +4599,7 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         sents = covSrcEnts;
         tents = tgtEnts;
     }
+#endif
 
     moab::TempestOnlineMap::CAASType caasType = moab::TempestOnlineMap::CAAS_NONE;
     if( filter_type )
@@ -4618,7 +4630,7 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
 
 // #define VERBOSE
 #ifdef VERBOSE
-    ParallelComm* pco_intx = context.pcomms[*pid_intersection];
+    ParallelComm* pco_intx = context.appDatas[*pid_intersection].pcomm;
 
     int ivar = 0;
     {
@@ -4643,7 +4655,7 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         sstr << "outputSrcDest_" << *pid_intersection << "_" << ivar << "_" << pco_intx->rank() << ".h5m";
         EntityHandle sets[2] = { context.appDatas[*tdata.pid_src].file_set,
                                  context.appDatas[*tdata.pid_dest].file_set };
-        rval                 = context.MBI->write_file( sstr.str().c_str(), NULL, "", sets, 2 );MB_CHK_ERR( rval );
+        rval                 = context.MBI->write_file( sstr.str().c_str(), nullptr, "", sets, 2 );MB_CHK_ERR( rval );
     }
     {
         std::stringstream sstr;
@@ -4651,21 +4663,21 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         // EntityHandle sets[2] = {data_intx.file_set, data_intx.covering_set};
         EntityHandle covering_set = remapper->GetCoveringSet();
         EntityHandle sets[2]      = { covering_set, context.appDatas[*tdata.pid_dest].file_set };
-        rval                      = context.MBI->write_file( sstr.str().c_str(), NULL, "", sets, 2 );MB_CHK_ERR( rval );
+        rval                      = context.MBI->write_file( sstr.str().c_str(), nullptr, "", sets, 2 );MB_CHK_ERR( rval );
     }
     {
         std::stringstream sstr;
         sstr << "covMesh_" << *pid_intersection << "_" << pco_intx->rank() << ".vtk";
         // EntityHandle sets[2] = {data_intx.file_set, data_intx.covering_set};
         EntityHandle covering_set = remapper->GetCoveringSet();
-        rval                      = context.MBI->write_file( sstr.str().c_str(), NULL, "", &covering_set, 1 );MB_CHK_ERR( rval );
+        rval                      = context.MBI->write_file( sstr.str().c_str(), nullptr, "", &covering_set, 1 );MB_CHK_ERR( rval );
     }
     {
         std::stringstream sstr;
         sstr << "tgtMesh_" << *pid_intersection << "_" << pco_intx->rank() << ".vtk";
         // EntityHandle sets[2] = {data_intx.file_set, data_intx.covering_set};
         EntityHandle target_set = remapper->GetMeshSet( Remapper::TargetMesh );
-        rval                    = context.MBI->write_file( sstr.str().c_str(), NULL, "", &target_set, 1 );MB_CHK_ERR( rval );
+        rval                    = context.MBI->write_file( sstr.str().c_str(), nullptr, "", &target_set, 1 );MB_CHK_ERR( rval );
     }
     {
         std::stringstream sstr;

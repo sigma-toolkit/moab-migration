@@ -2349,7 +2349,7 @@ ErrorCode ParallelComm::unpack_entities( unsigned char*& buff_ptr,
     myDebug->tprintf( 4, "Done unpacking entities.\n" );
 
     // Need to sort here, to enable searching
-    std::sort( new_ents.begin(), new_ents.end() );
+    // std::sort( new_ents.begin(), new_ents.end() );
 
     return MB_SUCCESS;
 }

@@ -33,7 +33,7 @@
 #error The climate coupler test example requires MOAB configuration with TempestRemap
 #endif
 
-// #define COMPUTE_FILE_MAP
+#define COMPUTE_FILE_MAP
 #define COMPUTE_ONLINE_MAP
 
 #if( !defined( COMPUTE_FILE_MAP ) && !defined( COMPUTE_ONLINE_MAP ) )
@@ -198,14 +198,14 @@ int main( int argc, char* argv[] )
     if( atmComm != MPI_COMM_NULL )
     {
         MPI_Comm_rank( atmComm, &rankInAtmComm );
-        CHECKIERR( iMOAB_RegisterApplication( "ATM", &atmComm, &cmpatm, cmpAtmPID ), "Cannot register ATM App" )
+        CHECKIERR( iMOAB_RegisterApplication( "ATMCMP", &atmComm, &cmpatm, cmpAtmPID ), "Cannot register ATM App" )
         CHECKIERR( iMOAB_LoadMesh( cmpAtmPID, atmFilename.c_str(), readopts.c_str(), &nghlay ), "Cannot load ATM mesh" )
     }
 
     if( ocnComm != MPI_COMM_NULL )
     {
         MPI_Comm_rank( ocnComm, &rankInOcnComm );
-        CHECKIERR( iMOAB_RegisterApplication( "OCN", &ocnComm, &cmpocn, cmpOcnPID ), "Cannot register OCN App" )
+        CHECKIERR( iMOAB_RegisterApplication( "OCNCMP", &ocnComm, &cmpocn, cmpOcnPID ), "Cannot register OCN App" )
         CHECKIERR( iMOAB_LoadMesh( cmpOcnPID, ocnFilename.c_str(), readopts.c_str(), &nghlay ), "Cannot load OCN mesh" )
     }
 
@@ -317,6 +317,30 @@ int main( int argc, char* argv[] )
     if( ocnComm != MPI_COMM_NULL )
     {
         CHECKIERR( iMOAB_FreeSenderBuffers( cmpOcnPID, &cplocnm ), "cannot free buffers used to send ocn mesh" )
+    }
+
+    // this model (recMeshOcn.h5m) has mixed meshes in it, we need to repair the comm graph
+    // first delete the one created with migration, then compute a new one
+    if( atmCouComm != MPI_COMM_NULL )
+    {
+        // ierr = iMOAB_DeleteCommGraph( cmpOcnPID, cplOcnPID, &cmpocn, &cplocn );
+        // CHECKIERR( ierr, "cannot delete graph between atm comp and atm migrated to coupler" )
+        int type = 3;  // type: 1 - SE, 2 - Vertex (point cloud), 3 - Element (FV scalars)
+        CHECKIERR( iMOAB_ComputeCommGraph( cmpAtmPID, cplAtmMemPID, &atmCouComm, &atmPEGroup, &couPEGroup, &type,
+                                           &type, &cmpatm, &cplatmm ),
+                   "cannot compute graph between atm comp and atm migrated to coupler" )
+    }
+
+    // this model (recMeshOcn.h5m) has mixed meshes in it, we need to repair the comm graph
+    // first delete the one created with migration, then compute a new one
+    if( ocnCouComm != MPI_COMM_NULL )
+    {
+        // ierr = iMOAB_DeleteCommGraph( cmpOcnPID, cplOcnPID, &cmpocn, &cplocn );
+        // CHECKIERR( ierr, "cannot delete graph between ocn comp and ocn migrated to coupler" )
+        int type = 3;  // type: 1 - SE, 2 - Vertex (point cloud), 3 - Element (FV scalars)
+        CHECKIERR( iMOAB_ComputeCommGraph( cmpOcnPID, cplOcnMemPID, &ocnCouComm, &ocnPEGroup, &couPEGroup, &type,
+                                           &type, &cmpocn, &cplocnm ),
+                   "cannot compute graph between ocn comp and ocn migrated to coupler" )
     }
 
     // write only for n==1 case
@@ -494,7 +518,7 @@ int main( int argc, char* argv[] )
                        "cannot send tag values" )
 #endif
 #ifdef COMPUTE_ONLINE_MAP
-            CHECKIERR( iMOAB_SendElementTag( cmpAtmPID, bottomFields, &atmCouComm, &cplatmm ),
+            CHECKIERR( iMOAB_SendElementTag( cmpAtmPID, bottomFields, &atmCouComm, &cplocnm ),
                        "cannot send tag values" )
             {
                 char outputFileRecvd[] = "cmpAtmOrig.h5m";
@@ -511,7 +535,7 @@ int main( int argc, char* argv[] )
                        "cannot receive tag values" )
 #endif
 #ifdef COMPUTE_ONLINE_MAP
-            CHECKIERR( iMOAB_ReceiveElementTag( cplAtmMemPID, bottomFields, &atmCouComm, &cmpatm ),
+            CHECKIERR( iMOAB_ReceiveElementTag( cplAtmMemPID, bottomFields, &atmCouComm, &cplocnm ),
                        "cannot receive tag values" )
             {
                 char outputFileRecvd[] = "cplAtmRecv.h5m";
@@ -529,7 +553,7 @@ int main( int argc, char* argv[] )
                        "cannot free buffers used to resend ATM tag towards the coverage mesh" )
 #endif
 #ifdef COMPUTE_ONLINE_MAP
-            CHECKIERR( iMOAB_FreeSenderBuffers( cmpAtmPID, &cplatmm ),
+            CHECKIERR( iMOAB_FreeSenderBuffers( cmpAtmPID, &cplocnm ),
                        "cannot free buffers used to resend ATM tag towards the coverage mesh" )
 #endif
         }

@@ -49,7 +49,7 @@ set(MOAB_USE_EIGEN @MOAB_HAVE_EIGEN3@)
 set(EIGEN3_DIR "@EIGEN3_DIR@")
 set(TEMPESTREMAP_DIR "@TEMPESTREMAP_DIR@")
 set(MOAB_USE_TEMPESTREMAP @MOAB_HAVE_TEMPESTREMAP@)
-
+set(MOAB_USE_SKBUILD @SKBUILD@)
 set(MOAB_MESH_DIR "@CMAKE_SOURCE_DIR@/MeshFiles/unittest")
 
 # Library and include defs
@@ -78,7 +78,7 @@ if(MOAB_USE_HDF5)
   endif()
 endif()
 
-if(@SKBUILD@)
+if(MOAB_USE_SKBUILD)
   # Find the Python interpreter and ensure it's available.
   find_package(Python COMPONENTS Interpreter REQUIRED)
 

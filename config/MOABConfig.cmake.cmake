@@ -104,7 +104,7 @@ if(MOAB_USE_SKBUILD)
   run_python_command(MOAB_LIBRARY_DIRS "import pymoab; print(pymoab.lib_path[0])")
   run_python_command(MOAB_EXTRA_LIBRARIES "import pymoab; print(' '.join(pymoab.extra_lib))")
 
-# Check if the wheel was repaired using auditwheel or delocate
+  # Check if the wheel was repaired using auditwheel or delocate
   if(MOAB_EXTRA_LIBRARIES)
     message(FATAL_ERROR
         "This build of MOAB is not supported. "
@@ -125,7 +125,7 @@ if(MOAB_USE_SKBUILD)
   set(MOAB_LIBRARIES ${MOAB_LIBRARY} ${MOAB_PACKAGE_LIBS})
 else()
   if(NOT TARGET MOAB AND NOT MOAB_BINARY_DIR)
-  include("${MOAB_CMAKE_DIR}/MOABTargets.cmake")
+    include("${MOAB_CMAKE_DIR}/MOABTargets.cmake")
   endif()
   set(MOAB_LIBRARY_DIRS "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@")
   set(MOAB_INCLUDE_DIRS "@CMAKE_INSTALL_PREFIX@/include" ${MOAB_PACKAGE_INCLUDES})

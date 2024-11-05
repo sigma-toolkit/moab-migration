@@ -263,20 +263,7 @@ ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
     // now create ParallelComm and a file set for this application
 #ifdef MOAB_HAVE_MPI
     if( *comm )
-    {
         app_data.pcomm = new ParallelComm( context.MBI, *comm  );
-
-#ifndef NDEBUG
-        int index = app_data.pcomm->get_id();  // it could be useful to get app id from pcomm instance ...
-        assert( index == *pid );
-        // here, we assert the the pid is the same as the id of the ParallelComm instance
-        // useful for writing in parallel
-#endif
-    }
-    else
-    {
-        app_data.pcomm = nullptr;
-    }
 #endif
 
     context.appDatas[*pid] = app_data;  // it will correspond to app_FileSets[*pid] will be the file set of interest
@@ -4054,12 +4041,14 @@ ErrCode iMOAB_SetGhostLayers( iMOAB_AppID pid, int* nghost_layers )
     return moab::MB_SUCCESS;
 }
 
-ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMOAB_AppID pid_intx )
+
+ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMOAB_AppID pid_intx )
 {
     // Default constant parameters
     constexpr bool validate          = true;
+#ifdef VERBOSE
     constexpr bool enforceConvexity  = true;
-    constexpr bool use_kdtree_search = true;
+#endif
     constexpr bool gnomonic          = true;
     constexpr double defaultradius   = 1.0;
     constexpr double boxeps          = 1.e-10;
@@ -4081,8 +4070,8 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     ParallelComm* pco_intx      = context.appDatas[*pid_intx].pcomm;
 #endif
 
-        // Mesh intersection has already been computed; Return early.
-        TempestMapAppData& tdata = data_intx.tempestData;
+    // Mesh intersection has already been computed; Return early.
+    TempestMapAppData& tdata = data_intx.tempestData;
     if( tdata.remapper != nullptr ) return moab::MB_SUCCESS;  // nothing to do
 
     bool is_parallel = false, is_root = true;
@@ -4098,7 +4087,7 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
 #endif
 
     moab::DebugOutput outputFormatter( std::cout, rank, 0 );
-    outputFormatter.set_prefix( "[iMOAB_ComputeMeshIntersectionOnSphere]: " );
+    outputFormatter.set_prefix( "[iMOAB_ComputeCoverageMesh]: " );
 
     ierr = iMOAB_UpdateMeshInfo( pid_src );MB_CHK_ERR( ierr );
     ierr = iMOAB_UpdateMeshInfo( pid_tgt );MB_CHK_ERR( ierr );
@@ -4235,6 +4224,42 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     // First, compute the covering source set.
     rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, data_src.num_ghost_layers );MB_CHK_ERR( rval );
 
+    return moab::MB_SUCCESS;
+}
+
+
+ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMOAB_AppID pid_intx )
+{
+    // Default constant parameters
+    constexpr bool validate          = true;
+    constexpr bool use_kdtree_search = true;
+    constexpr double defaultradius   = 1.0;
+
+    // Error code definitions
+    ErrorCode rval;
+
+    // Get the source and target data and pcomm objects
+    appData& data_src  = context.appDatas[*pid_src];
+    appData& data_tgt  = context.appDatas[*pid_tgt];
+    appData& data_intx = context.appDatas[*pid_intx];
+#ifdef MOAB_HAVE_MPI
+    ParallelComm* pco_intx      = context.appDatas[*pid_intx].pcomm;
+#endif
+
+    // Mesh intersection has already been computed; Return early.
+    TempestMapAppData& tdata = data_intx.tempestData;
+
+    if( tdata.remapper == nullptr )
+    {
+        // user has not called the coverage mesh computation routine -- so explicitly call it now
+        // this check supports the traditional workflow of directly computing mesh intersection
+        // and letting this routine compute coverage mesh as needed
+        MB_CHK_ERR( iMOAB_ComputeCoverageMesh( pid_src, pid_tgt, pid_intx ) );
+    }
+
+    moab::DebugOutput outputFormatter( std::cout, pco_intx->rank(), 0 );
+    outputFormatter.set_prefix( "[iMOAB_ComputeMeshIntersectionOnSphere]: " );
+
     // Next, compute intersections with MOAB.
     // for bilinear, this is an overkill
     rval = tdata.remapper->ComputeOverlapMesh( use_kdtree_search, false, data_src.num_ghost_layers );MB_CHK_ERR( rval );
@@ -4242,10 +4267,12 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     // Mapping computation done
     if( validate )
     {
+        // Default area_method = lHuiller; Options: Girard, GaussQuadrature (if TR is available)
+        IntxAreaUtils areaAdaptor( IntxAreaUtils::lHuiller );
         double local_areas[3], global_areas[3];
         local_areas[0] = areaAdaptor.area_on_sphere( context.MBI, data_src.file_set, defaultradius /*radius_source*/ );
         local_areas[1] = areaAdaptor.area_on_sphere( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ );
-        local_areas[2] = areaAdaptor.area_on_sphere( context.MBI, data_intx.file_set, radius_source );
+        local_areas[2] = areaAdaptor.area_on_sphere( context.MBI, data_intx.file_set, defaultradius );
 #ifdef MOAB_HAVE_MPI
 	global_areas[0] = global_areas[1] = global_areas[2] = 0.0;
         MPI_Reduce( &local_areas[0], &global_areas[0], 3, MPI_DOUBLE, MPI_SUM, 0, pco_intx->comm() );
@@ -4255,7 +4282,7 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
         global_areas[2] = local_areas[2];
 #endif
 
-        if( is_root )
+        if( pco_intx->rank() == 0 )
         {
             outputFormatter.printf( 0,
                                     "initial area: source mesh = %12.14f, target mesh = %12.14f, "

@@ -345,6 +345,14 @@ int main( int argc, char* argv[] )
     const std::string map_from_mem_identifier = "map-computed-online";
     if( couComm != MPI_COMM_NULL )
     {
+        PUSH_TIMER( "Compute ATM source coverage mesh for OCN" )
+        // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
+        // basically, atm was redistributed according to target (ocean) partition, to "cover" the
+        // ocean partitions check if intx valid, write some h5m intx file
+        CHECKIERR( iMOAB_ComputeCoverageMesh( cplAtmMemPID, cplOcnMemPID, cplAtmOcnMemPID ),
+                   "cannot compute source ATM coverage mesh for OCN" )
+        POP_TIMER( couComm, rankInCouComm )
+
         PUSH_TIMER( "Compute ATM-OCN mesh intersection" )
         // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
         // basically, atm was redistributed according to target (ocean) partition, to "cover" the

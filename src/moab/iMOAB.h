@@ -1071,6 +1071,22 @@ ErrCode iMOAB_SetMapGhostLayers( iMOAB_AppID pid, int* n_src_ghost_layers, int* 
 #ifdef MOAB_HAVE_TEMPESTREMAP
 
 /**
+ * @brief Compute the source coverage mesh that completely encompasses the target surface mesh on a sphere.
+ *
+ * \note  This step involves communication and mesh movement such that target mesh elements are within the
+ * convex hull of the source mesh in the current task. The subsequent operations to compute the intersection
+ * mesh between the coverage source and the target mesh are purely local.
+ *
+ * <B>Operations:</B> Collective on coupler tasks
+ *
+ * \param[in]  pid_source (iMOAB_AppID)            The unique pointer to the source application ID.
+ * \param[in]  pid_target (iMOAB_AppID)            The unique pointer to the destination application ID.
+ * \param[in]  pid_intersection (iMOAB_AppID)      The unique pointer to the intersection application ID.
+ * \return ErrCode                                 The error code indicating success or failure.
+ */
+ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_source, iMOAB_AppID pid_target, iMOAB_AppID pid_intersection );
+
+/**
  * @brief Compute intersection of the surface meshes defined on a sphere. The resulting intersected mesh consists
  * of (convex) polygons with 1-1 associativity with both the source and destination meshes provided.
  *
@@ -1078,7 +1094,7 @@ ErrCode iMOAB_SetMapGhostLayers( iMOAB_AppID pid, int* n_src_ghost_layers, int* 
  * corresponding to the \p pid_intersection application. This intersection data can be used to compute solution
  * projection weights between these meshes.
  *
- * <B>Operations:</B> Collective on coupler tasks
+ * <B>Operations:</B> Not collective. Embarassingly parallel.
  *
  * \param[in]  pid_source (iMOAB_AppID)            The unique pointer to the source application ID.
  * \param[in]  pid_target (iMOAB_AppID)            The unique pointer to the destination application ID.

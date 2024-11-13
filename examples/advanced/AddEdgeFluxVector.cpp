@@ -51,6 +51,11 @@ int main( int argc, char* argv[] )
     Tag vectorTag;
     rval = mb->tag_get_handle("FluxVector", 3, MB_TYPE_DOUBLE, vectorTag, MB_TAG_CREAT | MB_TAG_DENSE );MB_CHK_SET_ERR( rval, "Couldn't get tag handle" );
 
+    Tag vectorTagU;
+    rval = mb->tag_get_handle("FluxVectorU", 3, MB_TYPE_DOUBLE, vectorTagU, MB_TAG_CREAT | MB_TAG_DENSE );MB_CHK_SET_ERR( rval, "Couldn't get tag handle" );
+    Tag vectorTagV;
+    rval = mb->tag_get_handle("FluxVectorV", 3, MB_TYPE_DOUBLE, vectorTagV, MB_TAG_CREAT | MB_TAG_DENSE );MB_CHK_SET_ERR( rval, "Couldn't get tag handle" );
+
     int i = 0;
     for (Range::iterator eit=edges.begin(); eit!=edges.end(); eit++, i++)
     {
@@ -85,6 +90,13 @@ int main( int argc, char* argv[] )
         flux = fluxes[i] * flux; //
 
         rval = mb ->tag_set_data(vectorTag, &eh, 1, &(flux[0]));MB_CHK_SET_ERR( rval, "Couldn't set vector tag" );
+        double projU, projV;
+        projU = flux % u; // this is dot product between vectors
+        CartVect pU = projU * u;
+        projV = flux % v;
+        CartVect pV = projV *v;
+        rval = mb ->tag_set_data(vectorTagU, &eh, 1, &(pU[0]));MB_CHK_SET_ERR( rval, "Couldn't set vector tag" );
+        rval = mb ->tag_set_data(vectorTagV, &eh, 1, &(pV[0]));MB_CHK_SET_ERR( rval, "Couldn't set vector tag" );
 
     }
     // for each edge. get v1, v2, mid edge. compute lat, lon,

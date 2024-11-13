@@ -220,6 +220,7 @@ int main( int argc, char* argv[] )
 
     int dimIndex     = -1;  // index of the dimension of interest
     bool vertex_data = false;
+    bool edge_data = false;
     bool cell_data   = false;
     for( size_t j = 0; j < dims.size(); j++ )
     {
@@ -232,6 +233,11 @@ int main( int argc, char* argv[] )
         {
             dimIndex    = j;
             vertex_data = true;
+        }
+        if( recs == edges.size() )
+        {
+            dimIndex  = j;
+            edge_data = true;
         }
         if( recs == cells.size() )
         {
@@ -270,7 +276,7 @@ int main( int argc, char* argv[] )
     }
     Tag newTag;
 
-    if( ( dims.size() >= 1 && dims.size() <= 2 ) && ( vertex_data || cell_data ) )
+    if( ( dims.size() >= 1 && dims.size() <= 2 ) && ( vertex_data || cell_data || edge_data ) )
     {
 
         if( dims.size() == 2 )
@@ -297,12 +303,20 @@ int main( int argc, char* argv[] )
                         rval            = mb->tag_set_data( newTag, &vh, 1, &vals[k] );MB_CHK_SET_ERR( rval, "can't set tag on vertex" );
                     }
                 }
-                else  // cell_data
+                else if (cell_data) // cell_data
                 {
                     for( size_t k = 0; k < vals.size(); k++ )
                     {
                         EntityHandle ch = cGidHandle[k + 1];  // cell handle
                         rval            = mb->tag_set_data( newTag, &ch, 1, &vals[k] );MB_CHK_SET_ERR( rval, "can't set tag on cell" );
+                    }
+                }
+                else if (edge_data) // edge_data
+                {
+                    for( size_t k = 0; k < vals.size(); k++ )
+                    {
+                        EntityHandle edgeh = eGidHandle[k + 1];  // edge handle
+                        rval            = mb->tag_set_data( newTag, &edgeh, 1, &vals[k] );MB_CHK_SET_ERR( rval, "can't set tag on edge" );
                     }
                 }
             }
@@ -354,12 +368,20 @@ int main( int argc, char* argv[] )
                         rval            = mb->tag_set_data( newTag, &vh, 1, &vals[k] );MB_CHK_SET_ERR( rval, "can't set tag on vertex" );
                     }
                 }
-                else  // cell_data
+                else if (cell_data)// cell_data
                 {
                     for( size_t k = 0; k < vals.size(); k++ )
                     {
                         EntityHandle ch = cGidHandle[k + 1];  // cell handle
-                        rval            = mb->tag_set_data( newTag, &ch, 1, &vals[k] );MB_CHK_SET_ERR( rval, "can't set tag on vertex" );
+                        rval            = mb->tag_set_data( newTag, &ch, 1, &vals[k] );MB_CHK_SET_ERR( rval, "can't set tag on cell" );
+                    }
+                }
+                else // edge_data
+                {
+                    for( size_t k = 0; k < vals.size(); k++ )
+                    {
+                        EntityHandle edgeh = eGidHandle[k + 1];  // edge handle
+                        rval            = mb->tag_set_data( newTag, &edgeh, 1, &vals[k] );MB_CHK_SET_ERR( rval, "can't set tag on edge" );
                     }
                 }
             }

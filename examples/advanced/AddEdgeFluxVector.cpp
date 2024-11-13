@@ -56,6 +56,11 @@ int main( int argc, char* argv[] )
     Tag vectorTagV;
     rval = mb->tag_get_handle("FluxVectorV", 3, MB_TYPE_DOUBLE, vectorTagV, MB_TAG_CREAT | MB_TAG_DENSE );MB_CHK_SET_ERR( rval, "Couldn't get tag handle" );
 
+    Tag edgeLenTag;
+    rval = mb->tag_get_handle("EdgeLength", 1, MB_TYPE_DOUBLE, edgeLenTag, MB_TAG_CREAT | MB_TAG_DENSE );MB_CHK_SET_ERR( rval, "Couldn't get tag handle" );
+
+
+    // for each edge. get v1, v2, mid edge. compute lat, lon,
     int i = 0;
     for (Range::iterator eit=edges.begin(); eit!=edges.end(); eit++, i++)
     {
@@ -70,6 +75,8 @@ int main( int argc, char* argv[] )
         }
         rval = mb->get_coords(conn, 2, &verts[0][0]);MB_CHK_SET_ERR( rval, "Couldn't get vertex coordinates" );
         CartVect mid = 0.5*(verts[0]+verts[1]);
+        double edgeLen = (verts[1]-verts[0]).length();
+        rval = mb->tag_set_data(edgeLenTag, &eh, 1, &edgeLen);MB_CHK_SET_ERR( rval, "Couldn't set edge length" );
         // utility to convert to lat/lon
         IntxUtils::SphereCoords sph = IntxUtils::cart_to_spherical(mid);
         double lat = sph.lat, lon = sph.lon;
@@ -99,7 +106,31 @@ int main( int argc, char* argv[] )
         rval = mb ->tag_set_data(vectorTagV, &eh, 1, &(pV[0]));MB_CHK_SET_ERR( rval, "Couldn't set vector tag" );
 
     }
-    // for each edge. get v1, v2, mid edge. compute lat, lon,
+    // after computing each edge flux, add all vectors in a cell, to see the total flux along edges
+    Range cells;
+    rval = mb->get_entities_by_dimension(0, 2, cells);MB_CHK_ERR( rval );
+
+    // get all edges adjacent to a cell, then multiply by edge length and compute the total flux at
+    // center of cell
+    for (Range::iterator cit = cells.begin(); cit != cells.end(); cit++)
+    {
+        EntityHandle cell = *cit;
+        // get edges adjacent to the cell
+        std::vector<EntityHandle> adjEdges;
+        rval = mb->get_adjacencies(&cell, 1, 1, false, adjEdges, Interface::UNION);MB_CHK_ERR( rval );
+        CartVect totalFlux = CartVect(0.);
+        for (size_t i=0; i<adjEdges.size(); i++)
+        {
+            EntityHandle edge = adjEdges[i];
+            CartVect flux;
+            rval = mb->tag_get_data(vectorTag, &edge, 1, &flux[0]);MB_CHK_ERR( rval );
+            double edgeLen;
+            rval = mb->tag_get_data(edgeLenTag, &edge, 1, &edgeLen);MB_CHK_ERR( rval );
+            totalFlux = totalFlux + edgeLen*flux;
+
+        }
+        rval = mb->tag_set_data(vectorTag, &cell, 1, &totalFlux[0]);MB_CHK_ERR( rval );
+    }
     std::cout << " writing " << fileout << "\n";
     rval = mb->write_file( fileout.c_str() );MB_CHK_ERR( rval );
 

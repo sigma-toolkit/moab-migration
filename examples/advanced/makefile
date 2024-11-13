@@ -3,7 +3,7 @@ include ../makefile.config
 
 default: all
 
-EXAMPLES =  ExtrudePoly GeneralGnomonic
+EXAMPLES =  ExtrudePoly GeneralGnomonic AddEdgeFluxVector
 PAREXAMPLES = LloydRelaxation CrystalRouterExample GenLargeMesh
 EXOIIEXAMPLES = VisTags
 ALLEXAMPLES = ${EXAMPLES}
@@ -30,8 +30,9 @@ CrystalRouterExample: CrystalRouterExample.o ${MOAB_LIBDIR}/libMOAB.la
 VisTags: VisTags.o ${MOAB_LIBDIR}/libMOAB.la
 GenLargeMesh: GenLargeMesh.o ${MOAB_LIBDIR}/libMOAB.la
 GeneralGnomonic: GeneralGnomonic.o ${MOAB_LIBDIR}/libMOAB.la
+AddEdgeFluxVector: AddEdgeFluxVector.o ${MOAB_LIBDIR}/libMOAB.la
 
-ExtrudePoly LloydRelaxation CrystalRouterExample VisTags GenLargeMesh GeneralGnomonic:
+ExtrudePoly LloydRelaxation CrystalRouterExample VisTags GenLargeMesh GeneralGnomonic AddEdgeFluxVector:
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 

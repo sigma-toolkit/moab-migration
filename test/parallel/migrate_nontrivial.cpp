@@ -34,6 +34,18 @@ using namespace moab;
         return MB_FAILURE;                \
     }
 
+struct RunContext
+{
+    std::string filename;  // name of mesh file
+    int startG1;           // starting process for group 1
+    int startG2;           // starting process for group 2
+    int endG1;             // ending process for group 1
+    int endG2;             // ending process for group 2
+    MPI_Comm jcomm;        // will be a copy of the global communicator
+    MPI_Group jgroup;      // will be a copy of the global group
+    int rank, size;        // current rank and total PE size
+};
+
 int is_any_proc_error( int is_my_error )
 {
     int result = 0;
@@ -41,13 +53,11 @@ int is_any_proc_error( int is_my_error )
     return err || result;
 }
 
-int run_test( ErrorCode ( *func )( const char* ), const char* func_name, const char* file_name )
+int run_test( ErrorCode ( *func )( RunContext& ), const char* func_name, RunContext& context )
 {
-    ErrorCode result = ( *func )( file_name );
+    ErrorCode result = ( *func )( context );
     int is_err       = is_any_proc_error( ( MB_SUCCESS != result ) );
-    int rank;
-    MPI_Comm_rank( MPI_COMM_WORLD, &rank );
-    if( rank == 0 )
+    if( context.rank == 0 )
     {
         if( is_err )
             std::cout << func_name << " : FAILED!!" << std::endl;
@@ -58,49 +68,40 @@ int run_test( ErrorCode ( *func )( const char* ), const char* func_name, const c
     return is_err;
 }
 
-ErrorCode migrate_graph( const char* filename );
-ErrorCode migrate_geom( const char* filename );
-ErrorCode migrate_trivial( const char* filename );
+ErrorCode migrate_graph( RunContext& );
+ErrorCode migrate_geom( RunContext& );
+ErrorCode migrate_trivial( RunContext& );
 
-// some global variables, used by all tests
-int rank, size, ierr;
-
-int compid1, compid2;           // component ids are unique over all pes, and established in advance;
-int nghlay;                     // number of ghost layers for loading the file
-std::vector< int > groupTasks;  // at most 4 tasks
-int startG1, startG2, endG1, endG2;
-
-MPI_Comm jcomm;  // will be a copy of the global
-MPI_Group jgroup;
-
-ErrorCode migrate_smart( const char* filename, const char* outfile, int partMethod )
+ErrorCode migrate_smart( RunContext& context, const char* outfile, int partMethod )
 {
+    int ierr;
+    int compid1, compid2;           // component ids are unique over all pes, and established in advance;
+    std::vector< int > groupTasks;  // at most 4 tasks
+
     // first create MPI groups
-
-    std::string filen( filename );
     MPI_Group group1, group2;
-    groupTasks.resize( endG1 - startG1 + 1 );
-    for( int i = startG1; i <= endG1; i++ )
-        groupTasks[i - startG1] = i;
+    groupTasks.resize( context.endG1 - context.startG1 + 1 );
+    for( int i = context.startG1; i <= context.endG1; i++ )
+        groupTasks[i - context.startG1] = i;
 
-    ierr = MPI_Group_incl( jgroup, endG1 - startG1 + 1, &groupTasks[0], &group1 );
+    ierr = MPI_Group_incl( context.jgroup, context.endG1 - context.startG1 + 1, &groupTasks[0], &group1 );
     CHECKRC( ierr, "can't create group1" )
 
-    groupTasks.resize( endG2 - startG2 + 1 );
-    for( int i = startG2; i <= endG2; i++ )
-        groupTasks[i - startG2] = i;
+    groupTasks.resize( context.endG2 - context.startG2 + 1 );
+    for( int i = context.startG2; i <= context.endG2; i++ )
+        groupTasks[i - context.startG2] = i;
 
-    ierr = MPI_Group_incl( jgroup, endG2 - startG2 + 1, &groupTasks[0], &group2 );
+    ierr = MPI_Group_incl( context.jgroup, context.endG2 - context.startG2 + 1, &groupTasks[0], &group2 );
     CHECKRC( ierr, "can't create group2" )
 
     // create 2 communicators, one for each group
     int tagcomm1 = 1, tagcomm2 = 2;
     int context_id = -1;  // plain migrate, default context
     MPI_Comm comm1, comm2;
-    ierr = MPI_Comm_create_group( jcomm, group1, tagcomm1, &comm1 );
+    ierr = MPI_Comm_create_group( context.jcomm, group1, tagcomm1, &comm1 );
     CHECKRC( ierr, "can't create comm1" )
 
-    ierr = MPI_Comm_create_group( jcomm, group2, tagcomm2, &comm2 );
+    ierr = MPI_Comm_create_group( context.jcomm, group2, tagcomm2, &comm2 );
     CHECKRC( ierr, "can't create comm2" )
 
     ierr = iMOAB_Initialize( 0, 0 );  // not really needed anything from argc, argv, yet; maybe we should
@@ -131,12 +132,11 @@ ErrorCode migrate_smart( const char* filename, const char* outfile, int partMeth
     {
 
         std::string readopts( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS" );
+        int nghlay = 0;  // number of ghost layers for loading the file
 
-        nghlay = 0;
-
-        ierr = iMOAB_LoadMesh( pid1, filen.c_str(), readopts.c_str(), &nghlay );
+        ierr = iMOAB_LoadMesh( pid1, context.filename.c_str(), readopts.c_str(), &nghlay );
         CHECKRC( ierr, "can't load mesh " )
-        ierr = iMOAB_SendMesh( pid1, &jcomm, &group2, &compid2, &partMethod );  // send to component 2
+        ierr = iMOAB_SendMesh( pid1, &context.jcomm, &group2, &compid2, &partMethod );  // send to component 2
         CHECKRC( ierr, "cannot send elements" )
 #ifdef GRAPH_INFO
         int is_sender = 1;
@@ -147,7 +147,7 @@ ErrorCode migrate_smart( const char* filename, const char* outfile, int partMeth
 
     if( comm2 != MPI_COMM_NULL )
     {
-        ierr = iMOAB_ReceiveMesh( pid2, &jcomm, &group1, &compid1 );  // receive from component 1
+        ierr = iMOAB_ReceiveMesh( pid2, &context.jcomm, &group1, &compid1 );  // receive from component 1
         CHECKRC( ierr, "cannot receive elements" )
         std::string wopts;
         wopts = "PARALLEL=WRITE_PART;";
@@ -160,7 +160,7 @@ ErrorCode migrate_smart( const char* filename, const char* outfile, int partMeth
 #endif
     }
 
-    MPI_Barrier( jcomm );
+    MPI_Barrier( context.jcomm );
 
     // we can now free the sender buffers
     context_id = compid2;  // even for default migrate, be more explicit
@@ -188,68 +188,70 @@ ErrorCode migrate_smart( const char* filename, const char* outfile, int partMeth
     MPI_Group_free( &group2 );
     return MB_SUCCESS;
 }
+
 // migrate from 2 tasks to 3 tasks
-ErrorCode migrate_graph( const char* filename )
+ErrorCode migrate_graph( RunContext& context )
 {
-    return migrate_smart( filename, "migrate_graph.h5m", 1 );
+    return migrate_smart( context, "migrate_graph.h5m", 1 );
 }
 
-ErrorCode migrate_geom( const char* filename )
+ErrorCode migrate_geom( RunContext& context )
 {
-    return migrate_smart( filename, "migrate_geom.h5m", 2 );
+    return migrate_smart( context, "migrate_geom.h5m", 2 );
 }
 
-ErrorCode migrate_trivial( const char* filename )
+ErrorCode migrate_trivial( RunContext& context )
 {
-    return migrate_smart( filename, "migrate_trivial.h5m", 0 );
+    return migrate_smart( context, "migrate_trivial.h5m", 0 );
 }
 
 int main( int argc, char* argv[] )
 {
-    MPI_Init( &argc, &argv );
-    MPI_Comm_rank( MPI_COMM_WORLD, &rank );
-    MPI_Comm_size( MPI_COMM_WORLD, &size );
-
-    MPI_Comm_dup( MPI_COMM_WORLD, &jcomm );
-    MPI_Comm_group( jcomm, &jgroup );
-
+    // some global variables, used by all tests
     ProgOptions opts;
-    int typeTest = 2;
-    // std::string inputfile, outfile("out.h5m"), netcdfFile, variable_name, sefile_name;
-    std::string filename;
-    filename = TestDir + "unittest/field1.h5m";
-    startG1  = 0;
-    startG2  = 0;
-    endG1    = 0;
-    endG2    = 1;
+    int typeTest = 2;  // default: geometric partitioner
+    RunContext context;
 
-    opts.addOpt< std::string >( "file,f", "source file", &filename );
+    MPI_Init( &argc, &argv );
+    MPI_Comm_rank( MPI_COMM_WORLD, &context.rank );
+    MPI_Comm_size( MPI_COMM_WORLD, &context.size );
 
-    opts.addOpt< int >( "startSender,a", "start task for source layout", &startG1 );
-    opts.addOpt< int >( "endSender,b", "end task for source layout", &endG1 );
-    opts.addOpt< int >( "startRecv,c", "start task for receiver layout", &startG2 );
-    opts.addOpt< int >( "endRecv,d", "end task for receiver layout", &endG2 );
+    MPI_Comm_dup( MPI_COMM_WORLD, &context.jcomm );
+    MPI_Comm_group( context.jcomm, &context.jgroup );
+
+    // set default run arguments
+    context.filename = TestDir + "unittest/field1.h5m";
+    context.startG1  = 0;
+    context.startG2  = 0;
+    context.endG1    = 0;
+    context.endG2    = 1;
+
+    opts.addOpt< std::string >( "file,f", "source file", &context.filename );
+    opts.addOpt< int >( "startSender,a", "start task for source layout", &context.startG1 );
+    opts.addOpt< int >( "endSender,b", "end task for source layout", &context.endG1 );
+    opts.addOpt< int >( "startRecv,c", "start task for receiver layout", &context.startG2 );
+    opts.addOpt< int >( "endRecv,d", "end task for receiver layout", &context.endG2 );
 
     opts.addOpt< int >( "typeTest,t", "test types (0 - trivial, 1 graph, 2 geom, 3 both  graph and geometry",
                         &typeTest );
 
     opts.parseCommandLine( argc, argv );
 
-    if( rank == 0 )
+    if( context.rank == 0 )
     {
-        std::cout << " input file : " << filename << "\n";
-        std::cout << " sender   on tasks: " << startG1 << ":" << endG1 << "\n";
-        std::cout << " receiver on tasks: " << startG2 << ":" << endG2 << "\n";
+        std::cout << " input file : " << context.filename << "\n";
+        std::cout << " sender   on tasks: " << context.startG1 << ":" << context.endG1 << "\n";
+        std::cout << " receiver on tasks: " << context.startG2 << ":" << context.endG2 << "\n";
         std::cout << " type migrate: " << typeTest << " (0 - trivial, 1 graph , 2 geom, 3 both graph and geom  ) \n";
     }
 
     int num_errors = 0;
 
-    if( 0 == typeTest ) num_errors += RUN_TEST_ARG2( migrate_trivial, filename.c_str() );
-    if( 3 == typeTest || 1 == typeTest ) num_errors += RUN_TEST_ARG2( migrate_graph, filename.c_str() );
-    if( 3 == typeTest || 2 == typeTest ) num_errors += RUN_TEST_ARG2( migrate_geom, filename.c_str() );
+    if( 0 == typeTest ) num_errors += RUN_TEST_ARG2( migrate_trivial, context );
+    if( 3 == typeTest || 1 == typeTest ) num_errors += RUN_TEST_ARG2( migrate_graph, context );
+    if( 3 == typeTest || 2 == typeTest ) num_errors += RUN_TEST_ARG2( migrate_geom, context );
 
-    if( rank == 0 )
+    if( context.rank == 0 )
     {
         if( !num_errors )
             std::cout << "All tests passed" << std::endl;
@@ -257,8 +259,8 @@ int main( int argc, char* argv[] )
             std::cout << num_errors << " TESTS FAILED!" << std::endl;
     }
 
-    MPI_Group_free( &jgroup );
-    MPI_Comm_free( &jcomm );
+    MPI_Group_free( &context.jgroup );
+    MPI_Comm_free( &context.jcomm );
     MPI_Finalize();
     return num_errors;
 }

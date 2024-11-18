@@ -244,12 +244,6 @@ int main( int argc, char* argv[] )
 
     if( couComm != MPI_COMM_NULL )
     {
-        // int col_or_row = 0;  // row based partition
-        // int type       = 3;  // target is FV cell with global ID as DOFs
-        // ierr           = iMOAB_LoadMappingWeightsFromFile( cplAtmOcnPID, cplOcnPID, &col_or_row, &type,
-        //                                                    intx_from_file_identifier.c_str(), mapFilename.c_str() );
-        // CHECKIERR( ierr, "failed to load map file from disk" );
-
         int src_disc_type = 3;  // element-based FV
         int tgt_disc_type = 3;  // element-based FV
         CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type, &tgt_disc_type,

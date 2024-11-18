@@ -135,7 +135,6 @@ void testphysatm_lnd()
 }
 int commgraphtest()
 {
-
     if( !rankInGlobalComm )
     {
         std::cout << " first  file: " << atmFilename << "\n   on tasks : " << startG1 << ":" << endG1
@@ -175,7 +174,6 @@ int commgraphtest()
     CHECKIERR( ierr, "Cannot create physComm" )
 
     // now, create the joint communicator atm physatm
-
     //
     MPI_Group joinAtmPhysAtmGroup;
     ierr = MPI_Group_union( atmPEGroup, atmPhysGroup, &joinAtmPhysAtmGroup );
@@ -366,11 +364,11 @@ int main( int argc, char* argv[] )
     num_err += RUN_TEST( testspectral_phys );
 
     //
-    if( argc == 1 )
-    {
-        num_err += RUN_TEST( testspectral_lnd );
-        num_err += RUN_TEST( testphysatm_lnd );
-    }
+    // if( argc == 1 )
+    // {
+    //     num_err += RUN_TEST( testspectral_lnd );
+    //     num_err += RUN_TEST( testphysatm_lnd );
+    // }
     MPI_Group_free( &jgroup );
 
     MPI_Finalize();

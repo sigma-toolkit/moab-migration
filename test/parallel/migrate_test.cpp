@@ -112,7 +112,6 @@ int main( int argc, char* argv[] )
 ErrorCode migrate( const char* filename, const char* outfile )
 {
     // first create MPI groups
-
     std::string filen( filename );
     MPI_Group group1, group2;
     for( int i = startG1; i <= endG1; i++ )

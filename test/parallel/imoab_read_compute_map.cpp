@@ -34,7 +34,7 @@
 #endif
 
 #define COMPUTE_FILE_MAP
-// #define COMPUTE_ONLINE_MAP
+#define COMPUTE_ONLINE_MAP
 
 #if( !defined( COMPUTE_FILE_MAP ) && !defined( COMPUTE_ONLINE_MAP ) )
 #error Enable either file-based map (COMPUTE_FILE_MAP) and/or online (COMPUTE_ONLINE_MAP) for coupling
@@ -319,10 +319,11 @@ int main( int argc, char* argv[] )
         // CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmOcnFilePID, &dummyCpl, &dummy_rowcol, &dummyType,
         //                                              map_from_file_identifier.c_str(), mapFilename.c_str() ),
         //            "failed to load map file from disk" );
-        int col_or_row   = 0; // row-based or target-based
-        int disc_type    = 3; // element-based FV
-        CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtmOcnFilePID, &col_or_row, &disc_type,
-                                                     map_from_file_identifier.c_str(), mapFilename.c_str() ),
+        int src_disc_type = 3;  // element-based FV
+        int tgt_disc_type = 3;  // element-based FV
+        CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtmOcnFilePID, &src_disc_type,
+                                                     &tgt_disc_type, map_from_file_identifier.c_str(),
+                                                     mapFilename.c_str() ),
                    "failed to load map file from disk" );
     }
 
@@ -659,8 +660,6 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         CHECKIERR( iMOAB_DeregisterApplication( cplAtmOcnMemPID ), "cannot deregister app intx AO" )
-        CHECKIERR( iMOAB_DeregisterApplication( cplAtmPID ), "cannot deregister app ATMX" )
-        CHECKIERR( iMOAB_DeregisterApplication( cplOcnPID ), "cannot deregister app OCNX" )
     }
 #endif
 
@@ -668,10 +667,14 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         CHECKIERR( iMOAB_DeregisterApplication( cplAtmOcnFilePID ), "cannot deregister app intx AO" )
+    }
+#endif
+
+    if( couComm != MPI_COMM_NULL )
+    {
         CHECKIERR( iMOAB_DeregisterApplication( cplAtmPID ), "cannot deregister app ATMX" )
         CHECKIERR( iMOAB_DeregisterApplication( cplOcnPID ), "cannot deregister app OCNX" )
     }
-#endif
 
     if( ocnComm != MPI_COMM_NULL )
     {

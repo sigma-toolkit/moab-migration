@@ -3575,7 +3575,7 @@ ErrCode iMOAB_CoverageGraphStandalone( MPI_Comm* joint_communicator,
                 MB_CHK_ERR( context.MBI->tag_get_data( gidTag, &covCell, 1, &gidCell ) );
                 MB_CHK_ERR( context.MBI->tag_get_data( orgSendProcTag, &covCell, 1, &origProc ) );
 
-                printf("Found entity: %d from original process %d\n", gidCell, origProc);
+                // printf("Found entity: %d from original process %d\n", gidCell, origProc);
                 // we have augmented the overlap set with ghost cells ; in that case, the
                 // orig_sending_processor is not set so it will be -1;
                 if( origProc < 0 )  // it cannot < 0, I think
@@ -3683,15 +3683,13 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
     iMOAB_AppID pid_source,
     iMOAB_AppID pid_target,
     iMOAB_AppID pid_intersection,
-    int* col_or_row,
-    int* type,
+    int* srctype,
+    int* tgttype,
     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
     const iMOAB_String remap_weights_filename )
 {
     ErrorCode rval;
-    bool row_based_partition = true;
-    assert( type );
-    if( col_or_row && *col_or_row == 1 ) row_based_partition = false;  // do a column based partition;
+    assert( srctype && tgttype );
 
     // get the local degrees of freedom, from the pid_cpl and type of mesh
     // Get the source and target data and pcomm objects
@@ -3717,45 +3715,81 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
     moab::TempestOnlineMap* weightMap = tdata.weightMaps[std::string( solution_weights_identifier )];
     assert( weightMap != nullptr );
 
-    EntityHandle context_set = data_target.file_set; // default: row based partition
-    if( !row_based_partition ) // column based partition
-        context_set = tdata.remapper->GetMeshSet( Remapper::CoveringMesh );
+    EntityHandle source_set   = data_source.file_set;
+    EntityHandle covering_set = tdata.remapper->GetMeshSet( Remapper::CoveringMesh );
+    EntityHandle target_set = data_target.file_set;  // default: row based partition
 
-    int elem_dof_length = 1; // default=1: FV - element average DoF value
+    int src_elem_dof_length = 1, tgt_elem_dof_length = 1;  // default=1: FV - element average DoF value
     // tags of interest are either GLOBAL_DOFS (SE) or GLOBAL_ID (FV)
     Tag gdsTag;
     // find the values on first cell
-    if( *type == 1 ) // spectral element
+    if( *srctype == 1 )  // spectral element
     {
-        rval = context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag );MB_CHK_ERR( rval );
-        rval = context.MBI->tag_get_length( gdsTag, elem_dof_length );MB_CHK_ERR( rval );  // usually it is 16
+        MB_CHK_ERR( context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag ) );
+        // if it fails, usually it is 16
+        MB_CHK_ERR( context.MBI->tag_get_length( gdsTag, src_elem_dof_length ) );
+    }
+    // find the values on first cell
+    if( *tgttype == 1 )  // spectral element
+    {
+        MB_CHK_ERR( context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag ) );
+        // if it fails, usually it is 16
+        MB_CHK_ERR( context.MBI->tag_get_length( gdsTag, tgt_elem_dof_length ) );
     }
 
     Tag gidTag = context.MBI->globalId_tag();
-    std::vector< int > dofValues;
+    std::vector< int > srcDofValues, tgtDofValues;
 
     // populate first tuple
-    Range
-        ents_of_interest;  // will be filled with entities on coupler, from which we will get the DOFs, based on type
+    // will be filled with entities on coupler, from which we will get the DOFs, based on type
+    Range srcc_ents_of_interest, src_ents_of_interest, tgt_ents_of_interest;
 
-    if( *type == 1 )  // spectral element
+    if( *srctype == 1 )  // spectral element
     {
         assert( gdsTag );
-        rval = context.MBI->get_entities_by_type( context_set, MBQUAD, ents_of_interest );MB_CHK_ERR( rval );
-        dofValues.resize( ents_of_interest.size() * elem_dof_length );
-        rval = context.MBI->tag_get_data( gdsTag, ents_of_interest, &dofValues[0] );MB_CHK_ERR( rval );
+        MB_CHK_ERR( context.MBI->get_entities_by_type( covering_set, MBQUAD, src_ents_of_interest ) );
+        srcDofValues.resize( src_ents_of_interest.size() * src_elem_dof_length );
+        MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, src_ents_of_interest, &srcDofValues[0] ) );
     }
-    else if( *type == 2 )
+    else if( *srctype == 2 )
     {
-        rval = context.MBI->get_entities_by_type( context_set, MBVERTEX, ents_of_interest );MB_CHK_ERR( rval );
-        dofValues.resize( ents_of_interest.size() );
-        rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &dofValues[0] );MB_CHK_ERR( rval );  // just global ids
+        // vertex global ids
+        MB_CHK_ERR( context.MBI->get_entities_by_type( covering_set, MBVERTEX, src_ents_of_interest ) );
+        srcDofValues.resize( src_ents_of_interest.size() * src_elem_dof_length );
+        MB_CHK_ERR( context.MBI->tag_get_data( gidTag, src_ents_of_interest, &srcDofValues[0] ) );
     }
-    else if( *type == 3 )  // for FV meshes, just get the global id of cell
+    else if( *srctype == 3 )  // for FV meshes, just get the global id of cell
     {
-        rval = context.MBI->get_entities_by_dimension( context_set, 2, ents_of_interest );MB_CHK_ERR( rval );
-        dofValues.resize( ents_of_interest.size() );
-        rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &dofValues[0] );MB_CHK_ERR( rval );  // just global ids
+        // element global ids
+        MB_CHK_ERR( context.MBI->get_entities_by_dimension( covering_set, 2, src_ents_of_interest ) );
+        srcDofValues.resize( src_ents_of_interest.size() * src_elem_dof_length );
+        MB_CHK_ERR( context.MBI->tag_get_data( gidTag, src_ents_of_interest, &srcDofValues[0] ) );
+    }
+    else
+    {
+        MB_CHK_ERR( MB_FAILURE );  // we know only type 1 or 2 or 3
+    }
+
+    if( *tgttype == 1 )  // spectral element
+    {
+        assert( gdsTag );
+        MB_CHK_ERR( context.MBI->get_entities_by_type( target_set, MBQUAD, tgt_ents_of_interest ) );
+        tgtDofValues.resize( tgt_ents_of_interest.size() * tgt_elem_dof_length );
+        MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, tgt_ents_of_interest, &tgtDofValues[0] ) );
+    }
+    else if( *tgttype == 2 )
+    {
+        // vertex global ids
+        MB_CHK_ERR( context.MBI->get_entities_by_type( target_set, MBVERTEX, tgt_ents_of_interest ) );
+        tgtDofValues.resize( tgt_ents_of_interest.size() * tgt_elem_dof_length );
+        MB_CHK_ERR( context.MBI->tag_get_data( gidTag, tgt_ents_of_interest, &tgtDofValues[0] ) );
+    }
+    else if( *tgttype == 3 )  // for FV meshes, just get the global id of cell
+    {
+        // element global ids
+        MB_CHK_ERR( context.MBI->get_entities_by_dimension( target_set, 2, tgt_ents_of_interest ) );
+        tgtDofValues.resize( tgt_ents_of_interest.size() * tgt_elem_dof_length );
+        MB_CHK_ERR( context.MBI->tag_get_data( gidTag, tgt_ents_of_interest, &tgtDofValues[0] ) );
     }
     else
     {
@@ -3763,27 +3797,25 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
     }
 
     // pass ordered dofs, and unique
-    std::vector< int > orderDofs( dofValues.begin(), dofValues.end() );
+    std::vector< int > orderDofs( tgtDofValues.begin(), tgtDofValues.end() );
     std::sort( orderDofs.begin(), orderDofs.end() );
     orderDofs.erase( std::unique( orderDofs.begin(), orderDofs.end() ), orderDofs.end() );  // remove duplicates
 
-    rval = weightMap->ReadParallelMap( remap_weights_filename, orderDofs, row_based_partition );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( weightMap->ReadParallelMap( remap_weights_filename, orderDofs, true /*row_based_partition*/ ),
+                    "reading map from disk failed" );
 
     // if we are on target mesh (row based partition)
     tdata.pid_src = pid_source;
     tdata.pid_dest = pid_target;
-    if( row_based_partition )
-    {
-        tdata.remapper->SetMeshSet( Remapper::TargetMesh, context_set, &ents_of_interest );
-        // weightMap->SetDestinationNDofsPerElement( elem_dof_length );
-        // weightMap->set_row_dc_dofs( dofValues );  // will set row_dtoc_dofmap
-    }
-    else
-    {
-        tdata.remapper->SetMeshSet( Remapper::SourceMesh, context_set, &ents_of_interest );
-        // weightMap->SetSourceNDofsPerElement( elem_dof_length );
-        // weightMap->set_col_dc_dofs( dofValues );  // will set col_dtoc_dofmap
-    }
+
+    tdata.remapper->SetMeshSet( Remapper::SourceMesh, source_set, &srcc_ents_of_interest );
+    tdata.remapper->SetMeshSet( Remapper::CoveringMesh, covering_set, &src_ents_of_interest );
+    weightMap->SetSourceNDofsPerElement( src_elem_dof_length );
+    weightMap->set_col_dc_dofs( srcDofValues );  // will set col_dtoc_dofmap
+
+    tdata.remapper->SetMeshSet( Remapper::TargetMesh, target_set, &tgt_ents_of_interest );
+    weightMap->SetDestinationNDofsPerElement( tgt_elem_dof_length );
+    weightMap->set_row_dc_dofs( tgtDofValues );  // will set row_dtoc_dofmap
 
     return moab::MB_SUCCESS;
 }

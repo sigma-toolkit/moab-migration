@@ -332,43 +332,6 @@ int main( int argc, char* argv[] )
                    "failed to load map file from disk" );
     }
 
-//     if( atmCouComm != MPI_COMM_NULL )
-//     {
-//         int type      = 1;  // quads in source set
-//         int direction = 1;  // from source to coupler; will create a mesh on cplAtmPID
-//         // because it is like "coverage", context will be cplocn
-//         CHECKIERR( iMOAB_MigrateMapMesh( cmpAtmPID, cplAtmOcnFilePID, cplAtmPID, &atmCouComm, &atmPEGroup,
-//                                          &couPEGroup, &type, &cmpatm, &cplatm, &direction ),
-//                    "failed to migrate mesh for ATM on coupler" );
-// #ifdef VERBOSE
-//         if( *cplAtmPID >= 0 )
-//         {
-//             char prefix[] = "atmcov";
-//             ierr          = iMOAB_WriteLocalMesh( cplAtmPID, prefix );
-//             , "failed to write local mesh" );
-//         }
-// #endif
-//     }
-
-//     if( ocnCouComm != MPI_COMM_NULL )
-//     {
-//         int type      = 3;  // cells with GLOBAL_ID in ocean / target set
-//         int direction = 2;  // from coupler to target; will create a mesh on cplOcnPID
-//         // it will be like initial migrate cmpocn <-> cplocn
-//         CHECKIERR( iMOAB_MigrateMapMesh( cmpOcnPID, cplAtmOcnFilePID, cplOcnPID, &ocnCouComm, &ocnPEGroup,
-//                                          &couPEGroup, &type, &cmpocn, &cplocn, &direction ),
-//                    "failed to migrate mesh for OCN on coupler" );
-// #ifdef VERBOSE
-//         if( *cplOcnPID >= 0 )
-//         {
-//             char prefix[] = "ocntgt";
-//             CHECKIERR( iMOAB_WriteLocalMesh( cplOcnPID, prefix ), "failed to write local ocean mesh" );
-//             char outputFileRec[] = "CoupOcn.h5m";
-//             CHECKIERR( iMOAB_WriteMesh( cplOcnPID, outputFileRec, fileWriteOptions ),
-//                        "failed to write ocean global mesh file" );
-//         }
-// #endif
-//     }
 #endif
 
     int tagTypes = DENSE_DOUBLE;
@@ -380,14 +343,6 @@ int main( int argc, char* argv[] )
     const std::string map_from_mem_identifier = "map-computed-online";
     if( couComm != MPI_COMM_NULL )
     {
-        // PUSH_TIMER( "Compute ATM source coverage mesh for OCN" )
-        // // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
-        // // basically, atm was redistributed according to target (ocean) partition, to "cover" the
-        // // ocean partitions check if intx valid, write some h5m intx file
-        // CHECKIERR( iMOAB_ComputeCoverageMesh( cplAtmPID, cplOcnPID, cplAtmOcnMemPID ),
-        //            "cannot compute source ATM coverage mesh for OCN" )
-        // POP_TIMER( couComm, rankInCouComm )
-
         PUSH_TIMER( "Compute ATM-OCN mesh intersection" )
         // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
         // basically, atm was redistributed according to target (ocean) partition, to "cover" the
@@ -503,7 +458,7 @@ int main( int argc, char* argv[] )
         }
         POP_TIMER( MPI_COMM_WORLD, rankInGlobalComm )
 
-// #ifdef VERBOSE
+#ifdef VERBOSE
         if( *cplAtmPID >= 0 && number_iterations == 1 )
         {
             char prefix[] = "atmcov_withdata";
@@ -517,9 +472,7 @@ int main( int argc, char* argv[] )
             CHECKIERR( iMOAB_WriteMesh( cplAtmPID, outputFileRecvd, fileWriteOptions ),
                        "could not write cplAtmFile.h5m to disk" )
         }
-// #endif
-
-        std::cout << "Finished sending/receiving the data from ATM to cpl-ATM" << std::endl;
+#endif
 
         if( couComm != MPI_COMM_NULL )
         {
@@ -533,8 +486,6 @@ int main( int argc, char* argv[] )
                        "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )
 #endif
-
-            std::cout << "Applying projection of the data from ATM to OCN on coupler is done.." << std::endl;
 
 #ifdef COMPUTE_ONLINE_MAP
             PUSH_TIMER( "Apply in-memory scalar projection weights" )

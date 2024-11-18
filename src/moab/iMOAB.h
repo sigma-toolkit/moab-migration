@@ -1207,12 +1207,20 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
  *                                                          Typically, values could be identifiers such as "scalar", "flux" or "custom".
  * \param[in]  remap_weights_filename  (iMOAB_String)       The filename path to the mapping file to load in memory.
 */
+// ErrCode iMOAB_LoadMappingWeightsFromFile(
+//     iMOAB_AppID pid_source,
+//     iMOAB_AppID pid_target,
+//     iMOAB_AppID pid_intersection,
+//     int* col_or_row,
+//     int* type,
+//     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
+//     const iMOAB_String remap_weights_filename );
 ErrCode iMOAB_LoadMappingWeightsFromFile(
     iMOAB_AppID pid_source,
     iMOAB_AppID pid_target,
     iMOAB_AppID pid_intersection,
-    int* col_or_row,
-    int* type,
+    int* srctype,
+    int* tgttype,
     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
     const iMOAB_String remap_weights_filename );
 

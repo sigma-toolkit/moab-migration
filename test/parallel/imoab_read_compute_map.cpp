@@ -180,9 +180,14 @@ int main( int argc, char* argv[] )
 #endif
 
 #ifdef COMPUTE_ONLINE_MAP
+#ifdef COMPUTE_FILE_MAP
+        // if cplAtmOcnFilePID exists, reuse it - else register
+        cplAtmOcnMemPID = cplAtmOcnFilePID;
+#else
         // now create an app to compute map  between OCNx and ATMx on coupler PEs
         CHECKIERR( iMOAB_RegisterApplication( "ATMOCNMEM", &couComm, &atmocnmid, cplAtmOcnMemPID ),
                    "Cannot register ocn_atm map instance over coupler pes" )
+#endif
 #endif
     }
 
@@ -407,12 +412,12 @@ int main( int argc, char* argv[] )
          "cannot compute scalar projection weights" )
         POP_TIMER( couComm, rankInCouComm )
 
-        {
-            const std::string atmocn_map_file_name = "atm_ocn_map_computed.nc";
-            CHECKIERR( iMOAB_WriteMappingWeightsToFile( cplAtmOcnMemPID, map_from_mem_identifier.c_str(),
-                                                        atmocn_map_file_name.c_str() ),
-                       "failed to write map file to disk" );
-        }
+        // {
+        //     const std::string atmocn_map_file_name = "atm_ocn_map_computed.nc";
+        //     CHECKIERR( iMOAB_WriteMappingWeightsToFile( cplAtmOcnMemPID, map_from_mem_identifier.c_str(),
+        //                                                 atmocn_map_file_name.c_str() ),
+        //                "failed to write map file to disk" );
+        // }
     }
 
     // now create the linkage between the ATM component and the coverage source mesh in the coupler
@@ -493,7 +498,7 @@ int main( int argc, char* argv[] )
         // we can now free the sender buffers
         if( atmComm != MPI_COMM_NULL )
         {
-            CHECKIERR( iMOAB_FreeSenderBuffers( cmpAtmPID, &cplatm ),
+            CHECKIERR( iMOAB_FreeSenderBuffers( cmpAtmPID, &cplocn ),
                        "cannot free buffers used to resend ATM tag towards the coverage mesh" )
         }
         POP_TIMER( MPI_COMM_WORLD, rankInGlobalComm )
@@ -606,7 +611,7 @@ int main( int argc, char* argv[] )
             if( !no_regression_test )
             {
                 // get global id storage
-                const std::string GidStr = "GLOBAL_ID";  // hard coded too
+                const char* gidStr = "GLOBAL_ID";  // hard coded too
                 int tag_type = DENSE_INTEGER, ncomp = 1, tagInd = 0;
                 // the same as remap test
                 // get temp field on ocean, from conservative, the global ids, and dump to the baseline file
@@ -616,17 +621,17 @@ int main( int argc, char* argv[] )
                 std::vector< double > tempElems;
                 int err_code = 1, ent_type = 1;
 
-                CHECKIERR( iMOAB_DefineTagStorage( cmpOcnPID, GidStr.c_str(), &tag_type, &ncomp, &tagInd ),
+                CHECKIERR( iMOAB_DefineTagStorage( cmpOcnPID, gidStr, &tag_type, &ncomp, &tagInd ),
                            "failed to define global id tag" );
 
-#ifdef COMPUTE_FILE_MAP
                 CHECKIERR( iMOAB_GetMeshInfo( cmpOcnPID, nverts, nelem, 0, 0, 0 ), "failed to get OCN mesh info" );
                 gidElems.resize( nelem[2] );
                 tempElems.resize( nelem[2] );
 
-                CHECKIERR( iMOAB_GetIntTagStorage( cmpOcnPID, GidStr.c_str(), &nelem[2], &ent_type, &gidElems[0] ),
+#ifdef COMPUTE_FILE_MAP
+                CHECKIERR( iMOAB_GetIntTagStorage( cmpOcnPID, gidStr, &nelem[2], &ent_type, gidElems.data() ),
                            "failed to get global ids" );
-                CHECKIERR( iMOAB_GetDoubleTagStorage( cmpOcnPID, bottomProjectedFieldsF, &nelem[2], &ent_type, &tempElems[0] ),
+                CHECKIERR( iMOAB_GetDoubleTagStorage( cmpOcnPID, bottomProjectedFieldsF, &nelem[2], &ent_type, tempElems.data() ),
                            "failed to get bottomProjectedFieldsF field" );
 
                 // check against the baseline
@@ -637,13 +642,9 @@ int main( int argc, char* argv[] )
 #endif
 
 #ifdef COMPUTE_ONLINE_MAP
-                CHECKIERR( iMOAB_GetMeshInfo( cmpOcnPID, nverts, nelem, 0, 0, 0 ), "failed to get OCN mesh info" );
-                gidElems.resize( nelem[2] );
-                tempElems.resize( nelem[2] );
-
-                CHECKIERR( iMOAB_GetIntTagStorage( cmpOcnPID, GidStr.c_str(), &nelem[2], &ent_type, &gidElems[0] ),
+                CHECKIERR( iMOAB_GetIntTagStorage( cmpOcnPID, gidStr, &nelem[2], &ent_type, gidElems.data() ),
                            "failed to get global ids" );
-                CHECKIERR( iMOAB_GetDoubleTagStorage( cmpOcnPID, bottomProjectedFieldsM, &nelem[2], &ent_type, &tempElems[0] ),
+                CHECKIERR( iMOAB_GetDoubleTagStorage( cmpOcnPID, bottomProjectedFieldsM, &nelem[2], &ent_type, tempElems.data() ),
                            "failed to get bottomProjectedFieldsM field" );
                 // check against the baseline
                 check_baseline_file( baseline, gidElems, tempElems, 1.e-9, err_code );
@@ -659,7 +660,9 @@ int main( int argc, char* argv[] )
 #ifdef COMPUTE_ONLINE_MAP
     if( couComm != MPI_COMM_NULL )
     {
+#ifndef COMPUTE_FILE_MAP
         CHECKIERR( iMOAB_DeregisterApplication( cplAtmOcnMemPID ), "cannot deregister app intx AO" )
+#endif
     }
 #endif
 

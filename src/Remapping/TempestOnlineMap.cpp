@@ -645,7 +645,7 @@ moab::ErrorCode moab::TempestOnlineMap::set_col_dc_dofs( std::vector< int >& val
     // form first inverse
 
     col_dtoc_dofmap.resize( values_entities.size() );
-    for( int j = 0; j < (int)values_entities.size(); j++ )
+    for( size_t j = 0; j < values_entities.size(); j++ )
     {
         if( colMap.find( values_entities[j] - 1 ) != colMap.end() )
             col_dtoc_dofmap[j] = colMap[values_entities[j] - 1];
@@ -665,7 +665,7 @@ moab::ErrorCode moab::TempestOnlineMap::set_row_dc_dofs( std::vector< int >& val
     //  we need to find row_dtoc_dofmap such that: row_gdofmap[ row_dtoc_dofmap[i] ] == values_entities [i];
 
     row_dtoc_dofmap.resize( values_entities.size() );
-    for( int j = 0; j < (int)values_entities.size(); j++ )
+    for( size_t j = 0; j < values_entities.size(); j++ )
     {
         if( rowMap.find( values_entities[j] - 1 ) != rowMap.end() )
             row_dtoc_dofmap[j] = rowMap[values_entities[j] - 1];  // values are 1 based, but rowMap, colMap are not

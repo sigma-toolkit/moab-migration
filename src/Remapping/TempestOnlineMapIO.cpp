@@ -1550,8 +1550,12 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         }
     }
 
+    m_nTotDofs_Src = sparseMatrix.GetColumns();
     m_nTotDofs_SrcCov = sparseMatrix.GetColumns();
     m_nTotDofs_Dest   = sparseMatrix.GetRows();
+    // TODO: make this flexible and read the order from map with help of metadata
+    m_nDofsPEl_Src  = 1;  // always assume FV-FV maps are read from file
+    m_nDofsPEl_Dest = 1;  // always assume FV-FV maps are read from file
 
 #ifdef MOAB_HAVE_EIGEN3
     this->copy_tempest_sparsemat_to_eigen3();
@@ -1560,6 +1564,19 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     // Reset the source and target data first
     m_rowVector.setZero();
     m_colVector.setZero();
+
+    row_dtoc_dofmap.resize( rowMap.size() );
+    col_dtoc_dofmap.resize( colMap.size() );
+    int index = 0;
+    for( std::map< int, int >::iterator riter = rowMap.begin(); riter != rowMap.end(); ++riter )
+    {
+        row_dtoc_dofmap[index++] = riter->second;
+    }
+    index = 0;
+    for( std::map< int, int >::iterator citer = colMap.begin(); citer != colMap.end(); ++citer )
+    {
+        col_dtoc_dofmap[index++] = citer->second;
+    }
 
     return moab::MB_SUCCESS;
 }

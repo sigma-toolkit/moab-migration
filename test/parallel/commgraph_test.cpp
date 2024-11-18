@@ -90,7 +90,7 @@ int typeA = 1;  // spectral mesh, with GLOBAL_DOFS tags on cells
 int typeB = 2;  // point cloud mesh, with GLOBAL_ID tag on vertices
 
 std::string readopts( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS" );
-std::string readoptsPC( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION" );
+std::string readoptsPC( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;DEBUG_IO=5" );
 std::string fileWriteOptions( "PARALLEL=WRITE_PART" );
 std::string tagT( "a2oTbot" );
 std::string tagU( "a2oUbot" );

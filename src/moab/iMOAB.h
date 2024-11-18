@@ -1032,6 +1032,36 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
                              int* context_id );
 
 /**
+ * \brief Recompute the communication graph between component and coupler, considering intersection coverage.
+ *
+ * \note Original communication graph for source used an initial partition, while during intersection some of the source
+ * elements were sent to multiple tasks; send back the intersection coverage information for a direct communication
+ * between source cx mesh on coupler tasks and source cc mesh on interested tasks on the component.
+ * The intersection tasks will send to the original source component tasks, in a nonblocking way, the ids of all the
+ * cells involved in intersection with the target cells. The new ParCommGraph between cc source mesh and cx source mesh
+ * will be used just for tag migration, later on; The original ParCommGraph will stay unchanged, because this source mesh
+ * could be used for other intersection (atm with lnd) ? on component source tasks, we will wait for information; from each
+ * intersection task, will receive cells ids involved in intersection.
+ *
+ * \param[in]  joint_communicator (MPI_Comm *)     The joint communicator that overlaps component PEs and coupler PEs.
+ * \param[in]  pid_src (iMOAB_AppID)               The unique application identifier for the component mesh on component PEs.
+ * \param[in]  pid_migr (iMOAB_AppID)              The unique application identifier for the coupler mesh on coupler PEs.
+ * \param[in]  pid_intx (iMOAB_AppID)              The unique application identifier representing the intersection context on coupler PEs.
+ * \param[in]  src_id (int*)                       The external id for the component mesh on component PE.
+ * \param[in]  migr_id (int*)                      The external id for the migrated mesh on coupler PEs.
+ * \param[in]  context_id (int*)                   The unique identifier of the other participating component in intersection (target).
+ * \return ErrCode                                 The error code indicating success or failure.
+ */
+ErrCode iMOAB_CoverageGraphStandalone( MPI_Comm* joint_communicator,
+                                       iMOAB_AppID pid_src,
+                                       iMOAB_AppID pid_migr,
+                                       iMOAB_AppID pid_intx,
+                                       int* src_id,
+                                       int* migr_id,
+                                       int* context_id );
+
+
+/**
  * \brief Dump info about communication graph.
  *
  * \note <B>Operations:</B> Collective per sender or receiver group
@@ -1169,17 +1199,19 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
  *
  * <B>Operations:</B> Collective
  *
- * \param[in] pid_intersection (iMOAB_AppID)               The unique pointer to the application ID to store the map
- * \param[in] pid_cpl (iMOAB_AppID)                        The unique pointer to coupler instance of component; (-1) for old load
- * \param[in] col_or_row (int *)                           The flag to indicate whether distribution is according to source (0) or target grid (1)
- * \param[in] type (int *)                                 type of mesh (1) spectral with GLOBAL_DOFS, (2) Point Cloud (3) FV cell
- * \param[in] solution_weights_identifier  (iMOAB_String)  The unique identifier used to store the computed projection weights locally. Typically,
- *                                                         values could be identifiers such as "scalar", "flux" or "custom".
- * \param[in] remap_weights_filename  (iMOAB_String)       The filename path to the mapping file to load in memory.
+ * \param[in]  pid_source (iMOAB_AppID)            The unique pointer to the source application ID.
+ * \param[in]  pid_target (iMOAB_AppID)            The unique pointer to the destination application ID.
+ * \param[in]  pid_intersection (iMOAB_AppID)      The unique pointer to the intersection application ID.
+ * \param[in]  col_or_row (int *)                           The flag to indicate whether distribution is according to source (0) or target grid (1)
+ * \param[in]  type (int *)                                 type of mesh (1) spectral with GLOBAL_DOFS, (2) Point Cloud (3) FV cell
+ * \param[in]  solution_weights_identifier  (iMOAB_String)  The unique identifier used to store the computed projection weights locally.
+ *                                                          Typically, values could be identifiers such as "scalar", "flux" or "custom".
+ * \param[in]  remap_weights_filename  (iMOAB_String)       The filename path to the mapping file to load in memory.
 */
 ErrCode iMOAB_LoadMappingWeightsFromFile(
+    iMOAB_AppID pid_source,
+    iMOAB_AppID pid_target,
     iMOAB_AppID pid_intersection,
-    iMOAB_AppID pid_cpl,
     int* col_or_row,
     int* type,
     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */

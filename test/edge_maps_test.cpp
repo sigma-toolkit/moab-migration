@@ -243,12 +243,26 @@ int main( int argc, char* argv[] )
                                    &defVal );MB_CHK_SET_ERR( rval, "can't create fraction tag" );
     rval = mb->tag_get_handle( "NumSubEdges", 1, MB_TYPE_DOUBLE, numSubTag, MB_TAG_DENSE | MB_TAG_CREAT,
                                        &defVal );MB_CHK_SET_ERR( rval, "can't create fraction tag" );
-    rval = moab::IntxUtils::EdgeMap(mb, sf1, outputSet, sourceEdgeMap);MB_CHK_SET_ERR( rval, "failed to compute edge map for source" );
+    std::map<EntityHandle, std::vector<EntityHandle>> edgeVertices; // for each recovered edge, the chain of vertices that form subedges
+    std::map<EntityHandle, std::vector<int>> edgePolygons; // for each recovered edge, the list of intersected polygons;
+    moab::Range recoveredPolys;
+    rval = moab::IntxUtils::EdgeMap(mb, sf1, outputSet, sourceEdgeMap,
+        edgeVertices, edgePolygons, recoveredPolys );MB_CHK_SET_ERR( rval, "failed to compute edge map for source" );
 
+#ifdef MOAB_HAVE_NETCDF
+    rval = moab::IntxUtils::write_edge_map("source_edge.nc", mb, sf1, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for source file" );
+#endif
     rval = mb->write_file("source_withEdges.h5m", 0, 0, &sf1, 1);MB_CHK_SET_ERR( rval, "failed rewrite initial source" );
 
+    recoveredPolys.clear();
+    edgeVertices.clear();
+    edgePolygons.clear();
     sourceEdgeMap = false;
-    rval = moab::IntxUtils::EdgeMap(mb, sf2, outputSet, sourceEdgeMap);MB_CHK_SET_ERR( rval, "failed to compute edge map for target" );
+    rval = moab::IntxUtils::EdgeMap(mb, sf2, outputSet, sourceEdgeMap,
+        edgeVertices, edgePolygons, recoveredPolys );MB_CHK_SET_ERR( rval, "failed to compute edge map for target" );
+#ifdef MOAB_HAVE_NETCDF
+    rval = moab::IntxUtils::write_edge_map("target_edge.nc", mb, sf2, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
+#endif
     rval = mb->write_file("target_withEdges.h5m", 0, 0, &sf2, 1);MB_CHK_SET_ERR( rval, "failed rewrite initial target" );
     return 0;
 }

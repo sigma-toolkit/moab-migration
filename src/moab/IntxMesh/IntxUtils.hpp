@@ -229,13 +229,25 @@ class IntxUtils
     // used now to compute maximum diagonal for a range of cells
     static ErrorCode max_diagonal(Interface* mb, Range cells, int max_edges, double & diagonal);
 
-    // compute edge decomposition after intersection
-    static ErrorCode orderSubEdges(std::vector<EntityHandle> & subEdges, std::vector<EntityHandle> & VerticesSubEdges, const EntityHandle * connEdge);
-    static ErrorCode orderSubEdges( std::vector< EntityHandle >& subEdges,
-                                    std::vector< EntityHandle >& VerticesSubEdges,
-                                    const EntityHandle* connEdge );
+    static ErrorCode orderSubEdges( Interface * mb,
+            std::vector< EntityHandle >& subEdges,
+            std::vector< EntityHandle >& VerticesSubEdges,
+            const EntityHandle* connEdge,
+            std::vector<EntityHandle> & chainVertices,
+            std::vector<int> & polygonsIds,
+            Tag otherParentTag);
 
-    static ErrorCode EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle intx_set, bool sourceMap );
+    static ErrorCode EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle intx_set, bool sourceMap,
+            std::map<EntityHandle, std::vector<EntityHandle>>  & edgeVertices, // for each recovered edge, the chain of vertices that form subedges
+            std::map<EntityHandle, std::vector<int>> & edgePolygons, // for each recovered edge, the list of intersected polygons;
+            moab::Range & recoveredPolys);
+#ifdef MOAB_HAVE_NETCDF
+    static ErrorCode write_edge_map(const char * filename,
+            Interface * mb, EntityHandle sf1,
+            std::map<EntityHandle, std::vector<EntityHandle>>  & edgeVertices,
+            std::map<EntityHandle, std::vector<int>> & edgePolygons,
+            moab::Range & recoveredPolys);
+#endif
 };
 
 class IntxAreaUtils

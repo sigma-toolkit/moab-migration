@@ -214,7 +214,7 @@ int main( int argc, char* argv[] )
     MPI_Comm_group( jcomm, &jgroup );
 
     ProgOptions opts;
-    int typeTest = 3;
+    int typeTest = 2;
     // std::string inputfile, outfile("out.h5m"), netcdfFile, variable_name, sefile_name;
     std::string filename;
     filename = TestDir + "unittest/field1.h5m";

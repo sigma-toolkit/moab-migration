@@ -216,12 +216,18 @@ int main( int argc, char* argv[] )
 
     if( couComm != MPI_COMM_NULL )
     {
-        int dummyCpl     = -1;
-        int dummy_rowcol = -1;
-        int dummyType    = 0;
-        ierr             = iMOAB_LoadMappingWeightsFromFile( cplAtmOcnPID, &dummyCpl, &dummy_rowcol, &dummyType,
-                                                             intx_from_file_identifier.c_str(), mapFilename.c_str() );
-        CHECKIERR( ierr, "failed to load map file from disk" );
+        // int dummyCpl     = -1;
+        // int dummy_rowcol = -1;
+        // int dummyType    = 0;
+        // ierr             = iMOAB_LoadMappingWeightsFromFile( cplAtmOcnPID, &dummyCpl, &dummy_rowcol, &dummyType,
+        //                                                      intx_from_file_identifier.c_str(), mapFilename.c_str() );
+        // CHECKIERR( ierr, "failed to load map file from disk" );
+
+        int src_disc_type = 1;  // element-based SE-4
+        int tgt_disc_type = 3;  // element-based FV
+        CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type, &tgt_disc_type,
+                                                     intx_from_file_identifier.c_str(), mapFilename.c_str() ),
+                   "failed to load map file from disk" );
     }
 
     if( atmCouComm != MPI_COMM_NULL )

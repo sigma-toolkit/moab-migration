@@ -1001,14 +1001,19 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
 
     return MB_SUCCESS;
 }
-ErrorCode IntxUtils::orderSubEdges( std::vector< EntityHandle >& subEdges,
-                                    std::vector< EntityHandle >& VerticesSubEdges,
-                                    const EntityHandle* connEdge )
+ErrorCode IntxUtils::orderSubEdges( Interface * mb,
+        std::vector< EntityHandle >& subEdges,
+        std::vector< EntityHandle >& VerticesSubEdges,
+        const EntityHandle* connEdge,
+        std::vector<EntityHandle> & chainVertices,
+        std::vector<int> & polygonIds,
+        Tag otherParentTag)
 {
     int numEdges = (int)subEdges.size();
     if( numEdges == 1 ) return MB_SUCCESS;  // nothing to do
 
     EntityHandle currentVertex = connEdge[0];  // start vertex
+    chainVertices.push_back(currentVertex);
     EntityHandle endVertex     = connEdge[1];
     std::vector< EntityHandle > chain;
     std::vector< int > markedEdge( numEdges, 0 );  // 0 means not found yet; -1 or +1 for orientation
@@ -1021,6 +1026,7 @@ ErrorCode IntxUtils::orderSubEdges( std::vector< EntityHandle >& subEdges,
             if( VerticesSubEdges[j * 2] == currentVertex )
             {
                 currentVertex = VerticesSubEdges[j * 2 + 1];
+                chainVertices.push_back(currentVertex);
                 chain.push_back( subEdges[j] );
                 markedEdge[j] = 1;  // positive
                 break;              // break the j loop
@@ -1028,6 +1034,7 @@ ErrorCode IntxUtils::orderSubEdges( std::vector< EntityHandle >& subEdges,
             if( VerticesSubEdges[j * 2 + 1] == currentVertex )
             {
                 currentVertex = VerticesSubEdges[j * 2];
+                chainVertices.push_back(currentVertex);
                 chain.push_back( subEdges[j] );
                 markedEdge[j] = -1;  // reversed
                 break;               // break the j loop
@@ -1037,22 +1044,40 @@ ErrorCode IntxUtils::orderSubEdges( std::vector< EntityHandle >& subEdges,
     if( (int)chain.size() == numEdges && currentVertex == endVertex )
     {
         subEdges = chain;  // reordered list, no orientation saved; maybe we should ?
+        // from chain, form the list of original polygons that contain each subedge
+        // get the parent tag of 2 intx polys connected to each edge in chain
+        for (int j=0; j<(int)chain.size(); j++)
+        {
+            EntityHandle sEdge = chain[j];
+            std::vector<EntityHandle> intxPolys;
+            ErrorCode rval = mb->get_adjacencies(&sEdge, 1, 2, false, intxPolys, Interface::UNION);MB_CHK_ERR( rval );
+            EntityHandle onePolygon=intxPolys[0];
+            int global_id = 0;
+            rval = mb->tag_get_data(otherParentTag, &onePolygon, 1, &global_id);MB_CHK_ERR( rval );
+            polygonIds.push_back(global_id);
+        }
         return MB_SUCCESS;
     }
     else
         return MB_FAILURE;  // we did not find a chain, do not change anything
 }
-ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle intx_set, bool sourceMap )
+ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle intx_set, bool sourceMap,
+        std::map<EntityHandle, std::vector<EntityHandle>>  & edgeVertices, // for each recovered edge, the chain of vertices that form subedges
+        std::map<EntityHandle, std::vector<int>> & edgePolygons, // for each recovered edge, the list of intersected polygons;
+        moab::Range & recoveredCells )
 {
-    Tag parentTag;
+    Tag parentTag, otherParentTag;
     ErrorCode rval;
     if( sourceMap )
     {
         rval = mb->tag_get_handle( "SourceParent", parentTag );MB_CHK_SET_ERR( rval, "can't get parent source tag in edge map" );
+        rval = mb->tag_get_handle( "TargetParent", otherParentTag );MB_CHK_SET_ERR( rval, "can't get parent target tag in edge map" );
+
     }
     else
     {
         rval = mb->tag_get_handle( "TargetParent", parentTag );MB_CHK_SET_ERR( rval, "can't get parent target tag in edge map" );
+        rval = mb->tag_get_handle( "SourceParent", otherParentTag );MB_CHK_SET_ERR( rval, "can't get parent source tag in edge map" );
     }
     Tag fractionTag;
     rval = mb->tag_get_handle( "EdgeRecoveryFraction", fractionTag );
@@ -1114,7 +1139,7 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
         mapFromParentGIDToIntxCells[parentID].push_back( cell );
     }
     int recovered = 0, notRecovered = 0;
-    Range recoveredCells;
+    //Range recoveredCells;
     for( size_t j = 0; j < parentGids.size(); j++ )
     {
         int parentID    = parentGids[j];
@@ -1147,6 +1172,22 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
             mapEdges[initialEdge].push_back( initialEdge );
             identity_edges++;
             recoveredEdges++;
+            // get vertices and intx poly attached to it
+            int nve                     = 0;
+            const EntityHandle* connCell;
+            rval = mb->get_connectivity( initialEdge, connCell, nve );MB_CHK_SET_ERR( rval, "can't get connectivity of parent cell" );
+            edgeVertices[initialEdge].push_back(connCell[0]);
+            edgeVertices[initialEdge].push_back(connCell[1]);
+            // find cells in intx set adjacent to it, and get the other tag parent
+            Range adjPolys;
+            rval = mb->get_adjacencies(&initialEdge, 1, 2, false, adjPolys, Interface::UNION);MB_CHK_SET_ERR( rval, "can't get adj polys" );
+            adjPolys = intersect(adjPolys, parentCells);
+            if (adjPolys.empty()) MB_CHK_SET_ERR( MB_FAILURE, "no adjacent intx cells" );
+            EntityHandle intxPoly = adjPolys[0];
+            // get its parent tag
+            int gid;
+            rval = mb->tag_get_data(otherParentTag, &intxPoly, 1, &gid);MB_CHK_SET_ERR( rval, "can't get global id from other tag" );
+            edgePolygons[initialEdge].push_back(gid);
             continue;  // no need to sweat it anymore
         }
         // get adjacent polygons; if there is an adj polygon in intx cells, we are done; if not, get one in the initial recoveredCells range
@@ -1225,7 +1266,8 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
         // order subedges on the original edge, and find out their orientation
         // set also the parent tag on the edge, either source or target parent
         // in some cases, the parents can be both
-        rval = IntxUtils::orderSubEdges( mapEdges[initialEdge], VerticesSubEdges, connEdge );
+        rval = IntxUtils::orderSubEdges(mb, mapEdges[initialEdge], VerticesSubEdges, connEdge,
+                edgeVertices[initialEdge], edgePolygons[initialEdge], otherParentTag);
         if( fabs( edgeLength - recoveredLength ) < 1.e-10 || rval == MB_SUCCESS )
             recoveredEdges++;
         else
@@ -2714,4 +2756,14 @@ ErrorCode IntxUtils::max_diagonal(Interface* mb, Range cells, int max_edges, dou
     diagonal = sqrt(diagonal);
     return MB_SUCCESS;
 }
+#ifdef MOAB_HAVE_NETCDF
+ErrorCode IntxUtils::write_edge_map(const char * filename,
+            Interface * mb, EntityHandle sf1,
+            std::map<EntityHandle, std::vector<EntityHandle>>  & edgeVertices,
+            std::map<EntityHandle, std::vector<int>> & edgePolygons,
+            moab::Range & recoveredPolys)
+{
+    return MB_SUCCESS;
+}
+#endif
 }  // namespace moab

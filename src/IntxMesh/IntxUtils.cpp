@@ -2819,7 +2819,7 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
     std::vector<double >  latvals (num_cells * max_edge * max_subedge1, -9999);
     std::vector<double >  lonvals (num_cells * max_edge * max_subedge1, -9999);
 
-    for (auto it=polys.begin(); it!=polys.end(); ++it)
+    for (auto it=recoveredPolys.begin(); it!=recoveredPolys.end(); ++it)
     {
         EntityHandle polygon = *it;
         int gidPoly = 0;

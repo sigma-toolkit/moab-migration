@@ -1187,7 +1187,7 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
             // find cells in intx set adjacent to it, and get the other tag parent
             Range adjPolys;
             rval = mb->get_adjacencies(&initialEdge, 1, 2, false, adjPolys, Interface::UNION);MB_CHK_SET_ERR( rval, "can't get adj polys" );
-            adjPolys = intersect(adjPolys, parentCells);
+            adjPolys = subtract(adjPolys, parentCells);
             if (adjPolys.empty()) MB_CHK_SET_ERR( MB_FAILURE, "no adjacent intx cells" );
             EntityHandle intxPoly = adjPolys[0];
             // get its parent tag

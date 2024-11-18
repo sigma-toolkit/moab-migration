@@ -2841,8 +2841,11 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
 
     nc_enddef(ncid);
 
-    int * nb_sub_edge_per_edge = new int [num_cells * max_edge];
-    int * cells_assoc_per_edge = new int [num_cells * max_edge * max_subedge1];
+    std::vector<int > nb_sub_edge_per_edge(num_cells * max_edge, -9999);
+    std::vector<int >  cells_assoc_per_edge (num_cells * max_edge * max_sub_edge, -9999);
+
+    std::vector<double >  latvals (num_cells * max_edge * max_subedge1, -9999);
+    std::vector<double >  lonvals (num_cells * max_edge * max_subedge1, -9999);
 
     for (auto it=polys.begin(); it!=polys.end(); ++it)
     {
@@ -2863,14 +2866,74 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
             // reverse or not?
             std::vector<int> poly_assoc = edgePolygons[edge];
             nb_sub_edge_per_edge[ (gidPoly-1)*max_edge + i] = (int) poly_assoc.size();
+            std::vector<EntityHandle> vertexEdges = edgeVertices[edge];
+            std::vector<CartVect> coords(vertexEdges.size());
+            rval = mb->get_coords( &vertexEdges[0], vertexEdges.size(), &(coords[0][0]) );MB_CHK_SET_ERR( rval, "can't get coordinates" );
+            // convert to lat/lon
+            std::vector<double>  latv(vertexEdges.size()), lonv(vertexEdges.size());
+            for (int j=0; j<(int)vertexEdges.size(); j++)
+            {
+                SphereCoords sph1 = cart_to_spherical( coords[j] );
+                lonv[j] = sph1.lon;
+                latv[j] = sph1.lat;
+            }
+            // reversed edge or not?
+            const EntityHandle * edgeconn = NULL;
+            int nve;
+            rval = mb->get_connectivity(edge, edgeconn, nve);MB_CHK_SET_ERR( rval, "Failed to get edge connectivity" );
+            bool reverse = false;
+            if (v[0] == edgeconn[1]) reverse = true;
+            if (reverse)
+            {
+                // fill the arrays in reverse order
+                int sizep = (int) poly_assoc.size();
+                for (int j = 0; j< sizep; j++)
+                {
+                    cells_assoc_per_edge[ (gidPoly-1)*max_edge*max_sub_edge +
+                                          i*max_sub_edge + j] = poly_assoc[sizep - 1 - j];
+                }
+                sizep = (int)vertexEdges.size();
+                for (int j=0; j<sizep; j++)
+                {
+                    latvals [(gidPoly-1)*max_edge*max_subedge1 +
+                             i*max_subedge1 + j] = latv [sizep - 1 - j];
+                    lonvals [(gidPoly-1)*max_edge*max_subedge1 +
+                             i*max_subedge1 + j] = lonv [sizep - 1 - j];
+                }
+
+            }
+            else
+            {
+                // max_sub_edges
+                for (int j = 0; j< (int) poly_assoc.size(); j++)
+                {
+                    cells_assoc_per_edge[ (gidPoly-1)*max_edge*max_sub_edge +
+                                          i*max_sub_edge + j] = poly_assoc[j];
+                }
+                for (int j=0; j<(int)vertexEdges.size(); j++)
+                {
+                    latvals [(gidPoly-1)*max_edge*max_subedge1 +
+                             i*max_subedge1 + j] = latv [j];
+                    lonvals [(gidPoly-1)*max_edge*max_subedge1 +
+                             i*max_subedge1 + j] = lonv [j];
+                }
+
+
+            }
 
         }
     }
 
-    if ((retval = nc_put_var_int(ncid, varid_nsub, nb_sub_edge_per_edge) ))
+    if ((retval = nc_put_var_int(ncid, varid_nsub, &nb_sub_edge_per_edge[0]) ))
           ERR(retval);
 
-    if ((retval = nc_put_var_int(ncid, varid_cell_assoc, cells_assoc_per_edge) ))
+    if ((retval = nc_put_var_int(ncid, varid_cell_assoc, &cells_assoc_per_edge[0]) ))
+          ERR(retval);
+
+    if ((retval = nc_put_var_double(ncid, varid_lat, &latvals[0]) ))
+          ERR(retval);
+
+    if ((retval = nc_put_var_double(ncid, varid_lon, &lonvals[0]) ))
           ERR(retval);
 
     if ((retval = nc_close(ncid)))

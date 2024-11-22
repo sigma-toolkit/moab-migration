@@ -4,7 +4,7 @@ include ../makefile.config
 default: all
 
 EXAMPLES =  ExtrudePoly
-PAREXAMPLES = LloydRelaxation CrystalRouterExample GenLargeMesh
+PAREXAMPLES = LloydRelaxation CrystalRouterExample GenLargeMesh GatherMeshOnRoot
 EXOIIEXAMPLES = VisTags
 ALLEXAMPLES = ${EXAMPLES}
 
@@ -29,8 +29,9 @@ LloydRelaxation: LloydRelaxation.o ${MOAB_LIBDIR}/libMOAB.la
 CrystalRouterExample: CrystalRouterExample.o ${MOAB_LIBDIR}/libMOAB.la
 VisTags: VisTags.o ${MOAB_LIBDIR}/libMOAB.la
 GenLargeMesh: GenLargeMesh.o ${MOAB_LIBDIR}/libMOAB.la
+GatherMeshOnRoot: GatherMeshOnRoot.o ${MOAB_LIBDIR}/libMOAB.la
 
-ExtrudePoly LloydRelaxation CrystalRouterExample VisTags GenLargeMesh:
+ExtrudePoly LloydRelaxation CrystalRouterExample VisTags GenLargeMesh GatherMeshOnRoot:
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
@@ -70,6 +71,11 @@ endif
 run-CoupleMGen: CoupleMGen
 ifeq ("$(MOAB_MPI_ENABLED)-$(MOAB_HDF5_ENABLED)","yes-yes")
 	${RUNPARALLEL} ./CoupleMGen -M $(NPROCS)
+endif
+
+run-GatherMeshOnRoot: GatherMeshOnRoot
+ifeq ("$(MOAB_MPI_ENABLED)-$(MOAB_HDF5_ENABLED)","yes-yes")
+	${RUNPARALLEL} ./GatherMeshOnRoot
 endif
 
 

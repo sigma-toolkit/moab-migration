@@ -160,17 +160,23 @@ int main( int argc, char* argv[] )
 #endif
 
     // constant identifiers
-    int cmpatm = 1, cmpocn = 2, cplatm = 3, cplocn = 5, atmocnfid = 7, atmocnmid = 8;
+    int cmpatm = 1, cmpocn = 2, cplatm = 3, cplocn = 5;
+#ifdef COMPUTE_FILE_MAP
+    int atmocnfid = 7;
+#endif
+#if defined(COMPUTE_ONLINE_MAP) && !defined( COMPUTE_FILE_MAP )
+    int atmocnmid = 8;
+#endif
 
     if( couComm != MPI_COMM_NULL )
     {
         MPI_Comm_rank( couComm, &rankInCouComm );
         // Register all the applications on the coupler PEs
         // ATM on coupler pes
-        CHECKIERR( iMOAB_RegisterApplication( "CPLATMFILE", &couComm, &cplatm, cplAtmPID ),
+        CHECKIERR( iMOAB_RegisterApplication( "CPLATM", &couComm, &cplatm, cplAtmPID ),
                    "Cannot register ATM over coupler PEs" )
         // OCN on coupler pes
-        CHECKIERR( iMOAB_RegisterApplication( "CPLOCNFILE", &couComm, &cplocn, cplOcnPID ),
+        CHECKIERR( iMOAB_RegisterApplication( "CPLOCN", &couComm, &cplocn, cplOcnPID ),
                    "Cannot register OCN over coupler PEs" )
 
 #ifdef COMPUTE_FILE_MAP
@@ -306,7 +312,7 @@ int main( int argc, char* argv[] )
         // graph, that has more precise info about what to send for ocean cover ; every time, we
         // will use the element global id, which should uniquely identify the element
         PUSH_TIMER( "Compute OCN coverage graph for ATM mesh" )
-        CHECKIERR( iMOAB_CoverageGraphStandalone( &atmCouComm, cmpAtmPID, cplAtmPID, cplAtmOcnFilePID, &cmpatm, &cplatm,
+        CHECKIERR( iMOAB_CoverageGraph( &atmCouComm, cmpAtmPID, cplAtmPID, cplAtmOcnFilePID, &cmpatm, &cplatm,
                                                   &cplocn ),
                    "cannot recompute direct coverage graph for ocean" )
         POP_TIMER( atmCouComm, rankInAtmComm )  // hijack this rank
@@ -387,7 +393,8 @@ int main( int argc, char* argv[] )
          * will use the element global id, which should uniquely identify the element
          */
         PUSH_TIMER( "Compute OCN coverage graph for ATM mesh" )
-        CHECKIERR( iMOAB_CoverageGraph( &atmCouComm, cmpAtmPID, cplAtmPID, cplAtmOcnMemPID, &cmpatm, &cplatm, &cplocn ),
+        CHECKIERR( iMOAB_CoverageGraph( &atmCouComm, cmpAtmPID, cplAtmPID, cplAtmOcnMemPID, &cmpatm, &cplatm,
+                                                  &cplocn ),
                    "cannot recompute direct coverage graph for ocean" )
         POP_TIMER( atmCouComm, rankInAtmComm )  // hijack this rank
     }

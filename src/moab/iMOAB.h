@@ -1032,36 +1032,6 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
                              int* context_id );
 
 /**
- * \brief Recompute the communication graph between component and coupler, considering intersection coverage.
- *
- * \note Original communication graph for source used an initial partition, while during intersection some of the source
- * elements were sent to multiple tasks; send back the intersection coverage information for a direct communication
- * between source cx mesh on coupler tasks and source cc mesh on interested tasks on the component.
- * The intersection tasks will send to the original source component tasks, in a nonblocking way, the ids of all the
- * cells involved in intersection with the target cells. The new ParCommGraph between cc source mesh and cx source mesh
- * will be used just for tag migration, later on; The original ParCommGraph will stay unchanged, because this source mesh
- * could be used for other intersection (atm with lnd) ? on component source tasks, we will wait for information; from each
- * intersection task, will receive cells ids involved in intersection.
- *
- * \param[in]  joint_communicator (MPI_Comm *)     The joint communicator that overlaps component PEs and coupler PEs.
- * \param[in]  pid_src (iMOAB_AppID)               The unique application identifier for the component mesh on component PEs.
- * \param[in]  pid_migr (iMOAB_AppID)              The unique application identifier for the coupler mesh on coupler PEs.
- * \param[in]  pid_intx (iMOAB_AppID)              The unique application identifier representing the intersection context on coupler PEs.
- * \param[in]  src_id (int*)                       The external id for the component mesh on component PE.
- * \param[in]  migr_id (int*)                      The external id for the migrated mesh on coupler PEs.
- * \param[in]  context_id (int*)                   The unique identifier of the other participating component in intersection (target).
- * \return ErrCode                                 The error code indicating success or failure.
- */
-ErrCode iMOAB_CoverageGraphStandalone( MPI_Comm* joint_communicator,
-                                       iMOAB_AppID pid_src,
-                                       iMOAB_AppID pid_migr,
-                                       iMOAB_AppID pid_intx,
-                                       int* src_id,
-                                       int* migr_id,
-                                       int* context_id );
-
-
-/**
  * \brief Dump info about communication graph.
  *
  * \note <B>Operations:</B> Collective per sender or receiver group

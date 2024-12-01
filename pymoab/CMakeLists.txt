@@ -51,5 +51,5 @@ foreach(CYTHON_FILE ${CYTHON_FILES})
     set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH "${PYMOAB_PYTHON_MODULE_RPATH}")
 
     # Install the target in the pymoab directory
-    install(TARGETS ${TARGET_NAME} DESTINATION ../.)
+    install(TARGETS ${TARGET_NAME} DESTINATION .)
 endforeach()

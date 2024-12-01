@@ -25,7 +25,7 @@ if ( MOAB_HAVE_CGM )
                            MOAB
                            ${CGM_LIBRARIES} )
 
-    if(SKBUILD)
+    if(PYMOAB_BINARY_RPATH)
       # Set the install RPATH
       set_target_properties(cgm2moab PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
     endif()
@@ -35,6 +35,7 @@ if ( MOAB_HAVE_CGM )
       LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
       ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
       )
+    generate_and_install_python_script(cgm2moab)
   endif()
 endif( )
 

@@ -9,19 +9,7 @@
 # MOAB_CXX, MOAB_CC, MOAB_F77, MOAB_FC - compilers used to compile MOAB
 # MOAB_CXXFLAGS, MOAB_CCFLAGS, MOAB_FFLAGS, MOAB_FCFLAGS - compiler flags used to compile MOAB; possibly need to use these in add_definitions or CMAKE_<LANG>_FLAGS_<MODE> 
 
-set(MOAB_FOUND 1)
-
 set(MOAB_VERSION @PACKAGE_VERSION@)
-
-# Check whether the requested PACKAGE_FIND_VERSION is compatible
-if("${MOAB_VERSION}" VERSION_LESS "${PACKAGE_FIND_VERSION}")
-  set(PACKAGE_VERSION_COMPATIBLE FALSE)
-else()
-  set(PACKAGE_VERSION_COMPATIBLE TRUE)
-  if("${MOAB_VERSION}" VERSION_EQUAL "${PACKAGE_FIND_VERSION}")
-    set(PACKAGE_VERSION_EXACT TRUE)
-  endif()
-endif()
 
 set(MOAB_CC "@CMAKE_C_COMPILER@")
 set(MOAB_CXX "@CMAKE_CXX_COMPILER@")
@@ -61,7 +49,7 @@ set(MOAB_USE_EIGEN @MOAB_HAVE_EIGEN3@)
 set(EIGEN3_DIR "@EIGEN3_DIR@")
 set(TEMPESTREMAP_DIR "@TEMPESTREMAP_DIR@")
 set(MOAB_USE_TEMPESTREMAP @MOAB_HAVE_TEMPESTREMAP@)
-
+set(MOAB_USE_SKBUILD @SKBUILD@)
 set(MOAB_MESH_DIR "@CMAKE_SOURCE_DIR@/MeshFiles/unittest")
 
 # Library and include defs
@@ -83,10 +71,6 @@ RESOLVE_INCLUDES(MOAB_PACKAGE_INCLUDES "${MOAB_PACKAGE_INCLUDES_LIST}")
 separate_arguments(MOAB_PACKAGE_INCLUDES)
 list(REMOVE_DUPLICATES MOAB_PACKAGE_INCLUDES)
 
-if(NOT TARGET MOAB AND NOT MOAB_BINARY_DIR)
-  include("${MOAB_CMAKE_DIR}/MOABTargets.cmake")
-endif()
-
 # Target information
 if(MOAB_USE_HDF5)
   if(EXISTS "@HDF5_ROOT@/share/cmake/hdf5/hdf5-config.cmake")
@@ -94,8 +78,66 @@ if(MOAB_USE_HDF5)
   endif()
 endif()
 
-set(MOAB_LIBRARY_DIRS "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@")
-set(MOAB_INCLUDE_DIRS "@CMAKE_INSTALL_PREFIX@/include" ${MOAB_PACKAGE_INCLUDES})
-set(MOAB_LIBS "-lMOAB")
-set(MOAB_LIBRARIES "-L@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@ ${MOAB_LIBS} ${MOAB_PACKAGE_LIBS}")
+if(MOAB_USE_SKBUILD)
+  # Find the Python interpreter and ensure it's available.
+  find_package(Python COMPONENTS Interpreter REQUIRED)
 
+  # Function to run Python commands and validate their execution.
+  function(run_python_command output_var command)
+    execute_process(
+      COMMAND ${Python_EXECUTABLE} -c "${command}"
+      OUTPUT_VARIABLE ${output_var}
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      RESULT_VARIABLE result
+      )
+    # Check if the command was successful
+    if(NOT result EQUAL 0)
+      message(FATAL_ERROR "Failed to run Python command: ${command}")
+    else()
+      # Add the output variable to the parent scope
+      set(${output_var} "${${output_var}}" PARENT_SCOPE)
+    endif()
+  endfunction()
+
+  # Extract MOAB include paths, library paths, and extra libraries
+  run_python_command(MOAB_INCLUDE_DIRS "import pymoab; print(pymoab.include_path[0])")
+  run_python_command(MOAB_LIBRARY_DIRS "import pymoab; print(pymoab.lib_path[0])")
+  run_python_command(MOAB_EXTRA_LIBRARIES "import pymoab; print(' '.join(pymoab.extra_lib))")
+
+  # Check if the wheel was repaired using auditwheel or delocate
+  if(MOAB_EXTRA_LIBRARIES)
+    message(FATAL_ERROR
+        "This build of MOAB is not supported. "
+        "It appears that the wheel was repaired using tools like auditwheel or delocate, "
+        "that modifies the shared libraries, which may cause problems.\n"
+        "MOAB_EXTRA_LIBRARIES is not empty: ${MOAB_EXTRA_LIBRARIES}.\n"
+        "To resolve this, please build MOAB from scratch. "
+        "For more information, visit: https://bitbucket.org/fathomteam/moab\n"
+      )
+  endif()
+
+  # Add MOAB targets
+  file(TO_CMAKE_PATH "${MOAB_LIBRARY_DIRS}/cmake/MOAB/MOABTargets.cmake" MOAB_TARGETS_FILE)
+  include(${MOAB_TARGETS_FILE})
+
+  # Add the core library to the list of libraries
+  set(MOAB_INCLUDE_DIRS ${MOAB_INCLUDE_DIRS} ${MOAB_PACKAGE_INCLUDES})
+  set(MOAB_LIBRARIES ${MOAB_LIBRARY} ${MOAB_PACKAGE_LIBS})
+else()
+  if(NOT TARGET MOAB AND NOT MOAB_BINARY_DIR)
+    include("${MOAB_CMAKE_DIR}/MOABTargets.cmake")
+  endif()
+  set(MOAB_LIBRARY_DIRS "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@")
+  set(MOAB_INCLUDE_DIRS "@CMAKE_INSTALL_PREFIX@/include" ${MOAB_PACKAGE_INCLUDES})
+  set(MOAB_LIBS "-lMOAB")
+  set(MOAB_LIBRARIES "-L@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@ ${MOAB_LIBS} ${MOAB_PACKAGE_LIBS}")
+endif()
+
+# Include standard argument handling for finding packages
+include(FindPackageHandleStandardArgs)
+
+# Validates that the necessary variables are set
+find_package_handle_standard_args(MOAB
+  REQUIRED_VARS MOAB_LIBRARIES MOAB_INCLUDE_DIRS
+  VERSION_VAR MOAB_VERSION
+  )

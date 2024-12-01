@@ -41,7 +41,7 @@ if ( MOAB_HAVE_HDF5 )
   set_source_files_properties( compareFiles.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( compareFiles ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_COMPAREFILES 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(compareFiles PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -51,6 +51,7 @@ if ( MOAB_HAVE_HDF5 )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(compareFiles)
 endif ( MOAB_HAVE_HDF5 )
 
 # MBSIZE
@@ -59,7 +60,7 @@ if ( MOAB_BUILD_MBSIZE )
   set_source_files_properties( size.cpp measure.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbsize ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBSIZE 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(mbsize PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -69,6 +70,7 @@ if ( MOAB_BUILD_MBSIZE )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbsize)
   SET(MOAB_DOCS ${MOAB_DOCS} README.mbsize)
 endif ( )
 
@@ -78,7 +80,7 @@ if ( MOAB_BUILD_MBMERGE )
   set_source_files_properties( merge.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbmerge ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBMERGE 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(mbmerge PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -88,6 +90,7 @@ if ( MOAB_BUILD_MBMERGE )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbmerge)
 endif ( )
 
 
@@ -98,7 +101,7 @@ if ( MOAB_BUILD_MBMEM )
   set_source_files_properties( mbmem.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbmem ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBMEM 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(mbmem PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -108,6 +111,7 @@ if ( MOAB_BUILD_MBMEM )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbmem)
 endif ( )
 
 # MBCONVERT
@@ -116,7 +120,7 @@ if ( MOAB_BUILD_MBCONVERT )
   set_source_files_properties( convert.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbconvert ${TOOLS_LINK_LIBS} ${TEMPESTREMAP_LIBRARIES} )
   set( MOAB_HAVE_MBCONVERT 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(mbconvert PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -126,8 +130,9 @@ if ( MOAB_BUILD_MBCONVERT )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbconvert)
   SET(MOAB_DOCS ${MOAB_DOCS} README.mbconvert)
-  INSTALL(FILES mbconvert.man DESTINATION share/man/man1 RENAME mbconvert.1)
+  INSTALL(FILES mbconvert.man DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 RENAME mbconvert.1)
 endif ( )
 
 # MBHONODES
@@ -136,7 +141,7 @@ if ( MOAB_BUILD_MBHONODES )
   set_source_files_properties( honodes.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbhonodes ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBHONODES 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(mbhonodes PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -146,6 +151,7 @@ if ( MOAB_BUILD_MBHONODES )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbhonodes)
 endif ( )
 
 # MBDEPTH
@@ -154,7 +160,7 @@ if ( MOAB_BUILD_MBDEPTH )
   set_source_files_properties( depth.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbdepth ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBDEPTH 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(mbdepth PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -164,6 +170,7 @@ if ( MOAB_BUILD_MBDEPTH )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbdepth)
 endif ( )
 
 # MBSKIN
@@ -172,7 +179,7 @@ if ( MOAB_BUILD_MBSKIN )
   set_source_files_properties( skin.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbskin ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBSKIN 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(mbskin PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -182,6 +189,7 @@ if ( MOAB_BUILD_MBSKIN )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbskin)
   SET(MOAB_DOCS ${MOAB_DOCS} README.mbskin)
 endif ( )
 
@@ -191,7 +199,7 @@ if ( MOAB_BUILD_MBSURFPLOT )
   set_source_files_properties( surfplot.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbsurfplot ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBSURFPLOT 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(mbsurfplot PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -201,6 +209,7 @@ if ( MOAB_BUILD_MBSURFPLOT )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbsurfplot)
   SET(MOAB_DOCS ${MOAB_DOCS} README.mbsurfplot)
 endif ( )
 
@@ -210,7 +219,7 @@ if ( MOAB_BUILD_MBTAGPROP )
   set_source_files_properties( parse.cpp propagate_tags.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbtagprop ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBTAGPROP 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(mbtagprop PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -220,6 +229,7 @@ if ( MOAB_BUILD_MBTAGPROP )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbtagprop)
   SET(MOAB_DOCS ${MOAB_DOCS} README.mbtagprop)
 endif ( )
 
@@ -229,7 +239,7 @@ if ( MOAB_BUILD_MBGSETS )
   set_source_files_properties( gsets.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbgsets ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBGSETS 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(mbgsets PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -239,6 +249,7 @@ if ( MOAB_BUILD_MBGSETS )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbgsets)
 endif( )
 
 # MBUMR
@@ -247,7 +258,7 @@ if ( MOAB_BUILD_MBUMR )
   set_source_files_properties( umr.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbumr ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBUMR 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(mbumr PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -257,6 +268,7 @@ if ( MOAB_BUILD_MBUMR )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbumr)
 endif( )
 
 # MBSLAVEPART
@@ -265,7 +277,7 @@ if ( MOAB_BUILD_MBSLAVEPART )
   set_source_files_properties( mbslavepart.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbslavepart ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBSLAVEPART 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(mbslavepart PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -275,6 +287,7 @@ if ( MOAB_BUILD_MBSLAVEPART )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbslavepart)
 endif( )
 
 # MBTEMPEST
@@ -283,7 +296,7 @@ if ( MOAB_BUILD_MBTEMPEST )
   set_source_files_properties( mbtempest.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbtempest ${TOOLS_LINK_LIBS} ${TEMPESTREMAP_LIBRARIES} )
   set( MOAB_HAVE_MBTEMPEST 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(mbtempest PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -293,6 +306,7 @@ if ( MOAB_BUILD_MBTEMPEST )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbtempest)
 
 endif( )
 
@@ -302,7 +316,7 @@ if ( MOAB_BUILD_MBQUALITY )
   set_source_files_properties( quality.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbquality ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_MBQUALITY 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(mbquality PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -312,6 +326,7 @@ if ( MOAB_BUILD_MBQUALITY )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbquality)
 endif( )
 
 # Zoltan
@@ -323,7 +338,7 @@ if ( MOAB_BUILD_MBPART OR ( MOAB_HAVE_ZOLTAN OR MOAB_HAVE_METIS ) )
   set_source_files_properties( mbpart.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( mbpart ${TOOLS_LINK_LIBS} ${ZOLTAN_LIBRARIES} ${PARMETIS_LIBRARIES} ${METIS_LIBRARIES} )
   set( MOAB_HAVE_MBPART 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(mbpart PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -333,6 +348,7 @@ if ( MOAB_BUILD_MBPART OR ( MOAB_HAVE_ZOLTAN OR MOAB_HAVE_METIS ) )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(mbpart)
 endif ( MOAB_BUILD_MBPART OR ( MOAB_HAVE_ZOLTAN OR MOAB_HAVE_METIS ) )
 
 # MBCoupler
@@ -345,7 +361,7 @@ if( MOAB_BUILD_HEXMODOPS )
   add_executable( hexmodops makeops.cpp )
   target_link_libraries( hexmodops ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_HEXMODOPS 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(hexmodops PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -355,6 +371,7 @@ if( MOAB_BUILD_HEXMODOPS )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(hexmodops)
   SET(MOAB_DOCS ${MOAB_DOCS} README.hexmodops)
 endif()
 
@@ -364,7 +381,7 @@ if ( MOAB_BUILD_SPHEREDECOMP )
   set_source_files_properties( SphereDecomp.cpp SphereDecomp.hpp sphere_decomp.cpp COMPILE_FLAGS "${MOAB_DEFINES}" )
   target_link_libraries( spheredecomp ${TOOLS_LINK_LIBS} )
   set( MOAB_HAVE_SPHEREDECOMP 1 )
-  if(SKBUILD)
+  if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(spheredecomp PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
   endif()
@@ -374,7 +391,8 @@ if ( MOAB_BUILD_SPHEREDECOMP )
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+  generate_and_install_python_script(spheredecomp)
   SET(MOAB_DOCS ${MOAB_DOCS} README.spheredecomp)
 endif ( )
 
-install(FILES ${MOAB_DOCS} DESTINATION share/doc/moab)
+install(FILES ${MOAB_DOCS} DESTINATION ${MOABDocLocation})

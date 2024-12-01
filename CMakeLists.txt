@@ -1,4 +1,4 @@
-cmake_minimum_required( VERSION 3.5 )
+cmake_minimum_required( VERSION 3.15 )
 SET(PACKAGE_NAME "MOAB")
 SET(PACKAGE_VERSION "5.5.1")
 
@@ -106,6 +106,11 @@ set( MOAB_DEFINES "" )
 set( MOAB_LIBS )
 set( MOAB_INSTALL_TARGETS )
 set( MOAB_MESH_DIR        "${CMAKE_SOURCE_DIR}/MeshFiles/" )
+
+# TODO: Need to update this to GNUInstallDirs
+set(MOABDocLocation share/doc/moab)
+
+include ( config/GenerateScript.cmake )
 
 ################################################################################
 # Options that the user controls
@@ -498,29 +503,28 @@ if(SKBUILD OR ENABLE_PYMOAB)
       REQUIRED
   )
   if(SKBUILD)
-    # Scikit-build installs MOAB to ${SKBUILD_PLATLIB_DIR}/pymoab/core
-    # So, set bin directory to root environment (install prefix/bin)
-    set(CMAKE_INSTALL_BINDIR ${SKBUILD_SCRIPTS_DIR})
-    set(SKBUILD_LIB_DIR ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/pymoab/core/${CMAKE_INSTALL_LIBDIR})
+    # By default, scikit-build will install everything to ${SKBUILD_PLATLIB_DIR}/pymoab
+    # Install include and bin directories to ${SKBUILD_PLATLIB_DIR}/pymoab/$SKBUILD_SUBDIR
+    set(SKBUILD_SUBDIR core/)
+    set(CMAKE_INSTALL_BINDIR ${SKBUILD_SUBDIR}${CMAKE_INSTALL_BINDIR})
+    set(CMAKE_INSTALL_INCLUDEDIR ${SKBUILD_SUBDIR}${CMAKE_INSTALL_INCLUDEDIR})
+    set(CMAKE_INSTALL_DATADIR ${SKBUILD_DATA_DIR}/${CMAKE_INSTALL_DATADIR})
+    set(CMAKE_INSTALL_DOCDIR ${SKBUILD_DATA_DIR}/${CMAKE_INSTALL_DOCDIR})
+    set(CMAKE_INSTALL_MANDIR ${SKBUILD_DATA_DIR}/${CMAKE_INSTALL_MANDIR})
+    set(MOABDocLocation ${SKBUILD_DATA_DIR}/${MOABDocLocation})
 
-    # Auditwheel and Delocate need this when repairing the wheel
-    # Since MOAB libs are installed in the pymoab/core subdirectory
-    # Auditwheel and Delocate need this to find the MOAB libs for pymoab.data
-    # It's a bit of a hack, but it works
-    set(SKBUILD_REPAIR_WHEEL_PATCH pymoab/core/${CMAKE_INSTALL_LIBDIR})
+    # Set the RPATH
     if(APPLE)
       set(PYMOAB_LIBRARY_RPATH "@loader_path")
-      set(PYMOAB_PYTHON_MODULE_RPATH "@loader_path/core/${CMAKE_INSTALL_LIBDIR}")
-      set(PYMOAB_BINARY_RPATH "@loader_path/../${SKBUILD_LIB_DIR};@loader_path/../${SKBUILD_REPAIR_WHEEL_PATCH};@loader_path/../../${SKBUILD_REPAIR_WHEEL_PATCH}")
+      set(PYMOAB_PYTHON_MODULE_RPATH "@loader_path/${SKBUILD_SUBDIR}${CMAKE_INSTALL_LIBDIR}")
+      set(PYMOAB_BINARY_RPATH "@loader_path/../${CMAKE_INSTALL_LIBDIR}")
     elseif(UNIX)
       set(PYMOAB_LIBRARY_RPATH "$ORIGIN")
-      set(PYMOAB_PYTHON_MODULE_RPATH "$ORIGIN/core/${CMAKE_INSTALL_LIBDIR}")
-      set(PYMOAB_BINARY_RPATH "$ORIGIN/../${SKBUILD_LIB_DIR};$ORIGIN/../${SKBUILD_REPAIR_WHEEL_PATCH};$ORIGIN/../../${SKBUILD_REPAIR_WHEEL_PATCH}")
-    else()
-      set(PYMOAB_LIBRARY_RPATH OFF)
-      set(PYMOAB_PYTHON_MODULE_RPATH OFF)
-      set(PYMOAB_BINARY_RPATH OFF)
+      set(PYMOAB_PYTHON_MODULE_RPATH "$ORIGIN/${SKBUILD_SUBDIR}${CMAKE_INSTALL_LIBDIR}")
+      set(PYMOAB_BINARY_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
     endif()
+
+    # Add the pymoab subdirectory
     add_subdirectory(pymoab)
   else()
     # Get a list of all Python files in the pymoab directory
@@ -586,18 +590,17 @@ if ( ENABLE_TESTING )
 endif()
 
 ###############################################################################
-#
+# Generate the MOABTargets.cmake file
 ###############################################################################
 export(
   TARGETS ${MOAB_INSTALL_TARGETS}
   FILE "${PROJECT_BINARY_DIR}/MOABTargets.cmake"
   )
+set(MOABTargetLocation ${SKBUILD_SUBDIR}${CMAKE_INSTALL_LIBDIR}/cmake/MOAB)
 install(
   EXPORT MOABTargets
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/MOAB/
-  )
-
-# Create some custom command
+  DESTINATION ${MOABTargetLocation}
+)
 
 # For consistency with autoconf, create a "make check" equivalent to "ctest"
 ADD_CUSTOM_TARGET( check COMMAND ctest DEPENDS )
@@ -707,39 +710,46 @@ endif(CLANG_TIDY_EXE)
 #  OUTPUT_STRIP_TRAILING_WHITESPACE
 #  )
 CONFIGURE_FILE(config/MOABConfig.cmake.h.in "${PROJECT_BINARY_DIR}/src/moab/MOABConfig.h" @ONLY)
-
 CONFIGURE_FILE(config/MOABConfig.cmake.cmake "${PROJECT_BINARY_DIR}/MOABConfig.cmake" @ONLY)
+CONFIGURE_FILE(config/MOABConfigVersion.cmake.cmake "${PROJECT_BINARY_DIR}/MOABConfigVersion.cmake" @ONLY)
 CONFIGURE_FILE(moab.make.cmake "${PROJECT_BINARY_DIR}/lib/moab.make" @ONLY)
-INSTALL(
-  FILES "${PROJECT_BINARY_DIR}/lib/moab.make"
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+CONFIGURE_FILE(config/MOAB.pc.cmake.in "${PROJECT_BINARY_DIR}/MOAB.pc" @ONLY)
+
+# Install the CMake configuration files
+set(MOABMakeLocation ${CMAKE_INSTALL_LIBDIR})
+set(MOABConfigLocation ${CMAKE_INSTALL_LIBDIR}/cmake/MOAB)
+set(MOABPKGCONFIG_LOCATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+
+# Skip installing the make and pkgconfig files if SKBUILD is set
+if(NOT SKBUILD)
+  install(FILES "${PROJECT_BINARY_DIR}/lib/moab.make"
+    DESTINATION ${MOABMakeLocation}
+    )
+  install(FILES ${PROJECT_BINARY_DIR}/MOAB.pc
+    DESTINATION ${MOABPKGCONFIG_LOCATION}
+    )
+  install(CODE
+    "file(APPEND  ${CMAKE_INSTALL_LIBDIR}/moab.make MOAB_LIBDIR=${CMAKE_INSTALL_FULL_LIBDIR}\\n )"
+    )
+  install(CODE
+    "file(APPEND  ${CMAKE_INSTALL_LIBDIR}/moab.make MOAB_INCLUDES=-I${CMAKE_INSTALL_FULL_INCLUDEDIR}\\n )"
+    )
+else()
+  set(MOABConfigLocation ${SKBUILD_DATA_DIR}/${MOABConfigLocation})
+endif()
+
+install(
+  FILES "${PROJECT_BINARY_DIR}/MOABConfig.cmake" "${PROJECT_BINARY_DIR}/MOABConfigVersion.cmake"
+  DESTINATION ${MOABConfigLocation}
   )
-INSTALL(
-  CODE
-  "file(APPEND  ${CMAKE_INSTALL_LIBDIR}/moab.make MOAB_LIBDIR=${CMAKE_INSTALL_FULL_LIBDIR}\\n )"
-  )
-INSTALL(
-  CODE
-  "file(APPEND  ${CMAKE_INSTALL_LIBDIR}/moab.make MOAB_INCLUDES=-I${CMAKE_INSTALL_FULL_INCLUDEDIR}\\n )"
-  )
-INSTALL(
-  FILES "${PROJECT_BINARY_DIR}/MOABConfig.cmake"
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/MOAB/
-  )
-INSTALL(
+install(
   FILES "${PROJECT_SOURCE_DIR}/config/ResolveCompilerPaths.cmake"
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/MOAB
+  DESTINATION ${MOABConfigLocation}
   )
 
-ADD_CUSTOM_TARGET(
-  uninstall
+add_custom_target(uninstall
   COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
   )
-
-CONFIGURE_FILE(config/MOAB.pc.cmake.in "${PROJECT_BINARY_DIR}/MOAB.pc" @ONLY)
-install(FILES ${PROJECT_BINARY_DIR}/MOAB.pc
-  DESTINATION lib/pkgconfig)
-
 ###################
 # INSTALL documentation and examples
 ####################
@@ -747,11 +757,11 @@ install(FILES ${PROJECT_BINARY_DIR}/MOAB.pc
 SET(MOAB_DOCS ${MOAB_DOCS}
   LICENSE README.md RELEASE_NOTES.md TODO.md
 )
-install(FILES ${MOAB_DOCS} DESTINATION share/doc/moab)
+install(FILES ${MOAB_DOCS} DESTINATION ${MOABDocLocation})
 
 CONFIGURE_FILE(examples/makefile.config.cmake "${PROJECT_BINARY_DIR}/share/examples/makefile.config" @ONLY)
 install(FILES ${PROJECT_BINARY_DIR}/share/examples/makefile.config
-  DESTINATION share/examples)
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/examples)
 
 SET(MOAB_EXAMPLES
   examples/makefile

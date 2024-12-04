@@ -758,6 +758,17 @@ void check_baseline_file( std::string basefile,
                           double eps,
                           int& err_code )
 {
+    // check if we are running parallel MPI tests
+    int rank = 0;
+#ifdef MOAB_HAVE_MPI
+    int isInit;
+    MPI_Initialized( &isInit );
+    if( isInit )
+    {
+        MPI_Comm_rank( MPI_COMM_WORLD, &rank );
+    }
+#endif
+
     err_code = 1;
     std::fstream fs;
     fs.open( basefile.c_str(), std::fstream::in );

@@ -95,6 +95,7 @@ struct appData
 #endif
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
+    EntityHandle secondary_file_set;  // secondary file set (typically a child set like covering mesh)
     TempestMapAppData tempestData;
     std::map< std::string, std::string > metadataMap;
 #endif
@@ -186,9 +187,15 @@ ErrCode iMOAB_Finalize()
     return MB_SUCCESS;
 }
 
+// A string to integer hash function that is fast and robust
+// Based on the Fowler–Noll–Vo (or FNV) algorithm
 static int apphash( const iMOAB_String str, int identifier = 0 )
 {
+    // A minimal perfect hash function (MPHF)
     std::string appstr(str);
+    // Fowler–Noll–Vo (or FNV) is a non-cryptographic hash function created
+    // by Glenn Fowler, Landon Curt Noll, and Kiem-Phong Vo.
+    // Ref: https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
     unsigned int h = 2166136261u;  // FNV offset basis
     for( char c : appstr )
     {
@@ -233,6 +240,7 @@ ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
     // *pid = *compid;
     // hash: compute a unique hash as a combination of the appname and the component id
     *pid                   = apphash( app_name, *compid );
+    // store map of application name and the ID we just generated
     context.appIdMap[name] = *pid;
     int rankHere           = 0;
 #ifdef MOAB_HAVE_MPI
@@ -258,9 +266,11 @@ ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
     app_data.tempestData.remapper = nullptr;  // Only allocate as needed
 #endif
 
-    app_data.num_ghost_layers = 0;
-    app_data.point_cloud      = false;
-    app_data.is_fortran       = false;
+    // set some default values
+    app_data.num_ghost_layers   = 0;
+    app_data.point_cloud        = false;
+    app_data.is_fortran         = false;
+    app_data.secondary_file_set = app_data.file_set;
 
 #ifdef MOAB_HAVE_MPI
     if( *comm ) app_data.pcomm = new ParallelComm( context.MBI, *comm );
@@ -292,8 +302,8 @@ ErrCode iMOAB_RegisterApplicationFortran( const iMOAB_String app_name,
     MPI_Comm ccomm;
     if( comm )
     {
-        // convert from Fortran communicator to a C communicator
-        // see transfer of handles
+        // Convert from Fortran communicator to a C communicator
+        // NOTE: see transfer of handles at
         // http://www.mpi-forum.org/docs/mpi-2.2/mpi22-report/node361.htm
         ccomm = MPI_Comm_f2c( (MPI_Fint)*comm );
     }
@@ -416,28 +426,6 @@ ErrCode iMOAB_DeregisterApplicationFortran( iMOAB_AppID pid )
 
     // release all datastructure allocations
     return iMOAB_DeregisterApplication( pid );
-}
-
-// Utility function
-static void split_tag_names( std::string input_names,
-                             std::string& separator,
-                             std::vector< std::string >& list_tag_names )
-{
-    size_t pos = 0;
-    std::string token;
-    while( ( pos = input_names.find( separator ) ) != std::string::npos )
-    {
-        token = input_names.substr( 0, pos );
-        if( !token.empty() ) list_tag_names.push_back( token );
-        // std::cout << token << std::endl;
-        input_names.erase( 0, pos + separator.length() );
-    }
-    if( !input_names.empty() )
-    {
-        // if leftover something, or if not ended with delimiter
-        list_tag_names.push_back( input_names );
-    }
-    return;
 }
 
 ErrCode iMOAB_ReadHeaderInfo( const iMOAB_String filename,
@@ -1446,6 +1434,28 @@ ErrCode iMOAB_GetPointerToVertexBC( iMOAB_AppID pid,
     return moab::MB_SUCCESS;
 }
 
+// Utility function
+static void split_tag_names( std::string input_names,
+                             std::string& separator,
+                             std::vector< std::string >& list_tag_names )
+{
+    size_t pos = 0;
+    std::string token;
+    while( ( pos = input_names.find( separator ) ) != std::string::npos )
+    {
+        token = input_names.substr( 0, pos );
+        if( !token.empty() ) list_tag_names.push_back( token );
+        // std::cout << token << std::endl;
+        input_names.erase( 0, pos + separator.length() );
+    }
+    if( !input_names.empty() )
+    {
+        // if leftover something, or if not ended with delimiter
+        list_tag_names.push_back( input_names );
+    }
+    return;
+}
+
 ErrCode iMOAB_DefineTagStorage( iMOAB_AppID pid,
                                 const iMOAB_String tag_storage_name,
                                 int* tag_type,
@@ -1522,7 +1532,6 @@ ErrCode iMOAB_DefineTagStorage( iMOAB_AppID pid,
     // split storage names if separated list
 
     std::string tag_name( tag_storage_name );
-
     //  first separate the names of the tags
     // we assume that there are separators ":" between the tag names
     std::vector< std::string > tagNames;
@@ -1591,37 +1600,26 @@ ErrCode iMOAB_SetIntTagStorage( iMOAB_AppID pid,
 
     // Get the application data
     appData& data = context.appDatas[*pid];
-
+    // check if tag is defined
     if( data.tagMap.find( tag_name ) == data.tagMap.end() )
-    {
         return moab::MB_FAILURE;
-    }  // tag not defined
 
     Tag tag = data.tagMap[tag_name];
 
     int tagLength  = 0;
-    ErrorCode rval = context.MBI->tag_get_length( tag, tagLength );MB_CHK_ERR( rval );
+    MB_CHK_ERR( context.MBI->tag_get_length( tag, tagLength ) );
 
     DataType dtype;
-    rval = context.MBI->tag_get_data_type( tag, dtype );
+    MB_CHK_ERR( context.MBI->tag_get_data_type( tag, dtype ) );
 
-    if( MB_SUCCESS != rval || dtype != MB_TYPE_INTEGER )
+    if( dtype != MB_TYPE_INTEGER )
     {
-        return moab::MB_FAILURE;
+        MB_CHK_SET_ERR( moab::MB_FAILURE, "The tag is not of integer type." );
     }
 
     // set it on a subset of entities, based on type and length
-    Range* ents_to_set;
-
-    if( *ent_type == 0 )  // vertices
-    {
-        ents_to_set = &data.all_verts;
-    }
-    else  // if (*ent_type == 1) // *ent_type can be 0 (vertices) or 1 (elements)
-    {
-        ents_to_set = &data.primary_elems;
-    }
-
+    // if *entity_type = 0, then use vertices; else elements
+    Range* ents_to_set  = ( *ent_type == 0 ? &data.all_verts : &data.primary_elems );
     int nents_to_be_set = *num_tag_storage_length / tagLength;
 
     if( nents_to_be_set > (int)ents_to_set->size() )
@@ -1629,11 +1627,8 @@ ErrCode iMOAB_SetIntTagStorage( iMOAB_AppID pid,
         return moab::MB_FAILURE;
     }  // to many entities to be set or too few
 
-    // restrict the range; everything is contiguous; or not?
-
-    // Range contig_range ( * ( ents_to_set->begin() ), * ( ents_to_set->begin() + nents_to_be_set -
-    // 1 ) );
-    rval = context.MBI->tag_set_data( tag, *ents_to_set, tag_storage_data );MB_CHK_ERR( rval );
+    // now set the tag data
+    MB_CHK_ERR( context.MBI->tag_set_data( tag, *ents_to_set, tag_storage_data ) );
 
     return moab::MB_SUCCESS;  // no error
 }
@@ -1657,39 +1652,27 @@ ErrCode iMOAB_GetIntTagStorage( iMOAB_AppID pid,
     Tag tag = data.tagMap[tag_name];
 
     int tagLength = 0;
-    rval          = context.MBI->tag_get_length( tag, tagLength );MB_CHK_ERR( rval );
+    MB_CHK_ERR( context.MBI->tag_get_length( tag, tagLength ) );
 
     DataType dtype;
-    rval = context.MBI->tag_get_data_type( tag, dtype );MB_CHK_ERR( rval );
+    MB_CHK_ERR( context.MBI->tag_get_data_type( tag, dtype ) );
 
     if( dtype != MB_TYPE_INTEGER )
     {
-        return moab::MB_FAILURE;
+        MB_CHK_SET_ERR( moab::MB_FAILURE, "The tag is not of integer type." );
     }
 
     // set it on a subset of entities, based on type and length
-    Range* ents_to_get;
-
-    if( *ent_type == 0 )  // vertices
-    {
-        ents_to_get = &data.all_verts;
-    }
-    else  // if (*ent_type == 1)
-    {
-        ents_to_get = &data.primary_elems;
-    }
-
-    int nents_to_get = *num_tag_storage_length / tagLength;
+    // if *entity_type = 0, then use vertices; else elements
+    Range* ents_to_get = ( *ent_type == 0 ? &data.all_verts : &data.primary_elems );
+    int nents_to_get   = *num_tag_storage_length / tagLength;
 
     if( nents_to_get > (int)ents_to_get->size() )
     {
         return moab::MB_FAILURE;
     }  // to many entities to get, or too little
 
-    // restrict the range; everything is contiguous; or not?
-    // Range contig_range ( * ( ents_to_get->begin() ), * ( ents_to_get->begin() + nents_to_get - 1
-    // ) );
-
+    // now set the tag data
     rval = context.MBI->tag_get_data( tag, *ents_to_get, tag_storage_data );MB_CHK_ERR( rval );
 
     return moab::MB_SUCCESS;  // no error
@@ -1710,20 +1693,12 @@ ErrCode iMOAB_SetDoubleTagStorage( iMOAB_AppID pid,
     split_tag_names( tag_names, separator, tagNames );
 
     appData& data      = context.appDatas[*pid];
-    Range* ents_to_set = nullptr;
-
-    if( *ent_type == 0 )  // vertices
-    {
-        ents_to_set = &data.all_verts;
-    }
-    else if( *ent_type == 1 )
-    {
-        ents_to_set = &data.primary_elems;
-    }
+    // set it on a subset of entities, based on type and length
+    // if *entity_type = 0, then use vertices; else elements
+    Range* ents_to_set = ( *ent_type == 0 ? &data.all_verts : &data.primary_elems );
 
     int nents_to_be_set = (int)( *ents_to_set ).size();
     int position        = 0;
-
     for( size_t i = 0; i < tagNames.size(); i++ )
     {
         if( data.tagMap.find( tagNames[i] ) == data.tagMap.end() )
@@ -1770,18 +1745,10 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
     std::string separator( ":" );
     split_tag_names( tag_names, separator, tagNames );
 
-    appData& data      = context.appDatas[*pid];
-    Range* ents_to_set = nullptr;
-
-    if( *ent_type == 0 )  // vertices
-    {
-        ents_to_set = &data.all_verts;
-    }
-    else if( *ent_type == 1 )
-    {
-        ents_to_set = &data.primary_elems;
-    }
-
+    appData& data = context.appDatas[*pid];
+    // set it on a subset of entities, based on type and length
+    // if *entity_type = 0, then use vertices; else elements
+    Range* ents_to_set  = ( *ent_type == 0 ? &data.all_verts : &data.primary_elems );
     int nents_to_be_set = (int)( *ents_to_set ).size();
 
     Tag gidTag = context.MBI->globalId_tag();
@@ -2680,26 +2647,26 @@ ErrCode iMOAB_SendElementTag( iMOAB_AppID pid,
     // another possibility is for par comm graph to be computed from iMOAB_ComputeCommGraph, for
     // after atm ocn intx, from phys (case from imoab_phatm_ocn_coupler.cpp) get then the cover set
     // from ints remapper
-#ifdef MOAB_HAVE_TEMPESTREMAP
     if( data.tempestData.remapper != nullptr )  // this is the case this is part of intx;;
     {
         cover_set = data.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
         rval      = context.MBI->get_entities_by_dimension( cover_set, 2, owned );MB_CHK_ERR( rval );
         // should still have only quads ?
     }
-#else
-    // now, in case we are sending from intx between ocn and atm, we involve coverage set
-    // how do I know if this receiver already participated in an intersection driven by coupler?
-    // also, what if this was the "source" mesh in intx?
-    // in that case, the elements might have been instantiated in the coverage set locally, the
-    // "owned" range can be different the elements are now in tempestRemap coverage_set
-    cover_set = cgraph->get_cover_set();  // this will be non null only for intx app ?
-
-    if( 0 != cover_set )
+    else
     {
-        rval = context.MBI->get_entities_by_dimension( cover_set, 2, owned );MB_CHK_ERR( rval );
+        // now, in case we are sending from intx between ocn and atm, we involve coverage set
+        // how do I know if this receiver already participated in an intersection driven by coupler?
+        // also, what if this was the "source" mesh in intx?
+        // in that case, the elements might have been instantiated in the coverage set locally, the
+        // "owned" range can be different the elements are now in tempestRemap coverage_set
+        cover_set = cgraph->get_cover_set();  // this will be non null only for intx app ?
+        if( 0 != cover_set )
+        {
+            rval = context.MBI->get_entities_by_dimension( cover_set, 2, owned );
+            MB_CHK_ERR( rval );
+        }
     }
-#endif
 
     std::string tag_name( tag_storage_name );
 
@@ -2735,7 +2702,6 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid,
                                  int* context_id )
 {
     appData& data = context.appDatas[*pid];
-
     std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *context_id );
     if( mt == data.pgraph.end() )
     {
@@ -2746,41 +2712,42 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid,
     MPI_Comm global   = ( data.is_fortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( joint_communicator ) )
                                           : *joint_communicator );
     ParallelComm* pco = context.appDatas[*pid].pcomm;
-    Range owned       = data.owned_elems;
+    Range owned       = ( data.point_cloud ? data.local_verts : data.owned_elems );
 
-    // how do I know if this receiver already participated in an intersection driven by coupler?
-    // also, what if this was the "source" mesh in intx?
-    // in that case, the elements might have been instantiated in the coverage set locally, the
-    // "owned" range can be different the elements are now in tempestRemap coverage_set
-    EntityHandle cover_set = cgraph->get_cover_set();
-    ErrorCode rval;
-    if( 0 != cover_set )
-    {
-        rval = context.MBI->get_entities_by_dimension( cover_set, 2, owned );MB_CHK_ERR( rval );
-    }
-    if( data.point_cloud )
-    {
-        owned = data.local_verts;
-    }
-    // another possibility is for par comm graph to be computed from iMOAB_ComputeCommGraph, for
-    // after atm ocn intx, from phys (case from imoab_phatm_ocn_coupler.cpp) get then the cover set
-    // from ints remapper
-#ifdef MOAB_HAVE_TEMPESTREMAP
-    if( data.tempestData.remapper != nullptr )  // this is the case this is part of intx;;
-    {
-        cover_set = data.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
-        rval      = context.MBI->get_entities_by_dimension( cover_set, 2, owned );MB_CHK_ERR( rval );
-        // should still have only quads ?
-    }
-#endif
+    EntityHandle cover_set = cgraph->get_cover_set(); // data.secondary_file_set;
+    // // another possibility is for par comm graph to be computed from iMOAB_ComputeCommGraph, for
+    // // after atm ocn intx, from phys (case from imoab_phatm_ocn_coupler.cpp) get then the cover set
+    // // from ints remapper
+    // if( data.tempestData.remapper != nullptr )  // this is the case this is part of intx;;
+    // {
+    //     cover_set = data.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
+    //     MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, owned ) );
+    //     // should still have only quads ?
+    //     printf( "%d: Got into remapper!=null block\n", pco->rank() );
+    // }
+    // else
+    // {
+    //     // MB_CHK_SET_ERR( moab::MB_FAILURE, "cover_set is not set correctly" );
+    //     // now, in case we are sending from intx between ocn and atm, we involve coverage set
+    //     // how do I know if this receiver already participated in an intersection driven by coupler?
+    //     // also, what if this was the "source" mesh in intx?
+    //     // in that case, the elements might have been instantiated in the coverage set locally, the
+    //     // "owned" range can be different the elements are now in tempestRemap coverage_set
+    //     cover_set = cgraph->get_cover_set();  // this will be non null only for intx app ?
+
+    //     if( 0 != cover_set )
+    //     {
+    //         MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, owned ) );
+    //     }
+    // }
+    MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, owned ) );
+
     /*
      * data_intx.remapper exists though only on the intersection application
      *  how do we get from here ( we know the pid that receives, and the commgraph used by migrate
      * mesh )
      */
-
     std::string tag_name( tag_storage_name );
-
     // we assume that there are separators ";" between the tag names
     std::vector< std::string > tagNames;
     std::vector< Tag > tagHandles;
@@ -2789,10 +2756,12 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid,
     for( size_t i = 0; i < tagNames.size(); i++ )
     {
         Tag tagHandle;
-        rval = context.MBI->tag_get_handle( tagNames[i].c_str(), tagHandle );
+        ErrorCode rval = context.MBI->tag_get_handle( tagNames[i].c_str(), tagHandle );
         if( MB_SUCCESS != rval || nullptr == tagHandle )
         {
-            std::cout << " can't get tag handle for tag named:" << tagNames[i].c_str() << " at index " << i << "\n";MB_CHK_SET_ERR( rval, "can't get tag handle" );
+            std::cout << " can't get tag handle for tag named:" << tagNames[i].c_str() << " at index " << i
+                      << std::endl;
+            MB_CHK_SET_ERR( rval, "can't get tag handle" );
         }
         tagHandles.push_back( tagHandle );
     }
@@ -2803,12 +2772,18 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid,
 #endif
     // pco is needed to pack, and for moab instance, not for communication!
     // still use nonblocking communication
-    rval = cgraph->receive_tag_values( global, pco, owned, tagHandles );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( cgraph->receive_tag_values( global, pco, owned, tagHandles ), "failed to receive tag values" );
 
 #ifdef VERBOSE
     std::cout << pco->rank() << ". Looking to receive data for tags: " << tag_name << "\n";
 #endif
 
+    if( cover_set )
+    {
+        std::string prefix = "atmcov_withdata_" + std::to_string( pco->rank() ) + ".h5m";
+        MB_CHK_SET_ERR( context.MBI->write_file( prefix.c_str(), nullptr, "", &data.secondary_file_set, 1 ),
+                        "failed to write local ATM cov mesh with data" );
+    }
     return moab::MB_SUCCESS;
 }
 
@@ -3232,6 +3207,7 @@ ErrCode iMOAB_MergeVertices( iMOAB_AppID pid )
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
 
+
 // this call must be collective on the joint communicator
 //  intersection tasks on coupler will need to send to the components tasks the list of
 // id elements that are relevant: they intersected some of the target elements (which are not needed
@@ -3248,17 +3224,27 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
     // first, based on the scompid and migrcomp, find the parCommGraph corresponding to this exchange
     std::vector< int > srcSenders, receivers;
     ParCommGraph* sendGraph = nullptr;
-    int default_context_id  = -1;
     bool is_fortran_context = false;
+
+    if( pid_src && *pid_src > 0 && context.appDatas.find( *pid_src ) == context.appDatas.end() )
+        MB_CHK_SET_ERR( moab::MB_FAILURE, "Invalid source application ID specified: " << *pid_src );
+    if( pid_migr && *pid_migr > 0 && context.appDatas.find( *pid_migr ) == context.appDatas.end() )
+        MB_CHK_SET_ERR( moab::MB_FAILURE, "Invalid migration/coverage application ID specified: " << *pid_migr );
+    if( pid_intx && *pid_intx > 0 && context.appDatas.find( *pid_intx ) == context.appDatas.end() )
+        MB_CHK_SET_ERR( moab::MB_FAILURE, "Invalid intersection application ID specified: " << *pid_intx );
 
     // First, find the original graph between PE sets
     // And based on this one, we will build the newly modified one for coverage
     if( *pid_src >= 0 )
     {
-        default_context_id = *migration_id;  // the other one
-        assert( context.appDatas[*pid_src].global_id == *source_id );
-        is_fortran_context = context.appDatas[*pid_src].is_fortran || is_fortran_context;
-        sendGraph          = context.appDatas[*pid_src].pgraph[default_context_id];  // maybe check if it does not exist
+        appData& dataSrc   = context.appDatas[*pid_src];
+        int default_context_id = *migration_id;  // the other one
+        assert( dataSrc.global_id == *source_id );
+        is_fortran_context = dataSrc.is_fortran || is_fortran_context;
+        if( dataSrc.pgraph.find( default_context_id ) != dataSrc.pgraph.end() )
+            sendGraph = dataSrc.pgraph[default_context_id];  // maybe check if it does not exist
+        else
+            MB_CHK_SET_ERR(moab::MB_FAILURE, "Could not find source ParCommGraph with default migration context");
 
         // report the sender and receiver tasks in the joint comm
         srcSenders = sendGraph->senders();
@@ -3271,11 +3257,15 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
     ParCommGraph* recvGraph = nullptr;  // will be non null on receiver tasks (intx tasks)
     if( *pid_migr >= 0 )
     {
-        is_fortran_context = context.appDatas[*pid_migr].is_fortran || is_fortran_context;
+        appData& dataMigr  = context.appDatas[*pid_migr];
+        is_fortran_context = dataMigr.is_fortran || is_fortran_context;
         // find the original one
-        default_context_id = *source_id;
-        assert( context.appDatas[*pid_migr].global_id == *migration_id );
-        recvGraph = context.appDatas[*pid_migr].pgraph[default_context_id];
+        int default_context_id = *source_id;
+        assert( dataMigr.global_id == *migration_id );
+        if( dataMigr.pgraph.find( default_context_id ) != dataMigr.pgraph.end() )
+            recvGraph = dataMigr.pgraph[default_context_id];
+        else
+            MB_CHK_SET_ERR( moab::MB_FAILURE, "Could not find coverage receiver ParCommGraph with default migration context" );
         // report the sender and receiver tasks in the joint comm, from migrated mesh pt of view
         srcSenders = recvGraph->senders();
         receivers  = recvGraph->receivers();
@@ -3301,57 +3291,86 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
     int currentRankInJointComm = -1;
     CHK_MPI_ERR( MPI_Comm_rank( global, &currentRankInJointComm ) );
 
-    appData& dataIntx      = context.appDatas[*pid_intx];
-    EntityHandle cover_set = dataIntx.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
-    // int method_type =3; /* FV meshes (we are only doing FV-FV for file-based maps) */
-    // iMOAB_ComputeCommGraph( pid_src, /*iMOAB_AppID pid2*/ cover_set, joint_communicator, MPI_Group * group1,
-    //                         MPI_Group * group2, &method_type, &method_type, source_id, context_id );
-    // ( MPI_Comm * joint_communicator, iMOAB_AppID pid_src, iMOAB_AppID pid_migr, iMOAB_AppID pid_intx, int* source_id,
-    //   int* migration_id, int* context_id );
-
     // Global id of the coverage source elements
     Tag gidTag = context.MBI->globalId_tag();
-    if( !gidTag ) return moab::MB_FAILURE;  // fatal error, abort
+    if( !gidTag ) return moab::MB_TAG_NOT_FOUND;  // fatal error, abort
 
     // if currentRankInJointComm is in receivers list, it means that we are on intx tasks too, we
     // need to send information towards component tasks
     if( find( receivers.begin(), receivers.end(), currentRankInJointComm ) !=
         receivers.end() )  // we are on receivers tasks, we can request intx info
     {
+        appData& dataIntx      = context.appDatas[*pid_intx];
+        EntityHandle intx_set  = dataIntx.file_set;
+        EntityHandle cover_set = dataIntx.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
+
         Tag orgSendProcTag;
-
         MB_CHK_ERR( context.MBI->tag_get_handle( "orig_sending_processor", orgSendProcTag ) );
-        if( !orgSendProcTag ) return moab::MB_FAILURE;  // fatal error, abort
+        if( !orgSendProcTag ) return moab::MB_TAG_NOT_FOUND;  // fatal error, abort
 
-        // find the file set, red parents for intx cells, and put them in tuples
-        Range cells;
-        // get all entities from the set, and look at their RedParent
-        MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, cells ) );
+        bool intx_inactive = false;
+        Range intx_cells;
+        // get all entities from the intersection set, and look at their SourceParent
+        MB_CHK_ERR( context.MBI->get_entities_by_dimension( intx_set, 2, intx_cells ) );
+        // we did not compute the intersection (loaded from disk)
+        // so then just get the cells from covering mesh (no need to filter participating elements only)
+        if( intx_cells.size() == 0 ) intx_inactive = true;
 
         // send that info back to enhance parCommGraph cache
         std::map< int, std::set< int > > idsFromProcs;
-        // if we have no intx cells, it means we are on point clouds;
-        // quick fix just use all cells from coverage set
-        // if( cells.empty() )
+        if( !intx_inactive )
         {
-            // get all cells from coverage set
-            Tag gidTag = context.MBI->globalId_tag();
-            MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, cells ) );
-            // look at their orig_sending_processor and associate to global ID
-            for( Range::iterator it = cells.begin(); it != cells.end(); it++ )
-            {
-                EntityHandle covCell = *it;
-                int gidCell, origProc;  // look at o
+            Tag parentTag;
+            // global id of the source element corresponding to intersection cell
+            MB_CHK_ERR( context.MBI->tag_get_handle( "SourceParent", parentTag ) );
+            if( !parentTag ) return moab::MB_TAG_NOT_FOUND;  // fatal error, abort
 
-                MB_CHK_ERR( context.MBI->tag_get_data( gidTag, &covCell, 1, &gidCell ) );
-                MB_CHK_ERR( context.MBI->tag_get_data( orgSendProcTag, &covCell, 1, &origProc ) );
+            for( Range::iterator it = intx_cells.begin(); it != intx_cells.end(); ++it )
+            {
+                EntityHandle intx_cell = *it;
+
+                int origProc;  // look at receivers
+                MB_CHK_ERR( context.MBI->tag_get_data( orgSendProcTag, &intx_cell, 1, &origProc ) );
 
                 // we have augmented the overlap set with ghost cells ; in that case, the
                 // orig_sending_processor is not set so it will be -1;
-                if( origProc < 0 )  // it cannot < 0, I think
-                    continue;
-                std::set< int >& setInts = idsFromProcs[origProc];
-                setInts.insert( gidCell );
+                // if( origProc < 0 || currentRankInJointComm == origProc ) continue;
+                if( origProc < 0 ) continue;
+
+                int gidCell;  // get the global id of the cell for association
+                MB_CHK_ERR( context.MBI->tag_get_data( parentTag, &intx_cell, 1, &gidCell ) );
+                idsFromProcs[origProc].insert( gidCell );
+                // printf( "%d: active-intx: adding %d for proc %d\n", currentRankInJointComm, gidCell, origProc );
+            }
+        }
+
+        // if we have no intx cells, it means we are on point clouds;
+        // quick fix just use all cells from coverage set
+        if( intx_inactive )
+        {
+            // get all entities from the source covering set
+            intx_cells.clear();
+            MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, intx_cells ) );
+
+            // get all cells from coverage set
+            Tag gidTag = context.MBI->globalId_tag();
+
+            // look at their orig_sending_processor and associate to global ID
+            for( Range::iterator it = intx_cells.begin(); it != intx_cells.end(); ++it )
+            {
+                EntityHandle cov_cell = *it;
+
+                int origProc;  // look at receivers
+                MB_CHK_ERR( context.MBI->tag_get_data( orgSendProcTag, &cov_cell, 1, &origProc ) );
+
+                // we have augmented the overlap set with ghost cells ; in that case, the
+                // orig_sending_processor is not set so it will be -1;
+                if( origProc < 0  ) continue;
+
+                int gidCell;  // get the global id of the cell for association
+                MB_CHK_ERR( context.MBI->tag_get_data( gidTag, &cov_cell, 1, &gidCell ) );
+                assert( gidCell > 0 );
+                idsFromProcs[origProc].insert( gidCell );
             }
         }
 
@@ -3382,22 +3401,27 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
         }
         dbfile.close();
 #endif
+
         if( nullptr != recvGraph )
         {
-            ParCommGraph* recvGraph1 = new ParCommGraph( *recvGraph );  // just copy
-            recvGraph1->set_context_id( *context_id );
-            recvGraph1->SetReceivingAfterCoverage( idsFromProcs );
+            ParCommGraph* newRecvGraph = new ParCommGraph( *recvGraph );  // just copy
+            newRecvGraph->set_context_id( *context_id );
+            newRecvGraph->SetReceivingAfterCoverage( idsFromProcs );
             // this par comm graph will need to use the coverage set
             // so we are for sure on intx pes (the receiver is the coupler mesh)
-            assert( *pid_intx >= 0 );
-            recvGraph1->set_cover_set( cover_set );
-            context.appDatas[*pid_migr].pgraph[*context_id] = recvGraph1;  // possible memory leak if context_id is same
+            newRecvGraph->set_cover_set( cover_set );
+            if( context.appDatas[*pid_migr].pgraph.find( *context_id ) == context.appDatas[*pid_migr].pgraph.end() )
+                context.appDatas[*pid_migr].pgraph[*context_id] =
+                    newRecvGraph;
+            else  // possible memory leak if context_id is same
+                MB_CHK_SET_ERR( moab::MB_FAILURE, "ParCommGraph for context_id="
+                                                      << *context_id << " already exists. Check the workflow" );
         }
-        for( std::map< int, std::set< int > >::iterator mit = idsFromProcs.begin(); mit != idsFromProcs.end(); mit++ )
+        for( std::map< int, std::set< int > >::iterator mit = idsFromProcs.begin(); mit != idsFromProcs.end(); ++mit )
         {
             int procToSendTo       = mit->first;
             std::set< int >& idSet = mit->second;
-            for( std::set< int >::iterator sit = idSet.begin(); sit != idSet.end(); sit++ )
+            for( std::set< int >::iterator sit = idSet.begin(); sit != idSet.end(); ++sit )
             {
                 int n = TLcovIDs.get_n();
                 TLcovIDs.reserve();
@@ -3415,10 +3439,12 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
     // a test to know if we are on the sender tasks (original component, in this case, atmosphere)
     if( nullptr != sendGraph )
     {
+        appData& dataSrc = context.appDatas[*pid_src];
         // collect TLcovIDs tuple, will set in a local map/set, the ids that are sent to each receiver task
-        ParCommGraph* sendGraph1 = new ParCommGraph( *sendGraph );  // just copy
-        sendGraph1->set_context_id( *context_id );
-        context.appDatas[*pid_src].pgraph[*context_id] = sendGraph1;MB_CHK_ERR( sendGraph1->settle_send_graph( TLcovIDs ) );
+        ParCommGraph* newSendGraph = new ParCommGraph( *sendGraph );  // just copy
+        newSendGraph->set_context_id( *context_id );
+        dataSrc.pgraph[*context_id] = newSendGraph;
+        MB_CHK_ERR( newSendGraph->settle_send_graph( TLcovIDs ) );
     }
     return moab::MB_SUCCESS;  // success
 }
@@ -3488,21 +3514,22 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
 
     int src_elem_dof_length = 1, tgt_elem_dof_length = 1;  // default=1: FV - element average DoF value
     // tags of interest are either GLOBAL_DOFS (SE) or GLOBAL_ID (FV)
-    Tag gdsTag;
-    // find the values on first cell
+    Tag gdsTag = nullptr;
+    if( *srctype == 1 || *tgttype == 1 )
+    {
+        MB_CHK_ERR( context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag ) );
+        assert( gdsTag );
+    }
+
+    // Find the DoF tag length
+    // if it fails, usually it is 16
+    // first check if we need to query the source
     if( *srctype == 1 )  // spectral element
-    {
-        MB_CHK_ERR( context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag ) );
-        // if it fails, usually it is 16
         MB_CHK_ERR( context.MBI->tag_get_length( gdsTag, src_elem_dof_length ) );
-    }
-    // find the values on first cell
+    // find the DoF tag length
+    // next check if we need to query the target
     if( *tgttype == 1 )  // spectral element
-    {
-        MB_CHK_ERR( context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag ) );
-        // if it fails, usually it is 16
         MB_CHK_ERR( context.MBI->tag_get_length( gdsTag, tgt_elem_dof_length ) );
-    }
 
     Tag gidTag = context.MBI->globalId_tag();
     std::vector< int > srcDofValues, tgtDofValues;
@@ -3513,20 +3540,24 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
 
     if( *srctype == 1 )  // spectral element
     {
-        assert( gdsTag );MB_CHK_ERR( context.MBI->get_entities_by_type( covering_set, MBQUAD, src_ents_of_interest ) );
-        srcDofValues.resize( src_ents_of_interest.size() * src_elem_dof_length );MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, src_ents_of_interest, &srcDofValues[0] ) );
+        MB_CHK_ERR( context.MBI->tag_get_length( gdsTag, src_elem_dof_length ) );
+        MB_CHK_ERR( context.MBI->get_entities_by_type( covering_set, MBQUAD, src_ents_of_interest ) );
+        srcDofValues.resize( src_ents_of_interest.size() * src_elem_dof_length );
+        MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, src_ents_of_interest, &srcDofValues[0] ) );
     }
     else if( *srctype == 2 )
     {
         // vertex global ids
         MB_CHK_ERR( context.MBI->get_entities_by_type( covering_set, MBVERTEX, src_ents_of_interest ) );
-        srcDofValues.resize( src_ents_of_interest.size() * src_elem_dof_length );MB_CHK_ERR( context.MBI->tag_get_data( gidTag, src_ents_of_interest, &srcDofValues[0] ) );
+        srcDofValues.resize( src_ents_of_interest.size() * src_elem_dof_length );
+        MB_CHK_ERR( context.MBI->tag_get_data( gidTag, src_ents_of_interest, &srcDofValues[0] ) );
     }
     else if( *srctype == 3 )  // for FV meshes, just get the global id of cell
     {
         // element global ids
         MB_CHK_ERR( context.MBI->get_entities_by_dimension( covering_set, 2, src_ents_of_interest ) );
-        srcDofValues.resize( src_ents_of_interest.size() * src_elem_dof_length );MB_CHK_ERR( context.MBI->tag_get_data( gidTag, src_ents_of_interest, &srcDofValues[0] ) );
+        srcDofValues.resize( src_ents_of_interest.size() * src_elem_dof_length );
+        MB_CHK_ERR( context.MBI->tag_get_data( gidTag, src_ents_of_interest, &srcDofValues[0] ) );
     }
     else
     {
@@ -3535,20 +3566,24 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
 
     if( *tgttype == 1 )  // spectral element
     {
-        assert( gdsTag );MB_CHK_ERR( context.MBI->get_entities_by_type( target_set, MBQUAD, tgt_ents_of_interest ) );
-        tgtDofValues.resize( tgt_ents_of_interest.size() * tgt_elem_dof_length );MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, tgt_ents_of_interest, &tgtDofValues[0] ) );
+        MB_CHK_ERR( context.MBI->tag_get_length( gdsTag, tgt_elem_dof_length ) );
+        MB_CHK_ERR( context.MBI->get_entities_by_type( target_set, MBQUAD, tgt_ents_of_interest ) );
+        tgtDofValues.resize( tgt_ents_of_interest.size() * tgt_elem_dof_length );
+        MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, tgt_ents_of_interest, &tgtDofValues[0] ) );
     }
     else if( *tgttype == 2 )
     {
         // vertex global ids
         MB_CHK_ERR( context.MBI->get_entities_by_type( target_set, MBVERTEX, tgt_ents_of_interest ) );
-        tgtDofValues.resize( tgt_ents_of_interest.size() * tgt_elem_dof_length );MB_CHK_ERR( context.MBI->tag_get_data( gidTag, tgt_ents_of_interest, &tgtDofValues[0] ) );
+        tgtDofValues.resize( tgt_ents_of_interest.size() * tgt_elem_dof_length );
+        MB_CHK_ERR( context.MBI->tag_get_data( gidTag, tgt_ents_of_interest, &tgtDofValues[0] ) );
     }
     else if( *tgttype == 3 )  // for FV meshes, just get the global id of cell
     {
         // element global ids
         MB_CHK_ERR( context.MBI->get_entities_by_dimension( target_set, 2, tgt_ents_of_interest ) );
-        tgtDofValues.resize( tgt_ents_of_interest.size() * tgt_elem_dof_length );MB_CHK_ERR( context.MBI->tag_get_data( gidTag, tgt_ents_of_interest, &tgtDofValues[0] ) );
+        tgtDofValues.resize( tgt_ents_of_interest.size() * tgt_elem_dof_length );
+        MB_CHK_ERR( context.MBI->tag_get_data( gidTag, tgt_ents_of_interest, &tgtDofValues[0] ) );
     }
     else
     {
@@ -3566,6 +3601,11 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
     // if we are on target mesh (row based partition)
     tdata.pid_src  = pid_source;
     tdata.pid_dest = pid_target;
+
+    // TODO: now if coverage set exists, let us perform a filter based on
+    // available source/target nnz data in the map. The idea is to look at the
+    // source coverage and target meshes and to figure out only relevant elements
+    // that need to participate in the meshes.
 
     tdata.remapper->SetMeshSet( Remapper::SourceMesh, source_set, &srcc_ents_of_interest );
     tdata.remapper->SetMeshSet( Remapper::CoveringMesh, covering_set, &src_ents_of_interest );
@@ -4198,6 +4238,9 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
 
     // First, compute the covering source set.
     rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, data_src.num_ghost_layers );MB_CHK_ERR( rval );
+
+    // set the reference to the covering set in the source PID
+    data_src.secondary_file_set = tdata.remapper->GetMeshSet( moab::Remapper::CoveringMesh );
 
     return moab::MB_SUCCESS;
 }

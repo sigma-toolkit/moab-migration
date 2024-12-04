@@ -46,6 +46,43 @@
         return moab::MB_FAILURE;                                    \
     }
 
+#ifdef MOAB_HAVE_EIGEN3
+
+// Function to serialize a sparse matrix to disk in text format
+template < typename SparseMatrixType >
+void moab::TempestOnlineMap::serializeSparseMatrix( const SparseMatrixType& mat, const std::string& filename )
+{
+    std::ofstream ofs( filename );
+    if( !ofs.is_open() )
+    {
+        std::cerr << "Failed to open file for writing: " << filename << std::endl;
+        return;
+    }
+
+    // Write matrix dimensions and number of non-zeros
+    int rows                             = mat.rows();
+    int cols                             = mat.cols();
+    typename SparseMatrixType::Index nnz = mat.nonZeros();
+    ofs << rows << " " << cols << " " << nnz << "\n";
+
+    // Iterate over non-zero elements
+    for( int k = 0; k < mat.outerSize(); ++k )
+    {
+        for( typename SparseMatrixType::InnerIterator it( mat, k ); it; ++it )
+        {
+            // int row    = it.row();  // row index
+            // int col    = it.col();  // col index (equals k)
+            int row = 1 + this->GetRowGlobalDoF( it.row() );  // row index
+            int col = 1 + this->GetColGlobalDoF( it.col() );  // col index
+            auto value = it.value();
+            ofs << row << " " << col << " " << value << "\n";
+        }
+    }
+    ofs.close();
+}
+
+#endif
+
 int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< unsigned int >& gdofmap,
                                                       DataArray1D< double >& vecFaceArea,
                                                       DataArray1D< double >& dCenterLon,
@@ -782,6 +819,9 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
 
     ncMap.close();
 
+#ifdef VERBOSE
+    serializeSparseMatrix( m_weightMatrix, "map_operator_" + std::to_string( rank ) + ".txt" );
+#endif
     return moab::MB_SUCCESS;
 }
 
@@ -1162,6 +1202,7 @@ void print_progress( const int barWidth, const float progress, const char* messa
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
 moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
                                                          const std::vector< int >& owned_dof_ids,
                                                          bool row_partition )
@@ -1230,22 +1271,17 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         // read the file using pnetcdf directly, in parallel; need to have MPI, we do not check that anymore
         // why build wth pnetcdf without MPI ?
         // ParNcFile ncMap( m_pcomm->comm(), MPI_INFO_NULL, strSource, NcFile::ReadOnly, NcFile::Netcdf4 );
-        ret = ncmpi_open( m_pcomm->comm(), strSource, NC_NOWRITE, MPI_INFO_NULL, &ncfile );
-        ERR_PARNC( ret );  // bail out completely
-        ret = ncmpi_inq( ncfile, &ndims, &nvars, &ngatts, &unlimited );
-        ERR_PARNC( ret );
+        ERR_PARNC(
+            ncmpi_open( m_pcomm->comm(), strSource, NC_NOWRITE, MPI_INFO_NULL, &ncfile ) );  // bail out completely
+        ERR_PARNC( ncmpi_inq( ncfile, &ndims, &nvars, &ngatts, &unlimited ) );
         // find dimension ids for n_S
         int ins;
-        ret = ncmpi_inq_dimid( ncfile, "n_s", &ins );
-        ERR_PARNC( ret );
+        ERR_PARNC( ncmpi_inq_dimid( ncfile, "n_s", &ins ) );
         MPI_Offset leng;
-        ret = ncmpi_inq_dimlen( ncfile, ins, &leng );
-        ERR_PARNC( ret );
+        ERR_PARNC( ncmpi_inq_dimlen( ncfile, ins, &leng ) );
         nS  = (int)leng;
-        ret = ncmpi_inq_dimid( ncfile, "n_b", &ins );
-        ERR_PARNC( ret );
-        ret = ncmpi_inq_dimlen( ncfile, ins, &leng );
-        ERR_PARNC( ret );
+        ERR_PARNC( ncmpi_inq_dimid( ncfile, "n_b", &ins ) );
+        ERR_PARNC( ncmpi_inq_dimlen( ncfile, ins, &leng ) );
         nB = (int)leng;
 #else
         _EXCEPTION1( "cannot read the file %s", strSource );
@@ -1289,33 +1325,25 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         MPI_Offset start = (MPI_Offset)offsetRead;
         MPI_Offset count = (MPI_Offset)localSize;
         int varid;
-        ret = ncmpi_inq_varid( ncfile, "S", &varid );
-        ERR_PARNC( ret );
-        ret = ncmpi_get_vara_double_all( ncfile, varid, &start, &count, &vecS[0] );
-        ERR_PARNC( ret );
-        ret = ncmpi_inq_varid( ncfile, "row", &varid );
-        ERR_PARNC( ret );
-        ret = ncmpi_get_vara_int_all( ncfile, varid, &start, &count, &vecRow[0] );
-        ERR_PARNC( ret );
-        ret = ncmpi_inq_varid( ncfile, "col", &varid );
-        ERR_PARNC( ret );
-        ret = ncmpi_get_vara_int_all( ncfile, varid, &start, &count, &vecCol[0] );
-        ERR_PARNC( ret );
-        ret = ncmpi_close( ncfile );
-        ERR_PARNC( ret );
+        // get the sparse matrix values, row and column indices
+        ERR_PARNC( ncmpi_inq_varid( ncfile, "S", &varid ) );
+        ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &start, &count, &vecS[0] ) );
+        ERR_PARNC( ncmpi_inq_varid( ncfile, "row", &varid ) );
+        ERR_PARNC( ncmpi_get_vara_int_all( ncfile, varid, &start, &count, &vecRow[0] ) );
+        ERR_PARNC( ncmpi_inq_varid( ncfile, "col", &varid ) );
+        ERR_PARNC( ncmpi_get_vara_int_all( ncfile, varid, &start, &count, &vecCol[0] ) );
+        ERR_PARNC( ncmpi_close( ncfile ) );
 #endif
     }
 
-    // Now let us set the necessary global-to-local ID maps so that A*x operations
-    // can be performed cleanly as if map was computed online
-    row_dtoc_dofmap.clear();
-    // row_dtoc_dofmap.reserve( nB / size );
-    col_dtoc_dofmap.clear();
-    rowMap.clear();
-    colMap.clear();
-    // col_dtoc_dofmap.reserve( 2 * nA / size );
-    // row_dtoc_dofmap.resize( m_nTotDofs_Dest, UINT_MAX );
-    // col_dtoc_dofmap.resize( m_nTotDofs_SrcCov, UINT_MAX );
+    // NOTE: we can check if the following workflow would help here.
+    // Initial experiments did not show same index map.
+    // Might be useful to understand why that is the case.
+    // First, ensure that all local and global indices are computed
+    // this->m_remapper->ComputeGlobalLocalMaps();
+    // Next, reuse the global to local map
+    // const auto& rowMap = m_remapper->gid_to_lid_tgt;
+    // const auto& colMap = m_remapper->gid_to_lid_covsrc;
 
 #ifdef MOAB_HAVE_MPI
     // bother with tuple list only if size > 1
@@ -1376,7 +1404,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
 
         if( owned_dof_ids.size() > 0 )
         {
-            // we need to send desired dof to the rendez_vous point
+            // we need to send desired dof to the rendezvous point
             moab::TupleList tl_re;                                 //
             tl_re.initialize( 2, 0, 0, 0, owned_dof_ids.size() );  // to proc, value
             tl_re.enableWriteAccess();
@@ -1416,7 +1444,8 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             sort_buffer.buffer_init( tl->get_n() );
             int indexOrder = 2;                  //  colVal
             if( row_partition ) indexOrder = 1;  //  rowVal
-            //tl->sort( indexOrder, &sort_buffer );
+            // constexpr int indexOrder = 1;  //  rowVal
+            // tl->sort( indexOrder, &sort_buffer );
 
             std::map< int, int > startDofIndex, endDofIndex;  // indices in tl_re for values we want
             int dofVal = -1;
@@ -1480,10 +1509,10 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         for( int i = 0; i < n; i++ )
         {
             int rindex, cindex;
-            const int& vecRowValue = tl->vi_wr[3 * i + 1];
-            const int& vecColValue = tl->vi_wr[3 * i + 2];
+            const int vecRowValue = tl->vi_wr[3 * i + 1];
+            const int vecColValue = tl->vi_wr[3 * i + 2];
 
-            std::map< int, int >::iterator riter = rowMap.find( vecRowValue );
+            const auto riter = rowMap.find( vecRowValue );
             if( riter == rowMap.end() )
             {
                 rowMap[vecRowValue] = rindexMax;
@@ -1495,7 +1524,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             else
                 rindex = riter->second;
 
-            std::map< int, int >::iterator citer = colMap.find( vecColValue );
+            const auto citer = colMap.find( vecColValue );
             if( citer == colMap.end() )
             {
                 colMap[vecColValue] = cindexMax;
@@ -1515,14 +1544,13 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
 #endif
     {
         int rindexMax = 0, cindexMax = 0;
-
         for( int i = 0; i < nS; i++ )
         {
             int rindex, cindex;
-            const int& vecRowValue = vecRow[i] - 1;  // the rows, cols are 1 based in the file
-            const int& vecColValue = vecCol[i] - 1;
+            const int vecRowValue = vecRow[i] - 1;  // the rows, cols are 1 based in the file
+            const int vecColValue = vecCol[i] - 1;
 
-            std::map< int, int >::iterator riter = rowMap.find( vecRowValue );
+            const auto riter = rowMap.find( vecRowValue );
             if( riter == rowMap.end() )
             {
                 rowMap[vecRowValue] = rindexMax;
@@ -1534,7 +1562,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             else
                 rindex = riter->second;
 
-            std::map< int, int >::iterator citer = colMap.find( vecColValue );
+            const auto citer = colMap.find( vecColValue );
             if( citer == colMap.end() )
             {
                 colMap[vecColValue] = cindexMax;
@@ -1565,19 +1593,9 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     m_rowVector.setZero();
     m_colVector.setZero();
 
-    row_dtoc_dofmap.resize( rowMap.size() );
-    col_dtoc_dofmap.resize( colMap.size() );
-    int index = 0;
-    for( std::map< int, int >::iterator riter = rowMap.begin(); riter != rowMap.end(); ++riter )
-    {
-        row_dtoc_dofmap[index++] = riter->second;
-    }
-    index = 0;
-    for( std::map< int, int >::iterator citer = colMap.begin(); citer != colMap.end(); ++citer )
-    {
-        col_dtoc_dofmap[index++] = citer->second;
-    }
-
+#ifdef VERBOSE
+    serializeSparseMatrix( m_weightMatrix, "map_operator_"+std::to_string(rank)+".txt" );
+#endif
     return moab::MB_SUCCESS;
 }
 

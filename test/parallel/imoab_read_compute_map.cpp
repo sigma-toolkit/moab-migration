@@ -34,7 +34,7 @@
 #endif
 
 #define COMPUTE_FILE_MAP
-#define COMPUTE_ONLINE_MAP
+// #define COMPUTE_ONLINE_MAP
 
 #if( !defined( COMPUTE_FILE_MAP ) && !defined( COMPUTE_ONLINE_MAP ) )
 #error Enable either file-based map (COMPUTE_FILE_MAP) and/or online (COMPUTE_ONLINE_MAP) for coupling
@@ -145,27 +145,24 @@ int main( int argc, char* argv[] )
     CHECKIERR( iMOAB_Initialize( argc, argv ),  // not really needed anything from argc, argv, yet; maybe we should
                "Cannot initialize iMOAB" )
 
+    // constant identifiers
+    int cmpatm = 1, cmpocn = 2, cplatm = 3, cplocn = 5;
     // -1 means it is not initialized
     int cmpAtmAppID = -1, cmpOcnAppID = -1;
-    int cplOcnAppID = -1, cplAtmOcnFileAppID = -1, cplAtmOcnMemAppID = -1, cplAtmAppID = -1;
+    int cplOcnAppID = -1, cplAtmAppID = -1;
     iMOAB_AppID cmpAtmPID = &cmpAtmAppID;  // ATM on component PEs
     iMOAB_AppID cmpOcnPID = &cmpOcnAppID;  // OCN on component PEs
     iMOAB_AppID cplAtmPID = &cplAtmAppID;  // ATM on coupler PEs
     iMOAB_AppID cplOcnPID = &cplOcnAppID;  // OCN on coupler PEs
 #ifdef COMPUTE_FILE_MAP
+    int atmocnfid                = 7;
+    int cplAtmOcnFileAppID       = -1;
     iMOAB_AppID cplAtmOcnFilePID = &cplAtmOcnFileAppID;  // intx ATM - OCN on coupler PEs (file workflow)
 #endif
 #ifdef COMPUTE_ONLINE_MAP
-    iMOAB_AppID cplAtmOcnMemPID  = &cplAtmOcnMemAppID;   // intx ATM - OCN on coupler PEs (memory workflow)
-#endif
-
-    // constant identifiers
-    int cmpatm = 1, cmpocn = 2, cplatm = 3, cplocn = 5;
-#ifdef COMPUTE_FILE_MAP
-    int atmocnfid = 7;
-#endif
-#if defined(COMPUTE_ONLINE_MAP) && !defined( COMPUTE_FILE_MAP )
-    int atmocnmid = 8;
+    int atmocnmid               = 8;
+    int cplAtmOcnMemAppID       = -1;
+    iMOAB_AppID cplAtmOcnMemPID = &cplAtmOcnMemAppID;  // intx ATM - OCN on coupler PEs (memory workflow)
 #endif
 
     if( couComm != MPI_COMM_NULL )
@@ -186,14 +183,9 @@ int main( int argc, char* argv[] )
 #endif
 
 #ifdef COMPUTE_ONLINE_MAP
-#ifdef COMPUTE_FILE_MAP
-        // if cplAtmOcnFilePID exists, reuse it - else register
-        cplAtmOcnMemPID = cplAtmOcnFilePID;
-#else
         // now create an app to compute map  between OCNx and ATMx on coupler PEs
         CHECKIERR( iMOAB_RegisterApplication( "ATMOCNMEM", &couComm, &atmocnmid, cplAtmOcnMemPID ),
                    "Cannot register ocn_atm map instance over coupler pes" )
-#endif
 #endif
     }
 
@@ -226,6 +218,20 @@ int main( int argc, char* argv[] )
                    "cannot send atmosphere elements to coupler" )
     }
 
+    // now, receive mesh, on coupler communicator; first mesh 1, atm
+    if( couComm != MPI_COMM_NULL )
+    {
+        // receive from atmosphere component
+        CHECKIERR( iMOAB_ReceiveMesh( cplAtmPID, &atmCouComm, &atmPEGroup, &cmpatm ),
+                   "cannot receive atmosphere elements on coupler app" )
+    }
+
+    // we can now free the sender buffers
+    if( atmComm != MPI_COMM_NULL )
+    {
+        CHECKIERR( iMOAB_FreeSenderBuffers( cmpAtmPID, &cplatm ), "cannot free buffers used to send atmosphere mesh" )
+    }
+
     if( ocnComm != MPI_COMM_NULL )
     {
         // then send mesh to second coupler pes
@@ -237,19 +243,9 @@ int main( int argc, char* argv[] )
     // now, receive mesh, on coupler communicator; first mesh 1, atm
     if( couComm != MPI_COMM_NULL )
     {
-        // receive from atmosphere component
-        CHECKIERR( iMOAB_ReceiveMesh( cplAtmPID, &atmCouComm, &atmPEGroup, &cmpatm ),
-                   "cannot receive atmosphere elements on coupler app" )
-
         // receive from ocean component
         CHECKIERR( iMOAB_ReceiveMesh( cplOcnPID, &ocnCouComm, &ocnPEGroup, &cmpocn ),
                    "cannot receive ocean elements on coupler app" )
-    }
-
-    // we can now free the sender buffers
-    if( atmComm != MPI_COMM_NULL )
-    {
-        CHECKIERR( iMOAB_FreeSenderBuffers( cmpAtmPID, &cplatm ), "cannot free buffers used to send atmosphere mesh" )
     }
 
     // we can now free the sender buffers
@@ -257,6 +253,16 @@ int main( int argc, char* argv[] )
     {
         CHECKIERR( iMOAB_FreeSenderBuffers( cmpOcnPID, &cplocn ), "cannot free buffers used to send ocean mesh" )
     }
+
+    // this model (recMeshOcn.h5m) has mixed meshes in it, we need to repair the comm graph
+    // first delete the one created with migration, then compute a new one
+    // if( atmCouComm != MPI_COMM_NULL )
+    // {
+    //     int type = 3;  // type: 1 - SE, 2 - Vertex (point cloud), 3 - Element (FV scalars)
+    //     CHECKIERR( iMOAB_ComputeCommGraph( cmpAtmPID, cplAtmPID, &atmCouComm, &atmPEGroup, &couPEGroup, &type,
+    //                                        &type, &cmpatm, &cplatm ),
+    //                "cannot compute graph between ocn comp and ocn migrated to coupler" )
+    // }
 
     // this model (recMeshOcn.h5m) has mixed meshes in it, we need to repair the comm graph
     // first delete the one created with migration, then compute a new one
@@ -279,19 +285,9 @@ int main( int argc, char* argv[] )
                    "cannot write second atm mesh after receiving" )
     }
     // --------- ATM and OCN mesh migration ---------
-
     if( couComm != MPI_COMM_NULL )
     {
-#ifdef COMPUTE_FILE_MAP
-        PUSH_TIMER( "Compute ATM source coverage mesh for OCN (file-based)" )
-        // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
-        // basically, atm was redistributed according to target (ocean) partition, to "cover" the
-        // ocean partitions check if intx valid, write some h5m intx file
-        CHECKIERR( iMOAB_ComputeCoverageMesh( cplAtmPID, cplOcnPID, cplAtmOcnFilePID ),
-                   "cannot compute source ATM coverage mesh for OCN" )
-        POP_TIMER( couComm, rankInCouComm )
-#endif
-#ifdef COMPUTE_ONLINE_MAP
+#if defined( COMPUTE_ONLINE_MAP )
         PUSH_TIMER( "Compute ATM source coverage mesh for OCN (in-memory)" )
         // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
         // basically, atm was redistributed according to target (ocean) partition, to "cover" the
@@ -300,36 +296,28 @@ int main( int argc, char* argv[] )
                    "cannot compute source ATM coverage mesh for OCN" )
         POP_TIMER( couComm, rankInCouComm )
 #endif
-    }
-
-#ifdef COMPUTE_FILE_MAP
-    if( atmCouComm != MPI_COMM_NULL )
-    {
-        // the new graph will be for sending data from atm comp to coverage mesh;
-        // it involves initial atm app; cmpAtmPID; also migrate atm mesh on coupler pes, cplAtmPID
-        // results are in cplAtmOcnPID, intx mesh; remapper also has some info about coverage mesh
-        // after this, the sending of tags from atm pes to coupler pes will use the new par comm
-        // graph, that has more precise info about what to send for ocean cover ; every time, we
-        // will use the element global id, which should uniquely identify the element
-        PUSH_TIMER( "Compute OCN coverage graph for ATM mesh" )
-        CHECKIERR( iMOAB_CoverageGraph( &atmCouComm, cmpAtmPID, cplAtmPID, cplAtmOcnFilePID, &cmpatm, &cplatm,
-                                                  &cplocn ),
-                   "cannot recompute direct coverage graph for ocean" )
-        POP_TIMER( atmCouComm, rankInAtmComm )  // hijack this rank
-    }
+#if defined( COMPUTE_FILE_MAP ) //&& !defined( COMPUTE_ONLINE_MAP )
+        PUSH_TIMER( "Compute ATM source coverage mesh for OCN (file-based)" )
+        // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
+        // basically, atm was redistributed according to target (ocean) partition, to "cover" the
+        // ocean partitions check if intx valid, write some h5m intx file
+        CHECKIERR( iMOAB_ComputeCoverageMesh( cplAtmPID, cplOcnPID, cplAtmOcnFilePID ),
+                   "cannot compute source ATM coverage mesh for OCN" )
+        POP_TIMER( couComm, rankInCouComm )
 #endif
-    // --------- Compute ATM coverage mesh ---------
+    }
 
+    // --------- Load map from disk or compute it online ---------
 #ifdef COMPUTE_FILE_MAP
     const std::string map_from_file_identifier = "map-from-file";
     if( couComm != MPI_COMM_NULL )
     {
-        // int dummyCpl     = -1;
-        // int dummy_rowcol = 0;
-        // int dummyType    = 1;
-        // CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmOcnFilePID, &dummyCpl, &dummy_rowcol, &dummyType,
-        //                                              map_from_file_identifier.c_str(), mapFilename.c_str() ),
-        //            "failed to load map file from disk" );
+        // compute the mesh intersection between ATM and OCN
+        // PUSH_TIMER( "Compute ATM-OCN mesh intersection" )
+        // CHECKIERR( iMOAB_ComputeMeshIntersectionOnSphere( cplAtmPID, cplOcnPID, cplAtmOcnFilePID ),
+        //            "cannot compute intersection for ATM/OCN" )
+        // POP_TIMER( couComm, rankInCouComm )
+
         int src_disc_type = 3;  // element-based FV
         int tgt_disc_type = 3;  // element-based FV
         CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtmOcnFilePID, &src_disc_type,
@@ -347,39 +335,35 @@ int main( int argc, char* argv[] )
 
 #ifdef COMPUTE_ONLINE_MAP
     const std::string map_from_mem_identifier = "map-computed-online";
+    const std::string disc_methods[2]         = { "fv", "fv" };
+    const std::string dof_tag_names[2]        = { "GLOBAL_ID", "GLOBAL_ID" };
+    int fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 0, fNoConserve = 0, fNoBubble = 1, fInverseDistanceMap = 0;
     if( couComm != MPI_COMM_NULL )
     {
+        // compute the mesh intersection between ATM and OCN
         PUSH_TIMER( "Compute ATM-OCN mesh intersection" )
-        // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
-        // basically, atm was redistributed according to target (ocean) partition, to "cover" the
-        // ocean partitions check if intx valid, write some h5m intx file
         CHECKIERR( iMOAB_ComputeMeshIntersectionOnSphere( cplAtmPID, cplOcnPID, cplAtmOcnMemPID ),
                    "cannot compute intersection for ATM/OCN" )
         POP_TIMER( couComm, rankInCouComm )
-    }
 
-    const std::string disc_methods[2]  = { "fv", "fv" };
-    const std::string dof_tag_names[2] = { "GLOBAL_ID", "GLOBAL_ID" };
-    int fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 0, fNoConserve = 0, fNoBubble = 1, fInverseDistanceMap = 0;
-
-    if( couComm != MPI_COMM_NULL )
-    {
+        // next compute the FV-FV map for runtime field projections
         PUSH_TIMER( "Compute the projection weights with TempestRemap" )
-        CHECKIERR(  iMOAB_ComputeScalarProjectionWeights( cplAtmOcnMemPID, map_from_mem_identifier.c_str(),
-                                                     disc_methods[0].c_str(), &disc_orders[0], disc_methods[1].c_str(),
-                                                     &disc_orders[1], nullptr, &fNoBubble, &fMonotoneTypeID,
-                                                     &fVolumetric, &fInverseDistanceMap, &fNoConserve, &fValidate,
-                                                     dof_tag_names[0].c_str(), dof_tag_names[1].c_str() ),
-         "cannot compute scalar projection weights" )
+        CHECKIERR( iMOAB_ComputeScalarProjectionWeights(
+                       cplAtmOcnMemPID, map_from_mem_identifier.c_str(), disc_methods[0].c_str(), &disc_orders[0],
+                       disc_methods[1].c_str(), &disc_orders[1], nullptr, &fNoBubble, &fMonotoneTypeID, &fVolumetric,
+                       &fInverseDistanceMap, &fNoConserve, &fValidate, dof_tag_names[0].c_str(),
+                       dof_tag_names[1].c_str() ),
+                   "cannot compute scalar projection weights" )
         POP_TIMER( couComm, rankInCouComm )
 
-        // {
-        //     const std::string atmocn_map_file_name = "atm_ocn_map_computed.nc";
-        //     CHECKIERR( iMOAB_WriteMappingWeightsToFile( cplAtmOcnMemPID, map_from_mem_identifier.c_str(),
-        //                                                 atmocn_map_file_name.c_str() ),
-        //                "failed to write map file to disk" );
-        // }
+        {
+            const std::string atmocn_map_file_name = "atm_ocn_map_computed.nc";
+            CHECKIERR( iMOAB_WriteMappingWeightsToFile( cplAtmOcnMemPID, map_from_mem_identifier.c_str(),
+                                                        atmocn_map_file_name.c_str() ),
+                       "failed to write map file to disk" );
+        }
     }
+#endif
 
     // now create the linkage between the ATM component and the coverage source mesh in the coupler
     if( atmCouComm != MPI_COMM_NULL )
@@ -392,14 +376,21 @@ int main( int argc, char* argv[] )
          * graph, that has more precise info about what to send for ocean cover ; every time, we
          * will use the element global id, which should uniquely identify the element
          */
+#if defined( COMPUTE_ONLINE_MAP )
         PUSH_TIMER( "Compute OCN coverage graph for ATM mesh" )
         CHECKIERR( iMOAB_CoverageGraph( &atmCouComm, cmpAtmPID, cplAtmPID, cplAtmOcnMemPID, &cmpatm, &cplatm,
-                                                  &cplocn ),
+                                          &cplocn ),
                    "cannot recompute direct coverage graph for ocean" )
         POP_TIMER( atmCouComm, rankInAtmComm )  // hijack this rank
-    }
-
 #endif
+#if defined( COMPUTE_FILE_MAP ) //&& !defined( COMPUTE_ONLINE_MAP )
+        PUSH_TIMER( "Compute ATM coverage graph for OCN mesh" )
+        CHECKIERR( iMOAB_CoverageGraph( &atmCouComm, cmpAtmPID, cplAtmPID, cplAtmOcnFilePID, &cmpatm, &cplatm,
+                                        &cplocn ),
+                   "cannot recompute ATM source coverage graph for ocean" )
+        POP_TIMER( atmCouComm, rankInAtmComm )  // hijack this rank
+#endif
+    }
 
     int filter_type    = 0;
     const char* bottomFields = "AnalyticalSolnSrcExact";
@@ -439,6 +430,7 @@ int main( int argc, char* argv[] )
                    "bottomProjectedFieldsM on OCN pes" );
 #endif
     }
+// #undef COMPUTE_FILE_MAP
 
     // start a virtual loop for number of iterations
     for( int iters = 0; iters < number_iterations; iters++ )
@@ -505,7 +497,6 @@ int main( int argc, char* argv[] )
         }
 
         // send the projected tag back to ocean pes, with send/receive tag
-
         // send the tag to ocean pes, from ocean mesh on coupler pes
         //   from couComm, using common joint comm ocn_coupler
         // as always, use nonblocking sends
@@ -586,6 +577,7 @@ int main( int argc, char* argv[] )
                 gidElems.resize( nelem[2] );
                 tempElems.resize( nelem[2] );
 
+// #undef COMPUTE_FILE_MAP
 #ifdef COMPUTE_FILE_MAP
                 CHECKIERR( iMOAB_GetIntTagStorage( cmpOcnPID, gidStr, &nelem[2], &ent_type, gidElems.data() ),
                            "failed to get global ids" );
@@ -618,9 +610,7 @@ int main( int argc, char* argv[] )
 #ifdef COMPUTE_ONLINE_MAP
     if( couComm != MPI_COMM_NULL )
     {
-#ifndef COMPUTE_FILE_MAP
         CHECKIERR( iMOAB_DeregisterApplication( cplAtmOcnMemPID ), "cannot deregister app intx AO" )
-#endif
     }
 #endif
 
@@ -647,7 +637,7 @@ int main( int argc, char* argv[] )
         CHECKIERR( iMOAB_DeregisterApplication( cmpAtmPID ), "cannot deregister app ATM" )
     }
 
-    //#endif
+    // finalize iMOAB - all resources are now free
     CHECKIERR( iMOAB_Finalize(), "did not finalize iMOAB" )
 
     // free ATM coupler group and comm
@@ -663,12 +653,11 @@ int main( int argc, char* argv[] )
     if( MPI_COMM_NULL != couComm ) MPI_Comm_free( &couComm );
 
     MPI_Group_free( &atmPEGroup );
-
     MPI_Group_free( &ocnPEGroup );
-
     MPI_Group_free( &couPEGroup );
     MPI_Group_free( &jgroup );
 
+    // free all MPI resources
     MPI_Finalize();
 
     return 0;

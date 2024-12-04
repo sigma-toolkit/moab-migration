@@ -1057,7 +1057,7 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
 
     // Inserting element in pair vector
     // to keep track of previous indexes in valuesComp
-    for( int i = 0; i < (int)valuesComp.size(); ++i )
+    for( size_t i = 0; i < valuesComp.size(); ++i )
     {
         vp.push_back( std::make_pair( valuesComp[i], i ) );
     }
@@ -1067,7 +1067,7 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
     // vp[i].first, second
 
     // count now how many times some value appears in ordered (so in valuesComp)
-    for( std::map< int, std::set< int > >::iterator it = uniqueIDs.begin(); it != uniqueIDs.end(); it++ )
+    for( std::map< int, std::set< int > >::iterator it = uniqueIDs.begin(); it != uniqueIDs.end(); ++it )
     {
         int procId                  = it->first;
         std::set< int >& nums       = it->second;
@@ -1077,7 +1077,7 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
         int indexInVp = 0;
         int indexVal  = 0;
         indx[0]       = 0;  // start from 0
-        for( std::set< int >::iterator sst = nums.begin(); sst != nums.end(); sst++, indexVal++ )
+        for( std::set< int >::iterator sst = nums.begin(); sst != nums.end(); sst++, ++indexVal )
         {
             int val = *sst;
             involved_IDs_map[procId].push_back( val );
@@ -1279,7 +1279,7 @@ ErrorCode ParCommGraph::set_split_ranges( int comp,
         uniqueIDs[to_proc].insert( globalId );
     }
 
-    for( int i = 0; i < (int)ents_of_interest.size(); i++ )
+    for( size_t i = 0; i < ents_of_interest.size(); i++ )
     {
         EntityHandle ent = ents_of_interest[i];
         for( int j = 0; j < lenTag; j++ )

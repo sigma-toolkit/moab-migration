@@ -640,41 +640,31 @@ moab::ErrorCode moab::TempestOnlineMap::set_col_dc_dofs( std::vector< int >& val
 {
     // col_gdofmap has global dofs , that should be in the list of values, such that
     // row_dtoc_dofmap[offsetDOF] = localDOF;
-    // //  we need to find col_dtoc_dofmap such that: col_gdofmap[ col_dtoc_dofmap[i] ] == values_entities [i];
+    // we need to find col_dtoc_dofmap such that: col_gdofmap[ col_dtoc_dofmap[i] ] == values_entities [i];
     // we know that col_gdofmap[0..(nbcols-1)] = global_col_dofs -> in values_entities
     // form first inverse
-
-    col_dtoc_dofmap.resize( values_entities.size() );
+    //
+    // resize and initialize to -1 to signal that this value should not be used, if not set below
+    col_dtoc_dofmap.resize( values_entities.size(), -1 );
     for( size_t j = 0; j < values_entities.size(); j++ )
     {
-        if( colMap.find( values_entities[j] - 1 ) != colMap.end() )
-            col_dtoc_dofmap[j] = colMap[values_entities[j] - 1];
-        else
-        {
-            col_dtoc_dofmap[j] = -1;  // signal that this value should not be used in
-            // std::cout <<"values_entities[j] -  1: " << values_entities[j] -  1 <<" at index j = " << j <<  " not
-            // found in colMap \n";
-        }
+        // values are 1 based, but rowMap, colMap are not
+        const auto it = colMap.find( values_entities[j] - 1 );
+        if( it != colMap.end() ) col_dtoc_dofmap[j] = it->second;
     }
     return moab::MB_SUCCESS;
 }
 
 moab::ErrorCode moab::TempestOnlineMap::set_row_dc_dofs( std::vector< int >& values_entities )
 {
-    // row_dtoc_dofmap = values_entities; // needs to point to local
     //  we need to find row_dtoc_dofmap such that: row_gdofmap[ row_dtoc_dofmap[i] ] == values_entities [i];
-
-    row_dtoc_dofmap.resize( values_entities.size() );
+    // resize and initialize to -1 to signal that this value should not be used, if not set below
+    row_dtoc_dofmap.resize( values_entities.size(), -1 );
     for( size_t j = 0; j < values_entities.size(); j++ )
     {
-        if( rowMap.find( values_entities[j] - 1 ) != rowMap.end() )
-            row_dtoc_dofmap[j] = rowMap[values_entities[j] - 1];  // values are 1 based, but rowMap, colMap are not
-        else
-        {
-            row_dtoc_dofmap[j] = -1;  // not all values are used
-            // std::cout <<"values_entities[j] -  1: " << values_entities[j] -  1 <<" at index j = " << j <<  " not
-            // found in rowMap \n";
-        }
+        // values are 1 based, but rowMap, colMap are not
+        const auto it = rowMap.find( values_entities[j] - 1 );
+        if( it != rowMap.end() ) row_dtoc_dofmap[j] = it->second;
     }
     return moab::MB_SUCCESS;
 }

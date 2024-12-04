@@ -451,6 +451,10 @@ class TempestOnlineMap : public OfflineMap
     };
 
   private:
+    template < typename SparseMatrixType >
+    void serializeSparseMatrix( const SparseMatrixType& mat,
+                                const std::string& filename );
+
     void setup_sizes_dimensions();
 
     void CAASLimiter( std::vector< double >& dataCorrectedField,

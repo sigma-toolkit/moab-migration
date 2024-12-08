@@ -782,7 +782,7 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_HDF5],[
   # configure HDF5
   if [ $1 ]; then
     # configure PACKAGE with a minimal build: MPI
-    compiler_opts="CC=$CC CXX=$CXX MPIEXEC=$MPIEXEC"
+    compiler_opts="CC=\"$CC\" CXX=\"$CXX\"  MPIEXEC=\"$MPIEXEC\""
     configure_command="$compiler_opts $hdf5_src_dir/configure --prefix=$hdf5_install_dir --libdir=$hdf5_install_dir/lib --with-pic=1"
     # configure_command="$configure_command --enable-cxx --enable-unsupported"
     # VSM: Adding --enable-debug=all is causing problems in h5legacy test. So disabling debug symbols for HDF5.
@@ -970,7 +970,7 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_NETCDF],
   # configure NETCDF
   if [ $1 ]; then
     # configure PACKAGE with a minimal build: MPI, HDF5, NETCDF
-    compiler_opts="CC=$CC CXX=$CXX"
+    compiler_opts="CC=\"$CC\" CXX=\"$CXX\""
     configure_command="$compiler_opts $netcdf_src_dir/configure --prefix=$netcdf_install_dir --libdir=$netcdf_install_dir/lib --with-pic=1 --enable-shared=$enable_shared"
     if (test "$enablehdf5" != "no"); then
       configure_command="$configure_command --enable-netcdf-4 LDFLAGS=\"$HDF5_LDFLAGS $LDFLAGS\" CPPFLAGS=\"$HDF5_CPPFLAGS\" LIBS=\"$HDF5_LIBS -ldl -lm -lz\""
@@ -1149,7 +1149,7 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_METIS],
       if (test "$metis_use_cmake" != "yes"); then
         configure_command="make config cc=\"$CC\" cxx=\"$CXX\" prefix=$metis_install_dir gklib_path=$metis_build_dir/GKlib"
       else
-        configure_command="cmake $metis_src_dir -DCMAKE_INSTALL_PREFIX=$metis_install_dir -DCMAKE_C_COMPILER=$CC -DCMAKE_CXX_COMPILER=$CXX -DGKLIB_PATH=$metis_build_dir/GKlib"
+        configure_command="cmake $metis_src_dir -DCMAKE_INSTALL_PREFIX=$metis_install_dir -DCMAKE_C_COMPILER=\"$CC\" -DCMAKE_CXX_COMPILER=\"$CXX\" -DGKLIB_PATH=$metis_build_dir/GKlib"
       fi
       if (test "$enable_debug" != "no"); then
         if (test "$metis_use_cmake" != "yes"); then
@@ -1414,7 +1414,7 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_PARMETIS],
     if (test "$parmetis_manual_install" != "yes"); then
       # configure PACKAGE with a minimal build: MPI
       export CFLAGS="$CFLAGS -fPIC -DPIC" CXXFLAGS="$CXXFLAGS -fPIC -DPIC" FCFLAGS="$FCFLAGS -fPIC" FFLAGS="$FFLAGS -fPIC" LDFLAGS="$LDFLAGS"
-      configure_command="make config cc=$CC cxx=$CXX prefix=$parmetis_install_dir"
+      configure_command="make config cc=\"$CC\" cxx=\"$CXX\" prefix=$parmetis_install_dir"
       if (test "$enable_debug" != "no"); then
         configure_command="$configure_command debug=1"
       fi
@@ -1674,7 +1674,7 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_ZOLTAN],
   # configure ZOLTAN
   if [ $1 ]; then
     # configure PACKAGE with a minimal build: MPI, HDF5, ZOLTAN
-    compiler_opts="CC=$CC CXX=$CXX FC=$FC F90=$FC F77=$F77"
+    compiler_opts="CC=\"$CC\" CXX=\"$CXX\" FC=\"$FC\" F90=\"$FC\" F77=\"$F77\""
     configure_command="$compiler_opts $zoltan_src_dir/configure --prefix=$zoltan_install_dir --libdir=$zoltan_install_dir/lib --with-pic=1 --enable-shared=$enable_shared --enable-static=$enable_static"
     if (test "$enablempi" != "no"); then
       configure_command="$configure_command --enable-mpi"
@@ -1850,7 +1850,7 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_TEMPESTREMAP],
   # configure TEMPESTREMAP
   if [ $1 ]; then
     # configure PACKAGE with a minimal build: MPI, HDF5, TEMPESTREMAP
-    compiler_opts="CC=$CC CXX=$CXX FC=$FC F90=$FC F77=$F77"
+    compiler_opts="CC=\"$CC\" CXX=\"$CXX\" FC=\"$FC\" F90=\"$FC\" F77=\"$F77\""
     configure_command="$compiler_opts $tempestremap_src_dir/configure --prefix=$tempestremap_install_dir --libdir=$tempestremap_install_dir/lib --with-pic=1 --enable-shared=$enable_shared --enable-static=$enable_static"
     if (test "$enablenetcdf" != "no"); then
       configure_command="$configure_command --with-netcdf=$NETCDF_DIR"
@@ -2017,7 +2017,7 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_HYPRE],
   # configure HYPRE
   if [ $1 ]; then
     # configure PACKAGE with a minimal build: MPI, HDF5, HYPRE
-    compiler_opts="CC=$CC CXX=$CXX FC=$FC F90=$FC F77=$F77"
+    compiler_opts="CC=\"$CC\" CXX=\"$CXX\" FC=\"$FC\" F90=\"$FC\" F77=\"$F77\""
     configure_command="$compiler_opts $hypre_src_dir/src/configure --prefix=$hypre_install_dir --libdir=$hypre_install_dir/lib --with-pic=1 --enable-shared=$enable_shared"
     configure_command="$configure_command LDFLAGS=\"$LDFLAGS\" CPPFLAGS=\"$CPPFLAGS\" LIBS=\"$LIBS\""
 

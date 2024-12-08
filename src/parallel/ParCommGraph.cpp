@@ -727,7 +727,6 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
         valuesTags.resize( tag_handles.size() );
         for( size_t i = 0; i < tag_handles.size(); i++ )
         {
-
             int bytes_per_tag;
             rval = mb->tag_get_bytes( tag_handles[i], bytes_per_tag );MB_CHK_ERR( rval );
             valuesTags[i].resize( owned.size() * bytes_per_tag / sizeof( double ) );
@@ -737,7 +736,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
         // now, pack the data and send it
         sendReqs.resize( involved_IDs_map.size() );
         for( std::map< int, std::vector< int > >::iterator mit = involved_IDs_map.begin();
-             mit != involved_IDs_map.end(); mit++ )
+             mit != involved_IDs_map.end(); ++mit )
         {
             int receiver_proc                   = mit->first;
             std::vector< int >& eids            = mit->second;

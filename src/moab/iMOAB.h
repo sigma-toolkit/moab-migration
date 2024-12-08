@@ -1086,6 +1086,21 @@ ErrCode iMOAB_SetGhostLayers( iMOAB_AppID pid, int* nghost_layers );
 ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_source, iMOAB_AppID pid_target, iMOAB_AppID pid_intersection );
 
 /**
+ * \brief Write a MOAB source coverage  mesh (maintained internally) along with the solution tags to a file.
+ *
+ * \note The iMOAB_WriteMesh function with appropriate parameters to write out the secondary file_set is used.
+ *
+ * <B>Operations:</B> Collective for parallel write, non collective for serial write.
+ *
+ * \param[in] pid (iMOAB_AppID)            The unique pointer to the application ID.
+ * \param[in] filename (iMOAB_String)      The MOAB mesh file (H5M) to write all the entities contained in the
+ *                                         internal application mesh set.
+ * \param[in] write_options (iMOAB_String) Additional options for writing the MOAB mesh in parallel.
+ * \return ErrCode                         The error code indicating success or failure.
+ */
+ErrCode iMOAB_WriteCoverageMesh( iMOAB_AppID pid, const iMOAB_String filename, const iMOAB_String write_options );
+
+/**
  * @brief Compute intersection of the surface meshes defined on a sphere. The resulting intersected mesh consists
  * of (convex) polygons with 1-1 associativity with both the source and destination meshes provided.
  *

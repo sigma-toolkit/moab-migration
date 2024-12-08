@@ -430,7 +430,6 @@ int main( int argc, char* argv[] )
                    "bottomProjectedFieldsM on OCN pes" );
 #endif
     }
-// #undef COMPUTE_FILE_MAP
 
     // start a virtual loop for number of iterations
     for( int iters = 0; iters < number_iterations; iters++ )
@@ -577,7 +576,6 @@ int main( int argc, char* argv[] )
                 gidElems.resize( nelem[2] );
                 tempElems.resize( nelem[2] );
 
-// #undef COMPUTE_FILE_MAP
 #ifdef COMPUTE_FILE_MAP
                 CHECKIERR( iMOAB_GetIntTagStorage( cmpOcnPID, gidStr, &nelem[2], &ent_type, gidElems.data() ),
                            "failed to get global ids" );

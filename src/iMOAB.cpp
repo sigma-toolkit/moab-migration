@@ -274,7 +274,9 @@ ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
     app_data.num_ghost_layers   = 0;
     app_data.point_cloud        = false;
     app_data.is_fortran         = false;
+#ifdef MOAB_HAVE_TEMPESTREMAP
     app_data.secondary_file_set = app_data.file_set;
+#endif
 
 #ifdef MOAB_HAVE_MPI
     if( *comm ) app_data.pcomm = new ParallelComm( context.MBI, *comm );
@@ -4166,8 +4168,10 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
     // First, compute the covering source set.
     rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, tdata.num_src_ghost_layers );MB_CHK_ERR( rval );
 
+#ifdef MOAB_HAVE_TEMPESTREMAP
     // set the reference to the covering set in the source PID
     data_src.secondary_file_set = tdata.remapper->GetMeshSet( moab::Remapper::CoveringMesh );
+#endif
 
     return moab::MB_SUCCESS;
 }
@@ -4208,7 +4212,11 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
         MB_CHK_ERR( iMOAB_ComputeCoverageMesh( pid_src, pid_tgt, pid_intx ) );
     }
 
-    moab::DebugOutput outputFormatter( std::cout, pco_intx->rank(), 0 );
+    int rank = 0;
+#ifdef MOAB_HAVE_MPI
+    rank = pco_intx->rank();
+#endif
+    moab::DebugOutput outputFormatter( std::cout, rank, 0 );
     outputFormatter.set_prefix( "[iMOAB_ComputeMeshIntersectionOnSphere]: " );
 
     // Next, compute intersections with MOAB.
@@ -4233,7 +4241,7 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
         global_areas[2] = local_areas[2];
 #endif
 
-        if( pco_intx->rank() == 0 )
+        if( rank == 0 )
         {
             outputFormatter.printf( 0,
                                     "initial area: source mesh = %12.14f, target mesh = %12.14f, "

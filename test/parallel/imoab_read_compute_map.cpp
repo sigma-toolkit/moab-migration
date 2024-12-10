@@ -34,7 +34,7 @@
 #endif
 
 #define COMPUTE_FILE_MAP
-// #define COMPUTE_ONLINE_MAP
+#define COMPUTE_ONLINE_MAP
 
 #if( !defined( COMPUTE_FILE_MAP ) && !defined( COMPUTE_ONLINE_MAP ) )
 #error Enable either file-based map (COMPUTE_FILE_MAP) and/or online (COMPUTE_ONLINE_MAP) for coupling
@@ -49,7 +49,7 @@ int main( int argc, char* argv[] )
 
     int rankInGlobalComm, numProcesses;
     MPI_Group jgroup;
-    std::string readopts( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS" );
+    const iMOAB_String readopts( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS" );
 
     MPI_Init( &argc, &argv );
     MPI_Comm_rank( MPI_COMM_WORLD, &rankInGlobalComm );
@@ -102,7 +102,7 @@ int main( int argc, char* argv[] )
     {
         std::cout << " ATM file: " << atmFilename << "\n   on tasks : " << startG1 << ":" << endG1
                   << "\n OCN file: " << ocnFilename << "\n     on tasks : " << startG2 << ":" << endG2
-                  << "\n map file:" << mapFilename << "\n     on tasks : " << startG4 << ":" << endG4 << "\n";
+                  << "\n map file:" << mapFilename .c_str()<< "\n     on tasks : " << startG4 << ":" << endG4 << "\n";
         if( !no_regression_test )
         {
             std::cout << " check projection against baseline: " << baseline << "\n";
@@ -193,14 +193,14 @@ int main( int argc, char* argv[] )
     {
         MPI_Comm_rank( atmComm, &rankInAtmComm );
         CHECKIERR( iMOAB_RegisterApplication( "ATMCMP", &atmComm, &cmpatm, cmpAtmPID ), "Cannot register ATM App" )
-        CHECKIERR( iMOAB_LoadMesh( cmpAtmPID, atmFilename.c_str(), readopts.c_str(), &nghlay ), "Cannot load ATM mesh" )
+        CHECKIERR( iMOAB_LoadMesh( cmpAtmPID, atmFilename.c_str(), readopts, &nghlay ), "Cannot load ATM mesh" )
     }
 
     if( ocnComm != MPI_COMM_NULL )
     {
         MPI_Comm_rank( ocnComm, &rankInOcnComm );
         CHECKIERR( iMOAB_RegisterApplication( "OCNCMP", &ocnComm, &cmpocn, cmpOcnPID ), "Cannot register OCN App" )
-        CHECKIERR( iMOAB_LoadMesh( cmpOcnPID, ocnFilename.c_str(), readopts.c_str(), &nghlay ), "Cannot load OCN mesh" )
+        CHECKIERR( iMOAB_LoadMesh( cmpOcnPID, ocnFilename.c_str(), readopts, &nghlay ), "Cannot load OCN mesh" )
     }
 
     // migrate mesh from component to coupler
@@ -212,8 +212,7 @@ int main( int argc, char* argv[] )
 #endif
     if( atmComm != MPI_COMM_NULL )
     {
-        // then send mesh to second coupler pes
-        // send to  coupler pes
+        // then send mesh to second coupler pes send to  coupler pes
         CHECKIERR( iMOAB_SendMesh( cmpAtmPID, &atmCouComm, &couPEGroup, &cplatm, &repartitioner_scheme ),
                    "cannot send atmosphere elements to coupler" )
     }
@@ -277,7 +276,7 @@ int main( int argc, char* argv[] )
     // write only for n==1 case
     if( couComm != MPI_COMM_NULL && 1 == number_iterations )
     {
-        char outputFileATM[] = "recvAtmMem.h5m";
+        const iMOAB_String outputFileATM = "recvAtmMem.h5m";
         CHECKIERR( iMOAB_WriteMesh( cplAtmPID, outputFileATM, fileWriteOptions ),
                    "cannot write second atm mesh after receiving" )
         char outputFileOCN[] = "recvOcnMem.h5m";
@@ -309,19 +308,13 @@ int main( int argc, char* argv[] )
 
     // --------- Load map from disk or compute it online ---------
 #ifdef COMPUTE_FILE_MAP
-    const std::string map_from_file_identifier = "map-from-file";
+    const iMOAB_String map_from_file_identifier = "map-from-file";
     if( couComm != MPI_COMM_NULL )
     {
-        // compute the mesh intersection between ATM and OCN
-        // PUSH_TIMER( "Compute ATM-OCN mesh intersection" )
-        // CHECKIERR( iMOAB_ComputeMeshIntersectionOnSphere( cplAtmPID, cplOcnPID, cplAtmOcnFilePID ),
-        //            "cannot compute intersection for ATM/OCN" )
-        // POP_TIMER( couComm, rankInCouComm )
-
         int src_disc_type = 3;  // element-based FV
         int tgt_disc_type = 3;  // element-based FV
         CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtmOcnFilePID, &src_disc_type,
-                                                     &tgt_disc_type, map_from_file_identifier.c_str(),
+                                                     &tgt_disc_type, map_from_file_identifier,
                                                      mapFilename.c_str() ),
                    "failed to load map file from disk" );
     }
@@ -334,9 +327,9 @@ int main( int argc, char* argv[] )
     int atmCompNDoFs = disc_orders[0] * disc_orders[0] /* SE */, ocnCompNDoFs = disc_orders[1] * disc_orders[1] /*FV*/;
 
 #ifdef COMPUTE_ONLINE_MAP
-    const std::string map_from_mem_identifier = "map-computed-online";
-    const std::string disc_methods[2]         = { "fv", "fv" };
-    const std::string dof_tag_names[2]        = { "GLOBAL_ID", "GLOBAL_ID" };
+    const iMOAB_String map_from_mem_identifier = "map-computed-online";
+    const iMOAB_String disc_methods[2]         = { "fv", "fv" };
+    const iMOAB_String dof_tag_names[2]        = { "GLOBAL_ID", "GLOBAL_ID" };
     int fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 0, fNoConserve = 0, fNoBubble = 1, fInverseDistanceMap = 0;
     if( couComm != MPI_COMM_NULL )
     {
@@ -349,17 +342,17 @@ int main( int argc, char* argv[] )
         // next compute the FV-FV map for runtime field projections
         PUSH_TIMER( "Compute the projection weights with TempestRemap" )
         CHECKIERR( iMOAB_ComputeScalarProjectionWeights(
-                       cplAtmOcnMemPID, map_from_mem_identifier.c_str(), disc_methods[0].c_str(), &disc_orders[0],
-                       disc_methods[1].c_str(), &disc_orders[1], nullptr, &fNoBubble, &fMonotoneTypeID, &fVolumetric,
-                       &fInverseDistanceMap, &fNoConserve, &fValidate, dof_tag_names[0].c_str(),
-                       dof_tag_names[1].c_str() ),
+                       cplAtmOcnMemPID, map_from_mem_identifier, disc_methods[0], &disc_orders[0],
+                       disc_methods[1], &disc_orders[1], nullptr, &fNoBubble, &fMonotoneTypeID, &fVolumetric,
+                       &fInverseDistanceMap, &fNoConserve, &fValidate, dof_tag_names[0],
+                       dof_tag_names[1] ),
                    "cannot compute scalar projection weights" )
         POP_TIMER( couComm, rankInCouComm )
 
         {
-            const std::string atmocn_map_file_name = "atm_ocn_map_computed.nc";
-            CHECKIERR( iMOAB_WriteMappingWeightsToFile( cplAtmOcnMemPID, map_from_mem_identifier.c_str(),
-                                                        atmocn_map_file_name.c_str() ),
+            const iMOAB_String atmocn_map_file_name = "atm_ocn_map_computed.nc";
+            CHECKIERR( iMOAB_WriteMappingWeightsToFile( cplAtmOcnMemPID, map_from_mem_identifier,
+                                                        atmocn_map_file_name ),
                        "failed to write map file to disk" );
         }
     }
@@ -383,7 +376,7 @@ int main( int argc, char* argv[] )
                    "cannot recompute direct coverage graph for ocean" )
         POP_TIMER( atmCouComm, rankInAtmComm )  // hijack this rank
 #endif
-#if defined( COMPUTE_FILE_MAP ) //&& !defined( COMPUTE_ONLINE_MAP )
+#if defined( COMPUTE_FILE_MAP ) && !defined( COMPUTE_ONLINE_MAP )
         PUSH_TIMER( "Compute ATM coverage graph for OCN mesh" )
         CHECKIERR( iMOAB_CoverageGraph( &atmCouComm, cmpAtmPID, cplAtmPID, cplAtmOcnFilePID, &cmpatm, &cplatm,
                                         &cplocn ),
@@ -392,13 +385,31 @@ int main( int argc, char* argv[] )
 #endif
     }
 
+#if defined( COMPUTE_FILE_MAP ) && defined( COMPUTE_ONLINE_MAP )
+    if( couComm != MPI_COMM_NULL )
+    {
+        int meshtype = 3;
+        PUSH_TIMER( "Compute ATM coverage graph for OCN mesh" )
+        CHECKIERR( iMOAB_ComputeCommGraph( cplAtmPID, cplAtmOcnFilePID, &couComm, &couPEGroup, &couPEGroup, &meshtype,
+                                           &meshtype, &cplatm, &atmocnfid ),
+                   "cannot recompute ATM source coverage graph for ocean" )
+        POP_TIMER( atmCouComm, rankInAtmComm )  // hijack this rank
+    }
+#endif
+
     int filter_type    = 0;
     const char* bottomFields = "AnalyticalSolnSrcExact";
+    std::string allProjectedFields;
 #ifdef COMPUTE_FILE_MAP
     const char* bottomProjectedFieldsF = "Target_projF";
+    allProjectedFields                 = std::string( bottomProjectedFieldsF );
 #endif
 #ifdef COMPUTE_ONLINE_MAP
     const char* bottomProjectedFieldsM = "Target_projM";
+    allProjectedFields                 = std::string( bottomProjectedFieldsM );
+#endif
+#if defined( COMPUTE_FILE_MAP ) && defined( COMPUTE_ONLINE_MAP )
+    allProjectedFields = std::string( bottomProjectedFieldsM ) + ":" + std::string( bottomProjectedFieldsF );
 #endif
 
     if( couComm != MPI_COMM_NULL )
@@ -406,29 +417,18 @@ int main( int argc, char* argv[] )
         CHECKIERR( iMOAB_DefineTagStorage( cplAtmPID, bottomFields, &tagTypes, &atmCompNDoFs, &tagIndex[0] ),
                    "failed to define the field tags AnalyticalSolnSrcExact" );
 
-#ifdef COMPUTE_FILE_MAP
-        CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, bottomProjectedFieldsF, &tagTypes, &ocnCompNDoFs, &tagIndex[1] ),
-                   "failed to define the field tags bottomProjectedFieldsF" );
-#endif
-#ifdef COMPUTE_ONLINE_MAP
-        CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, bottomProjectedFieldsM, &tagTypes, &ocnCompNDoFs, &tagIndex[2] ),
-                   "failed to define the field tags bottomProjectedFieldsM" );
-#endif
+        CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, allProjectedFields.c_str(), &tagTypes, &ocnCompNDoFs,
+                                           &tagIndex[1] ),
+                   "failed to define the field tags allProjectedFields" );
     }
 
     if( ocnComm != MPI_COMM_NULL )
     {
         int tagIndexIn2;
-#ifdef COMPUTE_FILE_MAP
-        CHECKIERR( iMOAB_DefineTagStorage( cmpOcnPID, bottomProjectedFieldsF, &tagTypes, &ocnCompNDoFs, &tagIndexIn2 ),
+        CHECKIERR( iMOAB_DefineTagStorage( cmpOcnPID, allProjectedFields.c_str(), &tagTypes, &ocnCompNDoFs,
+                                           &tagIndexIn2 ),
                    "failed to define the field tag for receiving back the tags "
-                   "bottomProjectedFieldsF on OCN pes" );
-#endif
-#ifdef COMPUTE_ONLINE_MAP
-        CHECKIERR( iMOAB_DefineTagStorage( cmpOcnPID, bottomProjectedFieldsM, &tagTypes, &ocnCompNDoFs, &tagIndexIn2 ),
-                   "failed to define the field tag for receiving back the tags "
-                   "bottomProjectedFieldsM on OCN pes" );
-#endif
+                   "allProjectedFields on OCN pes" );
     }
 
     // start a virtual loop for number of iterations
@@ -456,6 +456,25 @@ int main( int argc, char* argv[] )
         }
         POP_TIMER( MPI_COMM_WORLD, rankInGlobalComm )
 
+        // second hop, is from atm towards ocean, on coupler
+        //  it should send from each part on coupler towards the coverage set that should form the
+        // rings around target cells (ocean)
+        // basically we should send to more cells than needed just for intersection
+        //TODO
+#if defined( COMPUTE_FILE_MAP ) && defined( COMPUTE_ONLINE_MAP )
+        if( couComm != MPI_COMM_NULL )
+        {
+            // send using the par comm graph computed by iMOAB_ComputeCommGraph
+            CHECKIERR( iMOAB_SendElementTag( cplAtmPID, bottomFields, &couComm, &atmocnfid ),
+                       "cannot send tag values towards coverage mesh for bilinear map" )
+
+            CHECKIERR( iMOAB_ReceiveElementTag( cplAtmOcnFilePID, bottomFields, &couComm, &cplatm ),
+                       "cannot receive tag values for bilinear map" )
+
+            CHECKIERR( iMOAB_FreeSenderBuffers( cplAtmPID, &atmocnfid ), "cannot free buffers" )
+        }
+#endif
+
 #ifdef VERBOSE
         if( *cplAtmPID >= 0 && number_iterations == 1 )
         {
@@ -479,7 +498,7 @@ int main( int argc, char* argv[] )
                on the source mesh and get the projection on the target mesh */
             PUSH_TIMER( "Apply from file scalar projection weights" )
             CHECKIERR( iMOAB_ApplyScalarProjectionWeights( cplAtmOcnFilePID, &filter_type,
-                                                           map_from_file_identifier.c_str(), bottomFields,
+                                                           map_from_file_identifier, bottomFields,
                                                            bottomProjectedFieldsF ),
                        "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )
@@ -488,7 +507,7 @@ int main( int argc, char* argv[] )
 #ifdef COMPUTE_ONLINE_MAP
             PUSH_TIMER( "Apply in-memory scalar projection weights" )
             CHECKIERR( iMOAB_ApplyScalarProjectionWeights( cplAtmOcnMemPID, &filter_type,
-                                                           map_from_mem_identifier.c_str(), bottomFields,
+                                                           map_from_mem_identifier, bottomFields,
                                                            bottomProjectedFieldsM ),
                        "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )
@@ -503,22 +522,12 @@ int main( int argc, char* argv[] )
         if( couComm != MPI_COMM_NULL )
         {
             // need to use ocean comp id for context
-#ifdef COMPUTE_FILE_MAP
-            CHECKIERR( iMOAB_SendElementTag( cplOcnPID, bottomProjectedFieldsF, &ocnCouComm, &cmpocn ),
+            CHECKIERR( iMOAB_SendElementTag( cplOcnPID, allProjectedFields.c_str(), &ocnCouComm, &cmpocn ),
                        "cannot send tag values back to ocean pes" )
+#ifdef VERBOSE
             {
                 // write only for n==1 case
-                char outputFileRecvd[] = "cplProjectedOCNFileF.h5m";
-                CHECKIERR( iMOAB_WriteMesh( cplOcnPID, outputFileRecvd, fileWriteOptions ),
-                           "could not write cplProjectedOCNFile.h5m to disk" )
-            }
-#endif
-#ifdef COMPUTE_ONLINE_MAP
-            CHECKIERR( iMOAB_SendElementTag( cplOcnPID, bottomProjectedFieldsM, &ocnCouComm, &cmpocn ),
-                       "cannot send tag values back to ocean pes" )
-            {
-                // write only for n==1 case
-                char outputFileRecvd[] = "cplProjectedOCNFileM.h5m";
+                char outputFileRecvd[] = "cplProjectedOCNFileMF.h5m";
                 CHECKIERR( iMOAB_WriteMesh( cplOcnPID, outputFileRecvd, fileWriteOptions ),
                            "could not write cplProjectedOCNFile.h5m to disk" )
             }
@@ -528,33 +537,22 @@ int main( int argc, char* argv[] )
         // receive on component 2, ocean
         if( ocnComm != MPI_COMM_NULL )
         {
-#ifdef COMPUTE_FILE_MAP
-            CHECKIERR( iMOAB_ReceiveElementTag( cmpOcnPID, bottomProjectedFieldsF, &ocnCouComm, &cplocn ),
+            CHECKIERR( iMOAB_ReceiveElementTag( cmpOcnPID, allProjectedFields.c_str(), &ocnCouComm, &cplocn ),
                        "cannot receive tag values from ocean mesh on coupler pes" )
-#endif
-#ifdef COMPUTE_ONLINE_MAP
-            CHECKIERR( iMOAB_ReceiveElementTag( cmpOcnPID, bottomProjectedFieldsM, &ocnCouComm, &cplocn ),
-                       "cannot receive tag values from ocean mesh on coupler pes" )
-#endif
         }
 
         if( couComm != MPI_COMM_NULL )
         {
-#ifdef COMPUTE_FILE_MAP
             CHECKIERR( iMOAB_FreeSenderBuffers( cplOcnPID, &cmpocn ), "Freeing buffers failed" )
-#endif
-#ifdef COMPUTE_ONLINE_MAP
-            CHECKIERR( iMOAB_FreeSenderBuffers( cplOcnPID, &cmpocn ), "Freeing buffers failed" )
-#endif
         }
 
         if( ocnComm != MPI_COMM_NULL && 1 == number_iterations )  // write only for n==1 case
         {
-// #ifdef VERBOSE
+#ifdef VERBOSE
             char outputFileOcnFile[] = "OcnWithProjection.h5m";
             CHECKIERR( iMOAB_WriteMesh( cmpOcnPID, outputFileOcnFile, fileWriteOptions ),
                        "could not write OcnWithProjection.h5m to disk" )
-            // #endif
+#endif
             // test results only for number_iterations== 1
             if( !no_regression_test )
             {
@@ -572,24 +570,11 @@ int main( int argc, char* argv[] )
                 CHECKIERR( iMOAB_DefineTagStorage( cmpOcnPID, gidStr, &tag_type, &ncomp, &tagInd ),
                            "failed to define global id tag" );
 
+#ifdef COMPUTE_ONLINE_MAP
                 CHECKIERR( iMOAB_GetMeshInfo( cmpOcnPID, nverts, nelem, 0, 0, 0 ), "failed to get OCN mesh info" );
                 gidElems.resize( nelem[2] );
                 tempElems.resize( nelem[2] );
 
-#ifdef COMPUTE_FILE_MAP
-                CHECKIERR( iMOAB_GetIntTagStorage( cmpOcnPID, gidStr, &nelem[2], &ent_type, gidElems.data() ),
-                           "failed to get global ids" );
-                CHECKIERR( iMOAB_GetDoubleTagStorage( cmpOcnPID, bottomProjectedFieldsF, &nelem[2], &ent_type, tempElems.data() ),
-                           "failed to get bottomProjectedFieldsF field" );
-
-                // check against the baseline
-                check_baseline_file( baseline, gidElems, tempElems, 1.e-9, err_code );
-                if( 0 == err_code )
-                    std::cout << " passed baseline test atm2ocn (file-based map projection) on ocean task "
-                              << rankInOcnComm << "\n";
-#endif
-
-#ifdef COMPUTE_ONLINE_MAP
                 CHECKIERR( iMOAB_GetIntTagStorage( cmpOcnPID, gidStr, &nelem[2], &ent_type, gidElems.data() ),
                            "failed to get global ids" );
                 CHECKIERR( iMOAB_GetDoubleTagStorage( cmpOcnPID, bottomProjectedFieldsM, &nelem[2], &ent_type, tempElems.data() ),
@@ -598,6 +583,24 @@ int main( int argc, char* argv[] )
                 check_baseline_file( baseline, gidElems, tempElems, 1.e-9, err_code );
                 if( 0 == err_code )
                     std::cout << " passed baseline test atm2ocn (in-memory map projection) on ocean task "
+                              << rankInOcnComm << "\n";
+#endif
+
+#ifdef COMPUTE_FILE_MAP
+                CHECKIERR( iMOAB_GetMeshInfo( cmpOcnPID, nverts, nelem, 0, 0, 0 ), "failed to get OCN mesh info" );
+                gidElems.resize( nelem[2] );
+                tempElems.resize( nelem[2] );
+
+                CHECKIERR( iMOAB_GetIntTagStorage( cmpOcnPID, gidStr, &nelem[2], &ent_type, gidElems.data() ),
+                           "failed to get global ids" );
+                CHECKIERR( iMOAB_GetDoubleTagStorage( cmpOcnPID, bottomProjectedFieldsF, &nelem[2], &ent_type,
+                                                      tempElems.data() ),
+                           "failed to get bottomProjectedFieldsF field" );
+
+                // check against the baseline
+                check_baseline_file( baseline, gidElems, tempElems, 1.e-9, err_code );
+                if( 0 == err_code )
+                    std::cout << " passed baseline test atm2ocn (file-based map projection) on ocean task "
                               << rankInOcnComm << "\n";
 #endif
             }

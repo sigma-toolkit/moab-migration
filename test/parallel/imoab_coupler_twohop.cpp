@@ -251,6 +251,16 @@ int main( int argc, char* argv[] )
                                         &couPEGroup, &ocnCouComm, ocnFilename, readopts, nghlay, repartitioner_scheme );
     CHECKIERR( ierr, "Cannot load and migrate ocn mesh" )
 
+    // this model (recMeshOcn.h5m) has mixed meshes in it, we need to repair the comm graph
+    // first delete the one created with migration, then compute a new one
+    if( ocnCouComm != MPI_COMM_NULL )
+    {
+        int type = 3;  // type: 1 - SE, 2 - Vertex (point cloud), 3 - Element (FV scalars)
+        CHECKIERR( iMOAB_ComputeCommGraph( cmpOcnPID, cplOcnPID, &ocnCouComm, &ocnPEGroup, &couPEGroup, &type, &type,
+                                           &cmpocn, &cplocn ),
+                   "cannot compute graph between ocn comp and ocn migrated to coupler" )
+    }
+
 #endif  // #ifdef ENABLE_ATMOCN_COUPLING
 
 #ifdef ENABLE_ATMCPLOCN_COUPLING

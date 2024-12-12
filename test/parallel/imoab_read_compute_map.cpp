@@ -398,14 +398,14 @@ int main( int argc, char* argv[] )
 #endif
 
     int filter_type    = 0;
-    const char* bottomFields = "AnalyticalSolnSrcExact";
+    const iMOAB_String bottomFields = "AnalyticalSolnSrcExact";
     std::string allProjectedFields;
 #ifdef COMPUTE_FILE_MAP
-    const char* bottomProjectedFieldsF = "Target_projF";
+    const iMOAB_String bottomProjectedFieldsF = "Target_projF";
     allProjectedFields                 = std::string( bottomProjectedFieldsF );
 #endif
 #ifdef COMPUTE_ONLINE_MAP
-    const char* bottomProjectedFieldsM = "Target_projM";
+    const iMOAB_String bottomProjectedFieldsM = "Target_projM";
     allProjectedFields                 = std::string( bottomProjectedFieldsM );
 #endif
 #if defined( COMPUTE_FILE_MAP ) && defined( COMPUTE_ONLINE_MAP )

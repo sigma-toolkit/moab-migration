@@ -888,7 +888,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
             // maybe it should be arranged by entity now, not by tag (so one loop for entities,
             // outside)
 
-            for( std::vector< int >::iterator it = eids.begin(); it != eids.end(); it++ )
+            for( std::vector< int >::iterator it = eids.begin(); it != eids.end(); ++it )
             {
                 int eID                                      = *it;
                 std::map< int, EntityHandle >::iterator mit2 = gidToHandle.find( eID );
@@ -943,7 +943,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
         // now, unpack the data and set the tags
         sendReqs.resize( involved_IDs_map.size() );
         for( std::map< int, std::vector< int > >::iterator mit = involved_IDs_map.begin();
-             mit != involved_IDs_map.end(); mit++ )
+             mit != involved_IDs_map.end(); ++mit )
         {
             int sender_proc                     = mit->first;
             std::vector< int >& eids            = mit->second;
@@ -959,7 +959,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
             if( ierr != 0 ) return MB_FAILURE;
             // use the values in buffer to populate valuesTag arrays, fill it up!
             int j = 0;
-            for( std::vector< int >::iterator it = eids.begin(); it != eids.end(); it++, j++ )
+            for( std::vector< int >::iterator it = eids.begin(); it != eids.end(); ++it, ++j )
             {
                 for( size_t i = 0; i < tag_handles.size(); i++ )
                 {
@@ -999,7 +999,7 @@ ErrorCode ParCommGraph::settle_send_graph( TupleList& TLcovIDs )
     }
 #ifdef VERBOSE
     for( std::map< int, std::vector< int > >::iterator mit = involved_IDs_map.begin(); mit != involved_IDs_map.end();
-         mit++ )
+         ++mit )
     {
         std::cout << " towards task " << mit->first << " send: " << mit->second.size() << " cells " << std::endl;
         for( size_t i = 0; i < mit->second.size(); i++ )
@@ -1016,7 +1016,7 @@ ErrorCode ParCommGraph::settle_send_graph( TupleList& TLcovIDs )
 void ParCommGraph::SetReceivingAfterCoverage(
     std::map< int, std::set< int > >& idsFromProcs )  // will make sense only on receivers, right now after cov
 {
-    for( std::map< int, std::set< int > >::iterator mt = idsFromProcs.begin(); mt != idsFromProcs.end(); mt++ )
+    for( auto mt = idsFromProcs.begin(); mt != idsFromProcs.end(); ++mt )
     {
         int fromProc            = mt->first;
         std::set< int >& setIds = mt->second;
@@ -1032,7 +1032,7 @@ void ParCommGraph::SetReceivingAfterCoverage(
     graph_type = COVERAGE;
     return;
 }
-//#define VERBOSE
+
 void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::vector< int >& valuesComp )
 {
     // settle comm graph on comp
@@ -1041,7 +1041,6 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
     // third_method = true; // do not rely only on involved_IDs_map.size(); this can be 0 in some
     // cases
     std::map< int, std::set< int > > uniqueIDs;
-
     for( int i = 0; i < n; i++ )
     {
         int to_proc  = TLBackToComp.vi_wr[3 * i + 2];
@@ -1066,7 +1065,7 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
     // vp[i].first, second
 
     // count now how many times some value appears in ordered (so in valuesComp)
-    for( std::map< int, std::set< int > >::iterator it = uniqueIDs.begin(); it != uniqueIDs.end(); ++it )
+    for( auto it = uniqueIDs.begin(); it != uniqueIDs.end(); ++it )
     {
         int procId                  = it->first;
         std::set< int >& nums       = it->second;
@@ -1076,7 +1075,7 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
         int indexInVp = 0;
         int indexVal  = 0;
         indx[0]       = 0;  // start from 0
-        for( std::set< int >::iterator sst = nums.begin(); sst != nums.end(); sst++, ++indexVal )
+        for( auto sst = nums.begin(); sst != nums.end(); ++sst, ++indexVal )
         {
             int val = *sst;
             involved_IDs_map[procId].push_back( val );
@@ -1097,8 +1096,8 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
     std::ofstream dbfile;
     f1 << "Involve_" << comp << "_" << rankInJoin << ".txt";
     dbfile.open( f1.str().c_str() );
-    for( std::map< int, std::vector< int > >::iterator mit = involved_IDs_map.begin(); mit != involved_IDs_map.end();
-         mit++ )
+    for( auto mit = involved_IDs_map.begin(); mit != involved_IDs_map.end();
+         ++mit )
     {
         int corrTask                = mit->first;
         std::vector< int >& corrIds = mit->second;

@@ -1123,7 +1123,7 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
             // if the mesh has holes, it could be more
 
             moab::EntityHandle set_with_ghosts;
-            rval = remapper.GhostLayers( ctx.meshsets[0], ctx.nlayers, set_with_ghosts );MB_CHK_ERR( rval );
+            rval = remapper.GhostLayers( ctx.pcomm, ctx.meshsets[0], ctx.nlayers, set_with_ghosts );MB_CHK_ERR( rval );
             remapper.SetMeshSet( moab::Remapper::SourceMeshWithGhosts, set_with_ghosts );
 #ifdef MOAB_DBG
             if( !runCtx->skip_io )

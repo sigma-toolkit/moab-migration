@@ -69,7 +69,7 @@ class Remapper
     {
         return m_interface;
     }
-
+//#define MOAB_DBG
 #ifdef MOAB_HAVE_MPI
     moab::ParallelComm* get_parallel_communicator()
     {
@@ -79,7 +79,7 @@ class Remapper
     /// <summary>
     ///     ghost layers
     /// </summary>
-    moab::ErrorCode GhostLayers( moab::EntityHandle& meshset, const int ngh_layers, moab::EntityHandle& set_with_ghosts )
+    moab::ErrorCode GhostLayers( moab::ParallelComm * pcomm, moab::EntityHandle& meshset, const int ngh_layers, moab::EntityHandle& set_with_ghosts )
     {
         // meshset contains the mesh set distributed already
         //
@@ -89,11 +89,11 @@ class Remapper
         moab::Range orgEnts;
         rval = m_interface->get_entities_by_handle( meshset, orgEnts );MB_CHK_ERR( rval );
         rval = m_interface->add_entities( set_with_ghosts, orgEnts );MB_CHK_ERR( rval );
-        rval = m_pcomm->exchange_ghost_cells( 2, 0, 1, 0, true, true, &set_with_ghosts );MB_CHK_ERR( rval );
+        rval = pcomm->exchange_ghost_cells( 2, 0, 1, 0, true, true, &set_with_ghosts );MB_CHK_ERR( rval );
         for( int i = 2; i <= ngh_layers; i++ )
         {
-            rval = m_pcomm->correct_thin_ghost_layers();MB_CHK_ERR( rval );
-            rval = m_pcomm->exchange_ghost_cells( 2, 0, i, 0, true, true, &set_with_ghosts );MB_CHK_ERR( rval );
+            rval = pcomm->correct_thin_ghost_layers();MB_CHK_ERR( rval );
+            rval = pcomm->exchange_ghost_cells( 2, 0, i, 0, true, true, &set_with_ghosts );MB_CHK_ERR( rval );
         }
 
         // need to set global id tags
@@ -107,18 +107,26 @@ class Remapper
         if ( rval == MB_SUCCESS )
         {
             moab::Range quads = entities.subset_by_type(moab::MBQUAD);
-            rval = m_pcomm->exchange_tags( doftag, quads );MB_CHK_ERR( rval );
+            rval = pcomm->exchange_tags( doftag, quads );MB_CHK_ERR( rval );
         }
 
         // get all vertices too, need to exchange global ids for vertices too
         moab::Range vertices;
         rval = m_interface->get_connectivity( entities, vertices );MB_CHK_ERR( rval );
         entities.merge( vertices );
-        rval = m_pcomm->exchange_tags( gtag, entities );MB_CHK_ERR( rval );
+        rval = pcomm->exchange_tags( gtag, entities );MB_CHK_ERR( rval );
+#ifdef MOAB_DBG
+        std::stringstream filename1;
+        filename1 << "set_with_ghosts" << m_pcomm->rank() << ".h5m";
+        rval = m_interface->write_file( filename1.str().c_str(), 0, 0, &set_with_ghosts, 1 );MB_CHK_ERR( rval );
+
+#endif
         return rval;
     }
 
 #endif
+
+#undef MOAB_DBG
 
     ErrorCode LoadNativeMesh( std::string filename,
                               moab::EntityHandle& meshset,

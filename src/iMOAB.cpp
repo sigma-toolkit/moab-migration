@@ -4185,9 +4185,10 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
         if( is_root )
             outputFormatter.printf( 0, "Generating %d ghost layers for the source mesh\n", data_src.num_ghost_layers );
         moab::EntityHandle augmentedSourceSet;
+        moab::ParallelComm * pc_src = context.pcomms[*pid_src];
         // get order -1 ghost layers; actually it should be decided by the mesh
         // if the mesh has holes, it could be more
-        rval = tdata.remapper->GhostLayers( data_src.file_set, data_src.num_ghost_layers, augmentedSourceSet );MB_CHK_ERR( rval );
+        rval = tdata.remapper->GhostLayers( pc_src, data_src.file_set, data_src.num_ghost_layers, augmentedSourceSet );MB_CHK_ERR( rval );
         tdata.remapper->SetMeshSet( moab::Remapper::SourceMeshWithGhosts, augmentedSourceSet );
     }
     else
@@ -4208,7 +4209,8 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
         moab::EntityHandle augmentedTargetSet;
         // get order -1 ghost layers; actually it should be decided by the mesh
         // if the mesh has holes, it could be more
-        rval = tdata.remapper->GhostLayers( data_tgt.file_set, data_tgt.num_ghost_layers, augmentedTargetSet );MB_CHK_ERR( rval );
+        moab::ParallelComm * pc_tgt = context.pcomms[*pid_tgt];
+        rval = tdata.remapper->GhostLayers( pc_tgt, data_tgt.file_set, data_tgt.num_ghost_layers, augmentedTargetSet );MB_CHK_ERR( rval );
         tdata.remapper->SetMeshSet( moab::Remapper::TargetMeshWithGhosts, augmentedTargetSet );
     }
     else
@@ -4218,14 +4220,14 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     }
 #else
     // this one needs to be initialized too with source set
-    tdata.remapper->GetMeshSet( moab::Remapper::SourceMeshWithGhosts ) = data_tgt.file_set;
+    tdata.remapper->GetMeshSet( moab::Remapper::TargetMeshWithGhosts ) = data_tgt.file_set;
 #endif
 
     rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( rval );
     rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
 
     // First, compute the covering source set.
-    rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, data_src.num_ghost_layers );MB_CHK_ERR( rval );
+    rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, data_src.num_ghost_layers+1 );MB_CHK_ERR( rval );
 
     // Next, compute intersections with MOAB.
     // for bilinear, this is an overkill

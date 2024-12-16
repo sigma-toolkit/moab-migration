@@ -72,6 +72,12 @@ int main( int argc, char* argv[] )
 
     opts.parseCommandLine( argc, argv );
 
+    if (0 == rankInGlobalComm)
+    {
+        std::cout<<" source mesh:" << lndMct << "\n";
+        std::cout<<" target mesh:" << lndMoab << "\n";
+        std::cout <<" tagname:" << tagname << "\n";
+    }
     int cplLndAppID = -1, cplLnd2AppID = -1;  // -1 means it is not initialized
     iMOAB_AppID cplLndPID  = &cplLndAppID;    // land on coupler PEs, moab dist
     iMOAB_AppID cplLnd2PID = &cplLnd2AppID;   // land on coupler PEs, another dist

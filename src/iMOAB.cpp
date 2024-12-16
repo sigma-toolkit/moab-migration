@@ -1642,7 +1642,7 @@ ErrCode iMOAB_SetIntTagStorage( iMOAB_AppID pid,
 
     int nents_to_be_set = *num_tag_storage_length / tagLength;
 
-    if( nents_to_be_set > (int)ents_to_set->size() || nents_to_be_set < 1 )
+    if( nents_to_be_set > (int)ents_to_set->size() )
     {
         return moab::MB_FAILURE;
     }  // to many entities to be set or too few
@@ -1699,7 +1699,7 @@ ErrCode iMOAB_GetIntTagStorage( iMOAB_AppID pid,
 
     int nents_to_get = *num_tag_storage_length / tagLength;
 
-    if( nents_to_get > (int)ents_to_get->size() || nents_to_get < 1 )
+    if( nents_to_get > (int)ents_to_get->size() )
     {
         return moab::MB_FAILURE;
     }  // to many entities to get, or too little

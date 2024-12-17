@@ -1241,7 +1241,7 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
                                                  double boxeps,
                                                  bool regional_mesh,
                                                  bool gnomonic,
-                                                 int order )
+                                                 int nb_ghost_layers )
 {
     ErrorCode rval;
 
@@ -1273,7 +1273,7 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
 
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_covering_source_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
 
-        rval = mbintx->construct_covering_set( m_source_set_with_ghosts, m_covering_source_set, gnomonic, order );MB_CHK_ERR( rval );
+        rval = mbintx->construct_covering_set( m_source_set_with_ghosts, m_covering_source_set, gnomonic, nb_ghost_layers );MB_CHK_ERR( rval );
 #ifdef MOAB_DBG
         std::stringstream filename1;
         filename1 << "source_with_ghosts" << rank << ".h5m";

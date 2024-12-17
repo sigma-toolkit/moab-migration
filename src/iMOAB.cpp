@@ -4227,7 +4227,7 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
 
     // First, compute the covering source set.
-    rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, data_src.num_ghost_layers+1 );MB_CHK_ERR( rval );
+    rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, data_src.num_ghost_layers );MB_CHK_ERR( rval );
 
     // Next, compute intersections with MOAB.
     // for bilinear, this is an overkill

@@ -854,7 +854,7 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
 ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distributed_set,
                                                      EntityHandle& covering_set,
                                                      bool gnomonic,
-                                                     int order )
+                                                     int nb_ghost_layers )
 {
     // primary element came from, in the joint communicator ; this will be forwarded by coverage
     // mesh needed for tag migrate later on
@@ -866,7 +866,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     Range meshCells;
     rval = mb->get_entities_by_dimension( initial_distributed_set, 2, meshCells );MB_CHK_SET_ERR( rval, "can't get cells by dimension from mesh set" );
 
-    bool extraWork = (order >= 2);
+    bool extraWork = (nb_ghost_layers >= 1);
     if( 1 == parcomm->proc_config().proc_size() )
     {
         // move all initial cells to coverage set
@@ -1082,7 +1082,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
             // Need to get layers of bridge-adj entities
             if( originalSend.empty() ) continue;
             Range extraCells;
-            rval  = MeshTopoUtil( mb ).get_bridge_adjacencies( originalSend, 0, 2, extraCells, order - 1 ); MB_CHK_SET_ERR( rval, "Failed to get bridge adjacencies" );
+            rval  = MeshTopoUtil( mb ).get_bridge_adjacencies( originalSend, 0, 2, extraCells, nb_ghost_layers ); MB_CHK_SET_ERR( rval, "Failed to get bridge adjacencies" );
             // big miss : need to merge only cells from initial source (ghost) set;
             // get_bridge adj will get all cells adjacent to a vertex
             extraCells = intersect(extraCells, meshCells);

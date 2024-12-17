@@ -51,7 +51,7 @@ class Intx2MeshOnSphere : public moab::Intx2Mesh
     virtual ErrorCode construct_covering_set( EntityHandle& initial_distributed_set,
                                               EntityHandle& covering_set,
                                               bool gnomonic = true,
-                                              int order = 1 );
+                                              int nb_ghost_layers = 0 );
 
     virtual ErrorCode build_processor_euler_boxes( EntityHandle euler_set, Range& local_verts, bool gnomonic = true );
 #endif

@@ -25,6 +25,45 @@ SUBROUTINE errorout(ierr, message)
    return
 end
 !
+SUBROUTINE check_baseline(baseline_file, nsize, gids, values, eps, ierr)
+   integer :: ierr
+   character  baseline_file*100
+   integer :: nsize
+   integer  :: gids (nsize)
+   double precision  :: values(nsize)
+   double precision :: eps 
+   integer , allocatable :: allgids(:)
+   double precision , allocatable :: allvals(:)
+   integer :: unit, n ! n is for number of rows in the file
+   
+   
+   unit = 21
+   open(unit, file = baseline_file,status="old",action="read")
+   ierr = 0
+   n = 0
+   do
+      read(unit,*,end=1)
+      n = n+1
+   end do
+1  rewind(unit)
+   allocate(allgids(n))
+   allocate(allvals(n))
+   
+   do i = 1,n
+      read(unit,*) allgids(i), allvals(i)  ! we should have allgids from 1 to n, actually
+   enddo
+   
+   do i = 1, nsize
+      if ( abs( values(i) - allvals(gids(i)) ) .gt. eps) then
+          print *, ' index i', i, ' values(i), gids(i), allvals(gids(i)), ', &
+             values(i), gids(i), allvals(gids(i))
+          ierr = 1
+      endif
+   end do
+    
+   return
+end
+
 #include "moab/MOABConfig.h"
 
 #define VERBOSE
@@ -50,6 +89,7 @@ program imoab_coupler_fortran
    character(:), allocatable :: atmFileName
    character(:), allocatable :: ocnFileName
    character(:), allocatable :: readopts, fileWriteOptions
+   character(:), allocatable :: base_file3 !  baseline for bilinear example
    character :: appname*128
    character(30) :: nproc
    character(:), allocatable :: weights_identifier1
@@ -76,12 +116,13 @@ program imoab_coupler_fortran
    character(:), allocatable :: fields, projectedFields, projectedFieldsBilin, projectedFieldsSecond, projectedFieldsCAAS
    integer, dimension(3) ::  nverts, nelem, nblocks, nsbc, ndbc
    double precision, allocatable :: vals(:) ! to set the double values to 0
+   integer, allocatable :: gids(:) ! integers global ids
    integer :: i ! for loops
    integer :: storLeng, eetype ! for tags defs
    character(:), allocatable :: transferFields, outputFileOcn
    integer :: tagIndexIn2 ! not really needed
    integer :: dummyCpl, dummyRC, dummyType
-   double precision  :: boxeps
+   double precision  :: eps
    integer :: gnomonic
 
    cmpatm = 5
@@ -110,6 +151,10 @@ program imoab_coupler_fortran
    ocnFileName = &
      MOAB_MESH_DIR &
      //'unittest/recMeshOcn.h5m'//C_NULL_CHAR
+     
+   base_file3 = &
+     MOAB_MESH_DIR &
+     //'unittest/baseline3.txt'//C_NULL_CHAR
 
    ! all comms span the whole world, for simplicity
    atmComm = MPI_COMM_NULL
@@ -197,7 +242,7 @@ program imoab_coupler_fortran
    if (cplComm .NE. MPI_COMM_NULL) then
 
       ! set the ghost layers on the coupler for the source mesh
-      nghlay = 3 ! number of ghost layers
+      nghlay = 1 ! number of ghost layers
       ierr = iMOAB_SetGhostLayers( cplAtmPID, nghlay )
       call errorout(ierr, 'failed to set number of ghost layers on ATM mesh')
 
@@ -367,6 +412,8 @@ program imoab_coupler_fortran
 
       ierr = iMOAB_DefineTagStorage(cmpOcnPID, transferFields, tagTypes(2), ocnCompNDoFs, tagIndexIn2)
       call errorout(ierr, 'failed to define the field tag for receiving back the tag a2oTbot_proj,  on ocn pes')
+      ierr = iMOAB_DefineTagStorage(cmpOcnPID, "GLOBAL_ID"//C_NULL_CHAR, 0, 1, tagIndexIn2)
+      call errorout(ierr, 'failed to define the field tag for GLOBAL_ID,  on ocn pes')
 
    end if
 
@@ -401,6 +448,28 @@ program imoab_coupler_fortran
       end if
       ierr = iMOAB_WriteMesh(cmpOcnPID, outputFileOcn, fileWriteOptions)
       call errorout(ierr, 'could not write OcnWithProjF.h5m to disk')
+      ! check baseline for some variables
+      !  Each process in the communicator will have access to a local mesh instance, which
+      !  will contain the original cells in the local partition and ghost entities. Number of
+      !  vertices, primary cells, visible blocks, number of sidesets and nodesets boundary
+      !  conditions will be returned in numProcesses 3 arrays, for local, ghost and total
+      !  numbers.
+
+      ierr = iMOAB_GetMeshInfo(cmpOcnPID, nverts, nelem, nblocks, nsbc, ndbc)
+      call errorout(ierr, 'failed to get num primary elems')
+      storLeng = nelem(3) ! 1 tag for now
+      allocate (vals(storLeng))
+      allocate (gids(storLeng))
+      eetype = 1 ! double type
+
+      eps = 1.e-9
+      eetype = 1 ! cell type, not vertex
+      ierr         = iMOAB_GetIntTagStorage( cmpOcnPID, "GLOBAL_ID"//C_NULL_CHAR, storLeng, eetype, gids );
+      call errorout(ierr, 'failed to get gids')
+      ierr         = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_bilin_proj"//C_NULL_CHAR, storLeng, eetype, vals );
+      call errorout(ierr, 'failed to get pbots bilinear')
+      
+      call check_baseline(base_file3, storLeng, gids, vals, eps, ierr)
 
    end if
 

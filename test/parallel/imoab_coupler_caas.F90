@@ -25,19 +25,20 @@ SUBROUTINE errorout(ierr, message)
    return
 end
 !
-SUBROUTINE check_baseline(baseline_file, nsize, gids, values, eps, ierr)
+SUBROUTINE check_baseline(baseline_file, nsize, gids, values, eps, rank, ierr)
    integer :: ierr
    character  baseline_file*100
    integer :: nsize
    integer  :: gids (nsize)
    double precision  :: values(nsize)
+   integer :: rank
    double precision :: eps 
    integer , allocatable :: allgids(:)
    double precision , allocatable :: allvals(:)
    integer :: unit, n ! n is for number of rows in the file
    
    
-   unit = 21
+   unit = 21 + rank ! to differentiate them
    open(unit, file = baseline_file,status="old",action="read")
    ierr = 0
    n = 0
@@ -55,8 +56,8 @@ SUBROUTINE check_baseline(baseline_file, nsize, gids, values, eps, ierr)
    
    do i = 1, nsize
       if ( abs( values(i) - allvals(gids(i)) ) .gt. eps) then
-          print *, ' index i', i, ' values(i), gids(i), allvals(gids(i)), ', &
-             values(i), gids(i), allvals(gids(i))
+          print *, 'rank:', rank, ' index i', i, ' values:', values(i), &
+           'gids:', gids(i),  'allvals(gids(i)): ',    allvals(gids(i))
           ierr = 1
       endif
    end do
@@ -150,7 +151,7 @@ program imoab_coupler_fortran
      //'unittest/atm_c2x.h5m'//C_NULL_CHAR
    ocnFileName = &
      MOAB_MESH_DIR &
-     //'unittest/recMeshOcn.h5m'//C_NULL_CHAR
+     //'unittest/wholeOcn.h5m'//C_NULL_CHAR
      
    base_file3 = &
      MOAB_MESH_DIR &
@@ -469,7 +470,7 @@ program imoab_coupler_fortran
       ierr         = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_bilin_proj"//C_NULL_CHAR, storLeng, eetype, vals );
       call errorout(ierr, 'failed to get pbots bilinear')
       
-      call check_baseline(base_file3, storLeng, gids, vals, eps, ierr)
+      call check_baseline(base_file3, storLeng, gids, vals, eps, my_id, ierr)
 
    end if
 

@@ -91,6 +91,8 @@ program imoab_coupler_fortran
    character(:), allocatable :: ocnFileName
    character(:), allocatable :: readopts, fileWriteOptions
    character(:), allocatable :: base_file3 !  baseline for bilinear example
+   character(:), allocatable :: base_file4 !  baseline for higher order example
+   character(:), allocatable :: base_file5 !  baseline for higher order example caas
    character :: appname*128
    character(30) :: nproc
    character(:), allocatable :: weights_identifier1
@@ -122,7 +124,7 @@ program imoab_coupler_fortran
    integer :: storLeng, eetype ! for tags defs
    character(:), allocatable :: transferFields, outputFileOcn
    integer :: tagIndexIn2 ! not really needed
-   integer :: dummyCpl, dummyRC, dummyType
+   integer :: type1, type2 ! for comm graph between atm cpl and atm coverage on cpl for ocean
    double precision  :: eps
    integer :: gnomonic
 
@@ -156,6 +158,13 @@ program imoab_coupler_fortran
    base_file3 = &
      MOAB_MESH_DIR &
      //'unittest/baseline3.txt'//C_NULL_CHAR
+   base_file4 = &
+     MOAB_MESH_DIR &
+     //'unittest/baseline4.txt'//C_NULL_CHAR
+   base_file5 = &
+     MOAB_MESH_DIR &
+     //'unittest/baseline5.txt'//C_NULL_CHAR
+     
 
    ! all comms span the whole world, for simplicity
    atmComm = MPI_COMM_NULL
@@ -260,15 +269,18 @@ program imoab_coupler_fortran
 
    end if
 
-   if (atmCouComm .NE. MPI_COMM_NULL) then
-      ! the new graph will be for sending data from atm comp to coverage mesh.
-      ! it involves initial atm app; also migrate atm mesh on coupler pes, cplAtmPID
+   if (cplComm .NE. MPI_COMM_NULL) then
+      ! the new graph will be for sending data from atm cpl  to atm coverage mesh for ocean
+      ! it involves cpl atm app;  cplAtmPID
       ! results are in cplAtmOcnPID, intx mesh; remapper also has some info about coverage mesh
       ! after this, the sending of tags from atm pes to coupler pes will use the new par comm
       ! graph, that has more precise info about what to send for ocean cover ; every time, we
       ! will use the element global id, which should uniquely identify the element
-      ierr = iMOAB_CoverageGraph(atmCouComm, cmpAtmPID, cplAtmPID, cplAtmOcnPID, cmpatm, cplatm, cplocn) ! it happens over joint communicator
-      call errorout(ierr, 'cannot recompute direct coverage graph for ocean')
+      type1 = 3;
+      type2 = 3;
+      ierr = iMOAB_ComputeCommGraph( cplAtmPID, cplAtmOcnPID, cplComm, cplGroup, cplGroup, &
+         type1, type2, cplatm, atmocnid )
+      call errorout(ierr, 'cannot recompute direct coverage graph for atm coverage for ocean')
    end if
 
    weights_identifier1 = 'scalar'//C_NULL_CHAR
@@ -343,20 +355,20 @@ program imoab_coupler_fortran
    if (atmComm .NE. MPI_COMM_NULL) then
       ! As always, use nonblocking sends
       ! this is for projection to ocean:
-      ierr = iMOAB_SendElementTag(cmpAtmPID, fields, atmCouComm, cplocn)
+      ierr = iMOAB_SendElementTag(cmpAtmPID, fields, atmCouComm, cplatm)
       call errorout(ierr, 'cannot send tag values')
 
    end if
 
    if (cplComm .NE. MPI_COMM_NULL) then
       !// receive on atm on coupler pes, that was redistributed according to coverage
-      ierr = iMOAB_ReceiveElementTag(cplAtmPID, fields, atmCouComm, cplocn)
+      ierr = iMOAB_ReceiveElementTag(cplAtmPID, fields, atmCouComm, cmpatm)
       call errorout(ierr, 'cannot receive tag values')
    end if
 
    ! we can now free the sender buffers
    if (atmComm .NE. MPI_COMM_NULL) then
-      ierr = iMOAB_FreeSenderBuffers(cmpAtmPID, cplocn) !context is for ocean
+      ierr = iMOAB_FreeSenderBuffers(cmpAtmPID, cplatm) !context is for ocean
       call errorout(ierr, 'cannot free buffers used to resend atm tag towards the coverage mesh')
    end if
 
@@ -368,6 +380,26 @@ program imoab_coupler_fortran
       call errorout(ierr, 'could not write AtmOnCpl.h5m to disk')
 
    end if
+   
+    ! we need a second hop, to send from cpl atm to atm coverage for ocn 
+    ! second hop, is from atm towards ocean, on coupler
+    !  it should send from each part on coupler towards the coverage set that should form the
+    ! rings around target cells (ocean)
+    ! basically we should send to more cells than needed just for intersection
+    !  TODO
+    if( cplComm .ne. MPI_COMM_NULL ) then
+        ! send using the par comm graph computed by iMOAB_ComputeCommGraph
+        ierr = iMOAB_SendElementTag( cplAtmPID, fields, cplComm, atmocnid )
+        call errorout( ierr, "cannot send tag values towards coverage mesh for bilinear map" )
+
+        ierr = iMOAB_ReceiveElementTag( cplAtmOcnPID, fields, cplComm, cplatm )
+        call errorout( ierr, "cannot receive tag values for bilinear map" )
+
+        ierr = iMOAB_FreeSenderBuffers( cplAtmPID, atmocnid )
+        call errorout( ierr, "cannot free buffers" )
+    endif
+   
+   
    if (cplComm .ne. MPI_COMM_NULL) then
 
       ! We have the remapping weights now. Let us apply the weights onto the tag we defined
@@ -471,7 +503,22 @@ program imoab_coupler_fortran
       call errorout(ierr, 'failed to get pbots bilinear')
       
       call check_baseline(base_file3, storLeng, gids, vals, eps, my_id, ierr)
+      call errorout(ierr, 'failed to check bilinear values')
+      if (ierr .eq. 0 .and. my_id .eq. 0 ) print *, 'checked Sa_pbot_bilin_proj values agains baseline'
+      ierr         = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_o2_proj"//C_NULL_CHAR, storLeng, eetype, vals )
+      call errorout(ierr, 'failed to get pbot order 2')
+      
+      call check_baseline(base_file4, storLeng, gids, vals, eps, my_id, ierr)
+      call errorout(ierr, 'failed to check higher order values')
+      if (ierr .eq. 0 .and. my_id .eq. 0 ) print *, 'checked Sa_pbot_o2_proj values against baseline'
 
+      ierr         = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_o2_caas_proj"//C_NULL_CHAR, storLeng, eetype, vals )
+      call errorout(ierr, 'failed to get pbot order 2 caas')
+      
+      call check_baseline(base_file5, storLeng, gids, vals, eps, my_id, ierr)
+      call errorout(ierr, 'failed to check higher order values caas')
+      if (ierr .eq. 0 .and. my_id .eq. 0 ) print *, 'checked Sa_pbot_o2_caas_proj values against baseline'
+      
    end if
 
    ! free up resources

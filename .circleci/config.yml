@@ -47,12 +47,12 @@ jobs:
     #   This would typically go in either a build or a build-and-test job when using workflows
     # Run the setup and install any pre-dependencies for building MOAB 
     - run: |
-        sudo apt -yy update && sudo apt -yy install gfortran cmake libhdf5-mpi-dev libnetcdf-mpi-dev libmetis-dev libopenblas-dev libeigen3-dev
-        autoreconf -fi
+        sudo apt -yy update && sudo apt -yy install gfortran cmake ninja-build libhdf5-mpi-dev libnetcdf-mpi-dev libmetis-dev libopenblas-dev libeigen3-dev
+        # autoreconf -fi
     # Run the actual configuration command
     - run: |
         # ./configure --with-eigen3=/usr/include/eigen3 --with-hdf5=/usr/lib/x86_64-linux-gnu/hdf5/openmpi --with-netcdf=/usr/lib/x86_64-linux-gnu/netcdf/mpi --with-metis=/usr LDFLAGS="-L/usr/lib/x86_64-linux-gnu/hdf5/openmpi/ -L/usr/lib/x86_64-linux-gnu/openblas-serial" --with-mpi=/usr/lib/x86_64-linux-gnu/openmpi CC=mpicc CXX=mpicxx FC=mpif90 F77=mpif77
-        cmake . -DENABLE_MPI=ON -DCMAKE_C_COMPILER=mpicc -DCMAKE_CXX_COMPILER=mpicxx -DCMAKE_Fortran_COMPILER=mpif90 -DENABLE_HDF5=ON -DHDF5_DIR=/usr/lib/x86_64-linux-gnu/hdf5/openmpi -DENABLE_NETCDF=ON -DNETCDF_DIR=/usr/lib/x86_64-linux-gnu/netcdf/mpi -DENABLE_EIGEN3=ON -G Ninja
+        cmake . -DENABLE_MPI=ON -DCMAKE_C_COMPILER=mpicc -DCMAKE_CXX_COMPILER=mpicxx -DCMAKE_Fortran_COMPILER=mpif90 -DENABLE_HDF5=ON -DHDF5_DIR=/usr/lib/x86_64-linux-gnu/hdf5/openmpi -DENABLE_NETCDF=ON -DNETCDF_DIR=/usr/lib/x86_64-linux-gnu/netcdf/mpi -DENABLE_EIGEN3=ON #  -G Ninja
         make all -j4
         make check -j4
   coverage-job:

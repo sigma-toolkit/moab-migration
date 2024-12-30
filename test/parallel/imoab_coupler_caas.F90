@@ -27,7 +27,7 @@ end
 !
 SUBROUTINE check_baseline(baseline_file, nsize, gids, values, eps, rank, ierr)
    integer :: ierr
-   character  baseline_file*100
+   character  baseline_file*1024
    integer :: nsize
    integer  :: gids (nsize)
    double precision  :: values(nsize)

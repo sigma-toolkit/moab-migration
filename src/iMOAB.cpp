@@ -66,6 +66,7 @@ struct appData
     int global_id;  // external component id, unique for application
     std::string name;
     Range all_verts;
+    Range all_edges;           // used only to set/get tags on edges
     // local vertices would be all_verts if no ghosting was required
     Range local_verts;     // it could include shared, but not owned at the interface
     Range owned_verts;     // owned_verts <= local_verts <= all_verts
@@ -783,6 +784,7 @@ ErrCode iMOAB_UpdateMeshInfo( iMOAB_AppID pid )
 
     // first clear all data ranges; this can be called after ghosting
     data.all_verts.clear();
+    data.all_edges.clear();
     data.primary_elems.clear();
     data.local_verts.clear();
     data.owned_verts.clear();
@@ -795,6 +797,9 @@ ErrCode iMOAB_UpdateMeshInfo( iMOAB_AppID pid )
 
     // Let us get all the vertex entities
     ErrorCode rval = context.MBI->get_entities_by_type( fileSet, MBVERTEX, data.all_verts, true );MB_CHK_ERR( rval );  // recursive
+
+    // Let us get all the edges
+    rval = context.MBI->get_entities_by_type( fileSet, MBEDGE, data.all_edges, true );MB_CHK_ERR( rval );  // recursive
 
     // Let us check first entities of dimension = 3
     data.dimension = 3;
@@ -1635,6 +1640,10 @@ ErrCode iMOAB_SetIntTagStorage( iMOAB_AppID pid,
     {
         ents_to_set = &data.all_verts;
     }
+    else if( *ent_type == 2)  // edges
+    {
+        ents_to_set = &data.all_edges;
+    }
     else  // if (*ent_type == 1) // *ent_type can be 0 (vertices) or 1 (elements)
     {
         ents_to_set = &data.primary_elems;
@@ -1692,6 +1701,10 @@ ErrCode iMOAB_GetIntTagStorage( iMOAB_AppID pid,
     {
         ents_to_get = &data.all_verts;
     }
+    else if( *ent_type == 2 )  // edges
+    {
+        ents_to_get = &data.all_edges;
+    }
     else  // if (*ent_type == 1)
     {
         ents_to_get = &data.primary_elems;
@@ -1734,7 +1747,11 @@ ErrCode iMOAB_SetDoubleTagStorage( iMOAB_AppID pid,
     {
         ents_to_set = &data.all_verts;
     }
-    else if( *ent_type == 1 )
+    else if( *ent_type == 2 )
+    {
+        ents_to_set = &data.all_edges;
+    }
+    else //  if( *ent_type == 1 )
     {
         ents_to_set = &data.primary_elems;
     }
@@ -2060,6 +2077,10 @@ ErrCode iMOAB_GetDoubleTagStorage( iMOAB_AppID pid,
     {
         ents_to_get = &data.primary_elems;
     }
+    else if( *ent_type == 2 )
+    {
+        ents_to_get = &data.all_edges;
+    }
     int nents_to_get = (int)ents_to_get->size();
     int position     = 0;
     for( size_t i = 0; i < tagNames.size(); i++ )
@@ -2117,6 +2138,10 @@ ErrCode iMOAB_SynchronizeTags( iMOAB_AppID pid, int* num_tag, int* tag_indices, 
     {
         ent_exchange = data.primary_elems;
     }
+    else if( *ent_type == 2 )
+    {
+        ent_exchange = data.all_edges;
+    }
     else
     {
         return moab::MB_FAILURE;
@@ -2157,6 +2182,10 @@ ErrCode iMOAB_ReduceTagsMax( iMOAB_AppID pid, int* tag_index, int* ent_type )
     else if( *ent_type == 1 )
     {
         ent_exchange = data.primary_elems;
+    }
+    else if( *ent_type == 2 )
+    {
+        ent_exchange = data.all_edges;
     }
     else
     {
@@ -2267,7 +2296,11 @@ ErrCode iMOAB_CreateElements( iMOAB_AppID pid,
 
     rval = context.MBI->add_entities( data.file_set, new_elems );MB_CHK_ERR( rval );
 
-    data.primary_elems.merge( new_elems );
+    // do not add to primary if edges
+    if(*type != 1)
+        data.primary_elems.merge( new_elems );
+    else
+        data.all_edges.merge( new_elems );
 
     // add to adjacency
     rval = read_iface->update_adjacencies( actual_start_handle, *num_elem, *num_nodes_per_element, array );MB_CHK_ERR( rval );

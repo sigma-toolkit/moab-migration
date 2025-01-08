@@ -1500,13 +1500,17 @@ void test_get_set_variable_length( const char* name,
         entities.erase( handle_list[i] );
 
     // try getting/setting single handle value
-    if( num_values == 1 )
+    if( num_values == 1 ) {
         rval = mb.tag_clear_data( tag, &one_handle, 1, values[0], lengths[0] );
-    else
-        rval = mb.tag_set_by_ptr( tag, &one_handle, 1, values, lengths );CHECK_ERR( rval );
+    }
+    else {
+        rval = mb.tag_set_by_ptr( tag, &one_handle, 1, values, lengths );
+        CHECK_ERR( rval );
+    }
     const void* data_ptr;
     int data_len;
-    rval = mb.tag_get_by_ptr( tag, &one_handle, 1, &data_ptr, &data_len );CHECK_ERR( rval );
+    rval = mb.tag_get_by_ptr( tag, &one_handle, 1, &data_ptr, &data_len );
+    CHECK_ERR( rval );
     CHECK_EQUAL( lengths[0], data_len );
     CHECK( !memcmp( values[0], data_ptr, data_len ) );
 

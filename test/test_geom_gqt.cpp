@@ -231,7 +231,15 @@ ErrorCode overlap_write_geometry( const char* output_file_name )
         }                                       \
     } while( false )
 
-int main( int argc, char* argv[] )
+int main( int 
+#ifdef MOAB_HAVE_MPI
+         argc
+#endif
+, char** 
+#ifdef MOAB_HAVE_MPI
+argv
+#endif
+)
 {
     ErrorCode rval;
     const char* filename = "test_geom.h5m";

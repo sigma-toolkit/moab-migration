@@ -595,11 +595,16 @@ ErrorCode test_interpolation( Interface* mbImpl,
 
         // First get all vertices adj to partition entities in target mesh
         result = pcs[1]->get_part_entities( targ_elems, 3 );MB_CHK_ERR( result );
-        if( Coupler::SPHERICAL == method ) result = pcs[1]->get_part_entities( targ_elems, 2 );MB_CHK_ERR( result );  // get the polygons/quads on a sphere.
+        if( Coupler::SPHERICAL == method ) {
+            result = pcs[1]->get_part_entities( targ_elems, 2 );
+            MB_CHK_ERR( result );  // get the polygons/quads on a sphere.
+        }
         if( Coupler::CONSTANT == method )
             targ_verts = targ_elems;
-        else
-            result = mbImpl->get_adjacencies( targ_elems, 0, false, targ_verts, Interface::UNION );MB_CHK_ERR( result );
+        else {
+            result = mbImpl->get_adjacencies( targ_elems, 0, false, targ_verts, Interface::UNION );
+            MB_CHK_ERR( result );
+        }
 
         // Then get non-owned verts and subtract
         result = pcs[1]->get_pstatus_entities( 0, PSTATUS_NOT_OWNED, tmp_verts );MB_CHK_ERR( result );

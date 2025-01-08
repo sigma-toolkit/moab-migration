@@ -96,7 +96,8 @@ static herr_t handle_hdf5_error( hid_t stack, void* data )
 {
     ReadHDF5::HDF5ErrorHandler* h = reinterpret_cast< ReadHDF5::HDF5ErrorHandler* >( data );
     herr_t result                 = 0;
-    if( h->func ) result = ( *h->func )( stack, h->data );MB_CHK_ERR_CONT( MB_FAILURE );
+    if( h->func ) result = ( *h->func )( stack, h->data );
+    MB_CHK_ERR_CONT( MB_FAILURE );
     return result;
 }
 #else

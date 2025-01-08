@@ -285,7 +285,15 @@ static herr_t handle_hdf5_error( void* data )
 
 #endif /* #ifdef H5_HAVE_PARALLEL */
 
-int main( int argc, char* argv[] )
+int main( int 
+#ifdef H5_HAVE_PARALLEL
+argc
+#endif
+, char** 
+#ifdef H5_HAVE_PARALLEL
+argv
+#endif
+ )
 {
 #ifdef H5_HAVE_PARALLEL
     int rval;

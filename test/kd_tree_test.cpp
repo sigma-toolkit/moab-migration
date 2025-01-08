@@ -355,7 +355,8 @@ void test_point_search()
         CHECK_REAL_EQUAL( iter.box_max()[2], iter2.box_max()[2], DBL_EPSILON );
 
         rval = iter2.step();
-        if( MB_ENTITY_NOT_FOUND == rval ) break;CHECK_ERR( rval );
+        if( MB_ENTITY_NOT_FOUND == rval ) break;
+        CHECK_ERR( rval );
         rval = iter.step();CHECK_ERR( rval );
     }
 
@@ -378,7 +379,8 @@ void test_point_search()
         CHECK_REAL_EQUAL( iter.box_max()[2], iter2.box_max()[2], DBL_EPSILON );
 
         rval = iter2.back();
-        if( MB_ENTITY_NOT_FOUND == rval ) break;CHECK_ERR( rval );
+        if( MB_ENTITY_NOT_FOUND == rval ) break;
+        CHECK_ERR( rval );
         rval = iter.back();CHECK_ERR( rval );
     }
 }

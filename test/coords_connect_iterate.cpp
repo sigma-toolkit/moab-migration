@@ -77,7 +77,8 @@ void test_coords_connect_iterate()
     while( vit != verts.end() )
     {
         rval = mb.coords_iterate( vit, verts.end(), xcoord, ycoord, zcoord, count );
-        if( MB_SUCCESS && ( !xcoord || !ycoord || !zcoord ) ) rval = MB_FAILURE;CHECK_ERR( rval );
+        if(rval == MB_SUCCESS && ( !xcoord || !ycoord || !zcoord ) ) rval = MB_FAILURE;
+        CHECK_ERR( rval );
 
         assert( total + count <= (int)verts.size() );
         for( int i = 0; i < count; i++ )
@@ -121,7 +122,8 @@ void test_coords_connect_iterate()
     while( hit != hexes.end() )
     {
         rval = mb.connect_iterate( hit, hexes.end(), connect, num_connect, count );
-        if( MB_SUCCESS && !connect ) rval = MB_FAILURE;CHECK_ERR( rval );
+        if(rval == MB_SUCCESS && !connect ) rval = MB_FAILURE;
+        CHECK_ERR( rval );
         CHECK_EQUAL( num_connect, 8 );
 
         // should be equal to initial connectivity

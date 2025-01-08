@@ -1775,7 +1775,11 @@ ErrCode iMOAB_SetDoubleTagStorage( iMOAB_AppID pid,
 
 ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
                                           const iMOAB_String tag_storage_names,
-                                          int* num_tag_storage_length,
+                                          int* 
+#ifdef MOAB_HAVE_MPI
+                                          num_tag_storage_length
+#endif
+                                            ,
                                           int* ent_type,
                                           double* tag_storage_data,
                                           int* globalIds )

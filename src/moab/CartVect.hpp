@@ -17,7 +17,7 @@ class CartVect
     double d[3];
 
   public:
-    inline CartVect() {}
+    inline CartVect() {d[0] = d[1] = d[2] = 0.0;}
     /**Initialze all three values to same scalar (typically zero)*/
     explicit inline CartVect( double v )
     {

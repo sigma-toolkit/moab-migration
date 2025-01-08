@@ -516,10 +516,12 @@ ErrorCode ReorderTool::reorder_tag_data( EntityType etype, Tag new_handles, Tag 
     // is handle type in which case we need to update the data
     // for all entities, regardless of reordering.
     std::vector< EntityHandle > newhandles;
-    if( MB_TYPE_HANDLE == tagtype )
+    if( MB_TYPE_HANDLE == tagtype ) {
         rval = get_reordered_handles( new_handles, old_tagged, newhandles );
-    else
+    }
+    else {
         rval = get_new_handles( new_handles, old_tagged, newhandles );CHKERR;
+    }
 
     if( old_tagged.empty() ) return MB_SUCCESS;
 

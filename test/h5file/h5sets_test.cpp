@@ -26,7 +26,8 @@ void read_write_file( Interface& output, Interface& input, EntityHandle* input_s
         rval = input.create_meshset( MESHSET_SET, *input_set );CHECK_ERR( rval );
     }
     rval = input.load_file( filename, input_set );
-    if( !keep_file ) remove( filename );CHECK_ERR( rval );
+    if( !keep_file ) remove( filename );
+    CHECK_ERR( rval );
 }
 
 void test_ranged_set_with_stale_handles()
@@ -325,7 +326,8 @@ void test_tree( int max_depth )
     rval = mb.write_file( str.str().c_str(), 0, "BUFFER_SIZE=1024;DEBUG_BINIO" );CHECK_ERR( rval );
     mb.delete_mesh();
     rval = mb.load_file( str.str().c_str() );
-    if( !keep_file ) remove( str.str().c_str() );CHECK_ERR( rval );
+    if( !keep_file ) remove( str.str().c_str() );
+    CHECK_ERR( rval );
 
     // get tree root
     rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, tag );CHECK_ERR( rval );
@@ -695,7 +697,8 @@ void test_set_flags()
     rval = mb.write_file( filename2, 0, "BUFFER_SIZE=1024;DEBUG_BINIO" );CHECK_ERR( rval );
     mb.delete_mesh();
     rval = mb.load_file( filename2 );
-    if( !keep_file ) remove( filename2 );CHECK_ERR( rval );
+    if( !keep_file ) remove( filename2 );
+    CHECK_ERR( rval );
     rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, tag );CHECK_ERR( rval );
 
     // find our sets

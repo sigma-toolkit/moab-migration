@@ -1007,7 +1007,8 @@ static void check_children( bool contents, GatherTestMode mode, Interface& mb, i
         if( contents )
             rval = mb.get_entities_by_type( set, MBENTITYSET, children );
         else
-            rval = mb.get_child_meshsets( set, children );CHECK_ERR( rval );
+            rval = mb.get_child_meshsets( set, children );
+        CHECK_ERR( rval );
         if( i == 1 )
         {
             CHECK( children.empty() );
@@ -1053,7 +1054,8 @@ void test_gather_sets_common( bool contents, GatherTestMode mode, bool no_parent
             if( contents )
                 rval = mb.add_entities( sets[i], sets + ( i - 1 ), 1 );
             else
-                rval = mb.add_child_meshset( sets[i], sets[i - 1] );CHECK_ERR( rval );
+                rval = mb.add_child_meshset( sets[i], sets[i - 1] );
+            CHECK_ERR( rval );
         }
     }
 

@@ -190,10 +190,12 @@ ErrorCode ReadUtil::gather_related_ents( Range& partition, Range& related_ents, 
 
     // Get contains-related sets
     Range tmp_ents3, last_related;
-    if( file_set )
+    if( file_set ) {
         result = mMB->get_entities_by_type( *file_set, MBENTITYSET, tmp_ents3 );
-    else
+    }
+    else {
         result = mMB->get_entities_by_type( 0, MBENTITYSET, tmp_ents3 );RR;
+    }
 
     while( related_ents.size() != last_related.size() )
     {

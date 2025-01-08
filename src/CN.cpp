@@ -689,8 +689,7 @@ void MBCN_SetBasis( const int in_basis )
 void MBCN_EntityTypeName( const int this_type, char* rval, int rval_len )
 {
     const char* rval_tmp = CN::EntityTypeName( (EntityType)this_type );
-    int rval_len_tmp     = strlen( rval_tmp );
-    rval_len_tmp         = ( rval_len_tmp < rval_len ? rval_len_tmp : rval_len );
+    int rval_len_tmp     = std::min(strlen( rval_tmp ), (size_t)rval_len);
     strncpy( rval, rval_tmp, rval_len_tmp );
 }
 

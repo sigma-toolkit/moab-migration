@@ -200,8 +200,9 @@ void calculate_big_value( Interface& moab, EntityHandle vert, size_t size, doubl
     CHECK( size >= 3 );
     ErrorCode rval = moab.get_coords( &vert, 1, data );CHECK_ERR( rval );
 
-    for( size_t j = 2; j < size; ++j )
+    for( size_t j = 2; j < size; ++j ) {
         data[j] = data[j - 2] + data[j - 1];CHECK_ERR( rval );
+    }
 }
 
 void test_var_length_big_data()
@@ -583,7 +584,9 @@ void test_huge_var_length()
 
     CHECK_REAL_EQUAL( dataArr[2], ( (double*)ptr2 )[0], 0.000000001 );
 
-    if( !keep_files ) remove( "test_huge_var_tag.h5m" );CHECK_ERR( rval );
+    if( !keep_files )
+        remove( "test_huge_var_tag.h5m" );
+    CHECK_ERR( rval );
 }
 void create_structured_quad_mesh( Interface& mb, int x, int y )
 {
@@ -662,7 +665,9 @@ void compare_tags( const char* name, Interface& mb1, Interface& mb2 )
 void read_write( const char* filename, Interface& writer, Interface& reader )
 {
     ErrorCode rval = writer.write_file( filename );
-    if( !keep_files && MB_SUCCESS != rval ) remove( filename );CHECK_ERR( rval );
+    if( !keep_files && MB_SUCCESS != rval ) remove( filename );
+    CHECK_ERR( rval );
     rval = reader.load_mesh( filename );
-    if( !keep_files ) remove( filename );CHECK_ERR( rval );
+    if( !keep_files ) remove( filename );
+    CHECK_ERR( rval );
 }

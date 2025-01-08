@@ -1505,8 +1505,8 @@ void test_get_set_variable_length( const char* name,
     }
     else {
         rval = mb.tag_set_by_ptr( tag, &one_handle, 1, values, lengths );
-        CHECK_ERR( rval );
     }
+    CHECK_ERR( rval );
     const void* data_ptr;
     int data_len;
     rval = mb.tag_get_by_ptr( tag, &one_handle, 1, &data_ptr, &data_len );

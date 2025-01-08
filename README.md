@@ -108,6 +108,45 @@ Detailed API documentation and user/development guides are available for the fol
 
 There are many other ways available to configure the build, please refer to the [Scikit Build Core documentation](https://scikit-build-core.readthedocs.io/) for more details.
 
+### Conan
+Conan is a python-based tool for managing 3rd-party dependencies in applications that use them. It simplifies the download and installation
+of these dependencies, and the specification of the proper locations and build options for their use in building applications.
+Conan can be viewed as a pre-processing tool that feeds information into the rest of an application's configuration logic that
+is specified using normal CMake language.
+
+For general information on conan, see https://docs.conan.io/2/. This implementation uses version 2 of conan.
+
+Using conan requires python3, so make sure that is installed before proceeding. Then, to install conan, execute:
+```bash
+      pip install conan
+      conan profile detect
+```
+On Linux, this will put a conan executable into ${HOME}/.local/bin, and create a default profile for building dependencies; make sure 
+the bin directory is in your PATH.
+
+MOAB's conan recipe creates either a "dbg" or "opt" build directory, depending on whether a Debug or Release build is requested, resp.
+Starting from the top-level MOAB directory, execute the following (using either Debug/dbg or Release/opt):
+```bash
+      conan install . -s build_type=[Debug|Release]
+      cd [dbg|opt]
+      cmake .. -DCMAKE_TOOLCHAIN_FILE=cmake/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=[Debug|Release]
+      make -j 8
+```
+
+By default, conan-based builds add a requirement for HDF5, and download/build a local version of the library for
+linking to MOAB. To disable this, use "-o hdf5=False" on the conan install command.
+
+If a parallel build is required, add "-o parallel=True" to the conan install command, AND ADD THE FOLLOWING COMMAND AFTER
+CHANGING INTO THE BUILD DIRECTORY (dbg or opt):
+```bash
+      source cmake/conanrun.sh
+```
+This changes the PATH to include the location of the MPI-enabled compilers (mpicc, mpicxx, mpif90). To undo those environment changes,
+if desired, use the command:
+```bash
+      source cmake/deactivate_conanrun.sh
+```
+
 ## Language Bindings
 
 Even though the MOAB library is written in C++ language (conforming to C++11 standard), several partial bindings and interfaces are available for other languages.

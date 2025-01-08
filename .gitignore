@@ -7,6 +7,7 @@ autom4te.cache/
 bin
 bin/*
 *.ccm
+CMakeUserPresets.json
 config/config.guess
 config/config.sub
 config/depcomp
@@ -35,6 +36,7 @@ cubit??.jou
 .env
 *.egg-info
 __pycache__/
+dbg
 dist
 doc/config.tex
 doc/dev.dox
@@ -104,6 +106,7 @@ MOABConfig.cmake
 *.includes
 moab.make
 *.o
+opt
 .project
 *.rej
 share/*

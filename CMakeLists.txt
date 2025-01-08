@@ -303,19 +303,19 @@ endif ( ENABLE_FORTRAN )
 # check for MPI package
 set (MOAB_HAVE_MPI OFF CACHE INTERNAL "Found necessary MPI components. Configure MOAB with it." )
 if ( ENABLE_MPI )
-  set (MPI_C_COMPILER ${CC} )
-  set (MPI_CXX_COMPILER ${CXX} )
-  set (MPI_Fortran_COMPILER ${FC} )
+  set (MPI_C_COMPILER mpicc )
+  set (MPI_CXX_COMPILER mpicxx )
+  set (MPI_Fortran_COMPILER mpif90 )
   find_package( MPI REQUIRED )
   if ( MPI_FOUND )
     set ( MOAB_DEFINES "${MOAB_DEFINES} -DUSE_MPI" )
     set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
     set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} ${MPI_CXX_LINK_FLAGS}")
-    include_directories(${MPI_CXX_INCLUDE_PATH})
+    include_directories(${MPI_INCLUDE_DIR})
     set( MOAB_HAVE_MPI ON )
     message(STATUS "MPI libraries and includes found..")
-    foreach (var ROOT C_COMPILER CXX_COMPILER Fortran_COMPILER CXX_INCLUDE_PATH CXX_LIBRARIES MPIEXEC_EXECUTABLE)
-      message(STATUS "    [VAR]: MPI_${var} = ${MPI_${var}}.")
+    foreach (var ROOT C_COMPILER CXX_COMPILER Fortran_COMPILER CXX_INCLUDE_PATH CXX_LIBRARIES LIBRARIES MPIEXEC_EXECUTABLE)
+      message(STATUS "    [${var}]: MPI_${var} = ${MPI_${var}}.")
     endforeach ()
 
     set_package_properties(MPI PROPERTIES
@@ -324,6 +324,21 @@ if ( ENABLE_MPI )
 
   endif ( MPI_FOUND )
 endif ( ENABLE_MPI )
+
+function(dump_cmake_variables)
+    get_cmake_property(_variableNames VARIABLES)
+    list (SORT _variableNames)
+    foreach (_variableName ${_variableNames})
+        if (ARGV0)
+            unset(MATCHED)
+            string(REGEX MATCH ${ARGV0} MATCHED ${_variableName})
+            if (NOT MATCHED)
+                continue()
+            endif()
+        endif()
+        message(STATUS "${_variableName}=${${_variableName}}")
+    endforeach()
+endfunction()
 
 include (config/CheckCompilerFlags.cmake)
 
@@ -347,7 +362,7 @@ if ( ENABLE_HDF5 )
   endif( MOAB_HAVE_MPI )
 
   # Call CMake-native FindHDF5 module and specify the components to check
-  find_package( HDF5 REQUIRED COMPONENTS C HL )
+  find_package( HDF5 REQUIRED )
 
   if ( HDF5_FOUND )
     # print some HDF5 configuration details
@@ -829,3 +844,6 @@ feature_summary(WHAT ALL #ENABLED_FEATURES DISABLED_FEATURES PACKAGES_FOUND
                 )
 MESSAGE("-- MOAB Configuration summary has been written to ${CMAKE_BINARY_DIR}/summary.log.")
 # All done.
+
+dump_cmake_variables("MPI_")
+dump_cmake_variables("HDF5")

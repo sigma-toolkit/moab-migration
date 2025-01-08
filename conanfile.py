@@ -1,6 +1,6 @@
 import os
 from conan import ConanFile
-from conan.tools.cmake import CMakeToolchain, CMakeDeps, CMake, cmake_layout
+from conan.tools.cmake import CMakeToolchain, CMakeDeps, CMake
 
 class Moab(ConanFile):
     version = "5.5.1"

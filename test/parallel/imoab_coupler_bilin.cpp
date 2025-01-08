@@ -264,7 +264,7 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         // set the ghost layers on the coupler for the source mesh
-        nghlay = 3;  // number of ghost layers
+        nghlay = 1;  // number of ghost layers
         ierr   = iMOAB_SetGhostLayers( cplAtmPID, &nghlay );
         CHECKIERR( ierr, "cannot set ghost layers" )
 

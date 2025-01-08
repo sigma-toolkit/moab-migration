@@ -25,6 +25,46 @@ SUBROUTINE errorout(ierr, message)
    return
 end
 !
+SUBROUTINE check_baseline(baseline_file, nsize, gids, values, eps, rank, ierr)
+   integer :: ierr
+   character  baseline_file*1024
+   integer :: nsize
+   integer  :: gids (nsize)
+   double precision  :: values(nsize)
+   integer :: rank
+   double precision :: eps 
+   integer , allocatable :: allgids(:)
+   double precision , allocatable :: allvals(:)
+   integer :: unit, n ! n is for number of rows in the file
+   
+   
+   unit = 21 + rank ! to differentiate them
+   open(unit, file = baseline_file,status="old",action="read")
+   ierr = 0
+   n = 0
+   do
+      read(unit,*,end=1)
+      n = n+1
+   end do
+1  rewind(unit)
+   allocate(allgids(n))
+   allocate(allvals(n))
+   
+   do i = 1,n
+      read(unit,*) allgids(i), allvals(i)  ! we should have allgids from 1 to n, actually
+   enddo
+   
+   do i = 1, nsize
+      if ( abs( values(i) - allvals(gids(i)) ) .gt. eps) then
+          print *, 'rank:', rank, ' index i', i, ' values:', values(i), &
+           'gids:', gids(i),  'allvals(gids(i)): ',    allvals(gids(i))
+          ierr = 1
+      endif
+   end do
+    
+   return
+end
+
 #include "moab/MOABConfig.h"
 
 #define VERBOSE
@@ -50,6 +90,9 @@ program imoab_coupler_fortran
    character(:), allocatable :: atmFileName
    character(:), allocatable :: ocnFileName
    character(:), allocatable :: readopts, fileWriteOptions
+   character(:), allocatable :: base_file3 !  baseline for bilinear example
+   character(:), allocatable :: base_file4 !  baseline for higher order example
+   character(:), allocatable :: base_file5 !  baseline for higher order example caas
    character :: appname*128
    character(30) :: nproc
    character(:), allocatable :: weights_identifier1
@@ -76,12 +119,13 @@ program imoab_coupler_fortran
    character(:), allocatable :: fields, projectedFields, projectedFieldsBilin, projectedFieldsSecond, projectedFieldsCAAS
    integer, dimension(3) ::  nverts, nelem, nblocks, nsbc, ndbc
    double precision, allocatable :: vals(:) ! to set the double values to 0
+   integer, allocatable :: gids(:) ! integers global ids
    integer :: i ! for loops
    integer :: storLeng, eetype ! for tags defs
    character(:), allocatable :: transferFields, outputFileOcn
    integer :: tagIndexIn2 ! not really needed
-   integer :: dummyCpl, dummyRC, dummyType
-   double precision  :: boxeps
+   integer :: type1, type2 ! for comm graph between atm cpl and atm coverage on cpl for ocean
+   double precision  :: eps
    integer :: gnomonic
 
    cmpatm = 5
@@ -109,7 +153,18 @@ program imoab_coupler_fortran
      //'unittest/atm_c2x.h5m'//C_NULL_CHAR
    ocnFileName = &
      MOAB_MESH_DIR &
-     //'unittest/recMeshOcn.h5m'//C_NULL_CHAR
+     //'unittest/wholeOcn.h5m'//C_NULL_CHAR
+     
+   base_file3 = &
+     MOAB_MESH_DIR &
+     //'unittest/baseline3.txt'//C_NULL_CHAR
+   base_file4 = &
+     MOAB_MESH_DIR &
+     //'unittest/baseline4.txt'//C_NULL_CHAR
+   base_file5 = &
+     MOAB_MESH_DIR &
+     //'unittest/baseline5.txt'//C_NULL_CHAR
+     
 
    ! all comms span the whole world, for simplicity
    atmComm = MPI_COMM_NULL
@@ -197,7 +252,7 @@ program imoab_coupler_fortran
    if (cplComm .NE. MPI_COMM_NULL) then
 
       ! set the ghost layers on the coupler for the source mesh
-      nghlay = 3 ! number of ghost layers
+      nghlay = 1 ! number of ghost layers
       ierr = iMOAB_SetGhostLayers( cplAtmPID, nghlay )
       call errorout(ierr, 'failed to set number of ghost layers on ATM mesh')
 
@@ -214,15 +269,18 @@ program imoab_coupler_fortran
 
    end if
 
-   if (atmCouComm .NE. MPI_COMM_NULL) then
-      ! the new graph will be for sending data from atm comp to coverage mesh.
-      ! it involves initial atm app; also migrate atm mesh on coupler pes, cplAtmPID
+   if (cplComm .NE. MPI_COMM_NULL) then
+      ! the new graph will be for sending data from atm cpl  to atm coverage mesh for ocean
+      ! it involves cpl atm app;  cplAtmPID
       ! results are in cplAtmOcnPID, intx mesh; remapper also has some info about coverage mesh
       ! after this, the sending of tags from atm pes to coupler pes will use the new par comm
       ! graph, that has more precise info about what to send for ocean cover ; every time, we
       ! will use the element global id, which should uniquely identify the element
-      ierr = iMOAB_CoverageGraph(atmCouComm, cmpAtmPID, cplAtmPID, cplAtmOcnPID, cmpatm, cplatm, cplocn) ! it happens over joint communicator
-      call errorout(ierr, 'cannot recompute direct coverage graph for ocean')
+      type1 = 3;
+      type2 = 3;
+      ierr = iMOAB_ComputeCommGraph( cplAtmPID, cplAtmOcnPID, cplComm, cplGroup, cplGroup, &
+         type1, type2, cplatm, atmocnid )
+      call errorout(ierr, 'cannot recompute direct coverage graph for atm coverage for ocean')
    end if
 
    weights_identifier1 = 'scalar'//C_NULL_CHAR
@@ -297,20 +355,20 @@ program imoab_coupler_fortran
    if (atmComm .NE. MPI_COMM_NULL) then
       ! As always, use nonblocking sends
       ! this is for projection to ocean:
-      ierr = iMOAB_SendElementTag(cmpAtmPID, fields, atmCouComm, cplocn)
+      ierr = iMOAB_SendElementTag(cmpAtmPID, fields, atmCouComm, cplatm)
       call errorout(ierr, 'cannot send tag values')
 
    end if
 
    if (cplComm .NE. MPI_COMM_NULL) then
       !// receive on atm on coupler pes, that was redistributed according to coverage
-      ierr = iMOAB_ReceiveElementTag(cplAtmPID, fields, atmCouComm, cplocn)
+      ierr = iMOAB_ReceiveElementTag(cplAtmPID, fields, atmCouComm, cmpatm)
       call errorout(ierr, 'cannot receive tag values')
    end if
 
    ! we can now free the sender buffers
    if (atmComm .NE. MPI_COMM_NULL) then
-      ierr = iMOAB_FreeSenderBuffers(cmpAtmPID, cplocn) !context is for ocean
+      ierr = iMOAB_FreeSenderBuffers(cmpAtmPID, cplatm) !context is for ocean
       call errorout(ierr, 'cannot free buffers used to resend atm tag towards the coverage mesh')
    end if
 
@@ -322,6 +380,26 @@ program imoab_coupler_fortran
       call errorout(ierr, 'could not write AtmOnCpl.h5m to disk')
 
    end if
+   
+    ! we need a second hop, to send from cpl atm to atm coverage for ocn 
+    ! second hop, is from atm towards ocean, on coupler
+    !  it should send from each part on coupler towards the coverage set that should form the
+    ! rings around target cells (ocean)
+    ! basically we should send to more cells than needed just for intersection
+    !  TODO
+    if( cplComm .ne. MPI_COMM_NULL ) then
+        ! send using the par comm graph computed by iMOAB_ComputeCommGraph
+        ierr = iMOAB_SendElementTag( cplAtmPID, fields, cplComm, atmocnid )
+        call errorout( ierr, "cannot send tag values towards coverage mesh for bilinear map" )
+
+        ierr = iMOAB_ReceiveElementTag( cplAtmOcnPID, fields, cplComm, cplatm )
+        call errorout( ierr, "cannot receive tag values for bilinear map" )
+
+        ierr = iMOAB_FreeSenderBuffers( cplAtmPID, atmocnid )
+        call errorout( ierr, "cannot free buffers" )
+    endif
+   
+   
    if (cplComm .ne. MPI_COMM_NULL) then
 
       ! We have the remapping weights now. Let us apply the weights onto the tag we defined
@@ -367,6 +445,8 @@ program imoab_coupler_fortran
 
       ierr = iMOAB_DefineTagStorage(cmpOcnPID, transferFields, tagTypes(2), ocnCompNDoFs, tagIndexIn2)
       call errorout(ierr, 'failed to define the field tag for receiving back the tag a2oTbot_proj,  on ocn pes')
+      ierr = iMOAB_DefineTagStorage(cmpOcnPID, "GLOBAL_ID"//C_NULL_CHAR, 0, 1, tagIndexIn2)
+      call errorout(ierr, 'failed to define the field tag for GLOBAL_ID,  on ocn pes')
 
    end if
 
@@ -401,7 +481,44 @@ program imoab_coupler_fortran
       end if
       ierr = iMOAB_WriteMesh(cmpOcnPID, outputFileOcn, fileWriteOptions)
       call errorout(ierr, 'could not write OcnWithProjF.h5m to disk')
+      ! check baseline for some variables
+      !  Each process in the communicator will have access to a local mesh instance, which
+      !  will contain the original cells in the local partition and ghost entities. Number of
+      !  vertices, primary cells, visible blocks, number of sidesets and nodesets boundary
+      !  conditions will be returned in numProcesses 3 arrays, for local, ghost and total
+      !  numbers.
 
+      ierr = iMOAB_GetMeshInfo(cmpOcnPID, nverts, nelem, nblocks, nsbc, ndbc)
+      call errorout(ierr, 'failed to get num primary elems')
+      storLeng = nelem(3) ! 1 tag for now
+      allocate (vals(storLeng))
+      allocate (gids(storLeng))
+      eetype = 1 ! double type
+
+      eps = 1.e-9
+      eetype = 1 ! cell type, not vertex
+      ierr         = iMOAB_GetIntTagStorage( cmpOcnPID, "GLOBAL_ID"//C_NULL_CHAR, storLeng, eetype, gids );
+      call errorout(ierr, 'failed to get gids')
+      ierr         = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_bilin_proj"//C_NULL_CHAR, storLeng, eetype, vals );
+      call errorout(ierr, 'failed to get pbots bilinear')
+      
+      call check_baseline(base_file3, storLeng, gids, vals, eps, my_id, ierr)
+      call errorout(ierr, 'failed to check bilinear values')
+      if (ierr .eq. 0 .and. my_id .eq. 0 ) print *, 'checked Sa_pbot_bilin_proj values agains baseline'
+      ierr         = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_o2_proj"//C_NULL_CHAR, storLeng, eetype, vals )
+      call errorout(ierr, 'failed to get pbot order 2')
+      
+      call check_baseline(base_file4, storLeng, gids, vals, eps, my_id, ierr)
+      call errorout(ierr, 'failed to check higher order values')
+      if (ierr .eq. 0 .and. my_id .eq. 0 ) print *, 'checked Sa_pbot_o2_proj values against baseline'
+
+      ierr         = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_o2_caas_proj"//C_NULL_CHAR, storLeng, eetype, vals )
+      call errorout(ierr, 'failed to get pbot order 2 caas')
+      
+      call check_baseline(base_file5, storLeng, gids, vals, eps, my_id, ierr)
+      call errorout(ierr, 'failed to check higher order values caas')
+      if (ierr .eq. 0 .and. my_id .eq. 0 ) print *, 'checked Sa_pbot_o2_caas_proj values against baseline'
+      
    end if
 
    ! free up resources

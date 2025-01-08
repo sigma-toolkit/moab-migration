@@ -92,7 +92,7 @@ class TempestRemapper : public Remapper
     /// <summary>
     ///     Construct a source covering mesh such that it completely encompasses the target grid in
     ///     parallel. This operation is critical to ensure that the parallel advancing-front
-    ///     intersection algorithm can the intersection mesh only locally without any process
+    ///     intersection algorithm can compute the intersection mesh only locally without any process
     ///     communication.
     /// </summary>
     moab::ErrorCode ConstructCoveringSet( double tolerance   = 1e-8,
@@ -101,7 +101,7 @@ class TempestRemapper : public Remapper
                                           double boxeps      = 0.1,
                                           bool regional_mesh = false,
                                           bool gnomonic      = true,
-                                          int order          = 1 );
+                                          int nb_ghost_layers  = 0 );
 
     /// <summary>
     ///     Compute the intersection mesh between the source and target grids that have been

@@ -22,9 +22,9 @@ class Moab(ConanFile):
             del self.options.fPIC
 
     def requirements(self):
-        self.requires("eigen/3.3.9")
+        self.requires("eigen/3.4.0")
         if self.options.hdf5:
-            self.requires("hdf5/1.12.0", options={"shared": True})
+            self.requires("hdf5/1.14.5", options={"shared": True})
         if self.options.parallel:
             self.requires("openmpi/4.1.0")
         self.requires("zlib/1.2.11")

@@ -127,7 +127,7 @@ the bin directory is in your PATH.
 MOAB's conan recipe creates either a "dbg" or "opt" build directory, depending on whether a Debug or Release build is requested, resp.
 Starting from the top-level MOAB directory, execute the following (using either Debug/dbg or Release/opt):
 ```bash
-      conan install . -s build_type=[Debug|Release]
+      conan install . -s build_type=[Debug|Release] --build=missing
       cd [dbg|opt]
       cmake .. -DCMAKE_TOOLCHAIN_FILE=cmake/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=[Debug|Release]
       make -j 8

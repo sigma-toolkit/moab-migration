@@ -1,12 +1,8 @@
 /*
- * This imoab_read_map test will simulate coupling between 2 components
+ * This imoab_read_compute_map test will simulate coupling between 2 components
  * 2 meshes will be loaded from 2 files (src, tgt), and one map file
- * after the map is read, in parallel, on coupler pes, with distributed rows, the
- * coupler meshes for source and target will be generated, in a migration step,
- * in which we will migrate from target pes according to row ids, to coupler target mesh,
- *  and from source to coverage mesh mesh on coupler. During this migration, par comm graphs
- *  will be established between source and coupler and target and coupler, which will assist
- *  in field transfer from source to target, through coupler
+ * We will compute the map FV-FV between the meshes and we will also read the map
+ * we will compare both workflows against the baseline test
  *
  */
 
@@ -34,7 +30,7 @@
 #endif
 
 #define COMPUTE_FILE_MAP
-//#define COMPUTE_ONLINE_MAP
+#define COMPUTE_ONLINE_MAP
 
 #if( !defined( COMPUTE_FILE_MAP ) && !defined( COMPUTE_ONLINE_MAP ) )
 #error Enable either file-based map (COMPUTE_FILE_MAP) and/or online (COMPUTE_ONLINE_MAP) for coupling
@@ -254,26 +250,6 @@ int main( int argc, char* argv[] )
         CHECKIERR( iMOAB_FreeSenderBuffers( cmpOcnPID, &cplocn ), "cannot free buffers used to send ocean mesh" )
     }
 
-    // this model (recMeshOcn.h5m) has mixed meshes in it, we need to repair the comm graph
-    // first delete the one created with migration, then compute a new one
-    // if( atmCouComm != MPI_COMM_NULL )
-    // {
-    //     int type = 3;  // type: 1 - SE, 2 - Vertex (point cloud), 3 - Element (FV scalars)
-    //     CHECKIERR( iMOAB_ComputeCommGraph( cmpAtmPID, cplAtmPID, &atmCouComm, &atmPEGroup, &couPEGroup, &type,
-    //                                        &type, &cmpatm, &cplatm ),
-    //                "cannot compute graph between ocn comp and ocn migrated to coupler" )
-    // }
-
-    // this model (recMeshOcn.h5m) has mixed meshes in it, we need to repair the comm graph
-    // first delete the one created with migration, then compute a new one
-    if( ocnCouComm != MPI_COMM_NULL )
-    {
-        int type = 3;  // type: 1 - SE, 2 - Vertex (point cloud), 3 - Element (FV scalars)
-        CHECKIERR( iMOAB_ComputeCommGraph( cmpOcnPID, cplOcnPID, &ocnCouComm, &ocnPEGroup, &couPEGroup, &type, &type,
-                                           &cmpocn, &cplocn ),
-                   "cannot compute graph between ocn comp and ocn migrated to coupler" )
-    }
-
     // write only for n==1 case
     if( couComm != MPI_COMM_NULL && 1 == number_iterations )
     {
@@ -356,35 +332,15 @@ int main( int argc, char* argv[] )
                                                         atmocn_map_file_name ),
                        "failed to write map file to disk" );
         }
+        int meshtype = 3;
+        PUSH_TIMER( "Compute ATM coverage graph for OCN mesh, for compute graph" )
+        CHECKIERR( iMOAB_ComputeCommGraph( cplAtmPID, cplAtmOcnMemPID, &couComm, &couPEGroup, &couPEGroup, &meshtype,
+                                          &meshtype, &cplatm, &atmocnmid ),
+                  "cannot recompute ATM source coverage graph for ocean" )
+        POP_TIMER( couComm, rankInCouComm )  // hijack this rank
     }
 #endif
 
-    // now create the linkage between the ATM component and the coverage source mesh in the coupler
-    if( atmCouComm != MPI_COMM_NULL )
-    {
-        /*
-         * This new graph will be used for sending data from ATM-cmp (cmpAtmPID) to ATM-coverage-cpl (cplAtmPID) application
-         * The operation involves initial atm app; cmpAtmPID; also migrate atm mesh on coupler pes, cplAtmPID
-         * results are in cplAtmOcnPID, intx mesh; remapper also has some info about coverage mesh
-         * after this, the sending of tags from atm pes to coupler pes will use the new par comm
-         * graph, that has more precise info about what to send for ocean cover ; every time, we
-         * will use the element global id, which should uniquely identify the element
-         */
-#if defined( COMPUTE_ONLINE_MAP )
-        PUSH_TIMER( "Compute OCN coverage graph for ATM mesh" )
-        CHECKIERR( iMOAB_CoverageGraph( &atmCouComm, cmpAtmPID, cplAtmPID, cplAtmOcnMemPID, &cmpatm, &cplatm,
-                                          &cplocn ),
-                   "cannot recompute direct coverage graph for ocean" )
-        POP_TIMER( atmCouComm, rankInAtmComm )  // hijack this rank
-#endif
-#if defined( COMPUTE_FILE_MAP ) && !defined( COMPUTE_ONLINE_MAP )
-        //PUSH_TIMER( "Compute ATM coverage graph for OCN mesh" )
-        //CHECKIERR( iMOAB_CoverageGraph( &atmCouComm, cmpAtmPID, cplAtmPID, cplAtmOcnFilePID, &cmpatm, &cplatm,
-         //                               &cplocn ),
-        //           "cannot recompute ATM source coverage graph for ocean" )
-       //POP_TIMER( atmCouComm, rankInAtmComm )  // hijack this rank
-#endif
-    }
 
 
 #if defined( COMPUTE_FILE_MAP )
@@ -476,12 +432,21 @@ int main( int argc, char* argv[] )
         }
 #endif
 
-#ifdef VERBOSE
-        if( *cplAtmPID >= 0 && number_iterations == 1 )
+#if defined( COMPUTE_ONLINE_MAP )
+        if( couComm != MPI_COMM_NULL )
         {
-            char prefix[] = "atmcov_withdata";
-            CHECKIERR( iMOAB_WriteLocalMesh( cplAtmPID, prefix ), "failed to write local ATM cov mesh with data" );
+            // send using the par comm graph computed by iMOAB_ComputeCommGraph
+            CHECKIERR( iMOAB_SendElementTag( cplAtmPID, bottomFields, &couComm, &atmocnmid ),
+                       "cannot send tag values towards coverage mesh for bilinear map" )
+
+            CHECKIERR( iMOAB_ReceiveElementTag( cplAtmOcnMemPID, bottomFields, &couComm, &cplatm ),
+                       "cannot receive tag values for bilinear map" )
+
+            CHECKIERR( iMOAB_FreeSenderBuffers( cplAtmPID, &atmocnmid ), "cannot free buffers" )
         }
+#endif
+
+#ifdef VERBOSE
 
         if( couComm != MPI_COMM_NULL && 1 == number_iterations )
         {

@@ -248,7 +248,7 @@ ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
 #ifdef MOAB_HAVE_MPI
     MPI_Comm_rank( *comm, &rankHere );
 #endif
-    if( !rankHere ) std::cout << " application " << name << " with ID = " << *pid << " is registered now \n";
+    if( !rankHere ) std::cout << " application " << name << " with ID = " << *pid << " and external id: " <<  *compid << "  is registered now \n";
     if( *compid <= 0 )
     {
         std::cout << " convention for external application is to have its id positive \n";
@@ -2652,7 +2652,13 @@ ErrCode iMOAB_SendElementTag( iMOAB_AppID pid,
     appData& data                               = context.appDatas[*pid];
     std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *context_id );
     if( mt == data.pgraph.end() )
+    {
+        std::cout <<" no par com graph for context_id:" << *context_id << " available contexts:";
+        for (auto mit = data.pgraph.begin(); mit != data.pgraph.end(); mit++)
+            std::cout << "  " << mit->first;
+        std::cout << "\n";
         return moab::MB_FAILURE;
+    }
 
     ParCommGraph* cgraph = mt->second;
     ParallelComm* pco    = context.appDatas[*pid].pcomm;

@@ -34,12 +34,13 @@
 #endif
 
 #define COMPUTE_FILE_MAP
-#define COMPUTE_ONLINE_MAP
+//#define COMPUTE_ONLINE_MAP
 
 #if( !defined( COMPUTE_FILE_MAP ) && !defined( COMPUTE_ONLINE_MAP ) )
 #error Enable either file-based map (COMPUTE_FILE_MAP) and/or online (COMPUTE_ONLINE_MAP) for coupling
 #endif
 
+#define VERBOSE
 int main( int argc, char* argv[] )
 {
     // Timer data
@@ -377,15 +378,16 @@ int main( int argc, char* argv[] )
         POP_TIMER( atmCouComm, rankInAtmComm )  // hijack this rank
 #endif
 #if defined( COMPUTE_FILE_MAP ) && !defined( COMPUTE_ONLINE_MAP )
-        PUSH_TIMER( "Compute ATM coverage graph for OCN mesh" )
-        CHECKIERR( iMOAB_CoverageGraph( &atmCouComm, cmpAtmPID, cplAtmPID, cplAtmOcnFilePID, &cmpatm, &cplatm,
-                                        &cplocn ),
-                   "cannot recompute ATM source coverage graph for ocean" )
-        POP_TIMER( atmCouComm, rankInAtmComm )  // hijack this rank
+        //PUSH_TIMER( "Compute ATM coverage graph for OCN mesh" )
+        //CHECKIERR( iMOAB_CoverageGraph( &atmCouComm, cmpAtmPID, cplAtmPID, cplAtmOcnFilePID, &cmpatm, &cplatm,
+         //                               &cplocn ),
+        //           "cannot recompute ATM source coverage graph for ocean" )
+       //POP_TIMER( atmCouComm, rankInAtmComm )  // hijack this rank
 #endif
     }
 
-#if defined( COMPUTE_FILE_MAP ) && defined( COMPUTE_ONLINE_MAP )
+
+#if defined( COMPUTE_FILE_MAP )
     if( couComm != MPI_COMM_NULL )
     {
         int meshtype = 3;
@@ -393,7 +395,7 @@ int main( int argc, char* argv[] )
         CHECKIERR( iMOAB_ComputeCommGraph( cplAtmPID, cplAtmOcnFilePID, &couComm, &couPEGroup, &couPEGroup, &meshtype,
                                            &meshtype, &cplatm, &atmocnfid ),
                    "cannot recompute ATM source coverage graph for ocean" )
-        POP_TIMER( atmCouComm, rankInAtmComm )  // hijack this rank
+        POP_TIMER( couComm, rankInCouComm )  // hijack this rank
     }
 #endif
 
@@ -434,24 +436,23 @@ int main( int argc, char* argv[] )
     // start a virtual loop for number of iterations
     for( int iters = 0; iters < number_iterations; iters++ )
     {
-        PUSH_TIMER( "Send/receive data from ATM component to coupler in OCN context" )
+        PUSH_TIMER( "Send/receive data from ATM component to coupler " )
         if( atmComm != MPI_COMM_NULL )
         {
             // as always, use nonblocking sends
-            // this is for projection to ocean:
-            CHECKIERR( iMOAB_SendElementTag( cmpAtmPID, bottomFields, &atmCouComm, &cplocn ), "cannot send tag values" )
+            CHECKIERR( iMOAB_SendElementTag( cmpAtmPID, bottomFields, &atmCouComm, &cplatm ), "cannot send tag values" )
         }
         if( couComm != MPI_COMM_NULL )
         {
             // receive on ATM on coupler pes, that was redistributed according to coverage
-            CHECKIERR( iMOAB_ReceiveElementTag( cplAtmPID, bottomFields, &atmCouComm, &cplocn ),
+            CHECKIERR( iMOAB_ReceiveElementTag( cplAtmPID, bottomFields, &atmCouComm, &cmpatm ),
                        "cannot receive tag values" )
         }
 
         // we can now free the sender buffers
         if( atmComm != MPI_COMM_NULL )
         {
-            CHECKIERR( iMOAB_FreeSenderBuffers( cmpAtmPID, &cplocn ),
+            CHECKIERR( iMOAB_FreeSenderBuffers( cmpAtmPID, &cplatm ),
                        "cannot free buffers used to resend ATM tag towards the coverage mesh" )
         }
         POP_TIMER( MPI_COMM_WORLD, rankInGlobalComm )
@@ -461,7 +462,7 @@ int main( int argc, char* argv[] )
         // rings around target cells (ocean)
         // basically we should send to more cells than needed just for intersection
         //TODO
-#if defined( COMPUTE_FILE_MAP ) && defined( COMPUTE_ONLINE_MAP )
+#if defined( COMPUTE_FILE_MAP )
         if( couComm != MPI_COMM_NULL )
         {
             // send using the par comm graph computed by iMOAB_ComputeCommGraph

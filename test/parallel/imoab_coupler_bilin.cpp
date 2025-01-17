@@ -89,6 +89,7 @@ int main( int argc, char* argv[] )
     int rankInOcnComm       = -1;
     int cmpocn = 17, cplocn = 18,
         atmocnid = 618;  // component ids are unique over all pes, and established in advance;
+    int ocnatmid = 1806; // for the extra intx
 #endif
 
     int rankInCouComm = -1;
@@ -187,6 +188,9 @@ int main( int argc, char* argv[] )
     int cplOcnAppID = -1, cplAtmOcnAppID = -1;   // -1 means it is not initialized
     iMOAB_AppID cplOcnPID    = &cplOcnAppID;     // ocn on coupler PEs
     iMOAB_AppID cplAtmOcnPID = &cplAtmOcnAppID;  // intx atm -ocn on coupler PEs
+    int cplOcnAtmAppID = -1;
+    iMOAB_AppID cplOcnAtmPID = &cplOcnAtmAppID; // this is for the intersection that
+     // triggers the ghosting bug
 #endif
 
     if( couComm != MPI_COMM_NULL )
@@ -252,7 +256,12 @@ int main( int argc, char* argv[] )
         // now compute intersection between OCNx and ATMx on coupler PEs
         ierr = iMOAB_RegisterApplication( "ATMOCN", &couComm, &atmocnid, cplAtmOcnPID );
         CHECKIERR( ierr, "Cannot register ocn_atm intx over coupler pes " )
+        // register the extra intx, that will trigger the ghosting bug
+        // now compute intersection between ATMx and OCNx on coupler PEs
+        ierr = iMOAB_RegisterApplication( "OCNATM", &couComm, &ocnatmid, cplOcnAtmPID );
+        CHECKIERR( ierr, "Cannot register atm_ocn intx over coupler pes " )
     }
+
 #endif
 
     int disc_orders[1]                       = { 1 };
@@ -263,6 +272,10 @@ int main( int argc, char* argv[] )
 #ifdef ENABLE_ATMOCN_COUPLING
     if( couComm != MPI_COMM_NULL )
     {
+        PUSH_TIMER( "Compute OCN-ATM mesh intersection" )
+        ierr = iMOAB_ComputeMeshIntersectionOnSphere( cplOcnPID, cplAtmPID, cplOcnAtmPID );
+        CHECKIERR( ierr, "cannot compute intersection" )
+        POP_TIMER( couComm, rankInCouComm )
         // set the ghost layers on the coupler for the source mesh
         nghlay = 1;  // number of ghost layers
         ierr   = iMOAB_SetGhostLayers( cplAtmPID, &nghlay );
@@ -515,6 +528,8 @@ int main( int argc, char* argv[] )
 #ifdef ENABLE_ATMOCN_COUPLING
     if( couComm != MPI_COMM_NULL )
     {
+        ierr = iMOAB_DeregisterApplication( cplOcnAtmPID );
+        CHECKIERR( ierr, "cannot deregister app intx OA" )
         ierr = iMOAB_DeregisterApplication( cplAtmOcnPID );
         CHECKIERR( ierr, "cannot deregister app intx AO" )
     }

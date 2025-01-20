@@ -81,5 +81,5 @@ EXTRA_DIST = 125hex.g \
 	     outTri15_8.h5m baseline2.txt mapNE20_FV15.nc srcWithSolnTag.h5m \
 	     recLand.h5m WHOLE_cx_lnd.h5m \
 	     wholeRof_06.h5m SCRIPgrid_2x2_nomask_c210211.nc \
-	     baseline3.txt atm_c2x.h5m wholeOcn.h5m 
+	     baseline3.txt baseline4.txt baseline5.txt atm_c2x.h5m wholeOcn.h5m 
 

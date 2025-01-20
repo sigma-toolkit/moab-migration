@@ -89,11 +89,12 @@ class Remapper
         moab::Range orgEnts;
         rval = m_interface->get_entities_by_handle( meshset, orgEnts );MB_CHK_ERR( rval );
         rval = m_interface->add_entities( set_with_ghosts, orgEnts );MB_CHK_ERR( rval );
-        rval = pcomm->exchange_ghost_cells( 2, 0, 1, 0, true, true, &set_with_ghosts );MB_CHK_ERR( rval );
+        bool global_id_filter = true;// only time this is true, so far
+        rval = pcomm->exchange_ghost_cells( 2, 0, 1, 0, true, true, &set_with_ghosts, global_id_filter );MB_CHK_ERR( rval );
         for( int i = 2; i <= ngh_layers; i++ )
         {
             rval = pcomm->correct_thin_ghost_layers();MB_CHK_ERR( rval );
-            rval = pcomm->exchange_ghost_cells( 2, 0, i, 0, true, true, &set_with_ghosts );MB_CHK_ERR( rval );
+            rval = pcomm->exchange_ghost_cells( 2, 0, i, 0, true, true, &set_with_ghosts, global_id_filter );MB_CHK_ERR( rval );
         }
 
         // need to set global id tags
@@ -119,31 +120,6 @@ class Remapper
         std::stringstream filename1;
         filename1 << "set_with_ghosts" << m_pcomm->rank() << ".h5m";
         rval = m_interface->write_file( filename1.str().c_str(), 0, 0, &set_with_ghosts, 1 );MB_CHK_ERR( rval );
-
-#endif
-        // an ugly fix, to our ghost problems:
-        // remove from set_with_ghosts all 2d cells that do not have global ids:
-        // another way would be to remove all cells that do not belong to the original iMOAB app
-        // that would mean marking the cells with a iMOAB app tag (either global or the actual iMOAB app id)
-        // in principle, the intersection cells have no global ids, they should be removed
-        //
-        // filter out the entities by dimension
-        moab::Range cells2d = entities.subset_by_dimension(2);
-        std::vector<int> globalIds(cells2d.size());
-        // collect all cells that have no global id
-        rval = m_interface->tag_get_data(gtag, cells2d, &globalIds[0]);MB_CHK_ERR( rval );
-        moab::Range to_remove;
-        for (size_t i=0; i<cells2d.size(); i++)
-        {
-            if (globalIds[i] <= 0)
-                to_remove.insert(cells2d[i]);
-        }
-        // remove from actual ghost set
-        rval = m_interface->remove_entities(set_with_ghosts, to_remove);MB_CHK_ERR( rval );
-#ifdef MOAB_DBG
-        std::stringstream filename2;
-        filename2 << "set_with_ghosts_after_clean" << m_pcomm->rank() << ".h5m";
-        rval = m_interface->write_file( filename2.str().c_str(), 0, 0, &set_with_ghosts, 1 );MB_CHK_ERR( rval );
 
 #endif
         return rval;

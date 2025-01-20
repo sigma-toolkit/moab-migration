@@ -245,7 +245,8 @@ class ParallelComm
                                     int addl_ents,
                                     bool store_remote_handles,
                                     bool wait_all          = true,
-                                    EntityHandle* file_set = NULL );
+                                    EntityHandle* file_set = NULL,
+                                    bool global_id_filter = false);
 
     /** \brief Static version of exchange_ghost_cells, exchanging info through
      * buffers rather than messages
@@ -1049,7 +1050,8 @@ class ParallelComm
                              const int addl_ents,
                              Range* sent_ents,
                              Range& allsent,
-                             TupleList& entprocs );
+                             TupleList& entprocs,
+                             bool global_id_filter = false);
 
     /** \brief Set pstatus values on entities
      *
@@ -1337,7 +1339,8 @@ class ParallelComm
                                     int to_proc,
                                     int num_layers,
                                     int addl_ents,
-                                    Range& ghosted_ents );
+                                    Range& ghosted_ents,
+                                    bool global_id_filter = false);
 
     //! add vertices adjacent to entities in this list
     ErrorCode add_verts( Range& sent_ents );

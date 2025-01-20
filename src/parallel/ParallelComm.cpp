@@ -5690,7 +5690,8 @@ ErrorCode ParallelComm::exchange_ghost_cells( int ghost_dim,
                                               int addl_ents,
                                               bool store_remote_handles,
                                               bool wait_all,
-                                              EntityHandle* file_set )
+                                              EntityHandle* file_set,
+                                              bool global_id_filter)
 {
 #ifdef MOAB_HAVE_MPE
     if( myDebug->get_verbosity() == 2 )
@@ -5761,7 +5762,7 @@ ErrorCode ParallelComm::exchange_ghost_cells( int ghost_dim,
     Range sent_ents[MAX_SHARING_PROCS], allsent, tmp_range;
     TupleList entprocs;
     int dum_ack_buff;
-    result = get_sent_ents( is_iface, bridge_dim, ghost_dim, num_layers, addl_ents, sent_ents, allsent, entprocs );MB_CHK_SET_ERR( result, "get_sent_ents failed" );
+    result = get_sent_ents( is_iface, bridge_dim, ghost_dim, num_layers, addl_ents, sent_ents, allsent, entprocs, global_id_filter );MB_CHK_SET_ERR( result, "get_sent_ents failed" );
 
     // augment file set with the entities to be sent
     // we might have created new entities if addl_ents>0, edges and/or faces
@@ -6522,7 +6523,8 @@ ErrorCode ParallelComm::get_sent_ents( const bool is_iface,
                                        const int addl_ents,
                                        Range* sent_ents,
                                        Range& allsent,
-                                       TupleList& entprocs )
+                                       TupleList& entprocs,
+                                       bool global_id_filter)
 {
     ErrorCode result;
     unsigned int ind;
@@ -6536,7 +6538,7 @@ ErrorCode ParallelComm::get_sent_ents( const bool is_iface,
         if( !is_iface )
         {
             result =
-                get_ghosted_entities( bridge_dim, ghost_dim, buffProcs[ind], num_layers, addl_ents, sent_ents[ind] );MB_CHK_SET_ERR( result, "Failed to get ghost layers" );
+                get_ghosted_entities( bridge_dim, ghost_dim, buffProcs[ind], num_layers, addl_ents, sent_ents[ind], global_id_filter );MB_CHK_SET_ERR( result, "Failed to get ghost layers" );
         }
         else
         {
@@ -7439,7 +7441,8 @@ ErrorCode ParallelComm::get_ghosted_entities( int bridge_dim,
                                               int to_proc,
                                               int num_layers,
                                               int addl_ents,
-                                              Range& ghosted_ents )
+                                              Range& ghosted_ents,
+                                              bool global_id_filter)
 {
     // Get bridge ents on interface(s)
     Range from_ents;
@@ -7465,6 +7468,24 @@ ErrorCode ParallelComm::get_ghosted_entities( int bridge_dim,
             MeshTopoUtil( mbImpl ).get_bridge_adjacencies( from_ents, bridge_dim, ghost_dim, ghosted_ents, num_layers );MB_CHK_SET_ERR( result, "Failed to get bridge adjacencies" );
     }
 
+    if (global_id_filter && !ghosted_ents.empty()) // remove entities that do not have global id set, from ghosted entities
+        // this is hopefully a temporary fix;
+        // these entities appear because of intersection polygons, that do not have a global id set
+        // we use the fact that they do not have global ids to filter them out
+    {
+        Tag globalIdTag = mbImpl->globalId_tag();// essential tag, it always exists
+        // this is called so far only for 2d entities, from Remapper.hpp around line 94
+        std::vector<int> gids(ghosted_ents.size());
+        result = mbImpl->tag_get_data( globalIdTag, ghosted_ents, &gids[0] );MB_CHK_SET_ERR( result, "Failed to get global ids of ghosted entities" );
+        Range to_remove;
+        for (size_t i=0; i<ghosted_ents.size(); i++)
+        {
+            if (gids[i] <= 0)
+                to_remove.insert(ghosted_ents[i]);
+        }
+        // remove from ghosted_ents Range the entities without global ids
+        ghosted_ents = subtract(ghosted_ents, to_remove);
+    }
     result = add_verts( ghosted_ents );MB_CHK_SET_ERR( result, "Failed to add verts" );
 
     if( addl_ents )

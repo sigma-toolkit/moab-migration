@@ -585,7 +585,8 @@ ErrorCode TempestRemapper::ConvertMeshToTempest( Remapper::IntersectionContext c
 ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
                                                             EntityHandle mesh_set,
                                                             moab::Range& elems,
-                                                            moab::Range* pverts )
+                                                            moab::Range* pverts,
+                                                            bool orderByID)
 {
     ErrorCode rval;
     Range verts;
@@ -688,6 +689,8 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
         *pverts = verts;
     }
     verts.clear();
+    if (orderByID)
+        cov_order_idx = sortedIdx; // this is only for coverage so far
 
     return MB_SUCCESS;
 }
@@ -876,8 +879,9 @@ ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
     if( 0 == m_covering_source )
     {
         m_covering_source = new Mesh();
+        bool orderByID = true;
         rval = convert_mesh_to_tempest_private( m_covering_source, m_covering_source_set, m_covering_source_entities,
-                                                &m_covering_source_vertices );MB_CHK_SET_ERR( rval, "Can't convert source Tempest mesh" );
+                                                &m_covering_source_vertices, orderByID );MB_CHK_SET_ERR( rval, "Can't convert source Tempest mesh" );
     }
 
 #ifdef VERBOSE
@@ -1234,7 +1238,7 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-//#define MOAB_DBG
+#define MOAB_DBG
 ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
                                                  double radius_src,
                                                  double radius_tgt,
@@ -1379,7 +1383,8 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
 
     return rval;
 }
-
+#undef MOAB_DBG
+//#define MOAB_DBG
 ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_tempest, int nLayers )
 {
     ErrorCode rval;

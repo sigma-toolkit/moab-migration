@@ -283,7 +283,8 @@ class TempestRemapper : public Remapper
     moab::ErrorCode convert_mesh_to_tempest_private( Mesh* mesh,
                                                      moab::EntityHandle meshset,
                                                      moab::Range& entities,
-                                                     moab::Range* pverts );
+                                                     moab::Range* pverts,
+                                                     bool orderByID = false);
 
     moab::ErrorCode convert_tempest_mesh_private( TempestMeshType type,
                                                   Mesh* mesh,
@@ -332,6 +333,10 @@ class TempestRemapper : public Remapper
     /* local to glboal and global to local ID maps */
     std::map< int, int > gid_to_lid_src, gid_to_lid_covsrc, gid_to_lid_tgt;
     std::map< int, int > lid_to_gid_src, lid_to_gid_covsrc, lid_to_gid_tgt;
+
+    // extra
+    std::vector<size_t>  cov_order_idx; // will exist so far only for coverage mesh
+    // the m_covering_source_entities is mapped to MeshCov faces with this order
 
     IntxAreaUtils::AreaMethod m_area_method;
 

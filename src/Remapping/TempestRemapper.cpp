@@ -586,7 +586,9 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
                                                             EntityHandle mesh_set,
                                                             moab::Range& elems,
                                                             moab::Range* pverts,
-                                                            bool orderByID)
+                                                            bool orderByID,
+                                                            std::vector< size_t > * pcov_order_idx
+                                                            )
 {
     ErrorCode rval;
     Range verts;
@@ -624,7 +626,7 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     moab::Tag gid = m_interface->globalId_tag();
     rval          = m_interface->tag_get_data( gid, elems, &globIds[0] );MB_CHK_ERR( rval );
     std::vector< size_t > sortedIdx;
-    if( offlineWorkflow )
+    if( offlineWorkflow || orderByID)
     {
         sortedIdx.resize( nelems );
         // initialize original index locations
@@ -638,7 +640,7 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     for( unsigned iface = 0; iface < nelems; ++iface )
     {
         Face& face           = faces[iface];
-        EntityHandle ehandle = ( offlineWorkflow ? elems[sortedIdx[iface]] : elems[iface] );
+        EntityHandle ehandle = ( ( offlineWorkflow || orderByID ) ? elems[sortedIdx[iface]] : elems[iface] );
 
         // get the connectivity for each edge
         const EntityHandle* connectface;
@@ -690,7 +692,7 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     }
     verts.clear();
     if (orderByID)
-        cov_order_idx = sortedIdx; // this is only for coverage so far
+        *pcov_order_idx = sortedIdx; // this is only for coverage so far
 
     return MB_SUCCESS;
 }
@@ -879,9 +881,9 @@ ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
     if( 0 == m_covering_source )
     {
         m_covering_source = new Mesh();
-        bool orderByID = true;
+        bool orderByID = false;
         rval = convert_mesh_to_tempest_private( m_covering_source, m_covering_source_set, m_covering_source_entities,
-                                                &m_covering_source_vertices, orderByID );MB_CHK_SET_ERR( rval, "Can't convert source Tempest mesh" );
+                                                &m_covering_source_vertices, orderByID, &cov_order_idx);MB_CHK_SET_ERR( rval, "Can't convert source Tempest mesh" );
     }
 
 #ifdef VERBOSE
@@ -911,8 +913,10 @@ ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
         }
         for( unsigned ie = 0; ie < gids.size(); ++ie )
         {
-            gid_to_lid_covsrc[gids[ie]] = ie;
-            lid_to_gid_covsrc[ie]       = gids[ie];
+            // we know that m_covering_source_entities[ie] has gids[ie] , but it has index cov_order_idx[ie] in
+            // m_covering_source::faces
+            gid_to_lid_covsrc[ gids[ie] ] = ie;
+            lid_to_gid_covsrc[ ie ]       = gids[ie]; // these are not ordered ?
         }
 
         if( point_cloud_source )
@@ -1384,7 +1388,7 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
     return rval;
 }
 #undef MOAB_DBG
-//#define MOAB_DBG
+#define MOAB_DBG
 ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_tempest, int nLayers )
 {
     ErrorCode rval;
@@ -1598,75 +1602,376 @@ ErrorCode TempestRemapper::augment_overlap_set()
 {
     /*
      * overall strategy:
+     * 1) find all source cells that have intersection cells distributed to more than one task; send to the original source the
+     *    ranks involved; if there is more than one rank, it means that the source cell is spread over multiple target ranks,
+     *    so it will participate in the augment of the overlap set
+     *     we need 2 crystal gs calls, one to send the rank current rank to original task; another one to send the other participating
+     *     ranks to each rank;
+     * 2) third gs_transfer will send overlap cells to the other tasks, for each source cell that is distributed
      *
-     * 1) collect all boundary target cells on the current task, affected by the partition boundary;
-     *    note: not only partition boundary, we need all boundary (all coastal lines) and partition
-     * boundary targetBoundaryIds is the set of target boundary cell IDs
-     *
-     * 2) collect all source cells that are intersecting boundary cells (call them
-     * affectedSourceCellsIds)
-     *
-     * 3) collect overlap, that is accumulate all overlap cells that have source target in
-     * affectedSourceCellsIds
      */
     // first, get all edges on the partition boundary, on the target mesh, then all the target
     // elements that border the partition boundary
     ErrorCode rval;
-    Skinner skinner( m_interface );
-    Range targetCells, boundaryEdges;
-    rval = m_interface->get_entities_by_dimension( m_target_set, 2, targetCells );MB_CHK_ERR( rval );
-    /// find all boundary edges
-    rval = skinner.find_skin( 0, targetCells, false, boundaryEdges );MB_CHK_ERR( rval );
-    // filter boundary edges that are on partition boundary, not on boundary
-    // find all cells adjacent to these boundary edges, from target set
-    Range boundaryCells;  // these will be filtered from target_set
-    rval = m_interface->get_adjacencies( boundaryEdges, 2, false, boundaryCells, Interface::UNION );MB_CHK_ERR( rval );
-    boundaryCells = intersect( boundaryCells, targetCells );
-#ifdef MOAB_DBG
-    EntityHandle tmpSet;
-    rval = m_interface->create_meshset( MESHSET_SET, tmpSet );MB_CHK_SET_ERR( rval, "Can't create temporary set" );
-    // add the boundary set and edges, and save it to a file
-    rval = m_interface->add_entities( tmpSet, boundaryCells );MB_CHK_SET_ERR( rval, "Can't add entities" );
-    rval = m_interface->add_entities( tmpSet, boundaryEdges );MB_CHK_SET_ERR( rval, "Can't add edges" );
-    std::stringstream ffs;
-    ffs << "boundaryCells_0" << rank << ".h5m";
-    rval = m_interface->write_mesh( ffs.str().c_str(), &tmpSet, 1 );MB_CHK_ERR( rval );
-#endif
-
-    // now that we have the boundary cells, see which overlap polys have these as parents;
-    //   find the ids of the boundary cells;
     Tag gid = m_interface->globalId_tag();
-    std::set< int > targetBoundaryIds;
-    for( Range::iterator it = boundaryCells.begin(); it != boundaryCells.end(); it++ )
-    {
-        int tid;
-        EntityHandle targetCell = *it;
-        rval                    = m_interface->tag_get_data( gid, &targetCell, 1, &tid );MB_CHK_SET_ERR( rval, "Can't get global id tag on target cell" );
-        if( tid < 0 ) std::cout << " incorrect id for a target cell\n";
-        targetBoundaryIds.insert( tid );
-    }
 
     Range overlapCells;
     rval = m_interface->get_entities_by_dimension( m_overlap_set, 2, overlapCells );MB_CHK_ERR( rval );
 
-    std::set< int > affectedSourceCellsIds;
+    std::set< int > affectedSourceCellsIds;// collect here all parent ids for the local overlap set
     Tag targetParentTag, sourceParentTag;  // do not use blue/red, as it is more confusing
     rval = m_interface->tag_get_handle( "TargetParent", targetParentTag );MB_CHK_ERR( rval );
     rval = m_interface->tag_get_handle( "SourceParent", sourceParentTag );MB_CHK_ERR( rval );
-    for( Range::iterator it = overlapCells.begin(); it != overlapCells.end(); it++ )
+    std::vector<int>  sourceIdsOverlap(overlapCells.size());
+    rval = m_interface->tag_get_data(sourceParentTag, overlapCells, &sourceIdsOverlap[0]);MB_CHK_ERR( rval );
+    for( auto it=sourceIdsOverlap.begin(); it!=sourceIdsOverlap.end(); ++it )
     {
-        EntityHandle intxCell = *it;
-        int targetParentID, sourceParentID;
-        rval = m_interface->tag_get_data( targetParentTag, &intxCell, 1, &targetParentID );MB_CHK_ERR( rval );
-        if( targetBoundaryIds.find( targetParentID ) != targetBoundaryIds.end() )
+        affectedSourceCellsIds.insert( *it );
+    }
+
+    // in theory, we already subtracted unused source in coverage, but in case not, we make sure again only used one are
+    // involved from m_covering_source_set
+    // now loop again over all affectedSourceCellsIds cells, to send the local rank to the original sending rank
+    Range covCells;
+    rval = m_interface->get_entities_by_dimension( m_covering_source_set, 2, covCells );MB_CHK_ERR( rval );
+    std::vector<int> allCovCellsIds(covCells.size());
+    rval = m_interface->tag_get_data(gid, covCells, &allCovCellsIds[0]);MB_CHK_ERR( rval );
+    // construct a map from global id to coverage cells;
+    std::map<int, EntityHandle>  sourceCellMap; // from global id to EntityHangle
+    for (size_t i = 0; i<covCells.size(); ++i)
+        sourceCellMap[allCovCellsIds[i]] = covCells[i];
+
+    TupleList TLrank;                           //
+    TLrank.initialize( 3, 0, 0, 0, affectedSourceCellsIds.size() );  // to proc, source id
+    TLrank.enableWriteAccess(); // we will send the current rank and the global id, to the original rank that sent this cell
+    for (auto sourceCellId : affectedSourceCellsIds) // use c++ 11 here
+    {
+        int n = TLrank.get_n();
+        EntityHandle covCell = sourceCellMap[sourceCellId];
+        int toTask = sourceCellId%size ; // send to the task modulo size
+        TLrank.vi_wr[3 * n]     = toTask;
+        TLrank.vi_wr[3 * n + 1] = rank;  // send to the rendevous task the current task that uses the coverage cell id
+        TLrank.vi_wr[3 * n + 2] = sourceCellId;
+        TLrank.inc_n();
+    }
+    // send now
+    ( m_pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLrank, 0 );
+    // now, we have on each rendevous rank, the source cell id and the tasks that use that id
+    // some of the source cells are used only on one task, but some will be used on multiple tasks;
+    // identify those, and send back to the from task
+
+    // now, sort by ID, and
+    TupleList::buffer buffer;
+    buffer.buffer_init( 3 * TLrank.get_n() );  // allocate memory for sorting
+    TLrank.sort( 2, &buffer ); // sort by the third field, the global id
+    // now, we have to count how many different tasks have each global id; send the rest to the
+    // now find all source cells affected, based on their id;
+
+
+     // will have send to, rank, global id
+    // first identify multiple ranks for each global id in TLrank
+    // loop over all TLrank tuples, and look for ids that are repeated
+
+    // first count source elements that are "spread" over multiple processes
+    // TLrank is ordered now by source ID; loop over them
+    int n = TLrank.get_n();  // total number of source cell ranks received on current task; some are repeated
+
+    std::map< int, int > currentProcsCount;
+    // will form a map between a source cell ID and the set of tasks/targets that are partially overlapped by
+    // these sources
+    std::map< int, std::set< int > > tasksForSource;
+    int sizeOfTLrankBack = 0;  // only increase when we will have to send data
+    for ( int i=0; i<n; i++ )
+    {
+        int currentSourceID  = TLrank.vi_rd[3 * i + 2];
+        int fromTask         = TLrank.vi_rd[3 * i + 1]; // rank that used the cov cell with source id
+        tasksForSource[currentSourceID].insert(fromTask);
+    }
+
+
+    // form the tuple with ranks involved for each global id
+    TupleList TLrankBack;
+    // count how many sends do we have to do
+    int sizeRankBack = 0;
+    for (std::map< int, std::set< int > >::iterator tasks_it = tasksForSource.begin(); tasks_it !=tasksForSource.end(); ++tasks_it )
+    {
+        std::set< int > tasks = tasks_it->second;
+        size_t sizeTaskSet = tasks.size();
+        if (sizeTaskSet > 1)
+            sizeRankBack += sizeTaskSet * (sizeTaskSet - 1);
+    }
+    TLrankBack.initialize( 3, 0, 0, 0, sizeRankBack);
+    TLrankBack.enableWriteAccess();
+    for (std::map< int, std::set< int > >::iterator tasks_it = tasksForSource.begin(); tasks_it !=tasksForSource.end(); ++tasks_it )
+    {
+        int sourceId = tasks_it->first;
+        std::set< int > tasks = tasks_it->second;
+        if (tasks.size() > 1)
         {
-            // this means that the source element is affected
-            rval = m_interface->tag_get_data( sourceParentTag, &intxCell, 1, &sourceParentID );MB_CHK_ERR( rval );
-            affectedSourceCellsIds.insert( sourceParentID );
+            // need to push to each task the other tasks in set
+            for ( auto involvedTask: tasks)
+            {
+                for ( auto otherTask : tasks)
+                {
+                    if (involvedTask != otherTask)
+                    {
+                       int n = TLrankBack.get_n();
+                       TLrankBack.vi_wr[3*n    ] = involvedTask;
+                       TLrankBack.vi_wr[3*n + 1] = otherTask;
+                       TLrankBack.vi_wr[3*n + 2] = sourceId;
+                       TLrankBack.inc_n(); // increment
+                    }
+                }
+            }
+        }
+    }
+    // now, exchange that info
+    ( m_pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLrankBack, 0 );
+    n = TLrankBack.get_n();
+    // now, build for each task in TLrankBack.vi_wr[3*n+1] a range of polygons that have the source TLrankBack.vi_wr[3*n+2]
+    // make a list now for each source id in this rank, from TLrankBack, to what tasks to send the
+    //   intx cells with this source
+
+
+    std::map<int, std::set<int>>  tasksForSourceIDs; // tasksForSourceIDs[sourceId] = tasks
+    for (int i=0; i<n; i++)
+    {
+        int sourceId = TLrankBack.vi_rd[3*i+2];
+        tasksForSourceIDs[sourceId].insert(TLrankBack.vi_rd[3*i+1]); // this source will have to be sent to these tasks
+    }
+
+
+    // basically a map from original processor task to the set of overlap cells to be sent there
+    std::map< int, std::set< EntityHandle > > overlapCellsForTask;
+    // this set will contain all intx cells that will need to be sent ( a union of above sets ,
+    //   that are organized per task on the above map )
+    std::set< EntityHandle > overlapCellsToSend;
+
+    for( size_t i=0; i<overlapCells.size(); ++i )
+    {
+        int sourceParentID = sourceIdsOverlap[i];
+        EntityHandle intxCell = overlapCells[i];
+        if( tasksForSourceIDs.find( sourceParentID ) != tasksForSourceIDs.end() )
+        {
+            std::set<int> tasks = tasksForSourceIDs[sourceParentID];
+            for (auto task: tasks)
+            {
+                overlapCellsForTask[task].insert(intxCell);
+                overlapCellsToSend.insert( intxCell );
+            }
         }
     }
 
-    // now find all source cells affected, based on their id;
+    // find out the maximum number of edges of the polygons needed to be sent
+    // we could we conservative and use a big number, or the number from intx, if we store it then?
+    int maxEdges = 0;
+    for( std::set< EntityHandle >::iterator it = overlapCellsToSend.begin(); it != overlapCellsToSend.end(); it++ )
+    {
+        EntityHandle intxCell = *it;
+        int nnodes;
+        const EntityHandle* conn;
+        rval = m_interface->get_connectivity( intxCell, conn, nnodes );MB_CHK_ERR( rval );
+        if( maxEdges < nnodes ) maxEdges = nnodes;
+    }
+
+    // find the maximum among processes in intersection
+    int globalMaxEdges;
+    if( m_pcomm )
+        MPI_Allreduce( &maxEdges, &globalMaxEdges, 1, MPI_INT, MPI_MAX, m_pcomm->comm() );
+    else
+        globalMaxEdges = maxEdges;
+
+#ifdef MOAB_DBG
+    if( is_root ) std::cout << "maximum number of edges for polygons to send is " << globalMaxEdges << "\n";
+#endif
+
+    // form tuple lists to send vertices and cells;
+    // the problem is that the lists of vertices will need to have other information, like the
+    // processor it comes from, and its index in that list; we may have to duplicate vertices, but
+    // we do not care much; we will not duplicate overlap elements, just the vertices, as they may
+    // come from different cells and different processes each vertex will have a local index and a
+    // processor task it is coming from
+
+    // look through the std::set's to be sent to other processes, and form the vertex tuples and
+    // cell tuples
+    //
+    std::map< int, std::set< EntityHandle > > verticesOverlapForTask;
+
+    std::set< EntityHandle > allVerticesToSend;
+    std::map< EntityHandle, int > allVerticesToSendMap;
+    int numVerts        = 0;
+    int numOverlapCells = 0;
+    for( std::map< int, std::set< EntityHandle > >::iterator it = overlapCellsForTask.begin();
+         it != overlapCellsForTask.end(); it++ )
+    {
+        int sendToProc                                = it->first;
+        std::set< EntityHandle >& overlapCellsToSend2 = it->second;  // organize vertices in std::set per processor
+        // Range vertices;
+        std::set< EntityHandle > vertices;  // collect all vertices connected to overlapCellsToSend2
+        for( std::set< EntityHandle >::iterator set_it = overlapCellsToSend2.begin();
+             set_it != overlapCellsToSend2.end(); ++set_it )
+        {
+            int nnodes_local          = 0;
+            const EntityHandle* conn1 = nullptr;
+            rval = m_interface->get_connectivity( *set_it, conn1, nnodes_local );MB_CHK_ERR( rval );
+            for( int k = 0; k < nnodes_local; k++ )
+                vertices.insert( conn1[k] );
+        }
+        verticesOverlapForTask[sendToProc] = vertices;
+        numVerts += (int)vertices.size();
+        numOverlapCells += (int)overlapCellsToSend2.size();
+        allVerticesToSend.insert( vertices.begin(), vertices.end() );
+    }
+    // build the index map, from entity handle to index in all vert set
+    int j = 0;
+    for( std::set< EntityHandle >::iterator vert_it = allVerticesToSend.begin(); vert_it != allVerticesToSend.end();
+         vert_it++, j++ )
+    {
+        EntityHandle vert          = *vert_it;
+        allVerticesToSendMap[vert] = j;
+    }
+
+    // first send vertices in a tuple list, then send overlap cells, according to requests
+    // overlap cells need to send info about the blue and red parent tags, too
+    TupleList TLv;                           //
+    TLv.initialize( 2, 0, 0, 3, numVerts );  // to proc, index in all range, DP points
+    TLv.enableWriteAccess();
+
+    for( std::map< int, std::set< EntityHandle > >::iterator it = verticesOverlapForTask.begin();
+         it != verticesOverlapForTask.end(); it++ )
+    {
+        int sendToProc                     = it->first;
+        std::set< EntityHandle >& vertices = it->second;
+        int i                              = 0;
+        for( std::set< EntityHandle >::iterator it2 = vertices.begin(); it2 != vertices.end(); it2++, i++ )
+        {
+            int n                = TLv.get_n();
+            TLv.vi_wr[2 * n]     = sendToProc;  // send to processor
+            EntityHandle v       = *it2;
+            int indexInAllVert   = allVerticesToSendMap[v];
+            TLv.vi_wr[2 * n + 1] = indexInAllVert;  // will be orgProc, to differentiate indices
+                                                    // of vertices sent to "sentToProc"
+            double coords[3];
+            rval = m_interface->get_coords( &v, 1, coords );MB_CHK_ERR( rval );
+            TLv.vr_wr[3 * n]     = coords[0];  // departure position, of the node local_verts[i]
+            TLv.vr_wr[3 * n + 1] = coords[1];
+            TLv.vr_wr[3 * n + 2] = coords[2];
+            TLv.inc_n();
+        }
+    }
+
+    TupleList TLc;
+    int sizeTuple = 4 + globalMaxEdges;
+    // total number of overlap cells to send
+    TLc.initialize( sizeTuple, 0, 0, 0,
+                    numOverlapCells );  // to proc, blue parent ID, red parent ID, nvert,
+                                        // connectivity[globalMaxEdges] (global ID v), local eh)
+    TLc.enableWriteAccess();
+
+    for( std::map< int, std::set< EntityHandle > >::iterator it = overlapCellsForTask.begin();
+         it != overlapCellsForTask.end(); it++ )
+    {
+        int sendToProc                                = it->first;
+        std::set< EntityHandle >& overlapCellsToSend2 = it->second;
+        // send also the target and source parents for these overlap cells
+        for( std::set< EntityHandle >::iterator it2 = overlapCellsToSend2.begin(); it2 != overlapCellsToSend2.end();
+             it2++ )
+        {
+            EntityHandle intxCell = *it2;
+            int sourceParentID, targetParentID;
+            rval = m_interface->tag_get_data( targetParentTag, &intxCell, 1, &targetParentID );MB_CHK_ERR( rval );
+            rval = m_interface->tag_get_data( sourceParentTag, &intxCell, 1, &sourceParentID );MB_CHK_ERR( rval );
+            int n                        = TLc.get_n();
+            TLc.vi_wr[sizeTuple * n]     = sendToProc;
+            TLc.vi_wr[sizeTuple * n + 1] = sourceParentID;
+            TLc.vi_wr[sizeTuple * n + 2] = targetParentID;
+            int nnodes;
+            const EntityHandle* conn = nullptr;
+            rval                     = m_interface->get_connectivity( intxCell, conn, nnodes );MB_CHK_ERR( rval );
+            TLc.vi_wr[sizeTuple * n + 3] = nnodes;
+            for( int i = 0; i < nnodes; i++ )
+            {
+                int indexVertex = allVerticesToSendMap[conn[i]];
+                ;  // the vertex index will be now unique per original proc
+                if( -1 == indexVertex ) MB_CHK_SET_ERR( MB_FAILURE, "Can't find vertex in range of vertices to send" );
+                TLc.vi_wr[sizeTuple * n + 4 + i] = indexVertex;
+            }
+            // fill the rest with 0, just because we do not like uninitialized data
+            for( int i = nnodes; i < globalMaxEdges; i++ )
+                TLc.vi_wr[sizeTuple * n + 4 + i] = 0;
+
+            TLc.inc_n();
+        }
+    }
+
+    ( m_pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLv, 0 );
+    ( m_pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLc, 0 );
+
+
+#if 0
+
+
+     for( int i = 0; i < n; i++ )
+     {
+         int sourceID = TLrank.vi_rd[3 * i + 2];
+         if( sourcesForTasks.find( sourceID ) != sourcesForTasks.end() )
+         {
+             // it means this intx cell needs to be sent to any proc that is not "original" to it
+             std::set< int > procs = sourcesForTasks[sourceID];  // set of processors involved with this source
+             if( procs.size() < 2 ) MB_CHK_SET_ERR( MB_FAILURE, " not enough processes involved with a sourceID cell" );
+
+             int orgProc = TLc.vi_rd[sizeTuple * i];  // this intx cell was sent from this orgProc, originally
+             // will need to be sent to all other procs from above set; also, need to mark the vertex
+             // indices for that proc, and check that they are available to populate TLv2
+             std::map< int, int >& availableVerticesFromThisProc = availVertexIndicesPerProcessor[orgProc];
+             for( std::set< int >::iterator setIt = procs.begin(); setIt != procs.end(); setIt++ )
+             {
+                 int procID = *setIt;
+                 // send this cell to the other processors, not to orgProc this cell is coming from
+
+                 if( procID != orgProc )
+                 {
+                     // send the cell to this processor;
+                     int n2 = TLc2.get_n();
+                     if( n2 >= sizeOfTLc2 ) MB_CHK_SET_ERR( MB_FAILURE, " memory overflow" );
+                     //
+                     std::set< int >& indexVerticesInTLv = verticesToSendForProc[procID];
+                     TLc2.vi_wr[n2 * sizeTuple2]         = procID;                    // send to
+                     TLc2.vi_wr[n2 * sizeTuple2 + 1]     = orgProc;                   // this cell is coming from here
+                     TLc2.vi_wr[n2 * sizeTuple2 + 2]     = sourceID;                  // source parent of the intx cell
+                     TLc2.vi_wr[n2 * sizeTuple2 + 3] = TLc.vi_rd[sizeTuple * i + 2];  // target parent of the intx cell
+                         // number of vertices of the intx cell
+                     int nvert                       = TLc.vi_rd[sizeTuple * i + 3];
+                     TLc2.vi_wr[n2 * sizeTuple2 + 4] = nvert;
+                     // now loop through the connectivity, and make sure the vertices are available;
+                     // mark them, to populate later the TLv2 tuple list
+
+                     // just copy the vertices, including 0 ones
+                     for( int j = 0; j < nvert; j++ )
+                     {
+                         int vertexIndex = TLc.vi_rd[i * sizeTuple + 4 + j];
+                         // is this vertex available from org proc?
+                         if( availableVerticesFromThisProc.find( vertexIndex ) == availableVerticesFromThisProc.end() )
+                         {
+                             MB_CHK_SET_ERR( MB_FAILURE, " vertex index not available from processor" );
+                         }
+                         TLc2.vi_wr[n2 * sizeTuple2 + 5 + j] = vertexIndex;
+                         int indexInTLv                      = availVertexIndicesPerProcessor[orgProc][vertexIndex];
+                         indexVerticesInTLv.insert( indexInTLv );
+                     }
+
+                     for( int j = nvert; j < globalMaxEdges; j++ )
+                     {
+                         TLc2.vi_wr[n2 * sizeTuple2 + 5 + j] = 0;  // or mark them 0
+                     }
+                     TLc2.inc_n();
+                 }
+             }
+         }
+     }
+
+// end copy
+
     //  (we do not have yet the mapping gid_to_lid_covsrc)
     std::map< int, EntityHandle > affectedCovCellFromID;  // map from source cell id to the eh; it is needed to find out
                                                           // the original processor
@@ -1694,11 +1999,7 @@ ErrorCode TempestRemapper::augment_overlap_set()
         }
     }
 
-    // now loop again over all overlap cells, to see if their source parent is "affected"
-    // store in ranges the overlap cells that need to be sent to original task of the source cell
-    // from there, they will be redistributed to the tasks that need that coverage cell
-    Tag sendProcTag;
-    rval = m_interface->tag_get_handle( "sending_processor", 1, MB_TYPE_INTEGER, sendProcTag );
+
 
     // basically a map from original processor task to the set of overlap cells to be sent there
     std::map< int, std::set< EntityHandle > > overlapCellsForTask;
@@ -2196,6 +2497,8 @@ ErrorCode TempestRemapper::augment_overlap_set()
     // add the new polygons to the overlap set
     // these will be ghosted, so will participate in conservation only
     rval = m_interface->add_entities( m_overlap_set, newPolygons );MB_CHK_ERR( rval );
+
+#endif // %if 0
     return MB_SUCCESS;
 }
 #endif

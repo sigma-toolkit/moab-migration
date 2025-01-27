@@ -387,7 +387,7 @@ struct ToolContext
             if( fVolumetric ) mapOptions.strMethod += "volumetric;";
 
             // For global meshes, this default should work out of the box.
-            if( !fvMethod.compare( "bilin" ) ) nlayers = 1;
+            if( !fvMethod.compare( "bilin" ) ) nlayers = 3;
             else
                 nlayers = ( mapOptions.nPin > 1 ? mapOptions.nPin + 1 : 0 );
             if ( nlayer_input )

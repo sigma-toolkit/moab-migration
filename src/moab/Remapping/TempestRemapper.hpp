@@ -284,7 +284,8 @@ class TempestRemapper : public Remapper
                                                      moab::EntityHandle meshset,
                                                      moab::Range& entities,
                                                      moab::Range* pverts,
-                                                     bool orderByID = false);
+                                                     bool orderByID = false,
+                                                     std::vector< size_t > * pcov_order_idx = NULL);
 
     moab::ErrorCode convert_tempest_mesh_private( TempestMeshType type,
                                                   Mesh* mesh,

@@ -69,7 +69,7 @@ class Remapper
     {
         return m_interface;
     }
-//#define MOAB_DBG
+#define MOAB_DBG
 #ifdef MOAB_HAVE_MPI
     moab::ParallelComm* get_parallel_communicator()
     {
@@ -120,6 +120,20 @@ class Remapper
         std::stringstream filename1;
         filename1 << "set_with_ghosts" << m_pcomm->rank() << ".h5m";
         rval = m_interface->write_file( filename1.str().c_str(), 0, 0, &set_with_ghosts, 1 );MB_CHK_ERR( rval );
+        // dump global ids of 2d entities, in order
+        moab::Range cells= entities.subset_by_dimension(2);
+        std::vector<int> gids(cells.size());
+        rval = m_interface->tag_get_data(gtag, cells, &gids[0]);MB_CHK_ERR( rval );
+        std::ofstream id_file;
+        std::stringstream filename2;
+        filename2 << "fileIds_" << m_pcomm->rank() << ".txt";
+        id_file.open (filename2.str());
+        for (size_t k=0; k<gids.size(); k++)
+        {
+            id_file << " " << gids[k];
+            if(k%10==9) id_file << "\n";
+        }
+        id_file.close();
 
 #endif
         return rval;

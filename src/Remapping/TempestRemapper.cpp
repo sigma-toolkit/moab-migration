@@ -635,11 +635,13 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
         // to avoid unnecessary index re-orderings when v contains elements of equal values
         std::sort( sortedIdx.begin(), sortedIdx.end(),
                    [&globIds]( size_t i1, size_t i2 ) { return globIds[i1] < globIds[i2]; } );
+        cov_ordered_gid.resize(nelems);
     }
 
     for( unsigned iface = 0; iface < nelems; ++iface )
     {
         Face& face           = faces[iface];
+        if (orderByID)  cov_ordered_gid[iface] = globIds[sortedIdx[iface]];
         EntityHandle ehandle = ( ( offlineWorkflow || orderByID ) ? elems[sortedIdx[iface]] : elems[iface] );
 
         // get the connectivity for each edge
@@ -877,13 +879,12 @@ ErrorCode TempestRemapper::convert_overlap_mesh_sorted_by_source()
 ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
 {
     ErrorCode rval;
-
+    bool orderByID = true;
     if( 0 == m_covering_source )
     {
         m_covering_source = new Mesh();
-        bool orderByID = false;
         rval = convert_mesh_to_tempest_private( m_covering_source, m_covering_source_set, m_covering_source_entities,
-                                                &m_covering_source_vertices, orderByID, &cov_order_idx);MB_CHK_SET_ERR( rval, "Can't convert source Tempest mesh" );
+                                                &m_covering_source_vertices, orderByID, &cov_order_idx );MB_CHK_SET_ERR( rval, "Can't convert source Tempest mesh" );
     }
 
 #ifdef VERBOSE
@@ -915,8 +916,17 @@ ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
         {
             // we know that m_covering_source_entities[ie] has gids[ie] , but it has index cov_order_idx[ie] in
             // m_covering_source::faces
-            gid_to_lid_covsrc[ gids[ie] ] = ie;
-            lid_to_gid_covsrc[ ie ]       = gids[ie]; // these are not ordered ?
+            if (orderByID)
+            {
+                // not used, actually
+                gid_to_lid_covsrc[ gids[ie] ] = cov_order_idx[ie] ;
+                lid_to_gid_covsrc[ cov_order_idx[ie] ]       = gids[ie]; // these are not ordered ?
+            }
+            else
+            {
+                gid_to_lid_covsrc[ gids[ie] ] = ie;
+                lid_to_gid_covsrc[ ie ]       = gids[ie]; // these are not ordered ?
+            }
         }
 
         if( point_cloud_source )
@@ -1388,7 +1398,7 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
     return rval;
 }
 #undef MOAB_DBG
-#define MOAB_DBG
+//#define MOAB_DBG
 ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_tempest, int nLayers )
 {
     ErrorCode rval;

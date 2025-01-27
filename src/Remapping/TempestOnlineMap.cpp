@@ -390,6 +390,8 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
         col_dtoc_dofmap.resize( m_remapper->m_covering_source_entities.size() * srcTagSize, UINT_MAX );
         src_soln_gdofs.resize( m_remapper->m_covering_source_entities.size() * srcTagSize, UINT_MAX );
         rval = m_interface->tag_get_data( m_dofTagSrc, m_remapper->m_covering_source_entities, &src_soln_gdofs[0] );MB_CHK_ERR( rval );
+        if(m_remapper->cov_ordered_gid.size()>=1)
+            src_soln_gdofs = m_remapper->cov_ordered_gid;
     }
 
     // std::cout << "TOnlineMap: Process: " << rank << " and covering entities = [" <<

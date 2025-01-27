@@ -337,6 +337,7 @@ class TempestRemapper : public Remapper
 
     // extra
     std::vector<size_t>  cov_order_idx; // will exist so far only for coverage mesh
+    std::vector<int>  cov_ordered_gid;
     // the m_covering_source_entities is mapped to MeshCov faces with this order
 
     IntxAreaUtils::AreaMethod m_area_method;

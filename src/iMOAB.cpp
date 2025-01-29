@@ -4202,7 +4202,7 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
 #endif
 
 #ifdef MOAB_HAVE_MPI
-    if( is_parallel && data_tgt.num_ghost_layers )
+/*    if( is_parallel && data_tgt.num_ghost_layers )
     {
         if( is_root )
             outputFormatter.printf( 0, "Generating %d ghost layers for the target mesh\n", data_src.num_ghost_layers );
@@ -4214,10 +4214,10 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
         tdata.remapper->SetMeshSet( moab::Remapper::TargetMeshWithGhosts, augmentedTargetSet );
     }
     else
-    {
+    {*/
         // this one needs to be initialized too with source set
         tdata.remapper->GetMeshSet( moab::Remapper::TargetMeshWithGhosts ) = data_tgt.file_set;
-    }
+    //}
 #else
     // this one needs to be initialized too with source set
     tdata.remapper->GetMeshSet( moab::Remapper::TargetMeshWithGhosts ) = data_tgt.file_set;

@@ -79,7 +79,7 @@ class Remapper
     /// <summary>
     ///     ghost layers
     /// </summary>
-    moab::ErrorCode GhostLayers( moab::ParallelComm* pcom,
+    moab::ErrorCode GhostLayers( moab::ParallelComm* pcomm,
                                  moab::EntityHandle& meshset,
                                  const int ngh_layers,
                                  moab::EntityHandle& set_with_ghosts )
@@ -152,7 +152,7 @@ class Remapper
         MB_CHK_ERR( m_interface->load_file( filename.c_str(), &meshset, opts.c_str() ) );
 
         Tag rectilinearTag;
-        rval = m_interface->tag_get_handle( "ClimateMetadata", rectilinearTag );
+        ErrorCode rval = m_interface->tag_get_handle( "ClimateMetadata", rectilinearTag );
 
         if( rval != MB_FAILURE && rval != MB_TAG_NOT_FOUND && rval != MB_ALREADY_ALLOCATED &&
             rectilinearTag != nullptr )

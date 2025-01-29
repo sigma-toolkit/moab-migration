@@ -610,17 +610,6 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     {
         rval = m_interface->get_entities_by_dimension( mesh_set, 0, verts );MB_CHK_ERR( rval );
     }
-    // assert(verts.size() > 0); // If not, this may be an invalid mesh ! possible for unbalanced loads
-
-    std::map< EntityHandle, int > indxMap;
-    bool useRange = true;
-    if( verts.compactness() > 0.01 )
-    {
-        int j = 0;
-        for( Range::iterator it = verts.begin(); it != verts.end(); it++ )
-            indxMap[*it] = j++;
-        useRange = false;
-    }
 
     std::vector< int > globIds( nelems );
     moab::Tag gid = m_interface->globalId_tag();
@@ -637,6 +626,41 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
                    [&globIds]( size_t i1, size_t i2 ) { return globIds[i1] < globIds[i2]; } );
         cov_ordered_gid.resize(nelems);
     }
+    // assert(verts.size() > 0); // If not, this may be an invalid mesh ! possible for unbalanced loads
+
+    std::map< EntityHandle, int > indxMap;
+
+
+    bool useRange = true;
+    if( verts.compactness() > 0.01 )
+    {
+        int j = 0;
+        for( Range::iterator it = verts.begin(); it != verts.end(); it++ )
+            indxMap[*it] = j++;
+        useRange = false;
+    }
+    std::vector< size_t > sortedVtIdx;
+    std::vector< int > vIds( verts.size() );
+    if (orderByID)
+    {
+        // order vertices by global id too
+        useRange = false;
+
+        rval = m_interface->tag_get_data( gid, verts, &vIds[0] );MB_CHK_ERR( rval );
+
+        sortedVtIdx.resize( verts.size()  );
+        // initialize original index locations
+        std::iota( sortedVtIdx.begin(), sortedVtIdx.end(), 0 );
+        // sort indexes based on comparing values in v, using std::stable_sort instead of std::sort
+        // to avoid unnecessary index re-orderings when v contains elements of equal values
+        std::sort( sortedVtIdx.begin(), sortedVtIdx.end(),
+                   [&vIds]( size_t i1, size_t i2 ) { return vIds[i1] < vIds[i2]; } );
+        // vIds[sortedVtIdx[i]] will be increasing, for i=0,nverts.size()-1
+        int j = 0;
+        for( size_t j = 0; j<verts.size(); j++ )
+            indxMap[ verts[sortedVtIdx[j]]] = j;
+    }
+
 
     for( unsigned iface = 0; iface < nelems; ++iface )
     {
@@ -670,9 +694,18 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     for( unsigned inode = 0; inode < nnodes; ++inode )
     {
         Node& node = nodes[inode];
-        node.x     = coordx[inode];
-        node.y     = coordy[inode];
-        node.z     = coordz[inode];
+        if (orderByID)
+        {
+            node.x     = coordx[sortedVtIdx[inode]];
+            node.y     = coordy[sortedVtIdx[inode]];
+            node.z     = coordz[sortedVtIdx[inode]];
+        }
+        else
+        {
+            node.x     = coordx[inode];
+            node.y     = coordy[inode];
+            node.z     = coordz[inode];
+        }
     }
     coordx.clear();
     coordy.clear();
@@ -887,6 +920,7 @@ ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
                                                 &m_covering_source_vertices, orderByID, &cov_order_idx );MB_CHK_SET_ERR( rval, "Can't convert source Tempest mesh" );
     }
 
+    m_covering_source->Write( std::string( "coverage_TR_p" + std::to_string( rank ) + ".g" ) );
 #ifdef VERBOSE
     m_covering_source->Write( std::string( "coverage_TR_p" + std::to_string( rank ) + ".g" ) );
     m_target->Write( std::string( "target_TR_p" + std::to_string( rank ) + ".g" ) );
@@ -1252,7 +1286,7 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-#define MOAB_DBG
+//#define MOAB_DBG
 ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
                                                  double radius_src,
                                                  double radius_tgt,

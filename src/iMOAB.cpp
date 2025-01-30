@@ -4178,7 +4178,7 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
         if( is_root )
             outputFormatter.printf( 0, "Generating %d ghost layers for the source mesh\n", data_src.num_ghost_layers );
         moab::EntityHandle augmentedSourceSet;
-        moab::ParallelComm * pc_src = context.pcomms[*pid_src];
+        moab::ParallelComm* pc_src = data_src.pcomm;
         // get order -1 ghost layers; actually it should be decided by the mesh
         // if the mesh has holes, it could be more
         rval = tdata.remapper->GhostLayers( pc_src, data_src.file_set, data_src.num_ghost_layers, augmentedSourceSet );MB_CHK_ERR( rval );
@@ -4202,7 +4202,7 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
         moab::EntityHandle augmentedTargetSet;
         // get order -1 ghost layers; actually it should be decided by the mesh
         // if the mesh has holes, it could be more
-        moab::ParallelComm * pc_tgt = context.pcomms[*pid_tgt];
+        moab::ParallelComm * pc_tgt = data_tgt.pcomm;
         rval = tdata.remapper->GhostLayers( pc_tgt, data_tgt.file_set, data_tgt.num_ghost_layers, augmentedTargetSet );MB_CHK_ERR( rval );
         tdata.remapper->SetMeshSet( moab::Remapper::TargetMeshWithGhosts, augmentedTargetSet );
     }

@@ -635,9 +635,8 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     tlValRow.enableWriteAccess();
     tlValCol.enableWriteAccess();
     /*
-     *
-             dFracA[ col ] += val / vecSourceFaceArea[ col ] * vecTargetFaceArea[ row ];
-             dFracB[ row ] += val ;
+        dFracA[ col ] += val / vecSourceFaceArea[ col ] * vecTargetFaceArea[ row ];
+        dFracB[ row ] += val ;
      */
     int offset = 0;
 #if defined( MOAB_HAVE_MPI )
@@ -1226,7 +1225,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
 
 #define CHECK_EXCEPTION( obj, type, varstr )                                                      \
     {                                                                                             \
-        if( obj == NULL )                                                                         \
+        if( obj == nullptr )                                                                         \
         {                                                                                         \
             _EXCEPTION3( "Map file \"%s\" does not contain %s \"%s\"", strSource, type, varstr ); \
         }                                                                                         \
@@ -1579,7 +1578,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     }
 
     m_nTotDofs_Src = sparseMatrix.GetColumns();
-    m_nTotDofs_SrcCov = sparseMatrix.GetColumns();
+    m_nTotDofs_SrcCov = m_nTotDofs_Src;
     m_nTotDofs_Dest   = sparseMatrix.GetRows();
     // TODO: make this flexible and read the order from map with help of metadata
     m_nDofsPEl_Src  = 1;  // always assume FV-FV maps are read from file

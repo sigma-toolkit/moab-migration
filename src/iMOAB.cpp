@@ -246,7 +246,9 @@ ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
 #ifdef MOAB_HAVE_MPI
     MPI_Comm_rank( *comm, &rankHere );
 #endif
-    if( !rankHere ) std::cout << " application " << name << " with ID = " << *pid << " and external id: " <<  *compid << "  is registered now \n";
+    if( !rankHere )
+        std::cout << " application " << name << " with ID = " << *pid << " and external id: " << *compid
+                  << "  is registered now \n";
     if( *compid <= 0 )
     {
         std::cout << " convention for external application is to have its id positive \n";
@@ -1498,7 +1500,8 @@ ErrCode iMOAB_DefineTagStorage( iMOAB_AppID pid,
     for( int i = 0; i < *components_per_entity; i++ )
     {
         defInt[i]    = 0;
-        defDouble[i] = -1e+10;
+        // defDouble[i] = -1e+10;
+        defDouble[i] = 0.0;
         defHandle[i] = (EntityHandle)0;
     }
 
@@ -2649,8 +2652,8 @@ ErrCode iMOAB_SendElementTag( iMOAB_AppID pid,
     std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *context_id );
     if( mt == data.pgraph.end() )
     {
-        std::cout <<" no par com graph for context_id:" << *context_id << " available contexts:";
-        for (auto mit = data.pgraph.begin(); mit != data.pgraph.end(); mit++)
+        std::cout << " no par com graph for context_id:" << *context_id << " available contexts:";
+        for( auto mit = data.pgraph.begin(); mit != data.pgraph.end(); mit++ )
             std::cout << "  " << mit->first;
         std::cout << "\n";
         return moab::MB_FAILURE;
@@ -3587,6 +3590,11 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
     weightMap->SetDestinationNDofsPerElement( tgt_elem_dof_length );
     weightMap->set_row_dc_dofs( tgtDofValues );  // will set row_dtoc_dofmap
 
+    // TODO: ideally, we should get this from the remap_weights_filename and just propagate it
+    std::string metadataStr = std::string( remap_weights_filename ) + ";FV:1:GLOBAL_ID;FV:1:GLOBAL_ID";
+
+    data_intx.metadataMap[std::string( solution_weights_identifier )] = metadataStr;
+
     return moab::MB_SUCCESS;
 }
 
@@ -3619,22 +3627,26 @@ ErrCode iMOAB_WriteMappingWeightsToFile(
     attrMap["normalization"] = "ovarea";
     attrMap["map_aPb"]       = filename;
 
-    const std::string delim = ";";
-    size_t pos = 0, index = 0;
-    std::vector< std::string > stringAttr( 3 );
-    // use find() function to get the position of the delimiters
-    while( ( pos = metadataStr.find( delim ) ) != std::string::npos )
-    {
-        std::string token1 = metadataStr.substr( 0, pos );  // store the substring
-        if( token1.size() > 0 || index == 0 ) stringAttr[index++] = token1;
-        metadataStr.erase(
-            0, pos + delim.length() ); /* erase() function store the current positon and move to next token. */
-    }
-    stringAttr[index] = metadataStr;  // store the last token of the string.
-    assert( index == 2 );
-    attrMap["remap_options"] = stringAttr[0];
-    attrMap["methodorder_b"] = stringAttr[1];
-    attrMap["methodorder_a"] = stringAttr[2];
+    std::cout << "Found metadata: " << metadataStr << std::endl;
+
+    // const std::string delim = ";";
+    // size_t pos = 0, index = 0;
+    // std::vector< std::string > stringAttr( 3 );
+    // // use find() function to get the position of the delimiters
+    // while( ( pos = metadataStr.find( delim ) ) != std::string::npos )
+    // {
+    //     std::string token1 = metadataStr.substr( 0, pos );  // store the substring
+    //     if( token1.size() > 0 || index == 0 ) stringAttr[index++] = token1;
+    //     std::cout << "\t Found token: "  << token1 << std::endl;
+    //     metadataStr.erase(
+    //         0, pos + delim.length() ); /* erase() function store the current positon and move to next token. */
+    // }
+    // std::cout << "\t Found token: " << metadataStr << " -- and index = " << index << std::endl;
+    // stringAttr[index] = metadataStr;  // store the last token of the string.
+    // assert( index == 2 );
+    // attrMap["remap_options"] = stringAttr[0];
+    // attrMap["methodorder_b"] = stringAttr[1];
+    // attrMap["methodorder_a"] = stringAttr[2];
     attrMap["concave_a"]     = "false";  // defaults
     attrMap["concave_b"]     = "false";  // defaults
     attrMap["bubble"]        = "true";   // defaults
@@ -4212,7 +4224,7 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
     // set the reference to the covering set in the source PID
-    data_src.secondary_file_set = tdata.remapper->GetMeshSet( moab::Remapper::CoveringMesh );
+    data_intx.secondary_file_set = tdata.remapper->GetMeshSet( moab::Remapper::CoveringMesh );
 #endif
 
     return moab::MB_SUCCESS;

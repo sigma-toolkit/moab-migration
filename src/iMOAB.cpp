@@ -57,6 +57,8 @@ struct TempestMapAppData
     std::map< std::string, moab::TempestOnlineMap* > weightMaps;
     iMOAB_AppID pid_src;
     iMOAB_AppID pid_dest;
+    int num_src_ghost_layers;      // number of ghost layers
+    int num_tgt_ghost_layers;      // number of ghost layers
 };
 #endif
 
@@ -273,6 +275,8 @@ ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
     app_data.tempestData.remapper = NULL;  // Only allocate as needed
+    app_data.tempestData.num_src_ghost_layers = 0;
+    app_data.tempestData.num_tgt_ghost_layers = 0;
 #endif
 
     app_data.num_ghost_layers = 0;
@@ -4038,12 +4042,13 @@ static ErrCode ComputeSphereRadius( iMOAB_AppID pid, double* radius )
     return moab::MB_SUCCESS;
 }
 
-ErrCode iMOAB_SetGhostLayers( iMOAB_AppID pid, int* nghost_layers )
+ErrCode iMOAB_SetMapGhostLayers( iMOAB_AppID pid, int* n_src_ghost_layers, int* n_tgt_ghost_layers )
 {
     appData& data = context.appDatas[*pid];
 
     // Set the number of ghost layers
-    data.num_ghost_layers = *nghost_layers;  // number of ghost layers
+    data.tempestData.num_src_ghost_layers = *n_src_ghost_layers;  // number of ghost layers for source
+    data.tempestData.num_tgt_ghost_layers = *n_tgt_ghost_layers;  // number of ghost layers for source
 
     return moab::MB_SUCCESS;
 }
@@ -4180,15 +4185,15 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     tdata.remapper->GetMeshSet( moab::Remapper::OverlapMesh ) = data_intx.file_set;
 
 #ifdef MOAB_HAVE_MPI
-    if( is_parallel && data_src.num_ghost_layers )
+    if( is_parallel && tdata.num_src_ghost_layers )
     {
         if( is_root )
-            outputFormatter.printf( 0, "Generating %d ghost layers for the source mesh\n", data_src.num_ghost_layers );
+            outputFormatter.printf( 0, "Generating %d ghost layers for the source mesh\n", tdata.num_src_ghost_layers );
         moab::EntityHandle augmentedSourceSet;
         moab::ParallelComm * pc_src = context.pcomms[*pid_src];
         // get order -1 ghost layers; actually it should be decided by the mesh
         // if the mesh has holes, it could be more
-        rval = tdata.remapper->GhostLayers( pc_src, data_src.file_set, data_src.num_ghost_layers, augmentedSourceSet );MB_CHK_ERR( rval );
+        rval = tdata.remapper->GhostLayers( pc_src, data_src.file_set, tdata.num_src_ghost_layers, augmentedSourceSet );MB_CHK_ERR( rval );
         tdata.remapper->SetMeshSet( moab::Remapper::SourceMeshWithGhosts, augmentedSourceSet );
     }
     else
@@ -4202,22 +4207,22 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
 #endif
 
 #ifdef MOAB_HAVE_MPI
-/*    if( is_parallel && data_tgt.num_ghost_layers )
+    if( is_parallel && tdata.num_tgt_ghost_layers )
     {
         if( is_root )
-            outputFormatter.printf( 0, "Generating %d ghost layers for the target mesh\n", data_src.num_ghost_layers );
+            outputFormatter.printf( 0, "Generating %d ghost layers for the target mesh\n", tdata.num_tgt_ghost_layers );
         moab::EntityHandle augmentedTargetSet;
         // get order -1 ghost layers; actually it should be decided by the mesh
         // if the mesh has holes, it could be more
         moab::ParallelComm * pc_tgt = context.pcomms[*pid_tgt];
-        rval = tdata.remapper->GhostLayers( pc_tgt, data_tgt.file_set, data_tgt.num_ghost_layers, augmentedTargetSet );MB_CHK_ERR( rval );
+        rval = tdata.remapper->GhostLayers( pc_tgt, data_tgt.file_set, tdata.num_tgt_ghost_layers, augmentedTargetSet );MB_CHK_ERR( rval );
         tdata.remapper->SetMeshSet( moab::Remapper::TargetMeshWithGhosts, augmentedTargetSet );
     }
     else
-    {*/
+    {
         // this one needs to be initialized too with source set
         tdata.remapper->GetMeshSet( moab::Remapper::TargetMeshWithGhosts ) = data_tgt.file_set;
-    //}
+    }
 #else
     // this one needs to be initialized too with source set
     tdata.remapper->GetMeshSet( moab::Remapper::TargetMeshWithGhosts ) = data_tgt.file_set;
@@ -4227,11 +4232,11 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
 
     // First, compute the covering source set.
-    rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, data_src.num_ghost_layers );MB_CHK_ERR( rval );
+    rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, tdata.num_src_ghost_layers );MB_CHK_ERR( rval );
 
     // Next, compute intersections with MOAB.
     // for bilinear, this is an overkill
-    rval = tdata.remapper->ComputeOverlapMesh( use_kdtree_search, false, data_src.num_ghost_layers );MB_CHK_ERR( rval );
+    rval = tdata.remapper->ComputeOverlapMesh( use_kdtree_search, false, tdata.num_src_ghost_layers );MB_CHK_ERR( rval );
 
     // Mapping computation done
     if( validate )

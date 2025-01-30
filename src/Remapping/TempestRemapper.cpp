@@ -912,15 +912,14 @@ ErrorCode TempestRemapper::convert_overlap_mesh_sorted_by_source()
 ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
 {
     ErrorCode rval;
-    bool orderByID = true;
+    bool orderByIDLocal = false;
     if( 0 == m_covering_source )
     {
         m_covering_source = new Mesh();
         rval = convert_mesh_to_tempest_private( m_covering_source, m_covering_source_set, m_covering_source_entities,
-                                                &m_covering_source_vertices, orderByID, &cov_order_idx );MB_CHK_SET_ERR( rval, "Can't convert source Tempest mesh" );
+                                                &m_covering_source_vertices, orderByIDLocal, &cov_order_idx );MB_CHK_SET_ERR( rval, "Can't convert source Tempest mesh" );
     }
 
-    m_covering_source->Write( std::string( "coverage_TR_p" + std::to_string( rank ) + ".g" ) );
 #ifdef VERBOSE
     m_covering_source->Write( std::string( "coverage_TR_p" + std::to_string( rank ) + ".g" ) );
     m_target->Write( std::string( "target_TR_p" + std::to_string( rank ) + ".g" ) );
@@ -950,7 +949,7 @@ ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
         {
             // we know that m_covering_source_entities[ie] has gids[ie] , but it has index cov_order_idx[ie] in
             // m_covering_source::faces
-            if (orderByID)
+            if (orderByIDLocal)
             {
                 // not used, actually
                 gid_to_lid_covsrc[ gids[ie] ] = cov_order_idx[ie] ;

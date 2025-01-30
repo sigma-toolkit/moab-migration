@@ -69,7 +69,7 @@ class Remapper
     {
         return m_interface;
     }
-#define MOAB_DBG
+//#define MOAB_DBG
 #ifdef MOAB_HAVE_MPI
     moab::ParallelComm* get_parallel_communicator()
     {

@@ -144,6 +144,11 @@ ErrorCode TempestRemapper::clear()
     lid_to_gid_src.clear();
     lid_to_gid_tgt.clear();
     lid_to_gid_covsrc.clear();
+    cov_order_idx.clear();
+    cov_ordered_gid.clear();
+    m_source_metadata.clear();
+    m_target_metadata.clear();
+    m_sorted_overlap_order.clear();
 
     return MB_SUCCESS;
 }
@@ -912,7 +917,7 @@ ErrorCode TempestRemapper::convert_overlap_mesh_sorted_by_source()
 ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
 {
     ErrorCode rval;
-    bool orderByIDLocal = false;
+    bool orderByIDLocal = true;
     if( 0 == m_covering_source )
     {
         m_covering_source = new Mesh();
@@ -949,7 +954,7 @@ ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
         {
             // we know that m_covering_source_entities[ie] has gids[ie] , but it has index cov_order_idx[ie] in
             // m_covering_source::faces
-            if (orderByIDLocal)
+            if (orderByIDLocal && !cov_order_idx.empty())
             {
                 // not used, actually
                 gid_to_lid_covsrc[ gids[ie] ] = cov_order_idx[ie] ;

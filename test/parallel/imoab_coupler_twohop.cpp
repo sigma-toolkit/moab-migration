@@ -251,6 +251,16 @@ int main( int argc, char* argv[] )
                                         &couPEGroup, &ocnCouComm, ocnFilename, readopts, nghlay, repartitioner_scheme );
     CHECKIERR( ierr, "Cannot load and migrate ocn mesh" )
 
+    // this model (recMeshOcn.h5m) has mixed meshes in it, we need to repair the comm graph
+    // first delete the one created with migration, then compute a new one
+    if( ocnCouComm != MPI_COMM_NULL )
+    {
+        int type = 3;  // type: 1 - SE, 2 - Vertex (point cloud), 3 - Element (FV scalars)
+        CHECKIERR( iMOAB_ComputeCommGraph( cmpOcnPID, cplOcnPID, &ocnCouComm, &ocnPEGroup, &couPEGroup, &type, &type,
+                                           &cmpocn, &cplocn ),
+                   "cannot compute graph between ocn comp and ocn migrated to coupler" )
+    }
+
 #endif  // #ifdef ENABLE_ATMOCN_COUPLING
 
 #ifdef ENABLE_ATMCPLOCN_COUPLING
@@ -415,12 +425,12 @@ int main( int argc, char* argv[] )
             CHECKIERR( ierr, "failed to write map file to disk" );
 
             const std::string intx_from_file_identifier = "map-from-file";
-            int dummyCpl                                = -1;
-            int dummy_rowcol                            = -1;
-            int dummyType                               = 0;
-            ierr = iMOAB_LoadMappingWeightsFromFile( cplAtmOcnPID, &dummyCpl, &dummy_rowcol, &dummyType,
-                                                     intx_from_file_identifier.c_str(), atmocn_map_file_name.c_str() );
-            CHECKIERR( ierr, "failed to load map file from disk" );
+            int src_disc_type = 1;  // element-based SE-4
+            int tgt_disc_type = 3;  // element-based FV
+            CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type,
+                                                         &tgt_disc_type, intx_from_file_identifier.c_str(),
+                                                         atmocn_map_file_name.c_str() ),
+                       "failed to load map file from disk" );
         }
 #endif
     }
@@ -450,12 +460,19 @@ int main( int argc, char* argv[] )
             CHECKIERR( ierr, "failed to write map file to disk" );
 
             const std::string intx_from_file_identifier = "map2-from-file";
-            int dummyCpl                                = -1;
-            int dummy_rowcol                            = -1;
-            int dummyType                               = 0;
-            ierr = iMOAB_LoadMappingWeightsFromFile( cplAtm2OcnPID, &dummyCpl, &dummy_rowcol, &dummyType,
-                                                     intx_from_file_identifier.c_str(), atmocn_map_file_name.c_str() );
-            CHECKIERR( ierr, "failed to load map file from disk" );
+            // int dummyCpl                                = -1;
+            // int dummy_rowcol                            = -1;
+            // int dummyType                               = 0;
+            // ierr = iMOAB_LoadMappingWeightsFromFile( cplAtm2OcnPID, &dummyCpl, &dummy_rowcol, &dummyType,
+            //                                          intx_from_file_identifier.c_str(), atmocn_map_file_name.c_str() );
+            // CHECKIERR( ierr, "failed to load map file from disk" );
+
+            int src_disc_type = 1;  // element-based SE-4
+            int tgt_disc_type = 3;  // element-based FV
+            CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtm2OcnPID, &src_disc_type,
+                                                         &tgt_disc_type, intx_from_file_identifier.c_str(),
+                                                         atmocn_map_file_name.c_str() ),
+                       "failed to load map file from disk" );
         }
 #endif
     }

@@ -640,41 +640,31 @@ moab::ErrorCode moab::TempestOnlineMap::set_col_dc_dofs( std::vector< int >& val
 {
     // col_gdofmap has global dofs , that should be in the list of values, such that
     // row_dtoc_dofmap[offsetDOF] = localDOF;
-    // //  we need to find col_dtoc_dofmap such that: col_gdofmap[ col_dtoc_dofmap[i] ] == values_entities [i];
+    // we need to find col_dtoc_dofmap such that: col_gdofmap[ col_dtoc_dofmap[i] ] == values_entities [i];
     // we know that col_gdofmap[0..(nbcols-1)] = global_col_dofs -> in values_entities
     // form first inverse
-
-    col_dtoc_dofmap.resize( values_entities.size() );
-    for( int j = 0; j < (int)values_entities.size(); j++ )
+    //
+    // resize and initialize to -1 to signal that this value should not be used, if not set below
+    col_dtoc_dofmap.resize( values_entities.size(), -1 );
+    for( size_t j = 0; j < values_entities.size(); j++ )
     {
-        if( colMap.find( values_entities[j] - 1 ) != colMap.end() )
-            col_dtoc_dofmap[j] = colMap[values_entities[j] - 1];
-        else
-        {
-            col_dtoc_dofmap[j] = -1;  // signal that this value should not be used in
-            // std::cout <<"values_entities[j] -  1: " << values_entities[j] -  1 <<" at index j = " << j <<  " not
-            // found in colMap \n";
-        }
+        // values are 1 based, but rowMap, colMap are not
+        const auto it = colMap.find( values_entities[j] - 1 );
+        if( it != colMap.end() ) col_dtoc_dofmap[j] = it->second;
     }
     return moab::MB_SUCCESS;
 }
 
 moab::ErrorCode moab::TempestOnlineMap::set_row_dc_dofs( std::vector< int >& values_entities )
 {
-    // row_dtoc_dofmap = values_entities; // needs to point to local
     //  we need to find row_dtoc_dofmap such that: row_gdofmap[ row_dtoc_dofmap[i] ] == values_entities [i];
-
-    row_dtoc_dofmap.resize( values_entities.size() );
-    for( int j = 0; j < (int)values_entities.size(); j++ )
+    // resize and initialize to -1 to signal that this value should not be used, if not set below
+    row_dtoc_dofmap.resize( values_entities.size(), -1 );
+    for( size_t j = 0; j < values_entities.size(); j++ )
     {
-        if( rowMap.find( values_entities[j] - 1 ) != rowMap.end() )
-            row_dtoc_dofmap[j] = rowMap[values_entities[j] - 1];  // values are 1 based, but rowMap, colMap are not
-        else
-        {
-            row_dtoc_dofmap[j] = -1;  // not all values are used
-            // std::cout <<"values_entities[j] -  1: " << values_entities[j] -  1 <<" at index j = " << j <<  " not
-            // found in rowMap \n";
-        }
+        // values are 1 based, but rowMap, colMap are not
+        const auto it = rowMap.find( values_entities[j] - 1 );
+        if( it != rowMap.end() ) row_dtoc_dofmap[j] = it->second;
     }
     return moab::MB_SUCCESS;
 }
@@ -1726,8 +1716,6 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
                                                       CAASType caasType,
                                                       double default_projection )
 {
-    moab::ErrorCode rval;
-
     std::vector< double > solSTagVals;
     std::vector< double > solTTagVals;
 
@@ -1777,17 +1765,23 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
     }
 
     // The tag data is np*np*n_el_src
-    rval = m_interface->tag_get_data( srcSolutionTag, sents, &solSTagVals[0] );MB_CHK_SET_ERR( rval, "Getting local tag data failed" );
+    MB_CHK_SET_ERR( m_interface->tag_get_data( srcSolutionTag, sents, &solSTagVals[0] ),
+                    "Getting local tag data failed" );
 
     // Compute the application of weights on the suorce solution data and store it in the
     // destination solution vector data Optionally, can also perform the transpose application of
     // the weight matrix. Set the 3rd argument to true if this is needed
-    rval = this->ApplyWeights( solSTagVals, solTTagVals, transpose );MB_CHK_SET_ERR( rval, "Applying remap operator onto source vector data failed" );
+    MB_CHK_SET_ERR( this->ApplyWeights( solSTagVals, solTTagVals, transpose ),
+                    "Applying remap operator onto source vector data failed" );
+
+    // The tag data is np*np*n_el_dest
+    MB_CHK_SET_ERR( m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] ),
+                    "Setting target tag data failed" );
 
     if( caasType != CAAS_NONE )
     {
         std::string tgtSolutionTagName;
-        rval = m_interface->tag_get_name( tgtSolutionTag, tgtSolutionTagName );MB_CHK_SET_ERR( rval, "Getting tag name failed" );
+        MB_CHK_SET_ERR( m_interface->tag_get_name( tgtSolutionTag, tgtSolutionTagName ), "Getting tag name failed" );
 
         // Perform CAAS iterations iteratively until convergence
         constexpr int nmax_caas_iterations = 10;
@@ -1797,9 +1791,6 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
         while( ( fabs( mismatch / initialMismatch ) > 1e-15 && fabs( mismatch ) > 1e-15 ) &&
                caasIteration++ < nmax_caas_iterations )  // iterate until convergence or a maximum of 5 iterations
         {
-            // The tag data is np*np*n_el_dest
-            rval = m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] );MB_CHK_SET_ERR( rval, "Setting local tag data failed" );
-
             double dMassDiffPostGlobal;
             std::pair< double, double > mDefect =
                 this->ApplyBoundsLimiting( solSTagVals, solTTagVals, caasType, caasIteration, mismatch );
@@ -1816,11 +1807,12 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
                         tgtSolutionTagName.c_str(), caasIteration, mDefect.first, dMassDiffPostGlobal );
             }
             mismatch = dMassDiffPostGlobal;
+
+            // The tag data is np*np*n_el_dest
+            MB_CHK_SET_ERR( m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] ),
+                            "Setting local tag data failed" );
         }
     }
-
-    // The tag data is np*np*n_el_dest
-    rval = m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] );MB_CHK_SET_ERR( rval, "Setting local tag data failed" );
 
     return moab::MB_SUCCESS;
 }

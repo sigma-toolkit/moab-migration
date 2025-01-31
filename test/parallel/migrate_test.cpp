@@ -112,7 +112,6 @@ int main( int argc, char* argv[] )
 ErrorCode migrate( const char* filename, const char* outfile )
 {
     // first create MPI groups
-
     std::string filen( filename );
     MPI_Group group1, group2;
     for( int i = startG1; i <= endG1; i++ )
@@ -164,11 +163,9 @@ ErrorCode migrate( const char* filename, const char* outfile )
     int method = 0;  // trivial partition for sending
     if( comm1 != MPI_COMM_NULL )
     {
-
-        std::string readopts( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS" );
+        std::string readopts( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;DEBUG_IO=3" );
 
         nghlay = 0;
-
         ierr = iMOAB_LoadMesh( pid1, filen.c_str(), readopts.c_str(), &nghlay );
         CHECKRC( ierr, "can't load mesh " )
         ierr = iMOAB_SendMesh( pid1, &jcomm, &group2, &compid2, &method );  // send to component 2

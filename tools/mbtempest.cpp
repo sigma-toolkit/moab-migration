@@ -598,6 +598,11 @@ int main( int argc, char* argv[] )
 
             moab::EntityHandle covering_set;
             runCtx->timer_push( "communicate the mesh" );
+            // TODO:: needs clarification
+            // we compute just intersection here, no need for extra ghost layers anyway
+            // ghost layers are needed in coverage for bilinear map, which does not actually need intersection
+            // this will be fixed in the future, bilinear map needs just coverage, not intersection
+            // so I am not passing the ghost layer here, even though there is an option in runCtx for a ghost layer
             rval = mbintx->construct_covering_set( runCtx->meshsets[0], covering_set );MB_CHK_ERR( rval );  // lots of communication if mesh is distributed very differently
             runCtx->timer_pop();
 
@@ -763,7 +768,7 @@ int main( int argc, char* argv[] )
 
         // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm
         runCtx->timer_push( "setup and compute mesh intersections" );
-        rval = remapper.ComputeOverlapMesh( runCtx->kdtreeSearch, false, runCtx->nlayers );MB_CHK_ERR( rval );
+        rval = remapper.ComputeOverlapMesh( runCtx->kdtreeSearch, false );MB_CHK_ERR( rval );
         runCtx->timer_pop();
 
         // print some diagnostic checks to see if the overlap grid resolved the input meshes
@@ -1115,27 +1120,7 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         ctx.timer_push( "preprocess MOAB Source mesh" );
         // Rescale the radius of both to compute the intersection
         rval = moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[0], radius_src );MB_CHK_ERR( rval );
-        // if order >=2, ghost at least this many layers (order -1) it may be too much
-#ifdef MOAB_HAVE_MPI
-        if( ctx.nlayers && ctx.n_procs > 1 )
-        {
-            // get order -1 ghost layers; actually it should be decided by the mesh
-            // if the mesh has holes, it could be more
 
-            moab::EntityHandle set_with_ghosts;
-            rval = remapper.GhostLayers( ctx.pcomm, ctx.meshsets[0], ctx.nlayers, set_with_ghosts );MB_CHK_ERR( rval );
-            remapper.SetMeshSet( moab::Remapper::SourceMeshWithGhosts, set_with_ghosts );
-#ifdef MOAB_DBG
-            if( !runCtx->skip_io )
-            {
-                // write the new source sets, after layers were decided, should see the ghosts now
-                std::stringstream filename;
-                filename << "expand_source" << ctx.pcomm->rank() << ".h5m";
-                rval = ctx.mbcore->write_file( filename.str().c_str(), 0, 0, &( ctx.meshsets[0] ), 1 );MB_CHK_ERR( rval );
-            }
-#endif
-        }
-#endif
         ctx.timer_pop();
 
         // Load the target mesh and validate

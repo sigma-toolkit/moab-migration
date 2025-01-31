@@ -203,6 +203,8 @@ class IntxUtils
                                                 std::vector< Tag >& tagList );
 
     static ErrorCode remove_padded_vertices( Interface* mb, EntityHandle file_set, std::vector< Tag >& tagList );
+    // used now to compute maximum diagonal for a range of cells
+    static ErrorCode max_diagonal(Interface* mb, Range cells, int max_edges, double & diagonal);
 };
 
 class IntxAreaUtils

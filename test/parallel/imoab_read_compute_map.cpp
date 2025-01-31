@@ -21,6 +21,7 @@
 #include "moab/CpuTimer.hpp"
 #include "moab/ProgOptions.hpp"
 #include <iostream>
+#include <iomanip>
 #include <sstream>
 
 #include "imoab_coupler_utils.hpp"

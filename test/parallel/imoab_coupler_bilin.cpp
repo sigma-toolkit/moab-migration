@@ -264,8 +264,9 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         // set the ghost layers on the coupler for the source mesh
-        nghlay = 1;  // number of ghost layers
-        ierr   = iMOAB_SetGhostLayers( cplAtmPID, &nghlay );
+        nghlay = 1;  // number of ghost layers for source and target
+        int nghlay_tgt = 0;
+        ierr   = iMOAB_SetMapGhostLayers( cplAtmOcnPID, &nghlay, &nghlay_tgt );
         CHECKIERR( ierr, "cannot set ghost layers" )
 
         PUSH_TIMER( "Compute ATM-OCN mesh intersection" )

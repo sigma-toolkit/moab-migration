@@ -58,7 +58,6 @@ ErrorCode TempestRemapper::initialize( bool initialize_fsets )
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_source_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_target_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_overlap_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
-        m_source_set_with_ghosts = m_source_set; // eventually, this will be overwritten by a new set, with ghosts
     }
     else
     {
@@ -1005,14 +1004,6 @@ void TempestRemapper::SetMeshSet( Remapper::IntersectionContext ctx /* Remapper:
         m_covering_source_set      = mset;
         if( entities ) m_covering_source_entities = *entities;
     }
-    else if( ctx == Remapper::SourceMeshWithGhosts )
-    {
-        m_source_set_with_ghosts = mset;  // entities not used
-    }
-    else if( ctx == Remapper::TargetMeshWithGhosts )
-    {
-        m_target_set_with_ghosts = mset;  // entities not used
-    }
     else
     {
         // nothing to do really..
@@ -1273,12 +1264,8 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
 
         rval = m_interface->create_meshset( moab::MESHSET_SET, m_covering_source_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
 
-        rval = mbintx->construct_covering_set( m_source_set_with_ghosts, m_covering_source_set, gnomonic, nb_ghost_layers );MB_CHK_ERR( rval );
+        rval = mbintx->construct_covering_set( m_source_set, m_covering_source_set, gnomonic, nb_ghost_layers );MB_CHK_ERR( rval );
 #ifdef MOAB_DBG
-        std::stringstream filename1;
-        filename1 << "source_with_ghosts" << rank << ".h5m";
-        rval = m_interface->write_file( filename1.str().c_str(), 0, 0, &m_source_set_with_ghosts, 1 );MB_CHK_ERR( rval );
-
         std::stringstream filename;
         filename << "covering" << rank << ".h5m";
         rval = m_interface->write_file( filename.str().c_str(), 0, 0, &m_covering_source_set, 1 );MB_CHK_ERR( rval );
@@ -1380,7 +1367,7 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
     return rval;
 }
 
-ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_tempest, int nLayers )
+ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_tempest )
 {
     ErrorCode rval;
     const bool outputEnabled = ( this->rank == 0 );
@@ -1474,17 +1461,6 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
 
                     assert( srcParent >= 0 );
                     intxCov.insert( covEnts[loc_gid_to_lid_covsrc[srcParent]] );
-                }
-                if( nLayers )
-                {
-                    if( !intxCov.empty() )
-                    {
-                        // add to the intxCov range the ghost layers we used for coverage for higher order maps
-                        Range extraCovCells;
-                        rval =
-                            MeshTopoUtil( m_interface ).get_bridge_adjacencies( intxCov, 0, 2, extraCovCells, nLayers );MB_CHK_SET_ERR( rval, "Failed to get bridge adjacencies" );
-                        intxCov.merge( extraCovCells );
-                    }
                 }
 
                 Range notNeededCovCells = moab::subtract( covEnts, intxCov );

@@ -142,7 +142,7 @@ cmake_DATA = MOABConfig.cmake config/ResolveCompilerPaths.cmake
 # directory until we're doing the install.
 install-data-hook:
 	$(AM_V_at)echo "MOAB_LIBDIR=${libdir}" >> $(DESTDIR)$(cfgdir)/moab.make
-	$(AM_V_at)echo "MOAB_INCLUDES=-I${includedir} ${MOAB_INCLUDES}" >> $(DESTDIR)$(cfgdir)/moab.make
+	$(AM_V_at)echo "MOAB_INCLUDES=-I${includedir} \$${MOAB_EXTERNAL_INCLUDES}" >> $(DESTDIR)$(cfgdir)/moab.make
 
 # Generate a file to be installed in $libdir containing the configuration
 # options used for this MOAB build.

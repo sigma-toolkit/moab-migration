@@ -8,18 +8,14 @@ ifeq ($(UNAME_S),Linux)
 	MOAB_CXXFLAGS += -fopenmp
 	MOAB_LIBS_LINK += -fopenmp
 endif
-ifeq ($(UNAME_S),Darwin)
-	MOAB_CXXFLAGS += -Xpreprocessor -fopenmp -I/opt/homebrew/Cellar/libomp/18.1.1/include
-	MOAB_LIBS_LINK += -L/opt/homebrew/Cellar/libomp/18.1.1/lib -lomp
-endif
 #MOAB_CXXFLAGS += -std=c++17 -Wno-missing-declarations -DKOKKOS_DEPENDENCE -Iinclude  -I/opt/compadre/include -I/opt/compadre/include/kokkos -Iexternal/alglib-cpp/src/
 #MOAB_CXXFLAGS += -g3 -O0 -Iinclude
 MOAB_CXXFLAGS += -g -O3 -Iinclude
 
 # PREDCXXFLAGS is for compiling J. Shewchuk's predicates. 
 PREDCXXFLAGS = -O0
-EXTLIBS = lib/libtet.a  lib/libTSFIT.a external/alglib-cpp/src/libalglib.a
-COMPADRELIBS=-L/opt/compadre/lib -lcompadre -lkokkoskernels -lkokkoscore
+EXTLIBS = lib/libtet.a # lib/libTSFIT.a external/alglib-cpp/src/libalglib.a
+#COMPADRELIBS=-L/opt/compadre/lib -lcompadre -lkokkoskernels -lkokkoscore
 
 EXAMPLES = RemapMPASROMS FilterElements
 all: RemapMPASROMS

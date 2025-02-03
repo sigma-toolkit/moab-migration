@@ -4023,10 +4023,9 @@ static ErrCode ComputeSphereRadius( iMOAB_AppID pid, double* radius )
     ErrorCode rval;
     moab::CartVect pos;
 
-    Range& verts                   = context.appDatas[*pid].all_verts;
-    *radius = 1.0;
-    if (verts.empty())
-    	return moab::MB_SUCCESS;
+    Range& verts = context.appDatas[*pid].all_verts;
+    *radius      = 1.0;
+    if( verts.empty() ) return moab::MB_SUCCESS;
     moab::EntityHandle firstVertex = ( verts[0] );
 
     // coordinate data
@@ -4121,30 +4120,33 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     IntxAreaUtils areaAdaptor( IntxAreaUtils::lHuiller );
 #endif
 
-    // print verbosely about the problem setting
+    // fixes to enforce positive orientation of the vertices (outward normal)
+    // fixes to clean up any degenerate quadrangular elements present in the mesh (RLL specifically?)
+    // fixes to enforce convexity in case concave elements are present
     rval = areaAdaptor.positive_orientation( context.MBI, data_src.file_set, defaultradius /*radius_source*/ );MB_CHK_ERR( rval );
+    rval = IntxUtils::fix_degenerate_quads( context.MBI, data_src.file_set );MB_CHK_ERR( rval );
+    if( enforceConvexity )
+    {
+        rval = moab::IntxUtils::enforce_convexity( context.MBI, data_src.file_set, rank );MB_CHK_ERR( rval );
+    }
+
     rval = areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ );MB_CHK_ERR( rval );
+    rval = IntxUtils::fix_degenerate_quads( context.MBI, data_tgt.file_set );MB_CHK_ERR( rval );
+    if( enforceConvexity )
+    {
+        rval = moab::IntxUtils::enforce_convexity( context.MBI, data_tgt.file_set, rank );MB_CHK_ERR( rval );
+    }
+
+    // print verbosely about the problem setting
 #ifdef VERBOSE
     {
         moab::Range rintxverts, rintxelems;
         rval = context.MBI->get_entities_by_dimension( data_src.file_set, 0, rintxverts );MB_CHK_ERR( rval );
         rval = context.MBI->get_entities_by_dimension( data_src.file_set, data_src.dimension, rintxelems );MB_CHK_ERR( rval );
-        rval = IntxUtils::fix_degenerate_quads( context.MBI, data_src.file_set );MB_CHK_ERR( rval );
-        if( enforceConvexity )
-        {
-            rval = moab::IntxUtils::enforce_convexity( context.MBI, data_src.file_set, rank );MB_CHK_ERR( rval );
-        }
-        rval = areaAdaptor.positive_orientation( context.MBI, data_src.file_set, defaultradius );MB_CHK_ERR( rval );
 
         moab::Range bintxverts, bintxelems;
         rval = context.MBI->get_entities_by_dimension( data_tgt.file_set, 0, bintxverts );MB_CHK_ERR( rval );
         rval = context.MBI->get_entities_by_dimension( data_tgt.file_set, data_tgt.dimension, bintxelems );MB_CHK_ERR( rval );
-        rval = IntxUtils::fix_degenerate_quads( context.MBI, data_tgt.file_set );MB_CHK_ERR( rval );
-        if( enforceConvexity )
-        {
-            rval = moab::IntxUtils::enforce_convexity( context.MBI, data_tgt.file_set, rank );MB_CHK_ERR( rval );
-        }
-        rval = areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, defaultradius );MB_CHK_ERR( rval );
 
         if( is_root )
         {
@@ -4153,11 +4155,11 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
             outputFormatter.printf( 0, "The target set contains %d vertices and %d elements \n", bintxverts.size(),
                                     bintxelems.size() );
         }
-        // use_kdtree_search = ( srctgt_areas_glb[0] < srctgt_areas_glb[1] );
-        // advancing front method will fail unless source mesh has no holes (area = 4 * pi) on unit sphere
-        // use_kdtree_search = true;
     }
 #endif
+    // use_kdtree_search = ( srctgt_areas_glb[0] < srctgt_areas_glb[1] );
+    // advancing front method will fail unless source mesh has no holes (area = 4 * pi) on unit sphere
+    // use_kdtree_search = true;
 
     data_intx.dimension = data_tgt.dimension;
     // set the context for the source and destination applications
@@ -4241,7 +4243,7 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
         local_areas[1] = areaAdaptor.area_on_sphere( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ );
         local_areas[2] = areaAdaptor.area_on_sphere( context.MBI, data_intx.file_set, radius_source );
 #ifdef MOAB_HAVE_MPI
-	global_areas[0] = global_areas[1] = global_areas[2] = 0.0; 
+        global_areas[0] = global_areas[1] = global_areas[2] = 0.0;
         MPI_Reduce( &local_areas[0], &global_areas[0], 3, MPI_DOUBLE, MPI_SUM, 0, pco_intx->comm() );
 #else
         global_areas[0] = local_areas[0];

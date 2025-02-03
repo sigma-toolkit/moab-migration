@@ -79,49 +79,50 @@ class Remapper
     /// <summary>
     ///     ghost layers
     /// </summary>
-    moab::ErrorCode GhostLayers( moab::ParallelComm * pcomm, moab::EntityHandle& meshset, const int ngh_layers, moab::EntityHandle& set_with_ghosts )
+    moab::ErrorCode GhostLayers( moab::ParallelComm* pcomm,
+                                 moab::EntityHandle& meshset,
+                                 const int ngh_layers,
+                                 moab::EntityHandle& set_with_ghosts )
     {
         // meshset contains the mesh set distributed already
-        //
-        moab::ErrorCode rval = m_interface->create_meshset( MESHSET_SET, set_with_ghosts );MB_CHK_ERR( rval );
+        MB_CHK_ERR( m_interface->create_meshset( MESHSET_SET, set_with_ghosts ) );
         // copy original content of mesh set here; we will use it later for local area, for example
         // it will not have any ghosts in it
         moab::Range orgEnts;
-        rval = m_interface->get_entities_by_handle( meshset, orgEnts );MB_CHK_ERR( rval );
-        rval = m_interface->add_entities( set_with_ghosts, orgEnts );MB_CHK_ERR( rval );
-        rval = pcomm->exchange_ghost_cells( 2, 0, 1, 0, true, true, &set_with_ghosts );MB_CHK_ERR( rval );
+        MB_CHK_ERR( m_interface->get_entities_by_handle( meshset, orgEnts ) );
+        MB_CHK_ERR( m_interface->add_entities( set_with_ghosts, orgEnts ) );
+        MB_CHK_ERR( pcomm->exchange_ghost_cells( 2, 0, 1, 0, true, true, &set_with_ghosts ) );
         for( int i = 2; i <= ngh_layers; i++ )
         {
-            rval = pcomm->correct_thin_ghost_layers();MB_CHK_ERR( rval );
-            rval = pcomm->exchange_ghost_cells( 2, 0, i, 0, true, true, &set_with_ghosts );MB_CHK_ERR( rval );
+            MB_CHK_ERR( pcomm->correct_thin_ghost_layers() );
+            MB_CHK_ERR( pcomm->exchange_ghost_cells( 2, 0, i, 0, true, true, &set_with_ghosts ) );
         }
 
         // need to set global id tags
         // need also to propagate global id to ghost cells; it is not done by default :(
-        moab::Tag gtag = m_interface->globalId_tag();
         moab::Range entities;
-        rval = m_interface->get_entities_by_dimension( set_with_ghosts, 2, entities );MB_CHK_ERR( rval );
+        moab::Tag gtag = m_interface->globalId_tag();
+        MB_CHK_ERR( m_interface->get_entities_by_dimension( set_with_ghosts, 2, entities ) );
 
         moab::Tag doftag;
-        rval = m_interface->tag_get_handle( "GLOBAL_DOFS", doftag );
-        if ( rval == MB_SUCCESS )
+        moab::ErrorCode rval = m_interface->tag_get_handle( "GLOBAL_DOFS", doftag );
+        if( rval == MB_SUCCESS )
         {
-            moab::Range quads = entities.subset_by_type(moab::MBQUAD);
-            rval = pcomm->exchange_tags( doftag, quads );MB_CHK_ERR( rval );
+            moab::Range quads = entities.subset_by_type( moab::MBQUAD );
+            MB_CHK_ERR( pcomm->exchange_tags( doftag, quads ) );
         }
 
         // get all vertices too, need to exchange global ids for vertices too
         moab::Range vertices;
-        rval = m_interface->get_connectivity( entities, vertices );MB_CHK_ERR( rval );
+        MB_CHK_ERR( m_interface->get_connectivity( entities, vertices ) );
         entities.merge( vertices );
-        rval = pcomm->exchange_tags( gtag, entities );MB_CHK_ERR( rval );
+        MB_CHK_ERR( pcomm->exchange_tags( gtag, entities ) );
 #ifdef MOAB_DBG
         std::stringstream filename1;
         filename1 << "set_with_ghosts" << m_pcomm->rank() << ".h5m";
-        rval = m_interface->write_file( filename1.str().c_str(), 0, 0, &set_with_ghosts, 1 );MB_CHK_ERR( rval );
-
+        MB_CHK_ERR( m_interface->write_file( filename1.str().c_str(), 0, 0, &set_with_ghosts, 1 ) );
 #endif
-        return rval;
+        return moab::MB_SUCCESS;
     }
 
 #endif
@@ -148,17 +149,18 @@ class Remapper
         const std::string opts = std::string( ( readopts ? readopts : "" ) );
         std::cout << "Reading file (" << filename << ") with options = [" << opts << "]\n";
 #endif
-        moab::ErrorCode rval = m_interface->load_file( filename.c_str(), &meshset, opts.c_str() );MB_CHK_ERR( rval );
+        MB_CHK_ERR( m_interface->load_file( filename.c_str(), &meshset, opts.c_str() ) );
 
         Tag rectilinearTag;
-        rval = m_interface->tag_get_handle( "ClimateMetadata", rectilinearTag );
+        ErrorCode rval = m_interface->tag_get_handle( "ClimateMetadata", rectilinearTag );
 
         if( rval != MB_FAILURE && rval != MB_TAG_NOT_FOUND && rval != MB_ALREADY_ALLOCATED &&
             rectilinearTag != nullptr )
         {
             int dimSizes[3];
-            rval = m_interface->tag_get_data( rectilinearTag, &meshset, 1,
-                                              dimSizes );  // MB_CHK_SET_ERR( rval, "Error geting tag data" );
+            EntityHandle rootset = 0;
+            rval                 = m_interface->tag_get_data( rectilinearTag, &rootset, 1,
+                                                              dimSizes );  // MB_CHK_SET_ERR( rval, "Error geting tag data" );
             metadata.clear();
             metadata.push_back( dimSizes[0] );
             metadata.push_back( dimSizes[1] );

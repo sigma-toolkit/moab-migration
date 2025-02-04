@@ -3567,6 +3567,7 @@ ErrCode set_aream_from_trivial_distribution(iMOAB_AppID pid, int N, std::vector<
             // this marker should give an idea of what index is actually needed for value
             int index = marker - 1 - rank*nL;
             TLBack.vr_wr[i] = trvArea[index] ; // !!! big assumptions about indices
+            TLBack.inc_n();
         }
 
         ( pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLBack, 0 );

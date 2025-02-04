@@ -444,9 +444,17 @@ int main( int argc, char* argv[] )
         CHECKIERR( iMOAB_DefineTagStorage( cplAtmPID, bottomFields, &tagTypes, &atmCompNDoFs, &tagIndex[0] ),
                    "failed to define the field tags AnalyticalSolnSrcExact" );
 
+        // just to be sure it is set, to be visible by iMOAB app
+        CHECKIERR( iMOAB_DefineTagStorage( cplAtmPID, "aream", &tagTypes, &atmCompNDoFs, &tagIndex[0] ),
+                           "failed to define the field tags aream" );
+
         CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, allProjectedFields.c_str(), &tagTypes, &ocnCompNDoFs,
                                            &tagIndex[1] ),
                    "failed to define the field tags allProjectedFields" );
+        CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, "aream", &tagTypes, &ocnCompNDoFs,
+                                           &tagIndex[1] ),
+                   "failed to define the field tag aream" );
+
 #ifdef COMPUTE_TRANSPOSE_FILE_MAP
         CHECKIERR( iMOAB_DefineTagStorage( cplAtmPID, bottomProjectedFieldsS, &tagTypes, &atmCompNDoFs, &tagIndex[0] ),
                    "failed to define the field tags AnalyticalSolnSrcExact" );

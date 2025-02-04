@@ -1150,7 +1150,7 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
     {
         int parentID    = parentGids[j];
         double areaDiff = fabs( initAreas[parentID] - recoveredAreas[parentID] );
-        if( areaDiff < 1.e-12 )
+        if( areaDiff < 5.e-12 )
         {
             recovered++;
             recoveredCells.insert( parentCells[j] );  // should we use a std::vector, that will be ordered already ?

@@ -3448,6 +3448,218 @@ ErrCode iMOAB_DumpCommGraph( iMOAB_AppID pid, int* context_id, int* is_sender, c
 #ifdef MOAB_HAVE_TEMPESTREMAP
 
 #ifdef MOAB_HAVE_NETCDF
+
+ErrCode set_aream_from_trivial_distribution(iMOAB_AppID pid, int N, std::vector<double> & trvArea )
+{
+    // this needs several rounds of communication, because the mesh is distributed differently than trivially
+    // get all the cells from the pid_source
+    // get global ids of the cells
+    // number of local cells: [n/size] nL = [n/size]
+    // last one extraN = n%size; nL += extraN
+    // start id = [ rank*nL + 1; endId = (rank+1)*nL
+    // lst one (rank = =size-1; endId = na
+    // the last cells get the rest
+    // construct global ids that correspond to trvArea [, rank *
+    appData& data     = context.appDatas[*pid];
+    ParallelComm * pcomm = context.appDatas[*pid].pcomm;
+    int size = pcomm->size();
+    int rank = pcomm->rank();
+    int nL = N/size;
+    int startId = rank * nL + 1;
+    int endId = (rank + 1) * nL;
+    if (rank == size - 1)
+    {
+        endId = N;
+        nL += nL + N%size; // extra size
+    }
+    //assert(nL == (int)trvArea.size());
+    // trvArea should have the same size as local [startId - endId]
+    ///   the tag should be created already in the e3sm workflow; if not, create it here
+    Tag areaTag;
+    ErrorCode rval = context.MBI->tag_get_handle( "aream", 1, MB_TYPE_DOUBLE, areaTag,
+                                            MB_TAG_DENSE | MB_TAG_EXCL | MB_TAG_CREAT );
+    if( MB_ALREADY_ALLOCATED == rval )
+    {
+        if( 0 == rank ) std::cout << " aream tag already defined \n " ;
+    }
+
+    // start copy
+    Range ents_to_set = data.primary_elems ;
+    int nents_to_be_set = (int)ents_to_set.size();
+
+    Tag gidTag = context.MBI->globalId_tag();
+    std::vector< int > globalIds;
+    globalIds.resize( nents_to_be_set );
+    rval = context.MBI->tag_get_data( gidTag, ents_to_set, &globalIds[0] );MB_CHK_ERR( rval );
+
+    // so we will need to set the tags according to the global id passed;
+    // so the order in tag_storage_data is the same as the order in globalIds, but the order
+    // in local range is gids
+    std::map< int, EntityHandle > eh_by_gid;
+    int i = 0;
+    for( Range::iterator it = ents_to_set.begin(); it != ents_to_set.end(); ++it, ++i )
+    {
+        eh_by_gid[globalIds[i]] = *it;
+    }
+
+
+    bool serial = true;
+    if( size > 1 ) serial = false;
+
+    if( serial )
+    {
+        // we do not assume anymore that the number of entities has to match
+        // we will set only what matches, and skip entities that do not have corresponding global ids
+        //assert( total_tag_len * nents_to_be_set - *num_tag_storage_length == 0 );
+        // tags are unrolled, we loop over global ids first, then careful about tags
+        for( int i = 0; i < nents_to_be_set; i++ )
+        {
+            int gid                                       = globalIds[i];
+            std::map< int, EntityHandle >::iterator mapIt = eh_by_gid.find( gid );
+            if( mapIt == eh_by_gid.end() ) continue;
+            EntityHandle eh = mapIt->second; //
+            rval = context.MBI->tag_set_data( areaTag, &eh, 1, &trvArea[i] );MB_CHK_ERR( rval );
+        }
+    }
+#ifdef MOAB_HAVE_MPI
+    else  // it can be not serial only if size > 1, parallel
+    {
+        // in this case, we have to use 2 crystal routers, to send data to the processor that needs it
+        // we will create first a tuple to rendevous points, then from there send to the processor that requested it
+        // it is a 2-hop global gather scatter
+        // TODO: allow for tags of different length; this is wrong
+        //assert( nbLocalVals * tagNames.size() - *num_tag_storage_length == 0 );
+        TupleList TLsend;
+        TLsend.initialize( 2, 0, 0, 1, nL );  //  to proc, marker(gid), total_tag_len doubles
+        TLsend.enableWriteAccess();
+        // the processor id that processes global_id is global_id / num_ents_per_proc
+
+        int indexInRealLocal = 0;
+        for( int i = 0; i < nL; i++ )
+        {
+            // to proc, marker, element local index, index in el
+            int marker              = globalIds[i];
+            int to_proc             = marker % size;
+            int n                   = TLsend.get_n();
+            TLsend.vi_wr[2 * n]     = to_proc;  // send to processor
+            TLsend.vi_wr[2 * n + 1] = marker;
+            TLsend.vr_wr[n] = trvArea[n];
+            TLsend.inc_n();
+        }
+
+        //assert( nbLocalVals * total_tag_len - indexInRealLocal == 0 );
+        // send now requests, basically inform the rendez-vous point who needs a particular global id
+        // send the data to the other processors:
+        ( pcomm->proc_config().crystal_router() ) -> gs_transfer( 1, TLsend, 0 );
+        TupleList TLreq;
+        TLreq.initialize( 2, 0, 0, 0, nents_to_be_set );
+        TLreq.enableWriteAccess();
+        for( int i = 0; i < nents_to_be_set; i++ )
+        {
+            // to proc, marker
+            int marker             = globalIds[i];
+            int to_proc            = marker % size;
+            int n                  = TLreq.get_n();
+            TLreq.vi_wr[2 * n]     = to_proc;  // send to processor
+            TLreq.vi_wr[2 * n + 1] = marker;
+            // tag data collect by number of tags
+            TLreq.inc_n();
+        }
+        ( pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLreq, 0 );
+
+        // we know now that process TLreq.vi_wr[2 * n] needs tags for gid TLreq.vi_wr[2 * n + 1]
+        // we should first order by global id, and then build the new TL with send to proc, global id and
+        // tags for it
+        // sort by global ids the tuple lists
+        moab::TupleList::buffer sort_buffer;
+        sort_buffer.buffer_init( TLreq.get_n() );
+        TLreq.sort( 1, &sort_buffer );
+        sort_buffer.reset();
+        sort_buffer.buffer_init( TLsend.get_n() );
+        TLsend.sort( 1, &sort_buffer );
+        sort_buffer.reset();
+        // now send the tag values to the proc that requested it
+        // in theory, for a full  partition, TLreq  and TLsend should have the same size, and
+        // each dof should have exactly one target proc. Is that true or not in general ?
+        // how do we plan to use this? Is it better to store the comm graph for future
+
+        // start copy from comm graph settle
+        TupleList TLBack;
+        TLBack.initialize( 3, 0, 0, 1, 0 );  // to proc, marker, tag from proc , tag values
+        TLBack.enableWriteAccess();
+
+        int n1 = TLreq.get_n();
+        int n2 = TLsend.get_n();
+
+        int indexInTLreq  = 0;
+        int indexInTLsend = 0;  // advance both, according to the marker
+        if( n1 > 0 && n2 > 0 )
+        {
+
+            while( indexInTLreq < n1 && indexInTLsend < n2 )  // if any is over, we are done
+            {
+                int currentValue1 = TLreq.vi_rd[2 * indexInTLreq + 1];
+                int currentValue2 = TLsend.vi_rd[2 * indexInTLsend + 1];
+                if( currentValue1 < currentValue2 )
+                {
+                    // we have a big problem; basically, we are saying that
+                    // dof currentValue is on one model and not on the other
+                    // std::cout << " currentValue1:" << currentValue1 << " missing in comp2" << "\n";
+                    indexInTLreq++;
+                    continue;
+                }
+                if( currentValue1 > currentValue2 )
+                {
+                    // std::cout << " currentValue2:" << currentValue2 << " missing in comp1" << "\n";
+                    indexInTLsend++;
+                    continue;
+                }
+                int size1 = 1;
+                int size2 = 1;
+                while( indexInTLreq + size1 < n1 && currentValue1 == TLreq.vi_rd[2 * ( indexInTLreq + size1 ) + 1] )
+                    size1++;
+                while( indexInTLsend + size2 < n2 && currentValue2 == TLsend.vi_rd[2 * ( indexInTLsend + size2 ) + 1] )
+                    size2++;
+                // must be found in both lists, find the start and end indices
+                for( int i1 = 0; i1 < size1; i1++ )
+                {
+                    for( int i2 = 0; i2 < size2; i2++ )
+                    {
+                        // send the info back to components
+                        int n = TLBack.get_n();
+                        TLBack.reserve();
+                        TLBack.vi_wr[3 * n] = TLreq.vi_rd[2 * ( indexInTLreq + i1 )];  // send back to the proc marker
+                                                                                       // came from, info from comp2
+                        TLBack.vi_wr[3 * n + 1] = currentValue1;  // initial value (resend, just for verif ?)
+                        TLBack.vi_wr[3 * n + 2] = TLsend.vi_rd[2 * ( indexInTLsend + i2 )];  // from proc on comp2
+                        // also fill tag values
+                        TLBack.vr_rd[ n ] = TLsend.vr_rd[indexInTLsend];  // deep copy of tag values
+                    }
+                }
+                indexInTLreq += size1;
+                indexInTLsend += size2;
+            }
+        }
+        ( pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLBack, 0 );
+        // end copy from comm graph
+        // after we are done sending, we need to set those tag values, in a reverse process compared to send
+        n1             = TLBack.get_n();
+        double* ptrVal = &TLBack.vr_rd[0];  //
+        for( int i = 0; i < n1; i++ )
+        {
+            int gid  = TLBack.vi_rd[3 * i + 1];  // marker
+            std::map< int, EntityHandle >::iterator mapIt = eh_by_gid.find( gid );
+            if( mapIt == eh_by_gid.end() ) continue;
+            EntityHandle eh = mapIt->second;
+            rval = context.MBI->tag_set_data( areaTag, &eh, 1, (void*)ptrVal );MB_CHK_ERR( rval );
+            ptrVal ++;  // at the end of tag data per call
+        }
+    }
+#endif
+    // end copy
+
+    return MB_SUCCESS;
+}
 ErrCode iMOAB_LoadMappingWeightsFromFile(
     iMOAB_AppID pid_source,
     iMOAB_AppID pid_target,
@@ -3565,13 +3777,18 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
         MB_CHK_ERR( MB_FAILURE );  // we know only type 1 or 2 or 3
     }
 
-    // pass ordered dofs, and unique
-    std::vector< int > orderDofs( tgtDofValues.begin(), tgtDofValues.end() );
-    std::sort( orderDofs.begin(), orderDofs.end() );
-    orderDofs.erase( std::unique( orderDofs.begin(), orderDofs.end() ), orderDofs.end() );  // remove duplicates
+    // pass tgt ordered dofs, and unique
+    // we need to read area_b and set aream tag on target cells, too
+    std::vector< int > sortTgtDofs( tgtDofValues.begin(), tgtDofValues.end() );
+    std::sort( sortTgtDofs.begin(), sortTgtDofs.end() );
+    sortTgtDofs.erase( std::unique( sortTgtDofs.begin(), sortTgtDofs.end() ), sortTgtDofs.end() );  // remove duplicates
 
-    MB_CHK_SET_ERR( weightMap->ReadParallelMap( remap_weights_filename, orderDofs, true /*row_based_partition*/ ),
+
+    std::vector<double> trvAreaA, trvAreaB; // passed by reference
+    int nA, nB; // passed by reference, so returned
+    MB_CHK_SET_ERR( weightMap->ReadParallelMap( remap_weights_filename, sortTgtDofs, true /*row_based_partition*/, trvAreaA, nA, trvAreaB, nB ),
                     "reading map from disk failed" );
+    // trivially distributed areaAs and areaBs will need to be set on their correct source and target cells, as an aream tag
 
     // if we are on target mesh (row based partition)
     tdata.pid_src  = pid_source;
@@ -3583,6 +3800,12 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
     // that need to participate in the meshes.
 
     tdata.remapper->SetMeshSet( Remapper::SourceMesh, source_set, &srcc_ents_of_interest );
+    // we have read the area A from map file, and we will set it as a aream double tag on the source set, knowing that we
+    // read it trivially, with a trivial distribution by the global DOFs
+    // local , private method:
+    MB_CHK_SET_ERR( set_aream_from_trivial_distribution(pid_source, nA, trvAreaA ), " fail to set aream on source " );
+    MB_CHK_SET_ERR( set_aream_from_trivial_distribution(pid_target, nB, trvAreaB ), " fail to set aream on target " );
+
     tdata.remapper->SetMeshSet( Remapper::CoveringMesh, covering_set, &src_ents_of_interest );
     weightMap->SetSourceNDofsPerElement( src_elem_dof_length );
     weightMap->set_col_dc_dofs( srcDofValues );  // will set col_dtoc_dofmap

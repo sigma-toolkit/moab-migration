@@ -3464,14 +3464,7 @@ ErrCode set_aream_from_trivial_distribution(iMOAB_AppID pid, int N, std::vector<
     ParallelComm * pcomm = context.appDatas[*pid].pcomm;
     int size = pcomm->size();
     int rank = pcomm->rank();
-    int nL = N/size;
-    int startId = rank * nL + 1;
-    int endId = (rank + 1) * nL;
-    if (rank == size - 1)
-    {
-        endId = N;
-        nL += nL + N%size; // extra size
-    }
+
     //assert(nL == (int)trvArea.size());
     // trvArea should have the same size as local [startId - endId]
     ///   the tag should be created already in the e3sm workflow; if not, create it here
@@ -3492,17 +3485,6 @@ ErrCode set_aream_from_trivial_distribution(iMOAB_AppID pid, int N, std::vector<
     globalIds.resize( nents_to_be_set );
     rval = context.MBI->tag_get_data( gidTag, ents_to_set, &globalIds[0] );MB_CHK_ERR( rval );
 
-    // so we will need to set the tags according to the global id passed;
-    // so the order in tag_storage_data is the same as the order in globalIds, but the order
-    // in local range is gids
-    std::map< int, EntityHandle > eh_by_gid;
-    int i = 0;
-    for( Range::iterator it = ents_to_set.begin(); it != ents_to_set.end(); ++it, ++i )
-    {
-        eh_by_gid[globalIds[i]] = *it;
-    }
-
-
     bool serial = true;
     if( size > 1 ) serial = false;
 
@@ -3514,145 +3496,88 @@ ErrCode set_aream_from_trivial_distribution(iMOAB_AppID pid, int N, std::vector<
         // tags are unrolled, we loop over global ids first, then careful about tags
         for( int i = 0; i < nents_to_be_set; i++ )
         {
-            int gid                                       = globalIds[i];
-            std::map< int, EntityHandle >::iterator mapIt = eh_by_gid.find( gid );
-            if( mapIt == eh_by_gid.end() ) continue;
-            EntityHandle eh = mapIt->second; //
-            rval = context.MBI->tag_set_data( areaTag, &eh, 1, &trvArea[i] );MB_CHK_ERR( rval );
+            int gid = globalIds[i];
+            int indexInVal = gid - 1; // assume the values are in order of global id, starting from 1 to number of cells
+            assert(indexInVal < N);
+            EntityHandle eh = ents_to_set[i];
+            rval = context.MBI->tag_set_data( areaTag, &eh, 1, &trvArea[indexInVal] );MB_CHK_ERR( rval );
         }
     }
 #ifdef MOAB_HAVE_MPI
     else  // it can be not serial only if size > 1, parallel
     {
+        int nL = N/size; // how many global ids per task, except the last one
+        int startId = rank * nL + 1;
+        int endId = (rank + 1) * nL;
+        if (rank == size - 1)
+        {
+            endId = N;
+        }
+
         // in this case, we have to use 2 crystal routers, to send data to the processor that needs it
         // we will create first a tuple to rendevous points, then from there send to the processor that requested it
         // it is a 2-hop global gather scatter
         // TODO: allow for tags of different length; this is wrong
         //assert( nbLocalVals * tagNames.size() - *num_tag_storage_length == 0 );
-        TupleList TLsend;
-        TLsend.initialize( 2, 0, 0, 1, nL );  //  to proc, marker(gid), total_tag_len doubles
-        TLsend.enableWriteAccess();
+        TupleList TLreq;
+        TLreq.initialize( 3, 0, 0, 0, nents_to_be_set );  //  to proc, marker(gid),
+        TLreq.enableWriteAccess();
         // the processor id that processes global_id is global_id / num_ents_per_proc
 
-        int indexInRealLocal = 0;
-        for( int i = 0; i < nL; i++ )
+        // send requests to processor that has the global id
+        for( int i = 0; i < nents_to_be_set; i++ )
         {
             // to proc, marker, element local index, index in el
             int marker              = globalIds[i];
-            int to_proc             = marker % size;
-            int n                   = TLsend.get_n();
-            TLsend.vi_wr[2 * n]     = to_proc;  // send to processor
-            TLsend.vi_wr[2 * n + 1] = marker;
-            TLsend.vr_wr[n] = trvArea[n];
-            TLsend.inc_n();
+            int to_proc             = (marker-1) / nL; // proc from 0 to size - 1
+
+            if (to_proc == size)
+                to_proc = size -1 ; // the last array is the longest
+            int n                   = TLreq.get_n();
+            TLreq.vi_wr[3 * n]     = to_proc;  // send to processor
+            TLreq.vi_wr[3 * n + 1] = marker;
+            TLreq.vi_wr[3 * n + 2] = i; // local index for this global id
+            TLreq.inc_n();
         }
 
         //assert( nbLocalVals * total_tag_len - indexInRealLocal == 0 );
         // send now requests, basically inform the rendez-vous point who needs a particular global id
         // send the data to the other processors:
-        ( pcomm->proc_config().crystal_router() ) -> gs_transfer( 1, TLsend, 0 );
-        TupleList TLreq;
-        TLreq.initialize( 2, 0, 0, 0, nents_to_be_set );
-        TLreq.enableWriteAccess();
-        for( int i = 0; i < nents_to_be_set; i++ )
-        {
-            // to proc, marker
-            int marker             = globalIds[i];
-            int to_proc            = marker % size;
-            int n                  = TLreq.get_n();
-            TLreq.vi_wr[2 * n]     = to_proc;  // send to processor
-            TLreq.vi_wr[2 * n + 1] = marker;
-            // tag data collect by number of tags
-            TLreq.inc_n();
-        }
-        ( pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLreq, 0 );
+        ( pcomm->proc_config().crystal_router() ) -> gs_transfer( 1, TLreq, 0 );
 
-        // we know now that process TLreq.vi_wr[2 * n] needs tags for gid TLreq.vi_wr[2 * n + 1]
-        // we should first order by global id, and then build the new TL with send to proc, global id and
-        // tags for it
-        // sort by global ids the tuple lists
-        moab::TupleList::buffer sort_buffer;
-        sort_buffer.buffer_init( TLreq.get_n() );
-        TLreq.sort( 1, &sort_buffer );
-        sort_buffer.reset();
+
+        /*sort_buffer.reset();
         sort_buffer.buffer_init( TLsend.get_n() );
         TLsend.sort( 1, &sort_buffer );
-        sort_buffer.reset();
+        sort_buffer.reset();*/
         // now send the tag values to the proc that requested it
-        // in theory, for a full  partition, TLreq  and TLsend should have the same size, and
-        // each dof should have exactly one target proc. Is that true or not in general ?
-        // how do we plan to use this? Is it better to store the comm graph for future
 
+        int sizeBack = TLreq.get_n();
         // start copy from comm graph settle
         TupleList TLBack;
-        TLBack.initialize( 3, 0, 0, 1, 0 );  // to proc, marker, tag from proc , tag values
+        TLBack.initialize( 3, 0, 0, 1, sizeBack );  // to proc, marker, tag from proc , tag values
         TLBack.enableWriteAccess();
-
-        int n1 = TLreq.get_n();
-        int n2 = TLsend.get_n();
-
-        int indexInTLreq  = 0;
-        int indexInTLsend = 0;  // advance both, according to the marker
-        if( n1 > 0 && n2 > 0 )
+        for (int i = 0; i < sizeBack ; i++)
         {
-
-            while( indexInTLreq < n1 && indexInTLsend < n2 )  // if any is over, we are done
-            {
-                int currentValue1 = TLreq.vi_rd[2 * indexInTLreq + 1];
-                int currentValue2 = TLsend.vi_rd[2 * indexInTLsend + 1];
-                if( currentValue1 < currentValue2 )
-                {
-                    // we have a big problem; basically, we are saying that
-                    // dof currentValue is on one model and not on the other
-                    // std::cout << " currentValue1:" << currentValue1 << " missing in comp2" << "\n";
-                    indexInTLreq++;
-                    continue;
-                }
-                if( currentValue1 > currentValue2 )
-                {
-                    // std::cout << " currentValue2:" << currentValue2 << " missing in comp1" << "\n";
-                    indexInTLsend++;
-                    continue;
-                }
-                int size1 = 1;
-                int size2 = 1;
-                while( indexInTLreq + size1 < n1 && currentValue1 == TLreq.vi_rd[2 * ( indexInTLreq + size1 ) + 1] )
-                    size1++;
-                while( indexInTLsend + size2 < n2 && currentValue2 == TLsend.vi_rd[2 * ( indexInTLsend + size2 ) + 1] )
-                    size2++;
-                // must be found in both lists, find the start and end indices
-                for( int i1 = 0; i1 < size1; i1++ )
-                {
-                    for( int i2 = 0; i2 < size2; i2++ )
-                    {
-                        // send the info back to components
-                        int n = TLBack.get_n();
-                        TLBack.reserve();
-                        TLBack.vi_wr[3 * n] = TLreq.vi_rd[2 * ( indexInTLreq + i1 )];  // send back to the proc marker
-                                                                                       // came from, info from comp2
-                        TLBack.vi_wr[3 * n + 1] = currentValue1;  // initial value (resend, just for verif ?)
-                        TLBack.vi_wr[3 * n + 2] = TLsend.vi_rd[2 * ( indexInTLsend + i2 )];  // from proc on comp2
-                        // also fill tag values
-                        TLBack.vr_rd[ n ] = TLsend.vr_rd[indexInTLsend];  // deep copy of tag values
-                    }
-                }
-                indexInTLreq += size1;
-                indexInTLsend += size2;
-            }
+            int from_proc = TLreq.vi_wr[3 * i] ;  // send to processor
+            TLBack.vi_wr[3*i] = from_proc;
+            int marker = TLreq.vi_wr[3 * i + 1]; // the actual global id
+            TLBack.vi_wr[3*i+1] = marker;
+            TLBack.vi_wr[3*i+2] = TLreq.vi_wr[3 * i + 2]; // the original index this came from
+            // this marker should give an idea of what index is actually needed for value
+            int index = marker - 1 - rank*nL;
+            TLBack.vr_wr[i] = trvArea[index] ; // !!! big assumptions about indices
         }
+
         ( pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLBack, 0 );
-        // end copy from comm graph
-        // after we are done sending, we need to set those tag values, in a reverse process compared to send
-        n1             = TLBack.get_n();
-        double* ptrVal = &TLBack.vr_rd[0];  //
+
+        int n1  = TLBack.get_n(); // should be the number of nents_to_be_set
         for( int i = 0; i < n1; i++ )
         {
             int gid  = TLBack.vi_rd[3 * i + 1];  // marker
-            std::map< int, EntityHandle >::iterator mapIt = eh_by_gid.find( gid );
-            if( mapIt == eh_by_gid.end() ) continue;
-            EntityHandle eh = mapIt->second;
-            rval = context.MBI->tag_set_data( areaTag, &eh, 1, (void*)ptrVal );MB_CHK_ERR( rval );
-            ptrVal ++;  // at the end of tag data per call
+            int origIndex = TLBack.vi_rd[3 * i + 2];
+            EntityHandle eh = ents_to_set[origIndex];
+            rval = context.MBI->tag_set_data( areaTag, &eh, 1, &TLBack.vr_rd[i] );MB_CHK_ERR( rval );
         }
     }
 #endif

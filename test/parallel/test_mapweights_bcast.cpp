@@ -502,7 +502,7 @@ void read_map_from_disk()
 
     std::vector<double> areaA, areaB; // will not be used in this test
     int nA, nB; // not used by this test
-    rval = onlinemap.ReadParallelMap( remap_weights_filename.c_str(), tgt_owned_ids, true, areaA, nA, areaB, nB);
+    rval = onlinemap.ReadParallelMap( remap_weights_filename.c_str(), tgt_owned_ids, areaA, nA, areaB, nB);
     CHECK_EQUAL( rval, moab::MB_SUCCESS );
 
     // consistency: row sums

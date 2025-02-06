@@ -1204,7 +1204,6 @@ void print_progress( const int barWidth, const float progress, const char* messa
 
 moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
                                                          const std::vector< int >& owned_dof_ids,
-                                                         bool row_partition,
                                                          std::vector<double> & vecAreaA,
                                                          int & nA,
                                                          std::vector<double> & vecAreaB,
@@ -1404,7 +1403,6 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         std::vector< int > ownership;
         // the default trivial partitioning scheme
         int nDofs = nB;                   // this is for row partitioning
-        if( !row_partition ) nDofs = nA;  // column partitioning
 
         // assert(row_major_ownership == true); // this block is valid only for row-based partitioning
         ownership.resize( size );
@@ -1426,8 +1424,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             int rowval  = vecRow[i] - 1;  // dofs are 1 based in the file
             int colval  = vecCol[i] - 1;
             int to_proc = -1;
-            int dof_val = colval;
-            if( row_partition ) dof_val = rowval;
+            int dof_val = rowval;
 
             if( ownership[0] > dof_val )
                 to_proc = 0;
@@ -1493,10 +1490,6 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             tl_re.sort( 1, &sort_buffer );  // so now we order by value
 
             sort_buffer.buffer_init( tl->get_n() );
-            int indexOrder = 2;                  //  colVal
-            if( row_partition ) indexOrder = 1;  //  rowVal
-            // constexpr int indexOrder = 1;  //  rowVal
-            // tl->sort( indexOrder, &sort_buffer );
 
             std::map< int, int > startDofIndex, endDofIndex;  // indices in tl_re for values we want
             int dofVal = -1;
@@ -1533,7 +1526,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
 
             for( unsigned k = 0; k < tl->get_n(); k++ )
             {
-                int valDof = tl->vi_rd[3 * k + indexOrder];  // 1 for row, 2 for column // first value, it should be
+                int valDof = tl->vi_rd[3 * k + 1];  // 1 for row, 2 for column // first value, it should be
                 for( int ire = startDofIndex[valDof]; ire <= endDofIndex[valDof]; ire++ )
                 {
                     int to_proc               = tl_re.vi_rd[2 * ire];

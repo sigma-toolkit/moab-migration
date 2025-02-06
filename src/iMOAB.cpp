@@ -3449,7 +3449,7 @@ ErrCode iMOAB_DumpCommGraph( iMOAB_AppID pid, int* context_id, int* is_sender, c
 
 #ifdef MOAB_HAVE_NETCDF
 
-ErrCode set_aream_from_trivial_distribution(iMOAB_AppID pid, int N, std::vector<double> & trvArea )
+static ErrCode set_aream_from_trivial_distribution(iMOAB_AppID pid, int N, std::vector<double> & trvArea )
 {
     // this needs several rounds of communication, because the mesh is distributed differently than trivially
     // get all the cells from the pid_source
@@ -3465,24 +3465,18 @@ ErrCode set_aream_from_trivial_distribution(iMOAB_AppID pid, int N, std::vector<
     int size = pcomm->size();
     int rank = pcomm->rank();
 
+    ///   the tag should be created already; error out if not
+    Tag areaTag;
+    ErrorCode rval = context.MBI->tag_get_handle( "aream", areaTag );MB_CHK_ERR( rval );
     //assert(nL == (int)trvArea.size());
     // trvArea should have the same size as local [startId - endId]
-    ///   the tag should be created already in the e3sm workflow; if not, create it here
-    Tag areaTag;
-    ErrorCode rval = context.MBI->tag_get_handle( "aream", 1, MB_TYPE_DOUBLE, areaTag,
-                                            MB_TAG_DENSE | MB_TAG_EXCL | MB_TAG_CREAT );
-    if( MB_ALREADY_ALLOCATED == rval )
-    {
-        if( 0 == rank ) std::cout << " aream tag already defined \n " ;
-    }
 
     // start copy
     Range ents_to_set = data.primary_elems ;
-    int nents_to_be_set = (int)ents_to_set.size();
+    size_t nents_to_be_set = ents_to_set.size();
 
     Tag gidTag = context.MBI->globalId_tag();
-    std::vector< int > globalIds;
-    globalIds.resize( nents_to_be_set );
+    std::vector< int > globalIds( nents_to_be_set );
     rval = context.MBI->tag_get_data( gidTag, ents_to_set, &globalIds[0] );MB_CHK_ERR( rval );
 
     bool serial = true;
@@ -3494,7 +3488,7 @@ ErrCode set_aream_from_trivial_distribution(iMOAB_AppID pid, int N, std::vector<
         // we will set only what matches, and skip entities that do not have corresponding global ids
         //assert( total_tag_len * nents_to_be_set - *num_tag_storage_length == 0 );
         // tags are unrolled, we loop over global ids first, then careful about tags
-        for( int i = 0; i < nents_to_be_set; i++ )
+        for( size_t i = 0; i < nents_to_be_set; i++ )
         {
             int gid = globalIds[i];
             int indexInVal = gid - 1; // assume the values are in order of global id, starting from 1 to number of cells
@@ -3525,7 +3519,7 @@ ErrCode set_aream_from_trivial_distribution(iMOAB_AppID pid, int N, std::vector<
         // the processor id that processes global_id is global_id / num_ents_per_proc
 
         // send requests to processor that has the global id
-        for( int i = 0; i < nents_to_be_set; i++ )
+        for( size_t i = 0; i < nents_to_be_set; i++ )
         {
             // to proc, marker, element local index, index in el
             int marker              = globalIds[i];
@@ -3540,17 +3534,9 @@ ErrCode set_aream_from_trivial_distribution(iMOAB_AppID pid, int N, std::vector<
             TLreq.inc_n();
         }
 
-        //assert( nbLocalVals * total_tag_len - indexInRealLocal == 0 );
         // send now requests, basically inform the rendez-vous point who needs a particular global id
         // send the data to the other processors:
         ( pcomm->proc_config().crystal_router() ) -> gs_transfer( 1, TLreq, 0 );
-
-
-        /*sort_buffer.reset();
-        sort_buffer.buffer_init( TLsend.get_n() );
-        TLsend.sort( 1, &sort_buffer );
-        sort_buffer.reset();*/
-        // now send the tag values to the proc that requested it
 
         int sizeBack = TLreq.get_n();
         // start copy from comm graph settle
@@ -3709,10 +3695,18 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
     std::sort( sortTgtDofs.begin(), sortTgtDofs.end() );
     sortTgtDofs.erase( std::unique( sortTgtDofs.begin(), sortTgtDofs.end() ), sortTgtDofs.end() );  // remove duplicates
 
+    ///   the tag should be created already in the e3sm workflow; if not, create it here
+    Tag areaTag;
+    ErrorCode rval = context.MBI->tag_get_handle( "aream", 1, MB_TYPE_DOUBLE, areaTag,
+                                            MB_TAG_DENSE | MB_TAG_EXCL | MB_TAG_CREAT );
+    if( MB_ALREADY_ALLOCATED == rval )
+    {
+        if( 0 == data_intx.pcomm->rank() ) std::cout << " aream tag already defined \n " ;
+    }
 
     std::vector<double> trvAreaA, trvAreaB; // passed by reference
     int nA, nB; // passed by reference, so returned
-    MB_CHK_SET_ERR( weightMap->ReadParallelMap( remap_weights_filename, sortTgtDofs, true /*row_based_partition*/, trvAreaA, nA, trvAreaB, nB ),
+    MB_CHK_SET_ERR( weightMap->ReadParallelMap( remap_weights_filename, sortTgtDofs, trvAreaA, nA, trvAreaB, nB ),
                     "reading map from disk failed" );
     // trivially distributed areaAs and areaBs will need to be set on their correct source and target cells, as an aream tag
 

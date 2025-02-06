@@ -4119,6 +4119,11 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
     IntxAreaUtils areaAdaptor( IntxAreaUtils::lHuiller );
 #endif
 
+    // print verbosely about the problem setting
+    rval = areaAdaptor.positive_orientation( context.MBI, data_src.file_set, defaultradius /*radius_source*/ );MB_CHK_ERR( rval );
+    rval = areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ );MB_CHK_ERR( rval );
+#ifdef VERBOSE
+
     // fixes to enforce positive orientation of the vertices (outward normal)
     // fixes to clean up any degenerate quadrangular elements present in the mesh (RLL specifically?)
     // fixes to enforce convexity in case concave elements are present
@@ -4137,7 +4142,7 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
     }
 
     // print verbosely about the problem setting
-#ifdef VERBOSE
+
     {
         moab::Range rintxverts, rintxelems;
         rval = context.MBI->get_entities_by_dimension( data_src.file_set, 0, rintxverts );MB_CHK_ERR( rval );

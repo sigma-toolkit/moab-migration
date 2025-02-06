@@ -98,17 +98,18 @@ class Remapper
         const std::string opts = std::string( ( readopts ? readopts : "" ) );
         std::cout << "Reading file (" << filename << ") with options = [" << opts << "]\n";
 #endif
-        moab::ErrorCode rval = m_interface->load_file( filename.c_str(), &meshset, opts.c_str() );MB_CHK_ERR( rval );
+        MB_CHK_ERR( m_interface->load_file( filename.c_str(), &meshset, opts.c_str() ) );
 
         Tag rectilinearTag;
-        rval = m_interface->tag_get_handle( "ClimateMetadata", rectilinearTag );
+        ErrorCode rval = m_interface->tag_get_handle( "ClimateMetadata", rectilinearTag );
 
         if( rval != MB_FAILURE && rval != MB_TAG_NOT_FOUND && rval != MB_ALREADY_ALLOCATED &&
             rectilinearTag != nullptr )
         {
             int dimSizes[3];
-            rval = m_interface->tag_get_data( rectilinearTag, &meshset, 1,
-                                              dimSizes );  // MB_CHK_SET_ERR( rval, "Error geting tag data" );
+            EntityHandle rootset = 0;
+            rval                 = m_interface->tag_get_data( rectilinearTag, &rootset, 1,
+                                                              dimSizes );  // MB_CHK_SET_ERR( rval, "Error geting tag data" );
             metadata.clear();
             metadata.push_back( dimSizes[0] );
             metadata.push_back( dimSizes[1] );

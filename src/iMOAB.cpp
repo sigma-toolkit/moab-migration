@@ -4119,30 +4119,33 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
     IntxAreaUtils areaAdaptor( IntxAreaUtils::lHuiller );
 #endif
 
-    // print verbosely about the problem setting
+    // fixes to enforce positive orientation of the vertices (outward normal)
+    // fixes to clean up any degenerate quadrangular elements present in the mesh (RLL specifically?)
+    // fixes to enforce convexity in case concave elements are present
     rval = areaAdaptor.positive_orientation( context.MBI, data_src.file_set, defaultradius /*radius_source*/ );MB_CHK_ERR( rval );
+    rval = IntxUtils::fix_degenerate_quads( context.MBI, data_src.file_set );MB_CHK_ERR( rval );
+    if( enforceConvexity )
+    {
+        rval = moab::IntxUtils::enforce_convexity( context.MBI, data_src.file_set, rank );MB_CHK_ERR( rval );
+    }
+
     rval = areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ );MB_CHK_ERR( rval );
+    rval = IntxUtils::fix_degenerate_quads( context.MBI, data_tgt.file_set );MB_CHK_ERR( rval );
+    if( enforceConvexity )
+    {
+        rval = moab::IntxUtils::enforce_convexity( context.MBI, data_tgt.file_set, rank );MB_CHK_ERR( rval );
+    }
+
+    // print verbosely about the problem setting
 #ifdef VERBOSE
     {
         moab::Range rintxverts, rintxelems;
         rval = context.MBI->get_entities_by_dimension( data_src.file_set, 0, rintxverts );MB_CHK_ERR( rval );
         rval = context.MBI->get_entities_by_dimension( data_src.file_set, data_src.dimension, rintxelems );MB_CHK_ERR( rval );
-        rval = IntxUtils::fix_degenerate_quads( context.MBI, data_src.file_set );MB_CHK_ERR( rval );
-        if( enforceConvexity )
-        {
-            rval = moab::IntxUtils::enforce_convexity( context.MBI, data_src.file_set, rank );MB_CHK_ERR( rval );
-        }
-        rval = areaAdaptor.positive_orientation( context.MBI, data_src.file_set, defaultradius );MB_CHK_ERR( rval );
 
         moab::Range bintxverts, bintxelems;
         rval = context.MBI->get_entities_by_dimension( data_tgt.file_set, 0, bintxverts );MB_CHK_ERR( rval );
         rval = context.MBI->get_entities_by_dimension( data_tgt.file_set, data_tgt.dimension, bintxelems );MB_CHK_ERR( rval );
-        rval = IntxUtils::fix_degenerate_quads( context.MBI, data_tgt.file_set );MB_CHK_ERR( rval );
-        if( enforceConvexity )
-        {
-            rval = moab::IntxUtils::enforce_convexity( context.MBI, data_tgt.file_set, rank );MB_CHK_ERR( rval );
-        }
-        rval = areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, defaultradius );MB_CHK_ERR( rval );
 
         if( is_root )
         {
@@ -4151,11 +4154,11 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
             outputFormatter.printf( 0, "The target set contains %d vertices and %d elements \n", bintxverts.size(),
                                     bintxelems.size() );
         }
-        // use_kdtree_search = ( srctgt_areas_glb[0] < srctgt_areas_glb[1] );
-        // advancing front method will fail unless source mesh has no holes (area = 4 * pi) on unit sphere
-        // use_kdtree_search = true;
     }
 #endif
+    // use_kdtree_search = ( srctgt_areas_glb[0] < srctgt_areas_glb[1] );
+    // advancing front method will fail unless source mesh has no holes (area = 4 * pi) on unit sphere
+    // use_kdtree_search = true;
 
     data_intx.dimension = data_tgt.dimension;
     // set the context for the source and destination applications

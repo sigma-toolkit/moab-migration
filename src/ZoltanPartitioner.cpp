@@ -1043,16 +1043,15 @@ ErrorCode ZoltanPartitioner::write_partition( const int nparts,
 
 void ZoltanPartitioner::SetRCB_Parameters( const bool recompute_rcb_box )
 {
-    if( mbpc->proc_config().proc_rank() == 0 ) std::cout << "\nRecursive Coordinate Bisection" << std::endl;
-    // General parameters:
+    if( mbpc->proc_config().proc_rank() == 0 )
+        std::cout << "Using Zoltan-RCB (Recursive Coordinate Bisection) repartitioning scheme..." << std::endl;
 
+    // General parameters:
     myZZ->Set_Param( "DEBUG_LEVEL", "0" );  // no debug messages
     myZZ->Set_Param( "LB_METHOD", "RCB" );  // recursive coordinate bisection
-    // myZZ->Set_Param( "RCB_RECOMPUTE_BOX", "1" );  // recompute RCB box if needed ?
 
     // RCB parameters:
-
-    myZZ->Set_Param( "RCB_OUTPUT_LEVEL", "1" );
+    myZZ->Set_Param( "RCB_OUTPUT_LEVEL", "0" ); // increase to 1 for verbose details
     myZZ->Set_Param( "KEEP_CUTS", "1" );  // save decomposition so that we can infer partitions
     // myZZ->Set_Param("RCB_RECTILINEAR_BLOCKS", "1"); // don't split point on boundary
     if( recompute_rcb_box ) myZZ->Set_Param( "RCB_RECOMPUTE_BOX", "1" );
@@ -1060,36 +1059,37 @@ void ZoltanPartitioner::SetRCB_Parameters( const bool recompute_rcb_box )
 
 void ZoltanPartitioner::SetRIB_Parameters()
 {
-    if( mbpc->proc_config().proc_rank() == 0 ) std::cout << "\nRecursive Inertial Bisection" << std::endl;
-    // General parameters:
+    if( mbpc->proc_config().proc_rank() == 0 )
+        std::cout << "Using Zoltan-RIB (Recursive Inertial Bisection) repartitioning scheme..." << std::endl;
 
+    // General parameters:
     myZZ->Set_Param( "DEBUG_LEVEL", "0" );  // no debug messages
     myZZ->Set_Param( "LB_METHOD", "RIB" );  // Recursive Inertial Bisection
 
     // RIB parameters:
-
     myZZ->Set_Param( "KEEP_CUTS", "1" );  // save decomposition
     myZZ->Set_Param( "AVERAGE_CUTS", "1" );
 }
 
 void ZoltanPartitioner::SetHSFC_Parameters()
 {
-    if( mbpc->proc_config().proc_rank() == 0 ) std::cout << "\nHilbert Space Filling Curve" << std::endl;
-    // General parameters:
+    if( mbpc->proc_config().proc_rank() == 0 )
+        std::cout << "Using Zoltan-HSFC (Hilbert Space Filling Curve) repartitioning scheme..." << std::endl;
 
+    // General parameters:
     myZZ->Set_Param( "DEBUG_LEVEL", "0" );   // no debug messages
     myZZ->Set_Param( "LB_METHOD", "HSFC" );  // perform Hilbert space filling curve
 
     // HSFC parameters:
-
     myZZ->Set_Param( "KEEP_CUTS", "1" );  // save decomposition
 }
 
 void ZoltanPartitioner::SetHypergraph_Parameters( const char* phg_method )
 {
-    if( mbpc->proc_config().proc_rank() == 0 ) std::cout << "\nHypergraph (or PHG): " << std::endl;
-    // General parameters:
+    if( mbpc->proc_config().proc_rank() == 0 )
+        std::cout << "Using Zoltan-PHG (Hypergraph) repartitioning scheme..." << std::endl;
 
+    // General parameters:
     myZZ->Set_Param( "DEBUG_LEVEL", "0" );         // no debug messages
     myZZ->Set_Param( "LB_METHOD", "Hypergraph" );  // Hypergraph (or PHG)
 
@@ -1099,27 +1099,27 @@ void ZoltanPartitioner::SetHypergraph_Parameters( const char* phg_method )
 
 void ZoltanPartitioner::SetPARMETIS_Parameters( const char* parmetis_method )
 {
-    if( mbpc->proc_config().proc_rank() == 0 ) std::cout << "\nPARMETIS: " << parmetis_method << std::endl;
-    // General parameters:
+    if( mbpc->proc_config().proc_rank() == 0 )
+        std::cout << "Using Zoltan-ParMetis (" << parmetis_method << ") repartitioning scheme..." << std::endl;
 
+    // General parameters:
     myZZ->Set_Param( "DEBUG_LEVEL", "0" );       // no debug messages
     myZZ->Set_Param( "LB_METHOD", "PARMETIS" );  // the ParMETIS library
 
     // PARMETIS parameters:
-
     myZZ->Set_Param( "PARMETIS_METHOD", parmetis_method );  // method in the library
 }
 
 void ZoltanPartitioner::SetOCTPART_Parameters( const char* oct_method )
 {
-    if( mbpc->proc_config().proc_rank() == 0 ) std::cout << "\nOctree Partitioning: " << oct_method << std::endl;
-    // General parameters:
+    if( mbpc->proc_config().proc_rank() == 0 )
+        std::cout << "Using Zoltan-OctTree (" << oct_method << ") repartitioning scheme..." << std::endl;
 
+    // General parameters:
     myZZ->Set_Param( "DEBUG_LEVEL", "0" );      // no debug messages
     myZZ->Set_Param( "LB_METHOD", "OCTPART" );  // octree partitioning
 
     // OCTPART parameters:
-
     myZZ->Set_Param( "OCT_METHOD", oct_method );  // the SFC to be used
     myZZ->Set_Param( "OCT_OUTPUT_LEVEL", "3" );
 }
@@ -1547,7 +1547,7 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
                                                     std::map< int, int > procs,
                                                     int& numNewPartitions,
                                                     std::map< int, Range >& distribution,
-                                                    int met )
+                                                    int partition_method )
 {
     // start copy
     MeshTopoUtil mtu( mbImpl );
@@ -1578,7 +1578,7 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
     {
         EntityHandle cell = *rit;
         // get bridge adjacencies for each cell
-        if( 1 == met )
+        if( 1 == partition_method )
         {
             adjs.clear();
             rval = mtu.get_bridge_adjacencies( cell, ( primaryDim > 0 ? primaryDim - 1 : 3 ), primaryDim, adjs );MB_CHK_ERR( rval );
@@ -1614,7 +1614,7 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
             std::copy( neighbors, neighbors + size_adjs, std::back_inserter( adjacencies ) );
             std::copy( neib_proc, neib_proc + size_adjs, std::back_inserter( nbor_proc ) );
         }
-        else if( 2 == met )
+        else if( 2 == partition_method )
         {
             if( TYPE_FROM_HANDLE( cell ) == MBVERTEX )
             {
@@ -1650,7 +1650,7 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
 
     // these are static var in this file, and used in the callbacks
     Points = NULL;
-    if( 1 != met ) Points = &coords[0];
+    if( 1 != partition_method ) Points = &coords[0];
     GlobalIds    = &ids[0];
     NumPoints    = (int)ids.size();
     NumEdges     = &length[0];
@@ -1661,8 +1661,6 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
     Parts        = NULL;
 
     float version;
-    if( mbpc->rank() == 0 ) std::cout << "Initializing zoltan..." << std::endl;
-
     Zoltan_Initialize( argcArg, argvArg, &version );
 
     // Create Zoltan object.  This calls Zoltan_Create.
@@ -1681,13 +1679,13 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
     myZZ->Set_Num_Obj_Fn( mbGetNumberOfAssignedObjects, NULL );
     myZZ->Set_Obj_List_Fn( mbGetObjectList, NULL );
     // due to a bug in zoltan, if method is graph partitioning, do not pass coordinates!!
-    if( 2 == met )
+    if( 2 == partition_method )
     {
         myZZ->Set_Num_Geom_Fn( mbGetObjectSize, NULL );
         myZZ->Set_Geom_Multi_Fn( mbGetObject, NULL );
         SetRCB_Parameters();  // geometry
     }
-    else if( 1 == met )
+    else if( 1 == partition_method )
     {
         myZZ->Set_Num_Edges_Multi_Fn( mbGetNumberOfEdges, NULL );
         myZZ->Set_Edge_List_Multi_Fn( mbGetEdgeList, NULL );
@@ -1707,9 +1705,9 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
     ZOLTAN_ID_PTR export_global_ids, export_local_ids;
     int *assign_procs, *assign_parts;
 
-    if( mbpc->rank() == 0 )
-        std::cout << "Computing partition using method (1-graph, 2-geom):" << met << " for " << numNewPartitions
-                  << " parts..." << std::endl;
+    // if( mbpc->rank() == 0 )
+    //     std::cout << "Computing partition using method (1-graph, 2-geom): " << partition_method << " for " << numNewPartitions
+    //               << " parts..." << std::endl;
 
 #ifndef NDEBUG
 #if 0
@@ -1717,12 +1715,12 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
   // give a way to not overwrite the files
   // it should work only with a modified version of Zoltan
   std::stringstream basename;
-  if (1==met)
+  if (1==partition_method)
   {
     basename << "phg_" << counter++;
     Zoltan_Generate_Files(myZZ->Get_C_Handle(), (char*)(basename.str().c_str()), 1, 0, 1, 0);
   }
-  else if (2==met)
+  else if (2==partition_method)
   {
     basename << "rcb_" << counter++;
     Zoltan_Generate_Files(myZZ->Get_C_Handle(), (char*)(basename.str().c_str()), 1, 1, 0, 0);

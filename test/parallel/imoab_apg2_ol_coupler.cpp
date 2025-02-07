@@ -938,7 +938,7 @@ int main( int argc, char* argv[] )
 
     if( couComm != MPI_COMM_NULL )
     {
-        context_id = cmpatm;
+        context_id = cmpPhysAtm;
         ierr       = iMOAB_FreeSenderBuffers( cplAtmPID, &context_id );
         CHECKIERR( ierr, "cannot free buffers for sending T2_ph from cpl to phys atm" )
     }
@@ -951,8 +951,12 @@ int main( int argc, char* argv[] )
 #endif
     // end copy need more work for land
 // start copy
-// lnd atm coupling; go reverse direction now, from lnd to atm , using lnd - atm intx, weight gen
-// send back the T_proj , etc , from lan comp to land coupler
+// atm lnd coupling; go reverse direction now, from lnd to atm , using lnd - atm intx, weight gen
+// send back the T_proj , etc , from land comp to land coupler
+    // this is equivalent to one hop projection, that we do not do anymore in E3SM
+    // intersection atm - lnd is based only on global id matching, we just use computed par graph lnd-atm
+// ierr = iMOAB_ComputeCommGraph( cmpPhAtmPID, cplAtmLndPID, &atmCouComm, &atmPEGroup, &couPEGroup, &typeA, &typeB,
+  //   &cmpPhysAtm, &atmlndid );
 #ifdef ENABLE_ATMLND_COUPLING
     PUSH_TIMER( "Send/receive data from lnd component to coupler in atm context" )
     if( lndComm != MPI_COMM_NULL )
@@ -963,7 +967,7 @@ int main( int argc, char* argv[] )
     }
     if( couComm != MPI_COMM_NULL )
     {
-        // receive on ocn on coupler pes, that was redistributed according to coverage
+        // receive on lnd on coupler pes
         ierr = iMOAB_ReceiveElementTag( cplLndPID, "T_proj:u_proj:v_proj", &lndCouComm, &cplatm );
         CHECKIERR( ierr, "cannot receive tag values on land" )
     }
@@ -1042,7 +1046,7 @@ int main( int argc, char* argv[] )
 
     if( couComm != MPI_COMM_NULL )
     {
-        context_id = cmpatm;
+        context_id = cmpPhysAtm;
         ierr       = iMOAB_FreeSenderBuffers( cplAtmPID, &context_id );
         CHECKIERR( ierr, "cannot free buffers used for sending back atm tags " )
     }

@@ -61,8 +61,6 @@ class Remapper
         TargetMesh           = 1,   // target mesh
         OverlapMesh          = 2,   // overlap/intersection mesh
         CoveringMesh         = 3,   // source mesh covering target mesh
-        SourceMeshWithGhosts = 4,   // mesh with extra ghost layers to compute coverage in high order case or bilin
-        TargetMeshWithGhosts = 5    // mesh with extra ghost layers to impose target data limiting
     };
 
     moab::Interface* get_interface()
@@ -74,55 +72,6 @@ class Remapper
     moab::ParallelComm* get_parallel_communicator()
     {
         return m_pcomm;
-    }
-
-    /// <summary>
-    ///     ghost layers
-    /// </summary>
-    moab::ErrorCode GhostLayers( moab::ParallelComm* pcomm,
-                                 moab::EntityHandle& meshset,
-                                 const int ngh_layers,
-                                 moab::EntityHandle& set_with_ghosts )
-    {
-        // meshset contains the mesh set distributed already
-        MB_CHK_ERR( m_interface->create_meshset( MESHSET_SET, set_with_ghosts ) );
-        // copy original content of mesh set here; we will use it later for local area, for example
-        // it will not have any ghosts in it
-        moab::Range orgEnts;
-        MB_CHK_ERR( m_interface->get_entities_by_handle( meshset, orgEnts ) );
-        MB_CHK_ERR( m_interface->add_entities( set_with_ghosts, orgEnts ) );
-        MB_CHK_ERR( pcomm->exchange_ghost_cells( 2, 0, 1, 0, true, true, &set_with_ghosts ) );
-        for( int i = 2; i <= ngh_layers; i++ )
-        {
-            MB_CHK_ERR( pcomm->correct_thin_ghost_layers() );
-            MB_CHK_ERR( pcomm->exchange_ghost_cells( 2, 0, i, 0, true, true, &set_with_ghosts ) );
-        }
-
-        // need to set global id tags
-        // need also to propagate global id to ghost cells; it is not done by default :(
-        moab::Range entities;
-        moab::Tag gtag = m_interface->globalId_tag();
-        MB_CHK_ERR( m_interface->get_entities_by_dimension( set_with_ghosts, 2, entities ) );
-
-        moab::Tag doftag;
-        moab::ErrorCode rval = m_interface->tag_get_handle( "GLOBAL_DOFS", doftag );
-        if( rval == MB_SUCCESS )
-        {
-            moab::Range quads = entities.subset_by_type( moab::MBQUAD );
-            MB_CHK_ERR( pcomm->exchange_tags( doftag, quads ) );
-        }
-
-        // get all vertices too, need to exchange global ids for vertices too
-        moab::Range vertices;
-        MB_CHK_ERR( m_interface->get_connectivity( entities, vertices ) );
-        entities.merge( vertices );
-        MB_CHK_ERR( pcomm->exchange_tags( gtag, entities ) );
-#ifdef MOAB_DBG
-        std::stringstream filename1;
-        filename1 << "set_with_ghosts" << m_pcomm->rank() << ".h5m";
-        MB_CHK_ERR( m_interface->write_file( filename1.str().c_str(), 0, 0, &set_with_ghosts, 1 ) );
-#endif
-        return moab::MB_SUCCESS;
     }
 
 #endif

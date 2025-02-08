@@ -109,7 +109,7 @@ class TempestRemapper : public Remapper
     ///     intersection algorithm internally for spherical meshes and can handle arbitrary
     ///     unstructured grids (CS, RLL, ICO, MPAS) with and without holes.
     /// </summary>
-    moab::ErrorCode ComputeOverlapMesh( bool kdtree_search = true, bool use_tempest = false, int nLayers = 0 );
+    moab::ErrorCode ComputeOverlapMesh( bool kdtree_search = true, bool use_tempest = false);
 
     /* Converters between MOAB and Tempest representations */
 
@@ -335,11 +335,6 @@ class TempestRemapper : public Remapper
 
     IntxAreaUtils::AreaMethod m_area_method;
 
-    // this is a copy of the original source/target set,
-    // with some ghosts created for parallel cases
-    moab::EntityHandle m_source_set_with_ghosts;  // source+ghost
-    moab::EntityHandle m_target_set_with_ghosts;  // target+ghost
-
     bool rrmgrids;
     bool is_parallel, is_root;
     int rank, size;
@@ -358,7 +353,7 @@ inline Mesh* TempestRemapper::GetMesh( Remapper::IntersectionContext ctx )
             return m_overlap;
         case Remapper::CoveringMesh:
             return m_covering_source;
-        case Remapper::DEFAULT:  // Remapper::SourceMeshWithGhosts does not need one
+        case Remapper::DEFAULT:
         default:
             return NULL;
     }
@@ -388,7 +383,7 @@ inline void TempestRemapper::SetMesh( Remapper::IntersectionContext ctx, Mesh* m
             if( overwrite && m_covering_source ) delete m_covering_source;
             m_covering_source = mesh;
             break;
-        case Remapper::DEFAULT:  // Remapper::SourceMeshWithGhosts does not need one
+        case Remapper::DEFAULT:
         default:
             break;
     }
@@ -433,10 +428,6 @@ inline moab::EntityHandle& TempestRemapper::GetMeshSet( Remapper::IntersectionCo
             return m_overlap_set;
         case Remapper::CoveringMesh:
             return m_covering_source_set;
-        case Remapper::SourceMeshWithGhosts:
-            return m_source_set_with_ghosts;
-        case Remapper::TargetMeshWithGhosts:
-            return m_target_set_with_ghosts;
         case Remapper::DEFAULT:
         default:
             MB_SET_ERR_RET_VAL( "Invalid context passed to GetMeshSet", m_overlap_set );
@@ -455,10 +446,6 @@ inline moab::EntityHandle TempestRemapper::GetMeshSet( Remapper::IntersectionCon
             return m_overlap_set;
         case Remapper::CoveringMesh:
             return m_covering_source_set;
-        case Remapper::SourceMeshWithGhosts:
-            return m_source_set_with_ghosts;
-        case Remapper::TargetMeshWithGhosts:
-            return m_target_set_with_ghosts;
         case Remapper::DEFAULT:
         default:
             MB_SET_ERR_RET_VAL( "Invalid context passed to GetMeshSet", m_overlap_set );
@@ -582,7 +569,7 @@ inline TempestRemapper::TempestMeshType TempestRemapper::GetMeshType( Remapper::
             return m_target_type;
         case Remapper::OverlapMesh:
             return m_overlap_type;
-        case Remapper::DEFAULT:  // not need yet case Remapper::SourceMeshWithGhosts
+        case Remapper::DEFAULT:
         default:
             return TempestRemapper::DEFAULT;
     }
@@ -609,7 +596,6 @@ inline int TempestRemapper::GetGlobalID( Remapper::IntersectionContext ctx, int 
         case Remapper::CoveringMesh:
             return lid_to_gid_covsrc[localID];
         case Remapper::OverlapMesh:
-        case Remapper::SourceMeshWithGhosts:
         case Remapper::DEFAULT:
         default:
             return -1;
@@ -628,7 +614,6 @@ inline int TempestRemapper::GetLocalID( Remapper::IntersectionContext ctx, int g
             return gid_to_lid_covsrc[globalID];
         case Remapper::DEFAULT:
         case Remapper::OverlapMesh:
-        case Remapper::SourceMeshWithGhosts:
         default:
             return -1;
     }

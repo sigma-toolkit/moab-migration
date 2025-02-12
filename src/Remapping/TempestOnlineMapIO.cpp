@@ -1212,7 +1212,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     int nS = 0, nA = 0, nB = 0;
 #ifdef MOAB_HAVE_PNETCDF
     // some variables will be used just in the case netcdfpar reader fails
-    int ncfile = -1, ret = 0;
+    int ncfile = -1;
     int ndims, nvars, ngatts, unlimited;
 #endif
 #ifdef MOAB_HAVE_NETCDFPAR

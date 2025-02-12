@@ -402,7 +402,7 @@ AC_DEFUN([CHECK_SOURCE_RECOMPILATION_HASH],
     # ac_cv_sha_moabcpp="`find $moab_src_dir -name '*.cpp' \( -exec $HASHPRGM "$PWD"/{} \; -o -print \) | $HASHPRGM | cut -d ' ' -f1`"
     # defaultshasum="`find $2 -type f -regex '.*\(hpp\|cpp\|c\|h\|f\|f90\)$' \( -exec $HASHPRGM {} \; -o -print \) | $HASHPRGM | cut -d ' ' -f1`"
     # defaultshasum="`find $2/src $2/Source $2/SRC $2/include $2/inc $2/INC -type f -regex '.*\(hpp\|cpp\|c\|h\|f\|f90\)$' | xargs ls -al | $HASHPRGM | cut -d ' ' -f1`"
-    defaultshasum="`cd $2/..; tar -tf $3 | tr \\n \\0 | xargs -0 ls -l | $HASHPRGM | cut -d ' ' -f1`"
+    defaultshasum="`cd $2/.. && tar -tf $3 | xargs ls -l | $HASHPRGM | cut -d ' ' -f1`"
     AC_CACHE_VAL([ac_cv_sha_$1], [ac_cv_sha_$1="0"])
     if (test "$defaultshasum" != "$ac_cv_sha_$1" || test $need_configuration); then
       recompile_and_install=true
@@ -1760,13 +1760,13 @@ AC_DEFUN([AUSCM_CONFIGURE_DOWNLOAD_TEMPESTREMAP],[
   # Set the default TempestRemap download version
   m4_pushdef([TEMPESTREMAP_DOWNLOAD_VERSION],[$1])dnl
 
-  tempestremap_repository_url="https://github.com/ClimateGlobalChange/tempestremap.git"
+  tempestremap_repository_url="https://github.com/E3SM-Project/tempestremap.git"
   tempestremap_repository_branch="master"
 
   # Invoke the download-tempestremap command
   m4_case( TEMPESTREMAP_DOWNLOAD_VERSION, [2.2.0], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/tempestremap/tempestremap-2_2_0.tar.gz], [$2] ) ],
                                   [2.1.6], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/tempestremap/tempestremap-2_1_6.tar.gz], [$2] ) ],
-                                  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/tempestremap/tempestremap-2_2_0.tar.gz], [$2] ) ] )
+                                  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://github.com/E3SM-Project/tempestremap/archive/refs/heads/master.tar.gz], [$2] ) ] )
 
   if (test "x$downloadtempestremap" == "xyes") ; then
     # download the latest TempestRemap sources, configure and install

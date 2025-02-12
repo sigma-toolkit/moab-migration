@@ -842,7 +842,7 @@ fi
 # Provide downloadable option for TempestRemap library
 # Supported TempestRemap versions: 2.2.0, 2.1.6
 # Arguments: 1) Default Version Number, 2) Download by default ?
-AUSCM_CONFIGURE_DOWNLOAD_TEMPESTREMAP([2.2.0], [no])
+AUSCM_CONFIGURE_DOWNLOAD_TEMPESTREMAP([master], [no])
 
 # Configuration for TempestRemap library
 AC_ARG_WITH([tempestremap],

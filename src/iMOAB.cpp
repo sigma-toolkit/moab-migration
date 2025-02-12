@@ -1488,11 +1488,10 @@ ErrCode iMOAB_DefineTagStorage( iMOAB_AppID pid,
                                 int* components_per_entity,
                                 int* tag_index )
 {
-    // see if the tag is already existing, and if yes, check the type, length
+    // we have 6 types of tags supported so far
+    // check if tag type is valid
     if( *tag_type < 0 || *tag_type > 5 )
-    {
         return moab::MB_FAILURE;
-    }  // we have 6 types of tags supported so far
 
     DataType tagDataType;
     TagType tagType;
@@ -1504,9 +1503,8 @@ ErrCode iMOAB_DefineTagStorage( iMOAB_AppID pid,
     for( int i = 0; i < *components_per_entity; i++ )
     {
         defInt[i]    = 0;
-        // defDouble[i] = -1e+10;
-        defDouble[i] = 0.0;
-        defHandle[i] = (EntityHandle)0;
+        defDouble[i] = -1e+10;
+        defHandle[i] = static_cast< EntityHandle >( 0 );
     }
 
     switch( *tag_type )
@@ -1555,11 +1553,9 @@ ErrCode iMOAB_DefineTagStorage( iMOAB_AppID pid,
         }  // error
     }
 
-    Tag tagHandle;
     // split storage names if separated list
-
     std::string tag_name( tag_storage_name );
-    //  first separate the names of the tags
+    // first separate the names of the tags
     // we assume that there are separators ":" between the tag names
     std::vector< std::string > tagNames;
     std::string separator( ":" );
@@ -1569,6 +1565,7 @@ ErrCode iMOAB_DefineTagStorage( iMOAB_AppID pid,
     appData& data            = context.appDatas[*pid];
     int already_defined_tags = 0;
 
+    Tag tagHandle;
     for( size_t i = 0; i < tagNames.size(); i++ )
     {
         rval = context.MBI->tag_get_handle( tagNames[i].c_str(), *components_per_entity, tagDataType, tagHandle,
@@ -4077,14 +4074,11 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
     TempestMapAppData& tdata = data_intx.tempestData;
     if( tdata.remapper != nullptr ) return moab::MB_SUCCESS;  // nothing to do
 
-    bool is_parallel = false, is_root = true;
     int rank = 0;
 #ifdef MOAB_HAVE_MPI
     if( pco_intx )
     {
         rank        = pco_intx->rank();
-        is_parallel = ( pco_intx->size() > 1 );
-        is_root     = ( rank == 0 );
         rval        = pco_intx->check_all_shared_handles();MB_CHK_ERR( rval );
     }
 #endif
@@ -4099,7 +4093,7 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
     rval = ComputeSphereRadius( pid_src, &radius_source );MB_CHK_ERR( rval );
     rval = ComputeSphereRadius( pid_tgt, &radius_target );MB_CHK_ERR( rval );
 #ifdef VERBOSE
-    if( is_root )
+    if( !rank )
         outputFormatter.printf( 0, "Radius of spheres: source = %12.14f, and target = %12.14f\n", radius_source,
                                 radius_target );
 #endif
@@ -4152,7 +4146,7 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
         rval = context.MBI->get_entities_by_dimension( data_tgt.file_set, 0, bintxverts );MB_CHK_ERR( rval );
         rval = context.MBI->get_entities_by_dimension( data_tgt.file_set, data_tgt.dimension, bintxelems );MB_CHK_ERR( rval );
 
-        if( is_root )
+        if( !rank )
         {
             outputFormatter.printf( 0, "The source set contains %d vertices and %d elements \n", rintxverts.size(),
                                     rintxelems.size() );

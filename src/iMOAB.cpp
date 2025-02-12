@@ -4046,7 +4046,7 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
 {
     // Default constant parameters
     constexpr bool validate = true;
-    constexpr bool enforceConvexity = true;
+    constexpr bool meshCleanup = true;
     constexpr bool gnomonic        = true;
     constexpr double defaultradius = 1.0;
     constexpr double boxeps        = 1.e-10;
@@ -4111,21 +4111,27 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
     IntxAreaUtils areaAdaptor( IntxAreaUtils::lHuiller );
 #endif
 
-    // fixes to enforce positive orientation of the vertices (outward normal)
-    // fixes to clean up any degenerate quadrangular elements present in the mesh (RLL specifically?)
-    // fixes to enforce convexity in case concave elements are present
-    rval = areaAdaptor.positive_orientation( context.MBI, data_src.file_set, defaultradius /*radius_source*/ );MB_CHK_ERR( rval );
-    rval = IntxUtils::fix_degenerate_quads( context.MBI, data_src.file_set );MB_CHK_ERR( rval );
-    if( enforceConvexity )
+    if( meshCleanup )
     {
-        rval = moab::IntxUtils::enforce_convexity( context.MBI, data_src.file_set, rank );MB_CHK_ERR( rval );
-    }
+        // Address issues for source mesh first
+        // fixes to enforce positive orientation of the vertices (outward normal)
+        MB_CHK_ERR( areaAdaptor.positive_orientation( context.MBI, data_src.file_set, defaultradius /*radius_source*/ ) );
 
-    rval = areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ );MB_CHK_ERR( rval );
-    rval = IntxUtils::fix_degenerate_quads( context.MBI, data_tgt.file_set );MB_CHK_ERR( rval );
-    if( enforceConvexity )
-    {
-        rval = moab::IntxUtils::enforce_convexity( context.MBI, data_tgt.file_set, rank );MB_CHK_ERR( rval );
+        // fixes to clean up any degenerate quadrangular elements present in the mesh (RLL specifically?)
+        MB_CHK_ERR( IntxUtils::fix_degenerate_quads( context.MBI, data_src.file_set ) );
+
+        // fixes to enforce convexity in case concave elements are present
+        MB_CHK_ERR( moab::IntxUtils::enforce_convexity( context.MBI, data_src.file_set, rank ) );
+
+        // Address issues for target mesh first
+        // fixes to enforce positive orientation of the vertices (outward normal)
+        MB_CHK_ERR( areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ ) );
+
+        // fixes to clean up any degenerate quadrangular elements present in the mesh (RLL specifically?)
+        MB_CHK_ERR( IntxUtils::fix_degenerate_quads( context.MBI, data_tgt.file_set ) );
+
+        // fixes to enforce convexity in case concave elements are present
+        MB_CHK_ERR( moab::IntxUtils::enforce_convexity( context.MBI, data_tgt.file_set, rank ) );
     }
 
     // print verbosely about the problem setting

@@ -3448,6 +3448,123 @@ ErrCode iMOAB_DumpCommGraph( iMOAB_AppID pid, int* context_id, int* is_sender, c
 #ifdef MOAB_HAVE_TEMPESTREMAP
 
 #ifdef MOAB_HAVE_NETCDF
+
+static ErrCode set_aream_from_trivial_distribution(iMOAB_AppID pid, int N, std::vector<double> & trvArea )
+{
+    // this needs several rounds of communication, because the mesh is distributed differently than trivially
+    // get all the cells from the pid_source
+    // get global ids of the cells
+    // number of local cells: [n/size] nL = [n/size]
+    // last one extraN = n%size; nL += extraN
+    // start id = [ rank*nL + 1; endId = (rank+1)*nL
+    // lst one (rank = =size-1; endId = na
+    // the last cells get the rest
+    // construct global ids that correspond to trvArea [, rank *
+    appData& data     = context.appDatas[*pid];
+    ParallelComm * pcomm = context.appDatas[*pid].pcomm;
+    const int size = pcomm->size();
+    const int rank = pcomm->rank();
+
+    /// the "aream" tag should be created already; error out if not
+    // NOTE: This is a bad assumption
+    // TODO: Fix it.
+    Tag areaTag;
+    MB_CHK_ERR( context.MBI->tag_get_handle( "aream", areaTag ) );
+
+    // start copy
+    const Range& ents_to_set = data.primary_elems ;
+    size_t nents_to_be_set = ents_to_set.size();
+
+    Tag gidTag = context.MBI->globalId_tag();
+    std::vector< int > globalIds( nents_to_be_set );
+    MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_to_set, &globalIds[0] ) );
+
+    const bool serial = (size == 1);
+    if( serial )
+    {
+        // we do not assume anymore that the number of entities has to match
+        // we will set only what matches, and skip entities that do not have corresponding global ids
+        //assert( total_tag_len * nents_to_be_set - *num_tag_storage_length == 0 );
+        // tags are unrolled, we loop over global ids first, then careful about tags
+        for( size_t i = 0; i < nents_to_be_set; i++ )
+        {
+            int gid = globalIds[i];
+            int indexInVal = gid - 1; // assume the values are in order of global id, starting from 1 to number of cells
+            assert(indexInVal < N);
+            EntityHandle eh = ents_to_set[i];
+            MB_CHK_ERR( context.MBI->tag_set_data( areaTag, &eh, 1, &trvArea[indexInVal] ) );
+        }
+    }
+#ifdef MOAB_HAVE_MPI
+    else  // it can be not serial only if size > 1, parallel
+    {
+        int nL = N/size; // how many global ids per task, except the last one
+
+        // in this case, we have to use 2 crystal routers, to send data to the processor that needs it
+        // we will create first a tuple to rendevous points, then from there send to the processor that requested it
+        // it is a 2-hop global gather scatter
+        // TODO: allow for tags of different length; this is wrong
+        //assert( nbLocalVals * tagNames.size() - *num_tag_storage_length == 0 );
+        TupleList TLreq;
+        TLreq.initialize( 3, 0, 0, 0, nents_to_be_set );  //  to proc, marker(gid),
+        TLreq.enableWriteAccess();
+        // the processor id that processes global_id is global_id / num_ents_per_proc
+
+        // send requests to processor that has the global id
+        for( size_t i = 0; i < nents_to_be_set; i++ )
+        {
+            // to proc, marker, element local index, index in el
+            int marker              = globalIds[i];
+            int to_proc             = (marker-1) / nL; // proc from 0 to size - 1
+
+            if (to_proc == size)
+                to_proc = size -1 ; // the last array is the longest
+            int n                   = TLreq.get_n();
+            TLreq.vi_wr[3 * n]     = to_proc;  // send to processor
+            TLreq.vi_wr[3 * n + 1] = marker;
+            TLreq.vi_wr[3 * n + 2] = i; // local index for this global id
+            TLreq.inc_n();
+        }
+
+        // send now requests, basically inform the rendez-vous point who needs a particular global id
+        // send the data to the other processors:
+        ( pcomm->proc_config().crystal_router() ) -> gs_transfer( 1, TLreq, 0 );
+
+        int sizeBack = TLreq.get_n();
+        // start copy from comm graph settle
+        TupleList TLBack;
+        TLBack.initialize( 3, 0, 0, 1, sizeBack );  // to proc, marker, tag from proc , tag values
+        TLBack.enableWriteAccess();
+        for (int i = 0; i < sizeBack ; i++)
+        {
+            int from_proc = TLreq.vi_wr[3 * i] ;  // send to processor
+            TLBack.vi_wr[3*i] = from_proc;
+            int marker = TLreq.vi_wr[3 * i + 1]; // the actual global id
+            TLBack.vi_wr[3*i+1] = marker;
+            TLBack.vi_wr[3*i+2] = TLreq.vi_wr[3 * i + 2]; // the original index this came from
+            // this marker should give an idea of what index is actually needed for value
+            int index = marker - 1 - rank*nL;
+            TLBack.vr_wr[i] = trvArea[index] ; // !!! big assumptions about indices
+            TLBack.inc_n();
+        }
+
+        ( pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLBack, 0 );
+
+        int n1  = TLBack.get_n(); // should be the number of nents_to_be_set
+        for( int i = 0; i < n1; i++ )
+        {
+            // int gid  = TLBack.vi_rd[3 * i + 1];  // marker
+            int origIndex = TLBack.vi_rd[3 * i + 2];
+            EntityHandle eh = ents_to_set[origIndex];
+            MB_CHK_ERR( context.MBI->tag_set_data( areaTag, &eh, 1, &TLBack.vr_rd[i] ) );
+        }
+    }
+#endif
+    // end copy
+
+    return MB_SUCCESS;
+}
+
 ErrCode iMOAB_LoadMappingWeightsFromFile(
     iMOAB_AppID pid_source,
     iMOAB_AppID pid_target,
@@ -3565,13 +3682,26 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
         MB_CHK_ERR( MB_FAILURE );  // we know only type 1 or 2 or 3
     }
 
-    // pass ordered dofs, and unique
-    std::vector< int > orderDofs( tgtDofValues.begin(), tgtDofValues.end() );
-    std::sort( orderDofs.begin(), orderDofs.end() );
-    orderDofs.erase( std::unique( orderDofs.begin(), orderDofs.end() ), orderDofs.end() );  // remove duplicates
+    // pass tgt ordered dofs, and unique
+    // we need to read area_b and set aream tag on target cells, too
+    std::vector< int > sortTgtDofs( tgtDofValues.begin(), tgtDofValues.end() );
+    std::sort( sortTgtDofs.begin(), sortTgtDofs.end() );
+    sortTgtDofs.erase( std::unique( sortTgtDofs.begin(), sortTgtDofs.end() ), sortTgtDofs.end() );  // remove duplicates
 
-    MB_CHK_SET_ERR( weightMap->ReadParallelMap( remap_weights_filename, orderDofs, true /*row_based_partition*/ ),
+    ///   the tag should be created already in the e3sm workflow; if not, create it here
+    Tag areaTag;
+    ErrorCode rval = context.MBI->tag_get_handle( "aream", 1, MB_TYPE_DOUBLE, areaTag,
+                                            MB_TAG_DENSE | MB_TAG_EXCL | MB_TAG_CREAT );
+    if( MB_ALREADY_ALLOCATED == rval )
+    {
+        if( 0 == data_intx.pcomm->rank() ) std::cout << " aream tag already defined \n " ;
+    }
+
+    std::vector<double> trvAreaA, trvAreaB; // passed by reference
+    int nA, nB; // passed by reference, so returned
+    MB_CHK_SET_ERR( weightMap->ReadParallelMap( remap_weights_filename, sortTgtDofs, trvAreaA, nA, trvAreaB, nB ),
                     "reading map from disk failed" );
+    // trivially distributed areaAs and areaBs will need to be set on their correct source and target cells, as an aream tag
 
     // if we are on target mesh (row based partition)
     tdata.pid_src  = pid_source;
@@ -3583,6 +3713,12 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
     // that need to participate in the meshes.
 
     tdata.remapper->SetMeshSet( Remapper::SourceMesh, source_set, &srcc_ents_of_interest );
+    // we have read the area A from map file, and we will set it as a aream double tag on the source set, knowing that we
+    // read it trivially, with a trivial distribution by the global DOFs
+    // local , private method:
+    MB_CHK_SET_ERR( set_aream_from_trivial_distribution(pid_source, nA, trvAreaA ), " fail to set aream on source " );
+    MB_CHK_SET_ERR( set_aream_from_trivial_distribution(pid_target, nB, trvAreaB ), " fail to set aream on target " );
+
     tdata.remapper->SetMeshSet( Remapper::CoveringMesh, covering_set, &src_ents_of_interest );
     weightMap->SetSourceNDofsPerElement( src_elem_dof_length );
     weightMap->set_col_dc_dofs( srcDofValues );  // will set col_dtoc_dofmap

@@ -483,7 +483,7 @@ void read_map_from_disk()
     moab::ErrorCode rval;
     NcError error( NcError::verbose_nonfatal );
     MPI_Comm commW = MPI_COMM_WORLD;
-    std::vector< int > tmp_owned_ids;
+    std::vector< int >  tgt_owned_ids;
     double dTolerance = 1e-08;
 
     std::string remap_weights_filename = TestDir + "unittest/outCS5ICOD5_map.nc";
@@ -500,7 +500,9 @@ void read_map_from_disk()
 
     moab::TempestOnlineMap onlinemap( &remapper );
 
-    rval = onlinemap.ReadParallelMap( remap_weights_filename.c_str(), tmp_owned_ids, true );
+    std::vector<double> areaA, areaB; // will not be used in this test
+    int nA, nB; // not used by this test
+    rval = onlinemap.ReadParallelMap( remap_weights_filename.c_str(), tgt_owned_ids, areaA, nA, areaB, nB);
     CHECK_EQUAL( rval, moab::MB_SUCCESS );
 
     // consistency: row sums

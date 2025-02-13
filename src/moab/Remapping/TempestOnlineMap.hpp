@@ -103,8 +103,11 @@ class TempestOnlineMap : public OfflineMap
     ///		Read the OfflineMap from a NetCDF file.
     ///	</summary>
     moab::ErrorCode ReadParallelMap( const char* strSource,
-                                     const std::vector< int >& owned_dof_ids,
-                                     bool row_major_ownership = true );
+                                     const std::vector< int >& tgt_dof_ids,
+                                     std::vector<double> & areaA,
+                                     int & nA,
+                                     std::vector<double> & areaB,
+                                     int & nB);
 
     ///	<summary>
     ///		Write the TempestOnlineMap to a parallel NetCDF file.

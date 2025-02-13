@@ -3462,26 +3462,24 @@ static ErrCode set_aream_from_trivial_distribution(iMOAB_AppID pid, int N, std::
     // construct global ids that correspond to trvArea [, rank *
     appData& data     = context.appDatas[*pid];
     ParallelComm * pcomm = context.appDatas[*pid].pcomm;
-    int size = pcomm->size();
-    int rank = pcomm->rank();
+    const int size = pcomm->size();
+    const int rank = pcomm->rank();
 
-    ///   the tag should be created already; error out if not
+    /// the "aream" tag should be created already; error out if not
+    // NOTE: This is a bad assumption
+    // TODO: Fix it.
     Tag areaTag;
-    ErrorCode rval = context.MBI->tag_get_handle( "aream", areaTag );MB_CHK_ERR( rval );
-    //assert(nL == (int)trvArea.size());
-    // trvArea should have the same size as local [startId - endId]
+    MB_CHK_ERR( context.MBI->tag_get_handle( "aream", areaTag ) );
 
     // start copy
-    Range ents_to_set = data.primary_elems ;
+    const Range& ents_to_set = data.primary_elems ;
     size_t nents_to_be_set = ents_to_set.size();
 
     Tag gidTag = context.MBI->globalId_tag();
     std::vector< int > globalIds( nents_to_be_set );
-    rval = context.MBI->tag_get_data( gidTag, ents_to_set, &globalIds[0] );MB_CHK_ERR( rval );
+    MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_to_set, &globalIds[0] ) );
 
-    bool serial = true;
-    if( size > 1 ) serial = false;
-
+    const bool serial = (size == 1);
     if( serial )
     {
         // we do not assume anymore that the number of entities has to match
@@ -3494,19 +3492,13 @@ static ErrCode set_aream_from_trivial_distribution(iMOAB_AppID pid, int N, std::
             int indexInVal = gid - 1; // assume the values are in order of global id, starting from 1 to number of cells
             assert(indexInVal < N);
             EntityHandle eh = ents_to_set[i];
-            rval = context.MBI->tag_set_data( areaTag, &eh, 1, &trvArea[indexInVal] );MB_CHK_ERR( rval );
+            MB_CHK_ERR( context.MBI->tag_set_data( areaTag, &eh, 1, &trvArea[indexInVal] ) );
         }
     }
 #ifdef MOAB_HAVE_MPI
     else  // it can be not serial only if size > 1, parallel
     {
         int nL = N/size; // how many global ids per task, except the last one
-        int startId = rank * nL + 1;
-        int endId = (rank + 1) * nL;
-        if (rank == size - 1)
-        {
-            endId = N;
-        }
 
         // in this case, we have to use 2 crystal routers, to send data to the processor that needs it
         // we will create first a tuple to rendevous points, then from there send to the processor that requested it
@@ -3561,10 +3553,10 @@ static ErrCode set_aream_from_trivial_distribution(iMOAB_AppID pid, int N, std::
         int n1  = TLBack.get_n(); // should be the number of nents_to_be_set
         for( int i = 0; i < n1; i++ )
         {
-            int gid  = TLBack.vi_rd[3 * i + 1];  // marker
+            // int gid  = TLBack.vi_rd[3 * i + 1];  // marker
             int origIndex = TLBack.vi_rd[3 * i + 2];
             EntityHandle eh = ents_to_set[origIndex];
-            rval = context.MBI->tag_set_data( areaTag, &eh, 1, &TLBack.vr_rd[i] );MB_CHK_ERR( rval );
+            MB_CHK_ERR( context.MBI->tag_set_data( areaTag, &eh, 1, &TLBack.vr_rd[i] ) );
         }
     }
 #endif
@@ -3572,6 +3564,7 @@ static ErrCode set_aream_from_trivial_distribution(iMOAB_AppID pid, int N, std::
 
     return MB_SUCCESS;
 }
+
 ErrCode iMOAB_LoadMappingWeightsFromFile(
     iMOAB_AppID pid_source,
     iMOAB_AppID pid_target,

@@ -104,10 +104,10 @@ class TempestOnlineMap : public OfflineMap
     ///	</summary>
     moab::ErrorCode ReadParallelMap( const char* strSource,
                                      const std::vector< int >& tgt_dof_ids,
-                                     std::vector<double> & areaA,
-                                     int & nA,
-                                     std::vector<double> & areaB,
-                                     int & nB);
+                                     std::vector< double >& areaA,
+                                     int& nA,
+                                     std::vector< double >& areaB,
+                                     int& nB );
 
     ///	<summary>
     ///		Write the TempestOnlineMap to a parallel NetCDF file.
@@ -282,7 +282,7 @@ class TempestOnlineMap : public OfflineMap
                                                      std::vector< double >& dataOutDouble,
                                                      CAASType caasType = CAAS_GLOBAL,
                                                      int caasIteration = 0,
-                                                     double mismatch = 0.0 );
+                                                     double mismatch   = 0.0 );
 
     /// @brief
     /// @param vecAdjFaces
@@ -395,9 +395,9 @@ class TempestOnlineMap : public OfflineMap
     ///	</summary>
     moab::ErrorCode ApplyWeights( moab::Tag srcSolutionTag,
                                   moab::Tag tgtSolutionTag,
-                                  bool transpose    = false,
-                                  CAASType caasType = CAAS_NONE,
-								  double default_projection = 0.0);
+                                  bool transpose            = false,
+                                  CAASType caasType         = CAAS_NONE,
+                                  double default_projection = 0.0 );
 
     typedef double ( *sample_function )( double, double );
 
@@ -455,8 +455,7 @@ class TempestOnlineMap : public OfflineMap
 
   private:
     template < typename SparseMatrixType >
-    void serializeSparseMatrix( const SparseMatrixType& mat,
-                                const std::string& filename );
+    void serializeSparseMatrix( const SparseMatrixType& mat, const std::string& filename );
 
     void setup_sizes_dimensions();
 

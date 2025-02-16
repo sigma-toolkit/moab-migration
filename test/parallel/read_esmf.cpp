@@ -112,7 +112,6 @@ void read_mesh_parallel( bool rcbzoltan, bool no_mixed_elements )
 #endif
 }
 
-
 void test_read_mesh_parallel_trivial()
 {
     read_mesh_parallel( false, false );
@@ -132,7 +131,6 @@ void test_read_mesh_parallel_rcbzoltan_no_mixed_elements()
 {
     read_mesh_parallel( true, true );
 }
-
 
 int main( int argc, char* argv[] )
 {

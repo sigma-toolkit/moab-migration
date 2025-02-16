@@ -38,7 +38,7 @@
 #define COMPUTE_TRANSPOSE_FILE_MAP
 #define COMPUTE_ONLINE_MAP
 
-#if ( !defined( COMPUTE_FILE_MAP ) && !defined( COMPUTE_TRANSPOSE_FILE_MAP ) && !defined( COMPUTE_ONLINE_MAP ) )
+#if( !defined( COMPUTE_FILE_MAP ) && !defined( COMPUTE_TRANSPOSE_FILE_MAP ) && !defined( COMPUTE_ONLINE_MAP ) )
 #error Enable either file-based map (COMPUTE_FILE_MAP/COMPUTE_TRANSPOSE_FILE_MAP) and/or online (COMPUTE_ONLINE_MAP) for coupling
 #endif
 
@@ -446,13 +446,12 @@ int main( int argc, char* argv[] )
 
         // just to be sure it is set, to be visible by iMOAB app
         CHECKIERR( iMOAB_DefineTagStorage( cplAtmPID, "aream", &tagTypes, &atmCompNDoFs, &tagIndex[0] ),
-                           "failed to define the field tags aream" );
+                   "failed to define the field tags aream" );
 
         CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, allProjectedFields.c_str(), &tagTypes, &ocnCompNDoFs,
                                            &tagIndex[1] ),
                    "failed to define the field tags allProjectedFields" );
-        CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, "aream", &tagTypes, &ocnCompNDoFs,
-                                           &tagIndex[1] ),
+        CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, "aream", &tagTypes, &ocnCompNDoFs, &tagIndex[1] ),
                    "failed to define the field tag aream" );
 
 #ifdef COMPUTE_TRANSPOSE_FILE_MAP

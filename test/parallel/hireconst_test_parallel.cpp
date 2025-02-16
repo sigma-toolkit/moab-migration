@@ -65,7 +65,7 @@ int main( int argc, char* argv[] )
 #endif
     int degree = 3, dim = 2;
     bool interp = false;
-    ErrorCode error;
+    ErrorCode rval;
 
 #ifdef MOAB_HAVE_HDF5
     std::string infile = TestDir + "unittest/mbcslam/fine4.h5m";
@@ -167,7 +167,7 @@ int main( int argc, char* argv[] )
 #endif
     }
 
-    error = test_mesh( infile.c_str(), degree, interp, dim );MB_CHK_ERR( error );
+    rval = test_mesh( infile.c_str(), degree, interp, dim );MB_CHK_ERR( rval );
 
 #ifdef MOAB_HAVE_MPI
     MPI_Finalize();
@@ -181,15 +181,15 @@ ErrorCode load_meshset_hirec( const char* infile,
                               const int degree,
                               const int dim )
 {
-    ErrorCode error;
-    error = mbimpl->create_meshset( moab::MESHSET_SET, meshset );MB_CHK_ERR( error );
+    ErrorCode rval;
+    rval = mbimpl->create_meshset( moab::MESHSET_SET, meshset );MB_CHK_ERR( rval );
 #ifdef MOAB_HAVE_MPI
     int nprocs, rank;
     MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Comm_size( comm, &nprocs );
     MPI_Comm_rank( comm, &rank );
     EntityHandle partnset;
-    error = mbimpl->create_meshset( moab::MESHSET_SET, partnset );MB_CHK_ERR( error );
+    rval = mbimpl->create_meshset( moab::MESHSET_SET, partnset );MB_CHK_ERR( rval );
 
     if( nprocs > 1 )
     {
@@ -227,18 +227,18 @@ ErrorCode load_meshset_hirec( const char* infile,
             read_options = part_method + ";PARALLEL_RESOLVE_SHARED_ENTS;";
         }
 
-        error = mbimpl->load_file( infile, &meshset, read_options.c_str() );MB_CHK_ERR( error );
+        rval = mbimpl->load_file( infile, &meshset, read_options.c_str() );MB_CHK_ERR( rval );
     }
     else
     {
-        error = mbimpl->load_file( infile, &meshset );MB_CHK_ERR( error );
+        rval = mbimpl->load_file( infile, &meshset );MB_CHK_ERR( rval );
     }
 
 #else
     assert( !pc && degree && dim );
-    error = mbimpl->load_file( infile, &meshset );MB_CHK_ERR( error );
+    rval = mbimpl->load_file( infile, &meshset );MB_CHK_ERR( rval );
 #endif
-    return error;
+    return rval;
 }
 
 ErrorCode test_mesh( const char* infile, const int degree, const bool interp, const int dim )
@@ -254,20 +254,20 @@ ErrorCode test_mesh( const char* infile, const int degree, const bool interp, co
     MPI_Comm_rank( comm, &rank );
 #endif
 
-    ErrorCode error;
+    ErrorCode rval;
     // mesh will be loaded and communicator pc will be updated
-    error = load_meshset_hirec( infile, mbimpl, meshset, pc, degree, dim );MB_CHK_ERR( error );
+    rval = load_meshset_hirec( infile, mbimpl, meshset, pc, degree, dim );MB_CHK_ERR( rval );
     // initialize
     HiReconstruction hirec( dynamic_cast< Core* >( mbimpl ), pc, meshset );
     Range elems, elems_owned;
-    error = mbimpl->get_entities_by_dimension( meshset, dim, elems );MB_CHK_ERR( error );
+    rval = mbimpl->get_entities_by_dimension( meshset, dim, elems );MB_CHK_ERR( rval );
     int nelems = elems.size();
 
 #ifdef MOAB_HAVE_MPI
 
     if( pc )
     {
-        error = pc->filter_pstatus( elems, PSTATUS_GHOST, PSTATUS_NOT, -1, &elems_owned );MB_CHK_ERR( error );
+        rval = pc->filter_pstatus( elems, PSTATUS_GHOST, PSTATUS_NOT, -1, &elems_owned );MB_CHK_ERR( rval );
     }
     else
     {
@@ -286,11 +286,11 @@ ErrorCode test_mesh( const char* infile, const int degree, const bool interp, co
     // reconstruction
     if( dim == 2 )
     {
-        error = hirec.reconstruct3D_surf_geom( degree, interp, false );MB_CHK_ERR( error );
+        rval = hirec.reconstruct3D_surf_geom( degree, interp, false );MB_CHK_ERR( rval );
     }
     else if( dim == 1 )
     {
-        error = hirec.reconstruct3D_curve_geom( degree, interp, false );MB_CHK_ERR( error );
+        rval = hirec.reconstruct3D_curve_geom( degree, interp, false );MB_CHK_ERR( rval );
     }
 
 #ifdef MOAB_HAVE_MPI
@@ -305,19 +305,19 @@ ErrorCode test_mesh( const char* infile, const int degree, const bool interp, co
     {
         int nvpe;
         const EntityHandle* conn;
-        error = mbimpl->get_connectivity( *ielem, conn, nvpe );MB_CHK_ERR( error );
+        rval = mbimpl->get_connectivity( *ielem, conn, nvpe );MB_CHK_ERR( rval );
         double w = 1.0 / (double)nvpe;
         std::vector< double > naturalcoords2fit( nvpe, w );
         CartVect newcoords, linearcoords;
-        error = hirec.hiproj_walf_in_element( *ielem, nvpe, 1, &( naturalcoords2fit[0] ), newcoords.array() );
+        rval = hirec.hiproj_walf_in_element( *ielem, nvpe, 1, &( naturalcoords2fit[0] ), newcoords.array() );
 
-        if( MB_FAILURE == error )
+        if( MB_FAILURE == rval )
         {
             continue;
         }
 
         std::vector< double > coords( 3 * nvpe );
-        error = mbimpl->get_coords( conn, nvpe, &( coords[0] ) );MB_CHK_ERR( error );
+        rval = mbimpl->get_coords( conn, nvpe, &( coords[0] ) );MB_CHK_ERR( rval );
         compute_linear_coords( nvpe, &( coords[0] ), &( naturalcoords2fit[0] ), linearcoords.array() );
         CartVect nlcoords = newcoords - linearcoords;
         mxdist            = std::max( mxdist, nlcoords.length() );
@@ -332,7 +332,7 @@ ErrorCode test_mesh( const char* infile, const int degree, const bool interp, co
 #else
     std::cout << "Maximum projection lift is " << mxdist << std::endl;
 #endif
-    return error;
+    return rval;
 }
 
 void compute_linear_coords( const int nvpe, double* elemcoords, double* naturals, double* linearcoords )

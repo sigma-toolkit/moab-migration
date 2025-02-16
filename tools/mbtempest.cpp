@@ -193,9 +193,9 @@ struct ToolContext
                              "relevant only for OVERLAP mesh)",
                              &computeWeights );
 
-        opts.addOpt< void >( "verbose,v",
-                             "Print verbose diagnostic messages during intersection and map computation (default=false)",
-                             &print_diagnostics );
+        opts.addOpt< void >(
+            "verbose,v", "Print verbose diagnostic messages during intersection and map computation (default=false)",
+            &print_diagnostics );
 
         opts.addOpt< std::string >( "method,m", "Discretization method for the source and target solution fields",
                                     &expectedMethod );
@@ -387,11 +387,11 @@ struct ToolContext
             if( fVolumetric ) mapOptions.strMethod += "volumetric;";
 
             // For global meshes, this default should work out of the box.
-            if( !fvMethod.compare( "bilin" ) ) nlayers = 3;
+            if( !fvMethod.compare( "bilin" ) )
+                nlayers = 3;
             else
                 nlayers = ( mapOptions.nPin > 1 ? mapOptions.nPin + 1 : 0 );
-            if ( nlayer_input )
-              nlayers = std::max( nlayer_input, nlayers );
+            if( nlayer_input ) nlayers = std::max( nlayer_input, nlayers );
         }
 
         // clear temporary string name
@@ -536,7 +536,7 @@ int main( int argc, char* argv[] )
     moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::GaussQuadrature );
 
     Mesh* tempest_mesh = new Mesh();
-    rval = CreateTempestMesh( *runCtx, remapper, tempest_mesh );MB_CHK_ERR( rval );
+    rval               = CreateTempestMesh( *runCtx, remapper, tempest_mesh );MB_CHK_ERR( rval );
 
     if( runCtx->meshType == moab::TempestRemapper::OVERLAP_MEMORY )
     {
@@ -1006,7 +1006,8 @@ int main( int argc, char* argv[] )
                     // it will be used later to test, along with a target file
                     if( !runCtx->skip_io )
                     {
-                        rval = mbCore->write_file( "srcWithSolnTag.h5m", nullptr, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
+                        rval =
+                            mbCore->write_file( "srcWithSolnTag.h5m", nullptr, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
                     }
                 }
 

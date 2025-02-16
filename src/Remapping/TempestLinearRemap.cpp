@@ -772,7 +772,7 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyBoundsLimiting( std::ve
     else
         globalMinMaxDefects[4] = mismatch;
 
-    dMassDiff  = localMinMaxDefects[4];
+    dMassDiff = localMinMaxDefects[4];
     // massDefect.first = localMinMaxDefects[4];
     massDefect.first = globalMinMaxDefects[4];
 #else
@@ -857,7 +857,6 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyBoundsLimiting( std::ve
     // But if we satisfy the constraint on every task, essentially, the global mass difference should be zero!
     return massDefect;
 }
-
 
 moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& srcVals,
                                                       std::vector< double >& tgtVals,

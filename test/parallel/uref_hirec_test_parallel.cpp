@@ -46,7 +46,7 @@ ErrorCode load_meshset_hirec( const char* infile,
                               const int degree,
                               const int dim )
 {
-    ErrorCode error;
+    ErrorCode rval;
     rval = mbimpl->create_meshset( moab::MESHSET_SET, meshset );MB_CHK_ERR( rval );
 #ifdef MOAB_HAVE_MPI
     int nprocs, rank;
@@ -94,16 +94,18 @@ ErrorCode load_meshset_hirec( const char* infile,
         }
 
         /*for debug*/
-        /*std::string outfile = std::string(infile); std::size_t dotpos = outfile.find_last_of(".");
-        std::ostringstream convert; convert << rank;
-        std::string localfile = outfile.substr(0,dotpos)+convert.str()+".vtk";
-        //write local mesh
-        EntityHandle local;
-        rval = mbimpl->create_meshset(moab::MESHSET_SET,local);CHECK_ERR(error);
-        std::string local_options =
-        "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;"; error =
-        mbimpl->load_file(infile,&local,local_options.c_str()); MB_CHK_ERR(error); error =
-        mbimpl->write_file(localfile.c_str(),0,0,&local,1);*/
+        /*
+          std::string outfile = std::string(infile); std::size_t dotpos = outfile.find_last_of(".");
+          std::ostringstream convert; convert << rank;
+          std::string localfile = outfile.substr(0,dotpos)+convert.str()+".vtk";
+          //write local mesh
+          EntityHandle local;
+          rval = mbimpl->create_meshset(moab::MESHSET_SET,local);CHECK_ERR( rval );
+          std::string local_options =
+          "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;";
+          rval = mbimpl->load_file(infile,&local,local_options.c_str());MB_CHK_ERR( rval );
+          rval = mbimpl->write_file(localfile.c_str(),0,0,&local,1);
+        */
 
         rval = mbimpl->load_file( infile, &meshset, read_options.c_str() );MB_CHK_ERR( rval );
         /*for debug
@@ -120,7 +122,7 @@ ErrorCode load_meshset_hirec( const char* infile,
     assert( !pc && degree && dim );
     rval = mbimpl->load_file( infile, &meshset );MB_CHK_ERR( rval );
 #endif
-    return error;
+    return rval;
 }
 
 ErrorCode closedsurface_uref_hirec_convergence_study( const char* infile,
@@ -145,7 +147,7 @@ ErrorCode closedsurface_uref_hirec_convergence_study( const char* infile,
     MPI_Comm_rank( comm, &rank );
 #endif
 
-    ErrorCode error;
+    ErrorCode rval;
     // mesh will be loaded and communicator pc will be updated
     int mxdeg = 1;
     for( size_t i = 0; i < degs2fit.size(); ++i )
@@ -193,7 +195,7 @@ ErrorCode closedsurface_uref_hirec_convergence_study( const char* infile,
 
         rval = mbImpl->set_coords( &currvert, 1, exactcoords );MB_CHK_ERR( rval );
         // for debug
-        /*rval = mbImpl->get_coords(&currvert,1,currcoords); MB_CHK_ERR(error);
+        /*rval = mbImpl->get_coords(&currvert,1,currcoords); MB_CHK_ERR( rval );
         assert(currcoords[0]==exactcoords[0]&&currcoords[1]==exactcoords[1]&&currcoords[2]==exactcoords[2]);*/
     }
 
@@ -202,12 +204,12 @@ ErrorCode closedsurface_uref_hirec_convergence_study( const char* infile,
     #ifdef MOAB_HAVE_MPI
         if(pc){
             error =
-    pc->filter_pstatus(verts,PSTATUS_GHOST,PSTATUS_NOT,-1,&verts_owned);MB_CHK_ERR(error); }else{
+    pc->filter_pstatus(verts,PSTATUS_GHOST,PSTATUS_NOT,-1,&verts_owned);MB_CHK_ERR( rval ); }else{
     verts_owned = verts;
         }
 
         HalfFacetRep *ahf = new HalfFacetRep(&moab,pc,meshset);
-        rval = ahf->initialize(); MB_CHK_ERR(error);
+        rval = ahf->initialize(); MB_CHK_ERR( rval );
 
         for(int i=0;i<nprocs;++i){
             if(rank==i){
@@ -215,7 +217,7 @@ ErrorCode closedsurface_uref_hirec_convergence_study( const char* infile,
                 for(Range::iterator ielem=elems.begin();ielem!=elems.end();++ielem){
                     EntityHandle currelem = *ielem;
                     std::vector<EntityHandle> conn;
-                    rval = mbImpl->get_connectivity(&currelem,1,conn); MB_CHK_ERR(error);
+                    rval = mbImpl->get_connectivity(&currelem,1,conn); MB_CHK_ERR( rval );
                     std::cout << *ielem << ": ";
                     for(size_t k=0;k<conn.size();++k) std::cout << conn[k] << " ";
                     std::cout << std::endl;
@@ -225,7 +227,7 @@ ErrorCode closedsurface_uref_hirec_convergence_study( const char* infile,
                 for(Range::iterator ielem=elems_owned.begin();ielem!=elems_owned.end();++ielem){
                     EntityHandle currelem = *ielem;
                     std::vector<EntityHandle> conn;
-                    rval = mbImpl->get_connectivity(&currelem,1,conn); MB_CHK_ERR(error);
+                    rval = mbImpl->get_connectivity(&currelem,1,conn); MB_CHK_ERR( rval );
                     std::cout << *ielem << ": ";
                     for(size_t k=0;k<conn.size();++k) std::cout << conn[k] << " ";
                     std::cout << std::endl;
@@ -247,8 +249,8 @@ ErrorCode closedsurface_uref_hirec_convergence_study( const char* infile,
                     EntityHandle currvid = *ivert;
                     std::cout << "Processor " << rank << " local verts: " << *ivert << " has
     adjfaces: "; std::vector<EntityHandle> adjfaces;
-                    //rval = ahf->get_up_adjacencies(currvid,2,adjfaces); MB_CHK_ERR(error);
-                    rval = mbImpl->get_adjacencies(&currvid,1,2,false,adjfaces); MB_CHK_ERR(error);
+                    //rval = ahf->get_up_adjacencies(currvid,2,adjfaces); MB_CHK_ERR( rval );
+                    rval = mbImpl->get_adjacencies(&currvid,1,2,false,adjfaces); MB_CHK_ERR( rval );
                     for(size_t k=0;k<adjfaces.size();++k){
                         std::cout << adjfaces[k] << " ";
                     }
@@ -259,8 +261,8 @@ ErrorCode closedsurface_uref_hirec_convergence_study( const char* infile,
                     EntityHandle currvid = *ivert;
                     std::cout << "Processor " << rank << " all verts: " << *ivert << " has adjfaces:
     "; std::vector<EntityHandle> adjfaces;
-                    //rval = ahf->get_up_adjacencies(*ivert,2,adjfaces); MB_CHK_ERR(error);
-                    rval = mbImpl->get_adjacencies(&currvid,1,2,false,adjfaces); MB_CHK_ERR(error);
+                    //rval = ahf->get_up_adjacencies(*ivert,2,adjfaces); MB_CHK_ERR( rval );
+                    rval = mbImpl->get_adjacencies(&currvid,1,2,false,adjfaces); MB_CHK_ERR( rval );
                     for(size_t k=0;k<adjfaces.size();++k){
                         std::cout << adjfaces[k] << " ";
                     }
@@ -362,7 +364,7 @@ ErrorCode closedsurface_uref_hirec_convergence_study( const char* infile,
         for( Range::iterator ielem = elems_owned.begin(); ielem != elems_owned.end(); ++ielem, ++index )
         {
             // Projection
-            error =
+            rval =
                 hirec.hiproj_walf_in_element( *ielem, nvpe, nsamples, &( testnaturalcoords[nvpe * nsamples * index] ),
                                               &( testpnts[3 * nsamples * index] ) );MB_CHK_ERR( rval );
             // for debug
@@ -382,13 +384,13 @@ ErrorCode closedsurface_uref_hirec_convergence_study( const char* infile,
         // for debug
         /*std::cout << "Degree " << degs2fit[ideg] << " has L-inf error " << maxlinferr << " at
         element " << elems_owned.index(elem_maxerr) << ":"; std::vector<EntityHandle> conn; error =
-        mbImpl->get_connectivity(&elem_maxerr,1,conn); MB_CHK_ERR(error); for(size_t
+        mbImpl->get_connectivity(&elem_maxerr,1,conn); MB_CHK_ERR( rval ); for(size_t
         ii=0;ii<conn.size();++ii) std::cout << verts.index(conn[ii]) << " "; std::cout << std::endl;
 
         for(size_t ii=0;ii<conn.size();++ii){
             //assume triangle
             std::vector<double> vertexcoords(3,0);
-            rval = mbImpl->get_coords(&(conn[ii]),1,&(vertexcoords[0])); MB_CHK_ERR(error);
+            rval = mbImpl->get_coords(&(conn[ii]),1,&(vertexcoords[0])); MB_CHK_ERR( rval );
             std::cout << verts.index(conn[ii]) << ":" << vertexcoords[0] << " "<< vertexcoords[1] <<
         " "<< vertexcoords[2] << "\n"; GEOMTYPE geomtype; std::vector<double> local_coords_system,
         local_coeffs; int deg_out; bool local_interp; bool hasfit =
@@ -406,7 +408,7 @@ ErrorCode closedsurface_uref_hirec_convergence_study( const char* infile,
         }*/
     }
 
-    return error;
+    return rval;
 }
 
 void usage()
@@ -428,7 +430,7 @@ int main( int argc, char* argv[] )
     std::string prefix, suffix, istr, iend;
     int dim = 2, geom = 0;
     bool interp = false;
-    ErrorCode error;
+    ErrorCode rval;
 
     if( argc == 1 )
     {

@@ -4282,9 +4282,9 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
 
         if( !rank )
         {
-            outputFormatter.printf( 0, "The source set contains %d vertices and %d elements \n", rintxverts.size(),
+            outputFormatter.printf( 0, "The source set contains %zu vertices and %zu elements\n", rintxverts.size(),
                                     rintxelems.size() );
-            outputFormatter.printf( 0, "The target set contains %d vertices and %d elements \n", bintxverts.size(),
+            outputFormatter.printf( 0, "The target set contains %zu vertices and %zu elements\n", bintxverts.size(),
                                     bintxelems.size() );
         }
     }

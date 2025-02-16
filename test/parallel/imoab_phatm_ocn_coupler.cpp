@@ -551,8 +551,8 @@ int main( int argc, char* argv[] )
         /* We have the remapping weights now. Let us apply the weights onto the tag we defined
            on the source mesh and get the projection on the target mesh */
         PUSH_TIMER( "Apply Scalar projection weights" )
-        ierr =
-            iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0], bottomFieldsExt, bottomFields );
+        ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0], bottomFieldsExt,
+                                                   bottomFields );
         CHECKIERR( ierr, "failed to compute projection weight application" );
         POP_TIMER( couComm, rankInCouComm )
 
@@ -595,7 +595,7 @@ int main( int argc, char* argv[] )
     {
         char outputFileOcn[] = "OcnWithProj2.h5m";
         ierr                 = iMOAB_WriteMesh( cmpOcnPID, outputFileOcn, fileWriteOptions );
-        CHECKIERR( ierr, "cannot write OcnWithProj2.h5m")
+        CHECKIERR( ierr, "cannot write OcnWithProj2.h5m" )
     }
 
 #endif

@@ -610,9 +610,8 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
 #if defined( MOAB_HAVE_EIGEN3 ) && defined( VERBOSE )
     if( vprint )
     {
-        std::cout << "[" << rank << "]"
-                  << "DoFs: row = " << m_nTotDofs_Dest << ", " << row_gdofmap.size() << ", col = " << m_nTotDofs_Src
-                  << ", " << m_nTotDofs_SrcCov << ", " << col_gdofmap.size() << "\n";
+        std::cout << "[" << rank << "]" << "DoFs: row = " << m_nTotDofs_Dest << ", " << row_gdofmap.size()
+                  << ", col = " << m_nTotDofs_Src << ", " << m_nTotDofs_SrcCov << ", " << col_gdofmap.size() << "\n";
         // std::cout << "Max col_dofmap: " << maxcol << ", Min col_dofmap" << mincol << "\n";
     }
 #endif
@@ -1471,7 +1470,7 @@ int moab::TempestOnlineMap::IsConsistent( double dTolerance )
 
     int ierr;
     int fConsistentGlobal = 0;
-    ierr = MPI_Allreduce( &fConsistent, &fConsistentGlobal, 1, MPI_INT, MPI_SUM, m_pcomm->comm() );
+    ierr                  = MPI_Allreduce( &fConsistent, &fConsistentGlobal, 1, MPI_INT, MPI_SUM, m_pcomm->comm() );
     if( ierr != MPI_SUCCESS ) return -1;
 
     return fConsistentGlobal;
@@ -1652,7 +1651,7 @@ int moab::TempestOnlineMap::IsMonotone( double dTolerance )
 
     int ierr;
     int fMonotoneGlobal = 0;
-    ierr = MPI_Allreduce( &fMonotone, &fMonotoneGlobal, 1, MPI_INT, MPI_SUM, m_pcomm->comm() );
+    ierr                = MPI_Allreduce( &fMonotone, &fMonotoneGlobal, 1, MPI_INT, MPI_SUM, m_pcomm->comm() );
     if( ierr != MPI_SUCCESS ) return -1;
 
     return fMonotoneGlobal;

@@ -500,8 +500,8 @@ ErrorCode test_elements_on_several_procs( const char* filename )
     if( !invalid.empty() )
     {
         std::cerr << "Elements or vertices owned by a single geometric entity are "
-                  << "not shared by the same set of processors for the "
-                  << "following geometric entities on process " << pcomm->proc_config().proc_rank() << ": ";
+                  << "not shared by the same set of processors for the " << "following geometric entities on process "
+                  << pcomm->proc_config().proc_rank() << ": ";
         for( Range::iterator i = invalid.begin(); i != invalid.end(); ++i )
         {
             int dim;
@@ -666,11 +666,9 @@ ErrorCode test_ghost_elements( const char* filename, int ghost_dimension, int br
     ErrorCode rval;
 
     std::ostringstream file_opts;
-    file_opts << "PARALLEL=READ_DELETE;"
-              << "PARTITION=GEOM_DIMENSION;PARTITION_VAL=3;"
-              << "PARTITION_DISTRIBUTE;"
-              << "PARALLEL_RESOLVE_SHARED_ENTS;"
-              << "PARALLEL_GHOSTS=" << ghost_dimension << '.' << bridge_dimension << '.' << num_layers;
+    file_opts << "PARALLEL=READ_DELETE;" << "PARTITION=GEOM_DIMENSION;PARTITION_VAL=3;" << "PARTITION_DISTRIBUTE;"
+              << "PARALLEL_RESOLVE_SHARED_ENTS;" << "PARALLEL_GHOSTS=" << ghost_dimension << '.' << bridge_dimension
+              << '.' << num_layers;
 
     rval = moab.load_file( filename, 0, file_opts.str().c_str() );CHKERR( rval );
     Tag geom_tag, id_tag;
@@ -723,8 +721,8 @@ ErrorCode test_ghost_elements( const char* filename, int ghost_dimension, int br
             if( tmp_procs != procs )
             {
                 error_msg << "Failure at " << __FILE__ << ':' << __LINE__ << std::endl
-                          << "\tNot all entities in geometric surface are shared with"
-                          << " same processor." << std::endl;
+                          << "\tNot all entities in geometric surface are shared with" << " same processor."
+                          << std::endl;
                 error = 1;
                 break;
             }

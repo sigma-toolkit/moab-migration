@@ -72,8 +72,8 @@ void moab::TempestOnlineMap::serializeSparseMatrix( const SparseMatrixType& mat,
         {
             // int row    = it.row();  // row index
             // int col    = it.col();  // col index (equals k)
-            int row = 1 + this->GetRowGlobalDoF( it.row() );  // row index
-            int col = 1 + this->GetColGlobalDoF( it.col() );  // col index
+            int row    = 1 + this->GetRowGlobalDoF( it.row() );  // row index
+            int col    = 1 + this->GetColGlobalDoF( it.col() );  // col index
             auto value = it.value();
             ofs << row << " " << col << " " << value << "\n";
         }
@@ -1204,12 +1204,16 @@ void print_progress( const int barWidth, const float progress, const char* messa
 
 moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
                                                          const std::vector< int >& owned_dof_ids,
-                                                         bool row_partition )
+                                                         std::vector< double >& vecAreaA,
+                                                         int& nA,
+                                                         std::vector< double >& vecAreaB,
+                                                         int& nB )
 {
     NcError error( NcError::silent_nonfatal );
 
     NcVar *varRow = NULL, *varCol = NULL, *varS = NULL;
-    int nS = 0, nA = 0, nB = 0;
+    NcVar *varAreaA = NULL, *varAreaB = NULL;
+    int nS = 0;
 #ifdef MOAB_HAVE_PNETCDF
     // some variables will be used just in the case netcdfpar reader fails
     int ncfile = -1;
@@ -1225,7 +1229,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
 
 #define CHECK_EXCEPTION( obj, type, varstr )                                                      \
     {                                                                                             \
-        if( obj == nullptr )                                                                         \
+        if( obj == nullptr )                                                                      \
         {                                                                                         \
             _EXCEPTION3( "Map file \"%s\" does not contain %s \"%s\"", strSource, type, varstr ); \
         }                                                                                         \
@@ -1258,10 +1262,18 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         varS = ncMap.get_var( "S" );
         CHECK_EXCEPTION( varS, "variable", "S" );
 
+        varAreaA = ncMap.get_var( "area_a" );
+        CHECK_EXCEPTION( varAreaA, "variable", "area_a" );
+
+        varAreaB = ncMap.get_var( "area_b" );
+        CHECK_EXCEPTION( varAreaB, "variable", "area_b" );
+
 #ifdef MOAB_HAVE_NETCDFPAR
         ncMap.enable_var_par_access( varRow, is_independent );
         ncMap.enable_var_par_access( varCol, is_independent );
         ncMap.enable_var_par_access( varS, is_independent );
+        ncMap.enable_var_par_access( varAreaA, is_independent );
+        ncMap.enable_var_par_access( varAreaB, is_independent );
 #endif
     }
     else
@@ -1278,7 +1290,10 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         ERR_PARNC( ncmpi_inq_dimid( ncfile, "n_s", &ins ) );
         MPI_Offset leng;
         ERR_PARNC( ncmpi_inq_dimlen( ncfile, ins, &leng ) );
-        nS  = (int)leng;
+        nS = (int)leng;
+        ERR_PARNC( ncmpi_inq_dimid( ncfile, "n_a", &ins ) );
+        ERR_PARNC( ncmpi_inq_dimlen( ncfile, ins, &leng ) );
+        nA = (int)leng;
         ERR_PARNC( ncmpi_inq_dimid( ncfile, "n_b", &ins ) );
         ERR_PARNC( ncmpi_inq_dimlen( ncfile, ins, &leng ) );
         nB = (int)leng;
@@ -1298,11 +1313,29 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         localSize += nS % size;
     }
 
+    int localSizeA   = nA / size;
+    long offsetReadA = rank * localSizeA;
+    // leftovers on last rank
+    if( rank == size - 1 )
+    {
+        localSizeA += nA % size;
+    }
+
+    int localSizeB   = nB / size;
+    long offsetReadB = rank * localSizeB;
+    // leftovers on last rank
+    if( rank == size - 1 )
+    {
+        localSizeB += nB % size;
+    }
+
     std::vector< int > vecRow, vecCol;
     std::vector< double > vecS;
     vecRow.resize( localSize );
     vecCol.resize( localSize );
     vecS.resize( localSize );
+    vecAreaA.resize( localSizeA );
+    vecAreaB.resize( localSizeB );
 
     if( ncMap.is_valid() )
     {
@@ -1314,6 +1347,12 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
 
         varS->set_cur( (long)( offsetRead ) );
         varS->get( &( vecS[0] ), localSize );
+
+        varAreaA->set_cur( (long)( offsetReadA ) );
+        varAreaA->get( &( vecAreaA[0] ), localSizeA );
+
+        varAreaB->set_cur( (long)( offsetReadB ) );
+        varAreaB->get( &( vecAreaB[0] ), localSizeB );
 
         ncMap.close();
     }
@@ -1331,6 +1370,17 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         ERR_PARNC( ncmpi_get_vara_int_all( ncfile, varid, &start, &count, &vecRow[0] ) );
         ERR_PARNC( ncmpi_inq_varid( ncfile, "col", &varid ) );
         ERR_PARNC( ncmpi_get_vara_int_all( ncfile, varid, &start, &count, &vecCol[0] ) );
+
+        ERR_PARNC( ncmpi_inq_varid( ncfile, "area_a", &varid ) );
+        MPI_Offset startA = (MPI_Offset)offsetReadA;
+        MPI_Offset countA = (MPI_Offset)localSizeA;
+        ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &startA, &countA, &vecAreaA[0] ) );
+
+        ERR_PARNC( ncmpi_inq_varid( ncfile, "area_b", &varid ) );
+        MPI_Offset startB = (MPI_Offset)offsetReadB;
+        MPI_Offset countB = (MPI_Offset)localSizeB;
+        ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &startB, &countB, &vecAreaB[0] ) );
+
         ERR_PARNC( ncmpi_close( ncfile ) );
 #endif
     }
@@ -1351,8 +1401,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     {
         std::vector< int > ownership;
         // the default trivial partitioning scheme
-        int nDofs = nB;                   // this is for row partitioning
-        if( !row_partition ) nDofs = nA;  // column partitioning
+        int nDofs = nB;  // this is for row partitioning
 
         // assert(row_major_ownership == true); // this block is valid only for row-based partitioning
         ownership.resize( size );
@@ -1374,8 +1423,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             int rowval  = vecRow[i] - 1;  // dofs are 1 based in the file
             int colval  = vecCol[i] - 1;
             int to_proc = -1;
-            int dof_val = colval;
-            if( row_partition ) dof_val = rowval;
+            int dof_val = rowval;
 
             if( ownership[0] > dof_val )
                 to_proc = 0;
@@ -1441,10 +1489,6 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             tl_re.sort( 1, &sort_buffer );  // so now we order by value
 
             sort_buffer.buffer_init( tl->get_n() );
-            int indexOrder = 2;                  //  colVal
-            if( row_partition ) indexOrder = 1;  //  rowVal
-            // constexpr int indexOrder = 1;  //  rowVal
-            // tl->sort( indexOrder, &sort_buffer );
 
             std::map< int, int > startDofIndex, endDofIndex;  // indices in tl_re for values we want
             int dofVal = -1;
@@ -1481,7 +1525,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
 
             for( unsigned k = 0; k < tl->get_n(); k++ )
             {
-                int valDof = tl->vi_rd[3 * k + indexOrder];  // 1 for row, 2 for column // first value, it should be
+                int valDof = tl->vi_rd[3 * k + 1];  // 1 for row, 2 for column // first value, it should be
                 for( int ire = startDofIndex[valDof]; ire <= endDofIndex[valDof]; ire++ )
                 {
                     int to_proc               = tl_re.vi_rd[2 * ire];
@@ -1577,7 +1621,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         }
     }
 
-    m_nTotDofs_Src = sparseMatrix.GetColumns();
+    m_nTotDofs_Src    = sparseMatrix.GetColumns();
     m_nTotDofs_SrcCov = m_nTotDofs_Src;
     m_nTotDofs_Dest   = sparseMatrix.GetRows();
     // TODO: make this flexible and read the order from map with help of metadata
@@ -1593,7 +1637,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     m_colVector.setZero();
 
 #ifdef VERBOSE
-    serializeSparseMatrix( m_weightMatrix, "map_operator_"+std::to_string(rank)+".txt" );
+    serializeSparseMatrix( m_weightMatrix, "map_operator_" + std::to_string( rank ) + ".txt" );
 #endif
     return moab::MB_SUCCESS;
 }

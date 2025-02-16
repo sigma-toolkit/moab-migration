@@ -79,9 +79,9 @@ int main( int argc, char* argv[] )
     // cplocn is for ocean on coupelr pes
     // atmocnid is for intx atm / ocn on coupler pes
     //
-    int rankInAtmComm = -1;
-    int cmpatm        = 5,
-        cplatm        = 6;  // component ids are unique over all pes, and established in advance;
+    int rankInAtmComm       = -1;
+    int cmpatm              = 5,
+        cplatm              = 6;  // component ids are unique over all pes, and established in advance;
     std::string ocnFilename = TestDir + "unittest/wholeOcn.h5m";
     int rankInOcnComm       = -1;
     int cmpocn = 17, cplocn = 18,
@@ -122,9 +122,9 @@ int main( int argc, char* argv[] )
 
     if( !rankInGlobalComm )
     {
-        std::cout << " atm file: " << atmFilename << "\n   on tasks : " << startG1 << ":" << endG1 <<
-            "\n ocn file: " << ocnFilename << "\n     on tasks : " << startG2 << ":" << endG2 <<
-            "\n  partitioning (0 trivial, 1 graph, 2 geometry) " << repartitioner_scheme << "\n  ";
+        std::cout << " atm file: " << atmFilename << "\n   on tasks : " << startG1 << ":" << endG1
+                  << "\n ocn file: " << ocnFilename << "\n     on tasks : " << startG2 << ":" << endG2
+                  << "\n  partitioning (0 trivial, 1 graph, 2 geometry) " << repartitioner_scheme << "\n  ";
     }
 
     // load files on 3 different communicators, groups
@@ -257,9 +257,9 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         // set the ghost layers on the coupler for the source mesh
-        nghlay = 1;  // number of ghost layers for source and target
+        nghlay         = 1;  // number of ghost layers for source and target
         int nghlay_tgt = 0;
-        ierr   = iMOAB_SetMapGhostLayers( cplAtmOcnPID, &nghlay, &nghlay_tgt );
+        ierr           = iMOAB_SetMapGhostLayers( cplAtmOcnPID, &nghlay, &nghlay_tgt );
         CHECKIERR( ierr, "cannot set ghost layers" )
 
         PUSH_TIMER( "Compute ATM-OCN mesh intersection" )
@@ -277,8 +277,8 @@ int main( int argc, char* argv[] )
         // ierr = iMOAB_CoverageGraph( &couComm, cplAtm2PID, cplAtm2OcnPID, cplAtm2OcnPID, &cplatm2, &atm2ocnid,
         // &cplocn );  // it happens over joint communicator
         int type = 3;
-        ierr      = iMOAB_ComputeCommGraph( cplAtmPID, cplAtmOcnPID, &couComm, &couPEGroup, &couPEGroup, &type, &type,
-                                            &cplatm, &atmocnid );
+        ierr     = iMOAB_ComputeCommGraph( cplAtmPID, cplAtmOcnPID, &couComm, &couPEGroup, &couPEGroup, &type, &type,
+                                           &cplatm, &atmocnid );
         CHECKIERR( ierr, "cannot recompute direct coverage graph for ocean from atm" )
     }
 

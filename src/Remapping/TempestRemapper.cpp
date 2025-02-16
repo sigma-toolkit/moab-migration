@@ -991,17 +991,17 @@ void TempestRemapper::SetMeshSet( Remapper::IntersectionContext ctx /* Remapper:
 
     if( ctx == Remapper::SourceMesh )  // should not be used
     {
-        m_source_set      = mset;
+        m_source_set = mset;
         if( entities ) m_source_entities = *entities;
     }
     else if( ctx == Remapper::TargetMesh )
     {
-        m_target_set      = mset;
+        m_target_set = mset;
         if( entities ) m_target_entities = *entities;
     }
     else if( ctx == Remapper::CoveringMesh )
     {
-        m_covering_source_set      = mset;
+        m_covering_source_set = mset;
         if( entities ) m_covering_source_entities = *entities;
     }
     else
@@ -1052,19 +1052,19 @@ ErrorCode TempestRemapper::GenerateCSMeshMetadata( const int ntot_elements,
                                                    const std::string& dofTagName,
                                                    int nP )
 {
-    Mesh csMesh;
-    int err;
-    moab::ErrorCode rval;
-
     const int csResolution = std::sqrt( ntot_elements / 6.0 );
-
     if( csResolution * csResolution * 6 != ntot_elements ) return MB_INVALID_SIZE;
 
     // Create a temporary Cubed-Sphere mesh
     // NOTE: This will not work for RRM grids. Need to run HOMME for that case anyway
-    err = GenerateCSMesh( csMesh, csResolution, "", "NetCDF4" );MB_CHK_SET_ERR( err ? MB_FAILURE : MB_SUCCESS, "Failed to generate CS mesh through TempestRemap" );
+    Mesh csMesh;
+    if( GenerateCSMesh( csMesh, csResolution, "", "NetCDF4" ) )
+        MB_CHK_SET_ERR( moab::MB_FAILURE,  // unsuccessful call
+                        "Failed to generate CS mesh through TempestRemap" );
 
-    rval = this->GenerateMeshMetadata( csMesh, ntot_elements, ents, secondary_ents, dofTagName, nP );MB_CHK_SET_ERR( rval, "Failed in call to GenerateMeshMetadata" );
+    // let us now generate the mesh metadata
+    if( this->GenerateMeshMetadata( csMesh, ntot_elements, ents, secondary_ents, dofTagName, nP ) )
+        MB_CHK_SET_ERR( moab::MB_FAILURE, "Failed in call to GenerateMeshMetadata" );  // unsuccessful call
 
     return moab::MB_SUCCESS;
 }

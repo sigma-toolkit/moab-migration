@@ -57,8 +57,8 @@ struct TempestMapAppData
     std::map< std::string, moab::TempestOnlineMap* > weightMaps;
     iMOAB_AppID pid_src;
     iMOAB_AppID pid_dest;
-    int num_src_ghost_layers;      // number of ghost layers
-    int num_tgt_ghost_layers;      // number of ghost layers
+    int num_src_ghost_layers;  // number of ghost layers
+    int num_tgt_ghost_layers;  // number of ghost layers
 };
 #endif
 
@@ -115,7 +115,7 @@ struct GlobalContext
     iMOAB_String* iArgv;
 
     std::map< std::string, int > appIdMap;  // from app string (uppercase) to app id
-    std::map< int, appData > appDatas;  // the same order as pcomms
+    std::map< int, appData > appDatas;      // the same order as pcomms
     int globalrank, worldprocs;
     bool MPI_initialized;
 
@@ -132,8 +132,8 @@ ErrCode iMOAB_Initialize( int argc, iMOAB_String* argv )
 {
     if( argc ) IMOAB_CHECKPOINTER( argv, 1 );
 
-    context.iArgc      = argc;
-    context.iArgv      = argv;  // shallow copy
+    context.iArgc = argc;
+    context.iArgv = argv;  // shallow copy
 
     if( 0 == context.refCountMB )
     {
@@ -194,7 +194,7 @@ ErrCode iMOAB_Finalize()
 static int apphash( const iMOAB_String str, int identifier = 0 )
 {
     // A minimal perfect hash function (MPHF)
-    std::string appstr(str);
+    std::string appstr( str );
     // Fowler–Noll–Vo (or FNV) is a non-cryptographic hash function created
     // by Glenn Fowler, Landon Curt Noll, and Kiem-Phong Vo.
     // Ref: https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
@@ -241,7 +241,7 @@ ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
     // trivial hash: just use the id that the user provided and assume it is unique
     // *pid = *compid;
     // hash: compute a unique hash as a combination of the appname and the component id
-    *pid                   = apphash( app_name, *compid );
+    *pid = apphash( app_name, *compid );
     // store map of application name and the ID we just generated
     context.appIdMap[name] = *pid;
     int rankHere           = 0;
@@ -267,15 +267,15 @@ ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
     app_data.name      = name;     // save the name of application
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
-    app_data.tempestData.remapper = nullptr;  // Only allocate as needed
+    app_data.tempestData.remapper             = nullptr;  // Only allocate as needed
     app_data.tempestData.num_src_ghost_layers = 0;
     app_data.tempestData.num_tgt_ghost_layers = 0;
 #endif
 
     // set some default values
-    app_data.num_ghost_layers   = 0;
-    app_data.point_cloud        = false;
-    app_data.is_fortran         = false;
+    app_data.num_ghost_layers = 0;
+    app_data.point_cloud      = false;
+    app_data.is_fortran       = false;
 #ifdef MOAB_HAVE_TEMPESTREMAP
     app_data.secondary_file_set = app_data.file_set;
 #endif
@@ -674,7 +674,10 @@ ErrCode iMOAB_LoadMesh( iMOAB_AppID pid,
     return iMOAB_UpdateMeshInfo( pid );
 }
 
-static ErrCode internal_WriteMesh( iMOAB_AppID pid, const iMOAB_String filename, const iMOAB_String write_options, bool primary_set = true )
+static ErrCode internal_WriteMesh( iMOAB_AppID pid,
+                                   const iMOAB_String filename,
+                                   const iMOAB_String write_options,
+                                   bool primary_set = true )
 {
     IMOAB_CHECKPOINTER( filename, 2 );
     IMOAB_ASSERT( strlen( filename ), "Invalid filename length." );
@@ -1490,8 +1493,7 @@ ErrCode iMOAB_DefineTagStorage( iMOAB_AppID pid,
 {
     // we have 6 types of tags supported so far
     // check if tag type is valid
-    if( *tag_type < 0 || *tag_type > 5 )
-        return moab::MB_FAILURE;
+    if( *tag_type < 0 || *tag_type > 5 ) return moab::MB_FAILURE;
 
     DataType tagDataType;
     TagType tagType;
@@ -1625,12 +1627,11 @@ ErrCode iMOAB_SetIntTagStorage( iMOAB_AppID pid,
     // Get the application data
     appData& data = context.appDatas[*pid];
     // check if tag is defined
-    if( data.tagMap.find( tag_name ) == data.tagMap.end() )
-        return moab::MB_FAILURE;
+    if( data.tagMap.find( tag_name ) == data.tagMap.end() ) return moab::MB_FAILURE;
 
     Tag tag = data.tagMap[tag_name];
 
-    int tagLength  = 0;
+    int tagLength = 0;
     MB_CHK_ERR( context.MBI->tag_get_length( tag, tagLength ) );
 
     DataType dtype;
@@ -1716,7 +1717,7 @@ ErrCode iMOAB_SetDoubleTagStorage( iMOAB_AppID pid,
     std::string separator( ":" );
     split_tag_names( tag_names, separator, tagNames );
 
-    appData& data      = context.appDatas[*pid];
+    appData& data = context.appDatas[*pid];
     // set it on a subset of entities, based on type and length
     // if *entity_type = 0, then use vertices; else elements
     Range* ents_to_set = ( *ent_type == 0 ? &data.all_verts : &data.primary_elems );
@@ -2679,8 +2680,7 @@ ErrCode iMOAB_SendElementTag( iMOAB_AppID pid,
     // in that case, the elements might have been instantiated in the coverage set locally, the
     // "owned" range can be different the elements are now in tempestRemap coverage_set
     EntityHandle cover_set = cgraph->get_cover_set();  // this will be non null only for intx app ?
-    if( 0 != cover_set )
-        MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, owned ) );
+    if( 0 != cover_set ) MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, owned ) );
 #endif
 
     std::string tag_name( tag_storage_name );
@@ -2698,8 +2698,8 @@ ErrCode iMOAB_SendElementTag( iMOAB_AppID pid,
         ErrorCode rval = context.MBI->tag_get_handle( tagNames[i].c_str(), tagHandle );
         if( MB_SUCCESS != rval || nullptr == tagHandle )
         {
-            std::cout << " can't get tag handle for tag named:" << tagNames[i].c_str() << " at index " << i << "\n";
-            MB_CHK_SET_ERR( rval, "can't get tag handle" );
+            MB_CHK_SET_ERR( moab::MB_FAILURE,
+                            "can't get tag handle with name: " << tagNames[i].c_str() << " at index " << i );
         }
         tagHandles.push_back( tagHandle );
     }
@@ -2717,10 +2717,9 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid,
                                  MPI_Comm* joint_communicator,
                                  int* context_id )
 {
-    appData& data = context.appDatas[*pid];
+    appData& data                               = context.appDatas[*pid];
     std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *context_id );
-    if( mt == data.pgraph.end() )
-        return moab::MB_FAILURE;
+    if( mt == data.pgraph.end() ) return moab::MB_FAILURE;
 
     ParCommGraph* cgraph = mt->second;
     ParallelComm* pco    = context.appDatas[*pid].pcomm;
@@ -2735,9 +2734,9 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid,
     EntityHandle cover_set = cgraph->get_cover_set();
     if( 0 != cover_set ) MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, owned ) );
 
-    // another possibility is for par comm graph to be computed from iMOAB_ComputeCommGraph, for
-    // after atm ocn intx, from phys (case from imoab_phatm_ocn_coupler.cpp) get then the cover set
-    // from ints remapper
+        // another possibility is for par comm graph to be computed from iMOAB_ComputeCommGraph, for
+        // after atm ocn intx, from phys (case from imoab_phatm_ocn_coupler.cpp) get then the cover set
+        // from ints remapper
 #ifdef MOAB_HAVE_TEMPESTREMAP
     if( data.tempestData.remapper != nullptr )  // this is the case this is part of intx;;
     {
@@ -2758,9 +2757,8 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid,
         ErrorCode rval = context.MBI->tag_get_handle( tagNames[i].c_str(), tagHandle );
         if( MB_SUCCESS != rval || nullptr == tagHandle )
         {
-            std::cout << " can't get tag handle for tag named:" << tagNames[i].c_str() << " at index " << i
-                      << std::endl;
-            MB_CHK_SET_ERR( rval, "can't get tag handle" );
+            MB_CHK_SET_ERR( moab::MB_FAILURE,
+                            " can't get tag handle for tag named:" << tagNames[i].c_str() << " at index " << i );
         }
         tagHandles.push_back( tagHandle );
     }
@@ -2832,7 +2830,7 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
         auto mt       = data.pgraph.find( *comp2 );
         if( mt != data.pgraph.end() ) data.pgraph.erase( mt );
         // now let us compute the new communication graph
-        cgraph = new ParCommGraph( global, srcGroup, tgtGroup, *comp1, *comp2 );
+        cgraph                                 = new ParCommGraph( global, srcGroup, tgtGroup, *comp1, *comp2 );
         context.appDatas[*pid1].pgraph[*comp2] = cgraph;  // the context will be the other comp
     }
     if( *pid2 >= 0 )
@@ -2841,7 +2839,7 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
         auto mt       = data.pgraph.find( *comp1 );
         if( mt != data.pgraph.end() ) data.pgraph.erase( mt );
         // now let us compute the new communication graph
-        cgraph_rev = new ParCommGraph( global, tgtGroup, srcGroup, *comp2, *comp1 );
+        cgraph_rev                             = new ParCommGraph( global, tgtGroup, srcGroup, *comp2, *comp1 );
         context.appDatas[*pid2].pgraph[*comp1] = cgraph_rev;  // from 2 to 1
     }
 
@@ -3214,14 +3212,14 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
     // And based on this one, we will build the newly modified one for coverage
     if( *pid_src >= 0 )
     {
-        appData& dataSrc   = context.appDatas[*pid_src];
+        appData& dataSrc       = context.appDatas[*pid_src];
         int default_context_id = *migration_id;  // the other one
         assert( dataSrc.global_id == *source_id );
         is_fortran_context = dataSrc.is_fortran || is_fortran_context;
         if( dataSrc.pgraph.find( default_context_id ) != dataSrc.pgraph.end() )
             sendGraph = dataSrc.pgraph[default_context_id];  // maybe check if it does not exist
         else
-            MB_CHK_SET_ERR(moab::MB_FAILURE, "Could not find source ParCommGraph with default migration context");
+            MB_CHK_SET_ERR( moab::MB_FAILURE, "Could not find source ParCommGraph with default migration context" );
 
         // report the sender and receiver tasks in the joint comm
         srcSenders = sendGraph->senders();
@@ -3242,7 +3240,8 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
         if( dataMigr.pgraph.find( default_context_id ) != dataMigr.pgraph.end() )
             recvGraph = dataMigr.pgraph[default_context_id];
         else
-            MB_CHK_SET_ERR( moab::MB_FAILURE, "Could not find coverage receiver ParCommGraph with default migration context" );
+            MB_CHK_SET_ERR( moab::MB_FAILURE,
+                            "Could not find coverage receiver ParCommGraph with default migration context" );
         // report the sender and receiver tasks in the joint comm, from migrated mesh pt of view
         srcSenders = recvGraph->senders();
         receivers  = recvGraph->receivers();
@@ -3265,8 +3264,7 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
 
     MPI_Comm global = ( is_fortran_context ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( joint_communicator ) )
                                            : *joint_communicator );
-    int currentRankInJointComm = -1;
-    CHK_MPI_ERR( MPI_Comm_rank( global, &currentRankInJointComm ) );
+    int currentRankInJointComm = -1;CHK_MPI_ERR( MPI_Comm_rank( global, &currentRankInJointComm ) );
 
     // Global id of the coverage source elements
     Tag gidTag = context.MBI->globalId_tag();
@@ -3340,7 +3338,7 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
 
                 // we have augmented the overlap set with ghost cells ; in that case, the
                 // orig_sending_processor is not set so it will be -1;
-                if( origProc < 0  ) continue;
+                if( origProc < 0 ) continue;
 
                 int gidCell;  // get the global id of the cell for association
                 MB_CHK_ERR( context.MBI->tag_get_data( gidTag, &cov_cell, 1, &gidCell ) );
@@ -3386,8 +3384,7 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
             // so we are for sure on intx pes (the receiver is the coupler mesh)
             newRecvGraph->set_cover_set( cover_set );
             if( context.appDatas[*pid_migr].pgraph.find( *context_id ) == context.appDatas[*pid_migr].pgraph.end() )
-                context.appDatas[*pid_migr].pgraph[*context_id] =
-                    newRecvGraph;
+                context.appDatas[*pid_migr].pgraph[*context_id] = newRecvGraph;
             else  // possible memory leak if context_id is same
                 MB_CHK_SET_ERR( moab::MB_FAILURE, "ParCommGraph for context_id="
                                                       << *context_id << " already exists. Check the workflow" );
@@ -3448,6 +3445,123 @@ ErrCode iMOAB_DumpCommGraph( iMOAB_AppID pid, int* context_id, int* is_sender, c
 #ifdef MOAB_HAVE_TEMPESTREMAP
 
 #ifdef MOAB_HAVE_NETCDF
+
+static ErrCode set_aream_from_trivial_distribution( iMOAB_AppID pid, int N, std::vector< double >& trvArea )
+{
+    // this needs several rounds of communication, because the mesh is distributed differently than trivially
+    // get all the cells from the pid_source
+    // get global ids of the cells
+    // number of local cells: [n/size] nL = [n/size]
+    // last one extraN = n%size; nL += extraN
+    // start id = [ rank*nL + 1; endId = (rank+1)*nL
+    // lst one (rank = =size-1; endId = na
+    // the last cells get the rest
+    // construct global ids that correspond to trvArea [, rank *
+    appData& data       = context.appDatas[*pid];
+    ParallelComm* pcomm = context.appDatas[*pid].pcomm;
+    const int size      = pcomm->size();
+    const int rank      = pcomm->rank();
+
+    /// the "aream" tag should be created already; error out if not
+    // NOTE: This is a bad assumption
+    // TODO: Fix it.
+    Tag areaTag;
+    MB_CHK_ERR( context.MBI->tag_get_handle( "aream", areaTag ) );
+
+    // start copy
+    const Range& ents_to_set = data.primary_elems;
+    size_t nents_to_be_set   = ents_to_set.size();
+
+    Tag gidTag = context.MBI->globalId_tag();
+    std::vector< int > globalIds( nents_to_be_set );
+    MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_to_set, &globalIds[0] ) );
+
+    const bool serial = ( size == 1 );
+    if( serial )
+    {
+        // we do not assume anymore that the number of entities has to match
+        // we will set only what matches, and skip entities that do not have corresponding global ids
+        //assert( total_tag_len * nents_to_be_set - *num_tag_storage_length == 0 );
+        // tags are unrolled, we loop over global ids first, then careful about tags
+        for( size_t i = 0; i < nents_to_be_set; i++ )
+        {
+            int gid = globalIds[i];
+            int indexInVal =
+                gid - 1;  // assume the values are in order of global id, starting from 1 to number of cells
+            assert( indexInVal < N );
+            EntityHandle eh = ents_to_set[i];
+            MB_CHK_ERR( context.MBI->tag_set_data( areaTag, &eh, 1, &trvArea[indexInVal] ) );
+        }
+    }
+#ifdef MOAB_HAVE_MPI
+    else  // it can be not serial only if size > 1, parallel
+    {
+        int nL = N / size;  // how many global ids per task, except the last one
+
+        // in this case, we have to use 2 crystal routers, to send data to the processor that needs it
+        // we will create first a tuple to rendevous points, then from there send to the processor that requested it
+        // it is a 2-hop global gather scatter
+        // TODO: allow for tags of different length; this is wrong
+        //assert( nbLocalVals * tagNames.size() - *num_tag_storage_length == 0 );
+        TupleList TLreq;
+        TLreq.initialize( 3, 0, 0, 0, nents_to_be_set );  //  to proc, marker(gid),
+        TLreq.enableWriteAccess();
+        // the processor id that processes global_id is global_id / num_ents_per_proc
+
+        // send requests to processor that has the global id
+        for( size_t i = 0; i < nents_to_be_set; i++ )
+        {
+            // to proc, marker, element local index, index in el
+            int marker  = globalIds[i];
+            int to_proc = ( marker - 1 ) / nL;  // proc from 0 to size - 1
+
+            if( to_proc == size ) to_proc = size - 1;  // the last array is the longest
+            int n                  = TLreq.get_n();
+            TLreq.vi_wr[3 * n]     = to_proc;  // send to processor
+            TLreq.vi_wr[3 * n + 1] = marker;
+            TLreq.vi_wr[3 * n + 2] = i;  // local index for this global id
+            TLreq.inc_n();
+        }
+
+        // send now requests, basically inform the rendez-vous point who needs a particular global id
+        // send the data to the other processors:
+        ( pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLreq, 0 );
+
+        int sizeBack = TLreq.get_n();
+        // start copy from comm graph settle
+        TupleList TLBack;
+        TLBack.initialize( 3, 0, 0, 1, sizeBack );  // to proc, marker, tag from proc , tag values
+        TLBack.enableWriteAccess();
+        for( int i = 0; i < sizeBack; i++ )
+        {
+            int from_proc           = TLreq.vi_wr[3 * i];  // send to processor
+            TLBack.vi_wr[3 * i]     = from_proc;
+            int marker              = TLreq.vi_wr[3 * i + 1];  // the actual global id
+            TLBack.vi_wr[3 * i + 1] = marker;
+            TLBack.vi_wr[3 * i + 2] = TLreq.vi_wr[3 * i + 2];  // the original index this came from
+            // this marker should give an idea of what index is actually needed for value
+            int index       = marker - 1 - rank * nL;
+            TLBack.vr_wr[i] = trvArea[index];  // !!! big assumptions about indices
+            TLBack.inc_n();
+        }
+
+        ( pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLBack, 0 );
+
+        int n1 = TLBack.get_n();  // should be the number of nents_to_be_set
+        for( int i = 0; i < n1; i++ )
+        {
+            // int gid  = TLBack.vi_rd[3 * i + 1];  // marker
+            int origIndex   = TLBack.vi_rd[3 * i + 2];
+            EntityHandle eh = ents_to_set[origIndex];
+            MB_CHK_ERR( context.MBI->tag_set_data( areaTag, &eh, 1, &TLBack.vr_rd[i] ) );
+        }
+    }
+#endif
+    // end copy
+
+    return MB_SUCCESS;
+}
+
 ErrCode iMOAB_LoadMappingWeightsFromFile(
     iMOAB_AppID pid_source,
     iMOAB_AppID pid_target,
@@ -3565,13 +3679,26 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
         MB_CHK_ERR( MB_FAILURE );  // we know only type 1 or 2 or 3
     }
 
-    // pass ordered dofs, and unique
-    std::vector< int > orderDofs( tgtDofValues.begin(), tgtDofValues.end() );
-    std::sort( orderDofs.begin(), orderDofs.end() );
-    orderDofs.erase( std::unique( orderDofs.begin(), orderDofs.end() ), orderDofs.end() );  // remove duplicates
+    // pass tgt ordered dofs, and unique
+    // we need to read area_b and set aream tag on target cells, too
+    std::vector< int > sortTgtDofs( tgtDofValues.begin(), tgtDofValues.end() );
+    std::sort( sortTgtDofs.begin(), sortTgtDofs.end() );
+    sortTgtDofs.erase( std::unique( sortTgtDofs.begin(), sortTgtDofs.end() ), sortTgtDofs.end() );  // remove duplicates
 
-    MB_CHK_SET_ERR( weightMap->ReadParallelMap( remap_weights_filename, orderDofs, true /*row_based_partition*/ ),
+    ///   the tag should be created already in the e3sm workflow; if not, create it here
+    Tag areaTag;
+    ErrorCode rval =
+        context.MBI->tag_get_handle( "aream", 1, MB_TYPE_DOUBLE, areaTag, MB_TAG_DENSE | MB_TAG_EXCL | MB_TAG_CREAT );
+    if( MB_ALREADY_ALLOCATED == rval )
+    {
+        if( 0 == data_intx.pcomm->rank() ) std::cout << " aream tag already defined \n ";
+    }
+
+    std::vector< double > trvAreaA, trvAreaB;  // passed by reference
+    int nA, nB;                                // passed by reference, so returned
+    MB_CHK_SET_ERR( weightMap->ReadParallelMap( remap_weights_filename, sortTgtDofs, trvAreaA, nA, trvAreaB, nB ),
                     "reading map from disk failed" );
+    // trivially distributed areaAs and areaBs will need to be set on their correct source and target cells, as an aream tag
 
     // if we are on target mesh (row based partition)
     tdata.pid_src  = pid_source;
@@ -3583,6 +3710,12 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
     // that need to participate in the meshes.
 
     tdata.remapper->SetMeshSet( Remapper::SourceMesh, source_set, &srcc_ents_of_interest );
+    // we have read the area A from map file, and we will set it as a aream double tag on the source set, knowing that we
+    // read it trivially, with a trivial distribution by the global DOFs
+    // local , private method:
+    MB_CHK_SET_ERR( set_aream_from_trivial_distribution( pid_source, nA, trvAreaA ), " fail to set aream on source " );
+    MB_CHK_SET_ERR( set_aream_from_trivial_distribution( pid_target, nB, trvAreaB ), " fail to set aream on target " );
+
     tdata.remapper->SetMeshSet( Remapper::CoveringMesh, covering_set, &src_ents_of_interest );
     weightMap->SetSourceNDofsPerElement( src_elem_dof_length );
     weightMap->set_col_dc_dofs( srcDofValues );  // will set col_dtoc_dofmap
@@ -3648,10 +3781,10 @@ ErrCode iMOAB_WriteMappingWeightsToFile(
     // attrMap["remap_options"] = stringAttr[0];
     // attrMap["methodorder_b"] = stringAttr[1];
     // attrMap["methodorder_a"] = stringAttr[2];
-    attrMap["concave_a"]     = "false";  // defaults
-    attrMap["concave_b"]     = "false";  // defaults
-    attrMap["bubble"]        = "true";   // defaults
-    attrMap["MOABversion"]   = std::string( MOAB_VERSION );
+    attrMap["concave_a"]   = "false";  // defaults
+    attrMap["concave_b"]   = "false";  // defaults
+    attrMap["bubble"]      = "true";   // defaults
+    attrMap["MOABversion"] = std::string( MOAB_VERSION );
 
     // Write the map file to disk in parallel using either HDF5 or SCRIP interface
     rval = weightMap->WriteParallelMap( filename, attrMap );MB_CHK_ERR( rval );
@@ -4045,10 +4178,8 @@ ErrCode iMOAB_SetMapGhostLayers( iMOAB_AppID pid, int* n_src_ghost_layers, int* 
 ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMOAB_AppID pid_intx )
 {
     // Default constant parameters
-    constexpr bool validate = true;
-#ifdef VERBOSE
-    constexpr bool enforceConvexity = true;
-#endif
+    constexpr bool validate        = true;
+    constexpr bool meshCleanup     = true;
     constexpr bool gnomonic        = true;
     constexpr double defaultradius = 1.0;
     constexpr double boxeps        = 1.e-10;
@@ -4078,8 +4209,8 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
 #ifdef MOAB_HAVE_MPI
     if( pco_intx )
     {
-        rank        = pco_intx->rank();
-        rval        = pco_intx->check_all_shared_handles();MB_CHK_ERR( rval );
+        rank = pco_intx->rank();
+        rval = pco_intx->check_all_shared_handles();MB_CHK_ERR( rval );
     }
 #endif
 
@@ -4113,26 +4244,29 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
     IntxAreaUtils areaAdaptor( IntxAreaUtils::lHuiller );
 #endif
 
-    // print verbosely about the problem setting
-    rval = areaAdaptor.positive_orientation( context.MBI, data_src.file_set, defaultradius /*radius_source*/ );MB_CHK_ERR( rval );
-    rval = areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ );MB_CHK_ERR( rval );
-#ifdef VERBOSE
-
-    // fixes to enforce positive orientation of the vertices (outward normal)
-    // fixes to clean up any degenerate quadrangular elements present in the mesh (RLL specifically?)
-    // fixes to enforce convexity in case concave elements are present
-    rval = areaAdaptor.positive_orientation( context.MBI, data_src.file_set, defaultradius /*radius_source*/ );MB_CHK_ERR( rval );
-    rval = IntxUtils::fix_degenerate_quads( context.MBI, data_src.file_set );MB_CHK_ERR( rval );
-    if( enforceConvexity )
+    if( meshCleanup )
     {
-        rval = moab::IntxUtils::enforce_convexity( context.MBI, data_src.file_set, rank );MB_CHK_ERR( rval );
-    }
+        // Address issues for source mesh first
+        // fixes to enforce positive orientation of the vertices (outward normal)
+        MB_CHK_ERR(
+            areaAdaptor.positive_orientation( context.MBI, data_src.file_set, defaultradius /*radius_source*/ ) );
 
-    rval = areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ );MB_CHK_ERR( rval );
-    rval = IntxUtils::fix_degenerate_quads( context.MBI, data_tgt.file_set );MB_CHK_ERR( rval );
-    if( enforceConvexity )
-    {
-        rval = moab::IntxUtils::enforce_convexity( context.MBI, data_tgt.file_set, rank );MB_CHK_ERR( rval );
+        // fixes to clean up any degenerate quadrangular elements present in the mesh (RLL specifically?)
+        MB_CHK_ERR( IntxUtils::fix_degenerate_quads( context.MBI, data_src.file_set ) );
+
+        // fixes to enforce convexity in case concave elements are present
+        MB_CHK_ERR( moab::IntxUtils::enforce_convexity( context.MBI, data_src.file_set, rank ) );
+
+        // Address issues for target mesh first
+        // fixes to enforce positive orientation of the vertices (outward normal)
+        MB_CHK_ERR(
+            areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ ) );
+
+        // fixes to clean up any degenerate quadrangular elements present in the mesh (RLL specifically?)
+        MB_CHK_ERR( IntxUtils::fix_degenerate_quads( context.MBI, data_tgt.file_set ) );
+
+        // fixes to enforce convexity in case concave elements are present
+        MB_CHK_ERR( moab::IntxUtils::enforce_convexity( context.MBI, data_tgt.file_set, rank ) );
     }
 
     // print verbosely about the problem setting
@@ -4154,7 +4288,6 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
                                     bintxelems.size() );
         }
     }
-#endif
     // use_kdtree_search = ( srctgt_areas_glb[0] < srctgt_areas_glb[1] );
     // advancing front method will fail unless source mesh has no holes (area = 4 * pi) on unit sphere
     // use_kdtree_search = true;
@@ -4183,7 +4316,8 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
     rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
 
     // First, compute the covering source set.
-    rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, tdata.num_src_ghost_layers );MB_CHK_ERR( rval );
+    rval =
+        tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, tdata.num_src_ghost_layers );MB_CHK_ERR( rval );
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
     // set the reference to the covering set in the source PID
@@ -4193,9 +4327,7 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
     return moab::MB_SUCCESS;
 }
 
-ErrCode iMOAB_WriteCoverageMesh( iMOAB_AppID pid,
-                                 const iMOAB_String filename,
-                                 const iMOAB_String write_options )
+ErrCode iMOAB_WriteCoverageMesh( iMOAB_AppID pid, const iMOAB_String filename, const iMOAB_String write_options )
 {
     return internal_WriteMesh( pid, filename, write_options, false );
 }

@@ -65,9 +65,7 @@ int main( int argc, char* argv[] )
     }
     else
     {
-        if( rank == 0 )
-            cout << "Using command:"
-                 << "\t" << argv[0] << " nx ny nz" << endl;
+        if( rank == 0 ) cout << "Using command:" << "\t" << argv[0] << " nx ny nz" << endl;
     }
 
     times[0] = MPI_Wtime();  // Initialize it (if needed)
@@ -214,8 +212,8 @@ moab::ErrorCode GenerateTestMatrixAndVectors( int nx,
     MPI_Comm_size( MPI_COMM_WORLD, &size );
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );
 #else
-    int size  = 1;  // Serial case (not using MPI)
-    int rank  = 0;
+    int size = 1;  // Serial case (not using MPI)
+    int rank = 0;
 #endif
     // Set this bool to true if you want a 7-pt stencil instead of a 27 pt stencil
     bool use_7pt_stencil = false;
@@ -289,8 +287,8 @@ moab::ErrorCode GenerateTestMatrixAndVectors( int nx,
                                 }
                             }
                         }  // end sx loop
-                    }      // end sy loop
-                }          // end sz loop
+                    }  // end sy loop
+                }  // end sz loop
 
                 int ncols = indices.size();
                 A.SetValues( 1, &ncols, &currow, indices.data(), colvals.data() );
@@ -301,8 +299,8 @@ moab::ErrorCode GenerateTestMatrixAndVectors( int nx,
                 rhs.SetValue( currow, 27.0 - ( (double)( nnzrow - 1 ) ) );
                 exactsol.SetValue( currow, 1.0 );
             }  // end ix loop
-        }      // end iy loop
-    }          // end iz loop
+        }  // end iy loop
+    }  // end iz loop
 
     if( debug )
         cout << "Global size of the matrix: " << total_nrow << " and NNZ (estimate) = " << total_nnz

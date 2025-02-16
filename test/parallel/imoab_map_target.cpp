@@ -120,9 +120,7 @@ int main( int argc, char* argv[] )
     bool analytic_field = false;
     opts.addOpt< void >( "analytic,q", "analytic field", &analytic_field );
 
-
     opts.addOpt< std::string >( "field,f", "field to project using the map ", &field_source );
-
 
     bool no_regression_test = false;
     opts.addOpt< void >( "no_regression,r", "do not do regression test against baseline 1", &no_regression_test );

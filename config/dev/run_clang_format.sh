@@ -28,6 +28,7 @@ function process_source()
 	eval `${SEDWITHOPTIONS} -n -e 'H;${x;s/;\n[[:space:]]*MB_CHK_ERR( ierr );/;MB_CHK_ERR( ierr );/g;p;}' ${srcfile}`
 	eval `${SEDWITHOPTIONS} -n -e 'H;${x;s/;\n[[:space:]]*MB_CHK_SET_ERR( rval,/;MB_CHK_SET_ERR( rval,/g;p;}' ${srcfile}`
 	eval `${SEDWITHOPTIONS} -n -e 'H;${x;s/;\n[[:space:]]*MB_CHK_SET_ERR_CONT( rval,/;MB_CHK_SET_ERR_CONT( rval,/g;p;}' ${srcfile}`
+	eval `${SEDWITHOPTIONS} -n -e 'H;${x;s/;\n[[:space:]]*MB_CHK_ERR_RET_VAL( rval,/;MB_CHK_ERR_RET_VAL( rval,/g;p;}' ${srcfile}`
 	eval `${SEDWITHOPTIONS} -n -e 'H;${x;s/;\n *RR;/;RR;/g;p;}' ${srcfile}`
 	eval `${SEDWITHOPTIONS} -n -e 'H;${x;s/;\n *CHECK_ERR/;CHECK_ERR/g;p;}' ${srcfile}`
 	eval `${SEDWITHOPTIONS} -n -e 'H;${x;s/;\n *CHK_MPI_ERR/;CHK_MPI_ERR/g;p;}' ${srcfile}`

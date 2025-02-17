@@ -208,7 +208,8 @@ ErrorCode Intx2Mesh::DetermineOrderedNeighbors( EntityHandle inputSet, int max_e
             if( siz > 2 )
             {
                 std::cout << "non manifold mesh, error" << mb->list_entities( &( cellsInSet[0] ), cellsInSet.size() )
-                          << "\n";MB_CHK_SET_ERR( MB_FAILURE, "non-manifold input mesh set" );  // non-manifold
+                          << std::endl;
+                MB_CHK_SET_ERR( MB_FAILURE, "non-manifold input mesh set" );  // non-manifold
             }
             if( siz == 1 )
             {
@@ -268,12 +269,11 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
     }
 
     int defaultInt = -1;
+    // Now let us create the association tags to source and target parent, along with internal counters
     rval = mb->tag_get_handle( "TargetParent", 1, MB_TYPE_INTEGER, tgtParentTag, MB_TAG_DENSE | MB_TAG_CREAT,
                                &defaultInt );MB_CHK_SET_ERR( rval, "can't create positive tag" );
-
     rval = mb->tag_get_handle( "SourceParent", 1, MB_TYPE_INTEGER, srcParentTag, MB_TAG_DENSE | MB_TAG_CREAT,
                                &defaultInt );MB_CHK_SET_ERR( rval, "can't create negative tag" );
-
     rval = mb->tag_get_handle( "Counting", 1, MB_TYPE_INTEGER, countTag, MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );MB_CHK_SET_ERR( rval, "can't create Counting tag" );
 
     // for tgt cells, save a dense tag with the bordering edges, so we do not have to search for
@@ -359,7 +359,7 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
 
     // create the kd tree on source cells, and intersect all targets in an expensive loop
     // build a kd tree with the rs1 (source) cells
-    FileOptions kdOpts("PLANE_SET=1;SPLITS_PER_DIR=2;SPHERICAL;RADIUS=1.0;");
+    FileOptions kdOpts( "PLANE_SET=1;SPLITS_PER_DIR=2;SPHERICAL;RADIUS=1.0;" );
     AdaptiveKDTree kd( mb );
     kd.parse_options( kdOpts );
     EntityHandle tree_root = 0;
@@ -492,7 +492,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
     // early from contention
 
     // build a kd tree with the rs1 (source) cells
-    FileOptions kdOpts("PLANE_SET=1;SPLITS_PER_DIR=2;SPHERICAL;RADIUS=1.0;");
+    FileOptions kdOpts( "PLANE_SET=1;SPLITS_PER_DIR=2;SPHERICAL;RADIUS=1.0;" );
     AdaptiveKDTree kd( mb );
     kd.parse_options( kdOpts );
     EntityHandle tree_root = 0;
@@ -738,7 +738,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                               << mb->id_from_handle( srcT ) << "\n";
                 }
 #endif
-            }                                                               // end while (!localSrc.empty())
+            }  // end while (!localSrc.empty())
             recoveredArea = ( recoveredArea - areaTgtCell ) / areaTgtCell;  // replace now with recovery fraction
 #if defined( ENABLE_DEBUG ) || defined( VERBOSE )
             if( fabs( recoveredArea ) > epsilon_1 )
@@ -867,8 +867,7 @@ void Intx2Mesh::correct_polygon( EntityHandle* nodes, int& nP )
                 for( int j = 0; j < nP; j++ )
                     std::cout << nodes[j] << " ";
                 std::cout << "\n";
-                std::cout << " node " << nodes[i] << " at index " << i << " is duplicated"
-                          << "\n";
+                std::cout << " node " << nodes[i] << " at index " << i << " is duplicated" << "\n";
             }
 #endif
             // this will work even if we start from 1 2 3 1; when i is 3, we find nextIndex is 0,
@@ -901,8 +900,10 @@ ErrorCode Intx2Mesh::build_processor_euler_boxes( EntityHandle euler_set, Range&
     assert( parcomm != NULL );
 
     // get the position of local vertices, and decide local boxes (allBoxes...)
-    double bmin[3] = { std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max() };
-    double bmax[3] = { -std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(), -std::numeric_limits<double>::max() };
+    double bmin[3] = { std::numeric_limits< double >::max(), std::numeric_limits< double >::max(),
+                       std::numeric_limits< double >::max() };
+    double bmax[3] = { -std::numeric_limits< double >::max(), -std::numeric_limits< double >::max(),
+                       -std::numeric_limits< double >::max() };
 
     std::vector< double > coords( 3 * num_local_verts );
     rval = mb->get_coords( local_verts, &coords[0] );ERRORR( rval, "can't get coords of vertices " );
@@ -999,8 +1000,8 @@ ErrorCode Intx2Mesh::create_departure_mesh_2nd_alg( EntityHandle& euler_set, Ent
         const EntityHandle* conn4;
         int num_nodes;
         rval = mb->get_connectivity( q, conn4, num_nodes );ERRORR( rval, "can't get DP tag values" );
-        CartVect qbmin( std::numeric_limits<double>::max() );
-        CartVect qbmax( -std::numeric_limits<double>::max() );
+        CartVect qbmin( std::numeric_limits< double >::max() );
+        CartVect qbmax( -std::numeric_limits< double >::max() );
         for( int i = 0; i < num_nodes; i++ )
         {
             EntityHandle v = conn4[i];
@@ -1275,8 +1276,8 @@ ErrorCode Intx2Mesh::create_departure_mesh_3rd_alg( EntityHandle& lagr_set, Enti
         const EntityHandle* conn4;
         int num_nodes;
         rval = mb->get_connectivity( q, conn4, num_nodes );ERRORR( rval, "can't get DP tag values" );
-        CartVect qbmin( std::numeric_limits<double>::max() );
-        CartVect qbmax( -std::numeric_limits<double>::max() );
+        CartVect qbmin( std::numeric_limits< double >::max() );
+        CartVect qbmax( -std::numeric_limits< double >::max() );
         for( int i = 0; i < num_nodes; i++ )
         {
             EntityHandle v = conn4[i];

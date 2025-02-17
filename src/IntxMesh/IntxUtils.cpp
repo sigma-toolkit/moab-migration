@@ -2154,30 +2154,32 @@ ErrorCode IntxUtils::remove_padded_vertices( Interface* mb, EntityHandle file_se
     return MB_SUCCESS;
 }
 
-ErrorCode IntxUtils::max_diagonal(Interface* mb, Range cells, int max_edges, double & diagonal)
+ErrorCode IntxUtils::max_diagonal( Interface* mb, Range cells, int max_edges, double& diagonal )
 {
-    diagonal = 0;
-    std::vector<CartVect> coords(max_edges); // maximum number of nodes in a cell? hard coded ?
-    for (auto it=cells.begin(); it!= cells.end(); ++it)
+    diagonal = 0.0;
+    std::vector< CartVect > coords( max_edges );  // maximum number of nodes in a cell? hard coded ?
+    for( auto it = cells.begin(); it != cells.end(); ++it )
     {
         // get the connectivity, then the coordinates
-        EntityHandle cell = *it;
+        EntityHandle cell          = *it;
         const EntityHandle* connec = NULL;
         int num_verts              = 0;
-        ErrorCode rval = mb->get_connectivity( cell, connec, num_verts );MB_CHK_SET_ERR( rval, "Failed to get connectivity" );
-        rval = mb->get_coords(connec, num_verts, &(coords[0][0])); MB_CHK_SET_ERR( rval, "Failed to get coordinates" );
+        MB_CHK_SET_ERR( mb->get_connectivity( cell, connec, num_verts ), "Failed to get connectivity" );
+        MB_CHK_SET_ERR( mb->get_coords( connec, num_verts, &( coords[0][0] ) ), "Failed to get coordinates" );
         // compute the max diagonal, in a double loop
-        for (int i=0; i<num_verts-1; i++)
+        for( int i = 0; i < num_verts - 1; i++ )
         {
-            for (int j=i+1; j<num_verts; j++)
+            for( int j = i + 1; j < num_verts; j++ )
             {
-                double len_sq = (coords[i]-coords[j]).length_squared();
-                if (len_sq > diagonal)
-                    diagonal = len_sq;
+                double len_sq = ( coords[i] - coords[j] ).length_squared();
+                if( len_sq > diagonal ) diagonal = len_sq;
             }
         }
     }
-    diagonal = sqrt(diagonal);
+
+    // return the root of the diagonal
+    diagonal = std::sqrt( diagonal );
     return MB_SUCCESS;
 }
+
 }  // namespace moab

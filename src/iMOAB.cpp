@@ -3457,14 +3457,17 @@ static ErrCode set_aream_from_trivial_distribution( iMOAB_AppID pid, int N, std:
     // lst one (rank = =size-1; endId = na
     // the last cells get the rest
     // construct global ids that correspond to trvArea [, rank *
-    appData& data       = context.appDatas[*pid];
+    appData& data = context.appDatas[*pid];
+    int size = 1, rank = 0;
+#ifdef MOAB_HAVE_MPI
     ParallelComm* pcomm = context.appDatas[*pid].pcomm;
-    const int size      = pcomm->size();
-    const int rank      = pcomm->rank();
+    size                = pcomm->size();
+    rank                = pcomm->rank();
+#endif
 
-    /// the "aream" tag should be created already; error out if not
-    // NOTE: This is a bad assumption
-    // TODO: Fix it.
+    /// The "aream" tag should be created already; error out if not
+    /// NOTE: This is a bad assumption
+    /// TODO: Fix it.
     Tag areaTag;
     MB_CHK_ERR( context.MBI->tag_get_handle( "aream", areaTag ) );
 
@@ -3691,7 +3694,10 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
         context.MBI->tag_get_handle( "aream", 1, MB_TYPE_DOUBLE, areaTag, MB_TAG_DENSE | MB_TAG_EXCL | MB_TAG_CREAT );
     if( MB_ALREADY_ALLOCATED == rval )
     {
-        if( 0 == data_intx.pcomm->rank() ) std::cout << " aream tag already defined \n ";
+#ifdef MOAB_HAVE_MPI
+        if( 0 == data_intx.pcomm->rank() )
+#endif
+            std::cout << " aream tag already defined \n ";
     }
 
     std::vector< double > trvAreaA, trvAreaB;  // passed by reference

@@ -83,6 +83,7 @@ int main( int argc, char** argv )
     int k1 = 0;  // number of exactly the same fields
     std::cout << " compare files: " << file1 << " and " << file2 << " dimension entity: " << dim << "\n";
     std::vector< std::string > same_fields;
+    std::vector< std::string > skipped_fields;
     std::vector<Tag> diffTags;
     for( size_t i = 0; i < list1.size(); i++ )
     {
@@ -99,9 +100,23 @@ int main( int argc, char** argv )
         rval       = mb->tag_get_length( tag, length );MB_CHK_SET_ERR( rval, "can't get tag length" );
         if( 1 != length ) continue;
         Tag tag2;
+        //std::cout <<" tag : " << name << "\n";
         rval = mb2->tag_get_handle( name.c_str(), tag2 );MB_CHK_SET_ERR( rval, "can't get tag on second model" );
-        rval = mb->tag_get_data( tag, cells1, &vals1[0] );MB_CHK_SET_ERR( rval, "can't get values on tag on model 1" );
-        rval = mb2->tag_get_data( tag2, cells2, &vals2[0] );MB_CHK_SET_ERR( rval, "can't get values on tag on model 2" );
+        rval = mb->tag_get_data( tag, cells1, &vals1[0] );
+        if (MB_SUCCESS != rval)
+        {
+            std::cout << " can't get values for tag " << name << " on model 1; skip it in comparison \n";
+            skipped_fields.push_back(name);
+            continue;
+        }
+
+        rval = mb2->tag_get_data( tag2, cells2, &vals2[0] );
+        if (MB_SUCCESS != rval)
+        {
+            std::cout << " can't get values for tag " << name << " on model 2; skip it in comparison \n";
+            skipped_fields.push_back(name);
+        }
+
         double minv1, maxv1, minv2, maxv2;
         if( vals1.size() > 0 )
         {
@@ -174,6 +189,7 @@ int main( int argc, char** argv )
         rval = mb->write_file("diff_tags.h5m", 0, 0, 0, 0, &diffTags[0], diffTags.size() ); MB_CHK_ERR( rval );
     }
     std::cout << " different fields:" << k << " \n exactly the same fields:" << k1 << "\n";
+    std::cout << " number of skipped fields: " << skipped_fields.size() << "\n";
     for( size_t i = 0; i < same_fields.size(); i++ )
     {
         std::cout << " " << same_fields[i];

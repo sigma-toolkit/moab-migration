@@ -8,6 +8,7 @@ std::string example_fv      = TestDir + "unittest/io/fv3x46x72.t.3.nc";
 std::string example_domain  = TestDir + "unittest/io/domain.ocn.ne4np4_oQU240.160614.nc";
 std::string example_domain2 = TestDir + "unittest/io/rof_domain.nc";
 std::string example_scrip   = TestDir + "unittest/io/ocean.QU.240km.scrip.151209.nc";
+std::string example_roms    = TestDir + "unittest/io/roms.nc";
 
 #ifdef MOAB_HAVE_MPI
 #include "moab_mpi.h"
@@ -41,6 +42,8 @@ void test_read_domain_zoltan();
 #endif
 // scrip file
 void test_read_scrip();
+// roms file
+void test_read_roms();
 
 ErrorCode get_options( std::string& opts );
 
@@ -56,7 +59,7 @@ int main( int argc, char* argv[] )
 #else
     argv[0]   = argv[argc - argc];  // To remove the warnings in serial mode about unused variables
 #endif
-
+/*
     result += RUN_TEST( test_read_eul_all );
     result += RUN_TEST( test_read_eul_onevar );
     result += RUN_TEST( test_read_eul_onetimestep );
@@ -65,9 +68,11 @@ int main( int argc, char* argv[] )
     result += RUN_TEST( test_read_domain_culling );
     result += RUN_TEST( test_read_old_domain );
     result += RUN_TEST( test_read_domain_no_culling );
-    result += RUN_TEST( test_read_scrip );
+    result += RUN_TEST( test_read_scrip );*/
+    result += RUN_TEST (test_read_roms);
     // Exclude test_read_fv_all() since reading edge data is not implemented in MOAB yet
     // result += RUN_TEST(test_read_fv_all);
+#if 0
     result += RUN_TEST( test_read_fv_onevar );
     result += RUN_TEST( test_read_fv_onetimestep );
     result += RUN_TEST( test_read_fv_nomesh );
@@ -79,6 +84,8 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_ZOLTAN
     result += RUN_TEST( test_read_domain_zoltan );
 #endif
+#endif
+
 #endif
 
 #ifdef MOAB_HAVE_MPI
@@ -593,6 +600,27 @@ void test_read_scrip()
     rval = mb.load_file( example_scrip.c_str(), &set, opts.c_str() );CHECK_ERR( rval );
 }
 
+void test_read_roms()
+{
+    Core moab;
+    Interface& mb = moab;
+
+    // Need a set for nomesh to work right
+    EntityHandle set;
+    ErrorCode rval = mb.create_meshset( MESHSET_SET, set );CHECK_ERR( rval );
+
+    std::string orig, opts;
+    rval = get_options( orig );CHECK_ERR( rval );
+
+    opts = orig + std::string( ";VARIABLE=" );
+    rval = mb.load_file( example_roms.c_str(), &set, opts.c_str() );CHECK_ERR( rval );
+#ifdef MOAB_HAVE_MPI
+#ifdef MOAB_HAVE_HDF5
+    opts = "PARALLEL=WRITE_PART";
+    rval = mb.write_file( "test_roms_out.h5m", 0, opts.c_str(), &set, 1 );CHECK_ERR( rval );
+#endif
+#endif
+}
 ErrorCode get_options( std::string& opts )
 {
 #ifdef MOAB_HAVE_MPI

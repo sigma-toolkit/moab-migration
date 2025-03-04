@@ -2,6 +2,7 @@
 #include "NCHelperEuler.hpp"
 #include "NCHelperFV.hpp"
 #include "NCHelperDomain.hpp"
+#include "NCHelperROMS.hpp"
 #include "NCHelperScrip.hpp"
 #include "NCHelperHOMME.hpp"
 #include "NCHelperMPAS.hpp"
@@ -58,7 +59,9 @@ ReadNC::NCFormatType NCHelper::get_nc_format( ReadNC* readNC, int fileId )
         return ReadNC::NC_FORMAT_GCRM;
     else if( NCHelperFV::can_read_file( readNC, fileId ) && is_CF )
         return ReadNC::NC_FORMAT_FV;
-    else  // Unknown NetCDF grid (will fill this in later for POP, CICE and CLM)
+    else  if( NCHelperROMS::can_read_file( readNC, fileId ) ) // && is_CF )
+        return ReadNC::NC_FORMAT_ROMS;
+    else // Unknown NetCDF grid (will fill this in later for POP, CICE and CLM)
         return ReadNC::NC_FORMAT_UNKNOWN_TYPE;
 }
 
@@ -81,6 +84,7 @@ std::string NCHelper::get_default_ncformat_options( ReadNC::NCFormatType format 
             return "PARALLEL=READ_PART;PARTITION_METHOD=TRIVIAL;PARALLEL_RESOLVE_SHARED_ENTS;";
         case moab::ReadNC::NC_FORMAT_EULER:  // Euler format reader
         case moab::ReadNC::NC_FORMAT_FV:     // FV climate format reader
+        case moab::ReadNC::NC_FORMAT_ROMS:     // FV climate format reader
             return "PARALLEL=READ_PART;PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;"
                    "PARTITION_METHOD=SQIJ;VARIABLE=;";
         default:
@@ -112,6 +116,9 @@ NCHelper* NCHelper::get_nc_helper( ReadNC* readNC, int fileId, const FileOptions
             return new( std::nothrow ) NCHelperEuler( readNC, fileId, opts, fileSet );
         case ReadNC::NC_FORMAT_FV:  // FV climate format reader
             return new( std::nothrow ) NCHelperFV( readNC, fileId, opts, fileSet );
+        case ReadNC::NC_FORMAT_ROMS:  // FV climate format reader
+            return new( std::nothrow ) NCHelperROMS( readNC, fileId, opts, fileSet );
+
         default:  // Unknown NetCDF grid (will fill this in later for POP, CICE and CLM)
             return nullptr;
     }

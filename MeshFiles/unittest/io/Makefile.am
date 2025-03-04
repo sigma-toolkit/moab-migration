@@ -47,4 +47,5 @@ EXTRA_DIST = HommeMapping.nc \
              rtttest_v100.rtt \
              rtttest_v101.rtt \
              test.obj \
-             shuttle.obj
+             shuttle.obj \
+	     roms.nc

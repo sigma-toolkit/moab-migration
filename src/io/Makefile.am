@@ -24,6 +24,7 @@ if HAVE_NETCDF
                      NCHelperEuler.cpp NCHelperEuler.hpp \
                      NCHelperFV.cpp NCHelperFV.hpp \
                      NCHelperDomain.cpp NCHelperDomain.hpp \
+                     NCHelperROMS.cpp NCHelperROMS.hpp \
                      NCHelperESMF.cpp NCHelperESMF.hpp \
                      NCHelperScrip.hpp    NCHelperScrip.cpp \
                      NCHelperHOMME.cpp NCHelperHOMME.hpp \

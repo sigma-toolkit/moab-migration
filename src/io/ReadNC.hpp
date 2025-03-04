@@ -67,6 +67,7 @@ class ReadNC : public ReaderIface
     friend class NCHelperEuler;
     friend class NCHelperFV;
     friend class NCHelperDomain;
+    friend class NCHelperROMS;
     friend class NCHelperScrip;
     friend class NCHelperHOMME;
     friend class NCHelperMPAS;
@@ -86,7 +87,8 @@ class ReadNC : public ReaderIface
         NC_FORMAT_HOMME        = 5,
         NC_FORMAT_GCRM         = 6,
         NC_FORMAT_EULER        = 7,
-        NC_FORMAT_FV           = 8
+        NC_FORMAT_FV           = 8,
+        NC_FORMAT_ROMS         = 9
     };
 
     //! Load an NC file

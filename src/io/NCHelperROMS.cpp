@@ -65,7 +65,7 @@ ErrorCode NCHelperROMS::init_mesh_vals()
     }
     iDim     = idx;
     gDims[0] = 0;
-    gDims[3] = dimLens[idx];
+    gDims[3] = dimLens[idx]-1;
 
     // Then j
     if( ( vit = std::find( dimNames.begin(), dimNames.end(), "eta_vert" ) ) != dimNames.end() )
@@ -79,7 +79,7 @@ ErrorCode NCHelperROMS::init_mesh_vals()
     }
     jDim     = idx;
     gDims[1] = 0;
-    gDims[4] = dimLens[idx];  // Add 2 for the pole points ? not needed
+    gDims[4] = dimLens[idx]-1;  // Add 2 for the pole points ? not needed
 
     if (iDim >= 0 and jDim >= 0)
         vertices_exist = true;
@@ -97,7 +97,7 @@ ErrorCode NCHelperROMS::init_mesh_vals()
     }
     iCDim     = idx;
     gCDims[0] = 0;
-    gCDims[3] = dimLens[idx];
+    gCDims[3] = dimLens[idx]-1;
 
     // Then j
     if( ( vit = std::find( dimNames.begin(), dimNames.end(), "eta_rho" ) ) != dimNames.end() )
@@ -111,7 +111,7 @@ ErrorCode NCHelperROMS::init_mesh_vals()
     }
     jCDim     = idx;
     gCDims[1] = 0;
-    gCDims[4] = dimLens[idx];  // Add 2 for the pole points ? not needed
+    gCDims[4] = dimLens[idx]-1;  // Add 2 for the pole points ? not needed
 
     // Parse options to get subset
     int rank = 0, procs = 1;
@@ -126,7 +126,7 @@ ErrorCode NCHelperROMS::init_mesh_vals()
     if( procs > 1 )
     {
         for( int i = 0; i < 6; i++ )
-            parData.gDims[i] = gDims[i];
+            parData.gDims[i] = gCDims[i];
         parData.partMethod = partMethod;
         int pdims[3];
 
@@ -144,18 +144,18 @@ ErrorCode NCHelperROMS::init_mesh_vals()
     else
     {
         for( int i = 0; i < 6; i++ )
-            lDims[i] = gDims[i];
+            lDims[i] = gCDims[i];
         locallyPeriodic[0] = globallyPeriodic[0];
     }
 
     // Now get actual coordinate values for vertices and cell centers
     lCDims[0] = lDims[0];
 
-    lCDims[3] = lDims[3] - 1; // one less for centers
+    lCDims[3] = lDims[3] ; //
 
     // will always be non-periodic
     lCDims[1] = lDims[1];
-    lCDims[4] = lDims[4] - 1;
+    lCDims[4] = lDims[4] ;
 
 
     dbgOut.tprintf( 1, "I=%d-%d, J=%d-%d\n", lDims[0], lDims[3], lDims[1], lDims[4] );
@@ -244,7 +244,7 @@ ErrorCode NCHelperROMS::create_mesh( Range& faces )
 
     int local_elems = ( lCDims[4] - lCDims[1] ) * ( lCDims[3] - lCDims[0] );
     dbgOut.tprintf( 1, "local cells: %d \n", local_elems );
-    int local_vertices = ( lDims[4] - lDims[1] ) * ( lDims[3] - lDims[0] );
+    int local_vertices = ( lDims[4] - lDims[1] +1) * ( lDims[3] - lDims[0] +1);
     dbgOut.tprintf( 1, "local vertices: %d \n", local_vertices );
 
 
@@ -264,7 +264,7 @@ ErrorCode NCHelperROMS::create_mesh( Range& faces )
 
     std::vector< int > gids( local_elems );
     int elem_index      = 0;
-    int global_row_size = gCDims[3] - gCDims[0];  // this is along first dimension in global decomposition
+    int global_row_size = gCDims[3] - gCDims[0]+1;  // this is along first dimension in global decomposition
     // create global id array for cells, for all cells, including those with 0 mask; which will be not used eventually
     for( int j = lCDims[1]; j < lCDims[4]; j++ )
         for( int i = lCDims[0]; i < lCDims[3]; i++ )
@@ -274,7 +274,7 @@ ErrorCode NCHelperROMS::create_mesh( Range& faces )
         }
     std::vector< int > gidv( local_vertices );
     int vertex_index      = 0;
-    int global_row_size_vert = gCDims[3] - gCDims[0]+1;  // this is along first dimension in global decomposition
+    int global_row_size_vert = gCDims[3] - gCDims[0]+2;  // this is along first dimension in global decomposition
     // create global id array for vertices
     for( int j = lDims[1]; j < lDims[4]; j++ )
         for( int i = lDims[0]; i < lDims[3]; i++ )

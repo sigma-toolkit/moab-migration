@@ -242,9 +242,9 @@ ErrorCode NCHelperROMS::create_mesh( Range& faces )
     ErrorCode rval;
     int success = 0;
 
-    int local_elems = ( lCDims[4] - lCDims[1] ) * ( lCDims[3] - lCDims[0] );
+    int local_elems = ( lCDims[4] - lCDims[1] +1) * ( lCDims[3] - lCDims[0] +1 );
     dbgOut.tprintf( 1, "local cells: %d \n", local_elems );
-    int local_vertices = ( lDims[4] - lDims[1] +1) * ( lDims[3] - lDims[0] +1);
+    int local_vertices = ( lCDims[4] - lCDims[1] +2) * ( lCDims[3] - lCDims[0] +2);
     dbgOut.tprintf( 1, "local vertices: %d \n", local_vertices );
 
 
@@ -256,8 +256,8 @@ ErrorCode NCHelperROMS::create_mesh( Range& faces )
     // mask is (nj, ni)
     vmask.readStarts.push_back( lCDims[1] );
     vmask.readStarts.push_back( lCDims[0] );
-    vmask.readCounts.push_back( lCDims[4] - lCDims[1] );
-    vmask.readCounts.push_back( lCDims[3] - lCDims[0] );
+    vmask.readCounts.push_back( lCDims[4] - lCDims[1] +1);
+    vmask.readCounts.push_back( lCDims[3] - lCDims[0] +1);
     std::vector< double > mask( local_elems );
     success = NCFUNCAG( _vara_double )( _fileId, vmask.varId, &vmask.readStarts[0], &vmask.readCounts[0], &mask[0] );
     if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read int data for mask_rho variable " );
@@ -266,8 +266,8 @@ ErrorCode NCHelperROMS::create_mesh( Range& faces )
     int elem_index      = 0;
     int global_row_size = gCDims[3] - gCDims[0]+1;  // this is along first dimension in global decomposition
     // create global id array for cells, for all cells, including those with 0 mask; which will be not used eventually
-    for( int j = lCDims[1]; j < lCDims[4]; j++ )
-        for( int i = lCDims[0]; i < lCDims[3]; i++ )
+    for( int j = lCDims[1]; j <= lCDims[4]; j++ )
+        for( int i = lCDims[0]; i <= lCDims[3]; i++ )
         {
             gids[elem_index] = j * global_row_size + i + 1;
             elem_index++;
@@ -276,8 +276,8 @@ ErrorCode NCHelperROMS::create_mesh( Range& faces )
     int vertex_index      = 0;
     int global_row_size_vert = gCDims[3] - gCDims[0]+2;  // this is along first dimension in global decomposition
     // create global id array for vertices
-    for( int j = lDims[1]; j < lDims[4]; j++ )
-        for( int i = lDims[0]; i < lDims[3]; i++ )
+    for( int j = lCDims[1]; j <= lCDims[4] + 1; j++ )
+        for( int i = lCDims[0]; i <= lCDims[3] + 1; i++ )
         {
             gidv[vertex_index] = j * global_row_size_vert + i + 1;
             vertex_index++;
@@ -353,6 +353,7 @@ ErrorCode NCHelperROMS::create_mesh( Range& faces )
         if( 1 == mask[i] ) nb_with_mask1++;
     dbgOut.tprintf( 1, "local cells with mask 1: %d \n", nb_with_mask1 );
 
+
     EntityHandle* conn_arr;
     EntityHandle vtx_handle;
     Range tmp_range;
@@ -372,12 +373,12 @@ ErrorCode NCHelperROMS::create_mesh( Range& faces )
 
 
     // quad cells , explicit connectivity
-    int row_cell = lCDims[3] - lCDims[0];
+    int row_cell = lCDims[3] - lCDims[0] + 1;
     int row_vert = row_cell + 1;
-    for (int j=lCDims[1]; j< lCDims[4]; j++)
+    for (int j=lCDims[1]; j<= lCDims[4]; j++)
     {
         int j1 = j - lCDims[1];
-        for (int i = lCDims[0]; i< lCDims[3]; i++)
+        for (int i = lCDims[0]; i<= lCDims[3]; i++)
         {
             int i1 = i - lCDims[0];
             int index_cells = j1* row_cell + i1;
@@ -394,10 +395,17 @@ ErrorCode NCHelperROMS::create_mesh( Range& faces )
 
     rval = _readNC->mbImpl->tag_set_data(mGlobalIdTag, local_cells, &gids[0]); MB_CHK_SET_ERR( rval, "Failed to set vertices global id" );
 
-    Tag mask_tag;
-    rval = _readNC->mbImpl->tag_get_handle("maskd", 1, MB_TYPE_DOUBLE, mask_tag,
-            MB_TAG_DENSE | MB_TAG_EXCL | MB_TAG_CREAT ); MB_CHK_SET_ERR( rval, "Failed to create mask tag" );
-    rval = _readNC->mbImpl->tag_set_data(mask_tag, local_cells, &mask[0]); MB_CHK_SET_ERR( rval, "Failed to set cells masks " );
+    // create the GRID_IMASK tag, used by mbtempest later
+    int def_val = 1;
+    Tag maskTag;
+    rval =_readNC->mbImpl->tag_get_handle( "GRID_IMASK", 1, MB_TYPE_INTEGER, maskTag, MB_TAG_DENSE | MB_TAG_CREAT, &def_val );MB_CHK_SET_ERR( rval, "Trouble creating GRID_IMASK tag" );
+
+    // convert the double values to integer, for masks
+    std::vector<int> imask(mask.size());
+    for (size_t k=0; k<mask.size(); k++)
+        imask[k] = static_cast<int>( mask[k]);
+
+    rval = _readNC->mbImpl->tag_set_data(maskTag, local_cells, &imask[0]); MB_CHK_SET_ERR( rval, "Failed to set cells masks " );
     std::stringstream local_file_name;
     local_file_name << "roms_task." << procs <<"."<< rank <<".h5m";
     rval = _readNC->mbImpl->write_file(local_file_name.str().c_str(), NULL, "", &_fileSet, 1); MB_CHK_SET_ERR( rval, "Failed to write local file" );

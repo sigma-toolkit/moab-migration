@@ -287,7 +287,8 @@ ErrorCode ParCommGraph::send_graph( MPI_Comm jcomm )
         // do not send the size in advance, because we use probe now
         /*ierr = MPI_Isend(&comm_graph[0], 1, MPI_INT, receiver(0), 10, jcomm, &sendReqs[0]); // we
         have to use global communicator if (ierr!=0) return MB_FAILURE;*/
-        ierr = MPI_Isend( &comm_graph[1], size_pack_array, MPI_INT, receiver( 0 ), 20, jcomm,
+        int  mtag = compid2;
+        ierr = MPI_Isend( &comm_graph[1], size_pack_array, MPI_INT, receiver( 0 ), mtag, jcomm,
                           &sendReqs[0] );  // we have to use global communicator
         if( ierr != 0 ) return MB_FAILURE;
     }
@@ -308,7 +309,7 @@ ErrorCode ParCommGraph::send_mesh_parts( MPI_Comm jcomm, ParallelComm* pco, Rang
         corr_tasks = sender_graph[senderTasks[rankInGroup1]];  // copy
         corr_sizes = sender_sizes[senderTasks[rankInGroup1]];  // another copy
     }
-
+    int  mtag = compid2;
     int indexReq = 0;
     int ierr;                             // MPI error
     if( is_root_sender() ) indexReq = 1;  // for sendReqs
@@ -344,7 +345,7 @@ ErrorCode ParCommGraph::send_mesh_parts( MPI_Comm jcomm, ParallelComm* pco, Rang
          &sendReqs[indexReq]); // we have to use global communicator if (ierr!=0) return MB_FAILURE;
          indexReq++;*/
 
-        ierr = MPI_Isend( buffer->mem_ptr, size_pack, MPI_UNSIGNED_CHAR, receiver_proc, 2, jcomm,
+        ierr = MPI_Isend( buffer->mem_ptr, size_pack, MPI_UNSIGNED_CHAR, receiver_proc, mtag, jcomm,
                           &sendReqs[indexReq] );  // we have to use global communicator
         if( ierr != 0 ) return MB_FAILURE;
         indexReq++;
@@ -371,7 +372,8 @@ ErrorCode ParCommGraph::receive_comm_graph( MPI_Comm jcomm, ParallelComm* pco, s
         MPI_Status* status)
          *
          */
-        ierr = MPI_Probe( sender( 0 ), 20, jcomm, &status );
+        int  mtag = compid2;
+        ierr = MPI_Probe( sender( 0 ), mtag, jcomm, &status );
         if( 0 != ierr )
         {
             std::cout << " MPI_Probe failure: " << ierr << "\n";
@@ -388,7 +390,7 @@ ErrorCode ParCommGraph::receive_comm_graph( MPI_Comm jcomm, ParallelComm* pco, s
         std::cout << " receive comm graph size: " << size_pack_array << "\n";
 #endif
         pack_array.resize( size_pack_array );
-        ierr = MPI_Recv( &pack_array[0], size_pack_array, MPI_INT, sender( 0 ), 20, jcomm, &status );
+        ierr = MPI_Recv( &pack_array[0], size_pack_array, MPI_INT, sender( 0 ), mtag, jcomm, &status );
         if( 0 != ierr ) return MB_FAILURE;
 #ifdef VERBOSE
         std::cout << " receive comm graph ";
@@ -426,6 +428,7 @@ ErrorCode ParCommGraph::receive_mesh( MPI_Comm jcomm,
     int defaultInt = -1;  // no processor, so it was not migrated from somewhere else
     rval           = pco->get_moab()->tag_get_handle( "orig_sending_processor", 1, MB_TYPE_INTEGER, orgSendProcTag,
                                                       MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );MB_CHK_SET_ERR( rval, "can't create original sending processor tag" );
+    int  mtag = compid2;
     if( !senders_local.empty() )
     {
         for( size_t k = 0; k < senders_local.size(); k++ )
@@ -440,7 +443,7 @@ ErrorCode ParCommGraph::receive_mesh( MPI_Comm jcomm,
                 MPI_Status* status)
                  *
                  */
-            ierr = MPI_Probe( sender1, 2, jcomm, &status );
+            ierr = MPI_Probe( sender1, mtag, jcomm, &status );
             if( 0 != ierr )
             {
                 std::cout << " MPI_Probe failure in ParCommGraph::receive_mesh " << ierr << "\n";
@@ -461,7 +464,7 @@ ErrorCode ParCommGraph::receive_mesh( MPI_Comm jcomm,
             ParallelComm::Buffer* buffer = new ParallelComm::Buffer( size_pack );
             // buffer->reserve(size_pack);
 
-            ierr = MPI_Recv( buffer->mem_ptr, size_pack, MPI_UNSIGNED_CHAR, sender1, 2, jcomm, &status );
+            ierr = MPI_Recv( buffer->mem_ptr, size_pack, MPI_UNSIGNED_CHAR, sender1, mtag, jcomm, &status );
             if( 0 != ierr )
             {
                 std::cout << " MPI_Recv failure in ParCommGraph::receive_mesh " << ierr << "\n";
@@ -609,6 +612,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
 #endif
     }
 
+    int  mtag = compid1 + compid2; // used as mpi tag to differentiate a little the messages
     int indexReq = 0;
     if( graph_type == INITIAL_MIGRATE )  // original send
     {
@@ -634,7 +638,8 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
             }
             *( (int*)buffer->mem_ptr ) = size_buffer;
             // int size_pack = buffer->get_current_size(); // debug check
-            ierr = MPI_Isend( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, receiver_proc, 222, jcomm,
+
+            ierr = MPI_Isend( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, receiver_proc, mtag, jcomm,
                               &sendReqs[indexReq] );  // we have to use global communicator
             if( ierr != 0 ) return MB_FAILURE;
             indexReq++;
@@ -711,7 +716,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
 #endif
             *( (int*)buffer->mem_ptr ) = size_buffer;
             // int size_pack = buffer->get_current_size(); // debug check
-            ierr = MPI_Isend( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, receiver_proc, 222, jcomm,
+            ierr = MPI_Isend( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, receiver_proc, mtag, jcomm,
                               &sendReqs[indexReq] );  // we have to use global communicator
             if( ierr != 0 ) return MB_FAILURE;
             indexReq++;
@@ -768,7 +773,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
             };
             *( (int*)buffer->mem_ptr ) = size_buffer;
             // int size_pack = buffer->get_current_size(); // debug check
-            ierr = MPI_Isend( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, receiver_proc, 222, jcomm,
+            ierr = MPI_Isend( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, receiver_proc, mtag, jcomm,
                               &sendReqs[indexReq] );  // we have to use global communicator
             if( ierr != 0 ) return MB_FAILURE;
             indexReq++;
@@ -810,6 +815,8 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
 #endif
     }
 
+    int  mtag = compid1 + compid2;
+
     if( graph_type == INITIAL_MIGRATE )
     {
         // std::map<int, Range> split_ranges;
@@ -829,7 +836,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
             *( (int*)buffer->mem_ptr ) = size_buffer;
             // int size_pack = buffer->get_current_size(); // debug check
 
-            ierr = MPI_Recv( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, sender_proc, 222, jcomm, &status );
+            ierr = MPI_Recv( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, sender_proc, mtag, jcomm, &status );
             if( ierr != 0 ) return MB_FAILURE;
             // now set the tag
             // copy to tag
@@ -872,7 +879,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
             *( (int*)buffer->mem_ptr ) = size_buffer;  // this is really not necessary, it should receive this too
 
             // receive the buffer
-            ierr = MPI_Recv( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, sender_proc, 222, jcomm, &status );
+            ierr = MPI_Recv( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, sender_proc, mtag, jcomm, &status );
             if( ierr != 0 ) return MB_FAILURE;
 // start copy
 #ifdef VERBOSE
@@ -955,7 +962,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
             buffer->reset_ptr( sizeof( int ) );
 
             // receive the buffer
-            ierr = MPI_Recv( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, sender_proc, 222, jcomm, &status );
+            ierr = MPI_Recv( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, sender_proc, mtag, jcomm, &status );
             if( ierr != 0 ) return MB_FAILURE;
             // use the values in buffer to populate valuesTag arrays, fill it up!
             int j = 0;

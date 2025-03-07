@@ -126,7 +126,7 @@ ErrorCode NCHelperROMS::init_mesh_vals()
     if( procs > 1 )
     {
         for( int i = 0; i < 6; i++ )
-            parData.gDims[i] = gCDims[i];
+            parData.gDims[i] = gDims[i];
         parData.partMethod = partMethod;
         int pdims[3];
 
@@ -144,18 +144,18 @@ ErrorCode NCHelperROMS::init_mesh_vals()
     else
     {
         for( int i = 0; i < 6; i++ )
-            lDims[i] = gCDims[i];
+            lDims[i] = gDims[i];
         locallyPeriodic[0] = globallyPeriodic[0];
     }
 
     // Now get actual coordinate values for vertices and cell centers
     lCDims[0] = lDims[0];
 
-    lCDims[3] = lDims[3] ; //
+    lCDims[3] = lDims[3]-1 ; //
 
     // will always be non-periodic
     lCDims[1] = lDims[1];
-    lCDims[4] = lDims[4] ;
+    lCDims[4] = lDims[4]-1 ;
 
 
     dbgOut.tprintf( 1, "I=%d-%d, J=%d-%d\n", lDims[0], lDims[3], lDims[1], lDims[4] );
@@ -242,7 +242,7 @@ ErrorCode NCHelperROMS::create_mesh( Range& faces )
     ErrorCode rval;
     int success = 0;
 
-    int local_elems = ( lCDims[4] - lCDims[1] +1) * ( lCDims[3] - lCDims[0] +1 );
+    int local_elems = ( lCDims[4] - lCDims[1] + 1) * ( lCDims[3] - lCDims[0] +1  );
     dbgOut.tprintf( 1, "local cells: %d \n", local_elems );
     int local_vertices = ( lCDims[4] - lCDims[1] +2) * ( lCDims[3] - lCDims[0] +2);
     dbgOut.tprintf( 1, "local vertices: %d \n", local_vertices );
@@ -406,11 +406,12 @@ ErrorCode NCHelperROMS::create_mesh( Range& faces )
         imask[k] = static_cast<int>( mask[k]);
 
     rval = _readNC->mbImpl->tag_set_data(maskTag, local_cells, &imask[0]); MB_CHK_SET_ERR( rval, "Failed to set cells masks " );
+#ifdef VERBOSE
     std::stringstream local_file_name;
     local_file_name << "roms_task." << procs <<"."<< rank <<".h5m";
     rval = _readNC->mbImpl->write_file(local_file_name.str().c_str(), NULL, "", &_fileSet, 1); MB_CHK_SET_ERR( rval, "Failed to write local file" );
 
-
+#endif
 
 #ifdef MOAB_HAVE_MPI
     if( isParallel )

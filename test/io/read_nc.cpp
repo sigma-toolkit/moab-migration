@@ -59,7 +59,7 @@ int main( int argc, char* argv[] )
 #else
     argv[0]   = argv[argc - argc];  // To remove the warnings in serial mode about unused variables
 #endif
-/*
+
     result += RUN_TEST( test_read_eul_all );
     result += RUN_TEST( test_read_eul_onevar );
     result += RUN_TEST( test_read_eul_onetimestep );
@@ -68,11 +68,11 @@ int main( int argc, char* argv[] )
     result += RUN_TEST( test_read_domain_culling );
     result += RUN_TEST( test_read_old_domain );
     result += RUN_TEST( test_read_domain_no_culling );
-    result += RUN_TEST( test_read_scrip );*/
+    result += RUN_TEST( test_read_scrip );
     result += RUN_TEST (test_read_roms);
     // Exclude test_read_fv_all() since reading edge data is not implemented in MOAB yet
     // result += RUN_TEST(test_read_fv_all);
-#if 0
+
     result += RUN_TEST( test_read_fv_onevar );
     result += RUN_TEST( test_read_fv_onetimestep );
     result += RUN_TEST( test_read_fv_nomesh );
@@ -84,7 +84,7 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_ZOLTAN
     result += RUN_TEST( test_read_domain_zoltan );
 #endif
-#endif
+
 
 #endif
 

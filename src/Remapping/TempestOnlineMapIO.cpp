@@ -1403,16 +1403,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         // the default trivial partitioning scheme
         int nDofs = nB;  // this is for row partitioning
 
-        // assert(row_major_ownership == true); // this block is valid only for row-based partitioning
-        ownership.resize( size );
         int nPerPart   = nDofs / size;
-        int nRemainder = nDofs % size;  // Keep the remainder in root
-        ownership[0]   = nPerPart + nRemainder;
-        for( int ip = 1, roffset = ownership[0]; ip < size; ++ip )
-        {
-            roffset += nPerPart;
-            ownership[ip] = roffset;
-        }
         moab::TupleList* tl = new moab::TupleList;
         unsigned numr       = 1;                     //
         tl->initialize( 3, 0, 0, numr, localSize );  // to proc, row, col, value
@@ -1423,21 +1414,10 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             int rowval  = vecRow[i] - 1;  // dofs are 1 based in the file
             int colval  = vecCol[i] - 1;
             int to_proc = -1;
-            int dof_val = rowval;
 
-            if( ownership[0] > dof_val )
-                to_proc = 0;
-            else
-            {
-                for( int ip = 1; ip < size; ++ip )
-                {
-                    if( ownership[ip - 1] <= dof_val && ownership[ip] > dof_val )
-                    {
-                        to_proc = ip;
-                        break;
-                    }
-                }
-            }
+            to_proc = rowval/nPerPart;
+            if (to_proc == size)
+                to_proc = size - 1;
 
             int n                = tl->get_n();
             tl->vi_wr[3 * n]     = to_proc;
@@ -1461,20 +1441,9 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             {
                 int to_proc = -1;
                 int dof_val = owned_dof_ids[i] - 1;  // dofs are 1 based in the file, partition from 0 ?
-
-                if( ownership[0] > dof_val )
-                    to_proc = 0;
-                else
-                {
-                    for( int ip = 1; ip < size; ++ip )
-                    {
-                        if( ownership[ip - 1] <= dof_val && ownership[ip] > dof_val )
-                        {
-                            to_proc = ip;
-                            break;
-                        }
-                    }
-                }
+                to_proc = dof_val/nPerPart;
+                if (to_proc == size)
+                    to_proc = size - 1;
 
                 int n                  = tl_re.get_n();
                 tl_re.vi_wr[2 * n]     = to_proc;
@@ -1492,24 +1461,27 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
 
             std::map< int, int > startDofIndex, endDofIndex;  // indices in tl_re for values we want
             int dofVal = -1;
-            if( tl_re.get_n() > 0 ) dofVal = tl_re.vi_rd[1];  // first dof val on this rank
-            startDofIndex[dofVal] = 0;
-            endDofIndex[dofVal]   = 0;  // start and end
-            for( unsigned k = 1; k < tl_re.get_n(); k++ )
+            if( tl_re.get_n() > 0 )
             {
-                int newDof = tl_re.vi_rd[2 * k + 1];
-                if( dofVal == newDof )
+                dofVal = tl_re.vi_rd[1];  // first dof val on this rank
+
+                startDofIndex[dofVal] = 0;
+                endDofIndex[dofVal]   = 0;  // start and end
+                for( unsigned k = 1; k < tl_re.get_n(); k++ )
                 {
-                    endDofIndex[dofVal] = k;  // increment by 1 actually
-                }
-                else
-                {
-                    dofVal                = newDof;
-                    startDofIndex[dofVal] = k;
-                    endDofIndex[dofVal]   = k;
+                    int newDof = tl_re.vi_rd[2 * k + 1];
+                    if( dofVal == newDof )
+                    {
+                        endDofIndex[dofVal] = k;  // increment by 1 actually
+                    }
+                    else
+                    {
+                        dofVal                = newDof;
+                        startDofIndex[dofVal] = k;
+                        endDofIndex[dofVal]   = k;
+                    }
                 }
             }
-
             // basically, for each value we are interested in, index in tl_re with those values are
             // tl_re.vi_rd[2*startDofIndex+1] == valDof == tl_re.vi_rd[2*endDofIndex+1]
             // so now we have ordered

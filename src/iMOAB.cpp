@@ -3767,8 +3767,6 @@ ErrCode iMOAB_WriteMappingWeightsToFile(
     attrMap["normalization"] = "ovarea";
     attrMap["map_aPb"]       = filename;
 
-    std::cout << "Found metadata: " << metadataStr << std::endl;
-
     // const std::string delim = ";";
     // size_t pos = 0, index = 0;
     // std::vector< std::string > stringAttr( 3 );

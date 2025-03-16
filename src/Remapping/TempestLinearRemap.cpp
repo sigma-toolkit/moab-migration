@@ -859,14 +859,26 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyBoundsLimiting( std::ve
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Kahan summation for improved numerical accuracy
-static inline void kahanSum( double& sum, double value, double& correction )
+
+// ** Kahan Summation Algorithm for improved numerical accuracy **
+struct KahanSum
 {
-    double y   = value - correction;  // Correct the input
-    double t   = sum + y;             // Perform the sum
-    correction = ( t - sum ) - y;     // Update correction
-    sum        = t;                   // Store the new sum
-}
+    double sum        = 0.0;
+    double correction = 0.0;
+
+    void add( double value )
+    {
+        double y   = value - correction;  // Correct the input
+        double t   = sum + y;             // Perform the sum
+        correction = ( t - sum ) - y;     // Update correction
+        sum        = t;                   // Store the new sum
+    }
+
+    double result() const
+    {
+        return sum;
+    }
+};
 
 // Pairwise summation helper function
 inline double pairwiseSum( const std::set< double >& sorted )
@@ -876,13 +888,23 @@ inline double pairwiseSum( const std::set< double >& sorted )
 
     // Accumulate pairwise to minimize rounding error
     double sum = 0.0;
-    double correction = 0.0;
     for( double val : sorted )
-    {
-        // sum += val;
-        kahanSum( sum, val, correction );
-    }
+        sum += val;
     return sum;
+}
+
+// Pairwise summation helper function
+inline double pairwiseKahanSum( const std::set< double >& sorted )
+{
+    if( sorted.empty() ) return 0.0;
+    if( sorted.size() == 1 ) return *sorted.begin();
+
+    // Accumulate pairwise to minimize rounding error
+    // Apply pairwise summation with Kahan correction
+    KahanSum kahan;
+    for( double val : sorted )
+        kahan.add( val );
+    return kahan.result();
 }
 
 // Sparse matrix-vector multiplication using pairwise summation
@@ -900,10 +922,11 @@ static void deterministicSparseMatVecMul( const typename moab::TempestOnlineMap:
         {
             accumulators.insert( it.value() * x( it.col() ) );
         }
-        result( row ) = pairwiseSum( accumulators );
+        // result( row ) = pairwiseSum( accumulators );
+        result( row ) = pairwiseKahanSum( accumulators );
     }
 }
-
+//
 // Perform a deterministic sparse matrix-vector multiplication
 static void deterministicSparseMatVecMulKahan( const typename moab::TempestOnlineMap::WeightMatrix& A,
                                           const typename moab::TempestOnlineMap::WeightColVector& x,
@@ -914,12 +937,14 @@ static void deterministicSparseMatVecMulKahan( const typename moab::TempestOnlin
     // Iterate row-wise to enforce a fixed summation order
     for( int row = 0; row < A.outerSize(); ++row )
     {
+        KahanSum kahan;
         for( typename moab::TempestOnlineMap::WeightMatrix::InnerIterator it( A, row ); it; ++it )
         {
-            double correction = 0.0;                              // Correction term for Kahan summation
             double product    = it.value() * x( it.col() );       // Compute product
-            kahanSum( result( it.row() ), product, correction );  // Accumulate using Kahan summation
+            kahan.add( product );
         }
+
+        result( row ) = kahan.result();
     }
 }
 
@@ -939,6 +964,13 @@ static void deterministicSparseMatVecMulClean( const typename moab::TempestOnlin
             result( it.row() ) += product;
         }
     }
+}
+
+static void deterministicSparseMatVecMulNative( const typename moab::TempestOnlineMap::WeightMatrix& A,
+                                               const typename moab::TempestOnlineMap::WeightColVector& x,
+                                               typename moab::TempestOnlineMap::WeightRowVector& result )
+{
+    result = A * x; // Perform the matrix-vector multiplication using Eigen3
 }
 
 // Deterministic sparse matrix-vector multiplication with A^T * x using pairwise summation
@@ -963,13 +995,15 @@ static void deterministicSparseMatTransposeVecMul( const typename moab::TempestO
     // Compute final sum using pairwise summation for each entry
     for( int col = 0; col < A.cols(); ++col )
     {
-        result( col ) = pairwiseSum( accumulators[col] );
+        // result( col ) = pairwiseSum( accumulators[col] );
+        result( col ) = pairwiseKahanSum( accumulators[col] );
     }
 }
 
-static void deterministicSparseMatTransposeVecMulKahan( const typename moab::TempestOnlineMap::WeightMatrix& A,
-                                                   const typename moab::TempestOnlineMap::WeightRowVector& x,
-                                                   typename moab::TempestOnlineMap::WeightColVector& result )
+// Perform a deterministic sparse matrix-vector multiplication
+static void deterministicSparseMatTransposeVecMulClean( const typename moab::TempestOnlineMap::WeightMatrix& A,
+                                                        const typename moab::TempestOnlineMap::WeightRowVector& x,
+                                                        typename moab::TempestOnlineMap::WeightColVector& result )
 {
     result.setZero();  // Ensure no uninitialized memory issues
 
@@ -978,11 +1012,18 @@ static void deterministicSparseMatTransposeVecMulKahan( const typename moab::Tem
     {
         for( typename moab::TempestOnlineMap::WeightMatrix::InnerIterator it( A, row ); it; ++it )
         {
-            double correction = 0.0;                              // Correction term for Kahan summation
-            double product    = it.value() * x( row );            // Compute product
-            kahanSum( result( it.col() ), product, correction );  // Accumulate using Kahan summation
+            const double product = it.value() * x( row );         // Compute product
+            result( it.col() ) += product;                // Accumulate contributions to the corresponding row in A^T
         }
     }
+}
+
+// Perform a deterministic sparse matrix-vector multiplication
+static void deterministicSparseMatTransposeVecMulNative( const typename moab::TempestOnlineMap::WeightMatrix& A,
+                                                        const typename moab::TempestOnlineMap::WeightRowVector& x,
+                                                        typename moab::TempestOnlineMap::WeightColVector& result )
+{
+    result = A.adjoint() * x;  // Perform the adjoint.matrix-vector multiplication using Eigen3
 }
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -993,7 +1034,6 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
     // Reset the source and target data first
     m_rowVector.setZero();
     m_colVector.setZero();
-#define VERBOSE
 #ifdef VERBOSE
     std::stringstream sstr;
     static int callId = 0;
@@ -1012,8 +1052,9 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
                 m_rowVector( row_dtoc_dofmap[i] ) = srcVals[i];  // permute and set the row (source) vector properly
         }
 
-        // m_colVector = m_weightMatrix.adjoint() * m_rowVector;
+        // deterministicSparseMatTransposeVecMulClean( m_weightMatrix, m_rowVector, m_colVector );
         deterministicSparseMatTransposeVecMul( m_weightMatrix, m_rowVector, m_colVector );
+        // deterministicSparseMatTransposeVecMulNative( m_weightMatrix, m_rowVector, m_colVector );
 
         // Permute the resulting target data back
         for( unsigned i = 0; i < tgtVals.size(); ++i )
@@ -1040,10 +1081,10 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
             }
         }
 
-        deterministicSparseMatVecMul( m_weightMatrix, m_colVector, m_rowVector );
-        // m_rowVector = m_weightMatrix * m_colVector;
-        // deterministicSparseMatVecMulKahan( m_weightMatrix, m_colVector, m_rowVector );
         // deterministicSparseMatVecMulClean( m_weightMatrix, m_colVector, m_rowVector );
+        deterministicSparseMatVecMul( m_weightMatrix, m_colVector, m_rowVector );
+        // deterministicSparseMatVecMulNative( m_weightMatrix, m_colVector, m_rowVector );
+        // deterministicSparseMatVecMulKahan( m_weightMatrix, m_colVector, m_rowVector );
 
         // Permute the resulting target data back
 #ifdef VERBOSE

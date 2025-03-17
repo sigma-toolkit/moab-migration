@@ -912,6 +912,9 @@ static void deterministicSparseMatVecMul( const typename moab::TempestOnlineMap:
                                           const typename moab::TempestOnlineMap::WeightColVector& x,
                                           typename moab::TempestOnlineMap::WeightRowVector& result )
 {
+    constexpr bool useKahanSum = false;
+    constexpr bool usePairwiseSum = false;
+
     result.setZero();  // Ensure no uninitialized memory issues
 
     // Iterate row-wise to enforce a fixed summation order
@@ -920,12 +923,22 @@ static void deterministicSparseMatVecMul( const typename moab::TempestOnlineMap:
         std::set< double > accumulators;
         for( typename moab::TempestOnlineMap::WeightMatrix::InnerIterator it( A, row ); it; ++it )
         {
+            // accumulators contains the sorted values of the product: A(row, col) * x(col)
             accumulators.insert( it.value() * x( it.col() ) );
         }
-        // result( row ) = pairwiseSum( accumulators );
-        result( row ) = pairwiseKahanSum( accumulators );
+        if( usePairwiseSum ) result( row ) = pairwiseSum( accumulators );
+        if( useKahanSum ) result( row ) = pairwiseKahanSum( accumulators );
+
+        if( !usePairwiseSum && !useKahanSum )
+        {
+            double sum = 0.0;
+            for( double val : accumulators )
+                sum += val;
+            result( row ) = sum;
+        }
     }
 }
+
 //
 // Perform a deterministic sparse matrix-vector multiplication
 static void deterministicSparseMatVecMulKahan( const typename moab::TempestOnlineMap::WeightMatrix& A,

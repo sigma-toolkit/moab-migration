@@ -1404,13 +1404,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     // otherwise, just fill the sparse matrix
     if( size > 1 )
     {
-        // the default trivial partitioning scheme
-        int nDofs = nB;  // this is for row partitioning
-
-        int nPerPart   = nDofs / size;
-        int nDofExtra = nDofs % size;
-        if (nDofExtra > 0)
-            nPerPart++; // make sure that all nDofs will be assigned a proc between 0 and size-1 by operation (id-1)/nPerPart
+        int nbRows   = nB / size;
         moab::TupleList* tl = new moab::TupleList;
         unsigned numr       = 1;                     //
         tl->initialize( 3, 0, 0, numr, localSize );  // to proc, row, col, value
@@ -1420,7 +1414,10 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         {
             int rowval  = vecRow[i] ;  // dofs are 1 based in the file
             int colval  = vecCol[i] ;
-            int to_proc = (rowval-1)/nPerPart;
+            int to_proc = (rowval-1)/nbRows;
+            // the last one can be larger
+            if (to_proc == size)
+                to_proc = size - 1;
 
             int n                = tl->get_n();
             tl->vi_wr[3 * n]     = to_proc;
@@ -1442,9 +1439,11 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
 
             for( size_t i = 0; i < owned_dof_ids.size(); i++ )
             {
-                int to_proc = -1;
                 int dof_val = owned_dof_ids[i] - 1;  // dofs are 1 based in the file, partition from 0 ?
-                to_proc = dof_val/nPerPart;
+                int to_proc = dof_val/nbRows;
+                // the last one can be larger
+                if (to_proc == size)
+                    to_proc = size - 1;
 
                 int n                  = tl_re.get_n();
                 tl_re.vi_wr[2 * n]     = to_proc;

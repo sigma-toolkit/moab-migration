@@ -137,12 +137,12 @@ ErrorCode TempestRemapper::clear()
     m_target_entities.clear();
     m_target_vertices.clear();
     m_overlap_entities.clear();
-    gid_to_lid_src.clear();
-    gid_to_lid_tgt.clear();
-    gid_to_lid_covsrc.clear();
-    lid_to_gid_src.clear();
-    lid_to_gid_tgt.clear();
-    lid_to_gid_covsrc.clear();
+    // gid_to_lid_src.clear();
+    // gid_to_lid_tgt.clear();
+    // gid_to_lid_covsrc.clear();
+    // lid_to_gid_src.clear();
+    // lid_to_gid_tgt.clear();
+    // lid_to_gid_covsrc.clear();
 
     return MB_SUCCESS;
 }
@@ -747,6 +747,9 @@ ErrorCode TempestRemapper::convert_overlap_mesh_sorted_by_source()
 
     m_overlap_entities.clear();
     rval = m_interface->get_entities_by_dimension( m_overlap_set, 2, m_overlap_entities );MB_CHK_ERR( rval );
+    printf( "%d: overlap mesh entities = %d\n", rank, m_overlap_entities.size() );
+
+    m_interface->write_file( "overlap_mesh.h5m", "H5M", "PARALLEL=WRITE_PART", &m_overlap_set, 1 );
 
     // Allocate for the overlap mesh
     if( !m_overlap ) m_overlap = new Mesh();
@@ -765,15 +768,17 @@ ErrorCode TempestRemapper::convert_overlap_mesh_sorted_by_source()
 
         // Overlap mesh: resize the source and target connection arrays
         std::vector< int > rbids_src( n_overlap_entitites ), rbids_tgt( n_overlap_entitites );
-        rval = m_interface->tag_get_data( srcParentTag, m_overlap_entities, &rbids_src[0] );MB_CHK_ERR( rval );
-        rval = m_interface->tag_get_data( tgtParentTag, m_overlap_entities, &rbids_tgt[0] );MB_CHK_ERR( rval );
+        MB_CHK_ERR( m_interface->tag_get_data( srcParentTag, m_overlap_entities, &rbids_src[0] ) );
+        MB_CHK_ERR( m_interface->tag_get_data( tgtParentTag, m_overlap_entities, &rbids_tgt[0] ) );
         for( size_t ix = 0; ix < n_overlap_entitites; ++ix )
         {
             std::get< 0 >( sorted_overlap_order[ix] ) = ix;
-            std::get< 1 >( sorted_overlap_order[ix] ) =
-                ( gid_to_lid_covsrc.size() ? gid_to_lid_covsrc[rbids_src[ix]] : rbids_src[ix] - 1 );
-            std::get< 2 >( sorted_overlap_order[ix] ) =
-                ( gid_to_lid_tgt.size() ? gid_to_lid_tgt[rbids_tgt[ix]] : rbids_tgt[ix] - 1 );
+            std::get< 1 >( sorted_overlap_order[ix] ) = rbids_src[ix];
+            std::get< 2 >( sorted_overlap_order[ix] ) = rbids_tgt[ix];
+            // std::get< 1 >( sorted_overlap_order[ix] ) =
+            //     ( gid_to_lid_covsrc.size() ? gid_to_lid_covsrc[rbids_src[ix]] : rbids_src[ix] - 1 );
+            // std::get< 2 >( sorted_overlap_order[ix] ) =
+            //     ( gid_to_lid_tgt.size() ? gid_to_lid_tgt[rbids_tgt[ix]] : rbids_tgt[ix] - 1 );
         }
         std::sort( sorted_overlap_order.begin(), sorted_overlap_order.end(), IntPairComparator );
         // sorted_overlap_order[ie].second , ie=0,nOverlap-1 is the order such that overlap elems
@@ -784,17 +789,57 @@ ErrorCode TempestRemapper::convert_overlap_mesh_sorted_by_source()
         {
             Tag ghostTag;
             ghFlags.resize( n_overlap_entitites );
-            rval = m_interface->tag_get_handle( "ORIG_PROC", ghostTag );MB_CHK_ERR( rval );
-            rval = m_interface->tag_get_data( ghostTag, m_overlap_entities, &ghFlags[0] );MB_CHK_ERR( rval );
+            MB_CHK_ERR( m_interface->tag_get_handle( "ORIG_PROC", ghostTag ) );
+            MB_CHK_ERR( m_interface->tag_get_data( ghostTag, m_overlap_entities, &ghFlags[0] ) );
         }
+
+        // We need a global to local numbering
+        Tag gidtag = m_interface->globalId_tag();
+        std::vector< int > gids_src( m_covering_source_entities.size(), -1 ), gids_tgt( m_target_entities.size(), -1 );
+        MB_CHK_ERR( m_interface->tag_get_data( gidtag, m_covering_source_entities, gids_src.data() ) );
+        MB_CHK_ERR( m_interface->tag_get_data( gidtag, m_target_entities, gids_tgt.data() ) );
+        if( rank )
+        {
+            printf( "Source gids: %d, %d, %d, %d, %d\n", gids_src[0], gids_src[1], gids_src[2], gids_src[3],
+                    gids_src[4] );
+            printf( "Target gids: %d, %d, %d, %d, %d\n", gids_tgt[0], gids_tgt[1], gids_tgt[2], gids_tgt[3],
+                    gids_tgt[4] );
+        }
+        auto find_lid = []( int rank, std::vector< int >& gids, int gid ) -> int {
+            // auto it = std::find( gids.begin(), gids.end(), gid );
+            // return ( it != gids.end() ? std::distance( gids.begin(), it ) : -1 );
+
+            // if (rank) printf( "Search for gid %d, found %d\n", gid,
+            //         ( it != gids.end() ? std::distance( gids.begin(), it ) : -1 ) );
+            int lid = -1;
+            for( int i = 0; i < gids.size(); i++ )
+                if( gids[i] == gid )
+                {
+                    lid = i;
+                    break;
+                }
+                // else printf( "Gid %d, looking for %d\n", gids[i], gid );
+
+                if (lid < 0)
+                    printf( "Did not find gid = %d\n", gid );
+            return lid;
+        };
+
         for( unsigned ie = 0; ie < n_overlap_entitites; ++ie )
         {
             int ix = std::get< 0 >( sorted_overlap_order[ie] );  // original index of the element
-            m_overlap->vecSourceFaceIx[ie] = std::get< 1 >( sorted_overlap_order[ie] );
+            // m_overlap->vecSourceFaceIx[ie] = std::get< 1 >( sorted_overlap_order[ie] );
+            m_overlap->vecSourceFaceIx[ie] = find_lid( rank, gids_src, std::get< 1 >( sorted_overlap_order[ie] ) );
             if( is_parallel && size > 1 && ghFlags[ix] >= 0 )  // it means it is a ghost overlap element
                 m_overlap->vecTargetFaceIx[ie] = -1;           // this should not participate in smat!
             else
-                m_overlap->vecTargetFaceIx[ie] = std::get< 2 >( sorted_overlap_order[ie] );
+                // m_overlap->vecTargetFaceIx[ie] = std::get< 2 >( sorted_overlap_order[ie] );
+                m_overlap->vecTargetFaceIx[ie] = find_lid( rank, gids_tgt, std::get< 2 >( sorted_overlap_order[ie] ) );
+
+            // if( !rank )
+            //     printf( "%d: Overlap %d: Source [%d, %d], Target [%d, %d]\n", rank, ie, std::get< 1 >( sorted_overlap_order[ie] ),
+            //             m_overlap->vecSourceFaceIx[ie],
+            //             std::get< 2 >( sorted_overlap_order[ie] ), m_overlap->vecTargetFaceIx[ie] );
         }
     }
 
@@ -868,83 +913,76 @@ ErrorCode TempestRemapper::convert_overlap_mesh_sorted_by_source()
 }
 
 // Should be ordered as Source, Target, Overlap
-ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
-{
-    ErrorCode rval;
+// ErrorCode TempestRemapper::ComputeGlobalLocalMaps()
+// {
+//     ErrorCode rval;
 
-    if( 0 == m_covering_source )
-    {
-        m_covering_source = new Mesh();
-        rval = convert_mesh_to_tempest_private( m_covering_source, m_covering_source_set, m_covering_source_entities,
-                                                &m_covering_source_vertices );MB_CHK_SET_ERR( rval, "Can't convert source Tempest mesh" );
-    }
+// #ifdef VERBOSE
+//     m_covering_source->Write( std::string( "coverage_TR_p" + std::to_string( rank ) + ".g" ) );
+//     m_target->Write( std::string( "target_TR_p" + std::to_string( rank ) + ".g" ) );
+// #endif
 
-#ifdef VERBOSE
-    m_covering_source->Write( std::string( "coverage_TR_p" + std::to_string( rank ) + ".g" ) );
-    m_target->Write( std::string( "target_TR_p" + std::to_string( rank ) + ".g" ) );
-#endif
+//     gid_to_lid_src.clear();
+//     lid_to_gid_src.clear();
+//     gid_to_lid_covsrc.clear();
+//     lid_to_gid_covsrc.clear();
+//     gid_to_lid_tgt.clear();
+//     lid_to_gid_tgt.clear();
+//     {
+//         Tag gidtag = m_interface->globalId_tag();
 
-    gid_to_lid_src.clear();
-    lid_to_gid_src.clear();
-    gid_to_lid_covsrc.clear();
-    lid_to_gid_covsrc.clear();
-    gid_to_lid_tgt.clear();
-    lid_to_gid_tgt.clear();
-    {
-        Tag gidtag = m_interface->globalId_tag();
+//         std::vector< int > gids;
+//         if( point_cloud_source )
+//         {
+//             gids.resize( m_covering_source_vertices.size(), -1 );
+//             rval = m_interface->tag_get_data( gidtag, m_covering_source_vertices, &gids[0] );MB_CHK_ERR( rval );
+//         }
+//         else
+//         {
+//             gids.resize( m_covering_source_entities.size(), -1 );
+//             rval = m_interface->tag_get_data( gidtag, m_covering_source_entities, &gids[0] );MB_CHK_ERR( rval );
+//         }
+//         for( unsigned ie = 0; ie < gids.size(); ++ie )
+//         {
+//             gid_to_lid_covsrc[gids[ie]] = ie;
+//             lid_to_gid_covsrc[ie]       = gids[ie];
+//         }
 
-        std::vector< int > gids;
-        if( point_cloud_source )
-        {
-            gids.resize( m_covering_source_vertices.size(), -1 );
-            rval = m_interface->tag_get_data( gidtag, m_covering_source_vertices, &gids[0] );MB_CHK_ERR( rval );
-        }
-        else
-        {
-            gids.resize( m_covering_source_entities.size(), -1 );
-            rval = m_interface->tag_get_data( gidtag, m_covering_source_entities, &gids[0] );MB_CHK_ERR( rval );
-        }
-        for( unsigned ie = 0; ie < gids.size(); ++ie )
-        {
-            gid_to_lid_covsrc[gids[ie]] = ie;
-            lid_to_gid_covsrc[ie]       = gids[ie];
-        }
+//         if( point_cloud_source )
+//         {
+//             gids.resize( m_source_vertices.size(), -1 );
+//             rval = m_interface->tag_get_data( gidtag, m_source_vertices, &gids[0] );MB_CHK_ERR( rval );
+//         }
+//         else
+//         {
+//             gids.resize( m_source_entities.size(), -1 );
+//             rval = m_interface->tag_get_data( gidtag, m_source_entities, &gids[0] );MB_CHK_ERR( rval );
+//         }
+//         for( unsigned ie = 0; ie < gids.size(); ++ie )
+//         {
+//             gid_to_lid_src[gids[ie]] = ie;
+//             lid_to_gid_src[ie]       = gids[ie];
+//         }
 
-        if( point_cloud_source )
-        {
-            gids.resize( m_source_vertices.size(), -1 );
-            rval = m_interface->tag_get_data( gidtag, m_source_vertices, &gids[0] );MB_CHK_ERR( rval );
-        }
-        else
-        {
-            gids.resize( m_source_entities.size(), -1 );
-            rval = m_interface->tag_get_data( gidtag, m_source_entities, &gids[0] );MB_CHK_ERR( rval );
-        }
-        for( unsigned ie = 0; ie < gids.size(); ++ie )
-        {
-            gid_to_lid_src[gids[ie]] = ie;
-            lid_to_gid_src[ie]       = gids[ie];
-        }
+//         if( point_cloud_target )
+//         {
+//             gids.resize( m_target_vertices.size(), -1 );
+//             rval = m_interface->tag_get_data( gidtag, m_target_vertices, &gids[0] );MB_CHK_ERR( rval );
+//         }
+//         else
+//         {
+//             gids.resize( m_target_entities.size(), -1 );
+//             rval = m_interface->tag_get_data( gidtag, m_target_entities, &gids[0] );MB_CHK_ERR( rval );
+//         }
+//         for( unsigned ie = 0; ie < gids.size(); ++ie )
+//         {
+//             gid_to_lid_tgt[gids[ie]] = ie;
+//             lid_to_gid_tgt[ie]       = gids[ie];
+//         }
+//     }
 
-        if( point_cloud_target )
-        {
-            gids.resize( m_target_vertices.size(), -1 );
-            rval = m_interface->tag_get_data( gidtag, m_target_vertices, &gids[0] );MB_CHK_ERR( rval );
-        }
-        else
-        {
-            gids.resize( m_target_entities.size(), -1 );
-            rval = m_interface->tag_get_data( gidtag, m_target_entities, &gids[0] );MB_CHK_ERR( rval );
-        }
-        for( unsigned ie = 0; ie < gids.size(); ++ie )
-        {
-            gid_to_lid_tgt[gids[ie]] = ie;
-            lid_to_gid_tgt[ie]       = gids[ie];
-        }
-    }
-
-    return MB_SUCCESS;
-}
+//     return MB_SUCCESS;
+// }
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -1549,8 +1587,16 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
             rval = areaAdaptor.positive_orientation( m_interface, m_overlap_set, 1.0 /*radius*/ );MB_CHK_ERR( rval );
         }
 
+        if( m_covering_source == nullptr )
+        {
+            m_covering_source = new Mesh();
+            MB_CHK_SET_ERR( convert_mesh_to_tempest_private( m_covering_source, m_covering_source_set,
+                                                             m_covering_source_entities, &m_covering_source_vertices ),
+                            "Can't convert source Tempest mesh" );
+        }
+
         // Now let us re-convert the MOAB mesh back to Tempest representation
-        rval = this->ComputeGlobalLocalMaps();MB_CHK_ERR( rval );
+        // rval = this->ComputeGlobalLocalMaps();MB_CHK_ERR( rval );
 
         rval = this->convert_overlap_mesh_sorted_by_source();MB_CHK_ERR( rval );
 

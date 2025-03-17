@@ -34,8 +34,8 @@
 #error The climate coupler test example requires MOAB configuration with TempestRemap
 #endif
 
-#define COMPUTE_FILE_MAP
-#define COMPUTE_TRANSPOSE_FILE_MAP
+// #define COMPUTE_FILE_MAP
+// #define COMPUTE_TRANSPOSE_FILE_MAP
 #define COMPUTE_ONLINE_MAP
 
 #if( !defined( COMPUTE_FILE_MAP ) && !defined( COMPUTE_TRANSPOSE_FILE_MAP ) && !defined( COMPUTE_ONLINE_MAP ) )

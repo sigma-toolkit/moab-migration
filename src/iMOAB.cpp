@@ -4516,7 +4516,7 @@ ErrCode iMOAB_ComputePointDoFIntersection( iMOAB_AppID pid_src, iMOAB_AppID pid_
 #endif
 
     // Now let us re-convert the MOAB mesh back to Tempest representation
-    rval = tdata.remapper->ComputeGlobalLocalMaps();MB_CHK_ERR( rval );
+    // rval = tdata.remapper->ComputeGlobalLocalMaps();MB_CHK_ERR( rval );
 
     return moab::MB_SUCCESS;
 }

@@ -200,13 +200,13 @@ class TempestRemapper : public Remapper
     ///     Get the global ID corresponding to the local entity ID according to the context (source,
     ///     target, intersection)
     /// </summary>
-    int GetGlobalID( Remapper::IntersectionContext ctx, int localID );
+    // int GetGlobalID( Remapper::IntersectionContext ctx, int localID );
 
     /// <summary>
     ///     Get the local ID corresponding to the global entity ID according to the context (source,
     ///     target, intersection)
     /// </summary>
-    int GetLocalID( Remapper::IntersectionContext ctx, int globalID );
+    // int GetLocalID( Remapper::IntersectionContext ctx, int globalID );
 
     /// <summary>
     ///     Gather the overlap mesh and asssociated source/target data and write it out to disk
@@ -244,7 +244,7 @@ class TempestRemapper : public Remapper
     /// <summary>
     ///     Compute the local and global IDs for elements in source/target/coverage meshes.
     /// </summary>
-    moab::ErrorCode ComputeGlobalLocalMaps();
+    // moab::ErrorCode ComputeGlobalLocalMaps();
 
     ///	<summary>
     ///		Get all the ghosted overlap entities that were accumulated to enable conservation in
@@ -330,8 +330,8 @@ class TempestRemapper : public Remapper
     moab::Range m_covering_source_vertices;
 
     /* local to glboal and global to local ID maps */
-    std::map< int, int > gid_to_lid_src, gid_to_lid_covsrc, gid_to_lid_tgt;
-    std::map< int, int > lid_to_gid_src, lid_to_gid_covsrc, lid_to_gid_tgt;
+    // std::map< int, int > gid_to_lid_src, gid_to_lid_covsrc, gid_to_lid_tgt;
+    // std::map< int, int > lid_to_gid_src, lid_to_gid_covsrc, lid_to_gid_tgt;
 
     IntxAreaUtils::AreaMethod m_area_method;
 
@@ -584,39 +584,39 @@ inline moab::EntityHandle& TempestRemapper::GetCoveringSet()
     return m_covering_source_set;
 }
 
-inline int TempestRemapper::GetGlobalID( Remapper::IntersectionContext ctx, int localID )
-{
-    switch( ctx )
-    {
-        case Remapper::SourceMesh:
-            return lid_to_gid_src[localID];
-        case Remapper::TargetMesh:
-            return lid_to_gid_tgt[localID];
-        case Remapper::CoveringMesh:
-            return lid_to_gid_covsrc[localID];
-        case Remapper::OverlapMesh:
-        case Remapper::DEFAULT:
-        default:
-            return -1;
-    }
-}
+// inline int TempestRemapper::GetGlobalID( Remapper::IntersectionContext ctx, int localID )
+// {
+//     switch( ctx )
+//     {
+//         case Remapper::SourceMesh:
+//             return lid_to_gid_src[localID];
+//         case Remapper::TargetMesh:
+//             return lid_to_gid_tgt[localID];
+//         case Remapper::CoveringMesh:
+//             return lid_to_gid_covsrc[localID];
+//         case Remapper::OverlapMesh:
+//         case Remapper::DEFAULT:
+//         default:
+//             return -1;
+//     }
+// }
 
-inline int TempestRemapper::GetLocalID( Remapper::IntersectionContext ctx, int globalID )
-{
-    switch( ctx )
-    {
-        case Remapper::SourceMesh:
-            return gid_to_lid_src[globalID];
-        case Remapper::TargetMesh:
-            return gid_to_lid_tgt[globalID];
-        case Remapper::CoveringMesh:
-            return gid_to_lid_covsrc[globalID];
-        case Remapper::DEFAULT:
-        case Remapper::OverlapMesh:
-        default:
-            return -1;
-    }
-}
+// inline int TempestRemapper::GetLocalID( Remapper::IntersectionContext ctx, int globalID )
+// {
+//     switch( ctx )
+//     {
+//         case Remapper::SourceMesh:
+//             return gid_to_lid_src[globalID];
+//         case Remapper::TargetMesh:
+//             return gid_to_lid_tgt[globalID];
+//         case Remapper::CoveringMesh:
+//             return gid_to_lid_covsrc[globalID];
+//         case Remapper::DEFAULT:
+//         case Remapper::OverlapMesh:
+//         default:
+//             return -1;
+//     }
+// }
 
 }  // namespace moab
 

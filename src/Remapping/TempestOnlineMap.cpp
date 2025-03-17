@@ -484,8 +484,8 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
                     col_gdofmap[localDOF]      = src_soln_gdofs[offsetDOF] - 1;
                     col_dtoc_dofmap[offsetDOF] = localDOF;
                     if( vprint )
-                        std::cout << "Col: " << m_remapper->lid_to_gid_covsrc[j] << ", " << offsetDOF << ", "
-                                  << localDOF << ", " << col_gdofmap[offsetDOF] << ", " << m_nTotDofs_SrcCov << "\n";
+                        std::cout << "Col: " << offsetDOF << ", " << localDOF << ", " << col_gdofmap[offsetDOF] << ", "
+                                  << m_nTotDofs_SrcCov << "\n";
                 }
             }
         }
@@ -599,8 +599,8 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
                     row_gdofmap[localDOF]      = tgt_soln_gdofs[offsetDOF] - 1;
                     row_dtoc_dofmap[offsetDOF] = localDOF;
                     if( vprint )
-                        std::cout << "Row: " << m_remapper->lid_to_gid_tgt[j] << ", " << offsetDOF << ", " << localDOF
-                                  << ", " << row_gdofmap[offsetDOF] << ", " << m_nTotDofs_Dest << "\n";
+                        std::cout << "Row: " << offsetDOF << ", " << localDOF << ", " << row_gdofmap[offsetDOF] << ", "
+                                  << m_nTotDofs_Dest << "\n";
                 }
             }
         }
@@ -938,7 +938,8 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             if( is_root ) dbgprint.printf( 0, "Overlap Mesh Area: %1.15e\n", dTotalAreaOverlap );
 
             // Correct areas to match the areas calculated in the overlap mesh
-            // if (fCorrectAreas) // In MOAB-TempestRemap, we will always keep this to be true
+            constexpr bool fCorrectAreas = false;
+            if( fCorrectAreas )  // In MOAB-TempestRemap, we will always keep this to be true
             {
                 if( is_root ) dbgprint.printf( 0, "Correcting source/target areas to overlap mesh areas\n" );
                 DataArray1D< double > dSourceArea( m_meshInputCov->faces.size() );

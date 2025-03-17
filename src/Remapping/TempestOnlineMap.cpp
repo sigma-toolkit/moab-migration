@@ -390,6 +390,7 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
         col_dtoc_dofmap.resize( m_remapper->m_covering_source_entities.size() * srcTagSize, UINT_MAX );
         src_soln_gdofs.resize( m_remapper->m_covering_source_entities.size() * srcTagSize, UINT_MAX );
         rval = m_interface->tag_get_data( m_dofTagSrc, m_remapper->m_covering_source_entities, &src_soln_gdofs[0] );MB_CHK_ERR( rval );
+        src_gid = src_soln_gdofs;
     }
 
     // std::cout << "TOnlineMap: Process: " << rank << " and covering entities = [" <<
@@ -561,6 +562,7 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
         row_dtoc_dofmap.resize( m_remapper->m_target_entities.size() * tgtTagSize, UINT_MAX );
         tgt_soln_gdofs.resize( m_remapper->m_target_entities.size() * tgtTagSize, UINT_MAX );
         rval = m_interface->tag_get_data( m_dofTagDest, m_remapper->m_target_entities, &tgt_soln_gdofs[0] );MB_CHK_ERR( rval );
+        tgt_gid = tgt_soln_gdofs;
     }
 
     // Now compute the mapping and store it for the target mesh
@@ -643,6 +645,7 @@ moab::ErrorCode moab::TempestOnlineMap::set_col_dc_dofs( std::vector< int >& val
     // we know that col_gdofmap[0..(nbcols-1)] = global_col_dofs -> in values_entities
     // form first inverse
     //
+    src_gid = values_entities;
     // resize and initialize to -1 to signal that this value should not be used, if not set below
     col_dtoc_dofmap.resize( values_entities.size(), -1 );
     for( size_t j = 0; j < values_entities.size(); j++ )
@@ -658,6 +661,7 @@ moab::ErrorCode moab::TempestOnlineMap::set_row_dc_dofs( std::vector< int >& val
 {
     //  we need to find row_dtoc_dofmap such that: row_gdofmap[ row_dtoc_dofmap[i] ] == values_entities [i];
     // resize and initialize to -1 to signal that this value should not be used, if not set below
+    tgt_gid = values_entities;
     row_dtoc_dofmap.resize( values_entities.size(), -1 );
     for( size_t j = 0; j < values_entities.size(); j++ )
     {

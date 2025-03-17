@@ -1393,17 +1393,24 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     // Next, reuse the global to local map
     // const auto& rowMap = m_remapper->gid_to_lid_tgt;
     // const auto& colMap = m_remapper->gid_to_lid_covsrc;
+#ifdef MOAB_HAVE_EIGEN3
+
+    // first matrix
+   typedef Eigen::Triplet< double > Triplet;
+   std::vector< Triplet > tripletList;
 
 #ifdef MOAB_HAVE_MPI
     // bother with tuple list only if size > 1
     // otherwise, just fill the sparse matrix
     if( size > 1 )
     {
-        std::vector< int > ownership;
         // the default trivial partitioning scheme
         int nDofs = nB;  // this is for row partitioning
 
         int nPerPart   = nDofs / size;
+        int nDofExtra = nDofs % size;
+        if (nDofExtra > 0)
+            nPerPart++; // make sure that all nDofs will be assigned a proc between 0 and size-1 by operation (id-1)/nPerPart
         moab::TupleList* tl = new moab::TupleList;
         unsigned numr       = 1;                     //
         tl->initialize( 3, 0, 0, numr, localSize );  // to proc, row, col, value
@@ -1411,13 +1418,9 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         // populate
         for( int i = 0; i < localSize; i++ )
         {
-            int rowval  = vecRow[i] - 1;  // dofs are 1 based in the file
-            int colval  = vecCol[i] - 1;
-            int to_proc = -1;
-
-            to_proc = rowval/nPerPart;
-            if (to_proc == size)
-                to_proc = size - 1;
+            int rowval  = vecRow[i] ;  // dofs are 1 based in the file
+            int colval  = vecCol[i] ;
+            int to_proc = (rowval-1)/nPerPart;
 
             int n                = tl->get_n();
             tl->vi_wr[3 * n]     = to_proc;
@@ -1442,12 +1445,10 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
                 int to_proc = -1;
                 int dof_val = owned_dof_ids[i] - 1;  // dofs are 1 based in the file, partition from 0 ?
                 to_proc = dof_val/nPerPart;
-                if (to_proc == size)
-                    to_proc = size - 1;
 
                 int n                  = tl_re.get_n();
                 tl_re.vi_wr[2 * n]     = to_proc;
-                tl_re.vi_wr[2 * n + 1] = dof_val;
+                tl_re.vi_wr[2 * n + 1] = dof_val + 1;
 
                 tl_re.inc_n();
             }
@@ -1521,77 +1522,36 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         int rindexMax = 0, cindexMax = 0;
         // populate the sparsematrix, using rowMap and colMap
         int n = tl->get_n();
+        tripletList.reserve( n );
         for( int i = 0; i < n; i++ )
         {
-            int rindex, cindex;
             const int vecRowValue = tl->vi_wr[3 * i + 1];
             const int vecColValue = tl->vi_wr[3 * i + 2];
-
-            const auto riter = rowMap.find( vecRowValue );
-            if( riter == rowMap.end() )
-            {
-                rowMap[vecRowValue] = rindexMax;
-                rindex              = rindexMax;
-                row_gdofmap.push_back( vecRowValue );
-                // row_dtoc_dofmap.push_back( vecRowValue );
-                rindexMax++;
-            }
-            else
-                rindex = riter->second;
-
-            const auto citer = colMap.find( vecColValue );
-            if( citer == colMap.end() )
-            {
-                colMap[vecColValue] = cindexMax;
-                cindex              = cindexMax;
-                col_gdofmap.push_back( vecColValue );
-                // col_dtoc_dofmap.push_back( vecColValue );
-                cindexMax++;
-            }
-            else
-                cindex = citer->second;
-
-            sparseMatrix( rindex, cindex ) = tl->vr_wr[i];
+            double value = tl->vr_wr[i];
+            tripletList.push_back( Triplet( vecRowValue - 1, vecColValue - 1, value) );
         }
         tl->reset();
     }
     else
 #endif
     {
-        int rindexMax = 0, cindexMax = 0;
+
+        tripletList.reserve(nS);
         for( int i = 0; i < nS; i++ )
         {
-            int rindex, cindex;
-            const int vecRowValue = vecRow[i] - 1;  // the rows, cols are 1 based in the file
-            const int vecColValue = vecCol[i] - 1;
 
-            const auto riter = rowMap.find( vecRowValue );
-            if( riter == rowMap.end() )
-            {
-                rowMap[vecRowValue] = rindexMax;
-                rindex              = rindexMax;
-                row_gdofmap.push_back( vecRowValue );
-                // row_dtoc_dofmap.push_back( vecRowValue );
-                rindexMax++;
-            }
-            else
-                rindex = riter->second;
-
-            const auto citer = colMap.find( vecColValue );
-            if( citer == colMap.end() )
-            {
-                colMap[vecColValue] = cindexMax;
-                cindex              = cindexMax;
-                col_gdofmap.push_back( vecColValue );
-                // col_dtoc_dofmap.push_back( vecColValue );
-                cindexMax++;
-            }
-            else
-                cindex = citer->second;
-
-            sparseMatrix( rindex, cindex ) = vecS[i];
+            const int vecRowValue = vecRow[i] ;  // the rows, cols are 1 based in the file
+            const int vecColValue = vecCol[i] ;  // sparse matrix will be 1 based too
+            double value = vecS[i];
+            tripletList.push_back( Triplet( vecRowValue - 1, vecColValue - 1, value) );
         }
     }
+    m_weightMatrix.resize( nB, nA);
+    m_rowVector.resize( nB );
+    m_colVector.resize( nA );
+
+    m_weightMatrix.setFromTriplets( tripletList.begin(), tripletList.end() );
+    m_weightMatrix.makeCompressed();
 
     m_nTotDofs_Src    = sparseMatrix.GetColumns();
     m_nTotDofs_SrcCov = m_nTotDofs_Src;
@@ -1600,8 +1560,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     m_nDofsPEl_Src  = 1;  // always assume FV-FV maps are read from file
     m_nDofsPEl_Dest = 1;  // always assume FV-FV maps are read from file
 
-#ifdef MOAB_HAVE_EIGEN3
-    this->copy_tempest_sparsemat_to_eigen3();
+
 #endif
 
     // Reset the source and target data first

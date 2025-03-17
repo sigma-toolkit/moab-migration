@@ -36,6 +36,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <sstream>
+#include <iomanip>
 #include <numeric>
 #include <algorithm>
 #include <unordered_set>
@@ -895,39 +896,39 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
     }
     else
     {
-        // Permute the source data first
-#ifdef VERBOSE
-        output_file << "ColVector: " << m_colVector.size() << ", SrcVals: " << srcVals.size()
-                    << ", Sizes: " << m_nTotDofs_SrcCov << ", " << col_dtoc_dofmap.size() << "\n";
-#endif
-        for( unsigned i = 0; i < srcVals.size(); ++i )
-        {
-            if( col_dtoc_dofmap[i] >= 0 )
-            {
-                m_colVector( col_dtoc_dofmap[i] ) = srcVals[i];  // permute and set the row (source) vector properly
-#ifdef VERBOSE
-                output_file << i << " " << col_gdofmap[col_dtoc_dofmap[i]] + 1 << "  " << srcVals[i] << "\n";
-#endif
-            }
-        }
+       for( unsigned i = 0; i < srcVals.size(); ++i )
+       {
+           if( src_gid[i] >= 1 )
+           {
+               m_colVector(  src_gid[i] - 1 ) = srcVals[i];  // permute and set the row (source) vector properly
 
-        m_rowVector = m_weightMatrix * m_colVector;
+           }
+       }
+#ifdef VERBOSE
+       std::cout<<std::setprecision(16);
+       for (int k=0; k<m_weightMatrix.outerSize(); ++k)
+           for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(m_weightMatrix,k); it; ++it)
+           {
+               double valC = it.value();
+               int rowC = it.row();   // row index
+               int colC = it.col();   // col index (here it is equal to k)
+               m_rowVector(rowC) += valC*m_colVector(colC);
+               std::cout <<" row:" << rowC << " col:" << colC
+                   << " val:" << valC << " colVal:" << m_colVector(colC)<< " acc:" << m_rowVector(rowC) <<"\n";
+           }
+       m_rowVector.setZero();
+#endif
+       m_rowVector = m_weightMatrix * m_colVector;
 
-        // Permute the resulting target data back
-#ifdef VERBOSE
-        output_file << "RowVector: " << m_rowVector.size() << ", TgtVals:" << tgtVals.size()
-                    << ", Sizes: " << m_nTotDofs_Dest << ", " << row_gdofmap.size() << "\n";
-#endif
-        for( unsigned i = 0; i < tgtVals.size(); ++i )
-        {
-            if( row_dtoc_dofmap[i] >= 0 )
-            {
-                tgtVals[i] = m_rowVector( row_dtoc_dofmap[i] );  // permute and set the row (source) vector properly
-#ifdef VERBOSE
-                output_file << i << " " << row_gdofmap[row_dtoc_dofmap[i]] + 1 << "  " << tgtVals[i] << "\n";
-#endif
-            }
-        }
+       // Permute the resulting target data back
+       for( unsigned i = 0; i < tgtVals.size(); ++i )
+       {
+           if( tgt_gid[i] >= 1 )
+           {
+               tgtVals[i] = m_rowVector( tgt_gid[i] - 1 );  // permute and set the row (source) vector properly
+           }
+       }
+
     }
 
     // if( caasType != CAAS_NONE )

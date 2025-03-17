@@ -35,8 +35,8 @@
 #endif
 
 #define COMPUTE_FILE_MAP
-#define COMPUTE_TRANSPOSE_FILE_MAP
-#define COMPUTE_ONLINE_MAP
+//#define COMPUTE_TRANSPOSE_FILE_MAP
+//#define COMPUTE_ONLINE_MAP
 
 #if( !defined( COMPUTE_FILE_MAP ) && !defined( COMPUTE_TRANSPOSE_FILE_MAP ) && !defined( COMPUTE_ONLINE_MAP ) )
 #error Enable either file-based map (COMPUTE_FILE_MAP/COMPUTE_TRANSPOSE_FILE_MAP) and/or online (COMPUTE_ONLINE_MAP) for coupling
@@ -607,8 +607,10 @@ int main( int argc, char* argv[] )
 #ifdef VERBOSE
             {
                 // write only for n==1 case
-                char outputFileRecvd[] = "cplProjectedOCNFileMF.h5m";
-                CHECKIERR( iMOAB_WriteMesh( cplOcnPID, outputFileRecvd, fileWriteOptions ),
+                std::stringstream outf;
+                outf << "cplProjectedOCNFileMF_p" << numProcesses << ".h5m";
+
+                CHECKIERR( iMOAB_WriteMesh( cplOcnPID, outf.str().c_str(), fileWriteOptions ),
                            "could not write cplProjectedOCNFile.h5m to disk" )
             }
 #endif

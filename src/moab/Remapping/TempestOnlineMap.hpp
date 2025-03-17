@@ -526,6 +526,8 @@ class TempestOnlineMap : public OfflineMap
     // make it int, because it can be -1 in new logic
     std::vector< int > row_dtoc_dofmap, col_dtoc_dofmap, srccol_dtoc_dofmap;
 
+    std::vector<int> src_gid, tgt_gid;
+
     std::map< int, int > rowMap, colMap;
     int m_input_order, m_output_order;
 

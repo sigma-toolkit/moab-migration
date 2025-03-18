@@ -1097,8 +1097,6 @@ if (test "x$download_ext_meshfiles" != "xno"); then
                         [[AtmPhys_pg2.h5m], [land_p8.h5m], [ne4pg2_p8.h5m]])
   DOWNLOAD_EXTERNAL_DATA([ne30pg2], [e3sm/ne30pg2_r05_oECv3_ICG],
                         [[AtmPhys_01.h5m], [domain_clean_p16.h5m], [outCS30_pg2_p8.h5m], [wholeMPAS.h5m]])
-  DOWNLOAD_EXTERNAL_DATA([edgeMaps], [e3sm/edge_maps],
-                        [[source_1.h5m], [target_1.h5m]])
 fi
 AM_CONDITIONAL([HAVE_EXTMESHES],[test "$download_ext_meshfiles" = "yes"])
 

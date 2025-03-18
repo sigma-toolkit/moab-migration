@@ -22,6 +22,15 @@
 #include "OfflineMap.h"
 
 #ifdef MOAB_HAVE_EIGEN3
+// #ifdef MOAB_HAVE_BLAS
+// #define EIGEN_USE_BLAS
+// #endif
+// #define EIGEN_DONT_PARALLELIZE
+// #define EIGEN_DONT_VECTORIZE
+// #define EIGEN_STRONG_INLINE
+#define EIGEN_DEFAULT_TO_ROW_MAJOR
+#define EIGEN_RUNTIME_NO_MALLOC
+// #define EIGEN_UNROLLING_LIMIT 0
 #include <Eigen/Sparse>
 #endif
 
@@ -142,6 +151,9 @@ class TempestOnlineMap : public OfflineMap
     ///	</summary>
     const DataArray1D< double >& GetGlobalTargetAreas() const;
 
+    ///	<summary>
+    ///		Print information and metadata about the remapping weights.
+    ///	</summary>
     void PrintMapStatistics();
 
   private:

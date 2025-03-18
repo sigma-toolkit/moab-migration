@@ -1070,7 +1070,7 @@ ErrorCode IntxUtils::orderSubEdges( Interface * mb,
 ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle intx_set, bool sourceMap,
         std::map<EntityHandle, std::vector<EntityHandle>>  & edgeVertices, // for each recovered edge, the chain of vertices that form subedges
         std::map<EntityHandle, std::vector<int>> & edgePolygons, // for each recovered edge, the list of intersected polygons;
-        moab::Range & recoveredCells )
+        moab::Range & recoveredCells, double areaTolerance )
 {
     Tag parentTag, otherParentTag;
     ErrorCode rval;
@@ -1150,7 +1150,7 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
     {
         int parentID    = parentGids[j];
         double areaDiff = fabs( initAreas[parentID] - recoveredAreas[parentID] );
-        if( areaDiff < 5.e-12 )
+        if( areaDiff < areaTolerance )
         {
             recovered++;
             recoveredCells.insert( parentCells[j] );  // should we use a std::vector, that will be ordered already ?

@@ -908,7 +908,7 @@ inline double pairwiseKahanSum( const std::set< double >& sorted )
 }
 
 // Sparse matrix-vector multiplication using pairwise summation
-static void deterministicSparseMatVecMul( const typename moab::TempestOnlineMap::WeightMatrix& A,
+inline void deterministicSparseMatVecMul( const typename moab::TempestOnlineMap::WeightMatrix& A,
                                           const typename moab::TempestOnlineMap::WeightColVector& x,
                                           typename moab::TempestOnlineMap::WeightRowVector& result )
 {
@@ -941,7 +941,7 @@ static void deterministicSparseMatVecMul( const typename moab::TempestOnlineMap:
 
 //
 // Perform a deterministic sparse matrix-vector multiplication
-static void deterministicSparseMatVecMulKahan( const typename moab::TempestOnlineMap::WeightMatrix& A,
+inline void deterministicSparseMatVecMulKahan( const typename moab::TempestOnlineMap::WeightMatrix& A,
                                           const typename moab::TempestOnlineMap::WeightColVector& x,
                                           typename moab::TempestOnlineMap::WeightRowVector& result )
 {
@@ -962,7 +962,7 @@ static void deterministicSparseMatVecMulKahan( const typename moab::TempestOnlin
 }
 
 // Perform a deterministic sparse matrix-vector multiplication
-static void deterministicSparseMatVecMulClean( const typename moab::TempestOnlineMap::WeightMatrix& A,
+inline void deterministicSparseMatVecMulClean( const typename moab::TempestOnlineMap::WeightMatrix& A,
                                                const typename moab::TempestOnlineMap::WeightColVector& x,
                                                typename moab::TempestOnlineMap::WeightRowVector& result )
 {
@@ -979,7 +979,7 @@ static void deterministicSparseMatVecMulClean( const typename moab::TempestOnlin
     }
 }
 
-static void deterministicSparseMatVecMulNative( const typename moab::TempestOnlineMap::WeightMatrix& A,
+inline void deterministicSparseMatVecMulNative( const typename moab::TempestOnlineMap::WeightMatrix& A,
                                                const typename moab::TempestOnlineMap::WeightColVector& x,
                                                typename moab::TempestOnlineMap::WeightRowVector& result )
 {
@@ -987,7 +987,7 @@ static void deterministicSparseMatVecMulNative( const typename moab::TempestOnli
 }
 
 // Deterministic sparse matrix-vector multiplication with A^T * x using pairwise summation
-static void deterministicSparseMatTransposeVecMul( const typename moab::TempestOnlineMap::WeightMatrix& A,
+inline void deterministicSparseMatTransposeVecMul( const typename moab::TempestOnlineMap::WeightMatrix& A,
                                                         const typename moab::TempestOnlineMap::WeightRowVector& x,
                                                         typename moab::TempestOnlineMap::WeightColVector& result )
 {
@@ -1014,7 +1014,7 @@ static void deterministicSparseMatTransposeVecMul( const typename moab::TempestO
 }
 
 // Perform a deterministic sparse matrix-vector multiplication
-static void deterministicSparseMatTransposeVecMulClean( const typename moab::TempestOnlineMap::WeightMatrix& A,
+inline void deterministicSparseMatTransposeVecMulClean( const typename moab::TempestOnlineMap::WeightMatrix& A,
                                                         const typename moab::TempestOnlineMap::WeightRowVector& x,
                                                         typename moab::TempestOnlineMap::WeightColVector& result )
 {
@@ -1032,9 +1032,9 @@ static void deterministicSparseMatTransposeVecMulClean( const typename moab::Tem
 }
 
 // Perform a deterministic sparse matrix-vector multiplication
-static void deterministicSparseMatTransposeVecMulNative( const typename moab::TempestOnlineMap::WeightMatrix& A,
-                                                        const typename moab::TempestOnlineMap::WeightRowVector& x,
-                                                        typename moab::TempestOnlineMap::WeightColVector& result )
+inline void deterministicSparseMatTransposeVecMulNative( const typename moab::TempestOnlineMap::WeightMatrix& A,
+                                                         const typename moab::TempestOnlineMap::WeightRowVector& x,
+                                                         typename moab::TempestOnlineMap::WeightColVector& result )
 {
     result = A.adjoint() * x;  // Perform the adjoint.matrix-vector multiplication using Eigen3
 }

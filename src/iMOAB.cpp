@@ -4317,9 +4317,6 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
     tdata.remapper->GetMeshSet( moab::Remapper::TargetMesh )  = data_tgt.file_set;
     tdata.remapper->GetMeshSet( moab::Remapper::OverlapMesh ) = data_intx.file_set;
 
-    rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( rval );
-    rval = tdata.remapper->ConvertMeshToTempest( moab::Remapper::TargetMesh );MB_CHK_ERR( rval );
-
     // First, compute the covering source set.
     rval =
         tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, tdata.num_src_ghost_layers );MB_CHK_ERR( rval );
@@ -4343,9 +4340,6 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     constexpr bool validate          = true;
     constexpr bool use_kdtree_search = true;
     constexpr double defaultradius   = 1.0;
-
-    // Error code definitions
-    ErrorCode rval;
 
     // Get the source and target data and pcomm objects
     appData& data_src  = context.appDatas[*pid_src];
@@ -4375,14 +4369,14 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
 
     // Next, compute intersections with MOAB.
     // for bilinear, this is an overkill
-    rval = tdata.remapper->ComputeOverlapMesh( use_kdtree_search, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( tdata.remapper->ComputeOverlapMesh( use_kdtree_search, false ) );
 
     // Mapping computation done
     if( validate )
     {
         // Default area_method = lHuiller; Options: Girard, GaussQuadrature (if TR is available)
         IntxAreaUtils areaAdaptor( IntxAreaUtils::lHuiller );
-        double local_areas[3], global_areas[3];
+        double local_areas[3] = { 0.0, 0.0, 0.0 }, global_areas[3] = { 0.0, 0.0, 0.0 };
         local_areas[0] = areaAdaptor.area_on_sphere( context.MBI, data_src.file_set, defaultradius /*radius_source*/ );
         local_areas[1] = areaAdaptor.area_on_sphere( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ );
         local_areas[2] = areaAdaptor.area_on_sphere( context.MBI, data_intx.file_set, defaultradius );
@@ -4516,7 +4510,7 @@ ErrCode iMOAB_ComputePointDoFIntersection( iMOAB_AppID pid_src, iMOAB_AppID pid_
 #endif
 
     // Now let us re-convert the MOAB mesh back to Tempest representation
-    rval = tdata.remapper->ComputeGlobalLocalMaps();MB_CHK_ERR( rval );
+    // rval = tdata.remapper->ComputeGlobalLocalMaps();MB_CHK_ERR( rval );
 
     return moab::MB_SUCCESS;
 }
@@ -4538,8 +4532,6 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
     const iMOAB_String source_solution_tag_dof_name,
     const iMOAB_String target_solution_tag_dof_name )
 {
-    moab::ErrorCode rval;
-
     assert( disc_order_source && disc_order_target && *disc_order_source > 0 && *disc_order_target > 0 );
     assert( solution_weights_identifier && strlen( solution_weights_identifier ) );
     assert( disc_method_source && strlen( disc_method_source ) );
@@ -4605,13 +4597,13 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
     // Now let us compute the local-global mapping and store it in the context
     // We need this mapping when computing matvec products and to do reductions in parallel
     // Additionally, the call below will also compute weights with TempestRemap
-    rval = weightMap->GenerateRemappingWeights(
+    MB_CHK_ERR( weightMap->GenerateRemappingWeights(
         std::string( disc_method_source ),            // const std::string& strInputType
         std::string( disc_method_target ),            // const std::string& strOutputType
         mapOptions,                                   // GenerateOfflineMapAlgorithmOptions& mapOptions
         std::string( source_solution_tag_dof_name ),  // const std::string& srcDofTagName = "GLOBAL_ID"
         std::string( target_solution_tag_dof_name )   // const std::string& tgtDofTagName = "GLOBAL_ID"
-    );MB_CHK_ERR( rval );
+        ) );
 
     // print some map statistics
     weightMap->PrintMapStatistics();

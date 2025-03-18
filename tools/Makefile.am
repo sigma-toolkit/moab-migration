@@ -30,7 +30,7 @@ EXTRA_DIST = README.hexmodops \
 if HAVE_HDF5
   bin_PROGRAMS += mbcmpfiles mbintxchk mbcleantags 
 if HAVE_NETCDF
-  bin_PROGRAMS += mbaddnc mbaddchunk
+  bin_PROGRAMS += mbaddnc mbaddchunk mbedgesplit
 if HAVE_EIGEN3
   bin_PROGRAMS += mbcmpmaps mbvisumap
 endif
@@ -183,6 +183,7 @@ mbintxchk_SOURCES = mbIntxCheck.cpp
 mbcmpmaps_SOURCES = compareMaps.cpp
 mbcleantags_SOURCES = cleanTags.cpp
 mbvisumap_SOURCES = visuMapVtk.cpp
+mbedgesplit_SOURCES = mbedgesplit.cpp
 
 bin_PROGRAMS += mbslavepart
 mbslavepart_SOURCES = mbslavepart.cpp

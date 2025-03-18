@@ -454,7 +454,7 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
         /* we only have a mapping for elements as DoFs */
         std::vector<int> sorted_tmp_dofs( src_soln_gdofs.size() );
         std::copy( src_soln_gdofs.begin(), src_soln_gdofs.end(), sorted_tmp_dofs.begin() );
-        // std::sort( sorted_tmp_dofs.begin(), sorted_tmp_dofs.end() );
+        std::sort( sorted_tmp_dofs.begin(), sorted_tmp_dofs.end() );
 
         for( unsigned i = 0; i < col_gdofmap.size(); ++i )
         {

@@ -18,7 +18,6 @@
 #endif
 #include "moab/IntxMesh/Intx2MeshOnSphere.hpp"
 #include "moab/IntxMesh/IntxUtils.hpp"
-#include "TestUtil.hpp"
 #include "moab/ProgOptions.hpp"
 #include <cmath>
 
@@ -29,7 +28,7 @@ int main( int argc, char* argv[] )
 
     std::string sourceFile, targetFile, intersectionFile, edgeFile;
     sourceFile =
-            "../sandbox/MeshFiles/e3sm/edge_maps/source_1.h5m";  // it also has data aassociated to edges
+            "../sandbox/MeshFiles/e3sm/edge_maps/source_1.h5m";  // it also has data associated to edges
     targetFile =
             "../sandbox/MeshFiles/e3sm/edge_maps/target_1.h5m";  //
     intersectionFile = "intx_edges.h5m";
@@ -42,10 +41,12 @@ int main( int argc, char* argv[] )
     double R      = 1.;  // input
     double epsrel = 1.e-12;
     double boxeps = 1.e-4;
+    double areaTolerance = 5.e-12;
     intersectionFile    = "intx.h5m";
     opts.addOpt< double >( "radius,R", "radius for model intx", &R );
     opts.addOpt< double >( "epsilon,e", "relative error in intx", &epsrel );
     opts.addOpt< double >( "boxerror,b", "relative error for box boundaries", &boxeps );
+    opts.addOpt< double >( "areaTol,a", "area recovery tolerance", &areaTolerance);
 
     opts.addOpt<void>( "outputFraction,f", "output fraction of areas" );
     opts.addOpt<void>( "writeFiles,w", "write files of interest" );
@@ -91,6 +92,7 @@ int main( int argc, char* argv[] )
         std::cout << "relative eps:  " << epsrel << "\n";
         std::cout << "box eps:  " << boxeps << "\n";
         std::cout << " use kd tree for intersection: " << brute_force << "\n";
+        std::cout << " area tolerance:" << areaTolerance <<"\n";
     }
     rval = mb->create_meshset( MESHSET_SET, outputSet );MB_CHK_ERR( rval );
 
@@ -247,7 +249,7 @@ int main( int argc, char* argv[] )
     std::map<EntityHandle, std::vector<int>> edgePolygons; // for each recovered edge, the list of intersected polygons;
     moab::Range recoveredPolys;
     rval = moab::IntxUtils::EdgeMap(mb, sf1, outputSet, sourceEdgeMap,
-        edgeVertices, edgePolygons, recoveredPolys );MB_CHK_SET_ERR( rval, "failed to compute edge map for source" );
+        edgeVertices, edgePolygons, recoveredPolys, areaTolerance );MB_CHK_SET_ERR( rval, "failed to compute edge map for source" );
 
 #ifdef MOAB_HAVE_NETCDF
     rval = moab::IntxUtils::write_edge_map("source_edge.nc", mb, sf1, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for source file" );
@@ -259,7 +261,7 @@ int main( int argc, char* argv[] )
     edgePolygons.clear();
     sourceEdgeMap = false;
     rval = moab::IntxUtils::EdgeMap(mb, sf2, outputSet, sourceEdgeMap,
-        edgeVertices, edgePolygons, recoveredPolys );MB_CHK_SET_ERR( rval, "failed to compute edge map for target" );
+        edgeVertices, edgePolygons, recoveredPolys, areaTolerance );MB_CHK_SET_ERR( rval, "failed to compute edge map for target" );
 #ifdef MOAB_HAVE_NETCDF
     rval = moab::IntxUtils::write_edge_map("target_edge.nc", mb, sf2, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
 #endif

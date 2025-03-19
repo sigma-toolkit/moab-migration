@@ -72,11 +72,11 @@ int main( int argc, char* argv[] )
 
     opts.parseCommandLine( argc, argv );
 
-    if (0 == rankInGlobalComm)
+    if( 0 == rankInGlobalComm )
     {
-        std::cout<<" source mesh:" << lndMct << "\n";
-        std::cout<<" target mesh:" << lndMoab << "\n";
-        std::cout <<" tagname:" << tagname << "\n";
+        std::cout << " source mesh:" << lndMct << "\n";
+        std::cout << " target mesh:" << lndMoab << "\n";
+        std::cout << " tagname:" << tagname << "\n";
     }
     int cplLndAppID = -1, cplLnd2AppID = -1;  // -1 means it is not initialized
     iMOAB_AppID cplLndPID  = &cplLndAppID;    // land on coupler PEs, moab dist
@@ -89,25 +89,12 @@ int main( int argc, char* argv[] )
                                       cplLnd2PID );  // mesh on coupler pes, MCT distr, point cloud
     CHECKIERR( ierr, "Cannot register LNDX2 over coupler PEs" )
 
-    if( entType == 1 )
-    {
-        ierr = iMOAB_LoadMesh( cplLndPID, lndMoab.c_str(), readopts.c_str(), &nghlay );  // moab mesh can be cells
-    }
-    else  // entType == 0
-    {
-        ierr = iMOAB_LoadMesh( cplLndPID, lndMoab.c_str(), readoptsLnd.c_str(), &nghlay );  // moab mesh is point cloud
-    }
-
+    ierr = iMOAB_LoadMesh( cplLndPID, lndMoab.c_str(), entType == 1 ? readopts.c_str() : readoptsLnd.c_str(),
+                           &nghlay );  // moab mesh can be cells
     CHECKIERR( ierr, "Cannot load moab mesh on coupler pes" )
 
-    if (mctEntType == 0)
-    {
-       ierr = iMOAB_LoadMesh( cplLnd2PID, lndMct.c_str(), readoptsLnd.c_str(), &nghlay );
-    }
-    else
-    {
-        ierr = iMOAB_LoadMesh( cplLnd2PID, lndMct.c_str(), readopts.c_str(), &nghlay );
-    }
+    ierr =
+        iMOAB_LoadMesh( cplLnd2PID, lndMct.c_str(), mctEntType == 0 ? readoptsLnd.c_str() : readopts.c_str(), &nghlay );
     CHECKIERR( ierr, "Cannot load second mesh on coupler pes" )
 
     int nverts[3], nelem[3];
@@ -123,7 +110,7 @@ int main( int argc, char* argv[] )
     ierr = iMOAB_GetMeshInfo( cplLnd2PID, nverts, nelem, 0, 0, 0 );
     CHECKIERR( ierr, "Cannot get info on mct mesh on coupler pes" )
 
-    int nvals = ntags * ( (mctEntType == 1) ? nelem[0] :  nverts[0] );
+    int nvals = ntags * ( ( mctEntType == 1 ) ? nelem[0] : nverts[0] );
     std::vector< double > fracts( nvals );
     ierr = iMOAB_DefineTagStorage( cplLnd2PID, tagname.c_str(), &tagType[0], &sizeTag, &tagIndex );
     CHECKIERR( ierr, "Cannot define frac tag" )
@@ -131,10 +118,10 @@ int main( int argc, char* argv[] )
     ierr = iMOAB_DefineTagStorage( cplLnd2PID, "GLOBAL_ID", &tagType[1], &sizeTag, &tagIndex );
     CHECKIERR( ierr, "Cannot define gid tag" )
 
-    ierr           = iMOAB_GetDoubleTagStorage( cplLnd2PID, tagname.c_str(), &nvals, &mctEntType, &fracts[0] );
+    ierr = iMOAB_GetDoubleTagStorage( cplLnd2PID, tagname.c_str(), &nvals, &mctEntType, &fracts[0] );
     CHECKIERR( ierr, "Cannot get tag on lnd2 on coupler pes" )
 
-    int ngids = (mctEntType == 1) ? nelem[0] : nverts[0];
+    int ngids = ( mctEntType == 1 ) ? nelem[0] : nverts[0];
     std::vector< int > gids( ngids );
     ierr = iMOAB_GetIntTagStorage( cplLnd2PID, "GLOBAL_ID", &ngids, &mctEntType, &gids[0] );
     CHECKIERR( ierr, "Cannot get global id tag on lnd2 on coupler pes" )

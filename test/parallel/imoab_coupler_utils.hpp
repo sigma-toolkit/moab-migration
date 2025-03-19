@@ -11,11 +11,12 @@
 #ifndef TEST_PARALLEL_IMOAB_COUPLER_UTILS_HPP_
 #define TEST_PARALLEL_IMOAB_COUPLER_UTILS_HPP_
 
-#define CHECKIERR( rc, message )                       \
-    if( 0 != ( rc ) )                                  \
-    {                                                  \
-        printf( "%s. ErrorCode = %d\n", message, rc ); \
-        return 1;                                      \
+#define CHECKIERR( rc, message )                                              \
+    if( 0 != ( rc ) )                                                         \
+    {                                                                         \
+        printf( "Error at line number %d in file %s\n", __LINE__, __FILE__ ); \
+        printf( "%s. ErrorCode = %d\n", message, rc );                        \
+        return 1;                                                             \
     }
 
 #define PUSH_TIMER( operation )               \

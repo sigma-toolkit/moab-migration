@@ -251,6 +251,16 @@ int main( int argc, char* argv[] )
                                         &couPEGroup, &ocnCouComm, ocnFilename, readopts, nghlay, repartitioner_scheme );
     CHECKIERR( ierr, "Cannot load and migrate ocn mesh" )
 
+    // this model (recMeshOcn.h5m) has mixed meshes in it, we need to repair the comm graph
+    // first delete the one created with migration, then compute a new one
+    if( ocnCouComm != MPI_COMM_NULL )
+    {
+        int type = 3;  // type: 1 - SE, 2 - Vertex (point cloud), 3 - Element (FV scalars)
+        CHECKIERR( iMOAB_ComputeCommGraph( cmpOcnPID, cplOcnPID, &ocnCouComm, &ocnPEGroup, &couPEGroup, &type, &type,
+                                           &cmpocn, &cplocn ),
+                   "cannot compute graph between ocn comp and ocn migrated to coupler" )
+    }
+
 #endif  // #ifdef ENABLE_ATMOCN_COUPLING
 
 #ifdef ENABLE_ATMCPLOCN_COUPLING
@@ -307,7 +317,7 @@ int main( int argc, char* argv[] )
 #endif
 
     int disc_orders[3]                       = { 4, 1, 1 };
-    const std::string weights_identifiers[2] = { "scalar", "scalar-pc" };
+    const std::string weights_identifiers[4] = { "scalar", "scalar-pc", "scalar-from-disk", "scalar-pc-from-disk" };
     const std::string disc_methods[3]        = { "cgll", "fv", "pcloud" };
     const std::string dof_tag_names[3]       = { "GLOBAL_DOFS", "GLOBAL_ID", "GLOBAL_ID" };
 #ifdef ENABLE_ATMOCN_COUPLING
@@ -414,13 +424,12 @@ int main( int argc, char* argv[] )
                                                     atmocn_map_file_name.c_str() );
             CHECKIERR( ierr, "failed to write map file to disk" );
 
-            const std::string intx_from_file_identifier = "map-from-file";
-            int dummyCpl                                = -1;
-            int dummy_rowcol                            = -1;
-            int dummyType                               = 0;
-            ierr = iMOAB_LoadMappingWeightsFromFile( cplAtmOcnPID, &dummyCpl, &dummy_rowcol, &dummyType,
-                                                     intx_from_file_identifier.c_str(), atmocn_map_file_name.c_str() );
-            CHECKIERR( ierr, "failed to load map file from disk" );
+            int src_disc_type = 1;  // element-based SE-4
+            int tgt_disc_type = 3;  // element-based FV
+            CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type,
+                                                         &tgt_disc_type, weights_identifiers[2].c_str(),
+                                                         atmocn_map_file_name.c_str() ),
+                       "failed to load map file from disk" );
         }
 #endif
     }
@@ -449,13 +458,12 @@ int main( int argc, char* argv[] )
                                                     atmocn_map_file_name.c_str() );
             CHECKIERR( ierr, "failed to write map file to disk" );
 
-            const std::string intx_from_file_identifier = "map2-from-file";
-            int dummyCpl                                = -1;
-            int dummy_rowcol                            = -1;
-            int dummyType                               = 0;
-            ierr = iMOAB_LoadMappingWeightsFromFile( cplAtm2OcnPID, &dummyCpl, &dummy_rowcol, &dummyType,
-                                                     intx_from_file_identifier.c_str(), atmocn_map_file_name.c_str() );
-            CHECKIERR( ierr, "failed to load map file from disk" );
+            int src_disc_type = 1;  // element-based SE-4
+            int tgt_disc_type = 3;  // element-based FV
+            CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtm2OcnPID, &src_disc_type,
+                                                         &tgt_disc_type, weights_identifiers[3].c_str(),
+                                                         atmocn_map_file_name.c_str() ),
+                       "failed to load map file from disk" );
         }
 #endif
     }
@@ -591,8 +599,8 @@ int main( int argc, char* argv[] )
             /* We have the remapping weights now. Let us apply the weights onto the tag we defined
                on the source mesh and get the projection on the target mesh */
             PUSH_TIMER( "Apply Scalar projection weights" )
-            ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0].c_str(), bottomFields,
-                                                       bottomProjectedFields );
+            ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0].c_str(),
+                                                       bottomFields, bottomProjectedFields );
             CHECKIERR( ierr, "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )
             if( 1 == n )  // write only for n==1 case

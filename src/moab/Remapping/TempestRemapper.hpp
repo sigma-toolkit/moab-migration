@@ -64,234 +64,403 @@ class TempestRemapper : public Remapper
     };
 
     friend class TempestOnlineMap;
+public:
+    /**
+     * @brief Initialize the TempestRemapper object internal data structures including the mesh sets
+     *        and TempestRemap mesh references.
+     *
+     * @param initialize_fsets Flag to initialize the mesh sets (default: true)
+     * @return ErrorCode indicating the status of the initialization
+     */
+    virtual ErrorCode initialize(bool initialize_fsets = true);
 
-  public:
-    /// <summary>
-    ///     Initialize the TempestRemapper object internal datastructures including the mesh sets
-    ///     and TempestRemap mesh references.
-    /// </summary>
-    virtual ErrorCode initialize( bool initialize_fsets = true );
-
-    /// <summary>
-    ///     Deallocate and clear any memory initialized in the TempestRemapper object
-    /// </summary>
+    /**
+     * @brief Deallocate and clear any memory initialized in the TempestRemapper object
+     *
+     * @return ErrorCode indicating the status of the clear operation
+     */
     virtual ErrorCode clear();
 
-    /// <summary>
-    ///     Generate a mesh in memory of given type (CS/RLL/ICO/MPAS(structured)) and store it
-    ///     under the context specified by the user.
-    /// </summary>
-    moab::ErrorCode GenerateMesh( Remapper::IntersectionContext ctx, TempestMeshType type );
+    /**
+     * @brief Generate a mesh in memory of given type (CS/RLL/ICO/MPAS(structured)) and store it
+     *        under the context specified by the user.
+     *
+     * @param ctx Intersection context
+     * @param type Type of mesh to generate
+     * @return ErrorCode indicating the status of the mesh generation
+     */
+    moab::ErrorCode GenerateMesh(Remapper::IntersectionContext ctx, TempestMeshType type);
 
-    /// <summary>
-    ///     Load a mesh from disk of given type and store it under the context specified by the
-    ///     user.
-    /// </summary>
-    moab::ErrorCode LoadMesh( Remapper::IntersectionContext ctx, std::string inputFilename, TempestMeshType type );
+    /**
+     * @brief Load a mesh from disk of given type and store it under the context specified by the user.
+     *
+     * @param ctx Intersection context
+     * @param inputFilename File name of the mesh to load
+     * @param type Type of mesh to load
+     * @return ErrorCode indicating the status of the mesh loading
+     */
+    moab::ErrorCode LoadMesh(Remapper::IntersectionContext ctx, std::string inputFilename, TempestMeshType type);
 
-    /// <summary>
-    ///     Construct a source covering mesh such that it completely encompasses the target grid in
-    ///     parallel. This operation is critical to ensure that the parallel advancing-front
-    ///     intersection algorithm can compute the intersection mesh only locally without any process
-    ///     communication.
-    /// </summary>
-    moab::ErrorCode ConstructCoveringSet( double tolerance   = 1e-8,
-                                          double radius_src  = 1.0,
-                                          double radius_tgt  = 1.0,
-                                          double boxeps      = 0.1,
+    /**
+     * @brief Construct a source covering mesh such that it completely encompasses the target grid in
+     *        parallel. This operation is critical to ensure that the parallel advancing-front
+     *        intersection algorithm can compute the intersection mesh only locally without any process
+     *        communication.
+     *
+     * @param tolerance Tolerance for the covering mesh construction (default: 1e-8)
+     * @param radius_src Radius of the source mesh (default: 1.0)
+     * @param radius_tgt Radius of the target mesh (default: 1.0)
+     * @param boxeps Box epsilon value (default: 0.1)
+     * @param regional_mesh Flag to indicate if the mesh is regional (default: false)
+     * @param gnomonic Flag to indicate if the mesh is gnomonic (default: true)
+     * @param nb_ghost_layers Number of ghost layers (default: 0)
+     * @return ErrorCode indicating the status of the covering mesh construction
+     */
+    moab::ErrorCode ConstructCoveringSet(double tolerance = 1e-8,
+                                          double radius_src = 1.0,
+                                          double radius_tgt = 1.0,
+                                          double boxeps = 0.1,
                                           bool regional_mesh = false,
-                                          bool gnomonic      = true,
-                                          int nb_ghost_layers  = 0 );
+                                          bool gnomonic = true,
+                                          int nb_ghost_layers = 0);
 
-    /// <summary>
-    ///     Compute the intersection mesh between the source and target grids that have been
-    ///     instantiated in the Remapper. This function invokes the parallel advancing-front
-    ///     intersection algorithm internally for spherical meshes and can handle arbitrary
-    ///     unstructured grids (CS, RLL, ICO, MPAS) with and without holes.
-    /// </summary>
-    moab::ErrorCode ComputeOverlapMesh( bool kdtree_search = true, bool use_tempest = false);
+    /**
+     * @brief Compute the intersection mesh between the source and target grids that have been
+     *        instantiated in the Remapper. This function invokes the parallel advancing-front
+     *        intersection algorithm internally for spherical meshes and can handle arbitrary
+     *        unstructured grids (CS, RLL, ICO, MPAS) with and without holes.
+     *
+     * @param kdtree_search Flag to enable k-d tree search (default: true)
+     * @param use_tempest Flag to use TempestRemap (default: false)
+     * @return ErrorCode indicating the status of the intersection mesh computation
+     */
+    moab::ErrorCode ComputeOverlapMesh(bool kdtree_search = true, bool use_tempest = false);
 
-    /* Converters between MOAB and Tempest representations */
+    /**
+     * @brief Convert the TempestRemap mesh object to a corresponding MOAB mesh representation
+     *        according to the intersection context.
+     *
+     * @param ctx Intersection context
+     * @return ErrorCode indicating the status of the mesh conversion
+     */
+    moab::ErrorCode ConvertTempestMesh(Remapper::IntersectionContext ctx);
 
-    /// <summary>
-    ///     Convert the TempestRemap mesh object to a corresponding MOAB mesh representation
-    ///     according to the intersection context.
-    /// </summary>
-    moab::ErrorCode ConvertTempestMesh( Remapper::IntersectionContext ctx );
+    /**
+     * @brief Convert the MOAB mesh representation to a corresponding TempestRemap mesh object
+     *        according to the intersection context.
+     *
+     * @param ctx Intersection context
+     * @return ErrorCode indicating the status of the mesh conversion
+     */
+    moab::ErrorCode ConvertMeshToTempest(Remapper::IntersectionContext ctx);
 
-    /// <summary>
-    ///     Convert the MOAB mesh representation to a corresponding TempestRemap mesh object
-    ///     according to the intersection context.
-    /// </summary>
-    moab::ErrorCode ConvertMeshToTempest( Remapper::IntersectionContext ctx );
+    /**
+     * @brief Get the TempestRemap mesh object according to the intersection context.
+     *
+     * @param ctx Intersection context
+     * @return Pointer to the TempestRemap mesh object
+     */
+    Mesh* GetMesh(Remapper::IntersectionContext ctx);
 
-    /// <summary>
-    ///     Get the TempestRemap mesh object according to the intersection context.
-    /// </summary>
-    Mesh* GetMesh( Remapper::IntersectionContext ctx );
+    /**
+     * @brief Set the TempestRemap mesh object according to the intersection context.
+     *
+     * @param ctx Intersection context
+     * @param mesh Pointer to the TempestRemap mesh object
+     * @param overwrite Flag to overwrite the existing mesh (default: true)
+     */
+    void SetMesh(Remapper::IntersectionContext ctx, Mesh* mesh, bool overwrite = true);
 
-    /// <summary>
-    ///     Set the TempestRemap mesh object according to the intersection context.
-    /// </summary>
-    void SetMesh( Remapper::IntersectionContext ctx, Mesh* mesh, bool overwrite = true );
+    /**
+     * @brief Set the mesh set according to the intersection context.
+     *
+     * @param ctx Intersection context
+     * @param mset MOAB mesh set handle
+     * @param entities MOAB range of entities (optional)
+     */
+    void SetMeshSet(Remapper::IntersectionContext ctx, moab::EntityHandle mset, moab::Range* entities = nullptr);
 
-    void SetMeshSet( Remapper::IntersectionContext ctx /* Remapper::CoveringMesh*/,
-                     moab::EntityHandle mset,
-                     moab::Range* entities = nullptr );
-    /// <summary>
-    ///     Get the covering mesh (TempestRemap) object.
-    /// </summary>
+    /**
+     * @brief Get the covering mesh (TempestRemap) object.
+     *
+     * @return Pointer to the covering mesh object
+     */
     Mesh* GetCoveringMesh();
 
-    /// <summary>
-    ///     Get the MOAB mesh set corresponding to the intersection context.
-    /// </summary>
-    moab::EntityHandle& GetMeshSet( Remapper::IntersectionContext ctx );
+    /**
+     * @brief Get the MOAB mesh set corresponding to the intersection context.
+     *
+     * @param ctx Intersection context
+     * @return MOAB mesh set handle
+     */
+    moab::EntityHandle& GetMeshSet(Remapper::IntersectionContext ctx);
 
-    /// <summary>
-    ///     Const overload. Get the MOAB mesh set corresponding to the intersection context.
-    /// </summary>
-    moab::EntityHandle GetMeshSet( Remapper::IntersectionContext ctx ) const;
+    /**
+     * @brief Const overload. Get the MOAB mesh set corresponding to the intersection context.
+     *
+     * @param ctx Intersection context
+     * @return MOAB mesh set handle
+     */
+    moab::EntityHandle GetMeshSet(Remapper::IntersectionContext ctx) const;
 
-    /// <summary>
-    ///     Get the mesh element entities corresponding to the intersection context.
-    /// </summary>
-    moab::Range& GetMeshEntities( Remapper::IntersectionContext ctx );
+    /**
+     * @brief Get the mesh element entities corresponding to the intersection context.
+     *
+     * @param ctx Intersection context
+     * @return MOAB range of mesh element entities
+     */
+    moab::Range& GetMeshEntities(Remapper::IntersectionContext ctx);
 
-    /// <summary>
-    ///     Const overload. Get the mesh element entities corresponding to the intersection context.
-    /// </summary>
-    const moab::Range& GetMeshEntities( Remapper::IntersectionContext ctx ) const;
+    /**
+     * @brief Const overload. Get the mesh element entities corresponding to the intersection context.
+     *
+     * @param ctx Intersection context
+     * @return MOAB range of mesh element entities
+     */
+    const moab::Range& GetMeshEntities(Remapper::IntersectionContext ctx) const;
 
-    /// <summary>
-    ///     Get the mesh vertices corresponding to the intersection context. Useful for point-cloud
-    ///     meshes
-    /// </summary>
-    moab::Range& GetMeshVertices( Remapper::IntersectionContext ctx );
+    /**
+     * @brief Get the mesh vertices corresponding to the intersection context. Useful for point-cloud
+     *        meshes.
+     *
+     * @param ctx Intersection context
+     * @return MOAB range of mesh vertices
+     */
+    moab::Range& GetMeshVertices(Remapper::IntersectionContext ctx);
 
-    /// <summary>
-    ///     Const overload. Get the mesh vertices corresponding to the intersection context. Useful
-    ///     for point-cloud meshes.
-    /// </summary>
-    const moab::Range& GetMeshVertices( Remapper::IntersectionContext ctx ) const;
+    /**
+     * @brief Const overload. Get the mesh vertices corresponding to the intersection context. Useful
+     *        for point-cloud meshes.
+     *
+     * @param ctx Intersection context
+     * @return MOAB range of mesh vertices
+     */
+    const moab::Range& GetMeshVertices(Remapper::IntersectionContext ctx) const;
 
-    /// <summary>
-    ///     Get access to the underlying source covering set if available. Else return the source
-    ///     set.
-    /// </summary>
+    /**
+     * @brief Get access to the underlying source covering set if available. Else return the source
+     *        set.
+     *
+     * @return MOAB entity handle of the covering set
+     */
     moab::EntityHandle& GetCoveringSet();
 
-    /// <summary>
-    ///     Set the mesh type corresponding to the intersection context
-    /// </summary>
-    void SetMeshType( Remapper::IntersectionContext ctx, const std::vector< int >& metadata );
+    /**
+     * @brief Set the mesh type corresponding to the intersection context
+     *
+     * @param ctx Intersection context
+     * @param metadata Vector of mesh type metadata
+     */
+    void SetMeshType(Remapper::IntersectionContext ctx, const std::vector<int>& metadata);
 
-    /// <summary>
-    ///     reconstruct mesh, used now only for IO; need a better solution maybe
-    /// </summary>
-    void ResetMeshSet( Remapper::IntersectionContext ctx, moab::EntityHandle meshSet );
+    /**
+     * @brief Reconstruct mesh, used now only for IO; need a better solution maybe
+     *
+     * @param ctx Intersection context
+     * @param meshSet MOAB mesh set handle
+     */
+    void ResetMeshSet(Remapper::IntersectionContext ctx, moab::EntityHandle meshSet);
 
-    /// <summary>
-    ///     Get the mesh type corresponding to the intersection context
-    /// </summary>
-    TempestMeshType GetMeshType( Remapper::IntersectionContext ctx ) const;
+    /**
+     * @brief Get the mesh type corresponding to the intersection context
+     *
+     * @param ctx Intersection context
+     * @return Mesh type
+     */
+    TempestMeshType GetMeshType(Remapper::IntersectionContext ctx) const;
 
-    /// <summary>
-    ///     Get the global ID corresponding to the local entity ID according to the context (source,
-    ///     target, intersection)
-    /// </summary>
-    int GetGlobalID( Remapper::IntersectionContext ctx, int localID );
-
-    /// <summary>
-    ///     Get the local ID corresponding to the global entity ID according to the context (source,
-    ///     target, intersection)
-    /// </summary>
-    int GetLocalID( Remapper::IntersectionContext ctx, int globalID );
-
-    /// <summary>
-    ///     Gather the overlap mesh and asssociated source/target data and write it out to disk
-    ///     using the TempestRemap output interface. This information can then be used with the
-    ///     "GenerateOfflineMap" tool in TempestRemap as needed.
-    /// </summary>
-    moab::ErrorCode WriteTempestIntersectionMesh( std::string strOutputFileName,
+    /**
+     * @brief Gather the overlap mesh and associated source/target data and write it out to disk
+     *        using the TempestRemap output interface. This information can then be used with the
+     *        "GenerateOfflineMap" tool in TempestRemap as needed.
+     *
+     * @param strOutputFileName Output file name
+     * @param fAllParallel Flag to write all parallel data (default: false)
+     * @param fInputConcave Flag to indicate if the input mesh is concave (default: false)
+     * @param fOutputConcave Flag to indicate if the output mesh is concave (default: false)
+     * @return ErrorCode indicating the status of the write operation
+     */
+    moab::ErrorCode WriteTempestIntersectionMesh(std::string strOutputFileName,
                                                   const bool fAllParallel,
                                                   const bool fInputConcave,
-                                                  const bool fOutputConcave );
+                                                  const bool fOutputConcave);
 
-    /// <summary>
-    ///     Generate the necessary metadata and specifically the GLL node numbering for DoFs for a
-    ///     CS mesh. This negates the need for running external code like HOMME to output the
-    ///     numbering needed for computing maps. The functionality is used through the `mbconvert`
-    ///     tool to compute processor-invariant Global DoF IDs at GLL nodes.
-    /// </summary>
-    moab::ErrorCode GenerateCSMeshMetadata( const int ntot_elements,
-                                            moab::Range& entities,
-                                            moab::Range* secondary_entities,
-                                            const std::string& dofTagName,
-                                            int nP );
+    /**
+     * @brief Generate the necessary metadata and specifically the GLL node numbering for DoFs for a
+     *        CS mesh. This negates the need for running external code like HOMME to output the
+     *        numbering needed for computing maps. The functionality is used through the `mbconvert`
+     *        tool to compute processor-invariant Global DoF IDs at GLL nodes.
+     *
+     * @param ntot_elements Total number of elements
+     * @param entities MOAB range of entities
+     * @param secondary_entities MOAB range of secondary entities (optional)
+     * @param dofTagName Name of the DoF tag
+     * @param nP Number of points
+     * @return ErrorCode indicating the status of the metadata generation
+     */
+    moab::ErrorCode GenerateCSMeshMetadata(const int ntot_elements,
+                                             moab::Range& entities,
+                                             moab::Range* secondary_entities,
+                                             const std::string& dofTagName,
+                                             int nP);
 
-    /// <summary>
-    ///     Generate the necessary metadata for DoF node numbering in a given mesh.
-    ///     Currently, only the functionality to generate numbering on CS grids is supported.
-    /// </summary>
-    moab::ErrorCode GenerateMeshMetadata( Mesh& mesh,
-                                          const int ntot_elements,
-                                          moab::Range& entities,
-                                          moab::Range* secondary_entities,
-                                          const std::string dofTagName,
-                                          int nP );
+    /**
+     * @brief Generate the necessary metadata for DoF node numbering in a given mesh.
+     *        Currently, only the functionality to generate numbering on CS grids is supported.
+     *
+     * @param mesh Mesh object
+     * @param ntot_elements Total number of elements
+     * @param entities MOAB range of entities
+     * @param secondary_entities MOAB range of secondary entities (optional)
+     * @param dofTagName Name of the DoF tag
+     * @param nP Number of points
+     * @return ErrorCode indicating the status of the metadata generation
+     */
+    moab::ErrorCode GenerateMeshMetadata(Mesh& mesh,
+                                           const int ntot_elements,
+                                           moab::Range& entities,
+                                           moab::Range* secondary_entities,
+                                           const std::string dofTagName,
+                                           int nP);
 
-    /// <summary>
-    ///     Compute the local and global IDs for elements in source/target/coverage meshes.
-    /// </summary>
-    moab::ErrorCode ComputeGlobalLocalMaps();
-
-    ///	<summary>
-    ///		Get all the ghosted overlap entities that were accumulated to enable conservation in
-    /// parallel
-    ///	</summary>
-    moab::ErrorCode GetOverlapAugmentedEntities( moab::Range& sharedGhostEntities );
+    /**
+     * @brief Get all the ghosted overlap entities that were accumulated to enable conservation in
+     *        parallel
+     *
+     * @param sharedGhostEntities MOAB range of ghosted overlap entities
+     * @return ErrorCode indicating the status of the get operation
+     */
+    moab::ErrorCode GetOverlapAugmentedEntities(moab::Range& sharedGhostEntities);
 
 #ifndef MOAB_HAVE_MPI
-    /// <summary>
-    ///    Internal method to assign vertex and element global IDs if one does not exist already
-    /// </summary>
-    moab::ErrorCode assign_vertex_element_IDs( Tag idtag,
+    /**
+     * @brief Internal method to assign vertex and element global IDs if one does not exist already
+     *
+     * @param idtag Tag for the global IDs
+     * @param this_set MOAB entity handle of the mesh set
+     * @param dimension Dimension of the mesh (default: 2)
+     * @param start_id Starting ID (default: 1)
+     * @return ErrorCode indicating the status of the assignment
+     */
+    moab::ErrorCode assign_vertex_element_IDs(Tag idtag,
                                                EntityHandle this_set,
                                                const int dimension = 2,
-                                               const int start_id  = 1 );
+                                               const int start_id = 1);
 #endif
-    //	<summary>
-    ///		Get the masks that could have been defined
-    ///	</summary>
-    ErrorCode GetIMasks( Remapper::IntersectionContext ctx, std::vector< int >& masks );
 
-  public:                        // public members
-    const bool offlineWorkflow;  // check whether we are in an offline workflow context (mbtempest)
-    bool meshValidate;           // Validate the mesh after loading from file
+    /**
+     * @brief Get the masks that could have been defined
+     *
+     * @param ctx Intersection context
+     * @param masks Vector of masks
+     * @return ErrorCode indicating the status of the get operation
+     */
+    ErrorCode GetIMasks(Remapper::IntersectionContext ctx, std::vector<int>& masks);
 
-    bool constructEdgeMap;  //  Construct the edge map within the TempestRemap datastructures
+public:                        // public members
+    /**
+     * @brief Flag indicating whether the workflow is in offline mode.
+     *
+     * This flag is used to determine the context of the workflow, specifically
+     * whether it is running in an offline mode (mbtempest).
+     */
+    const bool offlineWorkflow;
 
+    /**
+     * @brief Flag to enable mesh validation after loading from file.
+     *
+     * If set to true, the mesh will be validated after it is loaded from a file.
+     */
+    bool meshValidate;
+
+    /**
+     * @brief Flag to construct the edge map within the TempestRemap data structures.
+     *
+     * If set to true, the edge map will be constructed within the TempestRemap
+     * data structures.
+     */
+    bool constructEdgeMap;
+
+    /**
+     * @brief Global verbosity flag.
+     *
+     * This flag controls the verbosity of the output. If set to true, more
+     * detailed output will be generated.
+     */
     static const bool verbose = true;
 
-  private:
-    moab::ErrorCode convert_overlap_mesh_sorted_by_source();
+private:
 
-    // private methods
+    /**
+     * @brief Convert all MOAB meshes to TempestRemap format.
+     *
+     * Utility method primarily used in online workflows to convert all meshes
+     * to TempestRemap format.
+     *
+     * @return ErrorCode Status of the conversion
+     */
+    ErrorCode ConvertAllMeshesToTempest();
+
+    /**
+     * @brief Convert overlap mesh to source-ordered format.
+     *
+     * Transforms the overlap mesh into a source-ordered format compatible
+     * with TempestRemap.
+     *
+     * @return moab::ErrorCode Status of the conversion
+     */
+    moab::ErrorCode ConvertOverlapMeshSourceOrdered();
+
+    // Private methods
+
+    /**
+     * @brief Load a mesh from disk in TempestRemap format.
+     *
+     * @param inputFilename Path to the input mesh file
+     * @param tempest_mesh Pointer to store the loaded TempestRemap mesh
+     * @return moab::ErrorCode Status of the load operation
+     */
     moab::ErrorCode load_tempest_mesh_private( std::string inputFilename, Mesh** tempest_mesh );
 
+    /**
+     * @brief Convert a MOAB mesh to TempestRemap format.
+     *
+     * @param mesh Target TempestRemap mesh pointer
+     * @param meshset MOAB mesh set to convert
+     * @param entities Range of entities to convert
+     * @param pverts Optional pointer to vertex range
+     * @return moab::ErrorCode Status of the conversion
+     */
     moab::ErrorCode convert_mesh_to_tempest_private( Mesh* mesh,
-                                                     moab::EntityHandle meshset,
-                                                     moab::Range& entities,
-                                                     moab::Range* pverts );
+                                                    moab::EntityHandle meshset,
+                                                    moab::Range& entities,
+                                                    moab::Range* pverts );
 
+    /**
+     * @brief Convert a TempestRemap mesh to MOAB format.
+     *
+     * @param type Type of the TempestRemap mesh
+     * @param mesh Source TempestRemap mesh
+     * @param meshset Target MOAB mesh set
+     * @param entities Range to store converted entities
+     * @param vertices Optional range to store vertices
+     * @return moab::ErrorCode Status of the conversion
+     */
     moab::ErrorCode convert_tempest_mesh_private( TempestMeshType type,
-                                                  Mesh* mesh,
-                                                  moab::EntityHandle& meshset,
-                                                  moab::Range& entities,
-                                                  moab::Range* vertices );
+                                                    Mesh* mesh,
+                                                    moab::EntityHandle& meshset,
+                                                    moab::Range& entities,
+                                                    moab::Range* vertices );
 
-    moab::ErrorCode augment_overlap_set();
+    /**
+     * @brief Augment overlap mesh with ghosted entities.
+     *
+     * Adds ghosted entities to the overlap mesh to ensure conservation
+     * in parallel operations.
+     *
+     * @return moab::ErrorCode Status of the augmentation
+     */
+    moab::ErrorCode AugmentOverlapSet();
 
     /* Source meshset, mesh and entity references */
     Mesh* m_source;
@@ -330,8 +499,8 @@ class TempestRemapper : public Remapper
     moab::Range m_covering_source_vertices;
 
     /* local to glboal and global to local ID maps */
-    std::map< int, int > gid_to_lid_src, gid_to_lid_covsrc, gid_to_lid_tgt;
-    std::map< int, int > lid_to_gid_src, lid_to_gid_covsrc, lid_to_gid_tgt;
+    // std::map< int, int > gid_to_lid_src, gid_to_lid_covsrc, gid_to_lid_tgt;
+    // std::map< int, int > lid_to_gid_src, lid_to_gid_covsrc, lid_to_gid_tgt;
 
     IntxAreaUtils::AreaMethod m_area_method;
 
@@ -395,10 +564,10 @@ inline void TempestRemapper::ResetMeshSet( Remapper::IntersectionContext ctx, mo
     {
         case Remapper::SourceMesh:
             delete m_source;
-            m_source = new Mesh;
+            m_source     = new Mesh;
             m_source_set = meshSet;
             convert_mesh_to_tempest_private( m_source, m_source_set, m_source_entities, &m_source_vertices );
-            m_source->CalculateFaceAreas( false ); // fInputConcave is false ?
+            m_source->CalculateFaceAreas( false );  // fInputConcave is false ?
             break;
         case Remapper::TargetMesh:
             // not needed yet
@@ -414,7 +583,6 @@ inline void TempestRemapper::ResetMeshSet( Remapper::IntersectionContext ctx, mo
             break;
     }
 }
-
 
 inline moab::EntityHandle& TempestRemapper::GetMeshSet( Remapper::IntersectionContext ctx )
 {
@@ -585,39 +753,39 @@ inline moab::EntityHandle& TempestRemapper::GetCoveringSet()
     return m_covering_source_set;
 }
 
-inline int TempestRemapper::GetGlobalID( Remapper::IntersectionContext ctx, int localID )
-{
-    switch( ctx )
-    {
-        case Remapper::SourceMesh:
-            return lid_to_gid_src[localID];
-        case Remapper::TargetMesh:
-            return lid_to_gid_tgt[localID];
-        case Remapper::CoveringMesh:
-            return lid_to_gid_covsrc[localID];
-        case Remapper::OverlapMesh:
-        case Remapper::DEFAULT:
-        default:
-            return -1;
-    }
-}
+// inline int TempestRemapper::GetGlobalID( Remapper::IntersectionContext ctx, int localID )
+// {
+//     switch( ctx )
+//     {
+//         case Remapper::SourceMesh:
+//             return lid_to_gid_src[localID];
+//         case Remapper::TargetMesh:
+//             return lid_to_gid_tgt[localID];
+//         case Remapper::CoveringMesh:
+//             return lid_to_gid_covsrc[localID];
+//         case Remapper::OverlapMesh:
+//         case Remapper::DEFAULT:
+//         default:
+//             return -1;
+//     }
+// }
 
-inline int TempestRemapper::GetLocalID( Remapper::IntersectionContext ctx, int globalID )
-{
-    switch( ctx )
-    {
-        case Remapper::SourceMesh:
-            return gid_to_lid_src[globalID];
-        case Remapper::TargetMesh:
-            return gid_to_lid_tgt[globalID];
-        case Remapper::CoveringMesh:
-            return gid_to_lid_covsrc[globalID];
-        case Remapper::DEFAULT:
-        case Remapper::OverlapMesh:
-        default:
-            return -1;
-    }
-}
+// inline int TempestRemapper::GetLocalID( Remapper::IntersectionContext ctx, int globalID )
+// {
+//     switch( ctx )
+//     {
+//         case Remapper::SourceMesh:
+//             return gid_to_lid_src[globalID];
+//         case Remapper::TargetMesh:
+//             return gid_to_lid_tgt[globalID];
+//         case Remapper::CoveringMesh:
+//             return gid_to_lid_covsrc[globalID];
+//         case Remapper::DEFAULT:
+//         case Remapper::OverlapMesh:
+//         default:
+//             return -1;
+//     }
+// }
 
 }  // namespace moab
 

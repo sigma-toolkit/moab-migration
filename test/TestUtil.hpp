@@ -758,6 +758,17 @@ void check_baseline_file( std::string basefile,
                           double eps,
                           int& err_code )
 {
+    // check if we are running parallel MPI tests
+    int rank = 0;
+#ifdef MOAB_HAVE_MPI
+    int isInit;
+    MPI_Initialized( &isInit );
+    if( isInit )
+    {
+        MPI_Comm_rank( MPI_COMM_WORLD, &rank );
+    }
+#endif
+
     err_code = 1;
     std::fstream fs;
     fs.open( basefile.c_str(), std::fstream::in );
@@ -784,6 +795,8 @@ void check_baseline_file( std::string basefile,
             flag_error();
             return;
         }
+
+        // printf( "GID: %d, Value: %3.14f, Expected: %3.14f\n", gids[i], vals[i], it->second );
         if( fabs( it->second - vals[i] ) > eps )
         {
             std::cout << " value out of range: index i=" << i << " id: " << gids[i] << "  value:" << vals[i]

@@ -56,11 +56,11 @@ class Remapper
 
     enum IntersectionContext
     {
-        DEFAULT              = -1,  // default context
-        SourceMesh           = 0,   // source mesh
-        TargetMesh           = 1,   // target mesh
-        OverlapMesh          = 2,   // overlap/intersection mesh
-        CoveringMesh         = 3,   // source mesh covering target mesh
+        DEFAULT      = -1,  // default context
+        SourceMesh   = 0,   // source mesh
+        TargetMesh   = 1,   // target mesh
+        OverlapMesh  = 2,   // overlap/intersection mesh
+        CoveringMesh = 3,   // source mesh covering target mesh
     };
 
     moab::Interface* get_interface()

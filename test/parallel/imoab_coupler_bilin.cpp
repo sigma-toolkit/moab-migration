@@ -44,8 +44,6 @@ using namespace moab;
 #error The climate coupler test example requires MOAB configuration with TempestRemap
 #endif
 
-#define ENABLE_ATMOCN_COUPLING
-
 int main( int argc, char* argv[] )
 {
     int ierr;
@@ -81,15 +79,13 @@ int main( int argc, char* argv[] )
     // cplocn is for ocean on coupelr pes
     // atmocnid is for intx atm / ocn on coupler pes
     //
-    int rankInAtmComm = -1;
-    int cmpatm        = 5,
-        cplatm        = 6;  // component ids are unique over all pes, and established in advance;
-#ifdef ENABLE_ATMOCN_COUPLING
+    int rankInAtmComm       = -1;
+    int cmpatm              = 5,
+        cplatm              = 6;  // component ids are unique over all pes, and established in advance;
     std::string ocnFilename = TestDir + "unittest/wholeOcn.h5m";
     int rankInOcnComm       = -1;
     int cmpocn = 17, cplocn = 18,
         atmocnid = 618;  // component ids are unique over all pes, and established in advance;
-#endif
 
     int rankInCouComm = -1;
 
@@ -105,16 +101,12 @@ int main( int argc, char* argv[] )
 
     ProgOptions opts;
     opts.addOpt< std::string >( "atmosphere,t", "atm mesh filename (source)", &atmFilename );
-#ifdef ENABLE_ATMOCN_COUPLING
     opts.addOpt< std::string >( "ocean,m", "ocean mesh filename (target)", &ocnFilename );
     std::string baseline = TestDir + "unittest/baseline3.txt";
-#endif
     opts.addOpt< int >( "startAtm,a", "start task for atmosphere layout", &startG1 );
     opts.addOpt< int >( "endAtm,b", "end task for atmosphere layout", &endG1 );
-#ifdef ENABLE_ATMOCN_COUPLING
     opts.addOpt< int >( "startOcn,c", "start task for ocean layout", &startG2 );
     opts.addOpt< int >( "endOcn,d", "end task for ocean layout", &endG2 );
-#endif
 
     opts.addOpt< int >( "startCoupler,g", "start task for coupler layout", &startG4 );
     opts.addOpt< int >( "endCoupler,j", "end task for coupler layout", &endG4 );
@@ -130,11 +122,9 @@ int main( int argc, char* argv[] )
 
     if( !rankInGlobalComm )
     {
-        std::cout << " atm file: " << atmFilename << "\n   on tasks : " << startG1 << ":" << endG1 <<
-#ifdef ENABLE_ATMOCN_COUPLING
-            "\n ocn file: " << ocnFilename << "\n     on tasks : " << startG2 << ":" << endG2 <<
-#endif
-            "\n  partitioning (0 trivial, 1 graph, 2 geometry) " << repartitioner_scheme << "\n  ";
+        std::cout << " atm file: " << atmFilename << "\n   on tasks : " << startG1 << ":" << endG1
+                  << "\n ocn file: " << ocnFilename << "\n     on tasks : " << startG2 << ":" << endG2
+                  << "\n  partitioning (0 trivial, 1 graph, 2 geometry) " << repartitioner_scheme << "\n  ";
     }
 
     // load files on 3 different communicators, groups
@@ -147,12 +137,10 @@ int main( int argc, char* argv[] )
     ierr = create_group_and_comm( startG1, endG1, jgroup, &atmPEGroup, &atmComm );
     CHECKIERR( ierr, "Cannot create atm MPI group and communicator " )
 
-#ifdef ENABLE_ATMOCN_COUPLING
     MPI_Group ocnPEGroup;
     MPI_Comm ocnComm;
     ierr = create_group_and_comm( startG2, endG2, jgroup, &ocnPEGroup, &ocnComm );
     CHECKIERR( ierr, "Cannot create ocn MPI group and communicator " )
-#endif
 
     // we will always have a coupler
     MPI_Group couPEGroup;
@@ -166,13 +154,11 @@ int main( int argc, char* argv[] )
     ierr = create_joint_comm_group( atmPEGroup, couPEGroup, &joinAtmCouGroup, &atmCouComm );
     CHECKIERR( ierr, "Cannot create joint atm cou communicator" )
 
-#ifdef ENABLE_ATMOCN_COUPLING
     // ocn_coupler
     MPI_Group joinOcnCouGroup;
     MPI_Comm ocnCouComm;
     ierr = create_joint_comm_group( ocnPEGroup, couPEGroup, &joinOcnCouGroup, &ocnCouComm );
     CHECKIERR( ierr, "Cannot create joint ocn cou communicator" )
-#endif
 
     ierr = iMOAB_Initialize( argc, argv );  // not really needed anything from argc, argv, yet; maybe we should
     CHECKIERR( ierr, "Cannot initialize iMOAB" )
@@ -181,43 +167,37 @@ int main( int argc, char* argv[] )
     iMOAB_AppID cmpAtmPID = &cmpAtmAppID;  // atm
     int cplAtmAppID       = -1;            // -1 means it is not initialized
     iMOAB_AppID cplAtmPID = &cplAtmAppID;  // atm on coupler PEs
-#ifdef ENABLE_ATMOCN_COUPLING
     int cmpOcnAppID       = -1;
     iMOAB_AppID cmpOcnPID = &cmpOcnAppID;        // ocn
     int cplOcnAppID = -1, cplAtmOcnAppID = -1;   // -1 means it is not initialized
     iMOAB_AppID cplOcnPID    = &cplOcnAppID;     // ocn on coupler PEs
     iMOAB_AppID cplAtmOcnPID = &cplAtmOcnAppID;  // intx atm -ocn on coupler PEs
-#endif
 
     if( couComm != MPI_COMM_NULL )
     {
         MPI_Comm_rank( couComm, &rankInCouComm );
         // Register all the applications on the coupler PEs
-        ierr = iMOAB_RegisterApplication( "ATMX", &couComm, &cplatm,
+        ierr = iMOAB_RegisterApplication( "ATMCPL", &couComm, &cplatm,
                                           cplAtmPID );  // atm on coupler pes
         CHECKIERR( ierr, "Cannot register ATM over coupler PEs" )
-#ifdef ENABLE_ATMOCN_COUPLING
-        ierr = iMOAB_RegisterApplication( "OCNX", &couComm, &cplocn,
+        ierr = iMOAB_RegisterApplication( "OCNCPL", &couComm, &cplocn,
                                           cplOcnPID );  // ocn on coupler pes
         CHECKIERR( ierr, "Cannot register OCN over coupler PEs" )
-#endif
     }
 
     if( atmComm != MPI_COMM_NULL )
     {
         MPI_Comm_rank( atmComm, &rankInAtmComm );
-        ierr = iMOAB_RegisterApplication( "ATM1", &atmComm, &cmpatm, cmpAtmPID );
+        ierr = iMOAB_RegisterApplication( "ATMCMP", &atmComm, &cmpatm, cmpAtmPID );
         CHECKIERR( ierr, "Cannot register ATM App" )
     }
 
-#ifdef ENABLE_ATMOCN_COUPLING
     if( ocnComm != MPI_COMM_NULL )
     {
         MPI_Comm_rank( ocnComm, &rankInOcnComm );
-        ierr = iMOAB_RegisterApplication( "OCN1", &ocnComm, &cmpocn, cmpOcnPID );
+        ierr = iMOAB_RegisterApplication( "OCNCMP", &ocnComm, &cmpocn, cmpOcnPID );
         CHECKIERR( ierr, "Cannot register OCN App" )
     }
-#endif
 
     // atm
     ierr =
@@ -225,48 +205,61 @@ int main( int argc, char* argv[] )
                                         &couPEGroup, &atmCouComm, atmFilename, readopts, nghlay, repartitioner_scheme );
     CHECKIERR( ierr, "Cannot load and migrate atm mesh" )
 
+    if( atmCouComm != MPI_COMM_NULL )
+    {
+        // We just need to create a comm graph to internally transfer data from coupler atm to coupler ocean
+        // ierr = iMOAB_CoverageGraph( &couComm, cplAtm2PID, cplAtm2OcnPID, cplAtm2OcnPID, &cplatm2, &atm2ocnid,
+        // &cplocn );  // it happens over joint communicator
+        int type = 3;
+        CHECKIERR( iMOAB_ComputeCommGraph( cmpAtmPID, cplAtmPID, &atmCouComm, &atmPEGroup, &couPEGroup, &type, &type,
+                                           &cmpatm, &cplatm ),
+                   "cannot compute graph between ATM comp and ATM migrated to coupler" )
+    }
+
+#ifdef VERBOSE
     if( couComm != MPI_COMM_NULL )
     {  // write only for n==1 case
         char outputFileTgt3[] = "recvAtmx.h5m";
         ierr                  = iMOAB_WriteMesh( cplAtmPID, outputFileTgt3, fileWriteOptions );
         CHECKIERR( ierr, "cannot write atm mesh after receiving" )
     }
-    MPI_Barrier( MPI_COMM_WORLD );
+#endif
 
-#ifdef ENABLE_ATMOCN_COUPLING
     // ocean
     ierr =
         setup_component_coupler_meshes( cmpOcnPID, cmpocn, cplOcnPID, cplocn, &ocnComm, &ocnPEGroup, &couComm,
                                         &couPEGroup, &ocnCouComm, ocnFilename, readopts, nghlay, repartitioner_scheme );
     CHECKIERR( ierr, "Cannot load and migrate ocn mesh" )
 
-    MPI_Barrier( MPI_COMM_WORLD );
-
-#endif  // #ifdef ENABLE_ATMOCN_COUPLING
-
-    MPI_Barrier( MPI_COMM_WORLD );
-
-#ifdef ENABLE_ATMOCN_COUPLING
     if( couComm != MPI_COMM_NULL )
     {
         // now compute intersection between OCNx and ATMx on coupler PEs
-        ierr = iMOAB_RegisterApplication( "ATMOCN", &couComm, &atmocnid, cplAtmOcnPID );
+        ierr = iMOAB_RegisterApplication( "ATMOCNCPL", &couComm, &atmocnid, cplAtmOcnPID );
         CHECKIERR( ierr, "Cannot register ocn_atm intx over coupler pes " )
     }
-#endif
+
+    // this model (recMeshOcn.h5m) has mixed meshes in it, we need to repair the comm graph
+    // first delete the one created with migration, then compute a new one
+    if( ocnCouComm != MPI_COMM_NULL )
+    {
+        int type = 3;  // type: 1 - SE, 2 - Vertex (point cloud), 3 - Element (FV scalars)
+        CHECKIERR( iMOAB_ComputeCommGraph( cmpOcnPID, cplOcnPID, &ocnCouComm, &ocnPEGroup, &couPEGroup, &type, &type,
+                                           &cmpocn, &cplocn ),
+                   "cannot compute graph between ocn comp and ocn migrated to coupler" )
+    }
 
     int disc_orders[1]                       = { 1 };
     const std::string weights_identifiers[1] = { "bilinear" };
     const std::string disc_methods[1]        = { "fv" };
     const std::string dof_tag_names[1]       = { "GLOBAL_ID" };
     const std::string method                 = "bilin";
-#ifdef ENABLE_ATMOCN_COUPLING
+
     if( couComm != MPI_COMM_NULL )
     {
         // set the ghost layers on the coupler for the source mesh
-        nghlay = 1;  // number of ghost layers for source and target
+        nghlay         = 1;  // number of ghost layers for source and target
         int nghlay_tgt = 0;
-        ierr   = iMOAB_SetMapGhostLayers( cplAtmOcnPID, &nghlay, &nghlay_tgt );
+        ierr           = iMOAB_SetMapGhostLayers( cplAtmOcnPID, &nghlay, &nghlay_tgt );
         CHECKIERR( ierr, "cannot set ghost layers" )
 
         PUSH_TIMER( "Compute ATM-OCN mesh intersection" )
@@ -280,24 +273,16 @@ int main( int argc, char* argv[] )
 
     if( couComm != MPI_COMM_NULL )
     {
-
         // We just need to create a comm graph to internally transfer data from coupler atm to coupler ocean
         // ierr = iMOAB_CoverageGraph( &couComm, cplAtm2PID, cplAtm2OcnPID, cplAtm2OcnPID, &cplatm2, &atm2ocnid,
         // &cplocn );  // it happens over joint communicator
-        int type1 = 3;
-        int type2 = 3;
-        ierr      = iMOAB_ComputeCommGraph( cplAtmPID, cplAtmOcnPID, &couComm, &couPEGroup, &couPEGroup, &type1, &type2,
-                                            &cplatm, &atmocnid );
+        int type = 3;
+        ierr     = iMOAB_ComputeCommGraph( cplAtmPID, cplAtmOcnPID, &couComm, &couPEGroup, &couPEGroup, &type, &type,
+                                           &cplatm, &atmocnid );
         CHECKIERR( ierr, "cannot recompute direct coverage graph for ocean from atm" )
-        POP_TIMER( couComm, rankInCouComm )  // hijack this rank
     }
-#endif
-
-    MPI_Barrier( MPI_COMM_WORLD );
 
     int fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 0, fNoConserve = 0, fNoBubble = 1, fInverseDistanceMap = 0;
-
-#ifdef ENABLE_ATMOCN_COUPLING
 
     if( couComm != MPI_COMM_NULL )
     {
@@ -322,10 +307,6 @@ int main( int argc, char* argv[] )
 #endif
     }
 
-#endif
-
-    MPI_Barrier( MPI_COMM_WORLD );
-
     int tagIndex[2];
     int tagTypes[2]  = { DENSE_DOUBLE, DENSE_DOUBLE };
     int atmCompNDoFs = disc_orders[0] * disc_orders[0], ocnCompNDoFs = 1 /*FV*/;
@@ -345,10 +326,8 @@ int main( int argc, char* argv[] )
     {
         ierr = iMOAB_DefineTagStorage( cplAtmPID, bottomFields, &tagTypes[0], &atmCompNDoFs, &tagIndex[0] );
         CHECKIERR( ierr, "failed to define the field tag Sa_dens:Sa_pbot" );
-#ifdef ENABLE_ATMOCN_COUPLING
         ierr = iMOAB_DefineTagStorage( cplOcnPID, bottomProjectedFields, &tagTypes[1], &ocnCompNDoFs, &tagIndex[1] );
         CHECKIERR( ierr, "failed to define the field tag Sa_dens:Sa_pbot" );
-#endif
     }
 
     // need to make sure that the coverage mesh (created during intx method) received the tag that
@@ -386,7 +365,6 @@ int main( int argc, char* argv[] )
         }
     }
 
-#ifdef ENABLE_ATMOCN_COUPLING
     // first hop
     PUSH_TIMER( "Send/receive data from atm component to coupler in atm context" )
     if( atmComm != MPI_COMM_NULL )
@@ -402,7 +380,6 @@ int main( int argc, char* argv[] )
         ierr = iMOAB_ReceiveElementTag( cplAtmPID, bottomFields, &atmCouComm, &cmpatm );
         CHECKIERR( ierr, "cannot receive tag values" )
     }
-    POP_TIMER( MPI_COMM_WORLD, rankInGlobalComm )
 
     // we can now free the sender buffers
     if( atmComm != MPI_COMM_NULL )
@@ -410,6 +387,7 @@ int main( int argc, char* argv[] )
         ierr = iMOAB_FreeSenderBuffers( cmpAtmPID, &cplatm );  // context is for ocean
         CHECKIERR( ierr, "cannot free buffers used to resend atm tag towards the coverage mesh" )
     }
+    POP_TIMER( MPI_COMM_WORLD, rankInGlobalComm )
 
     // second hop, is from atm towards ocean, on coupler
     //  it should send from each part on coupler towards the coverage set that should form the
@@ -511,9 +489,6 @@ int main( int argc, char* argv[] )
         if( 0 == err_code ) std::cout << " passed baseline test atm2ocn on ocean task " << rankInOcnComm << "\n";
     }
 
-#endif
-
-#ifdef ENABLE_ATMOCN_COUPLING
     if( couComm != MPI_COMM_NULL )
     {
         ierr = iMOAB_DeregisterApplication( cplAtmOcnPID );
@@ -524,7 +499,6 @@ int main( int argc, char* argv[] )
         ierr = iMOAB_DeregisterApplication( cmpOcnPID );
         CHECKIERR( ierr, "cannot deregister app OCN1" )
     }
-#endif  // ENABLE_ATMOCN_COUPLING
 
     if( atmComm != MPI_COMM_NULL )
     {
@@ -532,13 +506,11 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "cannot deregister app ATM1" )
     }
 
-#ifdef ENABLE_ATMOCN_COUPLING
     if( couComm != MPI_COMM_NULL )
     {
         ierr = iMOAB_DeregisterApplication( cplOcnPID );
         CHECKIERR( ierr, "cannot deregister app OCNX" )
     }
-#endif  // ENABLE_ATMOCN_COUPLING
 
     if( couComm != MPI_COMM_NULL )
     {
@@ -555,20 +527,16 @@ int main( int argc, char* argv[] )
     MPI_Group_free( &joinAtmCouGroup );
     if( MPI_COMM_NULL != atmComm ) MPI_Comm_free( &atmComm );
 
-#ifdef ENABLE_ATMOCN_COUPLING
     if( MPI_COMM_NULL != ocnComm ) MPI_Comm_free( &ocnComm );
     // free ocn - coupler group and comm
     if( MPI_COMM_NULL != ocnCouComm ) MPI_Comm_free( &ocnCouComm );
     MPI_Group_free( &joinOcnCouGroup );
-#endif
 
     if( MPI_COMM_NULL != couComm ) MPI_Comm_free( &couComm );
 
+    // free up MPI resources
     MPI_Group_free( &atmPEGroup );
-#ifdef ENABLE_ATMOCN_COUPLING
     MPI_Group_free( &ocnPEGroup );
-#endif
-
     MPI_Group_free( &couPEGroup );
     MPI_Group_free( &jgroup );
 

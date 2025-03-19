@@ -449,11 +449,19 @@ module iMOAB
 ! closing endif: MOAB_HAVE_MPI
 #endif
 
+      integer(c_int) function iMOAB_ComputeCoverageMesh(pid_source, pid_target, pid_intersection) &
+                                                    bind(C, name='iMOAB_ComputeCoverageMesh')
+        use, intrinsic :: iso_c_binding, only: c_int
+        integer(c_int), intent(in) :: pid_source
+        integer(c_int), intent(in) :: pid_target
+        integer(c_int), intent(in) :: pid_intersection
+      end function iMOAB_ComputeCoverageMesh
+
 #ifdef MOAB_HAVE_TEMPESTREMAP
 
       integer(c_int) function iMOAB_ComputeMeshIntersectionOnSphere(pid_source, pid_target, pid_intersection) &
                                                                   bind(C, name='iMOAB_ComputeMeshIntersectionOnSphere')
-        use, intrinsic :: iso_c_binding, only: c_int, c_double
+        use, intrinsic :: iso_c_binding, only: c_int
         integer(c_int), intent(in) :: pid_source
         integer(c_int), intent(in) :: pid_target
         integer(c_int), intent(in) :: pid_intersection
@@ -469,14 +477,15 @@ module iMOAB
 
 #ifdef MOAB_HAVE_NETCDF
 
-      integer(c_int) function iMOAB_LoadMappingWeightsFromFile(pid_intersection, pid_cpl, column_or_row, mtype, &
+      integer(c_int) function iMOAB_LoadMappingWeightsFromFile(pid_source, pid_target, pid_intersection, src_disc_type, tgt_disc_type, &
                                                                solution_weights_identifier, remap_weights_filename) &
                                                                   bind(C, name='iMOAB_LoadMappingWeightsFromFile')
             use, intrinsic :: iso_c_binding, only : c_int, c_char
+            integer(c_int), intent(in) :: pid_source
+            integer(c_int), intent(in) :: pid_target
             integer(c_int), intent(in) :: pid_intersection
-            integer(c_int), intent(in) :: pid_cpl
-            integer(c_int), intent(in) :: column_or_row
-            integer(c_int), intent(in) :: mtype
+            integer(c_int), intent(in) :: src_disc_type
+            integer(c_int), intent(in) :: tgt_disc_type
             character(kind=c_char), intent(in) :: solution_weights_identifier(*)
             character(kind=c_char), intent(in) :: remap_weights_filename(*)
       end function iMOAB_LoadMappingWeightsFromFile

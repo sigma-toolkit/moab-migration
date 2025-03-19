@@ -22,6 +22,15 @@
 #include "OfflineMap.h"
 
 #ifdef MOAB_HAVE_EIGEN3
+// #ifdef MOAB_HAVE_BLAS
+// #define EIGEN_USE_BLAS
+// #endif
+// #define EIGEN_DONT_PARALLELIZE
+// #define EIGEN_DONT_VECTORIZE
+// #define EIGEN_STRONG_INLINE
+#define EIGEN_DEFAULT_TO_ROW_MAJOR
+#define EIGEN_RUNTIME_NO_MALLOC
+// #define EIGEN_UNROLLING_LIMIT 0
 #include <Eigen/Sparse>
 #endif
 
@@ -103,8 +112,11 @@ class TempestOnlineMap : public OfflineMap
     ///		Read the OfflineMap from a NetCDF file.
     ///	</summary>
     moab::ErrorCode ReadParallelMap( const char* strSource,
-                                     const std::vector< int >& owned_dof_ids,
-                                     bool row_major_ownership = true );
+                                     const std::vector< int >& tgt_dof_ids,
+                                     std::vector< double >& areaA,
+                                     int& nA,
+                                     std::vector< double >& areaB,
+                                     int& nB );
 
     ///	<summary>
     ///		Write the TempestOnlineMap to a parallel NetCDF file.
@@ -139,6 +151,9 @@ class TempestOnlineMap : public OfflineMap
     ///	</summary>
     const DataArray1D< double >& GetGlobalTargetAreas() const;
 
+    ///	<summary>
+    ///		Print information and metadata about the remapping weights.
+    ///	</summary>
     void PrintMapStatistics();
 
   private:
@@ -279,7 +294,7 @@ class TempestOnlineMap : public OfflineMap
                                                      std::vector< double >& dataOutDouble,
                                                      CAASType caasType = CAAS_GLOBAL,
                                                      int caasIteration = 0,
-                                                     double mismatch = 0.0 );
+                                                     double mismatch   = 0.0 );
 
     /// @brief
     /// @param vecAdjFaces
@@ -392,9 +407,9 @@ class TempestOnlineMap : public OfflineMap
     ///	</summary>
     moab::ErrorCode ApplyWeights( moab::Tag srcSolutionTag,
                                   moab::Tag tgtSolutionTag,
-                                  bool transpose    = false,
-                                  CAASType caasType = CAAS_NONE,
-								  double default_projection = 0.0);
+                                  bool transpose            = false,
+                                  CAASType caasType         = CAAS_NONE,
+                                  double default_projection = 0.0 );
 
     typedef double ( *sample_function )( double, double );
 
@@ -451,6 +466,9 @@ class TempestOnlineMap : public OfflineMap
     };
 
   private:
+    template < typename SparseMatrixType >
+    void serializeSparseMatrix( const SparseMatrixType& mat, const std::string& filename );
+
     void setup_sizes_dimensions();
 
     void CAASLimiter( std::vector< double >& dataCorrectedField,

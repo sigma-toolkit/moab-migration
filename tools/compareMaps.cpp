@@ -290,21 +290,11 @@ void diff_2d_vect( const char* var_name, int n )
     return;
 }
 
-template<typename T>
-bool compTrip (T & a, T & b)
-{
-    double v1_abs=fabs( a.value() );
-    double v2_abs=fabs( a.value() );
-    return (v1_abs < v2_abs) ;
-}
-
 typedef Eigen::Triplet< double > Triplet;
 
 struct CompareTriplets {
     bool operator()( Triplet & a, Triplet & b) {
-        double v1_abs=fabs( a.value() );
-        double v2_abs=fabs( b.value() );
-        return (v1_abs > v2_abs) ;
+        return  fabs( a.value() ) > fabs( b.value() ) ;
     }
 };
 
@@ -422,7 +412,7 @@ int main( int argc, char* argv[] )
                 largestDiffs.pop();
         }
     }
-    std::cout << std::setprecision( 10 );
+    std::cout << std::setprecision( 16 );
     int counter=0;
     while (!largestDiffs.empty()) {
         Triplet tp = largestDiffs.top();

@@ -665,8 +665,8 @@ moab::ErrorCode moab::TempestOnlineMap::set_col_dc_dofs( std::vector< int >& val
     col_dtoc_dofmap.resize( values_entities.size(), -1 );
     for( size_t j = 0; j < values_entities.size(); j++ )
     {
-        // values are 1 based, but rowMap, colMap are not
-        const auto it = colMap.find( values_entities[j] - 1 );
+        // values are 1 based, but rowMap, colMap point to indices that are 0 based
+        const auto it = colMap.find( values_entities[j] );
         if( it != colMap.end() ) col_dtoc_dofmap[j] = it->second;
     }
     return moab::MB_SUCCESS;
@@ -680,7 +680,7 @@ moab::ErrorCode moab::TempestOnlineMap::set_row_dc_dofs( std::vector< int >& val
     for( size_t j = 0; j < values_entities.size(); j++ )
     {
         // values are 1 based, but rowMap, colMap are not
-        const auto it = rowMap.find( values_entities[j] - 1 );
+        const auto it = rowMap.find( values_entities[j] );
         if( it != rowMap.end() ) row_dtoc_dofmap[j] = it->second;
     }
     return moab::MB_SUCCESS;

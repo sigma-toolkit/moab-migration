@@ -1416,11 +1416,11 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         // populate
         for( int i = 0; i < localSize; i++ )
         {
-            int rowval  = vecRow[i] - 1;  // dofs are 1 based in the file
-            int colval  = vecCol[i] - 1;
+            int rowval  = vecRow[i] ;  // dofs are 1 based in the file
+            int colval  = vecCol[i] ;
             int to_proc = -1;
 
-            to_proc = rowval/nPerPart;
+            to_proc = (rowval-1)/nPerPart;
             if (to_proc == size)
                 to_proc = size - 1;
 
@@ -1445,8 +1445,8 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             for( size_t i = 0; i < owned_dof_ids.size(); i++ )
             {
                 int to_proc = -1;
-                int dof_val = owned_dof_ids[i] - 1;  // dofs are 1 based in the file, partition from 0 ?
-                to_proc = dof_val/nPerPart;
+                int dof_val = owned_dof_ids[i];  // dofs are 1 based in the file, partition from 0 ?
+                to_proc = (dof_val - 1)/nPerPart;
                 if (to_proc == size)
                     to_proc = size - 1;
 
@@ -1568,8 +1568,8 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         // populate the sparsematrix, using rowMap and colMap
         for( int i = 0; i < nS; i++ )
         {
-            const int vecRowValue = vecRow[i]-1;
-            const int vecColValue = vecCol[i]-1;
+            const int vecRowValue = vecRow[i];
+            const int vecColValue = vecCol[i];
             rowSet.insert(vecRowValue);
             colSet.insert(vecColValue);
         }
@@ -1589,8 +1589,8 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         tripletList.reserve(nS);
         for( int i = 0; i < nS; i++ )
         {
-            const int vecRowValue = vecRow[i]-1 ;  // the rows, cols are 1 based in the file
-            const int vecColValue = vecCol[i]-1 ;  // sparse matrix will be 1 based too
+            const int vecRowValue = vecRow[i] ;  // the rows, cols are 1 based in the file
+            const int vecColValue = vecCol[i] ;  // sparse matrix will be 1 based too
             double value = vecS[i];
             tripletList.push_back( Triplet( rowMap[ vecRowValue ], colMap[ vecColValue ], value ) );
         }

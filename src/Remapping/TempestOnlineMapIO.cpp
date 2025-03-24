@@ -1393,6 +1393,11 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     // Next, reuse the global to local map
     // const auto& rowMap = m_remapper->gid_to_lid_tgt;
     // const auto& colMap = m_remapper->gid_to_lid_covsrc;
+#ifdef MOAB_HAVE_EIGEN3
+
+    // first matrix
+    typedef Eigen::Triplet< double > Triplet;
+    std::vector< Triplet > tripletList;
 
 #ifdef MOAB_HAVE_MPI
     // bother with tuple list only if size > 1
@@ -1518,99 +1523,95 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             tl = tl_back;
         }
 
-        int rindexMax = 0, cindexMax = 0;
+        // set of row and col used on this task
+        std::set<int> rowSet;
+        std::set<int> colSet;
         // populate the sparsematrix, using rowMap and colMap
         int n = tl->get_n();
         for( int i = 0; i < n; i++ )
         {
-            int rindex, cindex;
             const int vecRowValue = tl->vi_wr[3 * i + 1];
             const int vecColValue = tl->vi_wr[3 * i + 2];
+            rowSet.insert(vecRowValue);
+            colSet.insert(vecColValue);
+        }
+        int index = 0;
+        for  (std::set<int>::iterator setIt = rowSet.begin(); setIt!=rowSet.end(); ++setIt)
+        {
+            rowMap[*setIt] = index++;
+        }
+        m_nTotDofs_Dest = index;
+        index = 0;
+        for  (std::set<int>::iterator setIt = colSet.begin(); setIt!=colSet.end(); ++setIt)
+        {
+            colMap[*setIt] = index++;
+        }
+        m_nTotDofs_SrcCov = index;
 
-            const auto riter = rowMap.find( vecRowValue );
-            if( riter == rowMap.end() )
-            {
-                rowMap[vecRowValue] = rindexMax;
-                rindex              = rindexMax;
-                row_gdofmap.push_back( vecRowValue );
-                // row_dtoc_dofmap.push_back( vecRowValue );
-                rindexMax++;
-            }
-            else
-                rindex = riter->second;
 
-            const auto citer = colMap.find( vecColValue );
-            if( citer == colMap.end() )
-            {
-                colMap[vecColValue] = cindexMax;
-                cindex              = cindexMax;
-                col_gdofmap.push_back( vecColValue );
-                // col_dtoc_dofmap.push_back( vecColValue );
-                cindexMax++;
-            }
-            else
-                cindex = citer->second;
-
-            sparseMatrix( rindex, cindex ) = tl->vr_wr[i];
+        tripletList.reserve( n );
+        for( int i = 0; i < n; i++ )
+        {
+            const int vecRowValue = tl->vi_wr[3 * i + 1];
+            const int vecColValue = tl->vi_wr[3 * i + 2];
+            double value = tl->vr_wr[i];
+            tripletList.push_back( Triplet( rowMap[ vecRowValue ], colMap[ vecColValue ], value ) );
         }
         tl->reset();
     }
     else
 #endif
     {
-        int rindexMax = 0, cindexMax = 0;
+        // set of row and col used on this task
+        std::set<int> rowSet;
+        std::set<int> colSet;
+        // populate the sparsematrix, using rowMap and colMap
         for( int i = 0; i < nS; i++ )
         {
-            int rindex, cindex;
-            const int vecRowValue = vecRow[i] - 1;  // the rows, cols are 1 based in the file
-            const int vecColValue = vecCol[i] - 1;
+            const int vecRowValue = vecRow[i]-1;
+            const int vecColValue = vecCol[i]-1;
+            rowSet.insert(vecRowValue);
+            colSet.insert(vecColValue);
+        }
+        int index = 0;
+        for  (std::set<int>::iterator setIt = rowSet.begin(); setIt!=rowSet.end(); ++setIt)
+        {
+            rowMap[*setIt] = index++;
+        }
+        m_nTotDofs_Dest = index;
+        index = 0;
+        for  (std::set<int>::iterator setIt = colSet.begin(); setIt!=colSet.end(); ++setIt)
+        {
+            colMap[*setIt] = index++;
+        }
+        m_nTotDofs_SrcCov = index;
 
-            const auto riter = rowMap.find( vecRowValue );
-            if( riter == rowMap.end() )
-            {
-                rowMap[vecRowValue] = rindexMax;
-                rindex              = rindexMax;
-                row_gdofmap.push_back( vecRowValue );
-                // row_dtoc_dofmap.push_back( vecRowValue );
-                rindexMax++;
-            }
-            else
-                rindex = riter->second;
-
-            const auto citer = colMap.find( vecColValue );
-            if( citer == colMap.end() )
-            {
-                colMap[vecColValue] = cindexMax;
-                cindex              = cindexMax;
-                col_gdofmap.push_back( vecColValue );
-                // col_dtoc_dofmap.push_back( vecColValue );
-                cindexMax++;
-            }
-            else
-                cindex = citer->second;
-
-            sparseMatrix( rindex, cindex ) = vecS[i];
+        tripletList.reserve(nS);
+        for( int i = 0; i < nS; i++ )
+        {
+            const int vecRowValue = vecRow[i]-1 ;  // the rows, cols are 1 based in the file
+            const int vecColValue = vecCol[i]-1 ;  // sparse matrix will be 1 based too
+            double value = vecS[i];
+            tripletList.push_back( Triplet( rowMap[ vecRowValue ], colMap[ vecColValue ], value ) );
         }
     }
 
-    m_nTotDofs_Src    = sparseMatrix.GetColumns();
-    m_nTotDofs_SrcCov = m_nTotDofs_Src;
-    m_nTotDofs_Dest   = sparseMatrix.GetRows();
+    m_weightMatrix.resize( m_nTotDofs_Dest, m_nTotDofs_SrcCov);
+    m_rowVector.resize( m_nTotDofs_Dest );
+    m_colVector.resize( m_nTotDofs_SrcCov );
+    m_nTotDofs_Src = m_nTotDofs_SrcCov; // do we need both?
+    m_weightMatrix.setFromTriplets( tripletList.begin(), tripletList.end() );
+    // Reset the source and target data first
+    m_rowVector.setZero();
+    m_colVector.setZero();
+// #ifdef MOAB_HAVE_EIGEN3
+#endif
     // TODO: make this flexible and read the order from map with help of metadata
     m_nDofsPEl_Src  = 1;  // always assume FV-FV maps are read from file
     m_nDofsPEl_Dest = 1;  // always assume FV-FV maps are read from file
 
-#ifdef MOAB_HAVE_EIGEN3
-    this->copy_tempest_sparsemat_to_eigen3();
-#endif
 
-    // Reset the source and target data first
-    m_rowVector.setZero();
-    m_colVector.setZero();
 
-#ifdef VERBOSE
-    serializeSparseMatrix( m_weightMatrix, "map_operator_" + std::to_string( rank ) + ".txt" );
-#endif
     return moab::MB_SUCCESS;
 }
 

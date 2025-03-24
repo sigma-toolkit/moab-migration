@@ -3696,8 +3696,8 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
     {
 #ifdef MOAB_HAVE_MPI
         if( 0 == data_intx.pcomm->rank() )
-#endif
             std::cout << " aream tag already defined \n ";
+#endif
     }
 
     std::vector< double > trvAreaA, trvAreaB;  // passed by reference

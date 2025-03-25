@@ -1536,14 +1536,18 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             colSet.insert(vecColValue);
         }
         int index = 0;
+        row_gdofmap.resize(rowSet.size());
         for  (std::set<int>::iterator setIt = rowSet.begin(); setIt!=rowSet.end(); ++setIt)
         {
+            row_gdofmap[index] = *setIt;
             rowMap[*setIt] = index++;
         }
         m_nTotDofs_Dest = index;
         index = 0;
+        col_gdofmap.resize(colSet.size());
         for  (std::set<int>::iterator setIt = colSet.begin(); setIt!=colSet.end(); ++setIt)
         {
+            col_gdofmap[index] = *setIt;
             colMap[*setIt] = index++;
         }
         m_nTotDofs_SrcCov = index;
@@ -1573,15 +1577,20 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             rowSet.insert(vecRowValue);
             colSet.insert(vecColValue);
         }
+
         int index = 0;
+        row_gdofmap.resize(rowSet.size());
         for  (std::set<int>::iterator setIt = rowSet.begin(); setIt!=rowSet.end(); ++setIt)
         {
+            row_gdofmap[index] = *setIt;
             rowMap[*setIt] = index++;
         }
         m_nTotDofs_Dest = index;
+        col_gdofmap.resize(colSet.size());
         index = 0;
         for  (std::set<int>::iterator setIt = colSet.begin(); setIt!=colSet.end(); ++setIt)
         {
+            col_gdofmap[index] = *setIt;
             colMap[*setIt] = index++;
         }
         m_nTotDofs_SrcCov = index;

@@ -511,6 +511,7 @@ class TempestOnlineMap : public OfflineMap
 
 #ifdef MOAB_HAVE_EIGEN3
 
+    int num_rows, num_cols;
     WeightMatrix m_weightMatrix;
     WeightRowVector m_rowVector;
     WeightColVector m_colVector;

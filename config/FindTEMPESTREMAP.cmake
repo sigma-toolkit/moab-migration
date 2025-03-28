@@ -40,6 +40,6 @@ mark_as_advanced(
 )
 
 include (FindPackageHandleStandardArgs)
-find_package_handle_standard_args (TempestRemap "TempestRemap not found, check environment variables TEMPESTREMAP_DIR"
+find_package_handle_standard_args (TEMPESTREMAP "TempestRemap not found, check environment variables TEMPESTREMAP_DIR"
   TEMPESTREMAP_DIR TEMPESTREMAP_INCLUDES TEMPESTREMAP_LIBRARIES)
 

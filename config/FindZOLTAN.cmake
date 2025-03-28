@@ -83,6 +83,6 @@ mark_as_advanced(
 )
 
 include (FindPackageHandleStandardArgs)
-find_package_handle_standard_args (Zoltan "Zoltan not found, check environment variables ZOLTAN_DIR"
+find_package_handle_standard_args (ZOLTAN "Zoltan not found, check environment variables ZOLTAN_DIR"
   ZOLTAN_DIR ZOLTAN_INCLUDES ZOLTAN_LIBRARIES)
 

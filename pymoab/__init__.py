@@ -27,6 +27,24 @@ try:
 except PackageNotFoundError:
     __version__ = "unknown"
 
+try:
+    MOAB_CORE_BASE_PATH = os.path.join(__path__[0], "core")
+except NameError:
+    MOAB_CORE_BASE_PATH = None
+
+if not MOAB_CORE_BASE_PATH or not os.path.exists(MOAB_CORE_BASE_PATH):
+    import sysconfig
+    MOAB_CORE_BASE_PATH = os.path.join(sysconfig.get_path("platlib"), "pymoab", "core")
+    if not os.path.exists(MOAB_CORE_BASE_PATH):
+        raise ImportError("MOAB is not installed. Please run 'pip install MOAB'.")
+    warnings.warn(
+        "It seems that PyMOAB is being run from its source directory. "
+        "This setup is not recommended as it may lead to unexpected behavior, "
+        "such as conflicts between source and installed versions. "
+        "Please run your script from outside the MOAB source tree.",
+        RuntimeWarning
+    )
+
 def get_core_path(subdir, pattern="*", recursive=False):
     """
     Helper function to return paths that match a given pattern within a subdirectory.
@@ -39,8 +57,7 @@ def get_core_path(subdir, pattern="*", recursive=False):
     Returns:
         list: A list of matched paths.
     """
-    path = os.path.join(__path__[0], "core", subdir)
-    search_pattern = os.path.join(path, "**", pattern) if recursive else os.path.join(path, pattern)
+    search_pattern = os.path.join(MOAB_CORE_BASE_PATH, "**", pattern) if recursive else os.path.join(path, pattern)
     return glob.glob(search_pattern, recursive=recursive) if os.path.exists(path) else []
 
 def get_include_path():

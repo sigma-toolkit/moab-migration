@@ -61,14 +61,6 @@ int main( int argc, char** argv )
     int numProcesses = 1;
     std::string readopts;
 
-#ifdef MOAB_HAVE_MPI
-    if( MPI_Init( &argc, &argv ) ) return 1;
-    MPI_Comm_rank( MPI_COMM_WORLD, &rank );
-    MPI_Comm_size( MPI_COMM_WORLD, &numProcesses );
-
-    readopts = string( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION" );  // we do not have to
-                                                                             // resolve shared ents
-#endif
     // Instantiate
     Core mb;
 
@@ -121,12 +113,7 @@ int main( int argc, char** argv )
     rval = mb.add_entities( outSet, closeByCells );MB_CHK_SET_ERR( rval, "Can't add to entity set" );
 
     int numCells = (int)closeByCells.size();
-#ifdef MOAB_HAVE_MPI
-    // Reduce all of the local sums into the global sum
-    int globalCells;
-    MPI_Reduce( &numCells, &globalCells, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD );
-    numCells = globalCells;
-#endif
+
     if( numCells == 0 )
     {
         if( !rank )
@@ -142,8 +129,6 @@ int main( int argc, char** argv )
         rval = mb.write_file( outFile.c_str(), 0, writeOpts.c_str(), &outSet, 1 );MB_CHK_SET_ERR( rval, "Can't write file" );
     }
 
-#ifdef MOAB_HAVE_MPI
-    if( MPI_Finalize() ) return 1;
-#endif
+
     return 0;
 }

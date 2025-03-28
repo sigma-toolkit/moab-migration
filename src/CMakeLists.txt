@@ -265,19 +265,19 @@ if (MOAB_HAVE_METIS)
     include_directories( ${PARMETIS_INCLUDES} )
     list(APPEND MOAB_DEP_LIBRARIES ${PARMETIS_LIBRARIES})
   endif()
-  
+
   include_directories( ${METIS_INCLUDES} )
   list(APPEND MOAB_DEP_LIBRARIES ${METIS_LIBRARIES})
 endif()
 
 if (MOAB_HAVE_TEMPESTREMAP)
-  set( MOAB_LIB_SOURCES ${MOAB_LIB_SOURCES} 
-                        Remapping/TempestRemapper.cpp 
-                        Remapping/TempestOnlineMap.cpp 
+  set( MOAB_LIB_SOURCES ${MOAB_LIB_SOURCES}
+                        Remapping/TempestRemapper.cpp
+                        Remapping/TempestOnlineMap.cpp
                         Remapping/TempestLinearRemap.cpp
-                        Remapping/TempestOnlineMapIO.cpp 
+                        Remapping/TempestOnlineMapIO.cpp
                         )
-  set( MOAB_INSTALL_HEADERS ${MOAB_INSTALL_HEADERS} 
+  set( MOAB_INSTALL_HEADERS ${MOAB_INSTALL_HEADERS}
         moab/Remapping/Remapper.hpp
         moab/Remapping/TempestRemapper.hpp
         moab/Remapping/TempestOnlineMap.hpp )
@@ -324,11 +324,11 @@ else()
     )
 endif()
 
-set(MOAB_ALL_LIBS ${MOAB_DEP_LIBRARIES} ${MOAB_LIBS}) 
+set(MOAB_ALL_LIBS ${MOAB_DEP_LIBRARIES} ${MOAB_LIBS})
 list(APPEND MOAB_ALL_LIBS ${MPI_LIBRARIES})
 list(APPEND MOAB_ALL_LIBS ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
 target_link_libraries(MOAB ${MOAB_ALL_LIBS})
-message(STATUS "MOAB_ALL_LIBS = ${MOAB_ALL_LIBS}.")
+# message(STATUS "MOAB_ALL_LIBS = ${MOAB_ALL_LIBS}.")
 
 # If using clang-tidy, set the target property so that
 # reformatting code does not use full fledged C++11 semantics

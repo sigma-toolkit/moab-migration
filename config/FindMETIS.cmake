@@ -45,7 +45,7 @@ mark_as_advanced(
 
 include (FindPackageHandleStandardArgs)
 find_package_handle_standard_args (
-  Metis "Metis not found, check environment variables METIS_DIR"
+  METIS "Metis not found, check environment variables METIS_DIR"
   METIS_INCLUDES
   METIS_LIBRARIES
   )

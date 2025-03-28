@@ -1,5 +1,13 @@
 import subprocess
 import pytest
+import pymoab
+
+# Skip the test if the wheel was repaired
+pytestmark = pytest.mark.skipif(
+    pymoab.extra_lib != [],
+    reason="The wheel was repaired using tools like auditwheel or delocate",
+)
+
 
 def test_cmake_build(tmp_path):
     """

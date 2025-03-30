@@ -1790,6 +1790,18 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
     {
         eh_by_gid[gids[i]] = *it;
     }
+    // TODO: allow for tags of different length
+    int nbLocalVals = *num_tag_storage_length / ( (int)tagNames.size() );  // assumes all tags have the same length?
+    // check global ids to have different values
+    std::set<int> globalIdsSet;
+    for (int j=0; j<nbLocalVals; j++)
+        globalIdsSet.insert(globalIds[j]);
+    if(globalIdsSet.size() < nbLocalVals)
+    {
+        std::cout << "iMOAB_SetDoubleTagStorageWithGid: for pid:" << *pid <<" tags[0]:" << tagNames[0]  <<  " global ids passed are not unique, major error\n";
+        std::cout<<" nbLocalVals:" << nbLocalVals << " globalIdsSet.size():" <<  globalIdsSet.size() << " first global id:"<< globalIds[0] << "\n";
+        return moab::MB_FAILURE;
+    }
 
     std::vector< int > tagLengths( tagNames.size() );
     std::vector< Tag > tagList;
@@ -1853,8 +1865,6 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         // in this case, we have to use 2 crystal routers, to send data to the processor that needs it
         // we will create first a tuple to rendevous points, then from there send to the processor that requested it
         // it is a 2-hop global gather scatter
-        // TODO: allow for tags of different length; this is wrong
-        int nbLocalVals = *num_tag_storage_length / ( (int)tagNames.size() );  // assumes all tags have the same length?
         // we do not expect the sizes to match
         //assert( nbLocalVals * tagNames.size() - *num_tag_storage_length == 0 );
         TupleList TLsend;

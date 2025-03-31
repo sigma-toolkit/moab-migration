@@ -105,7 +105,7 @@ int main( int argc, char* argv[] )
     rval = mb2->get_entities_by_dimension( 0, 2, cells2 );MB_CHK_SET_ERR( rval, "can't get cells2" );
 
     Range solids2;
-    rval = mb2->get_entities_by_dimension( 0, 3, solids2 );MB_CHK_SET_ERR( rval, "can't get cells" );
+    rval = mb2->get_entities_by_dimension( 0, 3, solids2 );MB_CHK_SET_ERR( rval, "can't get solids2" );
 
     std::cout << inputfile2 << " has " << nodes2.size() << " vertices " << edges2.size() << " edges " << cells2.size()
               << " cells " << solids2.size() << " solids \n";
@@ -154,12 +154,12 @@ int main( int argc, char* argv[] )
         std::vector< int > ivals;
         if( doubleType )
         {
-            vals.resize( len_tag * cells.size() );
+            vals.resize( len_tag * ents.size() );
             rval = mb->tag_get_data( tag, ents, &vals[0] );MB_CHK_SET_ERR( rval, "can't get tag data on double tag" );
         }
         else
         {
-            ivals.resize( len_tag * cells.size() );
+            ivals.resize( len_tag * ents.size() );
             rval = mb->tag_get_data( tag, ents, &ivals[0] );MB_CHK_SET_ERR( rval, "can't get tag data on integer tag" );
         }
 
@@ -223,7 +223,7 @@ int main( int argc, char* argv[] )
             {
                 rval = mb->tag_set_data( newTag, &c1, 1, &ival2 );MB_CHK_SET_ERR( rval, "can't set new tag" );
             }
-            int indx    = cells.index( c1 );
+            int indx    = ents.index( c1 );
             double diff = 0;
             int diffi   = 0;
             if( doubleType )
@@ -245,14 +245,14 @@ int main( int argc, char* argv[] )
         std::cout << " l2norm of the diff: " << l2norm << "\n";
         std::cout << " wrote file " << outfile << "\n";
     }
-    else  // look at all tags that can be compared on cells
+    else  // look at all tags that can be compared on ents
     {
         // compare all tags
         std::vector< Tag > list1;
         rval = mb->tag_get_tags( list1 );MB_CHK_SET_ERR( rval, "can't get tags 1" );
 
         std::map< int, int > gidMap2;
-        for( int i = 0; i < cells2.size(); i++ )
+        for( int i = 0; i < ents2.size(); i++ )
         {
             gidMap2[gids2[i]] = i;
         }
@@ -285,12 +285,12 @@ int main( int argc, char* argv[] )
             if( doubleType )
             {
                 vals1.resize( ents.size() );
-                rval = mb->tag_get_data( tag, cells, &vals1[0] );
+                rval = mb->tag_get_data( tag, ents, &vals1[0] );
             }
             else
             {
                 ivals1.resize( ents.size() );
-                rval = mb->tag_get_data( tag, cells, &ivals1[0] );
+                rval = mb->tag_get_data( tag, ents, &ivals1[0] );
             }
 
             if( MB_SUCCESS != rval )

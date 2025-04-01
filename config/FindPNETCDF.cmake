@@ -8,7 +8,7 @@
 set (PNETCDF_DIR "" CACHE PATH "Path to search for PNetCDF header and library files" )
 set (PNETCDF_FOUND NO CACHE INTERNAL "Found PNetCDF components successfully." )
 
-IF (MOAB_HAVE_MPI AND ENABLE_PNETCDF AND MOAB_HAVE_NETCDF)
+IF (MOAB_HAVE_MPI AND ENABLE_PNETCDF)
 
   find_path( PNETCDF_INCLUDES pnetcdf.h
     ${PNETCDF_DIR}
@@ -39,9 +39,9 @@ find_library( PNETCDF_LIBRARIES
     PNETCDF_INCLUDES
     PNETCDF_LIBRARIES
   )
-ELSE (MOAB_HAVE_MPI AND ENABLE_PNETCDF AND MOAB_HAVE_NETCDF)
+ELSE (MOAB_HAVE_MPI AND ENABLE_PNETCDF)
   message (STATUS "Not configuring with PNetCDF since MPI installation not specified or explicitly disabled by user")
-ENDIF (MOAB_HAVE_MPI AND ENABLE_PNETCDF AND MOAB_HAVE_NETCDF)
+ENDIF (MOAB_HAVE_MPI AND ENABLE_PNETCDF)
 
 include (FindPackageHandleStandardArgs)
 find_package_handle_standard_args (PNETCDF "PNetCDF not found, check the CMake PNETCDF_DIR variable"

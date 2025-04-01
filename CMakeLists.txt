@@ -1,40 +1,44 @@
 cmake_minimum_required( VERSION 3.15 )
-SET(PACKAGE_NAME "MOAB")
-SET(PACKAGE_VERSION "5.5.1")
 
-SET(CMAKE_CXX_STANDARD 11)
-SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+set (CMAKE_CXX_STANDARD 11)
+set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (NOT WIN32)
   #This all breaks on windows.
-  SET(CMAKE_Fortran_COMPILER_INIT ${CMAKE_GENERATOR_FC})
-  SET(CMAKE_CXX_FLAGS_INIT "-fPIC -DPIC")
-  SET(CMAKE_CXX_FLAGS_DEBUG_INIT "-O0 -g")
-  SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT "-O2 -g")
-  SET(CMAKE_CXX_FLAGS_RELEASE_INIT "-O2 -DNDEBUG")
-  SET(CMAKE_C_FLAGS_INIT "-fPIC -DPIC")
-  SET(CMAKE_C_FLAGS_DEBUG_INIT "-O0 -g")
-  SET(CMAKE_C_FLAGS_RELWITHDEBINFO_INIT "-O2 -g")
-  SET(CMAKE_C_FLAGS_RELEASE_INIT "-O2 -DNDEBUG")
-  SET(CMAKE_Fortran_FLAGS_INIT "-fPIC")
-  SET(CMAKE_Fortran_FLAGS_DEBUG_INIT "-O0 -g")
-  SET(CMAKE_Fortran_FLAGS_RELWITHDEBINFO_INIT "-O2 -g")
-  SET(CMAKE_Fortran_FLAGS_RELEASE_INIT "-O2")
-  SET(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS_INIT "")
-  SET(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS_INIT "")
+  set (CMAKE_Fortran_COMPILER_INIT ${CMAKE_GENERATOR_FC})
+  set (CMAKE_CXX_FLAGS_INIT "-fPIC -DPIC")
+  set (CMAKE_CXX_FLAGS_DEBUG_INIT "-O0 -g")
+  set (CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT "-O2 -g")
+  set (CMAKE_CXX_FLAGS_RELEASE_INIT "-O2 -DNDEBUG")
+  set (CMAKE_C_FLAGS_INIT "-fPIC -DPIC")
+  set (CMAKE_C_FLAGS_DEBUG_INIT "-O0 -g")
+  set (CMAKE_C_FLAGS_RELWITHDEBINFO_INIT "-O2 -g")
+  set (CMAKE_C_FLAGS_RELEASE_INIT "-O2 -DNDEBUG")
+  set (CMAKE_Fortran_FLAGS_INIT "-fPIC")
+  set (CMAKE_Fortran_FLAGS_DEBUG_INIT "-O0 -g")
+  set (CMAKE_Fortran_FLAGS_RELWITHDEBINFO_INIT "-O2 -g")
+  set (CMAKE_Fortran_FLAGS_RELEASE_INIT "-O2")
+  set (CMAKE_SHARED_LIBRARY_LINK_C_FLAGS_INIT "")
+  set (CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS_INIT "")
 endif()
 
 if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Choose the type of build, options are: Debug Release RelWithDebInfo MinSizeRel.")
 endif()
 
-project( MOAB )
+project( MOAB 
+         VERSION 5.5.1
+         DESCRIPTION "Mesh-Oriented datABase (MOAB) library"
+         LANGUAGES C CXX Fortran
+       )
+set (PACKAGE_NAME "MOAB")
+set (PACKAGE_VERSION "5.5.1")
 
 include(GNUInstallDirs)
 include(FeatureSummary)
 
 #Add our Cmake directory to the module search path
-set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/config ${CMAKE_MODULE_PATH})
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/config ${CMAKE_MODULE_PATH})
 ################################################################################
 # Set up version info
 ################################################################################
@@ -258,17 +262,22 @@ macro(SET_VARS_IF_FOUND PACKAGE_NAME PACKAGE_TYPE PRINT_NAME DESCRIPTION PACKAGE
 
       # print some Metis configuration details
       message (STATUS "   ${PRINT_NAME} Configuration ::")
-      message (STATUS "        Directory : ${${PACKAGE_NAME}_DIR}")
+      if (DEFINED ${PACKAGE_NAME}_DIR AND NOT "${${PACKAGE_NAME}_DIR}" STREQUAL "")
+        message (STATUS "        Directory : ${${PACKAGE_NAME}_DIR}")
+      endif (DEFINED ${PACKAGE_NAME}_DIR AND NOT "${${PACKAGE_NAME}_DIR}" STREQUAL "")
       if (DEFINED ${PACKAGE_INCLUDES} AND NOT "${${PACKAGE_INCLUDES}}" STREQUAL "")
         message (STATUS "        Includes  : ${${PACKAGE_INCLUDES}}")
+        include_directories( ${${PACKAGE_INCLUDES}} )
       endif (DEFINED ${PACKAGE_INCLUDES} AND NOT "${${PACKAGE_INCLUDES}}" STREQUAL "")
       if (DEFINED ${PACKAGE_LIBRARIES} AND NOT "${${PACKAGE_LIBRARIES}}" STREQUAL "")
         message (STATUS "        Libraries : ${${PACKAGE_LIBRARIES}}")
+        set( MOAB_LIBS ${${PACKAGE_LIBRARIES}} ${MOAB_LIBS} )
       endif (DEFINED ${PACKAGE_LIBRARIES} AND NOT "${${PACKAGE_LIBRARIES}}" STREQUAL "")
 
       set_package_properties(${PACKAGE_NAME} PROPERTIES
                         TYPE ${PACKAGE_TYPE}
                         PURPOSE ${DESCRIPTION})
+
     endif ( ${PACKAGE_NAME}_FOUND )
 endmacro()
 
@@ -279,23 +288,28 @@ if ( ENABLE_BLASLAPACK  )
 
   # Find BLAS
   FIND_PACKAGE(BLAS REQUIRED)
-  if (BLAS_FOUND)
-    set(MOAB_HAVE_BLAS ON)
-  endif(BLAS_FOUND)
-  set_package_properties(BLAS PROPERTIES
-                       TYPE RECOMMENDED
-                       PURPOSE "Native BLAS implementations")
+  # if (BLAS_FOUND)
+  #   set(MOAB_HAVE_BLAS ON)
+  # endif(BLAS_FOUND)
+  # set_package_properties(BLAS PROPERTIES
+  #                      TYPE RECOMMENDED
+  #                      PURPOSE "Native BLAS implementations")
+
+  SET_VARS_IF_FOUND(BLAS RECOMMENDED "BLAS" "Native BLAS implementations" BLAS_INCLUDES BLAS_LIBRARIES )
 
   # Find LAPACK
   FIND_PACKAGE(LAPACK REQUIRED)
   if (LAPACK_FOUND)
-    set(MOAB_HAVE_LAPACK ON)
+    # set(MOAB_HAVE_LAPACK ON)
     set(ENABLE_FORTRAN ON)
   endif(LAPACK_FOUND)
 
-  set_package_properties(LAPACK PROPERTIES
-                       TYPE RECOMMENDED
-                       PURPOSE "Native LAPACK implementations")
+  # set_package_properties(LAPACK PROPERTIES
+  #                      TYPE RECOMMENDED
+  #                      PURPOSE "Native LAPACK implementations")
+
+  SET_VARS_IF_FOUND(LAPACK RECOMMENDED "LAPACK" "Native LAPACK implementations" LAPACK_INCLUDES LAPACK_LIBRARIES )
+  list(APPEND MOAB_ALL_LIBS ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
 
 endif (ENABLE_BLASLAPACK)
 
@@ -306,15 +320,18 @@ if ( ENABLE_EIGEN3 )
   # Eigen3 is optional if LAPACK has been found
   FIND_PACKAGE(Eigen3 OPTIONAL_COMPONENTS)
 
-  set_package_properties(Eigen3 PROPERTIES
-                       TYPE RECOMMENDED
-                       PURPOSE "Eigen3 headers as supplement to BLAS/LAPACK implementations")
+  # set_package_properties(Eigen3 PROPERTIES
+  #                      TYPE RECOMMENDED
+  #                      PURPOSE "Eigen3 headers as supplement to BLAS/LAPACK implementations")
 
   if ( EIGEN3_FOUND )
     INCLUDE_DIRECTORIES ( "${EIGEN3_DIR}" )
     SET(MOAB_DEFINES "${MOAB_DEFINES} ${EIGEN3_INCLUDES}")
     SET(MOAB_HAVE_EIGEN3 ON)
   endif (EIGEN3_FOUND)
+
+  SET_VARS_IF_FOUND(EIGEN3 RECOMMENDED "Eigen3" "Eigen3 headers as supplement to BLAS/LAPACK implementations" EIGEN3_INCLUDES EIGEN3_LIBRARIES )
+  list(APPEND MOAB_ALL_LIBS ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
 
 endif ( ENABLE_EIGEN3 )
 
@@ -343,6 +360,8 @@ if ( ENABLE_FORTRAN )
   set(MOAB_FC_FUNC_  "${FortranCInterface_GLOBAL__PREFIX} ${FC_CASE} ${FortranCInterface_GLOBAL__SUFFIX}")
 endif ( ENABLE_FORTRAN )
 
+message(STATUS "MOAB libs (blas/lapack/fortran) :: ${MOAB_LIBS}")
+
 # Check for MPI compiler support and set the necessary flags
 set (MOAB_HAVE_MPI OFF CACHE INTERNAL "Found necessary MPI components. Configure MOAB with it." )
 if ( ENABLE_MPI )
@@ -369,7 +388,7 @@ if ( ENABLE_MPI )
       message (STATUS "        ${var}   : ${${var}}")
     endforeach ()
 
-    set( MOAB_LIBS ${MPI_CXX_LINK_FLAGS} ${MPI_C_LIBRARIES} ${MOAB_LIBS} )
+    #set( MOAB_LIBS ${MPI_CXX_LINK_FLAGS} ${MPI_CXX_LIBRARIES} ${MOAB_LIBS} )
 
   endif ( MPI_FOUND )
 endif ( ENABLE_MPI )
@@ -406,12 +425,15 @@ if ( ENABLE_SZIP )
 endif (ENABLE_SZIP)
 
 # Check for HDF5 availability
+# set (HDF5_DIR "" CACHE PATH "Path to search for HDF5 header and library files")
+# set (HDF5_FOUND NO CACHE INTERNAL "Found HDF5 components successfully." )
 set (MOAB_HAVE_HDF5 OFF CACHE INTERNAL "Found necessary HDF5 components. Configure MOAB with it." )
 set (MOAB_HAVE_HDF5_PARALLEL OFF CACHE INTERNAL "Found necessary parallel HDF5 components. Configure MOAB with it." )
 if ( ENABLE_HDF5 )
   if ( MOAB_HAVE_MPI )
-    set(HDF5_PREFER_PARALLEL TRUE)
+    set(HDF5_PREFER_PARALLEL true)
   endif( MOAB_HAVE_MPI )
+  set(HDF5_FIND_DEBUG true)
 
   # Call CMake-native FindHDF5 module and specify the components to check
   find_package( HDF5 REQUIRED COMPONENTS C HL )
@@ -419,7 +441,14 @@ if ( ENABLE_HDF5 )
   if ( HDF5_FOUND )
     if ( HDF5_IS_PARALLEL )
       set (MOAB_HAVE_HDF5_PARALLEL ON)
+      if ( NOT MPI_FOUND )
+        message( FATAL_ERROR
+            "HDF5 was found with parallel support, but MPI was not found. Please provide MPI_DIR path and reconfigure."
+          )
+      endif ( NOT MPI_FOUND )
     endif ( HDF5_IS_PARALLEL )
+
+    set(HDF5_LIBRARIES ${HDF5_HL_LIBRARIES} ${HDF5_LIBRARIES})
 
     # check for CURL as well
     find_package( CURL )
@@ -427,8 +456,7 @@ if ( ENABLE_HDF5 )
       set( HDF5_LIBRARIES ${HDF5_LIBRARIES} ${CURL_LIBRARIES} )
     endif ( CURL_FOUND )
 
-    set( MOAB_LIBS ${HDF5_HL_LIBRARIES} ${HDF5_LIBRARIES} ${MOAB_LIBS} )
-    include_directories( ${HDF5_INCLUDE_DIRS} src/io/mhdf/include )
+    include_directories( src/io/mhdf/include )
 
     # Print some HDF5 configuration details
     SET_VARS_IF_FOUND(HDF5 RECOMMENDED "HDF5" "HDF5 library interfaces for MOAB native file format support" HDF5_INCLUDE_DIRS HDF5_LIBRARIES )
@@ -438,7 +466,21 @@ if ( ENABLE_HDF5 )
 
 endif ( ENABLE_HDF5 )
 
-message(STATUS "MOAB libs :: ${MOAB_LIBS}")
+message(STATUS "MOAB_HAVE_MPI :: ${MOAB_HAVE_MPI} ${MOAB_HAVE_NETCDF} ${ENABLE_PNETCDF}")
+
+message(STATUS "MOAB libs (zlib/szip/hdf5) :: ${MOAB_LIBS}")
+
+# Check for PNetCDF availability
+set (MOAB_HAVE_PNETCDF OFF CACHE INTERNAL "Found necessary PNetCDF components. Configure MOAB with it." )
+if ( ENABLE_PNETCDF )
+	find_package( PNETCDF REQUIRED )
+
+  # Print some PNetCDF configuration details
+  SET_VARS_IF_FOUND(PNETCDF RECOMMENDED "PNetCDF" "PNetCDF library interfaces for MOAB nc-file format support" PNETCDF_INCLUDES PNETCDF_LIBRARIES )
+
+endif ( ENABLE_PNETCDF )
+
+message(STATUS "MOAB libs (pnetcdf) :: ${MOAB_LIBS}")
 
 # Check for NetCDF availability
 set (MOAB_HAVE_NETCDF OFF CACHE INTERNAL "Found necessary NetCDF components. Configure MOAB with it." )
@@ -449,30 +491,14 @@ if ( ENABLE_NETCDF )
   if ( NETCDF_FOUND )
     set (MOAB_HAVE_NETCDF ON)
     set (MOAB_HAVE_NETCDF_H 1)
-
-    include_directories( ${NETCDF_INCLUDES} )
-    set( MOAB_LIBS ${NETCDF_LIBRARIES} ${MOAB_LIBS} )
   endif ( NETCDF_FOUND )
 
   # Print some NetCDF configuration details
-  SET_VARS_IF_FOUND(NETCDF RECOMMENDED "NetCDF" "NetCDF library interfaces for MOAB ExodusII file format support" NETCDF_INCLUDE_DIR NETCDF_LIBRARIES )
+  SET_VARS_IF_FOUND(NETCDF RECOMMENDED "NetCDF" "NetCDF library interfaces for MOAB ExodusII file format support" NETCDF_INCLUDES NETCDF_LIBRARIES )
 
 endif ( ENABLE_NETCDF )
 
-# Check for PNetCDF availability
-set (MOAB_HAVE_PNETCDF OFF CACHE INTERNAL "Found necessary PNetCDF components. Configure MOAB with it." )
-if ( ENABLE_PNETCDF AND MOAB_HAVE_NETCDF )
-	find_package( PNETCDF REQUIRED )
-
-  if ( PNETCDF_FOUND )
-    include_directories( ${PNETCDF_INCLUDES} )
-    set( MOAB_LIBS ${PNETCDF_LIBRARIES} ${MOAB_LIBS} )
-  endif ( PNETCDF_FOUND )
-
-  # Print some PNetCDF configuration details
-  SET_VARS_IF_FOUND(PNETCDF RECOMMENDED "PNetCDF" "PNetCDF library interfaces for MOAB nc-file format support" PNETCDF_INCLUDES PNETCDF_LIBRARIES )
-
-endif ( ENABLE_PNETCDF AND MOAB_HAVE_NETCDF )
+message(STATUS "MOAB libs (netcdf) :: ${MOAB_LIBS}")
 
 # Check for Metis partitioner availability
 set (MOAB_HAVE_METIS OFF CACHE INTERNAL "Found necessary Metis components. Configure MOAB with it." )
@@ -518,6 +544,9 @@ if (ENABLE_CGNS)
   set( MOABIO_LIBS ${MOABIO_LIBS} ${CGNS_LIBRARIES} )
   set (MOAB_HAVE_CGNS ON)
 endif(ENABLE_CGNS)
+
+list (REMOVE_DUPLICATES MOAB_LIBS)
+message(STATUS "MOAB libs :: ${MOAB_LIBS}")
 
 # Strip our custom flags
 string(STRIP "${CMAKE_EXE_LINKER_FLAGS} " CMAKE_EXE_LINKER_FLAGS)
@@ -876,5 +905,5 @@ feature_summary(WHAT ALL #ENABLED_FEATURES DISABLED_FEATURES PACKAGES_FOUND
 MESSAGE("-- MOAB Configuration summary has been written to ${CMAKE_BINARY_DIR}/summary.log.")
 # All done.
 
-dump_cmake_variables("MPI_")
-dump_cmake_variables("HDF5")
+# dump_cmake_variables("MPI_")
+# dump_cmake_variables("HDF5")

@@ -11,8 +11,6 @@ set (ZOLTAN_FOUND NO CACHE INTERNAL "Found Zoltan components successfully." )
 find_path( ZOLTAN_INCLUDE_DIR zoltan.h
   ${ZOLTAN_DIR}
   ${ZOLTAN_DIR}/include
-  /usr/local/include
-  /usr/include
 )
 
 find_library( ZOLTAN_LIBRARY
@@ -20,14 +18,7 @@ find_library( ZOLTAN_LIBRARY
   HINTS ${ZOLTAN_DIR}
   ${ZOLTAN_DIR}/lib64
   ${ZOLTAN_DIR}/lib
-  /usr/local/lib64
-  /usr/lib64
-  /usr/lib64/zoltan
-  /usr/local/lib
-  /usr/lib
-  /usr/lib/zoltan
 )
-
 
 macro (ZOLTAN_GET_VARIABLE makefile name var)
   set (${var} "NOTFOUND" CACHE INTERNAL "Cleared" FORCE)
@@ -50,7 +41,7 @@ show :
     ZOLTAN_GET_VARIABLE (zoltan_config_makefile ZOLTAN_CPPFLAGS    zoltan_extra_cppflags)
     ZOLTAN_GET_VARIABLE (zoltan_config_makefile ZOLTAN_EXTRA_LIBS  zoltan_extra_libs)
     ZOLTAN_GET_VARIABLE (zoltan_config_makefile ZOLTAN_LDFLAGS     zoltan_ldflags)
-    
+
     file (REMOVE ${zoltan_config_makefile})
     SET(tmp_incs "-I${ZOLTAN_INCLUDE_DIR} ${zoltan_extra_cppflags}")
     resolve_includes(ZOLTAN_INCLUDES ${tmp_incs})
@@ -58,7 +49,6 @@ show :
     resolve_libraries (ZOLTAN_LIBRARIES "${tmp_libs}")
   endif ()
 endmacro (ZOLTAN_GET_ALL_VARIABLES)
-
 
 IF (NOT ZOLTAN_FOUND)
   if ( ZOLTAN_INCLUDE_DIR AND ZOLTAN_LIBRARY )

@@ -60,7 +60,7 @@ if (EIGEN3_DIR)
   set(EIGEN3_FOUND ${EIGEN3_VERSION_OK})
   set(EIGEN3_INCLUDES "-I${EIGEN3_DIR}")
   mark_as_advanced(EIGEN3_INCLUDES)
-  message (STATUS "Using Eigen3 in ${EIGEN3_DIR}")
+  # message (STATUS "Using Eigen3 in ${EIGEN3_DIR}")
 
 else (EIGEN3_DIR)
 

@@ -358,8 +358,11 @@ ErrorCode ReadRTT::read_header( const char* filename )
             {
                 rval = get_header_data( input_file );
             }
-            if (line.compare("dims") == 0) {
+            else if (line.compare("dims") == 0) {
                 rval = parse_dims(input_file);
+            }
+            else if (line.compare("cell_defs")== 0) {
+                rval = ReadRTT::read_cell_defs(input_file);
             }
         }
         input_file.close();
@@ -605,8 +608,8 @@ ErrorCode ReadRTT::parse_dims(std::ifstream& input_file)
         if (line.find("end_dims") != std::string::npos) break;
 
         tokens = ReadRTT::split_string(line, ' ');
-        if (tokens[0] == "coord_units") {
-            dim_data.coord_units = tokens[1];
+        if (tokens[0] == "coor_units") {
+            dim_data.coor_units = tokens[1];
         } else if (tokens[0] == "prob_time_units") {
             dim_data.prob_time_units = tokens[1];
         } else if (tokens[0] == "ncell_defs") {
@@ -626,7 +629,7 @@ ErrorCode ReadRTT::parse_dims(std::ifstream& input_file)
         } else if (tokens[0] == "nnode_flag_types") {
             dim_data.nnode_flag_types = std::atoi(tokens[1].c_str());
         } else if (tokens[0] == "nnode_flags") {
-            for (int i = 1; i < tokens.size(); i++) {
+            for (size_t i = 1; i < tokens.size(); i++) {
                 dim_data.nnode_flags.push_back(std::atoi(tokens[i].c_str()));
             }
         } else if (tokens[0] == "nnode_data") {
@@ -640,7 +643,7 @@ ErrorCode ReadRTT::parse_dims(std::ifstream& input_file)
         } else if (tokens[0] == "nside_flag_types") {
             dim_data.nside_flag_types = std::atoi(tokens[1].c_str());
         } else if (tokens[0] == "nside_flags") {
-            for (int i = 1; i < tokens.size(); i++) {
+            for (size_t i = 1; i < tokens.size(); i++) {
                 dim_data.nside_flags.push_back(std::atoi(tokens[i].c_str()));
             }
         } else if (tokens[0] == "nside_data") {
@@ -654,7 +657,7 @@ ErrorCode ReadRTT::parse_dims(std::ifstream& input_file)
         } else if (tokens[0] == "ncell_flag_types") {
             dim_data.ncell_flag_types = std::atoi(tokens[1].c_str());
         } else if (tokens[0] == "ncell_flags") {
-            for (int i = 1; i < tokens.size(); i++) {
+            for (size_t i = 1; i < tokens.size(); i++) {
                 dim_data.ncell_flags.push_back(std::atoi(tokens[i].c_str()));
             }
         } else if (tokens[0] == "ncell_data") {
@@ -667,6 +670,64 @@ ErrorCode ReadRTT::parse_dims(std::ifstream& input_file)
     return MB_SUCCESS;
 }
 
+/*
+ * parsing the cell deifinitions
+ */
+ErrorCode ReadRTT::read_cell_defs(std::ifstream& input_file)
+{
+    if (!input_file.good() || !input_file.is_open())
+    {
+        std::cout << "Problems reading file" << std::endl;
+        return MB_FAILURE;
+    }
+
+    std::string line;
+    std::vector<std::string> tokens;
+    while(std::getline(input_file, line)) {
+        if (line == "") continue;
+        if (line.find("end_cell_defs") != std::string::npos) break;
+        cell_def new_cell_def;
+        // Tokenize the line
+        tokens = ReadRTT::split_string(line, ' ');
+        new_cell_def.id = std::atoi(tokens[0].c_str());
+        new_cell_def.name = tokens[1];
+        // Getting the number of nodes and sides
+        std::getline(input_file, line);
+        // Tokenize the line
+        tokens = ReadRTT::split_string(line, ' ');
+        new_cell_def.nnodes = std::atoi(tokens[0].c_str());
+        new_cell_def.nsides = std::atoi(tokens[1].c_str());
+        // Side type index
+        std::getline(input_file, line);
+        // Tokenize the line
+        tokens = ReadRTT::split_string(line, ' ');
+        for (int i = 0; i < new_cell_def.nsides; i++) {
+            int side_type = std::atoi(tokens[i].c_str());
+            // Ensure side types exists
+            if (cell_def_data.find(side_type) == cell_def_data.end()) {
+                std::cout << "Error: side type " << side_type << " not found in cell definitions." << std::endl;
+                return MB_FAILURE;
+            }
+            new_cell_def.side_type.push_back(side_type);
+        }
+        // Read the nodes per side
+        for (int i = 0; i < new_cell_def.nsides; i++) {
+            std::vector< int > side_nodes;
+            std::getline(input_file, line);
+            // Tokenize the line
+            tokens = ReadRTT::split_string( line, ' ' );
+            for (int j = 0; j < new_cell_def.nnodes; j++) {    
+                side_nodes.push_back( std::atoi( tokens[i].c_str() ) );
+            }
+            new_cell_def.sides_nodes.push_back(side_nodes);
+
+        }
+
+        cell_def_data.insert( std::make_pair( new_cell_def.id, new_cell_def ) );
+    }
+
+    return MB_SUCCESS;
+}
 
 /*
  * given the string sidedata, get the id number, senses and names of the sides
@@ -758,36 +819,42 @@ ReadRTT::facet ReadRTT::get_facet_data( std::string facetdata )
     std::vector< std::string > tokens;
     tokens = ReadRTT::split_string( facetdata, ' ' );
 
-    // set the side id
-    if( tokens.size() > 7 )
-    {
-        MB_SET_ERR_RET_VAL( "Error, too many tokens found from get_facet_data", new_facet );
-    }
-
-    new_facet.id = std::atoi( tokens[0].c_str() );
+    // ensure we have the correct number of tokens
+    int base_token_size = 0;
+    int idx_offset = 0;
     // branch on the rtt version number
     if( header_data.version == "v1.0.0" )
     {
-        new_facet.connectivity[0] = std::atoi( tokens[1].c_str() );
-        new_facet.connectivity[1] = std::atoi( tokens[2].c_str() );
-        new_facet.connectivity[2] = std::atoi( tokens[3].c_str() );
-        new_facet.side_id         = std::atoi( tokens[4].c_str() );
-        new_facet.surface_number  = std::atoi( tokens[5].c_str() );
+        base_token_size = 4;
     }
     else if( header_data.version == "v1.0.1" )
     {
-        new_facet.connectivity[0] = std::atoi( tokens[2].c_str() );
-        new_facet.connectivity[1] = std::atoi( tokens[3].c_str() );
-        new_facet.connectivity[2] = std::atoi( tokens[4].c_str() );
-        new_facet.side_id         = std::atoi( tokens[5].c_str() );
-        new_facet.surface_number  = std::atoi( tokens[6].c_str() );
+        base_token_size = 5;
+        idx_offset = 1;
     }
     else
     {
         MB_SET_ERR_RET_VAL( "Error, version number not understood", new_facet );
     }
 
+    if( (int)tokens.size() != base_token_size + dim_data.nside_flag_types )
+    {
+        std::cout << facetdata << std::endl;
+        std::cout << header_data.version << " " << (int)tokens.size() << " " << base_token_size << " " << dim_data.nside_flag_types << std::endl;
+        MB_SET_ERR_RET_VAL( "Error, too many tokens found from get_facet_data", new_facet );
+        exit( 1 );
+    }
+
+    // set the side id
+    new_facet.id = std::atoi( tokens[0].c_str() );
+    new_facet.connectivity[0] = std::atoi( tokens[idx_offset + 1].c_str() );
+    new_facet.connectivity[1] = std::atoi( tokens[idx_offset + 2].c_str() );
+    new_facet.connectivity[2] = std::atoi( tokens[idx_offset + 3].c_str() );
+    new_facet.side_id         = std::atoi( tokens[idx_offset + 4].c_str() );
+    new_facet.surface_number  = std::atoi( tokens[idx_offset + 5].c_str() );
+
     return new_facet;
+
 }
 
 /*
@@ -799,29 +866,54 @@ ReadRTT::tet ReadRTT::get_tet_data( std::string tetdata )
     std::vector< std::string > tokens;
     tokens = ReadRTT::split_string( tetdata, ' ' );
 
-    // set the side id
-    new_tet.id = std::atoi( tokens[0].c_str() );
-    // branch on the version number
+    // ensure we have the correct number of tokens
+    int base_token_size = 0;
+    int idx_offset = 0;
+    int n_nodes = 0;
+    // branch on the rtt version number
     if( header_data.version == "v1.0.0" )
     {
-        new_tet.connectivity[0] = std::atoi( tokens[1].c_str() );
-        new_tet.connectivity[1] = std::atoi( tokens[2].c_str() );
-        new_tet.connectivity[2] = std::atoi( tokens[3].c_str() );
-        new_tet.connectivity[3] = std::atoi( tokens[4].c_str() );
-        new_tet.material_number = std::atoi( tokens[5].c_str() );
+        base_token_size = 1;
+        // for old format we assume 4 nodes (Tet)
+        n_nodes = 4;
     }
     else if( header_data.version == "v1.0.1" )
     {
-        new_tet.connectivity[0] = std::atoi( tokens[2].c_str() );
-        new_tet.connectivity[1] = std::atoi( tokens[3].c_str() );
-        new_tet.connectivity[2] = std::atoi( tokens[4].c_str() );
-        new_tet.connectivity[3] = std::atoi( tokens[5].c_str() );
-        new_tet.material_number = std::atoi( tokens[6].c_str() );
+        base_token_size = 2;
+
+        // get the cell type
+        new_tet.type_id = std::atoi( tokens[1].c_str() );
+        // check that the cell type exists
+        if (cell_def_data.find( new_tet.type_id ) == cell_def_data.end())
+        {
+            std::cout << "Error: cell type " << new_tet.type_id << " not found in cell definitions." << std::endl;
+            MB_SET_ERR_RET_VAL( "Error, cell type not found in cell definitions", new_tet );
+        }
+        n_nodes = cell_def_data[new_tet.type_id].nnodes;
+        int n_sides = cell_def_data[new_tet.type_id].nsides;
+        if (n_nodes != 4 || n_sides != 4)
+        {
+            std::cout << "Error: cell type " << new_tet.type_id << " does not have 4 nodes and 4 sides." << std::endl;
+            MB_SET_ERR_RET_VAL( "Error, cell is not tetrahedricon", new_tet );
+        }
     }
     else
     {
-        MB_SET_ERR_RET_VAL( "Error, version number not supported", new_tet );
+        MB_SET_ERR_RET_VAL( "Error, version number not understood", new_tet );
     }
+    // set the side id
+    new_tet.id = std::atoi( tokens[0].c_str() );
+
+    if( (int)tokens.size() != base_token_size + n_nodes + dim_data.ncell_flag_types )
+    {
+        MB_SET_ERR_RET_VAL( "Error, unexpected number of tokens found from get_tet_data", new_tet );
+    }
+    for ( int i = 0; i < n_nodes; i++ )
+    {
+        new_tet.connectivity[i] = std::atoi( tokens[i + base_token_size].c_str() );
+    }
+    // set the material number
+    new_tet.material_number = std::atoi( tokens[base_token_size + n_nodes].c_str() );
 
     return new_tet;
 }

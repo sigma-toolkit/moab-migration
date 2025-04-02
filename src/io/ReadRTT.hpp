@@ -148,7 +148,7 @@ class ReadRTT : public ReaderIface
 
     struct dimData
     {
-        std::string coord_units;
+        std::string coor_units;
         std::string prob_time_units;
         int ncell_defs;
         int nnodes_max;
@@ -178,7 +178,7 @@ class ReadRTT : public ReaderIface
 
         void print() {
             std::cout << "dimData: " << std::endl;
-            std::cout << "coord_units: " << coord_units << std::endl;
+            std::cout << "coor_units: " << coor_units << std::endl;
             std::cout << "prob_time_units: " << prob_time_units << std::endl;
             std::cout << "ncell_defs: " << ncell_defs << std::endl;
             std::cout << std::endl;
@@ -191,7 +191,7 @@ class ReadRTT : public ReaderIface
             std::cout << "nnodes: " << nnodes << std::endl;
             std::cout << "nnode_flag_types: " << nnode_flag_types << std::endl;
             std::cout << "nnode_flags: ";
-            for (int i = 0; i < nnode_flags.size(); i++) {
+            for (size_t i = 0; i < nnode_flags.size(); i++) {
                 std::cout << nnode_flags[i] << " ";
             }
             std::cout << std::endl;
@@ -204,7 +204,7 @@ class ReadRTT : public ReaderIface
             std::cout << "side_types: " << side_types << std::endl;
             std::cout << "nside_flag_types: " << nside_flag_types << std::endl;
             std::cout << "nside_flags: ";
-            for (int i = 0; i < nside_flags.size(); i++) {
+            for (size_t i = 0; i < nside_flags.size(); i++) {
                 std::cout << nside_flags[i] << " ";
             }
             std::cout << std::endl;
@@ -218,7 +218,7 @@ class ReadRTT : public ReaderIface
             std::cout << "cell_types: " << cell_types << std::endl;
             std::cout << "ncell_flag_types: " << ncell_flag_types << std::endl;
             std::cout << "ncell_flags: ";
-            for (int i = 0; i < ncell_flags.size(); i++) {
+            for (size_t i = 0; i < ncell_flags.size(); i++) {
                 std::cout << ncell_flags[i] << " ";
             }
             std::cout << std::endl;
@@ -226,15 +226,15 @@ class ReadRTT : public ReaderIface
         }
 
         void validate() {
-            if (nnode_flag_types > 0 && nnode_flag_types != nnode_flags.size()) {
+            if (nnode_flag_types > 0 && nnode_flag_types != (int)nnode_flags.size()) {
                 std::cerr << "Warning: nnode_flag_types does not match nnode_flags.size()" << std::endl;
             }
 
-            if (nside_flag_types > 0 && nside_flag_types != nside_flags.size()) {
+            if (nside_flag_types > 0 && nside_flag_types != (int)nside_flags.size()) {
                 std::cerr << "Warning: nside_flag_types does not match nside_flags.size()" << std::endl;
             }
 
-            if (ncell_flag_types > 0 && ncell_flag_types != ncell_flags.size()) {
+            if (ncell_flag_types > 0 && ncell_flag_types != (int)ncell_flags.size()) {
                 std::cerr << "Warning: ncell_flag_types does not match ncell_flags.size()" << std::endl;
             }
 
@@ -242,6 +242,17 @@ class ReadRTT : public ReaderIface
                 std::cerr << "Warning: Additional flag types will not be read" << std::endl;
             }
         }
+    };
+
+    struct cell_def
+    {
+        int id;
+        std::string name;
+        int nnodes;
+        int nsides;
+
+        std::vector< int > side_type;
+        std::vector< std::vector< int > > sides_nodes;
     };
 
     // structure to hold sense & vol data
@@ -298,6 +309,7 @@ class ReadRTT : public ReaderIface
     struct tet
     {
         int id;
+        int type_id;
         int connectivity[4];
         int material_number;
         // with c++11 we could use tet(): id(0), connectivity({0}), material_number(0) {}
@@ -378,6 +390,11 @@ class ReadRTT : public ReaderIface
      * @param input_file, an open filestream
     */
     ErrorCode parse_dims(std::ifstream& input_file);
+
+    /** parse the cell definition car
+     * @param input_file, an open filestream
+     */
+    ErrorCode read_cell_defs( std::ifstream& input_file );
 
     /**
      * Builds the full MOAB representation of the data, making vertices from coordinates, triangles
@@ -543,6 +560,7 @@ class ReadRTT : public ReaderIface
   private:
     headerData header_data;
     dimData dim_data;
+    std::map<int, cell_def> cell_def_data;
 
     // read mesh interface
     ReadUtilIface* readMeshIface;

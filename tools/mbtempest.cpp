@@ -747,6 +747,9 @@ int main( int argc, char* argv[] )
         // First compute the covering set such that the target elements are fully covered by the
         // local source grid
         runCtx->timer_push( "construct covering set for intersection" );
+        // if ghosting, no gnomonic
+        if (runCtx->nlayers >=1)
+            runCtx->useGnomonicProjection = false;
         rval = remapper.ConstructCoveringSet( runCtx->epsrel, 1.0, 1.0, runCtx->boxeps, runCtx->rrmGrids,
                                               runCtx->useGnomonicProjection, runCtx->nlayers );MB_CHK_ERR( rval );
         runCtx->timer_pop();

@@ -4194,7 +4194,7 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
     // Default constant parameters
     constexpr bool validate        = true;
     constexpr bool meshCleanup     = true;
-    constexpr bool gnomonic        = true;
+    bool gnomonic        = true;
     constexpr double defaultradius = 1.0;
     constexpr double boxeps        = 1.e-10;
 
@@ -4328,6 +4328,8 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
     tdata.remapper->GetMeshSet( moab::Remapper::OverlapMesh ) = data_intx.file_set;
 
     // First, compute the covering source set.
+    if (tdata.num_src_ghost_layers >= 1)
+        gnomonic = false; // do not use gnomonic when we need ghost layers;
     rval =
         tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, tdata.num_src_ghost_layers );MB_CHK_ERR( rval );
 

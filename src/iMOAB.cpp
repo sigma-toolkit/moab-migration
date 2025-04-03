@@ -743,9 +743,8 @@ static ErrCode internal_WriteMesh( iMOAB_AppID pid,
     }
 
     // Now let us actually write the file to disk with appropriate options
-    // MB_CHK_ERR( context.MBI->write_file( filename, 0, newopts.str().c_str(), &fileSet, 1, copyTagList.data(),
-    //                                      copyTagList.size() ) );
-    MB_CHK_ERR( context.MBI->write_file( filename, 0, newopts.str().c_str(), &fileSet, 1 ) );
+    MB_CHK_ERR( context.MBI->write_file( filename, 0, newopts.str().c_str(), &fileSet, 1, copyTagList.data(), copyTagList.size() ) );
+    //MB_CHK_ERR( context.MBI->write_file( filename, 0, newopts.str().c_str(), &fileSet, 1 ) );
 
     return moab::MB_SUCCESS;
 }

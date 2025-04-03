@@ -1048,9 +1048,13 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
     m_rowVector.setZero();
     m_colVector.setZero();
 
-    // Perform the actual projection of weights: application of weight matrix onto the source
-    // solution vector
-
+#ifdef VERBOSE
+    std::stringstream sstr;
+    static int callId = 0;
+    callId++;
+    sstr << "projection_id_" << callId << "_s_" << size << "_rk_" << rank << ".txt";
+    std::ofstream output_file( sstr.str() );
+#endif
     // Perform the actual projection of weights: application of weight matrix onto the source
     // solution vector
 
@@ -1062,7 +1066,9 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
             if( row_dtoc_dofmap[i] >= 0 )
                 m_rowVector( row_dtoc_dofmap[i] ) = srcVals[i];  // permute and set the row (source) vector properly
         }
-
+        // deterministicSparseMatTransposeVecMulClean( m_weightMatrix, m_rowVector, m_colVector );
+        //deterministicSparseMatTransposeVecMul( m_weightMatrix, m_rowVector, m_colVector );
+        // deterministicSparseMatTransposeVecMulNative( m_weightMatrix, m_rowVector, m_colVector );
         m_colVector = m_weightMatrix.adjoint() * m_rowVector;
 
         // Permute the resulting target data back
@@ -1074,21 +1080,39 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
     }
     else
     {
+#ifdef VERBOSE
+        output_file << "ColVector: " << m_colVector.size() << ", SrcVals: " << srcVals.size()
+                    << ", Sizes: " << m_nTotDofs_SrcCov << ", " << col_dtoc_dofmap.size() << "\n";
+#endif
        for( unsigned i = 0; i < srcVals.size(); ++i )
        {
            if( col_dtoc_dofmap[i] >= 0 )
                m_colVector(  col_dtoc_dofmap[i] ) = srcVals[i];  // permute and set the row (source) vector properly
+#ifdef VERBOSE
+           output_file << i << " " << col_gdofmap[col_dtoc_dofmap[i]] + 1 << "  " << srcVals[i] << "\n";
+#endif
 
        }
-
+       // deterministicSparseMatVecMulClean( m_weightMatrix, m_colVector, m_rowVector );
+       // deterministicSparseMatVecMul( m_weightMatrix, m_colVector, m_rowVector );
+       // deterministicSparseMatVecMulNative( m_weightMatrix, m_colVector, m_rowVector );
+       // deterministicSparseMatVecMulKahan( m_weightMatrix, m_colVector, m_rowVector );
        m_rowVector = m_weightMatrix * m_colVector;
 
        // Permute the resulting target data back
+#ifdef VERBOSE
+       output_file
+            << "RowVector: " << m_rowVector.size() << ", TgtVals:" << tgtVals.size() << ", Sizes: " << m_nTotDofs_Dest
+            << ", " << row_gdofmap.size() << "\n";
+#endif
        for( unsigned i = 0; i < tgtVals.size(); ++i )
        {
            if( row_dtoc_dofmap[i] >= 0 )
            {
                tgtVals[i] = m_rowVector( row_dtoc_dofmap[i] );  // permute and set the row (source) vector properly
+#ifdef VERBOSE
+               output_file << i << " " << row_gdofmap[row_dtoc_dofmap[i]] + 1 << "  " << tgtVals[i] << "\n";
+#endif
            }
        }
 

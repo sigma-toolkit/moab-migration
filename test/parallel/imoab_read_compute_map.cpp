@@ -605,7 +605,6 @@ int main( int argc, char* argv[] )
                 // write only for n==1 case
                 std::stringstream outf;
                 outf << "cplProjectedOCNFileMF_" << endG4 - startG4 + 1 << ".h5m";  // number of tasks on coupler
-                char outputFileRecvd[] = "cplProjectedOCNFileMF.h5m";
                 CHECKIERR( iMOAB_WriteMesh( cplOcnPID, outf.str().c_str(), fileWriteOptions ),
                            "could not write cplProjectedOCNFile.h5m to disk" )
             }

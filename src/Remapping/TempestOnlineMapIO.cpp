@@ -1395,7 +1395,6 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     // const auto& colMap = m_remapper->gid_to_lid_covsrc;
 #ifdef MOAB_HAVE_EIGEN3
 
-    // first matrix
     typedef Eigen::Triplet< double > Triplet;
     std::vector< Triplet > tripletList;
 
@@ -1416,7 +1415,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         // populate
         for( int i = 0; i < localSize; i++ )
         {
-            int rowval  = vecRow[i] - 1;  // dofs are 1 based in the file
+            int rowval  = vecRow[i] - 1;  // dofs are 1 based in the file; sparse matrix is 0 based
             int colval  = vecCol[i] - 1;
             int to_proc = -1;
 
@@ -1537,21 +1536,18 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         }
         int index = 0;
         row_gdofmap.resize(rowSet.size());
-        for  (std::set<int>::iterator setIt = rowSet.begin(); setIt!=rowSet.end(); ++setIt)
-        {
-            row_gdofmap[index] = *setIt;
-            rowMap[*setIt] = index++;
+        for (auto setIt : rowSet) {
+            row_gdofmap[index] = setIt;
+            rowMap[setIt] = index++;
         }
         m_nTotDofs_Dest = index;
         index = 0;
         col_gdofmap.resize(colSet.size());
-        for  (std::set<int>::iterator setIt = colSet.begin(); setIt!=colSet.end(); ++setIt)
-        {
-            col_gdofmap[index] = *setIt;
-            colMap[*setIt] = index++;
+        for (auto setIt : colSet) {
+            col_gdofmap[index] = setIt;
+            colMap[setIt] = index++;
         }
         m_nTotDofs_SrcCov = index;
-
 
         tripletList.reserve( n );
         for( int i = 0; i < n; i++ )
@@ -1559,7 +1555,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             const int vecRowValue = tl->vi_wr[3 * i + 1];
             const int vecColValue = tl->vi_wr[3 * i + 2];
             double value = tl->vr_wr[i];
-            tripletList.push_back( Triplet( rowMap[ vecRowValue ], colMap[ vecColValue ], value ) );
+            tripletList.emplace_back( rowMap[ vecRowValue ], colMap[ vecColValue ], value  );
         }
         tl->reset();
     }
@@ -1580,18 +1576,16 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
 
         int index = 0;
         row_gdofmap.resize(rowSet.size());
-        for  (std::set<int>::iterator setIt = rowSet.begin(); setIt!=rowSet.end(); ++setIt)
-        {
-            row_gdofmap[index] = *setIt;
-            rowMap[*setIt] = index++;
+        for (auto setIt : rowSet) {
+            row_gdofmap[index] = setIt;
+            rowMap[setIt] = index++;
         }
         m_nTotDofs_Dest = index;
-        col_gdofmap.resize(colSet.size());
         index = 0;
-        for  (std::set<int>::iterator setIt = colSet.begin(); setIt!=colSet.end(); ++setIt)
-        {
-            col_gdofmap[index] = *setIt;
-            colMap[*setIt] = index++;
+        col_gdofmap.resize(colSet.size());
+        for (auto setIt : colSet) {
+            col_gdofmap[index] = setIt;
+            colMap[setIt] = index++;
         }
         m_nTotDofs_SrcCov = index;
 
@@ -1599,9 +1593,9 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         for( int i = 0; i < nS; i++ )
         {
             const int vecRowValue = vecRow[i]-1 ;  // the rows, cols are 1 based in the file
-            const int vecColValue = vecCol[i]-1 ;  // sparse matrix will be 1 based too
+            const int vecColValue = vecCol[i]-1 ;  // sparse matrix will be 0 based
             double value = vecS[i];
-            tripletList.push_back( Triplet( rowMap[ vecRowValue ], colMap[ vecColValue ], value ) );
+            tripletList.emplace_back(  rowMap[ vecRowValue ], colMap[ vecColValue ], value  );
         }
     }
 
@@ -1613,6 +1607,9 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     // Reset the source and target data first
     m_rowVector.setZero();
     m_colVector.setZero();
+#ifdef VERBOSE
+    serializeSparseMatrix( m_weightMatrix, "map_operator_" + std::to_string( rank ) + ".txt" );
+#endif
 // #ifdef MOAB_HAVE_EIGEN3
 #endif
     // TODO: make this flexible and read the order from map with help of metadata

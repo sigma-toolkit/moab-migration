@@ -1120,7 +1120,7 @@ ErrCode iMOAB_GetVisibleElementsInfo( iMOAB_AppID pid,
 
 #else
         /* everything owned by task 0 */
-        ranks[i] = 0;
+        ranks[i]             = 0;
 #endif
     }
 
@@ -3697,7 +3697,7 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
 #ifdef MOAB_HAVE_MPI
         if( 0 == data_intx.pcomm->rank() )
 #endif
-           std::cout << " aream tag already defined \n ";
+            std::cout << " aream tag already defined \n ";
     }
 
     std::vector< double > trvAreaA, trvAreaB;  // passed by reference

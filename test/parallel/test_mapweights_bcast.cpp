@@ -424,7 +424,7 @@ void read_buffered_map()
                 // clear the local buffer
                 dataRowCols.clear();
             }  // if( nEntriesComm > 0 )
-        }  // if( rank != rootProc )
+        }      // if( rank != rootProc )
 
         MPI_Barrier( commW );
 #endif

@@ -415,8 +415,8 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     offbuf[2] -= nS;
 
 #else
-    int offbuf[3] = { 0, 0, 0 };
-    int globuf[5] = { (int)nA, (int)nB, nS, nSourceNodesPerFace, nTargetNodesPerFace };
+    int offbuf[3]            = { 0, 0, 0 };
+    int globuf[5]            = { (int)nA, (int)nB, nS, nSourceNodesPerFace, nTargetNodesPerFace };
 #endif
 
     std::vector< std::string > srcdimNames, tgtdimNames;
@@ -1407,7 +1407,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         // the default trivial partitioning scheme
         int nDofs = nB;  // this is for row partitioning
 
-        int nPerPart   = nDofs / size;
+        int nPerPart        = nDofs / size;
         moab::TupleList* tl = new moab::TupleList;
         unsigned numr       = 1;                     //
         tl->initialize( 3, 0, 0, numr, localSize );  // to proc, row, col, value
@@ -1419,9 +1419,8 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             int colval  = vecCol[i] - 1;
             int to_proc = -1;
 
-            to_proc = rowval/nPerPart;
-            if (to_proc == size)
-                to_proc = size - 1;
+            to_proc = rowval / nPerPart;
+            if( to_proc == size ) to_proc = size - 1;
 
             int n                = tl->get_n();
             tl->vi_wr[3 * n]     = to_proc;
@@ -1445,9 +1444,8 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             {
                 int to_proc = -1;
                 int dof_val = owned_dof_ids[i] - 1;  // dofs are 1 based in the file, partition from 0 ?
-                to_proc = dof_val/nPerPart;
-                if (to_proc == size)
-                    to_proc = size - 1;
+                to_proc     = dof_val / nPerPart;
+                if( to_proc == size ) to_proc = size - 1;
 
                 int n                  = tl_re.get_n();
                 tl_re.vi_wr[2 * n]     = to_proc;
@@ -1523,29 +1521,31 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         }
 
         // set of row and col used on this task
-        std::set<int> rowSet;
-        std::set<int> colSet;
+        std::set< int > rowSet;
+        std::set< int > colSet;
         // populate the sparsematrix, using rowMap and colMap
         int n = tl->get_n();
         for( int i = 0; i < n; i++ )
         {
             const int vecRowValue = tl->vi_wr[3 * i + 1];
             const int vecColValue = tl->vi_wr[3 * i + 2];
-            rowSet.insert(vecRowValue);
-            colSet.insert(vecColValue);
+            rowSet.insert( vecRowValue );
+            colSet.insert( vecColValue );
         }
         int index = 0;
-        row_gdofmap.resize(rowSet.size());
-        for (auto setIt : rowSet) {
+        row_gdofmap.resize( rowSet.size() );
+        for( auto setIt : rowSet )
+        {
             row_gdofmap[index] = setIt;
-            rowMap[setIt] = index++;
+            rowMap[setIt]      = index++;
         }
         m_nTotDofs_Dest = index;
-        index = 0;
-        col_gdofmap.resize(colSet.size());
-        for (auto setIt : colSet) {
+        index           = 0;
+        col_gdofmap.resize( colSet.size() );
+        for( auto setIt : colSet )
+        {
             col_gdofmap[index] = setIt;
-            colMap[setIt] = index++;
+            colMap[setIt]      = index++;
         }
         m_nTotDofs_SrcCov = index;
 
@@ -1554,8 +1554,8 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         {
             const int vecRowValue = tl->vi_wr[3 * i + 1];
             const int vecColValue = tl->vi_wr[3 * i + 2];
-            double value = tl->vr_wr[i];
-            tripletList.emplace_back( rowMap[ vecRowValue ], colMap[ vecColValue ], value  );
+            double value          = tl->vr_wr[i];
+            tripletList.emplace_back( rowMap[vecRowValue], colMap[vecColValue], value );
         }
         tl->reset();
     }
@@ -1563,46 +1563,48 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
 #endif
     {
         // set of row and col used on this task
-        std::set<int> rowSet;
-        std::set<int> colSet;
+        std::set< int > rowSet;
+        std::set< int > colSet;
         // populate the sparsematrix, using rowMap and colMap
         for( int i = 0; i < nS; i++ )
         {
-            const int vecRowValue = vecRow[i]-1;
-            const int vecColValue = vecCol[i]-1;
-            rowSet.insert(vecRowValue);
-            colSet.insert(vecColValue);
+            const int vecRowValue = vecRow[i] - 1;
+            const int vecColValue = vecCol[i] - 1;
+            rowSet.insert( vecRowValue );
+            colSet.insert( vecColValue );
         }
 
         int index = 0;
-        row_gdofmap.resize(rowSet.size());
-        for (auto setIt : rowSet) {
+        row_gdofmap.resize( rowSet.size() );
+        for( auto setIt : rowSet )
+        {
             row_gdofmap[index] = setIt;
-            rowMap[setIt] = index++;
+            rowMap[setIt]      = index++;
         }
         m_nTotDofs_Dest = index;
-        index = 0;
-        col_gdofmap.resize(colSet.size());
-        for (auto setIt : colSet) {
+        index           = 0;
+        col_gdofmap.resize( colSet.size() );
+        for( auto setIt : colSet )
+        {
             col_gdofmap[index] = setIt;
-            colMap[setIt] = index++;
+            colMap[setIt]      = index++;
         }
         m_nTotDofs_SrcCov = index;
 
-        tripletList.reserve(nS);
+        tripletList.reserve( nS );
         for( int i = 0; i < nS; i++ )
         {
-            const int vecRowValue = vecRow[i]-1 ;  // the rows, cols are 1 based in the file
-            const int vecColValue = vecCol[i]-1 ;  // sparse matrix will be 0 based
-            double value = vecS[i];
-            tripletList.emplace_back(  rowMap[ vecRowValue ], colMap[ vecColValue ], value  );
+            const int vecRowValue = vecRow[i] - 1;  // the rows, cols are 1 based in the file
+            const int vecColValue = vecCol[i] - 1;  // sparse matrix will be 0 based
+            double value          = vecS[i];
+            tripletList.emplace_back( rowMap[vecRowValue], colMap[vecColValue], value );
         }
     }
 
-    m_weightMatrix.resize( m_nTotDofs_Dest, m_nTotDofs_SrcCov);
+    m_weightMatrix.resize( m_nTotDofs_Dest, m_nTotDofs_SrcCov );
     m_rowVector.resize( m_nTotDofs_Dest );
     m_colVector.resize( m_nTotDofs_SrcCov );
-    m_nTotDofs_Src = m_nTotDofs_SrcCov; // do we need both?
+    m_nTotDofs_Src = m_nTotDofs_SrcCov;  // do we need both?
     m_weightMatrix.setFromTriplets( tripletList.begin(), tripletList.end() );
     // Reset the source and target data first
     m_rowVector.setZero();
@@ -1615,8 +1617,6 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     // TODO: make this flexible and read the order from map with help of metadata
     m_nDofsPEl_Src  = 1;  // always assume FV-FV maps are read from file
     m_nDofsPEl_Dest = 1;  // always assume FV-FV maps are read from file
-
-
 
     return moab::MB_SUCCESS;
 }

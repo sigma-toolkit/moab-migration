@@ -82,6 +82,19 @@ foreach( fname ${TESTS} )
   add_test( ${base} ${EXECUTABLE_OUTPUT_PATH}/${base} )
 endforeach()
 
+if(MOAB_HAVE_TEMPESTREMAP)
+  set( MBTR_TESTS imoab_remap.cpp )
+  
+  foreach( fname ${MBTR_TESTS} )
+    string( REPLACE ".cpp" "" base ${fname} )
+    add_executable( ${base} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname})
+    set_target_properties( ${base} PROPERTIES COMPILE_FLAGS "${TEST_COMP_FLAGS} ${MOAB_DEFINES} -DTEST" )
+    target_link_libraries( ${base} MOAB ${TEMPESTREMAP_LIBRARIES} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
+    add_test( ${base} ${EXECUTABLE_OUTPUT_PATH}/${base} )
+  endforeach()
+
+endif()
+
 if(ENABLE_PYMOAB)
   ADD_SUBDIRECTORY(pymoab)
   find_package(
@@ -219,5 +232,25 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
   add_test( TestPCommSerial
     ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS}
     ${EXECUTABLE_OUTPUT_PATH}/pcomm_serial ${MPIEXEC_POSTFLAGS} 1 ${MOAB_SOURCE_DIR}/MeshFiles/unittest/ptest.cub )
+
+
+  if(MOAB_HAVE_TEMPESTREMAP)
+    set( MBTR_TESTS parallel/imoab_coupler.cpp parallel/imoab_coupler_bilin.cpp parallel/imoab_coupler_twohop.cpp
+                    parallel/imoab_domain_culling.cpp parallel/imoab_map2.cpp parallel/imoab_map_target.cpp 
+                    parallel/imoab_ptest2.cpp parallel/imoab_read_compute_map.cpp parallel/imoab_read_map.cpp 
+                    parallel/imoab_scrip.cpp parallel/imoab_setwithGid.cpp parallel/imoab_phatm_ocn_coupler.cpp 
+                    parallel/imoab_apg2_ol_coupler.cpp )
+    
+    foreach( fname ${MBTR_TESTS} )
+      string( REPLACE ".cpp" "" base ${fname} )
+      string( REPLACE "parallel/" "" noparbase ${base} )
+      add_executable( ${noparbase} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname})
+      set_target_properties( ${noparbase} PROPERTIES COMPILE_FLAGS "${TEST_COMP_FLAGS} ${MOAB_DEFINES} -DTEST" )
+      target_link_libraries( ${noparbase} MOAB ${TEMPESTREMAP_LIBRARIES} ${MPI_LIBRARIES} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
+      add_test( ${noparbase} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${noparbase} ${MPIEXEC_POSTFLAGS} )
+    endforeach()
+
+  endif()
+
 
 endif ( MOAB_HAVE_MPI AND MPI_FOUND )

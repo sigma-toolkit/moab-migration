@@ -331,17 +331,6 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
     // add tris to set
     rval = MBI->add_entities( file_set, mb_tets );
 
-    
-    rval =
-        MBI->tag_get_handle( "DIM_NCELL_DEFS", 1, MB_TYPE_INTEGER, dim_data.ncell_defs, MB_TAG_SPARSE | MB_TAG_CREAT, &zero );MB_CHK_ERR_CONT(rval);
-    rval =
-        MBI->tag_get_handle( "DIM_NNODES_MAX", 1, MB_TYPE_INTEGER, dim_data.nnodes_max, MB_TAG_SPARSE | MB_TAG_CREAT, &zero );MB_CHK_ERR_CONT(rval);
-    rval =
-        MBI->tag_get_handle( "DIM_NSIDES_MAX", 1, MB_TYPE_INTEGER, dim_data.nsides_max, MB_TAG_SPARSE | MB_TAG_CREAT, &zero );MB_CHK_ERR_CONT(rval);
-    rval =
-        MBI->tag_get_handle( "DIM_NNODES_MAX", 1, MB_TYPE_INTEGER, dim_data.nnodes_max, MB_TAG_SPARSE | MB_TAG_CREAT, &zero );MB_CHK_ERR_CONT(rval);
-
-
     return MB_SUCCESS;
 }
 

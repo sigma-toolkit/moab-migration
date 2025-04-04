@@ -74,6 +74,7 @@ if HAVE_NETCDF
 endif
 if HAVE_EXTMESHES
   HDF5_TESTS +=  imoab_apg2_ol_coupler
+  DEFS += -DEXT_DATA_DIR="$(builddir)/../../sandbox/MeshFiles/"
   imoab_apg2_ol_coupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
 endif
   test_mapweights_bcast_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)

@@ -34,6 +34,16 @@
 
 #include "imoab_coupler_utils.hpp"
 
+#ifdef EXT_DATA_DIR
+#ifdef __cplusplus
+const std::string ExtMeshDir( STRINGIFY(EXT_DATA_DIR) );
+#else
+const char* ExtMeshDir = STRINGIFY(EXT_DATA_DIR);
+#endif
+#else
+#error Specify EXT_DATA_DIR to compile test
+#endif
+
 using namespace moab;
 
 // #define VERBOSE
@@ -74,9 +84,9 @@ int main( int argc, char* argv[] )
     MPI_Comm_group( MPI_COMM_WORLD, &jgroup );  // all processes in jgroup
 
     std::string atmFilename =
-        "../../sandbox/MeshFiles/e3sm/ne4pg2_o240/ne4pg2_p8.h5m";  // we should use only mesh from here
+        ExtMeshDir + "e3sm/ne4pg2_o240/ne4pg2_p8.h5m";  // we should use only mesh from here
     std::string atmPhysMesh =
-        "../../sandbox/MeshFiles/e3sm/ne4pg2_o240/AtmPhys_pg2.h5m";  // it has some data associated to vertices, T_ph,
+        ExtMeshDir + "e3sm/ne4pg2_o240/AtmPhys_pg2.h5m";  // it has some data associated to vertices, T_ph,
                                                                      // u_ph, v_ph
     // we will eventually project that data to ocean mesh, after intx atm/ocn
 

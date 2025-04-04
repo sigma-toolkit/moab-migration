@@ -36,6 +36,7 @@ set (PACKAGE_VERSION "5.5.1")
 
 include(GNUInstallDirs)
 include(FeatureSummary)
+include(ExternalData)
 
 #Add our Cmake directory to the module search path
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/config ${CMAKE_MODULE_PATH})
@@ -537,6 +538,26 @@ if ( EIGEN3_FOUND AND ENABLE_TEMPESTREMAP )
   # Print some TempestRemap configuration details
   SET_VARS_IF_FOUND(TEMPESTREMAP OPTIONAL "TempestRemap" "TempestRemap library interfaces for MOAB climate remapping support" TEMPESTREMAP_INCLUDES TEMPESTREMAP_LIBRARIES )
 
+  if (MOAB_HAVE_TEMPESTREMAP)
+    # Make sure the directory exists
+    set(EXT_DATA_DIR "${CMAKE_BINARY_DIR}/sandbox/MeshFiles")
+    set(EXT_E3SM_DATA_DIR "${CMAKE_BINARY_DIR}/sandbox/MeshFiles/e3sm")
+    file(MAKE_DIRECTORY "${EXT_E3SM_DATA_DIR}")
+    file(MAKE_DIRECTORY "${EXT_E3SM_DATA_DIR}/ne4pg2_o240")
+    file(MAKE_DIRECTORY "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG")
+    set(MOAB_DEFINES "${MOAB_DEFINES} -DEXT_DATA_DIR=${EXT_DATA_DIR}/")
+
+    # case: ne4pg2_o240
+    file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne4pg2_o240/AtmPhys_pg2.h5m "${EXT_E3SM_DATA_DIR}/ne4pg2_o240/AtmPhys_pg2.h5m" )
+    file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne4pg2_o240/land_p8.h5m "${EXT_E3SM_DATA_DIR}/ne4pg2_o240/land_p8.h5m" )
+    file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne4pg2_o240/ne4pg2_p8.h5m "${EXT_E3SM_DATA_DIR}/ne4pg2_o240/ne4pg2_p8.h5m" )
+
+    # case: ne30pg2_r05_oECv3_ICG
+    file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne30pg2_r05_oECv3_ICG/AtmPhys_01.h5m "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG/AtmPhys_01.h5m" )
+    file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne30pg2_r05_oECv3_ICG/domain_clean_p16.h5m "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG/domain_clean_p16.h5m" )
+    file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne30pg2_r05_oECv3_ICG/outCS30_pg2_p8.h5m "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG/outCS30_pg2_p8.h5m" )
+    file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne30pg2_r05_oECv3_ICG/wholeMPAS.h5m "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG/wholeMPAS.h5m" )
+  endif(MOAB_HAVE_TEMPESTREMAP)
 endif( EIGEN3_FOUND AND ENABLE_TEMPESTREMAP )
 
 set (MOAB_HAVE_CGNS OFF CACHE INTERNAL "Found necessary CGNS components. Configure MOAB with it." )

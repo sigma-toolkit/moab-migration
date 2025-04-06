@@ -34,9 +34,21 @@ project( MOAB
 set (PACKAGE_NAME "MOAB")
 set (PACKAGE_VERSION "5.5.1")
 
+# Include standard CMake macros
 include(GNUInstallDirs)
 include(FeatureSummary)
 include(ExternalData)
+# Include local CMake macros
+include(config/logging.cmake)
+include(config/dist.cmake)
+include(config/distcheck.cmake)
+#include(config/release.cmake)
+
+LOGGING_INITIALIZE()
+_SETUP_PROJECT_DIST()
+DISTCHECK_SETUP()
+#RELEASE_SETUP()
+message(STATUS "MOAB: Configured 'distcheck' target")
 
 #Add our Cmake directory to the module search path
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/config ${CMAKE_MODULE_PATH})
@@ -108,7 +120,7 @@ include ( CheckTypeSize )
 
 # Compiler defines... this should really be in a config file.
 set( MOAB_DEFINES "" )
-set( MOAB_LIBS "" )
+set( MOAB_LIBRARIES "" )
 set( MOAB_INSTALL_TARGETS "" )
 set( MOAB_MESH_DIR        "${CMAKE_SOURCE_DIR}/MeshFiles/" )
 
@@ -124,6 +136,13 @@ macro(AUTO_ENABLE_PACKAGE PACKAGE_NAME)
     endif()
 endmacro()
 
+LIST(APPEND LOGGING_WATCHED_VARIABLES
+    MOAB_DEFINES
+    MOAB_CXX_FLAGS
+    MOAB_INCLUDES
+    MOAB_LIBRARIS
+    MOAB_INSTALL_TARGETS
+    )
 ################################################################################
 # Options that the user controls
 ################################################################################
@@ -272,7 +291,7 @@ macro(SET_VARS_IF_FOUND PACKAGE_NAME PACKAGE_TYPE PRINT_NAME DESCRIPTION PACKAGE
       endif (DEFINED ${PACKAGE_INCLUDES} AND NOT "${${PACKAGE_INCLUDES}}" STREQUAL "")
       if (DEFINED ${PACKAGE_LIBRARIES} AND NOT "${${PACKAGE_LIBRARIES}}" STREQUAL "")
         message (STATUS "        Libraries : ${${PACKAGE_LIBRARIES}}")
-        set( MOAB_LIBS ${${PACKAGE_LIBRARIES}} ${MOAB_LIBS} )
+        set( MOAB_LIBRARIES ${${PACKAGE_LIBRARIES}} ${MOAB_LIBRARIES} )
       endif (DEFINED ${PACKAGE_LIBRARIES} AND NOT "${${PACKAGE_LIBRARIES}}" STREQUAL "")
 
       set_package_properties(${PACKAGE_NAME} PROPERTIES
@@ -312,6 +331,10 @@ if ( ENABLE_BLASLAPACK  )
   SET_VARS_IF_FOUND(LAPACK RECOMMENDED "LAPACK" "Native LAPACK implementations" LAPACK_INCLUDES LAPACK_LIBRARIES )
   list(APPEND MOAB_ALL_LIBS ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
 
+  LIST(APPEND LOGGING_WATCHED_VARIABLES
+    BLAS_LIBRARIES
+    LAPACK_LIBRARIES )
+
 endif (ENABLE_BLASLAPACK)
 
 # Check for Eigen3 availability
@@ -332,7 +355,10 @@ if ( ENABLE_EIGEN3 )
   endif (EIGEN3_FOUND)
 
   SET_VARS_IF_FOUND(EIGEN3 RECOMMENDED "Eigen3" "Eigen3 headers as supplement to BLAS/LAPACK implementations" EIGEN3_INCLUDES EIGEN3_LIBRARIES )
-  list(APPEND MOAB_ALL_LIBS ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
+
+  LIST(APPEND LOGGING_WATCHED_VARIABLES
+    EIGEN3_INCLUDES
+    EIGEN3_LIBRARIES )
 
 endif ( ENABLE_EIGEN3 )
 
@@ -361,8 +387,6 @@ if ( ENABLE_FORTRAN )
   set(MOAB_FC_FUNC_  "${FortranCInterface_GLOBAL__PREFIX} ${FC_CASE} ${FortranCInterface_GLOBAL__SUFFIX}")
 endif ( ENABLE_FORTRAN )
 
-message(STATUS "MOAB libs (blas/lapack/fortran) :: ${MOAB_LIBS}")
-
 # Check for MPI compiler support and set the necessary flags
 set (MOAB_HAVE_MPI OFF CACHE INTERNAL "Found necessary MPI components. Configure MOAB with it." )
 if ( ENABLE_MPI )
@@ -389,7 +413,15 @@ if ( ENABLE_MPI )
       message (STATUS "        ${var}   : ${${var}}")
     endforeach ()
 
-    #set( MOAB_LIBS ${MPI_CXX_LINK_FLAGS} ${MPI_CXX_LIBRARIES} ${MOAB_LIBS} )
+    #set( MOAB_LIBRARIES ${MPI_CXX_LINK_FLAGS} ${MPI_CXX_LIBRARIES} ${MOAB_LIBRARIES} )
+    LIST(APPEND LOGGING_WATCHED_VARIABLES
+      MPI_DIR
+      MPI_C_COMPILER
+      MPI_CXX_COMPILER
+      MPI_Fortran_COMPILER
+      MPIEXEC_EXECUTABLE
+      MPIEXEC_NUMPROC_FLAG
+      MPIEXEC_MAX_NUMPROCS )
 
   endif ( MPI_FOUND )
 endif ( ENABLE_MPI )
@@ -463,13 +495,16 @@ if ( ENABLE_HDF5 )
     SET_VARS_IF_FOUND(HDF5 RECOMMENDED "HDF5" "HDF5 library interfaces for MOAB native file format support" HDF5_INCLUDE_DIRS HDF5_LIBRARIES )
     message (STATUS "        Parallel     : ${HDF5_IS_PARALLEL}")
 
+    LIST(APPEND LOGGING_WATCHED_VARIABLES
+      HDF5_DIR
+      HDF5_INCLUDE_DIRS
+      HDF5_LIBRARIES )
+
   endif ( HDF5_FOUND )
 
 endif ( ENABLE_HDF5 )
 
 message(STATUS "MOAB_HAVE_MPI :: ${MOAB_HAVE_MPI} ${MOAB_HAVE_NETCDF} ${ENABLE_PNETCDF}")
-
-message(STATUS "MOAB libs (zlib/szip/hdf5) :: ${MOAB_LIBS}")
 
 # Check for PNetCDF availability
 set (MOAB_HAVE_PNETCDF OFF CACHE INTERNAL "Found necessary PNetCDF components. Configure MOAB with it." )
@@ -480,8 +515,6 @@ if ( ENABLE_PNETCDF )
   SET_VARS_IF_FOUND(PNETCDF RECOMMENDED "PNetCDF" "PNetCDF library interfaces for MOAB nc-file format support" PNETCDF_INCLUDES PNETCDF_LIBRARIES )
 
 endif ( ENABLE_PNETCDF )
-
-message(STATUS "MOAB libs (pnetcdf) :: ${MOAB_LIBS}")
 
 # Check for NetCDF availability
 set (MOAB_HAVE_NETCDF OFF CACHE INTERNAL "Found necessary NetCDF components. Configure MOAB with it." )
@@ -498,8 +531,6 @@ if ( ENABLE_NETCDF )
   SET_VARS_IF_FOUND(NETCDF RECOMMENDED "NetCDF" "NetCDF library interfaces for MOAB ExodusII file format support" NETCDF_INCLUDES NETCDF_LIBRARIES )
 
 endif ( ENABLE_NETCDF )
-
-message(STATUS "MOAB libs (netcdf) :: ${MOAB_LIBS}")
 
 # Check for Metis partitioner availability
 set (MOAB_HAVE_METIS OFF CACHE INTERNAL "Found necessary Metis components. Configure MOAB with it." )
@@ -566,8 +597,7 @@ if (ENABLE_CGNS)
   set (MOAB_HAVE_CGNS ON)
 endif(ENABLE_CGNS)
 
-list (REMOVE_DUPLICATES MOAB_LIBS)
-message(STATUS "MOAB libs :: ${MOAB_LIBS}")
+list (REMOVE_DUPLICATES MOAB_LIBRARIES)
 
 # Strip our custom flags
 string(STRIP "${CMAKE_EXE_LINKER_FLAGS} " CMAKE_EXE_LINKER_FLAGS)
@@ -701,7 +731,7 @@ find_package(PkgConfig QUIET)
 ################################
 # Enable 'dist and distcheck'.
 # File adapted from http://ensc.de/cmake/FindMakeDist.cmake
-find_package(MakeDist)
+#find_package(MakeDist)
 # End 'enable dist and distcheck'
 
 
@@ -917,13 +947,14 @@ SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
 include(AutoconfHeader)
 moab_install_docs(${MOAB_EXAMPLES})
 
-
 feature_summary(WHAT ALL #ENABLED_FEATURES DISABLED_FEATURES PACKAGES_FOUND
                 DESCRIPTION "MOAB Configuration Summary"
                 INCLUDE_QUIET_PACKAGES
                 FILENAME ${CMAKE_BINARY_DIR}/summary.log
                 )
 MESSAGE("-- MOAB Configuration summary has been written to ${CMAKE_BINARY_DIR}/summary.log.")
+
+LOGGING_FINALIZE()
 # All done.
 
 # dump_cmake_variables("MPI_")

@@ -311,10 +311,6 @@ if ( ENABLE_BLASLAPACK  )
   # if (BLAS_FOUND)
   #   set(MOAB_HAVE_BLAS ON)
   # endif(BLAS_FOUND)
-  # set_package_properties(BLAS PROPERTIES
-  #                      TYPE RECOMMENDED
-  #                      PURPOSE "Native BLAS implementations")
-
   SET_VARS_IF_FOUND(BLAS RECOMMENDED "BLAS" "Native BLAS implementations" BLAS_INCLUDES BLAS_LIBRARIES )
 
   # Find LAPACK
@@ -323,10 +319,6 @@ if ( ENABLE_BLASLAPACK  )
     # set(MOAB_HAVE_LAPACK ON)
     set(ENABLE_FORTRAN ON)
   endif(LAPACK_FOUND)
-
-  # set_package_properties(LAPACK PROPERTIES
-  #                      TYPE RECOMMENDED
-  #                      PURPOSE "Native LAPACK implementations")
 
   SET_VARS_IF_FOUND(LAPACK RECOMMENDED "LAPACK" "Native LAPACK implementations" LAPACK_INCLUDES LAPACK_LIBRARIES )
   list(APPEND MOAB_ALL_LIBS ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
@@ -343,10 +335,22 @@ if ( ENABLE_EIGEN3 )
 
   # Eigen3 is optional if LAPACK has been found
   FIND_PACKAGE(Eigen3 OPTIONAL_COMPONENTS)
-
-  # set_package_properties(Eigen3 PROPERTIES
-  #                      TYPE RECOMMENDED
-  #                      PURPOSE "Eigen3 headers as supplement to BLAS/LAPACK implementations")
+  
+  ## Use CPM to auto-download Eigen3 directly
+  if ( DOWNLOAD_EIGEN3 )
+    CPMAddPackage(
+      NAME Eigen
+      VERSION 3.4.0
+      URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
+      # Eigen's CMakelists are not intended for library use
+      DOWNLOAD_ONLY YES
+    )
+    
+    if(Eigen_ADDED)
+      add_library(Eigen INTERFACE IMPORTED)
+      target_include_directories(Eigen INTERFACE ${Eigen_SOURCE_DIR})
+    endif()
+  endif ( DOWNLOAD_EIGEN3 )
 
   if ( EIGEN3_FOUND )
     INCLUDE_DIRECTORIES ( "${EIGEN3_DIR}" )
@@ -442,6 +446,12 @@ function(dump_cmake_variables)
 endfunction()
 
 include (config/CheckCompilerFlags.cmake)
+
+# ---- Dependencies ----
+include(config/CPM.cmake)
+
+CPMAddPackage("gh:fmtlib/fmt#7.1.3")
+# ---------------------------
 
 # Check for Zlib availability
 set (MOAB_HAVE_ZLIB OFF CACHE INTERNAL "Found necessary Zlib components. Configure MOAB with it." )

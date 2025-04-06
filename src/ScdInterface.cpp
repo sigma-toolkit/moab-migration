@@ -86,11 +86,14 @@ ErrorCode ScdInterface::find_boxes( Range& scd_boxes )
             scdBoxes.resize( boxes.size() );
             rval        = mbImpl->tag_get_data( boxSetTag, boxes, &scdBoxes[0] );
             ScdBox* dum = nullptr;
-            // std::remove_if(scdBoxes.begin(), scdBoxes.end(),
-            // std::bind2nd(std::equal_to<ScdBox*>(), dum) ) ;
-            std::remove_if( scdBoxes.begin(), scdBoxes.end(),
-                            std::bind( std::equal_to< ScdBox* >(), std::placeholders::_1, dum ) );
-            // https://stackoverflow.com/questions/32739018/a-replacement-for-stdbind2nd
+            scdBoxes.erase(
+                std::remove_if(
+                    scdBoxes.begin(),
+                    scdBoxes.end(),
+                    [dum](ScdBox* ptr) { return ptr == dum; }
+                ),
+                scdBoxes.end()
+            );
         }
     }
 

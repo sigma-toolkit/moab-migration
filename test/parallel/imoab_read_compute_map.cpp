@@ -31,8 +31,8 @@
 #endif
 
 #define COMPUTE_FILE_MAP
-//#define COMPUTE_TRANSPOSE_FILE_MAP
-//#define COMPUTE_ONLINE_MAP
+#define COMPUTE_TRANSPOSE_FILE_MAP
+#define COMPUTE_ONLINE_MAP
 
 #if( !defined( COMPUTE_FILE_MAP ) && !defined( COMPUTE_TRANSPOSE_FILE_MAP ) && !defined( COMPUTE_ONLINE_MAP ) )
 #error Enable either file-based map (COMPUTE_FILE_MAP/COMPUTE_TRANSPOSE_FILE_MAP) and/or online (COMPUTE_ONLINE_MAP) for coupling
@@ -781,10 +781,10 @@ int main( int argc, char* argv[] )
                     fs.close();
                 }
 
-                // check_baseline_file( baselineBilin, gidElems, tempElems, 1.e-14, err_code );
-                // if( 0 == err_code )
-                //     std::cout << " passed baseline test (bilinear) atm2ocn (file-based map projection) on ocean task "
-                //               << rankInOcnComm << "\n";
+                check_baseline_file( baselineBilin, gidElems, tempElems, 1.e-14, err_code );
+                if( 0 == err_code )
+                    std::cout << " passed baseline test (bilinear) atm2ocn (file-based map projection) on ocean task "
+                              << rankInOcnComm << "\n";
 
 #endif
             }

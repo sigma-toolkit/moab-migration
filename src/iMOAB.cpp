@@ -685,7 +685,7 @@ static ErrCode internal_WriteMesh( iMOAB_AppID pid,
     IMOAB_ASSERT( strlen( filename ), "Invalid filename length." );
 
     appData& data        = context.appDatas[*pid];
-    EntityHandle fileSet = data.file_set;
+    EntityHandle fileSet = (primary_set ? data.file_set : 0);
 
     std::ostringstream newopts;
 #ifdef MOAB_HAVE_MPI

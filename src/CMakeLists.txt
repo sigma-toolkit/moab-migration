@@ -252,7 +252,6 @@ if (MOAB_HAVE_ZOLTAN)
   set( MOAB_INSTALL_HEADERS ${MOAB_INSTALL_HEADERS}
           moab/ZoltanPartitioner.hpp )
   include_directories( ${ZOLTAN_INCLUDES} )
-  # list(APPEND MOAB_DEP_LIBRARIES ${ZOLTAN_LIBRARIES})
 endif()
 
 if (MOAB_HAVE_METIS)
@@ -261,13 +260,6 @@ if (MOAB_HAVE_METIS)
   set( MOAB_INSTALL_HEADERS ${MOAB_INSTALL_HEADERS}
         moab/MetisPartitioner.hpp )
 
-  # if (MOAB_HAVE_PARMETIS)
-  #   include_directories( ${PARMETIS_INCLUDES} )
-  #   list(APPEND MOAB_DEP_LIBRARIES ${PARMETIS_LIBRARIES})
-  # endif()
-
-  # include_directories( ${METIS_INCLUDES} )
-  # list(APPEND MOAB_DEP_LIBRARIES ${METIS_LIBRARIES})
 endif()
 
 if (MOAB_HAVE_TEMPESTREMAP)
@@ -281,9 +273,6 @@ if (MOAB_HAVE_TEMPESTREMAP)
         moab/Remapping/Remapper.hpp
         moab/Remapping/TempestRemapper.hpp
         moab/Remapping/TempestOnlineMap.hpp )
-
-  # include_directories( ${TEMPESTREMAP_INCLUDES} )
-  # list(APPEND MOAB_DEP_LIBRARIES ${TEMPESTREMAP_LIBRARIES})
 
 endif (MOAB_HAVE_TEMPESTREMAP)
 
@@ -324,12 +313,11 @@ else()
     )
 endif()
 
-# set(MOAB_ALL_LIBS ${MOAB_DEP_LIBRARIES} ${MOAB_LIBRARIES})
 set(MOAB_ALL_LIBS ${MOAB_LIBRARIES})
 list(APPEND MOAB_ALL_LIBS ${MPI_LIBRARIES})
-# list(APPEND MOAB_ALL_LIBS ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
+message("MOAB_ALL_LIBS: ${MOAB_ALL_LIBS}")
+
 target_link_libraries(MOAB ${MOAB_ALL_LIBS})
-# message(STATUS "MOAB_ALL_LIBS = ${MOAB_ALL_LIBS}.")
 
 # If using clang-tidy, set the target property so that
 # reformatting code does not use full fledged C++11 semantics

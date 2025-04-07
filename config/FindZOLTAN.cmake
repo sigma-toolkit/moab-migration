@@ -1,7 +1,7 @@
 #
 # Find Zoltan include directories and libraries
 #
-# ZOLTAN_INCLUDES            - list of include paths to find netcdf.h
+# ZOLTAN_INCLUDES            - list of include paths to find zoltan.h
 # ZOLTAN_LIBRARIES           - list of libraries to link against when using Zoltan
 # ZOLTAN_FOUND               - Do not attempt to use Zoltan if "no", "0", or undefined.
 
@@ -16,8 +16,8 @@ find_path( ZOLTAN_INCLUDE_DIR zoltan.h
 find_library( ZOLTAN_LIBRARY
   NAMES zoltan
   HINTS ${ZOLTAN_DIR}
-  ${ZOLTAN_DIR}/lib64
   ${ZOLTAN_DIR}/lib
+  ${ZOLTAN_DIR}/lib64
 )
 
 macro (ZOLTAN_GET_VARIABLE makefile name var)
@@ -43,9 +43,9 @@ show :
     ZOLTAN_GET_VARIABLE (zoltan_config_makefile ZOLTAN_LDFLAGS     zoltan_ldflags)
 
     file (REMOVE ${zoltan_config_makefile})
-    SET(tmp_incs "-I${ZOLTAN_INCLUDE_DIR} ${zoltan_extra_cppflags}")
+    set (tmp_incs "-I${ZOLTAN_INCLUDE_DIR} ${zoltan_extra_cppflags}")
     resolve_includes(ZOLTAN_INCLUDES ${tmp_incs})
-    SET(tmp_libs "${ZOLTAN_LIBRARY} ${zoltan_ldflags} ${zoltan_extra_libs}")
+    set (tmp_libs "${ZOLTAN_LIBRARY} ${zoltan_ldflags} ${zoltan_extra_libs}")
     resolve_libraries (ZOLTAN_LIBRARIES "${tmp_libs}")
   endif ()
 endmacro (ZOLTAN_GET_ALL_VARIABLES)
@@ -57,9 +57,9 @@ IF (NOT ZOLTAN_FOUND)
       include (ResolveCompilerPaths)
       ZOLTAN_GET_ALL_VARIABLES()
     else(EXISTS ${ZOLTAN_INCLUDE_DIR}/Makefile.export.zoltan)
-      SET(ZOLTAN_INCLUDES ${ZOLTAN_INCLUDE_DIR})
       SET(ZOLTAN_LIBRARIES ${ZOLTAN_LIBRARY})
     endif(EXISTS ${ZOLTAN_INCLUDE_DIR}/Makefile.export.zoltan)
+    SET(ZOLTAN_INCLUDES ${ZOLTAN_INCLUDE_DIR})
   else ( ZOLTAN_INCLUDE_DIR AND ZOLTAN_LIBRARY )
     set( ZOLTAN_FOUND NO )
     message("finding Zoltan failed, please try to set the var ZOLTAN_DIR")

@@ -286,7 +286,7 @@ int main( int argc, char* argv[] )
         // set the ghost layers on the coupler for the source mesh
         int nghlay_tgt = 0;
         nghlay = 1;
-        CHECKIERR( iMOAB_SetMapGhostLayers( cplAtmPID, &nghlay, &nghlay_tgt ), "cannot set ghost layers" );
+        CHECKIERR( iMOAB_SetMapGhostLayers( cplAtmOcnFilePID, &nghlay, &nghlay_tgt ), "cannot set ghost layers" );
 
 #if defined( COMPUTE_ONLINE_MAP )
         PUSH_TIMER( "Compute ATM source coverage mesh for OCN (in-memory)" )

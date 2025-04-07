@@ -313,8 +313,7 @@ else()
     )
 endif()
 
-set(MOAB_ALL_LIBS ${MOAB_LIBRARIES})
-list(APPEND MOAB_ALL_LIBS ${MPI_LIBRARIES})
+set(MOAB_ALL_LIBS ${MOAB_LIBRARIES} ${MPI_LIBRARIES})
 message("MOAB_ALL_LIBS: ${MOAB_ALL_LIBS}")
 
 target_link_libraries(MOAB ${MOAB_ALL_LIBS})

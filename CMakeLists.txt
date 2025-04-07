@@ -286,9 +286,10 @@ macro(SET_VARS_IF_FOUND PACKAGE_NAME PACKAGE_TYPE PRINT_NAME DESCRIPTION PACKAGE
       endif (DEFINED ${PACKAGE_INCLUDES} AND NOT "${${PACKAGE_INCLUDES}}" STREQUAL "")
       if (DEFINED ${PACKAGE_LIBRARIES} AND NOT "${${PACKAGE_LIBRARIES}}" STREQUAL "")
         message (STATUS "        Libraries : ${${PACKAGE_LIBRARIES}}")
-        RESOLVE_LIBRARIES(_tmp_resolved_pkglibs ${${PACKAGE_LIBRARIES}})
+        RESOLVE_LIBRARIES(_tmp_resolved_pkglibs "${${PACKAGE_LIBRARIES}}")
         # set( MOAB_LIBRARIES ${${PACKAGE_LIBRARIES}} ${MOAB_LIBRARIES} )
-        list( APPEND MOAB_LIBRARIES ${_tmp_resolved_pkglibs} )
+        # list( APPEND MOAB_LIBRARIES ${_tmp_resolved_pkglibs} )
+        list( INSERT MOAB_LIBRARIES 0 "${_tmp_resolved_pkglibs}" )
       endif (DEFINED ${PACKAGE_LIBRARIES} AND NOT "${${PACKAGE_LIBRARIES}}" STREQUAL "")
 
       set_package_properties(${PACKAGE_NAME} PROPERTIES
@@ -296,7 +297,7 @@ macro(SET_VARS_IF_FOUND PACKAGE_NAME PACKAGE_TYPE PRINT_NAME DESCRIPTION PACKAGE
                         PURPOSE ${DESCRIPTION})
 
     else ( ${PACKAGE_NAME}_FOUND )
-      set (MOAB_HAVE_${PACKAGE_NAME} OFF CACHE INTERNAL "Found necessary ${PACKAGE_NAME} components. Configure MOAB with it.")
+      set (MOAB_HAVE_${PACKAGE_NAME} OFF CACHE INTERNAL "Did not find necessary ${PACKAGE_NAME} components. Configure MOAB without it.")
     endif ( ${PACKAGE_NAME}_FOUND )
 endmacro()
 
@@ -313,25 +314,19 @@ endif (ENABLE_CPM)
 # ---------------------------
 
 # Check for BLAS and LAPACK availability
-set (MOAB_HAVE_BLAS OFF CACHE INTERNAL "Configured MOAB with BLAS library support." )
-set (MOAB_HAVE_LAPACK OFF CACHE INTERNAL "Configured MOAB with LAPACK library support." )
 if ( ENABLE_BLASLAPACK  )
 
   # Find BLAS
   FIND_PACKAGE(BLAS REQUIRED)
-  # if (BLAS_FOUND)
-  #   set(MOAB_HAVE_BLAS ON)
-  # endif(BLAS_FOUND)
-  SET_VARS_IF_FOUND(BLAS RECOMMENDED "BLAS" "Native BLAS implementations" BLAS_INCLUDES BLAS_LIBRARIES )
+  SET_VARS_IF_FOUND(BLAS RECOMMENDED "BLAS library" "Native BLAS implementations" BLAS_INCLUDES BLAS_LIBRARIES )
 
   # Find LAPACK
   FIND_PACKAGE(LAPACK REQUIRED)
   if (LAPACK_FOUND)
-    # set(MOAB_HAVE_LAPACK ON)
     set(ENABLE_FORTRAN ON)
   endif(LAPACK_FOUND)
 
-  SET_VARS_IF_FOUND(LAPACK RECOMMENDED "LAPACK" "Native LAPACK implementations" LAPACK_INCLUDES LAPACK_LIBRARIES )
+  SET_VARS_IF_FOUND(LAPACK RECOMMENDED "LAPACK library" "Native LAPACK implementations" LAPACK_INCLUDES LAPACK_LIBRARIES )
   list(APPEND MOAB_LIBS ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
 
   LIST(APPEND LOGGING_WATCHED_VARIABLES
@@ -341,7 +336,6 @@ if ( ENABLE_BLASLAPACK  )
 endif (ENABLE_BLASLAPACK)
 
 # Check for Eigen3 availability
-set (MOAB_HAVE_EIGEN3 OFF CACHE INTERNAL "Configured MOAB with Eigen3 library support." )
 if ( ENABLE_EIGEN3 )
 
   # Eigen3 is optional if LAPACK has been found
@@ -366,7 +360,6 @@ if ( ENABLE_EIGEN3 )
   if ( EIGEN3_FOUND )
     INCLUDE_DIRECTORIES ( "${EIGEN3_DIR}" )
     SET(MOAB_DEFINES "${MOAB_DEFINES} ${EIGEN3_INCLUDES}")
-    SET(MOAB_HAVE_EIGEN3 ON)
   endif (EIGEN3_FOUND)
 
   SET_VARS_IF_FOUND(EIGEN3 RECOMMENDED "Eigen3" "Eigen3 headers as supplement to BLAS/LAPACK implementations" EIGEN3_INCLUDES EIGEN3_LIBRARIES )
@@ -403,7 +396,6 @@ if ( ENABLE_FORTRAN )
 endif ( ENABLE_FORTRAN )
 
 # Check for MPI compiler support and set the necessary flags
-set (MOAB_HAVE_MPI OFF CACHE INTERNAL "Found necessary MPI components. Configure MOAB with it." )
 if ( ENABLE_MPI )
   set (MPI_C_COMPILER ${CC} )
   set (MPI_CXX_COMPILER ${CXX} )
@@ -518,7 +510,6 @@ if ( ENABLE_HDF5 )
 endif ( ENABLE_HDF5 )
 
 # Check for PNetCDF availability
-set (MOAB_HAVE_PNETCDF OFF CACHE INTERNAL "Found necessary PNetCDF components. Configure MOAB with it." )
 if ( ENABLE_PNETCDF )
 	find_package( PNETCDF REQUIRED )
 
@@ -535,7 +526,6 @@ if ( ENABLE_PNETCDF )
 endif ( ENABLE_PNETCDF )
 
 # Check for NetCDF availability
-set (MOAB_HAVE_NETCDF OFF CACHE INTERNAL "Found necessary NetCDF components. Configure MOAB with it." )
 if ( ENABLE_NETCDF )
   # pkg_check_modules(netcdf REQUIRED netcdf)
   find_package( NETCDF REQUIRED )
@@ -554,7 +544,6 @@ if ( ENABLE_NETCDF )
 endif ( ENABLE_NETCDF )
 
 # Check for Metis partitioner availability
-set (MOAB_HAVE_METIS OFF CACHE INTERNAL "Found necessary Metis components. Configure MOAB with it." )
 if ( ENABLE_METIS )
   find_package( METIS REQUIRED )
 
@@ -570,7 +559,6 @@ if ( ENABLE_METIS )
 endif (ENABLE_METIS )
 
 # Check for ParMetis partitioner availability
-set (MOAB_HAVE_PARMETIS OFF CACHE INTERNAL "Found necessary ParMetis components. Configure MOAB with it." )
 if ( ENABLE_PARMETIS AND METIS_FOUND )
   find_package( PARMETIS REQUIRED )
 
@@ -586,7 +574,6 @@ if ( ENABLE_PARMETIS AND METIS_FOUND )
 endif ( ENABLE_PARMETIS AND METIS_FOUND )
 
 # Check for Zoltan partitioner availability
-set (MOAB_HAVE_ZOLTAN OFF CACHE INTERNAL "Found necessary Zoltan components. Configure MOAB with it." )
 if ( ENABLE_ZOLTAN )
   find_package( ZOLTAN REQUIRED )
 
@@ -641,13 +628,11 @@ if ( ENABLE_TEMPESTREMAP )
   endif (NOT EIGEN3_FOUND)
 endif( ENABLE_TEMPESTREMAP )
 
-set (MOAB_HAVE_CGNS OFF CACHE INTERNAL "Found necessary CGNS components. Configure MOAB with it." )
 if (ENABLE_CGNS)
   set( MOABIO_LIBS ${MOABIO_LIBS} ${CGNS_LIBRARIES} )
   set (MOAB_HAVE_CGNS ON)
 endif(ENABLE_CGNS)
 
-#list (REMOVE_DUPLICATES MOAB_LIBRARIES)
 list (REVERSE MOAB_LIBRARIES)
 list (REMOVE_DUPLICATES MOAB_LIBRARIES)
 list (REVERSE MOAB_LIBRARIES)

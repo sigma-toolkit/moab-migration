@@ -70,81 +70,101 @@ macro(RESOLVE_LIBRARIES RESOLVED_LIBS_OUT LINK_LINE )
     
     # Create a list to store library search paths defined by -L<path> flags
     set(_lib_search_paths "")
-    
-    # Tokenize the GNU-style link line into separate flags
-    # Separate the link flags into individual components (e.g., -L/path, -lfoo, etc.)
-    set(_link_flags "")
-    separate_arguments(_link_flags UNIX_COMMAND "${LINK_LINE}")
 
-        # Loop over each argument in the link flags list
-    foreach(_flag IN LISTS _link_flags)
-        # Handle -L<path> flag (library search directory)
-        if(_flag MATCHES "^-L(.+)$")
-            # Extract the directory path and add it to the search path list
-            list(APPEND _lib_search_paths "${CMAKE_MATCH_1}")
+    # Check if LINK_LINE is a list (already resolved libraries)
+    # Count the number of semicolons
+    string(LENGTH "${LINK_LINE}" _len)
+    string(REPLACE ";" "" _counted_var "${LINK_LINE}")
+    string(LENGTH "${_counted_var}" _counted_var_len)
+    math(EXPR _semicolon_count "${_len} - ${_counted_var_len}")
+    if(_semicolon_count GREATER 0)
+      separate_arguments(LINK_LINE_LIST UNIX_COMMAND "${LINK_LINE}")
+      # If it's a list, we don't need to do any parsing. Just check each element.
+      foreach(_lib IN LISTS LINK_LINE_LIST)
+          # If it's not already in the resolved list, add it.
+          list(FIND _seen_libs "${_lib}" _already_index)
+          if(_already_index EQUAL -1)
+            list(INSERT ${RESOLVED_LIBS_OUT} 0 "${_lib}")
+            list(APPEND _seen_libs "${_lib}")
+          endif()
+      endforeach()
 
-        # Handle -l<library> flag (library to link)
-        elseif(_flag MATCHES "^-l(.+)$")
-            # Extract the library name (e.g., "foo" from -lfoo)
-            set(_lib_name "${CMAKE_MATCH_1}")
-            
-            # Check if we have already processed this library to avoid duplicates
-            list(FIND _seen_libs "${_lib_name}" _already_index)
-            if(_already_index EQUAL -1)
-                # Library not seen before, we will try to resolve it
-                
-                unset(_lib_path CACHE)  # Clear any previous cache
+    else()
+      # Tokenize the GNU-style link line into separate flags
+      # Separate the link flags into individual components (e.g., -L/path, -lfoo, etc.)
+      set(_link_flags "")
+      separate_arguments(_link_flags UNIX_COMMAND "${LINK_LINE}")
 
-                # Platform-specific behavior for library suffixes
-                if(WIN32)
-                    # On Windows, prefer to resolve ".lib" files for linking
-                    find_library(_lib_path "${_lib_name}"
-                        PATHS ${_lib_search_paths}
-                        NO_DEFAULT_PATH
-                        SUFFIXES "" ".lib"  # Only search for .lib files
-                    )
-                else()
-                    # On Linux/macOS, resolve shared libraries (.so/.dylib) and static libraries (.a)
-                    find_library(_lib_path "${_lib_name}"
-                        PATHS ${_lib_search_paths}
-                        NO_DEFAULT_PATH
-                    )
-                endif()
+          # Loop over each argument in the link flags list
+      foreach(_flag IN LISTS _link_flags)
+          # Handle -L<path> flag (library search directory)
+          if(_flag MATCHES "^-L(.+)$")
+              # Extract the directory path and add it to the search path list
+              list(APPEND _lib_search_paths "${CMAKE_MATCH_1}")
 
-                # Fallback to system-wide search if the library was not found in user-defined paths
-                if(NOT _lib_path)
-                    find_library(_lib_path "${_lib_name}")
-                endif()
+          # Handle -l<library> flag (library to link)
+          elseif(_flag MATCHES "^-l(.+)$")
+              # Extract the library name (e.g., "foo" from -lfoo)
+              set(_lib_name "${CMAKE_MATCH_1}")
+              
+              # Check if we have already processed this library to avoid duplicates
+              list(FIND _seen_libs "${_lib_name}" _already_index)
+              if(_already_index EQUAL -1)
+                  # Library not seen before, we will try to resolve it
+                  
+                  unset(_lib_path CACHE)  # Clear any previous cache
 
-                # If we found the library, add it to the resolved list
-                if(_lib_path)
-                    list(APPEND ${RESOLVED_LIBS_OUT} "${_lib_path}")
-                    list(APPEND _seen_libs "${_lib_name}")
-                else()
-                    # Print a warning if the library could not be found
-                    message(WARNING "Library '${_lib_name}' not found.")
-                endif()
-            endif()
+                  # Platform-specific behavior for library suffixes
+                  if(WIN32)
+                      # On Windows, prefer to resolve ".lib" files for linking
+                      find_library(_lib_path "${_lib_name}"
+                          PATHS ${_lib_search_paths}
+                          NO_DEFAULT_PATH
+                          SUFFIXES "" ".lib"  # Only search for .lib files
+                      )
+                  else()
+                      # On Linux/macOS, resolve shared libraries (.so/.dylib) and static libraries (.a)
+                      find_library(_lib_path "${_lib_name}"
+                          PATHS ${_lib_search_paths}
+                          NO_DEFAULT_PATH
+                      )
+                  endif()
 
-        # Handle absolute paths to libraries (e.g., /path/to/libfoo.a)
-        elseif(IS_ABSOLUTE "${_flag}" AND EXISTS "${_flag}")
-            # Add the library path directly to the resolved list if it exists
-            list(FIND _seen_libs "${_flag}" _already_index)
-            if(_already_index EQUAL -1)
-                # Optional: Warn if a DLL is passed as a library path
-                if(WIN32 AND _flag MATCHES "\\.dll$")
-                    message(WARNING "Ignoring DLL file for linking: ${_flag}")
-                else()
-                    list(APPEND ${RESOLVED_LIBS_OUT} "${_flag}")
-                endif()
-                list(APPEND _seen_libs "${_flag}")
-            endif()
+                  # Fallback to system-wide search if the library was not found in user-defined paths
+                  if(NOT _lib_path)
+                      find_library(_lib_path "${_lib_name}")
+                  endif()
 
-        # If the flag is not recognized, print a status message (for debugging)
-        else()
-            message(STATUS "Ignoring unrecognized flag: ${_flag}")
-        endif()
-    endforeach()
+                  # If we found the library, add it to the resolved list
+                  if(_lib_path)
+                      list(APPEND ${RESOLVED_LIBS_OUT} "${_lib_path}")
+                      list(APPEND _seen_libs "${_lib_name}")
+                  else()
+                      # Print a warning if the library could not be found
+                      message(WARNING "Library '${_lib_name}' not found.")
+                  endif()
+              endif()
+
+          # Handle absolute paths to libraries (e.g., /path/to/libfoo.a)
+          elseif(IS_ABSOLUTE "${_flag}" AND EXISTS "${_flag}")
+              # Add the library path directly to the resolved list if it exists
+              list(FIND _seen_libs "${_flag}" _already_index)
+              if(_already_index EQUAL -1)
+                  # Optional: Warn if a DLL is passed as a library path
+                  if(WIN32 AND _flag MATCHES "\\.dll$")
+                      message(WARNING "Ignoring DLL file for linking: ${_flag}")
+                  else()
+                      list(APPEND ${RESOLVED_LIBS_OUT} "${_flag}")
+                  endif()
+                  list(APPEND _seen_libs "${_flag}")
+              endif()
+
+          # If the flag is not recognized, print a status message (for debugging)
+          else()
+              message(STATUS "Ignoring unrecognized flag: ${_flag}")
+          endif()
+      endforeach()
+    endif()
 
     # Return the resolved libraries list to the caller 
     set(${RESOLVED_LIBS_OUT} "${${RESOLVED_LIBS_OUT}}")

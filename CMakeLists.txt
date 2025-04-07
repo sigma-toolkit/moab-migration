@@ -128,6 +128,7 @@ set( MOAB_MESH_DIR        "${CMAKE_SOURCE_DIR}/MeshFiles/" )
 set(MOABDocLocation share/doc/moab)
 
 include ( config/GenerateScript.cmake )
+include ( config/ResolveCompilerPaths.cmake )
 
 # Macro to automatically enable a package if its directory variable is set
 macro(AUTO_ENABLE_PACKAGE PACKAGE_NAME)
@@ -136,17 +137,11 @@ macro(AUTO_ENABLE_PACKAGE PACKAGE_NAME)
     endif()
 endmacro()
 
-LIST(APPEND LOGGING_WATCHED_VARIABLES
-    MOAB_DEFINES
-    MOAB_CXX_FLAGS
-    MOAB_INCLUDES
-    MOAB_LIBRARIS
-    MOAB_INSTALL_TARGETS
-    )
 ################################################################################
 # Options that the user controls
 ################################################################################
 option ( BUILD_SHARED_LIBS   "Should shared or static libraries be created?"   ON  )
+option ( ENABLE_CPM       "Should build with C++/CMake Package Manager (CPM) support?"  OFF )
 option ( ENABLE_CGNS       "Should build with CGNS support?"                 OFF )
 option ( ENABLE_MPI        "Should MOAB be compiled with MPI support?"       OFF )
 option ( ENABLE_HDF5       "Include HDF I/O interfaces in the build?"                   OFF )
@@ -278,7 +273,7 @@ endif ()
 # Macro to automatically enable a package if its directory variable is set
 macro(SET_VARS_IF_FOUND PACKAGE_NAME PACKAGE_TYPE PRINT_NAME DESCRIPTION PACKAGE_INCLUDES PACKAGE_LIBRARIES)
     if ( ${PACKAGE_NAME}_FOUND )
-      set (MOAB_HAVE_${PACKAGE_NAME} ON)
+      set (MOAB_HAVE_${PACKAGE_NAME} ON CACHE INTERNAL "Found necessary ${PACKAGE_NAME} components. Configure MOAB with it.")
 
       # print some Metis configuration details
       message (STATUS "   ${PRINT_NAME} Configuration ::")
@@ -291,15 +286,31 @@ macro(SET_VARS_IF_FOUND PACKAGE_NAME PACKAGE_TYPE PRINT_NAME DESCRIPTION PACKAGE
       endif (DEFINED ${PACKAGE_INCLUDES} AND NOT "${${PACKAGE_INCLUDES}}" STREQUAL "")
       if (DEFINED ${PACKAGE_LIBRARIES} AND NOT "${${PACKAGE_LIBRARIES}}" STREQUAL "")
         message (STATUS "        Libraries : ${${PACKAGE_LIBRARIES}}")
-        set( MOAB_LIBRARIES ${${PACKAGE_LIBRARIES}} ${MOAB_LIBRARIES} )
+        RESOLVE_LIBRARIES(_tmp_resolved_pkglibs ${${PACKAGE_LIBRARIES}})
+        # set( MOAB_LIBRARIES ${${PACKAGE_LIBRARIES}} ${MOAB_LIBRARIES} )
+        list( APPEND MOAB_LIBRARIES ${_tmp_resolved_pkglibs} )
       endif (DEFINED ${PACKAGE_LIBRARIES} AND NOT "${${PACKAGE_LIBRARIES}}" STREQUAL "")
 
       set_package_properties(${PACKAGE_NAME} PROPERTIES
                         TYPE ${PACKAGE_TYPE}
                         PURPOSE ${DESCRIPTION})
 
+    else ( ${PACKAGE_NAME}_FOUND )
+      set (MOAB_HAVE_${PACKAGE_NAME} OFF CACHE INTERNAL "Found necessary ${PACKAGE_NAME} components. Configure MOAB with it.")
     endif ( ${PACKAGE_NAME}_FOUND )
 endmacro()
+
+# ---- TPL Dependencies ----
+if (ENABLE_CPM)
+  set(FETCHCONTENT_BASE_DIR "${PROJECT_BINARY_DIR}/sandbox")
+  file(MAKE_DIRECTORY ${FETCHCONTENT_BASE_DIR})
+  set(CPM_SOURCE_CACHE "${PROJECT_BINARY_DIR}/sandbox/archives")
+  file(MAKE_DIRECTORY ${CPM_SOURCE_CACHE})
+  include(config/CPM.cmake)
+
+  CPMAddPackage("gh:fmtlib/fmt#7.1.3")
+endif (ENABLE_CPM)
+# ---------------------------
 
 # Check for BLAS and LAPACK availability
 set (MOAB_HAVE_BLAS OFF CACHE INTERNAL "Configured MOAB with BLAS library support." )
@@ -321,7 +332,7 @@ if ( ENABLE_BLASLAPACK  )
   endif(LAPACK_FOUND)
 
   SET_VARS_IF_FOUND(LAPACK RECOMMENDED "LAPACK" "Native LAPACK implementations" LAPACK_INCLUDES LAPACK_LIBRARIES )
-  list(APPEND MOAB_ALL_LIBS ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
+  list(APPEND MOAB_LIBS ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
 
   LIST(APPEND LOGGING_WATCHED_VARIABLES
     BLAS_LIBRARIES
@@ -337,7 +348,7 @@ if ( ENABLE_EIGEN3 )
   FIND_PACKAGE(Eigen3 OPTIONAL_COMPONENTS)
   
   ## Use CPM to auto-download Eigen3 directly
-  if ( DOWNLOAD_EIGEN3 )
+  if ( DOWNLOAD_EIGEN3 AND ENABLE_CPM )
     CPMAddPackage(
       NAME Eigen
       VERSION 3.4.0
@@ -350,7 +361,7 @@ if ( ENABLE_EIGEN3 )
       add_library(Eigen INTERFACE IMPORTED)
       target_include_directories(Eigen INTERFACE ${Eigen_SOURCE_DIR})
     endif()
-  endif ( DOWNLOAD_EIGEN3 )
+  endif ( DOWNLOAD_EIGEN3 AND ENABLE_CPM )
 
   if ( EIGEN3_FOUND )
     INCLUDE_DIRECTORIES ( "${EIGEN3_DIR}" )
@@ -447,12 +458,6 @@ endfunction()
 
 include (config/CheckCompilerFlags.cmake)
 
-# ---- Dependencies ----
-include(config/CPM.cmake)
-
-CPMAddPackage("gh:fmtlib/fmt#7.1.3")
-# ---------------------------
-
 # Check for Zlib availability
 set (MOAB_HAVE_ZLIB OFF CACHE INTERNAL "Found necessary Zlib components. Configure MOAB with it." )
 if ( ENABLE_ZLIB )
@@ -468,15 +473,13 @@ if ( ENABLE_SZIP )
 endif (ENABLE_SZIP)
 
 # Check for HDF5 availability
-# set (HDF5_DIR "" CACHE PATH "Path to search for HDF5 header and library files")
-# set (HDF5_FOUND NO CACHE INTERNAL "Found HDF5 components successfully." )
-set (MOAB_HAVE_HDF5 OFF CACHE INTERNAL "Found necessary HDF5 components. Configure MOAB with it." )
+# set (HDF5_DIR "$ENV{HDF5_DIR}" CACHE PATH "Path to search for HDF5 header and library files")
 set (MOAB_HAVE_HDF5_PARALLEL OFF CACHE INTERNAL "Found necessary parallel HDF5 components. Configure MOAB with it." )
 if ( ENABLE_HDF5 )
   if ( MOAB_HAVE_MPI )
     set(HDF5_PREFER_PARALLEL true)
   endif( MOAB_HAVE_MPI )
-  set(HDF5_FIND_DEBUG true)
+  set(HDF5_FIND_DEBUG false)
 
   # Call CMake-native FindHDF5 module and specify the components to check
   find_package( HDF5 REQUIRED COMPONENTS C HL )
@@ -514,8 +517,6 @@ if ( ENABLE_HDF5 )
 
 endif ( ENABLE_HDF5 )
 
-message(STATUS "MOAB_HAVE_MPI :: ${MOAB_HAVE_MPI} ${MOAB_HAVE_NETCDF} ${ENABLE_PNETCDF}")
-
 # Check for PNetCDF availability
 set (MOAB_HAVE_PNETCDF OFF CACHE INTERNAL "Found necessary PNetCDF components. Configure MOAB with it." )
 if ( ENABLE_PNETCDF )
@@ -523,6 +524,13 @@ if ( ENABLE_PNETCDF )
 
   # Print some PNetCDF configuration details
   SET_VARS_IF_FOUND(PNETCDF RECOMMENDED "PNetCDF" "PNetCDF library interfaces for MOAB nc-file format support" PNETCDF_INCLUDES PNETCDF_LIBRARIES )
+
+  if (PNETCDF_FOUND)
+    LIST(APPEND LOGGING_WATCHED_VARIABLES
+      PNETCDF_DIR
+      PNETCDF_INCLUDES
+      PNETCDF_LIBRARIES )
+  endif (PNETCDF_FOUND)
 
 endif ( ENABLE_PNETCDF )
 
@@ -532,10 +540,13 @@ if ( ENABLE_NETCDF )
   # pkg_check_modules(netcdf REQUIRED netcdf)
   find_package( NETCDF REQUIRED )
 
-  if ( NETCDF_FOUND )
-    set (MOAB_HAVE_NETCDF ON)
+  if (NETCDF_FOUND)
     set (MOAB_HAVE_NETCDF_H 1)
-  endif ( NETCDF_FOUND )
+    LIST(APPEND LOGGING_WATCHED_VARIABLES
+      NETCDF_DIR
+      NETCDF_INCLUDES
+      NETCDF_LIBRARIES )
+  endif (NETCDF_FOUND)
 
   # Print some NetCDF configuration details
   SET_VARS_IF_FOUND(NETCDF RECOMMENDED "NetCDF" "NetCDF library interfaces for MOAB ExodusII file format support" NETCDF_INCLUDES NETCDF_LIBRARIES )
@@ -550,6 +561,12 @@ if ( ENABLE_METIS )
   # Print some Metis configuration details
   SET_VARS_IF_FOUND(METIS RECOMMENDED "Metis" "Metis library interfaces for MOAB offline (serial) mesh partitioning support" METIS_INCLUDES METIS_LIBRARIES )
 
+  if (METIS_FOUND)
+    LIST(APPEND LOGGING_WATCHED_VARIABLES
+      METIS_DIR
+      METIS_INCLUDES
+      METIS_LIBRARIES )
+  endif (METIS_FOUND)
 endif (ENABLE_METIS )
 
 # Check for ParMetis partitioner availability
@@ -560,6 +577,12 @@ if ( ENABLE_PARMETIS AND METIS_FOUND )
   # Print some ParMetis configuration details
   SET_VARS_IF_FOUND(PARMETIS OPTIONAL "ParMetis" "ParMetis library interfaces for MOAB offline and online parallel mesh partitioning support" PARMETIS_INCLUDES PARMETIS_LIBRARIES )
 
+  if (PARMETIS_FOUND)
+    LIST(APPEND LOGGING_WATCHED_VARIABLES
+      PARMETIS_DIR
+      PARMETIS_INCLUDES
+      PARMETIS_LIBRARIES )
+  endif (PARMETIS_FOUND)
 endif ( ENABLE_PARMETIS AND METIS_FOUND )
 
 # Check for Zoltan partitioner availability
@@ -570,36 +593,53 @@ if ( ENABLE_ZOLTAN )
   # Print some Zoltan configuration details
   SET_VARS_IF_FOUND(ZOLTAN RECOMMENDED "Zoltan" "Zoltan library interfaces for MOAB offline/online parallel mesh partitioning support" ZOLTAN_INCLUDES ZOLTAN_LIBRARIES )
 
+  if (ZOLTAN_FOUND)
+    LIST(APPEND LOGGING_WATCHED_VARIABLES
+      ZOLTAN_DIR
+      ZOLTAN_INCLUDES
+      ZOLTAN_LIBRARIES )
+  endif (ZOLTAN_FOUND)
 endif (ENABLE_ZOLTAN )
 
 # Check for TempestRemap availability if Eigen3 headers have been found already
-if ( EIGEN3_FOUND AND ENABLE_TEMPESTREMAP )
-  find_package( TEMPESTREMAP REQUIRED )
+if ( ENABLE_TEMPESTREMAP )
+  if (NOT EIGEN3_FOUND)
+    message("WARNING: TempestRemap cannot be configured without Eigen3 support for MOAB. Skipping...")
+  else (NOT EIGEN3_FOUND)
+    find_package( TEMPESTREMAP REQUIRED )
 
-  # Print some TempestRemap configuration details
-  SET_VARS_IF_FOUND(TEMPESTREMAP OPTIONAL "TempestRemap" "TempestRemap library interfaces for MOAB climate remapping support" TEMPESTREMAP_INCLUDES TEMPESTREMAP_LIBRARIES )
+    # Print some TempestRemap configuration details
+    SET_VARS_IF_FOUND(TEMPESTREMAP OPTIONAL "TempestRemap" "TempestRemap library interfaces for MOAB climate remapping support" TEMPESTREMAP_INCLUDES TEMPESTREMAP_LIBRARIES )
 
-  if (MOAB_HAVE_TEMPESTREMAP)
-    # Make sure the directory exists
-    set(EXT_DATA_DIR "${CMAKE_BINARY_DIR}/sandbox/MeshFiles")
-    set(EXT_E3SM_DATA_DIR "${CMAKE_BINARY_DIR}/sandbox/MeshFiles/e3sm")
-    file(MAKE_DIRECTORY "${EXT_E3SM_DATA_DIR}")
-    file(MAKE_DIRECTORY "${EXT_E3SM_DATA_DIR}/ne4pg2_o240")
-    file(MAKE_DIRECTORY "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG")
-    set(MOAB_DEFINES "${MOAB_DEFINES} -DEXT_DATA_DIR=${EXT_DATA_DIR}/")
+    if (TEMPESTREMAP_FOUND)
+      LIST(APPEND LOGGING_WATCHED_VARIABLES
+        TEMPESTREMAP_DIR
+        TEMPESTREMAP_INCLUDES
+        TEMPESTREMAP_LIBRARIES )
+    endif (TEMPESTREMAP_FOUND)
 
-    # case: ne4pg2_o240
-    file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne4pg2_o240/AtmPhys_pg2.h5m "${EXT_E3SM_DATA_DIR}/ne4pg2_o240/AtmPhys_pg2.h5m" )
-    file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne4pg2_o240/land_p8.h5m "${EXT_E3SM_DATA_DIR}/ne4pg2_o240/land_p8.h5m" )
-    file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne4pg2_o240/ne4pg2_p8.h5m "${EXT_E3SM_DATA_DIR}/ne4pg2_o240/ne4pg2_p8.h5m" )
+    if (MOAB_HAVE_TEMPESTREMAP)
+      # Make sure the directory exists
+      set(EXT_DATA_DIR "${CMAKE_BINARY_DIR}/sandbox/MeshFiles")
+      set(EXT_E3SM_DATA_DIR "${CMAKE_BINARY_DIR}/sandbox/MeshFiles/e3sm")
+      file(MAKE_DIRECTORY "${EXT_E3SM_DATA_DIR}")
+      file(MAKE_DIRECTORY "${EXT_E3SM_DATA_DIR}/ne4pg2_o240")
+      file(MAKE_DIRECTORY "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG")
+      set(MOAB_DEFINES "${MOAB_DEFINES} -DEXT_DATA_DIR=${EXT_DATA_DIR}/")
 
-    # case: ne30pg2_r05_oECv3_ICG
-    file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne30pg2_r05_oECv3_ICG/AtmPhys_01.h5m "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG/AtmPhys_01.h5m" )
-    file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne30pg2_r05_oECv3_ICG/domain_clean_p16.h5m "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG/domain_clean_p16.h5m" )
-    file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne30pg2_r05_oECv3_ICG/outCS30_pg2_p8.h5m "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG/outCS30_pg2_p8.h5m" )
-    file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne30pg2_r05_oECv3_ICG/wholeMPAS.h5m "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG/wholeMPAS.h5m" )
-  endif(MOAB_HAVE_TEMPESTREMAP)
-endif( EIGEN3_FOUND AND ENABLE_TEMPESTREMAP )
+      # case: ne4pg2_o240
+      file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne4pg2_o240/AtmPhys_pg2.h5m "${EXT_E3SM_DATA_DIR}/ne4pg2_o240/AtmPhys_pg2.h5m" )
+      file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne4pg2_o240/land_p8.h5m "${EXT_E3SM_DATA_DIR}/ne4pg2_o240/land_p8.h5m" )
+      file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne4pg2_o240/ne4pg2_p8.h5m "${EXT_E3SM_DATA_DIR}/ne4pg2_o240/ne4pg2_p8.h5m" )
+
+      # case: ne30pg2_r05_oECv3_ICG
+      file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne30pg2_r05_oECv3_ICG/AtmPhys_01.h5m "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG/AtmPhys_01.h5m" )
+      file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne30pg2_r05_oECv3_ICG/domain_clean_p16.h5m "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG/domain_clean_p16.h5m" )
+      file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne30pg2_r05_oECv3_ICG/outCS30_pg2_p8.h5m "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG/outCS30_pg2_p8.h5m" )
+      file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne30pg2_r05_oECv3_ICG/wholeMPAS.h5m "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG/wholeMPAS.h5m" )
+    endif(MOAB_HAVE_TEMPESTREMAP)
+  endif (NOT EIGEN3_FOUND)
+endif( ENABLE_TEMPESTREMAP )
 
 set (MOAB_HAVE_CGNS OFF CACHE INTERNAL "Found necessary CGNS components. Configure MOAB with it." )
 if (ENABLE_CGNS)
@@ -607,7 +647,10 @@ if (ENABLE_CGNS)
   set (MOAB_HAVE_CGNS ON)
 endif(ENABLE_CGNS)
 
+#list (REMOVE_DUPLICATES MOAB_LIBRARIES)
+list (REVERSE MOAB_LIBRARIES)
 list (REMOVE_DUPLICATES MOAB_LIBRARIES)
+list (REVERSE MOAB_LIBRARIES)
 
 # Strip our custom flags
 string(STRIP "${CMAKE_EXE_LINKER_FLAGS} " CMAKE_EXE_LINKER_FLAGS)
@@ -752,7 +795,9 @@ set(CXX ${CMAKE_CXX_COMPILER})
 set(CC ${CMAKE_C_COMPILER})
 if (ENABLE_FORTRAN)
   set(F77 ${CMAKE_Fortran_COMPILER} )
-  set(FC ${CMAKE_Fortran_COMPILER})
+  set(FC ${CMAKE_Fortran_COMPILER} )
+  LIST(APPEND LOGGING_WATCHED_VARIABLES
+    CMAKE_Fortran_COMPILER )
 endif (ENABLE_FORTRAN)
 
 set(CPPFLAGS "${CMAKE_CXX_FLAGS} ${MOAB_DEFINES}")
@@ -769,6 +814,14 @@ ELSE (CMAKE_BUILD_TYPE MATCHES "Debug")
     set(FFLAGS ${CMAKE_Fortran_FLAGS_RELEASE})
   endif (ENABLE_FORTRAN)
 ENDIF (CMAKE_BUILD_TYPE MATCHES "Debug")
+
+LIST(APPEND LOGGING_WATCHED_VARIABLES
+    MOAB_DEFINES
+    MOAB_CXX_FLAGS
+    MOAB_INCLUDES
+    MOAB_LIBRARIS
+    MOAB_INSTALL_TARGETS
+    )
 
 # CMake does not define uninstall target. Look at install manifest and remove
 # all the files recursively.

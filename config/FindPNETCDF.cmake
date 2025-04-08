@@ -35,7 +35,6 @@ find_library( PNETCDF_LIBRARIES
   ENDIF (NOT PNETCDF_FOUND)
 
   mark_as_advanced(
-    PNETCDF_DIR
     PNETCDF_INCLUDES
     PNETCDF_LIBRARIES
   )

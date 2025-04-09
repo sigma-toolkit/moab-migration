@@ -159,24 +159,25 @@ class ReadRTT : public ReaderIface
         int n_dim_topo;
         int nnodes;
         int nnode_flag_types;
-        std::vector<int> nnode_flags;
+        std::vector< int > nnode_flags;
         int nnode_data;
 
         int nsides;
         int nside_types;
         int side_types;
         int nside_flag_types;
-        std::vector<int> nside_flags;
+        std::vector< int > nside_flags;
         int nside_data;
 
         int ncells;
         int ncell_types;
         int cell_types;
         int ncell_flag_types;
-        std::vector<int> ncell_flags;
+        std::vector< int > ncell_flags;
         int ncell_data;
 
-        void print() {
+        void print()
+        {
             std::cout << "dimData: " << std::endl;
             std::cout << "coor_units: " << coor_units << std::endl;
             std::cout << "prob_time_units: " << prob_time_units << std::endl;
@@ -191,7 +192,8 @@ class ReadRTT : public ReaderIface
             std::cout << "nnodes: " << nnodes << std::endl;
             std::cout << "nnode_flag_types: " << nnode_flag_types << std::endl;
             std::cout << "nnode_flags: ";
-            for (size_t i = 0; i < nnode_flags.size(); i++) {
+            for( size_t i = 0; i < nnode_flags.size(); i++ )
+            {
                 std::cout << nnode_flags[i] << " ";
             }
             std::cout << std::endl;
@@ -204,12 +206,12 @@ class ReadRTT : public ReaderIface
             std::cout << "side_types: " << side_types << std::endl;
             std::cout << "nside_flag_types: " << nside_flag_types << std::endl;
             std::cout << "nside_flags: ";
-            for (size_t i = 0; i < nside_flags.size(); i++) {
+            for( size_t i = 0; i < nside_flags.size(); i++ )
+            {
                 std::cout << nside_flags[i] << " ";
             }
             std::cout << std::endl;
             std::cout << "nside_data: " << nside_data << std::endl;
-
 
             std::cout << std::endl;
             std::cout << "Cell information: " << std::endl;
@@ -218,27 +220,33 @@ class ReadRTT : public ReaderIface
             std::cout << "cell_types: " << cell_types << std::endl;
             std::cout << "ncell_flag_types: " << ncell_flag_types << std::endl;
             std::cout << "ncell_flags: ";
-            for (size_t i = 0; i < ncell_flags.size(); i++) {
+            for( size_t i = 0; i < ncell_flags.size(); i++ )
+            {
                 std::cout << ncell_flags[i] << " ";
             }
             std::cout << std::endl;
             std::cout << "ncell_data: " << ncell_data << std::endl;
         }
 
-        void validate() {
-            if (nnode_flag_types > 0 && nnode_flag_types != (int)nnode_flags.size()) {
+        void validate()
+        {
+            if( nnode_flag_types > 0 && nnode_flag_types != (int)nnode_flags.size() )
+            {
                 std::cerr << "Warning: nnode_flag_types does not match nnode_flags.size()" << std::endl;
             }
 
-            if (nside_flag_types > 0 && nside_flag_types != (int)nside_flags.size()) {
+            if( nside_flag_types > 0 && nside_flag_types != (int)nside_flags.size() )
+            {
                 std::cerr << "Warning: nside_flag_types does not match nside_flags.size()" << std::endl;
             }
 
-            if (ncell_flag_types > 0 && ncell_flag_types != (int)ncell_flags.size()) {
+            if( ncell_flag_types > 0 && ncell_flag_types != (int)ncell_flags.size() )
+            {
                 std::cerr << "Warning: ncell_flag_types does not match ncell_flags.size()" << std::endl;
             }
 
-            if (ncell_flag_types > 1) {
+            if( ncell_flag_types > 1 )
+            {
                 std::cerr << "Warning: Additional flag types will not be read" << std::endl;
             }
         }
@@ -385,11 +393,10 @@ class ReadRTT : public ReaderIface
      */
     EntityHandle create_group( std::string group_name, int id );
 
-
     /** parse the dimensions of the problem from the file header
      * @param input_file, an open filestream
     */
-    ErrorCode parse_dims(std::ifstream& input_file);
+    ErrorCode parse_dims( std::ifstream& input_file );
 
     /** parse the cell definition car
      * @param input_file, an open filestream
@@ -560,7 +567,7 @@ class ReadRTT : public ReaderIface
   private:
     headerData header_data;
     dimData dim_data;
-    std::map<int, cell_def> cell_def_data;
+    std::map< int, cell_def > cell_def_data;
 
     // read mesh interface
     ReadUtilIface* readMeshIface;

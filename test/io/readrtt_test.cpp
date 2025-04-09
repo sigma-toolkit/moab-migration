@@ -57,7 +57,7 @@ int main()
     // third batch
     result += RUN_TEST( test_loadfile_3 );
     result += RUN_TEST( test_tets_3 );
-    result += RUN_TEST( test_tet_tags_3 ); 
+    result += RUN_TEST( test_tet_tags_3 );
 
     return result;
 }

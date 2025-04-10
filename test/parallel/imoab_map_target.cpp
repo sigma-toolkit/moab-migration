@@ -78,7 +78,7 @@ int main( int argc, char* argv[] )
     int rankInOcnComm    = -1;
     int cmpocn = 17, cplocn = 18,
         atmocnid = 618;  // component ids are unique over all pes, and established in advance;
-    //int cplatmcov = 6*100; // source times 100 for the special coverage instance; maybe we do not need another app
+
     // we should modify the MigrateMapMesh to work with source coverage directly, like an intersection app
 
     int rankInCouComm = -1;
@@ -92,7 +92,7 @@ int main( int argc, char* argv[] )
 
     int repartitioner_scheme = 0;
 #ifdef MOAB_HAVE_ZOLTAN
-    repartitioner_scheme = 2;  // use the graph partitioner in that caseS
+    repartitioner_scheme = 2;  // use the graph partitioner in that case
 #endif
 
     // default: load atm / source on 2 proc, ocean / target on 2,
@@ -387,6 +387,7 @@ int main( int argc, char* argv[] )
             CHECKIERR( ierr, "cannot free buffers used to resend atm tag towards the coverage mesh" )
         }
 
+        // start the second hop, from atm cpl to atm coverage for ocn
         // the data is now on cpl Atm, need to be sent to atm coverage over ocean
         PUSH_TIMER( "Send/receive data from atm cpl to coverage in ocn context" )
         if( atmComm != MPI_COMM_NULL )
@@ -399,6 +400,7 @@ int main( int argc, char* argv[] )
         if( couComm != MPI_COMM_NULL )
         {
             // receive on atm on coupler pes, that was redistributed according to coverage
+            // the trick is we use the map imoab app
             ierr = iMOAB_ReceiveElementTag( cplAtmOcnPID, concat_fieldname, &couComm, &cplatm );
             CHECKIERR( ierr, "cannot receive tag values" )
         }

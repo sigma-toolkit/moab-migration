@@ -36,7 +36,7 @@ int main( int argc, char* argv[] )
 
     ProgOptions opts;
 
-    std::string inputfile1, inputfile2, outfile("diff.h5m");
+    std::string inputfile1, inputfile2, outfile;
 
     std::string tag_name;
     int dim = 2;
@@ -224,26 +224,28 @@ int main( int argc, char* argv[] )
                 rval = mb->tag_set_data( newTag, &c1, 1, &ival2 );MB_CHK_SET_ERR( rval, "can't set new tag" );
             }
             int indx    = ents.index( c1 );
-            double diff = 0;
-            int diffi   = 0;
             if( doubleType )
             {
-                diff = vals[indx] - val2;
+                double diff = vals[indx] - val2;
                 rval = mb->tag_set_data( newTagDiff, &c1, 1, &diff );MB_CHK_SET_ERR( rval, "can't set new tag" );
                 l2norm += diff * diff;
             }
             else
             {
-                diffi = ivals[indx] - ival2;
+                int diffi   = ivals[indx] - ival2;
                 rval  = mb->tag_set_data( newTagDiff, &c1, 1, &diffi );MB_CHK_SET_ERR( rval, "can't set new tag" );
                 l2norm += diffi * diffi;
             }
         }
         l2norm = sqrt( l2norm );
 
-        rval = mb->write_file( outfile.c_str() );MB_CHK_SET_ERR( rval, "can't write file" );
+        if (!outfile.empty())
+        {
+            rval = mb->write_file( outfile.c_str() );MB_CHK_SET_ERR( rval, "can't write file" );
+            std::cout << " wrote file " << outfile << "\n";
+        }
         std::cout << " l2norm of the diff: " << l2norm << "\n";
-        std::cout << " wrote file " << outfile << "\n";
+
     }
     else  // look at all tags that can be compared on ents
     {
@@ -336,9 +338,10 @@ int main( int argc, char* argv[] )
                 minv2 = maxv2 = ivals2[0];
             }
             // compute the difference
-            double sum = 0, value1, value2;
+            double sum = 0;
             for( int j = 0; j < ents.size(); j++ )
             {
+                double value1, value2;
                 if( doubleType )
                     value1 = vals1[j];
                 else
@@ -391,9 +394,10 @@ int main( int argc, char* argv[] )
                 k1++;
             }
         }
-        if( k > 0 )
+        if( k > 0 && !outfile.empty())
         {
             rval = mb->write_file( outfile.c_str(), 0, 0, 0, 0, &diffTags[0], diffTags.size() );MB_CHK_ERR( rval );
+            std::cout << " wrote difference file: " << outfile << "\n";
         }
         std::cout << " different fields:" << k << " \n exactly the same fields:" << k1 << "\n";
         std::cout << " number of skipped fields: " << skipped_fields.size() << "\n";

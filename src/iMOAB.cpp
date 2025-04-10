@@ -4127,9 +4127,9 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         TempestMapAppData& tdata = dataIntx.tempestData;
         Range primary_ents3;                 // vertices for type 2, cells of dim 2 for type 1 or 3
         std::vector< int > values_entities;  // will be the size of primary_ents3 * lenTagType1
+        EntityHandle fset3 = tdata.remapper->GetMeshSet( Remapper::CoveringMesh);
         rval = cgraph_rev->form_mesh_from_tuples( context.MBI, TLv, TLc, *type, lenTagType1, fset3, primary_ents3,
                                                   values_entities );MB_CHK_ERR( rval );
-        iMOAB_UpdateMeshInfo( pid3 );
         int ndofPerEl = 1;
         if( 1 == *type ) ndofPerEl = (int)( sqrt( lenTagType1 ) );
         // because we are on the coupler, we know that the read map pid2 exists
@@ -4139,7 +4139,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         // if we are on source coverage, direction 1, we can set covering mesh, covering cells
         if( 1 == *direction )
         {
-            tdata.pid_src = pid3;
+            //tdata.pid_src = pid3;
             //tdata.remapper->SetMeshSet( Remapper::CoveringMesh, fset3, &primary_ents3 );
             weightMap->SetSourceNDofsPerElement( ndofPerEl );
             weightMap->set_col_dc_dofs( values_entities );  // will set col_dtoc_dofmap
@@ -4147,8 +4147,8 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         // if we are on target, we can set the target cells
         else
         {
-            tdata.pid_dest = pid3;
-            tdata.remapper->SetMeshSet( Remapper::TargetMesh, fset3, &primary_ents3 );
+            //tdata.pid_dest = pid3;
+            //tdata.remapper->SetMeshSet( Remapper::TargetMesh, fset3, &primary_ents3 );
             weightMap->SetDestinationNDofsPerElement( ndofPerEl );
             weightMap->set_row_dc_dofs( values_entities );  // will set row_dtoc_dofmap
         }

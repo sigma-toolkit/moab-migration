@@ -144,6 +144,7 @@ class ReadRTT : public ReaderIface
         std::string version;
         std::string title;
         std::string date;
+        std::string contiguity;
     };
 
     struct dimData
@@ -421,6 +422,12 @@ class ReadRTT : public ReaderIface
                           std::vector< facet > facet_data,
                           std::vector< tet > tet_data,
                           std::map< int, EntityHandle > surface_map );
+
+    /**
+     * Add Metadata to the meshset, this includes the version number and contiguity value
+     * @returns moab::ErrorCode
+     */
+    ErrorCode add_metadata();
 
     /**
      * reads the full set of header data

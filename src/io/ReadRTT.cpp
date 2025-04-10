@@ -24,25 +24,25 @@
 
 #include "ReadRTT.hpp"
 
-#include <iostream>
-#include <sstream>
-#include <fstream>
-#include <vector>
-#include <cstdlib>
-#include <map>
 #include <cassert>
 #include <cmath>
+#include <cstdlib>
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <sstream>
+#include <vector>
 
-#include "moab/Interface.hpp"
-#include "moab/ReadUtilIface.hpp"
-#include "Internals.hpp"  // for MB_START_ID
-#include "moab/Range.hpp"
-#include "moab/FileOptions.hpp"
 #include "FileTokenizer.hpp"
+#include "Internals.hpp"  // for MB_START_ID
 #include "MBTagConventions.hpp"
 #include "moab/CN.hpp"
 #include "moab/ErrorHandler.hpp"
+#include "moab/FileOptions.hpp"
 #include "moab/GeomTopoTool.hpp"
+#include "moab/Interface.hpp"
+#include "moab/Range.hpp"
+#include "moab/ReadUtilIface.hpp"
 
 namespace moab
 {
@@ -224,7 +224,8 @@ ErrorCode ReadRTT::generate_topology( std::vector< side > side_data,
     }
 
     // generate parent child links
-    // best to loop over the surfaces and assign them to volumes, we can then assign facets to
+    // best to loop over the surfaces and assign them to volumes, we can then
+    // assign facets to
     // to each surface
     generate_parent_child_links( num_ents, entmap, side_data, cell_data );
 
@@ -334,6 +335,31 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
     }
     // add tris to set
     rval = MBI->add_entities( file_set, mb_tets );
+
+    return MB_SUCCESS;
+}
+
+moab::ErrorCode ReadRTT::add_metadata()
+{
+    // Create an entity set to act as a metadata group
+    moab::EntityHandle metadataGroup;
+    MBI->create_meshset( moab::MESHSET_SET, metadataGroup );
+
+    // Create a tag for version number
+    moab::Tag versionTag;
+    const char* versionTagName = "version";
+    mb->tag_get_handle( versionTagName, header_data.version.size() + 1, moab::MB_TYPE_OPAQUE, versionTag,
+                        moab::MB_TAG_CREAT, header_data.version.c_str() );
+
+    // Create a tag for contiguity value
+    moab::Tag contiguityTag;
+    const char* contiguityTagName = "contiguity";
+    mb->tag_get_handle( contiguityTagName, header_data.contiguity.size() + 1, moab::MB_TYPE_OPAQUE, contiguityTag,
+                        moab::MB_TAG_CREAT, header_data.contiguity.c_str() );
+
+    // Assign the tags to the metadata group
+    mb->tag_set_data( versionTag, &metadataGroup, 1, header_data.version.c_str() );
+    mb->tag_set_data( contiguityTag, &metadataGroup, 1, header_data.contiguity.c_str() );
 
     return MB_SUCCESS;
 }
@@ -581,16 +607,19 @@ ErrorCode ReadRTT::get_header_data( std::ifstream& input_file )
                 header_data.version = split_string[1];
             }
         }
-
-        if( line.find( "title" ) != std::string::npos )
+        else if( line.find( "title" ) != std::string::npos )
         {
             header_data.title = split_string[1];
         }
-        if( line.find( "date" ) != std::string::npos )
+        else if( line.find( "date" ) != std::string::npos )
         {
             header_data.date = split_string[1];
         }
-        if( line.find( "end_header" ) != std::string::npos )
+        else if( line.find( "contiguyty" ) != std::string::npos )
+        {
+            header_data.contiguity = split_string[1];
+        }
+        else if( line.find( "end_header" ) != std::string::npos )
         {
             return MB_SUCCESS;
         }
@@ -919,7 +948,8 @@ ReadRTT::facet ReadRTT::get_facet_data( std::string facetdata )
 }
 
 /*
- * given the string tetdata, get the id number, connectivity and mat num of the tet
+ * given the string tetdata, get the id number, connectivity and mat num of the
+ * tet
  */
 ReadRTT::tet ReadRTT::get_tet_data( std::string tetdata )
 {

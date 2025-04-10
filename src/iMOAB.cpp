@@ -743,9 +743,8 @@ static ErrCode internal_WriteMesh( iMOAB_AppID pid,
     }
 
     // Now let us actually write the file to disk with appropriate options
-    // MB_CHK_ERR( context.MBI->write_file( filename, 0, newopts.str().c_str(), &fileSet, 1, copyTagList.data(),
-    //                                      copyTagList.size() ) );
-    MB_CHK_ERR( context.MBI->write_file( filename, 0, newopts.str().c_str(), &fileSet, 1 ) );
+    MB_CHK_ERR( context.MBI->write_file( filename, 0, newopts.str().c_str(), &fileSet, 1, copyTagList.data(), copyTagList.size() ) );
+    //MB_CHK_ERR( context.MBI->write_file( filename, 0, newopts.str().c_str(), &fileSet, 1 ) );
 
     return moab::MB_SUCCESS;
 }
@@ -1790,6 +1789,18 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
     {
         eh_by_gid[gids[i]] = *it;
     }
+    // TODO: allow for tags of different length
+    int nbLocalVals = *num_tag_storage_length / ( (int)tagNames.size() );  // assumes all tags have the same length?
+    // check global ids to have different values
+    std::set<int> globalIdsSet;
+    for (int j=0; j<nbLocalVals; j++)
+        globalIdsSet.insert(globalIds[j]);
+    if(globalIdsSet.size() < nbLocalVals)
+    {
+        std::cout << "iMOAB_SetDoubleTagStorageWithGid: for pid:" << *pid <<" tags[0]:" << tagNames[0]  <<  " global ids passed are not unique, major error\n";
+        std::cout<<" nbLocalVals:" << nbLocalVals << " globalIdsSet.size():" <<  globalIdsSet.size() << " first global id:"<< globalIds[0] << "\n";
+        return moab::MB_FAILURE;
+    }
 
     std::vector< int > tagLengths( tagNames.size() );
     std::vector< Tag > tagList;
@@ -1853,8 +1864,6 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         // in this case, we have to use 2 crystal routers, to send data to the processor that needs it
         // we will create first a tuple to rendevous points, then from there send to the processor that requested it
         // it is a 2-hop global gather scatter
-        // TODO: allow for tags of different length; this is wrong
-        int nbLocalVals = *num_tag_storage_length / ( (int)tagNames.size() );  // assumes all tags have the same length?
         // we do not expect the sizes to match
         //assert( nbLocalVals * tagNames.size() - *num_tag_storage_length == 0 );
         TupleList TLsend;
@@ -4184,7 +4193,7 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
     // Default constant parameters
     constexpr bool validate        = true;
     constexpr bool meshCleanup     = true;
-    constexpr bool gnomonic        = true;
+    bool gnomonic        = true;
     constexpr double defaultradius = 1.0;
     constexpr double boxeps        = 1.e-10;
 
@@ -4318,6 +4327,8 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
     tdata.remapper->GetMeshSet( moab::Remapper::OverlapMesh ) = data_intx.file_set;
 
     // First, compute the covering source set.
+    if (tdata.num_src_ghost_layers >= 1)
+        gnomonic = false; // do not use gnomonic when we need ghost layers;
     rval =
         tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, tdata.num_src_ghost_layers );MB_CHK_ERR( rval );
 

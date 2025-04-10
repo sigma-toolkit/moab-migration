@@ -1207,6 +1207,8 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
 {
     ErrorCode rval;
 
+    if (nb_ghost_layers >= 1)
+        gnomonic = false;
     rrmgrids = regional_mesh;
     moab::Range local_verts;
 
@@ -1340,6 +1342,8 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
 
     return rval;
 }
+#undef MOAB_DBG
+//#define MOAB_DBG
 
 ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_tempest )
 {

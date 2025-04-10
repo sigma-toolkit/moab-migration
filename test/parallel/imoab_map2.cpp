@@ -232,8 +232,8 @@ int main( int argc, char* argv[] )
         int type      = types[0];  // FV
         int direction = 1;         // from source to coupler; will create a mesh on cplAtmPID
         // because it is like "coverage", context will be cplocn
-        ierr = iMOAB_MigrateMapMesh( cmpAtmPID, cplAtmOcnPID, cplAtmPID, &atmCouComm, &atmPEGroup, &couPEGroup, &type,
-                                     &cmpatm, &cplocn, &direction );
+        ierr = iMOAB_MigrateMapMesh( cmpAtmPID, cplAtmOcnPID, &atmCouComm, &atmPEGroup, &couPEGroup, &type,
+                                     &cmpatm, &atmocnid, &direction );
         CHECKIERR( ierr, "failed to migrate mesh for atm on coupler" );
 #ifdef VERBOSE
         if( *cplAtmPID >= 0 )
@@ -251,7 +251,7 @@ int main( int argc, char* argv[] )
         int type      = types[1];  // cells with GLOBAL_ID in ocean / target set
         int direction = 2;         // from coupler to target; will create a mesh on cplOcnPID
         // it will be like initial migrate cmpocn <-> cplocn
-        ierr = iMOAB_MigrateMapMesh( cmpOcnPID, cplAtmOcnPID, cplOcnPID, &ocnCouComm, &ocnPEGroup, &couPEGroup, &type,
+        ierr = iMOAB_MigrateMapMesh( cmpOcnPID, cplAtmOcnPID, &ocnCouComm, &ocnPEGroup, &couPEGroup, &type,
                                      &cmpocn, &cplocn, &direction );
         CHECKIERR( ierr, "failed to migrate mesh for ocn on coupler" );
 

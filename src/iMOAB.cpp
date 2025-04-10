@@ -4099,15 +4099,22 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
 #endif
         // so we are now on pid1, we know now each marker were it has to go
         // add a new method to ParCommGraph, to set up the split_ranges and involved_IDs_map
+        // the par comm graph will be type "INITIAL_MIGRATE", although it will
+        // be used only in one direction (from source towards source coverage)
+        // maybe it would be less confusing if graph_type is "COVERAGE"
         rval = cgraph->set_split_ranges( *comp1, TLBackToComp1, valuesComp1, lenTagType1, ents_of_interest, *type );MB_CHK_ERR( rval );
         // we can just send vertices and elements, with crystal routers;
         // on the receiving end, make sure they are not duplicated, by looking at the global id
-        // if *type is 1, also send global_dofs tag in the element tuple
+        // if *type is 1, also send GLOBAL_DOFS tag in the element tuple
+        // (*type 1 is spectral, right now not used in E3SM)
         rval = cgraph->form_tuples_to_migrate_mesh( context.MBI, TLv, TLc, *type, lenTagType1 );MB_CHK_ERR( rval );
     }
-    else
+    else if (*pid2 >= 0)// TLv and TLc should be able to receive if *pid2 >= 0
+                        // this case will not happen if pid1 and pid2 are both on the coupler side
+                        // we need to cover the case if map migrate was used directly
+                        // in one hop projection; right now, we prefer 2 hop projection
     {
-        TLv.initialize( 2, 0, 0, 3, 0 );  // no vertices here, for sure
+        TLv.initialize( 2, 0, 0, 3, 0 );  // no vertices here yet, for sure
         TLv.enableWriteAccess();          // to be able to receive stuff, even if nothing is here yet, on this task
         if( *type != 2 )                  // for point cloud, we do not need to initialize TLc (for cells)
         {
@@ -4140,7 +4147,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         if( 1 == *direction )
         {
             //tdata.pid_src = pid3;
-            //tdata.remapper->SetMeshSet( Remapper::CoveringMesh, fset3, &primary_ents3 );
+            tdata.remapper->SetMeshSet( Remapper::CoveringMesh, fset3, &primary_ents3 );
             weightMap->SetSourceNDofsPerElement( ndofPerEl );
             weightMap->set_col_dc_dofs( values_entities );  // will set col_dtoc_dofmap
         }
@@ -4148,7 +4155,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         else
         {
             //tdata.pid_dest = pid3;
-            //tdata.remapper->SetMeshSet( Remapper::TargetMesh, fset3, &primary_ents3 );
+            tdata.remapper->SetMeshSet( Remapper::TargetMesh, fset3, &primary_ents3 );
             weightMap->SetDestinationNDofsPerElement( ndofPerEl );
             weightMap->set_row_dc_dofs( values_entities );  // will set row_dtoc_dofmap
         }

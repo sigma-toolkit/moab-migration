@@ -2728,7 +2728,14 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid,
 {
     appData& data                               = context.appDatas[*pid];
     std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *context_id );
-    if( mt == data.pgraph.end() ) return moab::MB_FAILURE;
+    if( mt == data.pgraph.end() )
+    {
+        std::cout << " no par com graph for context_id:" << *context_id << " available contexts:";
+        for( auto mit = data.pgraph.begin(); mit != data.pgraph.end(); mit++ )
+            std::cout << "  " << mit->first;
+        std::cout << "\n";
+        return moab::MB_FAILURE;
+    }
 
     ParCommGraph* cgraph = mt->second;
     ParallelComm* pco    = context.appDatas[*pid].pcomm;
@@ -3808,7 +3815,6 @@ ErrCode iMOAB_WriteMappingWeightsToFile(
 #ifdef MOAB_HAVE_MPI
 ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                               iMOAB_AppID pid2,
-                              iMOAB_AppID pid3,
                               MPI_Comm* jointcomm,
                               MPI_Group* groupA,
                               MPI_Group* groupB,
@@ -3823,7 +3829,6 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     bool is_fortran = false;
     if( *pid1 >= 0 ) is_fortran = context.appDatas[*pid1].is_fortran || is_fortran;
     if( *pid2 >= 0 ) is_fortran = context.appDatas[*pid2].is_fortran || is_fortran;
-    if( *pid3 >= 0 ) is_fortran = context.appDatas[*pid3].is_fortran || is_fortran;
 
     MPI_Comm joint_communicator =
         ( is_fortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( jointcomm ) ) : *jointcomm );
@@ -3844,12 +3849,12 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     if( *pid1 >= 0 ) cgraph = new ParCommGraph( joint_communicator, group_first, group_second, *comp1, *comp2 );
 
     ParCommGraph* cgraph_rev = nullptr;
-    if( *pid3 >= 0 ) cgraph_rev = new ParCommGraph( joint_communicator, group_second, group_first, *comp2, *comp1 );
+    if( *pid2 >= 0 ) cgraph_rev = new ParCommGraph( joint_communicator, group_second, group_first, *comp2, *comp1 );
 
     // we should search if we have another pcomm with the same comp ids in the list already
     // sort of check existing comm graphs in the map context.appDatas[*pid].pgraph
     if( *pid1 >= 0 ) context.appDatas[*pid1].pgraph[*comp2] = cgraph;      // the context will be the other comp
-    if( *pid3 >= 0 ) context.appDatas[*pid3].pgraph[*comp1] = cgraph_rev;  // from 2 to 1
+    if( *pid2 >= 0 ) context.appDatas[*pid2].pgraph[*comp1] = cgraph_rev;  // from 2 to 1
 
     // each model has a list of global ids that will need to be sent by gs to rendezvous the other
     // model on the joint_communicator
@@ -4094,15 +4099,22 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
 #endif
         // so we are now on pid1, we know now each marker were it has to go
         // add a new method to ParCommGraph, to set up the split_ranges and involved_IDs_map
+        // the par comm graph will be type "INITIAL_MIGRATE", although it will
+        // be used only in one direction (from source towards source coverage)
+        // maybe it would be less confusing if graph_type is "COVERAGE"
         rval = cgraph->set_split_ranges( *comp1, TLBackToComp1, valuesComp1, lenTagType1, ents_of_interest, *type );MB_CHK_ERR( rval );
         // we can just send vertices and elements, with crystal routers;
         // on the receiving end, make sure they are not duplicated, by looking at the global id
-        // if *type is 1, also send global_dofs tag in the element tuple
+        // if *type is 1, also send GLOBAL_DOFS tag in the element tuple
+        // (*type 1 is spectral, right now not used in E3SM)
         rval = cgraph->form_tuples_to_migrate_mesh( context.MBI, TLv, TLc, *type, lenTagType1 );MB_CHK_ERR( rval );
     }
-    else
+    else if (*pid2 >= 0)// TLv and TLc should be able to receive if *pid2 >= 0
+                        // this case will not happen if pid1 and pid2 are both on the coupler side
+                        // we need to cover the case if map migrate was used directly
+                        // in one hop projection; right now, we prefer 2 hop projection
     {
-        TLv.initialize( 2, 0, 0, 3, 0 );  // no vertices here, for sure
+        TLv.initialize( 2, 0, 0, 3, 0 );  // no vertices here yet, for sure
         TLv.enableWriteAccess();          // to be able to receive stuff, even if nothing is here yet, on this task
         if( *type != 2 )                  // for point cloud, we do not need to initialize TLc (for cells)
         {
@@ -4116,26 +4128,25 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     pc.crystal_router()->gs_transfer( 1, TLv, 0 );  // communication towards coupler tasks, with mesh vertices
     if( *type != 2 ) pc.crystal_router()->gs_transfer( 1, TLc, 0 );  // those are cells
 
-    if( *pid3 >= 0 )  // will receive the mesh, on coupler pes!
+    if( *pid2 >= 0 )  // will receive the mesh, on coupler pes!, the coverage mesh !
     {
-        appData& data3     = context.appDatas[*pid3];
-        EntityHandle fset3 = data3.file_set;
+        appData& dataIntx        = context.appDatas[*pid2];
+        TempestMapAppData& tdata = dataIntx.tempestData;
         Range primary_ents3;                 // vertices for type 2, cells of dim 2 for type 1 or 3
         std::vector< int > values_entities;  // will be the size of primary_ents3 * lenTagType1
+        EntityHandle fset3 = tdata.remapper->GetMeshSet( Remapper::CoveringMesh);
         rval = cgraph_rev->form_mesh_from_tuples( context.MBI, TLv, TLc, *type, lenTagType1, fset3, primary_ents3,
                                                   values_entities );MB_CHK_ERR( rval );
-        iMOAB_UpdateMeshInfo( pid3 );
         int ndofPerEl = 1;
         if( 1 == *type ) ndofPerEl = (int)( sqrt( lenTagType1 ) );
         // because we are on the coupler, we know that the read map pid2 exists
         assert( *pid2 >= 0 );
-        appData& dataIntx        = context.appDatas[*pid2];
-        TempestMapAppData& tdata = dataIntx.tempestData;
+
 
         // if we are on source coverage, direction 1, we can set covering mesh, covering cells
         if( 1 == *direction )
         {
-            tdata.pid_src = pid3;
+            //tdata.pid_src = pid3;
             tdata.remapper->SetMeshSet( Remapper::CoveringMesh, fset3, &primary_ents3 );
             weightMap->SetSourceNDofsPerElement( ndofPerEl );
             weightMap->set_col_dc_dofs( values_entities );  // will set col_dtoc_dofmap
@@ -4143,7 +4154,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         // if we are on target, we can set the target cells
         else
         {
-            tdata.pid_dest = pid3;
+            //tdata.pid_dest = pid3;
             tdata.remapper->SetMeshSet( Remapper::TargetMesh, fset3, &primary_ents3 );
             weightMap->SetDestinationNDofsPerElement( ndofPerEl );
             weightMap->set_row_dc_dofs( values_entities );  // will set row_dtoc_dofmap

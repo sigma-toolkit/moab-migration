@@ -30,7 +30,7 @@ taglist_clean = [
     #"dvEdge",
     #"edgeMask",
     #"fCell",
-    #"layerThickness0",
+    "layerThickness0",
     #"maxLevelCell",
     #"minLevelCell",
     #"normalVelocity0",

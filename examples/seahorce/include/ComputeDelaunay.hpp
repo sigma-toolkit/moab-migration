@@ -365,7 +365,7 @@ moab::ErrorCode ComputeDelaunayInterpolant( RuntimeContext& context,
 
         tree.findNeighbors( resultSet, query_pt, sparams );
         // bool treefound = tree.closest( resultSet, query_pt, sparams );
-        assert( treefound );
+        // assert( treefound );
 
         bool found      = false;
         double mindist  = srcdist[0];

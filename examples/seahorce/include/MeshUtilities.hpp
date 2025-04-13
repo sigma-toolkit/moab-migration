@@ -24,7 +24,6 @@ moab::ErrorCode ScaleCoords( moab::Interface* mb,
                              double R,
                              bool is_cartesian )
 {
-    moab::ErrorCode rval;
     double posi[3], posf[3], len = 0;
 
     // one by one, get the node and project it on the sphere, with a radius given
@@ -35,9 +34,9 @@ moab::ErrorCode ScaleCoords( moab::Interface* mb,
 
         if( !is_cartesian )
         {
-            rval = mb->get_coords( &nd, 1, posi );MB_CHK_ERR( rval );
-            const double lat = posi[1] * 3.14159265358979323846 / 180;
+            MB_CHK_ERR( mb->get_coords( &nd, 1, posi ) );
             const double lon = posi[0] * 3.14159265358979323846 / 180;
+            const double lat = posi[1] * 3.14159265358979323846 / 180;
             posf[0]          = cos( lat ) * cos( lon );  // x coordinate
             posf[1]          = cos( lat ) * sin( lon );  // y
             posf[2]          = sin( lat );               // z
@@ -48,7 +47,7 @@ moab::ErrorCode ScaleCoords( moab::Interface* mb,
         }
         else
         {
-            rval = mb->get_coords( &nd, 1, posf );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_coords( &nd, 1, posf ) );
         }
 
         len = std::sqrt( posf[0] * posf[0] + posf[1] * posf[1] + posf[2] * posf[2] );
@@ -73,7 +72,7 @@ moab::ErrorCode ScaleCoords( moab::Interface* mb,
 
         // if (is_threed)
         //     dbgprint( nd << " X=" << posf[0] << ", Y=" << posf[1] << ", Z = " << posf[2]  );
-        rval = mb->set_coords( &nd, 1, posf );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->set_coords( &nd, 1, posf ) );
     }
     return moab::MB_SUCCESS;
 }
@@ -168,9 +167,9 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( RuntimeContext& context,
 
                         if( layer_thickness[il * nlayers + ii] < 0 )
                         {
-                            // printf( "Thickness value for layer %d: element %zu  = %f\n", ii, k,
-                            //        layer_thickness[il * nlayers + ii] );
-                            // exit( 1 );
+                            printf( "Thickness value for layer %d: element %zu  = %f\n", ii, k,
+                                   layer_thickness[il * nlayers + ii] );
+                            exit( 1 );
                             continue;
                         }
                         invweight += 1.0;
@@ -182,7 +181,7 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( RuntimeContext& context,
                     {
                         printf( "Thickness value for layer %d: vertex %zu, adj = %zu = %f\n", ii, i, eladjs.size(),
                                 thickness );
-                        // exit( 1 );
+                        exit( 1 );
                         thickness = 0.0;
                     }
 
@@ -301,12 +300,11 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( RuntimeContext& context,
             const EntityType etype   = mb->type_from_handle( polyg );
             const int polyGID        = gidParentFaceData[j];
 
-            // printf( "Polygon %d has %d nodes\n", j, nnodes );
-
             const EntityHandle* connp = nullptr;
             int nnodes;
             rval = mb->get_connectivity( polyg, connp, nnodes );MB_CHK_ERR( rval );
 
+            // printf( "Polygon %d has %d nodes\n", j, nnodes );
             std::vector< int > vecents( nnodes + 2, polyGID );
             if( is_mpas )
             {
@@ -316,12 +314,12 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( RuntimeContext& context,
                 while( connp[nnodes - 2] == connp[nnodes - 1] && nnodes > 3 )
                     nnodes--;
 
-                std::copy( connp, connp + nnodes, vertexConn );
+                // std::copy( connp, connp + nnodes, vertexConn );
                 // we had padded entities
-                if( orig_nodes != nnodes )
-                {
-                    rval = mb->set_connectivity( polyg, vertexConn, nnodes );MB_CHK_ERR( rval );
-                }
+                // if( orig_nodes != nnodes )
+                // {
+                //     rval = mb->set_connectivity( polyg, vertexConn, nnodes );MB_CHK_ERR( rval );
+                // }
 
                 for( int i = 0; i < nnodes; i++ )
                 {

@@ -13,6 +13,8 @@
 #include "moab/ParallelComm.hpp"
 
 #include <Eigen/Dense>
+#include <Eigen/Sparse>
+// #include <Eigen/Map>
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
 #include "GridElements.h"
@@ -35,6 +37,13 @@ enum RemappingMethod
     MultilevelBsplineApproximation = 10
 };
 
+
+// typedef Eigen::Map< Eigen::Matrix< double, 1, Eigen::Dynamic > > WeightRowVector;
+// typedef Eigen::Map< Eigen::Matrix< double, Eigen::Dynamic, 1 > > WeightColVector;
+typedef Eigen::Map< Eigen::VectorXd > WeightVector;
+typedef Eigen::SparseMatrix< double, Eigen::RowMajor > WeightMatrix;
+
+
 /// @brief class RuntimeContext
 /// The RunttimeContext stores and manages the MPAS-ROMS coupler specific
 /// to multiscale modeling. The class also provides other utility functions
@@ -45,8 +54,10 @@ struct RuntimeContext
     Mesh meshInput;
     Mesh meshOutput;
     Mesh meshOverlap;
-    OfflineMap weightMap;
+    // OfflineMap weightMap;
+    // OfflineMap weightMapBilinear;
 #endif
+    WeightMatrix eigenMap, eigenBilinearMap;
 
     std::string mpas_filename{ "mpas_grid.h5m" };  /// input MPAS grid file
     std::string roms_filename{ "roms_grid.h5m" };  /// input ROMS grid file
@@ -77,6 +88,7 @@ struct RuntimeContext
     bool useCAAS{ false };
 
     std::map< std::string, std::pair< RemappingMethod, int > > field_methods;
+    std::string fvMapFileName, fvBilinearMapFileName;
 
     // MOAB objects
     moab::Interface* moab_interface{ nullptr };
@@ -89,10 +101,12 @@ struct RuntimeContext
     std::vector< int > tetrahedraconn;
     Eigen::Matrix< int, Eigen::Dynamic, Eigen::Dynamic > vertex_to_element;
     std::vector< double > dual_mpas_tetrahedron_centroids;
+
     // moab::Range mpas_elems, mpas_verts;
     // moab::Range roms_elems, roms_verts;
     // moab::Range mpas3d_elems, mpas3d_verts, mpas3d_dual_elems;
     // moab::Range roms3d_elems, roms3d_verts;
+    std::map<int, int> rowMap, colMap;
 
     double mpas_zref_heights[mpas_zreflevels];
 
@@ -241,6 +255,8 @@ struct RuntimeContext
         // Problem setup
         opts.addOpt< int >( "dimension", "Compute 2D surface or 3D volumetric coupling (default=2)", &dimension );
         opts.addOpt< int >( "smoothBathymetry", "Number of smoothing iterations for projected ROMS Bathymetry (default=0)", &smoothBathymetry );
+        opts.addOpt< std::string >( "mapfile", "Path to the the FV conservative map file", &fvMapFileName );
+        opts.addOpt< std::string >( "bilinmapfile", "Path to the bilinear map file", &fvBilinearMapFileName );
         opts.addOpt< void >( "setup", "Compute full mesh extrusions needed for coupling in 3D", &generateExtrusions );
         opts.addOpt< void >( "mono", "Ensure monotonicity in the weight generation (only for TR-FV)",
                              &ensureMonotonicity );
@@ -348,9 +364,10 @@ struct RuntimeContext
             {
                 const std::pair< RemappingMethod, int >& method_and_order = fieldkv.second;
                 RemappingMethod rmethod                                   = method_and_order.first;
-                if( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear || rmethod == TempestRemapInvDist ||
-                    rmethod == TempestRemapDelaunay || rmethod == TempestRemapIntegratedBilinear )
-                    computeTRMaps = true;
+                // if( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear || rmethod == TempestRemapInvDist ||
+                //     rmethod == TempestRemapDelaunay || rmethod == TempestRemapIntegratedBilinear )
+                //     computeTRMaps = true;
+                if( !fvMapFileName.size() && !fvBilinearMapFileName.size() ) computeTRMaps = true;
                 if( rmethod == MultilevelBsplineApproximation ) computeMBAInterpolant = true;
                 if( rmethod == ShepardInterpolant ) computeShepardInterpolant = true;
                 if( rmethod == NearestNeighborInterpolant ) computeNNInterpolant = true;

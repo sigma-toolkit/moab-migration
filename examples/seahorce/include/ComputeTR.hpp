@@ -97,6 +97,141 @@ moab::ErrorCode CloneToTRMesh( moab::Interface* m_interface, Mesh& mesh, moab::E
     return MB_SUCCESS;
 }
 
+// Loads the mapping matrix (S) from NetCDF file into an Eigen sparse matrix
+bool loadSparseMappingFromNetCDF(const std::string& filename,
+                                 WeightMatrix& mat, RuntimeContext& context) {
+
+    // using namespace netCDF;
+    // using namespace netCDF::exceptions;
+    NcError ncerror( NcError::verbose_fatal );
+    typedef Eigen::Triplet<double> Triplet;
+
+    // try
+    {
+        NcFile ncMap(filename.c_str(), NcFile::ReadOnly, NULL, 0, NcFile::Netcdf4);
+
+        // Read dimensions
+        auto n_s = ncMap.get_dim("n_s")->size();
+        auto n_a = ncMap.get_dim("n_a")->size();
+        auto n_b = ncMap.get_dim("n_b")->size();
+
+        std::vector<int> vecRow(n_s);
+        std::vector<int> vecCol(n_s);
+        std::vector<double> vecS(n_s);
+
+        // Read variables
+        NcVar * varRow = ncMap.get_var("row");
+        if (varRow == NULL) {
+            _EXCEPTION1("Map file \"%s\" does not contain variable \"row\"",
+                filename.c_str());
+        }
+
+        NcVar * varCol = ncMap.get_var("col");
+        if (varRow == NULL) {
+            _EXCEPTION1("Map file \"%s\" does not contain variable \"col\"",
+                filename.c_str());
+        }
+
+        NcVar * varS = ncMap.get_var("S");
+        if (varRow == NULL) {
+            _EXCEPTION1("Map file \"%s\" does not contain variable \"S\"",
+                filename.c_str());
+        }
+
+        varRow->set_cur((long)0);
+        varRow->get(&(vecRow[0]), n_s);
+
+        varCol->set_cur((long)0);
+        varCol->get(&(vecCol[0]), n_s);
+
+        varS->set_cur((long)0);
+        varS->get(&(vecS[0]), n_s);
+
+        std::vector<Triplet> triplets;
+        triplets.reserve(n_s);
+
+        for (int i = 0; i < n_s; ++i) {
+            // Subtract 1 if indices in NetCDF are 1-based (check your file)
+            // int vrow = context.rowMap[vecRow[i]];
+            // int vcol = context.colMap[vecCol[i]];
+
+            auto map_lookup = [](const std::map<int, int>& m, int key, const std::string& label) -> int {
+                auto it = m.find(key);
+                if (it == m.end()) {
+                    std::cerr << "Error: key " << key << " not found in " << label << "\n";
+                    std::exit(EXIT_FAILURE);
+                }
+                return it->second;
+            };
+
+            int vrow = map_lookup(context.rowMap, vecRow[i], "rowMap");
+            int vcol = map_lookup(context.colMap, vecCol[i], "colMap");
+
+            // if (i<10) printf("A(%d, %d) = %f\n", vrow, vcol, vecS[i]);
+            triplets.emplace_back(vrow, vcol, vecS[i]);
+            if (!(vrow>=0 && vrow<n_b && vcol>=0 && vcol<n_a))
+                printf("FAILED: A(%d, %d) = %f\n", vrow, vcol, vecS[i]);
+        }
+
+        printf("Row: %ld, Col: %ld, NNZs: %ld\n", n_b, n_a, n_s);
+        mat.resize(n_b, n_a);
+        mat.setFromTriplets(triplets.begin(), triplets.end());
+        mat.makeCompressed();
+        return true;
+    }
+    // catch (NcException& e) {
+    //     std::cerr << "NetCDF error: " << e.what() << std::endl;
+    //     return false;
+    // }
+}
+
+// void copy_tempest_sparsemat_to_eigen3(const SparseMatrix<double>& trmat, WeightMatrix& emat)
+// {
+//     DataArray1D< int > lrows;
+//     DataArray1D< int > lcols;
+//     DataArray1D< double > lvals;
+//     trmat.GetEntries( lrows, lcols, lvals );
+//     unsigned locvals = lvals.GetRows();
+
+//     /* Should the columns be the global size of the matrix ? */
+//     emat.resize( trmat.GetRows(), trmat.GetColumns() );
+//     // NOTE: hardcode it for gulfstream case
+//     // emat.resize( 341341, 1971153 );
+
+//     emat.reserve( locvals );
+//     for( unsigned iv = 0; iv < locvals; iv++ )
+//     {
+//         // std::cout << "Row = " << row_ldofmap[lrows[iv]] << ", Col = " << col_ldofmap[lcols[iv]]
+//         // << ", DATA = " << lvals[iv] << std::endl; std::cout << "Row = " << lrows[iv] << ", Col =
+//         // " << lcols[iv] << ", DATA = " << lvals[iv] << std::endl;
+//         emat.insert( lrows[iv], lcols[iv] ) = lvals[iv];
+//     }
+
+//     emat.makeCompressed();
+
+//     return;
+// }
+
+moab::ErrorCode GenerateLGMaps(moab::Interface* mbInt, moab::EntityHandle elset, std::map<int, int>& glmap)
+{
+    moab::Range elems;
+    MB_CHK_ERR(mbInt->get_entities_by_dimension(elset, 2, elems));
+
+    glmap.clear();
+    //
+    moab::Tag globalIDTag = mbInt->globalId_tag();
+    // build a global to local ID map to map the culled data
+    {
+        std::vector<int> gids(elems.size());
+        MB_CHK_ERR(mbInt->tag_get_data(globalIDTag, elems, gids.data()));
+        for (size_t i = 0; i < gids.size(); ++i) {
+            glmap.emplace(gids[i], static_cast<int>(i)); // emplace avoids overwrite if needed
+        }
+    }
+
+    return moab::MB_SUCCESS;
+}
+
 /**
  * @brief Loads TempestRemap weights for remapping between two sets.
  *
@@ -110,25 +245,36 @@ moab::ErrorCode CloneToTRMesh( moab::Interface* m_interface, Mesh& mesh, moab::E
  * @return The error code indicating the success or failure of the operation.
  */
 moab::ErrorCode LoadTempestRemapWeights( RuntimeContext& context,
-                                         moab::EntityHandle /*src_set*/,
-                                         moab::EntityHandle /*tgt_set*/,
-                                         const std::string& map_output_filename )
+                                         moab::EntityHandle src_set,
+                                         moab::EntityHandle tgt_set,
+                                         const std::string& map_output_filename,
+                                        bool is_bilinear = false )
 {
-    // CloneToTRMesh( context.moab_interface, context.meshInput, src_set );
-    // CloneToTRMesh( context.moab_interface, context.meshOutput, tgt_set );
-
-    // context.meshInput.ConstructEdgeMap();
-    // context.meshOutput.ConstructEdgeMap();
-
-    // load the 2D intersection mesh from disk
-    // context.meshOverlap = Mesh( "mesh_intersection.g" );
+    // build a global to local ID map to map the culled data
+    MB_CHK_ERR(GenerateLGMaps(context.moab_interface, src_set, context.colMap));
+    MB_CHK_ERR(GenerateLGMaps(context.moab_interface, tgt_set, context.rowMap));
 
     // next read the map file
     NcError ncerror( NcError::silent_nonfatal );
     // std::string map_output_filename =
     //     std::string( template_map_output_filename ) + ( strMethod.size() ? strMethod : "fv" ) + ".nc";
-    std::cout << "Reading TempestRemap map file: " << map_output_filename << "\n";
-    context.weightMap.Read( map_output_filename );
+    std::cout << "-- Reading TempestRemap map file: " << map_output_filename << "\n";
+    if (is_bilinear)
+    {
+        // OfflineMap weightMap;
+        // weightMap.Read( map_output_filename );
+        // const SparseMatrix< double >& fvweights = weightMap.GetSparseMatrix();
+        // copy_tempest_sparsemat_to_eigen3(fvweights, context.eigenBilinearMap);
+        loadSparseMappingFromNetCDF(map_output_filename, context.eigenBilinearMap, context);
+    }
+    else
+    {
+        // OfflineMap weightMap;
+        // weightMap.Read( map_output_filename );
+        // const SparseMatrix< double >& fvweights = weightMap.GetSparseMatrix();
+        // copy_tempest_sparsemat_to_eigen3(fvweights, context.eigenMap);
+        loadSparseMappingFromNetCDF(map_output_filename, context.eigenMap, context);
+    }
 
     return moab::MB_SUCCESS;
 }
@@ -181,102 +327,196 @@ moab::ErrorCode ComputeTempestRemapWeights( RuntimeContext& context,
     context.meshOutput.ConstructEdgeMap();
 
 #define COMPUTE_INTERSECTIONS
+    if( context.computeTRMaps )
+    {
 #ifdef COMPUTE_INTERSECTIONS
-
-    // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm
-    if( context.proc_id == 0 )
-        std::cout << "Setup and compute mesh intersections between source (MPAS) and target (ROMS) meshes" << std::endl;
-    // err = remapper.ComputeOverlapMesh( true, false );MB_CHK_ERR( err );
-    constexpr bool concaveMeshA = false, concaveMeshB = false, allowNoOverlap = true, verbose = false;
-    int ierr =
-        GenerateOverlapWithMeshes( context.meshOutput, context.meshInput, context.meshOverlap, "mesh_intersection.g" /*outFilename*/,
-                                   "Netcdf4", "exact", concaveMeshA, concaveMeshB, allowNoOverlap, verbose );
-    if( ierr )
-    {
-        MB_CHK_SET_ERR( moab::MB_FAILURE, "TempestRemap: Can't compute the intersection of meshes on the sphere" );
-    }
+        // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm
+        if( context.proc_id == 0 )
+            std::cout << "Setup and compute mesh intersections between source (MPAS) and target (ROMS) meshes" << std::endl;
+        // err = remapper.ComputeOverlapMesh( true, false );MB_CHK_ERR( err );
+        constexpr bool concaveMeshA = false, concaveMeshB = false, allowNoOverlap = true, verbose = false;
+        int ierr =
+            GenerateOverlapWithMeshes( context.meshOutput, context.meshInput, context.meshOverlap, "mesh_intersection.g" /*outFilename*/,
+                                    "Netcdf4", "exact", concaveMeshA, concaveMeshB, allowNoOverlap, verbose );
+        if( ierr )
+        {
+            MB_CHK_SET_ERR( moab::MB_FAILURE, "TempestRemap: Can't compute the intersection of meshes on the sphere" );
+        }
 #else
-    context.meshOverlap.Read( "mesh_intersection.g" );
+        context.meshOverlap.Read( "mesh_intersection.g" );
 #endif
+    }
+
     if( context.proc_id == 0 ) std::cout << "\nSetup computation of weights" << std::endl;
-
-    // Call to generate the remapping weights with the tempest meshes
-    std::string map_output_filename =
-        std::string( template_map_output_filename ) + ( strMethod.size() ? strMethod : "fv" ) + ".nc";
-    GenerateOfflineMapAlgorithmOptions mapOptions;
-    mapOptions.nPin             = order;
-    mapOptions.nPout            = order;
-    mapOptions.fSourceConcave   = false;
-    mapOptions.fTargetConcave   = false;
-    mapOptions.strMethod        = strMethodTR;  // invdist, bilin, intbilin, delaunay
-    mapOptions.fMonotone        = ensureMonotonicity;
-    mapOptions.fNoCorrectAreas  = false;
-    mapOptions.fNoCheck         = true;
-    mapOptions.strOutputMapFile = map_output_filename;  // ask TR to write it out
-    mapOptions.strOutputFormat  = "Netcdf4";
-
-    if( context.proc_id == 0 ) std::cout << "Compute weights with TempestRemap" << std::endl;
-    ierr = GenerateOfflineMapWithMeshes( context.meshInput,    // Mesh inputMesh
-                                         context.meshOutput,   // Mesh outputMesh,
-                                         context.meshOverlap,  // Mesh overlapMesh,
-                                         "fv",                 // std::string inputDiscretization,
-                                         "fv",                 // std::string outputDiscretization,
-                                         mapOptions,           // const GenerateOfflineMapAlgorithmOptions& options
-                                         context.weightMap );
-    if( ierr ) MB_CHK_SET_ERR( moab::MB_FAILURE, "TempestRemap: Can't generate offline map weights" );
-
-    // check the generated weights and output information
+    std::string map_output_filename = std::string( template_map_output_filename ) + "fv.nc";
+    // first compute the FV conservative map
     {
-        const double dNormalTolerance = 1.0E-8;
-        const double dStrictTolerance = 1.0E-12;
-        context.weightMap.CheckMap( true, true, ensureMonotonicity, dNormalTolerance, dStrictTolerance );
-    }
+        // Call to generate the remapping weights with the tempest meshes
+        GenerateOfflineMapAlgorithmOptions mapOptions;
+        mapOptions.nPin             = order;
+        mapOptions.nPout            = order;
+        mapOptions.fSourceConcave   = false;
+        mapOptions.fTargetConcave   = false;
+        mapOptions.strMethod        = "";  // invdist, bilin, intbilin, delaunay
+        mapOptions.fMonotone        = ensureMonotonicity;
+        mapOptions.fNoCorrectAreas  = false;
+        mapOptions.fNoCheck         = true;
+        mapOptions.strOutputMapFile = map_output_filename;  // ask TR to write it out
+        mapOptions.strOutputFormat  = "Netcdf4";
 
-    // Write the map to disk
+        if( context.proc_id == 0 ) std::cout << "Compute weights with TempestRemap" << std::endl;
+        OfflineMap weightMap;
+        int ierr = GenerateOfflineMapWithMeshes( context.meshInput,    // Mesh inputMesh
+                                            context.meshOutput,   // Mesh outputMesh,
+                                            context.meshOverlap,  // Mesh overlapMesh,
+                                            "fv",                 // std::string inputDiscretization,
+                                            "fv",                 // std::string outputDiscretization,
+                                            mapOptions,           // const GenerateOfflineMapAlgorithmOptions& options
+                                            weightMap );
+        if( ierr ) MB_CHK_SET_ERR( moab::MB_FAILURE, "TempestRemap: Can't generate offline map weights" );
+
+        // check the generated weights and output information
+        {
+            const double dNormalTolerance = 1.0E-8;
+            const double dStrictTolerance = 1.0E-12;
+            weightMap.CheckMap( true, true, ensureMonotonicity, dNormalTolerance, dStrictTolerance );
+        }
+
+        // Write the map to disk
 #ifdef WRITE_MAP_FILE
-    {
-        // First write out the overlap mesh to disk
-        // context.meshOverlap.Write( "mesh_intersection.g" );
-
-        // Next prepare set of attributes to add to the map NC file
-        typedef std::map< std::string, std::string > AttributeMap;
-        typedef AttributeMap::value_type AttributePair;
-
-        AttributeMap mapAttributes;
-        mapAttributes.insert( AttributePair( "grid_file_src", "mpas_grid.h5m" ) );
-        mapAttributes.insert( AttributePair( "grid_file_dst", "roms_grid.h5m" ) );
-        mapAttributes.insert( AttributePair( "grid_file_ovr", "mesh_intersection.g" ) );
-        mapAttributes.insert(
-            AttributePair( "concave_src", ( mapOptions.fSourceConcave ) ? ( "true" ) : ( "false" ) ) );
-        mapAttributes.insert(
-            AttributePair( "concave_dst", ( mapOptions.fTargetConcave ) ? ( "true" ) : ( "false" ) ) );
-        if( mapOptions.strSourceMeta != "" )
         {
-            mapAttributes.insert( AttributePair( "meta_src", mapOptions.strSourceMeta ) );
-        }
-        if( mapOptions.strTargetMeta != "" )
-        {
-            mapAttributes.insert( AttributePair( "meta_dst", mapOptions.strTargetMeta ) );
-        }
-        mapAttributes.insert( AttributePair( "type_src", "fv" ) );
-        mapAttributes.insert( AttributePair( "type_dst", "fv" ) );
-        mapAttributes.insert( AttributePair( "np_src", std::to_string( (long long)mapOptions.nPin ) ) );
-        mapAttributes.insert( AttributePair( "np_dst", std::to_string( (long long)mapOptions.nPout ) ) );
-        mapAttributes.insert( AttributePair( "mono", ( mapOptions.fMonotone ) ? ( "true" ) : ( "false" ) ) );
-        mapAttributes.insert( AttributePair( "nobubble", "false" ) );
-        mapAttributes.insert( AttributePair( "nocorrectareas", "false" ) );
-        mapAttributes.insert( AttributePair( "noconserve", "false" ) );
-        mapAttributes.insert( AttributePair( "sparse_constraints", "false" ) );
-        mapAttributes.insert( AttributePair( "method", mapOptions.strMethod ) );
-        mapAttributes.insert( AttributePair( "version", "RemapMPASROMS v0.1" ) );
+            // First write out the overlap mesh to disk
+            // context.meshOverlap.Write( "mesh_intersection.g" );
 
-        if( context.proc_id == 0 ) std::cout << "\nWrite the weights to " << map_output_filename << std::endl;
-        context.weightMap.Write( mapOptions.strOutputMapFile, mapAttributes, NcFile::Netcdf4Classic );
+            // Next prepare set of attributes to add to the map NC file
+            typedef std::map< std::string, std::string > AttributeMap;
+            typedef AttributeMap::value_type AttributePair;
 
-        // // Write the map file to disk in parallel using either HDF5 or SCRIP interface
-        // err = weightMap.WriteParallelMap( output_filename.c_str() );MB_CHK_ERR( err );
-    }
+            AttributeMap mapAttributes;
+            mapAttributes.insert( AttributePair( "grid_file_src", "mpas_grid.h5m" ) );
+            mapAttributes.insert( AttributePair( "grid_file_dst", "roms_grid.h5m" ) );
+            mapAttributes.insert( AttributePair( "grid_file_ovr", "mesh_intersection.g" ) );
+            mapAttributes.insert(
+                AttributePair( "concave_src", ( mapOptions.fSourceConcave ) ? ( "true" ) : ( "false" ) ) );
+            mapAttributes.insert(
+                AttributePair( "concave_dst", ( mapOptions.fTargetConcave ) ? ( "true" ) : ( "false" ) ) );
+            if( mapOptions.strSourceMeta != "" )
+            {
+                mapAttributes.insert( AttributePair( "meta_src", mapOptions.strSourceMeta ) );
+            }
+            if( mapOptions.strTargetMeta != "" )
+            {
+                mapAttributes.insert( AttributePair( "meta_dst", mapOptions.strTargetMeta ) );
+            }
+            mapAttributes.insert( AttributePair( "type_src", "fv" ) );
+            mapAttributes.insert( AttributePair( "type_dst", "fv" ) );
+            mapAttributes.insert( AttributePair( "np_src", std::to_string( (long long)mapOptions.nPin ) ) );
+            mapAttributes.insert( AttributePair( "np_dst", std::to_string( (long long)mapOptions.nPout ) ) );
+            mapAttributes.insert( AttributePair( "mono", ( mapOptions.fMonotone ) ? ( "true" ) : ( "false" ) ) );
+            mapAttributes.insert( AttributePair( "nobubble", "false" ) );
+            mapAttributes.insert( AttributePair( "nocorrectareas", "false" ) );
+            mapAttributes.insert( AttributePair( "noconserve", "false" ) );
+            mapAttributes.insert( AttributePair( "sparse_constraints", "false" ) );
+            mapAttributes.insert( AttributePair( "method", "" ) );
+            mapAttributes.insert( AttributePair( "version", "RemapMPASROMS v0.1" ) );
+
+            if( context.proc_id == 0 ) std::cout << "\nWrite the weights to " << map_output_filename << std::endl;
+            weightMap.Write( mapOptions.strOutputMapFile, mapAttributes, NcFile::Netcdf4 );
+
+            // // Write the map file to disk in parallel using either HDF5 or SCRIP interface
+            // err = weightMap.WriteParallelMap( output_filename.c_str() );MB_CHK_ERR( err );
+        }
 #endif
+
+        // const SparseMatrix< double >& fvweights = weightMap.GetSparseMatrix();
+        // copy_tempest_sparsemat_to_eigen3(fvweights, context.eigenMap);
+        loadSparseMappingFromNetCDF(map_output_filename, context.eigenMap, context);
+    }
+
+    // next compute the bilinear map
+    OfflineMap weightMapBilinear;
+    std::string bilin_map_output_filename = std::string( template_map_output_filename ) + "bilinear.nc";
+    {
+        // Call to generate the remapping weights with the tempest meshes
+        GenerateOfflineMapAlgorithmOptions mapOptions;
+        mapOptions.nPin             = order;
+        mapOptions.nPout            = order;
+        mapOptions.fSourceConcave   = false;
+        mapOptions.fTargetConcave   = false;
+        mapOptions.strMethod        = "bilin";  // invdist, bilin, intbilin, delaunay
+        mapOptions.fMonotone        = ensureMonotonicity;
+        mapOptions.fNoCorrectAreas  = false;
+        mapOptions.fNoCheck         = true;
+        mapOptions.strOutputMapFile = bilin_map_output_filename;  // ask TR to write it out
+        mapOptions.strOutputFormat  = "Netcdf4";
+
+        if( context.proc_id == 0 ) std::cout << "Compute weights with TempestRemap" << std::endl;
+        int ierr = GenerateOfflineMapWithMeshes( context.meshInput,    // Mesh inputMesh
+                                            context.meshOutput,   // Mesh outputMesh,
+                                            context.meshOverlap,  // Mesh overlapMesh,
+                                            "fv",                 // std::string inputDiscretization,
+                                            "fv",                 // std::string outputDiscretization,
+                                            mapOptions,           // const GenerateOfflineMapAlgorithmOptions& options
+                                            weightMapBilinear );
+        if( ierr ) MB_CHK_SET_ERR( moab::MB_FAILURE, "TempestRemap: Can't generate offline map weights" );
+
+        // check the generated weights and output information
+        {
+            const double dNormalTolerance = 1.0E-8;
+            const double dStrictTolerance = 1.0E-12;
+            weightMapBilinear.CheckMap( true, true, ensureMonotonicity, dNormalTolerance, dStrictTolerance );
+        }
+
+        // Write the map to disk
+#ifdef WRITE_MAP_FILE
+        {
+            // First write out the overlap mesh to disk
+            // context.meshOverlap.Write( "mesh_intersection.g" );
+
+            // Next prepare set of attributes to add to the map NC file
+            typedef std::map< std::string, std::string > AttributeMap;
+            typedef AttributeMap::value_type AttributePair;
+
+            AttributeMap mapAttributes;
+            mapAttributes.insert( AttributePair( "grid_file_src", "mpas_grid.h5m" ) );
+            mapAttributes.insert( AttributePair( "grid_file_dst", "roms_grid.h5m" ) );
+            mapAttributes.insert( AttributePair( "grid_file_ovr", "mesh_intersection.g" ) );
+            mapAttributes.insert(
+                AttributePair( "concave_src", ( mapOptions.fSourceConcave ) ? ( "true" ) : ( "false" ) ) );
+            mapAttributes.insert(
+                AttributePair( "concave_dst", ( mapOptions.fTargetConcave ) ? ( "true" ) : ( "false" ) ) );
+            if( mapOptions.strSourceMeta != "" )
+            {
+                mapAttributes.insert( AttributePair( "meta_src", mapOptions.strSourceMeta ) );
+            }
+            if( mapOptions.strTargetMeta != "" )
+            {
+                mapAttributes.insert( AttributePair( "meta_dst", mapOptions.strTargetMeta ) );
+            }
+            mapAttributes.insert( AttributePair( "type_src", "fv" ) );
+            mapAttributes.insert( AttributePair( "type_dst", "fv" ) );
+            mapAttributes.insert( AttributePair( "np_src", std::to_string( (long long)mapOptions.nPin ) ) );
+            mapAttributes.insert( AttributePair( "np_dst", std::to_string( (long long)mapOptions.nPout ) ) );
+            mapAttributes.insert( AttributePair( "mono", ( mapOptions.fMonotone ) ? ( "true" ) : ( "false" ) ) );
+            mapAttributes.insert( AttributePair( "nobubble", "false" ) );
+            mapAttributes.insert( AttributePair( "nocorrectareas", "false" ) );
+            mapAttributes.insert( AttributePair( "noconserve", "false" ) );
+            mapAttributes.insert( AttributePair( "sparse_constraints", "false" ) );
+            mapAttributes.insert( AttributePair( "method", mapOptions.strMethod ) );
+            mapAttributes.insert( AttributePair( "version", "RemapMPASROMS v0.1" ) );
+
+            if( context.proc_id == 0 ) std::cout << "\nWrite the weights to " << bilin_map_output_filename << std::endl;
+            weightMapBilinear.Write( mapOptions.strOutputMapFile, mapAttributes, NcFile::Netcdf4Classic );
+
+            // // Write the map file to disk in parallel using either HDF5 or SCRIP interface
+            // err = weightMapBilinear.WriteParallelMap( output_filename.c_str() );MB_CHK_ERR( err );
+        }
+#endif
+
+        // const SparseMatrix< double >& fvweights = weightMapBilinear.GetSparseMatrix();
+        // copy_tempest_sparsemat_to_eigen3(fvweights, context.eigenBilinearMap);
+        loadSparseMappingFromNetCDF(bilin_map_output_filename, context.eigenBilinearMap, context);
+    }
     return moab::MB_SUCCESS;
 }
 

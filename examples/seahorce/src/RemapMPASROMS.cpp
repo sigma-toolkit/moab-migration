@@ -148,6 +148,8 @@ int main( int argc, char** argv )
         }
 
         // Cull the MPAS set so that we don't have a global mesh
+        constexpr bool cull_mesh = true;
+        if (cull_mesh)
         {
             context.timer_push( "Cull MPAS surface mesh: covering region" );
             const int nring_neighborhood = 3;
@@ -172,7 +174,7 @@ int main( int argc, char** argv )
             nanoflann::KNNResultSet< double > resultSet( num_results );
             mpas_elems.clear();
             mpas_verts.clear();
-            moab::Range lelems, lverts;
+            moab::Range lelems;
             for( size_t i = 0; i < roms_elems.size(); i++ )
             {
                 const moab::EntityHandle ehandle = roms_elems[i];
@@ -185,14 +187,14 @@ int main( int argc, char** argv )
                 for( size_t j = 0; j < num_results; ++j )
                     lelems.insert( orig_mpas_elems[srcindx[j]] );
             }
-            runchk( mbi->add_entities( context.mpas_covering_set, lelems ) );
             context.timer_pop();
+            runchk( mbi->add_entities( context.mpas_covering_set, lelems ) );
 
 #ifdef VERBOSE_OUTPUT
             runchk( mbi->write_file( "mpas_covering_2d.h5m", "H5M", write_options.c_str(), &context.mpas_covering_set,
                                      1 ) );
 #endif
-
+            Range lverts;
             runchk( mbi->get_connectivity( lelems, lverts, true ) );
             runchk( mbi->add_entities( context.mpas_covering_set, lverts ) );
             runchk( mbi->get_entities_by_dimension( context.mpas_covering_set, 2, mpas_elems ) );
@@ -200,26 +202,36 @@ int main( int argc, char** argv )
             dbgprint( "Culled MPAS mesh contains " << mpas_elems.size() << " elements and " << mpas_verts.size()
                                                    << " vertices." );
         }
+        // else
+        {
+          context.mpas_covering_set = context.mpasset;
+        }
 
-#define COMPUTE_MAPS
-#ifdef COMPUTE_MAPS
         if( context.computeTRMaps )
         {
             context.timer_push( "Compute TempestRemap weights for method: " +
-                                RuntimeContext::GetMethod( context.field_methods["Bathymetry"].first ) );
+                                RuntimeContext::GetMethod( context.field_methods["Temperature"].first ) );
             // call to compute the 2D map and store to disk
             runchk( ComputeTempestRemapWeights( context, context.mpas_covering_set, context.romsset ),
                     "Cannot compute 2D remapping weights" );
             context.timer_pop();
         }
-#else
-        context.timer_push( "Load TempestRemap weights for method: mpas_roms_map_bilin.nc" );
-        // load the computed 2D map files
-        runchk( LoadTempestRemapWeights( context, context.mpas_covering_set, context.romsset,
-                                         "mpas_roms_map_bilin.nc" ),
-                "Cannot load 2D remapping weights" );
-        context.timer_pop();
-#endif
+        else
+        {
+            std::string fvMap = (context.fvMapFileName.size() ? context.fvMapFileName : context.fvBilinearMapFileName);
+            context.timer_push( "Load TempestRemap weights for method: " + fvMap );
+            // load the computed 2D map files
+            runchk( LoadTempestRemapWeights( context, context.mpas_covering_set, context.romsset, fvMap, false ),
+                    "Cannot load 2D conservative remapping weights" );
+            context.timer_pop();
+
+            context.timer_push( "Load TempestRemap weights for method: " + context.fvBilinearMapFileName );
+            // load the computed 2D map files
+            runchk( LoadTempestRemapWeights( context, context.mpas_covering_set, context.romsset,
+                                        context.fvBilinearMapFileName, true ),
+                    "Cannot load 2D bilinear remapping weights" );
+            context.timer_pop();
+        }
 
         // let us perform 3D extrusions as needed
         EntityHandle root_set  = 0;
@@ -509,7 +521,7 @@ int main( int argc, char** argv )
             // context.weightMap.SetEnforcementBounds( "Lp", &context.meshInput, &context.meshOverlap, nullptr, nullptr, 1 );
 
             // get the handle to the weight matrix
-            const SparseMatrix< double >& weights = context.weightMap.GetSparseMatrix();
+            const WeightMatrix& weights = context.eigenMap;
 
             double defaultvalue = -1.0;
             moab::Tag mpas_soltags_3d[nvars], roms_soltags_elem[nvars];
@@ -609,10 +621,9 @@ int main( int argc, char** argv )
                         if( rmethod == TempestRemapFV || rmethod == TempestRemapBilinear ||
                             rmethod == TempestRemapInvDist || rmethod == TempestRemapDelaunay ||
                             rmethod == TempestRemapIntegratedBilinear )
-                        // if ( context.computeTRMaps )
                         {
-                            DataArray1D< double > dataInDouble( mpassize, false );
-                            DataArray1D< double > dataOutDouble( romssize, false );
+                            WeightVector dataInDouble( src_twod.data(), mpassize );
+                            WeightVector dataOutDouble( tgtsrc_data.data() + offsetr + tsvaroffset * iv, romssize );
 
                             // for( size_t j = 0; j < mpassize; ++j )
                             // {
@@ -620,16 +631,15 @@ int main( int argc, char** argv )
                             //     dataInDouble[j] = src_data[ii + offset];
                             // }
 
-                            dataInDouble.AttachToData( src_twod.data() );
-                            dataOutDouble.AttachToData( tgtsrc_data.data() + offsetr + tsvaroffset * iv );
-
                             // Compute the projection for the field
-                            weights.Apply( dataInDouble, dataOutDouble );
+                            // weights.Apply( dataInDouble, dataOutDouble );
+                            const WeightMatrix& weights = context.eigenMap;
+                            dataOutDouble = weights * dataInDouble;
 
-                            if( context.useCAAS )
-                                ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap,
-                                                   context.field_methods[roms_tagnames[iv]].second /*nPin*/, dataInDouble,
-                                                   dataOutDouble, true /*useCAASLocal*/ );
+                            // if( context.useCAAS )
+                            //     ApplyCAASLimiting( context.weightMap, context.meshInput, context.meshOverlap,
+                            //                        context.field_methods[roms_tagnames[iv]].second /*nPin*/, dataInDouble,
+                            //                        dataOutDouble, true /*useCAASLocal*/ );
                         }
                         else
                         {
@@ -645,9 +655,9 @@ int main( int argc, char** argv )
 
                         if (ii == 0 && iv > 1)
                         {
-                            std::copy( src_twod.data(), src_twod.data() + mpassize, 
+                            std::copy( src_twod.data(), src_twod.data() + mpassize,
                                        mpas_velocity_data.begin() + (iv-2)*mpassize );
-                            std::copy( tgtsrc_data.data() + offsetr + tsvaroffset * iv, tgtsrc_data.data() + offsetr + tsvaroffset * iv + romssize, 
+                            std::copy( tgtsrc_data.data() + offsetr + tsvaroffset * iv, tgtsrc_data.data() + offsetr + tsvaroffset * iv + romssize,
                                        roms_velocity_data.begin() + (iv-2)*romssize );
                         }
                         // Example usage of loop over variables
@@ -682,7 +692,7 @@ int main( int argc, char** argv )
                       // compute the kinetic energy
                       double KE_mpas = 0.0, KE_roms = 0.0;
 
-                      for(int iter=0; iter < mpassize; ++iter)
+                      for(size_t iter=0; iter < mpassize; ++iter)
                       {
                         const EntityHandle elem = mpas_elems[iter];
                         // Get the areas of the mesh elements
@@ -690,7 +700,7 @@ int main( int argc, char** argv )
                         KE_mpas += area * ( std::pow(mpas_velocity_data[iter], 2.0) + std::pow(mpas_velocity_data[iter+mpassize], 2.0) );
                       }
                       // KE_mpas /= mpassize;
-                      for(int iter=0; iter < romssize; ++iter)
+                      for(size_t iter=0; iter < romssize; ++iter)
                       {
                         const EntityHandle elem = roms_elems[iter];
                         // Get the areas of the mesh elements
@@ -1069,6 +1079,8 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjections( int dimension,
     return moab::MB_SUCCESS;
 }
 
+
+
 moab::ErrorCode RuntimeContext::ComputeFieldProjectionsWithData( int dimension,
                                                                  std::string varProjectSrc,
                                                                  std::string varProjectDst,
@@ -1109,14 +1121,17 @@ moab::ErrorCode RuntimeContext::ComputeFieldProjectionsWithData( int dimension,
         rmethod == TempestRemapDelaunay || rmethod == TempestRemapIntegratedBilinear )
     {
         // get the handle to the weight matrix
-        const SparseMatrix< double >& weights = this->weightMap.GetSparseMatrix();
-        DataArray1D< double > dataInDouble( src_tdata.size(), false );
-        dataInDouble.AttachToData( src_tdata.data() );
-        DataArray1D< double > dataOutDouble( dst_tdata.size(), false );
-        dataOutDouble.AttachToData( dst_tdata.data() );
+        const WeightMatrix& weights = (rmethod == TempestRemapFV ? this->eigenMap : this->eigenBilinearMap);
+        WeightVector dataInDouble( src_tdata.data(), src_tdata.size() );
+        WeightVector dataOutDouble( dst_tdata.data(), dst_tdata.size() );
+
+        printf("Operator sizes: (%td, %td) %zu %zu\n", weights.rows(), weights.cols(), src_tdata.size(), dst_tdata.size());
+        printf("Computing projection for field %s: source values %f %f %f\n", varProjectSrc.c_str(), src_tdata[0], src_tdata[1], src_tdata[2]);
 
         // Compute the projection for the Bathymetry field
-        weights.Apply( dataInDouble, dataOutDouble );
+        dataOutDouble = weights * dataInDouble;
+
+        printf("Computed the projection for field %s: %f %f %f\n", varProjectSrc.c_str(), dst_tdata[0], dst_tdata[1], dst_tdata[2]);
     }
     else if( rmethod == NearestNeighborInterpolant )
     {

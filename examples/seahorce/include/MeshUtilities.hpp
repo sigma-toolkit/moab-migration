@@ -308,7 +308,7 @@ moab::ErrorCode ExtrudePolygonsToPolyhedra( RuntimeContext& context,
             std::vector< int > vecents( nnodes + 2, polyGID );
             if( is_mpas )
             {
-                const int orig_nodes = nnodes;
+                // const int orig_nodes = nnodes;
 
                 // account for padded polygons
                 while( connp[nnodes - 2] == connp[nnodes - 1] && nnodes > 3 )

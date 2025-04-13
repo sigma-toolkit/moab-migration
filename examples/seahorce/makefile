@@ -14,7 +14,7 @@ MOAB_CXXFLAGS += -g -O3 -Iinclude
 
 # PREDCXXFLAGS is for compiling J. Shewchuk's predicates. 
 PREDCXXFLAGS = -O0
-EXTLIBS = lib/libtet.a # lib/libTSFIT.a external/alglib-cpp/src/libalglib.a
+EXTLIBS = lib/libtet.a # external/alglib-cpp/src/libalglib.a
 #COMPADRELIBS=-L/opt/compadre/lib -lcompadre -lkokkoskernels -lkokkoscore
 
 EXAMPLES = RemapMPASROMS FilterElements
@@ -30,11 +30,7 @@ readnc_roms: readnc_roms.o ${MOAB_LIBDIR}/libMOAB.la ${EXTLIBS}
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK} ${EXTLIBS}
 
-lib/libtet.a: src/tetgen.cxx predicates.o
-	${VERBOSE}${MOAB_CXX} ${CXXFLAGS} ${MOAB_CXXFLAGS} -c src/tetgen.cxx
-	ar r lib/libtet.a tetgen.o predicates.o
-
-lib/libTSFIT.a: src/tetgen.cxx predicates.o
+lib/libTSFIT.a: 
 	${VERBOSE}make -C src/tsfit
 
 predicates.o: src/predicates.cxx

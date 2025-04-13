@@ -46,11 +46,14 @@ const char* mpas_twod_forcingtagnames[nforcingvars] = { "windStressZonal",
 // const char* mpas_twod_tagnames[4] = { "salinity", "temperature", "VX", "VY" };
 // const char* mpas_threed_cum_tagnames[4] = { "salinity_3d", "temperature_3d", "velocityX",
 //                                                 "velocityY" };
-const char* mpas_tagnames[nvars]     = { "timeDaily_avg_activeTracers_salinity_3d",
-                                         "timeDaily_avg_activeTracers_temperature_3d",
-                                         "timeDaily_avg_velocityMeridional_3d", "timeDaily_avg_velocityZonal_3d" };
-const char* mpas_ele_tagnames[nvars] = { "MPAS_Salinity", "MPAS_Temperature", "MPAS_VelMeridional", "MPAS_VelZonal" };
-const char* roms_tagnames[nvars]     = { "ROMS_Salinity", "ROMS_Temperature", "ROMS_VelMeridional", "ROMS_VelZonal" };
+// const char* mpas_tagnames[nvars]     = { "timeDaily_avg_activeTracers_salinity_3d",
+//                                          "timeDaily_avg_activeTracers_temperature_3d",
+//                                          "timeDaily_avg_velocityMeridional_3d", "timeDaily_avg_velocityZonal_3d" };
+const char* mpas_tagnames[nvars]     = { "salinity_3d",
+                                         "temperature_3d", "velocityMeridional_3d",
+                                         "velocityZonal_3d" };
+const char* mpas_ele_tagnames[nvars] = { "MPAS_Salinity", "MPAS_Temperature"};//, "MPAS_VelMeridional", "MPAS_VelZonal" };
+const char* roms_tagnames[nvars]     = { "ROMS_Salinity", "ROMS_Temperature"};//, "ROMS_VelMeridional", "ROMS_VelZonal" };
 
 // write the map file to disk; comment out to just compute in-memory
 #define VERTICAL_INTERPOLATION

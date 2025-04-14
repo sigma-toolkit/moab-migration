@@ -349,25 +349,26 @@ moab::ErrorCode ReadRTT::add_metadata()
     rval = MBI->create_meshset(moab::MESHSET_SET, metadataGroup);
         
     // Name the group
-    const char* groupName = "METADATA";
-    rval = MBI->tag_get_handle(versionTagName, 1, moab::MB_TYPE_OPAQUE, versionTag, 
-        moab::MB_TAG_CREAT);
+    moab::Tag group_tag;
+    rval = MBI->tag_get_handle("METADATA", 1, MB_TYPE_HANDLE, group_tag, 
+                              MB_TAG_SPARSE|MB_TAG_CREAT);
+    // Create the METADATA group
+    EntityHandle metadata_group;
+    rval = MBI->create_meshset(MESHSET_SET, metadata_group);
+    
+    Tag version_tag;
+    const char* version_value = header_data.version.c_str();
+    rval = MBI->tag_get_handle("VERSION", strlen(version_value) + 1, MB_TYPE_OPAQUE, 
+                              version_tag, MB_TAG_SPARSE|MB_TAG_CREAT);
+    rval = MBI->tag_set_data(version_tag, &metadata_group, 1, version_value);
 
-    // Create a tag for version number
-    moab::Tag versionTag;
-    const char* versionTagName = "version";
-    rval = MBI->tag_get_handle( versionTagName, header_data.version.size() + 1, moab::MB_TYPE_OPAQUE, versionTag,
-                        moab::MB_TAG_CREAT, header_data.version.c_str() );
+    // Create TOPOLOGY tag and set its value
+    Tag topology_tag;
+    const char* topology_value = header_data.contiguity.c_str(); // Example topology
+    rval = MBI->tag_get_handle("TOPOLOGY", strlen(topology_value) + 1, MB_TYPE_OPAQUE, 
+                              topology_tag, MB_TAG_SPARSE|MB_TAG_CREAT);
+    rval = MBI->tag_set_data(topology_tag, &metadata_group, 1, topology_value);
 
-    // Create a tag for contiguity value
-    moab::Tag topologyTag;
-    const char* topologyTagName = "contiguity";
-    rval = MBI->tag_get_handle( topologyTagName, header_data.contiguity.size() + 1, moab::MB_TYPE_OPAQUE, topologyTag,
-                        moab::MB_TAG_CREAT, header_data.contiguity.c_str() );
-
-    // Assign the tags to the metadata group
-    rval = MBI->tag_set_data( versionTag, &metadataGroup, 1, header_data.version.c_str() );
-    rval = MBI->tag_set_data( topologyTag, &metadataGroup, 1, header_data.contiguity.c_str() );
 
     return rval;
 }

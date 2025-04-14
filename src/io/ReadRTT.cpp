@@ -364,7 +364,7 @@ moab::ErrorCode ReadRTT::add_metadata()
 
     // Create TOPOLOGY tag and set its value
     Tag topology_tag;
-    const char* topology_value = header_data.contiguity.c_str(); // Example topology
+    const char* topology_value = header_data.contiguity.c_str();
     rval = MBI->tag_get_handle("TOPOLOGY", strlen(topology_value) + 1, MB_TYPE_OPAQUE, 
                               topology_tag, MB_TAG_SPARSE|MB_TAG_CREAT);
     rval = MBI->tag_set_data(topology_tag, &metadata_group, 1, topology_value);

@@ -350,9 +350,8 @@ moab::ErrorCode ReadRTT::add_metadata()
         
     // Name the group
     const char* groupName = "METADATA";
-    rval = MBI->tag_get_handle(groupName, groupName, strlen(groupName) + 1, 
-                       moab::MB_TYPE_OPAQUE, 
-                       moab::MB_TAG_CREAT | moab::MB_TAG_SPARSE);
+    rval = MBI->tag_get_handle(versionTagName, 1, moab::MB_TYPE_OPAQUE, versionTag, 
+        moab::MB_TAG_CREAT);
 
     // Create a tag for version number
     moab::Tag versionTag;

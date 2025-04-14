@@ -336,6 +336,8 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
     // add tris to set
     rval = MBI->add_entities( file_set, mb_tets );
 
+    rval = add_metadata();
+
     return MB_SUCCESS;
 }
 

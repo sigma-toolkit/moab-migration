@@ -353,14 +353,14 @@ moab::ErrorCode ReadRTT::add_metadata()
     const char* version_value = header_data.version.c_str();
     rval = MBI->tag_get_handle("VERSION", strlen(version_value) + 1, MB_TYPE_OPAQUE, 
                               version_tag, MB_TAG_SPARSE|MB_TAG_CREAT);
-    rval = MBI->tag_set_data(version_tag, &file_set, 1, &version_value);
+    rval = MBI->tag_set_data(version_tag, &file_set, 1, version_value);
 
     // Create TOPOLOGY tag and set its value
     Tag topology_tag;
     const char* topology_value = header_data.contiguity.c_str();
     rval = MBI->tag_get_handle("TOPOLOGY", strlen(topology_value) + 1, MB_TYPE_OPAQUE, 
                               topology_tag, MB_TAG_SPARSE|MB_TAG_CREAT);
-    rval = MBI->tag_set_data(topology_tag, &file_set, 1, &topology_value);
+    rval = MBI->tag_set_data(topology_tag, &file_set, 1, topology_value);
 
 
     return rval;

@@ -346,7 +346,13 @@ moab::ErrorCode ReadRTT::add_metadata()
     moab::ErrorCode rval = MB_FAILURE;
     // Create an entity set to act as a metadata group
     moab::EntityHandle metadataGroup;
-    rval = MBI->create_meshset( moab::MESHSET_SET, metadataGroup );
+    rval = MBI->create_meshset(moab::MESHSET_SET, metadataGroup);
+        
+    // Name the group
+    const char* groupName = "METADATA";
+    rval = MBI->tag_get_handle(groupName, groupName, strlen(groupName) + 1, 
+                       moab::MB_TYPE_OPAQUE, 
+                       moab::MB_TAG_CREAT | moab::MB_TAG_SPARSE);
 
     // Create a tag for version number
     moab::Tag versionTag;
@@ -355,14 +361,14 @@ moab::ErrorCode ReadRTT::add_metadata()
                         moab::MB_TAG_CREAT, header_data.version.c_str() );
 
     // Create a tag for contiguity value
-    moab::Tag contiguityTag;
-    const char* contiguityTagName = "contiguity";
-    rval = MBI->tag_get_handle( contiguityTagName, header_data.contiguity.size() + 1, moab::MB_TYPE_OPAQUE, contiguityTag,
+    moab::Tag topologyTag;
+    const char* topologyTagName = "contiguity";
+    rval = MBI->tag_get_handle( topologyTagName, header_data.contiguity.size() + 1, moab::MB_TYPE_OPAQUE, topologyTag,
                         moab::MB_TAG_CREAT, header_data.contiguity.c_str() );
 
     // Assign the tags to the metadata group
     rval = MBI->tag_set_data( versionTag, &metadataGroup, 1, header_data.version.c_str() );
-    rval = MBI->tag_set_data( contiguityTag, &metadataGroup, 1, header_data.contiguity.c_str() );
+    rval = MBI->tag_set_data( topologyTag, &metadataGroup, 1, header_data.contiguity.c_str() );
 
     return rval;
 }

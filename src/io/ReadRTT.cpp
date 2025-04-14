@@ -344,30 +344,23 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
 moab::ErrorCode ReadRTT::add_metadata()
 {
     moab::ErrorCode rval = MB_FAILURE;
-    // Create an entity set to act as a metadata group
-    moab::EntityHandle metadataGroup;
-    rval = MBI->create_meshset(moab::MESHSET_SET, metadataGroup);
-        
-    // Name the group
-    moab::Tag group_tag;
-    rval = MBI->tag_get_handle("METADATA", 1, MB_TYPE_HANDLE, group_tag, 
-                              MB_TAG_SPARSE|MB_TAG_CREAT);
-    // Create the METADATA group
-    EntityHandle metadata_group;
-    rval = MBI->create_meshset(MESHSET_SET, metadata_group);
+    EntityHandle file_set;  // the file handle
+    // create the file set
+    rval = MBI->create_meshset( MESHSET_SET, file_set );
+
     
     Tag version_tag;
     const char* version_value = header_data.version.c_str();
     rval = MBI->tag_get_handle("VERSION", strlen(version_value) + 1, MB_TYPE_OPAQUE, 
                               version_tag, MB_TAG_SPARSE|MB_TAG_CREAT);
-    rval = MBI->tag_set_data(version_tag, &metadata_group, 1, version_value);
+    rval = MBI->tag_set_data(version_tag, &file_set, 1, version_value);
 
     // Create TOPOLOGY tag and set its value
     Tag topology_tag;
     const char* topology_value = header_data.contiguity.c_str();
     rval = MBI->tag_get_handle("TOPOLOGY", strlen(topology_value) + 1, MB_TYPE_OPAQUE, 
                               topology_tag, MB_TAG_SPARSE|MB_TAG_CREAT);
-    rval = MBI->tag_set_data(topology_tag, &metadata_group, 1, topology_value);
+    rval = MBI->tag_set_data(topology_tag, &file_set, 1, topology_value);
 
 
     return rval;

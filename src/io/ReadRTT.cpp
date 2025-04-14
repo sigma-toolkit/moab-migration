@@ -355,12 +355,12 @@ moab::ErrorCode ReadRTT::add_metadata()
                               version_tag, MB_TAG_SPARSE|MB_TAG_CREAT);
     rval = MBI->tag_set_data(version_tag, &file_set, 1, version_value);
 
-    // Create TOPOLOGY tag and set its value
-    Tag topology_tag;
-    char* topology_value = header_data.contiguity.c_str();
-    rval = MBI->tag_get_handle("TOPOLOGY", strlen(topology_value) +1, MB_TYPE_OPAQUE, 
-                              topology_tag, MB_TAG_SPARSE|MB_TAG_CREAT);
-    rval = MBI->tag_set_data(topology_tag, &file_set, 1, topology_value);
+    // Create CONTIGUITY tag and set its value
+    Tag contiguity_tag;
+    char* contiguity_value = header_data.contiguity.c_str();
+    rval = MBI->tag_get_handle("CONTIGUITY", strlen(contiguity_value) +1, MB_TYPE_OPAQUE, 
+                                contiguity_tag, MB_TAG_SPARSE|MB_TAG_CREAT);
+    rval = MBI->tag_set_data(contiguity_tag, &file_set, 1, contiguity_value);
 
 
     return rval;
@@ -617,7 +617,7 @@ ErrorCode ReadRTT::get_header_data( std::ifstream& input_file )
         {
             header_data.date = split_string[1];
         }
-        else if( line.find( "contiguyty" ) != std::string::npos )
+        else if( line.find( "contiguity" ) != std::string::npos )
         {
             header_data.contiguity = split_string[1];
         }

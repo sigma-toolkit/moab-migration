@@ -136,7 +136,9 @@ Starting from the top-level MOAB directory, execute the following (using either 
 By default, conan-based builds add a requirement for HDF5, and download/build a local version of the library for
 linking to MOAB. To disable this, use "-o hdf5=False" on the conan install command.
 
-If a parallel build is required, add "-o parallel=True" to the conan install command, AND ADD THE FOLLOWING COMMAND AFTER
+NOTE: If a parallel build is required, the mpi-enabled compilers must be accessed through the CC and CXX (and FC) variables, and
+possibly LD for linking, or the normal linker does not know where to find the mpi libraries. Also, add "-o parallel=True" to the
+conan install command, AND ADD THE FOLLOWING COMMAND AFTER
 CHANGING INTO THE BUILD DIRECTORY (dbg or opt):
 ```bash
       source cmake/conanrun.sh

@@ -76,7 +76,7 @@ AC_DEFUN([FATHOM_CONFIGURE_METIS],[
     AC_CHECK_LIB([metis], [METIS_MeshToDual],
       [enablemetis=$enablemetis], 
       [enablemetis=no; AC_MSG_WARN([Could not find Metis library!])],
-      [-lm $LIBS]
+      [$LIBS]
     )
     LDFLAGS=$oldLDFLAGS
     AC_LANG_POP(C)
@@ -176,7 +176,7 @@ AC_DEFUN([FATHOM_CONFIGURE_PARMETIS],[
     AC_CHECK_LIB([parmetis], [ParMETIS_V3_Mesh2Dual], 
       [enableparmetis=$enableparmetis; PARMETIS_LIBS="-lparmetis"], 
       [enableparmetis=no; AC_MSG_WARN([Could not find ParMetis library!])],
-      [-lmetis -lm $LIBS]
+      [-lmetis $LIBS]
     )
     LDFLAGS=$oldLDFLAGS
     AC_LANG_POP(C)

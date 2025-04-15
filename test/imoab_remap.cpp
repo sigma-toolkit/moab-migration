@@ -246,13 +246,12 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "failed to write map file to disk" );
 
         const std::string intx_from_file_identifier = "map-from-file";
-        // use old reader, coupler PID is -1
-        int dummyCpl     = -1;
-        int dummy_rowcol = -1;
-        int dummyType    = 0;
-        ierr             = iMOAB_LoadMappingWeightsFromFile( atmocnPID, &dummyCpl, &dummy_rowcol, &dummyType,
-                                                             intx_from_file_identifier.c_str(), atmocn_map_file_name.c_str() );
         CHECKIERR( ierr, "failed to load map file from disk" );
+        int src_disc_type = 1;  // element-based SE
+        int tgt_disc_type = 3;  // element-based FV
+        CHECKIERR( iMOAB_LoadMappingWeightsFromFile( atmPID, ocnPID, atmocnPID, &src_disc_type, &tgt_disc_type,
+                                                     intx_from_file_identifier.c_str(), atmocn_map_file_name.c_str() ),
+                   "failed to load map file from disk" );
     }
 #endif
 #ifdef ENABLE_ATMLND_COUPLING
@@ -410,6 +409,16 @@ int main( int argc, char* argv[] )
     CHECKIERR( ierr, "failed to de-register application2" );
     ierr = iMOAB_DeregisterApplication( atmPID );
     CHECKIERR( ierr, "failed to de-register application1" );
+
+    ierr = iMOAB_DeregisterApplication( atmocnPID );
+    CHECKIERR( ierr, "failed to de-register application1" );
+
+    ierr = iMOAB_DeregisterApplication( atmlndPID );
+    CHECKIERR( ierr, "failed to de-register application1" );
+
+    ierr = iMOAB_DeregisterApplication( lndatmPID );
+    CHECKIERR( ierr, "failed to de-register application1" );
+
 
     /*
      * this method will delete MOAB instance

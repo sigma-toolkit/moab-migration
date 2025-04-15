@@ -23,6 +23,7 @@
 #include "netcdf.h"
 #include <cmath>
 #include <iomanip>
+#include <queue>
 #include <Eigen/Sparse>
 #define ERR_NC( e )                                \
     {                                              \
@@ -288,6 +289,15 @@ void diff_2d_vect( const char* var_name, int n )
     std::cout << var_name << " diff norm: " << ( fa1 - fa2 ).norm() << "\n";
     return;
 }
+
+typedef Eigen::Triplet< double > Triplet;
+
+struct CompareTriplets {
+    bool operator()( Triplet & a, Triplet & b) {
+        return  fabs( a.value() ) > fabs( b.value() ) ;
+    }
+};
+
 int main( int argc, char* argv[] )
 {
 
@@ -296,10 +306,8 @@ int main( int argc, char* argv[] )
     std::string inputfile1, inputfile2;
     opts.addOpt< std::string >( "firstMap,i", "input filename 1", &inputfile1 );
     opts.addOpt< std::string >( "secondMap,j", "input second map", &inputfile2 );
-    int print_diff = 20;
+    int print_diff = 10;
     opts.addOpt< int >( "print_differences,p", "print differences ", &print_diff );
-    double fraction = 0.9;
-    opts.addOpt< double >( "fraction_diff,f", "fraction threshold", &fraction );
 
     opts.parseCommandLine( argc, argv );
 
@@ -359,7 +367,7 @@ int main( int argc, char* argv[] )
     GET_1D_DBL_VAR2( "S", ids2, val2 );
 
     // first matrix
-    typedef Eigen::Triplet< double > Triplet;
+
     std::vector< Triplet > tripletList;
     tripletList.reserve( ns1 );
     for( int iv = 0; iv < ns1; iv++ )
@@ -390,27 +398,33 @@ int main( int argc, char* argv[] )
     std::cout << " euclidian norm for difference: " << diff.norm()
               << " \n squared norm for difference: " << diff.squaredNorm() << "\n"
               << " minv: " << minv << " maxv: " << maxv << "\n";
-    // print out the first 10 positions for which the value is outside 90% of min/max values
-    double min_threshold = fraction * minv;
-    double max_threshold = fraction * maxv;
-    int counter          = 0;
-    std::cout << std::setprecision( 9 );
+    // print out the largest 20 absolute values and position in diff sparse matrix
+    std::priority_queue< Triplet, std::vector<Triplet>, CompareTriplets > largestDiffs;
+
     for( int k = 0; ( k < diff.outerSize() ); ++k )  // this is by column
     {
-        for( Eigen::SparseMatrix< double >::InnerIterator it( diff, k ); ( it ) && ( counter < print_diff ); ++it )
+        for( Eigen::SparseMatrix< double >::InnerIterator it( diff, k ); ( it ) ; ++it )
         {
             double val = it.value();
-            if( val <= min_threshold || val >= max_threshold )
-            {
-                int row = it.row();
-                int col = it.col();
-                std::cout << " counter:" << counter << "\t col: " << col + 1 << "\t row: " << row + 1
-                          << "\t diff: " << val;
-                std::cout << "\t map1: " << weight1.coeffRef( row, col ) << "\t map2: " << weight2.coeffRef( row, col )
-                          << "\n";  // row index
-                counter++;
-            }
+            Triplet tp(it.row(), it.col(), val);
+            largestDiffs.push(tp);
+            if (largestDiffs.size() > print_diff)
+                largestDiffs.pop();
         }
+    }
+    std::cout << std::setprecision( 16 );
+    int counter=0;
+    while (!largestDiffs.empty()) {
+        Triplet tp = largestDiffs.top();
+        largestDiffs.pop();
+
+        int row = tp.row();
+        int col = tp.col();
+        std::cout << " counter:" << counter << "\t col: " << col + 1 << "\t row: " << row + 1
+                  << "\t diff: " << tp.value();
+        std::cout << "\t map1: " << weight1.coeffRef( row, col ) << "\t map2: " << weight2.coeffRef( row, col )
+                  << "\n";  // row index
+        counter ++;
     }
 
     // compare frac_a between maps

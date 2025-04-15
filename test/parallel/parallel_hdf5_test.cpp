@@ -332,20 +332,17 @@ void print_partitioned_entities( Interface& moab, bool list_non_shared = false )
             if( !num_shared )
             {
                 if( list_non_shared )
-                    buffer << rank << ":\t" << topo_names_s[t] << " " << id << ":\t"
-                           << "not shared" << std::endl;
+                    buffer << rank << ":\t" << topo_names_s[t] << " " << id << ":\t" << "not shared" << std::endl;
             }
             else if( num_shared != entities.size() )
             {
-                buffer << rank << ":\t" << topo_names_s[t] << " " << id << ":\t"
-                       << "ERROR: " << num_shared << " of " << entities.size() << " entities marked as 'shared'"
-                       << std::endl;
+                buffer << rank << ":\t" << topo_names_s[t] << " " << id << ":\t" << "ERROR: " << num_shared << " of "
+                       << entities.size() << " entities marked as 'shared'" << std::endl;
             }
             else if( num_owned && num_owned != entities.size() )
             {
-                buffer << rank << ":\t" << topo_names_s[t] << " " << id << ":\t"
-                       << "ERROR: " << num_owned << " of " << entities.size() << " entities owned by this processor"
-                       << std::endl;
+                buffer << rank << ":\t" << topo_names_s[t] << " " << id << ":\t" << "ERROR: " << num_owned << " of "
+                       << entities.size() << " entities owned by this processor" << std::endl;
             }
             else
             {
@@ -361,15 +358,15 @@ void print_partitioned_entities( Interface& moab, bool list_non_shared = false )
                 }
                 else if( proc != -1 )
                 {
-                    buffer << rank << ":\t" << topo_names_s[t] << " " << id << ":\t"
-                           << "shared with processor " << proc;
+                    buffer << rank << ":\t" << topo_names_s[t] << " " << id << ":\t" << "shared with processor "
+                           << proc;
                     if( num_owned ) buffer << " (owned by this processor)";
                     buffer << std::endl;
                 }
                 else if( entities.empty() )
                 {
-                    buffer << rank << ":\t" << topo_names_s[t] << " " << id << ":\t"
-                           << "ERROR: no entities!" << std::endl;
+                    buffer << rank << ":\t" << topo_names_s[t] << " " << id << ":\t" << "ERROR: no entities!"
+                           << std::endl;
                 }
                 else
                 {
@@ -387,8 +384,7 @@ void print_partitioned_entities( Interface& moab, bool list_non_shared = false )
                     }
                     else
                     {
-                        buffer << rank << ":\t" << topo_names_s[t] << " " << id << ":\t"
-                               << "processors ";
+                        buffer << rank << ":\t" << topo_names_s[t] << " " << id << ":\t" << "processors ";
                         for( int k = 0; k < MAX_SHARING_PROCS; ++k )
                             if( ent_procs[k] != -1 ) buffer << ent_procs[k] << ", ";
                         if( num_owned ) buffer << " (owned by this processor)";

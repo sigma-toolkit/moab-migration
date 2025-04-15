@@ -70,8 +70,9 @@ if HAVE_TEMPESTREMAP
   imoab_map2_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_map_target_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_domain_culling_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
+  imoab_read_compute_map_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
 if HAVE_NETCDF
-  HDF5_TESTS += imoab_read_map imoab_map2 imoab_map_target imoab_coupler_bilin imoab_domain_culling
+  HDF5_TESTS += imoab_read_map imoab_map2 imoab_map_target imoab_coupler_bilin imoab_domain_culling imoab_read_compute_map
 endif
 if HAVE_EXTMESHES
   HDF5_TESTS +=  imoab_apg2_ol_coupler
@@ -186,6 +187,7 @@ imoab_apg2_ol_coupler_SOURCES = imoab_apg2_ol_coupler.cpp
 imoab_read_map_SOURCES = imoab_read_map.cpp
 imoab_map2_SOURCES = imoab_map2.cpp
 imoab_map_target_SOURCES = imoab_map_target.cpp
+imoab_read_compute_map_SOURCES = imoab_read_compute_map.cpp
 imoab_setwithGid_SOURCES = imoab_setwithGid.cpp
 migrate_nontrivial_SOURCES = migrate_nontrivial.cpp
 ghost_thin_layers_SOURCES = ghost_thin_layers.cpp

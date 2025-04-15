@@ -335,9 +335,10 @@ ErrorCode create_shared_grid_3d( ParallelComm** pc, Range* verts, Range* hexes )
 
     int nijk[P][3];
     int NIJK[3] = { 0, 0, 0 };
-#define INDEXG( i, j, k ) ( (k)*NIJK[1] * NIJK[0] + (j)*NIJK[0] + ( i ) )
-#define INDEXL( i, j, k ) \
-    ( ( (k)-ijkmin[p][2] ) * nijk[p][1] * nijk[p][0] + ( (j)-ijkmin[p][1] ) * nijk[p][0] + ( (i)-ijkmin[p][0] ) )
+#define INDEXG( i, j, k ) ( ( k ) * NIJK[1] * NIJK[0] + ( j ) * NIJK[0] + ( i ) )
+#define INDEXL( i, j, k )                                                                          \
+    ( ( ( k ) - ijkmin[p][2] ) * nijk[p][1] * nijk[p][0] + ( ( j ) - ijkmin[p][1] ) * nijk[p][0] + \
+      ( ( i ) - ijkmin[p][0] ) )
 
     int p, i, j, k;
     for( p = 0; p < P; p++ )

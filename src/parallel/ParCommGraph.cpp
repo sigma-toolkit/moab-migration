@@ -287,7 +287,8 @@ ErrorCode ParCommGraph::send_graph( MPI_Comm jcomm )
         // do not send the size in advance, because we use probe now
         /*ierr = MPI_Isend(&comm_graph[0], 1, MPI_INT, receiver(0), 10, jcomm, &sendReqs[0]); // we
         have to use global communicator if (ierr!=0) return MB_FAILURE;*/
-        ierr = MPI_Isend( &comm_graph[1], size_pack_array, MPI_INT, receiver( 0 ), 20, jcomm,
+        int  mtag = compid2;
+        ierr = MPI_Isend( &comm_graph[1], size_pack_array, MPI_INT, receiver( 0 ), mtag, jcomm,
                           &sendReqs[0] );  // we have to use global communicator
         if( ierr != 0 ) return MB_FAILURE;
     }
@@ -308,7 +309,7 @@ ErrorCode ParCommGraph::send_mesh_parts( MPI_Comm jcomm, ParallelComm* pco, Rang
         corr_tasks = sender_graph[senderTasks[rankInGroup1]];  // copy
         corr_sizes = sender_sizes[senderTasks[rankInGroup1]];  // another copy
     }
-
+    int  mtag = compid2;
     int indexReq = 0;
     int ierr;                             // MPI error
     if( is_root_sender() ) indexReq = 1;  // for sendReqs
@@ -344,7 +345,7 @@ ErrorCode ParCommGraph::send_mesh_parts( MPI_Comm jcomm, ParallelComm* pco, Rang
          &sendReqs[indexReq]); // we have to use global communicator if (ierr!=0) return MB_FAILURE;
          indexReq++;*/
 
-        ierr = MPI_Isend( buffer->mem_ptr, size_pack, MPI_UNSIGNED_CHAR, receiver_proc, 2, jcomm,
+        ierr = MPI_Isend( buffer->mem_ptr, size_pack, MPI_UNSIGNED_CHAR, receiver_proc, mtag, jcomm,
                           &sendReqs[indexReq] );  // we have to use global communicator
         if( ierr != 0 ) return MB_FAILURE;
         indexReq++;
@@ -371,7 +372,8 @@ ErrorCode ParCommGraph::receive_comm_graph( MPI_Comm jcomm, ParallelComm* pco, s
         MPI_Status* status)
          *
          */
-        ierr = MPI_Probe( sender( 0 ), 20, jcomm, &status );
+        int  mtag = compid2;
+        ierr = MPI_Probe( sender( 0 ), mtag, jcomm, &status );
         if( 0 != ierr )
         {
             std::cout << " MPI_Probe failure: " << ierr << "\n";
@@ -388,7 +390,7 @@ ErrorCode ParCommGraph::receive_comm_graph( MPI_Comm jcomm, ParallelComm* pco, s
         std::cout << " receive comm graph size: " << size_pack_array << "\n";
 #endif
         pack_array.resize( size_pack_array );
-        ierr = MPI_Recv( &pack_array[0], size_pack_array, MPI_INT, sender( 0 ), 20, jcomm, &status );
+        ierr = MPI_Recv( &pack_array[0], size_pack_array, MPI_INT, sender( 0 ), mtag, jcomm, &status );
         if( 0 != ierr ) return MB_FAILURE;
 #ifdef VERBOSE
         std::cout << " receive comm graph ";
@@ -426,6 +428,7 @@ ErrorCode ParCommGraph::receive_mesh( MPI_Comm jcomm,
     int defaultInt = -1;  // no processor, so it was not migrated from somewhere else
     rval           = pco->get_moab()->tag_get_handle( "orig_sending_processor", 1, MB_TYPE_INTEGER, orgSendProcTag,
                                                       MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );MB_CHK_SET_ERR( rval, "can't create original sending processor tag" );
+    int  mtag = compid2;
     if( !senders_local.empty() )
     {
         for( size_t k = 0; k < senders_local.size(); k++ )
@@ -440,7 +443,7 @@ ErrorCode ParCommGraph::receive_mesh( MPI_Comm jcomm,
                 MPI_Status* status)
                  *
                  */
-            ierr = MPI_Probe( sender1, 2, jcomm, &status );
+            ierr = MPI_Probe( sender1, mtag, jcomm, &status );
             if( 0 != ierr )
             {
                 std::cout << " MPI_Probe failure in ParCommGraph::receive_mesh " << ierr << "\n";
@@ -461,7 +464,7 @@ ErrorCode ParCommGraph::receive_mesh( MPI_Comm jcomm,
             ParallelComm::Buffer* buffer = new ParallelComm::Buffer( size_pack );
             // buffer->reserve(size_pack);
 
-            ierr = MPI_Recv( buffer->mem_ptr, size_pack, MPI_UNSIGNED_CHAR, sender1, 2, jcomm, &status );
+            ierr = MPI_Recv( buffer->mem_ptr, size_pack, MPI_UNSIGNED_CHAR, sender1, mtag, jcomm, &status );
             if( 0 != ierr )
             {
                 std::cout << " MPI_Recv failure in ParCommGraph::receive_mesh " << ierr << "\n";
@@ -609,6 +612,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
 #endif
     }
 
+    int  mtag = compid1 + compid2; // used as mpi tag to differentiate a little the messages
     int indexReq = 0;
     if( graph_type == INITIAL_MIGRATE )  // original send
     {
@@ -634,7 +638,8 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
             }
             *( (int*)buffer->mem_ptr ) = size_buffer;
             // int size_pack = buffer->get_current_size(); // debug check
-            ierr = MPI_Isend( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, receiver_proc, 222, jcomm,
+
+            ierr = MPI_Isend( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, receiver_proc, mtag, jcomm,
                               &sendReqs[indexReq] );  // we have to use global communicator
             if( ierr != 0 ) return MB_FAILURE;
             indexReq++;
@@ -711,7 +716,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
 #endif
             *( (int*)buffer->mem_ptr ) = size_buffer;
             // int size_pack = buffer->get_current_size(); // debug check
-            ierr = MPI_Isend( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, receiver_proc, 222, jcomm,
+            ierr = MPI_Isend( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, receiver_proc, mtag, jcomm,
                               &sendReqs[indexReq] );  // we have to use global communicator
             if( ierr != 0 ) return MB_FAILURE;
             indexReq++;
@@ -727,7 +732,6 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
         valuesTags.resize( tag_handles.size() );
         for( size_t i = 0; i < tag_handles.size(); i++ )
         {
-
             int bytes_per_tag;
             rval = mb->tag_get_bytes( tag_handles[i], bytes_per_tag );MB_CHK_ERR( rval );
             valuesTags[i].resize( owned.size() * bytes_per_tag / sizeof( double ) );
@@ -737,7 +741,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
         // now, pack the data and send it
         sendReqs.resize( involved_IDs_map.size() );
         for( std::map< int, std::vector< int > >::iterator mit = involved_IDs_map.begin();
-             mit != involved_IDs_map.end(); mit++ )
+             mit != involved_IDs_map.end(); ++mit )
         {
             int receiver_proc                   = mit->first;
             std::vector< int >& eids            = mit->second;
@@ -769,7 +773,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
             };
             *( (int*)buffer->mem_ptr ) = size_buffer;
             // int size_pack = buffer->get_current_size(); // debug check
-            ierr = MPI_Isend( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, receiver_proc, 222, jcomm,
+            ierr = MPI_Isend( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, receiver_proc, mtag, jcomm,
                               &sendReqs[indexReq] );  // we have to use global communicator
             if( ierr != 0 ) return MB_FAILURE;
             indexReq++;
@@ -811,6 +815,8 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
 #endif
     }
 
+    int  mtag = compid1 + compid2;
+
     if( graph_type == INITIAL_MIGRATE )
     {
         // std::map<int, Range> split_ranges;
@@ -830,7 +836,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
             *( (int*)buffer->mem_ptr ) = size_buffer;
             // int size_pack = buffer->get_current_size(); // debug check
 
-            ierr = MPI_Recv( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, sender_proc, 222, jcomm, &status );
+            ierr = MPI_Recv( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, sender_proc, mtag, jcomm, &status );
             if( ierr != 0 ) return MB_FAILURE;
             // now set the tag
             // copy to tag
@@ -873,7 +879,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
             *( (int*)buffer->mem_ptr ) = size_buffer;  // this is really not necessary, it should receive this too
 
             // receive the buffer
-            ierr = MPI_Recv( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, sender_proc, 222, jcomm, &status );
+            ierr = MPI_Recv( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, sender_proc, mtag, jcomm, &status );
             if( ierr != 0 ) return MB_FAILURE;
 // start copy
 #ifdef VERBOSE
@@ -889,7 +895,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
             // maybe it should be arranged by entity now, not by tag (so one loop for entities,
             // outside)
 
-            for( std::vector< int >::iterator it = eids.begin(); it != eids.end(); it++ )
+            for( std::vector< int >::iterator it = eids.begin(); it != eids.end(); ++it )
             {
                 int eID                                      = *it;
                 std::map< int, EntityHandle >::iterator mit2 = gidToHandle.find( eID );
@@ -944,7 +950,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
         // now, unpack the data and set the tags
         sendReqs.resize( involved_IDs_map.size() );
         for( std::map< int, std::vector< int > >::iterator mit = involved_IDs_map.begin();
-             mit != involved_IDs_map.end(); mit++ )
+             mit != involved_IDs_map.end(); ++mit )
         {
             int sender_proc                     = mit->first;
             std::vector< int >& eids            = mit->second;
@@ -956,11 +962,11 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
             buffer->reset_ptr( sizeof( int ) );
 
             // receive the buffer
-            ierr = MPI_Recv( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, sender_proc, 222, jcomm, &status );
+            ierr = MPI_Recv( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, sender_proc, mtag, jcomm, &status );
             if( ierr != 0 ) return MB_FAILURE;
             // use the values in buffer to populate valuesTag arrays, fill it up!
             int j = 0;
-            for( std::vector< int >::iterator it = eids.begin(); it != eids.end(); it++, j++ )
+            for( std::vector< int >::iterator it = eids.begin(); it != eids.end(); ++it, ++j )
             {
                 for( size_t i = 0; i < tag_handles.size(); i++ )
                 {
@@ -1000,7 +1006,7 @@ ErrorCode ParCommGraph::settle_send_graph( TupleList& TLcovIDs )
     }
 #ifdef VERBOSE
     for( std::map< int, std::vector< int > >::iterator mit = involved_IDs_map.begin(); mit != involved_IDs_map.end();
-         mit++ )
+         ++mit )
     {
         std::cout << " towards task " << mit->first << " send: " << mit->second.size() << " cells " << std::endl;
         for( size_t i = 0; i < mit->second.size(); i++ )
@@ -1017,7 +1023,7 @@ ErrorCode ParCommGraph::settle_send_graph( TupleList& TLcovIDs )
 void ParCommGraph::SetReceivingAfterCoverage(
     std::map< int, std::set< int > >& idsFromProcs )  // will make sense only on receivers, right now after cov
 {
-    for( std::map< int, std::set< int > >::iterator mt = idsFromProcs.begin(); mt != idsFromProcs.end(); mt++ )
+    for( auto mt = idsFromProcs.begin(); mt != idsFromProcs.end(); ++mt )
     {
         int fromProc            = mt->first;
         std::set< int >& setIds = mt->second;
@@ -1033,7 +1039,7 @@ void ParCommGraph::SetReceivingAfterCoverage(
     graph_type = COVERAGE;
     return;
 }
-//#define VERBOSE
+
 void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::vector< int >& valuesComp )
 {
     // settle comm graph on comp
@@ -1042,7 +1048,6 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
     // third_method = true; // do not rely only on involved_IDs_map.size(); this can be 0 in some
     // cases
     std::map< int, std::set< int > > uniqueIDs;
-
     for( int i = 0; i < n; i++ )
     {
         int to_proc  = TLBackToComp.vi_wr[3 * i + 2];
@@ -1057,7 +1062,7 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
 
     // Inserting element in pair vector
     // to keep track of previous indexes in valuesComp
-    for( int i = 0; i < (int)valuesComp.size(); ++i )
+    for( size_t i = 0; i < valuesComp.size(); ++i )
     {
         vp.push_back( std::make_pair( valuesComp[i], i ) );
     }
@@ -1067,7 +1072,7 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
     // vp[i].first, second
 
     // count now how many times some value appears in ordered (so in valuesComp)
-    for( std::map< int, std::set< int > >::iterator it = uniqueIDs.begin(); it != uniqueIDs.end(); it++ )
+    for( auto it = uniqueIDs.begin(); it != uniqueIDs.end(); ++it )
     {
         int procId                  = it->first;
         std::set< int >& nums       = it->second;
@@ -1077,7 +1082,7 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
         int indexInVp = 0;
         int indexVal  = 0;
         indx[0]       = 0;  // start from 0
-        for( std::set< int >::iterator sst = nums.begin(); sst != nums.end(); sst++, indexVal++ )
+        for( auto sst = nums.begin(); sst != nums.end(); ++sst, ++indexVal )
         {
             int val = *sst;
             involved_IDs_map[procId].push_back( val );
@@ -1098,8 +1103,8 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
     std::ofstream dbfile;
     f1 << "Involve_" << comp << "_" << rankInJoin << ".txt";
     dbfile.open( f1.str().c_str() );
-    for( std::map< int, std::vector< int > >::iterator mit = involved_IDs_map.begin(); mit != involved_IDs_map.end();
-         mit++ )
+    for( auto mit = involved_IDs_map.begin(); mit != involved_IDs_map.end();
+         ++mit )
     {
         int corrTask                = mit->first;
         std::vector< int >& corrIds = mit->second;
@@ -1279,7 +1284,7 @@ ErrorCode ParCommGraph::set_split_ranges( int comp,
         uniqueIDs[to_proc].insert( globalId );
     }
 
-    for( int i = 0; i < (int)ents_of_interest.size(); i++ )
+    for( size_t i = 0; i < ents_of_interest.size(); i++ )
     {
         EntityHandle ent = ents_of_interest[i];
         for( int j = 0; j < lenTag; j++ )

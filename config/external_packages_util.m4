@@ -402,7 +402,7 @@ AC_DEFUN([CHECK_SOURCE_RECOMPILATION_HASH],
     # ac_cv_sha_moabcpp="`find $moab_src_dir -name '*.cpp' \( -exec $HASHPRGM "$PWD"/{} \; -o -print \) | $HASHPRGM | cut -d ' ' -f1`"
     # defaultshasum="`find $2 -type f -regex '.*\(hpp\|cpp\|c\|h\|f\|f90\)$' \( -exec $HASHPRGM {} \; -o -print \) | $HASHPRGM | cut -d ' ' -f1`"
     # defaultshasum="`find $2/src $2/Source $2/SRC $2/include $2/inc $2/INC -type f -regex '.*\(hpp\|cpp\|c\|h\|f\|f90\)$' | xargs ls -al | $HASHPRGM | cut -d ' ' -f1`"
-    defaultshasum="`cd $2/..; tar -tf $3 | tr \\n \\0 | xargs -0 ls -l | $HASHPRGM | cut -d ' ' -f1`"
+    defaultshasum="`cd $2/.. && tar -tf $3 | xargs ls -l | $HASHPRGM | cut -d ' ' -f1`"
     AC_CACHE_VAL([ac_cv_sha_$1], [ac_cv_sha_$1="0"])
     if (test "$defaultshasum" != "$ac_cv_sha_$1" || test $need_configuration); then
       recompile_and_install=true
@@ -782,7 +782,7 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_HDF5],[
   # configure HDF5
   if [ $1 ]; then
     # configure PACKAGE with a minimal build: MPI
-    compiler_opts="CC=$CC CXX=$CXX MPIEXEC=$MPIEXEC"
+    compiler_opts="CC=\"$CC\" CXX=\"$CXX\"  MPIEXEC=\"$MPIEXEC\""
     configure_command="$compiler_opts $hdf5_src_dir/configure --prefix=$hdf5_install_dir --libdir=$hdf5_install_dir/lib --with-pic=1"
     # configure_command="$configure_command --enable-cxx --enable-unsupported"
     # VSM: Adding --enable-debug=all is causing problems in h5legacy test. So disabling debug symbols for HDF5.
@@ -970,10 +970,10 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_NETCDF],
   # configure NETCDF
   if [ $1 ]; then
     # configure PACKAGE with a minimal build: MPI, HDF5, NETCDF
-    compiler_opts="CC=$CC CXX=$CXX"
+    compiler_opts="CC=\"$CC\" CXX=\"$CXX\""
     configure_command="$compiler_opts $netcdf_src_dir/configure --prefix=$netcdf_install_dir --libdir=$netcdf_install_dir/lib --with-pic=1 --enable-shared=$enable_shared"
     if (test "$enablehdf5" != "no"); then
-      configure_command="$configure_command --enable-netcdf-4 LDFLAGS=\"$HDF5_LDFLAGS $LDFLAGS\" CPPFLAGS=\"$HDF5_CPPFLAGS\" LIBS=\"$HDF5_LIBS -ldl -lm -lz\""
+      configure_command="$configure_command --enable-netcdf-4 LDFLAGS=\"$HDF5_LDFLAGS $LDFLAGS\" CPPFLAGS=\"$HDF5_CPPFLAGS\" LIBS=\"$HDF5_LIBS\""
     else
       configure_command="$configure_command --disable-netcdf-4 LDFLAGS=\"$LDFLAGS\" CPPFLAGS=\"$CPPFLAGS\" LIBS=\"$LIBS\""
     fi
@@ -1149,7 +1149,7 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_METIS],
       if (test "$metis_use_cmake" != "yes"); then
         configure_command="make config cc=\"$CC\" cxx=\"$CXX\" prefix=$metis_install_dir gklib_path=$metis_build_dir/GKlib"
       else
-        configure_command="cmake $metis_src_dir -DCMAKE_INSTALL_PREFIX=$metis_install_dir -DCMAKE_C_COMPILER=$CC -DCMAKE_CXX_COMPILER=$CXX -DGKLIB_PATH=$metis_build_dir/GKlib"
+        configure_command="cmake $metis_src_dir -DCMAKE_INSTALL_PREFIX=$metis_install_dir -DCMAKE_C_COMPILER=\"$CC\" -DCMAKE_CXX_COMPILER=\"$CXX\" -DGKLIB_PATH=$metis_build_dir/GKlib"
       fi
       if (test "$enable_debug" != "no"); then
         if (test "$metis_use_cmake" != "yes"); then
@@ -1414,7 +1414,7 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_PARMETIS],
     if (test "$parmetis_manual_install" != "yes"); then
       # configure PACKAGE with a minimal build: MPI
       export CFLAGS="$CFLAGS -fPIC -DPIC" CXXFLAGS="$CXXFLAGS -fPIC -DPIC" FCFLAGS="$FCFLAGS -fPIC" FFLAGS="$FFLAGS -fPIC" LDFLAGS="$LDFLAGS"
-      configure_command="make config cc=$CC cxx=$CXX prefix=$parmetis_install_dir"
+      configure_command="make config cc=\"$CC\" cxx=\"$CXX\" prefix=$parmetis_install_dir"
       if (test "$enable_debug" != "no"); then
         configure_command="$configure_command debug=1"
       fi
@@ -1674,7 +1674,7 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_ZOLTAN],
   # configure ZOLTAN
   if [ $1 ]; then
     # configure PACKAGE with a minimal build: MPI, HDF5, ZOLTAN
-    compiler_opts="CC=$CC CXX=$CXX FC=$FC F90=$FC F77=$F77"
+    compiler_opts="CC=\"$CC\" CXX=\"$CXX\" FC=\"$FC\" F90=\"$FC\" F77=\"$F77\""
     configure_command="$compiler_opts $zoltan_src_dir/configure --prefix=$zoltan_install_dir --libdir=$zoltan_install_dir/lib --with-pic=1 --enable-shared=$enable_shared --enable-static=$enable_static"
     if (test "$enablempi" != "no"); then
       configure_command="$configure_command --enable-mpi"
@@ -1760,13 +1760,13 @@ AC_DEFUN([AUSCM_CONFIGURE_DOWNLOAD_TEMPESTREMAP],[
   # Set the default TempestRemap download version
   m4_pushdef([TEMPESTREMAP_DOWNLOAD_VERSION],[$1])dnl
 
-  tempestremap_repository_url="https://github.com/ClimateGlobalChange/tempestremap.git"
+  tempestremap_repository_url="https://github.com/E3SM-Project/tempestremap.git"
   tempestremap_repository_branch="master"
 
   # Invoke the download-tempestremap command
   m4_case( TEMPESTREMAP_DOWNLOAD_VERSION, [2.2.0], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/tempestremap/tempestremap-2_2_0.tar.gz], [$2] ) ],
                                   [2.1.6], [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/tempestremap/tempestremap-2_1_6.tar.gz], [$2] ) ],
-                                  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://web.cels.anl.gov/projects/sigma/downloads/TPL/tempestremap/tempestremap-2_2_0.tar.gz], [$2] ) ] )
+                                  [ AUSCM_CONFIGURE_EXTERNAL_PACKAGE([TempestRemap], [https://github.com/E3SM-Project/tempestremap/archive/refs/heads/master.tar.gz], [$2] ) ] )
 
   if (test "x$downloadtempestremap" == "xyes") ; then
     # download the latest TempestRemap sources, configure and install
@@ -1850,7 +1850,7 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_TEMPESTREMAP],
   # configure TEMPESTREMAP
   if [ $1 ]; then
     # configure PACKAGE with a minimal build: MPI, HDF5, TEMPESTREMAP
-    compiler_opts="CC=$CC CXX=$CXX FC=$FC F90=$FC F77=$F77"
+    compiler_opts="CC=\"$CC\" CXX=\"$CXX\" FC=\"$FC\" F90=\"$FC\" F77=\"$F77\""
     configure_command="$compiler_opts $tempestremap_src_dir/configure --prefix=$tempestremap_install_dir --libdir=$tempestremap_install_dir/lib --with-pic=1 --enable-shared=$enable_shared --enable-static=$enable_static"
     if (test "$enablenetcdf" != "no"); then
       configure_command="$configure_command --with-netcdf=$NETCDF_DIR"
@@ -2017,7 +2017,7 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_HYPRE],
   # configure HYPRE
   if [ $1 ]; then
     # configure PACKAGE with a minimal build: MPI, HDF5, HYPRE
-    compiler_opts="CC=$CC CXX=$CXX FC=$FC F90=$FC F77=$F77"
+    compiler_opts="CC=\"$CC\" CXX=\"$CXX\" FC=\"$FC\" F90=\"$FC\" F77=\"$F77\""
     configure_command="$compiler_opts $hypre_src_dir/src/configure --prefix=$hypre_install_dir --libdir=$hypre_install_dir/lib --with-pic=1 --enable-shared=$enable_shared"
     configure_command="$configure_command LDFLAGS=\"$LDFLAGS\" CPPFLAGS=\"$CPPFLAGS\" LIBS=\"$LIBS\""
 

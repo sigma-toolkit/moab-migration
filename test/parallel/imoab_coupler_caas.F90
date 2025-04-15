@@ -27,7 +27,7 @@ end
 !
 SUBROUTINE check_baseline(baseline_file, nsize, gids, values, eps, rank, ierr)
    integer :: ierr
-   character  baseline_file*1024
+   character(*) ::  baseline_file
    integer :: nsize
    integer  :: gids (nsize)
    double precision  :: values(nsize)
@@ -108,7 +108,7 @@ program imoab_coupler_fortran
    integer :: cmpAtmPID, cplAtmPID ! iMOAB app ids
    integer :: cmpOcnPID, cplOcnPID ! iMOAB app ids
    integer :: cplAtmOcnPID ! intx pid
-   integer :: nghlay, partScheme, context_id
+   integer :: nghlay, partScheme, context_id, nghlay_tgt
    integer :: fNoBubble, fMonotoneTypeID, fVolumetric, fNoConserve, fValidate, fInverseDistanceMap
    integer :: filter_type
 
@@ -253,7 +253,8 @@ program imoab_coupler_fortran
 
       ! set the ghost layers on the coupler for the source mesh
       nghlay = 1 ! number of ghost layers
-      ierr = iMOAB_SetGhostLayers( cplAtmPID, nghlay )
+      nghlay_tgt = 0
+      ierr = iMOAB_SetMapGhostLayers( cplAtmOcnPID, nghlay, nghlay_tgt )
       call errorout(ierr, 'failed to set number of ghost layers on ATM mesh')
 
       ierr = iMOAB_ComputeMeshIntersectionOnSphere(cplAtmPID, cplOcnPID, cplAtmOcnPID)

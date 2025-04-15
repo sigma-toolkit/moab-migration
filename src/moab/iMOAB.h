@@ -1057,17 +1057,49 @@ ErrCode iMOAB_DumpCommGraph( iMOAB_AppID pid, int* context_id, int* is_sender, c
 ErrCode iMOAB_MergeVertices( iMOAB_AppID pid );
 
 /**
- * @brief Set the number of ghost layers for the mesh.
+ * @brief Set the number of ghost layers for the map.
  *
- * @param[in] pid (iMOAB_AppID) The unique pointer to the application ID.
- * @param[in] nghost_layers (int*) The number of ghost layers to set.
+ * @param[in] pid (iMOAB_AppID) The unique pointer to the map application ID.
+ * @param[in] n_src_ghost_layers (int*) The number of ghost layers for source.
+ * @param[in] n_tgt_ghost_layers (int*) The number of ghost layers for target.
  * @return ErrCode The error code indicating success or failure.
  */
-ErrCode iMOAB_SetGhostLayers( iMOAB_AppID pid, int* nghost_layers );
+ErrCode iMOAB_SetMapGhostLayers( iMOAB_AppID pid, int* n_src_ghost_layers, int* n_tgt_ghost_layers );
 
 #endif /* #ifdef MOAB_HAVE_MPI */
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
+
+/**
+ * @brief Compute the source coverage mesh that completely encompasses the target surface mesh on a sphere.
+ *
+ * \note  This step involves communication and mesh movement such that target mesh elements are within the
+ * convex hull of the source mesh in the current task. The subsequent operations to compute the intersection
+ * mesh between the coverage source and the target mesh are purely local.
+ *
+ * <B>Operations:</B> Collective on coupler tasks
+ *
+ * \param[in]  pid_source (iMOAB_AppID)            The unique pointer to the source application ID.
+ * \param[in]  pid_target (iMOAB_AppID)            The unique pointer to the destination application ID.
+ * \param[in]  pid_intersection (iMOAB_AppID)      The unique pointer to the intersection application ID.
+ * \return ErrCode                                 The error code indicating success or failure.
+ */
+ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_source, iMOAB_AppID pid_target, iMOAB_AppID pid_intersection );
+
+/**
+ * \brief Write a MOAB source coverage  mesh (maintained internally) along with the solution tags to a file.
+ *
+ * \note The iMOAB_WriteMesh function with appropriate parameters to write out the secondary file_set is used.
+ *
+ * <B>Operations:</B> Collective for parallel write, non collective for serial write.
+ *
+ * \param[in] pid (iMOAB_AppID)            The unique pointer to the application ID.
+ * \param[in] filename (iMOAB_String)      The MOAB mesh file (H5M) to write all the entities contained in the
+ *                                         internal application mesh set.
+ * \param[in] write_options (iMOAB_String) Additional options for writing the MOAB mesh in parallel.
+ * \return ErrCode                         The error code indicating success or failure.
+ */
+ErrCode iMOAB_WriteCoverageMesh( iMOAB_AppID pid, const iMOAB_String filename, const iMOAB_String write_options );
 
 /**
  * @brief Compute intersection of the surface meshes defined on a sphere. The resulting intersected mesh consists
@@ -1077,7 +1109,7 @@ ErrCode iMOAB_SetGhostLayers( iMOAB_AppID pid, int* nghost_layers );
  * corresponding to the \p pid_intersection application. This intersection data can be used to compute solution
  * projection weights between these meshes.
  *
- * <B>Operations:</B> Collective on coupler tasks
+ * <B>Operations:</B> Not collective. Embarassingly parallel.
  *
  * \param[in]  pid_source (iMOAB_AppID)            The unique pointer to the source application ID.
  * \param[in]  pid_target (iMOAB_AppID)            The unique pointer to the destination application ID.
@@ -1152,19 +1184,29 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
  *
  * <B>Operations:</B> Collective
  *
- * \param[in] pid_intersection (iMOAB_AppID)               The unique pointer to the application ID to store the map
- * \param[in] pid_cpl (iMOAB_AppID)                        The unique pointer to coupler instance of component; (-1) for old load
- * \param[in] col_or_row (int *)                           The flag to indicate whether distribution is according to source (0) or target grid (1)
- * \param[in] type (int *)                                 type of mesh (1) spectral with GLOBAL_DOFS, (2) Point Cloud (3) FV cell
- * \param[in] solution_weights_identifier  (iMOAB_String)  The unique identifier used to store the computed projection weights locally. Typically,
- *                                                         values could be identifiers such as "scalar", "flux" or "custom".
- * \param[in] remap_weights_filename  (iMOAB_String)       The filename path to the mapping file to load in memory.
+ * \param[in]  pid_source (iMOAB_AppID)            The unique pointer to the source application ID.
+ * \param[in]  pid_target (iMOAB_AppID)            The unique pointer to the destination application ID.
+ * \param[in]  pid_intersection (iMOAB_AppID)      The unique pointer to the intersection application ID.
+ * \param[in]  col_or_row (int *)                           The flag to indicate whether distribution is according to source (0) or target grid (1)
+ * \param[in]  type (int *)                                 type of mesh (1) spectral with GLOBAL_DOFS, (2) Point Cloud (3) FV cell
+ * \param[in]  solution_weights_identifier  (iMOAB_String)  The unique identifier used to store the computed projection weights locally.
+ *                                                          Typically, values could be identifiers such as "scalar", "flux" or "custom".
+ * \param[in]  remap_weights_filename  (iMOAB_String)       The filename path to the mapping file to load in memory.
 */
+// ErrCode iMOAB_LoadMappingWeightsFromFile(
+//     iMOAB_AppID pid_source,
+//     iMOAB_AppID pid_target,
+//     iMOAB_AppID pid_intersection,
+//     int* col_or_row,
+//     int* type,
+//     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
+//     const iMOAB_String remap_weights_filename );
 ErrCode iMOAB_LoadMappingWeightsFromFile(
+    iMOAB_AppID pid_source,
+    iMOAB_AppID pid_target,
     iMOAB_AppID pid_intersection,
-    iMOAB_AppID pid_cpl,
-    int* col_or_row,
-    int* type,
+    int* srctype,
+    int* tgttype,
     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
     const iMOAB_String remap_weights_filename );
 

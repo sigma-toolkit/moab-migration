@@ -431,7 +431,7 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_MPI
         remapper = new moab::TempestRemapper( gMB, pcomm, offlineGenerator );
 #else
-        remapper      = new moab::TempestRemapper( gMB, offlineGenerator );
+        remapper = new moab::TempestRemapper( gMB, offlineGenerator );
 #endif
     }
 
@@ -477,6 +477,7 @@ int main( int argc, char* argv[] )
                 NcError error_temp( NcError::silent_nonfatal );
                 // get the attribute
                 NcAtt* attRectilinear = ncInput.get_att( "rectilinear" );
+                NcVar* varGridDims    = ncInput.get_var( "grid_dims" );
 
                 // If rectilinear attribute present, mark it
                 std::vector< int > vecDimSizes( 3, 0 );
@@ -528,12 +529,39 @@ int main( int argc, char* argv[] )
                     vecDimSizes[0]               = static_cast< int >( moab::TempestRemapper::RLL );
                     vecDimSizes[1]               = vecDimNameSizes["lat"];
                     vecDimSizes[2]               = vecDimNameSizes["lon"];
+                }
+                else if( varGridDims != nullptr )
+                {
+                    // Obtain rectilinear attributes (dimension sizes)
+                    NcDim* dimGridRank = varGridDims->get_dim( 0 );
+                    if( dimGridRank == NULL )
+                    {
+                        _EXCEPTIONT( "Variable \"grid_dims\" has no dimensions" );
+                    }
 
-                    printf( "Rectilinear RLL mesh size: (lat) %d X (lon) %d\n", vecDimSizes[1], vecDimSizes[2] );
+                    int gridrank = dimGridRank->size();
+                    // now get the rank dimensions
+                    int gridsizes[2];
+                    varGridDims->get( &( gridsizes[0] ), dimGridRank->size() );
 
-                    moab::EntityHandle mSet = 0;
-                    // mSet   = remapper->GetMeshSet( moab::Remapper::SourceMesh );
-                    result = gMB->tag_set_data( rectilinearTag, &mSet, 1, vecDimSizes.data() );MB_CHK_ERR( result );
+                    const Range& elems = remapper->GetMeshEntities( moab::Remapper::SourceMesh );
+                    bool isQuads       = elems.all_of_type( moab::MBQUAD );
+                    bool isTris        = elems.all_of_type( moab::MBTRI );
+
+                    if( gridrank == 1 )
+                    {
+                        vecDimSizes[0] = ( isQuads ? static_cast< int >( moab::TempestRemapper::CS )
+                                                   : ( isTris ? static_cast< int >( moab::TempestRemapper::ICO )
+                                                              : static_cast< int >( moab::TempestRemapper::ICOD ) ) );
+                        vecDimSizes[1] = elems.size();
+                        vecDimSizes[2] = remapper->GetMeshVertices( moab::Remapper::SourceMesh ).size();
+                    }
+                    else
+                    {
+                        vecDimSizes[0] = static_cast< int >( moab::TempestRemapper::RLL );
+                        vecDimSizes[1] = gridsizes[0];
+                        vecDimSizes[2] = gridsizes[1];
+                    }
                 }
                 else
                 {
@@ -546,25 +574,27 @@ int main( int argc, char* argv[] )
                                                           : static_cast< int >( moab::TempestRemapper::ICOD ) ) );
                     vecDimSizes[1] = elems.size();
                     vecDimSizes[2] = remapper->GetMeshVertices( moab::Remapper::SourceMesh ).size();
+                }
+                moab::EntityHandle mSet = 0;
+                // mSet   = remapper->GetMeshSet( moab::Remapper::SourceMesh );
+                result = gMB->tag_set_data( rectilinearTag, &mSet, 1, vecDimSizes.data() );MB_CHK_ERR( result );
 
-                    switch( vecDimSizes[0] )
-                    {
-                        case 0:
-                            printf( "Cubed-Sphere mesh: %d (elems), %d (nodes)\n", vecDimSizes[1], vecDimSizes[2] );
-                            break;
-                        case 2:
-                            printf( "Icosahedral (triangular) mesh: %d (elems), %d (nodes)\n", vecDimSizes[1],
-                                    vecDimSizes[2] );
-                            break;
-                        case 3:
-                        default:
-                            printf( "Polygonal mesh: %d (elems), %d (nodes)\n", vecDimSizes[1], vecDimSizes[2] );
-                            break;
-                    }
-
-                    moab::EntityHandle mSet = 0;
-                    // mSet   = remapper->GetMeshSet( moab::Remapper::SourceMesh );
-                    result = gMB->tag_set_data( rectilinearTag, &mSet, 1, vecDimSizes.data() );MB_CHK_ERR( result );
+                switch( vecDimSizes[0] )
+                {
+                    case 0:
+                        printf( "Cubed-Sphere mesh: %d (elements), %d (vertices)\n", vecDimSizes[1], vecDimSizes[2] );
+                        break;
+                    case 1:
+                        printf( "Rectilinear RLL mesh: (lon) %d X (lat) %d\n", vecDimSizes[2], vecDimSizes[1] );
+                        break;
+                    case 2:
+                        printf( "Icosahedral (triangular) mesh: %d (elements), %d (vertices)\n", vecDimSizes[1],
+                                vecDimSizes[2] );
+                        break;
+                    case 3:
+                    default:
+                        printf( "Polygonal mesh: %d (elements), %d (vertices)\n", vecDimSizes[1], vecDimSizes[2] );
+                        break;
                 }
 
                 ncInput.close();
@@ -1175,8 +1205,7 @@ void list_formats( Interface* gMB )
         if( i->description().length() > w ) w = i->description().length();
 
     // write table header
-    str << "Format  " << std::setw( w ) << std::left << "Description"
-        << "  Read  Write  File Name Suffixes\n"
+    str << "Format  " << std::setw( w ) << std::left << "Description" << "  Read  Write  File Name Suffixes\n"
         << "------  " << std::setw( w ) << std::setfill( '-' ) << "" << std::setfill( ' ' )
         << "  ----  -----  ------------------\n";
 

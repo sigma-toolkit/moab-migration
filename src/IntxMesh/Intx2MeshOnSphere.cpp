@@ -291,7 +291,7 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
         {
             // int node = tgtTri.v[j];
             double d2 = IntxUtils::dist2( pp, &tgtCoords2D[2 * j] );
-            if( d2 < epsilon_1 / 1000 ) // two orders of magnitude smaller than it should, to avoid concave polygons
+            if( d2 < epsilon_1 / 1000 )  // two orders of magnitude smaller than it should, to avoid concave polygons
             {
 
                 foundIds[i] = tgtConn[j];  // no new node
@@ -473,7 +473,8 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
         {
             int k1 = ( k + 1 ) % nP;
             int k2 = ( k1 + 1 ) % nP;
-            double orientedArea = areaAdaptor. area_spherical_triangle( &coords[3 * k], &coords[3 * k1], &coords[3 * k2], Rdest );
+            double orientedArea =
+                areaAdaptor.area_spherical_triangle( &coords[3 * k], &coords[3 * k1], &coords[3 * k2], Rdest );
             if( orientedArea < 0 )
             {
                 std::cout << " np before 1 , 2, current " << npBefore1 << " " << npBefore2 << " " << nP << "\n";
@@ -709,6 +710,7 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
     {
         return Intx2Mesh::build_processor_euler_boxes( euler_set, local_verts, gnomonic );
     }
+    // so here, we know that the logic is for gnomonic == true
     localEnts.clear();
     ErrorCode rval = mb->get_entities_by_dimension( euler_set, 2, localEnts );MB_CHK_SET_ERR( rval, "can't get local ents" );
 
@@ -851,6 +853,9 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
 // will distribute the mesh to other procs, so that on each task, the covering set covers the local
 // bounding box this means it will cover the second (local) mesh set; So the covering set will cover
 // completely the second local mesh set (in intersection)
+// now, when covering set needs to have extra layers, we will increase dramatically the box_eps, from something close to 0,
+//   to something larger than the "source mesh size" * sqrt(3) for each layer needed
+// so the first step is finding the global diagonal mesh size in the source mesh
 ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distributed_set,
                                                      EntityHandle& covering_set,
                                                      bool gnomonic,
@@ -866,7 +871,6 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     Range meshCells;
     rval = mb->get_entities_by_dimension( initial_distributed_set, 2, meshCells );MB_CHK_SET_ERR( rval, "can't get cells by dimension from mesh set" );
 
-    bool extraWork = (nb_ghost_layers >= 1);
     if( 1 == parcomm->proc_config().proc_size() )
     {
         // move all initial cells to coverage set
@@ -954,9 +958,6 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     int migrated_mesh = 0;
     if( orig_sender != -1 ) migrated_mesh = 1;  //
 
-    int ghost_info = 0;
-    if (extraWork)
-        ghost_info = 1; // an extra field for ghost cell owner; we need it
     // if size_gdofs_tag>0, we are sure valsDOFs got resized to what we need
 
     // get all mesh verts1
@@ -990,6 +991,25 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     std::map< int, Range > Rto;
     int numprocs = parcomm->proc_config().proc_size();
 
+    // now, box error is pretty small, in general
+    // for bilinear mesh, we need an extra layer, which we will get by increasing the epsilon to catch the extra layer
+    // it will depend on the size of the source mesh
+    // so we will compute the max diagonal length for each cell, on the sphere, so we will modify box_error
+    if( nb_ghost_layers > 0 )
+    {
+        double diagonal;
+        rval            = IntxUtils::max_diagonal( mb, meshCells, max_edges_1, diagonal );MB_CHK_SET_ERR( rval, "can't get max diagonal" );
+        //
+        double global_diag = 0;
+        mpi_err = MPI_Allreduce( &diagonal, &global_diag, 1, MPI_DOUBLE, MPI_MAX, parcomm->proc_config().proc_comm() );
+        if( MPI_SUCCESS != mpi_err ) return MB_FAILURE;
+        double extra_thickness = global_diag * nb_ghost_layers;
+        if( gnomonic ) extra_thickness *= sqrt( 3. );
+        box_error += extra_thickness;  //
+        if( !my_rank )
+            std::cout << "ghost_layers:" << nb_ghost_layers << " max diagonal:" << global_diag
+                      << " extra thickness:" << extra_thickness << " box_error:" << box_error << "\n";
+    }
     for( Range::iterator eit = meshCells.begin(); eit != meshCells.end(); ++eit )
     {
         EntityHandle q = *eit;
@@ -1069,27 +1089,6 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         }
     }
 
-    // now, for higher order, we might need to send to processor p, not only the Range Rto[p] cells;
-    // we need to augment those ranges with adjacent cells, according to the order passed
-    // if order is 1, not do anything
-    // if order is 2, for example, we need to add all adj cells level 1, by edge
-    if (extraWork)
-    {
-        for (int p = 0; p < numprocs; p++ )
-        {
-            Range originalSend = Rto[p];
-            // determine all adjacent cells for order 2 and higher
-            // Need to get layers of bridge-adj entities
-            if( originalSend.empty() ) continue;
-            Range extraCells;
-            rval  = MeshTopoUtil( mb ).get_bridge_adjacencies( originalSend, 0, 2, extraCells, nb_ghost_layers ); MB_CHK_SET_ERR( rval, "Failed to get bridge adjacencies" );
-            // big miss : need to merge only cells from initial source (ghost) set;
-            // get_bridge adj will get all cells adjacent to a vertex
-            extraCells = intersect(extraCells, meshCells);
-            Rto[p].merge(extraCells);
-        }
-    }
-
     // here, we will use crystal router to send each cell to designated tasks (mesh migration)
 
     // a better implementation would be to use pcomm send / recv entities; a good test case
@@ -1124,7 +1123,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
 
     // add also GLOBAL_DOFS info, if found on the mesh cell; it should be found only on HOMME cells!
     int sizeTuple =
-        2 + max_edges_1 + migrated_mesh + size_gdofs_tag + ghost_info;  // max edges could be up to MAXEDGES :) for polygons
+        2 + max_edges_1 + migrated_mesh + size_gdofs_tag;  // max edges could be up to MAXEDGES :) for polygons
     TLq.initialize( sizeTuple, 0, 0, 0,
                     numq );  // to proc, elem GLOBAL ID, connectivity[max_edges] (global ID v), plus
                              // original sender if set (migrated mesh case)
@@ -1173,7 +1172,8 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
             rval = mb->get_connectivity( q, conn4, num_nodes );MB_CHK_SET_ERR( rval, "can't get connectivity for cell" );
             if( num_nodes > max_edges_1 )
             {
-                mb->list_entities( &q, 1 );MB_CHK_SET_ERR( MB_FAILURE, "too many nodes in a cell (" << num_nodes << "," << max_edges_1 << ")" );
+                mb->list_entities( &q, 1 );
+                MB_CHK_SET_ERR( MB_FAILURE, "too many nodes in a cell (" << num_nodes << "," << max_edges_1 << ")" );
             }
             for( int i = 0; i < num_nodes; i++ )
             {
@@ -1194,15 +1194,6 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
                 // case of extra work, maybe need to check if it is ghost ? yes, next loop !
                 rval = mb->tag_get_data( orgSendProcTag, &q, 1, &orig_sender );MB_CHK_SET_ERR( rval, "can't get original sender for polygon, in migrate scenario" );
                 TLq.vi_wr[sizeTuple * n + currentIndexIntTuple] = orig_sender;  // should be different than -1
-                currentIndexIntTuple++;
-            }
-            if (ghost_info > 0) // extraWork
-            {
-                // case of ghost
-                int owner = my_rank;
-                // this could happen if extra work, real owner is different ?
-                rval = parcomm->get_owner(q, owner); MB_CHK_SET_ERR( rval, "can't get owner for cell" );
-                TLq.vi_wr[sizeTuple * n + currentIndexIntTuple] = owner;  // should be different than -1
                 currentIndexIntTuple++;
             }
             // GLOBAL_DOFS info, if available
@@ -1274,17 +1265,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         rval = mb->tag_get_data( gid, &q, 1, &gid_el );MB_CHK_SET_ERR( rval, "can't get global id of cell " );
         assert( gid_el >= 0 );
         globalID_to_eh[gid_el] = q;  // do we need this? yes, now we do; parent tags are now using it heavily
-        if (extraWork)
-        {
-            int owner = my_rank;
-            // this could happen if extra work, real owner is different ?
-            rval = parcomm->get_owner(q, owner); MB_CHK_SET_ERR( rval, "can't get owner for cell" );
-            rval = mb->tag_set_data( sendProcTag, &q, 1, &owner );MB_CHK_SET_ERR( rval, "can't set sender for cell" );
-        }
-        else
-        {
-            rval = mb->tag_set_data( sendProcTag, &q, 1, &my_rank );MB_CHK_SET_ERR( rval, "can't set sender for cell" );
-        }
+        rval                   = mb->tag_set_data( sendProcTag, &q, 1, &my_rank );MB_CHK_SET_ERR( rval, "can't set sender for cell" );
     }
 
     // now look at all elements received through; we do not want to duplicate them
@@ -1299,8 +1280,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
 
         // do we already have a cell with this global ID, represented?
         // yes, it could happen for extraWork !
-        if (globalID_to_eh.find(globalIdEl) != globalID_to_eh.end())
-             continue;
+        if( globalID_to_eh.find( globalIdEl ) != globalID_to_eh.end() ) continue;
         // construct the conn triangle , quad or polygon
         EntityHandle new_conn[MAXEDGES];  // we should use std::vector with max_edges_1
         int nnodes = -1;
@@ -1336,13 +1316,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         }
         // store also the processor this coverage element came from
         int from_proc = TLq.vi_rd[sizeTuple * i];
-        if( ghost_info ) // ghost info will have the original owner of the coverage cell
-        {
-            // case of ghost
-           from_proc = TLq.vi_wr[sizeTuple * i + currentIndexIntTuple];
-           currentIndexIntTuple++;  // add one more
-        }
-        rval = mb->tag_set_data( sendProcTag, &new_element, 1, &from_proc );MB_CHK_SET_ERR( rval, "can't set sender for cell" );
+        rval          = mb->tag_set_data( sendProcTag, &new_element, 1, &from_proc );MB_CHK_SET_ERR( rval, "can't set sender for cell" );
 
         // check if we need to retrieve and set GLOBAL_DOFS data
         if( size_gdofs_tag )
@@ -1353,7 +1327,6 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
             }
             rval = mb->tag_set_data( gdsTag, &new_element, 1, &valsDOFs[0] );MB_CHK_SET_ERR( rval, "can't set GLOBAL_DOFS data on coverage mesh" );
         }
-
     }
 
     // now, add to the covering_set the elements created in the local_q range

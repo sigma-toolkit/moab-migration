@@ -120,9 +120,7 @@ int main( int argc, char* argv[] )
     bool analytic_field = false;
     opts.addOpt< void >( "analytic,q", "analytic field", &analytic_field );
 
-
     opts.addOpt< std::string >( "field,f", "field to project using the map ", &field_source );
-
 
     bool no_regression_test = false;
     opts.addOpt< void >( "no_regression,r", "do not do regression test against baseline 1", &no_regression_test );
@@ -244,11 +242,11 @@ int main( int argc, char* argv[] )
 
     if( couComm != MPI_COMM_NULL )
     {
-        int col_or_row = 0;  // row based partition
-        int type       = 3;  // target is FV cell with global ID as DOFs
-        ierr           = iMOAB_LoadMappingWeightsFromFile( cplAtmOcnPID, cplOcnPID, &col_or_row, &type,
-                                                           intx_from_file_identifier.c_str(), mapFilename.c_str() );
-        CHECKIERR( ierr, "failed to load map file from disk" );
+        int src_disc_type = 3;  // element-based FV
+        int tgt_disc_type = 3;  // element-based FV
+        CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type, &tgt_disc_type,
+                                                     intx_from_file_identifier.c_str(), mapFilename.c_str() ),
+                   "failed to load map file from disk" );
     }
 
     if( atmCouComm != MPI_COMM_NULL )

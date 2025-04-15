@@ -1,4 +1,4 @@
-#include "vtkMoabReader.h"
+#include "MoabReader.h"
 
 #include "SimpleMoab.h"
 #include "DataSetConverter.h"
@@ -14,21 +14,21 @@
 #include "vtkPolyData.h"
 
 
-vtkStandardNewMacro(vtkMoabReader)
+vtkStandardNewMacro(MoabReader)
 //------------------------------------------------------------------------------
-vtkMoabReader::vtkMoabReader()
+MoabReader::MoabReader()
   {
   this->SetNumberOfInputPorts(0);
   this->FileName = NULL;
   }
 
 //------------------------------------------------------------------------------
-vtkMoabReader::~vtkMoabReader()
+MoabReader::~MoabReader()
   {
   }
 
 //------------------------------------------------------------------------------
-int vtkMoabReader::RequestInformation(vtkInformation *request,
+int MoabReader::RequestInformation(vtkInformation *request,
                        vtkInformationVector **inputVector,
                        vtkInformationVector *outputVector)
 {
@@ -39,7 +39,7 @@ int vtkMoabReader::RequestInformation(vtkInformation *request,
 }
 
 //------------------------------------------------------------------------------
-int vtkMoabReader::RequestData(vtkInformation *vtkNotUsed(request),
+int MoabReader::RequestData(vtkInformation *vtkNotUsed(request),
                 vtkInformationVector **vtkNotUsed(inputVector),
                 vtkInformationVector *outputVector)
 {
@@ -94,7 +94,7 @@ int vtkMoabReader::RequestData(vtkInformation *vtkNotUsed(request),
 
 
 //------------------------------------------------------------------------------
-void vtkMoabReader::CreateSubBlocks(vtkNew<vtkMultiBlockDataSet> & root,
+void MoabReader::CreateSubBlocks(vtkNew<vtkMultiBlockDataSet> & root,
                                     smoab::Interface* interface,
                                     smoab::Tag const* parentTag,
                                     smoab::Tag const* extractTag)
@@ -143,7 +143,7 @@ void vtkMoabReader::CreateSubBlocks(vtkNew<vtkMultiBlockDataSet> & root,
 }
 
 //------------------------------------------------------------------------------
-void vtkMoabReader::PrintSelf(ostream& os, vtkIndent indent)
+void MoabReader::PrintSelf(ostream& os, vtkIndent indent)
 {
   this->Superclass::PrintSelf(os,indent);
 }

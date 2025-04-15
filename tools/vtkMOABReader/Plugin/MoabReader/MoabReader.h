@@ -1,5 +1,5 @@
-#ifndef VTKMOABREADER_H
-#define VTKMOABREADER_H
+#ifndef MOABREADER_H
+#define MOABREADER_H
 
 #include "vtkIOGeometryModule.h"  // For export macro
 #include "vtkMultiBlockDataSetAlgorithm.h"
@@ -14,11 +14,11 @@ class Tag;
 class Interface;
 }  // namespace smoab
 
-class vtkMoabReader : public vtkMultiBlockDataSetAlgorithm
+class MoabReader : public vtkMultiBlockDataSetAlgorithm
 {
   public:
-    static vtkMoabReader* New();
-    vtkTypeMacro( vtkMoabReader, vtkMultiBlockDataSetAlgorithm ) void PrintSelf( ostream& os, vtkIndent indent );
+    static MoabReader* New();
+    vtkTypeMacro( MoabReader, vtkMultiBlockDataSetAlgorithm ) void PrintSelf( ostream& os, vtkIndent indent );
 
     // Description:
     // Specify file name of the MOAB mesh file.
@@ -26,8 +26,8 @@ class vtkMoabReader : public vtkMultiBlockDataSetAlgorithm
     vtkGetStringMacro( FileName );
 
   protected:
-    vtkMoabReader();
-    ~vtkMoabReader();
+    MoabReader();
+    ~MoabReader();
 
     int RequestInformation( vtkInformation* vtkNotUsed( request ),
                             vtkInformationVector** vtkNotUsed( inputVector ),
@@ -45,9 +45,9 @@ class vtkMoabReader : public vtkMultiBlockDataSetAlgorithm
 
     void ExtractShell( vtkNew< vtkMultiBlockDataSet >& root, smoab::Interface* interface, smoab::Tag const* parentTag );
 
-    vtkMoabReader( const vtkMoabReader& );   // Not implemented.
-    void operator=( const vtkMoabReader& );  // Not implemented.
+    MoabReader( const MoabReader& );   // Not implemented.
+    void operator=( const MoabReader& );  // Not implemented.
     char* FileName;
 };
 
-#endif  // VTKMOABREADER_H
+#endif  // MoabReader_H

@@ -3,8 +3,8 @@
 
 #include "SimpleMoab.h"
 #include "CellSets.h"
-#include "detail/LoadGeometry.h"
-#include "detail/ReadSparseTag.h"
+#include "LoadGeometry.h"
+#include "ReadSparseTag.h"
 
 #include <vtkCellData.h>
 #include <vtkDoubleArray.h>

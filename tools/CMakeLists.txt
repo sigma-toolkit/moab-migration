@@ -19,6 +19,7 @@ option ( MOAB_BUILD_MBHONODES    "Build the hex8 to hex27 converter tool?"      
 option ( MOAB_BUILD_MBUMR        "Build the uniform mesh refinement tool?"       ON )
 option ( MOAB_BUILD_MBQUALITY    "Build the quality metrics tool?"               ON )
 option ( MOAB_BUILD_MBTEMPEST    "Build the TempestRemap coupler tool?"         OFF )
+option ( MOAB_BUILD_VTKMOABREADER "Build the VTK/ParaView MOAB reader/plugin?"  OFF )
 
 include_directories(
   ${CMAKE_BINARY_DIR}
@@ -327,6 +328,12 @@ if ( MOAB_BUILD_MBQUALITY )
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
   generate_and_install_python_script(mbquality)
+endif( )
+
+# VTKMOABREADER
+if ( MOAB_BUILD_VTKMOABREADER )
+  add_subdirectory(vtkMOABReader)
+  set(ParaView_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 endif( )
 
 # Zoltan

@@ -1,0 +1,10 @@
+# Similar to e.g. Examples/RegistrationName/Plugin/MyReader from paraview source
+NAME
+  LMOAB
+DEPENDS
+  VTK::CommonCore
+  VTK::CommonExecutionModel
+  VTK::IOImage
+  VTK::IOGeometry
+PRIVATE_DEPENDS
+  VTK::CommonDataModel

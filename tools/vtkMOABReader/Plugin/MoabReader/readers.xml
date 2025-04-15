@@ -1,0 +1,29 @@
+<ServerManagerConfiguration>
+  <ProxyGroup name="sources">
+   <SourceProxy name="MoabReader"
+                class="MoabReader"
+                label="Moab reader">
+     <Documentation
+       short_help="Read a Moab file."
+       long_help="Read a Moab file into an image data.">
+       The Moab reader reads any file Moab can read
+     </Documentation>
+     <StringVectorProperty
+        name="FileName"
+        animateable="0"
+        command="SetFileName"
+        number_of_elements="1"
+        panel_visibility="never">
+        <FileListDomain name="files"/>
+        <Documentation>
+          This property specifies the file name for the Moab reader.
+        </Documentation>
+     </StringVectorProperty>
+
+     <Hints>
+      <ReaderFactory extensions="h5m stl" file_description="MOAB-readable files" />
+     </Hints>
+   <!-- End MyPNGReader -->
+   </SourceProxy>
+  </ProxyGroup>
+</ServerManagerConfiguration>

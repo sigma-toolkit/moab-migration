@@ -2,7 +2,7 @@
 #define __smoab_ExtractShell_h
 
 #include "SimpleMoab.h"
-#include "detail/UsageTable.h"
+#include "UsageTable.h"
 
 #include <algorithm>
 

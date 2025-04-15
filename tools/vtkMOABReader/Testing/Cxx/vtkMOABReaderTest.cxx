@@ -1,4 +1,4 @@
-#include "vtkMOABReader.h"
+#include "MOABReader.h"
 #include "vtkRenderer.h"
 #include "vtkRenderWindow.h"
 #include "vtkRenderWindowInteractor.h"

@@ -411,6 +411,7 @@ ErrorCode ReadRTT::read_sides( const char* filename, std::vector< side >& side_d
 {
     std::string line;                      // the current line being read
     std::ifstream input_file( filename );  // filestream for rttfile
+    std::map< std::string, std::vector< std::string > > side_cards;
     // file ok?
     if( !input_file.good() )
     {
@@ -422,18 +423,33 @@ ErrorCode ReadRTT::read_sides( const char* filename, std::vector< side >& side_d
     {
         while( std::getline( input_file, line ) )
         {
-            if( line.compare( "  2 FACES\0" ) == 0 )
+            if (line.compare( "side_flags") == 0) 
             {
-                // read lines until find end nodes
                 while( std::getline( input_file, line ) )
-                {
+                { 
+                    // Read all the side block until we find the end
                     if( line.compare( "end_side_flags\0" ) == 0 ) break;
-                    side data = ReadRTT::get_side_data( line );
-                    side_data.push_back( data );
+                    std::vector< std::string > token = ReadRTT::split_string(line, ' ' );
+                    int card_key = std::stoi(token[0]) - 1;
+                    std::string key   = token[1];
+                    for(int i = 0; i< dim_data.nside_flags[card_key]; i++)
+                    {
+                        std::getline(input_file, line);
+                        side_cards[key].push_back(line);
+                    }
                 }
             }
         }
         input_file.close();
+    }
+    
+    if( side_cards.find("FACES" ) != side_cards.end())
+    {
+        for( int i;  i < side_cards["FACES"].size(); i++)
+            {
+                side data = ReadRTT::get_side_data( side_cards["FACES"][i] ); 
+                side_data.push_back( data );
+            }
     }
     if( side_data.size() == 0 ) return MB_FAILURE;
     return MB_SUCCESS;

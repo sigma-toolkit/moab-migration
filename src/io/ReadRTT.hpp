@@ -329,6 +329,9 @@ class ReadRTT : public ReaderIface
         }
     };
 
+    // structure to hold a subsection of the RTT input
+    typedef std::map< std::string, std::vector< std::string > > rtt_card;
+
     /**
      * generates the topology of the problem from the already read input data, loops over the 2 and
      * 3 dimension macrodata that exist from the rtt file, sides = dagmc surfaces, cells = dagmc
@@ -442,21 +445,43 @@ class ReadRTT : public ReaderIface
      * Reads the full set of side data from the file
      *
      * @param filename, the file to read all the side data from
-     * @param side data, a vector containing all the read side data
+     * @param side_cards, a map containing all the cards from the side_flags section
      *
      * @return moab::ErrorCode
      */
-    ErrorCode read_sides( const char* filename, std::vector< side >& side_data );
+    ErrorCode read_side_cards( const char* filename, rtt_card&  side_cards  );
+
+    /**
+     * Process the FACES card from the side_flags section
+     *
+     * @param side_cards, a vector containing all the read side data
+     * @param side_data, a vector containing all the read side data
+     *
+     * @return moab::ErrorCode
+     */
+    ErrorCode side_process_faces( rtt_card side_cards, std::vector< side >& side_data );
+
 
     /**
      * Reads the full set of cell data from the file
      *
      * @param filename, the file to read all the side data from
-     * @param cell data, a vector containing all the read cell data
+     * @param cell_cards, a map containing all the cards from the cell_flags section
      *
      * @return moab::ErrorCode
      */
-    ErrorCode read_cells( const char* filename, std::vector< cell >& cell_data );
+    ErrorCode read_cell_cards( const char* filename, rtt_card& cell_cards );
+
+    /**
+     * Process the REGIONS card from the cell_flags section
+     *
+     * @param cell_cards, a vector containing all the read side_flag section
+     * @param cell_data, a vector containing all the read cell data
+     *
+     * @return moab::ErrorCode
+     */
+    ErrorCode cell_process_regions( rtt_card cell_cards, std::vector< cell >& cell_data );
+
 
     /**
      * Reads the full set of node data from the file

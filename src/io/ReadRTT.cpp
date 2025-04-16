@@ -128,13 +128,23 @@ ErrorCode ReadRTT::load_file( const char* filename,
     if( rval != MB_SUCCESS ) return rval;
 
     // read the side_flag data
+    rtt_card side_cards;
+    rval = ReadRTT::read_side_cards( filename, side_cards );
+    if( rval != MB_SUCCESS ) return rval;
+    
+    //process sides
     std::vector< side > side_data;
-    rval = ReadRTT::read_sides( filename, side_data );
+    rval = ReadRTT::side_process_faces( side_cards, side_data );
     if( rval != MB_SUCCESS ) return rval;
 
     // read the cell data
+    rtt_card cell_cards;
+    rval = ReadRTT::read_cell_cards( filename, cell_cards );
+    if( rval != MB_SUCCESS ) return rval;
+
+    //process sides
     std::vector< cell > cell_data;
-    rval = ReadRTT::read_cells( filename, cell_data );
+    rval = ReadRTT::cell_process_regions( cell_cards, cell_data );
     if( rval != MB_SUCCESS ) return rval;
 
     // read the node data
@@ -403,11 +413,10 @@ ErrorCode ReadRTT::read_header( const char* filename )
 /*
  * reads the side data from the filename pointed to
  */
-ErrorCode ReadRTT::read_sides( const char* filename, std::vector< side >& side_data )
+ErrorCode ReadRTT::read_side_cards( const char* filename, rtt_card&  side_cards )
 {
     std::string line;                      // the current line being read
     std::ifstream input_file( filename );  // filestream for rttfile
-    std::map< std::string, std::vector< std::string > > side_cards;
     // file ok?
     if( !input_file.good() )
     {
@@ -426,6 +435,11 @@ ErrorCode ReadRTT::read_sides( const char* filename, std::vector< side >& side_d
                     // Read all the side block until we find the end
                     if( line.compare( "end_side_flags\0" ) == 0 ) break;
                     std::vector< std::string > token = ReadRTT::split_string(line, ' ' );
+                    if (token.size() != 2)
+                    {
+                        std::cout << "Error reading side flags" << std::endl;
+                        return MB_FAILURE;
+                    }
                     int card_key = std::stoi(token[0]) - 1;
                     std::string key   = token[1];
                     for(int i = 0; i< dim_data.nside_flags[card_key]; i++)
@@ -439,6 +453,14 @@ ErrorCode ReadRTT::read_sides( const char* filename, std::vector< side >& side_d
         input_file.close();
     }
     
+    return MB_SUCCESS;
+}
+
+/*
+ * process the FACES card from the side_flags section
+ */
+ErrorCode ReadRTT::side_process_faces( rtt_card side_cards, std::vector< side >& side_data )
+{
     if( side_cards.find("FACES" ) != side_cards.end())
     {
         for( int i;  i < side_cards["FACES"].size(); i++)
@@ -454,7 +476,7 @@ ErrorCode ReadRTT::read_sides( const char* filename, std::vector< side >& side_d
 /*
  * reads the cell data from the filename pointed to
  */
-ErrorCode ReadRTT::read_cells( const char* filename, std::vector< cell >& cell_data )
+ErrorCode ReadRTT::read_cell_cards( const char* filename, rtt_card& cell_cards  )
 {
     std::string line;                      // the current line being read
     std::ifstream input_file( filename );  // filestream for rttfile
@@ -469,22 +491,51 @@ ErrorCode ReadRTT::read_cells( const char* filename, std::vector< cell >& cell_d
     {
         while( std::getline( input_file, line ) )
         {
-            if( line.compare( "  1 REGIONS\0" ) == 0 )
+            if (line.compare( "cell_flags") == 0) 
             {
-                // read lines until find end nodes
                 while( std::getline( input_file, line ) )
-                {
+                { 
+                    // Read all the side block until we find the end
                     if( line.compare( "end_cell_flags\0" ) == 0 ) break;
-                    cell data = ReadRTT::get_cell_data( line );
-                    cell_data.push_back( data );
+                    std::vector< std::string > token = ReadRTT::split_string(line, ' ' );
+                    if (token.size() != 2)
+                    {
+                        std::cout << "Error reading cell flags" << std::endl;
+                        return MB_FAILURE;
+                    }
+                    int card_key = std::stoi(token[0]) - 1;
+                    std::string key   = token[1];
+                    for(int i = 0; i< dim_data.ncell_flags[card_key]; i++)
+                    {
+                        std::getline(input_file, line);
+                        cell_cards[key].push_back(line);
+                    }
                 }
             }
         }
         input_file.close();
     }
+   
+    return MB_SUCCESS;
+}
+
+/*
+ * process the REGION card from the cell_flags section
+ */
+ErrorCode ReadRTT::cell_process_regions( rtt_card cell_cards, std::vector< cell >& cell_data )
+{
+    if( cell_cards.find("REGIONS" ) != cell_cards.end())
+    {
+        for( int i;  i < cell_cards["REGIONS"].size(); i++)
+            {
+                cell data = ReadRTT::get_cell_data( cell_cards["REGIONS"][i] ); 
+                cell_data.push_back( data );
+            }
+    }
     if( cell_data.size() == 0 ) return MB_FAILURE;
     return MB_SUCCESS;
 }
+
 
 /*
  * Reads the node data fromt the filename pointed to

@@ -430,7 +430,7 @@ class ReadRTT : public ReaderIface
      * Add Metadata to the meshset, this includes the version number and contiguity value
      * @returns moab::ErrorCode
      */
-    ErrorCode add_metadata(EntityHandle file_set);
+    ErrorCode add_metadata( EntityHandle file_set );
 
     /**
      * reads the full set of header data
@@ -449,7 +449,7 @@ class ReadRTT : public ReaderIface
      *
      * @return moab::ErrorCode
      */
-    ErrorCode read_side_cards( const char* filename, rtt_card&  side_cards  );
+    ErrorCode read_side_cards( const char* filename, rtt_card& side_cards );
 
     /**
      * Process the FACES card from the side_flags section
@@ -460,7 +460,6 @@ class ReadRTT : public ReaderIface
      * @return moab::ErrorCode
      */
     ErrorCode side_process_faces( rtt_card side_cards, std::vector< side >& side_data );
-
 
     /**
      * Reads the full set of cell data from the file
@@ -481,7 +480,6 @@ class ReadRTT : public ReaderIface
      * @return moab::ErrorCode
      */
     ErrorCode cell_process_regions( rtt_card cell_cards, std::vector< cell >& cell_data );
-
 
     /**
      * Reads the full set of node data from the file

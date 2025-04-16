@@ -427,7 +427,7 @@ class ReadRTT : public ReaderIface
      * Add Metadata to the meshset, this includes the version number and contiguity value
      * @returns moab::ErrorCode
      */
-    ErrorCode add_metadata();
+    ErrorCode add_metadata(EntityHandle file_set);
 
     /**
      * reads the full set of header data

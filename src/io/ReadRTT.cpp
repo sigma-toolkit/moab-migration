@@ -336,18 +336,14 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
     // add tris to set
     rval = MBI->add_entities( file_set, mb_tets );
 
-    rval = add_metadata();
+    rval = add_metadata(file_set);
 
     return MB_SUCCESS;
 }
 
-moab::ErrorCode ReadRTT::add_metadata()
+moab::ErrorCode ReadRTT::add_metadata(EntityHandle file_set)
 {
     moab::ErrorCode rval = MB_FAILURE;
-    EntityHandle file_set;  // the file handle
-    // create the file set
-    rval = MBI->create_meshset( MESHSET_SET, file_set );
-
     
     Tag version_tag;
     char* version_value = header_data.version.c_str();

@@ -153,8 +153,8 @@ ErrorCode ReadRTT::load_file( const char* filename,
     if( rval != MB_SUCCESS ) return rval; 
 
     // read the abaqus parts data
-    std::vector< cell > mcnp_speudo_cells;
-    rval = ReadRTT::cell_process_card( cell_cards, "MCNP_PSEUDO_CELLS" , mcnp_speudo_cells );
+    // std::vector< cell > mcnp_speudo_cells;
+    rval = ReadRTT::cell_process_card( cell_cards, "MCNP_PSEUDO_CELLS" , cell_data );
     if( rval != MB_SUCCESS ) return rval; 
 
 

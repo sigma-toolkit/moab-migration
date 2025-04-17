@@ -1160,8 +1160,6 @@ ErrCode iMOAB_ComputePointDoFIntersection( iMOAB_AppID pid_source,
  *                                        (1) spectral with GLOBAL_DOFS, (2) Point Cloud (3) FV cell.
  * \param[in]  comp1 (int*)               The universally unique identifier of first component.
  * \param[in]  comp2 (int*)               The universally unique identifier of map component.
- * \param[in]  direction (int*)           A parameter indicating direction of the mesh migration.
- *                                        i.e., whether it is from source to map (1), or from map to target (2).
  * \return ErrCode                        The error code indicating success or failure.
 */
 ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
@@ -1171,8 +1169,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                               MPI_Group* group2,
                               int* type,
                               int* comp1,
-                              int* comp2,
-                              int* direction );
+                              int* comp2);
 
 #endif /* #ifdef MOAB_HAVE_MPI */
 

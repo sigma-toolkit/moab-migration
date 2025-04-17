@@ -289,9 +289,8 @@ int main( int argc, char* argv[] )
                                                      &tgt_disc_type, map_from_file_identifier[0], mapFilename.c_str() ),
                    "failed to load ATM-OCN map file from disk" );
         // because it is like "coverage", context will be atmocnfid
-        int direction = 1; //may be removed
         CHECKIERR( iMOAB_MigrateMapMesh( cplAtmPID, cplAtmOcnFilePID, &couComm, &couPEGroup, &couPEGroup, &src_disc_type,
-                                     &cplatm, &atmocnfid, &direction ),
+                                     &cplatm, &atmocnfid),
                 "failed to migrate mesh for map");
     }
 #endif
@@ -305,9 +304,8 @@ int main( int argc, char* argv[] )
                                                      mapFilenameTrans.c_str() ),
                    "failed to load OCN-ATM map file from disk" );
         // because it is like "coverage", context will be ocnatmfid
-        int direction = 1; //may be removed
         CHECKIERR( iMOAB_MigrateMapMesh( cplOcnPID, cplOcnAtmFilePID, &couComm, &couPEGroup, &couPEGroup, &src_disc_type,
-                                     &cplocn, &ocnatmfid, &direction ),
+                                     &cplocn, &ocnatmfid ),
                 "failed to migrate mesh for map");
     }
 #endif

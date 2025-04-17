@@ -3820,8 +3820,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                               MPI_Group* groupB,
                               int* type,
                               int* comp1,
-                              int* comp2,
-                              int* direction )
+                              int* comp2)
 {
     assert( jointcomm );
     assert( groupA );
@@ -3961,19 +3960,10 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         // maybe we need to check it is the map we expect
         weightMap = tdata.weightMaps.begin()->second;
         // std::vector<int> ids_of_interest;
-        // do a deep copy of the ids of interest: row ids or col ids, target or source direction
-        if( *direction == 1 )
-        {
-            // we are interested in col ids, source
-            // new method from moab::TempestOnlineMap
-            rval = weightMap->fill_col_ids( valuesComp2 );MB_CHK_ERR( rval );
-        }
-        else if( *direction == 2 )
-        {
-            // we are interested in row ids, for target ids
-            rval = weightMap->fill_row_ids( valuesComp2 );MB_CHK_ERR( rval );
-        }
-        //
+        // do a deep copy of the ids of interest: row ids
+        // we are interested in col ids, source
+        // new method from moab::TempestOnlineMap
+        rval = weightMap->fill_col_ids( valuesComp2 );MB_CHK_ERR( rval );
 
         // now fill the tuple list with info and markers
         std::set< int > uniq( valuesComp2.begin(), valuesComp2.end() );
@@ -4142,23 +4132,10 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         // because we are on the coupler, we know that the read map pid2 exists
         assert( *pid2 >= 0 );
 
+        tdata.remapper->SetMeshSet( Remapper::CoveringMesh, fset3, &primary_ents3 );
+        weightMap->SetSourceNDofsPerElement( ndofPerEl );
+        weightMap->set_col_dc_dofs( values_entities );  // will set col_dtoc_dofmap
 
-        // if we are on source coverage, direction 1, we can set covering mesh, covering cells
-        if( 1 == *direction )
-        {
-            //tdata.pid_src = pid3;
-            tdata.remapper->SetMeshSet( Remapper::CoveringMesh, fset3, &primary_ents3 );
-            weightMap->SetSourceNDofsPerElement( ndofPerEl );
-            weightMap->set_col_dc_dofs( values_entities );  // will set col_dtoc_dofmap
-        }
-        // if we are on target, we can set the target cells
-        else
-        {
-            //tdata.pid_dest = pid3;
-            tdata.remapper->SetMeshSet( Remapper::TargetMesh, fset3, &primary_ents3 );
-            weightMap->SetDestinationNDofsPerElement( ndofPerEl );
-            weightMap->set_row_dc_dofs( values_entities );  // will set row_dtoc_dofmap
-        }
     }
 
     return moab::MB_SUCCESS;

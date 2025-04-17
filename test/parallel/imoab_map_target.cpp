@@ -245,10 +245,9 @@ int main( int argc, char* argv[] )
                                                      intx_from_file_identifier.c_str(), mapFilename.c_str() ),
                    "failed to load map file from disk" );
         int type      = types[0];  // FV
-        int direction = 1;         // from source to coupler; will create a mesh on cplAtmPID
         // because it is like "coverage", context will be atmocnid
         ierr = iMOAB_MigrateMapMesh( cplAtmPID, cplAtmOcnPID, &couComm, &couPEGroup, &couPEGroup, &type,
-                                     &cplatm, &atmocnid, &direction );
+                                     &cplatm, &atmocnid);
         CHECKIERR( ierr, "failed to migrate mesh for atm on coupler" );
 #ifdef VERBOSE
         if( *cplAtmPID >= 0 )

@@ -244,15 +244,6 @@ int main( int argc, char* argv[] )
         CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type, &tgt_disc_type,
                                                      intx_from_file_identifier.c_str(), mapFilename.c_str() ),
                    "failed to load map file from disk" );
-    }
-
-    // the migrate mesh is now on coupler pes, coupler comm; will just compute a coverage for the second hop
-    if( couComm != MPI_COMM_NULL )
-    {
-        //
-        //ierr = iMOAB_RegisterApplication( "ATMCOVOCN", &couComm, &atmocnid, cplAtmOcnPID );
-        //CHECKIERR( ierr, "Cannot register ocn_atm map instance over coupler pes " )
-
         int type      = types[0];  // FV
         int direction = 1;         // from source to coupler; will create a mesh on cplAtmPID
         // because it is like "coverage", context will be atmocnid

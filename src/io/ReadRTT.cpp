@@ -142,10 +142,21 @@ ErrorCode ReadRTT::load_file( const char* filename,
     rval = ReadRTT::read_cell_cards( filename, cell_cards );
     if( rval != MB_SUCCESS ) return rval;
 
-    //process sides
+    //process REGIONS
     std::vector< cell > cell_data;
-    rval = ReadRTT::cell_process_regions( cell_cards, cell_data );
+    rval = ReadRTT::cell_process_card( cell_cards, "REGIONS" , cell_data );
     if( rval != MB_SUCCESS ) return rval;
+
+    // read the abaqus parts data
+    std::vector< cell > abaqus_parts;
+    rval = ReadRTT::cell_process_card( cell_cards, "ABAQUS_PARTS" , abaqus_parts );
+    if( rval != MB_SUCCESS ) return rval; 
+
+    // read the abaqus parts data
+    std::vector< cell > mcnp_speudo_cells;
+    rval = ReadRTT::cell_process_card( cell_cards, "MCNP_PSEUDO_CELLS" , mcnp_speudo_cells );
+    if( rval != MB_SUCCESS ) return rval; 
+
 
     // read the node data
     std::vector< node > node_data;
@@ -490,19 +501,20 @@ ErrorCode ReadRTT::read_cell_cards( const char* filename, rtt_cards& cell_cards 
 /*
  * process the REGION card from the cell_flags section
  */
-ErrorCode ReadRTT::cell_process_regions( rtt_cards cell_cards, std::vector< cell >& cell_data )
+ErrorCode ReadRTT::cell_process_card( rtt_cards cell_cards, std::string key, std::vector< cell >& cell_data )
 {
-    if( cell_cards.find( "REGIONS" ) != cell_cards.end() )
+    if( cell_cards.find( key ) != cell_cards.end() )
     {
-        for( int i; i < cell_cards["REGIONS"].size(); i++ )
+        for( int i; i < cell_cards[key].size(); i++ )
         {
-            cell data = ReadRTT::get_cell_data( cell_cards["REGIONS"][i] );
+            cell data = ReadRTT::get_cell_data( cell_cards[key][i] );
             cell_data.push_back( data );
         }
+        if( cell_data.size() == 0 ) return MB_FAILURE;
     }
-    if( cell_data.size() == 0 ) return MB_FAILURE;
     return MB_SUCCESS;
 }
+
 
 /*
  * Reads the node data fromt the filename pointed to

@@ -488,11 +488,12 @@ class ReadRTT : public ReaderIface
      * Process the REGIONS card from the cell_flags section
      *
      * @param cell_cards, a vector containing all the read side_flag section
+     * @param key, the key to read
      * @param cell_data, a vector containing all the read cell data
      *
      * @return moab::ErrorCode
      */
-    ErrorCode cell_process_regions( rtt_cards cell_cards, std::vector< cell >& cell_data );
+    ErrorCode cell_process_card( rtt_cards cell_cards, std::string key, std::vector< cell >& cell_data );
 
     /**
      * Reads the full set of node data from the file

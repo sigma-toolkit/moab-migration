@@ -128,7 +128,7 @@ ErrorCode ReadRTT::load_file( const char* filename,
     if( rval != MB_SUCCESS ) return rval;
 
     // read the side_flag data
-    rtt_card side_cards;
+    rtt_cards side_cards;
     rval = ReadRTT::read_side_cards( filename, side_cards );
     if( rval != MB_SUCCESS ) return rval;
 
@@ -138,7 +138,7 @@ ErrorCode ReadRTT::load_file( const char* filename,
     if( rval != MB_SUCCESS ) return rval;
 
     // read the cell data
-    rtt_card cell_cards;
+    rtt_cards cell_cards;
     rval = ReadRTT::read_cell_cards( filename, cell_cards );
     if( rval != MB_SUCCESS ) return rval;
 
@@ -355,12 +355,6 @@ moab::ErrorCode ReadRTT::add_metadata( EntityHandle file_set )
 {
     moab::ErrorCode rval = MB_FAILURE;
 
-    Tag version_tag;
-    char* version_value = header_data.version.c_str();
-    rval                = MBI->tag_get_handle( "VERSION", strlen( version_value ) + 1, MB_TYPE_OPAQUE, version_tag,
-                                               MB_TAG_SPARSE | MB_TAG_CREAT );
-    rval                = MBI->tag_set_data( version_tag, &file_set, 1, version_value );
-
     // Create CONTIGUITY tag and set its value
     Tag contiguity_tag;
     char* contiguity_value = header_data.contiguity.c_str();
@@ -412,8 +406,19 @@ ErrorCode ReadRTT::read_header( const char* filename )
 /*
  * reads the side data from the filename pointed to
  */
-ErrorCode ReadRTT::read_side_cards( const char* filename, rtt_card& side_cards )
+ErrorCode ReadRTT::read_side_cards( const char* filename, rtt_cards& side_cards )
 {
+    ErrorCode rval = MB_FAILURE;
+    // read all the side data
+    rval = read_all_cards( filename, dim_data.nside_flags, "side", side_cards );
+
+    return rval;
+}
+
+ErrorCode ReadRTT::read_all_cards(const char* filename, std::vector<int> n_flags, std::string card_id, rtt_cards& cards)
+{
+    std::string start_flag = card_id + "_flags";
+    std::string end_flag   = "end_" + start_flag + "\0";
     std::string line;                      // the current line being read
     std::ifstream input_file( filename );  // filestream for rttfile
     // file ok?
@@ -427,12 +432,12 @@ ErrorCode ReadRTT::read_side_cards( const char* filename, rtt_card& side_cards )
     {
         while( std::getline( input_file, line ) )
         {
-            if( line.compare( "side_flags" ) == 0 )
+            if( line.compare( start_flag ) == 0 )
             {
                 while( std::getline( input_file, line ) )
                 {
                     // Read all the side block until we find the end
-                    if( line.compare( "end_side_flags\0" ) == 0 ) break;
+                    if( line.compare( end_flag ) == 0 ) break;
                     std::vector< std::string > token = ReadRTT::split_string( line, ' ' );
                     if( token.size() != 2 )
                     {
@@ -441,24 +446,23 @@ ErrorCode ReadRTT::read_side_cards( const char* filename, rtt_card& side_cards )
                     }
                     int card_key    = std::stoi( token[0] ) - 1;
                     std::string key = token[1];
-                    for( int i = 0; i < dim_data.nside_flags[card_key]; i++ )
+                    for( int i = 0; i < n_flags[card_key]; i++ )
                     {
                         std::getline( input_file, line );
-                        side_cards[key].push_back( line );
+                        cards[key].push_back( line );
                     }
                 }
             }
         }
         input_file.close();
-    }
-
+    } 
     return MB_SUCCESS;
 }
 
 /*
  * process the FACES card from the side_flags section
  */
-ErrorCode ReadRTT::side_process_faces( rtt_card side_cards, std::vector< side >& side_data )
+ErrorCode ReadRTT::side_process_faces( rtt_cards side_cards, std::vector< side >& side_data )
 {
     if( side_cards.find( "FACES" ) != side_cards.end() )
     {
@@ -475,53 +479,18 @@ ErrorCode ReadRTT::side_process_faces( rtt_card side_cards, std::vector< side >&
 /*
  * reads the cell data from the filename pointed to
  */
-ErrorCode ReadRTT::read_cell_cards( const char* filename, rtt_card& cell_cards )
+ErrorCode ReadRTT::read_cell_cards( const char* filename, rtt_cards& cell_cards )
 {
-    std::string line;                      // the current line being read
-    std::ifstream input_file( filename );  // filestream for rttfile
-    // file ok?
-    if( !input_file.good() )
-    {
-        std::cout << "Problems reading file = " << filename << std::endl;
-        return MB_FAILURE;
-    }
-    // if it works
-    if( input_file.is_open() )
-    {
-        while( std::getline( input_file, line ) )
-        {
-            if( line.compare( "cell_flags" ) == 0 )
-            {
-                while( std::getline( input_file, line ) )
-                {
-                    // Read all the side block until we find the end
-                    if( line.compare( "end_cell_flags\0" ) == 0 ) break;
-                    std::vector< std::string > token = ReadRTT::split_string( line, ' ' );
-                    if( token.size() != 2 )
-                    {
-                        std::cout << "Error reading cell flags" << std::endl;
-                        return MB_FAILURE;
-                    }
-                    int card_key    = std::stoi( token[0] ) - 1;
-                    std::string key = token[1];
-                    for( int i = 0; i < dim_data.ncell_flags[card_key]; i++ )
-                    {
-                        std::getline( input_file, line );
-                        cell_cards[key].push_back( line );
-                    }
-                }
-            }
-        }
-        input_file.close();
-    }
-
-    return MB_SUCCESS;
+    ErrorCode rval = MB_FAILURE;
+    // read all the cell data
+    rval = read_all_cards( filename, dim_data.ncell_flags, "cell", cell_cards );
+    return rval;
 }
 
 /*
  * process the REGION card from the cell_flags section
  */
-ErrorCode ReadRTT::cell_process_regions( rtt_card cell_cards, std::vector< cell >& cell_data )
+ErrorCode ReadRTT::cell_process_regions( rtt_cards cell_cards, std::vector< cell >& cell_data )
 {
     if( cell_cards.find( "REGIONS" ) != cell_cards.end() )
     {

@@ -330,7 +330,7 @@ class ReadRTT : public ReaderIface
     };
 
     // structure to hold a subsection of the RTT input
-    typedef std::map< std::string, std::vector< std::string > > rtt_card;
+    typedef std::map< std::string, std::vector< std::string > > rtt_cards;
 
     /**
      * generates the topology of the problem from the already read input data, loops over the 2 and
@@ -441,6 +441,19 @@ class ReadRTT : public ReaderIface
      */
     ErrorCode read_header( const char* filename );
 
+
+    /**
+     * Reads the full set of data from the file
+     *
+     * @param filename, the file to read all the data from
+     * @param n_flags, a vector containing the number of flags
+     * @param card_id, the card id to read
+     * @param cards, a map containing all the cards from the XX_flags section
+     *
+     * @return moab::ErrorCode
+     */
+    ErrorCode ReadRTT::read_all_cards(const char* filename, std::vector<int> n_flags, std::string card_id, rtt_cards& cards);
+
     /**
      * Reads the full set of side data from the file
      *
@@ -449,7 +462,7 @@ class ReadRTT : public ReaderIface
      *
      * @return moab::ErrorCode
      */
-    ErrorCode read_side_cards( const char* filename, rtt_card& side_cards );
+    ErrorCode read_side_cards( const char* filename, rtt_cards& side_cards );
 
     /**
      * Process the FACES card from the side_flags section
@@ -459,7 +472,7 @@ class ReadRTT : public ReaderIface
      *
      * @return moab::ErrorCode
      */
-    ErrorCode side_process_faces( rtt_card side_cards, std::vector< side >& side_data );
+    ErrorCode side_process_faces( rtt_cards side_cards, std::vector< side >& side_data );
 
     /**
      * Reads the full set of cell data from the file
@@ -469,7 +482,7 @@ class ReadRTT : public ReaderIface
      *
      * @return moab::ErrorCode
      */
-    ErrorCode read_cell_cards( const char* filename, rtt_card& cell_cards );
+    ErrorCode read_cell_cards( const char* filename, rtt_cards& cell_cards );
 
     /**
      * Process the REGIONS card from the cell_flags section
@@ -479,7 +492,7 @@ class ReadRTT : public ReaderIface
      *
      * @return moab::ErrorCode
      */
-    ErrorCode cell_process_regions( rtt_card cell_cards, std::vector< cell >& cell_data );
+    ErrorCode cell_process_regions( rtt_cards cell_cards, std::vector< cell >& cell_data );
 
     /**
      * Reads the full set of node data from the file

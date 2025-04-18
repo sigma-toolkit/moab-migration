@@ -98,6 +98,8 @@ struct appData
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
     EntityHandle secondary_file_set;  // secondary file set (typically a child set like covering mesh)
+                                      // so we assume only one covering set for all maps on this intx app
+                                      // we can have multiple weightMaps, but only one coverage set for all maps
     TempestMapAppData tempestData;
     std::map< std::string, std::string > metadataMap;
 #endif
@@ -3597,15 +3599,40 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
     appData& data_source     = context.appDatas[*pid_source];
     appData& data_target     = context.appDatas[*pid_target];
     appData& data_intx       = context.appDatas[*pid_intersection];
+    // do we need to check for tempest remap?
+    // if we do not have it, do not do anything anyway
+//#ifdef MOAB_HAVE_TEMPESTREMAP
     TempestMapAppData& tdata = data_intx.tempestData;
 
     // check if the remapped context is null; we need to fix that, if so
+    // what if we read a map and compute a map, on a particular iMOAB app a2o for example?
+    // we compute an intx map and read a bilinear map
+    // this is rather wrong, we need to fix it
     if( tdata.remapper == nullptr )
     {
-        // user has not called the coverage mesh computation routine -- so explicitly call it now
-        // this check supports the traditional workflow of directly computing mesh intersection
-        // and letting this routine compute coverage mesh as needed
-        MB_CHK_ERR( iMOAB_ComputeCoverageMesh( pid_source, pid_target, pid_intersection ) );
+        // do not compute coverage anymore in advance;
+        // need to initialize the coverage set creation?
+        // or should we really just one enclosing coverage set for all maps in here ?
+        // Now allocate and initialize the remapper object
+#ifdef MOAB_HAVE_MPI
+        ParallelComm* pco_intx = data_intx.pcomm;
+        tdata.remapper = new moab::TempestRemapper( context.MBI, pco_intx );
+#else
+        tdata.remapper = new moab::TempestRemapper( context.MBI );
+#endif
+        tdata.remapper->meshValidate     = true;
+        tdata.remapper->constructEdgeMap = true;
+
+        // Do not create new filesets; Use the sets from our respective applications
+        tdata.remapper->initialize( false );
+        tdata.remapper->GetMeshSet( moab::Remapper::SourceMesh )  = data_source.file_set;
+        tdata.remapper->GetMeshSet( moab::Remapper::TargetMesh )  = data_target.file_set;
+        tdata.remapper->GetMeshSet( moab::Remapper::OverlapMesh ) = data_intx.file_set;
+        // create a unique coverage set; it will be
+        moab::EntityHandle covering_set_new;
+        MB_CHK_SET_ERR( context.MBI->create_meshset( moab::MESHSET_SET, covering_set_new ),
+                "Can't create new set" );
+        tdata.remapper->GetMeshSet( moab::Remapper::CoveringMesh ) = covering_set_new;
     }
 
     // Setup loading of weights onto TempestOnlineMap
@@ -3628,7 +3655,7 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
         MB_CHK_ERR( context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag ) );
         assert( gdsTag );
     }
-
+//#endif
     // Find the DoF tag length
     // if it fails, usually it is 16
     // first check if we need to query the source
@@ -3640,37 +3667,11 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
         MB_CHK_ERR( context.MBI->tag_get_length( gdsTag, tgt_elem_dof_length ) );
 
     Tag gidTag = context.MBI->globalId_tag();
-    std::vector< int > srcDofValues, tgtDofValues;
+    std::vector< int >  tgtDofValues; // srcDofValues,
 
     // populate first tuple
     // will be filled with entities on coupler, from which we will get the DOFs, based on type
-    Range srcc_ents_of_interest, src_ents_of_interest, tgt_ents_of_interest;
-
-    if( *srctype == 1 )  // spectral element
-    {
-        MB_CHK_ERR( context.MBI->tag_get_length( gdsTag, src_elem_dof_length ) );
-        MB_CHK_ERR( context.MBI->get_entities_by_type( covering_set, MBQUAD, src_ents_of_interest ) );
-        srcDofValues.resize( src_ents_of_interest.size() * src_elem_dof_length );
-        MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, src_ents_of_interest, &srcDofValues[0] ) );
-    }
-    else if( *srctype == 2 )
-    {
-        // vertex global ids
-        MB_CHK_ERR( context.MBI->get_entities_by_type( covering_set, MBVERTEX, src_ents_of_interest ) );
-        srcDofValues.resize( src_ents_of_interest.size() * src_elem_dof_length );
-        MB_CHK_ERR( context.MBI->tag_get_data( gidTag, src_ents_of_interest, &srcDofValues[0] ) );
-    }
-    else if( *srctype == 3 )  // for FV meshes, just get the global id of cell
-    {
-        // element global ids
-        MB_CHK_ERR( context.MBI->get_entities_by_dimension( covering_set, 2, src_ents_of_interest ) );
-        srcDofValues.resize( src_ents_of_interest.size() * src_elem_dof_length );
-        MB_CHK_ERR( context.MBI->tag_get_data( gidTag, src_ents_of_interest, &srcDofValues[0] ) );
-    }
-    else
-    {
-        MB_CHK_ERR( MB_FAILURE );  // we know only type 1 or 2 or 3
-    }
+    Range tgt_ents_of_interest;
 
     if( *tgttype == 1 )  // spectral element
     {
@@ -3731,16 +3732,16 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
     // source coverage and target meshes and to figure out only relevant elements
     // that need to participate in the meshes.
 
-    tdata.remapper->SetMeshSet( Remapper::SourceMesh, source_set, &srcc_ents_of_interest );
+    //tdata.remapper->SetMeshSet( Remapper::SourceMesh, source_set, &srcc_ents_of_interest );
     // we have read the area A from map file, and we will set it as a aream double tag on the source set, knowing that we
     // read it trivially, with a trivial distribution by the global DOFs
     // local , private method:
     MB_CHK_SET_ERR( set_aream_from_trivial_distribution( pid_source, nA, trvAreaA ), " fail to set aream on source " );
     MB_CHK_SET_ERR( set_aream_from_trivial_distribution( pid_target, nB, trvAreaB ), " fail to set aream on target " );
 
-    tdata.remapper->SetMeshSet( Remapper::CoveringMesh, covering_set, &src_ents_of_interest );
+    //tdata.remapper->SetMeshSet( Remapper::CoveringMesh, covering_set, &src_ents_of_interest );
     weightMap->SetSourceNDofsPerElement( src_elem_dof_length );
-    weightMap->set_col_dc_dofs( srcDofValues );  // will set col_dtoc_dofmap
+    //weightMap->set_col_dc_dofs( srcDofValues );  // will set col_dtoc_dofmap
 
     tdata.remapper->SetMeshSet( Remapper::TargetMesh, target_set, &tgt_ents_of_interest );
     weightMap->SetDestinationNDofsPerElement( tgt_elem_dof_length );
@@ -3947,7 +3948,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     // start copy
     TLcomp2.enableWriteAccess();
 
-    moab::TempestOnlineMap* weightMap = nullptr;  // declare it outside, but it will make sense only for *pid >= 0
+    //moab::TempestOnlineMap* weightMap = nullptr;  // declare it outside, but it will make sense only for *pid2 >= 0
     // we know that :) (or *pid2 >= 0, it means we are on the coupler PEs, read map exists, and coupler procs exist)
     // populate second tuple with ids  from read map: we need row_gdofmap and col_gdofmap
     std::vector< int > valuesComp2;
@@ -3955,15 +3956,22 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     {
         appData& data2           = context.appDatas[*pid2];
         TempestMapAppData& tdata = data2.tempestData;
-        // should be only one map, read from file
-        assert( tdata.weightMaps.size() == 1 );
+        // could be more than one map, read from file
+        // get all column dofs, and create a union
+        // assert( tdata.weightMaps.size() == 1 );
         // maybe we need to check it is the map we expect
-        weightMap = tdata.weightMaps.begin()->second;
+        for (auto mapIt=tdata.weightMaps.begin(); mapIt!=tdata.weightMaps.end(); ++mapIt)
+        {
+            moab::TempestOnlineMap* weightMap = mapIt->second;
+            std::vector<int> valueDofs;
+            rval = weightMap->fill_col_ids( valueDofs );MB_CHK_ERR( rval );
+            valuesComp2.insert(valuesComp2.end(),valueDofs.begin(), valueDofs.end());
+        }
         // std::vector<int> ids_of_interest;
         // do a deep copy of the ids of interest: row ids
         // we are interested in col ids, source
         // new method from moab::TempestOnlineMap
-        rval = weightMap->fill_col_ids( valuesComp2 );MB_CHK_ERR( rval );
+
 
         // now fill the tuple list with info and markers
         std::set< int > uniq( valuesComp2.begin(), valuesComp2.end() );
@@ -4129,12 +4137,15 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                                                   values_entities );MB_CHK_ERR( rval );
         int ndofPerEl = 1;
         if( 1 == *type ) ndofPerEl = (int)( sqrt( lenTagType1 ) );
-        // because we are on the coupler, we know that the read map pid2 exists
-        assert( *pid2 >= 0 );
 
         tdata.remapper->SetMeshSet( Remapper::CoveringMesh, fset3, &primary_ents3 );
-        weightMap->SetSourceNDofsPerElement( ndofPerEl );
-        weightMap->set_col_dc_dofs( values_entities );  // will set col_dtoc_dofmap
+        for (auto mapIt=tdata.weightMaps.begin(); mapIt!=tdata.weightMaps.end(); ++mapIt)
+        {
+            moab::TempestOnlineMap* weightMap = mapIt->second;
+            weightMap->SetSourceNDofsPerElement( ndofPerEl );
+            weightMap->set_col_dc_dofs( values_entities );  // will set col_dtoc_dofmap
+        }
+
 
     }
 

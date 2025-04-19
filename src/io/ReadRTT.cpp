@@ -128,33 +128,33 @@ ErrorCode ReadRTT::load_file( const char* filename,
     if( rval != MB_SUCCESS ) return rval;
 
     // read the side_flag data
-    rtt_cards side_cards;
-    rval = ReadRTT::read_side_cards( filename, side_cards );
+    rtt_flags side_flags;
+    rval = ReadRTT::read_side_flags( filename, side_flags );
     if( rval != MB_SUCCESS ) return rval;
 
     //process sides
     std::vector< side > side_data;
-    rval = ReadRTT::side_process_faces( side_cards, side_data );
+    rval = ReadRTT::side_process_faces( side_flags, side_data );
     if( rval != MB_SUCCESS ) return rval;
 
     // read the cell data
-    rtt_cards cell_cards;
-    rval = ReadRTT::read_cell_cards( filename, cell_cards );
+    rtt_flags cell_flags;
+    rval = ReadRTT::read_cell_flags( filename, cell_flags );
     if( rval != MB_SUCCESS ) return rval;
 
     //process REGIONS
     std::vector< cell > cell_data;
-    rval = ReadRTT::cell_process_card( cell_cards, "REGIONS" , cell_data );
+    rval = ReadRTT::cell_process_flag( cell_flags, "REGIONS" , cell_data );
     if( rval != MB_SUCCESS ) return rval;
 
     // read the abaqus parts data
     std::vector< cell > abaqus_parts;
-    rval = ReadRTT::cell_process_card( cell_cards, "ABAQUS_PARTS" , abaqus_parts );
+    rval = ReadRTT::cell_process_flag( cell_flags, "ABAQUS_PARTS" , abaqus_parts );
     if( rval != MB_SUCCESS ) return rval; 
 
     // read the abaqus parts data
     // std::vector< cell > mcnp_speudo_cells;
-    rval = ReadRTT::cell_process_card( cell_cards, "MCNP_PSEUDO_CELLS" , cell_data );
+    rval = ReadRTT::cell_process_flag( cell_flags, "MCNP_PSEUDO-CELLS" , cell_data );
     if( rval != MB_SUCCESS ) return rval; 
 
 
@@ -417,18 +417,18 @@ ErrorCode ReadRTT::read_header( const char* filename )
 /*
  * reads the side data from the filename pointed to
  */
-ErrorCode ReadRTT::read_side_cards( const char* filename, rtt_cards& side_cards )
+ErrorCode ReadRTT::read_side_flags( const char* filename, rtt_flags& side_flags )
 {
     ErrorCode rval = MB_FAILURE;
     // read all the side data
-    rval = read_all_cards( filename, dim_data.nside_flags, "side", side_cards );
+    rval = read_all_flags( filename, dim_data.nside_flags, "side", side_flags );
 
     return rval;
 }
 
-ErrorCode ReadRTT::read_all_cards(const char* filename, std::vector<int> n_flags, std::string card_id, rtt_cards& cards)
+ErrorCode ReadRTT::read_all_flags(const char* filename, std::vector<int> n_flags, std::string flag_id, rtt_flags& flags)
 {
-    std::string start_flag = card_id + "_flags";
+    std::string start_flag = flag_id + "_flags";
     std::string end_flag   = "end_" + start_flag + "\0";
     std::string line;                      // the current line being read
     std::ifstream input_file( filename );  // filestream for rttfile
@@ -455,12 +455,12 @@ ErrorCode ReadRTT::read_all_cards(const char* filename, std::vector<int> n_flags
                         std::cout << "Error reading side flags" << std::endl;
                         return MB_FAILURE;
                     }
-                    int card_key    = std::stoi( token[0] ) - 1;
+                    int flag_key    = std::stoi( token[0] ) - 1;
                     std::string key = token[1];
-                    for( int i = 0; i < n_flags[card_key]; i++ )
+                    for( int i = 0; i < n_flags[flag_key]; i++ )
                     {
                         std::getline( input_file, line );
-                        cards[key].push_back( line );
+                        flags[key].push_back( line );
                     }
                 }
             }
@@ -471,15 +471,15 @@ ErrorCode ReadRTT::read_all_cards(const char* filename, std::vector<int> n_flags
 }
 
 /*
- * process the FACES card from the side_flags section
+ * process the FACES flag from the side_flags section
  */
-ErrorCode ReadRTT::side_process_faces( rtt_cards side_cards, std::vector< side >& side_data )
+ErrorCode ReadRTT::side_process_faces( rtt_flags side_flags, std::vector< side >& side_data )
 {
-    if( side_cards.find( "FACES" ) != side_cards.end() )
+    if( side_flags.find( "FACES" ) != side_flags.end() )
     {
-        for( int i; i < side_cards["FACES"].size(); i++ )
+        for( int i; i < side_flags["FACES"].size(); i++ )
         {
-            side data = ReadRTT::get_side_data( side_cards["FACES"][i] );
+            side data = ReadRTT::get_side_data( side_flags["FACES"][i] );
             side_data.push_back( data );
         }
     }
@@ -490,24 +490,24 @@ ErrorCode ReadRTT::side_process_faces( rtt_cards side_cards, std::vector< side >
 /*
  * reads the cell data from the filename pointed to
  */
-ErrorCode ReadRTT::read_cell_cards( const char* filename, rtt_cards& cell_cards )
+ErrorCode ReadRTT::read_cell_flags( const char* filename, rtt_flags& cell_flags )
 {
     ErrorCode rval = MB_FAILURE;
     // read all the cell data
-    rval = read_all_cards( filename, dim_data.ncell_flags, "cell", cell_cards );
+    rval = read_all_flags( filename, dim_data.ncell_flags, "cell", cell_flags );
     return rval;
 }
 
 /*
- * process the REGION card from the cell_flags section
+ * process the REGION flag from the cell_flags section
  */
-ErrorCode ReadRTT::cell_process_card( rtt_cards cell_cards, std::string key, std::vector< cell >& cell_data )
+ErrorCode ReadRTT::cell_process_flag( rtt_flags cell_flags, std::string key, std::vector< cell >& cell_data )
 {
-    if( cell_cards.find( key ) != cell_cards.end() )
+    if( cell_flags.find( key ) != cell_flags.end() )
     {
-        for( int i; i < cell_cards[key].size(); i++ )
+        for( int i; i < cell_flags[key].size(); i++ )
         {
-            cell data = ReadRTT::get_cell_data( cell_cards[key][i] );
+            cell data = ReadRTT::get_cell_data( cell_flags[key][i] );
             cell_data.push_back( data );
         }
         if( cell_data.size() == 0 ) return MB_FAILURE;

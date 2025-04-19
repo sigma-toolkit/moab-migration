@@ -330,7 +330,7 @@ class ReadRTT : public ReaderIface
     };
 
     // structure to hold a subsection of the RTT input
-    typedef std::map< std::string, std::vector< std::string > > rtt_cards;
+    typedef std::map< std::string, std::vector< std::string > > rtt_flags;
 
     /**
      * generates the topology of the problem from the already read input data, loops over the 2 and
@@ -447,53 +447,53 @@ class ReadRTT : public ReaderIface
      *
      * @param filename, the file to read all the data from
      * @param n_flags, a vector containing the number of flags
-     * @param card_id, the card id to read
-     * @param cards, a map containing all the cards from the XX_flags section
+     * @param flag_id, the flag id to read
+     * @param flags, a map containing all the flags from the XX_flags section
      *
      * @return moab::ErrorCode
      */
-    ErrorCode ReadRTT::read_all_cards(const char* filename, std::vector<int> n_flags, std::string card_id, rtt_cards& cards);
+    ErrorCode ReadRTT::read_all_flags(const char* filename, std::vector<int> n_flags, std::string flag_id, rtt_flags& flags);
 
     /**
      * Reads the full set of side data from the file
      *
      * @param filename, the file to read all the side data from
-     * @param side_cards, a map containing all the cards from the side_flags section
+     * @param side_flags, a map containing all the flags from the side_flags section
      *
      * @return moab::ErrorCode
      */
-    ErrorCode read_side_cards( const char* filename, rtt_cards& side_cards );
+    ErrorCode read_side_flags( const char* filename, rtt_flags& side_flags );
 
     /**
-     * Process the FACES card from the side_flags section
+     * Process the FACES flag from the side_flags section
      *
-     * @param side_cards, a vector containing all the read side data
+     * @param side_flags, a vector containing all the read side data
      * @param side_data, a vector containing all the read side data
      *
      * @return moab::ErrorCode
      */
-    ErrorCode side_process_faces( rtt_cards side_cards, std::vector< side >& side_data );
+    ErrorCode side_process_faces( rtt_flags side_flags, std::vector< side >& side_data );
 
     /**
      * Reads the full set of cell data from the file
      *
      * @param filename, the file to read all the side data from
-     * @param cell_cards, a map containing all the cards from the cell_flags section
+     * @param cell_flags, a map containing all the flags from the cell_flags section
      *
      * @return moab::ErrorCode
      */
-    ErrorCode read_cell_cards( const char* filename, rtt_cards& cell_cards );
+    ErrorCode read_cell_flags( const char* filename, rtt_flags& cell_flags );
 
     /**
-     * Process the REGIONS card from the cell_flags section
+     * Process the REGIONS flag from the cell_flags section
      *
-     * @param cell_cards, a vector containing all the read side_flag section
+     * @param cell_flags, a vector containing all the read side_flag section
      * @param key, the key to read
      * @param cell_data, a vector containing all the read cell data
      *
      * @return moab::ErrorCode
      */
-    ErrorCode cell_process_card( rtt_cards cell_cards, std::string key, std::vector< cell >& cell_data );
+    ErrorCode cell_process_flag( rtt_flags cell_flags, std::string key, std::vector< cell >& cell_data );
 
     /**
      * Reads the full set of node data from the file

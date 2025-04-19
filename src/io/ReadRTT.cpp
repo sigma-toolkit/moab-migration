@@ -147,13 +147,12 @@ ErrorCode ReadRTT::load_file( const char* filename,
     rval = ReadRTT::cell_process_flag( cell_flags, "REGIONS" , cell_data );
     if( rval != MB_SUCCESS ) return rval;
 
-    // read the abaqus parts data
+    // process the ABAQUS_PARTS
     std::vector< cell > abaqus_parts;
     rval = ReadRTT::cell_process_flag( cell_flags, "ABAQUS_PARTS" , abaqus_parts );
     if( rval != MB_SUCCESS ) return rval; 
 
-    // read the abaqus parts data
-    // std::vector< cell > mcnp_speudo_cells;
+    // process the MCNP_PSEUDO-CELLS
     rval = ReadRTT::cell_process_flag( cell_flags, "MCNP_PSEUDO-CELLS" , cell_data );
     if( rval != MB_SUCCESS ) return rval; 
 

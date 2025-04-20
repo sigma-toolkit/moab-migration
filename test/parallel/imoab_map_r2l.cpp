@@ -1,10 +1,10 @@
 /*
- * This imoab_map_target test will simulate coupling between 2 components
- * 2 meshes will be loaded from 2 files (src, tgt), and one map file
- * the coverage source mesh is migrated to coupler after map read by row
- *  During this migration, par comm graph is computed between source and
- *  source coverage.  Will assist
- *  in field transfer from source to coupler;
+ * This imoab_map_r2l test will simulate coupling between land and river
+ * 2 meshes will be loaded from 2 files (land domain file, source,
+ * and target scrip file, tgt), and one map file read from disk
+ * the 
+ * the migrate map mesh will be used to generate coverage set over target
+ *  and will help for projection application
  */
 
 #include "moab/Core.hpp"
@@ -26,16 +26,11 @@
 
 #include "imoab_coupler_utils.hpp"
 
-#ifndef MOAB_HAVE_TEMPESTREMAP
-#error The climate coupler test example requires MOAB configuration with TempestRemap
-#endif
-
 int main( int argc, char* argv[] )
 {
     int ierr;
     int rankInGlobalComm, numProcesses;
     MPI_Group jgroup;
-    std::string readopts( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS" );
 
     // Timer data
     moab::CpuTimer timer;
@@ -48,31 +43,26 @@ int main( int argc, char* argv[] )
 
     MPI_Comm_group( MPI_COMM_WORLD, &jgroup );  // all processes in jgroup
 
-    std::string atmFilename = TestDir + "unittest/srcWithSolnTag.h5m";
-    // on a regular case,  5 ATM, 6 CPLATM (ATMX), 17 OCN     , 18 CPLOCN (OCNX)  ;
-    // intx atm/ocn is not in e3sm yet, give a number
-    //   6 * 100+ 18 = 618 : atmocnid
-    // 9 LND, 10 CPLLND
-    //   6 * 100 + 10 = 610  atmlndid:
-    // cmpatm is for atm on atm pes
-    // cmpocn is for ocean, on ocean pe
-    // cplatm is for atm on coupler pes
-    // cplocn is for ocean on coupelr pes
-    // atmocnid is for intx atm / ocn on coupler pes
-    //
-    int rankInAtmComm = -1;
-    int cmpatm        = 5,
-        cplatm        = 6;  // component ids are unique over all pes, and established in advance;
+    std::string lndFilename = TestDir + "unittest/domain.lnd.ne4pg2_oQU480.200527.nc";
+    std::string readopts_lnd( "PARALLEL=READ_PART;PARTITION_METHOD=SQIJ;VARIABLE=;REPARTITION" );
 
-    std::string ocnFilename = TestDir + "unittest/outTri15_8.h5m";
-    std::string mapFilename = TestDir + "unittest/mapNE20_FV15.nc";  // this is a netcdf file!
+    int cplrof        = 22,
+        cpllnd        = 10;  // component ids are unique over all pes, and established in advance;
 
-    std::string field_source = "AnalyticalSolnSrcExact";  // this is a tag name!
+    std::string rof_data = TestDir + "unittest/io/rof_comp_p32.h5m";
 
-    std::string baseline = TestDir + "unittest/baseline2.txt";
+    std::string rof_mesh = TestDir + "unittest/io/SCRIPgrid_2x2_nomask_c210211.nc";
+    std::string readopts_rof( "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN" );
+
+    std::string mapFilename = TestDir + "unittest/map_r2_to_ne4pg2_mono.210211.nc";  // this is a netcdf file!
+
+    std::string field_source = "Forr_rofl";  // this is a tag name, on the exported rof file
+    // this will be projected and generate a baseline after sending it to coupler
+
+    std::string baseline = TestDir + "unittest/baseline_lnd.txt";
     int rankInOcnComm    = -1;
-    int cmpocn = 17, cplocn = 18,
-        atmocnid = 618;  // component ids are unique over all pes, and established in advance;
+    int cmprof = 21,
+        roflndid = 1022;  // 100*10 + 22 component ids are unique over all pes, and established in advance;
 
     // we should modify the MigrateMapMesh to work with source coverage directly, like an intersection app
 
@@ -80,76 +70,63 @@ int main( int argc, char* argv[] )
 
     int nghlay = 0;  // number of ghost layers for loading the file
     std::vector< int > groupTasks;
-    int startG1 = 0, startG2 = 0, endG1 = numProcesses - 1, endG2 = numProcesses - 1;
+    int startG1 = 0,  endG1 = numProcesses - 1;
 
     int startG4 = startG1, endG4 = endG1;  // these are for coupler layout
     int context_id;                        // used now for freeing buffers
 
     int repartitioner_scheme = 0;
-#ifdef MOAB_HAVE_ZOLTAN
-    repartitioner_scheme = 2;  // use the graph partitioner in that case
-#endif
 
-    // default: load atm / source on 2 proc, ocean / target on 2,
-    // load map on 2 also, in parallel, distributed by rows (which is very bad actually for ocean mesh, because
+    // default: load rof / source on 2 proc, land / target on 2,
+    // load map on 2 also, in parallel, distributed by rows
     // probably all source cells will be involved in coverage mesh on both tasks
 
     ProgOptions opts;
-    opts.addOpt< std::string >( "atmosphere,t", "atm mesh filename (source)", &atmFilename );
-    opts.addOpt< std::string >( "ocean,m", "ocean mesh filename (target)", &ocnFilename );
+    opts.addOpt< std::string >( "rof,s", "rof mesh scrip filename (source)", &rof_mesh );
+    opts.addOpt< std::string >( "rofdata,d", "rof data filename (source)", &rof_data );
+    opts.addOpt< std::string >( "lnd,t", "land domain mesh filename (target)", &lndFilename );
     opts.addOpt< std::string >( "map_file,w", "map file from source to target", &mapFilename );
 
-    opts.addOpt< int >( "startAtm,a", "start task for atmosphere layout", &startG1 );
-    opts.addOpt< int >( "endAtm,b", "end task for atmosphere layout", &endG1 );
-
-    opts.addOpt< int >( "startOcn,c", "start task for ocean layout", &startG2 );
-    opts.addOpt< int >( "endOcn,d", "end task for ocean layout", &endG2 );
+    opts.addOpt< int >( "startAtm,a", "start task for rof layout", &startG1 );
+    opts.addOpt< int >( "endAtm,b", "end task for rof layout", &endG1 );
 
     opts.addOpt< int >( "startCoupler,g", "start task for coupler layout", &startG4 );
     opts.addOpt< int >( "endCoupler,j", "end task for coupler layout", &endG4 );
 
     int types[2]       = { 3, 3 };  // type of source and target;  1 = SE, 2,= PC, 3 = FV
     int disc_orders[2] = { 1, 1 };  // 1 is for FV and PC; 4 could be for SE
-    opts.addOpt< int >( "typeSource,x", "source type", &types[0] );
-    opts.addOpt< int >( "typeTarget,y", "target type", &types[1] );
-    opts.addOpt< int >( "orderSource,u", "source order", &disc_orders[0] );
-    opts.addOpt< int >( "orderTarget,v", "target oorder", &disc_orders[1] );
-    bool analytic_field = false;
-    opts.addOpt< void >( "analytic,q", "analytic field", &analytic_field );
 
     opts.addOpt< std::string >( "field,f", "field to project using the map ", &field_source );
 
     bool no_regression_test = false;
     opts.addOpt< void >( "no_regression,r", "do not do regression test against baseline 1", &no_regression_test );
+    opts.addOpt< std::string >( "newbaseline,n", "baseline to use for test ", &baseline );
     opts.parseCommandLine( argc, argv );
 
     char fileWriteOptions[] = "PARALLEL=WRITE_PART";
 
     if( !rankInGlobalComm )
     {
-        std::cout << " atm file: " << atmFilename << "\n   on tasks : " << startG1 << ":" << endG1
-                  << "\n ocn file: " << ocnFilename << "\n     on tasks : " << startG2 << ":" << endG2
-                  << "\n map file:" << mapFilename << "\n     on tasks : " << startG4 << ":" << endG4 << "\n";
+        std::cout << " rof_data file: " << rof_data << "\n   on tasks : " << startG1 << ":" << endG1
+                  << " rof_mesh scrip file on coupler: " << rof_mesh << "\n   on tasks : " << startG4 << ":" << endG4
+                  << "\n lnd domain file on coupler " << lndFilename << "\n     on tasks : " << startG4 << ":" << endG4
+                  << "\n map file:" << mapFilename << "\n     on tasks : " << startG4 << ":" << endG4 << "\n" <<
+                  << " baseline: " << baseline << "\n";
         if( !no_regression_test )
         {
             std::cout << " check projection against baseline: " << baseline << "\n";
         }
     }
 
-    // load files on 3 different communicators, groups
+    // load files on 2 different communicators, groups
     // first groups has task 0, second group tasks 0 and 1
     // coupler will be on joint tasks, will be on a third group (0 and 1, again)
     // first groups has task 0, second group tasks 0 and 1
     // coupler will be on joint tasks, will be on a third group (0 and 1, again)
-    MPI_Group atmPEGroup;
-    MPI_Comm atmComm;
-    ierr = create_group_and_comm( startG1, endG1, jgroup, &atmPEGroup, &atmComm );
+    MPI_Group rofPEGroup;
+    MPI_Comm rofComm;
+    ierr = create_group_and_comm( startG1, endG1, jgroup, &rofPEGroup, &rofComm );
     CHECKIERR( ierr, "Cannot create atm MPI group and communicator " )
-
-    MPI_Group ocnPEGroup;
-    MPI_Comm ocnComm;
-    ierr = create_group_and_comm( startG2, endG2, jgroup, &ocnPEGroup, &ocnComm );
-    CHECKIERR( ierr, "Cannot create ocn MPI group and communicator " )
 
     // we will always have a coupler
     MPI_Group couPEGroup;
@@ -157,77 +134,68 @@ int main( int argc, char* argv[] )
     ierr = create_group_and_comm( startG4, endG4, jgroup, &couPEGroup, &couComm );
     CHECKIERR( ierr, "Cannot create cpl MPI group and communicator " )
 
-    // atm_coupler
-    MPI_Group joinAtmCouGroup;
-    MPI_Comm atmCouComm;
-    ierr = create_joint_comm_group( atmPEGroup, couPEGroup, &joinAtmCouGroup, &atmCouComm );
-    CHECKIERR( ierr, "Cannot create joint atm cou communicator" )
-
-    // ocn_coupler
-    MPI_Group joinOcnCouGroup;
-    MPI_Comm ocnCouComm;
-    ierr = create_joint_comm_group( ocnPEGroup, couPEGroup, &joinOcnCouGroup, &ocnCouComm );
-    CHECKIERR( ierr, "Cannot create joint ocn cou communicator" )
+    // rof_coupler
+    MPI_Group joinRofCouGroup;
+    MPI_Comm rofCouComm;
+    ierr = create_joint_comm_group( rofPEGroup, couPEGroup, &joinRofCouGroup, &rofCouComm );
+    CHECKIERR( ierr, "Cannot create joint rof cou communicator" )
 
     ierr = iMOAB_Initialize( argc, argv );  // not really needed anything from argc, argv, yet; maybe we should
     CHECKIERR( ierr, "Cannot initialize iMOAB" )
 
-    int cmpAtmAppID       = -1;
-    iMOAB_AppID cmpAtmPID = &cmpAtmAppID;  // atm
-    int cplAtmAppID       = -1;            // -1 means it is not initialized
-    iMOAB_AppID cplAtmPID = &cplAtmAppID;  // atm on coupler PEs
+    int cmpRofAppID       = -1;
+    iMOAB_AppID cmpRofPID = &cmpRofAppID;  // rof
+    int cplRofAppID       = -1;            // -1 means it is not initialized
+    iMOAB_AppID cplRofPID = &cplRofAppID;  // rof on coupler PEs
 
-    int cmpOcnAppID       = -1;
-    iMOAB_AppID cmpOcnPID = &cmpOcnAppID;        // ocn
-    int cplOcnAppID = -1, cplAtmOcnAppID = -1;   // -1 means it is not initialized
-    iMOAB_AppID cplOcnPID    = &cplOcnAppID;     // ocn on coupler PEs
-    iMOAB_AppID cplAtmOcnPID = &cplAtmOcnAppID;  // intx atm -ocn on coupler PEs
-    int cplAtmCovOcn = -1;
-    iMOAB_AppID cplAtmCovOcnPID = &cplAtmCovOcn;
+    int cplLndAppID = -1;
+    iMOAB_AppID cplLndPID    = &cplLndAppID;     // lnd on coupler PEs
+    int cplRofLndAppID = -1;
+    iMOAB_AppID cplRofLndPID = &cplRofLndAppID;  // map rof -lnd on coupler PEs
 
     if( couComm != MPI_COMM_NULL )
     {
         MPI_Comm_rank( couComm, &rankInCouComm );
         // Register all the applications on the coupler PEs
-        ierr = iMOAB_RegisterApplication( "ATMX", &couComm, &cplatm,
-                                          cplAtmPID );  // atm on coupler pes
-        CHECKIERR( ierr, "Cannot register ATM over coupler PEs" )
+        ierr = iMOAB_RegisterApplication( "ROFX", &couComm, &cplrof,
+                cplRofPID );  // rof on coupler pes
+        CHECKIERR( ierr, "Cannot register ROF over coupler PEs" )
 
-        ierr = iMOAB_RegisterApplication( "OCNX", &couComm, &cplocn,
-                                          cplOcnPID );  // ocn on coupler pes
-        CHECKIERR( ierr, "Cannot register OCN over coupler PEs" )
+        ierr = iMOAB_RegisterApplication( "LNDX", &couComm, &cpllnd,
+                                          cplLndPID );  // lnd on coupler pes
+        CHECKIERR( ierr, "Cannot register LND over coupler PEs" )
     }
 
-    if( atmComm != MPI_COMM_NULL )
+    int rankInRofComm = -1;
+    if( rofComm != MPI_COMM_NULL )
     {
-        MPI_Comm_rank( atmComm, &rankInAtmComm );
-        ierr = iMOAB_RegisterApplication( "ATM1", &atmComm, &cmpatm, cmpAtmPID );
-        CHECKIERR( ierr, "Cannot register ATM App" )
+        MPI_Comm_rank( rofComm, &rankInRofComm );
+        ierr = iMOAB_RegisterApplication( "ROF1", &rofComm, &cmprof, cmpRofPID );
+        CHECKIERR( ierr, "Cannot register ROF cmp App" )
     }
 
-    if( ocnComm != MPI_COMM_NULL )
-    {
-        MPI_Comm_rank( ocnComm, &rankInOcnComm );
-        ierr = iMOAB_RegisterApplication( "OCN1", &ocnComm, &cmpocn, cmpOcnPID );
-        CHECKIERR( ierr, "Cannot register OCN App" )
-    }
     MPI_Barrier( MPI_COMM_WORLD );
 
-    ierr =
-        setup_component_coupler_meshes( cmpOcnPID, cmpocn, cplOcnPID, cplocn, &ocnComm, &ocnPEGroup, &couComm,
-                                        &couPEGroup, &ocnCouComm, ocnFilename, readopts, nghlay, repartitioner_scheme );
-
-    ierr =
-        setup_component_coupler_meshes( cmpAtmPID, cmpatm, cplAtmPID, cplatm, &atmComm, &atmPEGroup, &couComm,
-                                            &couPEGroup, &atmCouComm, atmFilename, readopts, nghlay, repartitioner_scheme );
-
-    CHECKIERR( ierr, "Cannot set-up target meshes" )
 
     if( couComm != MPI_COMM_NULL )
     {
         //
-        ierr = iMOAB_RegisterApplication( "ATMOCNMAP", &couComm, &atmocnid, cplAtmOcnPID );
-        CHECKIERR( ierr, "Cannot register ocn_atm map instance over coupler pes " )
+        ierr = iMOAB_RegisterApplication( "ROFLNDMAP", &couComm, &roflndid, cplRofLndPID );
+        CHECKIERR( ierr, "Cannot register rof2lnd map instance over coupler pes " )
+    }
+
+    // load rof data on component rof; fake a time step export
+    if (rofComm != MPI_COMM_NULL)
+    {
+        std::string readopts( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS");// load a point cloud with rof data
+        ierr = iMOAB_LoadMesh( cmpRofPID, rof_data.c_str(), readopts.c_str(), &nghlay );
+        CHECKIERR( ierr, "Cannot load component data file" )
+    }
+
+    // load rof mesh, lnd mesh on coupler
+    if (couComm != MPI_COMM_NULL)
+    {
+
     }
 
     const std::string intx_from_file_identifier = "map-from-file";
@@ -236,7 +204,7 @@ int main( int argc, char* argv[] )
     {
         int src_disc_type = 3;  // element-based FV
         int tgt_disc_type = 3;  // element-based FV
-        CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type, &tgt_disc_type,
+        CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplRofPID, cplLndPID, cplRofLndPID, &src_disc_type, &tgt_disc_type,
                                                      intx_from_file_identifier.c_str(), mapFilename.c_str() ),
                    "failed to load map file from disk" );
         int type      = types[0];  // FV

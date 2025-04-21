@@ -9,6 +9,11 @@
  *
  * can be built only if netcdf and hdf5 and eigen3 are available
  *
+ * default option is now -o 2, which means it will create an edge mesh file, with the edges corresponding to a weight
+ *  in the file, connecting one source with one target
+ *
+ *  only the map file is needed, positions for source and target centers are taken from map file itself
+ *
  *
  */
 #include "moab/MOABConfig.h"
@@ -224,6 +229,10 @@ int main( int argc, char* argv[] )
         }
         Range source_verts;
         rval = mb->create_vertices( &vertex_coords_src[0], na1, source_verts );MB_CHK_SET_ERR( rval, "can't create source vertices" );
+        // create a set with source vertices
+        EntityHandle srcSet;
+        rval = mb->create_meshset( MESHSET_SET, srcSet );MB_CHK_SET_ERR( rval, "can't create source set for vertices" );
+        rval = mb->add_entities(srcSet, source_verts);MB_CHK_SET_ERR( rval, "can't add vertices" );
         std::vector< int > vgid( na1 );
         for( int i = 0; i < na1; i++ )
             vgid[i] = i + 1;
@@ -244,6 +253,9 @@ int main( int argc, char* argv[] )
         }
         Range target_verts;
         rval = mb->create_vertices( &vertex_coords_tgt[0], nb1, target_verts );MB_CHK_SET_ERR( rval, "can't create target vertices" );
+        EntityHandle tgtSet;
+        rval = mb->create_meshset( MESHSET_SET, tgtSet );MB_CHK_SET_ERR( rval, "can't create target set for vertices" );
+        rval = mb->add_entities(tgtSet, target_verts);MB_CHK_SET_ERR( rval, "can't add vertices" );
         vgid.resize( nb1 );
         for( int i = 0; i < nb1; i++ )
             vgid[i] = i + 1;
@@ -265,6 +277,12 @@ int main( int argc, char* argv[] )
         Range edges( actual_start_handle, actual_start_handle + ns1 - 1 );
 
         rval = mb->tag_set_data( wtag, edges, &val1[0] );MB_CHK_SET_ERR( rval, "can't set tag on edges" );
+
+        vgid.resize( ns1 );
+        for( int i = 0; i < ns1; i++ )
+            vgid[i] = i + 1;
+        rval = mb->tag_set_data( gtag, edges, &vgid[0] );MB_CHK_SET_ERR( rval, "can't set global id on edges" );
+
 
         std::string name_file = name_map + extension;
         rval                  = mb->write_mesh( name_file.c_str() );MB_CHK_ERR( rval );

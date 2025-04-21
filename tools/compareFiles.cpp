@@ -179,13 +179,11 @@ int main( int argc, char* argv[] )
         }
         std::string new_tag_name = tag_name + "_2";
         Tag newTag, newTagDiff;
-        double def_vald[len_tag];
-        int def_vali[len_tag];
-        double def_val2           = 0.;
-        int dev_vali2             = 0;
         std::string tag_name_diff = tag_name + "_diff";
         if( doubleType )
         {
+            double def_val2 = 0.;
+            double def_vald[len_tag];
             rval = mb->tag_get_default_value( tag, def_vald );MB_CHK_SET_ERR( rval, "can't get default" );
 
             rval = mb->tag_get_handle( new_tag_name.c_str(), 1, dtype, newTag, MB_TAG_CREAT | MB_TAG_DENSE, def_vald );MB_CHK_SET_ERR( rval, "can't define new tag" );
@@ -194,6 +192,8 @@ int main( int argc, char* argv[] )
         }
         else
         {
+            int def_vali[len_tag];
+            int dev_vali2             = 0;
             rval = mb->tag_get_default_value( tag, def_vali );MB_CHK_SET_ERR( rval, "can't get default" );
 
             rval = mb->tag_get_handle( new_tag_name.c_str(), 1, dtype, newTag, MB_TAG_CREAT | MB_TAG_DENSE, def_vali );MB_CHK_SET_ERR( rval, "can't define new tag" );
@@ -267,6 +267,7 @@ int main( int argc, char* argv[] )
         for( size_t i = 0; i < list1.size(); i++ )
         {
             Tag tag = list1[i];
+            if (tag == gid) continue; // do not compare global id tag
             std::string name;
             rval = mb->tag_get_name( tag, name );MB_CHK_SET_ERR( rval, "can't get tag name" );
             DataType type;

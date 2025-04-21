@@ -70,7 +70,7 @@ if HAVE_TEMPESTREMAP
   imoab_domain_culling_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_read_compute_map_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
 if HAVE_NETCDF
-  HDF5_TESTS += imoab_map_target imoab_coupler_bilin imoab_domain_culling imoab_read_compute_map
+  HDF5_TESTS += imoab_map_target imoab_coupler_bilin imoab_domain_culling imoab_read_compute_map imoab_map_r2l
 endif
 if HAVE_EXTMESHES
   HDF5_TESTS +=  imoab_apg2_ol_coupler
@@ -191,6 +191,8 @@ commgraph_test_SOURCES = commgraph_test.cpp
 test_mapweights_bcast_SOURCES = test_mapweights_bcast.cpp
 imoab_coupler_bilin_SOURCES = imoab_coupler_bilin.cpp
 imoab_domain_culling_SOURCES = imoab_domain_culling.cpp
+imoab_map_r2l_SOURCES = imoab_map_r2l.cpp
+
 par_intx_sph_SOURCES = par_intx_sph.cpp
 par_intx_sph_LDADD = $(LDADD)
 

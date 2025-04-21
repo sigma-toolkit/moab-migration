@@ -3812,7 +3812,7 @@ ErrCode iMOAB_WriteMappingWeightsToFile(
 
     return moab::MB_SUCCESS;
 }
-
+//#define VERBOSE
 #ifdef MOAB_HAVE_MPI
 ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                               iMOAB_AppID pid2,
@@ -4139,6 +4139,17 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         if( 1 == *type ) ndofPerEl = (int)( sqrt( lenTagType1 ) );
 
         tdata.remapper->SetMeshSet( Remapper::CoveringMesh, fset3, &primary_ents3 );
+        // dump covering mesh in a file, to look at it
+        // should be one covering mesh per task, should cover the target mesh set
+#ifdef VERBOSE
+        std::stringstream fcov;
+        fcov << "MapCover_" << localRank << "_"<< numProcs << ".h5m";
+        context.MBI->write_file(fcov.str().c_str(),0,0,&fset3,1);
+        EntityHandle fset2 = tdata.remapper->GetMeshSet( Remapper::TargetMesh);
+        std::stringstream ftarg;
+        ftarg << "TargMap_" << localRank << "_"<< numProcs << ".h5m";
+        context.MBI->write_file(ftarg.str().c_str(),0,0,&fset2,1);
+#endif
         for (auto mapIt=tdata.weightMaps.begin(); mapIt!=tdata.weightMaps.end(); ++mapIt)
         {
             moab::TempestOnlineMap* weightMap = mapIt->second;
@@ -4151,7 +4162,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
 
     return moab::MB_SUCCESS;
 }
-
+#undef VERBOSE
 #endif  // #ifdef MOAB_HAVE_MPI
 
 #endif  // #ifdef MOAB_HAVE_NETCDF

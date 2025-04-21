@@ -745,8 +745,14 @@ static ErrCode internal_WriteMesh( iMOAB_AppID pid,
     }
 
     // Now let us actually write the file to disk with appropriate options
-    MB_CHK_ERR( context.MBI->write_file( filename, 0, newopts.str().c_str(), &fileSet, 1, copyTagList.data(), copyTagList.size() ) );
-    //MB_CHK_ERR( context.MBI->write_file( filename, 0, newopts.str().c_str(), &fileSet, 1 ) );
+    if (primary_set)
+    {
+        MB_CHK_ERR( context.MBI->write_file( filename, 0, newopts.str().c_str(), &fileSet, 1, copyTagList.data(), copyTagList.size() ) );
+    }
+    else
+    {
+        MB_CHK_ERR( context.MBI->write_file( filename, 0, newopts.str().c_str(), &fileSet, 1 ) );
+    }
 
     return moab::MB_SUCCESS;
 }
@@ -2808,7 +2814,7 @@ ErrCode iMOAB_FreeSenderBuffers( iMOAB_AppID pid, int* context_id )
     return moab::MB_SUCCESS;
 }
 
-//#define VERBOSE
+#define VERBOSE
 ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
                                 iMOAB_AppID pid2,
                                 MPI_Comm* joint_communicator,
@@ -4143,11 +4149,11 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         // should be one covering mesh per task, should cover the target mesh set
 #ifdef VERBOSE
         std::stringstream fcov;
-        fcov << "MapCover_" << localRank << "_"<< numProcs << ".h5m";
+        fcov << "MapCover_"<< numProcs << "_" << localRank << ".h5m";
         context.MBI->write_file(fcov.str().c_str(),0,0,&fset3,1);
         EntityHandle fset2 = tdata.remapper->GetMeshSet( Remapper::TargetMesh);
         std::stringstream ftarg;
-        ftarg << "TargMap_" << localRank << "_"<< numProcs << ".h5m";
+        ftarg << "TargMap_" << numProcs << "_" << localRank << ".h5m";
         context.MBI->write_file(ftarg.str().c_str(),0,0,&fset2,1);
 #endif
         for (auto mapIt=tdata.weightMaps.begin(); mapIt!=tdata.weightMaps.end(); ++mapIt)
@@ -4349,11 +4355,38 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
 
     return moab::MB_SUCCESS;
 }
-
-ErrCode iMOAB_WriteCoverageMesh( iMOAB_AppID pid, const iMOAB_String filename, const iMOAB_String write_options )
+#ifdef MOAB_HAVE_TEMPESTREMAP
+ErrCode iMOAB_WriteCoverageMesh( iMOAB_AppID pid, const iMOAB_String prefix )
 {
-    return internal_WriteMesh( pid, filename, write_options, false );
+    IMOAB_CHECKPOINTER( prefix, 2 );
+    IMOAB_ASSERT( strlen( prefix ), "Invalid prefix." );
+
+    appData& data        = context.appDatas[*pid];
+    EntityHandle fileSet = data.file_set;
+
+
+    if( data.tempestData.remapper != nullptr )
+        fileSet = data.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
+    else if( data.file_set != data.secondary_file_set )
+        fileSet = data.secondary_file_set;
+    else
+        MB_CHK_SET_ERR( moab::MB_FAILURE, "Invalid secondary file set handle" );
+
+    std::ostringstream file_name;
+    int rank = 0, size = 1;
+
+#ifdef MOAB_HAVE_MPI
+    ParallelComm* pcomm = data.pcomm;
+    rank                = pcomm->rank();
+    size                = pcomm->size();
+#endif
+
+    file_name << prefix << "_" << size << "_" << rank << ".h5m";
+    // Now let us actually write the file to disk with appropriate options
+    ErrorCode rval = context.MBI->write_file( file_name.str().c_str(), 0, 0, &fileSet, 1 );MB_CHK_ERR( rval );
+    return moab::MB_SUCCESS;
 }
+#endif
 
 ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMOAB_AppID pid_intx )
 {

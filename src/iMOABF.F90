@@ -456,6 +456,12 @@ module iMOAB
       end function iMOAB_ComputeCoverageMesh
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
+      integer(c_int) function iMOAB_WriteCoverageMesh(  pid,   prefix )&
+                                                    bind(C, name='iMOAB_WriteCoverageMesh')
+      use, intrinsic :: iso_c_binding, only: c_int, c_char
+        integer(c_int), intent(in) :: pid
+        character(kind=c_char), intent(in) :: prefix
+      end function iMOAB_WriteCoverageMesh
 
       integer(c_int) function iMOAB_ComputeMeshIntersectionOnSphere(pid_source, pid_target, pid_intersection) &
                                                                   bind(C, name='iMOAB_ComputeMeshIntersectionOnSphere')

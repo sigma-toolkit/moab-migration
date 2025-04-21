@@ -1094,12 +1094,11 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_source, iMOAB_AppID pid_targe
  * <B>Operations:</B> Collective for parallel write, non collective for serial write.
  *
  * \param[in] pid (iMOAB_AppID)            The unique pointer to the application ID.
- * \param[in] filename (iMOAB_String)      The MOAB mesh file (H5M) to write all the entities contained in the
- *                                         internal application mesh set.
- * \param[in] write_options (iMOAB_String) Additional options for writing the MOAB mesh in parallel.
+ * \param[in] prefix (iMOAB_String)      The MOAB mesh file (H5M) to write all the entities contained in the
+ *                                          coverage mesh set.
  * \return ErrCode                         The error code indicating success or failure.
  */
-ErrCode iMOAB_WriteCoverageMesh( iMOAB_AppID pid, const iMOAB_String filename, const iMOAB_String write_options );
+ErrCode iMOAB_WriteCoverageMesh( iMOAB_AppID pid, const iMOAB_String prefix);
 
 /**
  * @brief Compute intersection of the surface meshes defined on a sphere. The resulting intersected mesh consists

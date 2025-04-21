@@ -297,12 +297,19 @@ int main( int argc, char* argv[] )
             CHECKIERR( ierr, "cannot receive tag values" )
         }
 
+
         // we can now free the sender buffers
         if( couComm != MPI_COMM_NULL )
         {
             ierr = iMOAB_FreeSenderBuffers( cplRofPID, &roflndid );  // context is for ocean
             CHECKIERR( ierr, "cannot free buffers " )
         }
+        if( couComm != MPI_COMM_NULL )
+        {
+            ierr = iMOAB_WriteCoverageMesh( cplRofLndPID, "rof_cover_lnd");
+            CHECKIERR( ierr, "cannot write coverage mesh" )
+        }
+
         POP_TIMER( MPI_COMM_WORLD, rankInGlobalComm )
 
 
@@ -317,8 +324,10 @@ int main( int argc, char* argv[] )
             POP_TIMER( couComm, rankInCouComm )
 
             {
-                char outputFileTgt[] = "fLndOnCpl5.h5m";
-                ierr                 = iMOAB_WriteMesh( cplLndPID, outputFileTgt, fileWriteOptions );
+                int numTasksCpl=endG4-startG4+1;
+                std::ostringstream outfile;
+                outfile << "fLndOnCpl_" << numTasksCpl << ".h5m";
+                ierr = iMOAB_WriteMesh( cplLndPID, outfile.str().c_str(), fileWriteOptions );
                 CHECKIERR( ierr, "could not write fLndOnCpl5.h5m to disk" )
             }
         }

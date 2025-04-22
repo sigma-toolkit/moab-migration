@@ -303,9 +303,9 @@ endif ( ENABLE_FORTRAN )
 # check for MPI package
 set (MOAB_HAVE_MPI OFF CACHE INTERNAL "Found necessary MPI components. Configure MOAB with it." )
 if ( ENABLE_MPI )
-  set (MPI_C_COMPILER mpicc )
-  set (MPI_CXX_COMPILER mpicxx )
-  set (MPI_Fortran_COMPILER mpif90 )
+  set (MPI_C_COMPILER ${CC} )
+  set (MPI_CXX_COMPILER ${CXX} )
+  set (MPI_Fortran_COMPILER ${FC} )
   find_package( MPI REQUIRED )
   if ( MPI_FOUND )
     set ( MOAB_DEFINES "${MOAB_DEFINES} -DUSE_MPI" )
@@ -362,7 +362,7 @@ if ( ENABLE_HDF5 )
   endif( MOAB_HAVE_MPI )
 
   # Call CMake-native FindHDF5 module and specify the components to check
-  find_package( HDF5 REQUIRED )
+  find_package( HDF5 REQUIRED COMPONENTS C HL )
 
   if ( HDF5_FOUND )
     # print some HDF5 configuration details

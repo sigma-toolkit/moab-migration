@@ -27,10 +27,8 @@ class Moab(ConanFile):
             self.requires("hdf5/1.14.5", options={"shared": True})
         if self.options.parallel:
             self.requires("openmpi/4.1.0")
-        self.requires("zlib/1.2.11")
+        self.requires("zlib/1.3.1")
         self.requires("libcurl/8.10.1")
-        if self.options.plugin:
-            self.requires("paraview/5.12.1@d3d/stable")
 
     def layout(self):
         # We make the assumption that if the compiler is msvc the
@@ -57,9 +55,6 @@ class Moab(ConanFile):
         tc.variables["ENABLE_ZLIB"] = True
         tc.variables["ENABLE_EIGEN3"] = True
         tc.variables["ENABLE_BLASLAPACK"] = False
-        tc.variables["ENABLE_IMESH"] = False
-        tc.variables["ENABLE_VTK"] = self.options.plugin
-        tc.variables["MOAB_BUILD_VTKMOABREADER"] = self.options.plugin
         tc.generate()
         tc2 = CMakeDeps(self)
         tc2.generate()

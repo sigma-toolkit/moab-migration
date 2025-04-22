@@ -929,7 +929,6 @@ ReadRTT::tet ReadRTT::get_tet_data( std::string tetdata )
 
     // ensure we have the correct number of tokens
     int base_token_size = 0;
-    int idx_offset      = 0;
     int n_nodes         = 0;
     // branch on the rtt version number
     if( header_data.version == "v1.0.0" )

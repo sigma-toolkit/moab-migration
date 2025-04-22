@@ -370,6 +370,7 @@ moab::ErrorCode ReadRTT::add_metadata( EntityHandle file_set )
     char* contiguity_value = header_data.contiguity.c_str();
     rval = MBI->tag_get_handle( "CONTIGUITY", strlen( contiguity_value ) + 1, MB_TYPE_OPAQUE, contiguity_tag,
                                 MB_TAG_SPARSE | MB_TAG_CREAT );
+    if( rval != MB_SUCCESS ) return rval;
     rval = MBI->tag_set_data( contiguity_tag, &file_set, 1, contiguity_value );
 
     return rval;

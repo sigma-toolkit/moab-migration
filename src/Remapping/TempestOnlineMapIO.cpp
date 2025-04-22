@@ -1459,13 +1459,13 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             sort_buffer.buffer_init( tl_re.get_n() );
             tl_re.sort( 1, &sort_buffer );  // so now we order by value
 
-            sort_buffer.buffer_init( tl->get_n() );
+            //sort_buffer.buffer_init( tl->get_n() );
 
             std::map< int, int > startDofIndex, endDofIndex;  // indices in tl_re for values we want
             int dofVal = -1;
             if( tl_re.get_n() > 0 )
             {
-                dofVal = tl_re.vi_rd[1];  // first dof val on this rank
+                dofVal = tl_re.vi_rd[1];  // first dof val on this rank  tl_re.vi_rd[2 * 0 + 1];
 
                 startDofIndex[dofVal] = 0;
                 endDofIndex[dofVal]   = 0;  // start and end
@@ -1500,6 +1500,8 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             for( unsigned k = 0; k < tl->get_n(); k++ )
             {
                 int valDof = tl->vi_rd[3 * k + 1];  // 1 for row, 2 for column // first value, it should be
+                if (startDofIndex.find(valDof)==startDofIndex.end())
+                    continue;
                 for( int ire = startDofIndex[valDof]; ire <= endDofIndex[valDof]; ire++ )
                 {
                     int to_proc               = tl_re.vi_rd[2 * ire];

@@ -4166,6 +4166,12 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
 
     }
 
+    // the par comm graph might have problems for mixed meshes
+    int ierr =  iMOAB_ComputeCommGraph( pid1, pid2, jointcomm, groupA,
+                                    groupB, type, type, comp1, comp2 );
+    if (ierr != 0)
+        return moab::MB_FAILURE;
+
     return moab::MB_SUCCESS;
 }
 #undef VERBOSE

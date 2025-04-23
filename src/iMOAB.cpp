@@ -2814,7 +2814,7 @@ ErrCode iMOAB_FreeSenderBuffers( iMOAB_AppID pid, int* context_id )
     return moab::MB_SUCCESS;
 }
 
-#define VERBOSE
+//#define VERBOSE
 ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
                                 iMOAB_AppID pid2,
                                 MPI_Comm* joint_communicator,

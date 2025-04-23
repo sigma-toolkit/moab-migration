@@ -553,7 +553,7 @@ def test_get_conn():
     # create elements
     verts = np.array((verts[0],verts[1],verts[2]),dtype='uint64')
     tris = mb.create_elements(types.MBTRI, [verts])
-    
+
     # get the adjacencies of the triangle of dim 1 (should return the vertices)
     conn = mb.get_connectivity(tris)
     CHECK_EQ(len(conn), 3)
@@ -624,6 +624,41 @@ def test_meshsets():
         mb.add_child_meshset(parent_set,a)
     children = mb.get_child_meshsets(parent_set)
     CHECK_EQ(len(children),5)
+
+def test_remove_parent_meshset():
+    mb = core.Core()
+    parent_set = mb.create_meshset()
+    child_set = mb.create_meshset()
+    # add parent-child relationship
+    mb.add_parent_meshset(child_set, parent_set)
+    # verify parent exists
+    parents = mb.get_parent_meshsets(child_set)
+    CHECK_EQ(len(parents), 1)
+    # remove parent
+    mb.remove_parent_meshset(child_set, parent_set)
+    # verify parent was removed
+    parents = mb.get_parent_meshsets(child_set)
+    CHECK_EQ(len(parents), 0)
+
+def test_remove_parent_child():
+    mb = core.Core()
+    parent_set = mb.create_meshset()
+    child_set = mb.create_meshset()
+    # add parent-child relationship
+    mb.add_parent_child(parent_set, child_set)
+    # verify relationship exists
+    parents = mb.get_parent_meshsets(child_set)
+    children = mb.get_child_meshsets(parent_set)
+    CHECK_EQ(len(parents), 1)
+    CHECK_EQ(len(children), 1)
+    # remove relationship
+    mb.remove_parent_child(parent_set, child_set)
+    # verify relationship was removed
+    parents = mb.get_parent_meshsets(child_set)
+    children = mb.get_child_meshsets(parent_set)
+    CHECK_EQ(len(parents), 0)
+    CHECK_EQ(len(children), 0)
+
 
 def test_rs():
     mb = core.Core()
@@ -1162,6 +1197,8 @@ if __name__ == "__main__":
              test_get_entities_by_handle,
              test_get_entities_by_dimension,
              test_parent_child,
+             test_remove_parent_meshset,
+             test_remove_parent_child,
              test_remove_ents,
              test_iterables,
              test_vec_tags,

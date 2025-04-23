@@ -287,6 +287,10 @@ cdef extern from "moab/Core.hpp" namespace "moab":
                                     const EntityHandle child_meshset)
         ErrorCode add_parent_child(EntityHandle parent,
                                    EntityHandle child)
+        ErrorCode remove_parent_child(EntityHandle parent,
+                                      EntityHandle child)
+        ErrorCode remove_parent_meshset(EntityHandle parent,
+                                        const EntityHandle child)
         ErrorCode get_coords(const EntityHandle* entity_handles,
                              const int num_entities,
                              double* coords)

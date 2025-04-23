@@ -1324,6 +1324,81 @@ cdef class Core(object):
         err = self.inst.add_parent_child(<unsigned long> parent_meshset, <unsigned long> child_meshset)
         check_error(err, exceptions)
 
+    def remove_parent_child(self, parent_meshset, child_meshset, exceptions = ()):
+        """
+        Remove a parent-child links between two meshsets.
+
+        Example
+        -------
+        mb = core.Core()
+        parent_set = mb.create_meshset()
+        child_set = mb.create_meshset()
+        mb.add_parent_child(parent_set, child_set)
+        mb.remove_parent_child(parent_set, child_set)
+
+        Parameters
+        ----------
+        parent_meshset : MOAB EntityHandle
+            handle of the parent meshset
+        child_meshset : MOAB EntityHandle
+            handle of the child meshset
+        exceptions : tuple (default is empty tuple)
+            A tuple containing any error types that should
+            be ignored. (see pymoab.types module for more info)
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        MOAB ErrorCode
+            if a MOAB error occurs
+        ValueError
+            if the Meshset EntityHandle is not of the correct type
+        """
+        cdef moab.ErrorCode err
+        err = self.inst.remove_parent_child(<unsigned long> parent_meshset, <unsigned long> child_meshset)
+        check_error(err, exceptions)
+
+    def remove_parent_meshset(self, child_meshset, parent_meshset, exceptions = ()):
+        """
+        Remove a parent meshset from a child meshset.
+
+        Example
+        -------
+        mb = core.Core()
+        parent_set = mb.create_meshset()
+        child_set = mb.create_meshset()
+        mb.add_parent_child(parent_set, child_set)
+        mb.remove_parent_meshset(child_set, parent_set)
+
+        Parameters
+        ----------
+        child_meshset : MOAB EntityHandle
+            handle of the child meshset
+        parent_meshset : MOAB EntityHandle
+            handle of the parent meshset
+        exceptions : tuple (default is empty tuple)
+            A tuple containing any error types that should
+            be ignored. (see pymoab.types module for more info)
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        MOAB ErrorCode
+            if a MOAB error occurs
+        ValueError
+            if the Meshset EntityHandle is not of the correct type
+        """
+        cdef moab.ErrorCode err
+        err = self.inst.remove_parent_meshset(<unsigned long> child_meshset, <unsigned long> parent_meshset)
+        check_error(err, exceptions)
+
+
     def get_root_set(self):
         """
         Return the entity meshset representing the whole mesh.

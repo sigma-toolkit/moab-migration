@@ -182,59 +182,68 @@ int main( int argc, char* argv[] )
         std::string tag_name_diff = tag_name + "_diff";
         if( doubleType )
         {
-            double def_val2 = 0.;
-            double def_vald[len_tag];
-            rval = mb->tag_get_default_value( tag, def_vald );MB_CHK_SET_ERR( rval, "can't get default" );
-
-            rval = mb->tag_get_handle( new_tag_name.c_str(), 1, dtype, newTag, MB_TAG_CREAT | MB_TAG_DENSE, def_vald );MB_CHK_SET_ERR( rval, "can't define new tag" );
-            rval = mb->tag_get_handle( tag_name_diff.c_str(), 1, dtype, newTagDiff,
-                                       MB_TAG_CREAT | MB_TAG_DENSE | MB_TAG_DFTOK, &def_val2 );MB_CHK_SET_ERR( rval, "can't define new tag diff" );
+            std::vector<double> def_vald(len_tag);
+            rval = mb->tag_get_default_value( tag, &def_vald[0] );MB_CHK_SET_ERR( rval, "can't get default" );
+            rval = mb->tag_get_handle( new_tag_name.c_str(), len_tag, dtype, newTag, MB_TAG_CREAT | MB_TAG_DENSE, &def_vald[0] );MB_CHK_SET_ERR( rval, "can't define new tag" );
+            for (size_t k=0; k<len_tag; k++)
+                def_vald[k] = 0.;
+            rval = mb->tag_get_handle( tag_name_diff.c_str(), len_tag, dtype, newTagDiff,
+                                       MB_TAG_CREAT | MB_TAG_DENSE | MB_TAG_DFTOK, &def_vald[0] );MB_CHK_SET_ERR( rval, "can't define new tag diff" );
         }
         else
         {
-            int def_vali[len_tag];
-            int dev_vali2             = 0;
-            rval = mb->tag_get_default_value( tag, def_vali );MB_CHK_SET_ERR( rval, "can't get default" );
-
-            rval = mb->tag_get_handle( new_tag_name.c_str(), 1, dtype, newTag, MB_TAG_CREAT | MB_TAG_DENSE, def_vali );MB_CHK_SET_ERR( rval, "can't define new tag" );
-            rval = mb->tag_get_handle( tag_name_diff.c_str(), 1, dtype, newTagDiff,
-                                       MB_TAG_CREAT | MB_TAG_DENSE | MB_TAG_DFTOK, &dev_vali2 );MB_CHK_SET_ERR( rval, "can't define new tag diff" );
+            std::vector<int> def_vali(len_tag);
+            rval = mb->tag_get_default_value( tag, &def_vali[0] );MB_CHK_SET_ERR( rval, "can't get default" );
+            // the difference should be the same size tag
+            rval = mb->tag_get_handle( new_tag_name.c_str(), len_tag, dtype, newTag, MB_TAG_CREAT | MB_TAG_DENSE, &def_vali[0] );MB_CHK_SET_ERR( rval, "can't define new tag" );
+            for (size_t k=0; k<len_tag; k++)
+                def_vali[k] = 0.;
+            rval = mb->tag_get_handle( tag_name_diff.c_str(), len_tag, dtype, newTagDiff,
+                                       MB_TAG_CREAT | MB_TAG_DENSE | MB_TAG_DFTOK, &def_vali[0] );MB_CHK_SET_ERR( rval, "can't define new tag diff" );
         }
 
         i             = 0;
         double l2norm = 0;
         for( Range::iterator c2it = ents2.begin(); c2it != ents2.end(); ++c2it )
         {
-            double val2;
-            int ival2;
+            double *val2 = nullptr;
+            int * ival2= nullptr;
             if( doubleType )
-                val2 = vals2[i];
+                val2 = &vals2[i*len_tag];
             else
-                ival2 = ivals2[i];
+                ival2 = &ivals2[i*len_tag];
 
             int id2 = gids2[i];
             i++;
             EntityHandle c1 = cGidHandle[id2];
             if( doubleType )
             {
-                rval = mb->tag_set_data( newTag, &c1, 1, &val2 );MB_CHK_SET_ERR( rval, "can't set new tag" );
+                rval = mb->tag_set_data( newTag, &c1, 1, val2 );MB_CHK_SET_ERR( rval, "can't set new tag" );
             }
             else
             {
-                rval = mb->tag_set_data( newTag, &c1, 1, &ival2 );MB_CHK_SET_ERR( rval, "can't set new tag" );
+                rval = mb->tag_set_data( newTag, &c1, 1, ival2 );MB_CHK_SET_ERR( rval, "can't set new tag" );
             }
             int indx    = ents.index( c1 );
             if( doubleType )
             {
-                double diff = vals[indx] - val2;
-                rval = mb->tag_set_data( newTagDiff, &c1, 1, &diff );MB_CHK_SET_ERR( rval, "can't set new tag" );
-                l2norm += diff * diff;
+                double *diff = &vals[indx * len_tag];
+                for (int k=0; k<len_tag; k++)
+                {
+                    diff[k] -= val2[k];
+                    l2norm += diff[k] * diff[k];
+                }
+                rval = mb->tag_set_data( newTagDiff, &c1, 1, diff );MB_CHK_SET_ERR( rval, "can't set diff double tag" );
             }
             else
             {
-                int diffi   = ivals[indx] - ival2;
-                rval  = mb->tag_set_data( newTagDiff, &c1, 1, &diffi );MB_CHK_SET_ERR( rval, "can't set new tag" );
-                l2norm += diffi * diffi;
+                int *diffi   = &ivals[indx * len_tag];
+                for (int k=0; k<len_tag; k++)
+                {
+                    diffi[k] -= ival2[k];
+                    l2norm += diffi[k] * diffi[k];
+                }
+                rval  = mb->tag_set_data( newTagDiff, &c1, 1, diffi );MB_CHK_SET_ERR( rval, "can't set diff int tag" );
             }
         }
         l2norm = sqrt( l2norm );
@@ -352,7 +361,7 @@ int main( int argc, char* argv[] )
                 if( doubleType )
                     value2 = vals2[index2];
                 else
-                    value2 = ivals2[j];
+                    value2 = ivals2[index2];
 
                 sum += fabs( value1 - value2 );
                 if( value1 < minv1 ) minv1 = value1;

@@ -376,8 +376,17 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
     rval = MBI->tag_get_handle( "MATERIAL_NUMBER", 1, MB_TYPE_INTEGER, mat_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
 
     Tag mat_name_tag;
-    rval = MBI->tag_get_handle( "MATERIAL_NAME", 1, MB_TYPE_OPAQUE, mat_name_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
-
+    int mat_name_max_size;
+    for( auto cell : cell_data )
+    {
+        if( cell.name.size() > mat_name_max_size )
+            mat_name_max_size = cell.name.size();
+    }
+    rval = MBI->tag_get_handle( "MATERIAL_NAME", mat_name_max_size +1, MB_TYPE_OPAQUE, mat_name_tag,
+                                MB_TAG_SPARSE | MB_TAG_CREAT );
+    // rval = MBI->tag_get_handle( "MATERIAL_NAME", 1, MB_TYPE_OPAQUE, mat_name_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
+    // rval = MBI->tag_get_handle( "CONTIGUITY", strlen( contiguity_value ) + 1, MB_TYPE_OPAQUE, contiguity_tag,
+    // MB_TAG_SPARSE | MB_TAG_CREAT );
 
     // create the tets
     EntityHandle tetra;  // handle for a specific tet

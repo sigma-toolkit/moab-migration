@@ -384,7 +384,6 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
     }
     rval = MBI->tag_get_handle( "MATERIAL_NAME", mat_name_max_size +1, MB_TYPE_OPAQUE, mat_name_tag,
                                 MB_TAG_SPARSE | MB_TAG_CREAT );
-    // rval = MBI->tag_get_handle( "MATERIAL_NAME", 1, MB_TYPE_OPAQUE, mat_name_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
     // rval = MBI->tag_get_handle( "CONTIGUITY", strlen( contiguity_value ) + 1, MB_TYPE_OPAQUE, contiguity_tag,
     // MB_TAG_SPARSE | MB_TAG_CREAT );
 

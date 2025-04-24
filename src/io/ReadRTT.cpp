@@ -405,12 +405,19 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
         rval = MBI->tag_set_data( mat_num_tag, &tetra, 1, &mat_number );
 
         // // Add material name tag
+        // Create a buffer for the string data
+        std::vector<char> name_buffer(mat_name_max_size, '\0');
+
         auto idx = cell_data_idx.find(mat_number);
         if(idx != cell_data_idx.end()) 
         {
-            const char* mat_name = cell_data[idx->second].name.c_str();
-            // set the material name tag
-            rval = MBI->tag_set_data(mat_name_tag, &tetra, 1, mat_name);
+            // Copy the string into the buffer
+            std::string const& name = cell_data[idx->second].name;
+            std::copy(name.begin(), name.end(), name_buffer.begin());
+            
+            // Set the tag data using the buffer
+            rval = MBI->tag_set_data(mat_name_tag, &tetra, 1, name_buffer.data());
+            if(MB_SUCCESS != rval) continue;
         }
 
 

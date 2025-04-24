@@ -143,19 +143,33 @@ ErrorCode ReadRTT::load_file( const char* filename,
     if( rval != MB_SUCCESS ) return rval;
 
     //process REGIONS
-    std::vector< cell > cell_data;
-    rval = ReadRTT::cell_process_flag( cell_flags, "REGIONS" , cell_data );
+    rval = ReadRTT::cell_process_flag( cell_flags, "REGIONS" , regions_data );
     if( rval != MB_SUCCESS ) return rval;
 
     // process the ABAQUS_PARTS
-    std::vector< cell > abaqus_parts;
-    rval = ReadRTT::cell_process_flag( cell_flags, "ABAQUS_PARTS" , abaqus_parts );
+    rval = ReadRTT::cell_process_flag( cell_flags, "ABAQUS_PARTS" , abaqus_parts_data );
     if( rval != MB_SUCCESS ) return rval; 
 
     // process the MCNP_PSEUDO-CELLS
-    rval = ReadRTT::cell_process_flag( cell_flags, "MCNP_PSEUDO-CELLS" , cell_data );
-    if( rval != MB_SUCCESS ) return rval; 
+    // Give priority to MCNOP_PSEUDO-CELLS for cell ID.
+    rval = ReadRTT::cell_process_flag( cell_flags, "MCNP_PSEUDO-CELLS" , mcnp_pseudo_cells_data );
+    if( rval != MB_SUCCESS ) return rval;
+  
+    // build the index of the cell flags data
+    build_idx();
 
+    // store the cell data definitions, MCNP_PSEUDO-CELLS if present
+    // otherwise use the REGIONS data
+    if( mcnp_pseudo_cells_data.size() > 0 )
+    {
+        cell_data = mcnp_pseudo_cells_data;
+        cell_data_idx = mcnp_pseudo_cells_idx;
+    }
+    else
+    {
+        cell_data = regions_data;
+        cell_data_idx = regions_idx;
+    }
 
     // read the node data
     std::vector< node > node_data;
@@ -181,6 +195,33 @@ ErrorCode ReadRTT::load_file( const char* filename,
     rval = ReadRTT::build_moab( node_data, facet_data, tet_data, surface_map );
     if( rval != MB_SUCCESS ) return rval;
 
+    return MB_SUCCESS;
+}
+
+
+ErrorCode ReadRTT::build_idx()
+{
+    // build the index of the cell data
+    for( size_t i = 0; i < regions_data.size(); ++i )
+    {
+        cell tmp = regions_data[i];
+        regions_idx[tmp.id] = i;
+    }
+
+    // build the index of the abaqus parts
+    for ( size_t i = 0; i < abaqus_parts_data.size(); ++i )
+    {
+        cell tmp = abaqus_parts_data[i];
+        abaqus_parts_idx[tmp.id] = i;
+    }
+
+    // build the index of the mcnp pseudo cells
+    for ( size_t i = 0; i < mcnp_pseudo_cells_data.size(); ++i )
+    {
+        cell tmp = mcnp_pseudo_cells_data[i];
+        mcnp_pseudo_cells_idx[tmp.id] = i;
+    }
+    
     return MB_SUCCESS;
 }
 
@@ -334,6 +375,10 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
     //  int zero = 0;
     rval = MBI->tag_get_handle( "MATERIAL_NUMBER", 1, MB_TYPE_INTEGER, mat_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
 
+    Tag mat_name_tag;
+    rval = MBI->tag_get_handle( "MATERIAL_NAME", 1, MB_TYPE_OPAQUE, mat_name_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
+
+
     // create the tets
     EntityHandle tetra;  // handle for a specific tet
     std::vector< tet >::iterator it_t;
@@ -350,6 +395,18 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
         int mat_number = tmp.material_number;
         // tag the tet with the material number
         rval = MBI->tag_set_data( mat_num_tag, &tetra, 1, &mat_number );
+
+        // // Add material name tag
+        auto idx = cell_data_idx.find(mat_number);
+        if(idx != cell_data_idx.end()) 
+        {
+            const char* mat_name = cell_data[idx->second].name.c_str();
+            // set the material name tag
+            rval = MBI->tag_set_data(mat_name_tag, &tetra, 1, mat_name);
+        }
+
+
+
         // set the tag data
         mb_tets.insert( tetra );
     }
@@ -367,7 +424,7 @@ moab::ErrorCode ReadRTT::add_metadata( EntityHandle file_set )
 
     // Create CONTIGUITY tag and set its value
     Tag contiguity_tag;
-    char* contiguity_value = header_data.contiguity.c_str();
+    const char* contiguity_value = header_data.contiguity.c_str();
     rval = MBI->tag_get_handle( "CONTIGUITY", strlen( contiguity_value ) + 1, MB_TYPE_OPAQUE, contiguity_tag,
                                 MB_TAG_SPARSE | MB_TAG_CREAT );
     if( rval != MB_SUCCESS ) return rval;
@@ -477,7 +534,7 @@ ErrorCode ReadRTT::side_process_faces( rtt_flags side_flags, std::vector< side >
 {
     if( side_flags.find( "FACES" ) != side_flags.end() )
     {
-        for( int i; i < side_flags["FACES"].size(); i++ )
+        for( size_t i = 0; i < side_flags["FACES"].size(); i++ )
         {
             side data = ReadRTT::get_side_data( side_flags["FACES"][i] );
             side_data.push_back( data );
@@ -499,13 +556,13 @@ ErrorCode ReadRTT::read_cell_flags( const char* filename, rtt_flags& cell_flags 
 }
 
 /*
- * process the REGION flag from the cell_flags section
+ * process the standard flag from the cell_flags section
  */
 ErrorCode ReadRTT::cell_process_flag( rtt_flags cell_flags, std::string key, std::vector< cell >& cell_data )
 {
     if( cell_flags.find( key ) != cell_flags.end() )
     {
-        for( int i; i < cell_flags[key].size(); i++ )
+        for( size_t i = 0; i < cell_flags[key].size(); i++ )
         {
             cell data = ReadRTT::get_cell_data( cell_flags[key][i] );
             cell_data.push_back( data );

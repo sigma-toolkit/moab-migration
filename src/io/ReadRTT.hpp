@@ -452,7 +452,7 @@ class ReadRTT : public ReaderIface
      *
      * @return moab::ErrorCode
      */
-    ErrorCode ReadRTT::read_all_flags(const char* filename, std::vector<int> n_flags, std::string flag_id, rtt_flags& flags);
+    ErrorCode read_all_flags(const char* filename, std::vector<int> n_flags, std::string flag_id, rtt_flags& flags);
 
     /**
      * Reads the full set of side data from the file
@@ -485,7 +485,7 @@ class ReadRTT : public ReaderIface
     ErrorCode read_cell_flags( const char* filename, rtt_flags& cell_flags );
 
     /**
-     * Process the REGIONS flag from the cell_flags section
+     * Process the standard flag from the cell_flags section
      *
      * @param cell_flags, a vector containing all the read side_flag section
      * @param key, the key to read
@@ -494,6 +494,13 @@ class ReadRTT : public ReaderIface
      * @return moab::ErrorCode
      */
     ErrorCode cell_process_flag( rtt_flags cell_flags, std::string key, std::vector< cell >& cell_data );
+
+    /**
+     * Build the index of the cell data flags 
+     * 
+     * @return ErrorCode 
+     */
+    ErrorCode build_idx();
 
     /**
      * Reads the full set of node data from the file
@@ -612,7 +619,16 @@ class ReadRTT : public ReaderIface
     headerData header_data;
     dimData dim_data;
     std::map< int, cell_def > cell_def_data;
-
+    std::vector< cell > cell_data;
+    std::map< int, int > cell_data_idx;
+    std::vector< cell > regions_data;
+    std::map< int, int > regions_idx;
+    std::vector< cell > abaqus_parts_data;
+    std::map< int, int > abaqus_parts_idx;
+    std::vector< cell > mcnp_pseudo_cells_data;
+    std::map< int, int > mcnp_pseudo_cells_idx;
+    
+    std::vector< side > side_data;
     // read mesh interface
     ReadUtilIface* readMeshIface;
     // Moab Interface

@@ -287,9 +287,9 @@ ErrorCode ParCommGraph::send_graph( MPI_Comm jcomm )
         // do not send the size in advance, because we use probe now
         /*ierr = MPI_Isend(&comm_graph[0], 1, MPI_INT, receiver(0), 10, jcomm, &sendReqs[0]); // we
         have to use global communicator if (ierr!=0) return MB_FAILURE;*/
-        int  mtag = compid2;
-        ierr = MPI_Isend( &comm_graph[1], size_pack_array, MPI_INT, receiver( 0 ), mtag, jcomm,
-                          &sendReqs[0] );  // we have to use global communicator
+        int mtag = compid2;
+        ierr     = MPI_Isend( &comm_graph[1], size_pack_array, MPI_INT, receiver( 0 ), mtag, jcomm,
+                              &sendReqs[0] );  // we have to use global communicator
         if( ierr != 0 ) return MB_FAILURE;
     }
     return MB_SUCCESS;
@@ -309,7 +309,7 @@ ErrorCode ParCommGraph::send_mesh_parts( MPI_Comm jcomm, ParallelComm* pco, Rang
         corr_tasks = sender_graph[senderTasks[rankInGroup1]];  // copy
         corr_sizes = sender_sizes[senderTasks[rankInGroup1]];  // another copy
     }
-    int  mtag = compid2;
+    int mtag     = compid2;
     int indexReq = 0;
     int ierr;                             // MPI error
     if( is_root_sender() ) indexReq = 1;  // for sendReqs
@@ -372,8 +372,8 @@ ErrorCode ParCommGraph::receive_comm_graph( MPI_Comm jcomm, ParallelComm* pco, s
         MPI_Status* status)
          *
          */
-        int  mtag = compid2;
-        ierr = MPI_Probe( sender( 0 ), mtag, jcomm, &status );
+        int mtag = compid2;
+        ierr     = MPI_Probe( sender( 0 ), mtag, jcomm, &status );
         if( 0 != ierr )
         {
             std::cout << " MPI_Probe failure: " << ierr << "\n";
@@ -428,7 +428,7 @@ ErrorCode ParCommGraph::receive_mesh( MPI_Comm jcomm,
     int defaultInt = -1;  // no processor, so it was not migrated from somewhere else
     rval           = pco->get_moab()->tag_get_handle( "orig_sending_processor", 1, MB_TYPE_INTEGER, orgSendProcTag,
                                                       MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );MB_CHK_SET_ERR( rval, "can't create original sending processor tag" );
-    int  mtag = compid2;
+    int mtag = compid2;
     if( !senders_local.empty() )
     {
         for( size_t k = 0; k < senders_local.size(); k++ )
@@ -612,7 +612,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
 #endif
     }
 
-    int  mtag = compid1 + compid2; // used as mpi tag to differentiate a little the messages
+    int mtag     = compid1 + compid2;  // used as mpi tag to differentiate a little the messages
     int indexReq = 0;
     if( graph_type == INITIAL_MIGRATE )  // original send
     {
@@ -815,7 +815,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
 #endif
     }
 
-    int  mtag = compid1 + compid2;
+    int mtag = compid1 + compid2;
 
     if( graph_type == INITIAL_MIGRATE )
     {
@@ -1103,8 +1103,7 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
     std::ofstream dbfile;
     f1 << "Involve_" << comp << "_" << rankInJoin << ".txt";
     dbfile.open( f1.str().c_str() );
-    for( auto mit = involved_IDs_map.begin(); mit != involved_IDs_map.end();
-         ++mit )
+    for( auto mit = involved_IDs_map.begin(); mit != involved_IDs_map.end(); ++mit )
     {
         int corrTask                = mit->first;
         std::vector< int >& corrIds = mit->second;

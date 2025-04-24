@@ -1453,6 +1453,14 @@ ErrorCode ParCommGraph::form_mesh_from_tuples( Interface* mb,
 
     EntityHandle new_element;
     Range cells;
+    // try to sort by number of vertices, which is an index in TLc
+    int indexNbVertices = 2;
+    if (1 == type ) indexNbVertices += lenTagType1; // gds first
+    // sort the TLc
+    moab::TupleList::buffer sort_buffer;
+    sort_buffer.buffer_init( n );
+    TLc.sort( indexNbVertices, &sort_buffer );  // index for number of vertices, so we will not create mixed meshes anymore
+                                                // with different ordering
     std::map< int, EntityHandle > cellMap;  // do no tcreate one if it already exists, maybe from other processes
     for( int i = 0; i < n; i++ )
     {
@@ -1460,14 +1468,12 @@ ErrorCode ParCommGraph::form_mesh_from_tuples( Interface* mb,
         int globalIdEl = TLc.vi_rd[size_tuple * i + 1];
         if( cellMap.find( globalIdEl ) == cellMap.end() )  // need to create the cell
         {
-            int current_index = 2;
-            if( 1 == type ) current_index += lenTagType1;
-            int nnodes = TLc.vi_rd[size_tuple * i + current_index];
+            int nnodes = TLc.vi_rd[size_tuple * i + indexNbVertices];
             std::vector< EntityHandle > conn;
             conn.resize( nnodes );
             for( int j = 0; j < nnodes; j++ )
             {
-                conn[j] = vertexMap[TLc.vi_rd[size_tuple * i + current_index + j + 1]];
+                conn[j] = vertexMap[TLc.vi_rd[size_tuple * i + indexNbVertices + j + 1]];
             }
             //
             EntityType entType = MBQUAD;

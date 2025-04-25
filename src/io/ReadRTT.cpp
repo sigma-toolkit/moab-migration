@@ -412,7 +412,7 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
         if(idx != cell_data_idx.end()) 
         {
             // Copy the string into the buffer
-            std::string const& name = cell_data[idx->second].name;
+            std::string name = cell_data[idx->second].name;
             std::copy(name.begin(), name.end(), name_buffer.begin());
             
             // Set the tag data using the buffer

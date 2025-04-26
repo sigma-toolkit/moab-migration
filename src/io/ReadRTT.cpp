@@ -381,7 +381,7 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
             std::copy(name.begin(), name.end(), part_name_buffer.begin());
             
             // Set the tag data using the buffer
-            rval = MBI->tag_set_data(mat_name_tag, &tetra, 1, part_name_buffer.data());
+            rval = MBI->tag_set_data(part_name_tag, &tetra, 1, part_name_buffer.data());
             if(MB_SUCCESS != rval) continue;
         }
 

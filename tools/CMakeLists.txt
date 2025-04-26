@@ -1,27 +1,27 @@
 # Documentation
 # Optional tools
-option ( MOAB_BUILD_MBCONVERT    "Build the MOAB mesh converter tool?"            ON )
-option ( MOAB_BUILD_HEXMODOPS    "Build the hexahedral modops tool?"              ON )
-option ( MOAB_BUILD_MBSIZE       "Build the mbsize tool?"                         ON )
-option ( MOAB_BUILD_MBMERGE      "Build the mbmerge tool?"                        ON )
-option ( MOAB_BUILD_MBMEM        "Build the mbmem tool?"                          ON )
-option ( MOAB_BUILD_MBSKIN       "Build the mbskin tool?"                         ON )
-option ( MOAB_BUILD_MBDEPTH      "Build the mbdepth tool?"                        ON )
-option ( MOAB_BUILD_MBTAGPROP    "Build the mbtagprop tool?"                      ON )
-option ( MOAB_BUILD_MBGSETS      "Build the mbgsets tool?"                        ON )
-option ( MOAB_BUILD_SPHEREDECOMP "Build the sphere decomposition tool?"           ON )
-option ( MOAB_BUILD_MBSURFPLOT   "Build the mbsurfplot application?"              ON )
-option ( MOAB_BUILD_SPHEREDECOMP "Build the spheredecomp application?"            ON )
-option ( MOAB_BUILD_MBPART       "Build the mbpart (Zoltan-based) partitioner?"   OFF )
-option ( MOAB_BUILD_MBSLAVEPART  "Build the slave partitioner tool?"              ON )
-option ( MOAB_BUILD_MBCOUPLER    "Build the mesh coupler tool?"                   ON )
-option ( MOAB_BUILD_MBHONODES    "Build the hex8 to hex27 converter tool?"        ON )
-option ( MOAB_BUILD_MBUMR        "Build the uniform mesh refinement tool?"        ON )
-option ( MOAB_BUILD_MBQUALITY    "Build the quality metrics tool?"                ON )
-option ( MOAB_BUILD_MBTEMPEST    "Build the TempestRemap coupler tool?"           OFF )
-option ( MOAB_BUILD_MBCMPMAPS    "Build the remapping weights comparison tool?"   OFF )
-option ( MOAB_BUILD_MBCMPFILES   "Build the h5m mesh/data comparison tool?"       OFF )
-option ( MOAB_BUILD_MBVISUMAP    "Build the remapping weight visualization tool?" OFF )
+set( MOAB_BUILD_MBCONVERT    TRUE  CACHE INTERNAL  "Build the MOAB mesh converter tool?"           )
+set( MOAB_BUILD_HEXMODOPS    TRUE  CACHE INTERNAL  "Build the hexahedral modops tool?"             )
+set( MOAB_BUILD_MBSIZE       TRUE  CACHE INTERNAL  "Build the mbsize tool?"                        )
+set( MOAB_BUILD_MBMERGE      TRUE  CACHE INTERNAL  "Build the mbmerge tool?"                       )
+set( MOAB_BUILD_MBMEM        TRUE  CACHE INTERNAL  "Build the mbmem tool?"                         )
+set( MOAB_BUILD_MBSKIN       TRUE  CACHE INTERNAL  "Build the mbskin tool?"                        )
+set( MOAB_BUILD_MBDEPTH      TRUE  CACHE INTERNAL  "Build the mbdepth tool?"                       )
+set( MOAB_BUILD_MBTAGPROP    TRUE  CACHE INTERNAL  "Build the mbtagprop tool?"                     )
+set( MOAB_BUILD_MBGSETS      TRUE  CACHE INTERNAL  "Build the mbgsets tool?"                       )
+set( MOAB_BUILD_SPHEREDECOMP TRUE  CACHE INTERNAL  "Build the sphere decomposition tool?"          )
+set( MOAB_BUILD_MBSURFPLOT   TRUE  CACHE INTERNAL  "Build the mbsurfplot application?"             )
+set( MOAB_BUILD_SPHEREDECOMP TRUE  CACHE INTERNAL  "Build the spheredecomp application?"           )
+set( MOAB_BUILD_MBPART       FALSE CACHE INTERNAL  "Build the mbpart (Zoltan-based) partitioner?"  )
+set( MOAB_BUILD_MBSLAVEPART  TRUE  CACHE INTERNAL  "Build the slave partitioner tool?"             )
+set( MOAB_BUILD_MBCOUPLER    TRUE  CACHE INTERNAL  "Build the mesh coupler tool?"                  )
+set( MOAB_BUILD_MBHONODES    TRUE  CACHE INTERNAL  "Build the hex8 to hex27 converter tool?"       )
+set( MOAB_BUILD_MBUMR        TRUE  CACHE INTERNAL  "Build the uniform mesh refinement tool?"       )
+set( MOAB_BUILD_MBQUALITY    TRUE  CACHE INTERNAL  "Build the quality metrics tool?"               )
+set( MOAB_BUILD_MBTEMPEST    FALSE CACHE INTERNAL  "Build the TempestRemap coupler tool?"          )
+set( MOAB_BUILD_MBCMPMAPS    FALSE CACHE INTERNAL  "Build the remapping weights comparison tool?"  )
+set( MOAB_BUILD_MBCMPFILES   FALSE CACHE INTERNAL  "Build the h5m mesh/data comparison tool?"      )
+set( MOAB_BUILD_MBVISUMAP    FALSE CACHE INTERNAL  "Build the remapping weight visualization tool?")
 
 include_directories(
   ${CMAKE_BINARY_DIR}
@@ -34,7 +34,15 @@ include_directories(
 
 if (MOAB_HAVE_TEMPESTREMAP)
   include_directories( ${TEMPESTREMAP_INCLUDES} ${EIGEN3_DIR} )
+  set(MOAB_BUILD_MBTEMPEST ${MOAB_HAVE_TEMPESTREMAP})
 endif (MOAB_HAVE_TEMPESTREMAP)
+
+# Build mbpart if Zoltan or Metis is configured
+if (MOAB_HAVE_ZOLTAN OR MOAB_HAVE_METIS)
+  set(MOAB_BUILD_MBPART TRUE)
+endif(MOAB_HAVE_ZOLTAN OR MOAB_HAVE_METIS)
+
+set(MOAB_BUILD_MBCMPFILES ${MOAB_HAVE_HDF5})
 
 set( TOOLS_LINK_LIBS MOAB ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
 
@@ -152,13 +160,13 @@ if ( MOAB_BUILD_MBQUALITY )
   add_moab_tool( mbquality quality.cpp MOAB_HAVE_MBQUALITY )
 endif( )
 
-# Zoltan
-if ( MOAB_BUILD_MBPART OR ( MOAB_HAVE_ZOLTAN OR MOAB_HAVE_METIS ) )
+# MBPART
+if ( MOAB_BUILD_MBPART )
   set(MOAB_BUILD_MBPART ON)
   # Build the mbpart executable
   add_moab_tool( mbpart mbpart.cpp MOAB_HAVE_MBPART "${ZOLTAN_LIBRARIES}" "${PARMETIS_LIBRARIES}" "${METIS_LIBRARIES}" )
   include_directories( ${ZOLTAN_INCLUDES} ${PARMETIS_INCLUDES} ${METIS_INCLUDES} )
-endif ( MOAB_BUILD_MBPART OR ( MOAB_HAVE_ZOLTAN OR MOAB_HAVE_METIS ) )
+endif ( MOAB_BUILD_MBPART )
 
 # MBCoupler
 if ( MOAB_HAVE_MPI AND MPI_FOUND AND MOAB_BUILD_MBCOUPLER )

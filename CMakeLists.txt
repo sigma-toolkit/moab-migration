@@ -145,8 +145,6 @@ option ( ENABLE_CPM       "Should build with C++/CMake Package Manager (CPM) sup
 option ( ENABLE_CGNS       "Should build with CGNS support?"                 OFF )
 option ( ENABLE_MPI        "Should MOAB be compiled with MPI support?"       OFF )
 option ( ENABLE_HDF5       "Include HDF I/O interfaces in the build?"                   OFF )
-option ( ENABLE_ZLIB       "Include Zlib compression libraries (optionally used in HDF5)?"  OFF )
-option ( ENABLE_SZIP       "Should build with szip support?"                 OFF )
 option ( ENABLE_NETCDF     "Include NetCDF (ExodusII) interfaces in the build?" OFF )
 option ( ENABLE_PNETCDF    "Include PNetCDF interfaces in the build (Requires NetCDF) ?" OFF )
 option ( ENABLE_METIS      "Include Metis support for partitioning algorithms?" OFF )
@@ -283,6 +281,8 @@ macro(SET_VARS_IF_FOUND PACKAGE_NAME PACKAGE_TYPE PRINT_NAME DESCRIPTION PACKAGE
       if (DEFINED ${PACKAGE_INCLUDES} AND NOT "${${PACKAGE_INCLUDES}}" STREQUAL "")
         message (STATUS "        Includes  : ${${PACKAGE_INCLUDES}}")
         include_directories( ${${PACKAGE_INCLUDES}} )
+        RESOLVE_INCLUDES(_tmp_resolved_pkgincs "${${PACKAGE_INCLUDES}}")
+        list( APPEND MOAB_INCLUDES "${_tmp_resolved_pkgincs}" )
       endif (DEFINED ${PACKAGE_INCLUDES} AND NOT "${${PACKAGE_INCLUDES}}" STREQUAL "")
       if (DEFINED ${PACKAGE_LIBRARIES} AND NOT "${${PACKAGE_LIBRARIES}}" STREQUAL "")
         message (STATUS "        Libraries : ${${PACKAGE_LIBRARIES}}")
@@ -358,11 +358,11 @@ if ( ENABLE_EIGEN3 )
   endif ( DOWNLOAD_EIGEN3 AND ENABLE_CPM )
 
   if ( EIGEN3_FOUND )
-    INCLUDE_DIRECTORIES ( "${EIGEN3_DIR}" )
-    SET(MOAB_DEFINES "${MOAB_DEFINES} ${EIGEN3_INCLUDES}")
+    INCLUDE_DIRECTORIES ( "${EIGEN3_INCLUDE_DIR}" )
+    SET(MOAB_DEFINES "${MOAB_DEFINES} -I${EIGEN3_INCLUDE_DIR}")
   endif (EIGEN3_FOUND)
 
-  SET_VARS_IF_FOUND(EIGEN3 RECOMMENDED "Eigen3" "Eigen3 headers as supplement to BLAS/LAPACK implementations" EIGEN3_INCLUDES EIGEN3_LIBRARIES )
+  SET_VARS_IF_FOUND(EIGEN3 RECOMMENDED "Eigen3" "Eigen3 headers as supplement to BLAS/LAPACK implementations" EIGEN3_INCLUDE_DIR EIGEN3_LIBRARIES )
 
   LIST(APPEND LOGGING_WATCHED_VARIABLES
     EIGEN3_INCLUDES
@@ -450,20 +450,6 @@ endfunction()
 
 include (config/CheckCompilerFlags.cmake)
 
-# Check for Zlib availability
-set (MOAB_HAVE_ZLIB OFF CACHE INTERNAL "Found necessary Zlib components. Configure MOAB with it." )
-if ( ENABLE_ZLIB )
-  find_package( ZLIB REQUIRED )
-  set (MOAB_HAVE_ZLIB ON)
-endif (ENABLE_ZLIB)
-
-# Check for Szip availability
-set (MOAB_HAVE_SZIP OFF CACHE INTERNAL "Found necessary Zlib components. Configure MOAB with it." )
-if ( ENABLE_SZIP )
-  find_package( SZIP REQUIRED )
-  set (MOAB_HAVE_SZIP ON)
-endif (ENABLE_SZIP)
-
 # Check for HDF5 availability
 # set (HDF5_DIR "$ENV{HDF5_DIR}" CACHE PATH "Path to search for HDF5 header and library files")
 set (MOAB_HAVE_HDF5_PARALLEL OFF CACHE INTERNAL "Found necessary parallel HDF5 components. Configure MOAB with it." )
@@ -516,27 +502,26 @@ if ( ENABLE_PNETCDF )
   # Print some PNetCDF configuration details
   SET_VARS_IF_FOUND(PNETCDF RECOMMENDED "PNetCDF" "PNetCDF library interfaces for MOAB nc-file format support" PNETCDF_INCLUDES PNETCDF_LIBRARIES )
 
-  if (PNETCDF_FOUND)
+  if (MOAB_HAVE_PNETCDF)
     LIST(APPEND LOGGING_WATCHED_VARIABLES
       PNETCDF_DIR
       PNETCDF_INCLUDES
       PNETCDF_LIBRARIES )
-  endif (PNETCDF_FOUND)
+  endif (MOAB_HAVE_PNETCDF)
 
 endif ( ENABLE_PNETCDF )
 
 # Check for NetCDF availability
 if ( ENABLE_NETCDF )
-  # pkg_check_modules(netcdf REQUIRED netcdf)
   find_package( NETCDF REQUIRED )
 
-  if (NETCDF_FOUND)
+  if (MOAB_HAVE_NETCDF)
     set (MOAB_HAVE_NETCDF_H 1)
     LIST(APPEND LOGGING_WATCHED_VARIABLES
       NETCDF_DIR
       NETCDF_INCLUDES
       NETCDF_LIBRARIES )
-  endif (NETCDF_FOUND)
+  endif (MOAB_HAVE_NETCDF)
 
   # Print some NetCDF configuration details
   SET_VARS_IF_FOUND(NETCDF RECOMMENDED "NetCDF" "NetCDF library interfaces for MOAB ExodusII file format support" NETCDF_INCLUDES NETCDF_LIBRARIES )
@@ -550,12 +535,12 @@ if ( ENABLE_METIS )
   # Print some Metis configuration details
   SET_VARS_IF_FOUND(METIS RECOMMENDED "Metis" "Metis library interfaces for MOAB offline (serial) mesh partitioning support" METIS_INCLUDES METIS_LIBRARIES )
 
-  if (METIS_FOUND)
+  if (MOAB_HAVE_METIS)
     LIST(APPEND LOGGING_WATCHED_VARIABLES
       METIS_DIR
       METIS_INCLUDES
       METIS_LIBRARIES )
-  endif (METIS_FOUND)
+  endif (MOAB_HAVE_METIS)
 endif (ENABLE_METIS )
 
 # Check for ParMetis partitioner availability
@@ -565,12 +550,12 @@ if ( ENABLE_PARMETIS AND METIS_FOUND )
   # Print some ParMetis configuration details
   SET_VARS_IF_FOUND(PARMETIS OPTIONAL "ParMetis" "ParMetis library interfaces for MOAB offline and online parallel mesh partitioning support" PARMETIS_INCLUDES PARMETIS_LIBRARIES )
 
-  if (PARMETIS_FOUND)
+  if (MOAB_HAVE_PARMETIS)
     LIST(APPEND LOGGING_WATCHED_VARIABLES
       PARMETIS_DIR
       PARMETIS_INCLUDES
       PARMETIS_LIBRARIES )
-  endif (PARMETIS_FOUND)
+  endif (MOAB_HAVE_PARMETIS)
 endif ( ENABLE_PARMETIS AND METIS_FOUND )
 
 # Check for Zoltan partitioner availability
@@ -580,12 +565,12 @@ if ( ENABLE_ZOLTAN )
   # Print some Zoltan configuration details
   SET_VARS_IF_FOUND(ZOLTAN RECOMMENDED "Zoltan" "Zoltan library interfaces for MOAB offline/online parallel mesh partitioning support" ZOLTAN_INCLUDES ZOLTAN_LIBRARIES )
 
-  if (ZOLTAN_FOUND)
+  if (MOAB_HAVE_ZOLTAN)
     LIST(APPEND LOGGING_WATCHED_VARIABLES
       ZOLTAN_DIR
       ZOLTAN_INCLUDES
       ZOLTAN_LIBRARIES )
-  endif (ZOLTAN_FOUND)
+  endif (MOAB_HAVE_ZOLTAN)
 endif (ENABLE_ZOLTAN )
 
 # Check for TempestRemap availability if Eigen3 headers have been found already
@@ -598,14 +583,12 @@ if ( ENABLE_TEMPESTREMAP )
     # Print some TempestRemap configuration details
     SET_VARS_IF_FOUND(TEMPESTREMAP OPTIONAL "TempestRemap" "TempestRemap library interfaces for MOAB climate remapping support" TEMPESTREMAP_INCLUDES TEMPESTREMAP_LIBRARIES )
 
-    if (TEMPESTREMAP_FOUND)
+    if (MOAB_HAVE_TEMPESTREMAP)
       LIST(APPEND LOGGING_WATCHED_VARIABLES
         TEMPESTREMAP_DIR
         TEMPESTREMAP_INCLUDES
         TEMPESTREMAP_LIBRARIES )
-    endif (TEMPESTREMAP_FOUND)
 
-    if (MOAB_HAVE_TEMPESTREMAP)
       # Make sure the directory exists
       set(EXT_DATA_DIR "${CMAKE_BINARY_DIR}/sandbox/MeshFiles")
       set(EXT_E3SM_DATA_DIR "${CMAKE_BINARY_DIR}/sandbox/MeshFiles/e3sm")
@@ -633,14 +616,26 @@ if (ENABLE_CGNS)
   set (MOAB_HAVE_CGNS ON)
 endif(ENABLE_CGNS)
 
+set(tmp_libs ${MOAB_LIBRARIES})
+string(REPLACE ";" " " tmp_libs "${MOAB_LIBRARIES}")
+RESOLVE_LIBRARIES(MOAB_LIBRARIES "${tmp_libs}")
 list (REVERSE MOAB_LIBRARIES)
 list (REMOVE_DUPLICATES MOAB_LIBRARIES)
 list (REVERSE MOAB_LIBRARIES)
+
+set(tmp_incs ${MOAB_INCLUDES})
+string(REPLACE ";" " " tmp_incs "${MOAB_INCLUDES}")
+RESOLVE_INCLUDES(MOAB_INCLUDES "${tmp_incs}")
+list (REMOVE_DUPLICATES MOAB_INCLUDES)
+
 
 # Strip our custom flags
 string(STRIP "${CMAKE_EXE_LINKER_FLAGS} " CMAKE_EXE_LINKER_FLAGS)
 string(STRIP "${MOAB_CXX_FLAGS} " MOAB_CXX_FLAGS)
 string(STRIP "${MOAB_DEFINES} " MOAB_DEFINES)
+
+message("MOAB_LIBRARIES: ${MOAB_LIBRARIES}")
+message("MOAB_INCLUDES: ${MOAB_INCLUDES}")
 
 ###############################################################################
 # Python Module Build

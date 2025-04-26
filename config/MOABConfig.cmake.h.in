@@ -246,9 +246,6 @@
 /* "Define if configured with VTK I/O library support." */
 #cmakedefine MOAB_HAVE_VTK @MOAB_HAVE_VTK@
 
-/* Configure with tool: VTKMOABREADER */
-#cmakedefine MOAB_HAVE_VTKMOABREADER @MOAB_HAVE_VTKMOABREADER@
-
 /* "Define if configured with Zoltan library partitioning support." */
 #cmakedefine MOAB_HAVE_ZOLTAN @MOAB_HAVE_ZOLTAN@
 

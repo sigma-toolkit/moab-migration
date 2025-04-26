@@ -320,9 +320,9 @@ class ReadRTT : public ReaderIface
         int id;
         int type_id;
         int connectivity[4];
-        int material_number;
+        std::vector<int> falg_values;
         // with c++11 we could use tet(): id(0), connectivity({0}), material_number(0) {}
-        tet() : id( 0 ), material_number( 0 )
+        tet() : id( 0 )
         {
             for( int k = 0; k < 4; k++ )
                 connectivity[k] = 0;
@@ -331,6 +331,7 @@ class ReadRTT : public ReaderIface
 
     // structure to hold a subsection of the RTT input
     typedef std::map< std::string, std::vector< std::string > > rtt_flags;
+    typedef std::map< std::string, std::vector< cell > > rtt_flags_data;
 
     /**
      * generates the topology of the problem from the already read input data, loops over the 2 and
@@ -448,11 +449,12 @@ class ReadRTT : public ReaderIface
      * @param filename, the file to read all the data from
      * @param n_flags, a vector containing the number of flags
      * @param flag_id, the flag id to read
-     * @param flags, a map containing all the flags from the XX_flags section
+     * @param flags, a map for all the flags from the XX_flags section
+     * @param flag_idx, a map for the index of the flags
      *
      * @return moab::ErrorCode
      */
-    ErrorCode read_all_flags(const char* filename, std::vector<int> n_flags, std::string flag_id, rtt_flags& flags);
+    ErrorCode read_all_flags(const char* filename, std::vector<int> n_flags, std::string flag_id, rtt_flags& flags, std::map< std::string, int >& flag_idx);
 
     /**
      * Reads the full set of side data from the file
@@ -493,14 +495,7 @@ class ReadRTT : public ReaderIface
      *
      * @return moab::ErrorCode
      */
-    ErrorCode cell_process_flag( rtt_flags cell_flags, std::string key, std::vector< cell >& cell_data );
-
-    /**
-     * Build the index of the cell data flags 
-     * 
-     * @return ErrorCode 
-     */
-    ErrorCode build_idx();
+    ErrorCode cell_process_flag( rtt_flags cell_flags, std::string key );
 
     /**
      * Reads the full set of node data from the file
@@ -586,6 +581,16 @@ class ReadRTT : public ReaderIface
      */
     tet get_tet_data( std::string tetdata );
 
+    std::string get_material_ref_flag();
+    std::string get_container_ref_flag();
+    /**
+     * @brief Get the max name size object
+     * 
+     * @param cell_data, vector of cell data
+     * @return int, the max name size
+     */
+    int get_max_name_size( std::vector< cell > cell_data );
+
     /**
      * Splits a string into a vector of substrings delimited by split_char
      *
@@ -618,16 +623,23 @@ class ReadRTT : public ReaderIface
   private:
     headerData header_data;
     dimData dim_data;
-    std::map< int, cell_def > cell_def_data;
+
+    // Cell Datas read from the cell_flags section
+    rtt_flags_data cell_flag_datas;
+    std::map< std::string, std::map<int, int>> cell_flag_indexes;
+    std::map< std::string, int > cell_flag_idx;
+
+    // Side Datas read from the side_flags section
+    rtt_flags_data side_flag_datas;
+    std::map< std::string, std::map<int, int>> side_flag_indexes;
+    std::map<std::string, int> side_flag_idx;
+
+    // Data from the cell_def section
+    std::map< int, cell_def > cell_def_data; // definition of the types of cells
     std::vector< cell > cell_data;
     std::map< int, int > cell_data_idx;
-    std::vector< cell > regions_data;
-    std::map< int, int > regions_idx;
-    std::vector< cell > abaqus_parts_data;
-    std::map< int, int > abaqus_parts_idx;
-    std::vector< cell > mcnp_pseudo_cells_data;
-    std::map< int, int > mcnp_pseudo_cells_idx;
-    
+   
+
     std::vector< side > side_data;
     // read mesh interface
     ReadUtilIface* readMeshIface;

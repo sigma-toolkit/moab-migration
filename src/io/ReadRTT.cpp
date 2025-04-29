@@ -136,7 +136,6 @@ ErrorCode ReadRTT::load_file( const char* filename,
     rtt_flags cell_flags;
     rval = ReadRTT::read_cell_flags( filename, cell_flags );
     if( rval != MB_SUCCESS ) return rval;
-  
 
     // read the node data
     std::vector< node > node_data;
@@ -314,21 +313,21 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
     Tag mat_num_tag;
     Tag mat_name_tag;
     std::string mat_flag_name = get_material_ref_flag();
-    int mat_name_max_size = get_max_name_size(cell_flag_datas[mat_flag_name]);
+    int mat_name_max_size     = get_max_name_size( cell_flag_datas[mat_flag_name] );
     //  int zero = 0;
     rval = MBI->tag_get_handle( "MATERIAL_NUMBER", 1, MB_TYPE_INTEGER, mat_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
-    rval = MBI->tag_get_handle( "MATERIAL_NAME", mat_name_max_size +1, MB_TYPE_OPAQUE, mat_name_tag,
+    rval = MBI->tag_get_handle( "MATERIAL_NAME", mat_name_max_size + 1, MB_TYPE_OPAQUE, mat_name_tag,
                                 MB_TAG_SPARSE | MB_TAG_CREAT );
     if( MB_SUCCESS != rval ) return rval;
 
     Tag part_name_tag;
     Tag part_num_tag;
     std::string part_flag_name = get_container_ref_flag();
-    int max_part_name_size = get_max_name_size(cell_flag_datas[part_flag_name]);
+    int max_part_name_size     = get_max_name_size( cell_flag_datas[part_flag_name] );
     rval = MBI->tag_get_handle( "PART_NUMBER", 1, MB_TYPE_INTEGER, part_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
-    rval = MBI->tag_get_handle( "PART_NAME", max_part_name_size +1, MB_TYPE_OPAQUE, part_name_tag,
+    rval = MBI->tag_get_handle( "PART_NAME", max_part_name_size + 1, MB_TYPE_OPAQUE, part_name_tag,
                                 MB_TAG_SPARSE | MB_TAG_CREAT );
-    
+
     // create the tets
     EntityHandle tetra;  // handle for a specific tet
     std::vector< tet >::iterator it_t;
@@ -341,7 +340,7 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
         EntityHandle tet_nodes[4] = { mb_coords[tmp.connectivity[0] - 1], mb_coords[tmp.connectivity[1] - 1],
                                       mb_coords[tmp.connectivity[2] - 1], mb_coords[tmp.connectivity[3] - 1] };
         // create the tet
-        rval           = MBI->create_element( MBTET, tet_nodes, 4, tetra );
+        rval = MBI->create_element( MBTET, tet_nodes, 4, tetra );
 
         // deal with materials
         int mat_number = tmp.falg_values[cell_flag_idx[mat_flag_name]];
@@ -350,20 +349,20 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
 
         // // Add material name tag
         // Create a buffer for the string data
-        std::vector<char> mat_name_buffer(mat_name_max_size, '\0');
+        std::vector< char > mat_name_buffer( mat_name_max_size, '\0' );
 
-        auto mat_idx = cell_flag_indexes[mat_flag_name].find(mat_number);
-        if(mat_idx != cell_flag_indexes[mat_flag_name].end()) 
+        auto mat_idx = cell_flag_indexes[mat_flag_name].find( mat_number );
+        if( mat_idx != cell_flag_indexes[mat_flag_name].end() )
         {
             // Copy the string into the buffer
             std::string name = cell_flag_datas[mat_flag_name][mat_idx->second].name;
-            std::copy(name.begin(), name.end(), mat_name_buffer.begin());
-            
+            std::copy( name.begin(), name.end(), mat_name_buffer.begin() );
+
             // Set the tag data using the buffer
-            rval = MBI->tag_set_data(mat_name_tag, &tetra, 1, mat_name_buffer.data());
-            if(MB_SUCCESS != rval) continue;
+            rval = MBI->tag_set_data( mat_name_tag, &tetra, 1, mat_name_buffer.data() );
+            if( MB_SUCCESS != rval ) continue;
         }
-        
+
         // deal with parts
         int part_number = tmp.falg_values[cell_flag_idx[part_flag_name]];
         // tag the tet with the part number
@@ -371,21 +370,19 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
 
         // // Add material part tag
         // Create a buffer for the string data
-        std::vector<char> part_name_buffer(max_part_name_size, '\0');
+        std::vector< char > part_name_buffer( max_part_name_size, '\0' );
 
-        auto pat_idx = cell_flag_indexes[part_flag_name].find(part_number);
-        if(mat_idx != cell_flag_indexes[mat_flag_name].end()) 
+        auto pat_idx = cell_flag_indexes[part_flag_name].find( part_number );
+        if( mat_idx != cell_flag_indexes[mat_flag_name].end() )
         {
             // Copy the string into the buffer
             std::string name = cell_flag_datas[mat_flag_name][mat_idx->second].name;
-            std::copy(name.begin(), name.end(), part_name_buffer.begin());
-            
+            std::copy( name.begin(), name.end(), part_name_buffer.begin() );
+
             // Set the tag data using the buffer
-            rval = MBI->tag_set_data(part_name_tag, &tetra, 1, part_name_buffer.data());
-            if(MB_SUCCESS != rval) continue;
+            rval = MBI->tag_set_data( part_name_tag, &tetra, 1, part_name_buffer.data() );
+            if( MB_SUCCESS != rval ) continue;
         }
-
-
 
         // set the tag data
         mb_tets.insert( tetra );
@@ -452,12 +449,16 @@ ErrorCode ReadRTT::read_header( const char* filename )
 }
 
 // read all flags from a section
-ErrorCode ReadRTT::read_all_flags(const char* filename, std::vector<int> n_flags, std::string flag_id, rtt_flags& flags, std::map< std::string, int >& flag_idx)
+ErrorCode ReadRTT::read_all_flags( const char* filename,
+                                   std::vector< int > n_flags,
+                                   std::string flag_id,
+                                   rtt_flags& flags,
+                                   std::map< std::string, int >& flag_idx )
 {
     std::string start_flag = flag_id + "_flags";
     std::string end_flag   = "end_" + start_flag + "\0";
-    std::string line;                      // the current line being read
-    std::ifstream input_file( filename );  // filestream for rttfile
+    std::string line;                       // the current line being read
+    std::ifstream input_file( filename );   // filestream for rttfile
     std::vector< std::string > flag_order;  // order of the flags
     // file ok?
     if( !input_file.good() )
@@ -495,7 +496,7 @@ ErrorCode ReadRTT::read_all_flags(const char* filename, std::vector<int> n_flags
         }
         input_file.close();
     }
-    for ( size_t i = 0; i < flag_order.size(); i++ )
+    for( size_t i = 0; i < flag_order.size(); i++ )
     {
         std::string key = flag_order[i];
         // fill the index
@@ -503,7 +504,6 @@ ErrorCode ReadRTT::read_all_flags(const char* filename, std::vector<int> n_flags
     }
     return MB_SUCCESS;
 }
-
 
 /*
  * reads the side data from the filename pointed to
@@ -520,7 +520,6 @@ ErrorCode ReadRTT::read_side_flags( const char* filename, rtt_flags& side_flags 
 
     return rval;
 }
-
 
 /*
  * process the FACES flag from the side_flags section
@@ -539,15 +538,14 @@ ErrorCode ReadRTT::side_process_faces( rtt_flags side_flags, std::vector< side >
     return MB_SUCCESS;
 }
 
-
 std::string ReadRTT::get_material_ref_flag()
 {
     std::string material_ref_flag = "REGIONS";  // set defaul to REGIONS
-    if ( cell_flag_datas.find("MATERIALS") != cell_flag_datas.end() )
+    if( cell_flag_datas.find( "MATERIALS" ) != cell_flag_datas.end() )
     {
         material_ref_flag = "MATERIALS";
     }
-    else if ( cell_flag_datas.find("MCNP_PSEUDO-CELLS") != cell_flag_datas.end() )
+    else if( cell_flag_datas.find( "MCNP_PSEUDO-CELLS" ) != cell_flag_datas.end() )
     {
         material_ref_flag = "MCNP_PSEUDO-CELLS";
     }
@@ -557,11 +555,11 @@ std::string ReadRTT::get_material_ref_flag()
 std::string ReadRTT::get_container_ref_flag()
 {
     std::string part_ref_flag = "REGIONS";  // set defaul to REGIONS
-    if ( cell_flag_datas.find("ABAQUS_PARTS") != cell_flag_datas.end() )
+    if( cell_flag_datas.find( "ABAQUS_PARTS" ) != cell_flag_datas.end() )
     {
         part_ref_flag = "ABAQUS_PARTS";
     }
-    else if ( cell_flag_datas.find("MCNP_PSEUDO-CELLS") != cell_flag_datas.end() )
+    else if( cell_flag_datas.find( "MCNP_PSEUDO-CELLS" ) != cell_flag_datas.end() )
     {
         part_ref_flag = "MCNP_PSEUDO-CELLS";
     }
@@ -577,28 +575,27 @@ ErrorCode ReadRTT::read_cell_flags( const char* filename, rtt_flags& cell_flags 
     // read all the cell data
     rval = read_all_flags( filename, dim_data.ncell_flags, "cell", cell_flags, cell_flag_idx );
 
-
     rval = ReadRTT::cell_process_flag( cell_flags, "REGIONS" );
     if( rval != MB_SUCCESS ) return rval;
 
     // process the ABAQUS_PARTS
     rval = ReadRTT::cell_process_flag( cell_flags, "ABAQUS_PARTS" );
-    if( rval != MB_SUCCESS ) return rval; 
+    if( rval != MB_SUCCESS ) return rval;
 
     // process the MCNP_PSEUDO-CELLS
     // Give priority to MCNOP_PSEUDO-CELLS for cell ID.
     rval = ReadRTT::cell_process_flag( cell_flags, "MCNP_PSEUDO-CELLS" );
 
     std::string material_flag_name = get_material_ref_flag();
-    cell_data = cell_flag_datas[material_flag_name];
-    cell_data_idx = cell_flag_indexes[material_flag_name];
+    cell_data                      = cell_flag_datas[material_flag_name];
+    cell_data_idx                  = cell_flag_indexes[material_flag_name];
     return rval;
 }
 
 /*
  * process the standard flag from the cell_flags section
  */
-ErrorCode ReadRTT::cell_process_flag( rtt_flags cell_flags, std::string key)
+ErrorCode ReadRTT::cell_process_flag( rtt_flags cell_flags, std::string key )
 {
     std::vector< cell > cell_data;
     // check if the key is in the cell_flags
@@ -611,21 +608,19 @@ ErrorCode ReadRTT::cell_process_flag( rtt_flags cell_flags, std::string key)
         }
         if( cell_data.size() == 0 ) return MB_FAILURE;
     }
-    
+
     // fill the corresponding index
-    std::map<int, int> cell_data_idx;
-    for (size_t i = 0; i < cell_data.size(); ++i)
+    std::map< int, int > cell_data_idx;
+    for( size_t i = 0; i < cell_data.size(); ++i )
     {
-        cell tmp = cell_data[i];
+        cell tmp              = cell_data[i];
         cell_data_idx[tmp.id] = i;
     }
-    if( cell_data.size() > 0) 
-        cell_flag_datas[key] = cell_data;
-        cell_flag_indexes[key] = cell_data_idx;
+    if( cell_data.size() > 0 ) cell_flag_datas[key] = cell_data;
+    cell_flag_indexes[key] = cell_data_idx;
 
     return MB_SUCCESS;
 }
-
 
 /*
  * Reads the node data fromt the filename pointed to
@@ -1157,14 +1152,13 @@ ReadRTT::tet ReadRTT::get_tet_data( std::string tetdata )
     {
         new_tet.connectivity[i] = std::atoi( tokens[i + base_token_size].c_str() );
     }
-    for ( int i = 0; i < dim_data.ncell_flag_types; i++ )
-    {   
-        new_tet.falg_values.push_back(std::atoi( tokens[i + base_token_size + n_nodes].c_str() ));
+    for( int i = 0; i < dim_data.ncell_flag_types; i++ )
+    {
+        new_tet.falg_values.push_back( std::atoi( tokens[i + base_token_size + n_nodes].c_str() ) );
     }
 
     return new_tet;
 }
-
 
 /*
 * given the cell data, get the maximum name size
@@ -1174,12 +1168,10 @@ int ReadRTT::get_max_name_size( std::vector< cell > cell_data )
     int max_size = 0;
     for( size_t i = 0; i < cell_data.size(); i++ )
     {
-        if( cell_data[i].name.length() > max_size )
-            max_size = cell_data[i].name.length();
+        if( cell_data[i].name.length() > max_size ) max_size = cell_data[i].name.length();
     }
     return max_size;
 }
-
 
 /*
  * splits string into sense and name, to later facilitate the building

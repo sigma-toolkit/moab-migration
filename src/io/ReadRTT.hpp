@@ -320,7 +320,7 @@ class ReadRTT : public ReaderIface
         int id;
         int type_id;
         int connectivity[4];
-        std::vector<int> falg_values;
+        std::vector< int > falg_values;
         // with c++11 we could use tet(): id(0), connectivity({0}), material_number(0) {}
         tet() : id( 0 )
         {
@@ -442,7 +442,6 @@ class ReadRTT : public ReaderIface
      */
     ErrorCode read_header( const char* filename );
 
-
     /**
      * Reads the full set of data from the file
      *
@@ -454,7 +453,11 @@ class ReadRTT : public ReaderIface
      *
      * @return moab::ErrorCode
      */
-    ErrorCode read_all_flags(const char* filename, std::vector<int> n_flags, std::string flag_id, rtt_flags& flags, std::map< std::string, int >& flag_idx);
+    ErrorCode read_all_flags( const char* filename,
+                              std::vector< int > n_flags,
+                              std::string flag_id,
+                              rtt_flags& flags,
+                              std::map< std::string, int >& flag_idx );
 
     /**
      * Reads the full set of side data from the file
@@ -626,19 +629,18 @@ class ReadRTT : public ReaderIface
 
     // Cell Datas read from the cell_flags section
     rtt_flags_data cell_flag_datas;
-    std::map< std::string, std::map<int, int>> cell_flag_indexes;
+    std::map< std::string, std::map< int, int > > cell_flag_indexes;
     std::map< std::string, int > cell_flag_idx;
 
     // Side Datas read from the side_flags section
     rtt_flags_data side_flag_datas;
-    std::map< std::string, std::map<int, int>> side_flag_indexes;
-    std::map<std::string, int> side_flag_idx;
+    std::map< std::string, std::map< int, int > > side_flag_indexes;
+    std::map< std::string, int > side_flag_idx;
 
     // Data from the cell_def section
-    std::map< int, cell_def > cell_def_data; // definition of the types of cells
+    std::map< int, cell_def > cell_def_data;  // definition of the types of cells
     std::vector< cell > cell_data;
     std::map< int, int > cell_data_idx;
-   
 
     std::vector< side > side_data;
     // read mesh interface

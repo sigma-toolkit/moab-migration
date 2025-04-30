@@ -3820,7 +3820,7 @@ ErrCode iMOAB_WriteMappingWeightsToFile(
 
     return moab::MB_SUCCESS;
 }
-#define VERBOSE
+//#define VERBOSE
 #ifdef MOAB_HAVE_MPI
 ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                               iMOAB_AppID pid2,

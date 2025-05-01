@@ -16,26 +16,25 @@ namespace moab
 class ParallelComm;
 #endif
 
-class NCHelperROMS: public moab::ScdNCHelper {
-public:
+class NCHelperROMS : public moab::ScdNCHelper
+{
+  public:
     NCHelperROMS( ReadNC* readNC, int fileId, const FileOptions& opts, EntityHandle fileSet )
-            : ScdNCHelper( readNC, fileId, opts, fileSet )
-        {
-        }
-        static bool can_read_file( ReadNC* readNC, int fileId );
+        : ScdNCHelper( readNC, fileId, opts, fileSet )
+    {
+    }
+    static bool can_read_file( ReadNC* readNC, int fileId );
 
-        ErrorCode create_mesh( Range& faces );
+    ErrorCode create_mesh( Range& faces );
 
-      private:
-        virtual ErrorCode init_mesh_vals();
-        virtual std::string get_mesh_type_name()
-        {
-            return "ROMS";
-        }
-        bool spherical;
-        bool vertices_exist;
-    };
+  private:
+    virtual ErrorCode init_mesh_vals();
+    virtual std::string get_mesh_type_name()
+    {
+        return "ROMS";
+    }
+};
 
-}
+}  // namespace moab
 
 #endif /* SRC_IO_NCHELPERROMS_HPP_ */

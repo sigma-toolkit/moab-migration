@@ -44,6 +44,7 @@ void test_read_domain_zoltan();
 void test_read_scrip();
 // roms file
 void test_read_roms();
+void test_read_roms_cartesian();
 
 ErrorCode get_options( std::string& opts );
 
@@ -69,7 +70,8 @@ int main( int argc, char* argv[] )
     result += RUN_TEST( test_read_old_domain );
     result += RUN_TEST( test_read_domain_no_culling );
     result += RUN_TEST( test_read_scrip );
-    result += RUN_TEST (test_read_roms);
+    result += RUN_TEST( test_read_roms );
+    result += RUN_TEST( test_read_roms_cartesian );
     // Exclude test_read_fv_all() since reading edge data is not implemented in MOAB yet
     // result += RUN_TEST(test_read_fv_all);
 
@@ -84,7 +86,6 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_ZOLTAN
     result += RUN_TEST( test_read_domain_zoltan );
 #endif
-
 
 #endif
 
@@ -621,6 +622,29 @@ void test_read_roms()
 #endif
 #endif
 }
+
+void test_read_roms_cartesian()
+{
+    Core moab;
+    Interface& mb = moab;
+
+    // Need a set for nomesh to work right
+    EntityHandle set;
+    ErrorCode rval = mb.create_meshset( MESHSET_SET, set );CHECK_ERR( rval );
+
+    std::string orig, opts;
+    rval = get_options( orig );CHECK_ERR( rval );
+
+    opts = orig + std::string( "CARTESIAN;VARIABLE=" );
+    rval = mb.load_file( example_roms.c_str(), &set, opts.c_str() );CHECK_ERR( rval );
+#ifdef MOAB_HAVE_MPI
+#ifdef MOAB_HAVE_HDF5
+    opts = "PARALLEL=WRITE_PART";
+    rval = mb.write_file( "test_roms_cart_out.h5m", 0, opts.c_str(), &set, 1 );CHECK_ERR( rval );
+#endif
+#endif
+}
+
 ErrorCode get_options( std::string& opts )
 {
 #ifdef MOAB_HAVE_MPI

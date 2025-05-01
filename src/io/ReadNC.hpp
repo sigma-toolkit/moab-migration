@@ -234,9 +234,10 @@ class ReadNC : public ReaderIface
     bool noVars;
     bool spectralMesh;
     bool noMixedElements;
+    bool cartesian;  // used now only for ROMS reader
     bool noEdges;
     bool culling;
-    bool repartition; // with zoltan rcb
+    bool repartition;  // with zoltan rcb
     int gatherSetRank;
     int tStepBase;
     int trivialPartitionShift;

@@ -19,8 +19,9 @@ ReadNC::ReadNC( Interface* impl )
 #ifdef MOAB_HAVE_MPI
       myPcomm( NULL ),
 #endif
-      noMesh( false ), noVars( false ), spectralMesh( false ), noMixedElements( false ), noEdges( false ), culling(true),
-      repartition(false), gatherSetRank( -1 ), tStepBase( -1 ), trivialPartitionShift( 0 ), myHelper( NULL )
+      noMesh( false ), noVars( false ), spectralMesh( false ), noMixedElements( false ), cartesian( false ),
+      noEdges( false ), culling( true ), repartition( false ), gatherSetRank( -1 ), tStepBase( -1 ),
+      trivialPartitionShift( 0 ), myHelper( NULL )
 {
     assert( impl != NULL );
     impl->query_interface( readMeshIface );
@@ -223,13 +224,16 @@ ErrorCode ReadNC::parse_options( const FileOptions& opts,
     rval = opts.get_null_option( "NO_MIXED_ELEMENTS" );
     if( MB_SUCCESS == rval ) noMixedElements = true;
 
+    rval = opts.get_null_option( "CARTESIAN" );
+    if( MB_SUCCESS == rval ) cartesian = true;
+
     rval = opts.get_null_option( "NO_EDGES" );
     if( MB_SUCCESS == rval ) noEdges = true;
 
-    rval = opts.get_null_option( "NO_CULLING" ); // used now only for domain nc convention
+    rval = opts.get_null_option( "NO_CULLING" );  // used now only for domain nc convention
     if( MB_SUCCESS == rval ) culling = false;
 
-    rval = opts.get_null_option( "REPARTITION" ); // used now only for domain nc, to repartition with zoltan
+    rval = opts.get_null_option( "REPARTITION" );  // used now only for domain nc, to repartition with zoltan
     if( MB_SUCCESS == rval ) repartition = true;
 
     if( 2 <= dbgOut.get_verbosity() )
@@ -326,15 +330,18 @@ ErrorCode ReadNC::read_header()
     if( success ) MB_SET_ERR( MB_FAILURE, "Couldn't get number of global attributes" );
 
     // Read attributes into globalAtts
-    ErrorCode result = get_attributes( NC_GLOBAL, numgatts, globalAtts );MB_CHK_SET_ERR( result, "Trouble getting global attributes" );
+    ErrorCode result = get_attributes( NC_GLOBAL, numgatts, globalAtts );
+    MB_CHK_SET_ERR( result, "Trouble getting global attributes" );
     dbgOut.tprintf( 1, "Read %u attributes\n", (unsigned int)globalAtts.size() );
 
     // Read in dimensions into dimNames and dimLens
-    result = get_dimensions( fileId, dimNames, dimLens );MB_CHK_SET_ERR( result, "Trouble getting dimensions" );
+    result = get_dimensions( fileId, dimNames, dimLens );
+    MB_CHK_SET_ERR( result, "Trouble getting dimensions" );
     dbgOut.tprintf( 1, "Read %u dimensions\n", (unsigned int)dimNames.size() );
 
     // Read in variables into varInfo
-    result = get_variables();MB_CHK_SET_ERR( result, "Trouble getting variables" );
+    result = get_variables();
+    MB_CHK_SET_ERR( result, "Trouble getting variables" );
     dbgOut.tprintf( 1, "Read %u variables\n", (unsigned int)varInfo.size() );
 
     return MB_SUCCESS;

@@ -1,25 +1,39 @@
 /*
- * visuMapVtk.cpp
- * this tool will take a source file, target file (h5m) and a map file in nc format,
+ * visuMap.cpp
+ * this tool will take a source file, target file (h5m) and a map file in nc format, and will visualize weights
  *
  * example of usage:
- * ./mbvisumap -s source.h5m -t target.h5m -m map.nc -b startSourceID -e endSourceID  -c startTargetID -f endTargetID
- * will associate row i in map with a partial mesh
- *  will associate row j in map with a partial mesh
+ * ./mbvisumap -s source.h5m -t target.h5m -m map.nc -b startSourceID \
+ *          -e endSourceID  -c startTargetID -f endTargetID -o 1
+ *  will associate row i, corresponding to target DOF i, in the map, with a partial mesh with entities from source mesh that
+ *      target the DOF i; i.e. the weights w(i,j)!=0 , j=1,n_b, will be displayed on source cells with global DOF j
+ *  will associate column j corresponding to source DOF j, in the map, with a partial mesh with entities from the target mesh
+ *      that are affected by the source DOF j; i.e., the weights w(i,j)!=0, i=1,n_a, will be displayed on target cells with
+ *      global DOF i
+ *
+ *      The option -o controls if the row and columns files are output in vtk or in h5m format
  *
  * can be built only if netcdf and hdf5 and eigen3 are available
  *
- * default option is now -o 2, which means it will create an edge mesh file, with the edges corresponding to a weight
- *  in the file, connecting one source with one target
+ * default option is now -o 2, which will create an h5m edge mesh file, with the each edge corresponding to  w(i,j)!=0 in the
+ *  map file, connecting source center i with target center j. The map will be displayed on a sphere of radius 1,
+ *  with the source centers highly elevated from the surfaces, to differentiate them from the target vertices, which
+ *  stay on the sphere of radius 1; the elevation is controlled by a new option, -r, with a default value of .05
+ *  which means that the source vertices will be put on a sphere of radius 1.05, creating an umbrella for each source center
  *
- *  only the map file is needed, positions for source and target centers are taken from map file itself
- *
+ *  only the map file is needed, positions for source and target centers are taken from the map file itself
+ *  example of usage:
+ *   ./mbvisumap  -m map.nc  -r 0.01
  *
  */
 #include "moab/MOABConfig.h"
 
 #ifndef MOAB_HAVE_EIGEN3
-#error compareMaps tool requires eigen3 configuration
+#error mbvisumap tool requires eigen3 configuration
+#endif
+
+#ifndef MOAB_HAVE_HDF5
+#error mbvisumap tool requires hdf5 configuration
 #endif
 
 #include "moab/ProgOptions.hpp"
@@ -40,8 +54,8 @@
         exit( 2 );                                 \
     }
 
-// copy from ReadNCDF.cpp some useful macros for reading from a netcdf file (exodus?)
-// ncFile is an integer initialized when opening the nc file in read mode
+// copy from ReadNCDF.cpp some useful macros for reading from a netcdf file
+// ncFile1 is an integer initialized when opening the nc file in read mode
 
 int ncFile1;
 
@@ -157,7 +171,8 @@ int main( int argc, char* argv[] )
 
     std::string extension = ".vtk";
     if( 1 <= otype ) extension = ".h5m";
-    // Open netcdf/exodus file
+
+    // Open netcdf map file
     int fail = nc_open( inputfile1.c_str(), 0, &ncFile1 );
     if( NC_NOWRITE != fail )
     {
@@ -232,7 +247,7 @@ int main( int argc, char* argv[] )
         // create a set with source vertices
         EntityHandle srcSet;
         rval = mb->create_meshset( MESHSET_SET, srcSet );MB_CHK_SET_ERR( rval, "can't create source set for vertices" );
-        rval = mb->add_entities(srcSet, source_verts);MB_CHK_SET_ERR( rval, "can't add vertices" );
+        rval = mb->add_entities( srcSet, source_verts );MB_CHK_SET_ERR( rval, "can't add vertices" );
         std::vector< int > vgid( na1 );
         for( int i = 0; i < na1; i++ )
             vgid[i] = i + 1;
@@ -255,7 +270,7 @@ int main( int argc, char* argv[] )
         rval = mb->create_vertices( &vertex_coords_tgt[0], nb1, target_verts );MB_CHK_SET_ERR( rval, "can't create target vertices" );
         EntityHandle tgtSet;
         rval = mb->create_meshset( MESHSET_SET, tgtSet );MB_CHK_SET_ERR( rval, "can't create target set for vertices" );
-        rval = mb->add_entities(tgtSet, target_verts);MB_CHK_SET_ERR( rval, "can't add vertices" );
+        rval = mb->add_entities( tgtSet, target_verts );MB_CHK_SET_ERR( rval, "can't add vertices" );
         vgid.resize( nb1 );
         for( int i = 0; i < nb1; i++ )
             vgid[i] = i + 1;
@@ -282,7 +297,6 @@ int main( int argc, char* argv[] )
         for( int i = 0; i < ns1; i++ )
             vgid[i] = i + 1;
         rval = mb->tag_set_data( gtag, edges, &vgid[0] );MB_CHK_SET_ERR( rval, "can't set global id on edges" );
-
 
         std::string name_file = name_map + extension;
         rval                  = mb->write_mesh( name_file.c_str() );MB_CHK_ERR( rval );

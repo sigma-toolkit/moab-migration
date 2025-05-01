@@ -1,0 +1,23 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8.2 FATAL_ERROR)
+
+project(vtkMoabReader)
+
+# Use the Paraview includes to build the plugin for right version
+find_package(ParaView REQUIRED)
+include_directories(${PARAVIEW_INCLUDE_DIRS})
+include_directories(.)
+
+# Following is from paraview.org's Plugin Howto
+# Scan the plugin file in order to set up internal data structures for building
+# plugins.
+paraview_plugin_scan(
+  # The `paraview.plugin` file describing the plugin.
+  PLUGIN_FILES "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/paraview.plugin"
+  # A result variable for the (enabled) plugins found during the scan.
+  PROVIDES_PLUGINS plugins
+  # Enable plugins during this scan by default.
+  ENABLE_BY_DEFAULT ON)
+# Build the plugins discovered during the scan.
+paraview_plugin_build(
+  PLUGINS ${plugins})
+

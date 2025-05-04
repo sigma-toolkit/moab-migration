@@ -56,7 +56,6 @@ test = ["pytest"]
 
 # Scikit-Build Configuration
 [tool.scikit-build]
-cmake.version = "<4.0.0"
 build.verbose = true
 logging.level = "INFO"
 wheel.install-dir = "pymoab"

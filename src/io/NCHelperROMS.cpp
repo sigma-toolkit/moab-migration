@@ -232,6 +232,7 @@ ErrorCode NCHelperROMS::create_mesh( Range& faces )
     Interface*& mbImpl = _readNC->mbImpl;
     // std::string& fileName = _readNC->fileName;
     Tag& mGlobalIdTag = _readNC->mGlobalIdTag;
+    bool& cartesian = _readNC->cartesian;
     // const Tag*& mpFileIdTag = _readNC->mpFileIdTag;
     DebugOutput& dbgOut = _readNC->dbgOut;
 

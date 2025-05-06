@@ -313,7 +313,7 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
     Tag mat_num_tag;
     Tag mat_name_tag;
     std::string mat_flag_name = get_material_ref_flag();
-    int mat_name_max_size     = get_max_name_size( cell_flag_datas[mat_flag_name] );
+    int mat_name_max_size     = get_max_name_size( cell_flag_datas[mat_flag_name] ) +1;
     //  int zero = 0;
     rval = MBI->tag_get_handle( "MATERIAL_NUMBER", 1, MB_TYPE_INTEGER, mat_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
     rval = MBI->tag_get_handle( "MATERIAL_NAME", mat_name_max_size + 1, MB_TYPE_OPAQUE, mat_name_tag,
@@ -323,7 +323,7 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
     Tag part_name_tag;
     Tag part_num_tag;
     std::string part_flag_name = get_container_ref_flag();
-    int max_part_name_size     = get_max_name_size( cell_flag_datas[part_flag_name] );
+    int max_part_name_size     = get_max_name_size( cell_flag_datas[part_flag_name] ) +1;
     rval = MBI->tag_get_handle( "PART_NUMBER", 1, MB_TYPE_INTEGER, part_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
     rval = MBI->tag_get_handle( "PART_NAME", max_part_name_size + 1, MB_TYPE_OPAQUE, part_name_tag,
                                 MB_TAG_SPARSE | MB_TAG_CREAT );
@@ -543,12 +543,10 @@ std::string ReadRTT::get_material_ref_flag()
     std::string material_ref_flag = "REGIONS";  // set defaul to REGIONS
     if( cell_flag_datas.find( "MATERIAL" ) != cell_flag_datas.end() )
     {
-        std::cout << "MATERIAL" << std::endl;
         material_ref_flag = "MATERIAL";
     }
     else if( cell_flag_datas.find( "MCNP_PSEUDO-CELLS" ) != cell_flag_datas.end() )
     {
-        std::cout << "MCNP_PSEUDO-CELLS" << std::endl;
         material_ref_flag = "MCNP_PSEUDO-CELLS";
     }
     return material_ref_flag;

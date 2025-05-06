@@ -1,25 +1,46 @@
 /*
- * visuMapVtk.cpp
- * this tool will take a source file, target file (h5m) and a map file in nc format,
+ * visuMap.cpp
+ * this tool will take a source file, target file (h5m) and a map file in nc format, and will visualize weights
  *
  * example of usage:
- * ./mbvisumap -s source.h5m -t target.h5m -m map.nc -b startSourceID -e endSourceID  -c startTargetID -f endTargetID
- * will associate row i in map with a partial mesh
- *  will associate row j in map with a partial mesh
+ * ./mbvisumap -s source.h5m -t target.h5m -m map.nc -b startSourceID \
+ *          -e endSourceID  -c startTargetID -f endTargetID -o 1
+ *  will associate row i, corresponding to target DOF i, in the map, with a partial mesh with entities from source mesh that
+ *      target the DOF i; i.e. the weights w(i,j)!=0 , j=1,n_b, will be displayed on source cells with global DOF j
+ *  will associate column j corresponding to source DOF j, in the map, with a partial mesh with entities from the target mesh
+ *      that are affected by the source DOF j; i.e., the weights w(i,j)!=0, i=1,n_a, will be displayed on target cells with
+ *      global DOF i
+ *
+ *      The option -o controls if the row and columns files are output in vtk or in h5m format
  *
  * can be built only if netcdf and hdf5 and eigen3 are available
  *
+ * default option is now -o 2, which will create an h5m edge mesh file, with the each edge corresponding to  w(i,j)!=0 in the
+ *  map file, connecting source center i with target center j. The map will be displayed on a sphere of radius 1,
+ *  with the source centers highly elevated from the surfaces, to differentiate them from the target vertices, which
+ *  stay on the sphere of radius 1; the elevation is controlled by a new option, -r, with a default value of .05
+ *  which means that the source vertices will be put on a sphere of radius 1.05, creating an umbrella for each source center
+ *
+ *  only the map file is needed, positions for source and target centers are taken from the map file itself
+ *  example of usage:
+ *   ./mbvisumap  -m map.nc  -r 0.01
  *
  */
 #include "moab/MOABConfig.h"
 
 #ifndef MOAB_HAVE_EIGEN3
-#error compareMaps tool requires eigen3 configuration
+#error mbvisumap tool requires eigen3 configuration
+#endif
+
+#ifndef MOAB_HAVE_HDF5
+#error mbvisumap tool requires hdf5 configuration
 #endif
 
 #include "moab/ProgOptions.hpp"
 #include "moab/Core.hpp"
 #include "moab/Range.hpp"
+#include "moab/IntxMesh/IntxUtils.hpp"
+#include "moab/ReadUtilIface.hpp"
 
 #include "netcdf.h"
 #include <cmath>
@@ -33,8 +54,8 @@
         exit( 2 );                                 \
     }
 
-// copy from ReadNCDF.cpp some useful macros for reading from a netcdf file (exodus?)
-// ncFile is an integer initialized when opening the nc file in read mode
+// copy from ReadNCDF.cpp some useful macros for reading from a netcdf file
+// ncFile1 is an integer initialized when opening the nc file in read mode
 
 int ncFile1;
 
@@ -126,30 +147,32 @@ int main( int argc, char* argv[] )
 {
 
     ProgOptions opts;
-    int dimSource = 2;  // for FV meshes is 2; for SE meshes, use fine mesh, dim will be 0
-    int dimTarget = 2;  //
-    int otype     = 0;
-
+    int dimSource   = 2;  // for FV meshes is 2; for SE meshes, use fine mesh, dim will be 0
+    int dimTarget   = 2;  //
+    int otype       = 2;
+    double fraction = 0.05;
     std::string inputfile1, inputSource, inputTarget;
     opts.addOpt< std::string >( "map,m", "input map ", &inputfile1 );
     opts.addOpt< std::string >( "source,s", "source mesh", &inputSource );
     opts.addOpt< std::string >( "target,t", "target mesh", &inputTarget );
     opts.addOpt< int >( "dimSource,d", "dimension of source  ", &dimSource );
     opts.addOpt< int >( "dimTarget,g", "dimension of target  ", &dimTarget );
-    opts.addOpt< int >( "typeOutput,o", " output type vtk(0), h5m(1)", &otype );
+    opts.addOpt< int >( "typeOutput,o", " output type vtk(0), h5m(1), view(default = 2) ", &otype );
 
     int startSourceID = -1, endSourceID = -1, startTargetID = -1, endTargetID = -1;
     opts.addOpt< int >( "startSourceID,b", "start source id ", &startSourceID );
     opts.addOpt< int >( "endSourceID,e", "end source id ", &endSourceID );
     opts.addOpt< int >( "startTargetID,c", "start target id ", &startTargetID );
     opts.addOpt< int >( "endTargetID,f", "end target id ", &endTargetID );
+    opts.addOpt< double >( "raiseFraction,r", "fraction for raising source points height (default 0.05)", &fraction );
     //  -b startSourceID -e endSourceID  -c startTargetID -f endTargetID
 
     opts.parseCommandLine( argc, argv );
 
     std::string extension = ".vtk";
-    if( 1 == otype ) extension = ".h5m";
-    // Open netcdf/exodus file
+    if( 1 <= otype ) extension = ".h5m";
+
+    // Open netcdf map file
     int fail = nc_open( inputfile1.c_str(), 0, &ncFile1 );
     if( NC_NOWRITE != fail )
     {
@@ -170,6 +193,117 @@ int main( int argc, char* argv[] )
     GET_1D_INT_VAR1( "row", idrow1, row1 );
     GET_1D_INT_VAR1( "col", idcol1, col1 );
     GET_1D_DBL_VAR1( "S", ids1, val1 );
+
+    // we read the matrix; now read moab source and target
+    Core core;
+    Interface* mb = &core;
+    ErrorCode rval;
+    Tag gtag = mb->globalId_tag();
+
+    // a dense tag for weights
+    Tag wtag;
+    double defVal = 0;
+
+    std::string name_map = inputfile1;
+    // strip last 3 chars (.nc extension)
+    name_map.erase( name_map.begin() + name_map.length() - 3, name_map.end() );
+    // if path , remove from name
+    size_t pos = name_map.rfind( '/', name_map.length() );
+    if( pos != std::string::npos ) name_map = name_map.erase( 0, pos + 1 );
+
+    rval = mb->tag_get_handle( "weight", 1, MB_TYPE_DOUBLE, wtag, MB_TAG_CREAT | MB_TAG_DENSE, &defVal );MB_CHK_SET_ERR( rval, "Failed to create weight" );
+
+    if( 2 == otype )
+    {
+        // create a view of the full map, in which each weight is shown on an edge that starts at the source cell center
+        // and ends at the target cell center
+        // source cell centers are raised a little, let's say a fraction 0.05 * radius, which is 1
+        // each edge gets the associated weight as a tag
+        // first read the cell centers for source and target meshes, directly from the map file
+
+        std::vector< double > xc_a( na1 ), yc_a( na1 );
+        std::vector< double > xc_b( nb1 ), yc_b( nb1 );
+        int idxc_a, idxc_b, idyc_a, idyc_b;
+        GET_1D_DBL_VAR1( "xc_a", idxc_a, xc_a );
+        GET_1D_DBL_VAR1( "xc_b", idxc_b, xc_b );
+        GET_1D_DBL_VAR1( "yc_a", idyc_a, yc_a );
+        GET_1D_DBL_VAR1( "yc_b", idyc_b, yc_b );
+        // create source vertices, and target vertices
+        std::vector< double > vertex_coords_src( 3 * na1 );
+        // xc_a and yc_a are in degrees, usually
+        for( int i = 0; i < na1; i++ )
+        {
+            IntxUtils::SphereCoords sph;
+            sph.R                        = 1 + fraction;  // slightly higher
+            sph.lon                      = xc_a[i] * M_PI / 180;
+            sph.lat                      = yc_a[i] * M_PI / 180;
+            CartVect pos                 = IntxUtils::spherical_to_cart( sph );
+            vertex_coords_src[3 * i]     = pos[0];
+            vertex_coords_src[3 * i + 1] = pos[1];
+            vertex_coords_src[3 * i + 2] = pos[2];
+        }
+        Range source_verts;
+        rval = mb->create_vertices( &vertex_coords_src[0], na1, source_verts );MB_CHK_SET_ERR( rval, "can't create source vertices" );
+        // create a set with source vertices
+        EntityHandle srcSet;
+        rval = mb->create_meshset( MESHSET_SET, srcSet );MB_CHK_SET_ERR( rval, "can't create source set for vertices" );
+        rval = mb->add_entities( srcSet, source_verts );MB_CHK_SET_ERR( rval, "can't add vertices" );
+        std::vector< int > vgid( na1 );
+        for( int i = 0; i < na1; i++ )
+            vgid[i] = i + 1;
+        rval = mb->tag_set_data( gtag, source_verts, &vgid[0] );MB_CHK_SET_ERR( rval, "can't set global id on source verts" );
+
+        std::vector< double > vertex_coords_tgt( 3 * nb1 );
+        // xc_a and yc_a are in degrees, usually
+        for( int i = 0; i < nb1; i++ )
+        {
+            IntxUtils::SphereCoords sph;
+            sph.R                        = 1;  //
+            sph.lon                      = xc_b[i] * M_PI / 180;
+            sph.lat                      = yc_b[i] * M_PI / 180;
+            CartVect pos                 = IntxUtils::spherical_to_cart( sph );
+            vertex_coords_tgt[3 * i]     = pos[0];
+            vertex_coords_tgt[3 * i + 1] = pos[1];
+            vertex_coords_tgt[3 * i + 2] = pos[2];
+        }
+        Range target_verts;
+        rval = mb->create_vertices( &vertex_coords_tgt[0], nb1, target_verts );MB_CHK_SET_ERR( rval, "can't create target vertices" );
+        EntityHandle tgtSet;
+        rval = mb->create_meshset( MESHSET_SET, tgtSet );MB_CHK_SET_ERR( rval, "can't create target set for vertices" );
+        rval = mb->add_entities( tgtSet, target_verts );MB_CHK_SET_ERR( rval, "can't add vertices" );
+        vgid.resize( nb1 );
+        for( int i = 0; i < nb1; i++ )
+            vgid[i] = i + 1;
+        rval = mb->tag_set_data( gtag, target_verts, &vgid[0] );MB_CHK_SET_ERR( rval, "can't set global id on target verts" );
+        // create ns1 edges
+
+        ReadUtilIface* read_iface;
+        rval = mb->query_interface( read_iface );MB_CHK_ERR( rval );
+
+        EntityHandle actual_start_handle;
+        EntityHandle* array = nullptr;
+        rval                = read_iface->get_element_connect( ns1, 2, MBEDGE, 1, actual_start_handle, array );MB_CHK_ERR( rval );
+
+        for( int i = 0; i < ns1; i++ )
+        {
+            array[2 * i]     = source_verts[col1[i] - 1];  // 1 based to 0 based index
+            array[2 * i + 1] = target_verts[row1[i] - 1];  // 1 based to 0 based index
+        }
+        Range edges( actual_start_handle, actual_start_handle + ns1 - 1 );
+
+        rval = mb->tag_set_data( wtag, edges, &val1[0] );MB_CHK_SET_ERR( rval, "can't set tag on edges" );
+
+        vgid.resize( ns1 );
+        for( int i = 0; i < ns1; i++ )
+            vgid[i] = i + 1;
+        rval = mb->tag_set_data( gtag, edges, &vgid[0] );MB_CHK_SET_ERR( rval, "can't set global id on edges" );
+
+        std::string name_file = name_map + extension;
+        rval                  = mb->write_mesh( name_file.c_str() );MB_CHK_ERR( rval );
+        std::cout << " wrote view map file " << name_file << " with source fraction height: " << fraction << "\n";
+
+        return 0;  // do not bother with other files created, just one file with weights on edges
+    }
     // first matrix
     typedef Eigen::Triplet< double > Triplet;
     std::vector< Triplet > tripletList;
@@ -185,11 +319,6 @@ int main( int argc, char* argv[] )
 
     weight1.setFromTriplets( tripletList.begin(), tripletList.end() );
     weight1.makeCompressed();
-    // we read the matrix; now read moab source and target
-    Core core;
-    Interface* mb = &core;
-    ErrorCode rval;
-    Tag gtag = mb->globalId_tag();
     EntityHandle sourceSet, targetSet;
     // those are the maps from global ids to the moab entity handles corresponding to those global ids
     //   which are corresponding to the global DOFs
@@ -224,18 +353,6 @@ int main( int argc, char* argv[] )
         int gid            = tids[i];
         targetHandles[gid] = eh;
     }
-    // a dense tag for weights
-    Tag wtag;
-    double defVal = 0;
-
-    std::string name_map = inputfile1;
-    // strip last 3 chars (.nc extension)
-    name_map.erase( name_map.begin() + name_map.length() - 3, name_map.end() );
-    // if path , remove from name
-    size_t pos = name_map.rfind( '/', name_map.length() );
-    if( pos != std::string::npos ) name_map = name_map.erase( 0, pos + 1 );
-
-    rval = mb->tag_get_handle( "weight", 1, MB_TYPE_DOUBLE, wtag, MB_TAG_CREAT | MB_TAG_DENSE, &defVal );MB_CHK_SET_ERR( rval, "Failed to create weight" );
     EntityHandle partialSet;
     rval = mb->create_meshset( MESHSET_SET, partialSet );MB_CHK_SET_ERR( rval, "can't create partial set" );
     // how to get a complete row in sparse matrix? Or a complete column ?

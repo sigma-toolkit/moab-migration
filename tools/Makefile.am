@@ -182,7 +182,7 @@ mbcmpfiles_SOURCES = compareFiles.cpp
 mbintxchk_SOURCES = mbIntxCheck.cpp
 mbcmpmaps_SOURCES = compareMaps.cpp
 mbcleantags_SOURCES = cleanTags.cpp
-mbvisumap_SOURCES = visuMapVtk.cpp
+mbvisumap_SOURCES = visuMap.cpp
 
 bin_PROGRAMS += mbslavepart
 mbslavepart_SOURCES = mbslavepart.cpp

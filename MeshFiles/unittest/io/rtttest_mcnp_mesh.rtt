@@ -101,9 +101,9 @@ cell_flags
     2 Slab
     3 Tally
   5 MATERIAL
-    1 Concrete
-    2 Air
-    3 VOID
+    1 mat:Concrete
+    2 mat:Air
+    3 mat:VOID
 end_cell_flags
 
 node_data_ids

@@ -276,9 +276,10 @@ int main( int argc, char* argv[] )
             ierr = iMOAB_FreeSenderBuffers( cmpRofPID, &cplrof );
             CHECKIERR( ierr, "cannot free buffers used to send rof towards coupler" )
         }
-        ierr = iMOAB_WriteMesh( cplRofPID, "RofCpl2.h5m", fileWriteOptions );
-        CHECKIERR( ierr, "cannot write rof on coupler" )
-
+        if( couComm != MPI_COMM_NULL ){
+            ierr = iMOAB_WriteMesh( cplRofPID, "RofCpl2.h5m", fileWriteOptions );
+            CHECKIERR( ierr, "cannot write rof on coupler" )
+        }
         // start the second hop, from rof cpl to rof coverage for lnd
         // the data is now on cpl Rof, need to be sent to rof coverage over lnd
         PUSH_TIMER( "Send/receive data from rof cpl to coverage in lnd context" )

@@ -543,10 +543,12 @@ std::string ReadRTT::get_material_ref_flag()
     std::string material_ref_flag = "REGIONS";  // set defaul to REGIONS
     if( cell_flag_datas.find( "MATERIAL" ) != cell_flag_datas.end() )
     {
+        std::cout << "MATERIAL" << std::endl;
         material_ref_flag = "MATERIAL";
     }
     else if( cell_flag_datas.find( "MCNP_PSEUDO-CELLS" ) != cell_flag_datas.end() )
     {
+        std::cout << "MCNP_PSEUDO-CELLS" << std::endl;
         material_ref_flag = "MCNP_PSEUDO-CELLS";
     }
     return material_ref_flag;
@@ -586,6 +588,9 @@ ErrorCode ReadRTT::read_cell_flags( const char* filename, rtt_flags& cell_flags 
     // Give priority to MCNOP_PSEUDO-CELLS for cell ID.
     rval = ReadRTT::cell_process_flag( cell_flags, "MCNP_PSEUDO-CELLS" );
 
+    // process the MATERIAL
+    rval = ReadRTT::cell_process_flag( cell_flags, "MATERIAL" );
+    
     std::string material_flag_name = get_material_ref_flag();
     cell_data                      = cell_flag_datas[material_flag_name];
     cell_data_idx                  = cell_flag_indexes[material_flag_name];

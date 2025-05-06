@@ -373,10 +373,10 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
         std::vector< char > part_name_buffer( max_part_name_size, '\0' );
 
         auto pat_idx = cell_flag_indexes[part_flag_name].find( part_number );
-        if( mat_idx != cell_flag_indexes[mat_flag_name].end() )
+        if( mat_idx != cell_flag_indexes[part_flag_name].end() )
         {
             // Copy the string into the buffer
-            std::string name = cell_flag_datas[mat_flag_name][mat_idx->second].name;
+            std::string name = cell_flag_datas[part_flag_name][mat_idx->second].name;
             std::copy( name.begin(), name.end(), part_name_buffer.begin() );
 
             // Set the tag data using the buffer
@@ -541,9 +541,9 @@ ErrorCode ReadRTT::side_process_faces( rtt_flags side_flags, std::vector< side >
 std::string ReadRTT::get_material_ref_flag()
 {
     std::string material_ref_flag = "REGIONS";  // set defaul to REGIONS
-    if( cell_flag_datas.find( "MATERIALS" ) != cell_flag_datas.end() )
+    if( cell_flag_datas.find( "MATERIAL" ) != cell_flag_datas.end() )
     {
-        material_ref_flag = "MATERIALS";
+        material_ref_flag = "MATERIAL";
     }
     else if( cell_flag_datas.find( "MCNP_PSEUDO-CELLS" ) != cell_flag_datas.end() )
     {

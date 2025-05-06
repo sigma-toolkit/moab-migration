@@ -14,6 +14,7 @@ using namespace moab;
 std::string example1 = TestDir + "unittest/io/rtttest_v100.rtt";
 std::string example2 = TestDir + "unittest/io/rtttest_v101.rtt";
 std::string example3 = TestDir + "unittest/io/rtttest_v101_2.rtt";
+std::string example4 = TestDir + "unittest/io/rtttest_mcnp_mesh.rtt";
 
 void test_loadfile_1();
 void test_meshset_tags_1();
@@ -34,6 +35,10 @@ void test_vertices_2();
 void test_loadfile_3();
 void test_tets_3();
 void test_tet_tags_3();
+
+void test_loadfile_4();
+void test_tets_4();
+void test_tet_tags_4();
 
 void read_file( Interface& moab, const char* input_file );
 
@@ -58,7 +63,10 @@ int main()
     result += RUN_TEST( test_loadfile_3 );
     result += RUN_TEST( test_tets_3 );
     result += RUN_TEST( test_tet_tags_3 );
-
+    // fourth batch
+    result += RUN_TEST( test_loadfile_4 );
+    result += RUN_TEST( test_tets_4 );
+    result += RUN_TEST( test_tet_tags_4 );
     return result;
 }
 
@@ -414,6 +422,54 @@ void test_tet_tags_3()
     ErrorCode rval = moab.get_entities_by_type( 0, moab::MBTET, entities );CHECK_ERR( rval );
 
     int num_tets        = 84;
+    int num_tet_in_moab = entities.size();
+    CHECK_EQUAL( num_tet_in_moab, num_tets );
+
+    // get the number of tets tagged with
+    entities.clear();
+    Tag material_number;
+    // get the tag handle
+    rval = moab.tag_get_handle( "MATERIAL_NUMBER", 1, MB_TYPE_INTEGER, material_number, MB_TAG_SPARSE | MB_TAG_CREAT );CHECK_ERR( rval );
+    std::cout << "Done with tag_get_handle" << std::endl;
+
+    // get the entities that are tagged
+    rval = moab.get_entities_by_type_and_tag( 0, moab::MBTET, &material_number, 0, 1, entities );
+    // each tet should have the material tag
+    int num_tet_tag = entities.size();
+    CHECK_EQUAL( num_tet_tag, num_tets );CHECK_ERR( rval );
+    std::cout << "Done with get_entities_by_type_and_tag" << std::endl;
+}
+
+void test_loadfile_4()
+{
+    Core moab;
+    read_file( moab, example4.c_str() );
+}
+
+void test_tets_4()
+{
+    Core moab;
+    // load the data into moab
+    read_file( moab, example4.c_str() );
+    // query the dataset to make sure that there are the correct number of cells
+    // cells = 26710 - number of tets
+    Range entities;
+    ErrorCode rval = moab.get_entities_by_type( 0, moab::MBTET, entities );CHECK_ERR( rval );
+    int num_tets        = 30;
+    int num_tet_in_moab = entities.size();
+    CHECK_EQUAL( num_tet_in_moab, num_tets );
+}
+
+void test_tet_tags_4()
+{
+    Core moab;
+    // load the data into moab
+    read_file( moab, example4.c_str() );
+    // query the dataset to make sure that there are the correct number of cells
+    Range entities;
+    ErrorCode rval = moab.get_entities_by_type( 0, moab::MBTET, entities );CHECK_ERR( rval );
+
+    int num_tets        = 30;
     int num_tet_in_moab = entities.size();
     CHECK_EQUAL( num_tet_in_moab, num_tets );
 

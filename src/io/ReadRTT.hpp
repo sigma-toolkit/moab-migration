@@ -463,11 +463,10 @@ class ReadRTT : public ReaderIface
      * Reads the full set of side data from the file
      *
      * @param filename, the file to read all the side data from
-     * @param side_flags, a map containing all the flags from the side_flags section
      *
      * @return moab::ErrorCode
      */
-    ErrorCode read_side_flags( const char* filename, rtt_flags& side_flags );
+    ErrorCode read_side_flags( const char* filename );
 
     /**
      * Process the FACES flag from the side_flags section
@@ -483,11 +482,10 @@ class ReadRTT : public ReaderIface
      * Reads the full set of cell data from the file
      *
      * @param filename, the file to read all the side data from
-     * @param cell_flags, a map containing all the flags from the cell_flags section
      *
      * @return moab::ErrorCode
      */
-    ErrorCode read_cell_flags( const char* filename, rtt_flags& cell_flags );
+    ErrorCode read_cell_flags( const char* filename);
 
     /**
      * Process the standard flag from the cell_flags section

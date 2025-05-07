@@ -267,9 +267,9 @@ ErrorCode ReadRTT::build_moab(std::vector<node> node_data,
 
     // Step 4: Material mapping and group creation
     std::map<int, EntityHandle> material_groups;
-    std::map<int, std::string> material_name_map; // Example: Initialize with {1: "Hydrogen", 2: "Oxygen", ...}
     std::string mat_flag_name = get_material_ref_flag();
-
+    std::vector<cell> material_names = cell_flag_datas[mat_flag_name]; // Example: Initialize with {1: "Hydrogen", 2: "Oxygen", ...}
+    std::map<int, int> mat_idx = cell_flag_indexes[mat_flag_name]; // Example: Initialize with {1: 0, 2: 1, ...}
     Tag mat_num_tag;
     // Tag mat_name_tag;
     rval = MBI->tag_get_handle( "MATERIAL_NUMBER", 1, MB_TYPE_INTEGER, mat_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
@@ -281,8 +281,7 @@ ErrorCode ReadRTT::build_moab(std::vector<node> node_data,
         if (material_groups.find(mat_number) == material_groups.end()) {
             // Create a new material group if it doesn't exist
             EntityHandle material_group;
-            auto it = material_name_map.find(mat_number);
-            std::string material_name = (it != material_name_map.end()) ? it->second : "UnknownMaterial";
+            std::string material_name = material_names[mat_idx[mat_number]].name;
             rval = create_material_group("mat:" + material_name, mat_number, material_group);
             if (rval != MB_SUCCESS) {
                 std::cerr << "Failed to create material group for material " << mat_number << std::endl;

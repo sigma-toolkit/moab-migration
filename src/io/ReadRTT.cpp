@@ -312,20 +312,15 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
     Tag mat_num_tag;
     // Tag mat_name_tag;
     std::string mat_flag_name = get_material_ref_flag();
-    // int mat_name_max_size     = get_max_name_size( cell_flag_datas[mat_flag_name] ) + 1;
-    //  int zero = 0;
     rval = MBI->tag_get_handle( "MATERIAL_NUMBER", 1, MB_TYPE_INTEGER, mat_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
-    // rval = MBI->tag_get_handle( "MATERIAL_NAME", mat_name_max_size, MB_TYPE_OPAQUE, mat_name_tag,
-    //                             MB_TAG_SPARSE | MB_TAG_CREAT );
+
     if( MB_SUCCESS != rval ) return rval;
 
     // Tag part_name_tag;
     Tag part_num_tag;
     std::string part_flag_name = get_container_ref_flag();
-    // int max_part_name_size     = get_max_name_size( cell_flag_datas[part_flag_name] ) + 1;
     rval = MBI->tag_get_handle( "PART_NUMBER", 1, MB_TYPE_INTEGER, part_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
-    // rval = MBI->tag_get_handle( "PART_NAME", max_part_name_size, MB_TYPE_OPAQUE, part_name_tag,
-    //                             MB_TAG_SPARSE | MB_TAG_CREAT );
+
 
     // create the tets
     EntityHandle tetra;  // handle for a specific tet
@@ -346,42 +341,10 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
         // tag the tet with the material number
         rval = MBI->tag_set_data( mat_num_tag, &tetra, 1, &mat_number );
 
-        // // Add material name tag
-        // Create a buffer for the string data
-        // std::vector< char > mat_name_buffer( mat_name_max_size, '\0' );
-
-        // auto mat_idx = cell_flag_indexes[mat_flag_name].find( mat_number );
-        // if( mat_idx != cell_flag_indexes[mat_flag_name].end() )
-        // {
-        //     // Copy the string into the buffer
-        //     std::string name = cell_flag_datas[mat_flag_name][mat_idx->second].name;
-        //     std::copy( name.begin(), name.end(), mat_name_buffer.begin() );
-
-        //     // Set the tag data using the buffer
-        //     rval = MBI->tag_set_data( mat_name_tag, &tetra, 1, mat_name_buffer.data() );
-        //     if( MB_SUCCESS != rval ) continue;
-        // }
-
         // deal with parts
         int part_number = tmp.falg_values[cell_flag_idx[part_flag_name]];
         // tag the tet with the part number
         rval = MBI->tag_set_data( part_num_tag, &tetra, 1, &part_number );
-
-        // // Add material part tag
-        // Create a buffer for the string data
-        // std::vector< char > part_name_buffer( max_part_name_size, '\0' );
-
-        // auto pat_idx = cell_flag_indexes[part_flag_name].find( part_number );
-        // if( mat_idx != cell_flag_indexes[part_flag_name].end() )
-        // {
-        //     // Copy the string into the buffer
-        //     std::string name = cell_flag_datas[part_flag_name][mat_idx->second].name;
-        //     std::copy( name.begin(), name.end(), part_name_buffer.begin() );
-
-        //     // Set the tag data using the buffer
-        //     rval = MBI->tag_set_data( part_name_tag, &tetra, 1, part_name_buffer.data() );
-        //     if( MB_SUCCESS != rval ) continue;
-        // }
 
         // set the tag data
         mb_tets.insert( tetra );

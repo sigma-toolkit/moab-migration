@@ -240,122 +240,140 @@ ErrorCode ReadRTT::generate_topology( std::vector< side > side_data,
 /*
  * builds the moab representation of the mesh
  */
-ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
-                               std::vector< facet > facet_data,
-                               std::vector< tet > tet_data,
-                               std::map< int, EntityHandle > surface_map )
-{
-
-    ErrorCode rval;         // reusable return value
+ErrorCode ReadRTT::build_moab(std::vector<node> node_data,
+                              std::vector<facet> facet_data,
+                              std::vector<tet> tet_data,
+                              std::map<int, EntityHandle> surface_map) {
+    ErrorCode rval; 
     EntityHandle file_set;  // the file handle
-    // create the file set
-    rval = MBI->create_meshset( MESHSET_SET, file_set );
-    if( MB_SUCCESS != rval ) return rval;
 
-    // create the vertices
+    // Step 1: Create the file set
+    rval = MBI->create_meshset(MESHSET_SET, file_set);
+    if (MB_SUCCESS != rval) return rval;
+
+    // Step 2: Create the vertices
     EntityHandle handle;
-    std::vector< node >::iterator it;  // iterate over the nodes
-    Range mb_coords;                   // range of coordinates
-    for( it = node_data.begin(); it != node_data.end(); ++it )
-    {
-        node tmp         = *it;
-        double coords[3] = { tmp.x, tmp.y, tmp.z };
-        rval             = MBI->create_vertex( coords, handle );
-        if( MB_SUCCESS != rval ) return rval;
-        mb_coords.insert( handle );  // inesert handle into the coordinate range
+    Range mb_coords;  // range of coordinates
+    for (auto& tmp : node_data) {
+        double coords[3] = {tmp.x, tmp.y, tmp.z};
+        rval = MBI->create_vertex(coords, handle);
+        if (MB_SUCCESS != rval) return rval;
+        mb_coords.insert(handle);  // insert handle into coordinate range
     }
+    rval = MBI->add_entities(file_set, mb_coords);
 
-    // add verts to set
-    rval = MBI->add_entities( file_set, mb_coords );
+    // Step 3: Create the facets
+    create_facets(facet_data, surface_map, mb_coords, file_set);
 
-    // create sense tag
-    Tag side_id_tag, surface_number_tag;
-    //  int zero = 0;
-    rval = MBI->tag_get_handle( "SIDEID_TAG", 1, MB_TYPE_INTEGER, side_id_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
-    rval =
-        MBI->tag_get_handle( "SURFACE_NUMBER", 1, MB_TYPE_INTEGER, surface_number_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
+    // Step 4: Material mapping and group creation
+    std::map<int, EntityHandle> material_groups;
+    std::map<int, std::string> material_name_map; // Example: Initialize with {1: "Hydrogen", 2: "Oxygen", ...}
+    std::string mat_flag_name = get_material_ref_flag();
 
-    // create the facets
-    EntityHandle triangle;
-    std::vector< facet >::iterator it_f;
-    // range of triangles
-    Range mb_tris;
-    // loop over the facet data
-    for( it_f = facet_data.begin(); it_f != facet_data.end(); ++it_f )
-    {
-        facet tmp = *it_f;
-        // get the nodes for the triangle
-        EntityHandle tri_nodes[3] = { mb_coords[tmp.connectivity[0] - 1], mb_coords[tmp.connectivity[1] - 1],
-                                      mb_coords[tmp.connectivity[2] - 1] };
-        // create a triangle element
-        rval = MBI->create_element( MBTRI, tri_nodes, 3, triangle );
-        // tag in side id on the triangle
-        rval = MBI->tag_set_data( side_id_tag, &triangle, 1, &tmp.side_id );
-        // tag the surface number on the triangle
-        rval = MBI->tag_set_data( surface_number_tag, &triangle, 1, &tmp.surface_number );
-        // insert vertices and triangles into the appropriate surface meshset
-        EntityHandle meshset_handle = surface_map[tmp.surface_number];
-        // also set surface tag
-        rval = MBI->tag_set_data( side_id_tag, &meshset_handle, 1, &tmp.side_id );
-        rval = MBI->tag_set_data( surface_number_tag, &meshset_handle, 1, &tmp.surface_number );
-        // add vertices to the mesh
-        rval = MBI->add_entities( meshset_handle, &( *tri_nodes ), 3 );
-        // add triangles to the meshset
-        rval = MBI->add_entities( meshset_handle, &triangle, 1 );
-        // ineter triangles into large run
-        mb_tris.insert( triangle );
-    }
-    // add tris to set to fileset
-    rval = MBI->add_entities( file_set, mb_tris );
-
-    // create material number tag
     Tag mat_num_tag;
     // Tag mat_name_tag;
-    std::string mat_flag_name = get_material_ref_flag();
     rval = MBI->tag_get_handle( "MATERIAL_NUMBER", 1, MB_TYPE_INTEGER, mat_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
 
-    if( MB_SUCCESS != rval ) return rval;
+    // Step 5: Create material groups
+    for (const auto& tet : tet_data) {
+        int mat_number = tet.falg_values[cell_flag_idx[mat_flag_name]];
 
-    // Tag part_name_tag;
-    Tag part_num_tag;
-    std::string part_flag_name = get_container_ref_flag();
-    rval = MBI->tag_get_handle( "PART_NUMBER", 1, MB_TYPE_INTEGER, part_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
+        if (material_groups.find(mat_number) == material_groups.end()) {
+            // Create a new material group if it doesn't exist
+            EntityHandle material_group;
+            auto it = material_name_map.find(mat_number);
+            std::string material_name = (it != material_name_map.end()) ? it->second : "UnknownMaterial";
+            rval = create_material_group("mat:" + material_name, mat_number, material_group);
+            if (rval != MB_SUCCESS) {
+                std::cerr << "Failed to create material group for material " << mat_number << std::endl;
+                return rval;
+            }
+            material_groups[mat_number] = material_group;
+        }
+    }
 
-
-    // create the tets
-    EntityHandle tetra;  // handle for a specific tet
-    std::vector< tet >::iterator it_t;
+    // Step 6: Create the tetrahedra and add them to corresponding material groups
     Range mb_tets;
-    // loop over all tets
-    for( it_t = tet_data.begin(); it_t != tet_data.end(); ++it_t )
-    {
-        tet tmp = *it_t;
-        // get the handles for the tet
+    for (auto& tmp : tet_data) {
+        // get the handles for the tet nodes
         EntityHandle tet_nodes[4] = { mb_coords[tmp.connectivity[0] - 1], mb_coords[tmp.connectivity[1] - 1],
                                       mb_coords[tmp.connectivity[2] - 1], mb_coords[tmp.connectivity[3] - 1] };
-        // create the tet
-        rval = MBI->create_element( MBTET, tet_nodes, 4, tetra );
+        EntityHandle tetra;
+        rval = MBI->create_element(MBTET, tet_nodes, 4, tetra);
+        if (MB_SUCCESS != rval) return rval;
 
-        // deal with materials
-        int mat_number = tmp.falg_values[cell_flag_idx[mat_flag_name]];
         // tag the tet with the material number
-        rval = MBI->tag_set_data( mat_num_tag, &tetra, 1, &mat_number );
+        int mat_number = tmp.falg_values[cell_flag_idx[mat_flag_name]];
+        rval = MBI->tag_set_data(mat_num_tag, &tetra, 1, &mat_number);
 
-        // deal with parts
-        int part_number = tmp.falg_values[cell_flag_idx[part_flag_name]];
-        // tag the tet with the part number
-        rval = MBI->tag_set_data( part_num_tag, &tetra, 1, &part_number );
+        // Add the tetrahedron to the corresponding material group
+        rval = MBI->add_entities(material_groups[mat_number], &tetra, 1);
+        if (rval != MB_SUCCESS) {
+            std::cerr << "Failed to add tetrahedron to material group" << std::endl;
+        }
 
-        // set the tag data
-        mb_tets.insert( tetra );
+        mb_tets.insert(tetra);
     }
-    // add tris to set
-    rval = MBI->add_entities( file_set, mb_tets );
+    rval = MBI->add_entities(file_set, mb_tets);
 
-    rval = add_metadata( file_set );
+    // Add any additional processing, like metadata
 
     return MB_SUCCESS;
 }
+
+// Function to create a material group
+ErrorCode ReadRTT::create_material_group(const std::string& material_name, int material_id, EntityHandle& handle) {
+    ErrorCode rval;
+    rval = MBI->create_meshset(MESHSET_SET, handle);
+    if (rval != MB_SUCCESS) return rval;
+
+    rval = MBI->tag_set_data(name_tag, &handle, 1, material_name.c_str());
+    if (rval != MB_SUCCESS) return rval;
+
+    rval = MBI->tag_set_data(id_tag, &handle, 1, &material_id);
+    if (rval != MB_SUCCESS) return rval;
+
+    const char category[] = "Group";
+    rval = MBI->tag_set_data(category_tag, &handle, 1, &category);
+    return rval;
+}
+
+
+void ReadRTT::create_facets(const std::vector<facet>& facet_data, const std::map<int, EntityHandle>& surface_map,
+                            Range& mb_coords, EntityHandle file_set) {
+    ErrorCode rval;
+    Tag side_id_tag, surface_number_tag;
+    // Obtain or create tags for side IDs and surface numbers
+    rval = MBI->tag_get_handle("SIDEID_TAG", 1, MB_TYPE_INTEGER, side_id_tag, MB_TAG_SPARSE | MB_TAG_CREAT);
+    rval = MBI->tag_get_handle("SURFACE_NUMBER", 1, MB_TYPE_INTEGER, surface_number_tag, MB_TAG_SPARSE | MB_TAG_CREAT);
+
+    EntityHandle triangle;
+    Range mb_tris;  // For storing triangles
+
+    for (const auto& tmp : facet_data) {
+        EntityHandle tri_nodes[3] = { mb_coords[tmp.connectivity[0] - 1], mb_coords[tmp.connectivity[1] - 1],
+                                      mb_coords[tmp.connectivity[2] - 1] };
+        rval = MBI->create_element(MBTRI, tri_nodes, 3, triangle);
+        // tag in side id on the triangle
+        rval = MBI->tag_set_data(side_id_tag, &triangle, 1, &tmp.side_id);
+        // tag the surface number on the triangle
+        rval = MBI->tag_set_data(surface_number_tag, &triangle, 1, &tmp.surface_number);
+        // insert vertices and triangles into the appropriate surface meshset
+        EntityHandle meshset_handle = surface_map.at(tmp.surface_number);
+        // also set surface tag
+        rval = MBI->tag_set_data(side_id_tag, &meshset_handle, 1, &tmp.side_id);
+        rval = MBI->tag_set_data(surface_number_tag, &meshset_handle, 1, &tmp.surface_number);
+        // add vertices to the mesh
+        rval = MBI->add_entities(meshset_handle, tri_nodes, 3);
+        // add triangles to the meshset
+        rval = MBI->add_entities(meshset_handle, &triangle, 1);
+        // insert triangles into mb_tris
+        mb_tris.insert(triangle);
+    }
+    rval = MBI->add_entities(file_set, mb_tris);
+}
+
+
 
 moab::ErrorCode ReadRTT::add_metadata( EntityHandle file_set )
 {

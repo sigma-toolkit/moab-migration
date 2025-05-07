@@ -66,13 +66,11 @@ if HAVE_TEMPESTREMAP
   imoab_coupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_coupler_twohop_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_phatm_ocn_coupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_read_map_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_map2_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_map_target_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_domain_culling_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_read_compute_map_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
 if HAVE_NETCDF
-  HDF5_TESTS += imoab_read_map imoab_map2 imoab_map_target imoab_coupler_bilin imoab_domain_culling imoab_read_compute_map
+  HDF5_TESTS += imoab_map_target imoab_coupler_bilin imoab_domain_culling imoab_read_compute_map imoab_map_r2l
 endif
 if HAVE_EXTMESHES
   HDF5_TESTS +=  imoab_apg2_ol_coupler
@@ -184,8 +182,6 @@ imoab_scrip_SOURCES = imoab_scrip.cpp
 imoab_coupler_twohop_SOURCES = imoab_coupler_twohop.cpp
 imoab_phatm_ocn_coupler_SOURCES = imoab_phatm_ocn_coupler.cpp
 imoab_apg2_ol_coupler_SOURCES = imoab_apg2_ol_coupler.cpp
-imoab_read_map_SOURCES = imoab_read_map.cpp
-imoab_map2_SOURCES = imoab_map2.cpp
 imoab_map_target_SOURCES = imoab_map_target.cpp
 imoab_read_compute_map_SOURCES = imoab_read_compute_map.cpp
 imoab_setwithGid_SOURCES = imoab_setwithGid.cpp
@@ -195,6 +191,8 @@ commgraph_test_SOURCES = commgraph_test.cpp
 test_mapweights_bcast_SOURCES = test_mapweights_bcast.cpp
 imoab_coupler_bilin_SOURCES = imoab_coupler_bilin.cpp
 imoab_domain_culling_SOURCES = imoab_domain_culling.cpp
+imoab_map_r2l_SOURCES = imoab_map_r2l.cpp
+
 par_intx_sph_SOURCES = par_intx_sph.cpp
 par_intx_sph_LDADD = $(LDADD)
 

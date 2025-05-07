@@ -1094,12 +1094,11 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_source, iMOAB_AppID pid_targe
  * <B>Operations:</B> Collective for parallel write, non collective for serial write.
  *
  * \param[in] pid (iMOAB_AppID)            The unique pointer to the application ID.
- * \param[in] filename (iMOAB_String)      The MOAB mesh file (H5M) to write all the entities contained in the
- *                                         internal application mesh set.
- * \param[in] write_options (iMOAB_String) Additional options for writing the MOAB mesh in parallel.
+ * \param[in] prefix (iMOAB_String)      The MOAB mesh file (H5M) to write all the entities contained in the
+ *                                          coverage mesh set.
  * \return ErrCode                         The error code indicating success or failure.
  */
-ErrCode iMOAB_WriteCoverageMesh( iMOAB_AppID pid, const iMOAB_String filename, const iMOAB_String write_options );
+ErrCode iMOAB_WriteCoverageMesh( iMOAB_AppID pid, const iMOAB_String prefix);
 
 /**
  * @brief Compute intersection of the surface meshes defined on a sphere. The resulting intersected mesh consists
@@ -1152,29 +1151,24 @@ ErrCode iMOAB_ComputePointDoFIntersection( iMOAB_AppID pid_source,
  * <B>Operations:</B> Collective
  *
  * \param[in]  pid1 (iMOAB_AppID)         The unique pointer to the first component.
- * \param[in]  pid2 (iMOAB_AppID)         The unique pointer to the second component.
- * \param[in]  pid3 (iMOAB_AppID)         The unique pointer to the coupler instance of the mesh (component 2).
+ * \param[in]  pid2 (iMOAB_AppID)         The unique pointer to the map component.
  * \param[in]  join (MPI_Comm)            The joint communicator that overlaps both groups.
  * \param[in]  group1 (MPI_Group *)       The MPI group for the first component.
- * \param[in]  group2 (MPI_Group *)       The MPI group for the second component.
+ * \param[in]  group2 (MPI_Group *)       The MPI group for the map component.
  * \param[in]  type1 (int *)              The type of mesh being migrated;
  *                                        (1) spectral with GLOBAL_DOFS, (2) Point Cloud (3) FV cell.
  * \param[in]  comp1 (int*)               The universally unique identifier of first component.
- * \param[in]  comp2 (int*)               The universally unique identifier of second component.
- * \param[in]  direction (int*)           A parameter indicating direction of the mesh migration.
- *                                        i.e., whether it is from source to coupler (1), or from coupler to target (2).
+ * \param[in]  comp2 (int*)               The universally unique identifier of map component.
  * \return ErrCode                        The error code indicating success or failure.
 */
 ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                               iMOAB_AppID pid2,
-                              iMOAB_AppID pid3,
                               MPI_Comm* join,
                               MPI_Group* group1,
                               MPI_Group* group2,
                               int* type,
                               int* comp1,
-                              int* comp2,
-                              int* direction );
+                              int* comp2);
 
 #endif /* #ifdef MOAB_HAVE_MPI */
 

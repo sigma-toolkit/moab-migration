@@ -98,6 +98,8 @@ struct appData
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
     EntityHandle secondary_file_set;  // secondary file set (typically a child set like covering mesh)
+                                      // so we assume only one covering set for all maps on this intx app
+                                      // we can have multiple weightMaps, but only one coverage set for all maps
     TempestMapAppData tempestData;
     std::map< std::string, std::string > metadataMap;
 #endif
@@ -743,9 +745,15 @@ static ErrCode internal_WriteMesh( iMOAB_AppID pid,
     }
 
     // Now let us actually write the file to disk with appropriate options
-    // MB_CHK_ERR( context.MBI->write_file( filename, 0, newopts.str().c_str(), &fileSet, 1, copyTagList.data(),
-    //                                      copyTagList.size() ) );
-    MB_CHK_ERR( context.MBI->write_file( filename, 0, newopts.str().c_str(), &fileSet, 1 ) );
+    if( primary_set )
+    {
+        MB_CHK_ERR( context.MBI->write_file( filename, 0, newopts.str().c_str(), &fileSet, 1, copyTagList.data(),
+                                             copyTagList.size() ) );
+    }
+    else
+    {
+        MB_CHK_ERR( context.MBI->write_file( filename, 0, newopts.str().c_str(), &fileSet, 1 ) );
+    }
 
     return moab::MB_SUCCESS;
 }
@@ -1120,7 +1128,7 @@ ErrCode iMOAB_GetVisibleElementsInfo( iMOAB_AppID pid,
 
 #else
         /* everything owned by task 0 */
-        ranks[i] = 0;
+        ranks[i]             = 0;
 #endif
     }
 
@@ -1790,6 +1798,20 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
     {
         eh_by_gid[gids[i]] = *it;
     }
+    // TODO: allow for tags of different length
+    int nbLocalVals = *num_tag_storage_length / ( (int)tagNames.size() );  // assumes all tags have the same length?
+    // check global ids to have different values
+    std::set< int > globalIdsSet;
+    for( int j = 0; j < nbLocalVals; j++ )
+        globalIdsSet.insert( globalIds[j] );
+    if( globalIdsSet.size() < nbLocalVals )
+    {
+        std::cout << "iMOAB_SetDoubleTagStorageWithGid: for pid:" << *pid << " tags[0]:" << tagNames[0]
+                  << " global ids passed are not unique, major error\n";
+        std::cout << " nbLocalVals:" << nbLocalVals << " globalIdsSet.size():" << globalIdsSet.size()
+                  << " first global id:" << globalIds[0] << "\n";
+        return moab::MB_FAILURE;
+    }
 
     std::vector< int > tagLengths( tagNames.size() );
     std::vector< Tag > tagList;
@@ -1853,8 +1875,6 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         // in this case, we have to use 2 crystal routers, to send data to the processor that needs it
         // we will create first a tuple to rendevous points, then from there send to the processor that requested it
         // it is a 2-hop global gather scatter
-        // TODO: allow for tags of different length; this is wrong
-        int nbLocalVals = *num_tag_storage_length / ( (int)tagNames.size() );  // assumes all tags have the same length?
         // we do not expect the sizes to match
         //assert( nbLocalVals * tagNames.size() - *num_tag_storage_length == 0 );
         TupleList TLsend;
@@ -2719,7 +2739,14 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid,
 {
     appData& data                               = context.appDatas[*pid];
     std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *context_id );
-    if( mt == data.pgraph.end() ) return moab::MB_FAILURE;
+    if( mt == data.pgraph.end() )
+    {
+        std::cout << " no par com graph for context_id:" << *context_id << " available contexts:";
+        for( auto mit = data.pgraph.begin(); mit != data.pgraph.end(); mit++ )
+            std::cout << "  " << mit->first;
+        std::cout << "\n";
+        return moab::MB_FAILURE;
+    }
 
     ParCommGraph* cgraph = mt->second;
     ParallelComm* pco    = context.appDatas[*pid].pcomm;
@@ -3578,18 +3605,42 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
 
     // get the local degrees of freedom, from the pid_cpl and type of mesh
     // Get the source and target data and pcomm objects
-    appData& data_source     = context.appDatas[*pid_source];
-    appData& data_target     = context.appDatas[*pid_target];
-    appData& data_intx       = context.appDatas[*pid_intersection];
+    appData& data_source = context.appDatas[*pid_source];
+    appData& data_target = context.appDatas[*pid_target];
+    appData& data_intx   = context.appDatas[*pid_intersection];
+    // do we need to check for tempest remap?
+    // if we do not have it, do not do anything anyway
+    //#ifdef MOAB_HAVE_TEMPESTREMAP
     TempestMapAppData& tdata = data_intx.tempestData;
 
     // check if the remapped context is null; we need to fix that, if so
+    // what if we read a map and compute a map, on a particular iMOAB app a2o for example?
+    // we compute an intx map and read a bilinear map
+    // this is rather wrong, we need to fix it
     if( tdata.remapper == nullptr )
     {
-        // user has not called the coverage mesh computation routine -- so explicitly call it now
-        // this check supports the traditional workflow of directly computing mesh intersection
-        // and letting this routine compute coverage mesh as needed
-        MB_CHK_ERR( iMOAB_ComputeCoverageMesh( pid_source, pid_target, pid_intersection ) );
+        // do not compute coverage anymore in advance;
+        // need to initialize the coverage set creation?
+        // or should we really just one enclosing coverage set for all maps in here ?
+        // Now allocate and initialize the remapper object
+#ifdef MOAB_HAVE_MPI
+        ParallelComm* pco_intx = data_intx.pcomm;
+        tdata.remapper         = new moab::TempestRemapper( context.MBI, pco_intx );
+#else
+        tdata.remapper = new moab::TempestRemapper( context.MBI );
+#endif
+        tdata.remapper->meshValidate     = true;
+        tdata.remapper->constructEdgeMap = true;
+
+        // Do not create new filesets; Use the sets from our respective applications
+        tdata.remapper->initialize( false );
+        tdata.remapper->GetMeshSet( moab::Remapper::SourceMesh )  = data_source.file_set;
+        tdata.remapper->GetMeshSet( moab::Remapper::TargetMesh )  = data_target.file_set;
+        tdata.remapper->GetMeshSet( moab::Remapper::OverlapMesh ) = data_intx.file_set;
+        // create a unique coverage set; it will be
+        moab::EntityHandle covering_set_new;
+        MB_CHK_SET_ERR( context.MBI->create_meshset( moab::MESHSET_SET, covering_set_new ), "Can't create new set" );
+        tdata.remapper->GetMeshSet( moab::Remapper::CoveringMesh ) = covering_set_new;
     }
 
     // Setup loading of weights onto TempestOnlineMap
@@ -3612,7 +3663,7 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
         MB_CHK_ERR( context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag ) );
         assert( gdsTag );
     }
-
+    //#endif
     // Find the DoF tag length
     // if it fails, usually it is 16
     // first check if we need to query the source
@@ -3624,37 +3675,11 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
         MB_CHK_ERR( context.MBI->tag_get_length( gdsTag, tgt_elem_dof_length ) );
 
     Tag gidTag = context.MBI->globalId_tag();
-    std::vector< int > srcDofValues, tgtDofValues;
+    std::vector< int > tgtDofValues;  // srcDofValues,
 
     // populate first tuple
     // will be filled with entities on coupler, from which we will get the DOFs, based on type
-    Range srcc_ents_of_interest, src_ents_of_interest, tgt_ents_of_interest;
-
-    if( *srctype == 1 )  // spectral element
-    {
-        MB_CHK_ERR( context.MBI->tag_get_length( gdsTag, src_elem_dof_length ) );
-        MB_CHK_ERR( context.MBI->get_entities_by_type( covering_set, MBQUAD, src_ents_of_interest ) );
-        srcDofValues.resize( src_ents_of_interest.size() * src_elem_dof_length );
-        MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, src_ents_of_interest, &srcDofValues[0] ) );
-    }
-    else if( *srctype == 2 )
-    {
-        // vertex global ids
-        MB_CHK_ERR( context.MBI->get_entities_by_type( covering_set, MBVERTEX, src_ents_of_interest ) );
-        srcDofValues.resize( src_ents_of_interest.size() * src_elem_dof_length );
-        MB_CHK_ERR( context.MBI->tag_get_data( gidTag, src_ents_of_interest, &srcDofValues[0] ) );
-    }
-    else if( *srctype == 3 )  // for FV meshes, just get the global id of cell
-    {
-        // element global ids
-        MB_CHK_ERR( context.MBI->get_entities_by_dimension( covering_set, 2, src_ents_of_interest ) );
-        srcDofValues.resize( src_ents_of_interest.size() * src_elem_dof_length );
-        MB_CHK_ERR( context.MBI->tag_get_data( gidTag, src_ents_of_interest, &srcDofValues[0] ) );
-    }
-    else
-    {
-        MB_CHK_ERR( MB_FAILURE );  // we know only type 1 or 2 or 3
-    }
+    Range tgt_ents_of_interest;
 
     if( *tgttype == 1 )  // spectral element
     {
@@ -3715,16 +3740,16 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
     // source coverage and target meshes and to figure out only relevant elements
     // that need to participate in the meshes.
 
-    tdata.remapper->SetMeshSet( Remapper::SourceMesh, source_set, &srcc_ents_of_interest );
+    //tdata.remapper->SetMeshSet( Remapper::SourceMesh, source_set, &srcc_ents_of_interest );
     // we have read the area A from map file, and we will set it as a aream double tag on the source set, knowing that we
     // read it trivially, with a trivial distribution by the global DOFs
     // local , private method:
     MB_CHK_SET_ERR( set_aream_from_trivial_distribution( pid_source, nA, trvAreaA ), " fail to set aream on source " );
     MB_CHK_SET_ERR( set_aream_from_trivial_distribution( pid_target, nB, trvAreaB ), " fail to set aream on target " );
 
-    tdata.remapper->SetMeshSet( Remapper::CoveringMesh, covering_set, &src_ents_of_interest );
+    //tdata.remapper->SetMeshSet( Remapper::CoveringMesh, covering_set, &src_ents_of_interest );
     weightMap->SetSourceNDofsPerElement( src_elem_dof_length );
-    weightMap->set_col_dc_dofs( srcDofValues );  // will set col_dtoc_dofmap
+    //weightMap->set_col_dc_dofs( srcDofValues );  // will set col_dtoc_dofmap
 
     tdata.remapper->SetMeshSet( Remapper::TargetMesh, target_set, &tgt_ents_of_interest );
     weightMap->SetDestinationNDofsPerElement( tgt_elem_dof_length );
@@ -3795,18 +3820,16 @@ ErrCode iMOAB_WriteMappingWeightsToFile(
 
     return moab::MB_SUCCESS;
 }
-
+//#define VERBOSE
 #ifdef MOAB_HAVE_MPI
 ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                               iMOAB_AppID pid2,
-                              iMOAB_AppID pid3,
                               MPI_Comm* jointcomm,
                               MPI_Group* groupA,
                               MPI_Group* groupB,
                               int* type,
                               int* comp1,
-                              int* comp2,
-                              int* direction )
+                              int* comp2 )
 {
     assert( jointcomm );
     assert( groupA );
@@ -3814,12 +3837,9 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     bool is_fortran = false;
     if( *pid1 >= 0 ) is_fortran = context.appDatas[*pid1].is_fortran || is_fortran;
     if( *pid2 >= 0 ) is_fortran = context.appDatas[*pid2].is_fortran || is_fortran;
-    if( *pid3 >= 0 ) is_fortran = context.appDatas[*pid3].is_fortran || is_fortran;
 
     MPI_Comm joint_communicator =
         ( is_fortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( jointcomm ) ) : *jointcomm );
-    MPI_Group group_first  = ( is_fortran ? MPI_Group_f2c( *reinterpret_cast< MPI_Fint* >( groupA ) ) : *groupA );
-    MPI_Group group_second = ( is_fortran ? MPI_Group_f2c( *reinterpret_cast< MPI_Fint* >( groupB ) ) : *groupB );
 
     ErrorCode rval = MB_SUCCESS;
     int localRank = 0, numProcs = 1;
@@ -3827,20 +3847,6 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     // Get the local rank and number of processes in the joint communicator
     MPI_Comm_rank( joint_communicator, &localRank );
     MPI_Comm_size( joint_communicator, &numProcs );
-
-    // Next instantiate the par comm graph
-    // here we need to look at direction
-    // this direction is good for atm source -> ocn target coupler example
-    ParCommGraph* cgraph = nullptr;
-    if( *pid1 >= 0 ) cgraph = new ParCommGraph( joint_communicator, group_first, group_second, *comp1, *comp2 );
-
-    ParCommGraph* cgraph_rev = nullptr;
-    if( *pid3 >= 0 ) cgraph_rev = new ParCommGraph( joint_communicator, group_second, group_first, *comp2, *comp1 );
-
-    // we should search if we have another pcomm with the same comp ids in the list already
-    // sort of check existing comm graphs in the map context.appDatas[*pid].pgraph
-    if( *pid1 >= 0 ) context.appDatas[*pid1].pgraph[*comp2] = cgraph;      // the context will be the other comp
-    if( *pid3 >= 0 ) context.appDatas[*pid3].pgraph[*comp1] = cgraph_rev;  // from 2 to 1
 
     // each model has a list of global ids that will need to be sent by gs to rendezvous the other
     // model on the joint_communicator
@@ -3862,7 +3868,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         rval = context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag );MB_CHK_ERR( rval );
         rval = context.MBI->tag_get_length( gdsTag, lenTagType1 );MB_CHK_ERR( rval );  // usually it is 16
     }
-    Tag tagType2 = context.MBI->globalId_tag();
+    Tag gidTag = context.MBI->globalId_tag();
 
     std::vector< int > valuesComp1;
 
@@ -3885,13 +3891,13 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         {
             rval = context.MBI->get_entities_by_type( fset1, MBVERTEX, ents_of_interest );MB_CHK_ERR( rval );
             valuesComp1.resize( ents_of_interest.size() );
-            rval = context.MBI->tag_get_data( tagType2, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );  // just global ids
+            rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );  // just global ids
         }
         else if( *type == 3 )  // for FV meshes, just get the global id of cell
         {
             rval = context.MBI->get_entities_by_dimension( fset1, 2, ents_of_interest );MB_CHK_ERR( rval );
             valuesComp1.resize( ents_of_interest.size() );
-            rval = context.MBI->tag_get_data( tagType2, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );  // just global ids
+            rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );  // just global ids
         }
         else
         {
@@ -3934,7 +3940,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     // start copy
     TLcomp2.enableWriteAccess();
 
-    moab::TempestOnlineMap* weightMap = nullptr;  // declare it outside, but it will make sense only for *pid >= 0
+    //moab::TempestOnlineMap* weightMap = nullptr;  // declare it outside, but it will make sense only for *pid2 >= 0
     // we know that :) (or *pid2 >= 0, it means we are on the coupler PEs, read map exists, and coupler procs exist)
     // populate second tuple with ids  from read map: we need row_gdofmap and col_gdofmap
     std::vector< int > valuesComp2;
@@ -3942,24 +3948,21 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     {
         appData& data2           = context.appDatas[*pid2];
         TempestMapAppData& tdata = data2.tempestData;
-        // should be only one map, read from file
-        assert( tdata.weightMaps.size() == 1 );
+        // could be more than one map, read from file
+        // get all column dofs, and create a union
+        // assert( tdata.weightMaps.size() == 1 );
         // maybe we need to check it is the map we expect
-        weightMap = tdata.weightMaps.begin()->second;
+        for( auto mapIt = tdata.weightMaps.begin(); mapIt != tdata.weightMaps.end(); ++mapIt )
+        {
+            moab::TempestOnlineMap* weightMap = mapIt->second;
+            std::vector< int > valueDofs;
+            rval = weightMap->fill_col_ids( valueDofs );MB_CHK_ERR( rval );
+            valuesComp2.insert( valuesComp2.end(), valueDofs.begin(), valueDofs.end() );
+        }
         // std::vector<int> ids_of_interest;
-        // do a deep copy of the ids of interest: row ids or col ids, target or source direction
-        if( *direction == 1 )
-        {
-            // we are interested in col ids, source
-            // new method from moab::TempestOnlineMap
-            rval = weightMap->fill_col_ids( valuesComp2 );MB_CHK_ERR( rval );
-        }
-        else if( *direction == 2 )
-        {
-            // we are interested in row ids, for target ids
-            rval = weightMap->fill_row_ids( valuesComp2 );MB_CHK_ERR( rval );
-        }
-        //
+        // do a deep copy of the ids of interest: row ids
+        // we are interested in col ids, source
+        // new method from moab::TempestOnlineMap
 
         // now fill the tuple list with info and markers
         std::set< int > uniq( valuesComp2.begin(), valuesComp2.end() );
@@ -4003,10 +4006,6 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     TupleList TLBackToComp1;
     TLBackToComp1.initialize( 3, 0, 0, 0, 0 );  // to proc, marker, from proc on comp2,
     TLBackToComp1.enableWriteAccess();
-
-    TupleList TLBackToComp2;
-    TLBackToComp2.initialize( 3, 0, 0, 0, 0 );  // to proc, marker,  from proc,
-    TLBackToComp2.enableWriteAccess();
 
     int n1 = TLcomp1.get_n();
     int n2 = TLcomp2.get_n();
@@ -4053,13 +4052,6 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                                                                      // came from, info from comp2
                     TLBackToComp1.vi_wr[3 * n + 1] = currentValue1;  // initial value (resend?)
                     TLBackToComp1.vi_wr[3 * n + 2] = TLcomp2.vi_rd[2 * ( indexInTLComp2 + i2 )];  // from proc on comp2
-                    n                              = TLBackToComp2.get_n();
-                    TLBackToComp2.reserve();
-                    TLBackToComp2.vi_wr[3 * n] =
-                        TLcomp2.vi_rd[2 * ( indexInTLComp2 + i2 )];  // send back info to original
-                    TLBackToComp2.vi_wr[3 * n + 1] = currentValue1;  // initial value (resend?)
-                    TLBackToComp2.vi_wr[3 * n + 2] = TLcomp1.vi_rd[2 * ( indexInTLComp1 + i1 )];  // from proc on comp1
-                    // what if there are repeated markers in TLcomp2? increase just index2
                 }
             }
             indexInTLComp1 += size1;
@@ -4067,7 +4059,6 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         }
     }
     pc.crystal_router()->gs_transfer( 1, TLBackToComp1, 0 );  // communication towards original tasks, with info about
-    pc.crystal_router()->gs_transfer( 1, TLBackToComp2, 0 );
 
     TupleList TLv;  // vertices
     TupleList TLc;  // cells if needed (not type 2)
@@ -4083,17 +4074,119 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         f1 << "TLBack1_" << localRank << ".txt";
         TLBackToComp1.print_to_file( f1.str().c_str() );
 #endif
-        // so we are now on pid1, we know now each marker were it has to go
-        // add a new method to ParCommGraph, to set up the split_ranges and involved_IDs_map
-        rval = cgraph->set_split_ranges( *comp1, TLBackToComp1, valuesComp1, lenTagType1, ents_of_interest, *type );MB_CHK_ERR( rval );
-        // we can just send vertices and elements, with crystal routers;
-        // on the receiving end, make sure they are not duplicated, by looking at the global id
-        // if *type is 1, also send global_dofs tag in the element tuple
-        rval = cgraph->form_tuples_to_migrate_mesh( context.MBI, TLv, TLc, *type, lenTagType1 );MB_CHK_ERR( rval );
+        // so we are now on pid1, we know now each cell where it has to go
+        int n = TLBackToComp1.get_n();
+        std::map< int, std::set< int > > uniqueIDs;
+        for( int i = 0; i < n; i++ )
+        {
+            int to_proc  = TLBackToComp1.vi_wr[3 * i + 2];
+            int globalId = TLBackToComp1.vi_wr[3 * i + 1];
+            uniqueIDs[to_proc].insert( globalId );
+        }
+        // gidTag is gid tag
+        // gdsTag is GLOBAL_DOFS , used only for spectral (type 1)
+        // (*type 1 is spectral, right now not used in E3SM)
+
+        std::map< int, Range > splits;
+        for( size_t i = 0; i < ents_of_interest.size(); i++ )
+        {
+            EntityHandle ent = ents_of_interest[i];
+            for( int j = 0; j < lenTagType1; j++ )
+            {
+                int marker = valuesComp1[i * lenTagType1 + j];
+                for( auto mit = uniqueIDs.begin(); mit != uniqueIDs.end(); mit++ )
+                {
+                    int proc                = mit->first;
+                    std::set< int >& setIds = mit->second;
+                    if( setIds.find( marker ) != setIds.end() )
+                    {
+                        splits[proc].insert( ent );
+                    }
+                }
+            }
+        }
+
+        std::map< int, Range > verts_to_proc;
+        int numv = 0, numc = 0;
+        for( auto it = splits.begin(); it != splits.end(); it++ )
+        {
+            int to_proc = it->first;
+            Range verts;
+            if( *type != 2 )
+            {
+                rval = context.MBI->get_connectivity( it->second, verts );MB_CHK_ERR( rval );
+                numc += (int)it->second.size();
+            }
+            else
+                verts = it->second;
+            verts_to_proc[to_proc] = verts;
+            numv += (int)verts.size();
+        }
+        // first vertices:
+        TLv.initialize( 2, 0, 0, 3, numv );  // to proc, GLOBAL ID, 3 real coordinates
+        TLv.enableWriteAccess();
+        // use the global id of vertices for connectivity
+        for( auto it = verts_to_proc.begin(); it != verts_to_proc.end(); it++ )
+        {
+            int to_proc  = it->first;
+            Range& verts = it->second;
+            for( Range::iterator vit = verts.begin(); vit != verts.end(); ++vit )
+            {
+                EntityHandle v   = *vit;
+                int n            = TLv.get_n();  // current size of tuple list
+                TLv.vi_wr[2 * n] = to_proc;      // send to processor
+
+                rval = context.MBI->tag_get_data( gidTag, &v, 1, &( TLv.vi_wr[2 * n + 1] ) );MB_CHK_ERR( rval );
+                rval = context.MBI->get_coords( &v, 1, &( TLv.vr_wr[3 * n] ) );MB_CHK_ERR( rval );
+                TLv.inc_n();  // increment tuple list size
+            }
+        }
+        if( *type != 2 )
+        {
+            // to proc, ID cell, gdsTag, nbv, id conn,
+            int size_tuple =
+                2 + ( ( *type != 1 ) ? 0 : lenTagType1 ) + 1 + 10;  // 10 is the max number of vertices in cell
+
+            std::vector< int > gdvals;
+
+            TLc.initialize( size_tuple, 0, 0, 0, numc );  // to proc, GLOBAL ID, 3 real coordinates
+            TLc.enableWriteAccess();
+            for( auto it = splits.begin(); it != splits.end(); it++ )
+            {
+                int to_proc  = it->first;
+                Range& cells = it->second;
+                for( Range::iterator cit = cells.begin(); cit != cells.end(); ++cit )
+                {
+                    EntityHandle cell         = *cit;
+                    int n                     = TLc.get_n();  // current size of tuple list
+                    TLc.vi_wr[size_tuple * n] = to_proc;
+                    int current_index         = 2;
+                    rval = context.MBI->tag_get_data( gidTag, &cell, 1, &( TLc.vi_wr[size_tuple * n + 1] ) );MB_CHK_ERR( rval );
+                    if( 1 == *type )
+                    {
+                        rval = context.MBI->tag_get_data( gdsTag, &cell, 1,
+                                                          &( TLc.vi_wr[size_tuple * n + current_index] ) );MB_CHK_ERR( rval );
+                        current_index += lenTagType1;
+                    }
+                    // now get connectivity
+                    const EntityHandle* conn = NULL;
+                    int nnodes               = 0;
+                    rval                     = context.MBI->get_connectivity( cell, conn, nnodes );MB_CHK_ERR( rval );
+                    // fill nnodes:
+                    TLc.vi_wr[size_tuple * n + current_index] = nnodes;
+                    rval                                      = context.MBI->tag_get_data( gidTag, conn, nnodes,
+                                                                                           &( TLc.vi_wr[size_tuple * n + current_index + 1] ) );MB_CHK_ERR( rval );
+                    TLc.inc_n();  // increment tuple list size
+                }
+            }
+        }
     }
-    else
+    else if( *pid2 >= 0 )  // TLv and TLc should be able to receive if *pid2 >= 0
+                           // this case will not happen if pid1 and pid2 are both on the coupler side
+                           // we need to cover the case if map migrate was used directly
+                           // in one hop projection; right now, we prefer 2 hop projection
     {
-        TLv.initialize( 2, 0, 0, 3, 0 );  // no vertices here, for sure
+        TLv.initialize( 2, 0, 0, 3, 0 );  // no vertices here yet, for sure
         TLv.enableWriteAccess();          // to be able to receive stuff, even if nothing is here yet, on this task
         if( *type != 2 )                  // for point cloud, we do not need to initialize TLc (for cells)
         {
@@ -4107,43 +4200,123 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     pc.crystal_router()->gs_transfer( 1, TLv, 0 );  // communication towards coupler tasks, with mesh vertices
     if( *type != 2 ) pc.crystal_router()->gs_transfer( 1, TLc, 0 );  // those are cells
 
-    if( *pid3 >= 0 )  // will receive the mesh, on coupler pes!
+    if( *pid2 >= 0 )  // will receive the mesh, on coupler pes!, the coverage mesh !
     {
-        appData& data3     = context.appDatas[*pid3];
-        EntityHandle fset3 = data3.file_set;
-        Range primary_ents3;                 // vertices for type 2, cells of dim 2 for type 1 or 3
-        std::vector< int > values_entities;  // will be the size of primary_ents3 * lenTagType1
-        rval = cgraph_rev->form_mesh_from_tuples( context.MBI, TLv, TLc, *type, lenTagType1, fset3, primary_ents3,
-                                                  values_entities );MB_CHK_ERR( rval );
-        iMOAB_UpdateMeshInfo( pid3 );
-        int ndofPerEl = 1;
-        if( 1 == *type ) ndofPerEl = (int)( sqrt( lenTagType1 ) );
-        // because we are on the coupler, we know that the read map pid2 exists
-        assert( *pid2 >= 0 );
         appData& dataIntx        = context.appDatas[*pid2];
         TempestMapAppData& tdata = dataIntx.tempestData;
+        Range primary_ents;                  // vertices for type 2, cells of dim 2 for type 1 or 3
+        std::vector< int > values_entities;  // will be the size of primary_ents3 * lenTagType1
+        EntityHandle fset3 = tdata.remapper->GetMeshSet( Remapper::CoveringMesh );
 
-        // if we are on source coverage, direction 1, we can set covering mesh, covering cells
-        if( 1 == *direction )
+        // start copy
+        std::map< int, EntityHandle > vertexMap;  //
+        Range verts;
+        // always form vertices and add them to the fset3;
+        int n = TLv.get_n();
+        EntityHandle vertex;
+        for( int i = 0; i < n; i++ )
         {
-            tdata.pid_src = pid3;
-            tdata.remapper->SetMeshSet( Remapper::CoveringMesh, fset3, &primary_ents3 );
+            int gid = TLv.vi_rd[2 * i + 1];
+            if( vertexMap.find( gid ) == vertexMap.end() )
+            {
+                // need to form this vertex
+                rval = context.MBI->create_vertex( &( TLv.vr_rd[3 * i] ), vertex );MB_CHK_ERR( rval );
+                vertexMap[gid] = vertex;
+                verts.insert( vertex );
+                rval = context.MBI->tag_set_data( gidTag, &vertex, 1, &gid );MB_CHK_ERR( rval );
+            }
+        }
+        rval = context.MBI->add_entities( fset3, verts );MB_CHK_ERR( rval );
+        if( 2 == *type )
+        {
+            values_entities.resize( verts.size() );  // just get the ids of vertices
+            rval = context.MBI->tag_get_data( gidTag, verts, &values_entities[0] );MB_CHK_ERR( rval );
+            primary_ents = verts;
+            //return MB_SUCCESS;
+        }
+        else
+        {
+            n = TLc.get_n();
+            int size_tuple =
+                2 + ( ( *type != 1 ) ? 0 : lenTagType1 ) + 1 + 10;  // 10 is the max number of vertices in cell
+
+            EntityHandle new_element;
+
+            std::map< int, EntityHandle >
+                cellMap;  // do not create one if it already exists, maybe from other processes
+            for( int i = 0; i < n; i++ )
+            {
+                int from_proc  = TLc.vi_rd[size_tuple * i];
+                int globalIdEl = TLc.vi_rd[size_tuple * i + 1];
+                if( cellMap.find( globalIdEl ) == cellMap.end() )  // need to create the cell
+                {
+                    int current_index = 2;
+                    if( 1 == *type ) current_index += lenTagType1;
+                    int nnodes = TLc.vi_rd[size_tuple * i + current_index];
+                    std::vector< EntityHandle > conn;
+                    conn.resize( nnodes );
+                    for( int j = 0; j < nnodes; j++ )
+                    {
+                        conn[j] = vertexMap[TLc.vi_rd[size_tuple * i + current_index + j + 1]];
+                    }
+                    //
+                    EntityType entType = MBQUAD;
+                    if( nnodes > 4 ) entType = MBPOLYGON;
+                    if( nnodes < 4 ) entType = MBTRI;
+                    rval = context.MBI->create_element( entType, &conn[0], nnodes, new_element );MB_CHK_SET_ERR( rval, "can't create new element " );
+                    primary_ents.insert( new_element );
+                    cellMap[globalIdEl] = new_element;
+                    rval                = context.MBI->tag_set_data( gidTag, &new_element, 1, &globalIdEl );MB_CHK_SET_ERR( rval, "can't set global id tag on cell " );
+                    if( 1 == *type )
+                    {
+                        // set the gds tag
+                        rval = context.MBI->tag_set_data( gdsTag, &new_element, 1, &( TLc.vi_rd[size_tuple * i + 2] ) );MB_CHK_SET_ERR( rval, "can't set gds tag on cell " );
+                    }
+                }
+            }
+            rval = context.MBI->add_entities( fset3, primary_ents );MB_CHK_ERR( rval );
+            if( 1 == *type )
+            {
+                values_entities.resize( lenTagType1 * primary_ents.size() );
+                rval = context.MBI->tag_get_data( gdsTag, primary_ents, &values_entities[0] );MB_CHK_ERR( rval );
+            }
+            else  // *type == 3
+            {
+                values_entities.resize( primary_ents.size() );  // just get the global ids !
+                rval = context.MBI->tag_get_data( gidTag, primary_ents, &values_entities[0] );MB_CHK_ERR( rval );
+            }
+        }
+
+        int ndofPerEl = 1;
+        if( 1 == *type ) ndofPerEl = (int)( sqrt( lenTagType1 ) );
+
+        tdata.remapper->SetMeshSet( Remapper::CoveringMesh, fset3, &primary_ents );
+        // dump covering mesh in a file, to look at it
+        // should be one covering mesh per task, should cover the target mesh set
+#ifdef VERBOSE
+        std::stringstream fcov;
+        fcov << "MapCover_" << numProcs << "_" << localRank << ".h5m";
+        context.MBI->write_file( fcov.str().c_str(), 0, 0, &fset3, 1 );
+        EntityHandle fset2 = tdata.remapper->GetMeshSet( Remapper::TargetMesh );
+        std::stringstream ftarg;
+        ftarg << "TargMap_" << numProcs << "_" << localRank << ".h5m";
+        context.MBI->write_file( ftarg.str().c_str(), 0, 0, &fset2, 1 );
+#endif
+        for( auto mapIt = tdata.weightMaps.begin(); mapIt != tdata.weightMaps.end(); ++mapIt )
+        {
+            moab::TempestOnlineMap* weightMap = mapIt->second;
             weightMap->SetSourceNDofsPerElement( ndofPerEl );
             weightMap->set_col_dc_dofs( values_entities );  // will set col_dtoc_dofmap
         }
-        // if we are on target, we can set the target cells
-        else
-        {
-            tdata.pid_dest = pid3;
-            tdata.remapper->SetMeshSet( Remapper::TargetMesh, fset3, &primary_ents3 );
-            weightMap->SetDestinationNDofsPerElement( ndofPerEl );
-            weightMap->set_row_dc_dofs( values_entities );  // will set row_dtoc_dofmap
-        }
     }
+
+    // compute par comm graph
+    int ierr = iMOAB_ComputeCommGraph( pid1, pid2, jointcomm, groupA, groupB, type, type, comp1, comp2 );
+    if( ierr != 0 ) return moab::MB_FAILURE;
 
     return moab::MB_SUCCESS;
 }
-
+#undef VERBOSE
 #endif  // #ifdef MOAB_HAVE_MPI
 
 #endif  // #ifdef MOAB_HAVE_NETCDF
@@ -4184,7 +4357,7 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
     // Default constant parameters
     constexpr bool validate        = true;
     constexpr bool meshCleanup     = true;
-    constexpr bool gnomonic        = true;
+    bool gnomonic                  = true;
     constexpr double defaultradius = 1.0;
     constexpr double boxeps        = 1.e-10;
 
@@ -4318,6 +4491,7 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
     tdata.remapper->GetMeshSet( moab::Remapper::OverlapMesh ) = data_intx.file_set;
 
     // First, compute the covering source set.
+    if( tdata.num_src_ghost_layers >= 1 ) gnomonic = false;  // do not use gnomonic when we need ghost layers;
     rval =
         tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, tdata.num_src_ghost_layers );MB_CHK_ERR( rval );
 
@@ -4328,11 +4502,37 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
 
     return moab::MB_SUCCESS;
 }
-
-ErrCode iMOAB_WriteCoverageMesh( iMOAB_AppID pid, const iMOAB_String filename, const iMOAB_String write_options )
+#ifdef MOAB_HAVE_TEMPESTREMAP
+ErrCode iMOAB_WriteCoverageMesh( iMOAB_AppID pid, const iMOAB_String prefix )
 {
-    return internal_WriteMesh( pid, filename, write_options, false );
+    IMOAB_CHECKPOINTER( prefix, 2 );
+    IMOAB_ASSERT( strlen( prefix ), "Invalid prefix." );
+
+    appData& data        = context.appDatas[*pid];
+    EntityHandle fileSet = data.file_set;
+
+    if( data.tempestData.remapper != nullptr )
+        fileSet = data.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
+    else if( data.file_set != data.secondary_file_set )
+        fileSet = data.secondary_file_set;
+    else
+        MB_CHK_SET_ERR( moab::MB_FAILURE, "Invalid secondary file set handle" );
+
+    std::ostringstream file_name;
+    int rank = 0, size = 1;
+
+#ifdef MOAB_HAVE_MPI
+    ParallelComm* pcomm = data.pcomm;
+    rank                = pcomm->rank();
+    size                = pcomm->size();
+#endif
+
+    file_name << prefix << "_" << size << "_" << rank << ".h5m";
+    // Now let us actually write the file to disk with appropriate options
+    ErrorCode rval = context.MBI->write_file( file_name.str().c_str(), 0, 0, &fileSet, 1 );MB_CHK_ERR( rval );
+    return moab::MB_SUCCESS;
 }
+#endif
 
 ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMOAB_AppID pid_intx )
 {

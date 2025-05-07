@@ -424,19 +424,17 @@ module iMOAB
         integer(c_int), intent(in) :: pid
       end function iMOAB_MergeVertices
 
-      integer(c_int) function iMOAB_MigrateMapMesh( pid1, pid2, pid3, jointcomm, groupA, groupB, type, comp1, comp2, &
-                                                    direction) bind(C, name='iMOAB_MigrateMapMesh')
+      integer(c_int) function iMOAB_MigrateMapMesh( pid1, pid2, jointcomm, groupA, groupB, type, comp1, comp2) &
+            bind(C, name='iMOAB_MigrateMapMesh')
         use, intrinsic :: iso_c_binding, only : c_int
         integer(c_int), intent(in) :: pid1
         integer(c_int), intent(in) :: pid2
-        integer(c_int), intent(in) :: pid3
         integer, intent(in) :: jointcomm  ! MPI_Comm
         integer, intent(in) :: groupA     ! MPI_Group
         integer, intent(in) :: groupB     ! MPI_Group
         integer(c_int), intent(in) :: type
         integer(c_int), intent(in) :: comp1
         integer(c_int), intent(in) :: comp2
-        integer(c_int), intent(in) :: direction
       end function iMOAB_MigrateMapMesh
 
       integer(c_int) function iMOAB_SetMapGhostLayers(pid, num_src_layers, num_tgt_layers) bind(C, name='iMOAB_SetMapGhostLayers')
@@ -458,6 +456,12 @@ module iMOAB
       end function iMOAB_ComputeCoverageMesh
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
+      integer(c_int) function iMOAB_WriteCoverageMesh(  pid,   prefix )&
+                                                    bind(C, name='iMOAB_WriteCoverageMesh')
+      use, intrinsic :: iso_c_binding, only: c_int, c_char
+        integer(c_int), intent(in) :: pid
+        character(kind=c_char), intent(in) :: prefix
+      end function iMOAB_WriteCoverageMesh
 
       integer(c_int) function iMOAB_ComputeMeshIntersectionOnSphere(pid_source, pid_target, pid_intersection) &
                                                                   bind(C, name='iMOAB_ComputeMeshIntersectionOnSphere')

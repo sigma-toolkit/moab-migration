@@ -424,7 +424,7 @@ void read_buffered_map()
                 // clear the local buffer
                 dataRowCols.clear();
             }  // if( nEntriesComm > 0 )
-        }  // if( rank != rootProc )
+        }      // if( rank != rootProc )
 
         MPI_Barrier( commW );
 #endif
@@ -505,6 +505,8 @@ void read_map_from_disk()
     rval = onlinemap.ReadParallelMap( remap_weights_filename.c_str(), tgt_owned_ids, areaA, nA, areaB, nB );
     CHECK_EQUAL( rval, moab::MB_SUCCESS );
 
+    // sparse tempest remap matrix is not instantiated anymore; just the eigen matrix exists in read map case
+#if 0
     // consistency: row sums
     int isConsistentP = onlinemap.IsConsistent( dTolerance );
     CHECK_EQUAL( 0, isConsistentP );
@@ -520,6 +522,7 @@ void read_map_from_disk()
     // Accumulate sum of failures to ensure that it is exactly same as serial case
     // 4600 fails in serial. What about parallel ? Check and confirm.
     CHECK_EQUAL( 4600, isMonotoneP );
+#endif
 }
 
 void test_tempest_map_bcast()

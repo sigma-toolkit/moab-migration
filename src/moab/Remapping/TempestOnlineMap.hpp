@@ -436,16 +436,6 @@ class TempestOnlineMap : public OfflineMap
                                     std::map< std::string, double >& metrics,
                                     bool verbose = true );
 
-    moab::ErrorCode fill_row_ids( std::vector< int >& ids_of_interest )
-    {
-        ids_of_interest.reserve( row_gdofmap.size() );
-        // need to add 1
-        for( auto it = row_gdofmap.begin(); it != row_gdofmap.end(); it++ )
-            ids_of_interest.push_back( *it + 1 );
-
-        return moab::MB_SUCCESS;
-    }
-
     moab::ErrorCode fill_col_ids( std::vector< int >& ids_of_interest )
     {
         ids_of_interest.reserve( col_gdofmap.size() );
@@ -511,6 +501,7 @@ class TempestOnlineMap : public OfflineMap
 
 #ifdef MOAB_HAVE_EIGEN3
 
+    int num_rows, num_cols;
     WeightMatrix m_weightMatrix;
     WeightRowVector m_rowVector;
     WeightColVector m_colVector;

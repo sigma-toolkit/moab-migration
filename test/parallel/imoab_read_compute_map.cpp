@@ -19,10 +19,6 @@
 #include "TestUtil.hpp"
 #include "moab/CpuTimer.hpp"
 #include "moab/ProgOptions.hpp"
-#include <iostream>
-#include <iomanip>
-#include <sstream>
-
 #include "imoab_coupler_utils.hpp"
 
 // C++ includes
@@ -282,50 +278,6 @@ int main( int argc, char* argv[] )
                    "cannot write second atm mesh after receiving" )
     }
 
-    // --------- ATM and OCN mesh migration ---------
-    if( couComm != MPI_COMM_NULL )
-    {
-#if defined( COMPUTE_ONLINE_MAP )
-        PUSH_TIMER( "Compute ATM source coverage mesh for OCN (in-memory)" )
-        // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
-        // basically, atm was redistributed according to target (ocean) partition, to "cover" the
-        // ocean partitions check if intx valid, write some h5m intx file
-        CHECKIERR( iMOAB_ComputeCoverageMesh( cplAtmPID, cplOcnPID, cplAtmOcnMemPID ),
-                   "cannot compute source ATM coverage mesh for OCN" )
-        POP_TIMER( couComm, rankInCouComm )
-#endif
-#ifdef COMPUTE_FILE_MAP
-        PUSH_TIMER( "Compute ATM source coverage mesh for OCN (file-based)" )
-        // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
-        // basically, atm was redistributed according to target (ocean) partition, to "cover" the
-        // ocean partitions check if intx valid, write some h5m intx file
-        CHECKIERR( iMOAB_ComputeCoverageMesh( cplAtmPID, cplOcnPID, cplAtmOcnFilePID ),
-                   "cannot compute source ATM coverage mesh for OCN" )
-        POP_TIMER( couComm, rankInCouComm )
-        if( rankInCouComm == 0 )
-        {
-            CHECKIERR( iMOAB_WriteMesh( cplAtmPID, "atm.h5m", "" ), "cannot write ATM coverage mesh for OCN" )
-            CHECKIERR( iMOAB_WriteCoverageMesh( cplAtmOcnFilePID, "atm_ocn_coverage.h5m", "" ),
-                       "cannot write ATM coverage mesh for OCN" )
-        }
-#endif
-#ifdef COMPUTE_TRANSPOSE_FILE_MAP
-        PUSH_TIMER( "Compute OCN source coverage mesh for ATM (file-based)" )
-        // coverage mesh was computed here, for cplAtmPID, atm on coupler pes
-        // basically, atm was redistributed according to target (ocean) partition, to "cover" the
-        // ocean partitions check if intx valid, write some h5m intx file
-        CHECKIERR( iMOAB_ComputeCoverageMesh( cplOcnPID, cplAtmPID, cplOcnAtmFilePID ),
-                   "cannot compute source OCN coverage mesh for ATM" )
-        POP_TIMER( couComm, rankInCouComm )
-        if( rankInCouComm == 0 )
-        {
-            CHECKIERR( iMOAB_WriteMesh( cplOcnPID, "ocn.h5m", "" ), "cannot write OCN coverage mesh for ATM" )
-            CHECKIERR( iMOAB_WriteCoverageMesh( cplOcnAtmFilePID, "ocn_atm_coverage.h5m", "" ),
-                       "cannot write OCN coverage mesh for ATM" )
-        }
-#endif
-    }
-
     // --------- Load map from disk or compute it online ---------
     const iMOAB_String map_from_file_identifier[2] = { "atm-ocn-file-map", "ocn-atm-file-map" };
 #ifdef COMPUTE_FILE_MAP
@@ -336,20 +288,10 @@ int main( int argc, char* argv[] )
         CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtmOcnFilePID, &src_disc_type,
                                                      &tgt_disc_type, map_from_file_identifier[0], mapFilename.c_str() ),
                    "failed to load ATM-OCN map file from disk" );
-
-        // {
-        //     const iMOAB_String atmocn_map_file_name = "atm_ocn_map_loaded.nc";
-        //     CHECKIERR( iMOAB_WriteMappingWeightsToFile( cplAtmOcnFilePID, map_from_file_identifier[0],
-        //                                                 atmocn_map_file_name ),
-        //                "failed to write map file to disk" );
-        // }
-
-        int meshtype = 3;
-        PUSH_TIMER( "Compute ATM coverage graph for OCN mesh" )
-        CHECKIERR( iMOAB_ComputeCommGraph( cplAtmPID, cplAtmOcnFilePID, &couComm, &couPEGroup, &couPEGroup, &meshtype,
-                                           &meshtype, &cplatm, &atmocnfid ),
-                   "cannot recompute ATM source coverage graph for OCN" )
-        POP_TIMER( couComm, rankInCouComm )  // hijack this rank
+        // because it is like "coverage", context will be atmocnfid
+        CHECKIERR( iMOAB_MigrateMapMesh( cplAtmPID, cplAtmOcnFilePID, &couComm, &couPEGroup, &couPEGroup, &src_disc_type,
+                                     &cplatm, &atmocnfid),
+                "failed to migrate mesh for map");
     }
 #endif
 #ifdef COMPUTE_TRANSPOSE_FILE_MAP
@@ -361,20 +303,10 @@ int main( int argc, char* argv[] )
                                                      &tgt_disc_type, map_from_file_identifier[1],
                                                      mapFilenameTrans.c_str() ),
                    "failed to load OCN-ATM map file from disk" );
-
-        // {
-        //     const iMOAB_String atmocn_map_file_name = "ocn_atm_map_loaded.nc";
-        //     CHECKIERR( iMOAB_WriteMappingWeightsToFile( cplOcnAtmFilePID, map_from_file_identifier[1],
-        //                                                 atmocn_map_file_name ),
-        //                "failed to write map file to disk" );
-        // }
-
-        int meshtype = 3;
-        PUSH_TIMER( "Compute OCN coverage graph for ATM mesh" )
-        CHECKIERR( iMOAB_ComputeCommGraph( cplOcnPID, cplOcnAtmFilePID, &couComm, &couPEGroup, &couPEGroup, &meshtype,
-                                           &meshtype, &cplocn, &ocnatmfid ),
-                   "cannot recompute OCN source coverage graph for ATM" )
-        POP_TIMER( couComm, rankInCouComm )  // hijack this rank
+        // because it is like "coverage", context will be ocnatmfid
+        CHECKIERR( iMOAB_MigrateMapMesh( cplOcnPID, cplOcnAtmFilePID, &couComm, &couPEGroup, &couPEGroup, &src_disc_type,
+                                     &cplocn, &ocnatmfid ),
+                "failed to migrate mesh for map");
     }
 #endif
 
@@ -607,8 +539,9 @@ int main( int argc, char* argv[] )
 #ifdef VERBOSE
             {
                 // write only for n==1 case
-                char outputFileRecvd[] = "cplProjectedOCNFileMF.h5m";
-                CHECKIERR( iMOAB_WriteMesh( cplOcnPID, outputFileRecvd, fileWriteOptions ),
+                std::stringstream outf;
+                outf << "cplProjectedOCNFileMF_" << endG4 - startG4 + 1 << ".h5m";  // number of tasks on coupler
+                CHECKIERR( iMOAB_WriteMesh( cplOcnPID, outf.str().c_str(), fileWriteOptions ),
                            "could not write cplProjectedOCNFile.h5m to disk" )
             }
 #endif

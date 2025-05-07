@@ -1,15 +1,10 @@
 /*
  * This imoab_map_target test will simulate coupling between 2 components
  * 2 meshes will be loaded from 2 files (src, tgt), and one map file
- * the target mesh is migrated to coupler with a partitioning method
- * after the map is read, in parallel, on coupler pes, with row ownership from
- * target mesh, the
- * coupler meshes for source will be generated, in a migration step,
- * from source to coverage mesh mesh on coupler. During this migration, par comm graph
- *  will be established between source and coupler, which will assist
- *  in field transfer from source to coupler; the original migrate
- *  will be used for target mesh from coupler to target component
- *
+ * the coverage source mesh is migrated to coupler after map read by row
+ *  During this migration, par comm graph is computed between source and
+ *  source coverage.  Will assist
+ *  in field transfer from source to coupler;
  */
 
 #include "moab/Core.hpp"
@@ -79,6 +74,8 @@ int main( int argc, char* argv[] )
     int cmpocn = 17, cplocn = 18,
         atmocnid = 618;  // component ids are unique over all pes, and established in advance;
 
+    // we should modify the MigrateMapMesh to work with source coverage directly, like an intersection app
+
     int rankInCouComm = -1;
 
     int nghlay = 0;  // number of ghost layers for loading the file
@@ -90,7 +87,7 @@ int main( int argc, char* argv[] )
 
     int repartitioner_scheme = 0;
 #ifdef MOAB_HAVE_ZOLTAN
-    repartitioner_scheme = 2;  // use the graph partitioner in that caseS
+    repartitioner_scheme = 2;  // use the graph partitioner in that case
 #endif
 
     // default: load atm / source on 2 proc, ocean / target on 2,
@@ -185,6 +182,8 @@ int main( int argc, char* argv[] )
     int cplOcnAppID = -1, cplAtmOcnAppID = -1;   // -1 means it is not initialized
     iMOAB_AppID cplOcnPID    = &cplOcnAppID;     // ocn on coupler PEs
     iMOAB_AppID cplAtmOcnPID = &cplAtmOcnAppID;  // intx atm -ocn on coupler PEs
+    int cplAtmCovOcn = -1;
+    iMOAB_AppID cplAtmCovOcnPID = &cplAtmCovOcn;
 
     if( couComm != MPI_COMM_NULL )
     {
@@ -204,8 +203,6 @@ int main( int argc, char* argv[] )
         MPI_Comm_rank( atmComm, &rankInAtmComm );
         ierr = iMOAB_RegisterApplication( "ATM1", &atmComm, &cmpatm, cmpAtmPID );
         CHECKIERR( ierr, "Cannot register ATM App" )
-        ierr = iMOAB_LoadMesh( cmpAtmPID, atmFilename.c_str(), readopts.c_str(), &nghlay );
-        CHECKIERR( ierr, "Cannot load atm mesh" )
     }
 
     if( ocnComm != MPI_COMM_NULL )
@@ -219,22 +216,17 @@ int main( int argc, char* argv[] )
     ierr =
         setup_component_coupler_meshes( cmpOcnPID, cmpocn, cplOcnPID, cplocn, &ocnComm, &ocnPEGroup, &couComm,
                                         &couPEGroup, &ocnCouComm, ocnFilename, readopts, nghlay, repartitioner_scheme );
+
+    ierr =
+        setup_component_coupler_meshes( cmpAtmPID, cmpatm, cplAtmPID, cplatm, &atmComm, &atmPEGroup, &couComm,
+                                            &couPEGroup, &atmCouComm, atmFilename, readopts, nghlay, repartitioner_scheme );
+
     CHECKIERR( ierr, "Cannot set-up target meshes" )
-#ifdef VERBOSE
-    if( couComm != MPI_COMM_NULL )
-    {
-        char outputFileTgt3[] = "recvTgt.h5m";
-        ierr                  = iMOAB_WriteMesh( cplOcnPID, outputFileTgt3, fileWriteOptions );
-        CHECKIERR( ierr, "cannot write target mesh after receiving on coupler" )
-    }
-#endif
-    CHECKIERR( ierr, "Cannot load and distribute target mesh" )
-    MPI_Barrier( MPI_COMM_WORLD );
 
     if( couComm != MPI_COMM_NULL )
     {
-        // now load map between OCNx and ATMx on coupler PEs
-        ierr = iMOAB_RegisterApplication( "ATMOCN", &couComm, &atmocnid, cplAtmOcnPID );
+        //
+        ierr = iMOAB_RegisterApplication( "ATMOCNMAP", &couComm, &atmocnid, cplAtmOcnPID );
         CHECKIERR( ierr, "Cannot register ocn_atm map instance over coupler pes " )
     }
 
@@ -247,15 +239,10 @@ int main( int argc, char* argv[] )
         CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type, &tgt_disc_type,
                                                      intx_from_file_identifier.c_str(), mapFilename.c_str() ),
                    "failed to load map file from disk" );
-    }
-
-    if( atmCouComm != MPI_COMM_NULL )
-    {
         int type      = types[0];  // FV
-        int direction = 1;         // from source to coupler; will create a mesh on cplAtmPID
-        // because it is like "coverage", context will be cplocn
-        ierr = iMOAB_MigrateMapMesh( cmpAtmPID, cplAtmOcnPID, cplAtmPID, &atmCouComm, &atmPEGroup, &couPEGroup, &type,
-                                     &cmpatm, &cplocn, &direction );
+        // because it is like "coverage", context will be atmocnid
+        ierr = iMOAB_MigrateMapMesh( cplAtmPID, cplAtmOcnPID, &couComm, &couPEGroup, &couPEGroup, &type,
+                                     &cplatm, &atmocnid);
         CHECKIERR( ierr, "failed to migrate mesh for atm on coupler" );
 #ifdef VERBOSE
         if( *cplAtmPID >= 0 )
@@ -363,18 +350,17 @@ int main( int argc, char* argv[] )
     const char* concat_fieldnameT = "Target_proj";
 
     {
-
-        PUSH_TIMER( "Send/receive data from atm component to coupler in ocn context" )
+        // first hop
         if( atmComm != MPI_COMM_NULL )
         {
             // as always, use nonblocking sends
             // this is for projection to ocean:
-            ierr = iMOAB_SendElementTag( cmpAtmPID, concat_fieldname, &atmCouComm, &cplocn );
+            ierr = iMOAB_SendElementTag( cmpAtmPID, concat_fieldname, &atmCouComm, &cplatm );
             CHECKIERR( ierr, "cannot send tag values" )
         }
         if( couComm != MPI_COMM_NULL )
         {
-            // receive on atm on coupler pes, that was redistributed according to coverage
+            // receive on atm on coupler pes
             ierr = iMOAB_ReceiveElementTag( cplAtmPID, concat_fieldname, &atmCouComm, &cmpatm );
             CHECKIERR( ierr, "cannot receive tag values" )
         }
@@ -382,18 +368,36 @@ int main( int argc, char* argv[] )
         // we can now free the sender buffers
         if( atmComm != MPI_COMM_NULL )
         {
-            ierr = iMOAB_FreeSenderBuffers( cmpAtmPID, &cplocn );  // context is for ocean
+            ierr = iMOAB_FreeSenderBuffers( cmpAtmPID, &cplatm );  // context is for ocean
+            CHECKIERR( ierr, "cannot free buffers used to resend atm tag towards the coverage mesh" )
+        }
+
+        // start the second hop, from atm cpl to atm coverage for ocn
+        // the data is now on cpl Atm, need to be sent to atm coverage over ocean
+        PUSH_TIMER( "Send/receive data from atm cpl to coverage in ocn context" )
+        if( atmComm != MPI_COMM_NULL )
+        {
+            // as always, use nonblocking sends
+            // this is for projection to ocean:
+            ierr = iMOAB_SendElementTag( cplAtmPID, concat_fieldname, &couComm, &atmocnid );
+            CHECKIERR( ierr, "cannot send tag values" )
+        }
+        if( couComm != MPI_COMM_NULL )
+        {
+            // receive on atm on coupler pes, that was redistributed according to coverage
+            // the trick is we use the map imoab app
+            ierr = iMOAB_ReceiveElementTag( cplAtmOcnPID, concat_fieldname, &couComm, &cplatm );
+            CHECKIERR( ierr, "cannot receive tag values" )
+        }
+
+        // we can now free the sender buffers
+        if( atmComm != MPI_COMM_NULL )
+        {
+            ierr = iMOAB_FreeSenderBuffers( cplAtmPID, &atmocnid );  // context is for ocean
             CHECKIERR( ierr, "cannot free buffers used to resend atm tag towards the coverage mesh" )
         }
         POP_TIMER( MPI_COMM_WORLD, rankInGlobalComm )
-#ifdef VERBOSE
-        if( *cplAtmPID >= 0 )
-        {
-            char prefix[] = "atmcov_withdata";
-            ierr          = iMOAB_WriteLocalMesh( cplAtmPID, prefix );
-            CHECKIERR( ierr, "failed to write local atm cov mesh with data" );
-        }
-#endif
+
 
         if( couComm != MPI_COMM_NULL )
         {

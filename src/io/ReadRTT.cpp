@@ -1196,7 +1196,7 @@ int ReadRTT::get_max_name_size( std::vector< cell > cell_data )
     int max_size = 0;
     for( size_t i = 0; i < cell_data.size(); i++ )
     {
-        if( cell_data[i].name.length() > max_size ) max_size = cell_data[i].name.length();
+        if( (int)cell_data[i].name.length() > max_size ) max_size = cell_data[i].name.length();
     }
     return max_size;
 }

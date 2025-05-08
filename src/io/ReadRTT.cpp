@@ -128,7 +128,7 @@ ErrorCode ReadRTT::load_file( const char* filename,
     if( rval != MB_SUCCESS ) return rval;
 
     // read the side_flag data
-    rval = ReadRTT::read_side_flags( filename);
+    rval = ReadRTT::read_side_flags( filename );
     if( rval != MB_SUCCESS ) return rval;
 
     // read the cell data
@@ -153,7 +153,7 @@ ErrorCode ReadRTT::load_file( const char* filename,
 
     // make the map of surface number in the rttmesh to the surface meshset
     std::map< int, EntityHandle > surface_map;  // corrsespondance of surface number to entity handle
-    std::map< int, EntityHandle > volume_map;  // corrsespondance of volume number to entity handle
+    std::map< int, EntityHandle > volume_map;   // corrsespondance of volume number to entity handle
     rval = ReadRTT::generate_topology( side_data, cell_data, surface_map, volume_map );
     if( rval != MB_SUCCESS ) return rval;
 
@@ -214,7 +214,7 @@ ErrorCode ReadRTT::generate_topology( std::vector< side > side_data,
             else
             {
                 // otherwise we set the volume tag data, loop is only 2 & 3 dim
-                rval = MBI->tag_set_data( id_tag, &handle, 1, &cell_data[i].id );
+                rval                        = MBI->tag_set_data( id_tag, &handle, 1, &cell_data[i].id );
                 volume_map[cell_data[i].id] = handle;
             }
             // if fail
@@ -243,13 +243,13 @@ ErrorCode ReadRTT::generate_topology( std::vector< side > side_data,
 /*
  * builds the moab representation of the mesh
  */
-ErrorCode ReadRTT::build_moab( std::vector< node  >               node_data,
-                               std::vector< facet >               facet_data,
-                               std::vector< tet   >               tet_data,
-                               const std::map<int, EntityHandle> surface_map,
-                               const std::map<int, EntityHandle> volume_map )
+ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
+                               std::vector< facet > facet_data,
+                               std::vector< tet > tet_data,
+                               const std::map< int, EntityHandle > surface_map,
+                               const std::map< int, EntityHandle > volume_map )
 {
-    ErrorCode   rval;
+    ErrorCode rval;
     EntityHandle file_set;
 
     rval = MBI->create_meshset( MESHSET_SET, file_set );
@@ -261,103 +261,95 @@ ErrorCode ReadRTT::build_moab( std::vector< node  >               node_data,
     {
         double coords[3] = { n.x, n.y, n.z };
         EntityHandle v;
-        rval = MBI->create_vertex( coords, v );               MB_CHK_ERR( rval );
+        rval = MBI->create_vertex( coords, v );MB_CHK_ERR( rval );
         mb_coords.insert( v );
     }
-    rval = MBI->add_entities( file_set, mb_coords );          MB_CHK_ERR( rval );
+    rval = MBI->add_entities( file_set, mb_coords );MB_CHK_ERR( rval );
 
     // add facets to the file set
     create_facets( facet_data, surface_map, mb_coords, file_set );
 
     // material number tag
     Tag mat_num_tag;
-    rval = MBI->tag_get_handle( "MATERIAL_NUMBER", 1, MB_TYPE_INTEGER,
-                                mat_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
-    MB_CHK_ERR( rval );
+    rval = MBI->tag_get_handle( "MATERIAL_NUMBER", 1, MB_TYPE_INTEGER, mat_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_ERR( rval );
 
     // adding material groups
-    std::string                     mat_flag      = get_material_ref_flag();
-    std::string                     vol_flag      = get_container_ref_flag();
-    const std::vector< cell >&      mat_cells     = cell_flag_datas [ mat_flag ];
-    const std::map   <int,int>&     mat_idx       = cell_flag_indexes[ mat_flag ];
+    std::string mat_flag                 = get_material_ref_flag();
+    std::string vol_flag                 = get_container_ref_flag();
+    const std::vector< cell >& mat_cells = cell_flag_datas[mat_flag];
+    const std::map< int, int >& mat_idx  = cell_flag_indexes[mat_flag];
 
-    std::map< int,int >             volume2mat;          // region → material
-    std::map< int,EntityHandle >    mat_groups;           // material → group
+    std::map< int, int > volume2mat;           // region → material
+    std::map< int, EntityHandle > mat_groups;  // material → group
 
-    if ( get_material_ref_flag() == "MATERIAL" ){
+    if( get_material_ref_flag() == "MATERIAL" )
+    {
         for( const auto& t : tet_data )
         {
-            int mat_no = t.flag_values[ cell_flag_idx[ mat_flag ] ];
-            int vol_no = t.flag_values[ cell_flag_idx[ vol_flag ] ];
+            int mat_no = t.flag_values[cell_flag_idx[mat_flag]];
+            int vol_no = t.flag_values[cell_flag_idx[vol_flag]];
 
             // record the material of this volume (consistency check)
             auto it = volume2mat.find( vol_no );
             if( it == volume2mat.end() )
-                volume2mat[ vol_no ] = mat_no;
+                volume2mat[vol_no] = mat_no;
             else if( it->second != mat_no )
             {
-                std::cerr << "Volume " << vol_no
-                        << " has conflicting material numbers: "
-                        << it->second << " and " << mat_no << std::endl;
+                std::cerr << "Volume " << vol_no << " has conflicting material numbers: " << it->second << " and "
+                          << mat_no << std::endl;
                 return MB_FAILURE;
             }
 
             // create material group the first time we meet this material
             if( mat_groups.find( mat_no ) == mat_groups.end() )
             {
-                std::string name = mat_cells[ mat_idx.at( mat_no ) ].name;
-                if( name.rfind( "mat:", 0 ) != 0 ) name = "mat:" + name; // exactly one prefix
+                std::string name = mat_cells[mat_idx.at( mat_no )].name;
+                if( name.rfind( "mat:", 0 ) != 0 ) name = "mat:" + name;  // exactly one prefix
 
                 EntityHandle mat_grp;
-                rval = create_material_group( name, mat_no, mat_grp );        MB_CHK_ERR( rval );
-                mat_groups[ mat_no ] = mat_grp;
+                rval = create_material_group( name, mat_no, mat_grp );MB_CHK_ERR( rval );
+                mat_groups[mat_no] = mat_grp;
             }
         }
 
         // assigning volumes to material groups
         for( const auto& vp : volume2mat )
         {
-            int          vol_no   = vp.first;
-            int          mat_no   = vp.second;
-            auto v_it = volume_map.find( vol_no );
-            auto m_it = mat_groups.find ( mat_no );
+            int vol_no = vp.first;
+            int mat_no = vp.second;
+            auto v_it  = volume_map.find( vol_no );
+            auto m_it  = mat_groups.find( mat_no );
 
             if( v_it == volume_map.end() || m_it == mat_groups.end() )
             {
-                std::cerr << "Missing handle while adding volume " << vol_no
-                        << " to material "        << mat_no  << std::endl;
+                std::cerr << "Missing handle while adding volume " << vol_no << " to material " << mat_no << std::endl;
                 return MB_FAILURE;
             }
             EntityHandle vol_h = v_it->second;
             EntityHandle grp_h = m_it->second;
 
-            rval = MBI->add_entities( grp_h, &vol_h, 1 ); MB_CHK_ERR( rval );
+            rval = MBI->add_entities( grp_h, &vol_h, 1 );MB_CHK_ERR( rval );
         }
     }
     // add tets to the file set
     Range mb_tets;
     for( const auto& t : tet_data )
     {
-        EntityHandle tet_nodes[4] =
-        {
-            mb_coords[t.connectivity[0]-1],
-            mb_coords[t.connectivity[1]-1],
-            mb_coords[t.connectivity[2]-1],
-            mb_coords[t.connectivity[3]-1]
-        };
+        EntityHandle tet_nodes[4] = { mb_coords[t.connectivity[0] - 1], mb_coords[t.connectivity[1] - 1],
+                                      mb_coords[t.connectivity[2] - 1], mb_coords[t.connectivity[3] - 1] };
 
         EntityHandle tet_h;
-        rval = MBI->create_element( MBTET, tet_nodes, 4, tet_h );   MB_CHK_ERR( rval );
+        rval = MBI->create_element( MBTET, tet_nodes, 4, tet_h );MB_CHK_ERR( rval );
 
-        int mat_no = t.flag_values[ cell_flag_idx[ mat_flag ] ];
-        rval = MBI->tag_set_data( mat_num_tag, &tet_h, 1, &mat_no );MB_CHK_ERR( rval );
+        int mat_no = t.flag_values[cell_flag_idx[mat_flag]];
+        rval       = MBI->tag_set_data( mat_num_tag, &tet_h, 1, &mat_no );MB_CHK_ERR( rval );
 
-        if ( get_material_ref_flag() == "MATERIAL" ){
+        if( get_material_ref_flag() == "MATERIAL" )
+        {
             // put tet into its volume mesh-set for completeness
-            int vol_no = t.flag_values[ cell_flag_idx[ vol_flag ] ];
+            int vol_no = t.flag_values[cell_flag_idx[vol_flag]];
             auto v_it  = volume_map.find( vol_no );
-            if( v_it != volume_map.end() )
-                MBI->add_entities( v_it->second, &tet_h, 1 );
+            if( v_it != volume_map.end() ) MBI->add_entities( v_it->second, &tet_h, 1 );
         }
         mb_tets.insert( tet_h );
     }
@@ -367,69 +359,69 @@ ErrorCode ReadRTT::build_moab( std::vector< node  >               node_data,
 }
 
 // Function to create a material group
-ErrorCode ReadRTT::create_material_group( const std::string& material_name,
-                                          int                material_id,
-                                          EntityHandle&      handle )
+ErrorCode ReadRTT::create_material_group( const std::string& material_name, int material_id, EntityHandle& handle )
 {
     ErrorCode rval = MBI->create_meshset( MESHSET_SET, handle );
-    if (rval != MB_SUCCESS) return rval;
+    if( rval != MB_SUCCESS ) return rval;
 
     // NAME
-    char name_val[NAME_TAG_SIZE] = {0};
-    std::strncpy( name_val, material_name.c_str(), NAME_TAG_SIZE-1 );
-    rval = MBI->tag_set_data( name_tag, &handle, 1, name_val );     MB_CHK_ERR( rval );
+    char name_val[NAME_TAG_SIZE] = { 0 };
+    std::strncpy( name_val, material_name.c_str(), NAME_TAG_SIZE - 1 );
+    rval = MBI->tag_set_data( name_tag, &handle, 1, name_val );MB_CHK_ERR( rval );
 
     // GLOBAL_ID
-    rval = MBI->tag_set_data( id_tag,   &handle, 1, &material_id ); MB_CHK_ERR( rval );
+    rval = MBI->tag_set_data( id_tag, &handle, 1, &material_id );MB_CHK_ERR( rval );
 
     // CATEGORY
-    char cat[CATEGORY_TAG_SIZE] = {0};
-    std::strncpy( cat, "Group", CATEGORY_TAG_SIZE-1 );
-    rval = MBI->tag_set_data( category_tag, &handle, 1, cat );      MB_CHK_ERR( rval );
+    char cat[CATEGORY_TAG_SIZE] = { 0 };
+    std::strncpy( cat, "Group", CATEGORY_TAG_SIZE - 1 );
+    rval = MBI->tag_set_data( category_tag, &handle, 1, cat );MB_CHK_ERR( rval );
 
-   // GEOM_DIMENSION = 4
+    // GEOM_DIMENSION = 4
     int dim4 = 4;
-    rval = MBI->tag_set_data( geom_tag, &handle, 1, &dim4 );        MB_CHK_ERR( rval );
+    rval     = MBI->tag_set_data( geom_tag, &handle, 1, &dim4 );MB_CHK_ERR( rval );
 
     return MB_SUCCESS;
 }
 
-
-void ReadRTT::create_facets(const std::vector<facet>& facet_data, const std::map<int, EntityHandle>& surface_map,
-                            Range& mb_coords, EntityHandle file_set) {
+void ReadRTT::create_facets( const std::vector< facet >& facet_data,
+                             const std::map< int, EntityHandle >& surface_map,
+                             Range& mb_coords,
+                             EntityHandle file_set )
+{
     ErrorCode rval;
     Tag side_id_tag, surface_number_tag;
     // Obtain or create tags for side IDs and surface numbers
-    rval = MBI->tag_get_handle("SIDEID_TAG", 1, MB_TYPE_INTEGER, side_id_tag, MB_TAG_SPARSE | MB_TAG_CREAT);
-    rval = MBI->tag_get_handle("SURFACE_NUMBER", 1, MB_TYPE_INTEGER, surface_number_tag, MB_TAG_SPARSE | MB_TAG_CREAT);
+    rval = MBI->tag_get_handle( "SIDEID_TAG", 1, MB_TYPE_INTEGER, side_id_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
+    rval =
+        MBI->tag_get_handle( "SURFACE_NUMBER", 1, MB_TYPE_INTEGER, surface_number_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
 
     EntityHandle triangle;
     Range mb_tris;  // For storing triangles
 
-    for (const auto& tmp : facet_data) {
+    for( const auto& tmp : facet_data )
+    {
         EntityHandle tri_nodes[3] = { mb_coords[tmp.connectivity[0] - 1], mb_coords[tmp.connectivity[1] - 1],
                                       mb_coords[tmp.connectivity[2] - 1] };
-        rval = MBI->create_element(MBTRI, tri_nodes, 3, triangle);
+        rval                      = MBI->create_element( MBTRI, tri_nodes, 3, triangle );
         // tag in side id on the triangle
-        rval = MBI->tag_set_data(side_id_tag, &triangle, 1, &tmp.side_id);
+        rval = MBI->tag_set_data( side_id_tag, &triangle, 1, &tmp.side_id );
         // tag the surface number on the triangle
-        rval = MBI->tag_set_data(surface_number_tag, &triangle, 1, &tmp.surface_number);
+        rval = MBI->tag_set_data( surface_number_tag, &triangle, 1, &tmp.surface_number );
         // insert vertices and triangles into the appropriate surface meshset
-        EntityHandle meshset_handle = surface_map.at(tmp.surface_number);
+        EntityHandle meshset_handle = surface_map.at( tmp.surface_number );
         // also set surface tag
-        rval = MBI->tag_set_data(side_id_tag, &meshset_handle, 1, &tmp.side_id);
-        rval = MBI->tag_set_data(surface_number_tag, &meshset_handle, 1, &tmp.surface_number);
+        rval = MBI->tag_set_data( side_id_tag, &meshset_handle, 1, &tmp.side_id );
+        rval = MBI->tag_set_data( surface_number_tag, &meshset_handle, 1, &tmp.surface_number );
         // add vertices to the mesh
-        rval = MBI->add_entities(meshset_handle, tri_nodes, 3);
+        rval = MBI->add_entities( meshset_handle, tri_nodes, 3 );
         // add triangles to the meshset
-        rval = MBI->add_entities(meshset_handle, &triangle, 1);
+        rval = MBI->add_entities( meshset_handle, &triangle, 1 );
         // insert triangles into mb_tris
-        mb_tris.insert(triangle);
+        mb_tris.insert( triangle );
     }
-    rval = MBI->add_entities(file_set, mb_tris);
+    rval = MBI->add_entities( file_set, mb_tris );
 }
-
-
 
 moab::ErrorCode ReadRTT::add_metadata( EntityHandle file_set )
 {
@@ -618,14 +610,13 @@ ErrorCode ReadRTT::read_cell_flags( const char* filename )
     {
         std::string key = it->first;
         // fill the index
-        rval = ReadRTT::cell_process_flag( cell_flags, key);
+        rval = ReadRTT::cell_process_flag( cell_flags, key );
         if( rval != MB_SUCCESS ) return rval;
     }
 
-
     std::string part_flag_name = get_container_ref_flag();
-    cell_data                      = cell_flag_datas[part_flag_name];
-    cell_data_idx                  = cell_flag_indexes[part_flag_name];
+    cell_data                  = cell_flag_datas[part_flag_name];
+    cell_data_idx              = cell_flag_indexes[part_flag_name];
     return rval;
 }
 

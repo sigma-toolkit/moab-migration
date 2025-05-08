@@ -487,7 +487,7 @@ class ReadRTT : public ReaderIface
      *
      * @return moab::ErrorCode
      */
-    ErrorCode read_cell_flags( const char* filename);
+    ErrorCode read_cell_flags( const char* filename );
 
     /**
      * Process the standard flag from the cell_flags section

@@ -320,7 +320,7 @@ class ReadRTT : public ReaderIface
         int id;
         int type_id;
         int connectivity[4];
-        std::vector< int > falg_values;
+        std::vector< int > flag_values;
         // with c++11 we could use tet(): id(0), connectivity({0}), material_number(0) {}
         tet() : id( 0 )
         {
@@ -348,7 +348,8 @@ class ReadRTT : public ReaderIface
      */
     ErrorCode generate_topology( std::vector< side > side_data,
                                  std::vector< cell > cell_data,
-                                 std::map< int, EntityHandle >& surface_map );
+                                 std::map< int, EntityHandle >& surface_map,
+                                 std::map< int, EntityHandle >& volume_map );
     /**
      * Generate parent child links to create DAGMC like structure of surface meshsets being children
      * of parent cell meshsets. By looping over the surfaces (1->N), look in the description of the
@@ -425,7 +426,8 @@ class ReadRTT : public ReaderIface
     ErrorCode build_moab( std::vector< node > node_data,
                           std::vector< facet > facet_data,
                           std::vector< tet > tet_data,
-                          std::map< int, EntityHandle > surface_map );
+                          std::map< int, EntityHandle > surface_map,
+                          std::map< int, EntityHandle > volume_map );
 
     /**
      * Add Metadata to the meshset, this includes the version number and contiguity value

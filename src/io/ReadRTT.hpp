@@ -590,14 +590,14 @@ class ReadRTT : public ReaderIface
      * @return std::string 
      */
     std::string get_material_ref_flag();
-    
+
     /** 
      * @brief Get the volume ref flag object
      * 
      * @return std::string
      */
     std::string get_volume_ref_flag();
-    
+
     /**
      * @brief Get the max name size object
      * 
@@ -646,9 +646,10 @@ class ReadRTT : public ReaderIface
     dimData dim_data;
 
     // Cell Datas read from the cell_flags section
-    rtt_flags_data cell_flag_datas; //vector of cell for each cell sub-flag
-    std::map< std::string, std::map< int, int > > cell_flag_indexes; // map of indexes for each element of the cell_flag_datas
-    std::map< std::string, int > cell_flag_idx; 
+    rtt_flags_data cell_flag_datas;  //vector of cell for each cell sub-flag
+    std::map< std::string, std::map< int, int > >
+        cell_flag_indexes;                       // map of indexes for each element of the cell_flag_datas
+    std::map< std::string, int > cell_flag_idx;  // map the order of each sub-cell flag
 
     // Side Datas read from the side_flags section
     rtt_flags_data side_flag_datas;

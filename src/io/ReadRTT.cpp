@@ -284,7 +284,7 @@ ErrorCode ReadRTT::build_moab( std::vector< node  >               node_data,
     std::map< int,int >             volume2mat;          // region → material
     std::map< int,EntityHandle >    mat_groups;           // material → group
 
-    if ( get_container_ref_flag() == "MATERIAL" ){
+    if ( get_material_ref_flag() == "MATERIAL" ){
         for( const auto& t : tet_data )
         {
             int mat_no = t.flag_values[ cell_flag_idx[ mat_flag ] ];
@@ -352,7 +352,7 @@ ErrorCode ReadRTT::build_moab( std::vector< node  >               node_data,
         int mat_no = t.flag_values[ cell_flag_idx[ mat_flag ] ];
         rval = MBI->tag_set_data( mat_num_tag, &tet_h, 1, &mat_no );MB_CHK_ERR( rval );
 
-        if ( get_container_ref_flag() == "MATERIAL" ){
+        if ( get_material_ref_flag() == "MATERIAL" ){
             // put tet into its volume mesh-set for completeness
             int vol_no = t.flag_values[ cell_flag_idx[ vol_flag ] ];
             auto v_it  = volume_map.find( vol_no );

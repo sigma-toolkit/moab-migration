@@ -275,7 +275,7 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
 
     // adding material groups
     std::string mat_flag                 = get_material_ref_flag();
-    std::string vol_flag                 = get_container_ref_flag();
+    std::string vol_flag                 = get_volume_ref_flag();
     const std::vector< cell >& mat_cells = cell_flag_datas[mat_flag];
     const std::map< int, int >& mat_idx  = cell_flag_indexes[mat_flag];
 
@@ -570,28 +570,24 @@ ErrorCode ReadRTT::side_process_faces( rtt_flags side_flags, std::vector< side >
 
 std::string ReadRTT::get_material_ref_flag()
 {
-    std::string material_ref_flag = "REGIONS";  // set defaul to REGIONS
+    std::string material_ref_flag = "";  // set defaul to REGIONS
     if( cell_flag_datas.find( "MATERIAL" ) != cell_flag_datas.end() )
     {
         material_ref_flag = "MATERIAL";
     }
-    else if( cell_flag_datas.find( "MCNP_PSEUDO-CELLS" ) != cell_flag_datas.end() )
-    {
-        material_ref_flag = "MCNP_PSEUDO-CELLS";
-    }
     return material_ref_flag;
 }
 
-std::string ReadRTT::get_container_ref_flag()
+std::string ReadRTT::get_volume_ref_flag()
 {
     std::string part_ref_flag = "REGIONS";  // set defaul to REGIONS
-    if( cell_flag_datas.find( "ABAQUS_PARTS" ) != cell_flag_datas.end() )
-    {
-        part_ref_flag = "ABAQUS_PARTS";
-    }
-    else if( cell_flag_datas.find( "MCNP_PSEUDO-CELLS" ) != cell_flag_datas.end() )
+    if( cell_flag_datas.find( "MCNP_PSEUDO-CELLS" ) != cell_flag_datas.end() )
     {
         part_ref_flag = "MCNP_PSEUDO-CELLS";
+    }
+    else if( cell_flag_datas.find( "ABAQUS_PARTS" ) != cell_flag_datas.end() )
+    {
+        part_ref_flag = "ABAQUS_PARTS";
     }
     return part_ref_flag;
 }
@@ -614,7 +610,7 @@ ErrorCode ReadRTT::read_cell_flags( const char* filename )
         if( rval != MB_SUCCESS ) return rval;
     }
 
-    std::string part_flag_name = get_container_ref_flag();
+    std::string part_flag_name = get_volume_ref_flag();
     cell_data                  = cell_flag_datas[part_flag_name];
     cell_data_idx              = cell_flag_indexes[part_flag_name];
     return rval;

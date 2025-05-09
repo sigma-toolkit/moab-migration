@@ -154,7 +154,7 @@ ErrorCode ReadRTT::load_file( const char* filename,
     // make the map of surface number in the rttmesh to the surface meshset
     std::map< int, EntityHandle > surface_map;  // corrsespondance of surface number to entity handle
     std::map< int, EntityHandle > volume_map;   // corrsespondance of volume number to entity handle
-    rval = ReadRTT::generate_topology( side_data, cell_data, surface_map, volume_map );
+    rval = ReadRTT::generate_topology( side_data, cell_data, tet_data, surface_map, volume_map );
     if( rval != MB_SUCCESS ) return rval;
 
     // generate the rest of the database, triangles to surface meshsets etc
@@ -169,6 +169,7 @@ ErrorCode ReadRTT::load_file( const char* filename,
  */
 ErrorCode ReadRTT::generate_topology( std::vector< side > side_data,
                                       std::vector< cell > cell_data,
+                                      std::vector< tet > tet_data,
                                       std::map< int, EntityHandle >& surface_map,
                                       std::map< int, EntityHandle >& volume_map )
 {
@@ -235,7 +236,7 @@ ErrorCode ReadRTT::generate_topology( std::vector< side > side_data,
     set_surface_senses( num_ents, entmap, side_data, cell_data );
 
     // set the group data
-    rval = setup_group_data( entmap );
+    rval = setup_group_data( entmap, tet_data, volume_map );
 
     return MB_SUCCESS;
 }
@@ -274,63 +275,9 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
     rval = MBI->tag_get_handle( "MATERIAL_NUMBER", 1, MB_TYPE_INTEGER, mat_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_ERR( rval );
 
     // adding material groups
-    std::string mat_flag                 = get_material_ref_flag();
-    std::string vol_flag                 = get_volume_ref_flag();
-    const std::vector< cell >& mat_cells = cell_flag_datas[mat_flag];
-    const std::map< int, int >& mat_idx  = cell_flag_indexes[mat_flag];
+    std::string mat_flag = get_material_ref_flag();
+    std::string vol_flag = get_volume_ref_flag();
 
-    std::map< int, int > volume2mat;           // region → material
-    std::map< int, EntityHandle > mat_groups;  // material → group
-
-    if( get_material_ref_flag() == "MATERIAL" )
-    {
-        for( const auto& t : tet_data )
-        {
-            int mat_no = t.flag_values[cell_flag_idx[mat_flag]];
-            int vol_no = t.flag_values[cell_flag_idx[vol_flag]];
-
-            // record the material of this volume (consistency check)
-            auto it = volume2mat.find( vol_no );
-            if( it == volume2mat.end() )
-                volume2mat[vol_no] = mat_no;
-            else if( it->second != mat_no )
-            {
-                std::cerr << "Volume " << vol_no << " has conflicting material numbers: " << it->second << " and "
-                          << mat_no << std::endl;
-                return MB_FAILURE;
-            }
-
-            // create material group the first time we meet this material
-            if( mat_groups.find( mat_no ) == mat_groups.end() )
-            {
-                std::string name = mat_cells[mat_idx.at( mat_no )].name;
-                if( name.rfind( "mat:", 0 ) != 0 ) name = "mat:" + name;  // exactly one prefix
-
-                EntityHandle mat_grp;
-                rval = create_material_group( name, mat_no, mat_grp );MB_CHK_ERR( rval );
-                mat_groups[mat_no] = mat_grp;
-            }
-        }
-
-        // assigning volumes to material groups
-        for( const auto& vp : volume2mat )
-        {
-            int vol_no = vp.first;
-            int mat_no = vp.second;
-            auto v_it  = volume_map.find( vol_no );
-            auto m_it  = mat_groups.find( mat_no );
-
-            if( v_it == volume_map.end() || m_it == mat_groups.end() )
-            {
-                std::cerr << "Missing handle while adding volume " << vol_no << " to material " << mat_no << std::endl;
-                return MB_FAILURE;
-            }
-            EntityHandle vol_h = v_it->second;
-            EntityHandle grp_h = m_it->second;
-
-            rval = MBI->add_entities( grp_h, &vol_h, 1 );MB_CHK_ERR( rval );
-        }
-    }
     // add tets to the file set
     Range mb_tets;
     for( const auto& t : tet_data )
@@ -1346,7 +1293,9 @@ void ReadRTT::set_surface_senses( int num_ents[4],
 /*
  * Add all entities that are to be part of the graveyard
  */
-ErrorCode ReadRTT::setup_group_data( std::vector< EntityHandle > entity_map[4] )
+ErrorCode ReadRTT::setup_group_data( std::vector< EntityHandle > entity_map[4],
+                                     std::vector< tet > tet_data,
+                                     std::map< int, EntityHandle >& volume_map )
 {
     ErrorCode rval;  // error codes
     EntityHandle handle;
@@ -1355,6 +1304,65 @@ ErrorCode ReadRTT::setup_group_data( std::vector< EntityHandle > entity_map[4] )
     // add any volume to group graveyard, it is ignored by dag
     EntityHandle vol_handle = entity_map[3][0];
     rval                    = MBI->add_entities( handle, &vol_handle, 1 );
+
+    if( get_material_ref_flag() == "MATERIAL" )
+    {
+        std::string mat_flag                 = get_material_ref_flag();
+        std::string vol_flag                 = get_volume_ref_flag();
+        const std::vector< cell >& mat_cells = cell_flag_datas[mat_flag];
+        const std::map< int, int >& mat_idx  = cell_flag_indexes[mat_flag];
+
+        std::map< int, int > volume2mat;           // region → material
+        std::map< int, EntityHandle > mat_groups;  // material → group
+
+        for( const auto& t : tet_data )
+        {
+            int mat_no = t.flag_values[cell_flag_idx[mat_flag]];
+            int vol_no = t.flag_values[cell_flag_idx[vol_flag]];
+
+            // record the material of this volume (consistency check)
+            auto it = volume2mat.find( vol_no );
+            if( it == volume2mat.end() )
+                volume2mat[vol_no] = mat_no;
+            else if( it->second != mat_no )
+            {
+                std::cerr << "Volume " << vol_no << " has conflicting material numbers: " << it->second << " and "
+                          << mat_no << std::endl;
+                return MB_FAILURE;
+            }
+
+            // create material group the first time we meet this material
+            if( mat_groups.find( mat_no ) == mat_groups.end() )
+            {
+                std::string name = mat_cells[mat_idx.at( mat_no )].name;
+                if( name.rfind( "mat:", 0 ) != 0 ) name = "mat:" + name;  // exactly one prefix
+
+                EntityHandle mat_grp;
+                rval = create_material_group( name, mat_no, mat_grp );MB_CHK_ERR( rval );
+                mat_groups[mat_no] = mat_grp;
+            }
+        }
+
+        // assigning volumes to material groups
+        for( const auto& vp : volume2mat )
+        {
+            int vol_no = vp.first;
+            int mat_no = vp.second;
+            auto v_it  = volume_map.find( vol_no );
+            auto m_it  = mat_groups.find( mat_no );
+
+            if( v_it == volume_map.end() || m_it == mat_groups.end() )
+            {
+                std::cerr << "Missing handle while adding volume " << vol_no << " to material " << mat_no << std::endl;
+                return MB_FAILURE;
+            }
+            EntityHandle vol_h = v_it->second;
+            EntityHandle grp_h = m_it->second;
+
+            rval = MBI->add_entities( grp_h, &vol_h, 1 );MB_CHK_ERR( rval );
+        }
+    }
+
     return rval;
 }
 

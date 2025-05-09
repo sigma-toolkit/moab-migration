@@ -343,11 +343,14 @@ class ReadRTT : public ReaderIface
      *
      * @param side_data, vector of side data
      * @param cell_data, vector of vector of cell data
+     * @param tet_data, vector of tet data
      * @param surface_map, reference to the surface map of data
+     * @param volume_map, reference to the volume map of data
      *
      */
     ErrorCode generate_topology( std::vector< side > side_data,
                                  std::vector< cell > cell_data,
+                                 std::vector< tet > tet_data,
                                  std::map< int, EntityHandle >& surface_map,
                                  std::map< int, EntityHandle >& volume_map );
     /**
@@ -385,10 +388,13 @@ class ReadRTT : public ReaderIface
     /**
      * creates the group data requried for dagmc, reflecting planes, material assignments etc
      * @param entity_map, vector of vector of entitiy handles for each dimension
+     * @param tet_data, vector of tet data
      *
      * @returns moab::ErrorCode
      */
-    ErrorCode setup_group_data( std::vector< EntityHandle > entity_map[4] );
+    ErrorCode setup_group_data( std::vector< EntityHandle > entity_map[4],
+                                std::vector< tet > tet_data,
+                                std::map< int, EntityHandle >& volume_map );
 
     /**
      * create a group of a given name, mustkeep track of id

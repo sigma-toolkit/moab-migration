@@ -577,87 +577,97 @@ ErrorCode NCHelperDomain::redistribute_cells( ParallelComm* myPcomm,
                                               int nv,                       // number of vertices per cell
                                               bool nv_last )                // type of xv, yv, first or last
 {
+    const int my_rank   = myPcomm->proc_config().proc_rank();
 
 #ifdef MOAB_HAVE_ZOLTAN
-    // use zoltan and
+
+    if( !my_rank ) std::cout << "Using Zoltan RCB spatial partitioning method\n";
+
     size_t num_local_cells = gids.size();
-    bool& culling     = _readNC->culling;
-    if (culling)
+    if( _readNC->culling )
     {
-    	// num local cells will be smaller, based on masks
-    	// count cells with mask 1
-    	num_local_cells = 0;
-    	for (size_t i = 0; i< masks.size(); i++)
-    		if (1 == masks[i])  ++num_local_cells;
+        num_local_cells = std::count( masks.begin(), masks.end(), 1 );
     }
 
+    size_t actual_index = 0;
     std::vector< double > xi( num_local_cells ), yi( num_local_cells ), zi( num_local_cells );
     std::vector< int > gids2( num_local_cells );
-    const double pideg = acos( -1.0 ) / 180.0;
-    size_t actual_index = 0;
-    for( size_t i = 0; i < xc.size(); i++ )
+
+    // now loop over coordinates and accumulate
+    const double deg_to_rad = std::acos( -1.0 ) / 180.0;
+    for( size_t i = 0; i < xc.size(); ++i )
     {
-    	if (culling && 0 == masks[i])
-    		continue;
-        double x      = xc[i];
-        double y      = yc[i];
-        double cosphi = cos( pideg * y );
-        double zmult  = sin( pideg * y );
-        double xmult  = cosphi * cos( x * pideg );
-        double ymult  = cosphi * sin( x * pideg );
-        xi[actual_index]         = xmult;
-        yi[actual_index]         = ymult;
-        zi[actual_index]         = zmult;
-        gids2[actual_index]      = gids[i];
-        actual_index++;
+        if( _readNC->culling && masks[i] == 0 ) continue;
+
+        const double lon_rad = xc[i] * deg_to_rad;
+        const double lat_rad = yc[i] * deg_to_rad;
+        const double cos_lat = std::cos( lat_rad );
+        const double sin_lat = std::sin( lat_rad );
+
+        xi[actual_index]    = cos_lat * std::cos( lon_rad );
+        yi[actual_index]    = cos_lat * std::sin( lon_rad );
+        zi[actual_index]    = sin_lat;
+        gids2[actual_index] = gids[i];
+
+        ++actual_index;
     }
-    Interface*& mbImpl         = _readNC->mbImpl;
-    ZoltanPartitioner* mbZTool = new ZoltanPartitioner( mbImpl, myPcomm, false, 0, NULL );
+
     std::vector< int > dest( num_local_cells );
-    ErrorCode rval = mbZTool->repartition_to_procs( xi, yi, zi, gids2, "RCB", dest );MB_CHK_SET_ERR( rval, "Error in Zoltan partitioning" );
-    delete mbZTool;
+    {
+        // apply Zoltan partitioning using RCB strategy
+        ZoltanPartitioner mbZTool( _readNC->mbImpl, myPcomm, false, 0, NULL );
+        MB_CHK_SET_ERR( mbZTool.repartition_to_procs( xi, yi, zi, gids2, "RCB", dest ),
+                        "Error in Zoltan partitioning" );
+    }
+
     // now use crystal router to send the arrays to the right places
     moab::TupleList tl;
-    unsigned numr = 2 * nv + 4;                       //  doubles: area, centerlon, centerlat, frac, xv, yv,
-    tl.initialize( 3, 0, 0, numr, num_local_cells );  // to proc, dof, mask
+    const unsigned num_real = 2 * nv + 4;
+    tl.initialize( 3, 0, 0, num_real, num_local_cells );  // to_proc, global_id, mask
     tl.enableWriteAccess();
+
     // populate
-    int index_in_dest = 0;
-    for( size_t i = 0; i < xc.size(); i++ )
+    size_t index_in_dest = 0;
+    for( size_t i = 0; i < xc.size(); ++i )
     {
-    	if (culling && 0 == masks[i])
-    	    continue;
-        int gdof               = gids2[index_in_dest];
-        int to_proc            = dest[index_in_dest];
-        int mask               = masks[i]; // should be 1 if culling
-        int n                  = tl.get_n();
-        tl.vi_wr[3 * n]        = to_proc;
-        tl.vi_wr[3 * n + 1]    = gdof;
-        tl.vi_wr[3 * n + 2]    = mask;
-        tl.vr_wr[n * numr]     = area[i];
-        tl.vr_wr[n * numr + 1] = xc[i];
-        tl.vr_wr[n * numr + 2] = yc[i];
-        tl.vr_wr[n * numr + 3] = frac[i];
-        for( int k = 0; k < nv; k++ )
+        if( _readNC->culling && masks[i] == 0 ) continue;
+
+        const int to_proc   = dest[index_in_dest];
+        const int global_id = gids2[index_in_dest];
+        const int mask      = masks[i];
+        const int n         = tl.get_n();
+
+        tl.vi_wr[3 * n + 0] = to_proc;
+        tl.vi_wr[3 * n + 1] = global_id;
+        tl.vi_wr[3 * n + 2] = mask;
+
+        tl.vr_wr[n * num_real + 0] = area[i];
+        tl.vr_wr[n * num_real + 1] = xc[i];
+        tl.vr_wr[n * num_real + 2] = yc[i];
+        tl.vr_wr[n * num_real + 3] = frac[i];
+
+        for( int k = 0; k < nv; ++k )
         {
-            int index_v_arr = nv * i + k;
-            if( !nv_last ) index_v_arr = k * xc.size() + n;
-            tl.vr_wr[n * numr + 4 + k]      = xv[index_v_arr];
-            tl.vr_wr[n * numr + 4 + nv + k] = yv[index_v_arr];
+            const size_t index_v                = nv_last ? nv * i + k : k * xc.size() + i;
+            tl.vr_wr[n * num_real + 4 + k]      = xv[index_v];
+            tl.vr_wr[n * num_real + 4 + nv + k] = yv[index_v];
         }
+
         tl.inc_n();
-        index_in_dest++;
+        ++index_in_dest;
     }
 
-    // now do the heavy communication
-    ( myPcomm->proc_config().crystal_router() )->gs_transfer( 1, tl, 0 );
+    // Communicate using crystal router
+    myPcomm->proc_config().crystal_router()->gs_transfer( 1, tl, 0 );
 
     // after communication, on each processor we should have tuples coming in
-    // rearrange the vectors by global id
+    // rearrange (sort) the vectors by global id
     moab::TupleList::buffer sort_buffer;
     int N = tl.get_n();
     sort_buffer.buffer_init( N );
-    tl.sort( 1, &sort_buffer );  // 1 is the index for global id
+    tl.sort( 1, &sort_buffer );  // sort by global ID (index 1)
+
+    // Resize and fill output arrays
     xc.resize( N );
     yc.resize( N );
     xv.resize( N * nv );
@@ -666,27 +676,140 @@ ErrorCode NCHelperDomain::redistribute_cells( ParallelComm* myPcomm,
     masks.resize( N );
     area.resize( N );
     gids.resize( N );
-    for( int n = 0; n < N; n++ )
-    {
 
+    for( int n = 0; n < N; ++n )
+    {
         gids[n]  = tl.vi_wr[3 * n + 1];
         masks[n] = tl.vi_wr[3 * n + 2];
-        area[n]  = tl.vr_wr[n * numr];
-        xc[n]    = tl.vr_wr[n * numr + 1];
-        yc[n]    = tl.vr_wr[n * numr + 2];
-        frac[n]  = tl.vr_wr[n * numr + 3];
-        for( int k = 0; k < nv; k++ )
+        area[n]  = tl.vr_wr[n * num_real + 0];
+        xc[n]    = tl.vr_wr[n * num_real + 1];
+        yc[n]    = tl.vr_wr[n * num_real + 2];
+        frac[n]  = tl.vr_wr[n * num_real + 3];
+
+        for( int k = 0; k < nv; ++k )
         {
-            int index_v_arr = nv * n + k;
-            if( !nv_last ) index_v_arr = k * N + n;
-            xv[index_v_arr] = tl.vr_wr[n * numr + 4 + k];
-            yv[index_v_arr] = tl.vr_wr[n * numr + 4 + nv + k];
+            const size_t index_v = nv_last ? nv * n + k : k * N + n;
+            xv[index_v]          = tl.vr_wr[n * num_real + 4 + k];
+            yv[index_v]          = tl.vr_wr[n * num_real + 4 + nv + k];
         }
     }
 
     return MB_SUCCESS;
 #else
-    MB_CHK_SET_ERR( MB_FAILURE, "need to configure with Zoltan " );
+    const int num_procs = myPcomm->proc_config().proc_size();
+    // Trivial partitioning fallback if Zoltan is not available
+    constexpr bool use_spatial_partitioning = true;  // <-- Toggle this flag to test spatial partitioning
+
+    if( !my_rank )
+    {
+        if( use_spatial_partitioning && !_readNC->culling )
+            std::cout << "Using native spatial partitioning method\n";
+        else
+            std::cout << "Using native trivial partitioning method\n";
+    }
+
+    size_t num_local_cells = gids.size();
+    if( _readNC->culling )
+    {
+        num_local_cells = std::count( masks.begin(), masks.end(), 1 );
+    }
+
+    moab::TupleList tl;
+    const unsigned num_real = 2 * nv + 4;
+    tl.initialize( 3, 0, 0, num_real, num_local_cells );  // to_proc, global_id, mask
+    tl.enableWriteAccess();
+
+    auto clamp = []( auto v, auto lo, auto hi ) { return ( v < lo ) ? lo : ( v > hi ) ? hi : v; };
+
+    size_t actual_index = 0;
+    for( size_t i = 0; i < xc.size(); ++i )
+    {
+        if( _readNC->culling && masks[i] == 0 ) continue;
+
+        const int n = tl.get_n();
+        int to_proc = 0;
+        if( use_spatial_partitioning && !_readNC->culling )  // probably will not work when culling is on
+        {
+            // Spatial partitioning using longitude in range [-180, 180]
+            double lon = xc[i];
+            // Normalize longitude to [-180, 180]
+            while( lon < -180.0 )
+                lon += 360.0;
+            while( lon > 180.0 )
+                lon -= 360.0;
+            // Now map to [0, 1]
+            double lon_norm = ( lon + 180.0 ) / 360.0;
+
+            // Now let us compute the right partition
+            to_proc = static_cast< int >( lon_norm * num_procs );
+            // Handle edge case where lon_norm == 1.0 (e.g. xc[i] == 180)
+            to_proc = clamp( to_proc, 0, num_procs - 1 );
+        }
+        else
+        {
+            // Trivial linear partitioner
+            // to_proc = gids[i] % num_procs;
+            // Block-based partitioning: roughly equal number of cells per processor
+            to_proc = actual_index * num_procs / num_local_cells;
+        }
+
+        tl.vi_wr[3 * n + 0] = to_proc;
+        tl.vi_wr[3 * n + 1] = gids[i];
+        tl.vi_wr[3 * n + 2] = masks[i];
+
+        tl.vr_wr[n * num_real + 0] = area[i];
+        tl.vr_wr[n * num_real + 1] = xc[i];
+        tl.vr_wr[n * num_real + 2] = yc[i];
+        tl.vr_wr[n * num_real + 3] = frac[i];
+
+        for( int k = 0; k < nv; ++k )
+        {
+            const size_t index_v                = nv_last ? nv * i + k : k * xc.size() + i;
+            tl.vr_wr[n * num_real + 4 + k]      = xv[index_v];
+            tl.vr_wr[n * num_real + 4 + nv + k] = yv[index_v];
+        }
+
+        tl.inc_n();
+        ++actual_index;
+    }
+
+    // Communicate using crystal router
+    myPcomm->proc_config().crystal_router()->gs_transfer( 1, tl, 0 );
+
+    // Sort by global ID
+    moab::TupleList::buffer sort_buffer;
+    const int N = tl.get_n();
+    sort_buffer.buffer_init( N );
+    tl.sort( 1, &sort_buffer );  // sort by global ID
+
+    // Resize and fill output arrays
+    xc.resize( N );
+    yc.resize( N );
+    xv.resize( N * nv );
+    yv.resize( N * nv );
+    frac.resize( N );
+    masks.resize( N );
+    area.resize( N );
+    gids.resize( N );
+
+    for( int n = 0; n < N; ++n )
+    {
+        gids[n]  = tl.vi_wr[3 * n + 1];
+        masks[n] = tl.vi_wr[3 * n + 2];
+        area[n]  = tl.vr_wr[n * num_real + 0];
+        xc[n]    = tl.vr_wr[n * num_real + 1];
+        yc[n]    = tl.vr_wr[n * num_real + 2];
+        frac[n]  = tl.vr_wr[n * num_real + 3];
+
+        for( int k = 0; k < nv; ++k )
+        {
+            const size_t index_v = nv_last ? nv * n + k : k * N + n;
+            xv[index_v]          = tl.vr_wr[n * num_real + 4 + k];
+            yv[index_v]          = tl.vr_wr[n * num_real + 4 + nv + k];
+        }
+    }
+
+    return MB_SUCCESS;
 #endif
 }
 

@@ -10,12 +10,6 @@ if(MOAB_HAVE_MPI AND MPI_FOUND)
   add_subdirectory(parallel)
   set( MOAB_MPI moabpar )
   set( MOABPAR_OBJECTS $<TARGET_OBJECTS:moabpar> )
-  # find_package(MPI) sets MPI_LIBARY, not MPI_LIBRARIES
-  set(MPI_LIBRARIES ${MPI_CXX_LIBRARIES})
-  if (MPI_CXX_EXTRA_LIBRARY)
-	  list(APPEND MPI_LIBRARIES ${MPI_CXX_EXTRA_LIBRARY})
-  endif ()
-  message(STATUS "MPI_LIBRARIES = ${MPI_LIBRARIES}.")
 endif()
 
 #Create the moab/EntityHandle.hpp file

@@ -311,11 +311,11 @@ if ( ENABLE_MPI )
     set ( MOAB_DEFINES "${MOAB_DEFINES} -DUSE_MPI" )
     set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
     set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} ${MPI_CXX_LINK_FLAGS}")
-    include_directories(${MPI_CXX_INCLUDE_PATH})
+    include_directories(${MPI_INCLUDE_DIR})
     set( MOAB_HAVE_MPI ON )
     message(STATUS "MPI libraries and includes found..")
-    foreach (var ROOT C_COMPILER CXX_COMPILER Fortran_COMPILER CXX_INCLUDE_PATH CXX_LIBRARIES MPIEXEC_EXECUTABLE)
-      message(STATUS "    [VAR]: MPI_${var} = ${MPI_${var}}.")
+    foreach (var ROOT C_COMPILER CXX_COMPILER Fortran_COMPILER CXX_INCLUDE_PATH CXX_LIBRARIES LIBRARIES MPIEXEC_EXECUTABLE)
+      message(STATUS "    [${var}]: MPI_${var} = ${MPI_${var}}.")
     endforeach ()
 
     set_package_properties(MPI PROPERTIES
@@ -324,6 +324,21 @@ if ( ENABLE_MPI )
 
   endif ( MPI_FOUND )
 endif ( ENABLE_MPI )
+
+function(dump_cmake_variables)
+    get_cmake_property(_variableNames VARIABLES)
+    list (SORT _variableNames)
+    foreach (_variableName ${_variableNames})
+        if (ARGV0)
+            unset(MATCHED)
+            string(REGEX MATCH ${ARGV0} MATCHED ${_variableName})
+            if (NOT MATCHED)
+                continue()
+            endif()
+        endif()
+        message(STATUS "${_variableName}=${${_variableName}}")
+    endforeach()
+endfunction()
 
 include (config/CheckCompilerFlags.cmake)
 
@@ -829,3 +844,6 @@ feature_summary(WHAT ALL #ENABLED_FEATURES DISABLED_FEATURES PACKAGES_FOUND
                 )
 MESSAGE("-- MOAB Configuration summary has been written to ${CMAKE_BINARY_DIR}/summary.log.")
 # All done.
+
+dump_cmake_variables("MPI_")
+dump_cmake_variables("HDF5")

@@ -577,7 +577,7 @@ ErrorCode NCHelperDomain::redistribute_cells( ParallelComm* myPcomm,
                                               int nv,                       // number of vertices per cell
                                               bool nv_last )                // type of xv, yv, first or last
 {
-    const int my_rank   = myPcomm->proc_config().proc_rank();
+    const int my_rank = myPcomm->proc_config().proc_rank();
 
 #ifdef MOAB_HAVE_ZOLTAN
 
@@ -719,7 +719,7 @@ ErrorCode NCHelperDomain::redistribute_cells( ParallelComm* myPcomm,
     tl.initialize( 3, 0, 0, num_real, num_local_cells );  // to_proc, global_id, mask
     tl.enableWriteAccess();
 
-    auto clamp = []( auto v, auto lo, auto hi ) { return ( v < lo ) ? lo : ( v > hi ) ? hi : v; };
+    auto clamp = []( int v, int lo, int hi ) { return ( v < lo ) ? lo : ( v > hi ) ? hi : v; };
 
     size_t actual_index = 0;
     for( size_t i = 0; i < xc.size(); ++i )

@@ -43,13 +43,13 @@ def get_include_path():
 
 def get_core_libraries():
     """Return libraries and library paths for OpenMC."""
-    lib = [lib_file for lib in ["lib", "lib64"] for lib_file in get_paths(lib, "libopenmc*", recursive=True)]
+    lib = [lib_file for lib in ["lib", "lib64"] for lib_file in get_paths(lib, "libMOAB*", recursive=True)]
     lib_path = [lib_file for lib in ["lib", "lib64"] for lib_file in get_paths(lib, "", recursive=False)]
     return lib, lib_path
 
 def get_extra_libraries():
     """Return the extra libraries installed by auditwheel or delocate."""
-    libs_path = os.path.join(__path__[0], ".dylibs") if sys.platform == "darwin" else os.path.normpath(os.path.join(__path__[0], "..", "openmc.libs"))
+    libs_path = os.path.join(__path__[0], ".dylibs") if sys.platform == "darwin" else os.path.normpath(os.path.join(__path__[0], "..", "MOAB.libs"))
     return (glob.glob(os.path.join(libs_path, "*")), libs_path) if os.path.exists(libs_path) else ([], [])
 
 # Setup variables

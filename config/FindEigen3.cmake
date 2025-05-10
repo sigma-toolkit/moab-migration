@@ -101,6 +101,10 @@ else ()
 
 endif()
 
+if(EIGEN3_FOUND)
+  set(EIGEN3_INCLUDES ${EIGEN3_INCLUDE_DIR})
+endif(EIGEN3_FOUND)
+
 if(EIGEN3_FOUND AND NOT TARGET Eigen3::Eigen)
   add_library(Eigen3::Eigen INTERFACE IMPORTED)
   set_target_properties(Eigen3::Eigen PROPERTIES

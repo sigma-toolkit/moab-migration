@@ -314,8 +314,6 @@ else()
 endif()
 
 set(MOAB_ALL_LIBS ${MOAB_LIBRARIES} ${MPI_LIBRARIES})
-message("MOAB_ALL_LIBS: ${MOAB_ALL_LIBS}")
-
 target_link_libraries(MOAB ${MOAB_ALL_LIBS})
 
 # If using clang-tidy, set the target property so that

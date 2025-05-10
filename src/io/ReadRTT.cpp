@@ -291,11 +291,6 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
         int mat_no = t.flag_values[cell_flag_idx[mat_flag]];
         rval       = MBI->tag_set_data( mat_num_tag, &tet_h, 1, &mat_no );MB_CHK_ERR( rval );
 
-        // put tet into its volume mesh-set for completeness
-        int vol_no = t.flag_values[cell_flag_idx[vol_flag]];
-        auto v_it  = volume_map.find( vol_no );
-        if( v_it != volume_map.end() ) MBI->add_entities( v_it->second, &tet_h, 1 );
-
         mb_tets.insert( tet_h );
     }
     rval = MBI->add_entities( file_set, mb_tets );MB_CHK_ERR( rval );

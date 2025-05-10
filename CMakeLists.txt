@@ -120,6 +120,7 @@ include ( CheckTypeSize )
 
 # Compiler defines... this should really be in a config file.
 set( MOAB_DEFINES "" )
+set( MOAB_INCLUDES "" )
 set( MOAB_LIBRARIES "" )
 set( MOAB_INSTALL_TARGETS "" )
 set( MOAB_MESH_DIR        "${CMAKE_SOURCE_DIR}/MeshFiles/" )
@@ -281,8 +282,9 @@ macro(SET_VARS_IF_FOUND PACKAGE_NAME PACKAGE_TYPE PRINT_NAME DESCRIPTION PACKAGE
       if (DEFINED ${PACKAGE_INCLUDES} AND NOT "${${PACKAGE_INCLUDES}}" STREQUAL "")
         message (STATUS "        Includes  : ${${PACKAGE_INCLUDES}}")
         include_directories( ${${PACKAGE_INCLUDES}} )
-        RESOLVE_INCLUDES(_tmp_resolved_pkgincs "${${PACKAGE_INCLUDES}}")
-        list( APPEND MOAB_INCLUDES "${_tmp_resolved_pkgincs}" )
+        #RESOLVE_INCLUDES(_tmp_resolved_pkgincs "${${PACKAGE_INCLUDES}}")
+        set(MOAB_INCLUDES ${MOAB_INCLUDES} "${${PACKAGE_INCLUDES}}")
+        #list( APPEND MOAB_INCLUDES "${_tmp_resolved_pkgincs}" )
       endif (DEFINED ${PACKAGE_INCLUDES} AND NOT "${${PACKAGE_INCLUDES}}" STREQUAL "")
       if (DEFINED ${PACKAGE_LIBRARIES} AND NOT "${${PACKAGE_LIBRARIES}}" STREQUAL "")
         message (STATUS "        Libraries : ${${PACKAGE_LIBRARIES}}")
@@ -628,14 +630,10 @@ string(REPLACE ";" " " tmp_incs "${MOAB_INCLUDES}")
 RESOLVE_INCLUDES(MOAB_INCLUDES "${tmp_incs}")
 list (REMOVE_DUPLICATES MOAB_INCLUDES)
 
-
 # Strip our custom flags
 string(STRIP "${CMAKE_EXE_LINKER_FLAGS} " CMAKE_EXE_LINKER_FLAGS)
 string(STRIP "${MOAB_CXX_FLAGS} " MOAB_CXX_FLAGS)
 string(STRIP "${MOAB_DEFINES} " MOAB_DEFINES)
-
-message("MOAB_LIBRARIES: ${MOAB_LIBRARIES}")
-message("MOAB_INCLUDES: ${MOAB_INCLUDES}")
 
 ###############################################################################
 # Python Module Build
@@ -799,7 +797,7 @@ LIST(APPEND LOGGING_WATCHED_VARIABLES
     MOAB_DEFINES
     MOAB_CXX_FLAGS
     MOAB_INCLUDES
-    MOAB_LIBRARIS
+    MOAB_LIBRARIES
     MOAB_INSTALL_TARGETS
     )
 

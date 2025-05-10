@@ -48,7 +48,7 @@ def test_get_core_libraries():
 
 @pytest.mark.parametrize("platform_value, expected_dir_name, expected_ext", [
     ("darwin", ".dylibs", "dylib"),
-    ("linux", "pymoab.libs", "so"),
+    ("linux", "MOAB.libs", "so"),
 ])
 def test_get_extra_libraries_cross_platform(tmp_path, platform_value, expected_dir_name, expected_ext):
     """Simulate different platforms to test get_extra_libraries logic completely."""

@@ -415,8 +415,9 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     offbuf[2] -= nS;
 
 #else
-    int offbuf[3]            = { 0, 0, 0 };
-    int globuf[5]            = { (int)nA, (int)nB, nS, nSourceNodesPerFace, nTargetNodesPerFace };
+    int offbuf[3] = { 0, 0, 0 };
+    int globuf[5] = { static_cast< int >( nA ), static_cast< int >( nB ), nS, nSourceNodesPerFace,
+                      nTargetNodesPerFace };
 #endif
 
     std::vector< std::string > srcdimNames, tgtdimNames;
@@ -1313,8 +1314,6 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     }
 
     // Let us declare the map object for every process
-    SparseMatrix< double >& sparseMatrix = this->GetSparseMatrix();
-
     int localSize   = nS / size;
     long offsetRead = rank * localSize;
     // leftovers on last rank

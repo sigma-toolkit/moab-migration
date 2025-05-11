@@ -244,6 +244,7 @@ int main( int argc, char* argv[] )
     }
 
     // first hop
+    // make the tag 0, to check we are actually sending needed data
     if( rofComm != MPI_COMM_NULL )
     {
         // as always, use nonblocking sends

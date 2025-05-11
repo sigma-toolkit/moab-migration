@@ -182,8 +182,6 @@ int main( int argc, char* argv[] )
     int cplOcnAppID = -1, cplAtmOcnAppID = -1;   // -1 means it is not initialized
     iMOAB_AppID cplOcnPID    = &cplOcnAppID;     // ocn on coupler PEs
     iMOAB_AppID cplAtmOcnPID = &cplAtmOcnAppID;  // intx atm -ocn on coupler PEs
-    int cplAtmCovOcn = -1;
-    iMOAB_AppID cplAtmCovOcnPID = &cplAtmCovOcn;
 
     if( couComm != MPI_COMM_NULL )
     {

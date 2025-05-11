@@ -245,6 +245,7 @@ int main( int argc, char* argv[] )
 
     // first hop
     if( rofComm != MPI_COMM_NULL )
+    // make the tag 0, to check we are actually sending needed data
     {
         // as always, use nonblocking sends
         // this is for projection to ocean:

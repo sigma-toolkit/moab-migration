@@ -236,8 +236,8 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
 
   if(MOAB_HAVE_TEMPESTREMAP)
     set( MBTR_TESTS parallel/imoab_coupler.cpp parallel/imoab_coupler_bilin.cpp parallel/imoab_coupler_twohop.cpp
-                    parallel/imoab_domain_culling.cpp parallel/imoab_map2.cpp parallel/imoab_map_target.cpp 
-                    parallel/imoab_ptest2.cpp parallel/imoab_read_compute_map.cpp parallel/imoab_read_map.cpp 
+                    parallel/imoab_domain_culling.cpp parallel/imoab_map_r2l.cpp parallel/imoab_map_target.cpp 
+                    parallel/imoab_ptest2.cpp parallel/imoab_read_compute_map.cpp 
                     parallel/imoab_scrip.cpp parallel/imoab_setwithGid.cpp parallel/imoab_phatm_ocn_coupler.cpp 
                     parallel/imoab_apg2_ol_coupler.cpp )
     
@@ -249,6 +249,20 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
       target_link_libraries( ${noparbase} MOAB ${TEMPESTREMAP_LIBRARIES} ${MPI_LIBRARIES} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
       add_test( ${noparbase} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${noparbase} ${MPIEXEC_POSTFLAGS} )
     endforeach()
+
+    # Fortran tests
+    set( MBTRF_TESTS parallel/imoab_ptest.F parallel/imoab_coupler_fortran.F90 parallel/imoab_coupler_caas.F90  )
+    
+    foreach( fname ${MBTRF_TESTS} )
+      string( REPLACE ".F90" "" base ${fname} ) # For F90
+      string( REPLACE ".F" "" base ${base} ) # For F77
+      string( REPLACE "parallel/" "" noparbase ${base} )
+      add_executable( ${noparbase} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname})
+      set_target_properties( ${noparbase} PROPERTIES COMPILE_FLAGS "${TEST_COMP_FLAGS} ${MOAB_DEFINES} -DTEST" )
+      target_link_libraries( ${noparbase} MOAB ${TEMPESTREMAP_LIBRARIES} ${MPI_LIBRARIES} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
+      add_test( ${noparbase} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${noparbase} ${MPIEXEC_POSTFLAGS} )
+    endforeach()
+
 
   endif()
 

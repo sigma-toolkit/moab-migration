@@ -264,22 +264,22 @@ ErrorCode NCHelperMPAS::check_existing_mesh()
         if( 0 == numCellGroups )
         {
             Tag numCellGroupsTag;
-            rval = mbImpl->tag_get_handle( "__NUM_CELL_GROUPS", 1, MB_TYPE_INTEGER, numCellGroupsTag );MB_CHK_SET_ERR( rval, "Trouble getting __NUM_CELL_GROUPS tag" );
-            if( MB_SUCCESS == rval ) rval = mbImpl->tag_get_data( numCellGroupsTag, &_fileSet, 1, &numCellGroups );MB_CHK_SET_ERR( rval, "Trouble getting data of __NUM_CELL_GROUPS tag" );
+            MB_CHK_SET_ERR( mbImpl->tag_get_handle( "__NUM_CELL_GROUPS", 1, MB_TYPE_INTEGER, numCellGroupsTag ), "Trouble getting __NUM_CELL_GROUPS tag" );
+            MB_CHK_SET_ERR( mbImpl->tag_get_data( numCellGroupsTag, &_fileSet, 1, &numCellGroups ), "Trouble getting data of __NUM_CELL_GROUPS tag" );
         }
 
         if( localGidVerts.empty() )
         {
             // Get all vertices from current file set (it is the input set in no_mesh scenario)
             Range local_verts;
-            rval = mbImpl->get_entities_by_dimension( _fileSet, 0, local_verts );MB_CHK_SET_ERR( rval, "Trouble getting local vertices in current file set" );
+            MB_CHK_SET_ERR( mbImpl->get_entities_by_dimension( _fileSet, 0, local_verts ), "Trouble getting local vertices in current file set" );
 
             if( !local_verts.empty() )
             {
                 std::vector< int > gids( local_verts.size() );
 
                 // !IMPORTANT : this has to be the GLOBAL_ID tag
-                rval = mbImpl->tag_get_data( mGlobalIdTag, local_verts, &gids[0] );MB_CHK_SET_ERR( rval, "Trouble getting local gid values of vertices" );
+                MB_CHK_SET_ERR( mbImpl->tag_get_data( mGlobalIdTag, local_verts, &gids[0] ), "Trouble getting local gid values of vertices" );
 
                 // Restore localGidVerts
                 std::copy( gids.rbegin(), gids.rend(), range_inserter( localGidVerts ) );
@@ -291,14 +291,14 @@ ErrorCode NCHelperMPAS::check_existing_mesh()
         {
             // Get all edges from current file set (it is the input set in no_mesh scenario)
             Range local_edges;
-            rval = mbImpl->get_entities_by_dimension( _fileSet, 1, local_edges );MB_CHK_SET_ERR( rval, "Trouble getting local edges in current file set" );
+            MB_CHK_SET_ERR( mbImpl->get_entities_by_dimension( _fileSet, 1, local_edges ), "Trouble getting local edges in current file set" );
 
             if( !local_edges.empty() )
             {
                 std::vector< int > gids( local_edges.size() );
 
                 // !IMPORTANT : this has to be the GLOBAL_ID tag
-                rval = mbImpl->tag_get_data( mGlobalIdTag, local_edges, &gids[0] );MB_CHK_SET_ERR( rval, "Trouble getting local gid values of edges" );
+                MB_CHK_SET_ERR( mbImpl->tag_get_data( mGlobalIdTag, local_edges, &gids[0] ), "Trouble getting local gid values of edges" );
 
                 // Restore localGidEdges
                 std::copy( gids.rbegin(), gids.rend(), range_inserter( localGidEdges ) );
@@ -310,14 +310,14 @@ ErrorCode NCHelperMPAS::check_existing_mesh()
         {
             // Get all cells from current file set (it is the input set in no_mesh scenario)
             Range local_cells;
-            rval = mbImpl->get_entities_by_dimension( _fileSet, 2, local_cells );MB_CHK_SET_ERR( rval, "Trouble getting local cells in current file set" );
+            MB_CHK_SET_ERR( mbImpl->get_entities_by_dimension( _fileSet, 2, local_cells ), "Trouble getting local cells in current file set" );
 
             if( !local_cells.empty() )
             {
                 std::vector< int > gids( local_cells.size() );
 
                 // !IMPORTANT : this has to be the GLOBAL_ID tag
-                rval = mbImpl->tag_get_data( mGlobalIdTag, local_cells, &gids[0] );MB_CHK_SET_ERR( rval, "Trouble getting local gid values of cells" );
+                MB_CHK_SET_ERR( mbImpl->tag_get_data( mGlobalIdTag, local_cells, &gids[0] ), "Trouble getting local gid values of cells" );
 
                 // Restore localGidCells
                 std::copy( gids.rbegin(), gids.rend(), range_inserter( localGidCells ) );

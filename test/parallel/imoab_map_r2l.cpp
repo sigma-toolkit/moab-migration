@@ -86,7 +86,6 @@ int main( int argc, char* argv[] )
     opts.addOpt< int >( "endCoupler,j", "end task for coupler layout", &endG4 );
 
     int disc_orders[2] = { 1, 1 };  // 1 is for FV
-
     std::string fieldstr;
     opts.addOpt< std::string >( "field,f", "field to project using the map ", &fieldstr );
 

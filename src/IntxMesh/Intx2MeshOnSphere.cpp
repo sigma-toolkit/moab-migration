@@ -859,7 +859,8 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
 ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distributed_set,
                                                      EntityHandle& covering_set,
                                                      bool gnomonic,
-                                                     int nb_ghost_layers )
+                                                     int nb_ghost_layers,
+                                                     bool include_edges )
 {
     // primary element came from, in the joint communicator ; this will be forwarded by coverage
     // mesh needed for tag migrate later on
@@ -1114,6 +1115,13 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         numq = numq + range_to_P.size();
         numv = numv + vertsToP.size();
         range_to_P.merge( vertsToP );
+        if (include_edges)
+        {
+            Range edgesToP;
+            rval =  mb->get_adjacencies( range_to_P, 1, false, edgesToP, Interface::UNION );MB_CHK_SET_ERR( rval, "can't get edges" );
+            numq = numq + edgesToP.size();
+            range_to_P.merge( edgesToP );
+        }
     }
 
     TupleList TLv;  // send vertices with a different tuple list
@@ -1157,7 +1165,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
             TLv.inc_n();  // increment tuple list size
         }
         // also, prep the 2d cells for sending ...
-        Range Q = range_to_P.subset_by_dimension( 2 );
+        Range Q = subtract( range_to_P, mesh_verts ); // it could include edges too
         for( Range::iterator it = Q.begin(); it != Q.end(); ++it )
         {
             EntityHandle q = *it;  // this is a second mesh cell (or src, lagrange set)
@@ -1232,6 +1240,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     }
     /*std::map<int, EntityHandle> globalID_to_eh;*/  // do we need this one?
     globalID_to_eh.clear();                          // we need it now in case of extra work, to not duplicate cells
+    globalID_to_edgeh.clear();                       // we need it now in case of extra work, to not duplicate edges
 
     // now, look at every TLv, and see if we have to create a vertex there or not
     int n = TLv.get_n();  // the size of the points received
@@ -1257,6 +1266,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
 
     Range& local  = Rto[my_rank];
     Range local_q = local.subset_by_dimension( 2 );
+    Range local_e = local.subset_by_dimension( 1 );
 
     for( Range::iterator it = local_q.begin(); it != local_q.end(); ++it )
     {
@@ -1275,13 +1285,17 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
 
     for( int i = 0; i < n; i++ )
     {
+        bool isEdge = TLq.vi_rd[sizeTuple * i + 4 ] == 0; // this would be the third node id; if 0, it means edge entity handle
         int globalIdEl = TLq.vi_rd[sizeTuple * i + 1];
         // int from_proc=TLq.vi_rd[sizeTuple * i ]; // we do not need from_proc anymore
 
         // do we already have a cell with this global ID, represented?
         // yes, it could happen for extraWork !
-        if( globalID_to_eh.find( globalIdEl ) != globalID_to_eh.end() ) continue;
-        // construct the conn triangle , quad or polygon
+        if ((globalID_to_eh.find(globalIdEl) != globalID_to_eh.end()) && (!isEdge))
+             continue;
+        if ((globalID_to_edgeh.find(globalIdEl) != globalID_to_edgeh.end()) && (isEdge))
+             continue;
+        // construct the conn edge, triangle , quad or polygon
         EntityHandle new_conn[MAXEDGES];  // we should use std::vector with max_edges_1
         int nnodes = -1;
         for( int j = 0; j < max_edges_1; j++ )
@@ -1299,14 +1313,18 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         }
         EntityHandle new_element;
         //
-        EntityType entType = MBQUAD;
+        EntityType entType = MBEDGE;
+        if(nnodes == 3) entType = MBTRI;
+        if(nnodes == 4) entType = MBQUAD;
         if( nnodes > 4 ) entType = MBPOLYGON;
-        if( nnodes < 4 ) entType = MBTRI;
         rval = mb->create_element( entType, new_conn, nnodes, new_element );MB_CHK_SET_ERR( rval, "can't create new element for second mesh " );
 
-        globalID_to_eh[globalIdEl] = new_element;
+        if (isEdge)
+            globalID_to_edgeh[globalIdEl] = new_element;
+        else
+            globalID_to_eh[globalIdEl] = new_element;
         local_q.insert( new_element );
-        rval = mb->tag_set_data( gid, &new_element, 1, &globalIdEl );MB_CHK_SET_ERR( rval, "can't set gid for cell " );
+        rval = mb->tag_set_data( gid, &new_element, 1, &globalIdEl );MB_CHK_SET_ERR( rval, "can't set gid for cell/edge " );
         int currentIndexIntTuple = 2 + max_edges_1;
         if( migrated_mesh )
         {

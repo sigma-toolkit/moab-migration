@@ -904,7 +904,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     int size_gdofs_tag = 0;
     std::vector< int > valsDOFs;
     Tag gdsTag;
-    rval = mb->tag_get_handle( "GLOBAL_DOFS", gdsTag );
+    rval = mb->tag_get_handle( "GLOBAL_DOFS", gdsTag ); // if gdsTag exists, we may be on spectral case
 
     if( meshCells.size() > 0 )
     {
@@ -1114,7 +1114,6 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         rval = mb->get_connectivity( range_to_P, vertsToP );MB_CHK_SET_ERR( rval, "can't get connectivity" );
         numq = numq + range_to_P.size();
         numv = numv + vertsToP.size();
-        range_to_P.merge( vertsToP );
         if (include_edges)
         {
             Range edgesToP;
@@ -1122,6 +1121,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
             numq = numq + edgesToP.size();
             range_to_P.merge( edgesToP );
         }
+        range_to_P.merge( vertsToP );
     }
 
     TupleList TLv;  // send vertices with a different tuple list
@@ -1278,6 +1278,19 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         rval                   = mb->tag_set_data( sendProcTag, &q, 1, &my_rank );MB_CHK_SET_ERR( rval, "can't set sender for cell" );
     }
 
+    if (include_edges)
+    {
+        for( Range::iterator it = local_e.begin(); it != local_e.end(); ++it )
+        {
+            EntityHandle q = *it;  // these are from source edge cells, local
+            int gid_el;
+            rval = mb->tag_get_data( gid, &q, 1, &gid_el );MB_CHK_SET_ERR( rval, "can't get global id of edge " );
+            assert( gid_el >= 0 );
+            globalID_to_edgeh[gid_el] = q;  // do we need this? yes, now we do; parent tags are now using it heavily
+            // the edges might be shared, but set this anyway; I do not think we need it TODO: investigate if we need this
+            rval                   = mb->tag_set_data( sendProcTag, &q, 1, &my_rank );MB_CHK_SET_ERR( rval, "can't set sender for cell" );
+        }
+    }
     // now look at all elements received through; we do not want to duplicate them
     n = TLq.get_n();  // number of elements received by this processor
     // a cell should be received from one proc only; so why are we so worried about duplicated
@@ -1304,6 +1317,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
             if( vgid == 0 )
                 new_conn[j] = 0;  // this can actually happen for polygon mesh (when we have less
                                   // number of vertices than max_edges)
+                                  // also it could happen if we send edges in coverage set
             else
             {
                 assert( globalID_to_vertex_handle.find( vgid ) != globalID_to_vertex_handle.end() );
@@ -1319,8 +1333,8 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         if( nnodes > 4 ) entType = MBPOLYGON;
         rval = mb->create_element( entType, new_conn, nnodes, new_element );MB_CHK_SET_ERR( rval, "can't create new element for second mesh " );
 
-        if (isEdge)
-            globalID_to_edgeh[globalIdEl] = new_element;
+        if (isEdge) // it could be true only for incldue_edges true
+            globalID_to_edgeh[globalIdEl] = new_element; // it is actually an edge in this case
         else
             globalID_to_eh[globalIdEl] = new_element;
         local_q.insert( new_element );

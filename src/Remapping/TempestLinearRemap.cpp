@@ -1266,10 +1266,7 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
         }
 
         // No overlaps
-        if( nOverlapFaces == 0 )
-        {
-            continue;
-        }
+        if( nOverlapFaces == 0 ) continue;
 
         // Allocate remap coefficients array for meshFirst Face
         DataArray3D< double > dRemapCoeff( nP, nP, nOverlapFaces );

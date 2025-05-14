@@ -452,14 +452,9 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
     if( srcdataGLLNodes == nullptr )
     {
         /* we only have a mapping for elements as DoFs */
-        std::vector<int> sorted_tmp_dofs( src_soln_gdofs.size() );
-        std::copy( src_soln_gdofs.begin(), src_soln_gdofs.end(), sorted_tmp_dofs.begin() );
-        std::sort( sorted_tmp_dofs.begin(), sorted_tmp_dofs.end() );
-
         for( unsigned i = 0; i < col_gdofmap.size(); ++i )
         {
-            auto gdof = sorted_tmp_dofs[i];
-            // printf("%d: Column -- Unsorted: %d, Sorted: %d\n", rank, src_soln_gdofs[i], sorted_tmp_dofs[i]);
+            auto gdof = src_soln_gdofs[i];
             assert( gdof > 0 );
             col_gdofmap[i]     = gdof - 1;
             col_dtoc_dofmap[i] = i;
@@ -518,13 +513,9 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
     if( srcdataGLLNodesSrc == nullptr )
     {
         /* we only have a mapping for elements as DoFs */
-        std::vector< int > sorted_tmp_dofs( locsrc_soln_gdofs.size() );
-        std::copy( locsrc_soln_gdofs.begin(), locsrc_soln_gdofs.end(), sorted_tmp_dofs.begin() );
-        std::sort( sorted_tmp_dofs.begin(), sorted_tmp_dofs.end() );
-
         for( unsigned i = 0; i < srccol_gdofmap.size(); ++i )
         {
-            auto gdof = sorted_tmp_dofs[i];
+            auto gdof = locsrc_soln_gdofs[i];
             assert( gdof > 0 );
             srccol_gdofmap[i]     = gdof - 1;
             srccol_dtoc_dofmap[i] = i;
@@ -581,13 +572,9 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
     if( tgtdataGLLNodes == nullptr )
     {
         /* we only have a mapping for elements as DoFs */
-        std::vector< int > sorted_tmp_dofs( tgt_soln_gdofs.size() );
-        std::copy( tgt_soln_gdofs.begin(), tgt_soln_gdofs.end(), sorted_tmp_dofs.begin() );
-        std::sort( sorted_tmp_dofs.begin(), sorted_tmp_dofs.end() );
-
         for( unsigned i = 0; i < row_gdofmap.size(); ++i )
         {
-            auto gdof = sorted_tmp_dofs[i];
+            auto gdof = tgt_soln_gdofs[i];
             assert( gdof > 0 );
             row_gdofmap[i]     = gdof - 1;
             row_dtoc_dofmap[i] = i;

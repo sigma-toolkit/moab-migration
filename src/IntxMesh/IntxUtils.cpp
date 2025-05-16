@@ -1091,19 +1091,23 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
     rval = mb->tag_get_handle( "AreaDiff", areaDiffTag);MB_CHK_SET_ERR( rval, "can't get tag AreaDiff" );
     Tag areaTag;
     rval = mb->tag_get_handle( "Area", areaTag);MB_CHK_SET_ERR( rval, "can't get tag Area" );
+
+    Range parentCells;
+    rval = mb->get_entities_by_dimension( inputSet, 2, parentCells );MB_CHK_SET_ERR( rval, "can't get parent cells" );
+    Range initialEdges;
+    // we will assume the edges are already included in the source or target mesh
+    // we do not want to create them
+    rval = mb->get_adjacencies( parentCells, 1, false, initialEdges, Interface::UNION );    MB_CHK_SET_ERR( rval, "can't get parent edges" );
+    std::cout << " number of original input edges:" << initialEdges.size() << "\n";
+
     // get all polygons in the intx set
     Range cells;
     rval = mb->get_entities_by_dimension( intx_set, 2, cells );MB_CHK_SET_ERR( rval, "can't get intersection cells" );
     // create all edges adjacent to the cells in the intx set
     // some might be original edges from edge or target meshes
     Range intxEdges;
-    rval = mb->get_adjacencies( cells, 1, true, intxEdges, Interface::UNION );MB_CHK_SET_ERR( rval, "can't get intersection edges" );
+    rval = mb->get_adjacencies( cells, 1, true, intxEdges, Interface::UNION );MB_CHK_SET_ERR( rval, "can't create adjacent intx edges ");
     std::cout << " number of intx edges:" << intxEdges.size() << "\n";
-    Range parentCells;
-    rval = mb->get_entities_by_dimension( inputSet, 2, parentCells );MB_CHK_SET_ERR( rval, "can't get intersection cells" );
-    Range initialEdges;
-    rval = mb->get_adjacencies( parentCells, 1, true, initialEdges, Interface::UNION );MB_CHK_SET_ERR( rval, "can't get intersection edges" );
-    std::cout << " number of original input edges:" << initialEdges.size() << "\n";
 
     // first, identify input polygons that are recovered fully
     // get global ids of the initial cells

@@ -183,198 +183,6 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
 
     // Compute and store the total number of source and target DoFs corresponding
     // to number of rows and columns in the mapping.
-#ifdef VVERBOSE
-    {
-        src_soln_gdofs.resize( m_remapper->m_covering_source_entities.size() * m_nDofsPEl_Src * m_nDofsPEl_Src, -1 );
-        rval = m_interface->tag_get_data( m_dofTagSrc, m_remapper->m_covering_source_entities, &src_soln_gdofs[0] );MB_CHK_ERR( rval );
-        locsrc_soln_gdofs.resize( m_remapper->m_source_entities.size() * m_nDofsPEl_Src * m_nDofsPEl_Src );
-        rval = m_interface->tag_get_data( m_dofTagSrc, m_remapper->m_source_entities, &locsrc_soln_gdofs[0] );MB_CHK_ERR( rval );
-        tgt_soln_gdofs.resize( m_remapper->m_target_entities.size() * m_nDofsPEl_Dest * m_nDofsPEl_Dest );
-        rval = m_interface->tag_get_data( m_dofTagDest, m_remapper->m_target_entities, &tgt_soln_gdofs[0] );MB_CHK_ERR( rval );
-
-        if( is_root )
-        {
-            {
-                std::ofstream output_file( "sourcecov-gids-0.txt" );
-                output_file << "I, GDOF\n";
-                for( unsigned i = 0; i < src_soln_gdofs.size(); ++i )
-                    output_file << i << ", " << src_soln_gdofs[i] << "\n";
-
-                output_file << "ELEMID, IDOF, LDOF, GDOF, NDOF\n";
-                m_nTotDofs_SrcCov = 0;
-                if( isSrcContinuous )
-                    dgll_cgll_covcol_ldofmap.resize(
-                        m_remapper->m_covering_source_entities.size() * m_nDofsPEl_Src * m_nDofsPEl_Src, false );
-                for( unsigned j = 0; j < m_remapper->m_covering_source_entities.size(); j++ )
-                {
-                    for( int p = 0; p < m_nDofsPEl_Src; p++ )
-                    {
-                        for( int q = 0; q < m_nDofsPEl_Src; q++ )
-                        {
-                            const int localDOF  = ( *srcdataGLLNodes )[p][q][j] - 1;
-                            const int offsetDOF = j * m_nDofsPEl_Src * m_nDofsPEl_Src + p * m_nDofsPEl_Src + q;
-                            if( isSrcContinuous && !dgll_cgll_covcol_ldofmap[localDOF] )
-                            {
-                                m_nTotDofs_SrcCov++;
-                                dgll_cgll_covcol_ldofmap[localDOF] = true;
-                            }
-                            output_file << m_remapper->lid_to_gid_covsrc[j] << ", " << offsetDOF << ", " << localDOF
-                                        << ", " << src_soln_gdofs[offsetDOF] << ", " << m_nTotDofs_SrcCov << "\n";
-                        }
-                    }
-                }
-                output_file.flush();  // required here
-                output_file.close();
-                dgll_cgll_covcol_ldofmap.clear();
-            }
-
-            {
-                std::ofstream output_file( "source-gids-0.txt" );
-                output_file << "I, GDOF\n";
-                for( unsigned i = 0; i < locsrc_soln_gdofs.size(); ++i )
-                    output_file << i << ", " << locsrc_soln_gdofs[i] << "\n";
-
-                output_file << "ELEMID, IDOF, LDOF, GDOF, NDOF\n";
-                m_nTotDofs_Src = 0;
-                if( isSrcContinuous )
-                    dgll_cgll_col_ldofmap.resize(
-                        m_remapper->m_source_entities.size() * m_nDofsPEl_Src * m_nDofsPEl_Src, false );
-                for( unsigned j = 0; j < m_remapper->m_source_entities.size(); j++ )
-                {
-                    for( int p = 0; p < m_nDofsPEl_Src; p++ )
-                    {
-                        for( int q = 0; q < m_nDofsPEl_Src; q++ )
-                        {
-                            const int localDOF  = ( *srcdataGLLNodesSrc )[p][q][j] - 1;
-                            const int offsetDOF = j * m_nDofsPEl_Src * m_nDofsPEl_Src + p * m_nDofsPEl_Src + q;
-                            if( isSrcContinuous && !dgll_cgll_col_ldofmap[localDOF] )
-                            {
-                                m_nTotDofs_Src++;
-                                dgll_cgll_col_ldofmap[localDOF] = true;
-                            }
-                            output_file << m_remapper->lid_to_gid_src[j] << ", " << offsetDOF << ", " << localDOF
-                                        << ", " << locsrc_soln_gdofs[offsetDOF] << ", " << m_nTotDofs_Src << "\n";
-                        }
-                    }
-                }
-                output_file.flush();  // required here
-                output_file.close();
-                dgll_cgll_col_ldofmap.clear();
-            }
-
-            {
-                std::ofstream output_file( "target-gids-0.txt" );
-                output_file << "I, GDOF\n";
-                for( unsigned i = 0; i < tgt_soln_gdofs.size(); ++i )
-                    output_file << i << ", " << tgt_soln_gdofs[i] << "\n";
-
-                output_file << "ELEMID, IDOF, GDOF, NDOF\n";
-                m_nTotDofs_Dest = 0;
-
-                for( unsigned i = 0; i < tgt_soln_gdofs.size(); ++i )
-                {
-                    output_file << m_remapper->lid_to_gid_tgt[i] << ", " << i << ", " << tgt_soln_gdofs[i] << ", "
-                                << m_nTotDofs_Dest << "\n";
-                    m_nTotDofs_Dest++;
-                }
-
-                output_file.flush();  // required here
-                output_file.close();
-            }
-        }
-        else
-        {
-            {
-                std::ofstream output_file( "sourcecov-gids-1.txt" );
-                output_file << "I, GDOF\n";
-                for( unsigned i = 0; i < src_soln_gdofs.size(); ++i )
-                    output_file << i << ", " << src_soln_gdofs[i] << "\n";
-
-                output_file << "ELEMID, IDOF, LDOF, GDOF, NDOF\n";
-                m_nTotDofs_SrcCov = 0;
-                if( isSrcContinuous )
-                    dgll_cgll_covcol_ldofmap.resize(
-                        m_remapper->m_covering_source_entities.size() * m_nDofsPEl_Src * m_nDofsPEl_Src, false );
-                for( unsigned j = 0; j < m_remapper->m_covering_source_entities.size(); j++ )
-                {
-                    for( int p = 0; p < m_nDofsPEl_Src; p++ )
-                    {
-                        for( int q = 0; q < m_nDofsPEl_Src; q++ )
-                        {
-                            const int localDOF  = ( *srcdataGLLNodes )[p][q][j] - 1;
-                            const int offsetDOF = j * m_nDofsPEl_Src * m_nDofsPEl_Src + p * m_nDofsPEl_Src + q;
-                            if( isSrcContinuous && !dgll_cgll_covcol_ldofmap[localDOF] )
-                            {
-                                m_nTotDofs_SrcCov++;
-                                dgll_cgll_covcol_ldofmap[localDOF] = true;
-                            }
-                            output_file << m_remapper->lid_to_gid_covsrc[j] << ", " << offsetDOF << ", " << localDOF
-                                        << ", " << src_soln_gdofs[offsetDOF] << ", " << m_nTotDofs_SrcCov << "\n";
-                        }
-                    }
-                }
-                output_file.flush();  // required here
-                output_file.close();
-                dgll_cgll_covcol_ldofmap.clear();
-            }
-
-            {
-                std::ofstream output_file( "source-gids-1.txt" );
-                output_file << "I, GDOF\n";
-                for( unsigned i = 0; i < locsrc_soln_gdofs.size(); ++i )
-                    output_file << i << ", " << locsrc_soln_gdofs[i] << "\n";
-
-                output_file << "ELEMID, IDOF, LDOF, GDOF, NDOF\n";
-                m_nTotDofs_Src = 0;
-                if( isSrcContinuous )
-                    dgll_cgll_col_ldofmap.resize(
-                        m_remapper->m_source_entities.size() * m_nDofsPEl_Src * m_nDofsPEl_Src, false );
-                for( unsigned j = 0; j < m_remapper->m_source_entities.size(); j++ )
-                {
-                    for( int p = 0; p < m_nDofsPEl_Src; p++ )
-                    {
-                        for( int q = 0; q < m_nDofsPEl_Src; q++ )
-                        {
-                            const int localDOF  = ( *srcdataGLLNodesSrc )[p][q][j] - 1;
-                            const int offsetDOF = j * m_nDofsPEl_Src * m_nDofsPEl_Src + p * m_nDofsPEl_Src + q;
-                            if( isSrcContinuous && !dgll_cgll_col_ldofmap[localDOF] )
-                            {
-                                m_nTotDofs_Src++;
-                                dgll_cgll_col_ldofmap[localDOF] = true;
-                            }
-                            output_file << m_remapper->lid_to_gid_src[j] << ", " << offsetDOF << ", " << localDOF
-                                        << ", " << locsrc_soln_gdofs[offsetDOF] << ", " << m_nTotDofs_Src << "\n";
-                        }
-                    }
-                }
-                output_file.flush();  // required here
-                output_file.close();
-                dgll_cgll_col_ldofmap.clear();
-            }
-
-            {
-                std::ofstream output_file( "target-gids-1.txt" );
-                output_file << "I, GDOF\n";
-                for( unsigned i = 0; i < tgt_soln_gdofs.size(); ++i )
-                    output_file << i << ", " << tgt_soln_gdofs[i] << "\n";
-
-                output_file << "ELEMID, IDOF, GDOF, NDOF\n";
-                m_nTotDofs_Dest = 0;
-
-                for( unsigned i = 0; i < tgt_soln_gdofs.size(); ++i )
-                {
-                    output_file << m_remapper->lid_to_gid_tgt[i] << ", " << i << ", " << tgt_soln_gdofs[i] << ", "
-                                << m_nTotDofs_Dest << "\n";
-                    m_nTotDofs_Dest++;
-                }
-
-                output_file.flush();  // required here
-                output_file.close();
-            }
-        }
-    }
-#endif
-
     // Now compute the mapping and store it for the covering mesh
     int srcTagSize = ( m_eInputType == DiscretizationType_FV ? 1 : m_nDofsPEl_Src * m_nDofsPEl_Src );
     if( m_remapper->point_cloud_source )
@@ -394,72 +202,13 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
         MB_CHK_ERR( m_interface->tag_get_data( m_dofTagSrc, m_remapper->m_covering_source_entities, &src_soln_gdofs[0] ) );
     }
 
-#ifdef ALTERNATE_NUMBERING_IMPLEMENTATION
-    unsigned maxSrcIndx = 0;
-
-    // for ( unsigned j = 0; j < m_covering_source_entities.size(); j++ )
-    std::vector< int > locdofs( srcTagSize );
-    std::map< Node, moab::EntityHandle > mapLocalMBNodes;
-    double elcoords[3];
-    for( unsigned iel = 0; iel < m_remapper->m_covering_source_entities.size(); ++iel )
-    {
-        EntityHandle eh = m_remapper->m_covering_source_entities[iel];
-        rval            = m_interface->get_coords( &eh, 1, elcoords );MB_CHK_ERR( rval );
-        Node elCentroid( elcoords[0], elcoords[1], elcoords[2] );
-        mapLocalMBNodes.insert( std::pair< Node, moab::EntityHandle >( elCentroid, eh ) );
-    }
-
-    const NodeVector& nodes = m_remapper->m_covering_source->nodes;
-    for( unsigned j = 0; j < m_remapper->m_covering_source->faces.size(); j++ )
-    {
-        const Face& face = m_remapper->m_covering_source->faces[j];
-
-        Node centroid;
-        centroid.x = centroid.y = centroid.z = 0.0;
-        for( unsigned l = 0; l < face.edges.size(); ++l )
-        {
-            centroid.x += nodes[face[l]].x;
-            centroid.y += nodes[face[l]].y;
-            centroid.z += nodes[face[l]].z;
-        }
-        const double factor = 1.0 / face.edges.size();
-        centroid.x *= factor;
-        centroid.y *= factor;
-        centroid.z *= factor;
-
-        EntityHandle current_eh;
-        if( mapLocalMBNodes.find( centroid ) != mapLocalMBNodes.end() )
-        {
-            current_eh = mapLocalMBNodes[centroid];
-        }
-
-        rval = m_interface->tag_get_data( m_dofTagSrc, &current_eh, 1, &locdofs[0] );MB_CHK_ERR( rval );
-        for( int p = 0; p < m_nDofsPEl_Src; p++ )
-        {
-            for( int q = 0; q < m_nDofsPEl_Src; q++ )
-            {
-                const int localDOF  = ( *srcdataGLLNodes )[p][q][j] - 1;
-                const int offsetDOF = p * m_nDofsPEl_Src + q;
-                maxSrcIndx          = ( localDOF > maxSrcIndx ? localDOF : maxSrcIndx );
-                std::cout << "Col: " << current_eh << ", " << m_remapper->lid_to_gid_covsrc[j] << ", " << offsetDOF
-                          << ", " << localDOF << ", " << locdofs[offsetDOF] - 1 << ", " << maxSrcIndx << "\n";
-            }
-        }
-    }
-#endif
-
     m_nTotDofs_SrcCov = 0;
     if( srcdataGLLNodes == nullptr )
     {
         /* we only have a mapping for elements as DoFs */
-        std::vector<int> sorted_tmp_dofs( src_soln_gdofs.size() );
-        std::copy( src_soln_gdofs.begin(), src_soln_gdofs.end(), sorted_tmp_dofs.begin() );
-        std::sort( sorted_tmp_dofs.begin(), sorted_tmp_dofs.end() );
-
         for( unsigned i = 0; i < col_gdofmap.size(); ++i )
         {
-            auto gdof = sorted_tmp_dofs[i];
-            // printf("%d: Column -- Unsorted: %d, Sorted: %d\n", rank, src_soln_gdofs[i], sorted_tmp_dofs[i]);
+            auto gdof = src_soln_gdofs[i];
             assert( gdof > 0 );
             col_gdofmap[i]     = gdof - 1;
             col_dtoc_dofmap[i] = i;
@@ -518,13 +267,9 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
     if( srcdataGLLNodesSrc == nullptr )
     {
         /* we only have a mapping for elements as DoFs */
-        std::vector< int > sorted_tmp_dofs( locsrc_soln_gdofs.size() );
-        std::copy( locsrc_soln_gdofs.begin(), locsrc_soln_gdofs.end(), sorted_tmp_dofs.begin() );
-        std::sort( sorted_tmp_dofs.begin(), sorted_tmp_dofs.end() );
-
         for( unsigned i = 0; i < srccol_gdofmap.size(); ++i )
         {
-            auto gdof = sorted_tmp_dofs[i];
+            auto gdof = locsrc_soln_gdofs[i];
             assert( gdof > 0 );
             srccol_gdofmap[i]     = gdof - 1;
             srccol_dtoc_dofmap[i] = i;
@@ -581,13 +326,9 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
     if( tgtdataGLLNodes == nullptr )
     {
         /* we only have a mapping for elements as DoFs */
-        std::vector< int > sorted_tmp_dofs( tgt_soln_gdofs.size() );
-        std::copy( tgt_soln_gdofs.begin(), tgt_soln_gdofs.end(), sorted_tmp_dofs.begin() );
-        std::sort( sorted_tmp_dofs.begin(), sorted_tmp_dofs.end() );
-
         for( unsigned i = 0; i < row_gdofmap.size(); ++i )
         {
-            auto gdof = sorted_tmp_dofs[i];
+            auto gdof = tgt_soln_gdofs[i];
             assert( gdof > 0 );
             row_gdofmap[i]     = gdof - 1;
             row_dtoc_dofmap[i] = i;

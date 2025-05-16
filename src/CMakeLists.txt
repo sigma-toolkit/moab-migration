@@ -313,7 +313,10 @@ else()
     )
 endif()
 
-set(MOAB_ALL_LIBS ${MOAB_LIBRARIES} ${MPI_LIBRARIES})
+set(MOAB_ALL_LIBS ${MOAB_LIBRARIES} ${TEMPESTREMAP_LIBRARIES} ${NETCDF_LIBRARIES} ${PNETCDF_LIBRARIES} ${HDF5_LIBRARIES} ${ZOLTAN_LIBRARIES} ${PARMETIS_LIBRARIES} ${METIS_LIBRARIES} ${MPI_LIBRARIES} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
+
+include(../config/CleanLibraryList.cmake)
+clean_library_list(MOAB_ALL_LIBS)
 target_link_libraries(MOAB ${MOAB_ALL_LIBS})
 
 # If using clang-tidy, set the target property so that

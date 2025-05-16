@@ -1099,11 +1099,17 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     size_t numq = 0;
     size_t numv = 0;
 
-    // merge the list of vertices to be sent
+    // merge the list of vertices and edges to be sent
     for( int p = 0; p < numprocs; p++ )
     {
-        if( p == (int)my_rank ) continue;  // do not "send" it to current task, because it is already here
         Range& range_to_P = Rto[p];
+        if (include_edges)
+        {
+            Range edgesToP;
+            rval =  mb->get_adjacencies( range_to_P, 1, false, edgesToP, Interface::UNION );MB_CHK_SET_ERR( rval, "can't get edges" );
+            numq = numq + edgesToP.size();
+            range_to_P.merge( edgesToP );
+        }
         // add the vertices to it
         if( range_to_P.empty() ) continue;  // nothing to send to proc p
 #ifdef VERBOSE
@@ -1114,13 +1120,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         rval = mb->get_connectivity( range_to_P, vertsToP );MB_CHK_SET_ERR( rval, "can't get connectivity" );
         numq = numq + range_to_P.size();
         numv = numv + vertsToP.size();
-        if (include_edges)
-        {
-            Range edgesToP;
-            rval =  mb->get_adjacencies( range_to_P, 1, false, edgesToP, Interface::UNION );MB_CHK_SET_ERR( rval, "can't get edges" );
-            numq = numq + edgesToP.size();
-            range_to_P.merge( edgesToP );
-        }
+
         range_to_P.merge( vertsToP );
     }
 

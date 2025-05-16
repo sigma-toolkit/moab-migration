@@ -1,0 +1,252 @@
+rtt_ascii
+
+header
+  version    v1.0.1
+  title      SlabModel3
+  date       2025-04-17T14:01:54+0100
+  cycle      1
+  time       0
+  contiguity contiguous
+  ncomments  8
+RxMesher version          : 1.0.0
+Simmetrix MeshSim version : 2025.0-250217
+Global mesh size          : 10 m
+Generated                 : 2025-04-17T14:01:54+0100
+Solid Geometry :
+  Filename     : SlabModel3.x_t
+  Last changed : 2025-04-17T13:56:20+0100
+  MD5 checksum : c839afe55ca332d872033af21c8b2bd7
+end_header
+
+dims
+  coor_units       cm
+  prob_time_units  s
+  ncell_defs       4
+  nnodes_max       4
+  nsides_max       4
+  nnodes_side_max  3
+  ndim             3
+  ndim_topo        3
+  nnodes           21
+  nnode_flag_types 0
+  nnode_flags      0
+  nnode_data       0
+  nsides           42
+  nside_types      1
+  side_types       3
+  nside_flag_types 2
+  nside_flags      8 21
+  nside_data       0
+  ncells           30
+  ncell_types      1
+  cell_types       4
+  ncell_flag_types 5
+  ncell_flags      3 4 3 3 3
+  ncell_data       0
+end_dims
+
+node_flags
+end_node_flags
+
+side_flags
+  1 SIDES
+    1 X_SYM_LEFT
+    2 X_SYM_RIGHT
+    3 Y_SYM_INNER
+    4 Y_SYM_OUTER
+    5 Z_SYM_BOTTOM
+    6 Z_SYM_TOP
+    7 INTERNAL
+    8 EXTERNAL
+  2 FACES
+    1 (+)Src@1
+    2 (+)Src@2
+    3 (+)Src@3
+    4 (+)Src@4
+    5 (+)Src@5
+    6 (+)Slab@1
+    7 (+)Slab@2
+    8 (+)Slab@3
+    9 (+)Slab@4
+    10 (+)Slab/(-)Tally@1
+    11 (+)Slab/(-)Src@1
+    12 (+)Tally@1
+    13 (+)Tally@2
+    14 (+)Tally@3
+    15 (+)Tally@4
+    16 (+)Tally@5
+    17 (+)Tally@6
+    18 (+)Tally@7
+    19 (+)Tally/(-)Tally@1
+    20 (+)Tally@8
+    21 (+)Tally@9
+end_side_flags
+
+cell_flags
+  1 REGIONS
+    1 Src
+    2 Slab
+    3 Tally
+  2 BODIES
+    1 Src1
+    2 Slab1
+    3 Tally1
+    4 Tally2
+  3 ABAQUS_PARTS
+    1 Src
+    2 Slab
+    3 Tally
+  4 MCNP_PSEUDO-CELLS
+    1 Src
+    2 Slab
+    3 Tally
+  5 MATERIAL
+    1 mat:Concrete
+    2 mat:Air
+    3 mat:VOID
+end_cell_flags
+
+node_data_ids
+end_node_data_ids
+
+side_data_ids
+end_side_data_ids
+
+cell_data_ids
+end_cell_data_ids
+
+cell_defs
+  1 point
+    1 0
+  2 lines
+    2 2
+    1 1
+    1
+    2
+  3 triangle
+    3 3
+    2 2 2
+    2 3
+    3 1
+    1 2
+  4 tetrahedron
+    4 4
+    3 3 3 3
+    2 3 4
+    1 4 3
+    1 2 4
+    1 3 2
+end_cell_defs
+
+nodes
+  1 -1.5000000000e+02 -5.0000000000e+01 5.0000000000e+01 1
+  2 -1.5000000000e+02 -5.0000000000e+01 -5.0000000000e+01 2
+  3 -5.0000000000e+01 -5.0000000000e+01 5.0000000000e+01 3
+  4 -5.0000000000e+01 -5.0000000000e+01 -5.0000000000e+01 4
+  5 -5.0000000000e+01 5.0000000000e+01 5.0000000000e+01 5
+  6 -1.5000000000e+02 5.0000000000e+01 5.0000000000e+01 6
+  7 -1.5000000000e+02 5.0000000000e+01 -5.0000000000e+01 7
+  8 -5.0000000000e+01 5.0000000000e+01 -5.0000000000e+01 8
+  9 5.0000000000e+01 -5.0000000000e+01 5.0000000000e+01 9
+  10 5.0000000000e+01 -5.0000000000e+01 -5.0000000000e+01 10
+  11 5.0000000000e+01 5.0000000000e+01 5.0000000000e+01 11
+  12 5.0000000000e+01 5.0000000000e+01 -5.0000000000e+01 12
+  13 1.5000000000e+02 -5.0000000000e+01 5.0000000000e+01 13
+  14 1.5000000000e+02 -5.0000000000e+01 -5.0000000000e+01 14
+  15 1.5000000000e+02 5.0000000000e+01 5.0000000000e+01 15
+  16 1.5000000000e+02 5.0000000000e+01 -5.0000000000e+01 16
+  17 -2.5000000000e+02 -5.0000000000e+01 5.0000000000e+01 17
+  18 -2.5000000000e+02 -5.0000000000e+01 -5.0000000000e+01 18
+  19 -2.5000000000e+02 5.0000000000e+01 5.0000000000e+01 19
+  20 -2.5000000000e+02 5.0000000000e+01 -5.0000000000e+01 20
+  21 -1.0000000000e+02 0.0000000000e+00 0.0000000000e+00 21
+end_nodes
+
+sides
+  1 3  17 18 2 3 1
+  2 3  17 2 1 3 1
+  3 3  6 19 17 6 2
+  4 3  6 17 1 6 2
+  5 3  19 20 18 1 3
+  6 3  19 18 17 1 3
+  7 3  7 2 18 5 4
+  8 3  18 20 7 5 4
+  9 3  6 7 20 4 5
+  10 3  6 20 19 4 5
+  11 3  5 8 7 4 6
+  12 3  5 7 6 4 6
+  13 3  5 6 1 6 7
+  14 3  5 1 3 6 7
+  15 3  8 4 2 5 8
+  16 3  2 7 8 5 8
+  17 3  1 2 4 3 9
+  18 3  1 4 3 3 9
+  19 3  3 4 8 7 10
+  20 3  3 8 5 7 10
+  21 3  6 7 2 7 11
+  22 3  6 2 1 7 11
+  23 3  15 16 12 4 12
+  24 3  15 12 11 4 12
+  25 3  9 15 11 6 13
+  26 3  15 9 13 6 13
+  27 3  13 14 16 2 14
+  28 3  13 16 15 2 14
+  29 3  16 14 10 5 15
+  30 3  10 12 16 5 15
+  31 3  9 10 14 3 16
+  32 3  9 14 13 3 16
+  33 3  11 12 8 4 17
+  34 3  11 8 5 4 17
+  35 3  3 11 5 6 18
+  36 3  11 3 9 6 18
+  37 3  9 10 12 7 19
+  38 3  9 12 11 7 19
+  39 3  12 10 4 5 20
+  40 3  4 8 12 5 20
+  41 3  3 4 10 3 21
+  42 3  3 10 9 3 21
+end_sides
+
+cells
+  1 4  17 2 18 6 1 1 1 1 1
+  2 4  6 17 19 18 1 1 1 1 1
+  3 4  19 18 20 6 1 1 1 1 1
+  4 4  18 7 20 6 1 1 1 1 1
+  5 4  6 7 2 18 1 1 1 1 1
+  6 4  17 1 2 6 1 1 1 1 1
+  7 4  8 2 4 21 2 2 2 2 3
+  8 4  3 5 8 21 2 2 2 2 3
+  9 4  3 8 4 21 2 2 2 2 3
+  10 4  1 4 2 21 2 2 2 2 3
+  11 4  5 3 1 21 2 2 2 2 3
+  12 4  1 3 4 21 2 2 2 2 3
+  13 4  6 1 21 5 2 2 2 2 3
+  14 4  6 21 1 2 2 2 2 2 3
+  15 4  21 8 7 5 2 2 2 2 3
+  16 4  21 7 8 2 2 2 2 2 3
+  17 4  6 21 7 5 2 2 2 2 3
+  18 4  6 7 21 2 2 2 2 2 3
+  19 4  15 11 12 9 3 3 3 3 2
+  20 4  13 16 14 9 3 3 3 3 2
+  21 4  16 10 14 9 3 3 3 3 2
+  22 4  9 10 12 16 3 3 3 3 2
+  23 4  12 15 9 16 3 3 3 3 2
+  24 4  13 16 9 15 3 3 3 3 2
+  25 4  3 4 8 12 3 4 3 3 2
+  26 4  3 8 5 11 3 4 3 3 2
+  27 4  11 8 12 3 3 4 3 3 2
+  28 4  9 12 10 3 3 4 3 3 2
+  29 4  3 10 4 12 3 4 3 3 2
+  30 4  9 12 3 11 3 4 3 3 2
+end_cells
+
+nodedat
+end_nodedat
+
+sidedat
+end_sidedat
+
+celldat
+end_celldat
+
+end_rtt_mesh

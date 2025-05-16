@@ -46,5 +46,7 @@ EXTRA_DIST = HommeMapping.nc \
              ln4.h5m \
              rtttest_v100.rtt \
              rtttest_v101.rtt \
+             rtttest_v101_2.rtt \
+             rtttest_mcnp_mesh.rtt \
              test.obj \
              shuttle.obj

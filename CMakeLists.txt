@@ -474,7 +474,7 @@ if ( ENABLE_HDF5 )
       endif ( NOT MPI_FOUND )
     endif ( HDF5_IS_PARALLEL )
 
-    set(HDF5_LIBRARIES ${HDF5_HL_LIBRARIES} ${HDF5_LIBRARIES})
+    set(HDF5_LIBRARIES ${HDF5_C_HL_LIBRARIES} ${HDF5_C_LIBRARIES})
 
     # check for CURL as well
     find_package( CURL )
@@ -486,7 +486,7 @@ if ( ENABLE_HDF5 )
 
     # Print some HDF5 configuration details
     SET_VARS_IF_FOUND(HDF5 RECOMMENDED "HDF5" "HDF5 library interfaces for MOAB native file format support" HDF5_INCLUDE_DIRS HDF5_LIBRARIES )
-    message (STATUS "        Parallel     : ${HDF5_IS_PARALLEL}")
+    message (STATUS "        Parallel  : ${HDF5_IS_PARALLEL}")
 
     LIST(APPEND LOGGING_WATCHED_VARIABLES
       HDF5_DIR

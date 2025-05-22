@@ -560,11 +560,14 @@ ErrorCode ParCommGraph::receive_mesh( MPI_Comm jcomm,
 ErrorCode ParCommGraph::release_send_buffers()
 {
     int ierr, nsize = (int)sendReqs.size();
-    std::vector< MPI_Status > mult_status;
-    mult_status.resize( sendReqs.size() );
-    ierr = MPI_Waitall( nsize, &sendReqs[0], &mult_status[0] );
+    if (nsize > 0)
+    {
+       std::vector< MPI_Status > mult_status;
+       mult_status.resize( nsize );
+       ierr = MPI_Waitall( nsize, &sendReqs[0], &mult_status[0] );
 
-    if( ierr != 0 ) return MB_FAILURE;
+       if( ierr != 0 ) return MB_FAILURE;
+    }
     // now we can free all buffers
     delete[] comm_graph;
     comm_graph = NULL;

@@ -22,7 +22,7 @@
 
 #include <cmath>
 #if defined MOAB_HAVE_ISFINITE
-#define moab_isfinite( f ) isfinite( f )
+#define moab_isfinite( f ) std::isfinite( f )
 #elif defined MOAB_HAVE_STDISFINITE
 #include <cmath>
 #define moab_isfinite( f ) std::isfinite( f )

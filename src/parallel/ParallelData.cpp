@@ -74,7 +74,7 @@ ErrorCode ParallelData::get_interface_sets( std::vector< EntityHandle >& iface_s
         if( proc_sets.empty() ) CONTINUE;
 
         std::vector< int > proc_tags( proc_sets.size() * tsize );
-        tmp_result = mbImpl->tag_get_data( procs_tag, proc_sets, &proc_tags[0] );
+        tmp_result = mbImpl->tag_get_data( procs_tag, proc_sets, proc_tags.data() );
         if( MB_SUCCESS != tmp_result ) CONTINUE;
         int k;
         Range::iterator rit;

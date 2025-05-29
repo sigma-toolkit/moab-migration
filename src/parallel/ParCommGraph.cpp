@@ -92,7 +92,7 @@ void ParCommGraph::find_group_ranks( MPI_Group group, MPI_Comm joincomm, std::ve
     for( int i = 0; i < grp_size; i++ )
         rks[i] = i;
 
-    MPI_Group_translate_ranks( group, grp_size, &rks[0], global_grp, &ranks[0] );
+    MPI_Group_translate_ranks( group, grp_size, rks.data(), global_grp, ranks.data() );
     MPI_Group_free( &global_grp );
     return;
 }
@@ -277,7 +277,7 @@ ErrorCode ParCommGraph::send_graph( MPI_Comm jcomm )
         if( MB_SUCCESS != rval ) return rval;
 
         int size_pack_array = (int)packed_recv_array.size();
-        comm_graph          = new int[size_pack_array + 1];
+        comm_graph          = new int[size_pack_array + 1]; // this should be at least size 2
         comm_graph[0]       = size_pack_array;
         for( int k = 0; k < size_pack_array; k++ )
             comm_graph[k + 1] = packed_recv_array[k];
@@ -285,11 +285,11 @@ ErrorCode ParCommGraph::send_graph( MPI_Comm jcomm )
         /// use tag 10 to send size and tag 20 to send the packed array
         sendReqs.resize( 1 );
         // do not send the size in advance, because we use probe now
-        /*ierr = MPI_Isend(&comm_graph[0], 1, MPI_INT, receiver(0), 10, jcomm, &sendReqs[0]); // we
+        /*ierr = MPI_Isend( comm_graph.data(), 1, MPI_INT, receiver(0), 10, jcomm, sendReqs.data()); // we
         have to use global communicator if (ierr!=0) return MB_FAILURE;*/
         int mtag = compid2;
         ierr     = MPI_Isend( &comm_graph[1], size_pack_array, MPI_INT, receiver( 0 ), mtag, jcomm,
-                              &sendReqs[0] );  // we have to use global communicator
+                              sendReqs.data() );  // we have to use global communicator
         if( ierr != 0 ) return MB_FAILURE;
     }
     return MB_SUCCESS;
@@ -390,7 +390,7 @@ ErrorCode ParCommGraph::receive_comm_graph( MPI_Comm jcomm, ParallelComm* pco, s
         std::cout << " receive comm graph size: " << size_pack_array << "\n";
 #endif
         pack_array.resize( size_pack_array );
-        ierr = MPI_Recv( &pack_array[0], size_pack_array, MPI_INT, sender( 0 ), mtag, jcomm, &status );
+        ierr = MPI_Recv( pack_array.data(), size_pack_array, MPI_INT, sender( 0 ), mtag, jcomm, &status );
         if( 0 != ierr ) return MB_FAILURE;
 #ifdef VERBOSE
         std::cout << " receive comm graph ";
@@ -404,7 +404,7 @@ ErrorCode ParCommGraph::receive_comm_graph( MPI_Comm jcomm, ParallelComm* pco, s
     ierr = MPI_Bcast( &size_pack_array, 1, MPI_INT, 0, receive );
     if( 0 != ierr ) return MB_FAILURE;
     pack_array.resize( size_pack_array );
-    ierr = MPI_Bcast( &pack_array[0], size_pack_array, MPI_INT, 0, receive );
+    ierr = MPI_Bcast( pack_array.data(), size_pack_array, MPI_INT, 0, receive );
     if( 0 != ierr ) return MB_FAILURE;
     return MB_SUCCESS;
 }
@@ -503,7 +503,7 @@ ErrorCode ParCommGraph::receive_mesh( MPI_Comm jcomm,
                 // set a tag with the original sender for the primary entity
                 // will be used later for coverage mesh
                 std::vector< int > orig_senders( local_primary_ents.size(), sender1 );
-                rval = pco->get_moab()->tag_set_data( orgSendProcTag, local_primary_ents, &orig_senders[0] );
+                rval = pco->get_moab()->tag_set_data( orgSendProcTag, local_primary_ents, orig_senders.data() );
             }
             corr_sizes.push_back( (int)local_primary_ents.size() );
 
@@ -562,7 +562,7 @@ ErrorCode ParCommGraph::release_send_buffers()
     int ierr, nsize = (int)sendReqs.size();
     std::vector< MPI_Status > mult_status;
     mult_status.resize( sendReqs.size() );
-    ierr = MPI_Waitall( nsize, &sendReqs[0], &mult_status[0] );
+    ierr = MPI_Waitall( nsize, sendReqs.data(), mult_status.data() );
 
     if( ierr != 0 ) return MB_FAILURE;
     // now we can free all buffers
@@ -654,7 +654,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
         Tag gidTag = mb->globalId_tag();
         std::vector< int > gids;
         gids.resize( owned.size() );
-        rval = mb->tag_get_data( gidTag, owned, &gids[0] );MB_CHK_ERR( rval );
+        rval = mb->tag_get_data( gidTag, owned, gids.data() );MB_CHK_ERR( rval );
         std::map< int, EntityHandle > gidToHandle;
         size_t i = 0;
         for( Range::iterator it = owned.begin(); it != owned.end(); it++ )
@@ -736,7 +736,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
             rval = mb->tag_get_bytes( tag_handles[i], bytes_per_tag );MB_CHK_ERR( rval );
             valuesTags[i].resize( owned.size() * bytes_per_tag / sizeof( double ) );
             // fill the whole array, we will pick up from here
-            rval = mb->tag_get_data( tag_handles[i], owned, (void*)( &( valuesTags[i][0] ) ) );MB_CHK_ERR( rval );
+            rval = mb->tag_get_data( tag_handles[i], owned, (void*)( valuesTags[i].data() ) );MB_CHK_ERR( rval );
         }
         // now, pack the data and send it
         sendReqs.resize( involved_IDs_map.size() );
@@ -857,7 +857,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
         Tag gidTag = mb->globalId_tag();
         std::vector< int > gids;
         gids.resize( owned.size() );
-        rval = mb->tag_get_data( gidTag, owned, &gids[0] );MB_CHK_ERR( rval );
+        rval = mb->tag_get_data( gidTag, owned, gids.data() );MB_CHK_ERR( rval );
         std::map< int, EntityHandle > gidToHandle;
         size_t i = 0;
         for( Range::iterator it = owned.begin(); it != owned.end(); it++ )
@@ -945,7 +945,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
             valuesTags[i].resize( owned.size() * bytes_per_tag / sizeof( double ) );
             // fill the whole array, we will pick up from here
             // we will fill this array, using data from received buffer
-            // rval = mb->tag_get_data(owned, (void*)( &(valuesTags[i][0])) );MB_CHK_ERR ( rval );
+            // rval = mb->tag_get_data(owned, (void*)( valuesTags[i].data() ) );MB_CHK_ERR ( rval );
         }
         // now, unpack the data and set the tags
         sendReqs.resize( involved_IDs_map.size() );
@@ -984,7 +984,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
         for( size_t i = 0; i < tag_handles.size(); i++ )
         {
             // we will fill this array, using data from received buffer
-            rval = mb->tag_set_data( tag_handles[i], owned, (void*)( &( valuesTags[i][0] ) ) );MB_CHK_ERR( rval );
+            rval = mb->tag_set_data( tag_handles[i], owned, (void*)( valuesTags[i].data() ) );MB_CHK_ERR( rval );
         }
     }
     return MB_SUCCESS;
@@ -1195,7 +1195,7 @@ ErrorCode ParCommGraph::compute_partition( ParallelComm* pco, Range& owned, int 
                 EntityHandle adjCell = adjEnts[0];
                 int gid;
                 rval = mb->tag_get_data( gidTag, &adjCell, 1, &gid );MB_CHK_ERR( rval );
-                rval = pco->get_sharing_data( edge, &shprocs[0], &shhandles[0], pstatus, np );MB_CHK_ERR( rval );
+                rval = pco->get_sharing_data( edge, shprocs.data() , shhandles.data() , pstatus, np );MB_CHK_ERR( rval );
                 int n                = TLe.get_n();
                 TLe.vi_wr[2 * n]     = shprocs[0];
                 TLe.vi_wr[2 * n + 1] = gid;
@@ -1277,7 +1277,7 @@ ErrorCode ParCommGraph::send_graph_partition( ParallelComm* pco, MPI_Comm jcomm 
         counts.resize( nSenders );
     }
 
-    int ierr = MPI_Gather( &numberReceivers, 1, MPI_INT, &counts[0], 1, MPI_INT, 0, pco->comm() );
+    int ierr = MPI_Gather( &numberReceivers, 1, MPI_INT, counts.data(), 1, MPI_INT, 0, pco->comm() );
     if( ierr != MPI_SUCCESS ) return MB_FAILURE;
     // compute now displacements
     if( is_root_sender() )
@@ -1297,7 +1297,7 @@ ErrorCode ParCommGraph::send_graph_partition( ParallelComm* pco, MPI_Comm jcomm 
         recvs.push_back( mit->first );
     }
     ierr =
-        MPI_Gatherv( &recvs[0], numberReceivers, MPI_INT, &buffer[0], &counts[0], &displs[0], MPI_INT, 0, pco->comm() );
+        MPI_Gatherv( recvs.data(), numberReceivers, MPI_INT, buffer.data(), counts.data(), displs.data(), MPI_INT, 0, pco->comm() );
     if( ierr != MPI_SUCCESS ) return MB_FAILURE;
 
     // now form recv_graph map; points from the

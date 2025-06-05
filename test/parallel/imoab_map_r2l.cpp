@@ -19,6 +19,7 @@
 #include "moab/ProgOptions.hpp"
 #include <iostream>
 #include <sstream>
+//#include <iomanip>
 
 #include "imoab_coupler_utils.hpp"
 
@@ -346,9 +347,17 @@ int main( int argc, char* argv[] )
             CHECKIERR( ierr, "failed to get global ids" );
             ierr = iMOAB_GetDoubleTagStorage( cplLndPID, field, &nelem[2], &ent_type,
                                               &tempElems[0] );
-            CHECKIERR( ierr, "failed to get temperature field" );
+            CHECKIERR( ierr, "failed to get Forr_rofl field" );
+            /*std::stringstream fbase;
+            fbase << "temp" << rankInGlobalComm << "_"<< numProcesses << ".txt";
+            std::fstream fs;
+            fs << std::setprecision(15) ;
+            fs.open(fbase.str().c_str(), std::fstream::out );
+               for (int i=0; i<nelem[2]; i++)
+                   fs << gidElems[i]<< " " << tempElems[i] << "\n";
+            fs.close();*/
             int err_code = 1;
-            check_baseline_file( baseline, gidElems, tempElems, 1.e-9, err_code );
+            check_baseline_file( baseline, gidElems, tempElems, 1.e-15, err_code );
             if( 0 == err_code )
                 std::cout << " passed baseline test atm2ocn on ocean task " << rankInGlobalComm << "\n";
         }

@@ -256,11 +256,19 @@ int main( int argc, char* argv[] )
     moab::Range recoveredPolys;
     rval = moab::IntxUtils::EdgeMap(mb, sf1, outputSet, sourceEdgeMap,
         edgeVertices, edgePolygons, recoveredPolys, areaTolerance );MB_CHK_SET_ERR( rval, "failed to compute edge map for source" );
-
+#ifdef MOAB_HAVE_PNETCDF
+#ifdef MOAB_HAVE_MPI
+    rval = moab::IntxUtils::write_edge_map_parallel("source_edge.nc", pcomm, mb, sf1, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for source file" );
+#endif
+#else
 #ifdef MOAB_HAVE_NETCDF
     rval = moab::IntxUtils::write_edge_map("source_edge.nc", mb, sf1, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for source file" );
 #endif
-    rval = mb->write_file("source_withEdges.h5m", 0, 0, &sf1, 1);MB_CHK_SET_ERR( rval, "failed rewrite initial source" );
+#endif
+    if (1==size)
+    {
+        rval = mb->write_file("source_withEdges.h5m", 0, 0, &sf1, 1);MB_CHK_SET_ERR( rval, "failed rewrite initial source" );
+    }
 
     recoveredPolys.clear();
     edgeVertices.clear();
@@ -268,9 +276,18 @@ int main( int argc, char* argv[] )
     sourceEdgeMap = false;
     rval = moab::IntxUtils::EdgeMap(mb, sf2, outputSet, sourceEdgeMap,
         edgeVertices, edgePolygons, recoveredPolys, areaTolerance );MB_CHK_SET_ERR( rval, "failed to compute edge map for target" );
+#ifdef MOAB_HAVE_PNETCDF
+#ifdef MOAB_HAVE_MPI
+    rval = moab::IntxUtils::write_edge_map_parallel("target_edge.nc", pcomm, mb, sf2, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
+#endif
+#else
 #ifdef MOAB_HAVE_NETCDF
     rval = moab::IntxUtils::write_edge_map("target_edge.nc", mb, sf2, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
 #endif
-    rval = mb->write_file("target_withEdges.h5m", 0, 0, &sf2, 1);MB_CHK_SET_ERR( rval, "failed rewrite initial target" );
+#endif
+    if (1==size)
+    {
+        rval = mb->write_file("target_withEdges.h5m", 0, 0, &sf2, 1);MB_CHK_SET_ERR( rval, "failed rewrite initial target" );
+    }
     return 0;
 }

@@ -589,7 +589,7 @@ void test_read_scrip()
     std::string orig, opts;
     rval = get_options( orig );CHECK_ERR( rval );
 
-    opts = orig + std::string( ";VARIABLE=" );
+    opts = orig + std::string( ";VARIABLE=;REPARTITION" );
     rval = mb.load_file( example_scrip.c_str(), &set, opts.c_str() );CHECK_ERR( rval );
 }
 

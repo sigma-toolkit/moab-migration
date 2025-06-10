@@ -9,7 +9,9 @@
 
 #include "moab/CartVect.hpp"
 #include "moab/Core.hpp"
-
+#ifdef MOAB_HAVE_MPI
+#include "moab/ParallelComm.hpp"
+#endif
 namespace moab
 {
 
@@ -247,6 +249,16 @@ class IntxUtils
             std::map<EntityHandle, std::vector<EntityHandle>>  & edgeVertices,
             std::map<EntityHandle, std::vector<int>> & edgePolygons,
             moab::Range & recoveredPolys);
+#endif
+
+#ifdef MOAB_HAVE_PNETCDF
+#ifdef MOAB_HAVE_MPI
+    static ErrorCode write_edge_map_parallel(const char * filename,
+            ParallelComm * pcomm, Interface * mb, EntityHandle sf1,
+            std::map<EntityHandle, std::vector<EntityHandle>>  & edgeVertices,
+            std::map<EntityHandle, std::vector<int>> & edgePolygons,
+            moab::Range & recoveredPolys);
+#endif
 #endif
 };
 

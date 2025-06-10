@@ -2954,4 +2954,185 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
     return MB_SUCCESS;
 }
 #endif
+
+#ifdef MOAB_HAVE_PNETCDF
+#ifdef MOAB_HAVE_MPI
+    ErrorCode IntxUtils::write_edge_map_parallel(const char * filename,
+            ParallelComm * pcomm, Interface * mb, EntityHandle sf1,
+            std::map<EntityHandle, std::vector<EntityHandle>>  & edgeVertices,
+            std::map<EntityHandle, std::vector<int>> & edgePolygons,
+            moab::Range & recoveredPolys)
+{
+    // open for writing the pnetcdf nc file
+    int ncid; // file id
+    int ncell_dimid, max_edge_dimid, max_sub_edge_dimid, max_sub_edgeP1_dimid;
+    int retval; // return val for nc
+    if ((retval = nc_create(filename, NC_CLASSIC_MODEL|NC_CLOBBER, &ncid)))
+          ERR(retval);
+    int num_cells;
+    Range polys;
+    ErrorCode rval = mb->get_entities_by_dimension( sf1, 2, polys );MB_CHK_SET_ERR( rval, "Failed to get polygons" );
+    num_cells = (int)polys.size();
+
+    if ((retval = nc_def_dim(ncid, "num_cells", num_cells, &ncell_dimid)))
+          ERR(retval);
+
+    Tag gid = mb->globalId_tag();
+    // find max_edges and max subedges
+    int max_edge=-1, max_sub_edge=-1, max_subedge1=-1;
+
+    for (auto it=polys.begin(); it!=polys.end(); ++it)
+    {
+        EntityHandle polygon = *it;
+        const EntityHandle * conn = NULL;
+        int nv;
+        rval = mb->get_connectivity(polygon, conn, nv);MB_CHK_SET_ERR( rval, "Failed to get connectivity" );
+        if (max_edge < nv)
+            max_edge = nv;
+    }
+    if ((retval = nc_def_dim(ncid, "max_edges", max_edge, &max_edge_dimid)))
+              ERR(retval);
+
+    for (auto mapit = edgePolygons.begin(); mapit!=edgePolygons.end(); ++mapit)
+    {
+        int nsb = (int) mapit->second.size();
+        if (max_sub_edge < nsb)
+            max_sub_edge = nsb;
+    }
+    if ((retval = nc_def_dim(ncid, "max_sub_edges", max_sub_edge, &max_sub_edge_dimid )))
+                  ERR(retval);
+    max_subedge1 = max_sub_edge + 1;
+    if ((retval = nc_def_dim(ncid, "max_sub_edges1", max_subedge1, &max_sub_edgeP1_dimid )))
+                  ERR(retval);
+
+    int dimids_nbs[2];
+
+    dimids_nbs[0] = ncell_dimid;
+    dimids_nbs[1] = max_edge_dimid;
+    int varid_nsub;
+    if ((retval = nc_def_var(ncid, "nb_sub_edge", NC_INT, 2,
+                                dimids_nbs, &varid_nsub)))
+       ERR(retval);
+
+    int dimids_cell_assoc[3];
+    dimids_cell_assoc[0] = ncell_dimid;
+    dimids_cell_assoc[1] = max_edge_dimid;
+    dimids_cell_assoc[2] = max_sub_edge_dimid;
+    int varid_cell_assoc;
+    if ((retval = nc_def_var(ncid, "cells_assoc", NC_INT, 3,
+            dimids_cell_assoc , &varid_cell_assoc)))
+        ERR(retval);
+
+    dimids_cell_assoc[2] = max_sub_edgeP1_dimid;
+    int varid_lat, varid_lon;
+    if ((retval = nc_def_var(ncid, "lat_sub_edge", NC_DOUBLE, 3,
+                dimids_cell_assoc , &varid_lat)))
+            ERR(retval);
+    if ((retval = nc_def_var(ncid, "lon_sub_edge", NC_DOUBLE, 3,
+            dimids_cell_assoc , &varid_lon)))
+        ERR(retval);
+
+    nc_enddef(ncid);
+
+    std::vector<int > nb_sub_edge_per_edge(num_cells * max_edge, -9999);
+    std::vector<int >  cells_assoc_per_edge (num_cells * max_edge * max_sub_edge, -9999);
+
+    std::vector<double >  latvals (num_cells * max_edge * max_subedge1, -9999);
+    std::vector<double >  lonvals (num_cells * max_edge * max_subedge1, -9999);
+
+    for (auto it=recoveredPolys.begin(); it!=recoveredPolys.end(); ++it)
+    {
+        EntityHandle polygon = *it;
+        int gidPoly = 0;
+        rval = mb->tag_get_data(gid, &polygon, 1, &gidPoly);MB_CHK_SET_ERR( rval, "Failed to get id of poly" );
+        const EntityHandle * conn = NULL;
+        int nv;
+        rval = mb->get_connectivity(polygon, conn, nv);MB_CHK_SET_ERR( rval, "Failed to get connectivity" );
+        for (int i=0; i<nv; i++)
+        {
+            EntityHandle v[2];
+            v[0] = conn[i];
+            v[1] = conn[  (i+1)%nv];
+            Range edges;
+            rval = mb->get_adjacencies(v, 2, 1, false, edges, Interface::INTERSECT);MB_CHK_SET_ERR( rval, "Failed to get edge" );
+            EntityHandle edge = edges[0];
+            // reverse or not?
+            std::vector<int> poly_assoc = edgePolygons[edge];
+            nb_sub_edge_per_edge[ (gidPoly-1)*max_edge + i] = (int) poly_assoc.size();
+            std::vector<EntityHandle> vertexEdges = edgeVertices[edge];
+            std::vector<CartVect> coords(vertexEdges.size());
+            rval = mb->get_coords( &vertexEdges[0], vertexEdges.size(), &(coords[0][0]) );MB_CHK_SET_ERR( rval, "can't get coordinates" );
+            // convert to lat/lon
+            std::vector<double>  latv(vertexEdges.size()), lonv(vertexEdges.size());
+            for (int j=0; j<(int)vertexEdges.size(); j++)
+            {
+                SphereCoords sph1 = cart_to_spherical( coords[j] );
+                lonv[j] = sph1.lon;
+                latv[j] = sph1.lat;
+            }
+            // reversed edge or not?
+            const EntityHandle * edgeconn = NULL;
+            int nve;
+            rval = mb->get_connectivity(edge, edgeconn, nve);MB_CHK_SET_ERR( rval, "Failed to get edge connectivity" );
+            bool reverse = false;
+            if (v[0] == edgeconn[1]) reverse = true;
+            if (reverse)
+            {
+                // fill the arrays in reverse order
+                int sizep = (int) poly_assoc.size();
+                for (int j = 0; j< sizep; j++)
+                {
+                    cells_assoc_per_edge[ (gidPoly-1)*max_edge*max_sub_edge +
+                                          i*max_sub_edge + j] = poly_assoc[sizep - 1 - j];
+                }
+                sizep = (int)vertexEdges.size();
+                for (int j=0; j<sizep; j++)
+                {
+                    latvals [(gidPoly-1)*max_edge*max_subedge1 +
+                             i*max_subedge1 + j] = latv [sizep - 1 - j];
+                    lonvals [(gidPoly-1)*max_edge*max_subedge1 +
+                             i*max_subedge1 + j] = lonv [sizep - 1 - j];
+                }
+
+            }
+            else
+            {
+                // max_sub_edges
+                for (int j = 0; j< (int) poly_assoc.size(); j++)
+                {
+                    cells_assoc_per_edge[ (gidPoly-1)*max_edge*max_sub_edge +
+                                          i*max_sub_edge + j] = poly_assoc[j];
+                }
+                for (int j=0; j<(int)vertexEdges.size(); j++)
+                {
+                    latvals [(gidPoly-1)*max_edge*max_subedge1 +
+                             i*max_subedge1 + j] = latv [j];
+                    lonvals [(gidPoly-1)*max_edge*max_subedge1 +
+                             i*max_subedge1 + j] = lonv [j];
+                }
+
+
+            }
+
+        }
+    }
+
+    if ((retval = nc_put_var_int(ncid, varid_nsub, &nb_sub_edge_per_edge[0]) ))
+          ERR(retval);
+
+    if ((retval = nc_put_var_int(ncid, varid_cell_assoc, &cells_assoc_per_edge[0]) ))
+          ERR(retval);
+
+    if ((retval = nc_put_var_double(ncid, varid_lat, &latvals[0]) ))
+          ERR(retval);
+
+    if ((retval = nc_put_var_double(ncid, varid_lon, &lonvals[0]) ))
+          ERR(retval);
+
+    if ((retval = nc_close(ncid)))
+         ERR(retval);
+    return MB_SUCCESS;
+}
+#endif
+#endif
 }  // namespace moab

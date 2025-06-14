@@ -85,9 +85,7 @@ esac
 
 # Get fortran linker name of LAPACK function to check for.
 if (test "x$ENABLE_FORTRAN" != "xno"); then
-  AC_LANG_PUSH(Fortran)dnl
-  _AC_FC_FUNC(cheev)
-  AC_LANG_POP(Fortran)dnl
+  AC_F77_FUNC(cheev)
 else
   cheev="cheev$FCMANGLE_SUFFIX"
 fi

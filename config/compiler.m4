@@ -561,14 +561,18 @@ AC_DEFUN([FAC_FC_NAME_MANGLING],
 [_AC_FORTRAN_ASSERT()dnl
 AC_CACHE_CHECK([for Fortran name-mangling scheme],
                ac_cv_[]_AC_LANG_ABBREV[]_mangling,
-[AC_COMPILE_IFELSE(
-[      subroutine foobar()
+[
+  blas_symbol_var=""
+  lapack_symbol_var=""
+
+  AC_COMPILE_IFELSE(
+  [      subroutine foobar()
       return
       end
       subroutine foo_bar()
       return
       end],
-[mv conftest.$ac_objext cfortran_test.$ac_objext
+  [mv conftest.$ac_objext cfortran_test.$ac_objext
 
   ac_save_LIBS=$LIBS
   LIBS="cfortran_test.$ac_objext $LIBS $[]_AC_LANG_PREFIX[]LIBS $ac_cv_fc_libs"
@@ -589,10 +593,14 @@ AC_CACHE_CHECK([for Fortran name-mangling scheme],
   foobar)
      ac_case=lower
      ac_foo_bar=foo_bar
+     blas_symbol_var="dgemm"
+     lapack_symbol_var="cheev"
      ;;
   FOOBAR)
      ac_case=upper
      ac_foo_bar=FOO_BAR
+     blas_symbol_var="DGEMM"
+     lapack_symbol_var="CHEEV"
      ;;
      esac
 
@@ -611,11 +619,15 @@ AC_CACHE_CHECK([for Fortran name-mangling scheme],
          ac_cv_[]_AC_LANG_ABBREV[]_mangling="$ac_cv_[]_AC_LANG_ABBREV[]_mangling, no underscore"
        else
          ac_cv_[]_AC_LANG_ABBREV[]_mangling="$ac_cv_[]_AC_LANG_ABBREV[]_mangling, underscore"
+	 blas_symbol_var="${blas_symbol_var}_"
+	 lapack_symbol_var="${lapack_symbol_var}_"
        fi
        if test -z "$ac_extra"; then
          ac_cv_[]_AC_LANG_ABBREV[]_mangling="$ac_cv_[]_AC_LANG_ABBREV[]_mangling, no extra underscore"
        else
          ac_cv_[]_AC_LANG_ABBREV[]_mangling="$ac_cv_[]_AC_LANG_ABBREV[]_mangling, extra underscore"
+	 blas_symbol_var="${blas_symbol_var}_"
+	 lapack_symbol_var="${lapack_symbol_var}_"
        fi
      else
        ac_cv_[]_AC_LANG_ABBREV[]_mangling="unknown"
@@ -629,6 +641,8 @@ AC_CACHE_CHECK([for Fortran name-mangling scheme],
   ],
   [AC_MSG_FAILURE([cannot compile a simple Fortran program])])
 ])
+  AC_SUBST(blas_symbol_var)
+  AC_SUBST(lapack_symbol_var)
 ])# FAC_FC_NAME_MANGLING
 
 # FAC_FC_WRAPPERS

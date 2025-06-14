@@ -21,16 +21,18 @@
 #include "moab/CartVect.hpp"
 
 #include <cmath>
-#if defined MOAB_HAVE_ISFINITE
-#define moab_isfinite( f ) isfinite( f )
-#elif defined MOAB_HAVE_STDISFINITE
-#include <cmath>
-#define moab_isfinite( f ) std::isfinite( f )
-#elif defined MOAB_HAVE_FINITE
-#define moab_isfinite( f ) finite( f )
+#include <limits>
+//#define moab_isfinite( f ) std::isfinite( f )
+template<typename T>
+inline bool moab_isfinite(T x) {
+#if defined(_MSC_VER) && (_MSC_VER < 1800)
+    // Old MSVC does not support std::isfinite
+    return _finite(static_cast<double>(x)) != 0;
 #else
-#define moab_isfinite( f ) ( !std::isinf( double( f ) ) && !std::isnan( double( f ) ) )
+    // Always use the standard C++11 version
+    return std::isfinite(x);
 #endif
+}
 
 namespace moab
 {

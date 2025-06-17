@@ -397,7 +397,7 @@ ErrorCode ReadParallel::load_file( const char** file_names,
                     sl.part_number = myPcomm->rank();
                     if( !partition_tag_vals.empty() )
                     {
-                        parts.tag_values     = &partition_tag_vals[0];
+                        parts.tag_values     = partition_tag_vals.data();
                         parts.num_tag_values = partition_tag_vals.size();
                     }
                 }
@@ -408,7 +408,7 @@ ErrorCode ReadParallel::load_file( const char** file_names,
                                                                subset_list->tag_list + subset_list->tag_list_length );
                     tmplist.push_back( parts );
                     subset.swap( tmplist );
-                    sl.tag_list        = &subset[0];
+                    sl.tag_list        = subset.data();
                     sl.tag_list_length = subset.size();
                 }
                 else
@@ -626,18 +626,18 @@ ErrorCode ReadParallel::load_file( const char** file_names,
         // Get the maximum over all procs
         if( 0 != myPcomm->proc_config().proc_rank() )
         {
-            MPI_Reduce( &act_times[0], 0, pa_vec.size() + 1, MPI_DOUBLE, MPI_MAX, 0,
+            MPI_Reduce( act_times.data(), 0, pa_vec.size() + 1, MPI_DOUBLE, MPI_MAX, 0,
                         myPcomm->proc_config().proc_comm() );
         }
         else
         {
 #if( MPI_VERSION >= 2 )
-            MPI_Reduce( MPI_IN_PLACE, &act_times[0], pa_vec.size() + 1, MPI_DOUBLE, MPI_MAX, 0,
+            MPI_Reduce( MPI_IN_PLACE, act_times.data(), pa_vec.size() + 1, MPI_DOUBLE, MPI_MAX, 0,
                         myPcomm->proc_config().proc_comm() );
 #else
             // Note, extra comm-size allocation is required
             std::vector< double > act_times_tmp( pa_vec.size() + 1 );
-            MPI_Reduce( &act_times[0], &act_times_tmp[0], pa_vec.size() + 1, MPI_DOUBLE, MPI_MAX, 0,
+            MPI_Reduce( act_times.data(), act_times_tmp.data(), pa_vec.size() + 1, MPI_DOUBLE, MPI_MAX, 0,
                         myPcomm->proc_config().proc_comm() );
             act_times = act_times_tmp;  // extra copy here too
 #endif
@@ -671,7 +671,7 @@ ErrorCode ReadParallel::delete_nonlocal_entities( std::string& ptag_name,
         // Values input, get sets with those values
         Range tmp_sets;
         std::vector< int > tag_vals( myPcomm->partition_sets().size() );
-        result = mbImpl->tag_get_data( ptag, myPcomm->partition_sets(), &tag_vals[0] );MB_CHK_SET_ERR( result, "Failed to get tag data for partition vals tag" );
+        result = mbImpl->tag_get_data( ptag, myPcomm->partition_sets(), tag_vals.data() );MB_CHK_SET_ERR( result, "Failed to get tag data for partition vals tag" );
         for( std::vector< int >::iterator pit = tag_vals.begin(); pit != tag_vals.end(); ++pit )
         {
             std::vector< int >::iterator pit2 = std::find( ptag_vals.begin(), ptag_vals.end(), *pit );
@@ -750,7 +750,7 @@ ErrorCode ReadParallel::create_partition_sets( std::string& ptag_name, EntityHan
     std::vector< int > values( myPcomm->partition_sets().size() );
     for( unsigned int i = 0; i < myPcomm->partition_sets().size(); i++ )
         values[i] = proc_rk;
-    result = mbImpl->tag_set_data( ptag, myPcomm->partition_sets(), &values[0] );MB_CHK_SET_ERR( result, "Trouble setting data to PARALLEL_PARTITION tag" );
+    result = mbImpl->tag_set_data( ptag, myPcomm->partition_sets(), values.data() );MB_CHK_SET_ERR( result, "Trouble setting data to PARALLEL_PARTITION tag" );
 
     return MB_SUCCESS;
 }

@@ -576,7 +576,7 @@ ErrorCode ParallelMergeMesh::TagSharedElements( int dim )
     }
 
     // get entities shared by 1 or n procs
-    rval = myPcomm->get_proc_nvecs( dim, dim - 1, &mySkinEnts[0], proc_nranges );
+    rval = myPcomm->get_proc_nvecs( dim, dim - 1, mySkinEnts.data(), proc_nranges );
     if( rval != MB_SUCCESS )
     {
         return rval;

@@ -258,6 +258,7 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
       string( REPLACE ".F" "" base ${base} ) # For F77
       string( REPLACE "parallel/" "" noparbase ${base} )
       add_executable( ${noparbase} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname})
+      set_property(TARGET ${noparbase} PROPERTY LINKER_LANGUAGE Fortran)
       set_target_properties( ${noparbase} PROPERTIES COMPILE_FLAGS "${TEST_COMP_FLAGS} ${MOAB_DEFINES} -DTEST" )
       target_link_libraries( ${noparbase} MOAB ${TEMPESTREMAP_LIBRARIES} )
       add_test( ${noparbase} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${noparbase} ${MPIEXEC_POSTFLAGS} )

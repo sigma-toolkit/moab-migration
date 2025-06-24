@@ -35,10 +35,16 @@
 #include "Eigen/Dense"
 #endif
 
+#ifdef MOAB_HAVE_PNETCDF
+#include <pnetcdf.h>
+#define ERRCODE 2
+#define ERR(e) {printf("Error: %s\n", ncmpi_strerror(e)); exit(ERRCODE);}
+#else
 #ifdef MOAB_HAVE_NETCDF
 #include <netcdf.h>
 #define ERRCODE 2
 #define ERR(e) {printf("Error: %s\n", nc_strerror(e)); exit(ERRCODE);}
+#endif
 #endif
 
 namespace moab
@@ -2776,7 +2782,7 @@ ErrorCode IntxUtils::max_diagonal( Interface* mb, Range cells, int max_edges, do
     diagonal = std::sqrt( diagonal );
     return MB_SUCCESS;
 }
-#ifdef MOAB_HAVE_NETCDF
+#ifdef MOAB_HAVE_PNETCDF
 ErrorCode IntxUtils::write_edge_map(const char * filename,
             Interface * mb, EntityHandle sf1,
             std::map<EntityHandle, std::vector<EntityHandle>>  & edgeVertices,
@@ -2967,12 +2973,24 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
     int ncid; // file id
     int ncell_dimid, max_edge_dimid, max_sub_edge_dimid, max_sub_edgeP1_dimid;
     int retval; // return val for nc
-    if ((retval = nc_create(filename, NC_CLASSIC_MODEL|NC_CLOBBER, &ncid)))
-          ERR(retval);
-    int num_cells;
+    //Below is an example code fragment that sets the file header hint to 1MB and pass it to PnetCDF when creating a file.
+
+    MPI_Info info;
+    MPI_Info_create(&info);
+    MPI_Info_set(info, "nc_header_align_size", "1048576");
+    if ((retval = ncmpi_create(pcomm->comm(), filename, NC_CLOBBER|NC_64BIT_DATA, info, &ncid) ))
+        ERR(retval);
+    if((retval = ncmpi_redef(ncid)))  /* enter define mode */
+        ERR(retval);
+
+    int num_cells_local;
     Range polys;
     ErrorCode rval = mb->get_entities_by_dimension( sf1, 2, polys );MB_CHK_SET_ERR( rval, "Failed to get polygons" );
-    num_cells = (int)polys.size();
+    num_cells_local = (int)polys.size();
+
+    int num_cells = 0;
+    // do  mpi reduce all, to find out the total num_cells;
+    MPI_Allreduce(&num_cells_local, &num_cells, 1, MPI_INTEGER, MPI_SUM, pcomm->comm());
 
     if ((retval = nc_def_dim(ncid, "num_cells", num_cells, &ncell_dimid)))
           ERR(retval);
@@ -2990,19 +3008,26 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
         if (max_edge < nv)
             max_edge = nv;
     }
-    if ((retval = nc_def_dim(ncid, "max_edges", max_edge, &max_edge_dimid)))
+    int max_edgeg = 0;
+    // do  mpi reduce all, to find out the max number of edges;
+    MPI_Allreduce(&max_edge, &max_edgeg, 1, MPI_INTEGER, MPI_MAX, pcomm->comm());
+    if ((retval = ncmpi_def_dim(ncid, "max_edges", max_edgeg, &max_edge_dimid)))
               ERR(retval);
-
+    max_edge = max_edgeg;
     for (auto mapit = edgePolygons.begin(); mapit!=edgePolygons.end(); ++mapit)
     {
         int nsb = (int) mapit->second.size();
         if (max_sub_edge < nsb)
             max_sub_edge = nsb;
     }
-    if ((retval = nc_def_dim(ncid, "max_sub_edges", max_sub_edge, &max_sub_edge_dimid )))
+    int max_sub_edgeg= 0;
+    // do  mpi reduce all, to find out the max number of subedges;
+    MPI_Allreduce(&max_sub_edge, &max_sub_edgeg, 1, MPI_INTEGER, MPI_MAX, pcomm->comm());
+    if ((retval = ncmpi_def_dim(ncid, "max_sub_edges", max_sub_edgeg, &max_sub_edge_dimid )))
                   ERR(retval);
+    max_sub_edge = max_sub_edgeg;
     max_subedge1 = max_sub_edge + 1;
-    if ((retval = nc_def_dim(ncid, "max_sub_edges1", max_subedge1, &max_sub_edgeP1_dimid )))
+    if ((retval = ncmpi_def_dim(ncid, "max_sub_edges1", max_subedge1, &max_sub_edgeP1_dimid )))
                   ERR(retval);
 
     int dimids_nbs[2];
@@ -3010,7 +3035,7 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
     dimids_nbs[0] = ncell_dimid;
     dimids_nbs[1] = max_edge_dimid;
     int varid_nsub;
-    if ((retval = nc_def_var(ncid, "nb_sub_edge", NC_INT, 2,
+    if ((retval = ncmpi_def_var(ncid, "nb_sub_edge", NC_INT, 2,
                                 dimids_nbs, &varid_nsub)))
        ERR(retval);
 
@@ -3019,26 +3044,31 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
     dimids_cell_assoc[1] = max_edge_dimid;
     dimids_cell_assoc[2] = max_sub_edge_dimid;
     int varid_cell_assoc;
-    if ((retval = nc_def_var(ncid, "cells_assoc", NC_INT, 3,
+    if ((retval = ncmpi_def_var(ncid, "cells_assoc", NC_INT, 3,
             dimids_cell_assoc , &varid_cell_assoc)))
         ERR(retval);
 
     dimids_cell_assoc[2] = max_sub_edgeP1_dimid;
     int varid_lat, varid_lon;
-    if ((retval = nc_def_var(ncid, "lat_sub_edge", NC_DOUBLE, 3,
+    if ((retval = ncmpi_def_var(ncid, "lat_sub_edge", NC_DOUBLE, 3,
                 dimids_cell_assoc , &varid_lat)))
             ERR(retval);
-    if ((retval = nc_def_var(ncid, "lon_sub_edge", NC_DOUBLE, 3,
+    if ((retval = ncmpi_def_var(ncid, "lon_sub_edge", NC_DOUBLE, 3,
             dimids_cell_assoc , &varid_lon)))
         ERR(retval);
 
-    nc_enddef(ncid);
+    ncmpi_enddef(ncid);
 
-    std::vector<int > nb_sub_edge_per_edge(num_cells * max_edge, -9999);
-    std::vector<int >  cells_assoc_per_edge (num_cells * max_edge * max_sub_edge, -9999);
+    // need to find out the owned local cells on this task
+    // write only those owned local cells, at the correct location, given by their global id
+    // we are repeating the shared edges anyway;
+    /// so basically, all local cells are owned; no need to worry, just write them at the correct location in the file, based on
+    // their global id
+    std::vector<int > nb_sub_edge_per_edge(num_cells_local * max_edge, -9999);
+    std::vector<int >  cells_assoc_per_edge (num_cells_local * max_edge * max_sub_edge, -9999);
 
-    std::vector<double >  latvals (num_cells * max_edge * max_subedge1, -9999);
-    std::vector<double >  lonvals (num_cells * max_edge * max_subedge1, -9999);
+    std::vector<double >  latvals (num_cells_local * max_edge * max_subedge1, -9999);
+    std::vector<double >  lonvals (num_cells_local * max_edge * max_subedge1, -9999);
 
     for (auto it=recoveredPolys.begin(); it!=recoveredPolys.end(); ++it)
     {
@@ -3117,16 +3147,16 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
         }
     }
 
-    if ((retval = nc_put_var_int(ncid, varid_nsub, &nb_sub_edge_per_edge[0]) ))
+    if ((retval = ncmpi_put_var_int(ncid, varid_nsub, &nb_sub_edge_per_edge[0]) ))
           ERR(retval);
 
-    if ((retval = nc_put_var_int(ncid, varid_cell_assoc, &cells_assoc_per_edge[0]) ))
+    if ((retval = ncmpi_put_var_int(ncid, varid_cell_assoc, &cells_assoc_per_edge[0]) ))
           ERR(retval);
 
-    if ((retval = nc_put_var_double(ncid, varid_lat, &latvals[0]) ))
+    if ((retval = ncmpi_put_var_double(ncid, varid_lat, &latvals[0]) ))
           ERR(retval);
 
-    if ((retval = nc_put_var_double(ncid, varid_lon, &lonvals[0]) ))
+    if ((retval = ncmpi_put_var_double(ncid, varid_lon, &lonvals[0]) ))
           ERR(retval);
 
     if ((retval = nc_close(ncid)))

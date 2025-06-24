@@ -2975,10 +2975,7 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
     int retval; // return val for nc
     //Below is an example code fragment that sets the file header hint to 1MB and pass it to PnetCDF when creating a file.
 
-    MPI_Info info;
-    MPI_Info_create(&info);
-    MPI_Info_set(info, "nc_header_align_size", "1048576");
-    if ((retval = ncmpi_create(pcomm->comm(), filename, NC_CLOBBER|NC_64BIT_DATA, info, &ncid) ))
+    if ((retval = ncmpi_create(pcomm->comm(), filename, NC_CLOBBER|NC_64BIT_DATA, MPI_INFO_NULL, &ncid) ))
         ERR(retval);
 
     int num_cells_local;
@@ -3166,28 +3163,33 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
     {
         EntityHandle starth      = pair_iter->first;
         EntityHandle endh        = pair_iter->second;
-        MPI_Offset write_start1 =  static_cast< MPI_Offset >( starth - 1 ) * max_edge;
-        MPI_Offset write_count1 =  static_cast< MPI_Offset >( endh - starth + 1 ) * max_edge ;
-        if ((retval = ncmpi_iput_vara_int(ncid, varid_nsub, &write_start1, &write_count1,
+        MPI_Offset write_start[3], write_count[3]; // max dimension
+        write_start[0] = static_cast< MPI_Offset >( starth - 1 ) ;
+        write_start[1] = static_cast< MPI_Offset >(0);
+        write_start[2] = static_cast< MPI_Offset >(0);
+        write_count[0] = static_cast< MPI_Offset >( endh - starth + 1 );
+        write_count[1] = static_cast< MPI_Offset >( max_edge );
+        write_count[2] = static_cast< MPI_Offset >( max_sub_edge );
+
+        if ((retval = ncmpi_iput_vara_int(ncid, varid_nsub, write_start, write_count, // first 2 are used
                 &nb_sub_edge_per_edge[indexInArray1], &requests[idxReq++] ) ))
               ERR(retval);
         indexInArray1 += ( endh - starth + 1 ) * max_edge;
 
-        MPI_Offset write_start2 =  static_cast< MPI_Offset >( starth - 1 ) * max_edge * max_sub_edge;
-        MPI_Offset write_count2 =  static_cast< MPI_Offset >( endh - starth + 1 ) * max_edge * max_sub_edge;
-        if ((retval = ncmpi_iput_vara_int(ncid, varid_cell_assoc, &write_start2, &write_count2,
+
+        if ((retval = ncmpi_iput_vara_int(ncid, varid_cell_assoc, write_start, write_count, // all 3 are used
                 &cells_assoc_per_edge[indexInArray2], &requests[idxReq++] ) ))
               ERR(retval);
         indexInArray2 += ( endh - starth + 1 ) * max_edge * max_sub_edge;
 
-        MPI_Offset write_start3 =  static_cast< MPI_Offset >( starth - 1 ) * max_edge * max_subedge1;
-        MPI_Offset write_count3 =  static_cast< MPI_Offset >( endh - starth + 1 ) * max_edge * max_subedge1;
 
-        if ((retval = ncmpi_iput_vara_double(ncid, varid_lat, &write_start3, &write_count3,
+        write_count[2] = max_subedge1;
+
+        if ((retval = ncmpi_iput_vara_double(ncid, varid_lat, write_start, write_count, // all 3 are used
                 &latvals[indexInArray3], &requests[idxReq++] ) ))
               ERR(retval);
 
-        if ((retval = ncmpi_iput_vara_double(ncid, varid_lon,  &write_start3, &write_count3,
+        if ((retval = ncmpi_iput_vara_double(ncid, varid_lon,  write_start, write_count, // all 3 are used
                 &lonvals[indexInArray3], &requests[idxReq++] ) ))
               ERR(retval);
 

@@ -2980,8 +2980,6 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
     MPI_Info_set(info, "nc_header_align_size", "1048576");
     if ((retval = ncmpi_create(pcomm->comm(), filename, NC_CLOBBER|NC_64BIT_DATA, info, &ncid) ))
         ERR(retval);
-    if((retval = ncmpi_redef(ncid)))  /* enter define mode */
-        ERR(retval);
 
     int num_cells_local;
     Range polys;
@@ -2992,10 +2990,15 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
     // do  mpi reduce all, to find out the total num_cells;
     MPI_Allreduce(&num_cells_local, &num_cells, 1, MPI_INTEGER, MPI_SUM, pcomm->comm());
 
-    if ((retval = nc_def_dim(ncid, "num_cells", num_cells, &ncell_dimid)))
+    if ((retval = ncmpi_def_dim(ncid, "num_cells", num_cells, &ncell_dimid)))
           ERR(retval);
 
     Tag gid = mb->globalId_tag();
+    std::vector<int> global_ids_polys(num_cells_local);
+    rval = mb->tag_get_data(gid, polys, global_ids_polys.data());MB_CHK_SET_ERR( rval, "Failed to get ids of cells" );
+    Range localGidCells;
+    std::copy( global_ids_polys.rbegin(), global_ids_polys.rend(), range_inserter( localGidCells ) );
+
     // find max_edges and max subedges
     int max_edge=-1, max_sub_edge=-1, max_subedge1=-1;
 
@@ -3075,6 +3078,8 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
         EntityHandle polygon = *it;
         int gidPoly = 0;
         rval = mb->tag_get_data(gid, &polygon, 1, &gidPoly);MB_CHK_SET_ERR( rval, "Failed to get id of poly" );
+        int indexGidPoly = localGidCells.index(gidPoly);
+
         const EntityHandle * conn = NULL;
         int nv;
         rval = mb->get_connectivity(polygon, conn, nv);MB_CHK_SET_ERR( rval, "Failed to get connectivity" );
@@ -3088,7 +3093,7 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
             EntityHandle edge = edges[0];
             // reverse or not?
             std::vector<int> poly_assoc = edgePolygons[edge];
-            nb_sub_edge_per_edge[ (gidPoly-1)*max_edge + i] = (int) poly_assoc.size();
+            nb_sub_edge_per_edge[ indexGidPoly*max_edge + i] = (int) poly_assoc.size();
             std::vector<EntityHandle> vertexEdges = edgeVertices[edge];
             std::vector<CartVect> coords(vertexEdges.size());
             rval = mb->get_coords( &vertexEdges[0], vertexEdges.size(), &(coords[0][0]) );MB_CHK_SET_ERR( rval, "can't get coordinates" );
@@ -3112,15 +3117,15 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
                 int sizep = (int) poly_assoc.size();
                 for (int j = 0; j< sizep; j++)
                 {
-                    cells_assoc_per_edge[ (gidPoly-1)*max_edge*max_sub_edge +
+                    cells_assoc_per_edge[ indexGidPoly*max_edge*max_sub_edge +
                                           i*max_sub_edge + j] = poly_assoc[sizep - 1 - j];
                 }
                 sizep = (int)vertexEdges.size();
                 for (int j=0; j<sizep; j++)
                 {
-                    latvals [(gidPoly-1)*max_edge*max_subedge1 +
+                    latvals [indexGidPoly*max_edge*max_subedge1 +
                              i*max_subedge1 + j] = latv [sizep - 1 - j];
-                    lonvals [(gidPoly-1)*max_edge*max_subedge1 +
+                    lonvals [indexGidPoly*max_edge*max_subedge1 +
                              i*max_subedge1 + j] = lonv [sizep - 1 - j];
                 }
 
@@ -3130,14 +3135,14 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
                 // max_sub_edges
                 for (int j = 0; j< (int) poly_assoc.size(); j++)
                 {
-                    cells_assoc_per_edge[ (gidPoly-1)*max_edge*max_sub_edge +
+                    cells_assoc_per_edge[ indexGidPoly*max_edge*max_sub_edge +
                                           i*max_sub_edge + j] = poly_assoc[j];
                 }
                 for (int j=0; j<(int)vertexEdges.size(); j++)
                 {
-                    latvals [(gidPoly-1)*max_edge*max_subedge1 +
+                    latvals [indexGidPoly*max_edge*max_subedge1 +
                              i*max_subedge1 + j] = latv [j];
-                    lonvals [(gidPoly-1)*max_edge*max_subedge1 +
+                    lonvals [indexGidPoly*max_edge*max_subedge1 +
                              i*max_subedge1 + j] = lonv [j];
                 }
 
@@ -3147,19 +3152,52 @@ ErrorCode IntxUtils::write_edge_map(const char * filename,
         }
     }
 
-    if ((retval = ncmpi_put_var_int(ncid, varid_nsub, &nb_sub_edge_per_edge[0]) ))
-          ERR(retval);
+    size_t idxReq = 0;
+    size_t nb_writes = localGidCells.psize();
+    std::vector< int > requests( nb_writes * 4);
+    std::vector< int > statuss( nb_writes * 4);
 
-    if ((retval = ncmpi_put_var_int(ncid, varid_cell_assoc, &cells_assoc_per_edge[0]) ))
-          ERR(retval);
+    size_t indexInArray1 = 0;
+    size_t indexInArray2 = 0;
+    size_t indexInArray3 = 0;
 
-    if ((retval = ncmpi_put_var_double(ncid, varid_lat, &latvals[0]) ))
-          ERR(retval);
+    for( Range::pair_iterator pair_iter = localGidCells.pair_begin(); pair_iter != localGidCells.pair_end();
+             ++pair_iter ) // these will be the size of nb_writes
+    {
+        EntityHandle starth      = pair_iter->first;
+        EntityHandle endh        = pair_iter->second;
+        MPI_Offset write_start1 =  static_cast< MPI_Offset >( starth - 1 ) * max_edge;
+        MPI_Offset write_count1 =  static_cast< MPI_Offset >( endh - starth + 1 ) * max_edge ;
+        if ((retval = ncmpi_iput_vara_int(ncid, varid_nsub, &write_start1, &write_count1,
+                &nb_sub_edge_per_edge[indexInArray1], &requests[idxReq++] ) ))
+              ERR(retval);
+        indexInArray1 += ( endh - starth + 1 ) * max_edge;
 
-    if ((retval = ncmpi_put_var_double(ncid, varid_lon, &lonvals[0]) ))
-          ERR(retval);
+        MPI_Offset write_start2 =  static_cast< MPI_Offset >( starth - 1 ) * max_edge * max_sub_edge;
+        MPI_Offset write_count2 =  static_cast< MPI_Offset >( endh - starth + 1 ) * max_edge * max_sub_edge;
+        if ((retval = ncmpi_iput_vara_int(ncid, varid_cell_assoc, &write_start2, &write_count2,
+                &cells_assoc_per_edge[indexInArray2], &requests[idxReq++] ) ))
+              ERR(retval);
+        indexInArray2 += ( endh - starth + 1 ) * max_edge * max_sub_edge;
 
-    if ((retval = nc_close(ncid)))
+        MPI_Offset write_start3 =  static_cast< MPI_Offset >( starth - 1 ) * max_edge * max_subedge1;
+        MPI_Offset write_count3 =  static_cast< MPI_Offset >( endh - starth + 1 ) * max_edge * max_subedge1;
+
+        if ((retval = ncmpi_iput_vara_double(ncid, varid_lat, &write_start3, &write_count3,
+                &latvals[indexInArray3], &requests[idxReq++] ) ))
+              ERR(retval);
+
+        if ((retval = ncmpi_iput_vara_double(ncid, varid_lon,  &write_start3, &write_count3,
+                &lonvals[indexInArray3], &requests[idxReq++] ) ))
+              ERR(retval);
+
+        indexInArray3 += ( endh - starth + 1 ) * max_edge * max_subedge1;
+
+    }
+    // Wait outside the loop
+    if (( retval = ncmpi_wait_all( ncid, requests.size(), &requests[0], &statuss[0] ) ))
+        ERR(retval);
+    if (( retval = ncmpi_close(ncid) ))
          ERR(retval);
     return MB_SUCCESS;
 }

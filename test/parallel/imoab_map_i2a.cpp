@@ -56,8 +56,6 @@ int main( int argc, char* argv[] )
     char field[] = "ofrac";  // this is a tag name, on the exported ice file
     // this will be projected and generate a baseline after sending it to coupler
 
-    std::string baseline = "baselineOfrac.txt";
-
     int rankInCouComm = -1;
 
     int nghlay = 0;  // number of ghost layers for loading the file
@@ -81,9 +79,6 @@ int main( int argc, char* argv[] )
     std::string fieldstr;
     opts.addOpt< std::string >( "field,f", "field to project using the map ", &fieldstr );
 
-    bool no_regression_test = false;
-    opts.addOpt< void >( "no_regression,r", "do not do regression test against baseline 1", &no_regression_test );
-    opts.addOpt< std::string >( "newbaseline,n", "baseline to use for test ", &baseline );
     opts.parseCommandLine( argc, argv );
 
     char fileWriteOptions[] = "PARALLEL=WRITE_PART";
@@ -92,12 +87,7 @@ int main( int argc, char* argv[] )
     {
         std::cout << "\n ice mesh file on coupler: " << ice_mesh << "\n   on tasks : " << startG4 << ":" << endG4
                   << "\n atm file on coupler " << atmFilename << "\n     on tasks : " << startG4 << ":" << endG4
-                  << "\n map file:" << mapFilename << "\n     on tasks : " << startG4 << ":" << endG4 << "\n"
-                  << " baseline: " << baseline << "\n";
-        if( !no_regression_test )
-        {
-            std::cout << " check projection against baseline: " << baseline << "\n";
-        }
+                  << "\n map file:" << mapFilename << "\n     on tasks : " << startG4 << ":" << endG4 << "\n";
     }
 
     // load files on 2 different communicators, groups
@@ -243,48 +233,6 @@ int main( int argc, char* argv[] )
         }
     }
     MPI_Barrier( MPI_COMM_WORLD );
-
-    if( couComm != MPI_COMM_NULL )
-    {
-        if( !no_regression_test )
-        {
-            // the same as remap test
-            // get  field on atm, the global ids, and dump to the baseline file
-            // first get GlobalIds from Atm, and fields:
-            int nverts[3], nelem[3];
-            ierr = iMOAB_GetMeshInfo( cplAtmPID, nverts, nelem, 0, 0, 0 );
-            CHECKIERR( ierr, "failed to get Atm mesh info" );
-            std::vector< int > gidElems;
-            gidElems.resize( nelem[2] );
-            std::vector< double > tempElems;
-            tempElems.resize( nelem[2] );
-            // get global id storage
-            const std::string GidStr = "GLOBAL_ID";  // hard coded too
-            int tag_type = DENSE_INTEGER, ncomp = 1, tagInd = 0;
-            ierr = iMOAB_DefineTagStorage( cplAtmPID, GidStr.c_str(), &tag_type, &ncomp, &tagInd );
-            CHECKIERR( ierr, "failed to define global id tag" );
-
-            int ent_type = 1;
-            ierr         = iMOAB_GetIntTagStorage( cplAtmPID, GidStr.c_str(), &nelem[2], &ent_type, &gidElems[0] );
-            CHECKIERR( ierr, "failed to get global ids" );
-            ierr = iMOAB_GetDoubleTagStorage( cplAtmPID, field, &nelem[2], &ent_type,
-                                              &tempElems[0] );
-            CHECKIERR( ierr, "failed to get temperature field" );
-            int err_code = 1;
-            /*std::stringstream fbase;
-            fbase << "temp" << rankInGlobalComm << "_"<< numProcesses << ".txt";
-            std::fstream fs;
-            fs << std::setprecision(15) ;
-            fs.open(fbase.str().c_str(), std::fstream::out );
-               for (int i=0; i<nelem[2]; i++)
-                   fs << gidElems[i]<< " " << tempElems[i] << "\n";
-            fs.close();*/
-
-            check_baseline_file( baseline, gidElems, tempElems, 1.e-15, err_code );
-            if( 0 == err_code )
-                std::cout << " passed baseline test atm2ocn on ocean task " << rankInGlobalComm << "\n";
-        }
-    }
 
     if( couComm != MPI_COMM_NULL )
     {

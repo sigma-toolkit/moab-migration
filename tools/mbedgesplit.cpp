@@ -27,10 +27,10 @@ int main( int argc, char* argv[] )
 {
 
     std::string sourceFile, targetFile, intersectionFile, edgeFile;
-    sourceFile =
-            "../sandbox/MeshFiles/e3sm/edge_maps/source_1.h5m";  // it also has data associated to edges
-    targetFile =
-            "../sandbox/MeshFiles/e3sm/edge_maps/target_1.h5m";  //
+    //sourceFile =
+    //        "../sandbox/MeshFiles/e3sm/edge_maps/source_1.h5m";  // it also has data associated to edges
+    //targetFile =
+    //        "../sandbox/MeshFiles/e3sm/edge_maps/target_1.h5m";  //
     intersectionFile = "intx_edges.h5m";
 
     ProgOptions opts;
@@ -216,7 +216,7 @@ int main( int argc, char* argv[] )
     {
         std::stringstream outf;
         outf << "intersect" << rank << ".h5m";
-        rval = mb->write_file( outf.str().c_str(), 0, 0, &outputSet, 1 );
+        rval = mb->write_file( outf.str().c_str(), 0, 0, &outputSet, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
     }
     double intx_area    = areaAdaptor.area_on_sphere( mb, outputSet, R );
     double arrival_area = areaAdaptor.area_on_sphere( mb, sf2, R );

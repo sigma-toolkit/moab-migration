@@ -26,17 +26,19 @@ using namespace moab;
 int main( int argc, char* argv[] )
 {
 
-    std::string sourceFile, targetFile, intersectionFile, edgeFile;
+    std::string sourceFile, targetFile, intersectionFile, mapEdgeTargetFile;
     //sourceFile =
     //        "../sandbox/MeshFiles/e3sm/edge_maps/source_1.h5m";  // it also has data associated to edges
     //targetFile =
     //        "../sandbox/MeshFiles/e3sm/edge_maps/target_1.h5m";  //
     intersectionFile = "intx_edges.h5m";
+    mapEdgeTargetFile = "target_edge.nc";
 
     ProgOptions opts;
     opts.addOpt< std::string >( "source,s", "first mesh filename (source)", &sourceFile );
     opts.addOpt< std::string >( "target,t", "second mesh filename (target)", &targetFile );
     opts.addOpt< std::string >( "intersectionFile,i", "output intersection file", &intersectionFile );
+    opts.addOpt< std::string >( "edgeTarget,e", "output map edge target file", &mapEdgeTargetFile );
 
     double R      = 1.;  // input
     double epsrel = 1.e-12;
@@ -92,6 +94,7 @@ int main( int argc, char* argv[] )
         std::cout << "box eps:  " << boxeps << "\n";
         std::cout << " use kd tree for intersection: " << brute_force << "\n";
         std::cout << " area tolerance:" << areaTolerance <<"\n";
+        std::cout << " target edge file" << mapEdgeTargetFile << "\n";
     }
     rval = mb->create_meshset( MESHSET_SET, outputSet );MB_CHK_ERR( rval );
 
@@ -237,7 +240,7 @@ int main( int argc, char* argv[] )
 #else
     rval = mb->write_file( intersectionFile.c_str(), 0, 0, &outputSet, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
 #endif
-    bool sourceEdgeMap = true;
+
     moab::Tag fractionTag;
     moab::Tag numSubTag;
     moab::Tag areaDiffTag;
@@ -254,62 +257,36 @@ int main( int argc, char* argv[] )
     std::map<EntityHandle, std::vector<EntityHandle>> edgeVertices; // for each recovered edge, the chain of vertices that form subedges
     std::map<EntityHandle, std::vector<int>> edgePolygons; // for each recovered edge, the list of intersected polygons;
     moab::Range recoveredPolys;
-    rval = moab::IntxUtils::EdgeMap(mb, sf1, outputSet, sourceEdgeMap,
-        edgeVertices, edgePolygons, recoveredPolys, areaTolerance );MB_CHK_SET_ERR( rval, "failed to compute edge map for source" );
-#ifdef MOAB_HAVE_PNETCDF
-#ifdef MOAB_HAVE_MPI
-    if (size > 1)
-    {
-       std::ostringstream file_str;
-       file_str << "source_edge_p" << pcomm->size() << ".nc";
-       rval = moab::IntxUtils::write_edge_map_parallel(file_str.str().c_str(), pcomm, mb, sf1, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for source file" );
-    }
-    else
-    {
-#ifdef MOAB_HAVE_NETCDF
-       rval = moab::IntxUtils::write_edge_map("source_edge.nc", mb, sf1, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for source file" );
-#endif
-    }
-#endif
-#else
-#ifdef MOAB_HAVE_NETCDF
-    rval = moab::IntxUtils::write_edge_map("source_edge.nc", mb, sf1, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for source file" );
-#endif
-#endif
-    if (1==size)
-    {
-        rval = mb->write_file("source_withEdges.h5m", 0, 0, &sf1, 1);MB_CHK_SET_ERR( rval, "failed rewrite initial source" );
-    }
 
-    recoveredPolys.clear();
-    edgeVertices.clear();
-    edgePolygons.clear();
-    sourceEdgeMap = false;
+    bool sourceEdgeMap = false;
     rval = moab::IntxUtils::EdgeMap(mb, sf2, outputSet, sourceEdgeMap,
         edgeVertices, edgePolygons, recoveredPolys, areaTolerance );MB_CHK_SET_ERR( rval, "failed to compute edge map for target" );
+#ifdef MOAB_HAVE_MPI
+#ifdef MOAB_HAVE_HDF5_PARALLEL
+    rval = mb->write_file( "targetWithEdges.h5m", 0, "PARALLEL=WRITE_PART", &sf2, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
+#endif
+#endif
+
 #ifdef MOAB_HAVE_PNETCDF
 #ifdef MOAB_HAVE_MPI
     if (size > 1)
     {
         std::ostringstream file_str;
-        file_str << "target_edge_p" << pcomm->size() << ".nc";
+        file_str << "p" << pcomm->size() << "_"<<mapEdgeTargetFile;
         rval = moab::IntxUtils::write_edge_map_parallel(file_str.str().c_str(), pcomm, mb, sf2, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
     }
     else
     {
 #ifdef MOAB_HAVE_NETCDF
-        rval = moab::IntxUtils::write_edge_map("target_edge.nc", mb, sf2, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
+        rval = moab::IntxUtils::write_edge_map(mapEdgeTargetFile.c_str(), mb, sf2, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
 #endif
     }
 #endif
 #else
 #ifdef MOAB_HAVE_NETCDF
-    rval = moab::IntxUtils::write_edge_map("target_edge.nc", mb, sf2, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
+    rval = moab::IntxUtils::write_edge_map(mapEdgeTargetFile.c_str(), mb, sf2, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
 #endif
 #endif
-    if (1==size)
-    {
-        rval = mb->write_file("target_withEdges.h5m", 0, 0, &sf2, 1);MB_CHK_SET_ERR( rval, "failed rewrite initial target" );
-    }
+
     return 0;
 }

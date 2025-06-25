@@ -208,16 +208,16 @@ AC_SUBST(enable_cxx_optimize)
 EXTRA_PGI_ONLY_FCFLAGS="-Mfree"
 if (test "x$enable_debug" != "xno"); then # debug flags
 # GNU
-EXTRA_GNU_CXXFLAGS="-Wall -Wno-long-long -pedantic -Wshadow -Wno-unused-parameter -Wpointer-arith -Wformat -Wformat-security -Wextra -Wno-variadic-macros -Wno-unknown-pragmas"
+EXTRA_GNU_CXXFLAGS="-Wall -Wno-long-long -pedantic -Wshadow -Wno-unused-parameter -Wpointer-arith -Wformat -Wformat-security -Wextra -Wno-variadic-macros -Wno-unknown-pragmas -fsignaling-nans -ftrapping-math -fnon-call-exceptions"
 EXTRA_GNU_FCFLAGS="-pedantic"
 # CLANG
 EXTRA_CLANG_CXXFLAGS="$EXTRA_GNU_CXXFLAGS"
 EXTRA_CLANG_FCFLAGS="$EXTRA_GNU_FCFLAGS"
 # Intel
-EXTRA_INTEL_CXXFLAGS="-C"
-EXTRA_INTEL_FCFLAGS="-C"
+EXTRA_INTEL_CXXFLAGS="-C -fp-trap=common"
+EXTRA_INTEL_FCFLAGS="-C -fp-trap=common"
 # PGI
-EXTRA_PGI_CXXFLAGS="--diag_suppress 236 --diag_suppress=unrecognized_gcc_pragma -C"
+EXTRA_PGI_CXXFLAGS="--diag_suppress 236 --diag_suppress=unrecognized_gcc_pragma -C -Ktrap=fp"
 EXTRA_PGI_FCFLAGS="-Mbounds -Ktrap=inv,divz,ovf"
 # XLC
 EXTRA_BG_CXXFLAGS="-qarch=qp -qpic=large -qdebug=except"
@@ -226,17 +226,17 @@ fi
 
 if (test "x$enable_cxx_optimize" != "xno"); then  # optimization flags
 #GNU
-EXTRA_GNU_CXXFLAGS="$EXTRA_GNU_CXXFLAGS -ftree-vectorize"
-EXTRA_GNU_FCFLAGS="$EXTRA_GNU_FCFLAGS -ftree-vectorize"
+EXTRA_GNU_CXXFLAGS="$EXTRA_GNU_CXXFLAGS -fno-fast-math -ffp-contract=off -fp-trap=common -fsanitize=float-cast-overflow,float-divide-by-zero"
+EXTRA_GNU_FCFLAGS="$EXTRA_GNU_FCFLAGS -fno-fast-math -ffp-contract=off -fp-trap=common"
 #CLANG
-EXTRA_CLANG_CXXFLAGS="$EXTRA_CLANG_CXXFLAGS"
-EXTRA_CLANG_FCFLAGS="$EXTRA_CLANG_FCFLAGS"
+EXTRA_CLANG_CXXFLAGS="$EXTRA_CLANG_CXXFLAGS -fno-fast-math -ffp-model=strict -ffp-contract=off"
+EXTRA_CLANG_FCFLAGS="$EXTRA_CLANG_FCFLAGS -fno-fast-math -ffp-model=strict -ffp-contract=off"
 # Intel
-EXTRA_INTEL_CXXFLAGS="$EXTRA_INTEL_CXXFLAGS -ip -no-prec-div"
-EXTRA_INTEL_FCFLAGS="$EXTRA_INTEL_FCFLAGS -ip -no-prec-div"
+EXTRA_INTEL_CXXFLAGS="$EXTRA_INTEL_CXXFLAGS -ip -fp-model source -prec-div -fp-speculation=off"
+EXTRA_INTEL_FCFLAGS="$EXTRA_INTEL_FCFLAGS -ip -fp-model source -prec-div -fp-speculation=off"
 # PGI
-EXTRA_PGI_CXXFLAGS="$EXTRA_PGI_CXXFLAGS -fast"
-EXTRA_PGI_FCFLAGS="$EXTRA_PGI_FCFLAGS -fast"
+EXTRA_PGI_CXXFLAGS="$EXTRA_PGI_CXXFLAGS -Kieee -Mdaz=flush -Mfprelaxed=no"
+EXTRA_PGI_FCFLAGS="$EXTRA_PGI_FCFLAGS -Kieee -Mdaz=flush -Mfprelaxed=no"
 # XLC
 EXTRA_BG_CXXFLAGS="$EXTRA_BG_CXXFLAGS -qarch=qp -qtune=auto -qpic=large -qenablevmx"
 EXTRA_BG_FCFLAGS="$EXTRA_BG_FCFLAGS -qarch=qp -qtune=auto -qpic=large -qenablevmx"

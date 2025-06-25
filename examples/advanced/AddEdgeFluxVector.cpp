@@ -112,7 +112,7 @@ int main( int argc, char* argv[] )
 
     // get all edges adjacent to a cell, then multiply by edge length and compute the total flux at
     // center of cell
-    for (Range::iterator cit = cells.begin(); cit != cells.end(); cit++)
+    for (Range::iterator cit = cells.begin(); cit != cells.end(); ++cit)
     {
         EntityHandle cell = *cit;
         // get edges adjacent to the cell

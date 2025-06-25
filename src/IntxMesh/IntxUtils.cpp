@@ -1086,9 +1086,9 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
         rval = mb->tag_get_handle( "SourceParent", otherParentTag );MB_CHK_SET_ERR( rval, "can't get parent source tag in edge map" );
     }
     Tag fractionTag;
-    rval = mb->tag_get_handle( "EdgeRecoveryFraction", fractionTag );
+    rval = mb->tag_get_handle( "EdgeRecoveryFraction", fractionTag );MB_CHK_SET_ERR( rval, "can't get tag for recovery fraction" );
     Tag subTag;
-    rval = mb->tag_get_handle( "NumSubEdges", subTag );
+    rval = mb->tag_get_handle( "NumSubEdges", subTag );MB_CHK_SET_ERR( rval, "can't get tag NumSubEdges" );
     // get all polygons in the intx set
     Range cells;
     rval = mb->get_entities_by_dimension( intx_set, 2, cells );MB_CHK_SET_ERR( rval, "can't get intersection cells" );
@@ -1117,7 +1117,7 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
     std::map< int, double > recoveredAreas;                // get areas of from intersection cells
     std::map< int, EntityHandle > mapFromGIDToParent;
     std::map< int, std::vector< EntityHandle > > mapFromParentGIDToIntxCells;
-    for( Range::iterator it = parentCells.begin(); it != parentCells.end(); it++, i++ )
+    for( Range::iterator it = parentCells.begin(); it != parentCells.end(); ++it, i++ )
     {
         EntityHandle parentCell = *it;
         rval                    = mb->get_connectivity( parentCell, verts, num_nodes );MB_CHK_SET_ERR( rval, "can't get connectivity of parent cell" );
@@ -1132,7 +1132,7 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
         mapFromParentGIDToIntxCells[parentID];  // just initialize it with empty vector
     }
 
-    for( Range::iterator it = cells.begin(); it != cells.end(); it++ )
+    for( Range::iterator it = cells.begin(); it != cells.end(); ++it )
     {
         EntityHandle cell = *it;
         rval              = mb->get_connectivity( cell, verts, num_nodes );MB_CHK_SET_ERR( rval, "can't get connectivity of intx cell" );
@@ -1168,7 +1168,7 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
     int unrecovered    = 0;
     int identity_edges = 0;  // edges that are formed by one intx edge, itself, the original
     std::map< EntityHandle, std::vector< EntityHandle > > mapEdges;
-    for( Range::iterator eit = recoverableEdges.begin(); eit != recoverableEdges.end(); eit++ )
+    for( Range::iterator eit = recoverableEdges.begin(); eit != recoverableEdges.end(); ++eit )
     {
         EntityHandle initialEdge = *eit;
         // if this edge is among intxEdges, we are done
@@ -1300,7 +1300,7 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
                 std::cout << "     sub edge:" << mb->id_from_handle( subEdge ) << " v: " << conn2[0] << ", " << conn2[1]
                           << " len: " << length2 << "\n";
             }
-            std::cout << " edge length:" << edgeLength << " diff:" << edgeLength - recoveredLength
+            std::cout << " edge length:" << edgeLength << " newCheckLength:" << newCheckLength << " diff:" << edgeLength - newCheckLength
                       << " fraction:" << fraction << " subedges:" << numSubEdge << "\n";
             unrecovered++;
             std::cout << std::setprecision( 7 );

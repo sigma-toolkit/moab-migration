@@ -798,7 +798,9 @@ void check_baseline_file( std::string basefile,
 
         if( fabs( it->second - vals[i] ) > eps )
         {
-            printf( "[%d]: value out of range. Index: %zu, GID: %d, Value: %2.14f, Expected: %3.14f\n", rank, i, gids[i], vals[i], it->second );
+            std::cout.precision(std::numeric_limits<double>::max_digits10);
+            std::cout << "[" << rank << "]: value out of range: index i=" << i << " id: " << gids[i] << ", value:" << vals[i]
+                      << " expected: " << it->second << " error: " << fabs( it->second - vals[i] ) << "\n";
             flag_error();
             return;
         }

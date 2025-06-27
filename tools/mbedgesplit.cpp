@@ -240,11 +240,17 @@ int main( int argc, char* argv[] )
     bool sourceEdgeMap = true;
     moab::Tag fractionTag;
     moab::Tag numSubTag;
+    moab::Tag areaDiffTag;
+    moab::Tag areaTag;
     double defVal = 0.;
     rval = mb->tag_get_handle( "EdgeRecoveryFraction", 1, MB_TYPE_DOUBLE, fractionTag, MB_TAG_DENSE | MB_TAG_CREAT,
                                    &defVal );MB_CHK_SET_ERR( rval, "can't create fraction tag" );
-    rval = mb->tag_get_handle( "NumSubEdges", 1, MB_TYPE_DOUBLE, numSubTag, MB_TAG_DENSE | MB_TAG_CREAT,
+    rval = mb->tag_get_handle( "NumSubEnts", 1, MB_TYPE_DOUBLE, numSubTag, MB_TAG_DENSE | MB_TAG_CREAT,
                                        &defVal );MB_CHK_SET_ERR( rval, "can't create fraction tag" );
+    rval = mb->tag_get_handle( "AreaDiff", 1, MB_TYPE_DOUBLE, areaDiffTag, MB_TAG_DENSE | MB_TAG_CREAT,
+                                           &defVal );MB_CHK_SET_ERR( rval, "can't create fraction tag" );
+    rval = mb->tag_get_handle( "Area", 1, MB_TYPE_DOUBLE, areaTag, MB_TAG_DENSE | MB_TAG_CREAT,
+                                               &defVal );MB_CHK_SET_ERR( rval, "can't create fraction tag" );
     std::map<EntityHandle, std::vector<EntityHandle>> edgeVertices; // for each recovered edge, the chain of vertices that form subedges
     std::map<EntityHandle, std::vector<int>> edgePolygons; // for each recovered edge, the list of intersected polygons;
     moab::Range recoveredPolys;

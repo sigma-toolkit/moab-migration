@@ -1088,7 +1088,11 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
     Tag fractionTag;
     rval = mb->tag_get_handle( "EdgeRecoveryFraction", fractionTag );MB_CHK_SET_ERR( rval, "can't get tag for recovery fraction" );
     Tag subTag;
-    rval = mb->tag_get_handle( "NumSubEdges", subTag );MB_CHK_SET_ERR( rval, "can't get tag NumSubEdges" );
+    rval = mb->tag_get_handle( "NumSubEnts", subTag );MB_CHK_SET_ERR( rval, "can't get tag NumSubEdges" );
+    Tag areaDiffTag;
+    rval = mb->tag_get_handle( "AreaDiff", areaDiffTag);MB_CHK_SET_ERR( rval, "can't get tag AreaDiff" );
+    Tag areaTag;
+    rval = mb->tag_get_handle( "Area", areaTag);MB_CHK_SET_ERR( rval, "can't get tag Area" );
     // get all polygons in the intx set
     Range cells;
     rval = mb->get_entities_by_dimension( intx_set, 2, cells );MB_CHK_SET_ERR( rval, "can't get intersection cells" );
@@ -1125,6 +1129,7 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
         rval = mb->get_coords( verts, num_nodes, &coords[0] );MB_CHK_SET_ERR( rval, "can't get coords of parent cell" );
 
         double area                  = areaAdaptor.area_spherical_polygon( &coords[0], num_nodes, 1. );
+        rval = mb->tag_set_data(areaTag, &parentCell, 1, &area);MB_CHK_SET_ERR( rval, "can't set area Tag on parent cell" );
         int parentID                 = parentGids[i];
         initAreas[parentID]          = area;
         recoveredAreas[parentID]     = 0.;
@@ -1149,8 +1154,12 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
     for( size_t j = 0; j < parentGids.size(); j++ )
     {
         int parentID    = parentGids[j];
-        double areaDiff = fabs( initAreas[parentID] - recoveredAreas[parentID] );
-        if( areaDiff < areaTolerance )
+        EntityHandle parentCell = parentCells[j];
+        double areaDiff =  initAreas[parentID] - recoveredAreas[parentID];
+        rval = mb->tag_set_data(areaDiffTag, &parentCell, 1, &areaDiff);MB_CHK_SET_ERR( rval, "can't set diff area Tag" );
+        double numIntxcells = static_cast<double>(mapFromParentGIDToIntxCells[parentID].size());
+        rval = mb->tag_set_data(subTag, &parentCell, 1, &numIntxcells);MB_CHK_SET_ERR( rval, "can't set num sub ents Tag" );
+        if( fabs(areaDiff) < areaTolerance )
         {
             recovered++;
             recoveredCells.insert( parentCells[j] );  // should we use a std::vector, that will be ordered already ?
@@ -1158,7 +1167,7 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
         else
             notRecovered++;
     }
-    std::cout << "recovered initial cells: " << recovered << " vs:" << notRecovered << " not recovered \n";
+    std::cout << "recovered initial cells: " << recovered << " vs:" << notRecovered << " not recovered  (maybe on the boundary? ) \n";
     // initial edges that should be decomposable from intx edges
     Range recoverableEdges;
     rval = mb->get_adjacencies( recoveredCells, 1, false, recoverableEdges, Interface::UNION );MB_CHK_SET_ERR( rval, "can't get recoverable edges" );
@@ -1178,6 +1187,8 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
             mapEdges[initialEdge].push_back( initialEdge );
             identity_edges++;
             recoveredEdges++;
+            double numSubEdges = 1.;
+            rval = mb->tag_set_data(subTag, &initialEdge, 1, &numSubEdges);MB_CHK_SET_ERR( rval, "can't set num sub ents Tag" );
             // get vertices and intx poly attached to it
             int nve                     = 0;
             const EntityHandle* connCell;

@@ -6,12 +6,6 @@ pipelines:
         - step:
             script:
                 - alias python=python3
-                # Configure with Scikit Build System
-                - cd $BITBUCKET_CLONE_DIR && export SKBUILD_CMAKE_ARGS="-DBUILD_SHARED_LIBS=ON;-DENABLE_MPI=ON;-DENABLE_HDF5=ON;-DHDF5_DIR=/usr/lib/x86_64-linux-gnu/hdf5/openmpi;-DENABLE_NETCDF=ON;-DNETCDF_DIR=/usr/lib/x86_64-linux-gnu/netcdf/mpi;-DENABLE_METIS=ON;-DMETIS_DIR=/usr;-DEIGEN3_DIR=/usr/include/eigen3"
-                - python -m pip -v install .
-                - python -m pip install pytest
-                - cd test/pymoab
-                - pytest -ra
                 # Setup the build pipeline
                 - cd $BITBUCKET_CLONE_DIR && export CC=mpicc CXX=mpicxx FC=mpif90 F77=mpif77 F90=mpif90 OMPI_ALLOW_RUN_AS_ROOT="1" OMPI_ALLOW_RUN_AS_ROOT_CONFIRM="1"
                 # AutoTools Static Library Builds
@@ -26,18 +20,18 @@ pipelines:
                 - cmake .. -DCMAKE_C_FLAGS="-fPIC -DPIC -Wno-cast-function-type" -DCMAKE_CXX_FLAGS="-fPIC -DPIC -Wno-cast-function-type" -DBUILD_SHARED_LIBS=ON -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--no-undefined" -DENABLE_MPI=ON  -DENABLE_PYMOAB=ON -DENABLE_HDF5=ON -DHDF5_DIR=/usr/lib/x86_64-linux-gnu/hdf5/openmpi -DENABLE_NETCDF=ON -DNETCDF_DIR=/usr/lib/x86_64-linux-gnu/netcdf/mpi -DENABLE_METIS=ON -DMETIS_DIR=/usr -DEIGEN3_DIR=/usr/include/eigen3
                 - make all test VERBOSE=1
                 - make dist
+                # Now configure with Scikit Build System
+                - cd $BITBUCKET_CLONE_DIR && export SKBUILD_CMAKE_ARGS="-DBUILD_SHARED_LIBS=ON;-DENABLE_MPI=ON;-DENABLE_HDF5=ON;-DHDF5_DIR=/usr/lib/x86_64-linux-gnu/hdf5/openmpi;-DENABLE_NETCDF=ON;-DNETCDF_DIR=/usr/lib/x86_64-linux-gnu/netcdf/mpi;-DENABLE_METIS=ON;-DMETIS_DIR=/usr;-DEIGEN3_DIR=/usr/include/eigen3"
+                - python -m pip -v install .
+                - python -m pip install pytest
+                - cd test/pymoab
+                - pytest -ra
                 - echo "All done!"
     branches:
       master:
         - step:
             script:
                 - alias python=python3
-                # Configure with Scikit Build System
-                - cd $BITBUCKET_CLONE_DIR && export SKBUILD_CMAKE_ARGS="-DBUILD_SHARED_LIBS=ON;-DENABLE_MPI=ON;-DENABLE_HDF5=ON;-DHDF5_DIR=/usr/lib/x86_64-linux-gnu/hdf5/openmpi;-DENABLE_NETCDF=ON;-DNETCDF_DIR=/usr/lib/x86_64-linux-gnu/netcdf/mpi;-DENABLE_METIS=ON;-DMETIS_DIR=/usr;-DEIGEN3_DIR=/usr/include/eigen3"
-                - python -m pip -v install .
-                - python -m pip install pytest
-                - cd test/pymoab
-                - pytest -ra
                 # Setup the build pipeline
                 - cd $BITBUCKET_CLONE_DIR && export CC=mpicc CXX=mpicxx FC=mpif90 F77=mpif77 F90=mpif90 OMPI_ALLOW_RUN_AS_ROOT="1" OMPI_ALLOW_RUN_AS_ROOT_CONFIRM="1"
                 # AutoTools Static Library Builds
@@ -51,17 +45,17 @@ pipelines:
                 - cmake .. -DCMAKE_C_FLAGS="-fPIC -DPIC -Wno-cast-function-type" -DCMAKE_CXX_FLAGS="-fPIC -DPIC -Wno-cast-function-type" -DBUILD_SHARED_LIBS=ON -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--no-undefined" -DENABLE_MPI=ON  -DENABLE_PYMOAB=ON -DENABLE_HDF5=ON -DHDF5_DIR=/usr/lib/x86_64-linux-gnu/hdf5/openmpi -DENABLE_NETCDF=ON -DNETCDF_DIR=/usr/lib/x86_64-linux-gnu/netcdf/mpi -DENABLE_METIS=ON -DMETIS_DIR=/usr -DEIGEN3_DIR=/usr/include/eigen3
                 - make all test VERBOSE=1
                 - make dist
-                - echo "All done!"
-      develop:
-        - step:
-            script:
-                - alias python=python3
-                # Configure with Scikit Build System
+                # Now configure with Scikit Build System
                 - cd $BITBUCKET_CLONE_DIR && export SKBUILD_CMAKE_ARGS="-DBUILD_SHARED_LIBS=ON;-DENABLE_MPI=ON;-DENABLE_HDF5=ON;-DHDF5_DIR=/usr/lib/x86_64-linux-gnu/hdf5/openmpi;-DENABLE_NETCDF=ON;-DNETCDF_DIR=/usr/lib/x86_64-linux-gnu/netcdf/mpi;-DENABLE_METIS=ON;-DMETIS_DIR=/usr;-DEIGEN3_DIR=/usr/include/eigen3"
                 - python -m pip -v install .
                 - python -m pip install pytest
                 - cd test/pymoab
                 - pytest -ra
+                - echo "All done!"
+      develop:
+        - step:
+            script:
+                - alias python=python3
                 # Setup the build pipeline
                 - cd $BITBUCKET_CLONE_DIR && export CC=mpicc CXX=mpicxx FC=mpif90 F77=mpif77 F90=mpif90 OMPI_ALLOW_RUN_AS_ROOT="1" OMPI_ALLOW_RUN_AS_ROOT_CONFIRM="1"
                 # AutoTools Static Library Builds
@@ -75,4 +69,10 @@ pipelines:
                 - cmake .. -DCMAKE_C_FLAGS="-fPIC -DPIC -Wno-cast-function-type" -DCMAKE_CXX_FLAGS="-fPIC -DPIC -Wno-cast-function-type" -DBUILD_SHARED_LIBS=ON -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--no-undefined" -DENABLE_MPI=ON  -DENABLE_PYMOAB=ON -DENABLE_HDF5=ON -DHDF5_DIR=/usr/lib/x86_64-linux-gnu/hdf5/openmpi -DENABLE_NETCDF=ON -DNETCDF_DIR=/usr/lib/x86_64-linux-gnu/netcdf/mpi -DENABLE_METIS=ON -DMETIS_DIR=/usr -DEIGEN3_DIR=/usr/include/eigen3
                 - make all test VERBOSE=1
                 - make dist
+                # Now configure with Scikit Build System
+                - cd $BITBUCKET_CLONE_DIR && export SKBUILD_CMAKE_ARGS="-DBUILD_SHARED_LIBS=ON;-DENABLE_MPI=ON;-DENABLE_HDF5=ON;-DHDF5_DIR=/usr/lib/x86_64-linux-gnu/hdf5/openmpi;-DENABLE_NETCDF=ON;-DNETCDF_DIR=/usr/lib/x86_64-linux-gnu/netcdf/mpi;-DENABLE_METIS=ON;-DMETIS_DIR=/usr;-DEIGEN3_DIR=/usr/include/eigen3"
+                - python -m pip -v install .
+                - python -m pip install pytest
+                - cd test/pymoab
+                - pytest -ra
                 - echo "All done!"

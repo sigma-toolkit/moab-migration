@@ -9,16 +9,24 @@ MOAB_CORE_BASE_PATH = os.path.join(__path__[0], "core")
 
 if not os.path.exists(MOAB_CORE_BASE_PATH):
     import sysconfig
+
     MOAB_CORE_BASE_PATH = os.path.join(sysconfig.get_path("platlib"), "pymoab", "core")
-    if not os.path.exists(MOAB_CORE_BASE_PATH):
-        raise ImportError("MOAB is not installed. Please run 'pip install MOAB'.")
-    warnings.warn(
-        "It seems that PyMOAB is being run from its source directory. "
-        "This setup is not recommended as it may lead to unexpected behavior, "
-        "such as conflicts between source and installed versions. "
-        "Please run your script from outside the MOAB source tree.",
-        RuntimeWarning
-    )
+    if os.path.exists(MOAB_CORE_BASE_PATH):
+        warnings.warn(
+            "It seems that PyMOAB is being run from its source directory. "
+            "This setup is not recommended as it may lead to unexpected behavior, "
+            "such as conflicts between source and installed versions. "
+            "Please run your script from outside the MOAB source tree.",
+            RuntimeWarning,
+        )
+    else:
+        warnings.warn(
+            "PyMOAB appears to have been installed using CMake with ENABLE_PYMOAB=ON, "
+            "which is deprecated and may cause unexpected behavior. "
+            "Please install MOAB via pip instead.",
+            DeprecationWarning,
+        )
+
 
 def get_paths(subdir, pattern="*", recursive=False):
     """
@@ -32,25 +40,49 @@ def get_paths(subdir, pattern="*", recursive=False):
     Returns:
         list: A list of matched paths.
     """
-    search_pattern = os.path.join(MOAB_CORE_BASE_PATH, subdir, "**", pattern) if recursive else os.path.join(MOAB_CORE_BASE_PATH, subdir, pattern)
+    search_pattern = (
+        os.path.join(MOAB_CORE_BASE_PATH, subdir, "**", pattern)
+        if recursive
+        else os.path.join(MOAB_CORE_BASE_PATH, subdir, pattern)
+    )
     return glob.glob(search_pattern, recursive=recursive)
 
+
 def get_include_path():
-    """Return includes and include path for OpenMC headers."""
+    """Return includes and include path for MOAB headers."""
     include = get_paths("include", "*", recursive=True)
     include_path = get_paths("include", "", recursive=False)
     return include, include_path
 
+
 def get_core_libraries():
-    """Return libraries and library paths for OpenMC."""
-    lib = [lib_file for lib in ["lib", "lib64"] for lib_file in get_paths(lib, "libMOAB*", recursive=True)]
-    lib_path = [lib_file for lib in ["lib", "lib64"] for lib_file in get_paths(lib, "", recursive=False)]
+    """Return libraries and library paths for MOAB."""
+    lib = [
+        lib_file
+        for lib in ["lib", "lib64"]
+        for lib_file in get_paths(lib, "libMOAB*", recursive=True)
+    ]
+    lib_path = [
+        lib_file
+        for lib in ["lib", "lib64"]
+        for lib_file in get_paths(lib, "", recursive=False)
+    ]
     return lib, lib_path
+
 
 def get_extra_libraries():
     """Return the extra libraries installed by auditwheel or delocate."""
-    libs_path = os.path.join(__path__[0], ".dylibs") if sys.platform == "darwin" else os.path.normpath(os.path.join(__path__[0], "..", "MOAB.libs"))
-    return (glob.glob(os.path.join(libs_path, "*")), libs_path) if os.path.exists(libs_path) else ([], [])
+    libs_path = (
+        os.path.join(__path__[0], ".dylibs")
+        if sys.platform == "darwin"
+        else os.path.normpath(os.path.join(__path__[0], "..", "MOAB.libs"))
+    )
+    return (
+        (glob.glob(os.path.join(libs_path, "*")), libs_path)
+        if os.path.exists(libs_path)
+        else ([], [])
+    )
+
 
 # Setup variables
 include, include_path = get_include_path()

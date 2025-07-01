@@ -20,7 +20,7 @@
 
 namespace moab
 {
-#define ENABLE_DEBUG
+//#define ENABLE_DEBUG
 #ifdef ENABLE_DEBUG
 int dbg_1 = 1;
 int global_id_ent(Interface* mbi, EntityHandle eh, Tag glid)
@@ -430,8 +430,8 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
 #ifdef VERBOSE
         if( close_source_cells.empty() )
         {
-            std::cout << " there are no close source cells to target cell " << tcell << " id from handle "
-                      << mb->id_from_handle( tcell ) << "\n";
+            std::cout << " there are no close source cells to target cell " << tcell
+                      << " ht:" << mb->id_from_handle( tcell ) << "\n";
         }
 #endif
         for( Range::iterator it2 = close_source_cells.begin(); it2 != close_source_cells.end(); ++it2 )
@@ -451,9 +451,9 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
                 {  // this will also construct triangles/polygons in the new mesh, if needed
                     rval = findNodes( tcell, nnodes, startSrc, nsSrc, P, nP );MB_CHK_ERR( rval );
 #ifdef ENABLE_DEBUG
-                    std::cout << " intersect: " << mb->id_from_handle( tcell ) << " "
-                                      << mb->id_from_handle( startSrc ) << " gids:" <<
-                                      global_id_ent(mb, tcell, gid) << " " <<
+                    std::cout << " intersect: " << " ht:" << mb->id_from_handle( tcell ) << " "
+                                      << " hs:" << mb->id_from_handle( startSrc ) << " g:" <<
+                                      global_id_ent(mb, tcell, gid) << " g:" <<
                                       global_id_ent(mb, startSrc, gid) << " counting: " << counting << "\n";
 #endif
                 }
@@ -527,8 +527,8 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
            const EntityHandle* conn = NULL;
            int nnodes               = 0;
            rval                     = mb->get_connectivity( cell, conn, nnodes );MB_CHK_ERR( rval );
-           std::cout <<" cell: \t" <<  mb->id_from_handle(cell) << " nodes: " << nnodes
-                   << " gid: "<< global_id_ent(mb, cell, gid) << " stat: " << char_stat_ent(mb, cell, TgtFlagTag) << "\n";
+           std::cout <<" cell: \t" <<  " ht:" << mb->id_from_handle(cell) << " nodes: " << nnodes
+                   << " gt:" << global_id_ent(mb, cell, gid) << " stat: " << char_stat_ent(mb, cell, TgtFlagTag) << "\n";
        }
 #endif
     while( !rs22.empty() )
@@ -538,21 +538,32 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
         {
             std::cout << " possible not connected arrival mesh; my_rank: " << my_rank << " counting: " << counting
                       << " rs22.size():" << rs22.size() << "\n";
+            std::stringstream ffo;
+            ffo << "file0" << counting << "rank0" << my_rank << ".h5m";
+            rval = mb->write_mesh( ffo.str().c_str(), &outSet, 1 );MB_CHK_ERR( rval );
             for (auto it=rs22.begin();  it != rs22.end(); ++it)
-               {
-                   EntityHandle cell=*it;
-                   const EntityHandle* conn = NULL;
-                   int nnodes               = 0;
-                   rval                     = mb->get_connectivity( cell, conn, nnodes );MB_CHK_ERR( rval );
-                   std::cout <<" cell: \t" <<  mb->id_from_handle(cell) << " nodes: " << nnodes
-                      << " gid: "<< global_id_ent(mb, cell, gid) << " stat: " << char_stat_ent(mb, cell, TgtFlagTag) << "\n";
-               }
+            {
+                EntityHandle cell=*it;
+                const EntityHandle* conn = NULL;
+                int nnodes               = 0;
+                rval                     = mb->get_connectivity( cell, conn, nnodes );MB_CHK_ERR( rval );
+                std::cout <<" cell: \t" <<  " ht:" << mb->id_from_handle(cell) << " nodes: " << nnodes
+                  << " g:" << global_id_ent(mb, cell, gid) << " stat: " << char_stat_ent(mb, cell, TgtFlagTag) << "\n";
+            }
         }
 #endif
         bool seedFound = false;
-        for( Range::iterator it = rs22.begin(); it != rs22.end(); ++it )
+        Range verified_seeds;
+        for( Range::reverse_iterator it = rs22.rbegin(); it != rs22.rend(); ++it )
         {
             startTgt  = *it;
+            unsigned char status = 0;
+            rval = mb->tag_get_data( TgtFlagTag, &startTgt, 1, &status );MB_CHK_ERR( rval );
+            if (1 == status)
+            {
+                verified_seeds.insert(startTgt);
+                continue;
+            }
             int found = 0;
             // find vertex positions
             const EntityHandle* conn = NULL;
@@ -605,12 +616,13 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
             else
             {
 #ifdef ENABLE_DEBUG
-                std::cout << " on rank " << my_rank << " target cell " << mb->id_from_handle( startTgt ) <<
-                        global_id_ent(mb,startTgt, gid) << " not intx with any source\n";
+                std::cout << " on rank " << my_rank << " target cell " << " ht:" << mb->id_from_handle( startTgt ) <<
+                        " g:" <<global_id_ent(mb,startTgt, gid) << " not intx with any source\n";
 #endif
-                rs22.erase( startTgt );
+                verified_seeds.insert(startTgt);
             }
         }
+        rs22 = subtract(rs22, verified_seeds);
         if( !seedFound ) continue;  // continue while(!rs22.empty())
 
         std::queue< EntityHandle > srcQueue;  // these are corresponding to Ta,
@@ -648,7 +660,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                 for( int kk = 0; kk < nsidesTgt; kk++ )
                 {
                     if( tgtNeighbors[kk] > 0 )
-                        std::cout << mb->id_from_handle( tgtNeighbors[kk] ) << " ";
+                        std::cout << " ht:" << mb->id_from_handle( tgtNeighbors[kk] ) << " ";
                     else
                         std::cout << 0 << " ";
                 }
@@ -671,7 +683,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
             {
                 std::cout << "reset sources: ";
                 for( Range::iterator itr = toResetSrcs.begin(); itr != toResetSrcs.end(); ++itr )
-                    std::cout << mb->id_from_handle( *itr ) << " ";
+                    std::cout << "hs:" << mb->id_from_handle( *itr ) << " ";
                 std::cout << std::endl;
             }
 #endif
@@ -705,7 +717,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                 int nb[MAXEDGES] = { 0 };
                 int nr[MAXEDGES] = { 0 };
 
-                int nsidesSrc;  ///
+                int nsidesSrc;
                 // area is in 2d, points are in 3d (on a sphere), back-projected, or in a plane
                 // intersection points could include the vertices of initial elements
                 // nb [j] = 0 means no intersection on the side j for element src (markers)
@@ -717,17 +729,21 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                 if( nP > 0 )
                 {
 #ifdef ENABLE_DEBUG
-                    std::cout <<" currentTgt: " << mb->id_from_handle(currentTgt) << " gid:" <<
+                    std::cout <<" srcT: " << " hs:" << mb->id_from_handle(srcT) << " g:" <<
+                                                global_id_ent(mb,srcT, gid) << " nsidesSrc:" << nsidesSrc << "\n";
+                    std::cout <<" currentTgt: " << " ht:" << mb->id_from_handle(currentTgt) << " g:" <<
                             global_id_ent(mb,currentTgt, gid) << " stat:"
-                            << char_stat_ent(mb, currentTgt, TgtFlagTag) << "\n";
+                            << char_stat_ent(mb, currentTgt, TgtFlagTag) << " nsidesTgt:" << nsidesTgt << "\n";
                     unsigned char status = 1;
                     rval = mb->tag_set_data(TgtFlagTag, &currentTgt, 1, &status);MB_CHK_ERR( rval );
                     if( dbg_1 )
                     {
-                        for( int k = 0; k < 3; k++ )
-                        {
-                            std::cout << " nb, nr: " << k << " " << nb[k] << " " << nr[k] << "\n";
-                        }
+                        for (int k=0; k<nsidesSrc; k++)
+                            std::cout << " nb["<<k<<"]="<< nb[k];
+                        std::cout << "\n";
+                        for (int k=0; k<nsidesTgt; k++)
+                            std::cout << " nr["<<k<<"]="<< nr[k];
+                        std::cout << "\n";
                     }
 #endif
 
@@ -736,7 +752,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                     rval                             = mb->tag_get_data( srcNeighTag, &srcT, 1, neighbors );
                     if( rval != MB_SUCCESS )
                     {
-                        std::cout << " can't get the neighbors for src element " << mb->id_from_handle( srcT );
+                        std::cout << " can't get the neighbors for src element " << " hs:" << mb->id_from_handle( srcT );
                         return MB_FAILURE;
                     }
 
@@ -750,12 +766,8 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                             {
                                 localSrc.push( neighbor );
 #ifdef ENABLE_DEBUG
-                                if( 0 )
-                                {
-                                    std::cout << " local src elem " << mb->id_from_handle( neighbor )
-                                              << " for tgt:" << mb->id_from_handle( currentTgt ) << "\n";
-                                    mb->list_entities( &neighbor, 1 );
-                                }
+                                std::cout << " local src elem " << " hs:" << mb->id_from_handle( neighbor )
+                                          << " for tgt:" << "ht:" << mb->id_from_handle( currentTgt ) << "\n";
 #endif
                                 toResetSrcs.insert( neighbor );
                             }
@@ -772,10 +784,10 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                     {  // this will also construct triangles/polygons in the new mesh, if needed
                         rval = findNodes( currentTgt, nsidesTgt, srcT, nsidesSrc, P, nP );MB_CHK_ERR( rval );
 #ifdef ENABLE_DEBUG
-                        std::cout << " intersect: " << mb->id_from_handle( currentTgt ) << " "
-                                      << mb->id_from_handle( srcT ) << " gids:" <<
+                        std::cout << " intersect: " << " ht:" << mb->id_from_handle( currentTgt ) << " "
+                                      << " hs:" << mb->id_from_handle( srcT ) << " g:" <<
                                       global_id_ent(mb, currentTgt, gid) << " " <<
-                                      global_id_ent(mb, srcT, gid) << " counting: " << counting << "\n";
+                                      " g:" << global_id_ent(mb, srcT, gid) << " counting: " << counting << "\n";
 #endif
                     }
 
@@ -784,8 +796,8 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
 #ifdef ENABLE_DEBUG
                 else if( dbg_1 )
                 {
-                    std::cout << " tgt, src, do not intersect: " << mb->id_from_handle( currentTgt ) << " "
-                              << mb->id_from_handle( srcT ) << "\n";
+                    std::cout << " tgt, src, do not intersect: " << "ht:" << mb->id_from_handle( currentTgt ) << " "
+                              << "hs:" << mb->id_from_handle( srcT ) << "\n";
                 }
 #endif
             }  // end while (!localSrc.empty())
@@ -796,7 +808,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
 #ifdef VERBOSE
                 std::cout << " tgt area: " << areaTgtCell << " recovered :" << recoveredArea * ( 1 + areaTgtCell )
                           << " fraction error recovery:" << recoveredArea
-                          << " tgtID: " << mb->id_from_handle( currentTgt ) << " countingStart:" << countingStart
+                          << " tgtID: " << "ht:" << mb->id_from_handle( currentTgt ) << " countingStart:" << countingStart
                           << "\n";
 #endif
             }
@@ -805,7 +817,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
             // mesh)
             rs22.erase( currentTgt );
 #ifdef ENABLE_DEBUG
-            std::cout << " remove cell: "<<  mb->id_from_handle( currentTgt ) << " gid: " << global_id_ent(mb, currentTgt, gid) <<
+            std::cout << " remove cell: "<<  "ht:" << mb->id_from_handle( currentTgt ) << " g:" << global_id_ent(mb, currentTgt, gid) <<
                     "  rs22.size():"  << rs22.size() << "\n";
 #endif
             // also, look at its neighbors, and add to the seeds a next one
@@ -843,8 +855,8 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                             srcQueue.push( nextB );
 #ifdef ENABLE_DEBUG
                             if( dbg_1 )
-                                std::cout << "new polys pushed: src, tgt:" << mb->id_from_handle( tgtNeigh ) << " "
-                                          << mb->id_from_handle( nextB ) <<  " counting: "<< counting <<std::endl;
+                                std::cout << "new polys pushed: src, tgt:" << " ht:" << mb->id_from_handle( tgtNeigh )
+                                          << " hs:" << mb->id_from_handle( nextB ) <<  " counting: "<< counting <<std::endl;
 #endif
                             rval = mb->tag_set_data( TgtFlagTag, &tgtNeigh, 1, &used );MB_CHK_ERR( rval );
                         }

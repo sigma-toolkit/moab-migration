@@ -63,14 +63,12 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );
     MPI_Comm_size( MPI_COMM_WORLD, &size );
-#endif
 
-    // check command line arg second grid is red, arrival, first mesh is blue, departure
-    // will will keep the
-    std::string optsRead = ( size == 1 ? ""
-                                       : std::string( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION" ) +
+    std::string optsRead = ( std::string( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION" ) +
                                              std::string( ";PARALLEL_RESOLVE_SHARED_ENTS" ) );
-
+#else
+    std::string optsRead;
+#endif
     // read meshes in 2 file sets
     ErrorCode rval;
     Core moab;

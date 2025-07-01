@@ -234,10 +234,6 @@ class Intx2Mesh
     double tgtCoords2D[MAXEDGES2];  // these are in plane
     double srcCoords2D[MAXEDGES2];  // these are in plane
 
-#ifdef ENABLE_DEBUG
-    static int dbg_1;
-    std::ofstream mout_1[6];  // some debug files
-#endif
     // for each tgt edge, we keep a vector of extra nodes, coming from intersections
     // use the index in TgtEdges range
     // so the extra nodes on each tgt edge are kept track of

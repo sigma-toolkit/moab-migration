@@ -630,10 +630,6 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
         std::queue< EntityHandle > tgtQueue;
         tgtQueue.push( startTgt );
 
-        Range toResetSrcs;  // will be used to reset src flags for every tgt element processed
-
-        /*if (my_rank==0)
-          dbg_1 = 1;*/
         unsigned char used = 1;
         // mark the start tgt quad as used, so it will not come back again
         rval = mb->tag_set_data( TgtFlagTag, &startTgt, 1, &used );MB_CHK_ERR( rval );
@@ -678,15 +674,6 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                 if( 1 == status ) tgtNeighbors[j] = 0;  // so will not look anymore on this side of tgt
             }
 
-#ifdef ENABLE_DEBUG
-            if( dbg_1 )
-            {
-                std::cout << "reset sources: ";
-                for( Range::iterator itr = toResetSrcs.begin(); itr != toResetSrcs.end(); ++itr )
-                    std::cout << "hs:" << mb->id_from_handle( *itr ) << " ";
-                std::cout << std::endl;
-            }
-#endif
             EntityHandle currentSrc = srcQueue.front();
             // tgt and src queues are parallel; for clarity we should have kept in the queue pairs
             // of entity handle std::pair<EntityHandle, EntityHandle>; so just one queue, with
@@ -694,24 +681,21 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
             //  at every moment, the queue contains pairs of cells that intersect, and they form the
             //  "advancing front"
             srcQueue.pop();
-            toResetSrcs.clear();  // empty the range of used srcs, will have to be set unused again,
-            // at the end of tgt element processing
-            toResetSrcs.insert( currentSrc );
-            // mb2->set_tag_data
-            std::queue< EntityHandle > localSrc;
-            localSrc.push( currentSrc );
+
+            Range localSrc;
+            Range localSrcAlreadyTested;
+            localSrc.insert( currentSrc );
 #ifdef VERBOSE
             int countingStart = counting;
 #endif
             // will advance-front search in the neighborhood of tgt cell, until we finish processing
             // all
-            //   possible src cells; localSrc queue will contain all possible src cells that cover
+            //   possible src cells; localSrc set will contain all possible src cells that cover
             //   the current tgt cell
             while( !localSrc.empty() )
             {
                 //
-                EntityHandle srcT = localSrc.front();
-                localSrc.pop();
+                EntityHandle srcT = localSrc.pop_front(); // also remove from local range
                 double P[10 * MAXEDGES], area;  //
                 int nP           = 0;
                 int nb[MAXEDGES] = { 0 };
@@ -726,6 +710,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                 // adjacent to this side
                 rval = computeIntersectionBetweenTgtAndSrc( /* tgt */ currentTgt, srcT, P, nP, area, nb, nr, nsidesSrc,
                                                             nsidesTgt );MB_CHK_ERR( rval );
+                localSrcAlreadyTested.insert(srcT);
                 if( nP > 0 )
                 {
 #ifdef ENABLE_DEBUG
@@ -756,22 +741,48 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                         return MB_FAILURE;
                     }
 
+                    Range newPotentialSrc;
                     // add neighbors to the localSrc queue, if they are not marked
                     for( int nn = 0; nn < nsidesSrc; nn++ )
                     {
                         EntityHandle neighbor = neighbors[nn];
-                        if( neighbor > 0 && nb[nn] > 0 )  // advance across src boundary nn
+                        if( nb[nn] > 0 )  // advance across src boundary nn
                         {
-                            if( toResetSrcs.find( neighbor ) == toResetSrcs.end() )
+                            if ( neighbor > 0 )
                             {
-                                localSrc.push( neighbor );
+                                if( localSrcAlreadyTested.index( neighbor ) < 0 ) // -1
+                                {
+                                    localSrc.insert( neighbor );
 #ifdef ENABLE_DEBUG
-                                std::cout << " local src elem " << " hs:" << mb->id_from_handle( neighbor )
-                                          << " for tgt:" << "ht:" << mb->id_from_handle( currentTgt ) << "\n";
+                                    std::cout << " local src elem " << " hs:" << mb->id_from_handle( neighbor )
+                                              << " for tgt:" << "ht:" << mb->id_from_handle( currentTgt ) << "\n";
 #endif
-                                toResetSrcs.insert( neighbor );
+                                }
+                            }
+                            else // if it is on the boundary it is a special case, maybe we need to advance more on that side,
+                                // because the boundary is non-convex
+                            {
+                                // find the ends of edge nn, and add adjacent sources to those vertices (if they are in rs1)
+                                int NumNodesSrc = 0;
+                                const EntityHandle *connS;
+                                rval = mb->get_connectivity(srcT, connS, NumNodesSrc ); MB_CHK_SET_ERR( rval, "can't get connectivity" );
+                                EntityHandle v1=connS[ nn ];
+                                EntityHandle v2=connS[ (nn+1)%NumNodesSrc ];
+                                Range adjacentSourceCells1, adjacentSourceCells2;
+                                rval = mb -> get_adjacencies(&v1, 1, 2, false, adjacentSourceCells1); MB_CHK_SET_ERR( rval, "can't get adjacent cells" );
+                                adjacentSourceCells1 = intersect( adjacentSourceCells1, rs1);
+                                rval = mb -> get_adjacencies(&v2, 1, 2, false, adjacentSourceCells2); MB_CHK_SET_ERR( rval, "can't get adjacent cells" );
+                                adjacentSourceCells2 = intersect( adjacentSourceCells2, rs1);
+                                adjacentSourceCells1.merge(adjacentSourceCells2);
+                                Range potentialSrc = subtract(adjacentSourceCells1, localSrcAlreadyTested);
+                                newPotentialSrc.merge(potentialSrc);
                             }
                         }
+                    }
+                    // these might come from non-convex boundary
+                    if(!newPotentialSrc.empty())
+                    {
+                        localSrc.merge(newPotentialSrc);
                     }
                     // n(find(nc>0))=ac;        % ac is starting candidate for neighbor
                     for( int nn = 0; nn < nsidesTgt; nn++ )

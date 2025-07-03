@@ -1167,7 +1167,7 @@ ErrorCode IntxUtils::EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle
         else
             notRecovered++;
     }
-    std::cout << "recovered initial cells: " << recovered << " vs:" << notRecovered << " not recovered  (maybe on the boundary? ) \n";
+    std::cout << "recovered initial cells: " << recovered << " vs:" << notRecovered << " not recovered \n";
     // initial edges that should be decomposable from intx edges
     Range recoverableEdges;
     rval = mb->get_adjacencies( recoveredCells, 1, false, recoverableEdges, Interface::UNION );MB_CHK_SET_ERR( rval, "can't get recoverable edges" );

@@ -249,8 +249,9 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "failed to load map file from disk" );
         int src_disc_type = 1;  // element-based SE
         int tgt_disc_type = 3;  // element-based FV
-        CHECKIERR( iMOAB_LoadMappingWeightsFromFile( atmPID, ocnPID, atmocnPID, &src_disc_type, &tgt_disc_type,
-                                                     intx_from_file_identifier.c_str(), atmocn_map_file_name.c_str() ),
+        int arearead = 0; // no aream needs
+        CHECKIERR( iMOAB_LoadFromMappingFile( atmPID, ocnPID, atmocnPID, &src_disc_type, &tgt_disc_type,
+                                         &arearead, intx_from_file_identifier.c_str(), atmocn_map_file_name.c_str() ),
                    "failed to load map file from disk" );
     }
 #endif

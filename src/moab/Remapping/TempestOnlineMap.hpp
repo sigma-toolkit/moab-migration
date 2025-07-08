@@ -113,6 +113,7 @@ class TempestOnlineMap : public OfflineMap
     ///	</summary>
     moab::ErrorCode ReadParallelMap( const char* strSource,
                                      const std::vector< int >& tgt_dof_ids,
+                                     int arearead,
                                      std::vector< double >& areaA,
                                      int& nA,
                                      std::vector< double >& areaB,

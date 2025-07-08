@@ -1181,26 +1181,29 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
  * \param[in]  pid_source (iMOAB_AppID)            The unique pointer to the source application ID.
  * \param[in]  pid_target (iMOAB_AppID)            The unique pointer to the destination application ID.
  * \param[in]  pid_intersection (iMOAB_AppID)      The unique pointer to the intersection application ID.
- * \param[in]  col_or_row (int *)                           The flag to indicate whether distribution is according to source (0) or target grid (1)
- * \param[in]  type (int *)                                 type of mesh (1) spectral with GLOBAL_DOFS, (2) Point Cloud (3) FV cell
+ * \param[in]  srctype (int *)                           type of mesh (1) spectral with GLOBAL_DOFS, (2) Point Cloud (3) FV cell
+ * \param[in]  tgttype (int *)                           type of mesh (1) spectral with GLOBAL_DOFS, (2) Point Cloud (3) FV cell
+ * \param[in]  arearead (int *)                          flag for reading (or not) area_a, area_b, or both  possible values: 0, 1, 2, 3
  * \param[in]  solution_weights_identifier  (iMOAB_String)  The unique identifier used to store the computed projection weights locally.
  *                                                          Typically, values could be identifiers such as "scalar", "flux" or "custom".
  * \param[in]  remap_weights_filename  (iMOAB_String)       The filename path to the mapping file to load in memory.
 */
-// ErrCode iMOAB_LoadMappingWeightsFromFile(
+// ErrCode iMOAB_LoadFromMappingFile(
 //     iMOAB_AppID pid_source,
 //     iMOAB_AppID pid_target,
 //     iMOAB_AppID pid_intersection,
-//     int* col_or_row,
-//     int* type,
+//     int* srctype,
+//     int* tgttype,
+//     int* arearead,
 //     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
 //     const iMOAB_String remap_weights_filename );
-ErrCode iMOAB_LoadMappingWeightsFromFile(
+ErrCode iMOAB_LoadFromMappingFile(
     iMOAB_AppID pid_source,
     iMOAB_AppID pid_target,
     iMOAB_AppID pid_intersection,
     int* srctype,
     int* tgttype,
+    int* arearead,
     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
     const iMOAB_String remap_weights_filename );
 

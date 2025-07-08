@@ -486,8 +486,9 @@ int main( int argc, char* argv[] )
             const iMOAB_String intx_from_file_identifier = "atmocn-map-from-file";
             int src_disc_type                            = 1;  // element-based SE-4
             int tgt_disc_type                            = 3;  // element-based FV
-            CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type,
-                                                         &tgt_disc_type, intx_from_file_identifier,
+            int arearead = 0;
+            CHECKIERR( iMOAB_LoadFromMappingFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type,
+                                                         &tgt_disc_type, &arearead, intx_from_file_identifier,
                                                          atmocn_map_file_name ),
                        "failed to load map file from disk" );
         }
@@ -523,8 +524,8 @@ int main( int argc, char* argv[] )
 
             // int src_disc_type = 2;  // get the point-DoF
             // int tgt_disc_type = 2;  // get the point-DoF data (point clouds)
-            // CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplLndPID, cplAtmLndPID, &src_disc_type,
-            //                                              &tgt_disc_type, atmlnd_file_identifier, atmlnd_map_file_name ),
+            // CHECKIERR( iMOAB_LoadFromMappingFile( cplAtmPID, cplLndPID, cplAtmLndPID, &src_disc_type,
+            //                                              &tgt_disc_type, &arearead, atmlnd_file_identifier, atmlnd_map_file_name ),
             //            "failed to load map file from disk" );
         }
     }

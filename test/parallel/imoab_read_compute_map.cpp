@@ -285,8 +285,9 @@ int main( int argc, char* argv[] )
     {
         int src_disc_type = 3;  // element-based FV
         int tgt_disc_type = 3;  // element-based FV
-        CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtmOcnFilePID, &src_disc_type,
-                                                     &tgt_disc_type, map_from_file_identifier[0], mapFilename.c_str() ),
+        int arearead = 0; // no need for aream
+        CHECKIERR( iMOAB_LoadFromMappingFile( cplAtmPID, cplOcnPID, cplAtmOcnFilePID, &src_disc_type,
+                                        &tgt_disc_type, &arearead, map_from_file_identifier[0], mapFilename.c_str() ),
                    "failed to load ATM-OCN map file from disk" );
         // because it is like "coverage", context will be atmocnfid
         CHECKIERR( iMOAB_MigrateMapMesh( cplAtmPID, cplAtmOcnFilePID, &couComm, &couPEGroup, &couPEGroup, &src_disc_type,
@@ -299,8 +300,9 @@ int main( int argc, char* argv[] )
     {
         int src_disc_type = 3;  // element-based FV
         int tgt_disc_type = 3;  // element-based FV
-        CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplOcnPID, cplAtmPID, cplOcnAtmFilePID, &src_disc_type,
-                                                     &tgt_disc_type, map_from_file_identifier[1],
+        int arearead = 0;
+        CHECKIERR( iMOAB_LoadFromMappingFile( cplOcnPID, cplAtmPID, cplOcnAtmFilePID, &src_disc_type,
+                                                     &tgt_disc_type, &arearead, map_from_file_identifier[1],
                                                      mapFilenameTrans.c_str() ),
                    "failed to load OCN-ATM map file from disk" );
         // because it is like "coverage", context will be ocnatmfid

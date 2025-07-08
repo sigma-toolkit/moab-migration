@@ -1204,6 +1204,7 @@ void print_progress( const int barWidth, const float progress, const char* messa
 
 moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
                                                          const std::vector< int >& owned_dof_ids,
+                                                         int arearead,
                                                          std::vector< double >& vecAreaA,
                                                          int& nA,
                                                          std::vector< double >& vecAreaB,
@@ -1213,6 +1214,12 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
 
     NcVar *varRow = NULL, *varCol = NULL, *varS = NULL;
     NcVar *varAreaA = NULL, *varAreaB = NULL;
+    bool readAreaA = false;
+    bool readAreaB = false;
+    if (1 == arearead || 3 == arearead )
+        readAreaA = true;
+    if (2 == arearead || 3 == arearead )
+        readAreaB = true;
     int nS = 0;
 #ifdef MOAB_HAVE_PNETCDF
     // some variables will be used just in the case netcdfpar reader fails
@@ -1262,18 +1269,25 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         varS = ncMap.get_var( "S" );
         CHECK_EXCEPTION( varS, "variable", "S" );
 
-        varAreaA = ncMap.get_var( "area_a" );
-        CHECK_EXCEPTION( varAreaA, "variable", "area_a" );
-
-        varAreaB = ncMap.get_var( "area_b" );
-        CHECK_EXCEPTION( varAreaB, "variable", "area_b" );
+        if ( readAreaA )
+        {
+            varAreaA = ncMap.get_var( "area_a" );
+            CHECK_EXCEPTION( varAreaA, "variable", "area_a" );
+        }
+        if ( readAreaB )
+        {
+            varAreaB = ncMap.get_var( "area_b" );
+            CHECK_EXCEPTION( varAreaB, "variable", "area_b" );
+        }
 
 #ifdef MOAB_HAVE_NETCDFPAR
         ncMap.enable_var_par_access( varRow, is_independent );
         ncMap.enable_var_par_access( varCol, is_independent );
         ncMap.enable_var_par_access( varS, is_independent );
-        ncMap.enable_var_par_access( varAreaA, is_independent );
-        ncMap.enable_var_par_access( varAreaB, is_independent );
+        if ( readAreaA )
+            ncMap.enable_var_par_access( varAreaA, is_independent );
+        if ( readAreaB )
+            ncMap.enable_var_par_access( varAreaB, is_independent );
 #endif
     }
     else
@@ -1334,8 +1348,10 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     vecRow.resize( localSize );
     vecCol.resize( localSize );
     vecS.resize( localSize );
-    vecAreaA.resize( localSizeA );
-    vecAreaB.resize( localSizeB );
+    if (readAreaA)
+        vecAreaA.resize( localSizeA );
+    if (readAreaB)
+        vecAreaB.resize( localSizeB );
 
     if( ncMap.is_valid() )
     {
@@ -1348,11 +1364,17 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         varS->set_cur( (long)( offsetRead ) );
         varS->get( &( vecS[0] ), localSize );
 
-        varAreaA->set_cur( (long)( offsetReadA ) );
-        varAreaA->get( &( vecAreaA[0] ), localSizeA );
+        if (readAreaA)
+        {
+            varAreaA->set_cur( (long)( offsetReadA ) );
+            varAreaA->get( &( vecAreaA[0] ), localSizeA );
+        }
 
-        varAreaB->set_cur( (long)( offsetReadB ) );
-        varAreaB->get( &( vecAreaB[0] ), localSizeB );
+        if (readAreaB)
+        {
+            varAreaB->set_cur( (long)( offsetReadB ) );
+            varAreaB->get( &( vecAreaB[0] ), localSizeB );
+        }
 
         ncMap.close();
     }
@@ -1371,16 +1393,20 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         ERR_PARNC( ncmpi_inq_varid( ncfile, "col", &varid ) );
         ERR_PARNC( ncmpi_get_vara_int_all( ncfile, varid, &start, &count, &vecCol[0] ) );
 
-        ERR_PARNC( ncmpi_inq_varid( ncfile, "area_a", &varid ) );
-        MPI_Offset startA = (MPI_Offset)offsetReadA;
-        MPI_Offset countA = (MPI_Offset)localSizeA;
-        ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &startA, &countA, &vecAreaA[0] ) );
-
-        ERR_PARNC( ncmpi_inq_varid( ncfile, "area_b", &varid ) );
-        MPI_Offset startB = (MPI_Offset)offsetReadB;
-        MPI_Offset countB = (MPI_Offset)localSizeB;
-        ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &startB, &countB, &vecAreaB[0] ) );
-
+        if (readAreaA)
+        {
+            ERR_PARNC( ncmpi_inq_varid( ncfile, "area_a", &varid ) );
+            MPI_Offset startA = (MPI_Offset)offsetReadA;
+            MPI_Offset countA = (MPI_Offset)localSizeA;
+            ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &startA, &countA, &vecAreaA[0] ) );
+        }
+        if (readAreaB)
+        {
+            ERR_PARNC( ncmpi_inq_varid( ncfile, "area_b", &varid ) );
+            MPI_Offset startB = (MPI_Offset)offsetReadB;
+            MPI_Offset countB = (MPI_Offset)localSizeB;
+            ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &startB, &countB, &vecAreaB[0] ) );
+        }
         ERR_PARNC( ncmpi_close( ncfile ) );
 #endif
     }

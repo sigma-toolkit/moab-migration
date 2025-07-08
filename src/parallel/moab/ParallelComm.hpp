@@ -716,7 +716,7 @@ class ParallelComm
     void print_pstatus( unsigned char pstat );
 
     // ==================================
-    // \section IMESHP-RELATED FUNCTIONS
+    // \section PARTITIONING-RELATED FUNCTIONS
     // ==================================
 
     //! return all the entities in parts owned locally

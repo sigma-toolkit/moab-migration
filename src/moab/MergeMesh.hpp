@@ -52,7 +52,6 @@ class MergeMesh
     ErrorCode merge_all( EntityHandle meshset, const double merge_tol );
 
   private:
-    // iMesh_Instance imeshImpl;
 
     //- given a kdtree, set tag on vertices in leaf nodes with vertices
     //- to which they should be merged

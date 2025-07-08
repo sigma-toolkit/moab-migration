@@ -49,12 +49,12 @@ ErrorCode MergeMesh::merge_entities( EntityHandle* elems,
 
 /*  This function appears to be not necessary after MOAB conversion
 
- void MergeMesh::perform_merge(iBase_TagHandle merge_tag)
+ void MergeMesh::perform_merge(Tag merge_tag)
  {
  // put into a range
- ErrorCode result = perform_merge((Tag) merge_tag);
+ ErrorCode result = perform_merge(merge_tag);
  if (result != MB_SUCCESS)
- throw MKException(iBase_FAILURE, "");
+ throw std::runtime_error("Merge operation failed");
  }*/
 
 ErrorCode MergeMesh::merge_entities( Range& elems,

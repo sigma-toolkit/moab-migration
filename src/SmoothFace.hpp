@@ -25,7 +25,7 @@ namespace moab
 {
 class SmoothCurve;  // it is derived from SmoothBase, maybe just need
 
-//! Implement CAMAL geometry callbacks using smooth iMesh
+//! Implement CAMAL geometry callbacks using smooth mesh interface
 class SmoothFace  // public CMLSurfEval, public SmoothBase
 {
   public:

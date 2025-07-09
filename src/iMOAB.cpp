@@ -3592,15 +3592,14 @@ static ErrCode set_aream_from_trivial_distribution( iMOAB_AppID pid, int N, std:
     return MB_SUCCESS;
 }
 
-ErrCode iMOAB_LoadFromMappingFile(
-    iMOAB_AppID pid_source,
-    iMOAB_AppID pid_target,
-    iMOAB_AppID pid_intersection,
-    int* srctype,
-    int* tgttype,
-    int* arearead,
-    const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
-    const iMOAB_String remap_weights_filename )
+ErrCode iMOAB_LoadFromMappingFile( iMOAB_AppID pid_source,
+                                   iMOAB_AppID pid_target,
+                                   iMOAB_AppID pid_intersection,
+                                   int* srctype,
+                                   int* tgttype,
+                                   int* arearead,
+                                   const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
+                                   const iMOAB_String remap_weights_filename )
 {
     assert( srctype && tgttype );
 
@@ -3728,7 +3727,8 @@ ErrCode iMOAB_LoadFromMappingFile(
 
     std::vector< double > trvAreaA, trvAreaB;  // passed by reference
     int nA, nB;                                // passed by reference, so returned
-    MB_CHK_SET_ERR( weightMap->ReadParallelMap( remap_weights_filename, sortTgtDofs, *arearead, trvAreaA, nA, trvAreaB, nB ),
+    MB_CHK_SET_ERR( weightMap->ReadParallelMap( remap_weights_filename, sortTgtDofs, *arearead, trvAreaA, nA, trvAreaB,
+                                                nB ),
                     "reading map from disk failed" );
     // trivially distributed areaAs and areaBs will need to be set on their correct source and target cells, as an aream tag
 
@@ -3745,10 +3745,12 @@ ErrCode iMOAB_LoadFromMappingFile(
     // we have read the area A from map file, and we will set it as a aream double tag on the source set, knowing that we
     // read it trivially, with a trivial distribution by the global DOFs
     // local , private method:
-    if ( 1==*arearead || 3 == *arearead )
-        MB_CHK_SET_ERR( set_aream_from_trivial_distribution( pid_source, nA, trvAreaA ), " fail to set aream on source " );
-    if ( 2 == *arearead || 3 == *arearead )
-        MB_CHK_SET_ERR( set_aream_from_trivial_distribution( pid_target, nB, trvAreaB ), " fail to set aream on target " );
+    if( 1 == *arearead || 3 == *arearead )
+        MB_CHK_SET_ERR( set_aream_from_trivial_distribution( pid_source, nA, trvAreaA ),
+                        " fail to set aream on source " );
+    if( 2 == *arearead || 3 == *arearead )
+        MB_CHK_SET_ERR( set_aream_from_trivial_distribution( pid_target, nB, trvAreaB ),
+                        " fail to set aream on target " );
 
     //tdata.remapper->SetMeshSet( Remapper::CoveringMesh, covering_set, &src_ents_of_interest );
     weightMap->SetSourceNDofsPerElement( src_elem_dof_length );

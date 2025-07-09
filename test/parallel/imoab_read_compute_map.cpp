@@ -300,7 +300,7 @@ int main( int argc, char* argv[] )
     {
         int src_disc_type = 3;  // element-based FV
         int tgt_disc_type = 3;  // element-based FV
-        int arearead = 0;
+        int arearead = 3; // read both areas
         CHECKIERR( iMOAB_LoadFromMappingFile( cplOcnPID, cplAtmPID, cplOcnAtmFilePID, &src_disc_type,
                                                      &tgt_disc_type, &arearead, map_from_file_identifier[1],
                                                      mapFilenameTrans.c_str() ),

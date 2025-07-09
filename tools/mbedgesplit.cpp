@@ -74,8 +74,7 @@ int main( int argc, char* argv[] )
 #endif
     // read meshes in 2 file sets
     ErrorCode rval;
-    Core moab;
-    Interface* mb = &moab;  // global
+    Core* mb = new Core();
     EntityHandle sf1, sf2, outputSet;
 
     // create meshsets and load files
@@ -232,7 +231,10 @@ int main( int argc, char* argv[] )
 
 #ifdef MOAB_HAVE_MPI
 #ifdef MOAB_HAVE_HDF5_PARALLEL
-    rval = mb->write_file( intersectionFile.c_str(), 0, "PARALLEL=WRITE_PART", &outputSet, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
+    std::ostringstream intx_str;
+    intx_str << "p" << pcomm->size() << "_"<<intersectionFile;
+    rval = mb->write_file( intx_str.str().c_str(), 0, "PARALLEL=WRITE_PART", &outputSet, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
+    if( 0 == rank ) std::cout <<" Wrote intx file: "<< intx_str.str() << "\n";
 #else
     // write intx set on rank 0, in serial; we cannot write in parallel
     if( 0 == rank )
@@ -244,7 +246,6 @@ int main( int argc, char* argv[] )
 #else
     rval = mb->write_file( intersectionFile.c_str(), 0, 0, &outputSet, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
 #endif
-
     moab::Tag fractionTag;
     moab::Tag numSubTag;
     moab::Tag areaDiffTag;
@@ -267,7 +268,10 @@ int main( int argc, char* argv[] )
         edgeVertices, edgePolygons, recoveredPolys, areaTolerance );MB_CHK_SET_ERR( rval, "failed to compute edge map for target" );
 #ifdef MOAB_HAVE_MPI
 #ifdef MOAB_HAVE_HDF5_PARALLEL
-    rval = mb->write_file( "targetWithEdges.h5m", 0, "PARALLEL=WRITE_PART", &sf2, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
+    std::ostringstream h5mFile;
+    h5mFile << "p" << pcomm->size() << "_targetWithEdges.h5m";
+    rval = mb->write_file( h5mFile.str().c_str(), 0, "PARALLEL=WRITE_PART", &sf2, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
+    if( 0 == rank ) std::cout <<" Wrote file with edge mapping info: "<< h5mFile.str() << "\n";
 #endif
 #endif
 
@@ -278,6 +282,7 @@ int main( int argc, char* argv[] )
         std::ostringstream file_str;
         file_str << "p" << pcomm->size() << "_"<<mapEdgeTargetFile;
         rval = moab::IntxUtils::write_edge_map_parallel(file_str.str().c_str(), pcomm, mb, sf2, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
+        if( 0 == rank ) std::cout <<" Wrote netcdf file with edge mapping info: "<< file_str.str() << "\n";
     }
     else
     {
@@ -291,6 +296,9 @@ int main( int argc, char* argv[] )
     rval = moab::IntxUtils::write_edge_map(mapEdgeTargetFile.c_str(), mb, sf2, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
 #endif
 #endif
-
+    delete mb;
+#ifdef MOAB_HAVE_MPI
+    MPI_Finalize();
+#endif
     return 0;
 }

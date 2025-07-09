@@ -137,6 +137,7 @@ option ( ENABLE_TEMPESTREMAP "Should enable TempestRemap dependency?" OFF )
 
 add_feature_info(SharedLibs BUILD_SHARED_LIBS "Should shared or static libraries be created?")
 add_feature_info(EnableFortran ENABLE_FORTRAN "Should FORTRAN support be enabled?")
+add_feature_info(Doxygen DOXYGEN_FOUND "Doxygen documentation generator")
 
 mark_as_advanced(
   MOAB_FORCE_64_BIT_HANDLES
@@ -578,9 +579,9 @@ if(SKBUILD OR ENABLE_PYMOAB)
 
     # Install the PyMOAB package
     install(CODE "execute_process(COMMAND ${Python_EXECUTABLE} -m pip install . --prefix ${PYMOAB_PREFIX})")
-    
+
     # Print a deprecation warning
-    message(WARNING "ENABLE_PYMOAB and PYMOAB_PREFIX is deprecated and will be removed in the next release. " 
+    message(WARNING "ENABLE_PYMOAB and PYMOAB_PREFIX is deprecated and will be removed in the next release. "
       "Consider installing PyMOAB via pip instead. "
       "See README.md for more information."
       )
@@ -835,6 +836,78 @@ SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
 
 include(AutoconfHeader)
 moab_install_docs(${MOAB_EXAMPLES})
+
+###################
+# Doxygen Documentation
+####################
+
+# Find Doxygen
+find_package(Doxygen)
+if(DOXYGEN_FOUND)
+  message(STATUS "Doxygen found: ${DOXYGEN_EXECUTABLE}")
+
+  # Configure the Doxyfile
+  set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/doc/user.dox.in)
+  set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+
+  # Set variables for Doxyfile configuration
+  set(top_srcdir ${CMAKE_CURRENT_SOURCE_DIR})
+  set(top_builddir ${CMAKE_CURRENT_BINARY_DIR})
+  set(PACKAGE_VERSION ${PACKAGE_VERSION})
+
+  # Set Python patterns for pymoab
+  if(ENABLE_PYMOAB)
+    set(python_patterns "*.py *.pyx *.pxd")
+  else()
+    set(python_patterns "")
+  endif()
+
+  # Set filter program (empty for now, can be customized later)
+  set(filter_program "")
+  set(filter_sources "NO")
+
+  # Set main page file
+  set(USE_MDFILE_AS_MAINPAGE "doc/mainpage.md")
+
+  # Configure the Doxyfile with CMake variables
+  configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
+
+    # Add option to enable/disable documentation
+  option(BUILD_DOCUMENTATION "Build Doxygen documentation" ON)
+
+  if(BUILD_DOCUMENTATION)
+    # Add custom target for documentation
+    add_custom_target(docs ALL
+      COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      COMMENT "Generating API documentation with Doxygen"
+      VERBATIM
+    )
+
+    # Add dependency on MOAB library
+    add_dependencies(docs MOAB)
+
+    # Install documentation
+    install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/html/
+      DESTINATION ${MOABDocLocation}/api
+      FILES_MATCHING PATTERN "*.html" PATTERN "*.css" PATTERN "*.js" PATTERN "*.png" PATTERN "*.gif"
+    )
+
+    # Add clean target for documentation
+    add_custom_target(clean-docs
+      COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}/html
+      COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}/latex
+      COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}/man
+      COMMENT "Cleaning Doxygen documentation"
+    )
+  else()
+    message(STATUS "Doxygen documentation disabled")
+  endif()
+
+else()
+  message(STATUS "Doxygen not found - documentation will not be generated")
+  option(BUILD_DOCUMENTATION "Build Doxygen documentation" OFF)
+endif()
 
 
 feature_summary(WHAT ALL #ENABLED_FEATURES DISABLED_FEATURES PACKAGES_FOUND

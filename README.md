@@ -40,6 +40,19 @@ Detailed API documentation and user/development guides are available for the fol
 - [master](https://web.cels.anl.gov/projects/sigma/docs/moab/index.html)
 - [develop](https://web.cels.anl.gov/projects/sigma/docs/moab-develop/index.html)
 
+### Building Documentation Locally
+
+To build the API documentation locally using Doxygen:
+
+```bash
+mkdir build
+cd build
+cmake .. -DBUILD_DOCUMENTATION=ON
+make docs
+```
+
+The documentation will be generated in `build/html/` and can be viewed by opening `build/html/index.html` in your web browser. See `doc/README` for more detailed instructions.
+
 ## MOAB Pre-installed
 
 - MOAB pre-installed docker image: [![Docker for MOAB](https://img.shields.io/docker/pulls/vijaysm/moab-root?style=flat-square)](https://hub.docker.com/repository/docker/vijaysm/moab-root)
@@ -121,7 +134,7 @@ Using conan requires python3, so make sure that is installed before proceeding. 
       pip install conan
       conan profile detect
 ```
-On Linux, this will put a conan executable into ${HOME}/.local/bin, and create a default profile for building dependencies; make sure 
+On Linux, this will put a conan executable into ${HOME}/.local/bin, and create a default profile for building dependencies; make sure
 the bin directory is in your PATH.
 
 MOAB's conan recipe creates either a "dbg" or "opt" build directory, depending on whether a Debug or Release build is requested, resp.

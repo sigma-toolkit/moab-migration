@@ -268,7 +268,7 @@
  *  - The name must be the same as that of the tag definition in the main 
  *      \c tags group
  *  - The type of the data set must be the committed type object stored
- *      as \c /tstt/tags/<tagname>/type .
+ *      as \c /tstt/tags/\c tagname/type .
  *  - The data set must have the same length as the data set in the
  *    parent group with the \c start_id attribute.  
  *
@@ -276,7 +276,7 @@
  * it must be specified for every entity in the group.  The table is 
  * expected to contain one value for each entity in the corresponding 
  * primary definition table (\c /tstt/nodes/coordinates , 
- * \c /tstt/elements/<name>/connectivity , or \c /tstt/sets/list), in the
+ * \c /tstt/elements/\c name/connectivity , or \c /tstt/sets/list), in the
  * same order as the entities in that primary definition table.
  *
  *

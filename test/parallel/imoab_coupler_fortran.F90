@@ -219,7 +219,7 @@ program imoab_coupler_fortran
    fValidate = 0
    fInverseDistanceMap = 0
    filter_type = 0
-   arearead = 0 ! no need of aream
+   arearead = 2 ! read area_b only
 
    if (cplComm .NE. MPI_COMM_NULL) then
 

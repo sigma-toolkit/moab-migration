@@ -35,21 +35,20 @@ class SpectralMeshTool
     /** \brief Return tag used to store lexicographically-ordered vertex array
      * NOTE: If creating this tag with this call, this SpectralMeshTool instance must already have
      * a non-zero spectral order value set on it; the size of the spectral vertices tag depends on
-     * this order. \param sv_tag Spectral vertices tag \param create_if_missing If true, will create
-     * this tag if it doesn't exist already
+     * this order.
+     * \param create_if_missing If true, will create this tag if it doesn't exist already
      */
     Tag spectral_vertices_tag( const bool create_if_missing = false );
 
     /** \brief Return tag used to store spectral order
-     * \param so_tag Spectral order tag
      * \param create_if_missing If true, will create this tag if it doesn't exist already
      */
     Tag spectral_order_tag( const bool create_if_missing = false );
 
     /** \brief Convert representation from coarse to fine
      * Each element in set, or in interface if set is not input, is converted to fine elements,
-     * using vertices in SPECTRAL_VERTICES tagged array \param spectral_set Set containing spectral
-     * elements
+     * using vertices in SPECTRAL_VERTICES tagged array
+     * \param spectral_set Set containing spectral elements
      */
     ErrorCode convert_to_fine( EntityHandle spectral_set );
 
@@ -68,9 +67,9 @@ class SpectralMeshTool
      * and picking out the corner vertices to make coarse connectivity, and the other vertices
      * (along with corners) to make SPECTRAL_VERTICES array pointed to by each entity.
      * \param conn Connectivity of fine (linear) elements, in FE ordering
-     * \param verts_per_e Vertices per entity
      * \param num_fine_elems Number of fine elements represented by conn
-     * \param spectral_set Set to which coarse elements should be added, if any
+     * \param dim Dimension of the mesh
+     * \param output_range Range to store created coarse elements
      * \param start_idx Starting index in conn (for parallel support)
      * \param local_gids If non-null, will insert all fine vertices into this range
      */

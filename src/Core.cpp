@@ -1759,43 +1759,62 @@ ErrorCode Core::get_adjacencies( const Range& from_entities,
                                       adj_entities );
 }
 
-ErrorCode Core::add_adjacencies( const EntityHandle entity_handle,
-                                 const EntityHandle* adjacencies,
+/** \brief Add adjacencies between entities
+ * \param from_handle Entity from which adjacencies are being added
+ * \param to_handles Entities to which adjacencies are being added
+ * \param num_handles Number of handles in to_handles
+ * \param both_ways If true, add the adjacency information in both directions
+ * \see Interface::add_adjacencies
+ */
+ErrorCode Core::add_adjacencies( const EntityHandle from_handle,
+                                 const EntityHandle* to_handles,
                                  const int num_handles,
                                  bool both_ways )
 {
     ErrorCode result = MB_SUCCESS;
 
-    for( const EntityHandle* it = adjacencies; it != adjacencies + num_handles; it++ )
+    for( const EntityHandle* it = to_handles; it != to_handles + num_handles; it++ )
     {
-        result = aEntityFactory->add_adjacency( entity_handle, *it, both_ways );MB_CHK_ERR( result );
+        result = aEntityFactory->add_adjacency( from_handle, *it, both_ways );MB_CHK_ERR( result );
     }
 
     return MB_SUCCESS;
 }
 
-ErrorCode Core::add_adjacencies( const EntityHandle entity_handle, Range& adjacencies, bool both_ways )
+/** \brief Add adjacencies between entities using Range
+ * \param from_handle Entity from which adjacencies are being added
+ * \param adjacencies Range of entities to which adjacencies are being added
+ * \param both_ways If true, add the adjacency information in both directions
+ * \see Interface::add_adjacencies
+ */
+ErrorCode Core::add_adjacencies( const EntityHandle from_handle, Range& adjacencies, bool both_ways )
 {
     ErrorCode result = MB_SUCCESS;
 
     for( Range::iterator rit = adjacencies.begin(); rit != adjacencies.end(); ++rit )
     {
-        result = aEntityFactory->add_adjacency( entity_handle, *rit, both_ways );MB_CHK_ERR( result );
+        result = aEntityFactory->add_adjacency( from_handle, *rit, both_ways );MB_CHK_ERR( result );
     }
 
     return MB_SUCCESS;
 }
 
-ErrorCode Core::remove_adjacencies( const EntityHandle entity_handle,
-                                    const EntityHandle* adjacencies,
+/** \brief Remove adjacencies between entities
+ * \param from_handle Entity from which adjacencies are being removed
+ * \param to_handles Entities to which adjacencies are being removed
+ * \param num_handles Number of handles in to_handles
+ * \see Interface::remove_adjacencies
+ */
+ErrorCode Core::remove_adjacencies( const EntityHandle from_handle,
+                                    const EntityHandle* to_handles,
                                     const int num_handles )
 {
     ErrorCode result = MB_SUCCESS;
 
-    for( const EntityHandle* it = adjacencies; it != adjacencies + num_handles; it++ )
+    for( const EntityHandle* it = to_handles; it != to_handles + num_handles; it++ )
     {
-        result = aEntityFactory->remove_adjacency( entity_handle, *it );MB_CHK_ERR( result );
-        result = aEntityFactory->remove_adjacency( *it, entity_handle );MB_CHK_ERR( result );
+        result = aEntityFactory->remove_adjacency( from_handle, *it );MB_CHK_ERR( result );
+        result = aEntityFactory->remove_adjacency( *it, from_handle );MB_CHK_ERR( result );
     }
 
     return MB_SUCCESS;

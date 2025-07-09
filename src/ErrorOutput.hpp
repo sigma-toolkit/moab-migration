@@ -21,7 +21,7 @@ class ErrorOutputStream;
  * sends the output to the output stream followed by an explicit
  * flush, and optionally prefixed with the MPI rank.
  *
- * \Note Any output not terminated with an newline character or
+ * \note Any output not terminated with an newline character or
  *       followed by later output containing a newline character
  *       will not be flushed until the destructor is invoked.
  */

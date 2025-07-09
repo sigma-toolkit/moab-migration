@@ -6,7 +6,7 @@
  * remapped to those new positions.  Then mesh positions and state variables are transferred
  * to the slave mesh, mimicing another mesh used by some other physics.
  *
- * To run: ./DeformMeshRemap [<master_meshfile> <slave_meshfile>]\n
+ * To run: ./DeformMeshRemap [\c master_meshfile \c slave_meshfile]\n
  * (default values can run if users don't specify the mesh files)
  */
 

@@ -65,11 +65,11 @@ class CurveDomain;
  *       call run_instructions separately for each geometric surface and each
  *       volume.
  *
- *\NOTE This algorithm uses non-barrier metrics which makes it possible, if
+ *\note This algorithm uses non-barrier metrics which makes it possible, if
  *      unlikely, that the result mesh will contain more/different inverted
  *      elements than the input mesh.
  *
- *\NOTE Mesquite does not do edge/curve smoothing.  The caller may either
+ *\note Mesquite does not do edge/curve smoothing.  The caller may either
  *      set up a "free" smooth where vertices on geometric curves are
  *      smoothed as a part of teh surface or volume optimization or simply
  *      redistribute the vertices along the curves outside of mesquite.
@@ -125,9 +125,9 @@ class DeformingDomainWrapper : public Wrapper
      * mesh on deformed geometry.
      *\param mesh The mesh instance to be operated on.  Initial mesh
      *      data is stored by copying vertex coordinates to
-     *\Note This must be called prior to the optimization with the
+     *\note This must be called prior to the optimization with the
      *      mesh in its undeformed state.
-     *\Note This function need not be called if the application cal
+     *\note This function need not be called if the application cal
      *      provide access to the coordinates of vertices of the initial
      *      mesh through the tag mechanism already.
      *      See \c set_initial_coord_tag

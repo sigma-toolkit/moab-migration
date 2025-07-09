@@ -8,7 +8,7 @@ namespace moab
 
 class Core;
 
-/** \class Meshset iterator
+/** \class SetIterator
  * \brief A class to iterator over MOAB Meshsets
  */
 class SetIterator
@@ -89,7 +89,7 @@ class SetIterator
     bool checkValid;
 };
 
-/** \class Set-type set iterator
+/** \class RangeSetIterator
  * \brief A class to iterator over MOAB set-type meshsets
  */
 class RangeSetIterator : public SetIterator
@@ -147,7 +147,7 @@ class RangeSetIterator : public SetIterator
     int numPairs;
 };
 
-/** \class List-type set iterator
+/** \class VectorSetIterator
  * \brief A class to iterator over MOAB list-type meshsets
  */
 class VectorSetIterator : public SetIterator

@@ -1215,7 +1215,7 @@ class ParallelComm
      * writes the actual binary serialized representation of the
      * data to the passed buffer.
      *
-     *\NOTE First two arguments are not used.  (Legacy interface?)
+     *\note First two arguments are not used.  (Legacy interface?)
      *
      *\param entities      NOT USED
      *\param start_rit     NOT USED

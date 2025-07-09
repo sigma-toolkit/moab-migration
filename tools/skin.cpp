@@ -56,8 +56,8 @@ static void usage( const char* argv0, bool help = false )
     std::ostream& str = help ? std::cout : std::cerr;
 
     str << "Usage: " << argv0
-        << " [-b <block_num> [-b ...] ] [-l] [-m] [-M <n>] [-p] [-s <sideset_num>] [-S] [-t|-T "
-           "<name>] [-w] [-v|-V <n>]"
+        << " [-b <block_num> [-b ...] ] [-l] [-m] [-M \c n] [-p] [-s <sideset_num>] [-S] [-t|-T "
+           "<name>] [-w] [-v|-V \c n]"
         << " <input_file> [<output_file>]" << std::endl;
     str << "Help : " << argv0 << " -h" << std::endl;
     if( !help ) exit( 1 );
@@ -72,7 +72,7 @@ static void usage( const char* argv0, bool help = false )
     str << "-T <name> : Create tag with specified name and set to 1 on skin vertices." << std::endl;
     str << "-w : Write out whole mesh (otherwise just writes skin)." << std::endl;
     str << "-m : consolidate duplicate vertices" << std::endl;
-    str << "-M <n> : consolidate duplicate vertices with specified tolerance. "
+    str << "-M \c n : consolidate duplicate vertices with specified tolerance. "
            "(Default: min_edge_length/"
         << MIN_EDGE_LEN_DENOM << ")" << std::endl;
     str << "-l : List total numbers of entities and vertices in skin." << std::endl;

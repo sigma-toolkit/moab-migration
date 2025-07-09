@@ -75,7 +75,7 @@ static void print_usage( const char* name, std::ostream& stream )
            << "\t-g             - Enable verbose/debug output." << std::endl
            << "\t-h             - Print this help text and exit." << std::endl
            << "\t-l             - List available file formats and exit." << std::endl
-           << "\t-I <dim>       - Generate internal entities of specified dimension." << std::endl
+           << "\t-I \c dim       - Generate internal entities of specified dimension." << std::endl
 #ifdef MOAB_HAVE_MPI
            << "\t-P             - Append processor ID to output file name" << std::endl
            << "\t-p             - Replace '%' with processor ID in input and output file name" << std::endl

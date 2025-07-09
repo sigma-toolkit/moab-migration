@@ -263,7 +263,7 @@ class MOAB_EXPORT Interface : public UnknownInterface
      *               the tag that is one of the values in this array.
      *\param num_set_tag_values The length of set_tag_values.
      *
-     *\Note file_set is passed by pointer rather than by value (where a
+     *\note file_set is passed by pointer rather than by value (where a
      *      zero handle value would indicate no set) so as to intentionally
      *      break compatibility with the previous version of this function
      *      because the behavior with respect to the file set was changed.
@@ -1258,7 +1258,7 @@ class MOAB_EXPORT Interface : public UnknownInterface
      *        - \c MB_VARIABLE_DATA_LENGTH  if \c MB_TAG_VARLEN and \c default_value is non-null and
      *                                      \c default_value_size is not specified.
      *
-     *\NOTE A call to tag_get_handle that includes a default value will fail
+     *\note A call to tag_get_handle that includes a default value will fail
      * if the tag already exists with a different default value.  A call without
      * a default value will succeed if the tag already exists, regardless of
      * whether or not the existing tag has a default value.
@@ -1578,7 +1578,7 @@ class MOAB_EXPORT Interface : public UnknownInterface
      *\param data_ptr    Output: pointer to tag storage.
      *\param allocate    If true, space for this tag will be allocated, if not it wont
      *
-     *\Note If this function is called for entities for which no tag value
+     *\note If this function is called for entities for which no tag value
      *      has been set, but for which a default value exists, it will
      *      force the allocation of explicit storage for each such entity
      *      even though MOAB would normally not explicitly store tag values

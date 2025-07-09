@@ -60,7 +60,7 @@ class LaplaceWrapper : public Wrapper
      *        move in an iteration to avoid termination of the untangler
      *
      *  Specify a value less than or equal to zero for no limit.
-     *\NOTE Culling cannot be done w/out a limit on vertex movement
+     *\note Culling cannot be done w/out a limit on vertex movement
      */
     void set_vertex_movement_limit_factor( double f )
     {

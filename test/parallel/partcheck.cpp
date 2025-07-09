@@ -18,7 +18,7 @@ const char BCAST_DEL_OPT[]     = "BCAST_DELETE";
 const char READ_PART_OPT[]     = "READ_PART";
 const char* const DEFAULT_MODE = READ_PART_OPT;
 
-const char USAGE[] = " [-v <n>] [-R] [-p <parttag>[=val]] [-D|-B|-P] <input_file>";
+const char USAGE[] = " [-v \c n] [-R] [-p <parttag>[=val]] [-D|-B|-P] <input_file>";
 
 static void usage( const char* argv0 )
 {

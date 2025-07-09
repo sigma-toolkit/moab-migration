@@ -35,7 +35,7 @@ void print_usage()
     std::cerr << "Usage: ";
     std::cerr << "mbcoupler_test -meshes <source_mesh> <target_mesh> -itag <interp_tag> [-gnorm "
                  "<gnorm_tag>] [-ssnorm <ssnorm_tag> <ssnorm_selection>] [-ropts <roptions>] "
-                 "[-outfile <out_file> [-wopts <woptions>]] [-dbgout [<dbg_file>]]"
+                 "[-outfile \c out_file [-wopts <woptions>]] [-dbgout [<dbg_file>]]"
               << std::endl;
     std::cerr << "    -meshes" << std::endl;
     std::cerr << "        Read in mesh files <source_mesh> and <target_mesh>." << std::endl;
@@ -53,7 +53,7 @@ void print_usage()
     std::cerr << "    -ropts" << std::endl;
     std::cerr << "        Read in the mesh files using options in <roptions>." << std::endl;
     std::cerr << "    -outfile" << std::endl;
-    std::cerr << "        Write out target mesh to <out_file>." << std::endl;
+    std::cerr << "        Write out target mesh to \c out_file." << std::endl;
     std::cerr << "    -wopts" << std::endl;
     std::cerr << "        Write out mesh files using options in <woptions>." << std::endl;
     std::cerr << "    -dbgout" << std::endl;
@@ -483,7 +483,7 @@ ErrorCode get_file_options( int argc,
                 outFile = argv[npos++];
             else
             {
-                std::cerr << "    ERROR - missing <out_file>" << std::endl;
+                std::cerr << "    ERROR - missing \c out_file" << std::endl;
                 return MB_FAILURE;
             }
         }

@@ -1,6 +1,5 @@
-/** @example GetEntities.cpp
- * Description: Get entities and report non-vertex entity connectivity and vertex adjacencies.\n
- * then delete edges, and write result
+/** @example DeleteEdges.cpp
+ * Description: Delete edges from a mesh and write the result.\n
  * To run: ./DeleteEdges [meshfile] [outfile]\n
  */
 

@@ -328,7 +328,7 @@ class Core : public Interface
      *
      * Special case of get_adjacencies where to_dimension == 0
      * and operation_type == Interface::UNION.
-     *\Note This is not a variation of get_connectivity because
+     *\note This is not a variation of get_connectivity because
      *      the behavior is different for polyhedra.
      */
     virtual ErrorCode get_vertices( const Range& from_entities, Range& vertices );
@@ -864,7 +864,7 @@ class Core : public Interface
      *\param data_ptr    Output: pointer to tag storage.
      *\param allocate    If true, space for this tag will be allocated, if not it wont
      *
-     *\Note If this function is called for entities for which no tag value
+     *\note If this function is called for entities for which no tag value
      *      has been set, but for which a default value exists, it will
      *      force the allocation of explicit storage for each such entity
      *      even though MOAB would normally not explicitly store tag values

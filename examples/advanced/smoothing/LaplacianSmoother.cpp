@@ -1,6 +1,6 @@
 /** @example LaplacianSmoother.cpp \n
  * \brief Perform Laplacian relaxation on a mesh and its dual \n
- * <b>To run</b>: mpiexec -np <np> LaplacianSmoother [filename]\n
+ * <b>To run</b>: mpiexec -np \c np LaplacianSmoother [filename]\n
  *
  * Briefly, Laplacian relaxation is a technique to smooth out a mesh.  The centroid of each cell is
  * computed from its vertex positions, then vertices are placed at the average of their connected

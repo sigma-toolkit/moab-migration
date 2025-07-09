@@ -2,7 +2,7 @@
  * Description: read boundary points and loops that form islands and continents
       and create an edge mesh file \n
  *
- *    BoundaryContinents  <boundary_points.dat> <SaveLoopCounts>
+ *    BoundaryContinents  <boundary_points.dat> \c SaveLoopCounts
  * (default values can run if users don't specify input files)
  */
 

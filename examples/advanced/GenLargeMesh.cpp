@@ -52,7 +52,7 @@
  *  but rather the global id set on the vertices in a consistent manner
  *
  *  -d and -i options can be used to add some artificial tags on the model;
- *  you can have multiple -d and -i options; -i <tag_name> will set an integer
+ *  you can have multiple -d and -i options; -i \c tag_name will set an integer
  *  tag with name tag_name on the vertices; -d < tag_name2> will generate
  *  double tags on cells (3d elements). You can have multiple tags, like
  *  -i tag1 -i tag2 -i tag3 -d tag4
@@ -60,7 +60,7 @@
  *  -x, -y, -z options will control the geometric dimensions of the final mesh, in
  *  x, y and z directions.
  *
- *  -o <out_file> controls the name of the output file; it needs to have extension h5m,
+ *  -o \c out_file controls the name of the output file; it needs to have extension h5m,
  *  because the file is written in parallel.
  *
  *  -k will keep the edges and faces that are generated as part of resolving shared entities

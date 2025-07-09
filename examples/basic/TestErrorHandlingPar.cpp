@@ -1,7 +1,7 @@
 /** @example TestErrorHandlingPar.cpp \n
  * Description: This example tests MOAB's trace back error handler in parallel.\n
  *
- * <b>To run</b>: mpiexec -np <n> ./TestErrorHandlingPar <test_case_num(1 to 2)> \n
+ * <b>To run</b>: mpiexec -np \c n ./TestErrorHandlingPar <test_case_num(1 to 2)> \n
  */
 
 #include "moab/Core.hpp"

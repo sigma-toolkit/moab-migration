@@ -122,7 +122,7 @@ class MESQUITE_EXPORT MeshImpl : public MBMesquite::Mesh
      *
      *\param value Value to set on mid-edge, mid-face, or mid-region nodes.
      *
-     *\NOTE You must change slave vertex mode to Settings::SLAVED_FLAG for the values
+     *\note You must change slave vertex mode to Settings::SLAVED_FLAG for the values
      *      returned by vertices_get_slaved_flag to be used during optimization.
      */
     void set_all_slaved_flags( bool value, MsqError& err );
@@ -140,7 +140,7 @@ class MESQUITE_EXPORT MeshImpl : public MBMesquite::Mesh
      *\param midnode_slaved_flag  Value for vertices_get_slaved_flag for non-corner
      *                            vertices (i.e. mid-face or mid-element nodes)
      *
-     *\NOTE You must change slave vertex mode to Settings::SLAVED_FLAG for the values
+     *\note You must change slave vertex mode to Settings::SLAVED_FLAG for the values
      *      returned by vertices_get_slaved_flag to be used during optimization.
      */
     void set_skin_flags( bool corner_fixed_flag, bool midnode_fixed_flag, bool midnode_slaved_flag, MsqError& err );

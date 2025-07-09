@@ -21,7 +21,7 @@ int main( int argc, char* argv[] )
     const char* f2 = default_output;
     if( argc <= 2 )
     {
-        std::cout << "Usage: dual_test <mesh_file_name> <out file>" << std::endl;
+        std::cout << "Usage: dual_test \c mesh_file_name <out file>" << std::endl;
         std::cout << "using default input : " << default_input << " and output " << default_output << "\n";
     }
     else

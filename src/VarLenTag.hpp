@@ -146,7 +146,7 @@ typedef VarLenTagDataTemplate< sizeof( unsigned char* ) - sizeof( unsigned ) > V
 /**\brief Class for storing variable-length tag data
  *
  * Class for managing variable-length tag data.
- *\NOTE This class must behave as if it were initialized to empty
+ *\note This class must behave as if it were initialized to empty
  *      if it is memset to zero w/out invoking any constructor.
  */
 class VarLenTag

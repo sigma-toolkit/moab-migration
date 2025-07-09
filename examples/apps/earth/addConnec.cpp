@@ -1,6 +1,3 @@
-/*
- *
- *
 /** @example addConnec.cpp  Add connectivity to point cloud data, for better view in visit
  * this tool will take an existing h5m fine point cloud data (phys grid or land pc)
  *   and add 2d cells from a fine atm mesh

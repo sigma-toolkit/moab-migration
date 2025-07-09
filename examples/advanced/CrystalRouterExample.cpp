@@ -37,7 +37,7 @@
 
 /** @example CrystalRouterExample.cpp \n
  * \brief generalized gather scatter using tuples \n
- * <b>To run</b>: mpiexec -np <n> CrystalRouterExample -r [reportrank] -t [num_tuples] -n
+ * <b>To run</b>: mpiexec -np \c n CrystalRouterExample -r [reportrank] -t [num_tuples] -n
  * [num_comms] \n
  *
  */

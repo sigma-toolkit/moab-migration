@@ -370,7 +370,7 @@ class ReadHDF5 : public ReaderIface
   private:
     /**\brief Search for entities with specified tag values
      *
-     *\NOTE For parallel reads, this function does collective IO.
+     *\note For parallel reads, this function does collective IO.
      *
      *\param tag_index  Index into info->tags specifying which tag to search.
      *\param sorted_values  List of tag values to check for, in ascending sorted
@@ -384,7 +384,7 @@ class ReadHDF5 : public ReaderIface
 
     /**\brief Search for entities with specified tag
      *
-     *\NOTE For parallel reads, this function does collective IO.
+     *\note For parallel reads, this function does collective IO.
      *
      *\param tag_index  Index into info->tags specifying which tag to search.
      *\param file_ids_out  File IDs for entities with specified tag values.
@@ -395,7 +395,7 @@ class ReadHDF5 : public ReaderIface
      *
      * Search a table of tag values, returning the indices into the table
      * at which matches were found.
-     *\NOTE For parallel reads, this function does collective IO.
+     *\note For parallel reads, this function does collective IO.
      *
      *\param info       Summary of data contained in file.
      *\param tag_table     HDF5/mhdf handle for tag values

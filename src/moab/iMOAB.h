@@ -18,7 +18,7 @@
  */
 
 /**
- * \Notes
+ * \notes
  * 1) Fortran MPI_Comm won't work. Take an integer argument and use MPI_F2C calls to get the C-Comm object
  * 2) ReadHeaderInfo - Does it need the pid ?
  * 3) Reuse the comm object from the registration for both load and write operations.

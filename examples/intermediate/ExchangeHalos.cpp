@@ -19,7 +19,7 @@
  *    -#  Destroy the MOAB instance and finalize MPI
  *
  * <b>To run: </b>
- *      mpiexec -n np ./ExchangeHalos --input <mpas_mesh_file> --nghosts <ghostlayers> --vtaglength <vector component
+ *      mpiexec -n np ./ExchangeHalos --input \c mpas_mesh_file --nghosts \c ghostlayers --vtaglength <vector component
  * size> \
  *                    --nexchanges <number of exchange runs>
  * <b>Example:</b>

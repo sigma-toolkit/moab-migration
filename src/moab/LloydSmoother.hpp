@@ -1,5 +1,5 @@
-/** @class LloydSmoother.cpp \n
- * \brief Perform Lloyd relaxation on a mesh and its dual \n
+/** @class LloydSmoother
+ * \brief Perform Lloyd relaxation on a mesh and its dual
  *
  * Briefly, Lloyd relaxation is a technique to smooth out a mesh.  The centroid of each cell is
  * computed from its vertex positions, then vertices are placed at the average of their connected

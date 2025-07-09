@@ -62,11 +62,11 @@ class ReadHDF5Dataset
      *\param close_data_set_on_destruct Call \c H5Dclose on passed
      *                 \c data_set_handle in desturctor.
      *
-     *\NOTE If \c parallel is \c true and \c io_prop is \c H5FD_MPIO_COLLECTIVE,
+     *\note If \c parallel is \c true and \c io_prop is \c H5FD_MPIO_COLLECTIVE,
      *      then not only must \c communicator be non-null, but this call must
      *      be made collectively!
 
-     *\NOTE Class instance will not be usable until one of either
+     *\note Class instance will not be usable until one of either
      *      \c set_file_ids or \c set_all_file_ids is called.
      */
     ReadHDF5Dataset( const char* debug_desc,

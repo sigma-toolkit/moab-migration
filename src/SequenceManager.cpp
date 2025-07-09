@@ -103,7 +103,7 @@ ErrorCode SequenceManager::check_valid_entities( Error* /* error */, const Range
 }
 
 ErrorCode SequenceManager::check_valid_entities( Error* /* error_handler */,
-                                                 const EntityHandle* entities,
+                                                 const EntityHandle entities[],
                                                  size_t num_entities,
                                                  bool root_set_okay ) const
 {

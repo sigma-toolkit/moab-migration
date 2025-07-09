@@ -38,7 +38,7 @@ int main( int argc, char** argv )
         read_opts   = "PARALLEL=READ_PART;PARTITION_METHOD=SQIJ;PARALLEL_RESOLVE_SHARED_ENTS;VARIABLE=T,U";
         write_opts  = "PARALLEL=WRITE_PART";
 #else
-        cout << "Usage: mpiexec -n $NP ReadWriteTest [input] [output] -O <read_opts> -o "
+        cout << "Usage: mpiexec -n $NP ReadWriteTest [input] [output] -O \c read_opts -o "
                 "<write_opts>\n";
         return 0;
 #endif

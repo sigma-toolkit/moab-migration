@@ -6,7 +6,7 @@
  * ./mbaddpcdata -i wholeFineATM.h5m -s wholeLND_proj01.h5m -o atm_a2l.h5m -v a2lTbot_proj
  *
  * it should work also for pentagon file style data
- * ./mbaddpcdata -i <MOABsource>/MeshFiles/unittest/penta3d.h5m -s wholeLND_proj01.h5m -o
+ * ./mbaddpcdata -i \c MOABsource/MeshFiles/unittest/penta3d.h5m -s wholeLND_proj01.h5m -o
  * atm_a2l.h5m -v a2lTbot_proj -p 1
  *
  * Basically, will output a new h5m file (atm_a2l.h5m), which has an extra tag, corresponding to the

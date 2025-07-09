@@ -9,7 +9,7 @@
  *
  *
  * example of usage:
- * ./mbcmpfiles -i file1.h5m -j file2.h5m -n <tag_name>  -o out.file
+ * ./mbcmpfiles -i file1.h5m -j file2.h5m -n \c tag_name  -o out.file
  *
  * if no tag name is specified, it will try to compare all tags in the files
  *

@@ -73,7 +73,7 @@ class MeshUtil
      *\param tol a relative tolerance for coordinates
      *\param do_print flag for printing differences
      *
-     * \NOTE Only basic mesh properties are checked, number of vertices & elements,
+     * \note Only basic mesh properties are checked, number of vertices & elements,
      * element connectivity, and coordinates (within the given relative tolerance).
      */
     static bool meshes_are_different( Mesh& mesh1,

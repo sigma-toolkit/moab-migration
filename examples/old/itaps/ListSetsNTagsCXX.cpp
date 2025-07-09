@@ -2,7 +2,7 @@
  *
  * This program shows how to read and list sets and tags from a mesh
  *
- * Usage: SetsNTags <mesh_file_name>
+ * Usage: SetsNTags \c mesh_file_name
  *
  */
 

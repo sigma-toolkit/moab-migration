@@ -64,7 +64,7 @@ class BSPTreePoly
 
     /** Test if a point is contained in the polyhedron.
      *
-     *\NOTE algorithm assumes *convex* polyhedron.
+     *\note algorithm assumes *convex* polyhedron.
      */
     bool is_point_contained( const CartVect& point ) const;
 

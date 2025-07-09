@@ -51,7 +51,7 @@ class MESQUITE_EXPORT ConicDomain : public MBMesquite::MeshDomain
      *                          axis_direction from axis_point to the apex
      *\param axis_direction     Vector defining the direction of the axis
      *\param axis_point         A point through which the axis passes.
-     *\NOTE Cone is not bounded at apex.  It extends infinitely in both
+     *\note Cone is not bounded at apex.  It extends infinitely in both
      *      directions.
      */
     inline ConicDomain( double radius_at_point,

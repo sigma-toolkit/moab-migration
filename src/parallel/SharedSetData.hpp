@@ -78,7 +78,7 @@ class SharedSetData
 
     /**\brief set/update sharing list for a set
      *
-     *\NOTE sorts \c ranks vector
+     *\note sorts \c ranks vector
      */
     ErrorCode set_sharing_procs( EntityHandle set_handle, std::vector< unsigned >& ranks );
 

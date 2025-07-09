@@ -369,8 +369,9 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
     }
 #ifdef MOAB_HAVE_MPI
     // reduce box tolerance on every task, if needed
-    double min_box_eps;
-    MPI_Allreduce( &box_error, &min_box_eps, 1, MPI_DOUBLE, MPI_MIN, parcomm->comm() );
+    double min_box_eps = box_error;
+    if (nullptr != parcomm)
+        MPI_Allreduce( &box_error, &min_box_eps, 1, MPI_DOUBLE, MPI_MIN, parcomm->comm() );
     box_error = min_box_eps;
 #endif
 
@@ -466,7 +467,10 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
     // on the boundary edges
     // this needs to be collective, so we should maybe wait something
 #ifdef MOAB_HAVE_MPI
-    rval = resolve_intersection_sharing();MB_CHK_SET_ERR( rval, "can't correct position, Intx2Mesh.cpp \n" );
+    if ( nullptr != parcomm)
+    {
+        rval = resolve_intersection_sharing();MB_CHK_SET_ERR( rval, "can't correct position, Intx2Mesh.cpp \n" );
+    }
 #endif
 
     this->clean();

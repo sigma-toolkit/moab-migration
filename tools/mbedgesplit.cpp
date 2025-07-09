@@ -92,9 +92,13 @@ int main( int argc, char* argv[] )
         std::cout << "Radius:  " << R << "\n";
         std::cout << "relative eps:  " << epsrel << "\n";
         std::cout << "box eps:  " << boxeps << "\n";
-        std::cout << " use kd tree for intersection: " << brute_force << "\n";
+        if (brute_force)
+            std::cout << " use kd tree for intersection \n";
+        else
+            std::cout << " use advancing front for intersection \n";
+
         std::cout << " area tolerance:" << areaTolerance <<"\n";
-        std::cout << " target edge file" << mapEdgeTargetFile << "\n";
+        std::cout << " target edge file: " << mapEdgeTargetFile << "\n";
     }
     rval = mb->create_meshset( MESHSET_SET, outputSet );MB_CHK_ERR( rval );
 

@@ -109,14 +109,12 @@ Use the following macros for consistent error handling:
 
 - \b MB_CHK_ERR(err_code): Check error code and return if not MB_SUCCESS
   \code
-  ErrorCode rval = moab->load_file("mesh.h5m");
-  MB_CHK_ERR(rval);
+  MB_CHK_ERR( moab->load_file("mesh.h5m") );
   \endcode
 
 - \b MB_CHK_SET_ERR(err_code, message): Check error code and set new error message if not MB_SUCCESS
   \code
-  ErrorCode rval = moab->load_file("mesh.h5m");
-  MB_CHK_SET_ERR(rval, "Failed to load mesh file");
+  MB_CHK_SET_ERR( moab->load_file("mesh.h5m"), "Failed to load mesh file" );
   \endcode
 
 - \b MB_SET_ERR(err_code, message): Set a new error and return immediately

@@ -22,20 +22,14 @@ Several other sources of information about MOAB may also be of interest to reade
 
 <sup>1</sup> Non-namespaced names are also provided for backward compatibility, with the "MB" prefix added to the class or variable name.
 
- \ref contents
-
   \section interface 2. MOAB Data Model
 The MOAB data model describes the basic types used in MOAB and the language used to communicate that data to applications.  This chapter describes that data model, along with some of the reasons for some of the design choices in MOAB.
-
- \ref contents
 
  \subsection twoone 2.1. MOAB Interface
 
 MOAB is written in C++.  The primary interface with applications is through member functions of the abstract base class Interface.  The MOAB library is created by instantiating Core, which implements the Interface API.  Multiple instances of MOAB can exist concurrently in the same application; mesh entities are not shared between these instances<sup>2</sup>.  MOAB is most easily viewed as a database of mesh objects accessed through the instance.  No other assumptions explicitly made about the nature of the mesh stored there; for example, there is no fundamental requirement that elements fill space or do not overlap each other geometrically.
 
 <sup>2</sup> One exception to this statement is when the parallel interface to MOAB is used; in this case, entity sharing between instances is handled explicitly using message passing.  This is described in more detail in Section 11 of this document.
-
- \ref contents
 
  \subsection twotwo 2.2. Mesh Entities
 MOAB represents the following topological mesh entities: vertex, edge, triangle, quadrilateral, polygon, tetrahedron, pyramid, prism, knife, hexahedron, polyhedron.  MOAB uses the EntityType enumeration to refer to these entity types (see Table 1).  This enumeration has several special characteristics, chosen intentionally: the types begin with vertex, entity types are grouped by topological dimension, with lower-dimensional entities appearing before higher dimensions; the enumeration includes an entity type for sets (described in the next section); and MBMAXTYPE is included at the end of this enumeration, and can be used to terminate loops over type.  In addition to these defined values, the an increment operator (++) is defined such that variables of type EntityType can be used as iterators in loops.
@@ -104,8 +98,6 @@ The term adjacencies is used to refer to those entities topologically connected 
 
 In its most fundamental form, a mesh need only be represented by its vertices and the entities of maximal topological dimension.  For example, a hexahedral mesh can be represented as the connectivity of the hex elements and the vertices forming the hexes.  Edges and faces in a 3D mesh need not be explicitly represented.  We refer to such entities as "AEntities", where 'A' refers to "Auxiliary", "Ancillary", and a number of other words mostly beginning with 'A'.  Individual AEntities are created only when requested by applications, either using mesh modification functions or by requesting adjacencies with a special "create if missing" flag passed as "true".  This reduces the overall memory usage when representing large meshes.  Note entities must be explicitly represented before they can be assigned tag values or added to entity sets (described in following Sections).
 
-\ref contents
-
  \subsection twothree 2.4. Entity Sets
 Entity sets are also known as "mesh sets", or when the context is clear, not to be confused with std::set, just "sets". Entity sets are used to store arbitrary collections of entities and other sets.  Sets are used for a variety of things in mesh-based applications, from the set of entities discretizing a given geometric model entity to the entities partitioned to a specific processor in a parallel finite element application.  MOAB entity sets can also store parent/child relations with other entity sets, with these relations distinct from contains relations.  Parent/child relations are useful for building directed graphs with graph nodes representing collections of mesh entities; this construct can be used, for example, to represent an interface of mesh faces shared by two distinct collections of mesh regions.  MOAB also defines one special set, the "root set" or the interface itself; all entities are part of this set by definition.  Defining a root set allows the use of a single set of MOAB API functions to query entities in the overall mesh as well as its subsets.
 
@@ -126,8 +118,6 @@ MB_CHK_ERR( moab->get_entities_by_dimension(file_set, 3, set_ents) );
 \endcode
 
 Entity sets are often used in conjunction with tags (described in the next section), and provide a powerful mechanism to store a variety of meta-data with meshes.
-
-\ref contents
 
  \subsection twofour 2.5. Tags
 
@@ -166,13 +156,12 @@ MB_CHK_ERR( moab->tag_create("TEMPERATURE", sizeof(double), MB_TAG_DENSE,
 // assign a value to vertices
 for (Range::iterator vit = verts.begin();
      vit != verts.end(); ++vit)
-  MB_CHK_ERR( moab->tag_set_data(temperature, &(*rit), 1, &new_val) );
+  MB_CHK_ERR( moab->tag_set_data(temperature, &(*vit), 1, &new_val) );
 
 \endcode
 
 The semantic meaning of a tag is determined by applications using it.  However, to promote interoperability between applications, there are a number of tag names reserved by MOAB which are intended to be used by convention.  Mesh readers and writers in MOAB use these tag conventions, and applications can use them as well to access the same data. Ref. [1] maintains an up-to-date list of conventions for meta-data usage in MOAB.
 
-  \ref contents
 
   \section api 3. MOAB API Design Philosophy and Summary
 
@@ -188,7 +177,7 @@ The MOAB API is designed to balance complexity and ease of use.  This balance is
 
 - Entity lists: Lists of entities are passed to and from MOAB in a variety of forms.  Lists output from MOAB are passed as either STL vector or Range data types.  Either of these constructs may be more efficient in both time and memory, depending on the semantics of the data being requested.  Input lists are passed as either Range's, or as a pointer to EntityHandle and a size.  The latter allows the same function to be used when passing individual entities, without requiring construction of an otherwise unneeded STL vector.
 - Entity sets: Most query functions accept an entity set as input.  Applications can pass zero to indicate a request for the whole interface.  Note that this convention applies only to query functions; attempts to add or subtract entities to/from the interface using set-based modification functions, or to add parents or children to the interface set, will fail.  Allowing specification of the interface set in this manner avoids the need for a separate set of API functions to query the database as a whole.
-- Implicit Booleans in output lists: A number of query functions in MOAB allow specification of a Boolean operation (Interface::INTERSECT or Interface::UNION).  This operation is applied to the results of the query, often eliminating the need for code the application would need to otherwise implement.  For example, to find the set of vertices shared by a collection of quadrilaterals, the application would pass that list of quadrilaterals to a request for vertex adjacencies, with Interface::INTERSECT passed for the Boolean flag.  The list of vertices returned would be the same as if the application called that function for each individual entity, and computed the intersection of the results over all the quadrilaterals.  Applications may also input non-empty lists to store the results, in which case the intersection is also performed with entities already in the list.  In many cases, this allows optimizations in both time and memory inside the MOAB implementation.
+- Implicit Booleans in output lists: A number of query functions in MOAB allow specification of a Boolean operation (`Interface::INTERSECT` or `Interface::UNION`).  This operation is applied to the results of the query, often eliminating the need for code the application would need to otherwise implement.  For example, to find the set of vertices shared by a collection of quadrilaterals, the application would pass that list of quadrilaterals to a request for vertex adjacencies, with `Interface::INTERSECT` passed for the Boolean flag.  The list of vertices returned would be the same as if the application called that function for each individual entity, and computed the intersection of the results over all the quadrilaterals.  Applications may also input non-empty lists to store the results, in which case the intersection is also performed with entities already in the list.  In many cases, this allows optimizations in both time and memory inside the MOAB implementation.
 
 Since these objectives are at odds with each other, tradeoffs had to be made between them.  Some specific issues that came up are:
 
@@ -200,7 +189,6 @@ Since these objectives are at odds with each other, tradeoffs had to be made bet
 
 <sup>4</sup> This design choice was made to minimize the number of functions in the API, while preserving the ability to input single entities.  The tradeoff is that single entities must be passed as pointers, which can be confusing to some users.
 
-  \ref contents
 
   \section apiservices 4. MOAB Function API and Related Mesh Services
 
@@ -319,18 +307,15 @@ Core moab;
 Interface* mb = &moab;
 
 // Load a mesh file
-ErrorCode rval = mb->load_file("mesh.h5m");
-MB_CHK_ERR(rval);
+MB_CHK_ERR( mb->load_file("mesh.h5m") );
 
 // Get all vertices
 Range vertices;
-rval = mb->get_entities_by_dimension(0, 0, vertices);
-MB_CHK_ERR(rval);
+MB_CHK_ERR( mb->get_entities_by_dimension(0, 0, vertices) );
 
 // Get coordinates
 std::vector<double> coords;
-rval = mb->get_coords(vertices, coords);
-MB_CHK_ERR(rval);
+MB_CHK_ERR( mb->get_coords(vertices, coords) );
 \endcode
 
 \subsubsection tag_usage Tag Usage Example
@@ -338,31 +323,26 @@ MB_CHK_ERR(rval);
 // Create a temperature tag
 Tag temp_tag;
 double default_temp = 273.15;
-rval = mb->tag_get_handle("TEMPERATURE", 1, MB_TYPE_DOUBLE,
-                         temp_tag, MB_TAG_DENSE, &default_temp);
-MB_CHK_ERR(rval);
+MB_CHK_ERR( mb->tag_get_handle("TEMPERATURE", 1, MB_TYPE_DOUBLE,
+                         temp_tag, MB_TAG_DENSE, &default_temp) );
 
 // Set temperature values on vertices
 std::vector<double> temps(vertices.size(), 300.0);
-rval = mb->tag_set_data(temp_tag, vertices, temps.data());
-MB_CHK_ERR(rval);
+MB_CHK_ERR( mb->tag_set_data(temp_tag, vertices, temps.data()) );
 \endcode
 
 \subsubsection set_usage Set Usage Example
 \code
 // Create a set for boundary faces
 EntityHandle boundary_set;
-rval = mb->create_meshset(MESHSET_SET, boundary_set);
-MB_CHK_ERR(rval);
+MB_CHK_ERR( mb->create_meshset(MESHSET_SET, boundary_set) );
 
 // Get all faces
 Range faces;
-rval = mb->get_entities_by_dimension(0, 2, faces);
-MB_CHK_ERR(rval);
+MB_CHK_ERR( mb->get_entities_by_dimension(0, 2, faces) );
 
 // Add faces to boundary set
-rval = mb->add_entities(boundary_set, faces);
-MB_CHK_ERR(rval);
+MB_CHK_ERR( mb->add_entities(boundary_set, faces) );
 \endcode
 
 \subsection performance_considerations 4.5. Performance Considerations
@@ -384,7 +364,6 @@ MOAB uses a comprehensive error handling system:
 - **Error Messages**: Provide descriptive error messages for debugging
 - **Recovery**: Design applications to handle and recover from errors gracefully
 
-  \ref contents
 
   \section tools 5. MOAB Tools and Utilities
 
@@ -417,7 +396,6 @@ MOAB provides various mesh analysis capabilities:
 - **Geometry Analysis**: Tools for analyzing geometric properties
 - **Performance Analysis**: Tools for analyzing mesh operation performance
 
-  \ref contents
 
   \section building 6. Building MOAB-Based Applications
 
@@ -481,7 +459,6 @@ Considerations for deploying MOAB applications:
 - **Platform Compatibility**: Test on target platforms
 - **Performance Tuning**: Optimize for target hardware
 
-  \ref contents
 
   \section imoab 7. iMOAB Interface
 
@@ -596,7 +573,6 @@ iMOAB supports advanced MOAB features:
 - **Spatial Queries**: Efficient spatial search capabilities
 - **Remapping**: Tools for transferring data between different meshes
 
-  \ref contents
 
   \section structured 8. Structured Mesh Support
 
@@ -642,7 +618,6 @@ MOAB provides various operations on structured meshes:
 - **Mesh Modification**: Tools for modifying structured meshes
 - **Parallel Operations**: Full parallel support for structured mesh operations
 
-  \ref contents
 
   \section spectral 9. Spectral Element Support
 
@@ -666,7 +641,6 @@ MOAB provides several tools for working with spectral elements:
 - **Spectral Interpolation**: Tools for interpolating between different spectral orders
 - **Quality Metrics**: Specialized quality metrics for spectral elements
 
-  \ref contents
 
   \section optimization 10. Performance Optimization
 
@@ -693,7 +667,6 @@ This section provides guidelines for optimizing MOAB performance in your applica
 - **Compression**: Use compression for large mesh files
 - **Incremental Loading**: Load mesh data incrementally when possible
 
-  \ref contents
 
   \section parallel 11. Parallel Computing in MOAB
 
@@ -735,7 +708,6 @@ MOAB provides several tools for parallel mesh operations:
 - **Load Balancing**: Utilities for redistributing mesh data to improve load balance
 - **Parallel Quality Assessment**: Tools for assessing mesh quality in parallel
 
-  \ref contents
 
   \section advanced 12. Advanced Features
 
@@ -785,9 +757,124 @@ MOAB provides specialized support for spectral element methods:
 - **Gauss-Lobatto Points**: Support for Gauss-Lobatto quadrature points
 - **Spectral Interpolation**: Tools for spectral interpolation and projection
 
-  \ref contents
 
-  \section conclusion 13. Conclusion and Future Plans
+  \section verdict 13. Verdict Mesh Quality Metrics
+
+MOAB integrates the Verdict library to provide comprehensive mesh quality assessment capabilities. Verdict calculates various quality metrics for different element types, helping users assess and improve mesh quality.
+
+\subsection verdict_overview 13.1. Overview
+
+Verdict is a library used to calculate metrics on the following type of elements:
+
+- **Hexahedra**: 3D hexahedral elements
+- **Tetrahedra**: 3D tetrahedral elements
+- **Pyramid**: 3D pyramid elements
+- **Wedge**: 3D wedge/prism elements
+- **Knife**: 3D knife elements
+- **Quadrilateral**: 2D quadrilateral elements
+- **Triangle**: 2D triangular elements
+- **Edge**: 1D edge elements
+
+Verdict calculates individual or multiple metrics on a single element. The v_*_quality(...) functions allow for efficient calculations of multiple metrics on a single element. Individual metrics may be calculated on a single element as well.
+
+\subsection verdict_usage 13.2. Using Verdict
+
+The v_*_quality functions take the following parameters:
+
+- **num_nodes**: Number of nodes in the element
+- **coordinates**: 2D array containing x,y,z coordinate data of the nodes
+- **metrics_request_flag**: Bitfield to define which metrics to calculate
+- **metric_vals**: Struct to hold the metric calculated values
+
+All other functions take these parameters below and return the calculated metric value:
+
+- **num_nodes**: Number of nodes in the element
+- **coordinates**: 2D array containing x,y,z coordinate data of the nodes
+
+\subsection verdict_flags 13.3. Setting the Metrics Request Flag
+
+In order to use v_*_quality functions you must know how to set the bitfield argument correctly. To calculate aspect ratio, condition number, shape and shear metrics on a triangle, set the "metrics_request_flag" like so:
+
+\code
+unsigned int metrics_flag = 0;
+metrics_flag += V_TRI_ASPECT_FROBENIUS;
+metrics_flag += V_CONDITION;
+metrics_flag += V_SHAPE;
+metrics_flag += V_SHEAR;
+\endcode
+
+The bitwise field can also be set for many metrics at once using #defined numbers. V_HEX_ALL, V_HEX_DIAGNOSTIC, V_TRI_ALGEBRAIC are examples.
+
+\subsection verdict_example 13.4. Example Usage
+
+Below is an example of how to use Verdict's functions:
+
+\code
+QuadMetricVals quad_metrics = {0};
+unsigned long metrics_flag = 0;
+metrics_flag += V_QUAD_SHAPE;
+metrics_flag += V_QUAD_DISTORTION;
+metrics_flag += V_QUAD_AREA;
+double quad_nodes[4][3];
+
+//node 1
+quad_nodes[0][0] = 0;  //x
+quad_nodes[0][1] = 0;  //y
+quad_nodes[0][2] = 0;  //z
+
+//node 2
+quad_nodes[1][0] = 1;
+quad_nodes[1][1] = 0.1;
+quad_nodes[1][2] = 0.1;
+
+//node 3
+quad_nodes[2][0] = 0.9;
+quad_nodes[2][1] = 0.9;
+quad_nodes[2][2] = -0.1;
+
+//node 4
+quad_nodes[3][0] = -0.05;
+quad_nodes[3][1] = 1;
+quad_nodes[3][2] = 0;
+
+//calculate multiple metrics with one call
+v_quad_quality( 4, quad_nodes, metrics_flag, quad_metrics );
+double my_shape      = quad_metrics.shape;
+double my_distortion = quad_metrics.distortion;
+double my_area       = quad_metrics.area;
+
+//calculate an individual metric
+double my_relative_size = v_quad_relative_size( 4, quad_nodes );
+\endcode
+
+\subsection verdict_metrics 13.5. Available Metrics
+
+Verdict provides a comprehensive set of quality metrics for each element type:
+
+**Hexahedral Metrics:**
+- Edge ratio, max edge ratio, skew, taper
+- Volume, stretch, diagonal, dimension
+- Oddy, condition, Jacobian, scaled Jacobian
+- Shear, shape, relative size, distortion
+
+**Tetrahedral Metrics:**
+- Edge ratio, radius ratio, aspect ratios
+- Volume, condition, Jacobian, scaled Jacobian
+- Shape, relative size, distortion
+
+**Quadrilateral Metrics:**
+- Edge ratio, aspect ratio, radius ratio
+- Area, stretch, angles, condition
+- Jacobian, scaled Jacobian, shear, shape
+- Relative size, distortion
+
+**Triangular Metrics:**
+- Edge ratio, aspect ratio, radius ratio
+- Area, angles, condition, scaled Jacobian
+- Shape, relative size, distortion
+
+
+  \section conclusion 14. Conclusion and Future Plans
 
 MOAB continues to evolve to meet the needs of the scientific computing community. Current development efforts focus on:
 
@@ -799,9 +886,8 @@ MOAB continues to evolve to meet the needs of the scientific computing community
 
 MOAB's open-source development model encourages community contributions and ensures that the library remains responsive to user needs. The active development community and comprehensive documentation make MOAB an excellent choice for mesh-based scientific computing applications.
 
-  \ref contents
 
-  \section references 14. References
+  \section references 15. References
 
 [1] Mahadevan, Vijay S., Iulian Grindeanu, Rajeev Jain, Patrick Shriwise, Navamita Ray, Paul Wilson, Tautges, Timothy J., "SIGMA -- MOAB.", URL: http://sigma.mcs.anl.gov/
 
@@ -833,6 +919,5 @@ MOAB's open-source development model encourages community contributions and ensu
 
 [15] VisIt User's Guide.
 
-  \ref contents
 
 */

@@ -141,24 +141,24 @@ Matrix3 SpectralQuad::jacobian( const double* params,
     return J;
 }
 
-void SpectralQuad::evaluate_vector( const CartVect& params, const double* field, int num_tuples, double* eval ) const
-{
-    // piece that we shouldn't want to cache
-    int d;
-    for( d = 0; d < 2; d++ )
-    {
-        lagrange_0( &_ld[d], params[d] );
-    }
-
-    *eval = tensor_i2( _ld[0].J, _ld[0].n, _ld[1].J, _ld[1].n, field, _odwork );
-}
-void SpectralQuad::integrate_vector( const double* field,
-                                     const double* verts,
-                                     const int nverts,
-                                     const int ndim,
-                                     const int num_tuples,
-                                     double* work,
-                                     double* result )
+// void SpectralQuad::evaluate_vector( const CartVect& params, const double* field, int num_tuples, double* eval ) const
+// {
+//     // piece that we shouldn't want to cache
+//     int d;
+//     for( d = 0; d < 2; d++ )
+//     {
+//         lagrange_0( &_ld[d], params[d] );
+//     }
+//
+//     *eval = tensor_i2( _ld[0].J, _ld[0].n, _ld[1].J, _ld[1].n, field, _odwork );
+// }
+// void SpectralQuad::integrate_vector( const double* field,
+//                                      const double* verts,
+//                                      const int nverts,
+//                                      const int ndim,
+//                                      const int num_tuples,
+//                                      double* work,
+//                                      double* result )
 {
     // not implemented
 }

@@ -1764,7 +1764,7 @@ ErrorCode Core::get_adjacencies( const Range& from_entities,
  * \param to_handles Entities to which adjacencies are being added
  * \param num_handles Number of handles in to_handles
  * \param both_ways If true, add the adjacency information in both directions
- * \see Interface::add_adjacencies
+ * \see Interface::add_adjacencies(const EntityHandle, const EntityHandle*, const int, bool)
  */
 ErrorCode Core::add_adjacencies( const EntityHandle from_handle,
                                  const EntityHandle* to_handles,
@@ -1785,7 +1785,7 @@ ErrorCode Core::add_adjacencies( const EntityHandle from_handle,
  * \param from_handle Entity from which adjacencies are being added
  * \param adjacencies Range of entities to which adjacencies are being added
  * \param both_ways If true, add the adjacency information in both directions
- * \see Interface::add_adjacencies
+ * \see Interface::add_adjacencies(const EntityHandle, Range&, bool)
  */
 ErrorCode Core::add_adjacencies( const EntityHandle from_handle, Range& adjacencies, bool both_ways )
 {
@@ -1803,7 +1803,7 @@ ErrorCode Core::add_adjacencies( const EntityHandle from_handle, Range& adjacenc
  * \param from_handle Entity from which adjacencies are being removed
  * \param to_handles Entities to which adjacencies are being removed
  * \param num_handles Number of handles in to_handles
- * \see Interface::remove_adjacencies
+ * \see Interface::remove_adjacencies(const EntityHandle, const EntityHandle*, const int)
  */
 ErrorCode Core::remove_adjacencies( const EntityHandle from_handle,
                                     const EntityHandle* to_handles,
@@ -2659,13 +2659,13 @@ Tag Core::geom_dimension_tag()
 ErrorCode Core::create_element( const EntityType entity_type,
                                 const EntityHandle* connectivity,
                                 const int num_nodes,
-                                EntityHandle& handle )
+                                EntityHandle& element_handle )
 {
     // make sure we have enough vertices for this entity type
     if( num_nodes < CN::VerticesPerEntity( entity_type ) ) return MB_FAILURE;
 
-    ErrorCode status = sequence_manager()->create_element( entity_type, connectivity, num_nodes, handle );
-    if( MB_SUCCESS == status ) status = aEntityFactory->notify_create_entity( handle, connectivity, num_nodes );
+    ErrorCode status = sequence_manager()->create_element( entity_type, connectivity, num_nodes, element_handle );
+    if( MB_SUCCESS == status ) status = aEntityFactory->notify_create_entity( element_handle, connectivity, num_nodes );
 
 #ifdef MOAB_HAVE_AHF
     mesh_modified = true;
@@ -2675,10 +2675,10 @@ ErrorCode Core::create_element( const EntityType entity_type,
 }
 
 //! creates a vertex based on coordinates, returns a handle and error code
-ErrorCode Core::create_vertex( const double coords[3], EntityHandle& handle )
+ErrorCode Core::create_vertex( const double coords[3], EntityHandle& entity_handle )
 {
     // get an available vertex handle
-    return sequence_manager()->create_vertex( coords, handle );
+    return sequence_manager()->create_vertex( coords, entity_handle );
 }
 
 ErrorCode Core::create_vertices( const double* coordinates, const int nverts, Range& entity_handles )

@@ -747,13 +747,6 @@ void MBCN_SubEntityVertexIndices( const int this_type,
 }
 
 //! return the vertices of the specified sub entity
-//! \param parent_conn Connectivity of parent entity
-//! \param parent_type Entity type of parent entity
-//! \param sub_dimension Dimension of sub-entity being queried
-//! \param sub_index Index of sub-entity being queried
-//! \param sub_entity_conn Connectivity of sub-entity, based on parent_conn and canonical
-//!           ordering for parent_type
-//! \param num_sub_vertices Number of vertices in sub-entity
 //  void MBCN_SubEntityConn(const void *parent_conn, const int parent_type,
 //                            const int sub_dimension,
 //                            const int sub_index,

@@ -1127,6 +1127,7 @@ class Core : public Interface
      * \param ent_dim Dimension associated with this iterator
      * \param chunk_size Chunk size of the iterator
      * \param check_valid If true, entities are checked for validity before being returned
+     * \param set_iter Output parameter for the created set iterator
      */
     virtual ErrorCode create_set_iterator( EntityHandle meshset,
                                            EntityType ent_type,

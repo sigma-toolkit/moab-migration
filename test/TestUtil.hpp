@@ -9,6 +9,7 @@
 #ifdef MOAB_HAVE_MPI
 #include "moab_mpi.h"
 #endif
+#include <limits>
 
 /* Define these here because they are used by many tests
  * to find the add directory for input files */

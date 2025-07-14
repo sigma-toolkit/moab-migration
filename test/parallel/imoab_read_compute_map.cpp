@@ -344,6 +344,7 @@ int main( int argc, char* argv[] )
                        "cannot compute scalar projection weights" )
             POP_TIMER( couComm, rankInCouComm )
 
+	    if ( false )
             {
                 const iMOAB_String atmocn_map_file_name = "atm_ocn_map_computed.nc";
                 CHECKIERR( iMOAB_WriteMapFile( cplAtmOcnMemPID, map_from_mem_identifier,

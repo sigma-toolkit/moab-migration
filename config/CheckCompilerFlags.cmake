@@ -15,8 +15,6 @@ ENDIF()
 # Check for compiler types and add flags accordingly
 if ( CMAKE_COMPILER_IS_GNUCXX OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang") )
 
-  +EXTRA_GNU_CXXFLAGS="-Wall -Wno-long-long -pedantic -Wshadow -Wno-unused-parameter -Wpointer-arith -Wformat -Wformat-security -Wextra -Wno-variadic-macros -Wno-unknown-pragmas -fsignaling-nans -ftrapping-math -fnon-call-exceptions"
-
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-fpic")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wall")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-pipe")
@@ -30,7 +28,6 @@ if ( CMAKE_COMPILER_IS_GNUCXX OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang") )
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wformat-security")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wunused-parameter")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-fstack-protector-all")
-  FORCE_ADD_FLAGS(CMAKE_C_FLAGS "${MOAB_CXX_FLAGS}")
   #FORCE_ADD_FLAGS(CMAKE_Fortran_FLAGS "${MOAB_CXX_FLAGS}")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-fpermissive")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-fsignaling-nans")
@@ -69,7 +66,6 @@ else ( CMAKE_COMPILER_IS_GNUCXX OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang") )
     ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-wd383")
     ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-wd2259")
     ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-fp-model strict")
-    FORCE_ADD_FLAGS(CMAKE_C_FLAGS "${MOAB_CXX_FLAGS}")
     FORCE_ADD_FLAGS(CMAKE_Fortran_FLAGS "${MOAB_CXX_FLAGS}")
     # ifort (untested)
     set (CMAKE_Fortran_FLAGS_RELEASE "-f77rtl -O2")
@@ -130,6 +126,9 @@ IF (CMAKE_BUILD_TYPE MATCHES "Debug")
 
 ENDIF()
 
+# Force C99 standard support
+FORCE_ADD_FLAGS(CMAKE_C_FLAGS "-std=c99")
+
 # Release targets
 IF (CMAKE_BUILD_TYPE MATCHES "Release")
   #
@@ -153,4 +152,4 @@ IF (CMAKE_BUILD_TYPE MATCHES "Release")
 
 ENDIF()
 
-mark_as_advanced(CMAKE_Fortran_FLAGS MOAB_CXX_FLAGS)
+mark_as_advanced(CMAKE_Fortran_FLAGS CMAKE_C_FLAGS CMAKE_CXX_FLAGS MOAB_CXX_FLAGS)

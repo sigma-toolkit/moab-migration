@@ -208,14 +208,14 @@ AC_SUBST(enable_cxx_optimize)
 EXTRA_PGI_ONLY_FCFLAGS="-Mfree"
 if (test "x$enable_debug" != "xno"); then # debug flags
 # GNU
-EXTRA_GNU_CXXFLAGS="-Wall -Wno-long-long -pedantic -Wshadow -Wno-unused-parameter -Wpointer-arith -Wformat -Wformat-security -Wextra -Wno-variadic-macros -Wno-unknown-pragmas -fsignaling-nans -ftrapping-math -fnon-call-exceptions"
+EXTRA_GNU_CXXFLAGS="-Wall -Wno-long-long -pedantic -Wshadow -Wno-unused-parameter -Wpointer-arith -Wformat -Wformat-security -Wextra -Wno-variadic-macros -Wno-unknown-pragmas -ftrapping-math -fnon-call-exceptions"
 EXTRA_GNU_FCFLAGS="-pedantic"
 # CLANG
 EXTRA_CLANG_CXXFLAGS="$EXTRA_GNU_CXXFLAGS"
 EXTRA_CLANG_FCFLAGS="$EXTRA_GNU_FCFLAGS"
 # Intel
-EXTRA_INTEL_CXXFLAGS="-C -fp-trap=common"
-EXTRA_INTEL_FCFLAGS="-C -fp-trap=common"
+EXTRA_INTEL_CXXFLAGS=""
+EXTRA_INTEL_FCFLAGS="-C"
 # PGI
 EXTRA_PGI_CXXFLAGS="--diag_suppress 236 --diag_suppress=unrecognized_gcc_pragma -C -Ktrap=fp"
 EXTRA_PGI_FCFLAGS="-Mbounds -Ktrap=inv,divz,ovf"
@@ -229,11 +229,11 @@ if (test "x$enable_cxx_optimize" != "xno"); then  # optimization flags
 EXTRA_GNU_CXXFLAGS="$EXTRA_GNU_CXXFLAGS -fno-fast-math -ffp-contract=off -fp-trap=common -fsanitize=float-cast-overflow,float-divide-by-zero"
 EXTRA_GNU_FCFLAGS="$EXTRA_GNU_FCFLAGS -fno-fast-math -ffp-contract=off -fp-trap=common"
 #CLANG
-EXTRA_CLANG_CXXFLAGS="$EXTRA_CLANG_CXXFLAGS -fno-fast-math -ffp-model=strict -ffp-contract=off"
-EXTRA_CLANG_FCFLAGS="$EXTRA_CLANG_FCFLAGS -fno-fast-math -ffp-model=strict -ffp-contract=off"
+EXTRA_CLANG_CXXFLAGS="$EXTRA_CLANG_CXXFLAGS -fno-fast-math -ffp-model=source -ffp-contract=off"
+EXTRA_CLANG_FCFLAGS="$EXTRA_CLANG_FCFLAGS -fno-fast-math -ffp-model=source -ffp-contract=off"
 # Intel
-EXTRA_INTEL_CXXFLAGS="$EXTRA_INTEL_CXXFLAGS -ip -fp-model source -prec-div -fp-speculation=off"
-EXTRA_INTEL_FCFLAGS="$EXTRA_INTEL_FCFLAGS -ip -fp-model source -prec-div -fp-speculation=off"
+EXTRA_INTEL_CXXFLAGS="$EXTRA_INTEL_CXXFLAGS"
+EXTRA_INTEL_FCFLAGS="$EXTRA_INTEL_FCFLAGS -fp-model source -prec-div"
 # PGI
 EXTRA_PGI_CXXFLAGS="$EXTRA_PGI_CXXFLAGS -Kieee -Mdaz=flush -Mfprelaxed=no"
 EXTRA_PGI_FCFLAGS="$EXTRA_PGI_FCFLAGS -Kieee -Mdaz=flush -Mfprelaxed=no"
@@ -414,6 +414,7 @@ if (test "x$ENABLE_FORTRAN" != "xno" && test "x$CHECK_FC" != "xno"); then
   esac
 
   AC_LANG_PUSH([Fortran])
+  #if (test "$cxx_compiler" == "Intel" || test "$cxx_compiler" == "IntelOneAPI"); then
   if (test "$cxx_compiler" == "Intel"); then
     my_save_ldflags="$LDFLAGS"
     LDFLAGS="$LDFLAGS -cxxlib"
@@ -464,7 +465,7 @@ if (test "x$ENABLE_FORTRAN" != "xno" && test "x$CHECK_FC" != "xno"); then
 
       # GNU and other non-intel compilers will use the standard -lstdc++ linkage
       # This case also includes the Ubuntu+Clang combination as mentioned before
-      if (test "$cxx_compiler" != "Clang" || test "$fcxxlinkage" != "yes"); then
+      if (test "$cxx_compiler" != "Clang" || test "$fcxxlinkage" != "yes" || test "$cxx_compiler" == "IntelOneAPI"); then
         my_save_ldflags="$LDFLAGS"
         LDFLAGS="$LDFLAGS -lstdc++"
         AC_MSG_CHECKING([whether $FC supports -stdlib=libstdc++])
@@ -477,7 +478,7 @@ if (test "x$ENABLE_FORTRAN" != "xno" && test "x$CHECK_FC" != "xno"); then
       fi
     fi
 
-    # Need this check to build on summit/frontier OLCF
+    # Need this check to build on Aurora ALCF and Summit/Frontier OLCF
     my_save_fcflags="$FCFLAGS"
     FCFLAGS="$FCFLAGS -WF,-C!"
       AC_MSG_CHECKING([whether $FC supports -WF,-C!])
@@ -709,10 +710,11 @@ AC_MSG_CHECKING([for known c++ compilers])
 if test x$GXX = xyes; then
   cxx_compiler=GNU
   # Intel and Clang claims to be GCC, check for it here
-  FATHOM_TRY_COMPILER_DEFINE([__INTEL_COMPILER],[cxx_compiler=Intel])
   FATHOM_TRY_COMPILER_DEFINE([__clang__],[cxx_compiler=Clang])
+  FATHOM_TRY_COMPILER_DEFINE([__INTEL_COMPILER],[cxx_compiler=Intel])
   FATHOM_TRY_COMPILER_DEFINE([__PGI],[cxx_compiler=PortlandGroup])
   FATHOM_TRY_COMPILER_DEFINE([_CRAYC],[cxx_compiler=Cray])
+  FATHOM_TRY_COMPILER_DEFINE([__INTEL_LLVM_COMPILER],[cxx_compiler=IntelOneAPI])
 # Search for other compiler types
 # For efficiency, limit checks to relevant OSs
 else
@@ -739,6 +741,7 @@ else
       FATHOM_TRY_COMPILER_DEFINE([__SUNPRO_CC],[cxx_compiler=SunWorkshop])
       FATHOM_TRY_COMPILER_DEFINE([__PGI],[cxx_compiler=PortlandGroup])
       FATHOM_TRY_COMPILER_DEFINE([_CRAYC],[cxx_compiler=Cray])
+      FATHOM_TRY_COMPILER_DEFINE([__INTEL_LLVM_COMPILER],[cxx_compiler=IntelOneAPI])
       ;;
     hpux*)
       FATHOM_TRY_COMPILER_DEFINE([__HP_aCC],[cxx_compiler=HP])
@@ -788,6 +791,11 @@ case "$cxx_compiler:$host_cpu" in
     ;;
   GNU:*)
     FATHOM_CXX_SPECIAL="$EXTRA_GNU_ONLY_CXXFLAGS"
+    ;;
+  IntelOneAPI:*)
+    FATHOM_CXX_32BIT=-m32
+    FATHOM_CXX_64BIT=-m64
+    FATHOM_CXX_SPECIAL="$EXTRA_INTEL_CXXFLAGS "
     ;;
   Intel:*)
     FATHOM_CXX_32BIT=-m32
@@ -866,10 +874,11 @@ AC_MSG_CHECKING([for known C compilers])
 if test x$GCC = xyes; then
   cc_compiler=GNU
   # Intel claims to be GCC, check for it here
-  FATHOM_TRY_COMPILER_DEFINE([__INTEL_COMPILER],[cc_compiler=Intel])
   FATHOM_TRY_COMPILER_DEFINE([__clang__],[cc_compiler=Clang])
+  FATHOM_TRY_COMPILER_DEFINE([__INTEL_COMPILER],[cc_compiler=Intel])
   FATHOM_TRY_COMPILER_DEFINE([__PGI],[cc_compiler=PortlandGroup])
   FATHOM_TRY_COMPILER_DEFINE([_CRAYC],[cc_compiler=Cray])
+  FATHOM_TRY_COMPILER_DEFINE([__INTEL_LLVM_COMPILER],[cc_compiler=IntelOneAPI])
 # Search for other compiler types
 # For efficiency, limit checks to relevant OSs
 else
@@ -888,6 +897,7 @@ else
       FATHOM_TRY_COMPILER_DEFINE([__sgi],[cc_compiler=MIPSpro])
       ;;
     linux*)
+      FATHOM_TRY_COMPILER_DEFINE([__INTEL_LLVM_COMPILER],[cc_compiler=IntelOneAPI])
       FATHOM_TRY_COMPILER_DEFINE([__INTEL_COMPILER],[cc_compiler=Intel])
       FATHOM_TRY_COMPILER_DEFINE([__IBMC__],[cc_compiler=VisualAge])
       FATHOM_TRY_COMPILER_DEFINE([__DECC_VER],[cc_compiler=Compaq])
@@ -963,6 +973,13 @@ case "$cc_compiler:$host_cpu" in
       FATHOM_FC_SPECIAL="$EXTRA_GNU_ONLY_FCFLAGS"
       FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
     fi
+    ;;
+  IntelOneAPI:*)
+    FATHOM_CC_32BIT=-m32
+    FATHOM_CC_64BIT=-m64
+    FATHOM_CC_SPECIAL="$EXTRA_INTEL_CXXFLAGS"
+    FATHOM_FC_SPECIAL="$EXTRA_INTEL_FCFLAGS"
+    FATHOM_F77_SPECIAL="$FATHOM_FC_SPECIAL"
     ;;
   Intel:*)
     FATHOM_CC_32BIT=-m32
@@ -1269,4 +1286,5 @@ fi
 ])
 dnl
 dnl
+
 

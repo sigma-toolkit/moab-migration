@@ -286,7 +286,7 @@ int main( int argc, char* argv[] )
         int src_disc_type = 3;  // element-based FV
         int tgt_disc_type = 3;  // element-based FV
         int arearead = 0; // no need for aream
-        CHECKIERR( iMOAB_LoadFromMappingFile( cplAtmPID, cplOcnPID, cplAtmOcnFilePID, &src_disc_type,
+        CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnFilePID, &src_disc_type,
                                         &tgt_disc_type, &arearead, map_from_file_identifier[0], mapFilename.c_str() ),
                    "failed to load ATM-OCN map file from disk" );
         // because it is like "coverage", context will be atmocnfid
@@ -301,7 +301,7 @@ int main( int argc, char* argv[] )
         int src_disc_type = 3;  // element-based FV
         int tgt_disc_type = 3;  // element-based FV
         int arearead = 3; // read both areas
-        CHECKIERR( iMOAB_LoadFromMappingFile( cplOcnPID, cplAtmPID, cplOcnAtmFilePID, &src_disc_type,
+        CHECKIERR( iMOAB_LoadMapFile( cplOcnPID, cplAtmPID, cplOcnAtmFilePID, &src_disc_type,
                                                      &tgt_disc_type, &arearead, map_from_file_identifier[1],
                                                      mapFilenameTrans.c_str() ),
                    "failed to load OCN-ATM map file from disk" );
@@ -344,7 +344,7 @@ int main( int argc, char* argv[] )
 
             {
                 const iMOAB_String atmocn_map_file_name = "atm_ocn_map_computed.nc";
-                CHECKIERR( iMOAB_WriteMappingWeightsToFile( cplAtmOcnMemPID, map_from_mem_identifier,
+                CHECKIERR( iMOAB_WriteMapFile( cplAtmOcnMemPID, map_from_mem_identifier,
                                                             atmocn_map_file_name ),
                            "failed to write map file to disk" );
             }

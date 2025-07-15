@@ -242,7 +242,7 @@ int main( int argc, char* argv[] )
     {
         const std::string atmocn_map_file_name = "atm_ocn_map.nc";
         ierr =
-            iMOAB_WriteMappingWeightsToFile( atmocnPID, weights_identifiers[0].c_str(), atmocn_map_file_name.c_str() );
+            iMOAB_WriteMapFile( atmocnPID, weights_identifiers[0].c_str(), atmocn_map_file_name.c_str() );
         CHECKIERR( ierr, "failed to write map file to disk" );
 
         const std::string intx_from_file_identifier = "map-from-file";
@@ -250,7 +250,7 @@ int main( int argc, char* argv[] )
         int src_disc_type = 1;  // element-based SE
         int tgt_disc_type = 3;  // element-based FV
         int arearead = 0; // no aream needs
-        CHECKIERR( iMOAB_LoadFromMappingFile( atmPID, ocnPID, atmocnPID, &src_disc_type, &tgt_disc_type,
+        CHECKIERR( iMOAB_LoadMapFile( atmPID, ocnPID, atmocnPID, &src_disc_type, &tgt_disc_type,
                                          &arearead, intx_from_file_identifier.c_str(), atmocn_map_file_name.c_str() ),
                    "failed to load map file from disk" );
     }

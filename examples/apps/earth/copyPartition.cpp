@@ -1,4 +1,23 @@
-/** @example copyPartition.cpp  copy partition info on a mesh file from a point cloud
+/**
+ * @file copyPartition.cpp
+ * @brief Example demonstrating partition information copying between mesh files
+ *
+ * This example shows how to:
+ * - Load partition information from point cloud files
+ * - Copy partition data to PG2 mesh files
+ * - Match entities between different mesh files using global IDs
+ * - Create parallel partition sets for visualization
+ * - Handle partition mapping for E3SM climate model meshes
+ * - Write partition-enhanced mesh files for VisIt visualization
+ *
+ * This tool is useful for climate model visualization where
+ * partition information needs to be transferred between different
+ * mesh representations (point cloud to structured mesh).
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+
  * this tool will take an existing h5m  phys grid partition file (point cloud) and copy the
  * partition information on a pg2 mesh file, for better viewing with VisIt
  *
@@ -9,6 +28,10 @@
  *  --res ne30pg2_r05_oECv3_ICG --compset A_WCYCL1850S_CMIP6
  *  or
  *  --res ne4pg2_ne4pg2 --compset FC5AV1C-L
+ *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 #include "moab/ProgOptions.hpp"
 #include "moab/Core.hpp"

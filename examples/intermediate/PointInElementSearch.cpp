@@ -1,9 +1,7 @@
-/** \brief This test shows how to perform local point-in-element searches with MOAB's new tree
- * searching functionality.
- *
- * MOAB's SpatialLocator functionality performs point-in-element searches over a local or parallel
- * mesh. SpatialLocator is flexible as to what kind of tree is used and what kind of element basis
- * functions are used to localize elements and interpolate local fields.
+/** @example PointInElementSearch.cpp
+ * This example demonstrates how to perform local point-in-element searches with MOAB's SpatialLocator
+ * functionality. It shows how to build spatial trees and perform efficient point location queries
+ * over a local or parallel mesh using different tree types and element basis functions.
  */
 
 #include <iostream>
@@ -49,11 +47,11 @@ int main( int argc, char** argv )
     Core mb;
 
     // Load the file
-    ErrorCode rval = mb.load_file( test_file_name.c_str() );MB_CHK_SET_ERR( rval, "Error loading file" );
+    MB_CHK_SET_ERR( mb.load_file( test_file_name.c_str() ), "Error loading file" );
 
     // Get all 3d elements in the file
     Range elems;
-    rval = mb.get_entities_by_dimension( 0, 3, elems );MB_CHK_SET_ERR( rval, "Error getting 3d elements" );
+    MB_CHK_SET_ERR( mb.get_entities_by_dimension( 0, 3, elems ), "Error getting 3d elements" );
 
     // Create a tree to use for the location service
     AdaptiveKDTree tree( &mb );
@@ -76,9 +74,9 @@ int main( int argc, char** argv )
     EntityHandle elem;
     for( int i = 0; i < num_queries; i++ )
     {
-        pos  = box.bMin + CartVect( box_extents[0] * .01 * ( rand() % 100 ), box_extents[1] * .01 * ( rand() % 100 ),
-                                    box_extents[2] * .01 * ( rand() % 100 ) );
-        rval = sl.locate_point( pos.array(), elem, params.array(), &is_inside, 0.0, 0.0 );MB_CHK_ERR( rval );
+        pos = box.bMin + CartVect( box_extents[0] * .01 * ( rand() % 100 ), box_extents[1] * .01 * ( rand() % 100 ),
+                                   box_extents[2] * .01 * ( rand() % 100 ) );
+        MB_CHK_ERR( sl.locate_point( pos.array(), elem, params.array(), &is_inside, 0.0, 0.0 ) );
         if( is_inside ) num_inside++;
     }
 

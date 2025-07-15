@@ -1,10 +1,34 @@
-/** @example ErrorHandlingSimulation.cpp
+/**
+ * @file ErrorHandlingSimulation.cpp
+ * @brief Example demonstrating MOAB's enhanced error handling in parallel
+ *
+ * This example shows how to:
+ * - Initialize and finalize MOAB's error handler
+ * - Simulate different types of errors in parallel execution
+ * - Handle global fatal errors vs per-processor errors
+ * - Use error propagation through function call hierarchy
+ * - Demonstrate error reporting behavior across processors
+ *
+ * The example demonstrates four test cases:
+ * - Test case 1: Global fatal error (MB_NOT_IMPLEMENTED) on all processors
+ * - Test case 2: Per-processor error (MB_INDEX_OUT_OF_RANGE) on all processors
+ * - Test case 3: Per-processor error (MB_TYPE_OUT_OF_RANGE) on non-root processors
+ * - Test case 4: Different errors on specific processors (1 and 3)
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+
  * Description: This example simulates MOAB's enhanced error handling in parallel. \n
  * All of the errors are contrived, used for simulation purpose only. \n
  *
  * Note: We do not need a moab instance for this example
  *
  * <b>To run</b>: mpiexec -np 4 ./ErrorHandlingSimulation <test_case_num(1 to 4)> \n
+ *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 
 #include "moab/MOABConfig.h"
@@ -60,14 +84,14 @@ ErrorCode FunctionC( int test_case_num, int rank )
 
 ErrorCode FunctionB( int test_case_num, int rank )
 {
-    ErrorCode err_code = FunctionC( test_case_num, rank );MB_CHK_ERR( err_code );
+    MB_CHK_ERR( FunctionC( test_case_num, rank ) );
 
     return MB_SUCCESS;
 }
 
 ErrorCode FunctionA( int test_case_num, int rank )
 {
-    ErrorCode err_code = FunctionB( test_case_num, rank );MB_CHK_ERR( err_code );
+    MB_CHK_ERR( FunctionB( test_case_num, rank ) );
 
     return MB_SUCCESS;
 }
@@ -93,7 +117,7 @@ int main( int argc, char** argv )
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );
 #endif
 
-    ErrorCode rval = FunctionA( test_case_num, rank );MB_CHK_ERR( rval );
+    MB_CHK_ERR( FunctionA( test_case_num, rank ) );
 
     // Finalize error handler, required for this example (not using a moab instance)
     MBErrorHandler_Finalize();

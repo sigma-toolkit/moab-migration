@@ -1,4 +1,22 @@
-/** @example addConnec.cpp  Add connectivity to point cloud data, for better view in visit
+/**
+ * @file addConnec.cpp
+ * @brief Example demonstrating addition of connectivity to point cloud data for visualization
+ *
+ * This example shows how to:
+ * - Load point cloud data from H5M files
+ * - Match vertices between different meshes using global IDs
+ * - Add 2D cell connectivity to point cloud data
+ * - Create new mesh files with enhanced connectivity
+ * - Handle different element types (triangles, quads, polygons)
+ * - Write enhanced meshes for better visualization
+ *
+ * This tool is useful for converting point cloud data into
+ * connected meshes for better visualization in tools like VisIt.
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+
  * this tool will take an existing h5m fine point cloud data (phys grid or land pc)
  *   and add 2d cells from a fine atm mesh
  *
@@ -11,6 +29,9 @@
  *
  *  file  wholeFineATM.h5m is obtained from a coupled run in e3sm, with the ne 11, np 4,
  *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 #include "moab/ProgOptions.hpp"
 #include "moab/Core.hpp"

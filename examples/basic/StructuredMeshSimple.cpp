@@ -1,4 +1,23 @@
-/** @example StructuredMeshSimple.cpp
+/**
+ * @file StructuredMeshSimple.cpp
+ * @brief Example demonstrating creation and query of structured meshes in MOAB
+ *
+ * This example shows how to:
+ * - Create structured meshes in 1D, 2D, or 3D
+ * - Work with structured mesh interfaces (ScdInterface)
+ * - Handle both serial and parallel structured mesh creation
+ * - Query mesh entities and their connectivity
+ * - Access element coordinates and connectivity
+ * - Use parametric indexing for structured meshes
+ *
+ * In serial mode, a single N*N*N block of elements is created.
+ * In parallel mode, each processor gets an N*N*N block arranged
+ * in a 1D column, sharing vertices and faces at interfaces.
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+
  * \brief Show creation and query of structured mesh, serial or parallel, through MOAB's structured
  * mesh interface. This is an example showing creation and query of a 3D structured mesh.  In
  * serial, a single N*N*N block of elements is created; in parallel, each proc gets an N*N*N block,
@@ -21,6 +40,10 @@
  *
  * <b> To run: </b> ./StructuredMeshSimple [d [N] ] \n
  * (default values so can run w/ no user interaction)
+ *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 
 #include "moab/Core.hpp"
@@ -53,7 +76,7 @@ int main( int argc, char** argv )
     Interface* mb = new( std::nothrow ) Core;
     if( NULL == mb ) return 1;
     ScdInterface* scdiface;
-    ErrorCode rval = mb->query_interface( scdiface );MB_CHK_ERR( rval );  // Get a ScdInterface object through moab instance
+    MB_CHK_ERR( mb->query_interface( scdiface ) );  // Get a ScdInterface object through moab instance
 
     // 1. Decide what the local parameters of the mesh will be, based on parallel/serial and rank.
 #ifdef MOAB_HAVE_MPI
@@ -68,20 +91,21 @@ int main( int argc, char** argv )
 
     // 2. Create a N^d structured mesh, which includes (N+1)^d vertices and N^d elements.
     ScdBox* box;
-    rval = scdiface->construct_box(
+    MB_CHK_ERR( scdiface->construct_box(
         HomCoord( ilow, ( dim > 1 ? 0 : -1 ),
                   ( dim > 2 ? 0 : -1 ) ),  // Use in-line logical tests to handle dimensionality
         HomCoord( ihigh, ( dim > 1 ? N : -1 ), ( dim > 2 ? N : -1 ) ), NULL,
-        0,  // NULL coords vector and 0 coords (don't specify coords for now)
-        box );MB_CHK_ERR( rval );  // box is the structured box object providing the parametric
-                         // structured mesh interface for this rectangle of elements
+        0,        // NULL coords vector and 0 coords (don't specify coords for now)
+        box ) );  // box is the structured box object providing the parametric
+                  // structured mesh interface for this rectangle of elements
 
     // 3. Get the vertices and elements from moab and check their numbers against (N+1)^d and N^d,
     // resp.
     Range verts, elems;
-    rval = mb->get_entities_by_dimension( 0, 0, verts );MB_CHK_ERR( rval );  // First '0' specifies "root set", or entire MOAB instance, second the
+    // First '0' specifies "root set", or entire MOAB instance, second the
     // entity dimension being requested
-    rval = mb->get_entities_by_dimension( 0, dim, elems );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_dimension( 0, 0, verts ) );
+    MB_CHK_ERR( mb->get_entities_by_dimension( 0, dim, elems ) );
 
 #define MYSTREAM( a ) \
     if( !rank ) cout << a << endl
@@ -110,9 +134,10 @@ int main( int argc, char** argv )
                 EntityHandle ehandle = box->get_element( i, j, k );
                 if( 0 == ehandle ) return MB_FAILURE;
                 // 4b. Get the connectivity of the element
-                rval = mb->get_connectivity( &ehandle, 1, connect );MB_CHK_ERR( rval );  // Get the connectivity, in canonical order
+                MB_CHK_ERR( mb->get_connectivity( &ehandle, 1, connect ) );  // Get the connectivity, in canonical order
                 // 4c. Get the coordinates of the vertices comprising that element
-                rval = mb->get_coords( &connect[0], connect.size(), &coords[0] );MB_CHK_ERR( rval );  // Get the coordinates of those vertices
+                MB_CHK_ERR( mb->get_coords( &connect[0], connect.size(),
+                                            &coords[0] ) );  // Get the coordinates of those vertices
             }
         }
     }

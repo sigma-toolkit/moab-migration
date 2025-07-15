@@ -1,46 +1,62 @@
-/*
- * This example will show one of the building blocks of parallel infrastructure in MOAB
- * More exactly, if we have some homogeneous data to communicate from each processor to a list of
- * other processors, how do we do it?
+/**
+ * @file CrystalRouterExample.cpp
+ * @brief Example demonstrating parallel communication using TupleList and Crystal Router
  *
- * introduce the TupleList and crystal router to MOAB users.
+ * This example shows how to:
+ * - Use MOAB's TupleList for efficient data communication
+ * - Perform sparse all-to-all communication using Crystal Router
+ * - Handle parallel data exchange with varying communication patterns
+ * - Verify received data integrity
+ * - Measure communication performance
  *
- * This technology is used in resolving shared vertices / sets between partitions
- * It is used in the mbcoupler for sending data (target points) to the proper processor, and
- * communicate back the results. Also, it is used to communicate departure mesh for intersection in
- * parallel
+ * The Crystal Router is used for sparse communication patterns where
+ * each processor communicates with only a subset of other processors,
+ * avoiding the overhead of full all-to-all communication.
  *
- *  It is a way of doing  MPI_gatheralltoallv(), when the communication matrix is sparse
+ * @author MOAB Development Team
+ * @date 2024
  *
- *  It is assumed that every proc needs to communicate only with a few of the other processors.
- *  If every processor needs to communicate with all other, then we will have to use paired isend
- * and irecv, the communication matrix is full
- *
- *  the example needs to be launched in parallel.
- *  Every proc will build a list of tuples, that will be send to a few procs;
- *  In general, we will send to num_comms tasks, and about num_tuples to each task
- *  We vary num_comms and num_tuples for processor
- *
- *  we will send long ints of the form
- *    100000 * send + 1000* rank +j, where j is the index of tuple
- *
- *  after routing, we verify we received
- *    100000 * rank + 1000 * from
- *
- *    For some reportrank we also print the tuples.
- *
- *  after routing, we will see if we received, as expected. Should run on at least 2 processors.
- *
- * Note: We do not need a moab instance for this example
- *
- */
-
-/** @example CrystalRouterExample.cpp \n
- * \brief generalized gather scatter using tuples \n
  * <b>To run</b>: mpiexec -np \c n CrystalRouterExample -r [reportrank] -t [num_tuples] -n
  * [num_comms] \n
  *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
+// This example will show one of the building blocks of parallel infrastructure in MOAB
+// More exactly, if we have some homogeneous data to communicate from each processor to a list of
+// other processors, how do we do it?
+//
+// introduce the TupleList and crystal router to MOAB users.
+//
+// This technology is used in resolving shared vertices / sets between partitions
+// It is used in the mbcoupler for sending data (target points) to the proper processor, and
+// communicate back the results. Also, it is used to communicate departure mesh for intersection in
+// parallel
+//
+//  It is a way of doing  MPI_gatheralltoallv(), when the communication matrix is sparse
+//
+//  It is assumed that every proc needs to communicate only with a few of the other processors.
+//  If every processor needs to communicate with all other, then we will have to use paired isend
+// and irecv, the communication matrix is full
+//
+//  the example needs to be launched in parallel.
+//  Every proc will build a list of tuples, that will be send to a few procs;
+//  In general, we will send to num_comms tasks, and about num_tuples to each task
+//  We vary num_comms and num_tuples for processor
+//
+//  we will send long ints of the form
+//    100000 * send + 1000* rank +j, where j is the index of tuple
+//
+//  after routing, we verify we received
+//    100000 * rank + 1000 * from
+//
+//    For some reportrank we also print the tuples.
+//
+//  after routing, we will see if we received, as expected. Should run on at least 2 processors.
+//
+// Note: We do not need a moab instance for this example
+//
 //
 #include "moab/MOABConfig.h"
 #ifdef MOAB_HAVE_MPI
@@ -155,7 +171,7 @@ int main( int argc, char** argv )
 
     clock_t tt = clock();
     // All communication happens here; no mpi calls for the user
-    ErrorCode rval = cd->gs_transfer( 1, tl, 0 );MB_CHK_SET_ERR( rval, "Error in tuple transfer" );
+    MB_CHK_SET_ERR( cd->gs_transfer( 1, tl, 0 ), "Error in tuple transfer" );
 
     double secs = 0;
     if( rank == reportrank || ( reportrank >= size && 0 == rank ) )
@@ -182,8 +198,7 @@ int main( int argc, char** argv )
 
     if( rank == reportrank || ( reportrank >= size && 0 == rank ) )
     {
-        cout << "communication of about " << total_n_tuples << " tuples/per proc took " << secs << " seconds"
-             << "\n";
+        cout << "communication of about " << total_n_tuples << " tuples/per proc took " << secs << " seconds" << "\n";
         tt = clock();
     }
 

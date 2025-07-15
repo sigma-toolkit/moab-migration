@@ -1,4 +1,24 @@
-/** @example LaplacianSmoother.cpp \n
+/**
+ * @file LaplacianSmoother.cpp
+ * @brief Example demonstrating Laplacian smoothing for mesh optimization
+ *
+ * This example shows how to:
+ * - Load a parallel mesh with ghost layers
+ * - Perform Laplacian smoothing iterations for mesh optimization
+ * - Handle fixed vertices (e.g., boundary vertices)
+ * - Use Humphrey's Classes algorithm to reduce shrinkage
+ * - Apply Aitken acceleration for improved convergence
+ * - Perform uniform mesh refinement with smoothing
+ * - Measure mesh quality using Verdict metrics
+ * - Write the smoothed mesh to a parallel file
+ *
+ * Laplacian smoothing moves vertices to the average position of their
+ * connected neighbors, improving mesh quality while preserving topology.
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+
  * \brief Perform Laplacian relaxation on a mesh and its dual \n
  * <b>To run</b>: mpiexec -np \c np LaplacianSmoother [filename]\n
  *
@@ -18,6 +38,10 @@
  *
  * Usage: mpiexec -n 2 valgrind ./LaplacianSmoother -f input/surfrandomtris-64part.h5m -r 2 -p 2 -n
  * 25
+ *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 
 #include <iostream>
@@ -331,7 +355,7 @@ ErrorCode perform_laplacian_smoothing( Core* mb,
     if( global_size > 1 )
     {
 #ifdef MOAB_HAVE_MPI
-        rval = pcomm->filter_pstatus( verts, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &owned_verts );MB_CHK_ERR( rval );
+        MB_CHK_ERR( pcomm->filter_pstatus( verts, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &owned_verts ) );
 #endif
     }
     else
@@ -339,7 +363,7 @@ ErrorCode perform_laplacian_smoothing( Core* mb,
 
 #ifdef MOAB_HAVE_MPI
     // Get shared owned verts, for exchanging tags
-    rval = pcomm->get_shared_entities( -1, shared_owned_verts, 0, false, true );MB_CHK_ERR( rval );
+    MB_CHK_ERR( pcomm->get_shared_entities( -1, shared_owned_verts, 0, false, true ) );
     // Workaround: if no shared owned verts, put a non-shared one in the list, to prevent exchanging
     // tags for all shared entities
     if( shared_owned_verts.empty() ) shared_owned_verts.insert( *verts.begin() );

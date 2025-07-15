@@ -1,11 +1,11 @@
-/*
-   This example takes a .cub mesh file as input and prints out the total area of
-   meshes in each surface of the model. It works for tri and quad elements.
-   It makes use of CUBIT's reserved tag - GEOM_DIMENSION and GLOBAL_ID tag.
-   Both GLOBAL_ID & GEOM_DIMENSION tag are associated with all the geometric
-   entities in a .cub file. Note: The program would give incorrect result for a
-   non-convex element, since it breaks polygons into triangles for computing the area
-*/
+/** @example SurfArea.cpp
+ * This example takes a .cub mesh file as input and prints out the total area of
+ * meshes in each surface of the model. It works for tri and quad elements.
+ * It makes use of CUBIT's reserved tag - GEOM_DIMENSION and GLOBAL_ID tag.
+ * Both GLOBAL_ID & GEOM_DIMENSION tag are associated with all the geometric
+ * entities in a .cub file. Note: The program would give incorrect result for a
+ * non-convex element, since it breaks polygons into triangles for computing the area.
+ */
 
 #include "moab/Core.hpp"
 #include "moab/Range.hpp"

@@ -1,4 +1,23 @@
-/** @example ContinentsOnGlobe
+/**
+ * @file ContinentsOnGlobe.cpp
+ * @brief Example demonstrating continent boundary detection on spherical meshes
+ *
+ * This example shows how to:
+ * - Load spherical mesh files and continent boundary data
+ * - Convert 3D spherical coordinates to 2D lat-lon coordinates
+ * - Perform point-in-polygon tests for continent detection
+ * - Create mesh sets for different continents and islands
+ * - Tag mesh elements with continent information
+ * - Handle complex boundary loops for major landmasses
+ * - Write continent-mapped mesh files
+ *
+ * This tool is useful for climate and geophysical applications
+ * where continent boundaries need to be identified on spherical meshes.
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+ * @example ContinentsOnGlobe.cpp
  * Description: read a mesh on a sphere and boundaries of continents and major islands,
  *   and write a boundaries mesh file (bound.vtk) and a file with sets for major continents
  * (map.h5m). Boundaries exist as 2 files, a list of boundary points and a list of loops,
@@ -6,6 +25,10 @@
  * 1239 edges/segments (Asia+Europe), while the last one has only 3. It must be a small island :)
  *    ContinentsOnGlobe  <input.h5m>
  *  default values: poly2000.h5m : a mesh with 2000 polygons on a sphere of radius 1
+ *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 
 #include "moab/Core.hpp"

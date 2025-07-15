@@ -1,7 +1,24 @@
 /** @example ReadPartFile.cpp
+ * This example demonstrates how to read partition files created by Zoltan processes
+ * and apply them to MOAB meshes. It shows how to:
+ * - Load a mesh file and a partition file
+ * - Remove existing partition sets from the mesh
+ * - Create new partition sets based on the partition file
+ * - Assign entities to appropriate partition sets
+ * - Handle parallel partitioning with global IDs
+ * - Write the partitioned mesh to a new file
  *
- * read partition file created by a Zoltan process, that used the global ids for
- * identification of entities
+ * The partition file contains entity-to-partition assignments where entities
+ * are identified by their global IDs. This is useful for load balancing
+ * and parallel mesh processing workflows.
+ *
+ * Usage: ./ReadPartFile <input_mesh> <partition_file> <num_parts> <output_file>
+ *
+ * Example:
+ * ./ReadPartFile mesh.h5m partition.txt 4 partitioned_mesh.h5m
+ *
+ * The partition file should contain one integer per entity (in order)
+ * indicating which partition (0 to num_parts-1) each entity belongs to.
  */
 
 #include "moab/Core.hpp"
@@ -19,6 +36,7 @@ using namespace std;
 string test_file_name = string( MESH_DIR ) + string( "/3k-tri-sphere.vtk" );
 string part_file_name;
 int nparts;
+
 int main( int argc, char** argv )
 {
     // Get MOAB instance
@@ -38,6 +56,7 @@ int main( int argc, char** argv )
         cerr << " usage is " << argv[0] << " <input file> <part file> <#parts> <output file> \n";
         exit( 0 );
     }
+
     ifstream inFile;
     inFile.open( part_file_name.c_str() );
     if( !inFile )
@@ -45,22 +64,24 @@ int main( int argc, char** argv )
         cerr << "Unable to open file " << part_file_name << "\n";
         exit( 1 );  // call system to stop
     }
+
     // Load the mesh from file
-    ErrorCode rval = mb->load_mesh( test_file_name.c_str() );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->load_mesh( test_file_name.c_str() ) );
 
     // Get sets entities, by type
     Range sets;
-    rval = mb->get_entities_by_type( 0, MBENTITYSET, sets );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type( 0, MBENTITYSET, sets ) );
 
     // Output the number of sets
     cout << "Number of sets is " << sets.size() << endl;
-    // remove the sets that have a PARALLEL_PARTITION tag
 
+    // remove the sets that have a PARALLEL_PARTITION tag
     Tag tag;
-    rval = mb->tag_get_handle( "PARALLEL_PARTITION", tag );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_get_handle( "PARALLEL_PARTITION", tag ) );
 
     int i                = 0;
     int num_deleted_sets = 0;
+    ErrorCode rval;
     for( Range::iterator it = sets.begin(); it != sets.end(); it++, i++ )
     {
         EntityHandle eh = *it;
@@ -74,13 +95,14 @@ int main( int argc, char** argv )
         }
     }
     if( num_deleted_sets ) cout << "delete " << num_deleted_sets << " existing  partition sets, and create new ones \n";
+
     Range cells;  // get them by dimension 2!
-    rval = mb->get_entities_by_dimension( 0, 2, cells );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_dimension( 0, 2, cells ) );
     EntityHandle* psets = new EntityHandle[nparts];
     for( int i = 0; i < nparts; i++ )
     {
-        rval = mb->create_meshset( MESHSET_SET, psets[i] );MB_CHK_ERR( rval );
-        rval = mb->tag_set_data( tag, &( psets[i] ), 1, &i );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->create_meshset( MESHSET_SET, psets[i] ) );
+        MB_CHK_ERR( mb->tag_set_data( tag, &( psets[i] ), 1, &i ) );
     }
 
     for( Range::iterator it = cells.begin(); it != cells.end(); it++ )
@@ -88,10 +110,12 @@ int main( int argc, char** argv )
         int part;
         EntityHandle eh = *it;
         inFile >> part;
-        rval = mb->add_entities( psets[part], &eh, 1 );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->add_entities( psets[part], &eh, 1 ) );
     }
-    mb->write_file( argv[4] );
 
+    MB_CHK_ERR( mb->write_file( argv[4] ) );
+
+    delete[] psets;
     delete mb;
 
     return 0;

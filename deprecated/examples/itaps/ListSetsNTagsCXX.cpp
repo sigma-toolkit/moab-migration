@@ -1,9 +1,9 @@
-/** ListSetsNTags: list sets & tags from a mesh
- *
- * This program shows how to read and list sets and tags from a mesh
+/** @example ListSetsNTagsCXX.cpp
+ * This program shows how to read and list sets and tags from a mesh.
+ * It demonstrates using the iMesh interface to load a mesh file,
+ * get all entity sets, iterate through them, and list their tags with values.
  *
  * Usage: SetsNTags \c mesh_file_name
- *
  */
 
 #include <iostream>

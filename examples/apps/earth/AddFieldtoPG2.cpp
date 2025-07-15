@@ -1,3 +1,27 @@
+/**
+ * @file AddFieldtoPG2.cpp
+ * @brief Example demonstrating addition of field data from phys grid to PG2 mesh
+ *
+ * This example shows how to:
+ * - Load PG2 mesh and phys grid solution files
+ * - Extract variable data from phys grid
+ * - Match entities between phys grid and PG2 mesh using global IDs
+ * - Copy variable data to PG2 mesh cells
+ * - Write enhanced PG2 mesh files for visualization
+ *
+ * This tool is useful for transferring field data from phys grid
+ * solutions to PG2 mesh representations for climate model analysis.
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+
+ * Description: Add field data from phys grid to PG2 mesh for visualization and analysis
+ *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
+ */
 #include "moab/ProgOptions.hpp"
 #include "moab/Core.hpp"
 #include <iostream>

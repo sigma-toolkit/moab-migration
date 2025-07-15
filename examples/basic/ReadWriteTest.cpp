@@ -1,14 +1,20 @@
-/** @example ReadWriteTest.cpp \n
- * \brief Read mesh into MOAB and write some back \n
+/** @example ReadWriteTest.cpp
+ * This example demonstrates parallel mesh reading and writing with performance timing.
+ * It shows how to read a mesh file in parallel with specific options,
+ * write a mesh file in parallel with specific options,
+ * measure and report read/write performance times,
+ * handle parallel mesh operations with shared entities,
+ * and use different partition methods for parallel processing.
  *
- * <b>To run</b>: mpiexec -np 4 ReadWriteTest [input] [output] -O [read_opts] -o [write_opts]\n
+ * The example is designed for stress testing of MOAB's parallel
+ * reader/writer capabilities and provides timing information
+ * for performance analysis.
  *
- * used for stress test of reader/writer
- *  report times to read and write
+ * To run: mpiexec -np 4 ReadWriteTest [input] [output] -O [read_opts] -o [write_opts]
  *
- *  example ReadWriteTest ../MeshFiles/io/fv3x46x72.t.3.nc out.nc  \
- *  -O PARALLEL=READ_PART;PARTITION_METHOD=SQIJ;PARALLEL_RESOLVE_SHARED_ENTS;VARIABLE=T,U;  \
- *  -o PARALLEL=WRITE_PART;VARIABLE=T,U
+ * Example: ReadWriteTest ../MeshFiles/io/fv3x46x72.t.3.nc out.nc \
+ * -O PARALLEL=READ_PART;PARTITION_METHOD=SQIJ;PARALLEL_RESOLVE_SHARED_ENTS;VARIABLE=T,U; \
+ * -o PARALLEL=WRITE_PART;VARIABLE=T,U
  */
 
 #include "moab/Core.hpp"
@@ -71,7 +77,7 @@ int main( int argc, char** argv )
     int rank            = pcomm->proc_config().proc_rank();
 
     EntityHandle set;
-    ErrorCode rval = mb->create_meshset( MESHSET_SET, set );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->create_meshset( MESHSET_SET, set ) );
 
     clock_t tt = clock();
 
@@ -80,7 +86,7 @@ int main( int argc, char** argv )
              << " processors\n";
 
     // Read the file with the specified options
-    rval = mb->load_file( input_file.c_str(), &set, read_opts.c_str() );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->load_file( input_file.c_str(), &set, read_opts.c_str() ) );
 
     if( 0 == rank )
     {
@@ -89,7 +95,7 @@ int main( int argc, char** argv )
     }
 
     // Write back the file with the specified options
-    rval = mb->write_file( output_file.c_str(), 0, write_opts.c_str(), &set, 1 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->write_file( output_file.c_str(), 0, write_opts.c_str(), &set, 1 ) );
 
     if( 0 == rank )
     {

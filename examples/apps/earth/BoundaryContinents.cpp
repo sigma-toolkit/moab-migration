@@ -1,9 +1,32 @@
-/** @example BoundaryContinents
+/**
+ * @file BoundaryContinents.cpp
+ * @brief Example demonstrating creation of continent boundary edge meshes
+ *
+ * This example shows how to:
+ * - Load continent boundary point data and loop information
+ * - Create edge meshes from boundary point sequences
+ * - Convert 3D spherical coordinates to 2D lat-lon coordinates
+ * - Handle periodic boundary conditions for longitude wrapping
+ * - Remove long edges that cross the date line
+ * - Create mesh sets for boundary visualization
+ * - Write boundary meshes in VTK format
+ *
+ * This tool is useful for creating continent boundary meshes
+ * for climate and geophysical applications.
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+ * @example BoundaryContinents.cpp
  * Description: read boundary points and loops that form islands and continents
       and create an edge mesh file \n
  *
  *    BoundaryContinents  <boundary_points.dat> \c SaveLoopCounts
  * (default values can run if users don't specify input files)
+ *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 
 #include "moab/Core.hpp"

@@ -1,8 +1,32 @@
-/** \brief This test shows how to extract mesh from a model, based on distance.
+/**
+ * @file ExtractClose.cpp
+ * @brief Example demonstrating extraction of mesh elements based on distance from a point
+ *
+ * This example shows how to:
+ * - Load a large mesh file
+ * - Extract elements within a specified distance from a point
+ * - Handle both Cartesian and spherical coordinate systems
+ * - Compute element centroids for distance calculations
+ * - Create mesh sets for extracted elements
+ * - Write extracted mesh subsets to new files
+ *
+ * This is particularly useful for debugging large mesh files where
+ * you need to examine elements near a specific location without
+ * loading the entire mesh into memory.
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+
+ * \brief This test shows how to extract mesh from a model, based on distance.
  *
  * MOAB's It is needed to extract from large mesh files cells close to some point, where we suspect
  * errors It would be useful for 9Gb input file that we cannot visualize, but we have overlapped
  * elements.
+ *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 
 #include <iostream>
@@ -66,8 +90,8 @@ int main( int argc, char** argv )
 
     // Load the file into a new file set
     EntityHandle fileSet;
-    ErrorCode rval = mb.create_meshset( MESHSET_SET, fileSet );MB_CHK_SET_ERR( rval, "Error creating file set" );
-    rval = mb.load_file( inputFile.c_str(), &fileSet, readopts.c_str() );MB_CHK_SET_ERR( rval, "Error loading file" );
+    MB_CHK_SET_ERR( mb.create_meshset( MESHSET_SET, fileSet ), "Error creating file set" );
+    MB_CHK_SET_ERR( mb.load_file( inputFile.c_str(), &fileSet, readopts.c_str() ), "Error loading file" );
 
     if( !rank )
     {
@@ -77,13 +101,13 @@ int main( int argc, char** argv )
     }
     // Get all 2d elements in the file set
     Range elems;
-    rval = mb.get_entities_by_dimension( fileSet, 2, elems );MB_CHK_SET_ERR( rval, "Error getting 2d elements" );
+    MB_CHK_SET_ERR( mb.get_entities_by_dimension( fileSet, 2, elems ), "Error getting 2d elements" );
 
     // create a meshset with close elements
     EntityHandle outSet;
 
     // create meshset
-    rval = mb.create_meshset( MESHSET_SET, outSet );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.create_meshset( MESHSET_SET, outSet ) );
 
     // double sphere radius is 1
     CartVect point( x, y, z );
@@ -102,7 +126,7 @@ int main( int argc, char** argv )
     {
         EntityHandle cell = *it;
         CartVect center;
-        rval = mb.get_coords( &cell, 1, &( center[0] ) );MB_CHK_SET_ERR( rval, "Can't get cell center coords" );
+        MB_CHK_SET_ERR( mb.get_coords( &cell, 1, &( center[0] ) ), "Can't get cell center coords" );
         double dist = ( center - point ).length();
         if( dist <= distance )
         {
@@ -110,7 +134,7 @@ int main( int argc, char** argv )
         }
     }
 
-    rval = mb.add_entities( outSet, closeByCells );MB_CHK_SET_ERR( rval, "Can't add to entity set" );
+    MB_CHK_SET_ERR( mb.add_entities( outSet, closeByCells ), "Can't add to entity set" );
 
     int numCells = (int)closeByCells.size();
 
@@ -126,9 +150,8 @@ int main( int argc, char** argv )
                       << "\n";
         string writeOpts;
         if( numProcesses > 1 ) writeOpts = string( "PARALLEL=WRITE_PART;" );
-        rval = mb.write_file( outFile.c_str(), 0, writeOpts.c_str(), &outSet, 1 );MB_CHK_SET_ERR( rval, "Can't write file" );
+        MB_CHK_SET_ERR( mb.write_file( outFile.c_str(), 0, writeOpts.c_str(), &outSet, 1 ), "Can't write file" );
     }
-
 
     return 0;
 }

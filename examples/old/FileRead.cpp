@@ -1,3 +1,9 @@
+/** @example FileRead.cpp
+ * This example demonstrates how to read Triangle mesh output files (.node and .ele formats)
+ * and import them into MOAB. Triangle is a 2D mesh generator that produces .node and .ele files.
+ * This example shows how to parse node coordinates and element connectivity from these files
+ * and create MOAB entities from the external mesh data.
+ */
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -25,13 +31,7 @@ ErrorCode ReadTriangleOutput( Interface* mb, string fileBase )
     //
     // get the read interface from moab
     ReadUtilIface* iface;
-    ErrorCode rval = mb->query_interface( iface );
-    //
-    if( MB_SUCCESS != rval )
-    {
-        cout << "Can't get interface.\n";
-        return MB_FAILURE;
-    }
+    MB_CHK_SET_ERR( mb->query_interface( iface ), "Can't get interface" );
     // Triangle default <name>.node
     string nodeFileName = fileBase + ".node";
     ifstream nodeFile( nodeFileName.c_str() );
@@ -72,7 +72,7 @@ ErrorCode ReadTriangleOutput( Interface* mb, string fileBase )
     //   also, it will return a starting handle for the node sequence
     vector< double* > arrays;
     EntityHandle startv;
-    rval = iface->get_node_coords( 2, num_nodes, 0, startv, arrays );
+    MB_CHK_SET_ERR( iface->get_node_coords( 2, num_nodes, 0, startv, arrays ), "Failed to get node coordinates" );
     for( int i = 0; i < num_nodes; i++ )
     {
         getline( nodeFile, line );
@@ -102,7 +102,8 @@ ErrorCode ReadTriangleOutput( Interface* mb, string fileBase )
     EntityHandle* starth;  // the connectivity array that will get populated
                            // with triangle data
     // allocate block of triangle handles and read connectivity into them
-    rval = iface->get_element_connect( num_triangles, 3, MBTRI, 0, starte, starth );
+    MB_CHK_SET_ERR( iface->get_element_connect( num_triangles, 3, MBTRI, 0, starte, starth ),
+                    "Failed to get element connectivity" );
 
     for( int j = 0; j < num_triangles; j++ )
     {
@@ -151,13 +152,10 @@ int main( int argc, char** argv )
     // get MOAB instance and read the file
     Core* mb = new Core();
 
-    ErrorCode rval = ReadTriangleOutput( mb, filename );
+    MB_CHK_SET_ERR( ReadTriangleOutput( mb, filename ), "Failed to read Triangle output" );
 
-    if( rval == MB_SUCCESS )
-    {
-        cout << "Writing output file " << outfile << endl;
-        mb->write_file( outfile );
-    }
+    cout << "Writing output file " << outfile << endl;
+    MB_CHK_SET_ERR( mb->write_file( outfile ), "Failed to write output file" );
 
     delete mb;
 

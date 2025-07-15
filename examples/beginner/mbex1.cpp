@@ -1,15 +1,15 @@
-/// \file mbex1.cpp
-///
-/// \author Milad Fatenejad
-///
-/// \brief beginner tutorial, example 1: Demonstrates
-///        constructing/saving a simple 2x2x2 hex mesh
-///
-/// This example creates a 2x2x2 mesh (uniform grid) and writes it out
-/// to a VTK file and an H5M file. Each cell is of size 1x1x1 and is
-/// axis aligned. This example demonstrates how to manually create a
-/// mesh using the unstructured mesh interface. The mesh is then
-/// written out to file.
+/** @example mbex1.cpp
+ * \brief beginner tutorial, example 1: Demonstrates
+ *        constructing/saving a simple 2x2x2 hex mesh
+ *
+ * This example creates a 2x2x2 mesh (uniform grid) and writes it out
+ * to a VTK file and an H5M file. Each cell is of size 1x1x1 and is
+ * axis aligned. This example demonstrates how to manually create a
+ * mesh using the unstructured mesh interface. The mesh is then
+ * written out to file.
+ *
+ * \author Milad Fatenejad
+ */
 
 // The moab/Core.hpp header file is needed for all MOAB work...
 #include "moab/Core.hpp"
@@ -62,7 +62,7 @@ int main()
     // can also be stored in vectors or arrays, but ranges are much more
     // memory efficient, so use them when possible!
     moab::Range vertex_handles;
-    rval = mbcore.create_vertices( vertex_coords, NUMVTX, vertex_handles );MB_CHK_SET_ERR( rval, "create_vertices failed" );
+    MB_CHK_SET_ERR( mbcore.create_vertices( vertex_coords, NUMVTX, vertex_handles ), "create_vertices failed" );
 
     // You can print out a range to see what elements it contains:
     std::cout << "Created 27 vertex entities:" << vertex_handles;
@@ -107,7 +107,7 @@ int main()
     moab::EntityHandle element;
     for( unsigned i = 0; i < NUMHEX; ++i )
     {
-        rval = mbcore.create_element( moab::MBHEX, conn[i], 8, element );MB_CHK_SET_ERR( rval, "create_element failed" );
+        MB_CHK_SET_ERR( mbcore.create_element( moab::MBHEX, conn[i], 8, element ), "create_element failed" );
 
         hexahedron_handles.insert( element );
     }
@@ -128,7 +128,7 @@ int main()
     // because it is text based and will work whether or not you've got
     // HDF5, NETCDF, etc... installed and is a fairly standard file
     // format so a lot of tools work with it out of the box.
-    rval = mbcore.write_file( "mbex1.vtk" );MB_CHK_SET_ERR( rval, "write_file(mbex1.vtk) failed" );
+    MB_CHK_SET_ERR( mbcore.write_file( "mbex1.vtk" ), "write_file failed" );
 
     return 0;
 }

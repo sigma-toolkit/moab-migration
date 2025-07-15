@@ -80,15 +80,15 @@ int main( int argc, char** argv )
              << " processors on " << nbComms << " communicator(s)\n";
 
     // Read the file with the specified options
-    ErrorCode rval = mb->load_file( test_file_name.c_str(), 0, options.c_str() );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->load_file( test_file_name.c_str(), 0, options.c_str() ) );
 
     Range shared_ents;
     // Get entities shared with all other processors
-    rval = pcomm->get_shared_entities( -1, shared_ents );MB_CHK_ERR( rval );
+    MB_CHK_ERR( pcomm->get_shared_entities( -1, shared_ents ) );
 
     // Filter shared entities with not not_owned, which means owned
     Range owned_entities;
-    rval = pcomm->filter_pstatus( shared_ents, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &owned_entities );MB_CHK_ERR( rval );
+    MB_CHK_ERR( pcomm->filter_pstatus( shared_ents, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &owned_entities ) );
 
     unsigned int nums[4] = { 0 };  // to store the owned entities per dimension
     for( int i = 0; i < 4; i++ )
@@ -114,8 +114,8 @@ int main( int argc, char** argv )
     // Repeat the reports, after ghost exchange
     shared_ents.clear();
     owned_entities.clear();
-    rval = pcomm->get_shared_entities( -1, shared_ents );MB_CHK_ERR( rval );
-    rval = pcomm->filter_pstatus( shared_ents, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &owned_entities );MB_CHK_ERR( rval );
+    MB_CHK_ERR( pcomm->get_shared_entities( -1, shared_ents ) );
+    MB_CHK_ERR( pcomm->filter_pstatus( shared_ents, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &owned_entities ) );
 
     // Find out how many shared entities of each dimension are owned on this processor
     for( int i = 0; i < 4; i++ )

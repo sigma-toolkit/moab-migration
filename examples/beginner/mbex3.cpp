@@ -1,22 +1,13 @@
-/// \file mbex3.cpp
-///
-/// \author Milad Fatenejad
-///
-/// \brief beginner tutorial, example 3: Demonstrates
-///        constructing/saving a simple 2x2x2 hex mesh using the
-///        structured mesh interface
-///
-/// In this example, we create a 2x2x2 mesh that is identical to the
-/// previous example. However, in this case we will use the structured
-/// mesh interface since the mesh we created is logically
-/// structured. There are many advantages to using the structured mesh
-/// interface...such as memory savings, speed, ease-of-use...
-///
-/// In the previous example, we had to create 27 vertexes manually,
-/// define the connectivity, then manually create 8 hexahedrons. With
-/// the structured mesh interface, we just have to create the 27
-/// vertexes then tell MOAB that these define a 2x2x2 structured mesh
-/// and everything else is taken care of for us!
+/** @example mbex3.cpp
+ * \brief beginner tutorial, example 3: Demonstrates creating sets and tags
+ *
+ * In this example, we read in the VTK file (mbex2.vtk) generated
+ * in example 2, and demonstrate how to create sets and tags.
+ * We will create a set for each hexahedron, and add a tag to
+ * each set with some data.
+ *
+ * \author Milad Fatenejad
+ */
 
 // The moab/Core.hpp header file is needed for all MOAB work...
 #include "moab/Core.hpp"
@@ -59,7 +50,7 @@ int main()
     // for mbcore and will point scdint to it. This is how you tell moab
     // that our moab::Core instance is going to represent a structured
     // mesh.
-    rval = mbint.query_interface( scdint );MB_CHK_SET_ERR( rval, "mbint.query_interface failed" );
+    MB_CHK_SET_ERR( mbint.query_interface( scdint ), "mbint.query_interface failed" );
 
     // Structured meshes a divided into "boxes". Each box represents a
     // little structured mesh. A single mesh, for example a
@@ -67,7 +58,9 @@ int main()
     // example, we want to create a single, 2x2x2 box. The construct_box
     // method will do this for us.
     moab::ScdBox* scdbox = NULL;
-    rval = scdint->construct_box( moab::HomCoord( 0, 0, 0 ), moab::HomCoord( 2, 2, 2 ), vertex_coords, NUMVTX, scdbox );MB_CHK_SET_ERR( rval, "scdint->construct_box failed" );
+    MB_CHK_SET_ERR( scdint->construct_box( moab::HomCoord( 0, 0, 0 ), moab::HomCoord( 2, 2, 2 ), vertex_coords, NUMVTX,
+                                           scdbox ),
+                    "scdint->construct_box failed" );
 
     // moab::HomCoord is a little class that is used to represent a
     // coordinate in logical space. Above, we told MOAB that we want
@@ -108,7 +101,7 @@ int main()
     // ***************************
     // *   Write Mesh to Files   *
     // ***************************
-    rval = mbint.write_file( "mbex3.vtk" );MB_CHK_SET_ERR( rval, "write_file(mbex3.vtk) failed" );
+    MB_CHK_SET_ERR( mbint.write_file( "mbex3.vtk" ), "write_file(mbex3.vtk) failed" );
 
     return 0;
 }

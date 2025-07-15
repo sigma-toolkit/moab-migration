@@ -1,6 +1,18 @@
-/** @example ComputeTriDual.cpp \n
- * \brief Compute the polygonal (dual) mesh of the primal simplex grid in 2-D. \n
- * <b>To run</b>: ComputeTriDual  input_file output_file \n
+/** @example ComputeTriDual.cpp
+ * This example demonstrates computation of dual polygonal mesh from primal triangulation.
+ * It shows how to load a triangular mesh from a file,
+ * compute the dual polygonal mesh of a triangulation,
+ * handle spherical surface triangulations,
+ * create dual vertices at triangle centroids,
+ * generate dual polygons around primal vertices,
+ * orient dual polygons correctly on spherical surfaces,
+ * preserve global IDs during dual mesh construction,
+ * and write the dual mesh to a new file.
+ *
+ * The dual mesh computation is particularly useful for finite volume
+ * methods and other applications requiring dual grid structures.
+ *
+ * To run: ComputeTriDual input_file output_file
  * An example to demonstrate computing the dual polygonal grid of a triangulation
  * on a spherical surface.
  */
@@ -27,24 +39,24 @@ moab::ErrorCode compute_dual_mesh( moab::Interface* mb, moab::EntityHandle& dual
     moab::ErrorCode rval;
 
     moab::Range verts;
-    rval = mb->get_connectivity( cells, verts );MB_CHK_SET_ERR( rval, "Failed to get connectivity" );
+    MB_CHK_SET_ERR( mb->get_connectivity( cells, verts ), "Failed to get connectivity" );
 
     moab::ReadUtilIface* iface;
-    rval = mb->query_interface( iface );MB_CHK_SET_ERR( rval, "Can't get reader interface" );
+    MB_CHK_SET_ERR( mb->query_interface( iface ), "Can't get reader interface" );
 
     moab::EntityHandle startv;
     std::vector< double* > ccenters;
-    rval = iface->get_node_coords( 3, cells.size(), 0, startv, ccenters );MB_CHK_SET_ERR( rval, "Can't get node coords" );
+    MB_CHK_SET_ERR( iface->get_node_coords( 3, cells.size(), 0, startv, ccenters ), "Can't get node coords" );
 
     moab::Tag gidTag = mb->globalId_tag();
 
     std::vector< int > gids( cells.size() );
-    rval = mb->get_coords( cells, ccenters[0], ccenters[1], ccenters[2] );MB_CHK_SET_ERR( rval, "Failed to get coordinates" );
-    rval = mb->tag_get_data( gidTag, cells, &gids[0] );MB_CHK_SET_ERR( rval, "Can't set global_id tag" );
+    MB_CHK_SET_ERR( mb->get_coords( cells, ccenters[0], ccenters[1], ccenters[2] ), "Failed to get coordinates" );
+    MB_CHK_SET_ERR( mb->tag_get_data( gidTag, cells, &gids[0] ), "Can't set global_id tag" );
 
     moab::Range dualverts( startv, startv + cells.size() - 1 );
-    rval = mb->add_entities( dual_set, dualverts );MB_CHK_SET_ERR( rval, "Can't add entities" );
-    rval = mb->tag_set_data( gidTag, dualverts, &gids[0] );MB_CHK_SET_ERR( rval, "Can't set global_id tag" );
+    MB_CHK_SET_ERR( mb->add_entities( dual_set, dualverts ), "Can't add entities" );
+    MB_CHK_SET_ERR( mb->tag_set_data( gidTag, dualverts, &gids[0] ), "Can't set global_id tag" );
 
 #define CC( ind ) moab::CartVect( ccenters[0][ind], ccenters[1][ind], ccenters[2][ind] )
 #define CCXMY( ind, cv ) \
@@ -62,11 +74,11 @@ moab::ErrorCode compute_dual_mesh( moab::Interface* mb, moab::EntityHandle& dual
 
         std::vector< moab::EntityHandle > adjs;
         // generate all required adjacencies
-        rval = mb->get_adjacencies( &vtx, 1, 2, true, adjs );MB_CHK_SET_ERR( rval, "Failed to get adjacencies" );
+        MB_CHK_SET_ERR( mb->get_adjacencies( &vtx, 1, 2, true, adjs ), "Failed to get adjacencies" );
         const size_t nEdges = adjs.size();
 
         double vxyz[3];
-        rval = mb->get_coords( &vtx, 1, vxyz );MB_CHK_SET_ERR( rval, "Failed to get coordinates" );
+        MB_CHK_SET_ERR( mb->get_coords( &vtx, 1, vxyz ), "Failed to get coordinates" );
 
         // Reorient Faces
         moab::CartVect nodeCentral( vxyz );
@@ -137,7 +149,8 @@ moab::ErrorCode compute_dual_mesh( moab::Interface* mb, moab::EntityHandle& dual
         moab::EntityHandle starte;  // Connectivity
         moab::EntityHandle* conn;
 
-        rval = iface->get_element_connect( nElePerType, eit->first, moab::MBPOLYGON, 0, starte, conn );MB_CHK_SET_ERR( rval, "Can't get element connectivity" );
+        MB_CHK_SET_ERR( iface->get_element_connect( nElePerType, eit->first, moab::MBPOLYGON, 0, starte, conn ),
+                        "Can't get element connectivity" );
 
         // copy the connectivity that we have accumulated
         std::copy( eit->second.begin(), eit->second.end(), conn );
@@ -149,18 +162,18 @@ moab::ErrorCode compute_dual_mesh( moab::Interface* mb, moab::EntityHandle& dual
     }
 
     // add the computed dual cells to mesh
-    rval = mb->add_entities( dual_set, dualcells );MB_CHK_SET_ERR( rval, "Can't add polygonal entities" );
+    MB_CHK_SET_ERR( mb->add_entities( dual_set, dualcells ), "Can't add polygonal entities" );
 
     // Assign global IDs to all the dual cells - same as original vertices
     assert( dualcells.size() == verts.size() );
     gids.resize( verts.size() );
-    rval = mb->tag_get_data( gidTag, verts, &gids[0] );MB_CHK_SET_ERR( rval, "Can't set global_id tag" );
+    MB_CHK_SET_ERR( mb->tag_get_data( gidTag, verts, &gids[0] ), "Can't set global_id tag" );
     if( gids[0] == gids[1] && gids[0] < 0 )
     {
 #ifdef MOAB_HAVE_MPI
         moab::ParallelComm pcomm( mb, MPI_COMM_WORLD );
 
-        rval = pcomm.assign_global_ids( dual_set, 2, 1, false, true, true );MB_CHK_SET_ERR( rval, "Can't assign global_ids" );
+        MB_CHK_SET_ERR( pcomm.assign_global_ids( dual_set, 2, 1, false, true, true ), "Can't assign global_ids" );
 #else
         // No global ID assigned to input vertices.
         // Can we use std::iota ??
@@ -168,7 +181,7 @@ moab::ErrorCode compute_dual_mesh( moab::Interface* mb, moab::EntityHandle& dual
             gids[ix] = ix + 1;
 
         // set GID tag
-        rval = mb->tag_set_data( gidTag, dualcells, &gids[0] );MB_CHK_SET_ERR( rval, "Can't set global_id tag" );
+        MB_CHK_SET_ERR( mb->tag_set_data( gidTag, dualcells, &gids[0] ), "Can't set global_id tag" );
         std::cout << "GIDs: " << gids[0] << " " << gids[1] << " " << gids[2] << " " << gids[3] << " " << gids[4] << " "
                   << gids[5] << "\n";
 #endif
@@ -176,8 +189,8 @@ moab::ErrorCode compute_dual_mesh( moab::Interface* mb, moab::EntityHandle& dual
     gids.clear();
 
     // delete the original entities from the mesh
-    rval = mb->delete_entities( cells );MB_CHK_SET_ERR( rval, "Can't remove entities" );
-    rval = mb->delete_entities( verts );MB_CHK_SET_ERR( rval, "Can't remove entities" );
+    MB_CHK_SET_ERR( mb->delete_entities( cells ), "Can't remove entities" );
+    MB_CHK_SET_ERR( mb->delete_entities( verts ), "Can't remove entities" );
 
     return moab::MB_SUCCESS;
 }

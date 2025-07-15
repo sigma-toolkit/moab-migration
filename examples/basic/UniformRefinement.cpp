@@ -1,4 +1,15 @@
-/*This unit test is for the uniform refinement capability based on AHF datastructures*/
+/** @example UniformRefinement.cpp
+ * This example demonstrates uniform mesh refinement using MOAB's AHF data structures.
+ * It shows how to load a mesh file, use the NestedRefine class to perform uniform mesh refinement,
+ * control the number of refinement levels and degree at each level,
+ * and write the refined mesh hierarchy to a file.
+ *
+ * Usage:
+ *   ./UniformRefinement [filename] [level1_degree] [level2_degree] ...
+ *
+ * If no refinement degrees are specified, two levels are used by default.
+ */
+
 #include <iostream>
 #include "moab/Core.hpp"
 #include "moab/NestedRefine.hpp"
@@ -18,7 +29,8 @@ int main( int argc, char* argv[] )
     }
 
     const char* filename = argv[1];
-    error                = mbImpl->load_file( filename );MB_CHK_ERR( error );
+    error                = mbImpl->load_file( filename );
+    MB_CHK_ERR( error );
 
     NestedRefine uref( &mb );
 
@@ -40,11 +52,13 @@ int main( int argc, char* argv[] )
 
     std::cout << "Starting hierarchy generation" << std::endl;
     std::vector< EntityHandle > set;
-    error = uref.generate_mesh_hierarchy( num_levels, level_degrees.data(), set );MB_CHK_ERR( error );
+    error = uref.generate_mesh_hierarchy( num_levels, level_degrees.data(), set );
+    MB_CHK_ERR( error );
     std::cout << "Finished hierarchy generation" << std::endl;
 
     std::stringstream file;
     file << "mesh_hierarchy.h5m";
-    error = mbImpl->write_file( file.str().c_str() );MB_CHK_ERR( error );
+    error = mbImpl->write_file( file.str().c_str() );
+    MB_CHK_ERR( error );
     return 0;
 }

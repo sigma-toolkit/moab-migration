@@ -1,7 +1,28 @@
-/** @example TestErrorHandlingPar.cpp \n
+/**
+ * @file TestErrorHandlingPar.cpp
+ * @brief Example demonstrating parallel error handling in MOAB
+ *
+ * This example shows how to:
+ * - Initialize and finalize MOAB's error handler in parallel
+ * - Test different types of errors in parallel execution
+ * - Handle global fatal errors vs per-processor errors
+ * - Use parallel file loading with different partition methods
+ *
+ * The example demonstrates two test cases:
+ * - Test case 1: Tests a global fatal error (MB_NOT_IMPLEMENTED)
+ * - Test case 2: Tests a per-processor error (MB_FAILURE)
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+
  * Description: This example tests MOAB's trace back error handler in parallel.\n
  *
  * <b>To run</b>: mpiexec -np \c n ./TestErrorHandlingPar <test_case_num(1 to 2)> \n
+ *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 
 #include "moab/Core.hpp"
@@ -30,7 +51,7 @@ ErrorCode TestErrorHandlingPar_1()
     // Load a CAM-FV file and read a variable on edges (not supported yet)
     string test_file = string( MESH_DIR ) + string( "/io/fv3x46x72.t.3.nc" );
     opts += ";VARIABLE=US";
-    ErrorCode rval = mb.load_file( test_file.c_str(), NULL, opts.c_str() );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.load_file( test_file.c_str(), NULL, opts.c_str() ) );
 
     return MB_SUCCESS;
 }
@@ -51,7 +72,7 @@ ErrorCode TestErrorHandlingPar_2()
     // Load a CAM-FV file with an unknown partition method specified
     string test_file = string( MESH_DIR ) + string( "/io/fv3x46x72.t.3.nc" );
     opts += ";VARIABLE=T";
-    ErrorCode rval = mb.load_file( test_file.c_str(), NULL, opts.c_str() );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.load_file( test_file.c_str(), NULL, opts.c_str() ) );
 
     return MB_SUCCESS;
 }
@@ -77,10 +98,10 @@ int main( int argc, char** argv )
     switch( test_case_num )
     {
         case 1:
-            rval = TestErrorHandlingPar_1();MB_CHK_ERR( rval );
+            MB_CHK_ERR( TestErrorHandlingPar_1() );
             break;
         case 2:
-            rval = TestErrorHandlingPar_2();MB_CHK_ERR( rval );
+            MB_CHK_ERR( TestErrorHandlingPar_2() );
             break;
         default:
             break;

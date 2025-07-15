@@ -1,4 +1,23 @@
-/** @example addPCdata.cpp  Add point cloud data
+/**
+ * @file addPCdata.cpp
+ * @brief Example demonstrating addition of point cloud data to mesh files
+ *
+ * This example shows how to:
+ * - Load mesh files and point cloud data from H5M files
+ * - Match entities between different meshes using global IDs
+ * - Copy tag data from point cloud to mesh entities
+ * - Handle different data types (integer, double)
+ * - Support dual mesh operations for polygon data
+ * - Create new mesh files with enhanced data
+ * - Write enhanced meshes for visualization
+ *
+ * This tool is useful for adding point cloud data to mesh files
+ * for better visualization and analysis in tools like VisIt.
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+
  * this tool will take an existing h5m fine atm mesh file and add data from an h5m  type file with
  * point cloud mesh will support mainly showing the data with Visit
  *
@@ -16,6 +35,9 @@
  *
  *  file  wholeFineATM.h5m is obtained from a coupled run in e3sm, with the ne 11, np 4,
  *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 #include "moab/ProgOptions.hpp"
 #include "moab/Core.hpp"

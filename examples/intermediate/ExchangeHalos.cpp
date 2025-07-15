@@ -1,6 +1,7 @@
-/** @example ExchangeHalos Driver
- * \brief Example program that shows the use case for performing tag data exchange
- * between parallel processors in order to sync data on shared entities.
+/** @example ExchangeHalos.cpp
+ * 
+ * Example program that shows the use case for performing tag data exchange
+ * between parallel processors in order to sync data on shared entities. \n\n
  *
  * <b>This example </b>:
  *    -# Initialize MPI and instantiates MOAB

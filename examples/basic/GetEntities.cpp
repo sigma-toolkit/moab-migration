@@ -1,8 +1,14 @@
 /** @example GetEntities.cpp
- * Description: Get entities and report non-vertex entity connectivity and vertex adjacencies.\n
- * This example shows how to get connectivity and adjacencies.\n
+ * This example demonstrates entity querying and connectivity access.
+ * It shows how to get all entities in the mesh database,
+ * access entity connectivity (vertex connectivity for elements),
+ * query vertex adjacencies (elements connected to vertices),
+ * and iterate through entities and examine their properties.
  *
- * To run: ./GetEntities [meshfile]\n
+ * The program reads a mesh file and reports connectivity information
+ * for all non-vertex entities and adjacency information for vertices.
+ *
+ * To run: ./GetEntities [meshfile]
  * (default values can run if users don't specify a mesh file)
  */
 
@@ -31,19 +37,19 @@ int main( int argc, char** argv )
     // Instantiate & load a mesh from a file
     Core* mb = new( std::nothrow ) Core;
     if( NULL == mb ) return 1;
-    ErrorCode rval = mb->load_mesh( test_file_name.c_str() );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->load_mesh( test_file_name.c_str() ) );
 
     Range ents;
 
     // Get all entities in the database
-    rval = mb->get_entities_by_handle( 0, ents );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_handle( 0, ents ) );
 
     for( Range::iterator it = ents.begin(); it != ents.end(); ++it )
     {
         if( MBVERTEX == mb->type_from_handle( *it ) )
         {
             Range adjs;
-            rval = mb->get_adjacencies( &( *it ), 1, 3, false, adjs );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_adjacencies( &( *it ), 1, 3, false, adjs ) );
             cout << "Vertex " << mb->id_from_handle( *it ) << " adjacencies:" << endl;
             adjs.print();
         }
@@ -51,7 +57,7 @@ int main( int argc, char** argv )
         {
             const EntityHandle* connect;
             int num_connect;
-            rval = mb->get_connectivity( *it, connect, num_connect );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_connectivity( *it, connect, num_connect ) );
             cout << CN::EntityTypeName( mb->type_from_handle( *it ) ) << " " << mb->id_from_handle( *it )
                  << " vertex connectivity is: ";
             for( int i = 0; i < num_connect; i++ )

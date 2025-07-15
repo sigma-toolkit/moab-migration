@@ -239,13 +239,13 @@ program imoab_coupler_fortran
 
 #ifdef MOAB_HAVE_NETCDF
       atmocn_map_file_name = 'atm_ocn_map_f.nc'//C_NULL_CHAR
-      ierr = iMOAB_WriteMappingWeightsToFile( cplAtmOcnPID, weights_identifier1, atmocn_map_file_name)
+      ierr = iMOAB_WriteMapFile( cplAtmOcnPID, weights_identifier1, atmocn_map_file_name)
       call errorout(ierr, 'failed to write map file to disk')
 
       intx_from_file_identifier = 'map-from-file'//C_NULL_CHAR
       src_disc_type = 1;  ! element-based SE
       tgt_disc_type = 3;  ! element-based FV
-      ierr = iMOAB_LoadFromMappingFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &
+      ierr = iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &
                                                 src_disc_type, tgt_disc_type, &
                                                arearead, intx_from_file_identifier, atmocn_map_file_name)
       call errorout(ierr, 'failed to load map file from disk')

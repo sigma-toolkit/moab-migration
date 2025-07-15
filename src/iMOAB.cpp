@@ -3592,14 +3592,14 @@ static ErrCode set_aream_from_trivial_distribution( iMOAB_AppID pid, int N, std:
     return MB_SUCCESS;
 }
 
-ErrCode iMOAB_LoadFromMappingFile( iMOAB_AppID pid_source,
-                                   iMOAB_AppID pid_target,
-                                   iMOAB_AppID pid_intersection,
-                                   int* srctype,
-                                   int* tgttype,
-                                   int* arearead,
-                                   const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
-                                   const iMOAB_String remap_weights_filename )
+ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
+                           iMOAB_AppID pid_target,
+                           iMOAB_AppID pid_intersection,
+                           int* srctype,
+                           int* tgttype,
+                           int* arearead,
+                           const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
+                           const iMOAB_String remap_weights_filename )
 {
     assert( srctype && tgttype );
 
@@ -3768,7 +3768,7 @@ ErrCode iMOAB_LoadFromMappingFile( iMOAB_AppID pid_source,
     return moab::MB_SUCCESS;
 }
 
-ErrCode iMOAB_WriteMappingWeightsToFile(
+ErrCode iMOAB_WriteMapFile(
     iMOAB_AppID pid_intersection,
     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
     const iMOAB_String remap_weights_filename )

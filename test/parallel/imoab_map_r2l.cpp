@@ -212,7 +212,7 @@ int main( int argc, char* argv[] )
         int src_disc_type = 3;  // element-based FV
         int tgt_disc_type = 3;  // element-based FV
         int arearead = 0; // no need for aream
-        CHECKIERR( iMOAB_LoadFromMappingFile( cplRofPID, cplLndPID, cplRofLndPID, &src_disc_type, &tgt_disc_type,
+        CHECKIERR( iMOAB_LoadMapFile( cplRofPID, cplLndPID, cplRofLndPID, &src_disc_type, &tgt_disc_type,
                                               &arearead, intx_from_file_identifier.c_str(), mapFilename.c_str() ),
                    "failed to load map file from disk" );
         int type      = 3;  // FV

@@ -480,14 +480,14 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_NETCDF
         {
             const iMOAB_String atmocn_map_file_name = "atm_ocn_map.nc";
-            ierr = iMOAB_WriteMappingWeightsToFile( cplAtmOcnPID, weights_identifiers[0], atmocn_map_file_name );
+            ierr = iMOAB_WriteMapFile( cplAtmOcnPID, weights_identifiers[0], atmocn_map_file_name );
             CHECKIERR( ierr, "failed to write map file to disk" );
 
             const iMOAB_String intx_from_file_identifier = "atmocn-map-from-file";
             int src_disc_type                            = 1;  // element-based SE-4
             int tgt_disc_type                            = 3;  // element-based FV
             int arearead = 1; // read only area_a (atmosphere)
-            CHECKIERR( iMOAB_LoadFromMappingFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type,
+            CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type,
                                                          &tgt_disc_type, &arearead, intx_from_file_identifier,
                                                          atmocn_map_file_name ),
                        "failed to load map file from disk" );
@@ -519,12 +519,12 @@ int main( int argc, char* argv[] )
         {
             // const iMOAB_String atmlnd_file_identifier = "atmlnd-map-from-file";
             // const iMOAB_String atmlnd_map_file_name   = "atm_lnd_map.nc";
-            // ierr = iMOAB_WriteMappingWeightsToFile( cplAtmLndPID, weights_identifiers[1], atmlnd_map_file_name );
+            // ierr = iMOAB_WriteMapFile( cplAtmLndPID, weights_identifiers[1], atmlnd_map_file_name );
             // CHECKIERR( ierr, "failed to write map file to disk" );
 
             // int src_disc_type = 2;  // get the point-DoF
             // int tgt_disc_type = 2;  // get the point-DoF data (point clouds)
-            // CHECKIERR( iMOAB_LoadFromMappingFile( cplAtmPID, cplLndPID, cplAtmLndPID, &src_disc_type,
+            // CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplLndPID, cplAtmLndPID, &src_disc_type,
             //                                              &tgt_disc_type, &arearead, atmlnd_file_identifier, atmlnd_map_file_name ),
             //            "failed to load map file from disk" );
         }

@@ -197,7 +197,7 @@ test "xno" = "x$CHECK_FC" || CHECK_FC=yes
 # Check for debug flags
 AC_ARG_ENABLE( debug, AS_HELP_STRING([--enable-debug],[Debug symbols (-g)]),
                [enable_debug=$enableval], [enable_debug="no"] )
-AC_ARG_ENABLE( optimize, AS_HELP_STRING([--enable-optimize],[Compile optimized (-O3)]),
+AC_ARG_ENABLE( optimize, AS_HELP_STRING([--enable-optimize],[Compile optimized (-O2)]),
                [enable_optimize=$enableval; enable_cxx_optimize=$enableval; enable_cc_optimize=$enableval; enable_fc_optimize=$enableval;],
                [enable_optimize=""; enable_cxx_optimize="no"; enable_cc_optimize="no"; enable_fc_optimize="no";	]
              )
@@ -226,13 +226,13 @@ fi
 
 if (test "x$enable_cxx_optimize" != "xno"); then  # optimization flags
 #GNU
-EXTRA_GNU_CXXFLAGS="$EXTRA_GNU_CXXFLAGS -fno-fast-math -ffp-contract=off -fp-trap=common -fsanitize=float-cast-overflow,float-divide-by-zero"
-EXTRA_GNU_FCFLAGS="$EXTRA_GNU_FCFLAGS -fno-fast-math -ffp-contract=off -fp-trap=common"
+EXTRA_GNU_CXXFLAGS="$EXTRA_GNU_CXXFLAGS -fno-fast-math -fp-contract=off -fp-trap=common -fsanitize=float-cast-overflow,float-divide-by-zero"
+EXTRA_GNU_FCFLAGS="$EXTRA_GNU_FCFLAGS -fno-fast-math -fp-contract=off -fp-trap=common"
 #CLANG
-EXTRA_CLANG_CXXFLAGS="$EXTRA_CLANG_CXXFLAGS -fno-fast-math -ffp-model=source -ffp-contract=off"
-EXTRA_CLANG_FCFLAGS="$EXTRA_CLANG_FCFLAGS -fno-fast-math -ffp-model=source -ffp-contract=off"
+EXTRA_CLANG_CXXFLAGS="$EXTRA_CLANG_CXXFLAGS -fno-fast-math -fp-model=precise -fp-contract=off"
+EXTRA_CLANG_FCFLAGS="$EXTRA_CLANG_FCFLAGS -fno-fast-math fp-model=source -fp-contract=off"
 # Intel
-EXTRA_INTEL_CXXFLAGS="$EXTRA_INTEL_CXXFLAGS"
+EXTRA_INTEL_CXXFLAGS="$EXTRA_INTEL_CXXFLAGS -fp-model=precise"
 EXTRA_INTEL_FCFLAGS="$EXTRA_INTEL_FCFLAGS -fp-model source -prec-div"
 # PGI
 EXTRA_PGI_CXXFLAGS="$EXTRA_PGI_CXXFLAGS -Kieee -Mdaz=flush -Mfprelaxed=no"
@@ -295,20 +295,20 @@ else
   DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --enable-debug=no"
 fi
 if (test "xno" != "x$enable_cxx_optimize"); then
-  CXXFLAGS="$CXXFLAGS -O3 -DNDEBUG"
+  CXXFLAGS="$CXXFLAGS -O2 -DNDEBUG"
   DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --enable-optimize=yes"
 else
   DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --enable-optimize=no"
 fi
 if (test "xno" != "x$enable_cc_optimize"); then
-  CFLAGS="$CFLAGS -O3 -DNDEBUG"
+  CFLAGS="$CFLAGS -O2 -DNDEBUG"
 fi
 if (test "x$ENABLE_FORTRAN" != "xno"); then
   if (test "xno" != "x$enable_fc_optimize"); then
-    FCFLAGS="$FCFLAGS -O3"
+    FCFLAGS="$FCFLAGS -O2"
   fi
   if (test "xno" != "x$enable_f77_optimize"); then
-    FFLAGS="$FFLAGS -O3"
+    FFLAGS="$FFLAGS -O2"
   fi
   AC_FC_PP_DEFINE
 fi

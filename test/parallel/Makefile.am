@@ -20,6 +20,10 @@ AM_CPPFLAGS  = -I. \
                -I$(top_srcdir)/src/IntxMesh \
                -I$(top_srcdir)/src/io/mhdf/include
 
+# initialize
+HDF5_TESTS =
+NETCDF_TESTS =
+
 if ENABLE_mbcoupler
   AM_CPPFLAGS += -I$(top_srcdir)/tools/mbcoupler
 endif
@@ -42,7 +46,7 @@ TESTS = pcomm_unit \
         $(MBCSLAM_TESTS) $(IMOAB_TESTS)
 
 if HAVE_HDF5_PARALLEL
-  HDF5_TESTS = parallel_hdf5_test mhdf_parallel parallel_write_test \
+  HDF5_TESTS += parallel_hdf5_test mhdf_parallel parallel_write_test \
          parallel_adj parmerge_test augment_with_ghosts uref_hirec_test_parallel migrate_test \
          ghost_thin_layers commgraph_test 
 
@@ -70,24 +74,26 @@ if HAVE_TEMPESTREMAP
   imoab_domain_culling_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_read_compute_map_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
 if HAVE_NETCDF
-  HDF5_TESTS += imoab_map_target imoab_coupler_bilin imoab_domain_culling imoab_read_compute_map imoab_map_r2l
+  HDF5_TESTS += imoab_map_target imoab_coupler_bilin imoab_domain_culling imoab_read_compute_map
 endif
+if HAVE_PNETCDF
+  NETCDF_TESTS += imoab_map_r2l
+  imoab_map_r2l_SOURCES = imoab_map_r2l.cpp
+endif
+
 if HAVE_EXTMESHES
   HDF5_TESTS +=  imoab_apg2_ol_coupler
   DEFS += -DEXT_DATA_DIR="$(builddir)/../../sandbox/MeshFiles/"
   imoab_apg2_ol_coupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
 endif
-  test_mapweights_bcast_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
-endif
 
-else
-  HDF5_TESTS =
+  test_mapweights_bcast_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
+endif # tempestremap
+
 endif
 
 if HAVE_NETCDF
-  NETCDF_TESTS = scdpart read_nc_par ucdtrvpart mpastrvpart gcrm_par read_esmf
-else
-  NETCDF_TESTS =
+  NETCDF_TESTS += scdpart read_nc_par ucdtrvpart mpastrvpart gcrm_par read_esmf
 endif
 
 if HAVE_PNETCDF
@@ -192,7 +198,6 @@ commgraph_test_SOURCES = commgraph_test.cpp
 test_mapweights_bcast_SOURCES = test_mapweights_bcast.cpp
 imoab_coupler_bilin_SOURCES = imoab_coupler_bilin.cpp
 imoab_domain_culling_SOURCES = imoab_domain_culling.cpp
-imoab_map_r2l_SOURCES = imoab_map_r2l.cpp
 
 par_intx_sph_SOURCES = par_intx_sph.cpp
 par_intx_sph_LDADD = $(LDADD)

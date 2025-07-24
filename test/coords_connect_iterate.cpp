@@ -225,7 +225,6 @@ void test_iterates()
         rval = mb.tag_set_data( idtag, &start_hex, 1, &i );CHECK_ERR( rval );
     }
     int count = 0;
-    int total = 0;
 
     // now check connectivity
     start_hex             = hexes.front();
@@ -252,7 +251,6 @@ void test_iterates()
         }
 
         hit += count;
-        total += count;
     }
 
     hit = hexes.begin();

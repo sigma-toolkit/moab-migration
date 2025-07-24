@@ -116,17 +116,18 @@ include ( config/GenerateScript.cmake )
 # Options that the user controls
 ################################################################################
 option ( BUILD_SHARED_LIBS   "Should shared or static libraries be created?"   ON  )
-option ( ENABLE_CGNS       "Should build with CGNS support?"                 OFF )
-option ( ENABLE_MPI        "Should MOAB be compiled with MPI support?"       OFF )
-option ( ENABLE_HDF5       "Include HDF I/O interfaces in the build?"                   OFF )
-option ( ENABLE_ZLIB       "Include Zlib compression libraries (optionally used in HDF5)?"  OFF )
-option ( ENABLE_SZIP       "Should build with szip support?"                 OFF )
-option ( ENABLE_NETCDF     "Include NetCDF (ExodusII) interfaces in the build?" OFF )
-option ( ENABLE_PNETCDF    "Include PNetCDF interfaces in the build (Requires NetCDF) ?" OFF )
-option ( ENABLE_METIS      "Include Metis support for partitioning algorithms?" OFF )
-option ( ENABLE_PARMETIS   "Include ParMetis support for partitioning algorithms?" OFF )
-option ( ENABLE_ZOLTAN     "Include Zoltan support for partitioning algorithms?" OFF )
-option ( ENABLE_TESTING    "Enable Testing"                                  ON  )
+option ( BUILD_DOCUMENTATION "Build Doxygen documentation" OFF)
+option ( ENABLE_CGNS         "Should build with CGNS support?"                 OFF )
+option ( ENABLE_MPI          "Should MOAB be compiled with MPI support?"       OFF )
+option ( ENABLE_HDF5         "Include HDF I/O interfaces in the build?"                   OFF )
+option ( ENABLE_ZLIB         "Include Zlib compression libraries (optionally used in HDF5)?"  OFF )
+option ( ENABLE_SZIP         "Should build with szip support?"                 OFF )
+option ( ENABLE_NETCDF       "Include NetCDF (ExodusII) interfaces in the build?" OFF )
+option ( ENABLE_PNETCDF      "Include PNetCDF interfaces in the build (Requires NetCDF) ?" OFF )
+option ( ENABLE_METIS        "Include Metis support for partitioning algorithms?" OFF )
+option ( ENABLE_PARMETIS     "Include ParMetis support for partitioning algorithms?" OFF )
+option ( ENABLE_ZOLTAN       "Include Zoltan support for partitioning algorithms?" OFF )
+option ( ENABLE_TESTING      "Enable Testing"                                  ON  )
 option ( MOAB_FORCE_64_BIT_HANDLES "Force MBEntityHandle to be 64 bits (uint64_t)" OFF )
 option ( MOAB_FORCE_32_BIT_HANDLES "Force MBEntityHandle to be 32 bits (uint32_t)" OFF )
 option ( ENABLE_PYMOAB       "Build python interface to MOAB?" OFF )
@@ -842,40 +843,38 @@ moab_install_docs(${MOAB_EXAMPLES})
 ####################
 
 # Find Doxygen
-find_package(Doxygen)
-if(DOXYGEN_FOUND)
-  message(STATUS "Doxygen found: ${DOXYGEN_EXECUTABLE}")
+if(BUILD_DOCUMENTATION)
 
-  # Configure the Doxyfile
-  set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/doc/user.dox.in)
-  set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+  find_package(Doxygen)
+  if (DOXYGEN_FOUND)
+    message(STATUS "Doxygen found: ${DOXYGEN_EXECUTABLE}")
 
-  # Set variables for Doxyfile configuration
-  set(top_srcdir ${CMAKE_CURRENT_SOURCE_DIR})
-  set(top_builddir ${CMAKE_CURRENT_BINARY_DIR})
-  set(PACKAGE_VERSION ${PACKAGE_VERSION})
+    # Configure the Doxyfile
+    set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/doc/user.dox.in)
+    set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
 
-  # Set Python patterns for pymoab
-  if(ENABLE_PYMOAB)
-    set(python_patterns "*.py *.pyx *.pxd")
-  else()
-    set(python_patterns "")
-  endif()
+    # Set variables for Doxyfile configuration
+    set(top_srcdir ${CMAKE_CURRENT_SOURCE_DIR})
+    set(top_builddir ${CMAKE_CURRENT_BINARY_DIR})
+    set(PACKAGE_VERSION ${PACKAGE_VERSION})
 
-  # Set filter program (empty for now, can be customized later)
-  set(filter_program "")
-  set(filter_sources "NO")
+    # Set Python patterns for pymoab
+    if(ENABLE_PYMOAB)
+      set(python_patterns "*.py *.pyx *.pxd")
+    else()
+      set(python_patterns "")
+    endif()
 
-  # Set main page file
-  set(USE_MDFILE_AS_MAINPAGE "doc/mainpage.md")
+    # Set filter program (empty for now, can be customized later)
+    set(filter_program "")
+    set(filter_sources "NO")
 
-  # Configure the Doxyfile with CMake variables
-  configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
+    # Set main page file
+    set(USE_MDFILE_AS_MAINPAGE "doc/mainpage.md")
 
-    # Add option to enable/disable documentation
-  option(BUILD_DOCUMENTATION "Build Doxygen documentation" ON)
+    # Configure the Doxyfile with CMake variables
+    configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
 
-  if(BUILD_DOCUMENTATION)
     # Add custom target for documentation
     add_custom_target(docs ALL
       COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
@@ -901,12 +900,14 @@ if(DOXYGEN_FOUND)
       COMMENT "Cleaning Doxygen documentation"
     )
   else()
-    message(STATUS "Doxygen documentation disabled")
+    message(STATUS "Doxygen not found - documentation will not be generated")
   endif()
 
 else()
-  message(STATUS "Doxygen not found - documentation will not be generated")
-  option(BUILD_DOCUMENTATION "Build Doxygen documentation" OFF)
+  if(NOT BUILD_DOCUMENTATION)
+    message(STATUS "Documentation has been disabled. Enable with -DBUILD_DOCUMENTATION=ON option.")
+  endif(NOT BUILD_DOCUMENTATION)
+
 endif()
 
 

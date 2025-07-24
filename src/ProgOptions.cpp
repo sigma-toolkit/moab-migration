@@ -326,7 +326,7 @@ std::string ProgOptions::get_option_usage_prefix( const ProgOpt& option )
     else if( option.flags & int_flag )
     {
 
-        s << "-\c n";
+        s << "-n";
         if( has_longname )
         {
             s << " ";
@@ -943,7 +943,7 @@ void ProgOptions::write_man_page( std::ostream& s )
         }
         else if( it->first->flags & int_flag )
         {
-            s << ".RB [ - \c n| \"--" << it->first->longname << "\" \"=" << it->first->get_argstring() << "]\""
+            s << ".RB [ - n| \"--" << it->first->longname << "\" \"=" << it->first->get_argstring() << "]\""
               << std::endl;
         }
         else

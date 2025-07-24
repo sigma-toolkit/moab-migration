@@ -1799,11 +1799,12 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         eh_by_gid[gids[i]] = *it;
     }
     // TODO: allow for tags of different length
-    int nbLocalVals = *num_tag_storage_length / ( (int)tagNames.size() );  // assumes all tags have the same length?
+    size_t nbLocalVals = *num_tag_storage_length / tagNames.size();  // assumes all tags have the same length?
     // check global ids to have different values
     std::set< int > globalIdsSet;
-    for( int j = 0; j < nbLocalVals; j++ )
+    for( size_t j = 0; j < nbLocalVals; j++ )
         globalIdsSet.insert( globalIds[j] );
+
     if( globalIdsSet.size() < nbLocalVals )
     {
         std::cout << "iMOAB_SetDoubleTagStorageWithGid: for pid:" << *pid << " tags[0]:" << tagNames[0]
@@ -1815,7 +1816,9 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
 
     std::vector< int > tagLengths( tagNames.size() );
     std::vector< Tag > tagList;
+#ifdef MOAB_HAVE_MPI
     size_t total_tag_len = 0;
+#endif
     for( size_t i = 0; i < tagNames.size(); i++ )
     {
         if( data.tagMap.find( tagNames[i] ) == data.tagMap.end() )
@@ -1829,7 +1832,9 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         int tagLength = 0;
         rval          = context.MBI->tag_get_length( tag, tagLength );MB_CHK_ERR( rval );
 
+#ifdef MOAB_HAVE_MPI
         total_tag_len += tagLength;
+#endif
         tagLengths[i] = tagLength;
         DataType dtype;
         rval = context.MBI->tag_get_data_type( tag, dtype );MB_CHK_ERR( rval );
@@ -2122,10 +2127,10 @@ ErrCode iMOAB_SynchronizeTags( iMOAB_AppID pid, int* num_tag, int* tag_indices, 
 
 #else
     /* do nothing if serial */
-    // just silence the warning
-    // do not call sync tags in serial!
-    int k = *pid + *num_tag + *tag_indices + *ent_type;
-    k++;
+    UNUSED(pid);
+    UNUSED(num_tag);
+    UNUSED(tag_indices);
+    UNUSED(ent_type);
 #endif
 
     return moab::MB_SUCCESS;
@@ -2163,10 +2168,9 @@ ErrCode iMOAB_ReduceTagsMax( iMOAB_AppID pid, int* tag_index, int* ent_type )
 
 #else
     /* do nothing if serial */
-    // just silence the warning
-    // do not call sync tags in serial!
-    int k = *pid + *tag_index + *ent_type;
-    k++;  // just do junk, to avoid complaints
+    UNUSED(pid);
+    UNUSED(tag_index);
+    UNUSED(ent_type);
 #endif
     return moab::MB_SUCCESS;
 }

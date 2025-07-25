@@ -3592,14 +3592,14 @@ static ErrCode set_aream_from_trivial_distribution( iMOAB_AppID pid, int N, std:
     return MB_SUCCESS;
 }
 
-ErrCode iMOAB_LoadMappingWeightsFromFile(
-    iMOAB_AppID pid_source,
-    iMOAB_AppID pid_target,
-    iMOAB_AppID pid_intersection,
-    int* srctype,
-    int* tgttype,
-    const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
-    const iMOAB_String remap_weights_filename )
+ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
+                           iMOAB_AppID pid_target,
+                           iMOAB_AppID pid_intersection,
+                           int* srctype,
+                           int* tgttype,
+                           int* arearead,
+                           const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
+                           const iMOAB_String remap_weights_filename )
 {
     assert( srctype && tgttype );
 
@@ -3616,12 +3616,12 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
     // check if the remapped context is null; we need to fix that, if so
     // what if we read a map and compute a map, on a particular iMOAB app a2o for example?
     // we compute an intx map and read a bilinear map
-    // this is rather wrong, we need to fix it
+    // this is rather wrong, we need to fix it   FIXME
     if( tdata.remapper == nullptr )
     {
         // do not compute coverage anymore in advance;
         // need to initialize the coverage set creation?
-        // or should we really just one enclosing coverage set for all maps in here ?
+        // or should we really have just one enclosing coverage set for all maps in here ?
         // Now allocate and initialize the remapper object
 #ifdef MOAB_HAVE_MPI
         ParallelComm* pco_intx = data_intx.pcomm;
@@ -3727,7 +3727,8 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
 
     std::vector< double > trvAreaA, trvAreaB;  // passed by reference
     int nA, nB;                                // passed by reference, so returned
-    MB_CHK_SET_ERR( weightMap->ReadParallelMap( remap_weights_filename, sortTgtDofs, trvAreaA, nA, trvAreaB, nB ),
+    MB_CHK_SET_ERR( weightMap->ReadParallelMap( remap_weights_filename, sortTgtDofs, *arearead, trvAreaA, nA, trvAreaB,
+                                                nB ),
                     "reading map from disk failed" );
     // trivially distributed areaAs and areaBs will need to be set on their correct source and target cells, as an aream tag
 
@@ -3744,8 +3745,12 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
     // we have read the area A from map file, and we will set it as a aream double tag on the source set, knowing that we
     // read it trivially, with a trivial distribution by the global DOFs
     // local , private method:
-    MB_CHK_SET_ERR( set_aream_from_trivial_distribution( pid_source, nA, trvAreaA ), " fail to set aream on source " );
-    MB_CHK_SET_ERR( set_aream_from_trivial_distribution( pid_target, nB, trvAreaB ), " fail to set aream on target " );
+    if( 1 == *arearead || 3 == *arearead )
+        MB_CHK_SET_ERR( set_aream_from_trivial_distribution( pid_source, nA, trvAreaA ),
+                        " fail to set aream on source " );
+    if( 2 == *arearead || 3 == *arearead )
+        MB_CHK_SET_ERR( set_aream_from_trivial_distribution( pid_target, nB, trvAreaB ),
+                        " fail to set aream on target " );
 
     //tdata.remapper->SetMeshSet( Remapper::CoveringMesh, covering_set, &src_ents_of_interest );
     weightMap->SetSourceNDofsPerElement( src_elem_dof_length );
@@ -3763,7 +3768,7 @@ ErrCode iMOAB_LoadMappingWeightsFromFile(
     return moab::MB_SUCCESS;
 }
 
-ErrCode iMOAB_WriteMappingWeightsToFile(
+ErrCode iMOAB_WriteMapFile(
     iMOAB_AppID pid_intersection,
     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
     const iMOAB_String remap_weights_filename )

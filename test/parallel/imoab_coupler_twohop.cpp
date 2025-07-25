@@ -420,15 +420,16 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_NETCDF
         {
             const std::string atmocn_map_file_name = "atm_ocn_map2.nc";
-            ierr = iMOAB_WriteMappingWeightsToFile( cplAtmOcnPID, weights_identifiers[0].c_str(),
+            ierr = iMOAB_WriteMapFile( cplAtmOcnPID, weights_identifiers[0].c_str(),
                                                     atmocn_map_file_name.c_str() );
             CHECKIERR( ierr, "failed to write map file to disk" );
 
             int src_disc_type = 1;  // element-based SE-4
             int tgt_disc_type = 3;  // element-based FV
-            CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type,
-                                                         &tgt_disc_type, weights_identifiers[2].c_str(),
-                                                         atmocn_map_file_name.c_str() ),
+            int arearead = 0; // no aream needed to be set
+            CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type,
+                                                  &tgt_disc_type, &arearead, weights_identifiers[2].c_str(),
+                                                  atmocn_map_file_name.c_str() ),
                        "failed to load map file from disk" );
         }
 #endif
@@ -454,14 +455,15 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_NETCDF
         {
             const std::string atmocn_map_file_name = "atm2_ocn_map.nc";
-            ierr = iMOAB_WriteMappingWeightsToFile( cplAtm2OcnPID, weights_identifiers[0].c_str(),
+            ierr = iMOAB_WriteMapFile( cplAtm2OcnPID, weights_identifiers[0].c_str(),
                                                     atmocn_map_file_name.c_str() );
             CHECKIERR( ierr, "failed to write map file to disk" );
 
             int src_disc_type = 1;  // element-based SE-4
             int tgt_disc_type = 3;  // element-based FV
-            CHECKIERR( iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtm2OcnPID, &src_disc_type,
-                                                         &tgt_disc_type, weights_identifiers[3].c_str(),
+            int arearead = 0;
+            CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtm2OcnPID, &src_disc_type,
+                                                         &tgt_disc_type, &arearead, weights_identifiers[3].c_str(),
                                                          atmocn_map_file_name.c_str() ),
                        "failed to load map file from disk" );
         }

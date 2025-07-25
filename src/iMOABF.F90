@@ -481,26 +481,27 @@ module iMOAB
 
 #ifdef MOAB_HAVE_NETCDF
 
-      integer(c_int) function iMOAB_LoadMappingWeightsFromFile(pid_source, pid_target, pid_intersection, src_disc_type, tgt_disc_type, &
-                                                               solution_weights_identifier, remap_weights_filename) &
-                                                                  bind(C, name='iMOAB_LoadMappingWeightsFromFile')
+      integer(c_int) function iMOAB_LoadMapFile(pid_source, pid_target, pid_intersection, src_disc_type, tgt_disc_type, &
+                                                            arearead, solution_weights_identifier, remap_weights_filename) &
+                                                                  bind(C, name='iMOAB_LoadMapFile')
             use, intrinsic :: iso_c_binding, only : c_int, c_char
             integer(c_int), intent(in) :: pid_source
             integer(c_int), intent(in) :: pid_target
             integer(c_int), intent(in) :: pid_intersection
             integer(c_int), intent(in) :: src_disc_type
             integer(c_int), intent(in) :: tgt_disc_type
+            integer(c_int), intent(in) :: arearead
             character(kind=c_char), intent(in) :: solution_weights_identifier(*)
             character(kind=c_char), intent(in) :: remap_weights_filename(*)
-      end function iMOAB_LoadMappingWeightsFromFile
+      end function iMOAB_LoadMapFile
 
-      integer(c_int) function iMOAB_WriteMappingWeightsToFile(pid_intersection, solution_weights_identifier,  &
-                                                  remap_weights_filename) bind(C, name='iMOAB_WriteMappingWeightsToFile')
+      integer(c_int) function iMOAB_WriteMapFile(pid_intersection, solution_weights_identifier,  &
+                                                  remap_weights_filename) bind(C, name='iMOAB_WriteMapFile')
         use, intrinsic :: iso_c_binding, only: c_int, c_char
         integer(c_int), intent(in) :: pid_intersection
         character(kind=c_char), intent(in) :: solution_weights_identifier(*)
         character(kind=c_char), intent(in) :: remap_weights_filename(*)
-      end function iMOAB_WriteMappingWeightsToFile
+      end function iMOAB_WriteMapFile
 
 ! closing endif: MOAB_HAVE_NETCDF
 #endif

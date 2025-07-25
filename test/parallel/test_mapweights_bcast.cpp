@@ -502,7 +502,8 @@ void read_map_from_disk()
 
     std::vector< double > areaA, areaB;  // will not be used in this test
     int nA, nB;                          // not used by this test
-    rval = onlinemap.ReadParallelMap( remap_weights_filename.c_str(), tgt_owned_ids, areaA, nA, areaB, nB );
+    int arearead = 0; // do not read areas
+    rval = onlinemap.ReadParallelMap( remap_weights_filename.c_str(), tgt_owned_ids, arearead, areaA, nA, areaB, nB );
     CHECK_EQUAL( rval, moab::MB_SUCCESS );
 
     // sparse tempest remap matrix is not instantiated anymore; just the eigen matrix exists in read map case

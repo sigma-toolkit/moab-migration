@@ -301,7 +301,7 @@ int main( int argc, char* argv[] )
             std::stringstream outf;
             outf << "atm_ocn_bilin_map_p" << endG4 - startG4 + 1 << ".nc";  // number of tasks on coupler
             std::string mapfile = outf.str();  // write in parallel the map file, for debugging
-            ierr = iMOAB_WriteMappingWeightsToFile( cplAtmOcnPID, weights_identifiers[0].c_str(), outf.str().c_str() );
+            ierr = iMOAB_WriteMapFile( cplAtmOcnPID, weights_identifiers[0].c_str(), outf.str().c_str() );
             CHECKIERR( ierr, "failed to write map file to disk" );
         }
 #endif

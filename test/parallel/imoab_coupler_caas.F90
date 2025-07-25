@@ -326,7 +326,7 @@ program imoab_coupler_fortran
 #if defined( MOAB_HAVE_NETCDF ) && defined( VERBOSE )
       write(nproc,"(I0.2)")num_procs !
       atmocn_map_file_name = 'atm_ocn_map_second_n'//trim(nproc)//'.nc'//C_NULL_CHAR
-      ierr = iMOAB_WriteMappingWeightsToFile( cplAtmOcnPID, "secondorder"//C_NULL_CHAR, atmocn_map_file_name)
+      ierr = iMOAB_WriteMapFile( cplAtmOcnPID, "secondorder"//C_NULL_CHAR, atmocn_map_file_name)
       call errorout(ierr, 'failed to write map file to disk')
 #endif
 

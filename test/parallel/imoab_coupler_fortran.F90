@@ -69,7 +69,7 @@ program imoab_coupler_fortran
    integer :: storLeng, eetype ! for tags defs
    character(:), allocatable :: concat_fieldname, concat_fieldnameT, outputFileOcn
    integer :: tagIndexIn2 ! not really needed
-   integer :: src_disc_type, tgt_disc_type, dummyType
+   integer :: src_disc_type, tgt_disc_type, dummyType, arearead
 
    cmpatm = 5
    cplatm = 6
@@ -219,6 +219,7 @@ program imoab_coupler_fortran
    fValidate = 0
    fInverseDistanceMap = 0
    filter_type = 0
+   arearead = 2 ! read area_b only
 
    if (cplComm .NE. MPI_COMM_NULL) then
 
@@ -238,15 +239,15 @@ program imoab_coupler_fortran
 
 #ifdef MOAB_HAVE_NETCDF
       atmocn_map_file_name = 'atm_ocn_map_f.nc'//C_NULL_CHAR
-      ierr = iMOAB_WriteMappingWeightsToFile( cplAtmOcnPID, weights_identifier1, atmocn_map_file_name)
+      ierr = iMOAB_WriteMapFile( cplAtmOcnPID, weights_identifier1, atmocn_map_file_name)
       call errorout(ierr, 'failed to write map file to disk')
 
       intx_from_file_identifier = 'map-from-file'//C_NULL_CHAR
       src_disc_type = 1;  ! element-based SE
       tgt_disc_type = 3;  ! element-based FV
-      ierr = iMOAB_LoadMappingWeightsFromFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &
+      ierr = iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &
                                                 src_disc_type, tgt_disc_type, &
-                                                intx_from_file_identifier, atmocn_map_file_name)
+                                               arearead, intx_from_file_identifier, atmocn_map_file_name)
       call errorout(ierr, 'failed to load map file from disk')
 #endif
    end if

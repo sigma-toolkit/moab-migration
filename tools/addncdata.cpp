@@ -140,17 +140,19 @@ int main( int argc, char* argv[] )
     ErrorCode rval;
     ProgOptions opts;
 
-    std::string inputfile, outfile( "out.h5m" ), netcdfFile, variable_name, sefile_name;
+    std::string inputfile, outfile( "out.h5m" ), netcdfFile, variable_name, sefile_name, tag_name;
 
     opts.addOpt< std::string >( "input,i", "input mesh filename", &inputfile );
     opts.addOpt< std::string >( "netcdfFile,n", "netcdf file aligned with the mesh input file", &netcdfFile );
     opts.addOpt< std::string >( "output,o", "output mesh filename", &outfile );
 
     opts.addOpt< std::string >( "var,v", "variable to extract and add to output file", &variable_name );
+    opts.addOpt< std::string >( "tag,t", "tag name given", &tag_name );
 
     opts.addOpt< std::string >( "sefile,s", "spectral elements file (coarse SE mesh)", &sefile_name );
     opts.parseCommandLine( argc, argv );
 
+    if( tag_name.empty() ) tag_name = variable_name;
     Core* mb = new Core();
 
     rval = mb->load_file( inputfile.c_str() );MB_CHK_SET_ERR( rval, "can't load input file" );
@@ -209,6 +211,7 @@ int main( int argc, char* argv[] )
 
     std::cout << " opened " << netcdfFile << " with new data \n";
     std::vector< int > dims;
+    std::vector< size_t > counts;
     int nc_var;
 
     size_t recs;
@@ -217,10 +220,12 @@ int main( int argc, char* argv[] )
     std::cout << " looking for variable " << variable_name << "\n";
     GET_VAR( variable_name.c_str(), nc_var, dims );
     std::cout << " it has " << dims.size() << " dimensions\n";
+    counts.resize( dims.size() );
 
-    int dimIndex     = -1;  // index of the dimension of interest
-    bool vertex_data = false;
-    bool cell_data   = false;
+    int dimIndex      = -1;  // index of the dimension of interest
+    bool vertex_data  = false;
+    bool cell_data    = false;
+    size_t total_size = 1;
     for( size_t j = 0; j < dims.size(); j++ )
     {
         fail = nc_inq_dim( ncFile, dims[j], recname, &recs );
@@ -228,6 +233,8 @@ int main( int argc, char* argv[] )
         std::string name_dim( recname );
         std::cout << " dimension index " << j << " in file: " << dims[j] << " name: " << name_dim << " recs:" << recs
                   << "\n";
+        total_size *= recs;
+        counts[j] = recs;
         if( recs == nodes.size() )
         {
             dimIndex    = j;
@@ -238,6 +245,17 @@ int main( int argc, char* argv[] )
             dimIndex  = j;
             cell_data = true;
         }
+    }
+    std::cout << "Total size of variable: " << total_size << "\n";
+    if( total_size == nodes.size() )
+    {
+        std::cout << " total size is the number of nodes, will align with nodes.\n";
+        vertex_data = true;
+    }
+    if( total_size == cells.size() )
+    {
+        std::cout << " total size is the number of cells, will align with cells.\n";
+        cell_data = true;
     }
 
     int otherDim    = 1 - dimIndex;  // used only if 2 dimensions ; could be 0 or 1;
@@ -258,6 +276,11 @@ int main( int argc, char* argv[] )
 
     if( NC_FLOAT == dataType ) float_var = true;
 
+    double fill_value = 0;
+    if( NC_DOUBLE == dataType )
+    {
+        nc_get_att_double( ncFile, nc_var, "_FillValue", &fill_value );
+    }
     bool use_time = false;
     int time_id   = -1;
     std::vector< float > times;
@@ -270,7 +293,7 @@ int main( int argc, char* argv[] )
     }
     Tag newTag;
 
-    if( ( dims.size() >= 1 && dims.size() <= 2 ) && ( vertex_data || cell_data ) )
+    if( ( dims.size() >= 1 && dims.size() <= 3 ) && ( vertex_data || cell_data ) )
     {
 
         if( dims.size() == 2 )
@@ -279,8 +302,8 @@ int main( int argc, char* argv[] )
             if( NC_NOERR != fail ) MB_SET_ERR( MB_FAILURE, "addncdata:: Couldn't get dimension" );
         }
 
-        int def_val = 0;
-        rval = mb->tag_get_handle( variable_name.c_str(), (int)size_tag, mbtype, newTag, MB_TAG_CREAT | MB_TAG_DENSE,
+        double def_val = fill_value;
+        rval = mb->tag_get_handle( tag_name.c_str(), (int)size_tag, mbtype, newTag, MB_TAG_CREAT | MB_TAG_DENSE,
                                    &def_val );MB_CHK_SET_ERR( rval, "can't define new tag" );
 
         if( NC_INT == dataType )
@@ -306,7 +329,7 @@ int main( int argc, char* argv[] )
                     }
                 }
             }
-            else  // dims.size() == 2
+            else if( dims.size() == 2 )  // or 3
             {
                 // Single var for all coords
                 size_t start[2] = { 0, 0 }, count[2] = { 1, 1 };
@@ -339,6 +362,29 @@ int main( int argc, char* argv[] )
                     }
                 }
             }
+            else  // dims.size  == 3
+            {
+                size_t start[3] = { 0, 0, 0 };
+                vals.resize( total_size );
+                fail = nc_get_vara_int( ncFile, nc_var, start, counts.data(), &vals[0] );
+                // just set lexicographically
+                if( vertex_data )
+                {
+                    for( size_t k = 0; k < total_size; k++ )
+                    {
+                        EntityHandle vh = vGidHandle[k + 1];  // global id is from 1
+                        rval            = mb->tag_set_data( newTag, &vh, 1, &vals[k] );MB_CHK_SET_ERR( rval, "can't set tag on vertex" );
+                    }
+                }
+                else  // cell_data
+                {
+                    for( size_t k = 0; k < total_size; k++ )
+                    {
+                        EntityHandle ch = cGidHandle[k + 1];  // global id is from 1
+                        rval            = mb->tag_set_data( newTag, &ch, 1, &vals[k] );MB_CHK_SET_ERR( rval, "can't set tag on vertex" );
+                    }
+                }
+            }
         }
         else
         {
@@ -363,7 +409,7 @@ int main( int argc, char* argv[] )
                     }
                 }
             }
-            else  // dims.size() == 2
+            else if( dims.size() == 2 )  // dims.size() == 2 or 3?
             {
                 // Single var for all coords
                 size_t start[2] = { 0, 0 }, count[2] = { 1, 1 };
@@ -393,6 +439,29 @@ int main( int argc, char* argv[] )
                         for( size_t j = 0; j < size_tag; j++ )
                             dvals[j] = vals[start_in_vals + j * stride];
                         rval = mb->tag_set_data( newTag, &ch, 1, &dvals[0] );MB_CHK_SET_ERR( rval, "can't set tag on cell" );
+                    }
+                }
+            }
+            else  // dims.size() == 3
+            {
+                size_t start[3] = { 0, 0, 0 };
+                vals.resize( total_size );
+                fail = nc_get_vara_double( ncFile, nc_var, start, counts.data(), &vals[0] );
+                // just set lexicographically
+                if( vertex_data )
+                {
+                    for( size_t k = 0; k < total_size; k++ )
+                    {
+                        EntityHandle vh = vGidHandle[k + 1];  // global id is from 1
+                        rval            = mb->tag_set_data( newTag, &vh, 1, &vals[k] );MB_CHK_SET_ERR( rval, "can't set tag on vertex" );
+                    }
+                }
+                else  // cell_data
+                {
+                    for( size_t k = 0; k < total_size; k++ )
+                    {
+                        EntityHandle ch = cGidHandle[k + 1];  // global id is from 1
+                        rval            = mb->tag_set_data( newTag, &ch, 1, &vals[k] );MB_CHK_SET_ERR( rval, "can't set tag on vertex" );
                     }
                 }
             }
@@ -426,10 +495,10 @@ int main( int argc, char* argv[] )
             for( size_t k = 0; k < dim0; k++ )
             {
                 // create a tag for each time, and
-                std::stringstream tag_name;
-                tag_name << variable_name << "_t" << times[k];
+                std::stringstream tag_name1;
+                tag_name1 << tag_name << "_t" << times[k];
                 std::vector< double > defvals( dim1, 0. );
-                rval = mb->tag_get_handle( tag_name.str().c_str(), (int)dim1, mbtype, newTag,
+                rval = mb->tag_get_handle( tag_name1.str().c_str(), (int)dim1, mbtype, newTag,
                                            MB_TAG_CREAT | MB_TAG_DENSE, &defvals[0] );MB_CHK_SET_ERR( rval, "can't define new tag" );
                 start[0] = k;
 
@@ -488,7 +557,7 @@ int main( int argc, char* argv[] )
         std::vector< double > dfield;
         dfield.resize( sizeTag, 0.0 );
         Tag newTag2;
-        rval = mb2->tag_get_handle( variable_name.c_str(), (int)sizeTag, mbtype, newTag2, MB_TAG_CREAT | MB_TAG_DENSE,
+        rval = mb2->tag_get_handle( tag_name.c_str(), (int)sizeTag, mbtype, newTag2, MB_TAG_CREAT | MB_TAG_DENSE,
                                     &dfield[0] );MB_CHK_SET_ERR( rval, "can't define new tag" );
 
         int i1 = 0;  // index in the gdofs array, per element

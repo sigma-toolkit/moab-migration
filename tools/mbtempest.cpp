@@ -78,6 +78,7 @@ struct ToolContext
     moab::TempestOnlineMap::CAASType cassType;      // CAAS filter type
     GenerateOfflineMapAlgorithmOptions mapOptions;  // Offline map options
     bool print_diagnostics;                         // Print diagnostics
+    bool skip_intersection;                         // Skip intersection
     double boxeps;                                  // Box error tolerance
     double epsrel;                                  // Relative error tolerance
 
@@ -93,7 +94,7 @@ struct ToolContext
           baselineFile( "" ), variableToVerify( "" ), meshType( moab::TempestRemapper::DEFAULT ), skip_io( false ),
           computeDual( false ), computeWeights( false ), verifyWeights( false ), enforceConvexity( false ),
           ensureMonotonicity( 0 ), rrmGrids( false ), kdtreeSearch( true ), fCheck( false ), fVolumetric( false ),
-          useGnomonicProjection( false ), cassType( moab::TempestOnlineMap::CAAS_NONE ), print_diagnostics( false ),
+          useGnomonicProjection( false ), cassType( moab::TempestOnlineMap::CAAS_NONE ), print_diagnostics( false ), skip_intersection( false ),
           boxeps( 1e-7 ),               // Box error tolerance default value
           epsrel( ReferenceTolerance )  // ReferenceTolerance is defined in Defines.h in TempestRemap
     {
@@ -222,6 +223,7 @@ struct ToolContext
                              "when computing weights)",
                              &fVolumetric );
 
+        opts.addOpt< void >( "skip_intersection", "Skip mesh intersection computation.", &skip_intersection );
         opts.addOpt< void >( "skip_output", "For performance studies, skip all I/O operations.", &skip_io );
 
         opts.addOpt< void >( "gnomonic", "Use Gnomonic plane projections to compute coverage mesh.",
@@ -387,8 +389,13 @@ struct ToolContext
             if( fVolumetric ) mapOptions.strMethod += "volumetric;";
 
             // For global meshes, this default should work out of the box.
-            if( !fvMethod.compare( "bilin" ) )
+            // ideally, 1 layer should suffice for bilinear variants and FV-SE-averaged schemes,
+            // but we will be conservative as parallel correctness depends on having enough coverage layers
+            if( fvMethod.compare( "none" ) ) // True for invdist, delaunay, bilin, intbilin, intbilingb, fvse-averaged
+            {
                 nlayers = 3;
+                skip_intersection = true; // Do not need intersection for any of these schemes
+            }
             else
                 nlayers = ( mapOptions.nPin > 1 ? mapOptions.nPin + 1 : 0 );
             if( nlayer_input ) nlayers = std::max( nlayer_input, nlayers );
@@ -480,6 +487,7 @@ std::string get_file_read_options( ToolContext& ctx, std::string filename )
     }
     return opts;
 }
+
 //#define MOAB_DBG
 int main( int argc, char* argv[] )
 {
@@ -768,16 +776,23 @@ int main( int argc, char* argv[] )
             outputFormatter.printf( 0, "The target set contains %lu vertices and %lu elements \n", gvelist[2],
                                     gvelist[3] );
         }
-
-        // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm
-        runCtx->timer_push( "setup and compute mesh intersections" );
-        rval = remapper.ComputeOverlapMesh( runCtx->kdtreeSearch, false );MB_CHK_ERR( rval );
-        runCtx->timer_pop();
+//
+        if (runCtx->skip_intersection)
+        {
+            outputFormatter.printf( 0, "Skipping mesh intersection computation.\n" );
+        }
+        else
+        {
+            // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm
+            runCtx->timer_push( "setup and compute mesh intersections" );
+            MB_CHK_SET_ERR( remapper.ComputeOverlapMesh( runCtx->kdtreeSearch, false ), "Failed to compute mesh intersections" );
+            runCtx->timer_pop();
+        }
 
         // print some diagnostic checks to see if the overlap grid resolved the input meshes
         // correctly
         double dTotalOverlapArea = 0.0;
-        if( runCtx->print_diagnostics )
+        if( runCtx->print_diagnostics && !runCtx->skip_intersection )
         {
             moab::IntxAreaUtils areaAdaptorHuiller(
                 moab::IntxAreaUtils::GaussQuadrature );  // lHuiller, GaussQuadrature
@@ -812,7 +827,7 @@ int main( int argc, char* argv[] )
             dTotalOverlapArea = global_areas[2];
         }
 
-        if( runCtx->intxFilename.size() )
+        if( runCtx->intxFilename.size() && !runCtx->skip_intersection )
         {
             moab::EntityHandle writableOverlapSet;
             rval = mbCore->create_meshset( moab::MESHSET_SET, writableOverlapSet );MB_CHK_SET_ERR( rval, "Can't create new set" );
@@ -897,7 +912,7 @@ int main( int argc, char* argv[] )
                                      dNormalTolerance, dStrictTolerance, dTotalOverlapArea );
             }
 
-            if( runCtx->outFilename.size() )
+            if( runCtx->outFilename.size() && !runCtx->skip_io )
             {
                 std::map< std::string, std::string > attrMap;
                 attrMap["MOABversion"]   = std::string( MOAB_VERSION );
@@ -920,10 +935,7 @@ int main( int argc, char* argv[] )
                 // Write the map file to disk in parallel using either HDF5 or SCRIP interface
                 // in extra case; maybe need a better solution, just create it with the right meshset
                 // from the beginning;
-                if( !runCtx->skip_io )
-                {
-                    rval = weightMap->WriteParallelMap( runCtx->outFilename.c_str(), attrMap );MB_CHK_ERR( rval );
-                }
+                MB_CHK_SET_ERR( weightMap->WriteParallelMap( runCtx->outFilename.c_str(), attrMap ), "Failed writing the parallel map to disk" );
             }
 
             if( runCtx->verifyWeights )

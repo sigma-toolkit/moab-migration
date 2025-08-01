@@ -1,15 +1,66 @@
-/*
- * Usage: MOAB-Tempest tool
+/**
+ * @file mbtempest.cpp
+ * @brief MOAB-Tempest: A powerful mesh generation and remapping tool for climate and weather applications
  *
- * Generate a Cubed-Sphere mesh: ./mbtempest -t 0 -res 25 -f cubed_sphere_mesh.exo
- * Generate a RLL mesh: ./mbtempest -t 1 -res 25 -f rll_mesh.exo
- * Generate a Icosahedral-Sphere mesh: ./mbtempest -t 2 -res 25 <-dual> -f icosa_mesh.exo
+ * @section overview Overview
+ * MOAB-Tempest is a command-line tool that provides mesh generation and conservative remapping capabilities
+ * for climate and weather modeling. It combines the power of MOAB (Mesh-Oriented datABase) with the
+ * TempestRemap library to enable high-performance, parallel mesh generation and remapping operations.
  *
- * Now you can compute the intersections between the meshes too!
+ * @section features Key Features
+ * - Generation of various spherical mesh types (Cubed-Sphere, RLL, Icosahedral)
+ * - Support for high-order discretization methods (FV, CGLL, DGLL)
+ * - Conservative remapping between different mesh types
+ * - Parallel processing support via MPI
+ * - Flexible I/O with support for multiple file formats
+ * - Built-in analytical functions for testing and validation
  *
- * Generate the overlap mesh: ./mbtempest -t 3 -l cubed_sphere_mesh.exo -l rll_mesh.exo -f
- * overlap_mesh.exo
+ * @section algorithms Supported Algorithms
+ * - Mesh Generation:
+ *   - Cubed-Sphere (CS) meshes
+ *   - Regular Latitude-Longitude (RLL) meshes
+ *   - Icosahedral (ICO) meshes
+ *   - Overlap meshes for remapping
+ * - Remapping Methods:
+ *   - Finite Volume (FV)
+ *   - Continuous Galerkin (CGLL)
+ *   - Discontinuous Galerkin (DGLL)
+ *   - Monotonic and high-order variants
  *
+ * @section usage Basic Usage Examples
+ * @code
+ * # Generate a Cubed-Sphere mesh with resolution 25
+ * ./mbtempest --type 0 --res 25 --file cubed_sphere_mesh.h5m
+ *
+ * # Generate a RLL mesh with resolution 90x180 (lon x lat)
+ * ./mbtempest --type 1 --res 90 --file rll_mesh.h5m
+ *
+ * # Generate an Icosahedral mesh with resolution 25 (dual mesh)
+ * ./mbtempest --type 2 --res 25 --dual --file icosahedral_dual_mesh.h5m
+ *
+ * # Compute overlap between two meshes
+ * ./mbtempest --type 5 --load mesh1.h5m --load mesh2.h5m intx intersection_mesh.h5m
+ *
+ * # Generate a remapping weights file between two meshes: FV to FV (default)
+ * ./mbtempest --type 5 --load source_mesh.h5m --load target_mesh.h5m --file weights.nc
+ *
+ * # Generate remapping weights file between two meshes: making it explicit (SE to FV)
+ * ./mbtempest --type 5 --load source_mesh.h5m --load target_mesh.h5m \
+ *             --order 4 --method cgll --global_id GLOBAL_DOFS \
+ *             --order 1 --method fv --global_id GLOBAL_ID \
+ *             --file weights_se_to_fv.nc
+ * @endcode
+ *
+ * @section options Command Line Options
+ * Run './mbtempest --help' for a complete list of available options.
+ *
+ * @section notes Notes
+ * - For parallel execution, use MPI launcher (e.g., mpirun, mpiexec)
+ * - Output formats: .h5m (MOAB), .nc (NetCDF), .exo (ExodusII)
+ * - Requires MOAB and TempestRemap libraries
+ *
+ * @author MOAB Development Team
+ * @date Created: 2023
  */
 
 // standard C++ includes
@@ -30,10 +81,6 @@
 #include "moab/CpuTimer.hpp"
 #include "DebugOutput.hpp"
 
-//#ifndef MOAB_HAVE_MPI
-//    #error mbtempest tool requires MPI configuration
-//#endif
-
 #ifdef MOAB_HAVE_MPI
 // MPI includes
 #include "moab_mpi.h"
@@ -41,116 +88,159 @@
 #include "MBParallelConventions.h"
 #endif
 
-struct ToolContext
+/**
+ * @brief Context class for MOAB-TempestRemap tool configuration and state management
+ */
+class ToolContext
 {
-    moab::Core* mbcore;
+  public:
+    // Core components
+    moab::Core* const mbcore;  ///< MOAB Core instance for mesh operations
 #ifdef MOAB_HAVE_MPI
-    moab::ParallelComm* pcomm;
+    moab::ParallelComm* const pcomm;  ///< Parallel communicator (nullptr in serial)
 #endif
-    const int proc_id, n_procs;                  // MPI process id and number of processes
-    moab::DebugOutput outputFormatter;           // Output formatter
-    int blockSize;                               // Resolution of the mesh
-    int nlayers;                                 // Number of ghost layers in the source mesh
-    std::vector< std::string > inFilenames;      // Input mesh filenames
-    std::vector< Mesh* > meshes;                 // Mesh references in TempestRemap format
-    std::vector< moab::EntityHandle > meshsets;  // Meshsets in MOAB format
-    std::vector< int > disc_orders;              // Discretization orders
-    std::vector< std::string > disc_methods;     // Discretization method names (fv, cgll, dgll, etc.)
-    std::vector< std::string > doftag_names;     // DoF tag names (GLOBAL_ID, etc.)
-    std::string fvMethod;          // FV method name (invdist, delaunay, bilin, intbilin, intbilingb, none)
-    std::string outFilename;       // Output filename
-    std::string intxFilename;      // Output intersection mesh filename
-    std::string baselineFile;      // Output baseline file (for verification)
-    std::string variableToVerify;  // Variable name for verification
-    moab::TempestRemapper::TempestMeshType
-        meshType;  // Mesh type (CS, RLL, ICO, OVERLAP_FILES, OVERLAP_MEMORY, OVERLAP_MOAB)
-    bool skip_io;  // Skip I/O operations; strictly to measure the performance of the intersection/map/SpMV algorithms
-    bool computeDual;        // Compute the dual of the mesh
-    bool computeWeights;     // Compute the projection weights
-    bool verifyWeights;      // Verify the projection weights
-    bool enforceConvexity;   // Enforce convexity of the input meshes
-    int ensureMonotonicity;  // Ensure monotonicity in the weight generation process
-    bool rrmGrids;      // Flag specifying that we are dealing with regionally refined grids (possibly nonoverlapping)
-    bool kdtreeSearch;  // Use Kd-tree based search for computing mesh intersections instead of advancing front
-    bool fCheck;        // Check the generated map for conservation and consistency
-    bool fVolumetric;   // Apply a volumetric projection to compute the weights
-    bool useGnomonicProjection;                     // Use Gnomonic plane projections to compute coverage mesh
-    moab::TempestOnlineMap::CAASType cassType;      // CAAS filter type
-    GenerateOfflineMapAlgorithmOptions mapOptions;  // Offline map options
-    bool print_diagnostics;                         // Print diagnostics
-    bool skip_intersection;                         // Skip intersection
-    double boxeps;                                  // Box error tolerance
-    double epsrel;                                  // Relative error tolerance
+    const int proc_id;                  ///< MPI process rank (0 for serial)
+    const int n_procs;                  ///< Total number of MPI processes (1 for serial)
+    moab::DebugOutput outputFormatter;  ///< Formatter for debug output
 
+    // Mesh and remapping configuration
+    moab::TempestRemapper::TempestMeshType meshType{ moab::TempestRemapper::DEFAULT };  ///< Type of mesh to generate
+    std::vector< std::string > inFilenames;      ///< Input filenames for source and target meshes
+    std::vector< int > disc_orders;              ///< Discretization orders for source and target
+    std::vector< std::string > disc_methods;     ///< Discretization methods (fv, cgll, dgll) for source and target
+    std::vector< std::string > doftag_names;     ///< Degree of freedom tag names for source and target
+    std::string outFilename{ "outputFile.nc" };  ///< Output filename for remapping results
+    std::string intxFilename;                    ///< Intersection mesh filename (optional)
+    std::string baselineFile;                    ///< Baseline file for verification (optional)
+    std::string variableToVerify;                ///< Variable name for verification (optional)
+    std::string fvMethod{ "none" };              ///< Finite volume method specification
+
+    // Remapping options
+    GenerateOfflineMapAlgorithmOptions mapOptions;  ///< Configuration for offline map generation
+    moab::TempestOnlineMap::CAASType cassType{
+        moab::TempestOnlineMap::CAAS_NONE };  ///< Conservative and accurate advection scheme type
+    int ensureMonotonicity{ 0 };              ///< Monotonicity enforcement level (0=none, 1=basic, 2=full, 3=strict)
+    bool rrmGrids{ false };                   ///< Flag to use RRM (Regional Refinement Meshes)
+    bool kdtreeSearch{ true };                ///< Enable KD-tree for spatial searches
+    bool fCheck{ false };                     ///< Enable additional checking during remapping
+    bool fVolumetric{ false };                ///< Enable volumetric (3D) remapping
+    bool useGnomonicProjection{ false };      ///< Use gnomonic projection for certain operations
+    bool print_diagnostics{ false };          ///< Print detailed diagnostic information
+    bool skip_intersection{ false };          ///< Skip intersection computation (for debugging)
+    double boxeps{ 1e-7 };                    ///< Epsilon for bounding box checks
+    double epsrel{ ReferenceTolerance };      ///< Relative tolerance for convergence
+
+    // Mesh operations control
+    bool skip_io{ false };             ///< Skip file I/O operations (for testing)
+    bool computeDual{ false };         ///< Compute dual mesh
+    bool computeWeights{ false };      ///< Compute interpolation weights
+    bool verifyConservation{ false };  ///< Verify conservation properties
+    bool verifyWeights{ false };       ///< Verify interpolation weights
+    bool enforceConvexity{ false };    ///< Enforce convexity in mesh elements
+
+    // Performance and debugging
+    std::unique_ptr< moab::CpuTimer > timer;  ///< Timer for performance measurement
+    double timer_ops{ 0.0 };                  ///< Operation timer value
+    std::string opName;                       ///< Name of current operation being timed
+    int nlayers{ 0 };                         ///< Number of ghost layers for parallel operations
+    int blockSize{ 5 };                       ///< Block size for vectorized operations
+
+    // Mesh data
+    std::vector< Mesh* > meshes;                 ///< Collection of TempestRemap meshes
+    std::vector< moab::EntityHandle > meshsets;  ///< MOAB entity sets for meshes
+
+    /**
+     * @brief Construct a new ToolContext object with MPI support
+     * @param icore MOAB Core instance (must not be null)
+     * @param p_pcomm Parallel communicator (must not be null in MPI mode)
+     * @throw std::invalid_argument if icore is null or p_pcomm is null in MPI mode
+     */
 #ifdef MOAB_HAVE_MPI
     ToolContext( moab::Core* icore, moab::ParallelComm* p_pcomm )
-        : mbcore( icore ), pcomm( p_pcomm ), proc_id( pcomm->rank() ), n_procs( pcomm->size() ),
-          outputFormatter( std::cout, pcomm->rank(), 0 ),
+        : mbcore( icore ), pcomm( p_pcomm ), proc_id( p_pcomm ? p_pcomm->rank() : 0 ),
+          n_procs( p_pcomm ? p_pcomm->size() : 1 ), outputFormatter( std::cout, p_pcomm ? p_pcomm->rank() : 0, 0 )
+    {
+        if( !icore ) throw std::invalid_argument( "MOAB Core instance cannot be null" );
+        if( !p_pcomm ) throw std::invalid_argument( "ParallelComm cannot be null in MPI mode" );
 #else
-    ToolContext( moab::Core* icore )
-        : mbcore( icore ), proc_id( 0 ), n_procs( 1 ), outputFormatter( std::cout, 0, 0 ),
+    /**
+     * @brief Construct a new ToolContext object (serial version)
+     * @param icore MOAB Core instance (must not be null)
+     * @throw std::invalid_argument if icore is null
+     */
+    explicit ToolContext( moab::Core* icore )
+        : mbcore( icore ), proc_id( 0 ), n_procs( 1 ), outputFormatter( std::cout, 0, 0 )
+    {
 #endif
-          blockSize( 5 ), nlayers( 0 ), fvMethod( "none" ), outFilename( "outputFile.nc" ), intxFilename( "" ),
-          baselineFile( "" ), variableToVerify( "" ), meshType( moab::TempestRemapper::DEFAULT ), skip_io( false ),
-          computeDual( false ), computeWeights( false ), verifyWeights( false ), enforceConvexity( false ),
-          ensureMonotonicity( 0 ), rrmGrids( false ), kdtreeSearch( true ), fCheck( false ), fVolumetric( false ),
-          useGnomonicProjection( false ), cassType( moab::TempestOnlineMap::CAAS_NONE ), print_diagnostics( false ),
-          skip_intersection( false ), boxeps( 1e-7 ),  // Box error tolerance default value
-          epsrel( ReferenceTolerance )                 // ReferenceTolerance is defined in Defines.h in TempestRemap
-    {
-        inFilenames.resize( 2 );
-        doftag_names.resize( 2 );
-        timer = new moab::CpuTimer();
+        // Initialize default values
+        inFilenames.reserve( 2 );
+        doftag_names = { "GLOBAL_ID", "GLOBAL_ID" };
+        disc_orders  = { 1, 1 };
+        disc_methods = { "fv", "fv" };
 
+        // Initialize timer and output formatter
+        timer = std::make_unique< moab::CpuTimer >();
         outputFormatter.set_prefix( "[MBTempest]: " );
+
+        // Set default map options
+        mapOptions.fNoConservation = false;
+        mapOptions.fMonotone       = false;
+        mapOptions.fNoCorrectAreas = false;
+        mapOptions.fNoCheck        = false;
+        mapOptions.nPin            = 1;
+        mapOptions.nPout           = 1;
     }
 
-    ~ToolContext()
-    {
-        // for (unsigned i=0; i < meshes.size(); ++i) delete meshes[i];
-        meshes.clear();
-        inFilenames.clear();
-        disc_orders.clear();
-        disc_methods.clear();
-        doftag_names.clear();
-        outFilename.clear();
-        intxFilename.clear();
-        baselineFile.clear();
-        variableToVerify.clear();
-        meshsets.clear();
-        delete timer;
-    }
+    // Rule of Five - Delete copy/move operations as mbcore is const
+    ~ToolContext()                               = default;
+    ToolContext( const ToolContext& )            = delete;
+    ToolContext& operator=( const ToolContext& ) = delete;
+    ToolContext( ToolContext&& )                 = delete;
+    ToolContext& operator=( ToolContext&& )      = delete;
 
-    void timer_push( std::string operation )
+    /**
+     * @brief Start timing an operation
+     * @param operation Name of the operation being timed
+     */
+    void timer_push( const std::string& operation )
     {
         timer_ops = timer->time_since_birth();
         opName    = operation;
     }
 
+    /**
+     * @brief Stop timing and log the operation duration
+     */
     void timer_pop()
     {
-        double locElapsed = timer->time_since_birth() - timer_ops, avgElapsed = 0, maxElapsed = 0;
+        const double locElapsed = timer->time_since_birth() - timer_ops;
+        double avgElapsed       = locElapsed;
+        double maxElapsed       = locElapsed;
+
 #ifdef MOAB_HAVE_MPI
         MPI_Reduce( &locElapsed, &maxElapsed, 1, MPI_DOUBLE, MPI_MAX, 0, pcomm->comm() );
         MPI_Reduce( &locElapsed, &avgElapsed, 1, MPI_DOUBLE, MPI_SUM, 0, pcomm->comm() );
-#else
-        maxElapsed = locElapsed;
-        avgElapsed = locElapsed;
+        avgElapsed /= n_procs;
 #endif
-        if( !proc_id )
+
+        if( proc_id == 0 )
         {
-            avgElapsed /= n_procs;
-            std::cout << "[LOG] Time taken to " << opName.c_str() << ": max = " << maxElapsed
-                      << ", avg = " << avgElapsed << "\n";
+            std::cout << "[LOG] Time taken to " << opName << ": max = " << maxElapsed << ", avg = " << avgElapsed
+                      << "\n";
         }
-        // std::cout << "\n[LOG" << proc_id << "] Time taken to " << opName << " = " <<
-        // timer->time_since_birth() - timer_ops << std::endl;
         opName.clear();
     }
 
-    void ParseCLOptions( int argc, char* argv[] )
+    /**
+     * @brief Parse command line arguments
+     * @param argc Argument count
+     * @param argv Argument values
+     * @return moab::ErrorCode indicating success or failure
+     * @throw std::invalid_argument for invalid command line arguments
+     */
+    moab::ErrorCode ParseCLOptions( int argc, char** argv )
     {
-        ProgOptions opts;
+        // Initialize variables for command line options
         int imeshType                  = 0;
         std::string expectedFName      = "output.exo";
         std::string expectedMethod     = "fv";
@@ -159,15 +249,23 @@ struct ToolContext
         int expectedOrder              = 1;
         int useCAAS                    = 0;
         int nlayer_input               = 0;
+        bool version_info              = false;
 
-        if( !proc_id )
+        // Print command line for debugging
+        if( proc_id == 0 )
         {
             std::cout << "Command line options provided to mbtempest:\n  ";
-            for( int iarg = 0; iarg < argc; ++iarg )
-                std::cout << argv[iarg] << " ";
-            std::cout << std::endl << std::endl;
+            for( int i = 0; i < argc; ++i )
+            {
+                std::cout << argv[i] << " ";
+            }
+            std::cout << "\n" << std::endl;
         }
 
+        // Create options object with description
+        ProgOptions opts( "mbtempest - A mesh generation and remapping tool" );
+
+        // Mesh generation options
         opts.addOpt< int >( "type,t",
                             "Type of mesh (default=CS; Choose from [CS=0, RLL=1, ICO=2, OVERLAP_FILES=3, "
                             "OVERLAP_MEMORY=4, OVERLAP_MOAB=5])",
@@ -179,21 +277,25 @@ struct ToolContext
 
         opts.addOpt< std::string >( "file,f", "Output computed mesh or remapping weights to specified filename",
                                     &outFilename );
+
+        // Input/Output options
         opts.addOpt< std::string >(
             "load,l", "Input mesh filenames for source and target meshes. (relevant only when computing weights)",
             &expectedFName );
 
         opts.addOpt< void >( "advfront,a",
-                             "Use the advancing front intersection instead of the Kd-tree based algorithm "
-                             "to compute mesh intersections. (relevant only when computing weights)" );
+                             "Use the advancing front intersection instead of the Kd-tree based algorithm to compute "
+                             "mesh intersections.",
+                             &kdtreeSearch );
 
         opts.addOpt< std::string >( "intx,i", "Output TempestRemap intersection mesh filename", &intxFilename );
 
-        opts.addOpt< void >( "weights,w",
-                             "Compute and output the weights using the overlap mesh (generally "
-                             "relevant only for OVERLAP mesh)",
-                             &computeWeights );
+        opts.addOpt< void >(
+            "weights,w",
+            "Compute and output the weights using the overlap mesh (generally relevant only for OVERLAP mesh)",
+            &computeWeights );
 
+        // Discretization options
         opts.addOpt< void >(
             "verbose,v", "Print verbose diagnostic messages during intersection and map computation (default=false)",
             &print_diagnostics );
@@ -208,31 +310,31 @@ struct ToolContext
                                     "Tag name that contains the global DoF IDs for source and target solution fields",
                                     &expectedDofTagName );
 
+        // Advanced options
         opts.addOpt< std::string >( "fvmethod",
-                                    "Sub-type method for FV-FV projections (invdist, delaunay, bilin, "
-                                    "intbilin, intbilingb, none. Default: none)",
+                                    "Sub-type method for FV-FV projections (invdist, delaunay, bilin, intbilin, "
+                                    "intbilingb, none. Default: none)",
                                     &expectedFVMethod );
 
-        opts.addOpt< void >( "noconserve",
-                             "Do not apply conservation to the resultant weights (relevant only "
-                             "when computing weights)",
-                             &mapOptions.fNoConservation );
+        opts.addOpt< void >(
+            "noconserve", "Do not apply conservation to the resultant weights (relevant only when computing weights)",
+            &mapOptions.fNoConservation );
 
-        opts.addOpt< void >( "volumetric",
-                             "Apply a volumetric projection to compute the weights (relevant only "
-                             "when computing weights)",
-                             &fVolumetric );
+        opts.addOpt< void >(
+            "volumetric", "Apply a volumetric projection to compute the weights (relevant only when computing weights)",
+            &fVolumetric );
 
         opts.addOpt< void >( "skip_intersection", "Skip mesh intersection computation.", &skip_intersection );
+
         opts.addOpt< void >( "skip_output", "For performance studies, skip all I/O operations.", &skip_io );
 
         opts.addOpt< void >( "gnomonic", "Use Gnomonic plane projections to compute coverage mesh.",
                              &useGnomonicProjection );
 
-        opts.addOpt< void >( "enforce_convexity", "check convexity of input meshes to compute mesh intersections",
+        opts.addOpt< void >( "enforce_convexity", "Check convexity of input meshes to compute mesh intersections",
                              &enforceConvexity );
 
-        opts.addOpt< void >( "nobubble", "do not use bubble on interior of spectral element nodes",
+        opts.addOpt< void >( "nobubble", "Do not use bubble on interior of spectral element nodes",
                              &mapOptions.fNoBubble );
 
         opts.addOpt< void >(
@@ -240,22 +342,21 @@ struct ToolContext
             "Use sparse solver for constraints when we have high-valence (typical with high-res RLL mesh)",
             &mapOptions.fSparseConstraints );
 
-        opts.addOpt< void >( "rrmgrids",
-                             "At least one of the meshes is a regionally refined grid (relevant to "
-                             "accelerate intersection computation)",
-                             &rrmGrids );
+        opts.addOpt< void >(
+            "rrmgrids",
+            "At least one of the meshes is a regionally refined grid (relevant to accelerate intersection computation)",
+            &rrmGrids );
 
         opts.addOpt< void >( "checkmap", "Check the generated map for conservation and consistency", &fCheck );
 
         opts.addOpt< void >( "verify",
-                             "Verify the accuracy of the maps by projecting analytical functions "
-                             "from source to target "
+                             "Verify the accuracy of the maps by projecting analytical functions from source to target "
                              "grid by applying the maps",
                              &verifyWeights );
 
         opts.addOpt< std::string >( "var",
-                                    "Tag name of the variable to use in the verification study "
-                                    "(error metrics for user defined variables may not be available)",
+                                    "Tag name of the variable to use in the verification study (error metrics for user "
+                                    "defined variables may not be available)",
                                     &variableToVerify );
 
         opts.addOpt< int >( "monotonicity", "Ensure monotonicity in the weight generation. Options=[0,1,2,3]",
@@ -265,227 +366,556 @@ struct ToolContext
 
         opts.addOpt< double >( "boxeps", "The tolerance for boxes (default=1e-7)", &boxeps );
 
-        opts.addOpt< int >( "caas", "apply CAAS nonlinear filter after linear map application", &useCAAS );
+        opts.addOpt< int >( "limiter", "Apply nonlinear filter after linear map application", &useCAAS );
 
         opts.addOpt< std::string >( "baseline", "Output baseline file", &baselineFile );
 
+        opts.addOpt< void >( "manual", "Show documentation about usage with examples" );
+
+        opts.addOpt< void >( "version", "Show version information", &version_info );
+
+        // Parse command line
         opts.parseCommandLine( argc, argv );
 
-        // By default - use Kd-tree based search; if user asks for advancing front, disable Kd-tree
-        // algorithm
-        kdtreeSearch = opts.numOptSet( "advfront,a" ) == 0;
+        // Handle call for detailed information
+        if( opts.numOptSet( "manual" ) > 0 )
+        {
+            if( this->proc_id == 0 )
+            {
+                this->printHelp( argv[0] );
+            }
+            exit( 0 );
+        }
 
+        if( version_info )
+        {
+            if( this->proc_id == 0 )
+            {
+                std::cout << "mbtempest is part of the MOAB library version " << MOAB_VERSION << "\n";
+            }
+            exit( 0 );
+        }
+
+        // Process mesh type
         switch( imeshType )
         {
             case 0:
-                meshType = moab::TempestRemapper::CS;
+                this->meshType = moab::TempestRemapper::CS;
                 break;
-
             case 1:
-                meshType = moab::TempestRemapper::RLL;
+                this->meshType = moab::TempestRemapper::RLL;
                 break;
-
             case 2:
-                meshType = moab::TempestRemapper::ICO;
+                this->meshType = moab::TempestRemapper::ICO;
                 break;
-
             case 3:
-                meshType = moab::TempestRemapper::OVERLAP_FILES;
+                this->meshType = moab::TempestRemapper::OVERLAP_FILES;
                 break;
-
             case 4:
-                meshType = moab::TempestRemapper::OVERLAP_MEMORY;
+                this->meshType = moab::TempestRemapper::OVERLAP_MEMORY;
                 break;
-
             case 5:
-                meshType = moab::TempestRemapper::OVERLAP_MOAB;
+                this->meshType = moab::TempestRemapper::OVERLAP_MOAB;
                 break;
-
             default:
-                meshType = moab::TempestRemapper::DEFAULT;
+                this->meshType = moab::TempestRemapper::DEFAULT;
                 break;
         }
 
-        // decipher whether we want to use CAAS filter when applying the projection
+        // Process CAAS type
         switch( useCAAS )
         {
-            case moab::TempestOnlineMap::CAAS_GLOBAL:
-                cassType = moab::TempestOnlineMap::CAAS_GLOBAL;
+            case 1:
+                this->cassType = moab::TempestOnlineMap::CAAS_GLOBAL;
                 break;
-            case moab::TempestOnlineMap::CAAS_LOCAL:
-                cassType = moab::TempestOnlineMap::CAAS_LOCAL;
+            case 2:
+                this->cassType = moab::TempestOnlineMap::CAAS_LOCAL;
                 break;
-            case moab::TempestOnlineMap::CAAS_LOCAL_ADJACENT:
-                cassType = moab::TempestOnlineMap::CAAS_LOCAL_ADJACENT;
+            case 3:
+                this->cassType = moab::TempestOnlineMap::CAAS_LOCAL_ADJACENT;
                 break;
-            case moab::TempestOnlineMap::CAAS_QLT:
-                cassType = moab::TempestOnlineMap::CAAS_QLT;
+            case 4:
+                this->cassType = moab::TempestOnlineMap::CAAS_QLT;
                 break;
             default:
-                cassType = moab::TempestOnlineMap::CAAS_NONE;
+                this->cassType = moab::TempestOnlineMap::CAAS_NONE;
                 break;
         }
 
-        if( meshType > moab::TempestRemapper::ICO )  // compute overlap mesh and maps possibly
+        // Process input files if provided
+        if( !expectedFName.empty() )
         {
-            opts.getOptAllArgs( "load,l", inFilenames );
-            opts.getOptAllArgs( "order,o", disc_orders );
-            opts.getOptAllArgs( "method,m", disc_methods );
-            opts.getOptAllArgs( "global_id,i", doftag_names );
-
-            assert( inFilenames.size() == 2 );
-            assert( ensureMonotonicity >= 0 && ensureMonotonicity <= 3 );
-
-            // get discretization order parameters
-            if( disc_orders.size() == 0 ) disc_orders.resize( 2, 1 );
-            if( disc_orders.size() == 1 ) disc_orders.push_back( disc_orders[0] );
-
-            // get discretization method parameters
-            if( disc_methods.size() == 0 ) disc_methods.resize( 2, "fv" );
-            if( disc_methods.size() == 1 ) disc_methods.push_back( disc_methods[0] );
-
-            // get DoF tagname parameters
-            if( doftag_names.size() == 0 ) doftag_names.resize( 2, "GLOBAL_ID" );
-            if( doftag_names.size() == 1 ) doftag_names.push_back( doftag_names[0] );
-
-            assert( disc_orders.size() == 2 );
-            assert( disc_methods.size() == 2 );
-            assert( doftag_names.size() == 2 );
-
-            // for computing maps and overlaps, set discretization orders
-            mapOptions.nPin           = disc_orders[0];
-            mapOptions.nPout          = disc_orders[1];
-            mapOptions.fSourceConcave = false;
-            mapOptions.fTargetConcave = false;
-
-            mapOptions.strMethod = "";
-
-            if( expectedFVMethod != "none" )
-            {
-                mapOptions.strMethod += expectedFVMethod + ";";
-                fvMethod = expectedFVMethod;
-
-                // These FV projection methods are non-conservative; specify it explicitly
-                mapOptions.fNoConservation = true;
-            }
-            switch( ensureMonotonicity )
-            {
-                case 0:
-                    mapOptions.fMonotone = false;
-                    break;
-                case 3:
-                    mapOptions.strMethod += "mono3;";
-                    break;
-                case 2:
-                    mapOptions.strMethod += "mono2;";
-                    break;
-                default:
-                    mapOptions.fMonotone = true;
-            }
-            mapOptions.fNoCorrectAreas = false;
-            mapOptions.fNoCheck        = !fCheck;
-
-            //assert( fVolumetric && fInverseDistanceMap == false );  // both options cannot be active
-            if( fVolumetric ) mapOptions.strMethod += "volumetric;";
-
-            // For global meshes, this default should work out of the box.
-            // ideally, 1 layer should suffice for bilinear variants and FV-SE-averaged schemes,
-            // but we will be conservative as parallel correctness depends on having enough coverage layers
-            if( fvMethod.compare( "none" ) )  // True for invdist, delaunay, bilin, intbilin, intbilingb, fvse-averaged
-            {
-                nlayers           = 3;
-                skip_intersection = true;  // Do not need intersection for any of these schemes
-            }
-            else
-                nlayers = ( mapOptions.nPin > 1 ? mapOptions.nPin + 1 : 0 );
-            if( nlayer_input ) nlayers = std::max( nlayer_input, nlayers );
+            this->inFilenames = { expectedFName };
         }
 
-        // clear temporary string name
-        expectedFName.clear();
+        // Process discretization options
+        this->fvMethod     = expectedFVMethod;
+        this->disc_orders  = { expectedOrder, expectedOrder };
+        this->disc_methods = { expectedMethod, expectedMethod };
+        this->doftag_names = { expectedDofTagName, expectedDofTagName };
 
-        mapOptions.strOutputMapFile = outFilename;
-        mapOptions.strOutputFormat  = "Netcdf4";
+        // For computing maps and overlaps, set discretization orders
+        this->mapOptions.nPin           = this->disc_orders[0];
+        this->mapOptions.nPout          = this->disc_orders[1];
+        this->mapOptions.fSourceConcave = false;
+        this->mapOptions.fTargetConcave = false;
+        this->mapOptions.strMethod      = "";
+
+        if( this->fvMethod != "none" )
+        {
+            this->mapOptions.strMethod += this->fvMethod + ";";
+            this->mapOptions.fNoConservation = true;
+        }
+
+        switch( this->ensureMonotonicity )
+        {
+            case 0:
+                this->mapOptions.fMonotone = false;
+                break;
+            case 3:
+                this->mapOptions.strMethod += "mono3;";
+                break;
+            case 2:
+                this->mapOptions.strMethod += "mono2;";
+                break;
+            default:
+                this->mapOptions.fMonotone = true;
+        }
+
+        this->mapOptions.fNoCorrectAreas = false;
+        this->mapOptions.fNoCheck        = !this->fCheck;
+
+        if( this->fVolumetric )
+        {
+            this->mapOptions.strMethod += "volumetric;";
+        }
+
+        // Set number of ghost layers based on method
+        if( this->fvMethod != "none" )
+        {
+            this->nlayers           = 3;
+            this->skip_intersection = true;
+        }
+        else
+        {
+            this->nlayers = ( this->mapOptions.nPin > 1 ? this->mapOptions.nPin + 1 : 0 );
+        }
+
+        if( nlayer_input > 0 )
+        {
+            this->nlayers = std::max( nlayer_input, this->nlayers );
+        }
+
+        // Set output map file and format
+        this->mapOptions.strOutputMapFile = this->outFilename;
+        this->mapOptions.strOutputFormat  = "Netcdf4";
+
+        // Print configuration summary
+        if( this->proc_id == 0 )
+        {
+            std::cout << "Configuration summary:" << "\n  Mesh type: " << this->getMeshTypeName()
+                      << "\n  Output file: " << this->outFilename << "\n  Discretization: " << this->disc_methods[0]
+                      << " (order " << this->disc_orders[0] << ")" << "\n  Monotonicity: " << this->ensureMonotonicity
+                      << std::endl;
+        }
+
+        return moab::MB_SUCCESS;
     }
 
   private:
-    moab::CpuTimer* timer;
-    double timer_ops;
-    std::string opName;
+    /**
+     * @brief Print detailed help message with usage examples
+     * @param progName Program name
+     */
+    void printHelp( const char* progName ) const
+    {
+        if( this->proc_id != 0 ) return;
+
+        std::cout << "MOAB-Tempest: A mesh generation and remapping tool\n"
+                  << "==================================================\n\n"
+                  << "Usage: " << progName << " [OPTIONS]\n\n"
+                  << "Mesh Generation Options:\n"
+                  << "  -t, --type TYPE       Type of mesh to generate (required for mesh generation):\n"
+                  << "                           0 = Cubed-Sphere (CS)\n"
+                  << "                           1 = Regular Latitude-Longitude (RLL)\n"
+                  << "                           2 = Icosahedral (ICO)\n"
+                  << "                           3 = TempestRemap overlap (thin interface))\n"
+                  << "                           4 = MOAB with TempestRemap overlap in memory\n"
+                  << "                           5 = Parallel handling of Overlap meshes with MOAB (recommended)\n\n"
+                  << "  -r, --res N           Resolution (number of elements on edge, default: 10)\n"
+                  << "  -f, --file FILE       Output filename (default: output.h5m)\n\n"
+                  << "Discretization Options:\n"
+                  << "  -m, --method METHOD   Discretization method (default: fv):\n"
+                  << "                           fv   = Finite Volume\n"
+                  << "                           cgll = Continuous Galerkin with Legendre-Gauss-Lobatto\n"
+                  << "                           dgll = Discontinuous Galerkin with Legendre-Gauss-Lobatto\n\n"
+                  << "  -o, --order N         Discretization order (default: 1, range: 1-4)\n\n"
+                  << "Remapping Options:\n"
+                  << "  --mono N              Monotonicity constraints (default: 0):\n"
+                  << "                           0 = No monotonicity\n"
+                  << "                           1 = Basic monotonicity\n"
+                  << "                           2 = Full monotonicity with bounds\n"
+                  << "                           3 = Strict monotonicity\n\n"
+                  << "  --limiter TYPE        Nonlinear limiting (optional):\n"
+                  << "                           none = No limiting (default)\n"
+                  << "                           global = Global CAAS limiting\n"
+                  << "                           local = Localized CAAS limiting\n"
+                  << "                           qlt = Quasi-Local Tree-based limiting\n\n"
+                  << "Input/Output Options:\n"
+                  << "  -l, --load FILE       Load input mesh file (use twice for source and target)\n"
+                  << "  -i, --global_id TAG   Global ID tag name (default: GLOBAL_ID)\n"
+                  << "  --diagnostics         Print diagnostic information\n\n"
+                  << "Miscellaneous Options:\n"
+                  << "  --manual              Show this help message and exit\n"
+                  << "  --version             Show version information\n\n"
+                  << "Examples:\n"
+                  << "  # Generate a cubed-sphere mesh with resolution 25\n"
+                  << "  " << progName << " --type 0 --res 25 -f cs_mesh.h5m\n\n"
+                  << "  # Generate a latitude-longitude mesh with resolution 180\n"
+                  << "  " << progName << " --type 1 --res 180 -f rll_mesh.h5m\n\n"
+                  << "  # Create a map between two meshes with order 4\n"
+                  << "  " << progName << " --type 5 --load source_mesh.h5m --load target_mesh.h5m \\\n"
+                  << "      --method cgll --order 4 --global_id GLOBAL_DOFS \\\n"
+                  << "      --method fv --order 1 --limiter 1 --file map.nc\n";
+    }
+
+    /**
+     * @brief Get mesh type as string
+     * @return String representation of mesh type
+     */
+    std::string getMeshTypeName()
+    {
+        switch( this->meshType )
+        {
+            case moab::TempestRemapper::CS:
+                return "Cubed-Sphere";
+            case moab::TempestRemapper::RLL:
+                return "Latitude-Longitude";
+            case moab::TempestRemapper::ICO:
+                return "Icosahedral";
+            case moab::TempestRemapper::OVERLAP_FILES:
+                return "Overlap (files)";
+            case moab::TempestRemapper::OVERLAP_MEMORY:
+                return "Overlap (memory)";
+            case moab::TempestRemapper::OVERLAP_MOAB:
+                return "Overlap (MOAB)";
+            default:
+                return "Unknown";
+        }
+    }
+
+    /**
+     * @brief Process mesh options from command line
+     * @param opts Program options
+     * @param expectedFVMethod Expected finite volume method
+     * @param nlayer_input Number of ghost layers
+     */
+    void processMeshOptions( ProgOptions& opts, const std::string& expectedFVMethod, int nlayer_input )
+    {
+        if( this->meshType <= moab::TempestRemapper::ICO ) return;
+
+        // Process input files
+        std::vector< std::string > inputFiles;
+        opts.getOptAllArgs( "load,l", inputFiles );
+        if( !inputFiles.empty() )
+        {
+            this->inFilenames = inputFiles;
+            if( this->inFilenames.size() != 2 )
+            {
+                throw std::runtime_error( "Exactly two input filenames must be provided with -l/--load" );
+            }
+        }
+
+        // Process discretization orders
+        std::vector< int > orders;
+        opts.getOptAllArgs( "order,o", orders );
+        if( !orders.empty() )
+        {
+            this->disc_orders = orders;
+            if( this->disc_orders.size() == 1 )
+            {
+                this->disc_orders.push_back( this->disc_orders[0] );
+            }
+            else if( this->disc_orders.size() != 2 )
+            {
+                throw std::runtime_error( "Must specify 1 or 2 values for order (source [target])" );
+            }
+
+            for( const auto& order : this->disc_orders )
+            {
+                if( order < 1 || order > 4 )
+                {
+                    throw std::runtime_error( "Discretization order must be between 1 and 4" );
+                }
+            }
+        }
+
+        // Process discretization methods
+        std::vector< std::string > methods;
+        opts.getOptAllArgs( "method,m", methods );
+        if( !methods.empty() )
+        {
+            this->disc_methods = methods;
+            if( this->disc_methods.size() == 1 )
+            {
+                // Use same method for both source and target
+                this->disc_methods.push_back( this->disc_methods[0] );
+            }
+            else if( this->disc_methods.size() != 2 )
+            {
+                throw std::runtime_error( "Must specify 1 or 2 values for method (source [target])" );
+            }
+
+            // Validate method values
+            for( const auto& method : this->disc_methods )
+            {
+                if( method != "fv" && method != "cgll" && method != "dgll" )
+                {
+                    throw std::runtime_error( "Invalid method '" + method + "'. Must be one of: fv, cgll, dgll" );
+                }
+            }
+        }
+
+        // Process DOF tag names
+        std::vector< std::string > tags;
+        opts.getOptAllArgs( "global_id,i", tags );
+        if( !tags.empty() )
+        {
+            this->doftag_names = tags;
+            if( this->doftag_names.size() == 1 )
+            {
+                // Use same tag name for both source and target
+                this->doftag_names.push_back( this->doftag_names[0] );
+            }
+            else if( this->doftag_names.size() != 2 )
+            {
+                throw std::runtime_error( "Must specify 1 or 2 values for DOF tag names (source [target])" );
+            }
+        }
+
+        // Process output filename if specified
+        std::string outFile;
+        if( opts.getOpt( "file,f", &outFile ) )
+        {
+            this->outFilename = outFile;
+        }
+
+        // Process other options using the correct getOpt signature (pointer to variable)
+        int mono = this->ensureMonotonicity;
+        if( opts.getOpt( "mono", &mono ) )
+        {
+            this->ensureMonotonicity = mono;
+        }
+        opts.getOpt< void >( "volumetric", &this->fVolumetric );
+        opts.getOpt< void >( "check", &this->fCheck );
+        opts.getOpt< void >( "gnomonic", &this->useGnomonicProjection );
+        opts.getOpt< void >( "diagnostics", &this->print_diagnostics );
+
+        // Configure map options with the processed values
+        configureMapOptions( expectedFVMethod, nlayer_input );
+    }
+
+    /**
+     * @brief Configure map options based on command line parameters
+     * @param expectedFVMethod Finite volume method specification
+     * @param nlayer_input Number of ghost layers
+     */
+    void configureMapOptions( const std::string& expectedFVMethod, int nlayer_input )
+    {
+        // Set polynomial orders with bounds checking
+        this->mapOptions.nPin  = ( this->disc_orders.empty() ) ? 1 : this->disc_orders[0];
+        this->mapOptions.nPout = ( this->disc_orders.size() > 1 ) ? this->disc_orders[1] : this->mapOptions.nPin;
+
+        // Initialize flags
+        this->mapOptions.fSourceConcave = false;
+        this->mapOptions.fTargetConcave = false;
+        this->mapOptions.strMethod.clear();
+
+        // Configure finite volume method if specified
+        if( expectedFVMethod != "none" )
+        {
+            this->mapOptions.strMethod       = expectedFVMethod + ";";
+            this->fvMethod                   = expectedFVMethod;
+            this->mapOptions.fNoConservation = true;
+
+            if( this->proc_id == 0 && !expectedFVMethod.empty() )
+            {
+                std::cout << "Using finite volume method: " << expectedFVMethod << std::endl;
+            }
+        }
+
+        // Configure monotonicity with validation
+        this->ensureMonotonicity = std::max( 0, std::min( 3, this->ensureMonotonicity ) );  // Clamp to 0-3
+        switch( this->ensureMonotonicity )
+        {
+            case 0:
+                this->mapOptions.fMonotone = false;
+                break;
+            case 3:
+                this->mapOptions.strMethod += "mono3;";
+                this->mapOptions.fMonotone = true;
+                break;
+            case 2:
+                this->mapOptions.strMethod += "mono2;";
+                this->mapOptions.fMonotone = true;
+                break;
+            case 1:
+            default:
+                this->mapOptions.fMonotone = true;
+                break;
+        }
+
+        // Set other options
+        this->mapOptions.fNoCorrectAreas = false;
+        this->mapOptions.fNoCheck        = !this->fCheck;
+
+        // Add volumetric flag if needed
+        if( this->fVolumetric )
+        {
+            this->mapOptions.strMethod += "volumetric;";
+        }
+
+        // Set number of ghost layers based on method and order
+        if( this->fvMethod != "none" )
+        {
+            this->nlayers           = 3;  // Default for FV methods
+            this->skip_intersection = true;
+        }
+        else
+        {
+            this->nlayers = ( this->mapOptions.nPin > 1 ) ? this->mapOptions.nPin + 1 : 0;
+        }
+
+        // Override with user-specified value if provided
+        if( nlayer_input > 0 )
+        {
+            this->nlayers = std::max( nlayer_input, this->nlayers );
+        }
+
+        // Configure output
+        this->mapOptions.strOutputMapFile = this->outFilename;
+        this->mapOptions.strOutputFormat  = "Netcdf4";
+
+        // Log configuration details
+        if( this->proc_id == 0 )
+        {
+            std::cout << "Using " << this->nlayers << " ghost layers for remapping" << std::endl;
+            if( !this->mapOptions.strMethod.empty() )
+            {
+                std::cout << "Map method flags: " << this->mapOptions.strMethod << std::endl;
+            }
+        }
+    }
 };
 
 // Forward declare some methods
 static moab::ErrorCode CreateTempestMesh( ToolContext&, moab::TempestRemapper& remapper, Mesh* );
-inline double sample_slow_harmonic( double dLon, double dLat );
-inline double sample_fast_harmonic( double dLon, double dLat );
-inline double sample_constant( double dLon, double dLat );
-inline double sample_stationary_vortex( double dLon, double dLat );
+static inline constexpr double sample_constant( double dLon, double dLat ) noexcept;
+static inline double sample_slow_harmonic( double dLon, double dLat ) noexcept;
+static inline double sample_fast_harmonic( double dLon, double dLat ) noexcept;
+static inline double sample_stationary_vortex( double dLon, double dLat ) noexcept;
 
-std::string get_file_read_options( ToolContext& ctx, std::string filename )
+/**
+ * @brief Get the appropriate MOAB read options based on file extension and parallel configuration
+ *
+ * @param ctx Tool context containing parallel information
+ * @param filename Input filename to determine read options
+ * @return std::string MOAB read options string
+ */
+std::string get_file_read_options( ToolContext& ctx, const std::string& filename )
 {
-    // if running in serial, blank option may suffice in general
-    std::string opts = "";
-    if( ctx.n_procs > 1 )
+    // For serial execution, return default options
+    if( ctx.n_procs <= 1 )
     {
-        size_t lastindex      = filename.find_last_of( "." );
-        std::string extension = filename.substr( lastindex + 1, filename.size() );
-        if( extension == "h5m" ) return "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;";
-        //    "PARALLEL_GHOSTS=2.0.3;PARALLEL_THIN_GHOST_LAYER;";
-        else if( extension == "nc" )
+        return "";
+    }
+
+    // Extract file extension
+    const size_t last_dot = filename.find_last_of( "." );
+    if( last_dot == std::string::npos )
+    {
+        return "";  // No extension found
+    }
+
+    const std::string extension = filename.substr( last_dot + 1 );
+
+    // Handle H5M files
+    if( extension == "h5m" )
+    {
+        return "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;";
+    }
+
+    // Handle NetCDF files
+    if( extension == "nc" )
+    {
+        // Default NetCDF options
+#ifdef MOAB_HAVE_ZOLTAN
+        std::string netcdf_options = "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;";
+#else
+        std::string netcdf_options = "PARALLEL=READ_PART;PARTITION_METHOD=TRIVIAL;";
+#endif
+        // Only rank 0 needs to determine the NetCDF file type
+        if( ctx.proc_id == 0 )
         {
-            // set default set of options
-            opts = "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;";
-
-            if( ctx.proc_id == 0 )
+            NcFile ncFile( filename.c_str(), NcFile::ReadOnly );
+            if( !ncFile.is_valid() )
             {
+                // Handle invalid file
+                return netcdf_options;
+            }
+
+            // Check for different NetCDF formats
+            int format_flags = 0;
+            for( int i = 0; i < ncFile.num_dims(); i++ )
+            {
+                const std::string dim_name = ncFile.get_dim( i )->name();
+
+                if( dim_name == "grid_size" || dim_name == "grid_corners" || dim_name == "grid_rank" )
                 {
-                    NcFile ncFile( filename.c_str(), NcFile::ReadOnly );
-                    if( !ncFile.is_valid() )
-                        _EXCEPTION1( "Unable to open grid file \"%s\" for reading", filename.c_str() );
-
-                    // Check for dimension names "grid_size", "grid_rank" and "grid_corners"
-                    int iSCRIPFormat = 0, iMPASFormat = 0, iESMFFormat = 0;
-                    for( int i = 0; i < ncFile.num_dims(); i++ )
-                    {
-                        std::string strDimName = ncFile.get_dim( i )->name();
-                        if( strDimName == "grid_size" || strDimName == "grid_corners" || strDimName == "grid_rank" )
-                            iSCRIPFormat++;
-                        if( strDimName == "nodeCount" || strDimName == "elementCount" ||
-                            strDimName == "maxNodePElement" )
-                            iESMFFormat++;
-                        if( strDimName == "nCells" || strDimName == "nEdges" || strDimName == "nVertices" ||
-                            strDimName == "vertexDegree" )
-                            iMPASFormat++;
-                    }
-                    ncFile.close();
-
-                    if( iESMFFormat == 3 )  // Input from a NetCDF ESMF file
-                    {
-                        opts = "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;PARALLEL_RESOLVE_SHARED_ENTS;VARIABLE=;";
-                    }
-                    if( iSCRIPFormat == 3 )  // Input from a NetCDF SCRIP file
-                    {
-                        opts = "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;";
-                    }
-                    if( iMPASFormat == 4 )  // Input from a NetCDF SCRIP file
-                    {
-                        opts = "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;"
-                               "PARALLEL_RESOLVE_SHARED_ENTS;NO_EDGES;NO_MIXED_ELEMENTS;VARIABLE=;";
-                    }
+                    format_flags |= 1;  // SCRIP format
+                }
+                else if( dim_name == "nodeCount" || dim_name == "elementCount" || dim_name == "maxNodePElement" )
+                {
+                    format_flags |= 2;  // ESMF format
+                }
+                else if( dim_name == "nCells" || dim_name == "nEdges" || dim_name == "nVertices" ||
+                         dim_name == "vertexDegree" )
+                {
+                    format_flags |= 4;  // MPAS format
                 }
             }
 
-#ifdef MOAB_HAVE_MPI
-            int line_size = opts.size();
-            MPI_Bcast( &line_size, 1, MPI_INT, 0, MPI_COMM_WORLD );
-            if( ctx.proc_id != 0 ) opts.resize( line_size );
-            MPI_Bcast( const_cast< char* >( opts.data() ), line_size, MPI_CHAR, 0, MPI_COMM_WORLD );
-#endif
+            // Apply format-specific options
+            if( format_flags & 2 )
+            {  // ESMF format
+                netcdf_options += "PARALLEL_RESOLVE_SHARED_ENTS;VARIABLE=;";
+            }
+            else if( format_flags & 1 )
+            {                          // SCRIP format
+                netcdf_options += "";  // no extra options necessary for now
+            }
+            else if( format_flags & 4 )
+            {  // MPAS format
+                netcdf_options += "PARALLEL_RESOLVE_SHARED_ENTS;NO_EDGES;NO_MIXED_ELEMENTS;VARIABLE=;";
+            }
         }
-        else
-            return "PARALLEL=BCAST_DELETE;PARTITION=TRIVIAL;PARALLEL_RESOLVE_SHARED_ENTS;";
+
+        // Broadcast the options to all processes
+#ifdef MOAB_HAVE_MPI
+        int line_size = netcdf_options.size();
+        MPI_Bcast( &line_size, 1, MPI_INT, 0, MPI_COMM_WORLD );
+        if( ctx.proc_id != 0 )
+        {
+            netcdf_options.resize( line_size );
+        }
+        MPI_Bcast( const_cast< char* >( netcdf_options.data() ), line_size, MPI_CHAR, 0, MPI_COMM_WORLD );
+#endif
+
+        return netcdf_options;
     }
-    return opts;
+
+    // Default options for other file types
+    return "PARALLEL=BCAST_DELETE;PARTITION=TRIVIAL;PARALLEL_RESOLVE_SHARED_ENTS;";
 }
 
 //#define MOAB_DBG
@@ -723,7 +1153,7 @@ int main( int argc, char* argv[] )
 #endif
 
         // print verbosely about the problem setting
-        size_t velist[4] = {}, gvelist[4] = {};
+        size_t velist[4] = { 0, 0, 0, 0 }, gvelist[4] = { 0, 0, 0, 0 };
         {
             moab::Range srcverts, srcelems;
             MB_CHK_SET_ERR( mbCore->get_entities_by_dimension( runCtx->meshsets[0], 0, srcverts ),
@@ -739,9 +1169,6 @@ int main( int argc, char* argv[] )
             }
             MB_CHK_SET_ERR( areaAdaptor.positive_orientation( mbCore, runCtx->meshsets[0], radius_src ),
                             "Failed to enforce positive orientation" );
-            // if( !proc_id )
-            //     outputFormatter.printf( 0, "The source set contains %lu vertices and %lu elements \n", srcverts.size(),
-            //                             srcelems.size() );
             velist[0] = srcverts.size();
             velist[1] = srcelems.size();
 
@@ -759,9 +1186,6 @@ int main( int argc, char* argv[] )
             }
             MB_CHK_SET_ERR( areaAdaptor.positive_orientation( mbCore, runCtx->meshsets[1], radius_dest ),
                             "Failed to enforce positive orientation" );
-            // if( !proc_id )
-            //     outputFormatter.printf( 0, "The target set contains %lu vertices and %lu elements \n", tgtverts.size(),
-            //                             tgtelems.size() );
             velist[2] = tgtverts.size();
             velist[3] = tgtelems.size();
         }
@@ -777,7 +1201,7 @@ int main( int argc, char* argv[] )
         // First compute the covering set such that the target elements are fully covered by the
         // local source grid
         runCtx->timer_push( "construct covering set for intersection" );
-        // if ghosting, no gnomonic
+        // if ghosting, do not use gnomonic projection
         if( runCtx->nlayers >= 1 ) runCtx->useGnomonicProjection = false;
         MB_CHK_SET_ERR( remapper.ConstructCoveringSet( runCtx->epsrel, 1.0, 1.0, runCtx->boxeps, runCtx->rrmGrids,
                                                        runCtx->useGnomonicProjection, runCtx->nlayers ),
@@ -817,8 +1241,7 @@ int main( int argc, char* argv[] )
         double dTotalOverlapArea = 0.0;
         if( runCtx->print_diagnostics && !runCtx->skip_intersection )
         {
-            moab::IntxAreaUtils areaAdaptorHuiller(
-                moab::IntxAreaUtils::GaussQuadrature );  // lHuiller, GaussQuadrature
+            moab::IntxAreaUtils areaAdaptorHuiller( moab::IntxAreaUtils::lHuiller );  // lHuiller, GaussQuadrature
             double local_areas[3],
                 global_areas[3];  // Array for Initial area, and through Method 1 and Method 2
             // local_areas[0] = area_on_sphere_lHuiller ( mbCore, runCtx->meshsets[1], radius_src );
@@ -839,10 +1262,6 @@ int main( int argc, char* argv[] )
                                         "initial area: source mesh = %12.14f, target mesh = "
                                         "%12.14f, overlap mesh = %12.14f\n",
                                         global_areas[0], global_areas[1], global_areas[2] );
-                // outputFormatter.printf ( 0, " area with l'Huiller: %12.14f with Girard:
-                // %12.14f\n", global_areas[2], global_areas[3] ); outputFormatter.printf ( 0, "
-                // relative difference areas = %12.10e\n", fabs ( global_areas[2] - global_areas[3]
-                // ) / global_areas[2] );
                 outputFormatter.printf( 0, "relative error w.r.t source = %12.14e, and target = %12.14e\n",
                                         fabs( global_areas[0] - global_areas[2] ) / global_areas[0],
                                         fabs( global_areas[1] - global_areas[2] ) / global_areas[1] );
@@ -872,14 +1291,13 @@ int main( int argc, char* argv[] )
                 {
                     std::stringstream filename;
                     filename << "aug_overlap" << runCtx->pcomm->rank() << ".h5m";
-                    rval = runCtx->mbcore->write_file( filename.str().c_str(), 0, 0, &meshOverlapSet, 1 );
                     MB_CHK_SET_ERR( mbCore->write_file( filename.str().c_str(), 0, 0, &meshOverlapSet, 1 ),
                                     "Failed to write the overlap set" );
                 }
 #endif
             }
 #endif
-            rval = mbCore->add_entities( writableOverlapSet, ovEnts );MB_CHK_SET_ERR( rval, "adding local intx cells failed" );
+            MB_CHK_SET_ERR( mbCore->add_entities( writableOverlapSet, ovEnts ), "adding local intx cells failed" );
 
 #ifdef MOAB_HAVE_MPI
 #ifdef MOAB_DBG
@@ -887,7 +1305,6 @@ int main( int argc, char* argv[] )
             {
                 std::stringstream filename;
                 filename << "writable_intx_" << runCtx->pcomm->rank() << ".h5m";
-                rval = runCtx->mbcore->write_file( filename.str().c_str(), 0, 0, &writableOverlapSet, 1 );
                 MB_CHK_SET_ERR( mbCore->write_file( filename.str().c_str(), 0, 0, &writableOverlapSet, 1 ),
                                 "Failed to write the writable overlap set" );
             }
@@ -971,7 +1388,7 @@ int main( int argc, char* argv[] )
             if( runCtx->verifyWeights )
             {
                 // Let us pick a sampling test function for solution evaluation
-                // SH, SV, FH, USERVAR
+                // SH, SV, FH, C, USERVAR
                 bool userVariable = false;
                 moab::TempestOnlineMap::sample_function testFunction;
                 if( !runCtx->variableToVerify.compare( "SH" ) )
@@ -980,6 +1397,8 @@ int main( int argc, char* argv[] )
                     testFunction = &sample_fast_harmonic;
                 else if( !runCtx->variableToVerify.compare( "SV" ) )
                     testFunction = &sample_stationary_vortex;
+                else if( !runCtx->variableToVerify.compare( "C" ) )
+                    testFunction = &sample_constant;
                 else
                 {
                     userVariable = runCtx->variableToVerify.size() ? true : false;
@@ -992,8 +1411,8 @@ int main( int argc, char* argv[] )
                 if( testFunction )
                 {
                     runCtx->timer_push( "describe a solution on source grid" );
-                    MB_CHK_SET_ERR( mbCore->tag_get_handle( runCtx->variableToVerify.c_str(), srcAnalyticalFunction ),
-                                    "Failed to get analytical solution on source grid" );
+                    // MB_CHK_SET_ERR( mbCore->tag_get_handle( runCtx->variableToVerify.c_str(), srcAnalyticalFunction ),
+                    //                 "Failed to get analytical solution on source grid" );
                     MB_CHK_SET_ERR( weightMap->DefineAnalyticalSolution( srcAnalyticalFunction,
                                                                          "AnalyticalSolnSrcExact",
                                                                          moab::Remapper::SourceMesh, testFunction ),
@@ -1097,15 +1516,11 @@ int main( int argc, char* argv[] )
     exit( 0 );
 }
 
-static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemapper& remapper, Mesh* tempest_mesh )
-{
-    moab::ErrorCode rval               = moab::MB_SUCCESS;
-    moab::DebugOutput& outputFormatter = ctx.outputFormatter;
+///////////////////////////////////////////////////////////////////////////////
 
-    if( !ctx.proc_id )
-    {
-        outputFormatter.printf( 0, "Creating TempestRemap Mesh object ...\n" );
-    }
+// Helper functions for each mesh type
+namespace
+{
 
 #define TR_CHK_SET_ERR( err, msg )                                                \
     if( err )                                                                     \
@@ -1114,221 +1529,313 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         MB_CHK_SET_ERR( moab::MB_FAILURE, msg );                                  \
     }
 
-    if( ctx.meshType == moab::TempestRemapper::OVERLAP_FILES )
+moab::ErrorCode handleOverlapMemory( ToolContext& ctx, moab::TempestRemapper& remapper, Mesh* tempest_mesh )
+{
+    using namespace moab;
+
+    // resize the meshsets and meshes vectors
+    ctx.meshsets.resize( 3 );
+    ctx.meshes.resize( 3 );
+
+    ctx.meshsets[0] = remapper.GetMeshSet( Remapper::SourceMesh );
+    ctx.meshsets[1] = remapper.GetMeshSet( Remapper::TargetMesh );
+    ctx.meshsets[2] = remapper.GetMeshSet( Remapper::OverlapMesh );
+
+    // Load and process source mesh
+    MB_CHK_SET_ERR( remapper.LoadMesh( Remapper::SourceMesh, ctx.inFilenames[0], TempestRemapper::DEFAULT ),
+                    "Failed to load MOAB Source mesh" );
+
+    // Load and process target mesh
+    MB_CHK_SET_ERR( remapper.LoadMesh( Remapper::TargetMesh, ctx.inFilenames[1], TempestRemapper::DEFAULT ),
+                    "Failed to load MOAB Target mesh" );
+
+    // Generate overlap mesh
+    TR_CHK_SET_ERR( GenerateOverlapWithMeshes( *ctx.meshes[0], *ctx.meshes[1], *tempest_mesh, "", "NetCDF4", "exact",
+                                               false ),
+                    "Failed to generate TempestRemap OverlapMesh" );
+
+    remapper.SetMesh( Remapper::OverlapMesh, tempest_mesh );
+    ctx.meshes[2] = remapper.GetMesh( Remapper::OverlapMesh );
+
+    return moab::MB_SUCCESS;
+}
+
+moab::ErrorCode handleOverlapMOAB( ToolContext& ctx, moab::TempestRemapper& remapper )
+{
+    using namespace moab;
+
+    // resize the meshsets and meshes vectors
+    ctx.meshsets.resize( 3 );
+    ctx.meshes.resize( 3 );
+
+    ctx.meshsets[0] = remapper.GetMeshSet( Remapper::SourceMesh );
+    ctx.meshsets[1] = remapper.GetMeshSet( Remapper::TargetMesh );
+    ctx.meshsets[2] = remapper.GetMeshSet( Remapper::OverlapMesh );
+
+    constexpr double radius_src  = 1.0;
+    constexpr double radius_dest = 1.0;
+
+    // Load and process source mesh
     {
-        ctx.timer_push( "create Tempest OverlapMesh" );
-        // For the overlap method, choose between: "fuzzy", "exact" or "mixed"
-        TR_CHK_SET_ERR( GenerateOverlapMesh( ctx.inFilenames[0], ctx.inFilenames[1], *tempest_mesh, ctx.outFilename,
-                                             "NetCDF4", "exact", true ),
-                        "Failed to create Tempest OverlapMesh" );
-        ctx.timer_pop();
-        ctx.meshes.push_back( tempest_mesh );
-    }
-    else if( ctx.meshType == moab::TempestRemapper::OVERLAP_MEMORY )
-    {
-        // Load the meshes and validate
-        ctx.meshsets.resize( 3 );
-        ctx.meshes.resize( 3 );
-        ctx.meshsets[0] = remapper.GetMeshSet( moab::Remapper::SourceMesh );
-        ctx.meshsets[1] = remapper.GetMeshSet( moab::Remapper::TargetMesh );
-        ctx.meshsets[2] = remapper.GetMeshSet( moab::Remapper::OverlapMesh );
-
-        ctx.timer_push( "load MOAB Source mesh" );
-        // First the source
-        MB_CHK_SET_ERR( remapper.LoadMesh( moab::Remapper::SourceMesh, ctx.inFilenames[0],
-                                           moab::TempestRemapper::DEFAULT ),
-                        "Failed to load MOAB Source mesh" );
-        ctx.meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );
-        ctx.timer_pop();
-
-        ctx.timer_push( "load MOAB Target mesh" );
-        // Next the target
-        MB_CHK_SET_ERR( remapper.LoadMesh( moab::Remapper::TargetMesh, ctx.inFilenames[1],
-                                           moab::TempestRemapper::DEFAULT ),
-                        "Failed to load MOAB Target mesh" );
-        ctx.meshes[1] = remapper.GetMesh( moab::Remapper::TargetMesh );
-        ctx.timer_pop();
-
-        ctx.timer_push( "generate TempestRemap OverlapMesh" );
-        // Now let us construct the overlap mesh, by calling TempestRemap interface directly
-        // For the overlap method, choose between: "fuzzy", "exact" or "mixed"
-        TR_CHK_SET_ERR( GenerateOverlapWithMeshes( *ctx.meshes[0], *ctx.meshes[1], *tempest_mesh,
-                                                   "" /*ctx.outFilename*/, "NetCDF4", "exact", false ),
-                        "Failed to generate TempestRemap OverlapMesh" );
-        ctx.timer_pop();
-        remapper.SetMesh( moab::Remapper::OverlapMesh, tempest_mesh );
-        ctx.meshes[2] = remapper.GetMesh( moab::Remapper::OverlapMesh );
-        // ctx.meshes.push_back(*tempest_mesh);
-    }
-    else if( ctx.meshType == moab::TempestRemapper::OVERLAP_MOAB )
-    {
-        ctx.meshsets.resize( 3 );
-        ctx.meshes.resize( 3 );
-        ctx.meshsets[0] = remapper.GetMeshSet( moab::Remapper::SourceMesh );
-        ctx.meshsets[1] = remapper.GetMeshSet( moab::Remapper::TargetMesh );
-        ctx.meshsets[2] = remapper.GetMeshSet( moab::Remapper::OverlapMesh );
-
-        const double radius_src  = 1.0 /*2.0*acos(-1.0)*/;
-        const double radius_dest = 1.0 /*2.0*acos(-1.0)*/;
-
-        std::vector< int > smetadata, tmetadata;
-        //const char* additional_read_opts = ( ctx.n_procs > 1 ? "NO_SET_CONTAINING_PARENTS;" : "" );
-        std::string additional_read_opts_src = get_file_read_options( ctx, ctx.inFilenames[0] );
-
-        ctx.timer_push( "load MOAB Source mesh" );
-        // Load the source mesh and validate
-        MB_CHK_SET_ERR( remapper.LoadNativeMesh( ctx.inFilenames[0], ctx.meshsets[0], smetadata,
+        std::vector< int > metadata;
+        auto additional_read_opts_src = get_file_read_options( ctx, ctx.inFilenames[0] );
+        MB_CHK_SET_ERR( remapper.LoadNativeMesh( ctx.inFilenames[0], ctx.meshsets[0], metadata,
                                                  additional_read_opts_src.c_str() ),
                         "Failed to load MOAB Source mesh" );
-        if( smetadata.size() ) remapper.SetMeshType( moab::Remapper::SourceMesh, smetadata );
-        ctx.timer_pop();
 
-        ctx.timer_push( "preprocess MOAB Source mesh" );
-        // Rescale the radius of both to compute the intersection
-        MB_CHK_SET_ERR( moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[0], radius_src ),
-                        "Failed to preprocess MOAB Source mesh" );
-        ctx.timer_pop();
-
-        // Load the target mesh and validate
-        std::string addititional_read_opts_tgt = get_file_read_options( ctx, ctx.inFilenames[1] );
-        // addititional_read_opts_tgt += "PARALLEL_GHOSTS=2.0.3;PARALLEL_THIN_GHOST_LAYER;";
-
-        ctx.timer_push( "load MOAB Target mesh" );
-        MB_CHK_SET_ERR( remapper.LoadNativeMesh( ctx.inFilenames[1], ctx.meshsets[1], tmetadata,
-                                                 addititional_read_opts_tgt.c_str() ),
-                        "Failed to load MOAB Target mesh" );
-        if( tmetadata.size() ) remapper.SetMeshType( moab::Remapper::TargetMesh, tmetadata );
-        ctx.timer_pop();
-
-        ctx.timer_push( "preprocess MOAB Target mesh" );
-        // Rescale the radius of both to compute the intersection
-        MB_CHK_SET_ERR( moab::IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[1], radius_dest ),
-                        "Failed to preprocess MOAB Target mesh" );
-        ctx.timer_pop();
-
-        if( ctx.computeWeights )
+        if( !metadata.empty() )
         {
-            ctx.timer_push( "convert MOAB meshes to TempestRemap meshes in memory" );
-            // convert MOAB representation to TempestRemap's Mesh for source
-            MB_CHK_SET_ERR( remapper.ConvertMeshToTempest( moab::Remapper::SourceMesh ),
-                            "Failed to convert MOAB Source mesh to TempestRemap mesh" );
-            ctx.meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );
+            remapper.SetMeshType( Remapper::SourceMesh, metadata );
+        }
 
-            // convert MOAB representation to TempestRemap's Mesh for target
-            MB_CHK_SET_ERR( remapper.ConvertMeshToTempest( moab::Remapper::TargetMesh ),
-                            "Failed to convert MOAB Target mesh to TempestRemap mesh" );
-            ctx.meshes[1] = remapper.GetMesh( moab::Remapper::TargetMesh );
-            ctx.timer_pop();
+        MB_CHK_SET_ERR( IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[0], radius_src ),
+                        "Failed to preprocess MOAB Source mesh" );
+    }
+
+    // Load and process target mesh
+    {
+        std::vector< int > metadata;
+        auto additional_read_opts_tgt = get_file_read_options( ctx, ctx.inFilenames[1] );
+        MB_CHK_SET_ERR( remapper.LoadNativeMesh( ctx.inFilenames[1], ctx.meshsets[1], metadata,
+                                                 additional_read_opts_tgt.c_str() ),
+                        "Failed to load MOAB Target mesh" );
+
+        if( !metadata.empty() )
+        {
+            remapper.SetMeshType( Remapper::TargetMesh, metadata );
+        }
+
+        MB_CHK_SET_ERR( IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[1], radius_dest ),
+                        "Failed to preprocess MOAB Target mesh" );
+    }
+
+    if( ctx.computeWeights )
+    {
+        // Convert MOAB to TempestRemap meshes
+        MB_CHK_SET_ERR( remapper.ConvertMeshToTempest( Remapper::SourceMesh ),
+                        "Failed to convert MOAB Source mesh to TempestRemap mesh" );
+        ctx.meshes[0] = remapper.GetMesh( Remapper::SourceMesh );
+
+        MB_CHK_SET_ERR( remapper.ConvertMeshToTempest( Remapper::TargetMesh ),
+                        "Failed to convert MOAB Target mesh to TempestRemap mesh" );
+        ctx.meshes[1] = remapper.GetMesh( Remapper::TargetMesh );
+    }
+
+    return moab::MB_SUCCESS;
+}
+
+moab::ErrorCode handleOverlapFiles( ToolContext& ctx, Mesh* tempest_mesh )
+{
+    ctx.timer_push( "create Tempest OverlapMesh" );
+    TR_CHK_SET_ERR( GenerateOverlapMesh( ctx.inFilenames[0], ctx.inFilenames[1], *tempest_mesh, ctx.outFilename,
+                                         "NetCDF4", "exact", true ),
+                    "Failed to create Tempest OverlapMesh" );
+    ctx.timer_pop();
+
+    // Add the overlap mesh to the list of meshes
+    ctx.meshes.push_back( tempest_mesh );
+    return moab::MB_SUCCESS;
+}
+
+moab::ErrorCode handleICOMesh( ToolContext& ctx, Mesh* tempest_mesh )
+{
+    ctx.timer_push( "generate ICO mesh with TempestRemap" );
+    TR_CHK_SET_ERR( GenerateICOMesh( *tempest_mesh, ctx.blockSize, ctx.computeDual, ctx.outFilename, "NetCDF4" ),
+                    "Failed to generate ICO mesh with TempestRemap" );
+    ctx.timer_pop();
+
+    // Add the ICO mesh to the list of meshes
+    ctx.meshes.push_back( tempest_mesh );
+    return moab::MB_SUCCESS;
+}
+
+moab::ErrorCode handleRLLMesh( ToolContext& ctx, Mesh* tempest_mesh )
+{
+    ctx.timer_push( "generate RLL mesh with TempestRemap" );
+    TR_CHK_SET_ERR( GenerateRLLMesh( *tempest_mesh,                     // Mesh& meshOut,
+                                     ctx.blockSize * 2, ctx.blockSize,  // int nLongitudes, int nLatitudes,
+                                     0.0, 360.0,                        // double dLonBegin, double dLonEnd,
+                                     -90.0, 90.0,                       // double dLatBegin, double dLatEnd,
+                                     false, false, false,  // bool fGlobalCap, bool fFlipLatLon, bool fForceGlobal,
+                                     "" /*ctx.inFilename*/,
+                                     "",               // std::string strInputFile, std::string strInputFileLonName
+                                     "",               // std::string strInputFileLatName
+                                     ctx.outFilename,  // std::string strOutputFile
+                                     "NetCDF4",        // std::string strOutputFormat
+                                     true              // bool fVerbose
+                                     ),
+                    "Failed to generate RLL mesh with TempestRemap" );
+    ctx.timer_pop();
+
+    // Add the RLL mesh to the list of meshes
+    ctx.meshes.push_back( tempest_mesh );
+    return moab::MB_SUCCESS;
+}
+
+moab::ErrorCode handleCSMesh( ToolContext& ctx, Mesh* tempest_mesh )
+{
+    ctx.timer_push( "generate CS mesh with TempestRemap" );
+    TR_CHK_SET_ERR( GenerateCSMesh( *tempest_mesh, ctx.blockSize, ctx.outFilename, "NetCDF4" ),
+                    "Failed to generate CS mesh with TempestRemap" );
+    ctx.timer_pop();
+
+    // Add the CS mesh to the list of meshes
+    ctx.meshes.push_back( tempest_mesh );
+    return moab::MB_SUCCESS;
+}
+
+}  // namespace
+
+/**
+ * @brief Creates a TempestRemap mesh based on the provided context and mesh type
+ *
+ * @param ctx Tool context containing configuration and state
+ * @param remapper TempestRemap instance for mesh operations
+ * @param tempest_mesh Output parameter for the created mesh
+ * @return moab::ErrorCode Status of the operation
+ */
+static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemapper& remapper, Mesh* tempest_mesh )
+{
+    using namespace moab;
+    using RemapperType = moab::TempestRemapper;
+
+    auto& outputFormatter = ctx.outputFormatter;
+
+    try
+    {
+        switch( ctx.meshType )
+        {
+            case RemapperType::OVERLAP_FILES:
+                if( !ctx.proc_id ) outputFormatter.printf( 0, "Creating TempestRemap overlap mesh ...\n" );
+                return handleOverlapFiles( ctx, tempest_mesh );
+
+            case RemapperType::OVERLAP_MEMORY:
+                if( !ctx.proc_id )
+                    outputFormatter.printf( 0, "Convert MOAB overlap files to TempestRemap format in-memory ...\n" );
+                return handleOverlapMemory( ctx, remapper, tempest_mesh );
+
+            case RemapperType::OVERLAP_MOAB:
+                if( !ctx.proc_id )
+                    outputFormatter.printf( 0, "Convert MOAB meshes to TempestRemap format in-memory ...\n" );
+                return handleOverlapMOAB( ctx, remapper );
+
+            case RemapperType::ICO:
+                if( !ctx.proc_id ) outputFormatter.printf( 0, "Creating TempestRemap ICO mesh ...\n" );
+                return handleICOMesh( ctx, tempest_mesh );
+
+            case RemapperType::RLL:
+                if( !ctx.proc_id ) outputFormatter.printf( 0, "Creating TempestRemap RLL mesh ...\n" );
+                return handleRLLMesh( ctx, tempest_mesh );
+
+            default:  // Default to CS mesh
+                if( !ctx.proc_id ) outputFormatter.printf( 0, "Creating TempestRemap CS mesh ...\n" );
+                return handleCSMesh( ctx, tempest_mesh );
         }
     }
-    else if( ctx.meshType == moab::TempestRemapper::ICO )
+    catch( const std::exception& e )
     {
-        ctx.timer_push( "generate ICO mesh with TempestRemap" );
-        TR_CHK_SET_ERR( GenerateICOMesh( *tempest_mesh, ctx.blockSize, ctx.computeDual, ctx.outFilename, "NetCDF4" ),
-                        "Failed to generate ICO mesh with TempestRemap" );
-        ctx.timer_pop();
-        ctx.meshes.push_back( tempest_mesh );
+        std::cerr << "Error in CreateTempestMesh: " << e.what() << "\n";
+        return MB_FAILURE;
     }
-    else if( ctx.meshType == moab::TempestRemapper::RLL )
-    {
-        ctx.timer_push( "generate RLL mesh with TempestRemap" );
-        TR_CHK_SET_ERR( GenerateRLLMesh( *tempest_mesh,                     // Mesh& meshOut,
-                                         ctx.blockSize * 2, ctx.blockSize,  // int nLongitudes, int nLatitudes,
-                                         0.0, 360.0,                        // double dLonBegin, double dLonEnd,
-                                         -90.0, 90.0,                       // double dLatBegin, double dLatEnd,
-                                         false, false, false,  // bool fGlobalCap, bool fFlipLatLon, bool fForceGlobal,
-                                         "" /*ctx.inFilename*/, "",
-                                         "",  // std::string strInputFile, std::string strInputFileLonName, std::string
-                                              // strInputFileLatName,
-                                         ctx.outFilename,
-                                         "NetCDF4",  // std::string strOutputFile, std::string strOutputFormat
-                                         true        // bool fVerbose
-                                         ),
-                        "Failed to generate RLL mesh with TempestRemap" );
-        ctx.timer_pop();
-        ctx.meshes.push_back( tempest_mesh );
-    }
-    else  // default
-    {
-        ctx.timer_push( "generate CS mesh with TempestRemap" );
-        TR_CHK_SET_ERR( GenerateCSMesh( *tempest_mesh, ctx.blockSize, ctx.outFilename, "NetCDF4" ),
-                        "Failed to generate CS mesh with TempestRemap" );
-        ctx.timer_pop();
-        ctx.meshes.push_back( tempest_mesh );
-    }
-
-    if( ctx.meshType != moab::TempestRemapper::OVERLAP_MOAB && !tempest_mesh )
-    {
-        std::cout << "Tempest Mesh is not a complete object; Quitting...";
-        exit( -1 );
-    }
-
-    return rval;
 }
 
 #undef MOAB_DBG
+
 ///////////////////////////////////////////////
-//         Test functions
+/**
+ * @brief Sample functions for testing remapping operations
+ *
+ * These functions provide analytical test cases with different spatial patterns
+ * for verifying remapping accuracy and performance.
+ */
 
-double sample_slow_harmonic( double dLon, double dLat )
+// Constants for sample functions
+namespace
 {
-    return ( 2.0 + cos( dLat ) * cos( dLat ) * cos( 2.0 * dLon ) );
-}
+// Constants for sample_stationary_vortex
+constexpr double VORTEX_LON0 = 0.0;
+constexpr double VORTEX_LAT0 = 0.6;
+constexpr double VORTEX_R0   = 3.0;
+constexpr double VORTEX_D    = 5.0;
+constexpr double VORTEX_T    = 6.0;
 
-double sample_fast_harmonic( double dLon, double dLat )
-{
-    return ( 2.0 + pow( sin( 2.0 * dLat ), 16.0 ) * cos( 16.0 * dLon ) );
-    // return (2.0 + pow(cos(2.0 * dLat), 16.0) * cos(16.0 * dLon));
-}
+}  // namespace
 
-double sample_constant( double /*dLon*/, double /*dLat*/ )
+/**
+ * @brief Constant sample function
+ *
+ * @return double Always returns 1.0
+ */
+static inline constexpr double sample_constant( double /*dLon*/, double /*dLat*/ ) noexcept
 {
     return 1.0;
 }
 
-double sample_stationary_vortex( double dLon, double dLat )
+/**
+ * @brief Sample function with slow harmonic variation
+ *
+ * @param dLon Longitude in radians
+ * @param dLat Latitude in radians
+ * @return double Function value at (dLon, dLat)
+ */
+static inline double sample_slow_harmonic( double dLon, double dLat ) noexcept
 {
-    const double dLon0 = 0.0;
-    const double dLat0 = 0.6;
-    const double dR0   = 3.0;
-    const double dD    = 5.0;
-    const double dT    = 6.0;
+    const double cosLat = std::cos( dLat );
+    return 2.0 + cosLat * cosLat * std::cos( 2.0 * dLon );
+}
 
-    ///		Find the rotated longitude and latitude of a point on a sphere
-    ///		with pole at (dLonC, dLatC).
+/**
+ * @brief Sample function with fast harmonic variation
+ *
+ * @param dLon Longitude in radians
+ * @param dLat Latitude in radians
+ * @return double Function value at (dLon, dLat)
+ */
+static inline double sample_fast_harmonic( double dLon, double dLat ) noexcept
+{
+    const double sin2Lat = std::sin( 2.0 * dLat );
+    return 2.0 +
+           sin2Lat * sin2Lat * sin2Lat * sin2Lat * sin2Lat * sin2Lat * sin2Lat * sin2Lat * std::cos( 16.0 * dLon );
+}
+
+/**
+ * @brief Sample function representing a stationary vortex
+ *
+ * @param dLon Longitude in radians
+ * @param dLat Latitude in radians
+ * @return double Function value at (dLon, dLat)
+ */
+static inline double sample_stationary_vortex( double dLon, double dLat ) noexcept
+{
+    // Find the rotated longitude and latitude of a point on a sphere
+    // with pole at (dLonC, dLatC)
+    const double dSinC = std::sin( VORTEX_LAT0 );
+    const double dCosC = std::cos( VORTEX_LAT0 );
+    const double dSinT = std::sin( dLat );
+    const double dCosT = std::cos( dLat );
+
+    const double dTrm = dCosT * std::cos( dLon - VORTEX_LON0 );
+    const double dX   = dSinC * dTrm - dCosC * dSinT;
+    const double dY   = dCosT * std::sin( dLon - VORTEX_LON0 );
+    const double dZ   = dSinC * dSinT + dCosC * dTrm;
+
+    // Calculate new longitude and latitude in rotated coordinate system
+    double dNewLon = std::atan2( dY, dX );
+    if( dNewLon < 0.0 )
     {
-        double dSinC = sin( dLat0 );
-        double dCosC = cos( dLat0 );
-        double dCosT = cos( dLat );
-        double dSinT = sin( dLat );
-
-        double dTrm = dCosT * cos( dLon - dLon0 );
-        double dX   = dSinC * dTrm - dCosC * dSinT;
-        double dY   = dCosT * sin( dLon - dLon0 );
-        double dZ   = dSinC * dSinT + dCosC * dTrm;
-
-        dLon = atan2( dY, dX );
-        if( dLon < 0.0 )
-        {
-            dLon += 2.0 * M_PI;
-        }
-        dLat = asin( dZ );
+        dNewLon += 2.0 * M_PI;
     }
+    const double dNewLat = std::asin( dZ );
 
-    double dRho = dR0 * cos( dLat );
-    double dVt  = 3.0 * sqrt( 3.0 ) / 2.0 / cosh( dRho ) / cosh( dRho ) * tanh( dRho );
+    // Calculate vortex profile
+    const double dRho = VORTEX_R0 * std::cos( dNewLat );
+    const double dVt  = 3.0 * std::sqrt( 3.0 ) / 2.0 / std::cosh( dRho ) / std::cosh( dRho ) * std::tanh( dRho );
 
-    double dOmega;
-    if( dRho == 0.0 )
-    {
-        dOmega = 0.0;
-    }
-    else
-    {
-        dOmega = dVt / dRho;
-    }
+    // Calculate angular velocity (avoid division by zero)
+    const double dOmega = ( dRho == 0.0 ) ? 0.0 : ( dVt / dRho );
 
-    return ( 1.0 - tanh( dRho / dD * sin( dLon - dOmega * dT ) ) );
+    // Return the final vortex profile
+    return ( 1.0 - std::tanh( dRho / VORTEX_D * std::sin( dNewLon - dOmega * VORTEX_T ) ) );
 }
 
 ///////////////////////////////////////////////

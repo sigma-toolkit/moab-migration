@@ -20,6 +20,7 @@
 #include "GaussLobattoQuadrature.h"
 #include "TriangularQuadrature.h"
 #include "MathHelper.h"
+#include "kdtree.h"
 #include "SparseMatrix.h"
 #include "OverlapMesh.h"
 #include "MeshUtilitiesFuzzy.h"
@@ -28,6 +29,7 @@
 #include "moab/nanoflann.hpp"
 #include "moab/Remapping/TempestOnlineMap.hpp"
 #include "moab/TupleList.hpp"
+#include "moab/IntxMesh/IntxUtils.hpp"
 #include "moab/MeshTopoUtil.hpp"
 
 #pragma GCC diagnostic pop
@@ -2312,17 +2314,23 @@ void moab::TempestOnlineMap::LinearRemapGLLtoGLL2_Pointwise_MOAB( const DataArra
 struct MOABCentroidCloud
 {
     constexpr static int DIM = 3;
-    std::vector< double > points;
+    std::vector< std::array< double, DIM > > points;
     std::vector< moab::EntityHandle > elements;
+
+    inline void init( size_t length )
+    {
+        points.reserve( length );
+        elements.reserve( length );
+    }
 
     inline size_t kdtree_get_point_count() const
     {
-        return points.size() / DIM;
+        return points.size();
     }
 
     inline double kdtree_get_pt( const size_t idx, const size_t dim ) const
     {
-        return points[idx * DIM + dim];
+        return points[idx][dim];
     }
 
     template < class BBOX >
@@ -2341,23 +2349,37 @@ using KDTree = nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor
 // Radius search wrapper
 // ----------------------
 std::vector< int > radius_search_kdtree( const MOABCentroidCloud& cloud,
-                                                  const double* query_pt,
-                                                  double radius )
+                                         const std::array< double, 3 >& query_pt,
+                                         double radius )
 {
     KDTree tree( 3, cloud, nanoflann::KDTreeSingleIndexAdaptorParams( 10 ) );
     tree.buildIndex();
 
-    double radius_sq = radius * radius;
+    // double radius_sq = radius * radius;
+    double radius_sq = radius;
     std::vector< nanoflann::ResultItem< unsigned, double > > matches;
     nanoflann::SearchParameters params;
     params.sorted = true;
 
-    tree.radiusSearch( query_pt, radius_sq, matches, params );
+    const double query_pt_sq = query_pt[0] * query_pt[0] + query_pt[1] * query_pt[1] + query_pt[2] * query_pt[2];
+    assert( query_pt_sq > 1.0 - 1e-10 && query_pt_sq < 1.0 + 1.0e-10 ); // Check if the point is on the unit sphere
+
+    tree.radiusSearch( query_pt.data(), radius_sq, matches, params );
 
     std::vector< int > found_elements;
-    for( const auto& match : matches )
+    if( !matches.empty() )
     {
-        found_elements.push_back( cloud.elements[match.first] );
+        // Return all matches within the radius
+        for( const auto& match : matches )
+            found_elements.emplace_back( cloud.elements[match.first] );
+    }
+    else
+    {
+        // Fallback to nearest neighbor
+        unsigned nearest_index;
+        double nearest_dist_sq;
+        tree.knnSearch( query_pt.data(), 1, &nearest_index, &nearest_dist_sq );
+        found_elements.push_back( cloud.elements[nearest_index] );
     }
 
     return found_elements;
@@ -2372,7 +2394,7 @@ moab::ErrorCode moab::TempestOnlineMap::LinearRemapFVtoGLL_Averaged( const DataA
                                                                      bool fContinuous )
 {
     // Order of triangular quadrature rule
-    const int TriQuadRuleOrder = 8;
+    const int TriQuadRuleOrder = 4;
 
     // Verify ReverseNodeArray has been calculated
     if( m_meshInputCov->revnodearray.size() == 0 )
@@ -2422,6 +2444,9 @@ moab::ErrorCode moab::TempestOnlineMap::LinearRemapFVtoGLL_Averaged( const DataA
     const unsigned outputFrequency = ( m_meshOutput->faces.size() / 10 ) + 1;
 #endif
 
+    // kd-tree for nearest neighbor search
+    // kdtree* kdSource = kd_create( 3 );
+
     MOABCentroidCloud cloud;
     // {
     //     const moab::Range& elems = m_remapper->m_covering_source_entities;
@@ -2441,20 +2466,31 @@ moab::ErrorCode moab::TempestOnlineMap::LinearRemapFVtoGLL_Averaged( const DataA
     //     }
     // }
     {
-        cloud.points.resize( m_meshInputCov->faces.size() * 3 );
+        // Initialize the kd-tree
+        cloud.init( m_meshInputCov->faces.size() );
 
         // Loop through all elements and add to the tree
-        cloud.elements.reserve( m_meshInputCov->faces.size() );
         for( size_t ielem = 0; ielem < m_meshInputCov->faces.size(); ielem++ )
         {
             // Loop through all elements and add to the tree
-            Node nodeRef = GetFaceCentroid( ielem, m_meshInputCov->nodes );
-            cloud.elements.emplace_back( nodeRef.x );
-            cloud.elements.emplace_back( nodeRef.y );
-            cloud.elements.emplace_back( nodeRef.z );
+            Node nodeRef = GetFaceCentroid( m_meshInputCov->faces[ielem], m_meshInputCov->nodes );
+
+            const double query_pt_sq =
+                std::sqrt( nodeRef.x * nodeRef.x + nodeRef.y * nodeRef.y + nodeRef.z * nodeRef.z );
+
+            // Rescale the coordinates to the unit sphere
+            nodeRef.x /= query_pt_sq;
+            nodeRef.y /= query_pt_sq;
+            nodeRef.z /= query_pt_sq;
+
+            cloud.points.emplace_back( std::array< double, 3 >( { nodeRef.x, nodeRef.y, nodeRef.z } ) );
 
             // Get the centroid of the element
             cloud.elements.emplace_back( ielem );
+
+            // printf( "Adding element %zu to kd-tree: %f, %f\n", ielem, nodeRef.x, nodeRef.y, nodeRef.z );
+
+            // kd_insert3( kdSource, nodeRef.x, nodeRef.y, nodeRef.z, (void*)( &( ielem ) ) );
         }
     }
 
@@ -2472,33 +2508,94 @@ moab::ErrorCode moab::TempestOnlineMap::LinearRemapFVtoGLL_Averaged( const DataA
 
         // Area of the First Face
         // double dSecondArea = m_meshOutput->vecFaceArea[ixOutput];
+        // Node nodecenter = GetFaceCentroid( faceSecond, m_meshOutput->nodes );
 
         for( int p = 0; p < nP; p++ )
         {
             for( int q = 0; q < nP; q++ )
             {
                 int ixOutputGlobal;
-                if( fContinuous ) ixOutputGlobal = dataGLLNodes[p][q][ixOutput] - 1;
-                else ixOutputGlobal = ixOutput * nP * nP + p * nP + q;
+                if( fContinuous )
+                    ixOutputGlobal = dataGLLNodes[p][q][ixOutput] - 1;
+                else
+                    ixOutputGlobal = ixOutput * nP * nP + p * nP + q;
 
                 // Coordinate of the GLL point
-                Node nodeRef = GetFaceCentroid( faceSecond, m_meshOutput->nodes );
+                // Node nodeRef = m_meshOutput->nodes[ixOutputGlobal];
 
-                const double query[] = { nodeRef.x, nodeRef.y, nodeRef.z };
-                const double radius  = dataGLLJacobian[p][q][ixOutput];
-                auto results         = radius_search_kdtree( cloud, query, radius );
-                const size_t nResults = results.size();
-                const double dWeight  = dataGLLNodalArea[ixOutput] / nResults;
+                Node nodeRef;
+                ApplyLocalMap( faceSecond, m_meshOutput->nodes, dG[p], dG[q], nodeRef );
 
-                std::cout << "Found " << nResults << " elements within radius " << radius << "\n";
+                const std::array< double, 3 > query = { nodeRef.x, nodeRef.y, nodeRef.z };
+
+                // The radius for the search is the sqrt of the Jacobian
+                const double radius   = std::sqrt( dataGLLJacobian[p][q][ixOutput] );
+
+                // Now let us search for the nearest elements within search radius
+                auto results          = radius_search_kdtree( cloud, query, radius );
+
+                // Find how many elements were found
+                size_t nResults = results.size();
+
+                // Newton-Cotes equal-weight method
+                // const double dWeight  = dataGLLNodalArea[ixOutput] / nResults;
+                const double dWeight = 1.0 / nResults;
+
+                // Find nearest source mesh face and add its contribution
+                // to the inverse distance.
+                // kdres* kdresSource = kd_nearest_range( kdSource, query, radius );
+
+                // nResults = kd_res_size( kdresSource );
+                // if ( nResults == 0 )
+                // {
+                //     kd_res_free( kdresSource );
+                //     // Find nearest source mesh face and add its contribution
+                //     // to the inverse distance.
+                //     kdresSource = kd_nearest3( kdSource, query[0], query[1], query[2] );
+                //     nResults    = kd_res_size( kdresSource );
+                // }
+                // double pos[3];
+                // while( !kd_res_end( kdresSource ) )
+                // {
+                //     /* get the data and position of the current result item */
+                //     int* pFace = (int*)kd_res_item( kdresSource, pos );
+
+                //     /* compute the distance of the current result from the pt */
+
+                //     std::cout << "\t[ " << ixOutputGlobal << "] Found association of point "
+                //               << query[0] << ", " << query[1] << ", " << query[2] << " to " << *pFace << "\n";
+                //     smatMap( ixOutputGlobal, *pFace ) += dWeight;
+
+                //     /* go to the next entry */
+                //     kd_res_next( kdresSource );
+                // }
+
+                if (nResults == 0)
+                {
+                    _EXCEPTION4( "No elements found within radius %f for query point: %f, %f, %f",
+                                 radius, query[0], query[1], query[2] );
+                }
+
+                // std::cout << "Found " << nResults << " elements within radius " << radius
+                //           << " for query point: " << query[0] << ", " << query[1] << ", " << query[2] << "\n";
                 for( auto ixFirstElement : results )
                 {
+                    // std::cout << "\t[ " << ixOutputGlobal << "] Found association of point " << query[0] << ", "
+                    //           << query[1] << ", " << query[2] << " to " << ixFirstElement << "\n";
+                    if ( ixFirstElement < 0 || ixFirstElement >= m_meshInputCov->faces.size() )
+                    {
+                        _EXCEPTION3( "Logic error: source element has to be between 0 and %d, but received %d for row %d\n",
+                                     m_meshInputCov->faces.size(), ixFirstElement, ixOutputGlobal );
+                    }
                     smatMap( ixOutputGlobal, ixFirstElement ) += dWeight;
                 }
+
+                // kd_res_free( kdresSource );
             }
         }
-
     }
+
+    // kd_free( kdSource );
     return moab::MB_SUCCESS;
 }
 

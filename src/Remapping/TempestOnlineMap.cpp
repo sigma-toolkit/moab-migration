@@ -541,9 +541,8 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                     _EXCEPTIONT( "--method \"mono2\" is only used when remapping to/from CGLL or DGLL grids" );
                 }
                 nMonotoneType = 2;
-
-                // Piecewise linear monotonicity
             }
+            // Piecewise linear monotonicity
             else if( it == "mono3" )
             {
                 if( nMonotoneType != 0 )
@@ -555,9 +554,8 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                     _EXCEPTIONT( "--method \"mono3\" is only used when remapping to/from CGLL or DGLL grids" );
                 }
                 nMonotoneType = 3;
-
-                // Volumetric remapping from FV to GLL
             }
+            // Volumetric remapping from FV to GLL
             else if( it == "volumetric" )
             {
                 if( ( m_eInputType != DiscretizationType_FV ) || ( m_eOutputType == DiscretizationType_FV ) )
@@ -565,9 +563,8 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                     _EXCEPTIONT( "--method \"volumetric\" may only be used for FV->CGLL or FV->DGLL remapping" );
                 }
                 strMapAlgorithm = "volumetric";
-
-                // Inverse distance mapping
             }
+            // Inverse distance mapping
             else if( it == "invdist" )
             {
                 if( ( m_eInputType != DiscretizationType_FV ) || ( m_eOutputType != DiscretizationType_FV ) )
@@ -575,9 +572,8 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                     _EXCEPTIONT( "--method \"invdist\" may only be used for FV->FV remapping" );
                 }
                 strMapAlgorithm = "invdist";
-
-                // Delaunay triangulation mapping
             }
+            // Delaunay triangulation mapping
             else if( it == "delaunay" )
             {
                 if( ( m_eInputType != DiscretizationType_FV ) || ( m_eOutputType != DiscretizationType_FV ) )
@@ -585,9 +581,8 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                     _EXCEPTIONT( "--method \"delaunay\" may only be used for FV->FV remapping" );
                 }
                 strMapAlgorithm = "delaunay";
-
-                // Bilinear
             }
+            // Bilinear
             else if( it == "bilin" )
             {
                 if( ( m_eInputType != DiscretizationType_FV ) || ( m_eOutputType != DiscretizationType_FV ) )
@@ -595,9 +590,8 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                     _EXCEPTIONT( "--method \"bilin\" may only be used for FV->FV remapping" );
                 }
                 strMapAlgorithm = "fvbilin";
-
-                // Integrated bilinear (same as mono3 when source grid is CGLL/DGLL)
             }
+            // Integrated bilinear (same as mono3 when source grid is CGLL/DGLL)
             else if( it == "intbilin" )
             {
                 if( m_eOutputType != DiscretizationType_FV )
@@ -612,9 +606,8 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                 {
                     strMapAlgorithm = "mono3";
                 }
-
-                // Integrated bilinear with generalized Barycentric coordinates
             }
+            // Integrated bilinear with generalized Barycentric coordinates
             else if( it == "intbilingb" )
             {
                 if( ( m_eInputType != DiscretizationType_FV ) || ( m_eOutputType != DiscretizationType_FV ) )
@@ -622,6 +615,14 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                     _EXCEPTIONT( "--method \"intbilingb\" may only be used for FV->FV remapping" );
                 }
                 strMapAlgorithm = "fvintbilingb";
+            }
+            else if( it == "fvse-averaged" )
+            {
+                if( m_eInputType != DiscretizationType_FV || m_eOutputType == DiscretizationType_FV )
+                {
+                    _EXCEPTIONT( "--method \"fvse-averaged\" may only be used for FV->SE remapping" );
+                }
+                strMapAlgorithm = "fvse-averaged";
             }
             else
             {

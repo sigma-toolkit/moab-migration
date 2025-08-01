@@ -179,6 +179,17 @@ class TempestOnlineMap : public OfflineMap
                                       const DataArray3D< double >& dataGLLJacobian );
 
     ///	<summary>
+    ///		Compute the remapping weights as a permutation matrix that relates DoFs on the source
+    /// mesh
+    ///     to DoFs on the target mesh.
+    ///	</summary>
+    moab::ErrorCode LinearRemapFVtoGLL_Averaged( const DataArray3D< int >& dataGLLNodes,
+                                                 const DataArray3D< double >& dataGLLJacobian,
+                                                 const DataArray1D< double >& dataGLLNodalArea,
+                                                 int nOrder,
+                                                 bool fContinuous );
+
+    ///	<summary>
     ///		Generate the OfflineMap for cubic conserative element-average
     ///		spectral element to element average remapping.
     ///	</summary>

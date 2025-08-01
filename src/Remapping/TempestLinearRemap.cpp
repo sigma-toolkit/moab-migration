@@ -22,10 +22,10 @@
 #include "MathHelper.h"
 #include "SparseMatrix.h"
 #include "OverlapMesh.h"
+#include "MeshUtilitiesFuzzy.h"
 
 #include "DebugOutput.hpp"
-#include "moab/AdaptiveKDTree.hpp"
-
+#include "moab/nanoflann.hpp"
 #include "moab/Remapping/TempestOnlineMap.hpp"
 #include "moab/TupleList.hpp"
 #include "moab/MeshTopoUtil.hpp"
@@ -2303,6 +2303,203 @@ void moab::TempestOnlineMap::LinearRemapGLLtoGLL2_Pointwise_MOAB( const DataArra
     }
 
     return;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// ----------------------
+// KD-tree point cloud
+// ----------------------
+struct MOABCentroidCloud
+{
+    constexpr static int DIM = 3;
+    std::vector< double > points;
+    std::vector< moab::EntityHandle > elements;
+
+    inline size_t kdtree_get_point_count() const
+    {
+        return points.size() / DIM;
+    }
+
+    inline double kdtree_get_pt( const size_t idx, const size_t dim ) const
+    {
+        return points[idx * DIM + dim];
+    }
+
+    template < class BBOX >
+    bool kdtree_get_bbox( BBOX& ) const
+    {
+        return false;
+    }
+};
+
+using KDTree = nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, MOABCentroidCloud >,
+                                                    MOABCentroidCloud,
+                                                    3  // 3D
+                                                    >;
+
+// ----------------------
+// Radius search wrapper
+// ----------------------
+std::vector< int > radius_search_kdtree( const MOABCentroidCloud& cloud,
+                                                  const double* query_pt,
+                                                  double radius )
+{
+    KDTree tree( 3, cloud, nanoflann::KDTreeSingleIndexAdaptorParams( 10 ) );
+    tree.buildIndex();
+
+    double radius_sq = radius * radius;
+    std::vector< nanoflann::ResultItem< unsigned, double > > matches;
+    nanoflann::SearchParameters params;
+    params.sorted = true;
+
+    tree.radiusSearch( query_pt, radius_sq, matches, params );
+
+    std::vector< int > found_elements;
+    for( const auto& match : matches )
+    {
+        found_elements.push_back( cloud.elements[match.first] );
+    }
+
+    return found_elements;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+moab::ErrorCode moab::TempestOnlineMap::LinearRemapFVtoGLL_Averaged( const DataArray3D< int >& dataGLLNodes,
+                                                                     const DataArray3D< double >& dataGLLJacobian,
+                                                                     const DataArray1D< double >& dataGLLNodalArea,
+                                                                     int nOrder,
+                                                                     bool fContinuous )
+{
+    // Order of triangular quadrature rule
+    const int TriQuadRuleOrder = 8;
+
+    // Verify ReverseNodeArray has been calculated
+    if( m_meshInputCov->revnodearray.size() == 0 )
+    {
+        _EXCEPTIONT( "ReverseNodeArray has not been calculated for meshInput" );
+    }
+    if( m_meshInputCov->edgemap.size() == 0 )
+    {
+        _EXCEPTIONT( "EdgeMap has not been calculated for meshInput" );
+    }
+
+    // Get SparseMatrix represntation of the OfflineMap
+    SparseMatrix< double >& smatMap = this->GetSparseMatrix();
+
+    // Order of the finite element method
+    int nP = dataGLLNodes.GetRows();
+
+    // GLL nodes
+    DataArray1D< double > dG;
+    DataArray1D< double > dW;
+
+    GaussLobattoQuadrature::GetPoints( nP, 0.0, 1.0, dG, dW );
+
+    // Triangular quadrature rule
+    TriangularQuadratureRule triquadrule( TriQuadRuleOrder );
+
+    // Number of elements needed
+#ifdef RECTANGULAR_TRUNCATION
+    int nCoefficients = nOrder * nOrder;
+#endif
+#ifdef TRIANGULAR_TRUNCATION
+    int nCoefficients = nOrder * ( nOrder + 1 ) / 2;
+#endif
+
+    // Announcements
+    moab::DebugOutput dbgprint( std::cout, this->rank, 0 );
+    dbgprint.set_prefix( "[LinearRemapFVtoSE_Averaged]: " );
+    if( is_root )
+    {
+        dbgprint.printf( 0, "Finite Volume to Spectral Element Projection\n" );
+        dbgprint.printf( 0, "Triangular quadrature rule order %i\n", TriQuadRuleOrder );
+        dbgprint.printf( 0, "Number of coefficients: %i\n", nCoefficients );
+    }
+
+    // Loop through all faces on meshInput
+#ifdef VERBOSE
+    const unsigned outputFrequency = ( m_meshOutput->faces.size() / 10 ) + 1;
+#endif
+
+    MOABCentroidCloud cloud;
+    // {
+    //     const moab::Range& elems = m_remapper->m_covering_source_entities;
+
+    //     cloud.points( elems.size() * 3 );
+    //     // Get coordinates of the elements
+    //     MB_CHK_ERR( m_interface->get_coords( elems, cloud.points.data() ) );
+
+    //     // Loop through all elements and add to the tree
+    //     cloud.elements.reserve( elems.size() );
+    //     for( auto elem : elems )
+    //     {
+    //         Node nodeRef = GetFaceCentroid( faceSecond, m_meshOutput->nodes );
+
+    //         // Get the centroid of the element
+    //         cloud.elements.emplace_back( elem );
+    //     }
+    // }
+    {
+        cloud.points.resize( m_meshInputCov->faces.size() * 3 );
+
+        // Loop through all elements and add to the tree
+        cloud.elements.reserve( m_meshInputCov->faces.size() );
+        for( size_t ielem = 0; ielem < m_meshInputCov->faces.size(); ielem++ )
+        {
+            // Loop through all elements and add to the tree
+            Node nodeRef = GetFaceCentroid( ielem, m_meshInputCov->nodes );
+            cloud.elements.emplace_back( nodeRef.x );
+            cloud.elements.emplace_back( nodeRef.y );
+            cloud.elements.emplace_back( nodeRef.z );
+
+            // Get the centroid of the element
+            cloud.elements.emplace_back( ielem );
+        }
+    }
+
+    for( size_t ixOutput = 0; ixOutput < m_meshOutput->faces.size(); ixOutput++ )
+    {
+        // Output every 1000 elements
+#ifdef VERBOSE
+        if( ixOutput % outputFrequency == 0 && is_root )
+        {
+            dbgprint.printf( 0, "Element %zu/%lu\n", ixOutput, m_meshOutput->faces.size() );
+        }
+#endif
+        // This Face
+        const Face& faceSecond = m_meshOutput->faces[ixOutput];
+
+        // Area of the First Face
+        // double dSecondArea = m_meshOutput->vecFaceArea[ixOutput];
+
+        for( int p = 0; p < nP; p++ )
+        {
+            for( int q = 0; q < nP; q++ )
+            {
+                int ixOutputGlobal;
+                if( fContinuous ) ixOutputGlobal = dataGLLNodes[p][q][ixOutput] - 1;
+                else ixOutputGlobal = ixOutput * nP * nP + p * nP + q;
+
+                // Coordinate of the GLL point
+                Node nodeRef = GetFaceCentroid( faceSecond, m_meshOutput->nodes );
+
+                const double query[] = { nodeRef.x, nodeRef.y, nodeRef.z };
+                const double radius  = dataGLLJacobian[p][q][ixOutput];
+                auto results         = radius_search_kdtree( cloud, query, radius );
+                const size_t nResults = results.size();
+                const double dWeight  = dataGLLNodalArea[ixOutput] / nResults;
+
+                std::cout << "Found " << nResults << " elements within radius " << radius << "\n";
+                for( auto ixFirstElement : results )
+                {
+                    smatMap( ixOutputGlobal, ixFirstElement ) += dWeight;
+                }
+            }
+        }
+
+    }
+    return moab::MB_SUCCESS;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

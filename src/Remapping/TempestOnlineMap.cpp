@@ -898,6 +898,12 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                                                dataGLLJacobian, this->GetTargetAreas(), mapOptions.nPin, *this,
                                                nMonotoneType, fContinuous, mapOptions.fNoConservation );
             }
+            else if( strMapAlgorithm == "fvse-averaged" )
+            {
+                if( is_root ) dbgprint.printf( 0, "Calculating remapping weights for FV->GLL (averaged)\n" );
+                this->LinearRemapFVtoGLL_Averaged( dataGLLNodesDest, dataGLLJacobian, this->GetTargetAreas(),
+                                                   mapOptions.nPin, fContinuous );
+            }
             else
             {
                 if( is_root ) dbgprint.printf( 0, "Calculating remapping weights for FV->GLL\n" );

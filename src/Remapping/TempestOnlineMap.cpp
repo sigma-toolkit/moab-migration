@@ -673,13 +673,20 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
 
         if( !m_bPointCloud )
         {
-            // Verify that overlap mesh is in the correct order (sanity check)
-            assert( m_meshOverlap->vecSourceFaceIx.size() == m_meshOverlap->vecTargetFaceIx.size() );
+            if (m_meshOverlap)
+            {
+                // Verify that overlap mesh is in the correct order (sanity check)
+                assert( m_meshOverlap->vecSourceFaceIx.size() == m_meshOverlap->vecTargetFaceIx.size() );
 
-            // Calculate Face areas
-            if( is_root ) dbgprint.printf( 0, "Calculating overlap mesh Face areas\n" );
-            local_areas[2] =
+                // Calculate Face areas
+                if( is_root ) dbgprint.printf( 0, "Calculating overlap mesh Face areas\n" );
+                local_areas[2] =
                 m_meshOverlap->CalculateFaceAreas( mapOptions.fSourceConcave || mapOptions.fTargetConcave );
+            }
+            else
+            {
+                local_areas[2] = 0.0;
+            }
 
             // store it as global output for now - used later in reduction
             std::copy( local_areas, local_areas + 3, global_areas );
@@ -688,16 +695,17 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             if( m_pcomm && is_parallel )
                 MPI_Reduce( local_areas, global_areas, 3, MPI_DOUBLE, MPI_SUM, 0, m_pcomm->comm() );
 #endif
+
             if( is_root )
             {
                 dbgprint.printf( 0, "Input Mesh Geometric Area: %1.15e\n", global_areas[0] );
                 dbgprint.printf( 0, "Output Mesh Geometric Area: %1.15e\n", global_areas[1] );
-                dbgprint.printf( 0, "Overlap Mesh Recovered Area: %1.15e\n", global_areas[2] );
+                if (m_meshOverlap) dbgprint.printf( 0, "Overlap Mesh Recovered Area: %1.15e\n", global_areas[2] );
             }
 
             // Correct areas to match the areas calculated in the overlap mesh
             constexpr bool fCorrectAreas = true;
-            if( fCorrectAreas )  // In MOAB-TempestRemap, we will always keep this to be true
+            if( fCorrectAreas && m_meshOverlap )  // In MOAB-TempestRemap, we will always keep this to be true
             {
                 if( is_root ) dbgprint.printf( 0, "Correcting source/target areas to overlap mesh areas\n" );
                 DataArray1D< double > dSourceArea( m_meshInputCov->faces.size() );
@@ -1107,7 +1115,9 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
         copy_tempest_sparsemat_to_eigen3();
 #endif
 
+
 #ifdef MOAB_HAVE_MPI
+        if (m_meshOverlap)
         {
             // Remove ghosted entities from overlap set
             moab::Range ghostedEnts;
@@ -1897,28 +1907,22 @@ moab::ErrorCode moab::TempestOnlineMap::ComputeMetrics( moab::Remapper::Intersec
     moab::ErrorCode rval;
     const bool outputEnabled = ( is_root );
     int discOrder;
-    // DiscretizationType discMethod;
-    // moab::EntityHandle meshset;
+    Mesh* mesh;
     moab::Range entities;
-    // Mesh* trmesh;
+    assert( !m_remapper->point_cloud_source );
+    assert( !m_remapper->point_cloud_target );
     switch( ctx )
     {
         case Remapper::SourceMesh:
-            // meshset    = m_remapper->m_covering_source_set;
-            // trmesh     = m_remapper->m_covering_source;
-            entities  = ( m_remapper->point_cloud_source ? m_remapper->m_covering_source_vertices
-                                                         : m_remapper->m_covering_source_entities );
+            entities  = m_remapper->m_covering_source_entities;
             discOrder = m_nDofsPEl_Src;
-            // discMethod = m_eInputType;
+            mesh      = m_remapper->m_covering_source;
             break;
 
         case Remapper::TargetMesh:
-            // meshset = m_remapper->m_target_set;
-            // trmesh  = m_remapper->m_target;
-            entities =
-                ( m_remapper->point_cloud_target ? m_remapper->m_target_vertices : m_remapper->m_target_entities );
+            entities = m_remapper->m_target_entities;
             discOrder = m_nDofsPEl_Dest;
-            // discMethod = m_eOutputType;
+            mesh      = m_remapper->m_target;
             break;
 
         default:
@@ -1937,24 +1941,40 @@ moab::ErrorCode moab::TempestOnlineMap::ComputeMetrics( moab::Remapper::Intersec
     rval = m_interface->tag_get_name( approxTag, projTagName );MB_CHK_ERR( rval );
     rval = m_interface->tag_get_data( approxTag, entities, &projSolution[0] );MB_CHK_ERR( rval );
 
-    const auto& ovents = m_remapper->m_overlap_entities;
-
     std::vector< double > errnorms( 4, 0.0 ), globerrnorms( 4, 0.0 );  //  L1Err, L2Err, LinfErr
     double sumarea = 0.0;
-    for( size_t i = 0; i < ovents.size(); ++i )
+    if (m_remapper->m_overlap)
     {
-        const int srcidx = m_remapper->m_overlap->vecSourceFaceIx[i];
-        if( srcidx < 0 ) continue;  // Skip non-overlapping entities
-        const int tgtidx = m_remapper->m_overlap->vecTargetFaceIx[i];
-        if( tgtidx < 0 ) continue;  // skip ghost target faces
-        const double ovarea = m_remapper->m_overlap->vecFaceArea[i];
-        const double error  = fabs( exactSolution[tgtidx] - projSolution[tgtidx] );
-        errnorms[0] += ovarea * error;
-        errnorms[1] += ovarea * error * error;
-        errnorms[3] = ( error > errnorms[3] ? error : errnorms[3] );
-        sumarea += ovarea;
+        const auto& ovents = m_remapper->m_overlap_entities;
+        for( size_t i = 0; i < ovents.size(); ++i )
+        {
+            const int srcidx = m_remapper->m_overlap->vecSourceFaceIx[i];
+            if( srcidx < 0 ) continue;  // Skip non-overlapping entities
+            const int tgtidx = m_remapper->m_overlap->vecTargetFaceIx[i];
+            if( tgtidx < 0 ) continue;  // skip ghost target faces
+            const double ovarea = m_remapper->m_overlap->vecFaceArea[i];
+            const double error  = fabs( exactSolution[tgtidx] - projSolution[tgtidx] );
+            errnorms[0] += ovarea * error;
+            errnorms[1] += ovarea * error * error;
+            errnorms[3] = ( error > errnorms[3] ? error : errnorms[3] );
+            sumarea += ovarea;
+        }
+        errnorms[2] = sumarea;
     }
-    errnorms[2] = sumarea;
+    else
+    {
+        for( size_t i = 0; i < entities.size(); ++i )
+        {
+            const double area = mesh->vecFaceArea[i];
+            const double error  = fabs( exactSolution[i] - projSolution[i] );
+            errnorms[0] += area * error;
+            errnorms[1] += area * error * error;
+            errnorms[3] = ( error > errnorms[3] ? error : errnorms[3] );
+            sumarea += area;
+        }
+        errnorms[2] = sumarea;
+    }
+
 #ifdef MOAB_HAVE_MPI
     if( m_pcomm )
     {
@@ -1977,7 +1997,7 @@ moab::ErrorCode moab::TempestOnlineMap::ComputeMetrics( moab::Remapper::Intersec
     if( verbose && is_root )
     {
         std::cout << "Error metrics when comparing " << projTagName << " against " << exactTagName << std::endl;
-        std::cout << "\t Total Intersection area = " << globerrnorms[2] << std::endl;
+        std::cout << "\t Total area  = " << globerrnorms[2] << std::endl;
         std::cout << "\t L_1 error   = " << globerrnorms[0] << std::endl;
         std::cout << "\t L_2 error   = " << globerrnorms[1] << std::endl;
         std::cout << "\t L_inf error = " << globerrnorms[3] << std::endl;

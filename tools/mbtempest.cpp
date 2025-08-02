@@ -454,6 +454,8 @@ class ToolContext
         this->disc_methods = { expectedMethod, expectedMethod };
         this->doftag_names = { expectedDofTagName, expectedDofTagName };
 
+        this->processMeshOptions( opts, expectedFVMethod, expectedOrder );
+
         // For computing maps and overlaps, set discretization orders
         this->mapOptions.nPin           = this->disc_orders[0];
         this->mapOptions.nPout          = this->disc_orders[1];
@@ -510,17 +512,117 @@ class ToolContext
         this->mapOptions.strOutputMapFile = this->outFilename;
         this->mapOptions.strOutputFormat  = "Netcdf4";
 
-        // Print configuration summary
-        if( this->proc_id == 0 )
-        {
-            std::cout << "Configuration summary:" << "\n  Mesh type: " << this->getMeshTypeName()
-                      << "\n  Output file: " << this->outFilename << "\n  Discretization: " << this->disc_methods[0]
-                      << " (order " << this->disc_orders[0] << ")" << "\n  Monotonicity: " << this->ensureMonotonicity
-                      << std::endl;
-        }
+
+        // Print runtime parameters
+        this->printRuntimeParameters();
 
         return moab::MB_SUCCESS;
     }
+
+
+    /**
+     * @brief Get the appropriate MOAB read options based on file extension and parallel configuration
+     *
+     * @param ctx Tool context containing parallel information
+     * @param filename Input filename to determine read options
+     * @return std::string MOAB read options string
+     */
+    std::string get_file_read_options( const std::string& filename )
+    {
+        // For serial execution, return default options
+        if( n_procs <= 1 )
+        {
+            return "";
+        }
+
+        // Extract file extension
+        const size_t last_dot = filename.find_last_of( "." );
+        if( last_dot == std::string::npos )
+        {
+            return "";  // No extension found
+        }
+
+        const std::string extension = filename.substr( last_dot + 1 );
+
+        // Handle H5M files
+        if( extension == "h5m" )
+        {
+            return "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;";
+        }
+
+        // Handle NetCDF files
+        if( extension == "nc" )
+        {
+            // Default NetCDF options
+    #ifdef MOAB_HAVE_ZOLTAN
+            std::string netcdf_options = "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;";
+    #else
+            std::string netcdf_options = "PARALLEL=READ_PART;PARTITION_METHOD=TRIVIAL;";
+    #endif
+            // Only rank 0 needs to determine the NetCDF file type
+            if( proc_id == 0 )
+            {
+                NcFile ncFile( filename.c_str(), NcFile::ReadOnly );
+                if( !ncFile.is_valid() )
+                {
+                    // Handle invalid file
+                    return netcdf_options;
+                }
+
+                // Check for different NetCDF formats
+                int format_flags = 0;
+                for( int i = 0; i < ncFile.num_dims(); i++ )
+                {
+                    const std::string dim_name = ncFile.get_dim( i )->name();
+
+                    if( dim_name == "grid_size" || dim_name == "grid_corners" || dim_name == "grid_rank" )
+                    {
+                        format_flags |= 1;  // SCRIP format
+                    }
+                    else if( dim_name == "nodeCount" || dim_name == "elementCount" || dim_name == "maxNodePElement" )
+                    {
+                        format_flags |= 2;  // ESMF format
+                    }
+                    else if( dim_name == "nCells" || dim_name == "nEdges" || dim_name == "nVertices" ||
+                            dim_name == "vertexDegree" )
+                    {
+                        format_flags |= 4;  // MPAS format
+                    }
+                }
+
+                // Apply format-specific options
+                if( format_flags & 2 )
+                {  // ESMF format
+                    netcdf_options += "PARALLEL_RESOLVE_SHARED_ENTS;VARIABLE=;";
+                }
+                else if( format_flags & 1 )
+                {                          // SCRIP format
+                    netcdf_options += "";  // no extra options necessary for now
+                }
+                else if( format_flags & 4 )
+                {  // MPAS format
+                    netcdf_options += "PARALLEL_RESOLVE_SHARED_ENTS;NO_EDGES;NO_MIXED_ELEMENTS;VARIABLE=;";
+                }
+            }
+
+            // Broadcast the options to all processes
+    #ifdef MOAB_HAVE_MPI
+            int line_size = netcdf_options.size();
+            MPI_Bcast( &line_size, 1, MPI_INT, 0, MPI_COMM_WORLD );
+            if( proc_id != 0 )
+            {
+                netcdf_options.resize( line_size );
+            }
+            MPI_Bcast( const_cast< char* >( netcdf_options.data() ), line_size, MPI_CHAR, 0, MPI_COMM_WORLD );
+    #endif
+
+            return netcdf_options;
+        }
+
+        // Default options for other file types
+        return "PARALLEL=BCAST_DELETE;PARTITION=TRIVIAL;PARALLEL_RESOLVE_SHARED_ENTS;";
+    }
+
 
   private:
     /**
@@ -583,7 +685,7 @@ class ToolContext
      * @brief Get mesh type as string
      * @return String representation of mesh type
      */
-    std::string getMeshTypeName()
+    std::string getMeshTypeName() const
     {
         switch( this->meshType )
         {
@@ -700,19 +802,69 @@ class ToolContext
             this->outFilename = outFile;
         }
 
-        // Process other options using the correct getOpt signature (pointer to variable)
-        int mono = this->ensureMonotonicity;
-        if( opts.getOpt( "mono", &mono ) )
-        {
-            this->ensureMonotonicity = mono;
-        }
-        opts.getOpt< void >( "volumetric", &this->fVolumetric );
-        opts.getOpt< void >( "check", &this->fCheck );
-        opts.getOpt< void >( "gnomonic", &this->useGnomonicProjection );
-        opts.getOpt< void >( "diagnostics", &this->print_diagnostics );
-
         // Configure map options with the processed values
         configureMapOptions( expectedFVMethod, nlayer_input );
+    }
+
+    /**
+     * @brief Print all runtime parameters in a formatted way
+     */
+    void printRuntimeParameters() const
+    {
+        if( this->proc_id != 0 ) return;
+
+        constexpr int width = 60;
+
+        std::cout << std::string(width, '=') << "\n";
+        std::cout << "  MOAB-TempestRemap Runtime Configuration " << "\n";
+        std::cout << std::string(width, '=');
+
+        // Input files
+        if( this->meshType == moab::TempestRemapper::OVERLAP_MOAB ) {
+            if(!this->inFilenames.empty()) {
+                std::cout << "\n\nInput Files:";
+                std::cout << "\n  Source mesh:          " << this->inFilenames[0];
+                std::cout << "\n  Target mesh:          " << this->inFilenames[1];
+            }
+
+            std::cout << "\n\nOutput Files:";
+            if(!skip_intersection) std::cout << "\n  Intersection mesh:   " << this->intxFilename;
+            else std::cout << "\n  Skipping intersection mesh ...";
+            if(computeWeights) std::cout << "\n  Remap weights:       " << this->outFilename;
+            else std::cout << "\n  Mesh filename:       " << this->outFilename;
+        }
+
+        // Mesh configuration
+        std::cout << "\n\nMesh Configuration:";
+        std::cout << "\n  Mesh type:              " << this->getMeshTypeName();
+        if (this->meshType <= moab::TempestRemapper::ICO) std::cout << "\n  Resolution:             " << this->blockSize;
+        if (this->meshType == moab::TempestRemapper::ICO && computeDual)std::cout << "\n  Compute dual:           " << (this->computeDual ? "Yes" : "No");
+
+        if( this->meshType > moab::TempestRemapper::ICO ) {
+            std::cout << "\n  Gnomonic projection:    " << (this->useGnomonicProjection ? "Yes" : "No");
+            std::cout << "\n  Intersection algorithm: " << (this->kdtreeSearch ? "KdTree search" : "Advancing front");
+
+            // Discretization settings
+            std::cout << "\n\nDiscretization:";
+            std::cout << "\n  Source:             " << this->disc_methods[0] << " (order " << this->disc_orders[0] << ")";
+            std::cout << "\n  Target:             " << this->disc_methods[1] << " (order " << this->disc_orders[1] << ")";
+
+            // Remapping options
+            std::cout << "\n\nRemapping Options:";
+            std::cout << "\n  Method:             " << this->mapOptions.strMethod;
+            std::cout << "\n  Monotonicity:       " << this->ensureMonotonicity;
+            std::cout << "\n  Volumetric:         " << (this->fVolumetric ? "Yes" : "No");
+            std::cout << "\n  Check consistency:  " << (this->fCheck ? "Yes" : "No");
+            std::cout << "\n  Skip intersection:  " << (this->skip_intersection ? "Yes" : "No");
+        }
+
+        // Parallel configuration
+        std::cout << "\n\nParallel Configuration:";
+        std::cout << "\n  MPI Processes:          " << this->n_procs;
+        std::cout << "\n  Process Rank:           " << this->proc_id;
+        if( this->meshType > moab::TempestRemapper::ICO )std::cout << "\n  Number of Ghost Layers: " << this->nlayers;
+
+        std::cout << "\n\n" << std::string(width, '=') << "\n\n";
     }
 
     /**
@@ -737,11 +889,6 @@ class ToolContext
             this->mapOptions.strMethod       = expectedFVMethod + ";";
             this->fvMethod                   = expectedFVMethod;
             this->mapOptions.fNoConservation = true;
-
-            if( this->proc_id == 0 && !expectedFVMethod.empty() )
-            {
-                std::cout << "Using finite volume method: " << expectedFVMethod << std::endl;
-            }
         }
 
         // Configure monotonicity with validation
@@ -795,16 +942,6 @@ class ToolContext
         // Configure output
         this->mapOptions.strOutputMapFile = this->outFilename;
         this->mapOptions.strOutputFormat  = "Netcdf4";
-
-        // Log configuration details
-        if( this->proc_id == 0 )
-        {
-            std::cout << "Using " << this->nlayers << " ghost layers for remapping" << std::endl;
-            if( !this->mapOptions.strMethod.empty() )
-            {
-                std::cout << "Map method flags: " << this->mapOptions.strMethod << std::endl;
-            }
-        }
     }
 };
 
@@ -815,108 +952,7 @@ static inline double sample_slow_harmonic( double dLon, double dLat ) noexcept;
 static inline double sample_fast_harmonic( double dLon, double dLat ) noexcept;
 static inline double sample_stationary_vortex( double dLon, double dLat ) noexcept;
 
-/**
- * @brief Get the appropriate MOAB read options based on file extension and parallel configuration
- *
- * @param ctx Tool context containing parallel information
- * @param filename Input filename to determine read options
- * @return std::string MOAB read options string
- */
-std::string get_file_read_options( ToolContext& ctx, const std::string& filename )
-{
-    // For serial execution, return default options
-    if( ctx.n_procs <= 1 )
-    {
-        return "";
-    }
-
-    // Extract file extension
-    const size_t last_dot = filename.find_last_of( "." );
-    if( last_dot == std::string::npos )
-    {
-        return "";  // No extension found
-    }
-
-    const std::string extension = filename.substr( last_dot + 1 );
-
-    // Handle H5M files
-    if( extension == "h5m" )
-    {
-        return "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;";
-    }
-
-    // Handle NetCDF files
-    if( extension == "nc" )
-    {
-        // Default NetCDF options
-#ifdef MOAB_HAVE_ZOLTAN
-        std::string netcdf_options = "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;";
-#else
-        std::string netcdf_options = "PARALLEL=READ_PART;PARTITION_METHOD=TRIVIAL;";
-#endif
-        // Only rank 0 needs to determine the NetCDF file type
-        if( ctx.proc_id == 0 )
-        {
-            NcFile ncFile( filename.c_str(), NcFile::ReadOnly );
-            if( !ncFile.is_valid() )
-            {
-                // Handle invalid file
-                return netcdf_options;
-            }
-
-            // Check for different NetCDF formats
-            int format_flags = 0;
-            for( int i = 0; i < ncFile.num_dims(); i++ )
-            {
-                const std::string dim_name = ncFile.get_dim( i )->name();
-
-                if( dim_name == "grid_size" || dim_name == "grid_corners" || dim_name == "grid_rank" )
-                {
-                    format_flags |= 1;  // SCRIP format
-                }
-                else if( dim_name == "nodeCount" || dim_name == "elementCount" || dim_name == "maxNodePElement" )
-                {
-                    format_flags |= 2;  // ESMF format
-                }
-                else if( dim_name == "nCells" || dim_name == "nEdges" || dim_name == "nVertices" ||
-                         dim_name == "vertexDegree" )
-                {
-                    format_flags |= 4;  // MPAS format
-                }
-            }
-
-            // Apply format-specific options
-            if( format_flags & 2 )
-            {  // ESMF format
-                netcdf_options += "PARALLEL_RESOLVE_SHARED_ENTS;VARIABLE=;";
-            }
-            else if( format_flags & 1 )
-            {                          // SCRIP format
-                netcdf_options += "";  // no extra options necessary for now
-            }
-            else if( format_flags & 4 )
-            {  // MPAS format
-                netcdf_options += "PARALLEL_RESOLVE_SHARED_ENTS;NO_EDGES;NO_MIXED_ELEMENTS;VARIABLE=;";
-            }
-        }
-
-        // Broadcast the options to all processes
-#ifdef MOAB_HAVE_MPI
-        int line_size = netcdf_options.size();
-        MPI_Bcast( &line_size, 1, MPI_INT, 0, MPI_COMM_WORLD );
-        if( ctx.proc_id != 0 )
-        {
-            netcdf_options.resize( line_size );
-        }
-        MPI_Bcast( const_cast< char* >( netcdf_options.data() ), line_size, MPI_CHAR, 0, MPI_COMM_WORLD );
-#endif
-
-        return netcdf_options;
-    }
-
-    // Default options for other file types
-    return "PARALLEL=BCAST_DELETE;PARTITION=TRIVIAL;PARALLEL_RESOLVE_SHARED_ENTS;";
-}
+/////////////////////////////////////////////////////////////
 
 //#define MOAB_DBG
 int main( int argc, char* argv[] )
@@ -1223,7 +1259,7 @@ int main( int argc, char* argv[] )
                                     gvelist[3] );
         }
 
-        if( runCtx->skip_intersection )
+        if( runCtx->skip_intersection && !proc_id )
         {
             outputFormatter.printf( 0, "Skipping mesh intersection computation.\n" );
         }
@@ -1578,7 +1614,7 @@ moab::ErrorCode handleOverlapMOAB( ToolContext& ctx, moab::TempestRemapper& rema
     // Load and process source mesh
     {
         std::vector< int > metadata;
-        auto additional_read_opts_src = get_file_read_options( ctx, ctx.inFilenames[0] );
+        auto additional_read_opts_src = ctx.get_file_read_options( ctx.inFilenames[0] );
         MB_CHK_SET_ERR( remapper.LoadNativeMesh( ctx.inFilenames[0], ctx.meshsets[0], metadata,
                                                  additional_read_opts_src.c_str() ),
                         "Failed to load MOAB Source mesh" );
@@ -1595,7 +1631,12 @@ moab::ErrorCode handleOverlapMOAB( ToolContext& ctx, moab::TempestRemapper& rema
     // Load and process target mesh
     {
         std::vector< int > metadata;
-        auto additional_read_opts_tgt = get_file_read_options( ctx, ctx.inFilenames[1] );
+        std::string additional_read_opts_tgt = ctx.get_file_read_options( ctx.inFilenames[1] );
+        if( ctx.n_procs > 1 && ctx.disc_methods[1].compare("fv") != 0 ) // target discretization is cgll or dgll
+        {
+            // add one ghost layer to the target mesh
+            additional_read_opts_tgt = additional_read_opts_tgt +  "PARALLEL_GHOSTS=3.0.2;PARALLEL_THIN_GHOST_LAYER;";
+        }
         MB_CHK_SET_ERR( remapper.LoadNativeMesh( ctx.inFilenames[1], ctx.meshsets[1], metadata,
                                                  additional_read_opts_tgt.c_str() ),
                         "Failed to load MOAB Target mesh" );

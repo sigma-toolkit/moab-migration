@@ -238,28 +238,6 @@ class IntxUtils
             std::vector<EntityHandle> & chainVertices,
             std::vector<int> & polygonsIds,
             Tag otherParentTag);
-
-    static ErrorCode EdgeMap( Interface* mb, EntityHandle inputSet, EntityHandle intx_set, bool sourceMap,
-            std::map<EntityHandle, std::vector<EntityHandle>>  & edgeVertices, // for each recovered edge, the chain of vertices that form subedges
-            std::map<EntityHandle, std::vector<int>> & edgePolygons, // for each recovered edge, the list of intersected polygons;
-            moab::Range & recoveredPolys, double areaTolerance);
-#ifdef MOAB_HAVE_NETCDF
-    static ErrorCode write_edge_map(const char * filename,
-            Interface * mb, EntityHandle sf1,
-            std::map<EntityHandle, std::vector<EntityHandle>>  & edgeVertices,
-            std::map<EntityHandle, std::vector<int>> & edgePolygons,
-            moab::Range & recoveredPolys);
-#endif
-
-#ifdef MOAB_HAVE_PNETCDF
-#ifdef MOAB_HAVE_MPI
-    static ErrorCode write_edge_map_parallel(const char * filename,
-            ParallelComm * pcomm, Interface * mb, EntityHandle sf1,
-            std::map<EntityHandle, std::vector<EntityHandle>>  & edgeVertices,
-            std::map<EntityHandle, std::vector<int>> & edgePolygons,
-            moab::Range & recoveredPolys);
-#endif
-#endif
 };
 
 class IntxAreaUtils

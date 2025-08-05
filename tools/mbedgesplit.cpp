@@ -16,7 +16,7 @@
 #ifdef MOAB_HAVE_MPI
 #include "moab/ParallelComm.hpp"
 #endif
-#include "moab/IntxMesh/Intx2MeshOnSphere.hpp"
+#include "moab/IntxMesh/Intx2MeshEdges.hpp"
 #include "moab/IntxMesh/IntxUtils.hpp"
 #include "moab/ProgOptions.hpp"
 #include <cmath>
@@ -107,7 +107,7 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_MPI
     ParallelComm* pcomm = ParallelComm::get_pcomm( mb, 0 );
 #endif
-    Intx2MeshOnSphere worker( mb );
+    Intx2MeshEdges worker( mb );
     IntxAreaUtils areaAdaptor;
 
     worker.set_error_tolerance( R * epsrel );
@@ -213,13 +213,12 @@ int main( int argc, char* argv[] )
                                            &defVal );MB_CHK_SET_ERR( rval, "can't create AreaDiff tag" );
     rval = mb->tag_get_handle( "Area", 1, MB_TYPE_DOUBLE, areaTag, MB_TAG_DENSE | MB_TAG_CREAT,
                                                &defVal );MB_CHK_SET_ERR( rval, "can't create Area tag" );
-    std::map<EntityHandle, std::vector<EntityHandle>> edgeVertices; // for each recovered edge, the chain of vertices that form subedges
+/*    std::map<EntityHandle, std::vector<EntityHandle>> edgeVertices; // for each recovered edge, the chain of vertices that form subedges
     std::map<EntityHandle, std::vector<int>> edgePolygons; // for each recovered edge, the list of intersected polygons;
-    moab::Range recoveredPolys;
+    moab::Range recoveredPolys;*/
 
-    bool sourceEdgeMap = false;
-    rval = moab::IntxUtils::EdgeMap(mb, sf2, outputSet, sourceEdgeMap,
-        edgeVertices, edgePolygons, recoveredPolys, areaTolerance );MB_CHK_SET_ERR( rval, "failed to compute edge map for target" );
+    //bool sourceEdgeMap = false;
+    rval = worker.EdgeSplits( areaTolerance );MB_CHK_SET_ERR( rval, "failed to compute edge splits for target" );
 #ifdef MOAB_HAVE_MPI
 #ifdef MOAB_HAVE_HDF5_PARALLEL
     std::ostringstream h5mFile;
@@ -229,27 +228,20 @@ int main( int argc, char* argv[] )
 #endif
 #endif
 
+
 #ifdef MOAB_HAVE_PNETCDF
 #ifdef MOAB_HAVE_MPI
-    if (size > 1)
-    {
-        std::ostringstream file_str;
-        file_str << "p" << pcomm->size() << "_"<<mapEdgeTargetFile;
-        rval = moab::IntxUtils::write_edge_map_parallel(file_str.str().c_str(), pcomm, mb, sf2, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
-        if( 0 == rank ) std::cout <<" Wrote netcdf file with edge mapping info: "<< file_str.str() << "\n";
-    }
-    else
-    {
-#ifdef MOAB_HAVE_NETCDF
-        rval = moab::IntxUtils::write_edge_map(mapEdgeTargetFile.c_str(), mb, sf2, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
-#endif
-    }
-#endif
+    std::ostringstream file_str;
+    file_str << "p" << pcomm->size() << "_"<<mapEdgeTargetFile;
+    rval = worker.write_edge_map_parallel(file_str.str().c_str());MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
+    if( 0 == rank ) std::cout <<" Wrote netcdf file with edge mapping info: "<< file_str.str() << "\n";
 #else
 #ifdef MOAB_HAVE_NETCDF
-    rval = moab::IntxUtils::write_edge_map(mapEdgeTargetFile.c_str(), mb, sf2, edgeVertices, edgePolygons, recoveredPolys);MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
+    rval = worker.write_edge_map(mapEdgeTargetFile.c_str());MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
 #endif
 #endif
+#endif
+
     delete mb;
 #ifdef MOAB_HAVE_MPI
     MPI_Finalize();

@@ -73,6 +73,7 @@ libMOAB_la_SOURCES = \
   IntxMesh/Intx2Mesh.cpp  \
   IntxMesh/Intx2MeshInPlane.cpp  \
   IntxMesh/Intx2MeshOnSphere.cpp \
+  IntxMesh/Intx2MeshEdges.cpp \
   IntxMesh/IntxRllCssphere.cpp \
   IntxMesh/IntxUtils.cpp \
   LloydSmoother.cpp \
@@ -288,6 +289,7 @@ intxmeshinclude_HEADERS = \
 	moab/IntxMesh/IntxUtils.hpp \
   moab/IntxMesh/Intx2MeshInPlane.hpp \
   moab/IntxMesh/Intx2MeshOnSphere.hpp \
+  moab/IntxMesh/Intx2MeshEdges.hpp \
   moab/IntxMesh/IntxRllCssphere.hpp
 
 # Conditional sources

@@ -31,7 +31,7 @@ int main( int argc, char* argv[] )
     //        "../sandbox/MeshFiles/e3sm/edge_maps/source_1.h5m";  // it also has data associated to edges
     //targetFile =
     //        "../sandbox/MeshFiles/e3sm/edge_maps/target_1.h5m";  //
-    intersectionFile = "intx_edges.h5m";
+    intersectionFile  = "intx_edges.h5m";
     mapEdgeTargetFile = "target_edge.nc";
 
     ProgOptions opts;
@@ -40,23 +40,23 @@ int main( int argc, char* argv[] )
     opts.addOpt< std::string >( "intersectionFile,i", "output intersection file", &intersectionFile );
     opts.addOpt< std::string >( "edgeTarget,p", "output map edge target file", &mapEdgeTargetFile );
 
-    double R      = 1.;  // input
-    double epsrel = 1.e-12;
-    double boxeps = 1.e-4;
+    double R             = 1.;  // input
+    double epsrel        = 1.e-12;
+    double boxeps        = 1.e-4;
     double areaTolerance = 5.e-12;
-    intersectionFile    = "intx.h5m";
+    intersectionFile     = "intx.h5m";
     opts.addOpt< double >( "radius,R", "radius for model intx", &R );
     opts.addOpt< double >( "epsilon,e", "relative error in intx", &epsrel );
     opts.addOpt< double >( "boxerror,b", "relative error for box boundaries", &boxeps );
-    opts.addOpt< double >( "areaTol,a", "area recovery tolerance", &areaTolerance);
+    opts.addOpt< double >( "areaTol,a", "area recovery tolerance", &areaTolerance );
 
-    opts.addOpt<void>( "writeFiles,w", "write files of interest" );
-    opts.addOpt<void>( "kdtreeOption,k", "use kd tree for intersection" );
+    opts.addOpt< void >( "writeFiles,w", "write files of interest" );
+    opts.addOpt< void >( "kdtreeOption,k", "use kd tree for intersection" );
 
     opts.parseCommandLine( argc, argv );
 
-    bool write_files_rank = opts.numOptSet("writeFiles") > 0;
-    bool brute_force = opts.numOptSet("kdtreeOption") > 0;
+    bool write_files_rank = opts.numOptSet( "writeFiles" ) > 0;
+    bool brute_force      = opts.numOptSet( "kdtreeOption" ) > 0;
 
     int rank = 0, size = 1;
 #ifdef MOAB_HAVE_MPI
@@ -89,12 +89,12 @@ int main( int argc, char* argv[] )
         std::cout << "Radius:  " << R << "\n";
         std::cout << "relative eps:  " << epsrel << "\n";
         std::cout << "box eps:  " << boxeps << "\n";
-        if (brute_force)
+        if( brute_force )
             std::cout << " use kd tree for intersection \n";
         else
             std::cout << " use advancing front for intersection \n";
 
-        std::cout << " area tolerance:" << areaTolerance <<"\n";
+        std::cout << " area tolerance:" << areaTolerance << "\n";
         std::cout << " target edge file: " << mapEdgeTargetFile << "\n";
     }
     rval = mb->create_meshset( MESHSET_SET, outputSet );MB_CHK_ERR( rval );
@@ -102,7 +102,6 @@ int main( int argc, char* argv[] )
     // fix radius of both meshes, to be consistent with input R
     rval = moab::IntxUtils::ScaleToRadius( mb, sf1, R );MB_CHK_ERR( rval );
     rval = moab::IntxUtils::ScaleToRadius( mb, sf2, R );MB_CHK_ERR( rval );
-
 
 #ifdef MOAB_HAVE_MPI
     ParallelComm* pcomm = ParallelComm::get_pcomm( mb, 0 );
@@ -139,10 +138,10 @@ int main( int argc, char* argv[] )
     {
         double elapsed = MPI_Wtime();
         rval           = mb->create_meshset( moab::MESHSET_SET, covering_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
-        bool gnomonic = true;
-        int order = 0; // we should not need ghost layers here
-        bool include_edges = true; // this is by default false; make it true for this case, for edge maps computation
-        rval          = worker.construct_covering_set( sf1, covering_set, gnomonic, order, include_edges );MB_CHK_ERR( rval );  // lots of communication if mesh is distributed very differently
+        bool gnomonic      = true;
+        int order          = 0;     // we should not need ghost layers here
+        bool include_edges = true;  // this is by default false; make it true for this case, for edge maps computation
+        rval               = worker.construct_covering_set( sf1, covering_set, gnomonic, order, include_edges );MB_CHK_ERR( rval );  // lots of communication if mesh is distributed very differently
         elapsed = MPI_Wtime() - elapsed;
         if( 0 == rank ) std::cout << "\nTime to communicate the mesh = " << elapsed << std::endl;
         if( write_files_rank )
@@ -186,9 +185,9 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_MPI
 #ifdef MOAB_HAVE_HDF5_PARALLEL
     std::ostringstream intx_str;
-    intx_str << "p" << pcomm->size() << "_"<<intersectionFile;
+    intx_str << "p" << pcomm->size() << "_" << intersectionFile;
     rval = mb->write_file( intx_str.str().c_str(), 0, "PARALLEL=WRITE_PART", &outputSet, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
-    if( 0 == rank ) std::cout <<" Wrote intx file: "<< intx_str.str() << "\n";
+    if( 0 == rank ) std::cout << " Wrote intx file: " << intx_str.str() << "\n";
 #else
     // write intx set on rank 0, in serial; we cannot write in parallel
     if( 0 == rank )
@@ -206,14 +205,11 @@ int main( int argc, char* argv[] )
     moab::Tag areaTag;
     double defVal = 0.;
     rval = mb->tag_get_handle( "EdgeRecoveryFraction", 1, MB_TYPE_DOUBLE, fractionTag, MB_TAG_DENSE | MB_TAG_CREAT,
-                                   &defVal );MB_CHK_SET_ERR( rval, "can't create edge recovery fraction tag" );
-    rval = mb->tag_get_handle( "NumSubEnts", 1, MB_TYPE_DOUBLE, numSubTag, MB_TAG_DENSE | MB_TAG_CREAT,
-                                       &defVal );MB_CHK_SET_ERR( rval, "can't create NumSubEnts tag" );
-    rval = mb->tag_get_handle( "AreaDiff", 1, MB_TYPE_DOUBLE, areaDiffTag, MB_TAG_DENSE | MB_TAG_CREAT,
-                                           &defVal );MB_CHK_SET_ERR( rval, "can't create AreaDiff tag" );
-    rval = mb->tag_get_handle( "Area", 1, MB_TYPE_DOUBLE, areaTag, MB_TAG_DENSE | MB_TAG_CREAT,
-                                               &defVal );MB_CHK_SET_ERR( rval, "can't create Area tag" );
-/*    std::map<EntityHandle, std::vector<EntityHandle>> edgeVertices; // for each recovered edge, the chain of vertices that form subedges
+                               &defVal );MB_CHK_SET_ERR( rval, "can't create edge recovery fraction tag" );
+    rval = mb->tag_get_handle( "NumSubEnts", 1, MB_TYPE_DOUBLE, numSubTag, MB_TAG_DENSE | MB_TAG_CREAT, &defVal );MB_CHK_SET_ERR( rval, "can't create NumSubEnts tag" );
+    rval = mb->tag_get_handle( "AreaDiff", 1, MB_TYPE_DOUBLE, areaDiffTag, MB_TAG_DENSE | MB_TAG_CREAT, &defVal );MB_CHK_SET_ERR( rval, "can't create AreaDiff tag" );
+    rval = mb->tag_get_handle( "Area", 1, MB_TYPE_DOUBLE, areaTag, MB_TAG_DENSE | MB_TAG_CREAT, &defVal );MB_CHK_SET_ERR( rval, "can't create Area tag" );
+    /*    std::map<EntityHandle, std::vector<EntityHandle>> edgeVertices; // for each recovered edge, the chain of vertices that form subedges
     std::map<EntityHandle, std::vector<int>> edgePolygons; // for each recovered edge, the list of intersected polygons;
     moab::Range recoveredPolys;*/
 
@@ -224,20 +220,19 @@ int main( int argc, char* argv[] )
     std::ostringstream h5mFile;
     h5mFile << "p" << pcomm->size() << "_targetWithEdges.h5m";
     rval = mb->write_file( h5mFile.str().c_str(), 0, "PARALLEL=WRITE_PART", &sf2, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
-    if( 0 == rank ) std::cout <<" Wrote file with edge mapping info: "<< h5mFile.str() << "\n";
+    if( 0 == rank ) std::cout << " Wrote file with edge mapping info: " << h5mFile.str() << "\n";
 #endif
 #endif
-
 
 #ifdef MOAB_HAVE_PNETCDF
 #ifdef MOAB_HAVE_MPI
     std::ostringstream file_str;
-    file_str << "p" << pcomm->size() << "_"<<mapEdgeTargetFile;
-    rval = worker.write_edge_map_parallel(file_str.str().c_str());MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
-    if( 0 == rank ) std::cout <<" Wrote netcdf file with edge mapping info: "<< file_str.str() << "\n";
+    file_str << "p" << pcomm->size() << "_" << mapEdgeTargetFile;
+    rval = worker.write_edge_map_parallel( file_str.str().c_str() );MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
+    if( 0 == rank ) std::cout << " Wrote netcdf file with edge mapping info: " << file_str.str() << "\n";
 #else
 #ifdef MOAB_HAVE_NETCDF
-    rval = worker.write_edge_map(mapEdgeTargetFile.c_str());MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
+    rval = worker.write_edge_map( mapEdgeTargetFile.c_str() );MB_CHK_SET_ERR( rval, "failed to write edge map for target" );
 #endif
 #endif
 #endif

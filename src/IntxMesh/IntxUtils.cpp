@@ -999,66 +999,6 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
 
     return MB_SUCCESS;
 }
-ErrorCode IntxUtils::orderSubEdges( Interface * mb,
-        std::vector< EntityHandle >& subEdges,
-        std::vector< EntityHandle >& VerticesSubEdges,
-        const EntityHandle* connEdge,
-        std::vector<EntityHandle> & chainVertices,
-        std::vector<int> & polygonIds,
-        Tag otherParentTag)
-{
-    int numEdges = (int)subEdges.size();
-    if( numEdges == 1 ) return MB_SUCCESS;  // nothing to do
-
-    EntityHandle currentVertex = connEdge[0];  // start vertex
-    chainVertices.push_back(currentVertex);
-    EntityHandle endVertex     = connEdge[1];
-    std::vector< EntityHandle > chain;
-    std::vector< int > markedEdge( numEdges, 0 );  // 0 means not found yet; -1 or +1 for orientation
-    // start finding the current vertex, until we close the chain; double loop, we could be smarter :)
-    for( int i = 0; i < numEdges; i++ )
-    {
-        for( int j = 0; j < numEdges; j++ )
-        {
-            if( 0 != markedEdge[j] ) continue;  // do not use it anymore
-            if( VerticesSubEdges[j * 2] == currentVertex )
-            {
-                currentVertex = VerticesSubEdges[j * 2 + 1];
-                chainVertices.push_back(currentVertex);
-                chain.push_back( subEdges[j] );
-                markedEdge[j] = 1;  // positive
-                break;              // break the j loop
-            }
-            if( VerticesSubEdges[j * 2 + 1] == currentVertex )
-            {
-                currentVertex = VerticesSubEdges[j * 2];
-                chainVertices.push_back(currentVertex);
-                chain.push_back( subEdges[j] );
-                markedEdge[j] = -1;  // reversed
-                break;               // break the j loop
-            }
-        }
-    }
-    if( (int)chain.size() == numEdges && currentVertex == endVertex )
-    {
-        subEdges = chain;  // reordered list, no orientation saved; maybe we should ?
-        // from chain, form the list of original polygons that contain each subedge
-        // get the parent tag of 2 intx polys connected to each edge in chain
-        for (int j=0; j<(int)chain.size(); j++)
-        {
-            EntityHandle sEdge = chain[j];
-            std::vector<EntityHandle> intxPolys;
-            ErrorCode rval = mb->get_adjacencies(&sEdge, 1, 2, false, intxPolys, Interface::UNION);MB_CHK_ERR( rval );
-            EntityHandle onePolygon=intxPolys[0];
-            int global_id = 0;
-            rval = mb->tag_get_data(otherParentTag, &onePolygon, 1, &global_id);MB_CHK_ERR( rval );
-            polygonIds.push_back(global_id);
-        }
-        return MB_SUCCESS;
-    }
-    else
-        return MB_FAILURE;  // we did not find a chain, do not change anything
-}
 
 void IntxUtils::transform_coordinates( double* avg_position, int projection_type )
 {

@@ -563,8 +563,8 @@ AC_DEFUN([FAC_FC_NAME_MANGLING],
 AC_CACHE_CHECK([for Fortran name-mangling scheme],
                ac_cv_[]_AC_LANG_ABBREV[]_mangling,
 [
-  blas_symbol_var=""
-  lapack_symbol_var=""
+  blas_symbol_var="dgemm_"
+  lapack_symbol_var="cheev_"
 
   AC_COMPILE_IFELSE(
   [      subroutine foobar()
@@ -688,7 +688,9 @@ case $ac_cv_[]_AC_LANG_ABBREV[]_mangling in
           AC_DEFINE(_AC_FC[_FUNC(name,NAME)],  [NAME ## _])
           AC_DEFINE(_AC_FC[_FUNC_(name,NAME)], [NAME ## __]) ;;
   *)
-          AC_MSG_WARN([unknown Fortran name-mangling scheme])
+          AC_MSG_WARN([unknown Fortran name-mangling scheme. Assuming defaults.])
+          AC_DEFINE(_AC_FC[_FUNC(name,NAME)],  [name ## _])
+          AC_DEFINE(_AC_FC[_FUNC_(name,NAME)], [name ## _])
           ;;
 esac
 AC_LANG_POP([Fortran])
@@ -1286,5 +1288,6 @@ fi
 ])
 dnl
 dnl
+
 
 

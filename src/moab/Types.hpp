@@ -88,9 +88,14 @@ enum MOAB_EXPORT DataType
 {
     MB_TYPE_OPAQUE   = 0, /**< byte array */
     MB_TYPE_INTEGER  = 1, /**< native 'int' type */
-    MB_TYPE_DOUBLE   = 2, /**< native 'double' type */
-    MB_TYPE_BIT      = 3, /**< mandatory type for tags with MB_TAG_BIT storage */
-    MB_TYPE_HANDLE   = 4, /**< EntityHandle */
+    MB_TYPE_UNSIGNED_INTEGER  = 2, /**< native 'int' type */
+    MB_TYPE_LONG      = 3, /**< native 'long' type */
+    MB_TYPE_UNSIGNED_LONG = 4, /**< native 'unsigned long' type */
+    MB_TYPE_UNSIGNED_LONG_LONG = 5, /**< native 'unsigned long' type */
+    MB_TYPE_FLOAT    = 6, /**< native 'float' type */
+    MB_TYPE_DOUBLE   = 7, /**< native 'double' type */
+    MB_TYPE_BIT      = 8, /**< mandatory type for tags with MB_TAG_BIT storage */
+    MB_TYPE_HANDLE   = 9, /**< EntityHandle */
     MB_MAX_DATA_TYPE = MB_TYPE_HANDLE
 };
 

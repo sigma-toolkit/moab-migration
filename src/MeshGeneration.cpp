@@ -117,8 +117,7 @@ ErrorCode MeshGeneration::BrickInstance( MeshGeneration::BrickOpts& opts )
     ReadUtilIface* iface;
     ErrorCode rval = mb->query_interface( iface );MB_CHK_SET_ERR( rval, "Can't get reader interface" );
 
-    Tag global_id_tag;
-    rval = mb->tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, global_id_tag );MB_CHK_SET_ERR( rval, "Can't get global id tag" );
+    Tag global_id_tag = mb->globalId_tag();
 
     // set global ids
     Tag new_id_tag;

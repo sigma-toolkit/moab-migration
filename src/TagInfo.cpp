@@ -27,9 +27,33 @@ TagInfo::~TagInfo()
     mDefaultValueSize = 0;
 }
 
+// enum MOAB_EXPORT DataType
+// {
+//     MB_TYPE_OPAQUE   = 0, /**< byte array */
+//     MB_TYPE_INTEGER  = 1, /**< native 'int' type */
+//     MB_TYPE_UNSIGNED_INTEGER  = 2, /**< native 'int' type */
+//     MB_TYPE_LONG = 3, /**< native 'long' type */
+//     MB_TYPE_UNSIGNED_LONG = 4, /**< native 'unsigned long' type */
+//     MB_TYPE_UNSIGNED_LONG_LONG = 5, /**< native 'unsigned long' type */
+//     MB_TYPE_FLOAT    = 6, /**< native 'float' type */
+//     MB_TYPE_DOUBLE   = 7, /**< native 'double' type */
+//     MB_TYPE_BIT      = 8, /**< mandatory type for tags with MB_TAG_BIT storage */
+//     MB_TYPE_HANDLE   = 8, /**< EntityHandle */
+//     MB_MAX_DATA_TYPE = MB_TYPE_HANDLE
+// };
 int TagInfo::size_from_data_type( DataType t )
 {
-    static const int sizes[] = { 1, sizeof( int ), sizeof( double ), 1, sizeof( EntityHandle ), 0 };
+    static const int sizes[] = { 1,  // MB_TYPE_OPAQUE
+                                sizeof( int ), // MB_TYPE_INTEGER
+                                sizeof( unsigned int ), // MB_TYPE_UNSIGNED_INTEGER
+                                sizeof( long ), // MB_TYPE_LONG
+                                sizeof( unsigned long ), // MB_TYPE_UNSIGNED_LONG
+                                sizeof( unsigned long long ), // MB_TYPE_UNSIGNED_LONG_LONG
+                                sizeof( float ), // MB_TYPE_FLOAT
+                                sizeof( double ), // MB_TYPE_DOUBLE
+                                1, // MB_TYPE_BIT
+                                sizeof( EntityHandle ), // MB_TYPE_HANDLE
+                                0 };
     return sizes[t];
 }
 

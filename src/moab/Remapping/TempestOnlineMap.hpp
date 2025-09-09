@@ -248,7 +248,7 @@ class TempestOnlineMap : public OfflineMap
     ///     needed for projections.
     ///	</summary>
 #ifdef MOAB_HAVE_EIGEN3
-    void copy_tempest_sparsemat_to_eigen3();
+    moab::ErrorCode copy_tempest_sparsemat_to_eigen3(bool perform_reduction = false);
 #endif
 
     ///	<summary>
@@ -517,6 +517,9 @@ class TempestOnlineMap : public OfflineMap
     WeightMatrix m_weightMatrix;
     WeightRowVector m_rowVector;
     WeightColVector m_colVector;
+    
+    // Store triplets for sparse matrix construction and distributed reduction
+    std::vector<Eigen::Triplet<double>> local_triplets;
 
 #endif
 

@@ -28,6 +28,8 @@
 #endif
 
 #ifdef MOAB_HAVE_PNETCDF
+
+// Parallel NetCDF wrappers
 #include "pnetcdf.h"
 #define NCFUNC( func ) ncmpi_##func
 
@@ -42,13 +44,17 @@
 
 #define NCDF_SIZE MPI_Offset
 #define NCDF_DIFF MPI_Offset
+
 #else
+
+// Serial NetCDF wrappers
 #include "netcdf.h"
 #define NCFUNC( func )   nc_##func
 #define NCFUNCAG( func ) nc_get##func
 #define NCFUNCG( func )  nc_get##func
 #define NCDF_SIZE        size_t
 #define NCDF_DIFF        ptrdiff_t
+
 #endif
 
 namespace moab
@@ -72,6 +78,7 @@ class ReadNC : public ReaderIface
     friend class NCHelperMPAS;
     friend class NCHelperESMF;
     friend class NCHelperGCRM;
+    friend class NCHelperTOPO;
 
   public:
     static ReaderIface* factory( Interface* );
@@ -86,7 +93,8 @@ class ReadNC : public ReaderIface
         NC_FORMAT_HOMME        = 5,
         NC_FORMAT_GCRM         = 6,
         NC_FORMAT_EULER        = 7,
-        NC_FORMAT_FV           = 8
+        NC_FORMAT_FV           = 8,
+        NC_FORMAT_TOPO         = 9
     };
 
     //! Load an NC file

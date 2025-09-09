@@ -28,6 +28,7 @@
 #include "DebugOutput.hpp"
 #include "moab/nanoflann.hpp"
 #include "moab/Remapping/TempestOnlineMap.hpp"
+#include "moab/Skinner.hpp"
 #include "moab/TupleList.hpp"
 #include "moab/IntxMesh/IntxUtils.hpp"
 #include "moab/MeshTopoUtil.hpp"
@@ -306,9 +307,659 @@ void moab::TempestOnlineMap::PrintMapStatistics()
 #endif
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 #ifdef MOAB_HAVE_EIGEN3
-void moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3()
+
+struct CommunicationPattern {
+    std::map<int, std::vector<int>> send_map; // rank -> [global_rows]
+    std::map<int, std::vector<int>> recv_map; // rank -> [global_rows]
+};
+
+/**
+ * @brief Determines the communication pattern based on the distribution of sparse matrix rows across MPI ranks.
+ *
+ * This function discovers which ranks share common global row indices in a distributed sparse matrix.
+ * It constructs a symmetric communication pattern where if rank A sends data for a row to rank B, rank B
+ * also sends its data for the same row to rank A. This pattern is essential for performing collective
+ * operations like distributed reductions.
+ *
+ * The algorithm proceeds as follows:
+ * 1. Each rank identifies its unique set of local row indices.
+ * 2. `MPI_Allgather` is used to collect the number of rows from each rank.
+ * 3. `MPI_Allgatherv` gathers all row indices from all ranks into a single buffer on every process.
+ *    This gives every rank a complete picture of the row distribution.
+ * 4. From this global information, each rank builds a map (`all_row_sharers`) that lists, for each
+ *    global row index, the set of ranks that hold data for that row.
+ * 5. Using the `all_row_sharers` map, each rank constructs its `CommunicationPattern`, populating the
+ *    send and receive maps. If a rank shares a row with other ranks, it adds that row to its send/receive
+ *    lists for each of those other ranks.
+ * 6. The send/receive lists are sorted and made unique for consistency.
+ *
+ * @param pcomm A pointer to the MOAB ParallelComm object for MPI communication.
+ * @param local_matrix_data The local sparse matrix data for the current rank.
+ * @param comm_pattern [out] The communication pattern to be filled.
+ * @param all_row_sharers [out] A map where the key is the global row index and the value is the set of ranks sharing that row.
+ * @return moab::ErrorCode Returns MB_SUCCESS on success.
+ */
+static moab::ErrorCode determine_communication_pattern(
+    moab::ParallelComm* pcomm,
+    const std::vector<Eigen::Triplet<double>>& local_triplets,
+    const std::vector<unsigned int>& row_gdofmap,
+    CommunicationPattern& comm_pattern,
+    std::map<int, std::set<int>>& all_row_sharers)
 {
+    int rank = pcomm->rank();
+    int size = pcomm->size();
+    MPI_Comm comm = pcomm->comm();
+
+    // Step 1: Each rank identifies its unique global row DOF IDs from its triplets.
+    std::set<int> global_rows_set;
+    for (const auto& triplet : local_triplets) {
+        // Convert local row index to global DOF ID using row_gdofmap
+        int global_row_id = row_gdofmap[triplet.row()];
+        global_rows_set.insert(global_row_id);
+    }
+    std::vector<int> local_rows(global_rows_set.begin(), global_rows_set.end());
+
+    // Step 2: Gather the number of rows from each rank.
+    int local_row_count = local_rows.size();
+    std::vector<int> all_row_counts(size);
+    MPI_Allgather(&local_row_count, 1, MPI_INT, all_row_counts.data(), 1, MPI_INT, comm);
+
+    // Step 3: Gather all row indices from all ranks (Allgatherv).
+    std::vector<int> all_rows_buffer;
+    std::vector<int> displacements(size);
+    int total_rows_gathered = 0;
+    for (int i = 0; i < size; ++i) {
+        displacements[i] = total_rows_gathered;
+        total_rows_gathered += all_row_counts[i];
+    }
+    all_rows_buffer.resize(total_rows_gathered);
+
+    MPI_Allgatherv(local_rows.data(), local_row_count, MPI_INT,
+                   all_rows_buffer.data(), all_row_counts.data(), displacements.data(),
+                   MPI_INT, comm);
+
+    // Step 4: Build the global row sharing map on every rank.
+    all_row_sharers.clear();
+    int current_pos = 0;
+    for (int i = 0; i < size; ++i) {
+        for (int j = 0; j < all_row_counts[i]; ++j) {
+            int global_row = all_rows_buffer[current_pos++];
+            all_row_sharers[global_row].insert(i);
+        }
+    }
+
+    // Step 5: Build the symmetric communication pattern.
+    comm_pattern.send_map.clear();
+    comm_pattern.recv_map.clear();
+
+    for (const auto& pair : all_row_sharers) {
+        int global_row = pair.first;
+        const std::set<int>& sharers = pair.second;
+
+        if (sharers.size() > 1 && sharers.count(rank)) {
+            // If this rank is a sharer, it needs to communicate with all other sharers.
+            for (int other_rank : sharers) {
+                if (other_rank != rank) {
+                    comm_pattern.send_map[other_rank].push_back(global_row);
+                    comm_pattern.recv_map[other_rank].push_back(global_row);
+                }
+            }
+        }
+    }
+
+    // Ensure send/recv lists are sorted and unique, which is good practice.
+    for (auto& pair : comm_pattern.send_map) {
+        std::sort(pair.second.begin(), pair.second.end());
+        pair.second.erase(std::unique(pair.second.begin(), pair.second.end()), pair.second.end());
+    }
+    for (auto& pair : comm_pattern.recv_map) {
+        std::sort(pair.second.begin(), pair.second.end());
+        pair.second.erase(std::unique(pair.second.begin(), pair.second.end()), pair.second.end());
+    }
+
+    return moab::MB_SUCCESS;
+}
+
+/**
+ * @brief Performs an in-place distributed reduction (summation) on shared rows of a sparse matrix.
+ *
+ * This function updates the `local_matrix_data` directly, summing the values of shared rows from
+ * different MPI ranks without requiring a separate output matrix. This approach minimizes memory usage.
+ * The process ensures that after the reduction, all ranks that share a particular row have the same
+ * final, summed values for that row, while non-shared rows remain untouched.
+ *
+ * The reduction is performed using a two-stage communication strategy to avoid deadlocks and ensure correctness:
+ *
+ * Stage 1: Reduction to Owner
+ * - For each shared row, a single "owner" rank is determined (here, the lowest-ranking sharer).
+ * - All other ranks that share the row send their local data for that row to the owner.
+ * - The owner rank receives the data from all other sharers and adds their contributions to its own local values.
+ * - This stage uses non-blocking sends and receives (`MPI_Isend`/`MPI_Irecv`) with `MPI_Probe` to handle variable message sizes.
+ *
+ * Stage 2: Broadcast from Owner
+ * - The owner rank, which now holds the final, fully reduced row, sends this complete row back to all the other ranks that share it.
+ * - The non-owning ranks receive this final version.
+ * - To update their local matrix, non-owning ranks first clear their existing row (`*= 0`) and then insert the final, correct values received from the owner.
+ * - A different MPI tag is used for the broadcast to distinguish it from the reduction messages.
+ *
+ * @param pcomm A pointer to the MOAB ParallelComm object.
+ * @param comm_pattern The pre-determined communication pattern indicating who to send to and receive from.
+ * @param all_row_sharers A map detailing which ranks share each global row.
+ * @param local_triplets [in, out] The local sparse matrix, which will be modified in-place.
+ * @return moab::ErrorCode Returns MB_SUCCESS on success.
+ */
+static moab::ErrorCode perform_distributed_reduction(
+    moab::ParallelComm* pcomm,
+    const std::map<int, int>& rowMap,
+    const std::map<int, int>& colMap,
+    const std::vector<unsigned int>& row_gdofmap,
+    const std::vector<unsigned int>& col_gdofmap,
+    const std::map<int, std::set<int>>& all_row_sharers,
+    std::vector<Eigen::Triplet<double>>& local_triplets)
+{
+    int rank = pcomm->rank();
+    MPI_Comm comm = pcomm->comm();
+
+    if (rank == 0) {
+        std::cout << "TempestLinearRemap:: Performing distributed reduction on shared rows." << std::endl;
+    }
+
+    // Communication happens in two stages: reduction to an owner, then broadcast from the owner.
+
+    // Determine owner for each shared row (simplistic: lowest rank is owner).
+    std::map<int, int> row_owners;
+    for (const auto& pair : all_row_sharers) {
+        if (!pair.second.empty()) {
+            row_owners[pair.first] = *pair.second.begin();
+        }
+    }
+
+    return moab::MB_SUCCESS;
+
+    // Calculate a globally consistent tag offset for the broadcast stage.
+    // This prevents tag collisions between the reduction and broadcast stages.
+    int local_max_row = 0;
+    for (const auto& triplet : local_triplets) {
+        int global_row = rowMap.at(triplet.row());
+        if (global_row > local_max_row) {
+            local_max_row = global_row;
+        }
+    }
+
+    int global_max_row = 0;
+    MPI_Allreduce(&local_max_row, &global_max_row, 1, MPI_INT, MPI_MAX, comm);
+    int tag_offset = global_max_row + 1;
+
+    // Stage 1: Reduction - Non-owners send their row data to the owner rank.
+    std::vector<MPI_Request> reduce_requests;
+    std::map<int, std::vector<char>> reduce_recv_buffers; // Owners receive into these
+
+    for (const auto& pair : all_row_sharers) {
+        int global_row = pair.first;
+        const auto& sharers = pair.second;
+        int owner_rank = row_owners[global_row];
+
+        if (sharers.count(rank)) { // If this rank has the row
+            if (rank == owner_rank) {
+                // Owner posts receives for this row from all other sharers.
+                for (int other_rank : sharers) {
+                    if (other_rank != rank) {
+                        // For simplicity, probe for size. In a real scenario, sizes would be exchanged first.
+                        MPI_Status status;
+                        MPI_Probe(other_rank, global_row, comm, &status);
+                        int recv_bytes;
+                        MPI_Get_count(&status, MPI_BYTE, &recv_bytes);
+
+                        reduce_recv_buffers[global_row].resize(recv_bytes);
+                        MPI_Request req;
+                        MPI_Irecv(reduce_recv_buffers[global_row].data(), recv_bytes, MPI_BYTE, other_rank, global_row, comm, &req);
+                        reduce_requests.push_back(req);
+                    }
+                }
+            } else {
+                // Non-owner sends its data for this row to the owner.
+                std::vector<Eigen::Triplet<double>> triplets_to_send;
+                for (const auto& triplet : local_triplets) {
+                    // Check if this triplet's global row DOF ID matches the shared row
+                    if (row_gdofmap[triplet.row()] == global_row) {
+                        triplets_to_send.emplace_back(row_gdofmap[triplet.row()], col_gdofmap[triplet.col()], triplet.value());
+                    }
+                }
+                if (!triplets_to_send.empty()) {
+                    // Convert to global DOF IDs before sending
+                    std::vector<Eigen::Triplet<double>> triplets_to_send_global;
+                    triplets_to_send_global.reserve(triplets_to_send.size());
+                    for (const auto& triplet : triplets_to_send) {
+                        triplets_to_send_global.emplace_back(row_gdofmap[triplet.row()], col_gdofmap[triplet.col()], triplet.value());
+                    }
+
+                    MPI_Request req;
+                    MPI_Isend(triplets_to_send_global.data(), triplets_to_send_global.size() * sizeof(Eigen::Triplet<double>),
+                              MPI_BYTE, owner_rank, global_row, comm, &req);
+                    reduce_requests.push_back(req);
+                }
+            }
+        }
+    }
+
+    if (!reduce_requests.empty()) {
+        MPI_Waitall(reduce_requests.size(), reduce_requests.data(), MPI_STATUSES_IGNORE);
+    }
+
+    // Owners perform the reduction.
+    if (reduce_recv_buffers.size() > 0) {
+        for (const auto& pair : reduce_recv_buffers) {
+            int global_row = pair.first;
+            const std::vector<char>& recv_buffer = pair.second;
+            const Eigen::Triplet<double>* received_triplets = reinterpret_cast<const Eigen::Triplet<double>*>(recv_buffer.data());
+            int num_triplets = recv_buffer.size() / sizeof(Eigen::Triplet<double>);
+
+            for (int i = 0; i < num_triplets; ++i) {
+                const Eigen::Triplet<double>& global_triplet = received_triplets[i];
+                auto row_it = rowMap.find(global_triplet.row());
+                auto col_it = colMap.find(global_triplet.col());
+
+                if (row_it != rowMap.end() && col_it != colMap.end()) {
+                    int lRow = row_it->second;
+                    int lCol = col_it->second;
+                    double value = global_triplet.value();
+
+                    // Find existing triplet and add to it, or create new one
+                    bool found = false;
+                    for (auto& local_triplet : local_triplets) {
+                        if (local_triplet.row() == lRow && local_triplet.col() == lCol) {
+                            const_cast<double&>(local_triplet.value()) += value;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        local_triplets.emplace_back(lRow, lCol, value);
+                    }
+                } else {
+                    std::cout << "Warning: Rank " << rank << " received global DOF IDs ("
+                              << global_triplet.row() << ", " << global_triplet.col()
+                              << ") that are not found in local maps. Skipping." << std::endl;
+                }
+            }
+        }
+    }
+
+    // Stage 2: Broadcast - Owners send the final reduced row to all non-owning sharers.
+    std::vector<MPI_Request> bcast_requests;
+    std::map<int, std::vector<Eigen::Triplet<double>>> bcast_recv_buffers; // Non-owners receive into these
+
+    for (const auto& pair : all_row_sharers) {
+        int global_row = pair.first;
+        const auto& sharers = pair.second;
+        int owner_rank = row_owners[global_row];
+
+        if (sharers.count(rank)) {
+            if (rank == owner_rank) {
+                // Owner sends the final row to other sharers.
+                std::vector<Eigen::Triplet<double>> send_buffer;
+                for (const auto& triplet : local_triplets) {
+                    // Check if this triplet's global row DOF ID matches the shared row
+                    if (row_gdofmap[triplet.row()] == global_row) {
+                        send_buffer.push_back(triplet);
+                    }
+                }
+                // Convert to global DOF IDs before broadcasting
+                std::vector<Eigen::Triplet<double>> triplets_for_bcast_global;
+                triplets_for_bcast_global.reserve(send_buffer.size());
+                for (const auto& triplet : send_buffer) {
+                    triplets_for_bcast_global.emplace_back(row_gdofmap[triplet.row()], col_gdofmap[triplet.col()], triplet.value());
+                }
+                for (int other_rank : sharers) {
+                    if (other_rank != rank) {
+                        MPI_Request req;
+                        MPI_Isend(triplets_for_bcast_global.data(), triplets_for_bcast_global.size() * sizeof(Eigen::Triplet<double>),
+                                  MPI_BYTE, other_rank, global_row + tag_offset, comm, &req);
+                        bcast_requests.push_back(req);
+                    }
+                }
+            } else {
+                // Non-owner receives the final row from the owner.
+                MPI_Status status;
+                MPI_Probe(owner_rank, global_row + tag_offset, comm, &status);
+                int recv_bytes;
+                MPI_Get_count(&status, MPI_BYTE, &recv_bytes);
+                int recv_count = recv_bytes / sizeof(Eigen::Triplet<double>);
+                bcast_recv_buffers[global_row].resize(recv_count);
+                MPI_Request req;
+                MPI_Irecv(bcast_recv_buffers[global_row].data(), recv_bytes, MPI_BYTE, owner_rank, global_row + tag_offset, comm, &req);
+                bcast_requests.push_back(req);
+            }
+        }
+    }
+
+    if (!bcast_requests.empty()) {
+        MPI_Waitall(bcast_requests.size(), bcast_requests.data(), MPI_STATUSES_IGNORE);
+    }
+
+    // Non-owners update their matrix with the final, reduced row data.
+    if (!bcast_recv_buffers.empty()) {
+        // First, create a set of all rows that this rank will receive from owners.
+        std::set<int> shared_rows_to_update;
+        for (const auto& pair : bcast_recv_buffers) {
+            shared_rows_to_update.insert(pair.first);
+        }
+
+        // Remove all existing triplets for these shared rows (using global DOF IDs).
+        local_triplets.erase(
+            std::remove_if(local_triplets.begin(), local_triplets.end(),
+                [&](const Eigen::Triplet<double>& t) {
+                    int global_row_id = row_gdofmap[t.row()];
+                    return shared_rows_to_update.count(global_row_id);
+                }),
+            local_triplets.end());
+
+        // Now, add the final, authoritative triplets received from the owners.
+        for (const auto& pair : bcast_recv_buffers) {
+            const auto& received_triplets = pair.second;
+            for (const auto& global_triplet : received_triplets) {
+                auto row_it = rowMap.find(global_triplet.row());
+                auto col_it = colMap.find(global_triplet.col());
+
+                if (row_it != rowMap.end() && col_it != colMap.end()) {
+                    local_triplets.emplace_back(row_it->second, col_it->second, global_triplet.value());
+                } else {
+                    std::cout << "Warning: Rank " << rank << " received global DOF IDs ("
+                              << global_triplet.row() << ", " << global_triplet.col()
+                              << ") that are not found in local maps. Skipping." << std::endl;
+                }
+            }
+        }
+    }
+
+    return moab::MB_SUCCESS;
+}
+
+
+/**
+ * @brief Determines a communication pattern based on shared Degrees of Freedom (DoFs) from MOAB mesh tags.
+ *
+ * This function inspects the mesh geometry and connectivity data stored in MOAB to figure out which
+ * DoFs are shared across MPI partition boundaries. It is an alternative to `determine_communication_pattern`
+ * when the sharing information is derived from the mesh topology rather than an already-existing matrix.
+ *
+ * The workflow is as follows:
+ * 1. Identify geometric entities (e.g., edges) on the partition boundaries using `pcomm->get_shared_entities`.
+ * 2. For each shared entity, retrieve the associated DoF IDs from the provided MOAB `dof_tag`.
+ * 3. A preliminary, potentially non-symmetric map of shared DoFs is created (`rank_to_dofs`).
+ * 4. A two-phase, non-blocking MPI exchange is performed to symmetrize this map:
+ *    a. First, ranks exchange the *number* of DoFs they will send to each neighbor.
+ *    b. Second, they exchange the actual DoF IDs.
+ * 5. Each rank computes the intersection of the DoFs it sent and the DoFs it received from each neighbor.
+ *    This intersection represents the truly shared DoFs, creating a symmetric pattern.
+ * 6. The final, symmetric `CommunicationPattern` and the `all_dof_sharers` map are constructed from this intersection.
+ *
+ * @param pcomm A pointer to the MOAB ParallelComm object.
+ * @param tag_name The name of the MOAB tag containing the DoF data (used for logging).
+ * @param dof_tag The MOAB handle for the DoF tag.
+ * @param comm_pattern [out] The resulting symmetric communication pattern.
+ * @param all_dof_sharers [out] A map detailing which ranks share each DoF.
+ * @return moab::ErrorCode Returns MB_SUCCESS on success.
+ */
+moab::ErrorCode determine_communication_pattern_from_tag(
+    moab::ParallelComm* pcomm,
+    const char* tag_name,
+    moab::Tag dof_tag,
+    CommunicationPattern& comm_pattern,
+    std::map<int, std::set<int>>& all_dof_sharers)
+{
+    moab::ErrorCode rval;
+    moab::Interface* mb = pcomm->get_moab();
+    int rank = pcomm->rank();
+    int size = pcomm->size();
+    MPI_Comm comm = pcomm->comm();
+
+    // Clear output parameters
+    comm_pattern.send_map.clear();
+    comm_pattern.recv_map.clear();
+    all_dof_sharers.clear();
+
+    std::cout << "Rank " << rank << ": Starting communication pattern detection for tag '" << tag_name << "'" << std::endl;
+
+    // Get all elements
+    moab::Range elems;
+    rval = mb->get_entities_by_dimension(0, 2, elems); // Assuming 2D elements
+    if (rval != moab::MB_SUCCESS) return rval;
+    std::cout << "Rank " << rank << ": Found " << elems.size() << " elements" << std::endl;
+
+    // Get shared entities and their sharing ranks
+    moab::Range shared_ents_edge;
+    rval = pcomm->get_shared_entities(-1, shared_ents_edge, 1, true, false); // Check dimension 1 (edges)
+    if (rval != moab::MB_SUCCESS) {
+        std::cerr << "Rank " << rank << ": Error getting shared entities" << std::endl;
+        return rval;
+    }
+    std::cout << "Rank " << rank << ": Found " << shared_ents_edge.size() << " interface edges" << std::endl;
+    moab::Range shared_ents;
+    rval = mb->get_adjacencies(shared_ents_edge, 2, true, shared_ents, moab::Interface::UNION); // Check dimension 1 (edges)
+    if (rval != moab::MB_SUCCESS) {
+        std::cerr << "Rank " << rank << ": Error getting shared entities" << std::endl;
+        return rval;
+    }
+
+    // Get skin entities (boundary)
+    moab::Skinner skinner(mb);
+    moab::Range skin_ents;
+    rval = skinner.find_skin(0, elems, false, skin_ents, nullptr, true, true);
+    if (rval != moab::MB_SUCCESS) {
+        std::cerr << "Rank " << rank << ": Error finding skin" << std::endl;
+        return rval;
+    }
+    std::cout << "Rank " << rank << ": Found " << skin_ents.size() << " skin entities" << std::endl;
+
+    // Find shared skin entities (on partition boundaries)
+    // moab::Range shared_skin = moab::intersect(skin_ents, shared_ents);
+    moab::Range shared_skin = shared_ents;
+    std::cout << "Rank " << rank << ": Found " << shared_skin.size()
+              << " shared skin entities (partition boundaries)" << std::endl;
+
+    // First, collect all DoFs on the interface for each adjacent rank
+    std::map<int, std::set<int>> rank_to_dofs;  // Maps rank to set of DoFs on interface
+
+    std::set< unsigned int > neighbor_procs;
+    rval = pcomm->get_interface_procs(neighbor_procs);
+
+    // Debug: Print neighbor procs and initialize rank_to_dofs
+    std::cout << "Rank " << rank << ": Found " << neighbor_procs.size() << " neighbor processes" << std::endl;
+    {
+        std::ostringstream oss;
+        oss << "Identified neighbor procs: ";
+        for (int p : neighbor_procs) oss << p << " ";
+        std::cout << oss.str() << std::endl;
+    }
+    for (int np : neighbor_procs) {
+        // std::cout << "Rank " << rank << ": Neighbor rank " << np << std::endl;
+        // Initialize map entry for each neighbor
+        rank_to_dofs[np] = std::set<int>();
+    }
+
+    // For each shared skin entity, get its adjacent elements and their DoFs
+    std::cout << "Rank " << rank << ": Processing " << shared_skin.size() << " shared skin entities" << std::endl;
+    for (moab::Range::iterator it = shared_skin.begin(); it != shared_skin.end(); ++it) {
+        moab::EntityHandle elem = *it;
+
+        // Get DoF numbers for this element (16 DoFs per element)
+        std::vector<int> dof_numbers(16);
+        rval = mb->tag_get_data(dof_tag, &elem, 1, dof_numbers.data());
+        if (rval != moab::MB_SUCCESS) {
+            std::cerr << "Rank " << rank << ": Failed to get DOF data for element " << elem << std::endl;
+            return rval;
+        }
+
+        // Verify DOF numbers are valid
+        for (int i = 0; i < 16; ++i) {
+            if (dof_numbers[i] < 0) {
+                std::cerr << "Rank " << rank << ": Invalid DOF number " << dof_numbers[i]
+                         << " at index " << i << " for element " << elem << std::endl;
+                return moab::MB_FAILURE;
+            }
+        }
+
+        // For each element, get its DoF numbers
+        moab::Range shared_edges;
+        rval = mb->get_adjacencies(&elem, 1, 1, false, shared_edges, moab::Interface::UNION); // Check dimension 1 (edges)
+        if (rval != moab::MB_SUCCESS) {
+            std::cerr << "Rank " << rank << ": Error getting shared entities" << std::endl;
+            return rval;
+        }
+        // Get sharing ranks for this element
+        std::set<int> sharing_ranks_set;
+        rval = pcomm->get_sharing_data(shared_edges, sharing_ranks_set, moab::Interface::UNION);
+        if (rval != moab::MB_SUCCESS) {
+            std::cerr << "Rank " << rank << ": Failed to get sharing data for element " << elem << std::endl;
+            return rval;
+        }
+
+        // Add current rank to sharing set for this element
+        sharing_ranks_set.insert(rank);
+
+        // Debug: Print sharing information
+        if (sharing_ranks_set.size() > 1) {  // Only print if shared with other ranks
+            // std::cout << "Rank " << rank << ": Element " << elem << " is shared with ranks: ";
+            // for (int r : sharing_ranks_set) std::cout << r << " ";
+            // std::cout << "(DOFs: ";
+            // for (int i = 0; i < 16; ++i) std::cout << dof_numbers[i] << " ";
+            // std::cout << ")" << std::endl;
+
+            // Add DOFs to rank_to_dofs for each sharing rank
+            for (int other_rank : sharing_ranks_set) {
+                if (other_rank != rank) {
+                    for (int i = 0; i < 16; ++i) {
+                        rank_to_dofs[other_rank].insert(dof_numbers[i]);
+                    }
+                }
+            }
+        }
+
+        // Convert to vector and add current rank
+        std::vector<int> sharing_ranks(sharing_ranks_set.begin(), sharing_ranks_set.end());
+
+        // Add this processor to sharing ranks
+        sharing_ranks.push_back(rank);
+        std::sort(sharing_ranks.begin(), sharing_ranks.end());
+        sharing_ranks.erase(std::unique(sharing_ranks.begin(), sharing_ranks.end()),
+                            sharing_ranks.end());
+
+        // For each sharing rank, add these DoFs to their interface set
+        for (int other_rank : sharing_ranks) {
+            if (other_rank != rank) {
+                for (int j = 0; j < 16; ++j) {
+                    rank_to_dofs[other_rank].insert(dof_numbers[j]);
+                }
+            }
+        }
+    }
+
+    // Symmetrize the communication pattern in two phases to avoid deadlock.
+
+    // Phase 1: Exchange the number of DOFs to be sent.
+    std::map<int, int> incoming_sizes;
+    std::vector<MPI_Request> size_requests;
+
+    for (int neighbor : neighbor_procs) {
+        if (neighbor == rank) continue;
+        // Post receive for the size of the neighbor's DOF list.
+        size_requests.push_back(MPI_REQUEST_NULL);
+        MPI_Irecv(&incoming_sizes[neighbor], 1, MPI_INT, neighbor, 0, comm, &size_requests.back());
+    }
+
+    for (int neighbor : neighbor_procs) {
+        if (neighbor == rank) continue;
+        // Post send for the size of our DOF list for that neighbor.
+        int send_size = rank_to_dofs[neighbor].size();
+        size_requests.push_back(MPI_REQUEST_NULL);
+        MPI_Isend(&send_size, 1, MPI_INT, neighbor, 0, comm, &size_requests.back());
+    }
+
+    // Wait for all size exchanges to complete.
+    if (!size_requests.empty()) {
+        MPI_Waitall(size_requests.size(), size_requests.data(), MPI_STATUSES_IGNORE);
+    }
+
+    // Phase 2: Exchange the actual DOF data.
+    std::map<int, std::vector<int>> received_dofs;
+    std::vector<MPI_Request> data_requests;
+
+    for (int neighbor : neighbor_procs) {
+        if (neighbor == rank) continue;
+        // Post receive for the actual DOF list.
+        if (incoming_sizes[neighbor] > 0) {
+            received_dofs[neighbor].resize(incoming_sizes[neighbor]);
+            data_requests.push_back(MPI_REQUEST_NULL);
+            MPI_Irecv(received_dofs[neighbor].data(), incoming_sizes[neighbor], MPI_INT, neighbor, 1, comm, &data_requests.back());
+        }
+    }
+
+    for (int neighbor : neighbor_procs) {
+        if (neighbor == rank) continue;
+        // Post send for our DOF list.
+        if (!rank_to_dofs[neighbor].empty()) {
+            std::vector<int> dofs_to_send(rank_to_dofs[neighbor].begin(), rank_to_dofs[neighbor].end());
+            data_requests.push_back(MPI_REQUEST_NULL);
+            MPI_Isend(dofs_to_send.data(), dofs_to_send.size(), MPI_INT, neighbor, 1, comm, &data_requests.back());
+        }
+    }
+
+    // Wait for all data exchanges to complete.
+    if (!data_requests.empty()) {
+        MPI_Waitall(data_requests.size(), data_requests.data(), MPI_STATUSES_IGNORE);
+    }
+
+    // Now, compute the intersection to get the symmetric communication pattern
+    std::map<int, std::set<int>> final_rank_to_dofs;
+    for (int neighbor : neighbor_procs) {
+        if (neighbor == rank) continue;
+
+        std::set<int> local_dofs = rank_to_dofs[neighbor];
+        std::set<int> remote_dofs(received_dofs[neighbor].begin(), received_dofs[neighbor].end());
+
+        std::set<int> intersection;
+        std::set_intersection(local_dofs.begin(), local_dofs.end(),
+                              remote_dofs.begin(), remote_dofs.end(),
+                              std::inserter(intersection, intersection.begin()));
+
+        final_rank_to_dofs[neighbor] = intersection;
+    }
+    rank_to_dofs = final_rank_to_dofs; // Replace with the symmetrized map
+
+    // Finally, build the communication pattern and all_dof_sharers map from the
+    // now-symmetric rank_to_dofs map.
+    for (const auto& pair : rank_to_dofs) {
+        int other_rank = pair.first;
+        const std::set<int>& dofs = pair.second;
+
+        if (!dofs.empty()) {
+            // We send these DOFs to the other rank
+            comm_pattern.send_map[other_rank].assign(dofs.begin(), dofs.end());
+
+            // Symmetrically, we will receive the same DOFs from that rank
+            comm_pattern.recv_map[other_rank].assign(dofs.begin(), dofs.end());
+        }
+
+        // Update the global list of sharers for each DOF
+        for (int dof : dofs) {
+            all_dof_sharers[dof].insert(rank);
+            all_dof_sharers[dof].insert(other_rank);
+        }
+    }
+
+
+    return moab::MB_SUCCESS;
+}
+
+moab::ErrorCode moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3(bool perform_reduction)
+{
+    // std::cout << "copy_tempest_sparsemat_to_eigen3\n";
+    // std::cout << "m_weightMatrix.rows() = " << m_weightMatrix.rows() << "\n";
+    // std::cout << "m_weightMatrix.cols() = " << m_weightMatrix.cols() << "\n";
 #ifndef VERBOSE
 #define VERBOSE_ACTIVATED
 // #define VERBOSE
@@ -327,21 +978,53 @@ void moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3()
     // assert(m_weightMatrix.rows() == locrows && m_weightMatrix.cols() == loccols);
 #endif
 
+    // Extract triplets from m_mapRemap and populate local_triplets
     DataArray1D< int > lrows;
     DataArray1D< int > lcols;
     DataArray1D< double > lvals;
     m_mapRemap.GetEntries( lrows, lcols, lvals );
     size_t locvals = lvals.GetRows();
 
-    // first matrix
-    typedef Eigen::Triplet< double > Triplet;
-    std::vector< Triplet > tripletList;
-    tripletList.reserve( locvals );
+    // Clear and populate local_triplets
+    this->local_triplets.clear();
+    this->local_triplets.reserve( locvals );
     for( size_t iv = 0; iv < locvals; iv++ )
     {
-        tripletList.push_back( Triplet( lrows[iv], lcols[iv], lvals[iv] ) );
+        this->local_triplets.emplace_back( lrows[iv], lcols[iv], lvals[iv] );
     }
-    m_weightMatrix.setFromTriplets( tripletList.begin(), tripletList.end() );
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (perform_reduction && false) {
+        // --- Determine the communication pattern based on row distribution ---
+        CommunicationPattern comm_pattern;
+        std::map<int, std::set<int>> all_row_sharers;
+        constexpr int method = 1;
+
+        if (method == 0)
+        {
+            std::cout << rank << ": Determining communication pattern. " << std::endl;
+            MB_CHK_SET_ERR( determine_communication_pattern(m_pcomm, this->local_triplets, this->row_gdofmap, comm_pattern, all_row_sharers),
+                                "determine_communication_pattern failed");
+
+            // --- Perform the distributed reduction in-place on the triplet list ---
+            if (rank == 0) std::cout << "Performing distributed reduction on triplets." << std::endl;
+            MB_CHK_SET_ERR( perform_distributed_reduction(m_pcomm, this->rowMap, this->colMap, this->row_gdofmap, this->col_gdofmap, all_row_sharers, this->local_triplets),
+                                "perform_distributed_reduction failed" );
+            if (rank == 0) std::cout << rank << ": Performing distributed reduction all done. Operator is synced!!" << std::endl;
+        }
+        else
+        {
+            Tag gdofTag;
+            MB_CHK_SET_ERR( m_interface->tag_get_handle("GLOBAL_DOFS", gdofTag), "failed to get GLOBAL_DOFS tag");
+            MB_CHK_SET_ERR( determine_communication_pattern_from_tag(m_pcomm, "GLOBAL_DOFS", gdofTag, comm_pattern, all_row_sharers),
+                                "determine_communication_pattern_from_tag failed");
+
+            // For now, just print some debug information about the triplets
+            std::cout << rank << ": Found " << this->local_triplets.size() << " local triplets for potential reduction" << std::endl;
+        }
+    }
+
+    m_weightMatrix.setFromTriplets( this->local_triplets.begin(), this->local_triplets.end() );
     m_weightMatrix.makeCompressed();
 
 #ifdef VERBOSE
@@ -349,13 +1032,10 @@ void moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3()
     sstr << "tempestmatrix.txt.0000" << rank;
     std::ofstream output_file( sstr.str(), std::ios::out );
     output_file << "0 " << locrows << " 0 " << loccols << "\n";
-    for( unsigned iv = 0; iv < locvals; iv++ )
+    for( const auto& triplet : this->local_triplets )
     {
-        // output_file << lrows[iv] << " " << row_ldofmap[lrows[iv]] << " " <<
-        // row_gdofmap[row_ldofmap[lrows[iv]]] << " " << col_gdofmap[col_ldofmap[lcols[iv]]] << " "
-        // << lvals[iv] << "\n";
-        output_file << row_gdofmap[row_ldofmap[lrows[iv]]] << " " << col_gdofmap[col_ldofmap[lcols[iv]]] << " "
-                    << lvals[iv] << "\n";
+        output_file << row_gdofmap[triplet.row()] << " " << col_gdofmap[triplet.col()] << " "
+                    << triplet.value() << "\n";
     }
     output_file.flush();  // required here
     output_file.close();
@@ -365,7 +1045,7 @@ void moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3()
 #undef VERBOSE_ACTIVATED
 #undef VERBOSE
 #endif
-    return;
+    return moab::MB_SUCCESS;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2348,15 +3028,13 @@ using KDTree = nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor
 // ----------------------
 // Radius search wrapper
 // ----------------------
-std::vector< int > radius_search_kdtree( const MOABCentroidCloud& cloud,
+std::vector< int > radius_search_kdtree( const KDTree& tree,
+                                         const MOABCentroidCloud& cloud,
                                          const std::array< double, 3 >& query_pt,
                                          double radius )
 {
-    KDTree tree( 3, cloud, nanoflann::KDTreeSingleIndexAdaptorParams( 10 ) );
-    tree.buildIndex();
-
-    // double radius_sq = radius * radius;
-    double radius_sq = radius;
+    double radius_sq = radius * radius;
+    // double radius_sq = radius;
     std::vector< nanoflann::ResultItem< unsigned, double > > matches;
     nanoflann::SearchParameters params;
     params.sorted = true;
@@ -2379,7 +3057,7 @@ std::vector< int > radius_search_kdtree( const MOABCentroidCloud& cloud,
         unsigned nearest_index;
         double nearest_dist_sq;
         tree.knnSearch( query_pt.data(), 1, &nearest_index, &nearest_dist_sq );
-        found_elements.push_back( cloud.elements[nearest_index] );
+        found_elements.emplace_back( cloud.elements[nearest_index] );
     }
 
     return found_elements;
@@ -2399,11 +3077,11 @@ moab::ErrorCode moab::TempestOnlineMap::LinearRemapFVtoGLL_Averaged( const DataA
     // Verify ReverseNodeArray has been calculated
     if( m_meshInputCov->revnodearray.size() == 0 )
     {
-        _EXCEPTIONT( "ReverseNodeArray has not been calculated for meshInput" );
+        m_meshInputCov->ConstructReverseNodeArray();
     }
     if( m_meshInputCov->edgemap.size() == 0 )
     {
-        _EXCEPTIONT( "EdgeMap has not been calculated for meshInput" );
+        m_meshInputCov->ConstructEdgeMap( false );
     }
 
     // Get SparseMatrix represntation of the OfflineMap
@@ -2440,9 +3118,10 @@ moab::ErrorCode moab::TempestOnlineMap::LinearRemapFVtoGLL_Averaged( const DataA
     }
 
     // Loop through all faces on meshInput
-#ifdef VERBOSE
+// #ifdef VERBOSE
     const unsigned outputFrequency = ( m_meshOutput->faces.size() / 10 ) + 1;
-#endif
+    // const unsigned outputFrequency = 1;
+// #endif
 
     // kd-tree for nearest neighbor search
     // kdtree* kdSource = kd_create( 3 );
@@ -2494,15 +3173,19 @@ moab::ErrorCode moab::TempestOnlineMap::LinearRemapFVtoGLL_Averaged( const DataA
         }
     }
 
+    // if( is_root ) dbgprint.printf( 0, "Building Kd-tree now..." );
+    KDTree tree( 3, cloud, nanoflann::KDTreeSingleIndexAdaptorParams( 10 ) );
+    tree.buildIndex();
+    // if( is_root ) dbgprint.printf( 0, "Finished building Kd-tree index..." );
     for( size_t ixOutput = 0; ixOutput < m_meshOutput->faces.size(); ixOutput++ )
     {
         // Output every 1000 elements
-#ifdef VERBOSE
+// #ifdef VERBOSE
         if( ixOutput % outputFrequency == 0 && is_root )
         {
             dbgprint.printf( 0, "Element %zu/%lu\n", ixOutput, m_meshOutput->faces.size() );
         }
-#endif
+// #endif
         // This Face
         const Face& faceSecond = m_meshOutput->faces[ixOutput];
 
@@ -2531,8 +3214,10 @@ moab::ErrorCode moab::TempestOnlineMap::LinearRemapFVtoGLL_Averaged( const DataA
                 // The radius for the search is the sqrt of the Jacobian
                 const double radius   = std::sqrt( dataGLLJacobian[p][q][ixOutput] );
 
+                std::cout << "Searching elements within radius " << radius
+                          << " for query point: " << query[0] << ", " << query[1] << ", " << query[2] << "\n";
                 // Now let us search for the nearest elements within search radius
-                auto results          = radius_search_kdtree( cloud, query, radius );
+                auto results          = radius_search_kdtree( tree, cloud, query, radius );
 
                 // Find how many elements were found
                 size_t nResults = results.size();
@@ -2576,8 +3261,8 @@ moab::ErrorCode moab::TempestOnlineMap::LinearRemapFVtoGLL_Averaged( const DataA
                                  radius, query[0], query[1], query[2] );
                 }
 
-                // std::cout << "Found " << nResults << " elements within radius " << radius
-                //           << " for query point: " << query[0] << ", " << query[1] << ", " << query[2] << "\n";
+                std::cout << "\tFound " << nResults << " elements within radius " << radius
+                          << " for query point: " << query[0] << ", " << query[1] << ", " << query[2] << "\n";
                 for( auto ixFirstElement : results )
                 {
                     // std::cout << "\t[ " << ixOutputGlobal << "] Found association of point " << query[0] << ", "

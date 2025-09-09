@@ -255,7 +255,31 @@ static struct mhdf_FileDesc* get_tag_desc( mhdf_FileHandle file_handle,
             have_global *= sizeof( int );
             valsize *= sizeof( int );
             break;
+        case mhdf_UNSIGNED_INTEGER:
+            type = H5T_NATIVE_UINT;
+            have_default *= sizeof( uint );
+            have_global *= sizeof( uint );
+            valsize *= sizeof( uint );
+            break;
+        case mhdf_UNSIGNED_LONG:
+            type = H5T_NATIVE_ULONG;
+            have_default *= sizeof( unsigned long );
+            have_global *= sizeof( unsigned long );
+            valsize *= sizeof( unsigned long );
+            break;
+        case mhdf_UNSIGNED_LONG_LONG:
+            type = H5T_NATIVE_ULLONG;
+            have_default *= sizeof( unsigned long long );
+            have_global *= sizeof( unsigned long long );
+            valsize *= sizeof( unsigned long long );
+            break;
         case mhdf_FLOAT:
+            type = H5T_NATIVE_FLOAT;
+            have_default *= sizeof( float );
+            have_global *= sizeof( float );
+            valsize *= sizeof( float );
+            break;
+        case mhdf_DOUBLE:
             type = H5T_NATIVE_DOUBLE;
             have_default *= sizeof( double );
             have_global *= sizeof( double );

@@ -320,7 +320,7 @@ class GeomTopoTool
     ErrorCode separate_by_dimension( const Range& geom_sets );
 
     //! Verify global id tag
-    ErrorCode check_gid_tag( bool create = false );
+    ErrorCode check_gid_tag( );
 
     //! Verify geometry tag
     ErrorCode check_geom_tag( bool create = false );
@@ -381,7 +381,7 @@ inline Tag GeomTopoTool::get_sense_tag()
 
 inline Tag GeomTopoTool::get_gid_tag()
 {
-    check_gid_tag( true );
+    check_gid_tag();
     return gidTag;
 }
 

@@ -187,7 +187,7 @@ class WriteHDF5 : public WriterIface
     /** Create attributes holding the HDF5 type handle for the
      *  type of a bunch of the default tags.
      */
-    // static ErrorCode register_known_tag_types( Interface* );
+    static ErrorCode register_known_tag_types( Interface* );
 
     //! Store old HDF5 error handling function
     struct HDF5ErrorHandler

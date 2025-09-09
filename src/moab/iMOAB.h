@@ -50,8 +50,8 @@
 
 #define iMOAB_AppID    int*
 #define iMOAB_String   char*
-#define iMOAB_GlobalID int
-#define iMOAB_LocalID  int
+#define iMOAB_GlobalID long
+#define iMOAB_LocalID  long
 #ifdef __cplusplus
 #define ErrCode moab::ErrorCode
 #else

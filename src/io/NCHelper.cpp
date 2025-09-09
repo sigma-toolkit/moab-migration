@@ -7,6 +7,7 @@
 #include "NCHelperMPAS.hpp"
 #include "NCHelperGCRM.hpp"
 #include "NCHelperESMF.hpp"
+#include "NCHelperTOPO.hpp"
 
 #include <sstream>
 
@@ -58,6 +59,8 @@ ReadNC::NCFormatType NCHelper::get_nc_format( ReadNC* readNC, int fileId )
         return ReadNC::NC_FORMAT_GCRM;
     else if( NCHelperFV::can_read_file( readNC, fileId ) && is_CF )
         return ReadNC::NC_FORMAT_FV;
+    else if( NCHelperTOPO::can_read_file( readNC ) )
+        return ReadNC::NC_FORMAT_TOPO;
     else  // Unknown NetCDF grid (will fill this in later for POP, CICE and CLM)
         return ReadNC::NC_FORMAT_UNKNOWN_TYPE;
 }
@@ -75,6 +78,8 @@ std::string NCHelper::get_default_ncformat_options( ReadNC::NCFormatType format 
             return "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;";
         case moab::ReadNC::NC_FORMAT_ESMF:  // ESMF unstructured format reader
             return "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;PARALLEL_RESOLVE_SHARED_ENTS;VARIABLE=;";
+        case moab::ReadNC::NC_FORMAT_TOPO:  // Climate Topography reader
+            return "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN;VARIABLE=;";
         case moab::ReadNC::NC_FORMAT_DOMAIN:  // Climate Domain reader
             return "PARALLEL=READ_PART;PARTITION_METHOD=SQIJ;VARIABLE=;";
         case moab::ReadNC::NC_FORMAT_HOMME:  // HOMME format reader
@@ -101,6 +106,8 @@ NCHelper* NCHelper::get_nc_helper( ReadNC* readNC, int fileId, const FileOptions
             return new( std::nothrow ) NCHelperScrip( readNC, fileId, opts, fileSet );
         case ReadNC::NC_FORMAT_ESMF:  // ESMF unstructured format reader
             return new( std::nothrow ) NCHelperESMF( readNC, fileId, opts, fileSet );
+        case ReadNC::NC_FORMAT_TOPO:  // Climate Topography reader
+            return new( std::nothrow ) NCHelperTOPO( readNC, fileId, opts, fileSet );
         case ReadNC::NC_FORMAT_DOMAIN:  // Climate Domain reader
             return new( std::nothrow ) NCHelperDomain( readNC, fileId, opts, fileSet );
         case ReadNC::NC_FORMAT_HOMME:  // HOMME format reader
@@ -254,7 +261,30 @@ ErrorCode NCHelper::create_conventional_tags( const std::vector< int >& tstep_nu
         {
             Tag tmptag             = 0;
             std::string tmptagname = dimNames[varInfo[mapIter->first].varDims[i]];
-            rval = mbImpl->tag_get_handle( tmptagname.c_str(), 0, MB_TYPE_OPAQUE, tmptag, MB_TAG_ANY );MB_CHK_SET_ERR( rval, "Trouble getting tag " << tmptagname );
+
+            rval = mbImpl->tag_get_handle( tmptagname.c_str(), 0, MB_TYPE_OPAQUE, tmptag, MB_TAG_ANY );
+            if( MB_SUCCESS != rval )
+            {
+                dbgOut.tprintf( 2, "Could not find dimension tag %s\n", tmptagname.c_str() );
+                // Tag doesn't exist, create it as a sparse tag
+                rval = mbImpl->tag_get_handle( tmptagname.c_str(), 0, MB_TYPE_OPAQUE, tmptag, MB_TAG_CREAT | MB_TAG_SPARSE | MB_TAG_VARLEN );
+                if( MB_SUCCESS == rval )
+                {
+                    // Set the dimension length as tag value
+                    int dimIdx = varInfo[mapIter->first].varDims[i];
+                    const void* ptr = &dimLens[dimIdx];
+                    int size = 1;
+                    rval = mbImpl->tag_set_by_ptr( tmptag, &_fileSet, 1, &ptr, &size );
+                    if( MB_SUCCESS != rval )
+                        MB_SET_ERR( rval, "Trouble setting data for dimension tag " << tmptagname );
+                    dbgOut.tprintf( 2, "Created new dimension tag %s\n", tmptagname.c_str() );
+                }
+                else
+                {
+                    MB_SET_ERR( rval, "Trouble creating dimension tag " << tmptagname );
+                }
+            }
+
             varDimTags[i] = tmptag;
         }
         // rval = mbImpl->tag_get_handle(tag_name.c_str(), varDimSz, MB_TYPE_HANDLE,

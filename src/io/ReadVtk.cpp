@@ -1056,7 +1056,11 @@ ErrorCode ReadVtk::vtk_read_tag_data( FileTokenizer& tokens,
 
     // Get/create tag
     Tag handle;
-    result = mdbImpl->tag_get_handle( name, per_elem, mb_type, handle, MB_TAG_DENSE | MB_TAG_CREAT );MB_CHK_SET_ERR( result, "Tag name conflict for attribute \"" << name << "\" at line " << tokens.line_number() );
+    if ( !std::string(name).compare( "GLOBAL_ID" ) ) handle = mdbImpl->globalId_tag();
+    else
+    {
+        MB_CHK_SET_ERR( mdbImpl->tag_get_handle( name, per_elem, mb_type, handle, MB_TAG_DENSE | MB_TAG_CREAT ), "Tag name conflict for attribute \"" << name << "\" at line " << tokens.line_number() );
+    }
 
     std::vector< Range >::iterator iter;
 

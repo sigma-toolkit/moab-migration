@@ -1292,8 +1292,7 @@ ErrorCode IntxUtils::enforce_convexity( Interface* mb, EntityHandle lset, int my
     rval              = mb->tag_get_handle( CORRTAGNAME, 1, MB_TYPE_HANDLE, corrTag, MB_TAG_DENSE, &dumH );
     if( rval == MB_TAG_NOT_FOUND ) corrTag = 0;
 
-    Tag gidTag;
-    rval = mb->tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, gidTag, MB_TAG_DENSE );MB_CHK_ERR( rval );
+    Tag gidTag = mb->globalId_tag();
 
     std::vector< double > coords;
     coords.resize( 3 * MAXEDGES );  // at most 10 vertices per polygon

@@ -391,7 +391,27 @@ static hid_t create_tag_common( mhdf_FileHandle file_handle,
 
             case mhdf_FLOAT:
                 arr_len  = abs( size );
+                hdf_type = H5Tcopy( H5T_NATIVE_FLOAT );
+                break;
+
+            case mhdf_DOUBLE:
+                arr_len  = abs( size );
                 hdf_type = H5Tcopy( H5T_NATIVE_DOUBLE );
+                break;
+
+            case mhdf_UNSIGNED_INTEGER:
+                arr_len  = abs( size );
+                hdf_type = H5Tcopy( H5T_NATIVE_UINT );
+                break;
+
+            case mhdf_UNSIGNED_LONG:
+                arr_len  = abs( size );
+                hdf_type = H5Tcopy( H5T_NATIVE_ULONG );
+                break;
+
+            case mhdf_UNSIGNED_LONG_LONG:
+                arr_len  = abs( size );
+                hdf_type = H5Tcopy( H5T_NATIVE_ULLONG );
                 break;
         }
     }
@@ -1050,7 +1070,7 @@ void mhdf_getTagInfo( mhdf_FileHandle file_handle,
 
     if( is_handle )
     {
-        if( *class_out != mhdf_INTEGER )
+        if( *class_out != mhdf_INTEGER && *class_out != mhdf_UNSIGNED_INTEGER && *class_out != mhdf_UNSIGNED_LONG && *class_out != mhdf_UNSIGNED_LONG_LONG )
         {
             mhdf_setFail( status, "Non-integer tag marked as handle type." );
             return;

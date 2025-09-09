@@ -176,19 +176,18 @@ ErrorCode ReadGmsh::load_file( const char* filename,
             !tokens.get_doubles( 1, z++ ) )
             return MB_FILE_WRITE_ERROR;
 
-        if( !node_id_map.insert( std::pair< long, EntityHandle >( id, handle ) ).second )
+        if( !node_id_map.insert( std::pair< size_t, EntityHandle >( id, handle ) ).second )
         {
             MB_SET_ERR( MB_FILE_WRITE_ERROR, "Duplicate node ID at line " << tokens.line_number() );
         }
     }
 
     // Create reverse map from handle to id
-    std::vector< int > ids( num_nodes );
-    std::vector< int >::iterator id_iter = ids.begin();
+    std::vector< size_t > ids( num_nodes );
+    auto id_iter = ids.begin();
     std::vector< EntityHandle > handles( num_nodes );
-    std::vector< EntityHandle >::iterator h_iter = handles.begin();
-    for( std::map< long, EntityHandle >::iterator i = node_id_map.begin(); i != node_id_map.end();
-         ++i, ++id_iter, ++h_iter )
+    auto h_iter = handles.begin();
+    for( auto i = node_id_map.begin(); i != node_id_map.end(); ++i, ++id_iter, ++h_iter )
     {
         *id_iter = i->first;
         *h_iter  = i->second;
@@ -215,7 +214,8 @@ ErrorCode ReadGmsh::load_file( const char* filename,
 
     // Lists of data accumulated for elements
     std::vector< EntityHandle > connectivity;
-    std::vector< int > mat_set_list, geom_set_list, part_set_list, id_list;
+    std::vector< int > mat_set_list, geom_set_list, part_set_list;
+    std::vector< size_t > id_list;
     // Temporary, per-element data
     std::vector< int > int_data( 5 ), tag_data( 2 );
     std::vector< long > tmp_conn;
@@ -323,7 +323,7 @@ ErrorCode ReadGmsh::load_file( const char* filename,
 
 //! Create an element sequence
 ErrorCode ReadGmsh::create_elements( const GmshElemType& type,
-                                     const std::vector< int >& elem_ids,
+                                     const std::vector< size_t >& elem_ids,
                                      const std::vector< int >& matl_ids,
                                      const std::vector< int >& geom_ids,
                                      const std::vector< int >& prtn_ids,
@@ -333,7 +333,7 @@ ErrorCode ReadGmsh::create_elements( const GmshElemType& type,
     ErrorCode result;
 
     // Make sure input is consistent
-    const unsigned long num_elem = elem_ids.size();
+    const size_t num_elem = elem_ids.size();
     const int node_per_elem      = type.num_nodes;
     if( matl_ids.size() != num_elem || geom_ids.size() != num_elem || prtn_ids.size() != num_elem ||
         connectivity.size() != num_elem * node_per_elem )

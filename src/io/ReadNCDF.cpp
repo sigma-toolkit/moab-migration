@@ -110,6 +110,28 @@ namespace moab
         }                                                                                     \
     }
 
+#define GET_1D_LONG_VAR( name, id, vals )                                                     \
+    {                                                                                         \
+        std::vector< int > dum_dims;                                                          \
+        GET_VAR( name, id, dum_dims );                                                        \
+        if( -1 != ( id ) )                                                                    \
+        {                                                                                     \
+            size_t ntmp;                                                                      \
+            int ivfail = nc_inq_dimlen( ncFile, ( vals )[0], &ntmp );                         \
+            if( NC_NOERR != ivfail )                                                          \
+            {                                                                                 \
+                MB_SET_ERR( MB_FAILURE, "ReadNCDF:: Couldn't get dimension length" );         \
+            }                                                                                 \
+            ( vals ).resize( ntmp );                                                          \
+            size_t ntmp1 = 0;                                                                 \
+            ivfail       = nc_get_vara_long( ncFile, id, &ntmp1, &ntmp, &( vals )[0] );        \
+            if( NC_NOERR != ivfail )                                                          \
+            {                                                                                 \
+                MB_SET_ERR( MB_FAILURE, "ReadNCDF:: Problem getting variable " << ( name ) ); \
+            }                                                                                 \
+        }                                                                                     \
+    }
+
 #define GET_1D_DBL_VAR( name, id, vals )                                                      \
     {                                                                                         \
         std::vector< int > dum_dims;                                                          \
@@ -756,6 +778,7 @@ ErrorCode ReadNCDF::read_elements( const Tag* file_id_tag )
 
         // Get some information about this block
         int block_id       = ( *this_it ).blockId;
+        long block_idl       = static_cast<long>(block_id);
         EntityHandle* conn = 0;
 
         // Get the ncdf connect variable and the element type
@@ -849,7 +872,7 @@ ErrorCode ReadNCDF::read_elements( const Tag* file_id_tag )
             }
             // Set the block id with an offset
             if( mdbImpl->tag_set_data( mMaterialSetTag, &ms_handle, 1, &block_id ) != MB_SUCCESS ) return MB_FAILURE;
-            if( mdbImpl->tag_set_data( mGlobalIdTag, &ms_handle, 1, &block_id ) != MB_SUCCESS ) return MB_FAILURE;
+            if( mdbImpl->tag_set_data( mGlobalIdTag, &ms_handle, 1, &block_idl ) != MB_SUCCESS ) return MB_FAILURE;
         }
         else if( mb_type == MBPOLYHEDRON )
         {
@@ -908,7 +931,7 @@ ErrorCode ReadNCDF::read_elements( const Tag* file_id_tag )
             }
             // Set the block id with an offset
             if( mdbImpl->tag_set_data( mMaterialSetTag, &ms_handle, 1, &block_id ) != MB_SUCCESS ) return MB_FAILURE;
-            if( mdbImpl->tag_set_data( mGlobalIdTag, &ms_handle, 1, &block_id ) != MB_SUCCESS ) return MB_FAILURE;
+            if( mdbImpl->tag_set_data( mGlobalIdTag, &ms_handle, 1, &block_idl ) != MB_SUCCESS ) return MB_FAILURE;
         }
         else  // this is regular
         {
@@ -979,7 +1002,7 @@ ErrorCode ReadNCDF::read_elements( const Tag* file_id_tag )
 
             // Set the block id with an offset
             if( mdbImpl->tag_set_data( mMaterialSetTag, &ms_handle, 1, &block_id ) != MB_SUCCESS ) return MB_FAILURE;
-            if( mdbImpl->tag_set_data( mGlobalIdTag, &ms_handle, 1, &block_id ) != MB_SUCCESS ) return MB_FAILURE;
+            if( mdbImpl->tag_set_data( mGlobalIdTag, &ms_handle, 1, &block_idl ) != MB_SUCCESS ) return MB_FAILURE;
 
             if( file_id_tag )
             {
@@ -996,10 +1019,10 @@ ErrorCode ReadNCDF::read_elements( const Tag* file_id_tag )
 ErrorCode ReadNCDF::read_global_ids()
 {
     // Read in the map from the exodus file
-    std::vector< int > ids( std::max( numberElements_loading, numberNodes_loading ) );
+    std::vector< long > ids( std::max( numberElements_loading, numberNodes_loading ) );
 
     int varid = -1;
-    GET_1D_INT_VAR( "elem_map", varid, ids );
+    GET_1D_LONG_VAR( "elem_map", varid, ids );
     if( -1 != varid )
     {
         std::vector< ReadBlockData >::iterator iter;
@@ -1036,7 +1059,7 @@ ErrorCode ReadNCDF::read_global_ids()
 
     // Read in node map next
     varid = -1;
-    GET_1D_INT_VAR( "node_num_map", varid, ids );
+    GET_1D_LONG_VAR( "node_num_map", varid, ids );
     if( -1 != varid )
     {
         Range range( MB_START_ID + vertexOffset, MB_START_ID + vertexOffset + numberNodes_loading - 1 );
@@ -1169,8 +1192,9 @@ ErrorCode ReadNCDF::read_nodesets()
             // TODO: create this tag another way
 
             int nodeset_id = id_array[i];
+            long nodeset_idl = static_cast<long>(id_array[i]);
             if( mdbImpl->tag_set_data( mDirichletSetTag, &ns_handle, 1, &nodeset_id ) != MB_SUCCESS ) return MB_FAILURE;
-            if( mdbImpl->tag_set_data( mGlobalIdTag, &ns_handle, 1, &nodeset_id ) != MB_SUCCESS ) return MB_FAILURE;
+            if( mdbImpl->tag_set_data( mGlobalIdTag, &ns_handle, 1, &nodeset_idl ) != MB_SUCCESS ) return MB_FAILURE;
 
             if( !dist_factor_vector.empty() )
             {

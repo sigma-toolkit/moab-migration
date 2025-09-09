@@ -640,8 +640,7 @@ ErrorCode NestedRefine::create_hm_storage_single_level( EntityHandle* set, int c
     error = mbImpl->add_entities( *set, newverts );MB_CHK_ERR( error );
     level_mesh[cur_level].verts = newverts;
 
-    Tag gidtag;
-    error = mbImpl->tag_get_handle( GLOBAL_ID_TAG_NAME, gidtag );MB_CHK_ERR( error );
+    Tag gidtag = mbImpl->globalId_tag();
     error = read_iface->assign_ids( gidtag, newverts, level_mesh[cur_level].start_vertex );MB_CHK_ERR( error );
 
     // Edges

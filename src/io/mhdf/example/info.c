@@ -83,27 +83,31 @@ static void print_elem_desc( struct mhdf_ElemDesc* data, struct mhdf_FileDesc* a
 
 static const char* tag_type_name( enum mhdf_TagDataType type )
 {
-    static const char opaque[]  = "opaque";
-    static const char integer[] = "integer";
-    static const char real[]    = "real";
-    static const char bits[]    = "bit field";
-    static const char boolean[] = "boolean";
-    static const char id[]      = "entity id";
     static const char unknown[] = "(UNKNOWN TYPE ID)";
     switch( type )
     {
         case mhdf_OPAQUE:
-            return opaque;
+            return "opaque";
         case mhdf_INTEGER:
-            return integer;
+            return "integer";
+        case mhdf_UNSIGNED_INTEGER:
+            return "unsigned integer";
+        case mhdf_LONG:
+            return "long";
+        case mhdf_UNSIGNED_LONG:
+            return "unsigned long";
+        case mhdf_UNSIGNED_LONG_LONG:
+            return "unsigned long long";
         case mhdf_FLOAT:
-            return real;
+            return "real (single precision)";
+        case mhdf_DOUBLE:
+            return "real (double precision)";
         case mhdf_BITFIELD:
-            return bits;
+            return "bit field";
         case mhdf_BOOLEAN:
-            return boolean;
+            return "boolean";
         case mhdf_ENTITY_ID:
-            return id;
+            return "entity id";
     }
     return unknown;
 }
@@ -147,6 +151,10 @@ static const char* string_tag_value( const void* value, enum mhdf_TagDataType ty
             }
             break;
         case mhdf_INTEGER:
+        case mhdf_UNSIGNED_INTEGER:
+        case mhdf_LONG:
+        case mhdf_UNSIGNED_LONG:
+        case mhdf_UNSIGNED_LONG_LONG:
             if( size == 1 )
             {
                 offset += snprintf( offset, 1024, "%d", intptr[0] );
@@ -160,6 +168,7 @@ static const char* string_tag_value( const void* value, enum mhdf_TagDataType ty
             }
             break;
         case mhdf_FLOAT:
+        case mhdf_DOUBLE:
             if( size == 1 )
             {
                 offset += snprintf( offset, 1024, "%g", dblptr[0] );

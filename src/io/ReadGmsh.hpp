@@ -57,7 +57,7 @@ class ReadGmsh : public ReaderIface
 
   private:
     ErrorCode create_elements( const GmshElemType& type,
-                               const std::vector< int >& elem_ids,
+                               const std::vector< size_t >& elem_ids,
                                const std::vector< int >& matl_ids,
                                const std::vector< int >& geom_ids,
                                const std::vector< int >& prtn_ids,

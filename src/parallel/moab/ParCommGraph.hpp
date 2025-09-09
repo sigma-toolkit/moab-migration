@@ -221,7 +221,7 @@ class ParCommGraph
     // strideComp is np x np, or 1, in our cases
     // will fill up ordered lists for corresponding IDs on the other component
     // will form back and forth information, from ordered list of IDs, to valuesComp
-    void settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::vector< int >& valuesComp );
+    void settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::vector< long >& valuesComp );
 
     // new partition calculation
     ErrorCode compute_partition( ParallelComm* pco, Range& owned, int met );
@@ -287,9 +287,9 @@ class ParCommGraph
     // these will be used now after coverage, quick fix; they will also be populated by
     // iMOAB_CoverageGraph
     TypeGraph graph_type;  // this should be false , set to true in settle send graph, to use send_IDs_map
-    std::map< int, std::vector< int > > involved_IDs_map;  // replace send and recv IDs_mapp with involved_IDs_map
+    std::map< int, std::vector< long > > involved_IDs_map;  // replace send and recv IDs_mapp with involved_IDs_map
     // used only for third method: DOF_BASED
-    std::map< int, std::vector< int > >
+    std::map< int, std::vector< long > >
         map_index;  // from index in involved[] to index in values[] of tag, for each corr task
     std::map< int, std::vector< int > > map_ptr;  //  lmap[ie], lmap[ie+1], pointer into map_index[corrTask]
 };

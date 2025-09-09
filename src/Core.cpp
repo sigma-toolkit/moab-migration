@@ -2621,9 +2621,9 @@ Tag Core::dirichletBC_tag()
 
 Tag Core::globalId_tag()
 {
-    const int negone = -1;
+    const size_t negone = -1;
     if( 0 == globalIdTag )
-        tag_get_handle( GLOBAL_ID_TAG_NAME, 1, MB_TYPE_INTEGER, globalIdTag, MB_TAG_CREAT | MB_TAG_DENSE, &negone );
+        tag_get_handle( GLOBAL_ID_TAG_NAME, 1, MB_TYPE_LONG, globalIdTag, MB_TAG_CREAT | MB_TAG_DENSE, &negone );
     return globalIdTag;
 }
 
@@ -3700,8 +3700,12 @@ ErrorCode Core::print_entity_tags( std::string indent_prefix, const EntityHandle
         result = this->tag_get_length( *vit, this_size );
         if( MB_SUCCESS != result ) continue;
         // use double since this is largest single-valued tag
+        std::vector< float > flt_vals( this_size );
         std::vector< double > dbl_vals( this_size );
         std::vector< int > int_vals( this_size );
+        std::vector< unsigned int > uint_vals( this_size );
+        std::vector< unsigned long > ulong_vals( this_size );
+        std::vector< unsigned long long > ull_vals( this_size );
         std::vector< EntityHandle > hdl_vals( this_size );
         std::string tag_name;
         result = this->tag_get_name( *vit, tag_name );
@@ -3717,6 +3721,50 @@ ErrorCode Core::print_entity_tags( std::string indent_prefix, const EntityHandle
                         std::cout << int_vals[i] << " ";
                 else
                     std::cout << int_vals[0] << "... (mult values)";
+                std::cout << std::endl;
+                break;
+            case MB_TYPE_UNSIGNED_INTEGER:
+                result = this->tag_get_data( *vit, &handle, 1, &uint_vals[0] );
+                if( MB_SUCCESS != result ) continue;
+                std::cout << indent_prefix << tag_name << " = ";
+                if( this_size < 10 )
+                    for( int i = 0; i < this_size; i++ )
+                        std::cout << uint_vals[i] << " ";
+                else
+                    std::cout << uint_vals[0] << "... (mult values)";
+                std::cout << std::endl;
+                break;
+            case MB_TYPE_UNSIGNED_LONG:
+                result = this->tag_get_data( *vit, &handle, 1, &ulong_vals[0] );
+                if( MB_SUCCESS != result ) continue;
+                std::cout << indent_prefix << tag_name << " = ";
+                if( this_size < 10 )
+                    for( int i = 0; i < this_size; i++ )
+                        std::cout << ulong_vals[i] << " ";
+                else
+                    std::cout << ulong_vals[0] << "... (mult values)";
+                std::cout << std::endl;
+                break;
+            case MB_TYPE_UNSIGNED_LONG_LONG:
+                result = this->tag_get_data( *vit, &handle, 1, &ull_vals[0] );
+                if( MB_SUCCESS != result ) continue;
+                std::cout << indent_prefix << tag_name << " = ";
+                if( this_size < 10 )
+                    for( int i = 0; i < this_size; i++ )
+                        std::cout << ull_vals[i] << " ";
+                else
+                    std::cout << ull_vals[0] << "... (mult values)";
+                std::cout << std::endl;
+                break;
+            case MB_TYPE_FLOAT:
+                result = this->tag_get_data( *vit, &handle, 1, &flt_vals[0] );
+                if( MB_SUCCESS != result ) continue;
+                std::cout << indent_prefix << tag_name << " = ";
+                if( this_size < 10 )
+                    for( int i = 0; i < this_size; i++ )
+                        std::cout << flt_vals[i] << " ";
+                else
+                    std::cout << flt_vals[0] << "... (mult values)";
                 std::cout << std::endl;
                 break;
             case MB_TYPE_DOUBLE:

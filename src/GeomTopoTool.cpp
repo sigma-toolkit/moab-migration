@@ -1137,15 +1137,9 @@ ErrorCode GeomTopoTool::check_geom_tag( bool create )
     return MB_SUCCESS;
 }
 
-ErrorCode GeomTopoTool::check_gid_tag( bool create )
+ErrorCode GeomTopoTool::check_gid_tag()
 {
-    ErrorCode rval;
-    unsigned flags = create ? MB_TAG_DENSE | MB_TAG_CREAT : MB_TAG_DENSE;
-    if( !gidTag )
-    {
-        // get any kind of tag that already exists
-        rval = mdbImpl->tag_get_handle( GLOBAL_ID_TAG_NAME, 1, MB_TYPE_INTEGER, gidTag, flags );MB_CHK_SET_ERR( rval, "Could not get/create the global id tag" );
-    }
+    gidTag = mdbImpl->globalId_tag();
     return MB_SUCCESS;
 }
 

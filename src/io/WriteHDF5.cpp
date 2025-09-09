@@ -415,7 +415,7 @@ ErrorCode WriteHDF5::init()
     */
     // For known tag types, store the corresponding HDF5 in which
     // the tag data is to be written in the file.
-    // register_known_tag_types(iFace);
+    register_known_tag_types(iFace);
 
     // Get the util interface
     rval = iFace->query_interface( writeUtil );
@@ -2439,7 +2439,7 @@ ErrorCode WriteHDF5::write_qa( const std::vector< std::string >& list )
     return MB_SUCCESS;
 }
 
-/*
+
 ErrorCode WriteHDF5::register_known_tag_types(Interface* iface)
 {
   hid_t int4, double16;
@@ -2448,16 +2448,16 @@ ErrorCode WriteHDF5::register_known_tag_types(Interface* iface)
   ErrorCode rval;
 
   dim[0] = 4;
-  int4 = H5Tarray_create(H5T_NATIVE_INT, 1, dim, NULL);
+  int4 = H5Tarray_create(H5T_NATIVE_INT, 1, dim);
 
   dim[0] = 16;
-  double16 = H5Tarray_create(H5T_NATIVE_DOUBLE, 1, dim, NULL);
+  double16 = H5Tarray_create(H5T_NATIVE_DOUBLE, 1, dim);
 
   if (int4 < 0 || double16 < 0)
     error = 1;
 
   struct { const char* name; hid_t type; } list[] = {
-    { GLOBAL_ID_TAG_NAME, H5T_NATIVE_INT } ,
+    { GLOBAL_ID_TAG_NAME, H5T_NATIVE_ULONG } ,
     { MATERIAL_SET_TAG_NAME, H5T_NATIVE_INT },
     { DIRICHLET_SET_TAG_NAME, H5T_NATIVE_INT },
     { NEUMANN_SET_TAG_NAME, H5T_NATIVE_INT },
@@ -2479,7 +2479,7 @@ ErrorCode WriteHDF5::register_known_tag_types(Interface* iface)
 
     rval = iface->tag_get_handle(name.c_str(), handle);
     if (MB_TAG_NOT_FOUND == rval) {
-      rval = iface->tag_create(name.c_str(), sizeof(hid_t), MB_TAG_SPARSE, handle, NULL);
+      rval = iface->tag_get_handle(name.c_str(), sizeof(list[i].type), MB_TYPE_OPAQUE, handle, MB_TAG_SPARSE | MB_TAG_CREAT );
       if (MB_SUCCESS != rval) {
         ++error;
         continue;
@@ -2499,7 +2499,7 @@ ErrorCode WriteHDF5::register_known_tag_types(Interface* iface)
   H5Tclose(double16);
   return error ? MB_FAILURE : MB_SUCCESS;
 }
-*/
+
 
 ErrorCode WriteHDF5::gather_tags( const Tag* user_tag_list, int num_tags )
 {
@@ -2960,6 +2960,12 @@ ErrorCode WriteHDF5::get_tag_size( Tag tag,
             type_size      = sizeof( int );
             file_type      = mhdf_INTEGER;
             hdf_type       = H5T_NATIVE_INT;
+            close_hdf_type = false;
+            break;
+        case MB_TYPE_UNSIGNED_LONG:
+            type_size      = sizeof( size_t );
+            file_type      = mhdf_INTEGER;
+            hdf_type       = H5T_NATIVE_ULONG;
             close_hdf_type = false;
             break;
         case MB_TYPE_DOUBLE:

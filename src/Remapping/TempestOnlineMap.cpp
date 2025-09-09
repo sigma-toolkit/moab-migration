@@ -158,7 +158,6 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapTags( const std::string srcDofT
     return moab::MB_SUCCESS;
 }
 
-///////////////////////////////////////////////////////////////////////////////
 
 moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType srcType,
                                                               int srcOrder,
@@ -1112,7 +1111,9 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
         }
 
 #ifdef MOAB_HAVE_EIGEN3
-        copy_tempest_sparsemat_to_eigen3();
+        // Copy the sparse matrix to Eigen3 matrix
+        // Optionally, if there are shared DoFs (e.g. FV/GLL->GLL), perform distributed reduction
+        copy_tempest_sparsemat_to_eigen3(( eOutputType != DiscretizationType_FV ));
 #endif
 
 
@@ -1481,11 +1482,19 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
 
         sents = covSrcEnts;
         tents = tgtEnts;
+        std::cout << " Number of source elements: " << covSrcEnts.size() << ", " << solSTagVals.size() << std::endl;
+        std::cout << " Number of destination elements: " << tgtEnts.size() << ", " << solTTagVals.size() << std::endl;
     }
 
     // The tag data is np*np*n_el_src
     MB_CHK_SET_ERR( m_interface->tag_get_data( srcSolutionTag, sents, &solSTagVals[0] ),
                     "Getting local tag data failed" );
+
+    if (this->rank == 0)
+    {
+        moab::EntityHandle& covSrcSet = m_remapper->GetMeshSet( moab::Remapper::CoveringMesh );
+        MB_CHK_SET_ERR(m_interface->write_file("source_rank0.h5m", nullptr, "", &covSrcSet, 1), "Failed to write solSTagVals");
+    }
 
     // Compute the application of weights on the suorce solution data and store it in the
     // destination solution vector data Optionally, can also perform the transpose application of
@@ -1496,6 +1505,25 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
     // The tag data is np*np*n_el_dest
     MB_CHK_SET_ERR( m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] ),
                     "Setting target tag data failed" );
+
+
+    // only do this for Spectral Element target data
+    if( m_eOutputType == DiscretizationType_CGLL || m_eOutputType == DiscretizationType_DGLL )
+    {
+        m_pcomm->set_debug_verbosity(5);
+        // Exchange the solution on the target grid
+        // MB_CHK_SET_ERR( m_pcomm->reduce_tags( tgtSolutionTag, MPI_SUM, tents ),
+        //                 "Failed to reduce solution on target grid" );
+        // MB_CHK_SET_ERR( m_pcomm->exchange_tags( tgtSolutionTag, tents ),
+        //                 "Failed to exchange solution on target grid" );
+        m_pcomm->set_debug_verbosity(0);
+    }
+
+    if (this->rank == 0)
+    {
+        moab::EntityHandle& tgtSet = m_remapper->GetMeshSet( moab::Remapper::TargetMesh );
+        MB_CHK_SET_ERR(m_interface->write_file("target_rank0.h5m", nullptr, "", &tgtSet, 1), "Failed to write solSTagVals");
+    }
 
     if( caasType != CAAS_NONE )
     {
@@ -1576,28 +1604,31 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
             return moab::MB_FAILURE;
     }
 
+    if( outputEnabled ) std::cout << ctx <<  ": defining tag with discorder " << discOrder << std::endl;
+
     // Let us create teh solution tag with appropriate information for name, discretization order
     // (DoF space)
-    rval = m_interface->tag_get_handle( solnName.c_str(), discOrder * discOrder, MB_TYPE_DOUBLE, solnTag,
-                                        MB_TAG_DENSE | MB_TAG_CREAT );MB_CHK_ERR( rval );
+    std::vector<double> default_value( discOrder * discOrder, 0.0 );
+    MB_CHK_SET_ERR( m_interface->tag_get_handle( solnName.c_str(), discOrder * discOrder, MB_TYPE_DOUBLE, solnTag,
+                                        MB_TAG_DENSE | MB_TAG_CREAT, default_value.data() ), "Failed to create tag" );
     if( clonedSolnTag != nullptr )
     {
         if( cloneSolnName.size() == 0 )
         {
             cloneSolnName = solnName + std::string( "Cloned" );
         }
-        rval = m_interface->tag_get_handle( cloneSolnName.c_str(), discOrder * discOrder, MB_TYPE_DOUBLE,
-                                            *clonedSolnTag, MB_TAG_DENSE | MB_TAG_CREAT );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( m_interface->tag_get_handle( cloneSolnName.c_str(), discOrder * discOrder, MB_TYPE_DOUBLE,
+                                            *clonedSolnTag, MB_TAG_DENSE | MB_TAG_CREAT, default_value.data() ), "Failed to create tag" );
     }
 
     // Triangular quadrature rule
     const int TriQuadratureOrder = 10;
 
-    if( outputEnabled ) std::cout << "Using triangular quadrature of order " << TriQuadratureOrder << std::endl;
-
     TriangularQuadratureRule triquadrule( TriQuadratureOrder );
 
     const int TriQuadraturePoints = triquadrule.GetPoints();
+
+    if( outputEnabled ) std::cout << ctx <<  ": Using triangular quadrature of order " << TriQuadratureOrder << std::endl;
 
     const DataArray2D< double >& TriQuadratureG = triquadrule.GetG();
     const DataArray1D< double >& TriQuadratureW = triquadrule.GetW();
@@ -1610,7 +1641,7 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
     DataArray1D< double > dNodeArea;
 
     // Calculate element areas
-    // trmesh->CalculateFaceAreas(fContainsConcaveFaces);
+    trmesh->CalculateFaceAreas(false);
 
     if( discMethod == DiscretizationType_CGLL || discMethod == DiscretizationType_DGLL )
     {
@@ -1621,6 +1652,8 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
         // Generate grid metadata
         DataArray3D< int > dataGLLNodes;
         DataArray3D< double > dataGLLJacobian;
+
+        if( outputEnabled ) std::cout << "Metadata generated " << std::endl;
 
         GenerateMetaData( *trmesh, discOrder, false, dataGLLNodes, dataGLLJacobian );
 
@@ -1686,7 +1719,6 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
                 {
                     for( int j = 0; j < discOrder; j++ )
                     {
-
                         // Apply local map
                         Node node;
                         Node dDx1G;
@@ -1701,6 +1733,8 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
                             dNodeLon += 2.0 * M_PI;
                         }
                         double dNodeLat = asin( node.z );
+
+                        // if( outputEnabled ) std::cout << k << ", " << i << ", " << j << ": Sampled at " << dNodeLon << ", " << dNodeLat << std::endl;
 
                         double dSample = ( *testFunction )( dNodeLon, dNodeLat );
 
@@ -1717,7 +1751,6 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
                 {
                     for( int q = 0; q < nGaussP; q++ )
                     {
-
                         // Apply local map
                         Node node;
                         Node dDx1G;
@@ -1750,7 +1783,6 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
                         {
                             for( int j = 0; j < discOrder; j++ )
                             {
-
                                 double dNodalArea = dCoeff[i][j] * dGaussW[p] * dGaussW[q] * dJacobian;
 
                                 dVar[dataGLLNodes[i][j][k] - 1] += dSample * dNodalArea;
@@ -1795,7 +1827,7 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
         }
 
         // Set the tag data
-        rval = m_interface->tag_set_data( solnTag, entities, &dVarMB[0] );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( m_interface->tag_set_data( solnTag, entities, &dVarMB[0] ), "Failed to set SE tag data on entities" );
     }
     else
     {

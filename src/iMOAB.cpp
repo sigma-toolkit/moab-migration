@@ -1785,24 +1785,24 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
     int nents_to_be_set = (int)( *ents_to_set ).size();
 
     Tag gidTag = context.MBI->globalId_tag();
-    std::vector< int > gids;
+    std::vector< iMOAB_GlobalID > gids;
     gids.resize( nents_to_be_set );
     rval = context.MBI->tag_get_data( gidTag, *ents_to_set, &gids[0] );MB_CHK_ERR( rval );
 
     // so we will need to set the tags according to the global id passed;
     // so the order in tag_storage_data is the same as the order in globalIds, but the order
     // in local range is gids
-    std::map< int, EntityHandle > eh_by_gid;
-    int i = 0;
+    std::map< iMOAB_GlobalID, EntityHandle > eh_by_gid;
+    iMOAB_GlobalID i = 0;
     for( Range::iterator it = ents_to_set->begin(); it != ents_to_set->end(); ++it, ++i )
     {
         eh_by_gid[gids[i]] = *it;
     }
     // TODO: allow for tags of different length
-    int nbLocalVals = *num_tag_storage_length / ( (int)tagNames.size() );  // assumes all tags have the same length?
+    size_t nbLocalVals = *num_tag_storage_length / tagNames.size();  // assumes all tags have the same length?
     // check global ids to have different values
-    std::set< int > globalIdsSet;
-    for( int j = 0; j < nbLocalVals; j++ )
+    std::set< iMOAB_GlobalID > globalIdsSet;
+    for( iMOAB_GlobalID j = 0; j < nbLocalVals; j++ )
         globalIdsSet.insert( globalIds[j] );
     if( globalIdsSet.size() < nbLocalVals )
     {
@@ -1854,9 +1854,11 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         // tags are unrolled, we loop over global ids first, then careful about tags
         for( int i = 0; i < nents_to_be_set; i++ )
         {
-            int gid                                       = globalIds[i];
-            std::map< int, EntityHandle >::iterator mapIt = eh_by_gid.find( gid );
+            iMOAB_GlobalID gid = globalIds[i];
+            auto mapIt = eh_by_gid.find( gid );
             if( mapIt == eh_by_gid.end() ) continue;
+
+            // found the entity handle, set the tag data
             EntityHandle eh = mapIt->second;
             // now loop over tags
             int indexInTagValues = 0;  //
@@ -1883,7 +1885,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         // the processor id that processes global_id is global_id / num_ents_per_proc
 
         int indexInRealLocal = 0;
-        for( int i = 0; i < nbLocalVals; i++ )
+        for( size_t i = 0; i < nbLocalVals; i++ )
         {
             // to proc, marker, element local index, index in el
             int marker              = globalIds[i];
@@ -1915,7 +1917,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         for( int i = 0; i < nents_to_be_set; i++ )
         {
             // to proc, marker
-            int marker             = gids[i];
+            long marker             = gids[i];
             int to_proc            = marker % num_procs;
             int n                  = TLreq.get_n();
             TLreq.vi_wr[2 * n]     = to_proc;  // send to processor
@@ -2009,12 +2011,13 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         double* ptrVal = &TLBack.vr_rd[0];  //
         for( int i = 0; i < n1; i++ )
         {
-            int gid                                       = TLBack.vi_rd[3 * i + 1];  // marker
-            std::map< int, EntityHandle >::iterator mapIt = eh_by_gid.find( gid );
+            iMOAB_GlobalID gid = TLBack.vi_rd[3 * i + 1];  // marker
+            auto mapIt = eh_by_gid.find( gid );
             if( mapIt == eh_by_gid.end() ) continue;
+
+            // found the entity handle, set the tag data
             EntityHandle eh = mapIt->second;
             // now loop over tags
-
             for( size_t j = 0; j < tagList.size(); j++ )
             {
                 rval = context.MBI->tag_set_data( tagList[j], &eh, 1, (void*)ptrVal );MB_CHK_ERR( rval );
@@ -2891,7 +2894,7 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
     }
     Tag gidTag = context.MBI->globalId_tag();
 
-    std::vector< int > valuesComp1;
+    std::vector< long > valuesComp1;
     // populate first tuple
     if( *pid1 >= 0 )
     {
@@ -2928,12 +2931,12 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
         }
         // now fill the tuple list with info and markers
         // because we will send only the ids, order and compress the list
-        std::set< int > uniq( valuesComp1.begin(), valuesComp1.end() );
+        std::set< long > uniq( valuesComp1.begin(), valuesComp1.end() );
         TLcomp1.resize( uniq.size() );
-        for( std::set< int >::iterator sit = uniq.begin(); sit != uniq.end(); sit++ )
+        for( auto sit = uniq.begin(); sit != uniq.end(); ++sit )
         {
             // to proc, marker, element local index, index in el
-            int marker               = *sit;
+            long marker              = *sit;
             int to_proc              = marker % numProcs;
             int n                    = TLcomp1.get_n();
             TLcomp1.vi_wr[2 * n]     = to_proc;  // send to processor
@@ -3154,11 +3157,9 @@ ErrCode iMOAB_MergeVertices( iMOAB_AppID pid )
     // collapse vertices and transform cells into triangles/quads /polys
     // tags we care about: area, frac, global id
     std::vector< Tag > tagsList;
-    Tag tag;
-    ErrorCode rval = context.MBI->tag_get_handle( "GLOBAL_ID", tag );
-    if( !tag || rval != MB_SUCCESS ) return moab::MB_FAILURE;  // fatal error, abort
+    Tag tag = context.MBI->globalId_tag();
     tagsList.push_back( tag );
-    rval = context.MBI->tag_get_handle( "area", tag );
+    ErrorCode rval = context.MBI->tag_get_handle( "area", tag );
     if( tag && rval == MB_SUCCESS ) tagsList.push_back( tag );
     rval = context.MBI->tag_get_handle( "frac", tag );
     if( tag && rval == MB_SUCCESS ) tagsList.push_back( tag );
@@ -3651,8 +3652,8 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
     moab::TempestOnlineMap* weightMap = tdata.weightMaps[std::string( solution_weights_identifier )];
     assert( weightMap != nullptr );
 
-    EntityHandle source_set   = data_source.file_set;
-    EntityHandle covering_set = tdata.remapper->GetMeshSet( Remapper::CoveringMesh );
+    // EntityHandle source_set   = data_source.file_set;
+    // EntityHandle covering_set = tdata.remapper->GetMeshSet( Remapper::CoveringMesh );
     EntityHandle target_set   = data_target.file_set;  // default: row based partition
 
     int src_elem_dof_length = 1, tgt_elem_dof_length = 1;  // default=1: FV - element average DoF value

@@ -548,6 +548,16 @@ struct serial_tag_data
                 return def_val_len;
             case MB_TYPE_INTEGER:
                 return def_val_len * sizeof( int );
+            case MB_TYPE_UNSIGNED_INTEGER:
+                return def_val_len * sizeof( unsigned int );
+            case MB_TYPE_LONG:
+                return def_val_len * sizeof( long );
+            case MB_TYPE_UNSIGNED_LONG:
+                return def_val_len * sizeof( unsigned long );
+            case MB_TYPE_UNSIGNED_LONG_LONG:
+                return def_val_len * sizeof( unsigned long long );
+            case MB_TYPE_FLOAT:
+                return def_val_len * sizeof( float );
             case MB_TYPE_DOUBLE:
                 return def_val_len * sizeof( double );
             case MB_TYPE_HANDLE:
@@ -1652,8 +1662,7 @@ ErrorCode WriteHDF5Parallel::communicate_shared_set_ids( const Range& owned, con
 //                    size_t len, unsigned flags,
 //                    std::vector<int>& ids)
 //{
-//  Tag idtag;
-//  iFace->tag_get_handle(GLOBAL_ID_TAG_NAME, 1, MB_TYPE_INTEGER, idtag);
+//  Tag idtag = iFace->globalId_tag();
 //  for (size_t i = 0; i < len; ++i) {
 //    if (flags & MESHSET_ORDERED) {
 //      int tmp;

@@ -1040,24 +1040,24 @@ void ParCommGraph::SetReceivingAfterCoverage(
     return;
 }
 
-void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::vector< int >& valuesComp )
+void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::vector< long >& valuesComp )
 {
     // settle comm graph on comp
     if( rootSender || rootReceiver ) std::cout << " settle comm graph by id on component " << comp << "\n";
     int n = TLBackToComp.get_n();
     // third_method = true; // do not rely only on involved_IDs_map.size(); this can be 0 in some
     // cases
-    std::map< int, std::set< int > > uniqueIDs;
+    std::map< int, std::set< long > > uniqueIDs;
     for( int i = 0; i < n; i++ )
     {
         int to_proc  = TLBackToComp.vi_wr[3 * i + 2];
-        int globalId = TLBackToComp.vi_wr[3 * i + 1];
+        long globalId = TLBackToComp.vi_wr[3 * i + 1];
         uniqueIDs[to_proc].insert( globalId );
     }
 
     // Vector to store element
     // with respective present index
-    std::vector< std::pair< int, int > > vp;
+    std::vector< std::pair< size_t, size_t > > vp;
     vp.reserve( valuesComp.size() );
 
     // Inserting element in pair vector
@@ -1075,19 +1075,19 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
     for( auto it = uniqueIDs.begin(); it != uniqueIDs.end(); ++it )
     {
         int procId                  = it->first;
-        std::set< int >& nums       = it->second;
+        std::set< long >& nums       = it->second;
         std::vector< int >& indx    = map_ptr[procId];
         std::vector< int >& indices = map_index[procId];
         indx.resize( nums.size() + 1 );
-        int indexInVp = 0;
-        int indexVal  = 0;
+        size_t indexInVp = 0;
+        size_t indexVal  = 0;
         indx[0]       = 0;  // start from 0
         for( auto sst = nums.begin(); sst != nums.end(); ++sst, ++indexVal )
         {
-            int val = *sst;
+            long val = *sst;
             involved_IDs_map[procId].push_back( val );
             indx[indexVal + 1] = indx[indexVal];
-            while( ( indexInVp < (int)valuesComp.size() ) && ( vp[indexInVp].first <= val ) )  // should be equal !
+            while( ( indexInVp < valuesComp.size() ) && ( vp[indexInVp].first <= val ) )  // should be equal !
             {
                 if( vp[indexInVp].first == val )
                 {

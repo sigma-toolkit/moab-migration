@@ -56,7 +56,12 @@ typedef enum mhdf_TagDataType
 {
     mhdf_OPAQUE = 0, /**< Opaque/unknown type */
     mhdf_INTEGER,    /**< Integer type */
+    mhdf_UNSIGNED_INTEGER, /**< Unsigned integer type */
+    mhdf_LONG, /**< Long type */
+    mhdf_UNSIGNED_LONG, /**< Unsigned long type */
+    mhdf_UNSIGNED_LONG_LONG, /**< Unsigned long long type */
     mhdf_FLOAT,      /**< Floating point value */
+    mhdf_DOUBLE,     /**< Floating point value */
     mhdf_BITFIELD,   /**< Bit field */
     mhdf_BOOLEAN,    /**< Boolean values stored as one byte each */
     mhdf_ENTITY_ID   /**< Global ID referencing another entity in file */

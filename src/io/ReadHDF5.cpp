@@ -2931,42 +2931,79 @@ ErrorCode ReadHDF5::create_tag( const mhdf_TagDesc& info, Tag& handle, hid_t& hd
     }
     else
     {
-        switch( info.type )
+        if ( strcmp(info.name, "GLOBAL_ID" ) == 0 )
         {
-            case mhdf_INTEGER:
-                hdf_type = H5T_NATIVE_INT;
-                mb_type  = MB_TYPE_INTEGER;
-                break;
-            case mhdf_FLOAT:
-                hdf_type = H5T_NATIVE_DOUBLE;
-                mb_type  = MB_TYPE_DOUBLE;
-                break;
-            case mhdf_BOOLEAN:
-                hdf_type = H5T_NATIVE_UINT;
-                mb_type  = MB_TYPE_INTEGER;
-                break;
-            case mhdf_ENTITY_ID:
-                hdf_type = handleType;
-                mb_type  = MB_TYPE_HANDLE;
-                break;
-            default:
-                MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
-        }
-
-        if( info.size > 1 )
-        {  // Array
-            hsize_t tmpsize = info.size;
-#if defined( H5Tarray_create_vers ) && H5Tarray_create_vers > 1
-            hdf_type = H5Tarray_create2( hdf_type, 1, &tmpsize );
-#else
-            hdf_type = H5Tarray_create( hdf_type, 1, &tmpsize, NULL );
-#endif
+            // handle special case of GLOBAL_ID
+            if( info.size > 0 )
+            {
+                hdf_type = H5Tcopy( H5T_NATIVE_LONG );
+                mb_type  = MB_TYPE_LONG;
+            }
+            else
+            {
+                hdf_type = H5Tcopy( H5T_NATIVE_INT );
+                mb_type  = MB_TYPE_LONG;
+            }
         }
         else
         {
-            hdf_type = H5Tcopy( hdf_type );
+            switch( info.type )
+            {
+                case mhdf_INTEGER:
+                    hdf_type = H5T_NATIVE_INT;
+                    mb_type  = MB_TYPE_INTEGER;
+                    break;
+                case mhdf_UNSIGNED_INTEGER:
+                    hdf_type = H5T_NATIVE_UINT;
+                    mb_type  = MB_TYPE_UNSIGNED_INTEGER;
+                    break;
+                case mhdf_LONG:
+                    hdf_type = H5T_NATIVE_LONG;
+                    mb_type  = MB_TYPE_LONG;
+                    break;
+                case mhdf_UNSIGNED_LONG:
+                    hdf_type = H5T_NATIVE_ULONG;
+                    mb_type  = MB_TYPE_UNSIGNED_LONG;
+                    break;
+                case mhdf_UNSIGNED_LONG_LONG:
+                    hdf_type = H5T_NATIVE_ULLONG;
+                    mb_type  = MB_TYPE_UNSIGNED_LONG_LONG;
+                    break;
+                case mhdf_FLOAT:
+                    // hdf_type = H5T_NATIVE_FLOAT;
+                    // mb_type  = MB_TYPE_FLOAT;
+                    // break;
+                case mhdf_DOUBLE:
+                    hdf_type = H5T_NATIVE_DOUBLE;
+                    mb_type  = MB_TYPE_DOUBLE;
+                    break;
+                case mhdf_BOOLEAN:
+                    hdf_type = H5T_NATIVE_UINT;
+                    mb_type  = MB_TYPE_INTEGER;
+                    break;
+                case mhdf_ENTITY_ID:
+                    hdf_type = handleType;
+                    mb_type  = MB_TYPE_HANDLE;
+                    break;
+                default:
+                    MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
+            }
+
+            if( info.size > 1 )
+            {  // Array
+                hsize_t tmpsize = info.size;
+                #if defined( H5Tarray_create_vers ) && H5Tarray_create_vers > 1
+                hdf_type = H5Tarray_create2( hdf_type, 1, &tmpsize );
+                #else
+                hdf_type = H5Tarray_create( hdf_type, 1, &tmpsize, NULL );
+                #endif
+            }
+            else
+            {
+                hdf_type = H5Tcopy( hdf_type );
+            }
+            if( hdf_type < 0 ) MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
         }
-        if( hdf_type < 0 ) MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
     }
 
     // If default or global/mesh value in file, read it.
@@ -3055,16 +3092,24 @@ ErrorCode ReadHDF5::read_dense_tag( Tag tag_handle,
     rval = iFace->tag_get_data_type( tag_handle, mb_type );
     if( MB_SUCCESS != rval ) MB_SET_ERR( rval, "ReadHDF5 Failure" );
 
+    std::string tn( "<error>" );
+    iFace->tag_get_name( tag_handle, tn );
+
     int read_size;
     rval = iFace->tag_get_bytes( tag_handle, read_size );
     if( MB_SUCCESS != rval )  // Wrong function for variable-length tags
         MB_SET_ERR( rval, "ReadHDF5 Failure" );
     // if (MB_TYPE_BIT == mb_type)
     // read_size = (read_size + 7) / 8; // Convert bits to bytes, plus 7 for ceiling
+    // if (strcmp(tn.c_str(), "GLOBAL_ID") == 0)
+    // {
+    //     read_size = sizeof(int);
+    // }
 
     if( hdf_read_type )
     {  // If not opaque
         hsize_t hdf_size = H5Tget_size( hdf_read_type );
+        std::cout << tn << ": ReadHDF5: hdf_size = " << hdf_size << ", read_size = " << read_size << std::endl;
         if( hdf_size != (hsize_t)read_size ) MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
     }
 
@@ -3109,8 +3154,6 @@ ErrorCode ReadHDF5::read_dense_tag( Tag tag_handle,
     // ENTS ARE READ AND THEN DELETED FOR PARTIAL READS.
     // assert(handles.empty() || handles.size() == (handles.back() - handles.front() + 1));
 
-    std::string tn( "<error>" );
-    iFace->tag_get_name( tag_handle, tn );
     tn += " data for ";
     tn += ent_name;
     try
@@ -3271,6 +3314,10 @@ ErrorCode ReadHDF5::read_sparse_tag( Tag tag_handle,
         MB_SET_ERR( rval, "ReadHDF5 Failure" );
     // if (MB_TYPE_BIT == mbtype)
     // read_size = (read_size + 7) / 8; // Convert bits to bytes, plus 7 for ceiling
+    // if (strcmp(tn.c_str(), "GLOBAL_ID") == 0)
+    // {
+    //     read_size = sizeof(int);
+    // }
 
     if( hdf_read_type )
     {  // If not opaque

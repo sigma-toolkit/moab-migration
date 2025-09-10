@@ -2457,7 +2457,7 @@ ErrorCode WriteHDF5::register_known_tag_types(Interface* iface)
     error = 1;
 
   struct { const char* name; hid_t type; } list[] = {
-    { GLOBAL_ID_TAG_NAME, H5T_NATIVE_ULONG } ,
+    { GLOBAL_ID_TAG_NAME, H5T_NATIVE_LONG } ,
     { MATERIAL_SET_TAG_NAME, H5T_NATIVE_INT },
     { DIRICHLET_SET_TAG_NAME, H5T_NATIVE_INT },
     { NEUMANN_SET_TAG_NAME, H5T_NATIVE_INT },
@@ -2966,6 +2966,12 @@ ErrorCode WriteHDF5::get_tag_size( Tag tag,
             type_size      = sizeof( size_t );
             file_type      = mhdf_INTEGER;
             hdf_type       = H5T_NATIVE_ULONG;
+            close_hdf_type = false;
+            break;
+        case MB_TYPE_LONG:
+            type_size      = sizeof( long );
+            file_type      = mhdf_LONG;
+            hdf_type       = H5T_NATIVE_LONG;
             close_hdf_type = false;
             break;
         case MB_TYPE_DOUBLE:

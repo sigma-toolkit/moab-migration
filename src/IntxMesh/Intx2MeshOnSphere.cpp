@@ -443,7 +443,7 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
         rval = mb->add_entities( outSet, &polyNew, 1 );MB_CHK_ERR( rval );
 
         // tag it with the global ids from target and source elements
-        int globalID;
+        mbGIDType globalID;
         rval = mb->tag_get_data( gid, &src, 1, &globalID );MB_CHK_ERR( rval );
         rval = mb->tag_set_data( srcParentTag, &polyNew, 1, &globalID );MB_CHK_ERR( rval );
         // if(!parcomm->rank()) std::cout << "Setting parent for " << mb->id_from_handle(polyNew) <<
@@ -607,7 +607,7 @@ ErrorCode Intx2MeshOnSphere::update_tracer_data( EntityHandle out_set, Tag& tagE
 #ifdef MOAB_HAVE_MPI
             if( !remote_cells_with_tracers ) MB_CHK_SET_ERR( MB_FAILURE, "no remote cells, failure\n" );
             // maybe the element is remote, from another processor
-            int global_id_src;
+            mbGIDType global_id_src;
             rval = mb->tag_get_data( gid, &src, 1, &global_id_src );MB_CHK_SET_ERR( rval, "can't get arrival target for corresponding source gid" );
             // find the
             int index_in_remote = remote_cells_with_tracers->find( 1, global_id_src );
@@ -983,7 +983,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         }
     }
 
-    std::vector< int > gids( num_mesh_verts );
+    std::vector< mbGIDType > gids( num_mesh_verts );
     rval = mb->tag_get_data( gid, mesh_verts, &gids[0] );MB_CHK_SET_ERR( rval, "can't get vertices gids" );
 
     // ranges to send to each processor; will hold vertices and elements (quads/ polygons)
@@ -1161,7 +1161,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         for( Range::iterator it = Q.begin(); it != Q.end(); ++it )
         {
             EntityHandle q = *it;  // this is a second mesh cell (or src, lagrange set)
-            int global_id;
+            mbGIDType global_id;
             rval = mb->tag_get_data( gid, &q, 1, &global_id );MB_CHK_SET_ERR( rval, "can't get gid for polygon" );
             int n                    = TLq.get_n();  // current size
             TLq.vi_wr[sizeTuple * n] = to_proc;      //
@@ -1237,7 +1237,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     int n = TLv.get_n();  // the size of the points received
     for( int i = 0; i < n; i++ )
     {
-        int globalId = TLv.vi_rd[2 * i + 1];
+        mbGIDType globalId = TLv.vi_rd[2 * i + 1];
         if( globalID_to_vertex_handle.find( globalId ) ==
             globalID_to_vertex_handle.end() )  // we do not have locally this vertex (yet)
                                                // so we have to create it, and add to the inverse map
@@ -1261,7 +1261,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     for( Range::iterator it = local_q.begin(); it != local_q.end(); ++it )
     {
         EntityHandle q = *it;  // these are from source cells, local
-        int gid_el;
+        mbGIDType gid_el;
         rval = mb->tag_get_data( gid, &q, 1, &gid_el );MB_CHK_SET_ERR( rval, "can't get global id of cell " );
         assert( gid_el >= 0 );
         globalID_to_eh[gid_el] = q;  // do we need this? yes, now we do; parent tags are now using it heavily
@@ -1275,7 +1275,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
 
     for( int i = 0; i < n; i++ )
     {
-        int globalIdEl = TLq.vi_rd[sizeTuple * i + 1];
+        mbGIDType globalIdEl = TLq.vi_rd[sizeTuple * i + 1];
         // int from_proc=TLq.vi_rd[sizeTuple * i ]; // we do not need from_proc anymore
 
         // do we already have a cell with this global ID, represented?
@@ -1286,7 +1286,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         int nnodes = -1;
         for( int j = 0; j < max_edges_1; j++ )
         {
-            int vgid = TLq.vi_rd[sizeTuple * i + 2 + j];  // vertex global ID
+            mbGIDType vgid = TLq.vi_rd[sizeTuple * i + 2 + j];  // vertex global ID
             if( vgid == 0 )
                 new_conn[j] = 0;  // this can actually happen for polygon mesh (when we have less
                                   // number of vertices than max_edges)

@@ -309,7 +309,6 @@ public:
      *        Currently, only the functionality to generate numbering on CS grids is supported.
      *
      * @param mesh Mesh object
-     * @param ntot_elements Total number of elements
      * @param entities MOAB range of entities
      * @param secondary_entities MOAB range of secondary entities (optional)
      * @param dofTagName Name of the DoF tag
@@ -317,7 +316,6 @@ public:
      * @return ErrorCode indicating the status of the metadata generation
      */
     moab::ErrorCode GenerateMeshMetadata(Mesh& mesh,
-                                           const int ntot_elements,
                                            moab::Range& entities,
                                            moab::Range* secondary_entities,
                                            const std::string dofTagName,

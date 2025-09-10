@@ -287,9 +287,9 @@ class ParCommGraph
     // these will be used now after coverage, quick fix; they will also be populated by
     // iMOAB_CoverageGraph
     TypeGraph graph_type;  // this should be false , set to true in settle send graph, to use send_IDs_map
-    std::map< int, std::vector< long > > involved_IDs_map;  // replace send and recv IDs_mapp with involved_IDs_map
+    std::map< int, std::vector< mbGIDType > > involved_IDs_map;  // replace send and recv IDs_mapp with involved_IDs_map
     // used only for third method: DOF_BASED
-    std::map< int, std::vector< long > >
+    std::map< int, std::vector< mbGIDType > >
         map_index;  // from index in involved[] to index in values[] of tag, for each corr task
     std::map< int, std::vector< int > > map_ptr;  //  lmap[ie], lmap[ie+1], pointer into map_index[corrTask]
 };

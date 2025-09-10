@@ -753,7 +753,7 @@ void check_equal( const moab::Range& A,
 #endif  // #ifdef MOAB_RANGE_HPP
 
 void check_baseline_file( std::string basefile,
-                          std::vector< int >& gids,
+                          std::vector< mbGIDType >& gids,
                           std::vector< double >& vals,
                           double eps,
                           int& err_code )

@@ -46,7 +46,6 @@ const double EPS1 = 1.0e-6;
 
 void test_eval( ElemEvaluator& ee, bool test_integrate )
 {
-
     CartVect params, posn, params2;
     int is_inside;
     Matrix3 jacob;

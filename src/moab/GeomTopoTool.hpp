@@ -194,7 +194,7 @@ class GeomTopoTool
     //! Adds a geometry set to the range of all geometry sets, the model set, and root set
     //  Make sure the set has the proper geometry dimension tag
     //  This could make the obb tree out of date
-    ErrorCode add_geo_set( EntityHandle set, int dimension, int global_id = 0 );
+    ErrorCode add_geo_set( EntityHandle set, int dimension, mbGIDType global_id = 0 );
 
     //! Will assume no geo sets are defined for this surface
     //  Will output a mesh_set that contains everything (all sets of interest), for proper output
@@ -296,7 +296,7 @@ class GeomTopoTool
 
     Range geomRanges[5];  // add one more dimension, for set of gentities; by default, they will
                           // have geom_dimension 4
-    int maxGlobalId[5];   // one max global id for each dimension
+    long maxGlobalId[5];   // one max global id for each dimension
     bool updated;
 
     OrientedBoxTreeTool* obbTree;

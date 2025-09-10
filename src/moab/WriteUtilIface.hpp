@@ -103,7 +103,7 @@ class WriteUtilIface
                                            const Range& entities,
                                            Tag element_id_tag,
                                            int start_element_id,
-                                           int* array,
+                                           mbGIDType* array,
                                            bool add_sizes = false ) = 0;
 
     /** Get connectivity for elements
@@ -139,7 +139,7 @@ class WriteUtilIface
                                            const int vertices_per_elem,
                                            Tag node_id_tag,
                                            const size_t array_size,
-                                           int* const element_array,
+                                           mbGIDType* const element_array,
                                            bool add_sizes = false ) = 0;
 
     /** Get connectivity for elements

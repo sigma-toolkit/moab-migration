@@ -217,7 +217,7 @@ ErrorCode WriteGMV::local_write_mesh( const char* file_name,
 
     // iterate over types in selected dimension
 
-    std::vector< int > connect;
+    std::vector< mbGIDType > connect;
     std::vector< EntityHandle > connecth;
 
     if( mesh )

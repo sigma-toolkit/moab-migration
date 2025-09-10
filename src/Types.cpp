@@ -7,8 +7,16 @@ const char* const moab::ErrorCodeStr[] = {
     "MB_INVALID_SIZE",     "MB_UNSUPPORTED_OPERATION",   "MB_UNHANDLED_OPTION",  "MB_STRUCTURED_MESH",
     "MB_FAILURE" };
 
-const char* const moab::DataTypeStr[] = { "MB_TYPE_OPAQUE", "MB_TYPE_INTEGER", "MB_TYPE_DOUBLE", "MB_TYPE_BIT",
-                                          "MB_TYPE_HANDLE" };
+const char* const moab::DataTypeStr[] = { "MB_TYPE_OPAQUE",              // 0
+                                          "MB_TYPE_INTEGER",             // 1
+                                          "MB_TYPE_UNSIGNED_INTEGER",    // 2
+                                          "MB_TYPE_LONG",                // 3
+                                          "MB_TYPE_UNSIGNED_LONG",       // 4
+                                          "MB_TYPE_UNSIGNED_LONG_LONG",  // 5
+                                          "MB_TYPE_FLOAT",               // 6
+                                          "MB_TYPE_DOUBLE",              // 7
+                                          "MB_TYPE_BIT",                 // 8
+                                          "MB_TYPE_HANDLE" };            // 9
 
 const char* const SenseTypeStr_private[] = { "SENSE_INVALID", "SENSE_REVERSE", "SENSE_BOTH", "SENSE_FORWARD" };
 

@@ -345,9 +345,9 @@ struct CommunicationPattern {
 static moab::ErrorCode determine_communication_pattern(
     moab::ParallelComm* pcomm,
     const std::vector<Eigen::Triplet<double>>& local_triplets,
-    const std::vector<unsigned int>& row_gdofmap,
+    const std::vector<mbGIDType>& row_gdofmap,
     CommunicationPattern& comm_pattern,
-    std::map<int, std::set<int>>& all_row_sharers)
+    std::map<mbGIDType, std::set<int>>& all_row_sharers)
 {
     int rank = pcomm->rank();
     int size = pcomm->size();
@@ -453,11 +453,11 @@ static moab::ErrorCode determine_communication_pattern(
  */
 static moab::ErrorCode perform_distributed_reduction(
     moab::ParallelComm* pcomm,
-    const std::map<int, int>& rowMap,
-    const std::map<int, int>& colMap,
-    const std::vector<unsigned int>& row_gdofmap,
-    const std::vector<unsigned int>& col_gdofmap,
-    const std::map<int, std::set<int>>& all_row_sharers,
+    const std::map<mbGIDType, mbGIDType>& rowMap,
+    const std::map<mbGIDType, mbGIDType>& colMap,
+    const std::vector<mbGIDType>& row_gdofmap,
+    const std::vector<mbGIDType>& col_gdofmap,
+    const std::map<mbGIDType, std::set<int>>& all_row_sharers,
     std::vector<Eigen::Triplet<double>>& local_triplets)
 {
     int rank = pcomm->rank();
@@ -709,7 +709,7 @@ moab::ErrorCode determine_communication_pattern_from_tag(
     const char* tag_name,
     moab::Tag dof_tag,
     CommunicationPattern& comm_pattern,
-    std::map<int, std::set<int>>& all_dof_sharers)
+    std::map<mbGIDType, std::set<int>>& all_dof_sharers)
 {
     moab::ErrorCode rval;
     moab::Interface* mb = pcomm->get_moab();
@@ -787,7 +787,7 @@ moab::ErrorCode determine_communication_pattern_from_tag(
         moab::EntityHandle elem = *it;
 
         // Get DoF numbers for this element (16 DoFs per element)
-        std::vector<int> dof_numbers(16);
+        std::vector<mbGIDType> dof_numbers(16);
         rval = mb->tag_get_data(dof_tag, &elem, 1, dof_numbers.data());
         if (rval != moab::MB_SUCCESS) {
             std::cerr << "Rank " << rank << ": Failed to get DOF data for element " << elem << std::endl;
@@ -997,7 +997,7 @@ moab::ErrorCode moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3(bool pe
     if (perform_reduction && false) {
         // --- Determine the communication pattern based on row distribution ---
         CommunicationPattern comm_pattern;
-        std::map<int, std::set<int>> all_row_sharers;
+        std::map<mbGIDType, std::set<int>> all_row_sharers;
         constexpr int method = 1;
 
         if (method == 0)

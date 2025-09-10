@@ -258,8 +258,8 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     success = NCFUNCAG( _vara_int )( _fileId, vmask.varId, &vmask.readStarts[0], &vmask.readCounts[0], &mask[0] );
     if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read int data for mask variable " );
 
-    std::vector< int > gids( local_elems );
-    int elem_index      = 0;
+    std::vector< mbGIDType > gids( local_elems );
+    size_t elem_index      = 0;
     int global_row_size = gDims[3] - gDims[0];  // this is along first dimension in global decomposition
     // create global id array for cells, for all cells, including those with 0 mask; which will be not used eventually
     for( int j = lCDims[1]; j < lCDims[4]; j++ )
@@ -573,7 +573,7 @@ ErrorCode NCHelperDomain::redistribute_cells( ParallelComm* myPcomm,
                                               std::vector< double >& frac,  // fractions
                                               std::vector< int >& masks,    // mask
                                               std::vector< double >& area,  // area
-                                              std::vector< int >& gids,     // global ids
+                                              std::vector< mbGIDType >& gids,     // global ids
                                               int nv,                       // number of vertices per cell
                                               bool nv_last )                // type of xv, yv, first or last
 {
@@ -591,7 +591,7 @@ ErrorCode NCHelperDomain::redistribute_cells( ParallelComm* myPcomm,
 
     size_t actual_index = 0;
     std::vector< double > xi( num_local_cells ), yi( num_local_cells ), zi( num_local_cells );
-    std::vector< int > gids2( num_local_cells );
+    std::vector< mbGIDType > gids2( num_local_cells );
 
     // now loop over coordinates and accumulate
     const double deg_to_rad = std::acos( -1.0 ) / 180.0;

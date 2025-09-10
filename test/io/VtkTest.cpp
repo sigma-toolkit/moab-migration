@@ -1320,7 +1320,7 @@ bool test_write_free_nodes()
     const int conn[][4] = { { 0, 1, 4, 3 }, { 1, 2, 5, 4 }, { 3, 4, 7, 6 } };
 
     Tag gid;
-    rval = moab.tag_get_handle( "GLOBAL_ID", 1, moab::MB_TYPE_INTEGER, gid );
+    rval = moab.tag_get_handle( "GLOBAL_ID", 1, moab::MB_TYPE_LONG, gid );
     assert( MB_SUCCESS == rval );
     EntityHandle econn[4], elems[3];
     for( unsigned i = 0; i < 3; ++i )
@@ -1329,7 +1329,7 @@ bool test_write_free_nodes()
             econn[j] = verts[conn[i][j]];
         rval = moab.create_element( MBQUAD, econn, 4, elems[i] );
         assert( MB_SUCCESS == rval );
-        int id = i + 1;
+        long id = i + 1;
         rval   = moab.tag_set_data( gid, &elems[i], 1, &id );
         assert( MB_SUCCESS == rval );
     }

@@ -404,6 +404,11 @@ static hid_t create_tag_common( mhdf_FileHandle file_handle,
                 hdf_type = H5Tcopy( H5T_NATIVE_UINT );
                 break;
 
+            case mhdf_LONG:
+                arr_len  = abs( size );
+                hdf_type = H5Tcopy( H5T_NATIVE_LONG );
+                break;
+
             case mhdf_UNSIGNED_LONG:
                 arr_len  = abs( size );
                 hdf_type = H5Tcopy( H5T_NATIVE_ULONG );
@@ -971,12 +976,12 @@ void mhdf_getTagInfo( mhdf_FileHandle file_handle,
     switch( class_tmp )
     {
         case H5T_INTEGER:
-            *class_out = ( size == 1 ) ? mhdf_BOOLEAN : mhdf_INTEGER;
+            *class_out = ( size == 1  ? mhdf_BOOLEAN : ( size == sizeof(int) ? mhdf_INTEGER : ( size == sizeof(long) ? mhdf_LONG : ( size == sizeof(long long) ? mhdf_UNSIGNED_LONG_LONG : mhdf_UNSIGNED_INTEGER ) ) ) );
             *size_out  = 1;
             break;
 
         case H5T_FLOAT:
-            *class_out = mhdf_FLOAT;
+            *class_out = ( size == 4 ? mhdf_FLOAT : mhdf_DOUBLE );
             *size_out  = 1;
             break;
 
@@ -1048,12 +1053,12 @@ void mhdf_getTagInfo( mhdf_FileHandle file_handle,
             switch( class_tmp )
             {
                 case H5T_INTEGER:
-                    *class_out = ( sup_size == 1 ) ? mhdf_BOOLEAN : mhdf_INTEGER;
+                    *class_out = ( sup_size == 1  ? mhdf_BOOLEAN : ( sup_size == sizeof(int) ? mhdf_INTEGER : ( sup_size == sizeof(long) ? mhdf_LONG : ( sup_size == sizeof(long long) ? mhdf_UNSIGNED_LONG_LONG : mhdf_UNSIGNED_INTEGER ) ) ) );
                     *size_out  = dims[0];
                     break;
 
                 case H5T_FLOAT:
-                    *class_out = mhdf_FLOAT;
+                    *class_out = ( sup_size == 4 ? mhdf_FLOAT : mhdf_DOUBLE );
                     *size_out  = dims[0];
                     break;
 
@@ -1070,7 +1075,7 @@ void mhdf_getTagInfo( mhdf_FileHandle file_handle,
 
     if( is_handle )
     {
-        if( *class_out != mhdf_INTEGER && *class_out != mhdf_UNSIGNED_INTEGER && *class_out != mhdf_UNSIGNED_LONG && *class_out != mhdf_UNSIGNED_LONG_LONG )
+        if( *class_out != mhdf_INTEGER && *class_out != mhdf_UNSIGNED_INTEGER && *class_out != mhdf_LONG && *class_out != mhdf_UNSIGNED_LONG && *class_out != mhdf_UNSIGNED_LONG_LONG )
         {
             mhdf_setFail( status, "Non-integer tag marked as handle type." );
             return;

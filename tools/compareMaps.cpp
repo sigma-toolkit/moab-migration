@@ -300,13 +300,12 @@ struct CompareTriplets {
 
 int main( int argc, char* argv[] )
 {
-
     ProgOptions opts;
 
     std::string inputfile1, inputfile2;
+    int print_diff = 10;
     opts.addOpt< std::string >( "firstMap,i", "input filename 1", &inputfile1 );
     opts.addOpt< std::string >( "secondMap,j", "input second map", &inputfile2 );
-    int print_diff = 10;
     opts.addOpt< int >( "print_differences,p", "print differences ", &print_diff );
 
     opts.parseCommandLine( argc, argv );
@@ -376,7 +375,8 @@ int main( int argc, char* argv[] )
     }
     Eigen::SparseMatrix< double > weight1( nb1, na1 );
 
-    weight1.setFromTriplets( tripletList.begin(), tripletList.end() );
+    weight1.setFromTriplets( tripletList.begin(), tripletList.end(), [] (const double& a, const double &) { return a; } );
+    // weight1.setFromTriplets( tripletList.begin(), tripletList.end(), [] (const double& a, const double &b) { return a + b; } );
     weight1.makeCompressed();
 
     if( ns1 != ns2 ) tripletList.resize( ns2 );
@@ -386,7 +386,8 @@ int main( int argc, char* argv[] )
     }
     Eigen::SparseMatrix< double > weight2( nb2, na2 );
 
-    weight2.setFromTriplets( tripletList.begin(), tripletList.end() );
+    // weight2.setFromTriplets( tripletList.begin(), tripletList.end(), [] (const double&, const double &b) { return b; } );
+    weight2.setFromTriplets( tripletList.begin(), tripletList.end(), [] (const double& a, const double &b) { return a + b; } );
     weight2.makeCompressed();
 
     // default storage type is column major

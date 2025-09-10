@@ -1077,7 +1077,7 @@ ErrorCode WriteNCDF::write_elementblocks( ExodusMeshInfo& mesh_info, std::vector
         {
             num_nodes = num_nodes_per_elem;
         }
-        int* connectivity = new int[num_nodes];
+        mbGIDType* connectivity = new mbGIDType[num_nodes];
 
         ErrorCode result = MB_SUCCESS;
         if( block.element_type != EXOII_POLYHEDRON )
@@ -1117,7 +1117,7 @@ ErrorCode WriteNCDF::write_elementblocks( ExodusMeshInfo& mesh_info, std::vector
         if( EXOII_POLYGON == block.element_type )
         {
             size_t start[1] = { 0 }, count[1] = { num_nodes_per_elem };
-            int fail = nc_put_vara_int( ncFile, nc_var, start, count, connectivity );
+            int fail = nc_put_vara_long( ncFile, nc_var, start, count, connectivity );
             if( NC_NOERR != fail )
             {
                 delete[] connectivity;
@@ -1138,7 +1138,7 @@ ErrorCode WriteNCDF::write_elementblocks( ExodusMeshInfo& mesh_info, std::vector
                 ErrorCode rval           = mdbImpl->get_connectivity( polg, conn, nnodes );MB_CHK_ERR( rval );
                 connectivity[j] = nnodes;
             }
-            fail = nc_put_vara_int( ncFile, nc_var, start, count, connectivity );
+            fail = nc_put_vara_long( ncFile, nc_var, start, count, connectivity );
             if( NC_NOERR != fail )
             {
                 delete[] connectivity;
@@ -1148,7 +1148,7 @@ ErrorCode WriteNCDF::write_elementblocks( ExodusMeshInfo& mesh_info, std::vector
         else if( block.element_type != EXOII_POLYHEDRON )
         {
             size_t start[2] = { 0, 0 }, count[2] = { num_elem, num_nodes_per_elem };
-            int fail = nc_put_vara_int( ncFile, nc_var, start, count, connectivity );
+            int fail = nc_put_vara_long( ncFile, nc_var, start, count, connectivity );
             if( NC_NOERR != fail )
             {
                 delete[] connectivity;
@@ -1202,7 +1202,7 @@ ErrorCode WriteNCDF::write_elementblocks( ExodusMeshInfo& mesh_info, std::vector
                 // num_faces+=nfaces;
             }
             count[0] = ixcon;  // facconn1
-            int fail = nc_put_vara_int( ncFile, nc_var, start, count, connectivity );
+            int fail = nc_put_vara_long( ncFile, nc_var, start, count, connectivity );
             if( NC_NOERR != fail )
             {
                 delete[] connectivity;

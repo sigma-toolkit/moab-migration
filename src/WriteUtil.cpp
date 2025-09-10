@@ -125,8 +125,8 @@ ErrorCode WriteUtil::get_node_coords( const int num_arrays,
     if( 0 == node_id_tag || MB_SUCCESS != result ) return result;
 
     // Now assign tags
-    std::vector< int > ids( num_nodes );
-    int node_id = start_node_id;
+    std::vector< mbGIDType > ids( num_nodes );
+    mbGIDType node_id = start_node_id;
     for( int i = 0; i < num_nodes; i++ )
         ids[i] = node_id++;
     result = mMB->tag_set_data( node_id_tag, entities, &ids[0] );
@@ -218,7 +218,7 @@ ErrorCode WriteUtil::get_element_connect( const int num_elements,
                                           const Range& elements,
                                           Tag element_id_tag,
                                           int start_element_id,
-                                          int* element_array,
+                                          mbGIDType* element_array,
                                           bool add_sizes )
 {
     // Check the data we got
@@ -311,7 +311,7 @@ ErrorCode WriteUtil::get_element_connect( Range::const_iterator iter,
                                           const int vertices_per_elem,
                                           Tag node_id_tag,
                                           const size_t elem_array_size,
-                                          int* const element_array,
+                                          mbGIDType* const element_array,
                                           bool add_sizes )
 {
     // Check the data we got
@@ -324,8 +324,8 @@ ErrorCode WriteUtil::get_element_connect( Range::const_iterator iter,
 
     // loop over range, getting coordinate value
     EntityType current_type = MBMAXTYPE;
-    int* output_iter        = element_array;
-    int* const output_end   = element_array + elem_array_size;
+    mbGIDType* output_iter        = element_array;
+    mbGIDType* const output_end   = element_array + elem_array_size;
     while( iter != end )
     {
         // Make sure we have the right sequence list (and get the sequence

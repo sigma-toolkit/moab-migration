@@ -2623,7 +2623,15 @@ Tag Core::globalId_tag()
 {
     const size_t negone = -1;
     if( 0 == globalIdTag )
-        tag_get_handle( GLOBAL_ID_TAG_NAME, 1, MB_TYPE_LONG, globalIdTag, MB_TAG_CREAT | MB_TAG_DENSE, &negone );
+    {
+        // Try to get existing GLOBAL_ID tag first (for backward compatibility)
+        ErrorCode rval = tag_get_handle( GLOBAL_ID_TAG_NAME, globalIdTag );
+        if( MB_SUCCESS != rval )
+        {
+            // Create new GLOBAL_ID tag with MB_TYPE_LONG
+            tag_get_handle( GLOBAL_ID_TAG_NAME, 1, MB_TYPE_LONG, globalIdTag, MB_TAG_CREAT | MB_TAG_DENSE, &negone );
+        }
+    }
     return globalIdTag;
 }
 
@@ -2929,7 +2937,7 @@ ErrorCode Core::list_entity( const EntityHandle entity ) const
 
     if( 0 != globalIdTag )
     {
-        int dum;
+        mbGIDType dum;
         result = tag_get_data( globalIdTag, &entity, 1, &dum );
         if( MB_SUCCESS == result ) std::cout << "Global id = " << dum << std::endl;
     }
@@ -3732,6 +3740,17 @@ ErrorCode Core::print_entity_tags( std::string indent_prefix, const EntityHandle
                         std::cout << uint_vals[i] << " ";
                 else
                     std::cout << uint_vals[0] << "... (mult values)";
+                std::cout << std::endl;
+                break;
+            case MB_TYPE_LONG:
+                result = this->tag_get_data( *vit, &handle, 1, &ulong_vals[0] );
+                if( MB_SUCCESS != result ) continue;
+                std::cout << indent_prefix << tag_name << " = ";
+                if( this_size < 10 )
+                    for( int i = 0; i < this_size; i++ )
+                        std::cout << ulong_vals[i] << " ";
+                else
+                    std::cout << ulong_vals[0] << "... (mult values)";
                 std::cout << std::endl;
                 break;
             case MB_TYPE_UNSIGNED_LONG:

@@ -83,7 +83,7 @@ void moab::TempestOnlineMap::serializeSparseMatrix( const SparseMatrixType& mat,
 
 #endif
 
-int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< unsigned int >& gdofmap,
+int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< mbGIDType >& gdofmap,
                                                       DataArray1D< double >& vecFaceArea,
                                                       DataArray1D< double >& dCenterLon,
                                                       DataArray1D< double >& dCenterLat,
@@ -979,7 +979,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteHDF5MapFile( const std::string& str
     // row_gdofmap [ row_ldofmap [ 0 : local_ndofs ] ] = GDOF
     ////
     int maxrow = 0, maxcol = 0;
-    std::vector< int > src_global_dofs( tot_src_size ), tgt_global_dofs( tot_tgt_size );
+    std::vector< mbGIDType > src_global_dofs( tot_src_size ), tgt_global_dofs( tot_tgt_size );
     for( int i = 0; i < tot_src_size; ++i )
     {
         src_global_dofs[i] = srccol_gdofmap[i];
@@ -1203,7 +1203,7 @@ void print_progress( const int barWidth, const float progress, const char* messa
 ///////////////////////////////////////////////////////////////////////////////
 
 moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
-                                                         const std::vector< int >& owned_dof_ids,
+                                                         const std::vector< mbGIDType >& owned_dof_ids,
                                                          int arearead,
                                                          std::vector< double >& vecAreaA,
                                                          int& nA,
@@ -1241,7 +1241,6 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     }
 
     // Read SparseMatrix entries
-
     if( ncMap.is_valid() )
     {
         NcDim* dimNS = ncMap.get_dim( "n_s" );
@@ -1339,7 +1338,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         localSizeB += nB % size;
     }
 
-    std::vector< int > vecRow, vecCol;
+    std::vector< mbGIDType > vecRow, vecCol;
     std::vector< double > vecS;
     vecRow.resize( localSize );
     vecCol.resize( localSize );
@@ -1383,9 +1382,9 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         ERR_PARNC( ncmpi_inq_varid( ncfile, "S", &varid ) );
         ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &start, &count, &vecS[0] ) );
         ERR_PARNC( ncmpi_inq_varid( ncfile, "row", &varid ) );
-        ERR_PARNC( ncmpi_get_vara_int_all( ncfile, varid, &start, &count, &vecRow[0] ) );
+        ERR_PARNC( ncmpi_get_vara_all( ncfile, varid, &start, &count, &vecRow[0], count, MPI_INT ) );
         ERR_PARNC( ncmpi_inq_varid( ncfile, "col", &varid ) );
-        ERR_PARNC( ncmpi_get_vara_int_all( ncfile, varid, &start, &count, &vecCol[0] ) );
+        ERR_PARNC( ncmpi_get_vara_all( ncfile, varid, &start, &count, &vecCol[0], count, MPI_INT ) );
 
         if( readAreaA )
         {
@@ -1435,8 +1434,8 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         // populate
         for( int i = 0; i < localSize; i++ )
         {
-            int rowval  = vecRow[i] - 1;  // dofs are 1 based in the file; sparse matrix is 0 based
-            int colval  = vecCol[i] - 1;
+            mbGIDType rowval  = vecRow[i] - 1;  // dofs are 1 based in the file; sparse matrix is 0 based
+            mbGIDType colval  = vecCol[i] - 1;
             int to_proc = -1;
 
             to_proc = rowval / nPerPart;
@@ -1463,7 +1462,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             for( size_t i = 0; i < owned_dof_ids.size(); i++ )
             {
                 int to_proc = -1;
-                int dof_val = owned_dof_ids[i] - 1;  // dofs are 1 based in the file, partition from 0 ?
+                mbGIDType dof_val = owned_dof_ids[i] - 1;  // dofs are 1 based in the file, partition from 0 ?
                 to_proc     = dof_val / nPerPart;
                 if( to_proc == size ) to_proc = size - 1;
 
@@ -1481,8 +1480,8 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
 
             //sort_buffer.buffer_init( tl->get_n() );
 
-            std::map< int, int > startDofIndex, endDofIndex;  // indices in tl_re for values we want
-            int dofVal = -1;
+            std::map< mbGIDType, mbGIDType > startDofIndex, endDofIndex;  // indices in tl_re for values we want
+            mbGIDType dofVal = -1;
             if( tl_re.get_n() > 0 )
             {
                 dofVal = tl_re.vi_rd[1];  // first dof val on this rank  tl_re.vi_rd[2 * 0 + 1];
@@ -1491,7 +1490,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
                 endDofIndex[dofVal]   = 0;  // start and end
                 for( unsigned k = 1; k < tl_re.get_n(); k++ )
                 {
-                    int newDof = tl_re.vi_rd[2 * k + 1];
+                    mbGIDType newDof = tl_re.vi_rd[2 * k + 1];
                     if( dofVal == newDof )
                     {
                         endDofIndex[dofVal] = k;  // increment by 1 actually
@@ -1519,7 +1518,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
 
             for( unsigned k = 0; k < tl->get_n(); k++ )
             {
-                int valDof = tl->vi_rd[3 * k + 1];  // 1 for row, 2 for column // first value, it should be
+                mbGIDType valDof = tl->vi_rd[3 * k + 1];  // 1 for row, 2 for column // first value, it should be
                 if( startDofIndex.find( valDof ) == startDofIndex.end() ) continue;
                 for( int ire = startDofIndex[valDof]; ire <= endDofIndex[valDof]; ire++ )
                 {
@@ -1542,18 +1541,18 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         }
 
         // set of row and col used on this task
-        std::set< int > rowSet;
-        std::set< int > colSet;
+        std::set< mbGIDType > rowSet;
+        std::set< mbGIDType > colSet;
         // populate the sparsematrix, using rowMap and colMap
         int n = tl->get_n();
         for( int i = 0; i < n; i++ )
         {
-            const int vecRowValue = tl->vi_wr[3 * i + 1];
-            const int vecColValue = tl->vi_wr[3 * i + 2];
+            const mbGIDType vecRowValue = tl->vi_wr[3 * i + 1];
+            const mbGIDType vecColValue = tl->vi_wr[3 * i + 2];
             rowSet.insert( vecRowValue );
             colSet.insert( vecColValue );
         }
-        int index = 0;
+        mbGIDType index = 0;
         row_gdofmap.resize( rowSet.size() );
         for( auto setIt : rowSet )
         {
@@ -1573,8 +1572,8 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         tripletList.reserve( n );
         for( int i = 0; i < n; i++ )
         {
-            const int vecRowValue = tl->vi_wr[3 * i + 1];
-            const int vecColValue = tl->vi_wr[3 * i + 2];
+            const mbGIDType vecRowValue = tl->vi_wr[3 * i + 1];
+            const mbGIDType vecColValue = tl->vi_wr[3 * i + 2];
             double value          = tl->vr_wr[i];
             tripletList.emplace_back( rowMap[vecRowValue], colMap[vecColValue], value );
         }
@@ -1584,13 +1583,13 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
 #endif
     {
         // set of row and col used on this task
-        std::set< int > rowSet;
-        std::set< int > colSet;
+        std::set< mbGIDType > rowSet;
+        std::set< mbGIDType > colSet;
         // populate the sparsematrix, using rowMap and colMap
         for( int i = 0; i < nS; i++ )
         {
-            const int vecRowValue = vecRow[i] - 1;
-            const int vecColValue = vecCol[i] - 1;
+            const mbGIDType vecRowValue = vecRow[i] - 1;
+            const mbGIDType vecColValue = vecCol[i] - 1;
             rowSet.insert( vecRowValue );
             colSet.insert( vecColValue );
         }
@@ -1615,9 +1614,9 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         tripletList.reserve( nS );
         for( int i = 0; i < nS; i++ )
         {
-            const int vecRowValue = vecRow[i] - 1;  // the rows, cols are 1 based in the file
-            const int vecColValue = vecCol[i] - 1;  // sparse matrix will be 0 based
-            double value          = vecS[i];
+            const mbGIDType vecRowValue = vecRow[i] - 1;  // the rows, cols are 1 based in the file
+            const mbGIDType vecColValue = vecCol[i] - 1;  // sparse matrix will be 0 based
+            double value               = vecS[i];
             tripletList.emplace_back( rowMap[vecRowValue], colMap[vecColValue], value );
         }
     }

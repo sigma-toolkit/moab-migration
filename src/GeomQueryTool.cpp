@@ -122,7 +122,6 @@ class FindVolumeIntRegCtxt : public OrientedBoxTreeTool::IntRegCtxt
 
 class GQT_IntRegCtxt : public OrientedBoxTreeTool::IntRegCtxt
 {
-
   private:
     // Input
     OrientedBoxTreeTool* tool;
@@ -204,7 +203,6 @@ class GQT_IntRegCtxt : public OrientedBoxTreeTool::IntRegCtxt
 
 ErrorCode GQT_IntRegCtxt::update_orient( EntityHandle set, int* surfTriOrient )
 {
-
     ErrorCode rval;
 
     // Get desired orientation of surface wrt volume. Use this to return only

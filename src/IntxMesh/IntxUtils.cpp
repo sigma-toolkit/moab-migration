@@ -1327,8 +1327,8 @@ ErrorCode IntxUtils::enforce_convexity( Interface* mb, EntityHandle lset, int my
         {
             rval = mb->tag_get_data( corrTag, &eh, 1, &corrHandle );MB_CHK_ERR( rval );
         }
-        int gid = 0;
-        rval    = mb->tag_get_data( gidTag, &eh, 1, &gid );MB_CHK_ERR( rval );
+        mbGIDType gid = 0;
+        rval          = mb->tag_get_data( gidTag, &eh, 1, &gid );MB_CHK_ERR( rval );
         coords.resize( 3 * nsides );
         if( nsides < 4 ) continue;  // if already triangles, don't bother
         // get coordinates

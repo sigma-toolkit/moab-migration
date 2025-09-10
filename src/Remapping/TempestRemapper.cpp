@@ -657,10 +657,10 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
         useRange = false;
     }
 
-    std::vector< int > globIds( nelems );
+    std::vector< mbGIDType > globIds( nelems );
     moab::Tag gid = m_interface->globalId_tag();
-    rval          = m_interface->tag_get_data( gid, elems, &globIds[0] );MB_CHK_ERR( rval );
-    std::vector< size_t > sortedIdx;
+    MB_CHK_SET_ERR( m_interface->tag_get_data( gid, elems, globIds.data() ), "Failed to get global IDs" );
+    std::vector< mbGIDType > sortedIdx;
     if( offlineWorkflow )
     {
         sortedIdx.resize( nelems );
@@ -669,10 +669,10 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
         // sort indexes based on comparing values in v, using std::stable_sort instead of std::sort
         // to avoid unnecessary index re-orderings when v contains elements of equal values
         std::sort( sortedIdx.begin(), sortedIdx.end(),
-                   [&globIds]( size_t i1, size_t i2 ) { return globIds[i1] < globIds[i2]; } );
+                   [&globIds]( mbGIDType i1, mbGIDType i2 ) { return globIds[i1] < globIds[i2]; } );
     }
 
-    for( unsigned iface = 0; iface < nelems; ++iface )
+    for( mbGIDType iface = 0; iface < nelems; ++iface )
     {
         Face& face           = faces[iface];
         EntityHandle ehandle = ( offlineWorkflow ? elems[sortedIdx[iface]] : elems[iface] );
@@ -803,7 +803,7 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
 
         // We need a global to local numbering
         Tag gidtag = m_interface->globalId_tag();
-        std::vector< int > gids_src( m_covering_source_entities.size(), -1 ), gids_tgt( m_target_entities.size(), -1 );
+        std::vector< mbGIDType > gids_src( m_covering_source_entities.size(), -1 ), gids_tgt( m_target_entities.size(), -1 );
         MB_CHK_ERR( m_interface->tag_get_data( gidtag, m_covering_source_entities, gids_src.data() ) );
         MB_CHK_ERR( m_interface->tag_get_data( gidtag, m_target_entities, gids_tgt.data() ) );
 
@@ -813,7 +813,7 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
         std::sort( gids_src.begin(), gids_src.end() );
         std::sort( gids_tgt.begin(), gids_tgt.end() );
 
-        auto find_lid = []( std::vector< int >& gids, int gid ) -> int {
+        auto find_lid = []( std::vector< mbGIDType >& gids, mbGIDType gid ) -> int {
             // auto it = std::equal_range( gids.begin(), gids.end(), gid );
             // return ( ( it.first != it.second ) ? std::distance( gids.begin(), it.first ) : -1 );
 
@@ -821,7 +821,7 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
             return ( it != gids.end() ? std::distance( gids.begin(), it ) : -1 );
         };
 #else
-        auto find_lid = []( std::vector< int >& gids, int gid ) -> int {
+        auto find_lid = []( std::vector< mbGIDType >& gids, mbGIDType gid ) -> int {
             auto it = std::find( gids.begin(), gids.end(), gid );
             return ( it != gids.end() ? std::distance( gids.begin(), it ) : -1 );
         };
@@ -1046,14 +1046,13 @@ ErrorCode TempestRemapper::GenerateCSMeshMetadata( const int ntot_elements,
                         "Failed to generate CS mesh through TempestRemap" );
 
     // let us now generate the mesh metadata
-    if( this->GenerateMeshMetadata( csMesh, ntot_elements, ents, secondary_ents, dofTagName, nP ) )
+    if( this->GenerateMeshMetadata( csMesh, ents, secondary_ents, dofTagName, nP ) )
         MB_CHK_SET_ERR( moab::MB_FAILURE, "Failed in call to GenerateMeshMetadata" );  // unsuccessful call
 
     return moab::MB_SUCCESS;
 }
 
 ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
-                                                 const int ntot_elements,
                                                  moab::Range& ents,
                                                  moab::Range* secondary_ents,
                                                  const std::string dofTagName,
@@ -1063,19 +1062,13 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
 
     Tag dofTag;
     bool created = false;
-    rval         = m_interface->tag_get_handle( dofTagName.c_str(), nP * nP, MB_TYPE_INTEGER, dofTag,
-                                                MB_TAG_DENSE | MB_TAG_CREAT, 0, &created );MB_CHK_SET_ERR( rval, "Failed creating DoF tag" );
-
+    const std::vector<mbGIDType> negone ( nP * nP, -1);
+    MB_CHK_SET_ERR( m_interface->tag_get_handle( dofTagName.c_str(), nP * nP, MB_TYPE_LONG, dofTag,
+                                                MB_TAG_DENSE | MB_TAG_CREAT, negone.data(), &created ), "Failed creating DoF tag" );
     // Number of Faces
-    int nElements = static_cast< int >( csMesh.faces.size() );
+    const size_t nElements = csMesh.faces.size();
 
-    if( nElements != ntot_elements ) return MB_INVALID_SIZE;
-
-    // Initialize data structures
-    DataArray3D< int > dataGLLnodes;
-    dataGLLnodes.Allocate( nP, nP, nElements );
-
-    std::map< Node, int > mapNodes;
+    std::map< Node, mbGIDType > mapNodes;
     std::map< Node, moab::EntityHandle > mapLocalMBNodes;
 
     // GLL Quadrature nodes
@@ -1100,10 +1093,10 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
     //     If yes - then let us compute the DoF numbering and set to tag data
     //     If no - then compute DoF numbering BUT DO NOT SET to tag data
     // continue
-    int* dofIDs = new int[nP * nP];
+    mbGIDType* dofIDs = new mbGIDType[nP * nP];
 
     // Write metadata
-    for( int k = 0; k < nElements; k++ )
+    for( size_t k = 0; k < nElements; k++ )
     {
         const Face& face        = csMesh.faces[k];
         const NodeVector& nodes = csMesh.nodes;
@@ -1115,7 +1108,7 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
 
         Node centroid;
         centroid.x = centroid.y = centroid.z = 0.0;
-        for( unsigned l = 0; l < face.edges.size(); ++l )
+        for( size_t l = 0; l < face.edges.size(); ++l )
         {
             centroid.x += nodes[face[l]].x;
             centroid.y += nodes[face[l]].y;
@@ -1133,6 +1126,10 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
             locElem    = true;
             current_eh = mapLocalMBNodes[centroid];
         }
+
+        // Initialize data structures
+        // DataArray2D< mbGIDType > dataGLLnodes;
+        // dataGLLnodes.Allocate( nP, nP ); // only for current element
 
         for( int j = 0; j < nP; j++ )
         {
@@ -1175,20 +1172,18 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
                 nodeGLL.z = dZc / dR;
 
                 // Determine if this is a unique Node
-                std::map< Node, int >::const_iterator iter = mapNodes.find( nodeGLL );
+                std::map< Node, mbGIDType >::const_iterator iter = mapNodes.find( nodeGLL );
                 if( iter == mapNodes.end() )
                 {
                     // Insert new unique node into map
-                    int ixNode = static_cast< int >( mapNodes.size() );
-                    mapNodes.insert( std::pair< Node, int >( nodeGLL, ixNode ) );
-                    dataGLLnodes[j][i][k] = ixNode + 1;
+                    mbGIDType ixNode = static_cast< mbGIDType >( mapNodes.size() );
+                    mapNodes.insert( std::pair< Node, mbGIDType >( nodeGLL, ixNode ) );
+                    dofIDs[j * nP + i] = ixNode + 1;
                 }
                 else
                 {
-                    dataGLLnodes[j][i][k] = iter->second + 1;
+                    dofIDs[j * nP + i] = iter->second + 1;
                 }
-
-                dofIDs[j * nP + i] = dataGLLnodes[j][i][k];
             }
         }
 

@@ -34,7 +34,8 @@ include 'mpif.h'
       integer nghlay
       integer nverts(3), nelem(3), nblocks(3), nsbc(3), ndbc(3)
       !      large enough work arrays
-      integer iwork(100000)
+      integer(4) iwork(100000)
+      integer(8) iwork8(100000)
       double precision  dwork(100000)
       !      indices in work arrays for vertex ids, ranks, coordinates
       integer vID, vRA, vCO
@@ -124,7 +125,7 @@ include 'mpif.h'
       call errorout(ierr, 'fail to get mesh info')
 
       vID = 1
-      ierr = iMOAB_GetVertexID(pid, nverts(3), IWORK(vID) )
+      ierr = iMOAB_GetVertexID(pid, nverts(3), iwork8(vID) )
       call errorout(ierr, 'failed to get vertex id info')
 
       vRA = vID + nverts(3)
@@ -144,7 +145,7 @@ include 'mpif.h'
       dfree = vCO + 3 * nverts(3)
 
       bID = ifree
-      ierr = iMOAB_GetBlockID(pid, nblocks(3), IWORK(bID))
+      ierr = iMOAB_GetBlockID(pid, nblocks(3), iwork8(bID))
       call errorout(ierr, 'failed to get block info')
       ifree = ifree + nblocks(3)
 
@@ -203,7 +204,7 @@ include 'mpif.h'
 
             print *,' block index:', i, ' block ID ', IWORK(bID+i-1)
             blockID = IWORK(bID+i-1)
-            ierr = iMOAB_GetBlockInfo(pid, blockID , vpere, nebl)
+            ierr = iMOAB_GetBlockInfo(pid, blockID, vpere, nebl)
             call errorout(ierr, 'failed to elem block info')
             print *, '  has' , nebl, ' elements with ', vpere, 'verts'
 
@@ -307,4 +308,4 @@ enddo
       call errorout(ierr, 'fail to finalize MPI')
 
       stop
-end   
+end

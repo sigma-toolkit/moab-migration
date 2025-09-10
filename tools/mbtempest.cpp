@@ -1250,7 +1250,6 @@ int main( int argc, char* argv[] )
         for( int i = 0; i < 4; i++ )
             gvelist[i] = velist[i];
 #endif
-
         if( !proc_id && runCtx->print_diagnostics )
         {
             outputFormatter.printf( 0, "The source set contains %lu vertices and %lu elements \n", gvelist[0],
@@ -1259,7 +1258,7 @@ int main( int argc, char* argv[] )
                                     gvelist[3] );
         }
 
-        if( runCtx->skip_intersection && !proc_id )
+        if( runCtx->skip_intersection )
         {
             outputFormatter.printf( 0, "Skipping mesh intersection computation.\n" );
         }
@@ -1268,7 +1267,7 @@ int main( int argc, char* argv[] )
             // Compute intersections with MOAB with either the Kd-tree or the advancing front algorithm
             runCtx->timer_push( "setup and compute mesh intersections" );
             MB_CHK_SET_ERR( remapper.ComputeOverlapMesh( runCtx->kdtreeSearch, false ),
-                            "Failed to compute mesh intersections" );
+            "Failed to compute mesh intersections" );
             runCtx->timer_pop();
         }
 
@@ -1455,6 +1454,12 @@ int main( int argc, char* argv[] )
                                     "Failed to define analytical solution on source grid" );
                     runCtx->timer_pop();
 
+                    // runCtx->timer_push( "exchange solution on source grid" );
+                    // moab::Range& srccovEnts = remapper.GetMeshEntities( moab::Remapper::CoveringMesh );
+                    // MB_CHK_SET_ERR( pcomm->exchange_tags( srcAnalyticalFunction, srccovEnts ),
+                    //                 "Failed to exchange analytical solution on source grid" );
+                    // runCtx->timer_pop();
+
                     runCtx->timer_push( "describe a solution on target grid" );
                     MB_CHK_SET_ERR( weightMap->DefineAnalyticalSolution(
                                         tgtAnalyticalFunction, "AnalyticalSolnTgtExact", moab::Remapper::TargetMesh,
@@ -1611,10 +1616,81 @@ moab::ErrorCode handleOverlapMOAB( ToolContext& ctx, moab::TempestRemapper& rema
     constexpr double radius_src  = 1.0;
     constexpr double radius_dest = 1.0;
 
+    // Load and process target mesh
+    {
+        std::vector< int > metadata;
+        std::string additional_read_opts_tgt = ctx.get_file_read_options( ctx.inFilenames[1] );
+        if( ctx.n_procs > 1 && ctx.disc_methods[1].compare("fv") != 0 ) // target discretization is cgll or dgll
+        {
+            // auto pcomm = new ParallelComm( ctx.mbcore, MPI_COMM_WORLD );
+            // add one ghost layer to the target mesh
+            // additional_read_opts_tgt = additional_read_opts_tgt +  "PARALLEL_GHOSTS=3.0.2;PARALLEL_THIN_GHOST_LAYER;SKIP_AUGMENT_WITH_GHOSTS;PRINT_PARALLEL;";
+            // additional_read_opts_tgt = additional_read_opts_tgt +  "PARALLEL_COMM=1;";
+            // additional_read_opts_tgt = additional_read_opts_tgt +  "PARALLEL_GHOSTS=3.0.1;";
+            // additional_read_opts_tgt = additional_read_opts_tgt +  "PARALLEL_COMM=" + std::to_string(ctx.pcomm->get_id()) + ";";
+        }
+
+        MB_CHK_SET_ERR( remapper.LoadNativeMesh( ctx.inFilenames[1], ctx.meshsets[1], metadata,
+                                                 additional_read_opts_tgt.c_str() ),
+                        "Failed to load MOAB Target mesh" );
+
+        if( ctx.n_procs > 1 && ctx.disc_methods[1].compare("fv") != 0 && false ) // target discretization is cgll or dgll
+        {
+            Range beforeGhost, afterGhost;
+            ctx.mbcore->get_entities_by_dimension( ctx.meshsets[1], 2, beforeGhost );
+
+            ctx.pcomm->set_debug_verbosity(5);
+            MB_CHK_SET_ERR( ctx.pcomm->exchange_ghost_cells( 2, 0, 1, 0, true, true, &ctx.meshsets[1] ),
+                            "Failed to exchange ghost cells for MOAB Target mesh" );
+            ctx.pcomm->set_debug_verbosity(0);
+
+            ctx.mbcore->get_entities_by_dimension( ctx.meshsets[1], 2, afterGhost );
+            std::cout << ctx.proc_id << ": N(before) = " << beforeGhost.size() << ", N(after) = " << afterGhost.size() << std::endl;
+
+            std::vector<Tag> taglist;
+            taglist.push_back(ctx.mbcore->globalId_tag());
+            Tag gdofTag;
+            MB_CHK_SET_ERR( ctx.mbcore->tag_get_handle("GLOBAL_DOFS", gdofTag),
+                            "Failed to get global dofs tag for MOAB Target mesh" );
+            taglist.push_back(gdofTag);
+            MB_CHK_SET_ERR( ctx.pcomm->exchange_tags( taglist, taglist, afterGhost ),
+                            "Failed to exchange global dofs for MOAB Target mesh" );
+
+            // std::set< unsigned int > commprocs;
+            // MB_CHK_SET_ERR( ctx.pcomm->get_comm_procs( commprocs ),
+            //                 "Failed to get commprocs for MOAB Target mesh" );
+            // if (ctx.proc_id == 0)
+            // {
+            //     std::cout << ctx.proc_id << ": commprocs = [";
+            //     for( auto p : commprocs ) std::cout << p << ", ";
+            //     std::cout << "]\n";
+
+            //     std::cout << ctx.proc_id << ": N(after) = " << afterGhost.size() << std::endl;
+            //     for (auto eh: afterGhost)
+            //     {
+            //         std::cout << ctx.mbcore->type_from_handle(eh) << ": " << eh << std::endl;
+            //     }
+            // }
+        }
+
+        if( !metadata.empty() )
+        {
+            remapper.SetMeshType( Remapper::TargetMesh, metadata );
+        }
+
+        MB_CHK_SET_ERR( IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[1], radius_dest ),
+                        "Failed to preprocess MOAB Target mesh" );
+    }
+
     // Load and process source mesh
     {
         std::vector< int > metadata;
         auto additional_read_opts_src = ctx.get_file_read_options( ctx.inFilenames[0] );
+        if( ctx.n_procs > 1 )
+        {
+            // auto pcomm = new ParallelComm( ctx.mbcore, MPI_COMM_WORLD );
+            additional_read_opts_src = additional_read_opts_src +  "PARALLEL_COMM=" + std::to_string(ctx.pcomm->get_id()) + ";";
+        }
         MB_CHK_SET_ERR( remapper.LoadNativeMesh( ctx.inFilenames[0], ctx.meshsets[0], metadata,
                                                  additional_read_opts_src.c_str() ),
                         "Failed to load MOAB Source mesh" );
@@ -1628,27 +1704,6 @@ moab::ErrorCode handleOverlapMOAB( ToolContext& ctx, moab::TempestRemapper& rema
                         "Failed to preprocess MOAB Source mesh" );
     }
 
-    // Load and process target mesh
-    {
-        std::vector< int > metadata;
-        std::string additional_read_opts_tgt = ctx.get_file_read_options( ctx.inFilenames[1] );
-        if( ctx.n_procs > 1 && ctx.disc_methods[1].compare("fv") != 0 ) // target discretization is cgll or dgll
-        {
-            // add one ghost layer to the target mesh
-            additional_read_opts_tgt = additional_read_opts_tgt +  "PARALLEL_GHOSTS=3.0.2;PARALLEL_THIN_GHOST_LAYER;";
-        }
-        MB_CHK_SET_ERR( remapper.LoadNativeMesh( ctx.inFilenames[1], ctx.meshsets[1], metadata,
-                                                 additional_read_opts_tgt.c_str() ),
-                        "Failed to load MOAB Target mesh" );
-
-        if( !metadata.empty() )
-        {
-            remapper.SetMeshType( Remapper::TargetMesh, metadata );
-        }
-
-        MB_CHK_SET_ERR( IntxUtils::ScaleToRadius( ctx.mbcore, ctx.meshsets[1], radius_dest ),
-                        "Failed to preprocess MOAB Target mesh" );
-    }
 
     if( ctx.computeWeights )
     {

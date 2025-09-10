@@ -460,7 +460,7 @@ int main( int argc, char* argv[] )
         int nverts[3], nelem[3];
         ierr = iMOAB_GetMeshInfo( cmpOcnPID, nverts, nelem, 0, 0, 0 );
         CHECKIERR( ierr, "failed to get ocn mesh info" );
-        std::vector< int > gidElems;
+        std::vector< mbGIDType > gidElems;
         gidElems.resize( nelem[2] );
         std::vector< double > tempElems;
         tempElems.resize( nelem[2] );
@@ -471,7 +471,7 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "failed to define global id tag" );
 
         int ent_type = 1;
-        ierr         = iMOAB_GetIntTagStorage( cmpOcnPID, GidStr.c_str(), &nelem[2], &ent_type, &gidElems[0] );
+        ierr         = iMOAB_GetGIDStorage( cmpOcnPID, GidStr.c_str(), &nelem[2], &ent_type, &gidElems[0] );
         CHECKIERR( ierr, "failed to get global ids" );
         ierr = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot", &nelem[2], &ent_type, &tempElems[0] );
         CHECKIERR( ierr, "failed to get temperature field" );

@@ -112,7 +112,7 @@ class TempestOnlineMap : public OfflineMap
     ///		Read the OfflineMap from a NetCDF file.
     ///	</summary>
     moab::ErrorCode ReadParallelMap( const char* strSource,
-                                     const std::vector< int >& tgt_dof_ids,
+                                     const std::vector< mbGIDType >& tgt_dof_ids,
                                      int arearead,
                                      std::vector< double >& areaA,
                                      int& nA,
@@ -457,9 +457,9 @@ class TempestOnlineMap : public OfflineMap
         return moab::MB_SUCCESS;
     }
 
-    moab::ErrorCode set_col_dc_dofs( std::vector< int >& values_entities );
+    moab::ErrorCode set_col_dc_dofs( std::vector< mbGIDType >& values_entities );
 
-    moab::ErrorCode set_row_dc_dofs( std::vector< int >& values_entities );
+    moab::ErrorCode set_row_dc_dofs( std::vector< mbGIDType >& values_entities );
 
     // hack
     void SetMeshInput( Mesh* imesh )
@@ -494,7 +494,7 @@ class TempestOnlineMap : public OfflineMap
                                   bool transpose = false );
 
 #ifdef MOAB_HAVE_MPI
-    int rearrange_arrays_by_dofs( const std::vector< unsigned int >& gdofmap,
+    int rearrange_arrays_by_dofs( const std::vector< mbGIDType >& gdofmap,
                                   DataArray1D< double >& vecFaceArea,
                                   DataArray1D< double >& dCenterLon,
                                   DataArray1D< double >& dCenterLat,
@@ -517,7 +517,7 @@ class TempestOnlineMap : public OfflineMap
     WeightMatrix m_weightMatrix;
     WeightRowVector m_rowVector;
     WeightColVector m_colVector;
-    
+
     // Store triplets for sparse matrix construction and distributed reduction
     std::vector<Eigen::Triplet<double>> local_triplets;
 
@@ -539,12 +539,12 @@ class TempestOnlineMap : public OfflineMap
     ///		The original tag data and local to global DoF mapping to associate matrix values to
     /// solution 	<summary>
     moab::Tag m_dofTagSrc, m_dofTagDest;
-    std::vector< unsigned > row_gdofmap, col_gdofmap, srccol_gdofmap;
+    std::vector< mbGIDType > row_gdofmap, col_gdofmap, srccol_gdofmap;
 
     // make it int, because it can be -1 in new logic
-    std::vector< int > row_dtoc_dofmap, col_dtoc_dofmap, srccol_dtoc_dofmap;
+    std::vector< mbGIDType > row_dtoc_dofmap, col_dtoc_dofmap, srccol_dtoc_dofmap;
 
-    std::map< int, int > rowMap, colMap;
+    std::map< mbGIDType, mbGIDType > rowMap, colMap;
     int m_input_order, m_output_order;
 
     DataArray3D< int > dataGLLNodesSrc, dataGLLNodesSrcCov, dataGLLNodesDest;

@@ -1171,7 +1171,7 @@ ErrorCode GeomTopoTool::check_edge_sense_tags( bool create )
     return MB_SUCCESS;
 }
 
-ErrorCode GeomTopoTool::add_geo_set( EntityHandle set, int dim, int gid )
+ErrorCode GeomTopoTool::add_geo_set( EntityHandle set, int dim, mbGIDType gid )
 {
     if( dim < 0 || dim > 4 ) MB_SET_ERR( MB_FAILURE, "Invalid geometric dimension provided" );
 
@@ -1490,7 +1490,7 @@ ErrorCode GeomTopoTool::duplicate_model( GeomTopoTool*& duplicate, std::vector< 
     // each set will get the same entities as the original
     for( int dim = 0; dim < 5; dim++ )
     {
-        int gid                  = 0;
+        mbGIDType gid                  = 0;
         unsigned int set_options = ( ( 1 != dim ) ? MESHSET_SET : MESHSET_ORDERED );
         for( Range::iterator it = geomRanges[dim].begin(); it != geomRanges[dim].end(); ++it )
         {

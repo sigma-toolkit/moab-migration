@@ -261,7 +261,7 @@ class Intx2Mesh
     ParallelComm* parcomm;
     TupleList* remote_cells;                       // not used anymore for communication, just a container
     TupleList* remote_cells_with_tracers;          // these will be used now to update tracers on remote procs
-    std::map< int, EntityHandle > globalID_to_eh;  // needed for parallel, mostly
+    std::map< mbGIDType, EntityHandle > globalID_to_eh;  // needed for parallel, mostly
 #endif
     int max_edges_1;  // maximum number of edges in the lagrange set (first set, src)
     int max_edges_2;  // maximum number of edges in the euler set (second set, tgt)

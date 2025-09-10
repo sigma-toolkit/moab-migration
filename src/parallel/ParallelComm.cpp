@@ -458,7 +458,7 @@ ErrorCode ParallelComm::assign_global_ids( Range entities[],
                                            const bool parallel,
                                            const bool owned_only )
 {
-    int local_num_elements[4];
+    mbGIDType local_num_elements[4];
     ErrorCode result;
     for( int dim = 0; dim <= dimension; dim++ )
     {
@@ -466,12 +466,12 @@ ErrorCode ParallelComm::assign_global_ids( Range entities[],
     }
 
     // Communicate numbers
-    std::vector< int > num_elements( procConfig.proc_size() * 4 );
+    std::vector< mbGIDType > num_elements( procConfig.proc_size() * 4 );
 #ifdef MOAB_HAVE_MPI
     if( procConfig.proc_size() > 1 && parallel )
     {
         int retval =
-            MPI_Allgather( local_num_elements, 4, MPI_INT, num_elements.data(), 4, MPI_INT, procConfig.proc_comm() );
+            MPI_Allgather( local_num_elements, 4, MB_MPI_GIDTYPE, num_elements.data(), 4, MB_MPI_GIDTYPE, procConfig.proc_comm() );
         if( 0 != retval ) return MB_FAILURE;
     }
     else
@@ -480,7 +480,7 @@ ErrorCode ParallelComm::assign_global_ids( Range entities[],
             num_elements[dim] = local_num_elements[dim];
 
     // My entities start at one greater than total_elems[d]
-    int total_elems[4] = { start_id, start_id, start_id, start_id };
+    mbGIDType total_elems[4] = { start_id, start_id, start_id, start_id };
 
     for( unsigned int proc = 0; proc < procConfig.proc_rank(); proc++ )
     {
@@ -4048,8 +4048,8 @@ ErrorCode ParallelComm::resolve_shared_ents( EntityHandle this_set,
     else
     {
         bool tag_created = false;
-        int def_val      = -1;
-        result = mbImpl->tag_get_handle( GLOBAL_ID_TAG_NAME, 1, MB_TYPE_INTEGER, gid_tag, MB_TAG_DENSE | MB_TAG_CREAT,
+        mbGIDType def_val = -1;
+        result = mbImpl->tag_get_handle( GLOBAL_ID_TAG_NAME, 1, MB_TYPE_LONG, gid_tag, MB_TAG_DENSE | MB_TAG_CREAT,
                                          &def_val, &tag_created );
         if( MB_ALREADY_ALLOCATED != result && MB_SUCCESS != result )
         {
@@ -4080,6 +4080,12 @@ ErrorCode ParallelComm::resolve_shared_ents( EntityHandle this_set,
     else if( 4 == bytes_per_tag )
     {  // Must be GLOBAL_ID tag or 32 bits ...
         std::vector< int > gid_data( lgid_data.size() );
+        result = mbImpl->tag_get_data( gid_tag, skin_ents[0], gid_data.data() );MB_CHK_SET_ERR( result, "Failed to get gid tag for skin vertices" );
+        std::copy( gid_data.begin(), gid_data.end(), lgid_data.begin() );
+    }
+    else if( sizeof(mbGIDType) == bytes_per_tag )
+    {  // Must be mbGIDType (long) tag
+        std::vector< mbGIDType > gid_data( lgid_data.size() );
         result = mbImpl->tag_get_data( gid_tag, skin_ents[0], gid_data.data() );MB_CHK_SET_ERR( result, "Failed to get gid tag for skin vertices" );
         std::copy( gid_data.begin(), gid_data.end(), lgid_data.begin() );
     }
@@ -4285,7 +4291,7 @@ ErrorCode ParallelComm::resolve_shared_ents( ParallelComm** pc,
 
     i = 0;
     j = 0;
-    std::vector< int > gids;
+    std::vector< mbGIDType > gids;
     Range::iterator rit;
     Tag gid_tag;
     for( p = 0; p < np; p++ )

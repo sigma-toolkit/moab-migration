@@ -257,9 +257,15 @@ static struct mhdf_FileDesc* get_tag_desc( mhdf_FileHandle file_handle,
             break;
         case mhdf_UNSIGNED_INTEGER:
             type = H5T_NATIVE_UINT;
-            have_default *= sizeof( uint );
-            have_global *= sizeof( uint );
-            valsize *= sizeof( uint );
+            have_default *= sizeof( unsigned int );
+            have_global *= sizeof( unsigned int );
+            valsize *= sizeof( unsigned int );
+            break;
+        case mhdf_LONG:
+            type = H5T_NATIVE_LONG;
+            have_default *= sizeof( long );
+            have_global *= sizeof( long );
+            valsize *= sizeof( long );
             break;
         case mhdf_UNSIGNED_LONG:
             type = H5T_NATIVE_ULONG;
@@ -764,8 +770,7 @@ struct mhdf_FileDesc* mhdf_getFileSummary( mhdf_FileHandle file_handle,
                         free( id_list );
                     }
                     else if( 0 == k || 1 == k )
-                    { /* parallel partition or material sets should still work if dense
- could be dense tags on sets */
+                    { /* parallel partition or material sets should still work if dense could be dense tags on sets */
                         if( !mhdf_haveDenseTag( file_handle, pname[k], mhdf_set_type_handle(), status ) ) continue;
                         table[0] =
                             mhdf_openDenseTagData( file_handle, pname[k], mhdf_set_type_handle(), &nval, status );

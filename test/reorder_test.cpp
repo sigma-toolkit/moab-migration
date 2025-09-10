@@ -104,7 +104,7 @@ void build_mesh()
 
     // get/create various tags
     Tag gid;
-    rval = mb->tag_get_handle( GLOBAL_ID_NAME, 1, MB_TYPE_INTEGER, gid, dense );CHECK_ERR( rval );
+    rval = mb->tag_get_handle( GLOBAL_ID_NAME, 1, MB_TYPE_LONG, gid );CHECK_ERR( rval );
 
     Tag conn_ids;
     rval = mb->tag_get_handle( CONN_IDS_NAME, 4, MB_TYPE_INTEGER, conn_ids, dense );CHECK_ERR( rval );
@@ -244,12 +244,12 @@ void check_order( EntityType type )
     ErrorCode rval;
 
     Tag gid;
-    rval = mb->tag_get_handle( GLOBAL_ID_NAME, 1, MB_TYPE_INTEGER, gid );CHECK_ERR( rval );
+    rval = mb->tag_get_handle( GLOBAL_ID_NAME, 1, MB_TYPE_LONG, gid );CHECK_ERR( rval );
 
     Range ents;
     rval = mb->get_entities_by_type( 0, type, ents );CHECK_ERR( rval );
 
-    std::vector< int > ids( ents.size() );
+    std::vector< long > ids( ents.size() );
     rval = mb->tag_get_data( gid, ents, &ids[0] );CHECK_ERR( rval );
 
     for( size_t i = 1; i < ids.size(); ++i )
@@ -350,12 +350,12 @@ void check_node_coords()
     ErrorCode rval;
 
     Tag gid;
-    rval = mb->tag_get_handle( GLOBAL_ID_NAME, 1, MB_TYPE_INTEGER, gid );CHECK_ERR( rval );
+    rval = mb->tag_get_handle( GLOBAL_ID_NAME, 1, MB_TYPE_LONG, gid );CHECK_ERR( rval );
 
     Range verts;
     rval = mb->get_entities_by_type( 0, MBVERTEX, verts );CHECK_ERR( rval );
 
-    std::vector< int > ids( verts.size() );
+    std::vector< long > ids( verts.size() );
     rval = mb->tag_get_data( gid, verts, &ids[0] );CHECK_ERR( rval );
 
     std::vector< double > coords( 3 * verts.size() );
@@ -373,7 +373,7 @@ void check_quad_conn()
     ErrorCode rval;
 
     Tag gid;
-    rval = mb->tag_get_handle( GLOBAL_ID_NAME, 1, MB_TYPE_INTEGER, gid );CHECK_ERR( rval );
+    rval = mb->tag_get_handle( GLOBAL_ID_NAME, 1, MB_TYPE_LONG, gid );CHECK_ERR( rval );
 
     Tag conn_ids;
     rval = mb->tag_get_handle( CONN_IDS_NAME, 4, MB_TYPE_INTEGER, conn_ids );CHECK_ERR( rval );
@@ -385,9 +385,14 @@ void check_quad_conn()
     rval = mb->get_connectivity( &quads[0], quads.size(), conn, true );CHECK_ERR( rval );
 
     CHECK_EQUAL( 4 * quads.size(), conn.size() );
-    std::vector< int > exp_ids( 4 * quads.size() ), act_ids( 4 * quads.size() );
+    std::vector< int > exp_ids( 4 * quads.size() );
+    std::vector< long > act_gids( 4 * quads.size() );
+    std::vector< int > act_ids( 4 * quads.size() );
     rval = mb->tag_get_data( conn_ids, &quads[0], quads.size(), &exp_ids[0] );CHECK_ERR( rval );
-    rval = mb->tag_get_data( gid, &conn[0], conn.size(), &act_ids[0] );CHECK_ERR( rval );
+    rval = mb->tag_get_data( gid, &conn[0], conn.size(), &act_gids[0] );CHECK_ERR( rval );
+    // Convert long global IDs to int for comparison
+    for( size_t i = 0; i < act_gids.size(); ++i )
+        act_ids[i] = static_cast< int >( act_gids[i] );
 
     CHECK_EQUAL( exp_ids, act_ids );
 }
@@ -400,7 +405,7 @@ void check_meshset_common( bool ordered )
     rval = mb->tag_get_handle( SET_IDS_NAME, ENTS_PER_SET, MB_TYPE_INTEGER, set_ids );CHECK_ERR( rval );
 
     Tag gid;
-    rval = mb->tag_get_handle( GLOBAL_ID_NAME, 1, MB_TYPE_INTEGER, gid );CHECK_ERR( rval );
+    rval = mb->tag_get_handle( GLOBAL_ID_NAME, 1, MB_TYPE_LONG, gid );CHECK_ERR( rval );
 
     Range sets;
     rval = mb->get_entities_by_type_and_tag( 0, MBENTITYSET, &set_ids, 0, 1, sets );CHECK_ERR( rval );
@@ -424,8 +429,12 @@ void check_meshset_common( bool ordered )
     CHECK_EQUAL( ENTS_PER_SET, (int)ents.size() );
 
     int exp[ENTS_PER_SET], act[ENTS_PER_SET];
+    long act_gids[ENTS_PER_SET];
     rval = mb->tag_get_data( set_ids, &set, 1, exp );CHECK_ERR( rval );
-    rval = mb->tag_get_data( gid, &ents[0], ENTS_PER_SET, act );CHECK_ERR( rval );
+    rval = mb->tag_get_data( gid, &ents[0], ENTS_PER_SET, act_gids );CHECK_ERR( rval );
+    // Convert long global IDs to int for comparison
+    for( int i = 0; i < ENTS_PER_SET; ++i )
+        act[i] = static_cast< int >( act_gids[i] );
 
     if( !ordered )
     {
@@ -532,7 +541,7 @@ void check_varlen_tag()
     ErrorCode rval;
 
     Tag gid;
-    rval = mb->tag_get_handle( GLOBAL_ID_NAME, 1, MB_TYPE_INTEGER, gid );CHECK_ERR( rval );
+    rval = mb->tag_get_handle( GLOBAL_ID_NAME, 1, MB_TYPE_LONG, gid );CHECK_ERR( rval );
 
     Tag var_data;
     rval = mb->tag_get_handle( VAR_INTS_NAME, 0, MB_TYPE_INTEGER, var_data );CHECK_ERR( rval );
@@ -540,7 +549,7 @@ void check_varlen_tag()
     Range verts;
     rval = mb->get_entities_by_type( 0, MBVERTEX, verts );CHECK_ERR( rval );
 
-    std::vector< int > gids( verts.size() );
+    std::vector< long > gids( verts.size() );
     rval = mb->tag_get_data( gid, verts, &gids[0] );CHECK_ERR( rval );
 
     std::vector< const void* > ptrs( verts.size() );
@@ -560,7 +569,7 @@ void check_bit_tag()
     ErrorCode rval;
 
     Tag gid;
-    rval = mb->tag_get_handle( GLOBAL_ID_NAME, 1, MB_TYPE_INTEGER, gid );CHECK_ERR( rval );
+    rval = mb->tag_get_handle( GLOBAL_ID_NAME, 1, MB_TYPE_LONG, gid );CHECK_ERR( rval );
 
     Tag bit_data;
     rval = mb->tag_get_handle( BIT_NAME, BITS_PER_TAG, MB_TYPE_BIT, bit_data );CHECK_ERR( rval );
@@ -568,7 +577,7 @@ void check_bit_tag()
     Range verts;
     rval = mb->get_entities_by_type( 0, MBVERTEX, verts );CHECK_ERR( rval );
 
-    std::vector< int > gids( verts.size() );
+    std::vector< long > gids( verts.size() );
     rval = mb->tag_get_data( gid, verts, &gids[0] );CHECK_ERR( rval );
 
     std::vector< unsigned char > exp( gids.size() ), act( gids.size() );

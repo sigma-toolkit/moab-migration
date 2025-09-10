@@ -170,7 +170,7 @@ class ZoltanPartitioner : public PartitionerBase< int >
     ErrorCode repartition_to_procs( std::vector< double >& x,
                                     std::vector< double >& y,
                                     std::vector< double >& z,
-                                    std::vector< int >& gids,
+                                    std::vector< mbGIDType >& gids,
                                     const char* zmethod,
                                     std::vector< int >& dest );
 
@@ -222,7 +222,7 @@ class ZoltanPartitioner : public PartitionerBase< int >
     // moab_ids
     ErrorCode assemble_graph( const int dimension,
                               std::vector< double >& coords,
-                              std::vector< int >& moab_ids,
+                              std::vector< mbGIDType >& moab_ids,
                               std::vector< int >& adjacencies,
                               std::vector< int >& length,
                               Range& elems,
@@ -233,7 +233,7 @@ class ZoltanPartitioner : public PartitionerBase< int >
 
     int mbInitializePoints( int npts,
                             double* pts,
-                            int* ids,
+                            mbGIDType* ids,
                             int* adjs,
                             int* length,
                             double* obj_weights  = NULL,

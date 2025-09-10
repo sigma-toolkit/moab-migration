@@ -182,17 +182,17 @@ int main( int argc, char* argv[] )
         std::string tag_name_diff = tag_name + "_diff";
         if( doubleType )
         {
-            std::vector<double> def_vald(len_tag);
-            rval = mb->tag_get_default_value( tag, &def_vald[0] );MB_CHK_SET_ERR( rval, "can't get default" );
-            rval = mb->tag_get_handle( new_tag_name.c_str(), len_tag, dtype, newTag, MB_TAG_CREAT | MB_TAG_DENSE, &def_vald[0] );MB_CHK_SET_ERR( rval, "can't define new tag" );
+            std::vector<double> def_vald(len_tag, 0.0);
+            //rval = mb->tag_get_default_value( tag, def_vald.data() );MB_CHK_SET_ERR( rval, "can't get default" );
+            rval = mb->tag_get_handle( new_tag_name.c_str(), len_tag, dtype, newTag, MB_TAG_CREAT | MB_TAG_DENSE, def_vald.data() );MB_CHK_SET_ERR( rval, "can't define new tag" );
             for (size_t k=0; k<len_tag; k++)
                 def_vald[k] = 0.;
             rval = mb->tag_get_handle( tag_name_diff.c_str(), len_tag, dtype, newTagDiff,
-                                       MB_TAG_CREAT | MB_TAG_DENSE | MB_TAG_DFTOK, &def_vald[0] );MB_CHK_SET_ERR( rval, "can't define new tag diff" );
+                                       MB_TAG_CREAT | MB_TAG_DENSE | MB_TAG_DFTOK, def_vald.data() );MB_CHK_SET_ERR( rval, "can't define new tag diff" );
         }
         else
         {
-            std::vector<int> def_vali(len_tag);
+            std::vector<int> def_vali(len_tag, 0);
             rval = mb->tag_get_default_value( tag, &def_vali[0] );MB_CHK_SET_ERR( rval, "can't get default" );
             // the difference should be the same size tag
             rval = mb->tag_get_handle( new_tag_name.c_str(), len_tag, dtype, newTag, MB_TAG_CREAT | MB_TAG_DENSE, &def_vali[0] );MB_CHK_SET_ERR( rval, "can't define new tag" );

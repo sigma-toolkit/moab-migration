@@ -262,7 +262,7 @@ ErrorCode report_nsets( Interface* mbImpl )
         std::cerr << "Couldn't PARALLEL_PARTITION tag." << std::endl;
         return result;
     }
-    result = mbImpl->tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, gidtag );
+    result = mbImpl->tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_LONG, gidtag );
     if( MB_SUCCESS != result )
     {
         std::cerr << "Couldn't get GLOBAL_ID tag." << std::endl;

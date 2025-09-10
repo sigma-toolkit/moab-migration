@@ -983,7 +983,7 @@ ErrorCode Intx2Mesh::create_departure_mesh_2nd_alg( EntityHandle& euler_set, Ent
 
     rval = Intx2Mesh::build_processor_euler_boxes( euler_set, local_verts );ERRORR( rval, "can't build processor boxes" );
 
-    std::vector< int > gids( num_local_verts );
+    std::vector< mbGIDType > gids( num_local_verts );
     rval = mb->tag_get_data( gid, local_verts, &gids[0] );ERRORR( rval, "can't get local vertices gids" );
 
     // now see the departure points; to what boxes should we send them?
@@ -1074,7 +1074,7 @@ ErrorCode Intx2Mesh::create_departure_mesh_2nd_alg( EntityHandle& euler_set, Ent
         for( Range::iterator it = Q.begin(); it != Q.end(); ++it )
         {
             EntityHandle q = *it;
-            int global_id;
+            mbGIDType global_id;
             rval = mb->tag_get_data( gid, &q, 1, &global_id );ERRORR( rval, "can't get gid for polygon" );
             int n                        = TLq.get_n();
             TLq.vi_wr[sizeTuple * n]     = to_proc;    //
@@ -1161,7 +1161,7 @@ ErrorCode Intx2Mesh::create_departure_mesh_2nd_alg( EntityHandle& euler_set, Ent
 
         rval = mb->create_element( entType, new_conn, nnodes, new_element );ERRORR( rval, "can't create new quad " );
         rval = mb->add_entities( covering_lagr_set, &new_element, 1 );ERRORR( rval, "can't add new element to dep set" );
-        int gid_el;
+        mbGIDType gid_el;
         // get the global ID of the initial quad
         rval = mb->tag_get_data( gid, &q, 1, &gid_el );ERRORR( rval, "can't get element global ID " );
         globalID_to_eh[gid_el] = new_element;
@@ -1178,7 +1178,7 @@ ErrorCode Intx2Mesh::create_departure_mesh_2nd_alg( EntityHandle& euler_set, Ent
     remote_cells->enableWriteAccess();
     for( int i = 0; i < n; i++ )
     {
-        int globalIdEl = TLq.vi_rd[sizeTuple * i + 1];
+        mbGIDType globalIdEl = TLq.vi_rd[sizeTuple * i + 1];
         int from_proc  = TLq.vi_wr[sizeTuple * i];
         // do we already have a quad with this global ID, represented?
         if( globalID_to_eh.find( globalIdEl ) == globalID_to_eh.end() )
@@ -1250,7 +1250,7 @@ ErrorCode Intx2Mesh::create_departure_mesh_3rd_alg( EntityHandle& lagr_set, Enti
     rval                = mb->get_connectivity( localEnts, local_verts );
     int num_local_verts = (int)local_verts.size();ERRORR( rval, "can't get local vertices" );
 
-    std::vector< int > gids( num_local_verts );
+    std::vector< mbGIDType > gids( num_local_verts );
     rval = mb->tag_get_data( gid, local_verts, &gids[0] );ERRORR( rval, "can't get local vertices gids" );
 
     Range localDepCells;
@@ -1354,7 +1354,7 @@ ErrorCode Intx2Mesh::create_departure_mesh_3rd_alg( EntityHandle& lagr_set, Enti
         for( Range::iterator it = Q.begin(); it != Q.end(); ++it )
         {
             EntityHandle q = *it;  // this is a src cell
-            int global_id;
+            mbGIDType global_id;
             rval = mb->tag_get_data( gid, &q, 1, &global_id );ERRORR( rval, "can't get gid for polygon" );
             int n                        = TLq.get_n();
             TLq.vi_wr[sizeTuple * n]     = to_proc;    //
@@ -1423,7 +1423,7 @@ ErrorCode Intx2Mesh::create_departure_mesh_3rd_alg( EntityHandle& lagr_set, Enti
     for( Range::iterator it = local_q.begin(); it != local_q.end(); ++it )
     {
         EntityHandle q = *it;  // these are from lagr cells, local
-        int gid_el;
+        mbGIDType gid_el;
         rval = mb->tag_get_data( gid, &q, 1, &gid_el );ERRORR( rval, "can't get element global ID " );
         globalID_to_eh[gid_el] = q;  // do we need this? maybe to just mark the ones on this processor
         // maybe a range of global cell ids is fine?
@@ -1438,7 +1438,7 @@ ErrorCode Intx2Mesh::create_departure_mesh_3rd_alg( EntityHandle& lagr_set, Enti
     remote_cells->enableWriteAccess();
     for( int i = 0; i < n; i++ )
     {
-        int globalIdEl = TLq.vi_rd[sizeTuple * i + 1];
+        mbGIDType globalIdEl = TLq.vi_rd[sizeTuple * i + 1];
         int from_proc  = TLq.vi_rd[sizeTuple * i];
         // do we already have a quad with this global ID, represented?
         if( globalID_to_eh.find( globalIdEl ) == globalID_to_eh.end() )

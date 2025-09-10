@@ -1666,6 +1666,51 @@ ErrCode iMOAB_SetIntTagStorage( iMOAB_AppID pid,
     return moab::MB_SUCCESS;  // no error
 }
 
+ErrCode iMOAB_GetGIDStorage( iMOAB_AppID pid,
+                            const iMOAB_String tag_storage_name,
+                            int* num_tag_storage_length,
+                            int* ent_type,
+                            iMOAB_GlobalID* tag_storage_data )
+{
+    ErrorCode rval;
+    std::string tag_name( tag_storage_name );
+
+    appData& data = context.appDatas[*pid];
+
+    if( data.tagMap.find( tag_name ) == data.tagMap.end() )
+    {
+        return moab::MB_FAILURE;
+    }  // tag not defined
+
+    Tag tag = data.tagMap[tag_name];
+
+    int tagLength = 0;
+    MB_CHK_ERR( context.MBI->tag_get_length( tag, tagLength ) );
+
+    DataType dtype;
+    MB_CHK_ERR( context.MBI->tag_get_data_type( tag, dtype ) );
+
+    if( dtype != MB_TYPE_LONG ) // long = GLOBAL_ID?
+    {
+        MB_CHK_SET_ERR( moab::MB_FAILURE, "The tag is not of integer type." );
+    }
+
+    // set it on a subset of entities, based on type and length
+    // if *entity_type = 0, then use vertices; else elements
+    Range* ents_to_get = ( *ent_type == 0 ? &data.all_verts : &data.primary_elems );
+    int nents_to_get   = *num_tag_storage_length / tagLength;
+
+    if( nents_to_get > (int)ents_to_get->size() )
+    {
+        return moab::MB_FAILURE;
+    }  // to many entities to get, or too little
+
+    // now set the tag data
+    rval = context.MBI->tag_get_data( tag, *ents_to_get, tag_storage_data );MB_CHK_ERR( rval );
+
+    return moab::MB_SUCCESS;  // no error
+}
+
 ErrCode iMOAB_GetIntTagStorage( iMOAB_AppID pid,
                                 const iMOAB_String tag_storage_name,
                                 int* num_tag_storage_length,
@@ -1785,9 +1830,8 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
     int nents_to_be_set = (int)( *ents_to_set ).size();
 
     Tag gidTag = context.MBI->globalId_tag();
-    std::vector< iMOAB_GlobalID > gids;
-    gids.resize( nents_to_be_set );
-    rval = context.MBI->tag_get_data( gidTag, *ents_to_set, &gids[0] );MB_CHK_ERR( rval );
+    std::vector< iMOAB_GlobalID > gids( nents_to_be_set );
+    MB_CHK_SET_ERR( context.MBI->tag_get_data( gidTag, *ents_to_set, gids.data() ), "failed to get global ids" );
 
     // so we will need to set the tags according to the global id passed;
     // so the order in tag_storage_data is the same as the order in globalIds, but the order
@@ -1802,7 +1846,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
     size_t nbLocalVals = *num_tag_storage_length / tagNames.size();  // assumes all tags have the same length?
     // check global ids to have different values
     std::set< iMOAB_GlobalID > globalIdsSet;
-    for( iMOAB_GlobalID j = 0; j < nbLocalVals; j++ )
+    for( size_t j = 0; j < nbLocalVals; j++ )
         globalIdsSet.insert( globalIds[j] );
     if( globalIdsSet.size() < nbLocalVals )
     {
@@ -1827,12 +1871,12 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         tagList.push_back( tag );
 
         int tagLength = 0;
-        rval          = context.MBI->tag_get_length( tag, tagLength );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( context.MBI->tag_get_length( tag, tagLength ), "failed to get tag length" );
 
         total_tag_len += tagLength;
         tagLengths[i] = tagLength;
         DataType dtype;
-        rval = context.MBI->tag_get_data_type( tag, dtype );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( context.MBI->tag_get_data_type( tag, dtype ), "failed to get tag data type" );
 
         if( dtype != MB_TYPE_DOUBLE )
         {
@@ -1865,7 +1909,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
             for( size_t j = 0; j < tagList.size(); j++ )
             {
                 indexInTagValues += i * tagLengths[j];
-                rval = context.MBI->tag_set_data( tagList[j], &eh, 1, &tag_storage_data[indexInTagValues] );MB_CHK_ERR( rval );
+                MB_CHK_SET_ERR( context.MBI->tag_set_data( tagList[j], &eh, 1, &tag_storage_data[indexInTagValues] ), "failed to set tag data" );
                 // advance the pointer/index
                 indexInTagValues += ( nents_to_be_set - i ) * tagLengths[j];  // at the end of tag data
             }
@@ -1888,7 +1932,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         for( size_t i = 0; i < nbLocalVals; i++ )
         {
             // to proc, marker, element local index, index in el
-            int marker              = globalIds[i];
+            iMOAB_GlobalID marker   = globalIds[i];
             int to_proc             = marker % num_procs;
             int n                   = TLsend.get_n();
             TLsend.vi_wr[2 * n]     = to_proc;  // send to processor
@@ -1917,7 +1961,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         for( int i = 0; i < nents_to_be_set; i++ )
         {
             // to proc, marker
-            long marker             = gids[i];
+            iMOAB_GlobalID marker  = gids[i];
             int to_proc            = marker % num_procs;
             int n                  = TLreq.get_n();
             TLreq.vi_wr[2 * n]     = to_proc;  // send to processor
@@ -1955,11 +1999,10 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         int indexInTLsend = 0;  // advance both, according to the marker
         if( n1 > 0 && n2 > 0 )
         {
-
             while( indexInTLreq < n1 && indexInTLsend < n2 )  // if any is over, we are done
             {
-                int currentValue1 = TLreq.vi_rd[2 * indexInTLreq + 1];
-                int currentValue2 = TLsend.vi_rd[2 * indexInTLsend + 1];
+                iMOAB_GlobalID currentValue1 = TLreq.vi_rd[2 * indexInTLreq + 1];
+                iMOAB_GlobalID currentValue2 = TLsend.vi_rd[2 * indexInTLsend + 1];
                 if( currentValue1 < currentValue2 )
                 {
                     // we have a big problem; basically, we are saying that
@@ -2894,7 +2937,7 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
     }
     Tag gidTag = context.MBI->globalId_tag();
 
-    std::vector< long > valuesComp1;
+    std::vector< mbGIDType > valuesComp1;
     // populate first tuple
     if( *pid1 >= 0 )
     {
@@ -2966,7 +3009,7 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
     // start copy
     TLcomp2.enableWriteAccess();
     // populate second tuple
-    std::vector< int > valuesComp2;
+    std::vector< mbGIDType > valuesComp2;
     if( *pid2 >= 0 )
     {
         appData& data2     = context.appDatas[*pid2];
@@ -3002,16 +3045,16 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
             MB_CHK_ERR( MB_FAILURE );  // we know only type 1 or 2
         }
         // now fill the tuple list with info and markers
-        std::set< int > uniq( valuesComp2.begin(), valuesComp2.end() );
+        std::set< mbGIDType > uniq( valuesComp2.begin(), valuesComp2.end() );
         TLcomp2.resize( uniq.size() );
-        for( std::set< int >::iterator sit = uniq.begin(); sit != uniq.end(); sit++ )
+        for( std::set< mbGIDType >::iterator sit = uniq.begin(); sit != uniq.end(); sit++ )
         {
             // to proc, marker, element local index, index in el
-            int marker               = *sit;
-            int to_proc              = marker % numProcs;
+            mbGIDType marker         = *sit;
+            int to_proc              = static_cast<int>(marker % numProcs);
             int n                    = TLcomp2.get_n();
             TLcomp2.vi_wr[2 * n]     = to_proc;  // send to processor
-            TLcomp2.vi_wr[2 * n + 1] = marker;
+            TLcomp2.vi_wr[2 * n + 1] = static_cast<int>(marker);
             TLcomp2.inc_n();
         }
     }
@@ -3368,7 +3411,7 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
                 // orig_sending_processor is not set so it will be -1;
                 if( origProc < 0 ) continue;
 
-                int gidCell;  // get the global id of the cell for association
+                mbGIDType gidCell;  // get the global id of the cell for association
                 MB_CHK_ERR( context.MBI->tag_get_data( gidTag, &cov_cell, 1, &gidCell ) );
                 assert( gidCell > 0 );
                 idsFromProcs[origProc].insert( gidCell );
@@ -3504,7 +3547,7 @@ static ErrCode set_aream_from_trivial_distribution( iMOAB_AppID pid, int N, std:
     size_t nents_to_be_set   = ents_to_set.size();
 
     Tag gidTag = context.MBI->globalId_tag();
-    std::vector< int > globalIds( nents_to_be_set );
+    std::vector< mbGIDType > globalIds( nents_to_be_set );
     MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_to_set, &globalIds[0] ) );
 
     const bool serial = ( size == 1 );
@@ -3676,7 +3719,7 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
         MB_CHK_ERR( context.MBI->tag_get_length( gdsTag, tgt_elem_dof_length ) );
 
     Tag gidTag = context.MBI->globalId_tag();
-    std::vector< int > tgtDofValues;  // srcDofValues,
+    std::vector< mbGIDType > tgtDofValues;  // srcDofValues,
 
     // populate first tuple
     // will be filled with entities on coupler, from which we will get the DOFs, based on type
@@ -3710,7 +3753,7 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
 
     // pass tgt ordered dofs, and unique
     // we need to read area_b and set aream tag on target cells, too
-    std::vector< int > sortTgtDofs( tgtDofValues.begin(), tgtDofValues.end() );
+    std::vector< mbGIDType > sortTgtDofs( tgtDofValues.begin(), tgtDofValues.end() );
     std::sort( sortTgtDofs.begin(), sortTgtDofs.end() );
     sortTgtDofs.erase( std::unique( sortTgtDofs.begin(), sortTgtDofs.end() ), sortTgtDofs.end() );  // remove duplicates
 
@@ -3876,7 +3919,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     }
     Tag gidTag = context.MBI->globalId_tag();
 
-    std::vector< int > valuesComp1;
+    std::vector< mbGIDType > valuesComp1;
 
     // populate first tuple
     Range ents_of_interest;  // will be filled with entities on pid1, that need to be distributed,
@@ -3911,13 +3954,13 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         }
         // now fill the tuple list with info and markers
         // because we will send only the ids, order and compress the list
-        std::set< int > uniq( valuesComp1.begin(), valuesComp1.end() );
+        std::set< mbGIDType > uniq( valuesComp1.begin(), valuesComp1.end() );
         TLcomp1.resize( uniq.size() );
-        for( std::set< int >::iterator sit = uniq.begin(); sit != uniq.end(); sit++ )
+        for( auto sit = uniq.begin(); sit != uniq.end(); sit++ )
         {
             // to proc, marker, element local index, index in el
-            int marker               = *sit;
-            int to_proc              = marker % numProcs;
+            mbGIDType marker         = *sit;
+            int to_proc              = static_cast<int>(marker % numProcs);
             int n                    = TLcomp1.get_n();
             TLcomp1.vi_wr[2 * n]     = to_proc;  // send to processor
             TLcomp1.vi_wr[2 * n + 1] = marker;
@@ -3949,7 +3992,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     //moab::TempestOnlineMap* weightMap = nullptr;  // declare it outside, but it will make sense only for *pid2 >= 0
     // we know that :) (or *pid2 >= 0, it means we are on the coupler PEs, read map exists, and coupler procs exist)
     // populate second tuple with ids  from read map: we need row_gdofmap and col_gdofmap
-    std::vector< int > valuesComp2;
+    std::vector< mbGIDType > valuesComp2;
     if( *pid2 >= 0 )  // we are now on coupler, map side
     {
         appData& data2           = context.appDatas[*pid2];
@@ -3971,16 +4014,16 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         // new method from moab::TempestOnlineMap
 
         // now fill the tuple list with info and markers
-        std::set< int > uniq( valuesComp2.begin(), valuesComp2.end() );
+        std::set< mbGIDType > uniq( valuesComp2.begin(), valuesComp2.end() );
         TLcomp2.resize( uniq.size() );
-        for( std::set< int >::iterator sit = uniq.begin(); sit != uniq.end(); sit++ )
+        for( std::set< mbGIDType >::iterator sit = uniq.begin(); sit != uniq.end(); sit++ )
         {
             // to proc, marker, element local index, index in el
-            int marker               = *sit;
-            int to_proc              = marker % numProcs;
+            mbGIDType marker         = *sit;
+            int to_proc              = static_cast<int>(marker % numProcs);
             int n                    = TLcomp2.get_n();
             TLcomp2.vi_wr[2 * n]     = to_proc;  // send to processor
-            TLcomp2.vi_wr[2 * n + 1] = marker;
+            TLcomp2.vi_wr[2 * n + 1] = static_cast<int>(marker);
             TLcomp2.inc_n();
         }
     }
@@ -4211,7 +4254,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         appData& dataIntx        = context.appDatas[*pid2];
         TempestMapAppData& tdata = dataIntx.tempestData;
         Range primary_ents;                  // vertices for type 2, cells of dim 2 for type 1 or 3
-        std::vector< int > values_entities;  // will be the size of primary_ents3 * lenTagType1
+        std::vector< mbGIDType > values_entities;  // will be the size of primary_ents3 * lenTagType1
         EntityHandle fset3 = tdata.remapper->GetMeshSet( Remapper::CoveringMesh );
 
         // start copy
@@ -4222,7 +4265,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         EntityHandle vertex;
         for( int i = 0; i < n; i++ )
         {
-            int gid = TLv.vi_rd[2 * i + 1];
+            mbGIDType gid = TLv.vi_rd[2 * i + 1];
             if( vertexMap.find( gid ) == vertexMap.end() )
             {
                 // need to form this vertex
@@ -4253,7 +4296,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
             for( int i = 0; i < n; i++ )
             {
                 int from_proc  = TLc.vi_rd[size_tuple * i];
-                int globalIdEl = TLc.vi_rd[size_tuple * i + 1];
+                mbGIDType globalIdEl = TLc.vi_rd[size_tuple * i + 1];
                 if( cellMap.find( globalIdEl ) == cellMap.end() )  // need to create the cell
                 {
                     int current_index = 2;

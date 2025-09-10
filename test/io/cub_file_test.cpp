@@ -234,13 +234,13 @@ void test_vertices()
 
     // check global ids (should be 1 to 45 for vertices.)
     Tag gid_tag;
-    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, gid_tag );CHECK_ERR( rval );
-    std::vector< int > ids( num_nodes );
+    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_LONG, gid_tag );CHECK_ERR( rval );
+    std::vector< long > ids( num_nodes );
     rval = mb.tag_get_data( gid_tag, verts, &ids[0] );CHECK_ERR( rval );
-    std::vector< int > sorted( ids );
+    std::vector< long > sorted( ids );
     std::sort( sorted.begin(), sorted.end() );
     for( size_t i = 0; i < num_nodes; ++i )
-        CHECK_EQUAL( (int)( i + 1 ), sorted[i] );
+        CHECK_EQUAL( (long)( i + 1 ), sorted[i] );
 
     // check coordinates of each vertex
     std::vector< double > coords( 3 * num_nodes );
@@ -268,15 +268,15 @@ void test_element( const std::string& filename, EntityType type, int num_elem, i
 
     // get global ids
     Tag gid_tag;
-    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, gid_tag );CHECK_ERR( rval );
-    std::vector< int > ids( num_elem );
+    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_LONG, gid_tag );CHECK_ERR( rval );
+    std::vector< long > ids( num_elem );
     rval = mb.tag_get_data( gid_tag, elems, &ids[0] );CHECK_ERR( rval );
 
     // check that global ids are consecutive, beginning with 1
-    std::vector< int > sorted( ids );
+    std::vector< long > sorted( ids );
     std::sort( sorted.begin(), sorted.end() );
     for( int i = 0; i < num_elem; ++i )
-        CHECK_EQUAL( i + 1, sorted[i] );
+        CHECK_EQUAL( (long)( i + 1 ), sorted[i] );
 
     // check connectivity of each element
     std::vector< int > conn_ids( node_per_elem );
@@ -361,7 +361,7 @@ int check_geometric_set( Interface& moab,
     ErrorCode rval;
     Tag gid_tag, dim_tag;
 
-    rval = moab.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, gid_tag );CHECK_ERR( rval );
+    rval = moab.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_LONG, gid_tag );CHECK_ERR( rval );
     rval = moab.tag_get_handle( "GEOM_DIMENSION", 1, MB_TYPE_INTEGER, dim_tag );CHECK_ERR( rval );
     void* tag_vals[] = { &dim, &id };
     Tag tags[]       = { dim_tag, gid_tag };
@@ -370,7 +370,7 @@ int check_geometric_set( Interface& moab,
     CHECK_EQUAL( 1u, (unsigned)ents.size() );
 
     const EntityHandle geom = ents.front();
-    std::vector< int > exp_rel, act_rel;
+    std::vector< long > exp_rel, act_rel;
     std::vector< EntityHandle > rel;
 
     if( num_children )
@@ -456,7 +456,7 @@ void test_geometric_sets()
     Interface& mb = mb_impl;
     read_file( mb, input_file_1 );
     Tag gid_tag, dim_tag;
-    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, gid_tag );CHECK_ERR( rval );
+    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_LONG, gid_tag );CHECK_ERR( rval );
     rval = mb.tag_get_handle( "GEOM_DIMENSION", 1, MB_TYPE_INTEGER, dim_tag );CHECK_ERR( rval );
 
     // verify mesh entity counts
@@ -590,7 +590,7 @@ void test_bc_sets( const char* tag_name, unsigned count, const int* ids, const s
     read_file( mb, input_file_1 );
     Tag ss_tag, gid_tag, dim_tag;
     rval = mb.tag_get_handle( tag_name, 1, MB_TYPE_INTEGER, ss_tag );CHECK_ERR( rval );
-    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, gid_tag );CHECK_ERR( rval );
+    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_LONG, gid_tag );CHECK_ERR( rval );
     rval = mb.tag_get_handle( "GEOM_DIMENSION", 1, MB_TYPE_INTEGER, dim_tag );CHECK_ERR( rval );
 
     // check number of sidesets and IDs
@@ -903,9 +903,9 @@ void test_cubit14()
     ErrorCode rval = gtt.find_geomsets( ranges );CHECK_ERR( rval );
     EntityHandle set0 = ranges[0][0];  // does it have a global id > 0?
     Tag gid_tag;
-    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, gid_tag );CHECK_ERR( rval );
+    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_LONG, gid_tag );CHECK_ERR( rval );
 
-    int val;
+    long val;
     rval = mb.tag_get_data( gid_tag, &set0, 1, &val );
     CHECK( val != 0 );
 }

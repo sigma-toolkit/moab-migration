@@ -42,7 +42,7 @@ using namespace moab;
     if( MB_SUCCESS != result ) return result
 
 static double* Points      = NULL;
-static int* GlobalIds      = NULL;
+static mbGIDType* GlobalIds      = NULL;
 static int NumPoints       = 0;
 static int* NumEdges       = NULL;
 static int* NborGlobalId   = NULL;
@@ -92,7 +92,7 @@ ErrorCode ZoltanPartitioner::balance_mesh( const char* zmethod,
     }
 
     std::vector< double > pts;  // x[0], y[0], z[0], ... from MOAB
-    std::vector< int > ids;     // point ids from MOAB
+    std::vector< mbGIDType > ids;     // point ids from MOAB
     std::vector< int > adjs, length;
     Range elems;
 
@@ -218,7 +218,7 @@ ErrorCode ZoltanPartitioner::balance_mesh( const char* zmethod,
 ErrorCode ZoltanPartitioner::repartition_to_procs( std::vector< double >& x,
                                                    std::vector< double >& y,
                                                    std::vector< double >& z,
-                                                   std::vector< int >& ids,
+                                                   std::vector< mbGIDType >& ids,
                                                    const char* zmethod,
                                                    std::vector< int >& dest )
 {
@@ -240,12 +240,12 @@ ErrorCode ZoltanPartitioner::repartition_to_procs( std::vector< double >& x,
     Points       = &pts[0];
     GlobalIds    = &ids[0];
     NumPoints    = (int)x.size();
-    NumEdges     = NULL;
-    NborGlobalId = NULL;
-    NborProcs    = NULL;
-    ObjWeights   = NULL;
-    EdgeWeights  = NULL;
-    Parts        = NULL;
+    NumEdges     = nullptr;
+    NborGlobalId = nullptr;
+    NborProcs    = nullptr;
+    ObjWeights   = nullptr;
+    EdgeWeights  = nullptr;
+    Parts        = nullptr;
 
     float version;
     if( rank == 0 ) std::cout << "Initializing zoltan..." << std::endl;
@@ -253,9 +253,9 @@ ErrorCode ZoltanPartitioner::repartition_to_procs( std::vector< double >& x,
     Zoltan_Initialize( argcArg, argvArg, &version );
 
     // Create Zoltan object.  This calls Zoltan_Create.
-    if( NULL == myZZ ) myZZ = new Zoltan( mbpc->comm() );
+    if( nullptr == myZZ ) myZZ = new Zoltan( mbpc->comm() );
 
-    if( NULL == zmethod || !strcmp( zmethod, "RCB" ) )
+    if( nullptr == zmethod || !strcmp( zmethod, "RCB" ) )
         SetRCB_Parameters();
     else if( !strcmp( zmethod, "RIB" ) )
         SetRIB_Parameters();
@@ -334,7 +334,7 @@ ErrorCode ZoltanPartitioner::repartition( std::vector< double >& x,
     // form pts and ids, as in assemble_graph
     std::vector< double > pts;  // x[0], y[0], z[0], ... from MOAB
     pts.resize( x.size() * 3 );
-    std::vector< int > ids;  // point ids from MOAB
+    std::vector< mbGIDType > ids;  // point ids from MOAB
     ids.resize( x.size() );
     for( size_t i = 0; i < x.size(); i++ )
     {
@@ -348,12 +348,12 @@ ErrorCode ZoltanPartitioner::repartition( std::vector< double >& x,
     Points       = &pts[0];
     GlobalIds    = &ids[0];
     NumPoints    = (int)x.size();
-    NumEdges     = NULL;
-    NborGlobalId = NULL;
-    NborProcs    = NULL;
-    ObjWeights   = NULL;
-    EdgeWeights  = NULL;
-    Parts        = NULL;
+    NumEdges     = nullptr;
+    NborGlobalId = nullptr;
+    NborProcs    = nullptr;
+    ObjWeights   = nullptr;
+    EdgeWeights  = nullptr;
+    Parts        = nullptr;
 
     float version;
     if( rank == 0 ) std::cout << "Initializing zoltan..." << std::endl;
@@ -361,9 +361,9 @@ ErrorCode ZoltanPartitioner::repartition( std::vector< double >& x,
     Zoltan_Initialize( argcArg, argvArg, &version );
 
     // Create Zoltan object.  This calls Zoltan_Create.
-    if( NULL == myZZ ) myZZ = new Zoltan( mbpc->comm() );
+    if( nullptr == myZZ ) myZZ = new Zoltan( mbpc->comm() );
 
-    if( NULL == zmethod || !strcmp( zmethod, "RCB" ) )
+    if( nullptr == zmethod || !strcmp( zmethod, "RCB" ) )
         SetRCB_Parameters();
     else if( !strcmp( zmethod, "RIB" ) )
         SetRIB_Parameters();
@@ -555,7 +555,7 @@ ErrorCode ZoltanPartitioner::partition_mesh_and_geometry( const double part_geom
         0 == strcmp( zmethod, "HSFC" ) )
         part_geom = true;       // so no adjacency / edges needed
     std::vector< double > pts;  // x[0], y[0], z[0], ... from MOAB
-    std::vector< int > ids;     // point ids from MOAB
+    std::vector< mbGIDType > ids;     // point ids from MOAB
     std::vector< int > adjs, length, parts;
     std::vector< double > obj_weights, edge_weights;
     Range elems;
@@ -839,7 +839,7 @@ ErrorCode ZoltanPartitioner::include_closure()
 
 ErrorCode ZoltanPartitioner::assemble_graph( const int dimension,
                                              std::vector< double >& coords,
-                                             std::vector< int >& moab_ids,
+                                             std::vector< mbGIDType >& moab_ids,
                                              std::vector< int >& adjacencies,
                                              std::vector< int >& length,
                                              Range& elems,
@@ -1126,7 +1126,7 @@ void ZoltanPartitioner::SetOCTPART_Parameters( const char* oct_method )
 
 int ZoltanPartitioner::mbInitializePoints( int npts,
                                            double* pts,
-                                           int* ids,
+                                           mbGIDType* ids,
                                            int* adjs,
                                            int* length,
                                            double* obj_weights,
@@ -1140,7 +1140,7 @@ int ZoltanPartitioner::mbInitializePoints( int npts,
     int sum, ptsPerProc, ptsAssigned, mySize;
     MPI_Status stat;
     double* sendPts;
-    int* sendIds;
+    mbGIDType* sendIds;
     int* sendEdges  = NULL;
     int* sendNborId = NULL;
     int* sendProcs;
@@ -1191,7 +1191,7 @@ int ZoltanPartitioner::mbInitializePoints( int npts,
         {
             MPI_Send( &numPts[i], 1, MPI_INT, i, 0x00, mbpc->comm() );
             MPI_Send( sendPts, 3 * numPts[i], MPI_DOUBLE, i, 0x01, mbpc->comm() );
-            MPI_Send( sendIds, numPts[i], MPI_INT, i, 0x03, mbpc->comm() );
+            MPI_Send( sendIds, numPts[i], MPI_LONG, i, 0x03, mbpc->comm() );
             MPI_Send( sendEdges, numPts[i], MPI_INT, i, 0x06, mbpc->comm() );
             sum = 0;
 
@@ -1213,11 +1213,11 @@ int ZoltanPartitioner::mbInitializePoints( int npts,
     {
         MPI_Recv( &mySize, 1, MPI_INT, 0, 0x00, mbpc->comm(), &stat );
         pts    = (double*)malloc( sizeof( double ) * 3 * mySize );
-        ids    = (int*)malloc( sizeof( int ) * mySize );
+        ids    = (mbGIDType*)malloc( sizeof( mbGIDType ) * mySize );
         length = (int*)malloc( sizeof( int ) * mySize );
         if( obj_weights != NULL ) obj_weights = (double*)malloc( sizeof( double ) * mySize );
         MPI_Recv( pts, 3 * mySize, MPI_DOUBLE, 0, 0x01, mbpc->comm(), &stat );
-        MPI_Recv( ids, mySize, MPI_INT, 0, 0x03, mbpc->comm(), &stat );
+        MPI_Recv( ids, mySize, MPI_LONG, 0, 0x03, mbpc->comm(), &stat );
         MPI_Recv( length, mySize, MPI_INT, 0, 0x06, mbpc->comm(), &stat );
         sum = 0;
 
@@ -1554,8 +1554,7 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
     Range adjs;
 
     std::vector< int > adjacencies;
-    std::vector< int > ids;
-    ids.resize( primary.size() );
+    std::vector< mbGIDType > ids( primary.size() );
     std::vector< int > length;
     std::vector< double > coords;
     std::vector< int > nbor_proc;
@@ -1569,7 +1568,7 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
     // get the global id tag handle
     Tag gid = mbImpl->globalId_tag();
 
-    ErrorCode rval = mbImpl->tag_get_data( gid, primary, &ids[0] );MB_CHK_ERR( rval );
+    ErrorCode rval = mbImpl->tag_get_data( gid, primary, ids.data() );MB_CHK_ERR( rval );
 
     // mbpc is member in base class, PartitionerBase
     int rank = mbpc->rank();  // current rank , will be put on regular neighbors
@@ -1765,7 +1764,7 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
     // clear arrays that were resized locally, to free up local memory
 
     std::vector< int >().swap( adjacencies );
-    std::vector< int >().swap( ids );
+    std::vector< mbGIDType >().swap( ids );
     std::vector< int >().swap( length );
     std::vector< int >().swap( nbor_proc );
     std::vector< double >().swap( coords );

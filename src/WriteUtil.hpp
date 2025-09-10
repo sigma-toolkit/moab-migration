@@ -94,6 +94,7 @@ class WriteUtil : public WriteUtilIface
      *\param entities Entities being queried
      *\param element_id_tag If non-zero, elements are tagged with an id starting at start_element_id
      *\param start_element_id Starting id value for element_id_tag
+     *\param element_array Array to write connectivity into
      *\param add_sizes If true, writes size of connect array before connectivity in array
      */
     ErrorCode get_element_connect( const int num_elements,
@@ -102,7 +103,7 @@ class WriteUtil : public WriteUtilIface
                                    const Range& entities,
                                    Tag element_id_tag,
                                    int start_element_id,
-                                   int* array,
+                                   mbGIDType* element_array,
                                    bool add_sizes = false );
 
     /** Get connectivity for elements
@@ -138,7 +139,7 @@ class WriteUtil : public WriteUtilIface
                                    const int vertices_per_elem,
                                    Tag node_id_tag,
                                    const size_t array_size,
-                                   int* const element_array,
+                                   mbGIDType* const element_array,
                                    bool add_sizes = false );
 
     /** Get connectivity for elements

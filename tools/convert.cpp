@@ -921,16 +921,16 @@ int main( int argc, char* argv[] )
 #endif
 
         Tag gidTag = gMB->globalId_tag();
-        std::vector< int > gids( faces.size() );
-        result = gMB->tag_get_data( gidTag, faces, &gids[0] );MB_CHK_ERR( result );
+        std::vector< mbGIDType > gids( faces.size() );
+        MB_CHK_SET_ERR( gMB->tag_get_data( gidTag, faces, &gids[0] ), "Failed to get global IDs" );
 
         if( faces.size() > 1 && gids[0] == gids[1] && !use_overlap_context )
         {
 #ifdef MOAB_HAVE_MPI
-            result = pcomm->assign_global_ids( srcmesh, 2, 1, false );MB_CHK_ERR( result );
+            MB_CHK_SET_ERR( pcomm->assign_global_ids( srcmesh, 2, 1, false ), "Failed to assign global IDs" );
 #else
-            result = remapper->assign_vertex_element_IDs( gidTag, srcmesh, 2, 1 );MB_CHK_ERR( result );
-            result = remapper->assign_vertex_element_IDs( gidTag, srcmesh, 0, 1 );MB_CHK_ERR( result );
+            MB_CHK_SET_ERR( remapper->assign_vertex_element_IDs( gidTag, srcmesh, 2, 1 ), "Failed to assign vertex element IDs" );
+            MB_CHK_SET_ERR( remapper->assign_vertex_element_IDs( gidTag, srcmesh, 0, 1 ), "Failed to assign vertex element IDs" );
 #endif
         }
 
@@ -939,8 +939,8 @@ int main( int argc, char* argv[] )
         // Useful only for SE meshes with GLL DoFs
         if( spectral_order > 1 && globalid_tag_name.size() > 1 )
         {
-            result = remapper->GenerateMeshMetadata( *tempestMesh, ntot_elements, faces, NULL, globalid_tag_name,
-                                                     spectral_order );MB_CHK_ERR( result );
+            MB_CHK_SET_ERR( remapper->GenerateMeshMetadata( *tempestMesh, faces, NULL, globalid_tag_name,
+                                                     spectral_order ), "Failed to generate mesh metadata" );
         }
 
         if( tempestout )
@@ -953,8 +953,8 @@ int main( int argc, char* argv[] )
                 // Overlap mesh: resize the source and target connection arrays
                 tempestMesh->vecSourceFaceIx.resize( nOverlapFaces );  // 0-based indices corresponding to source mesh
                 tempestMesh->vecTargetFaceIx.resize( nOverlapFaces );  // 0-based indices corresponding to target mesh
-                result = gMB->tag_get_data( srcParentTag, faces, &tempestMesh->vecSourceFaceIx[0] );MB_CHK_ERR( result );
-                result = gMB->tag_get_data( tgtParentTag, faces, &tempestMesh->vecTargetFaceIx[0] );MB_CHK_ERR( result );
+                MB_CHK_SET_ERR( gMB->tag_get_data( srcParentTag, faces, &tempestMesh->vecSourceFaceIx[0] ), "Failed to get source parent tag data" );
+                MB_CHK_SET_ERR( gMB->tag_get_data( tgtParentTag, faces, &tempestMesh->vecTargetFaceIx[0] ), "Failed to get target parent tag data" );
             }
             // Write out the mesh using TempestRemap
             tempestMesh->Write( out, NcFile::Netcdf4 );

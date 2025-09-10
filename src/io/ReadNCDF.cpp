@@ -117,17 +117,30 @@ namespace moab
         if( -1 != ( id ) )                                                                    \
         {                                                                                     \
             size_t ntmp;                                                                      \
-            int ivfail = nc_inq_dimlen( ncFile, ( vals )[0], &ntmp );                         \
+            int ivfail = nc_inq_dimlen( ncFile, dum_dims[0], &ntmp );                         \
             if( NC_NOERR != ivfail )                                                          \
             {                                                                                 \
                 MB_SET_ERR( MB_FAILURE, "ReadNCDF:: Couldn't get dimension length" );         \
             }                                                                                 \
             ( vals ).resize( ntmp );                                                          \
             size_t ntmp1 = 0;                                                                 \
-            ivfail       = nc_get_vara_long( ncFile, id, &ntmp1, &ntmp, &( vals )[0] );        \
+            /* Try reading as long first, then fall back to int if that fails */             \
+            ivfail = nc_get_vara_long( ncFile, id, &ntmp1, &ntmp, &( vals )[0] );              \
             if( NC_NOERR != ivfail )                                                          \
             {                                                                                 \
-                MB_SET_ERR( MB_FAILURE, "ReadNCDF:: Problem getting variable " << ( name ) ); \
+                /* Fall back to reading as int and converting */                             \
+                std::vector< int > int_vals( ntmp );                                          \
+                ivfail = nc_get_vara_int( ncFile, id, &ntmp1, &ntmp, &int_vals[0] );           \
+                if( NC_NOERR != ivfail )                                                      \
+                {                                                                             \
+                    MB_SET_ERR( MB_FAILURE, "ReadNCDF:: Problem getting variable " << ( name ) ); \
+                }                                                                             \
+                else                                                                          \
+                {                                                                             \
+                    /* Convert int values to long */                                         \
+                    for( size_t i = 0; i < ntmp; ++i )                                        \
+                        ( vals )[i] = static_cast< long >( int_vals[i] );                      \
+                }                                                                             \
             }                                                                                 \
         }                                                                                     \
     }

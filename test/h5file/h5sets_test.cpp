@@ -309,7 +309,7 @@ void test_tree( int max_depth )
     // create tag in which to store number for each tree node,
     // in depth-first in-order search order.
     Tag tag;
-    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, tag );CHECK_ERR( rval );
+    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_LONG, tag );CHECK_ERR( rval );
 
     // create a binary tree to a depth of 20 (about 1 million nodes)
     rval = mb.create_meshset( MESHSET_SET, root );CHECK_ERR( rval );
@@ -328,7 +328,7 @@ void test_tree( int max_depth )
     if( !keep_file ) remove( str.str().c_str() );CHECK_ERR( rval );
 
     // get tree root
-    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, tag );CHECK_ERR( rval );
+    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_LONG, tag );CHECK_ERR( rval );
     Range roots;
     idx                = 1;
     const void* vals[] = { &idx };
@@ -652,8 +652,8 @@ void test_set_flags()
     // Assign IDs to things so that we can identify them in the
     // data we read back in.
     Tag tag;
-    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, tag );CHECK_ERR( rval );
-    int ids[nverts];
+    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_LONG, tag );CHECK_ERR( rval );
+    long ids[nverts];
     for( int i = 0; i < nverts; ++i )
         ids[i] = i + 1;
     rval = mb.tag_set_data( tag, verts, ids );CHECK_ERR( rval );
@@ -696,13 +696,13 @@ void test_set_flags()
     mb.delete_mesh();
     rval = mb.load_file( filename2 );
     if( !keep_file ) remove( filename2 );CHECK_ERR( rval );
-    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, tag );CHECK_ERR( rval );
+    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_LONG, tag );CHECK_ERR( rval );
 
     // find our sets
     Range tmp;
     for( int i = 0; i < 6; ++i )
     {
-        int id = i + 1;
+        long id = i + 1;
         tmp.clear();
         const void* vals[] = { &id };
         rval               = mb.get_entities_by_type_and_tag( 0, MBENTITYSET, &tag, vals, 1, tmp );CHECK_ERR( rval );

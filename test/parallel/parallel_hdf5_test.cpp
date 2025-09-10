@@ -1442,7 +1442,7 @@ void test_write_unbalanced()
     Tag idtag = mb.globalId_tag();
 
     // create a shared set
-    const int two = 2;
+    const long two = 2;
     Range entities, sets;
 
     EntityHandle set;
@@ -1491,7 +1491,7 @@ void test_write_unbalanced()
     CHECK_EQUAL( nquads, quads.size() );
     CHECK_EQUAL( nverts, verts.size() );
 
-    rval = mb.tag_get_handle( GLOBAL_ID_TAG_NAME, 1, MB_TYPE_INTEGER, idtag );CHECK_ERR( rval );
+    rval = mb.tag_get_handle( GLOBAL_ID_TAG_NAME, 1, MB_TYPE_LONG, idtag );CHECK_ERR( rval );
     sets.clear();
     const void* vals[] = { &two };
     rval               = mb.get_entities_by_type_and_tag( 0, MBENTITYSET, &idtag, vals, 1, sets );CHECK_ERR( rval );

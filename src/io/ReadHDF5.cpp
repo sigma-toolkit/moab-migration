@@ -2931,18 +2931,25 @@ ErrorCode ReadHDF5::create_tag( const mhdf_TagDesc& info, Tag& handle, hid_t& hd
     }
     else
     {
-        if ( strcmp(info.name, "GLOBAL_ID" ) == 0 )
+        // Special handling for GLOBAL_ID backward compatibility
+        if( strcmp( info.name, "GLOBAL_ID" ) == 0 )
         {
-            // handle special case of GLOBAL_ID
-            if( info.size > 0 )
+            // Always create GLOBAL_ID tags as MB_TYPE_LONG in memory for consistency
+            mb_type = MB_TYPE_LONG;
+
+            if( info.type == mhdf_INTEGER )
             {
-                hdf_type = H5Tcopy( H5T_NATIVE_LONG );
-                mb_type  = MB_TYPE_LONG;
+                // File has 32-bit GLOBAL_ID, read as int but create as long tag
+                hdf_type = H5T_NATIVE_INT;
+            }
+            else if( info.type == mhdf_LONG )
+            {
+                // File has 64-bit GLOBAL_ID
+                hdf_type = H5T_NATIVE_LONG;
             }
             else
             {
-                hdf_type = H5Tcopy( H5T_NATIVE_INT );
-                mb_type  = MB_TYPE_LONG;
+                MB_SET_ERR( MB_FAILURE, "Unsupported GLOBAL_ID type in file: " << info.type );
             }
         }
         else
@@ -2988,22 +2995,22 @@ ErrorCode ReadHDF5::create_tag( const mhdf_TagDesc& info, Tag& handle, hid_t& hd
                 default:
                     MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
             }
-
-            if( info.size > 1 )
-            {  // Array
-                hsize_t tmpsize = info.size;
-                #if defined( H5Tarray_create_vers ) && H5Tarray_create_vers > 1
-                hdf_type = H5Tarray_create2( hdf_type, 1, &tmpsize );
-                #else
-                hdf_type = H5Tarray_create( hdf_type, 1, &tmpsize, NULL );
-                #endif
-            }
-            else
-            {
-                hdf_type = H5Tcopy( hdf_type );
-            }
-            if( hdf_type < 0 ) MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
         }
+
+        if( info.size > 1 )
+        {  // Array
+            hsize_t tmpsize = info.size;
+#if defined( H5Tarray_create_vers ) && H5Tarray_create_vers > 1
+            hdf_type = H5Tarray_create2( hdf_type, 1, &tmpsize );
+#else
+            hdf_type = H5Tarray_create( hdf_type, 1, &tmpsize, NULL );
+#endif
+        }
+        else
+        {
+            hdf_type = H5Tcopy( hdf_type );
+        }
+        if( hdf_type < 0 ) MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
     }
 
     // If default or global/mesh value in file, read it.
@@ -3043,15 +3050,51 @@ ErrorCode ReadHDF5::create_tag( const mhdf_TagDesc& info, Tag& handle, hid_t& hd
     }
 
     // Get tag handle, creating if necessary
-    if( info.size < 0 )
-        rval = iFace->tag_get_handle( info.name, info.default_value_size, mb_type, handle,
-                                      storage | MB_TAG_CREAT | MB_TAG_VARLEN | MB_TAG_DFTOK, info.default_value );
+    // Special handling for GLOBAL_ID backward compatibility
+    if( strcmp( info.name, "GLOBAL_ID" ) == 0 )
+    {
+        // For GLOBAL_ID, always use MB_TYPE_LONG in memory regardless of file format
+        DataType memory_type = MB_TYPE_LONG;
+        int memory_size = sizeof(long);
+
+        // Try to get existing GLOBAL_ID tag first
+        rval = iFace->tag_get_handle( info.name, handle );
+        if( MB_SUCCESS != rval )
+        {
+            // Create new GLOBAL_ID tag with MB_TYPE_LONG
+            if( info.size < 0 )
+                rval = iFace->tag_get_handle( info.name, info.default_value_size, memory_type, handle,
+                                              storage | MB_TAG_CREAT | MB_TAG_VARLEN | MB_TAG_DFTOK, info.default_value );
+            else
+                rval = iFace->tag_get_handle( info.name, memory_size, memory_type, handle, storage | MB_TAG_CREAT | MB_TAG_DFTOK,
+                                              info.default_value );
+        }
+        // If tag exists, verify it's MB_TYPE_LONG
+        if( MB_SUCCESS == rval )
+        {
+            DataType existing_type;
+            iFace->tag_get_data_type( handle, existing_type );
+            if( existing_type != MB_TYPE_LONG )
+            {
+                if( hdf_type && hdf_type != H5T_NATIVE_INT ) H5Tclose( hdf_type );
+                MB_SET_ERR( MB_FAILURE, "GLOBAL_ID tag must be MB_TYPE_LONG in memory, found: " << existing_type );
+            }
+        }
+    }
     else
-        rval = iFace->tag_get_handle( info.name, info.size, mb_type, handle, storage | MB_TAG_CREAT | MB_TAG_DFTOK,
-                                      info.default_value );
+    {
+        // Normal tag creation
+        if( info.size < 0 )
+            rval = iFace->tag_get_handle( info.name, info.default_value_size, mb_type, handle,
+                                          storage | MB_TAG_CREAT | MB_TAG_VARLEN | MB_TAG_DFTOK, info.default_value );
+        else
+            rval = iFace->tag_get_handle( info.name, info.size, mb_type, handle, storage | MB_TAG_CREAT | MB_TAG_DFTOK,
+                                          info.default_value );
+    }
+
     if( MB_SUCCESS != rval )
     {
-        if( hdf_type ) H5Tclose( hdf_type );
+        if( hdf_type && hdf_type != H5T_NATIVE_INT ) H5Tclose( hdf_type );
         MB_SET_ERR( MB_FAILURE, "Tag type in file does not match type in database for \"" << info.name << "\"" );
     }
 
@@ -3069,7 +3112,7 @@ ErrorCode ReadHDF5::create_tag( const mhdf_TagDesc& info, Tag& handle, hid_t& hd
         }
         if( MB_SUCCESS != rval )
         {
-            if( hdf_type ) H5Tclose( hdf_type );
+            if( hdf_type && hdf_type != H5T_NATIVE_INT ) H5Tclose( hdf_type );
             MB_SET_ERR( rval, "ReadHDF5 Failure" );
         }
     }
@@ -3095,6 +3138,10 @@ ErrorCode ReadHDF5::read_dense_tag( Tag tag_handle,
     std::string tn( "<error>" );
     iFace->tag_get_name( tag_handle, tn );
 
+    // Check if this is GLOBAL_ID backward compatibility case
+    bool is_global_id_conversion = ( tn == "GLOBAL_ID" && mb_type == MB_TYPE_LONG &&
+                                     H5Tequal( hdf_read_type, H5T_NATIVE_INT ) );
+
     int read_size;
     rval = iFace->tag_get_bytes( tag_handle, read_size );
     if( MB_SUCCESS != rval )  // Wrong function for variable-length tags
@@ -3109,8 +3156,9 @@ ErrorCode ReadHDF5::read_dense_tag( Tag tag_handle,
     if( hdf_read_type )
     {  // If not opaque
         hsize_t hdf_size = H5Tget_size( hdf_read_type );
-        std::cout << tn << ": ReadHDF5: hdf_size = " << hdf_size << ", read_size = " << read_size << std::endl;
-        if( hdf_size != (hsize_t)read_size ) MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
+        // Allow size mismatch for GLOBAL_ID backward compatibility (4-byte file, 8-byte memory)
+        if( hdf_size != (hsize_t)read_size && !is_global_id_conversion )
+            MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
     }
 
     // Get actual entities read from file
@@ -3160,7 +3208,15 @@ ErrorCode ReadHDF5::read_dense_tag( Tag tag_handle,
     {
         h_ins = handles.begin();
         ReadHDF5Dataset reader( tn.c_str(), data, nativeParallel, mpiComm, false );
-        long buffer_size = bufferSize / read_size;
+        // For GLOBAL_ID backward compatibility, adjust buffer size for conversion
+        long buffer_size;
+        if( is_global_id_conversion ) {
+            // Scale buffer size by sizeof(mbGIDType)/sizeof(int) to account for expansion during conversion
+            buffer_size = bufferSize / read_size;  // Number of longs that fit in buffer
+            buffer_size = buffer_size * sizeof(int) / sizeof(mbGIDType);  // Scale down for file reading
+        } else {
+            buffer_size = bufferSize / read_size;
+        }
         reader.set_file_ids( file_ids, start_id, buffer_size, hdf_read_type );
         dbgOut.printf( 3, "Reading dense data for tag \"%s\" and group \"%s\" in %lu chunks\n", tn.c_str(), ent_name,
                        reader.get_read_count() );
@@ -3176,6 +3232,13 @@ ErrorCode ReadHDF5::read_dense_tag( Tag tag_handle,
             {
                 rval = convert_id_to_handle( (EntityHandle*)dataBuffer, count * read_size / sizeof( EntityHandle ) );
                 if( MB_SUCCESS != rval ) MB_SET_ERR( rval, "ReadHDF5 Failure" );
+            }
+            else if( is_global_id_conversion )
+            {
+                // Convert 32-bit integers to 64-bit longs using H5Tconvert
+                size_t total_count = count * reader.columns();
+                herr_t err = H5Tconvert( H5T_NATIVE_INT, H5T_NATIVE_LONG, total_count, dataBuffer, 0, H5P_DEFAULT );
+                if( err < 0 ) MB_SET_ERR( rval, "ReadHDF5 Failure" );
             }
 
             Range ents;
@@ -3291,6 +3354,16 @@ ErrorCode ReadHDF5::read_sparse_tag( Tag tag_handle,
 {
     CHECK_OPEN_HANDLES;
 
+    // Check if this is GLOBAL_ID backward compatibility case
+    DataType mb_type;
+    ErrorCode rval = iFace->tag_get_data_type( tag_handle, mb_type );
+    if( MB_SUCCESS != rval ) MB_SET_ERR( rval, "ReadHDF5 Failure" );
+
+    std::string tn;
+    iFace->tag_get_name( tag_handle, tn );
+    bool is_global_id_conversion = ( tn == "GLOBAL_ID" && mb_type == MB_TYPE_LONG &&
+                                     H5Tequal( hdf_read_type, H5T_NATIVE_INT ) );
+
     // Read entire ID table and for those file IDs corresponding
     // to entities that we have read from the file add both the
     // offset into the offset range and the handle into the handle
@@ -3298,15 +3371,9 @@ ErrorCode ReadHDF5::read_sparse_tag( Tag tag_handle,
     const EntityHandle base_offset = 1;  // Can't put zero in a Range
     std::vector< EntityHandle > handle_vect;
     Range handle_range, offset_range;
-    std::string tn( "<error>" );
-    iFace->tag_get_name( tag_handle, tn );
-    ErrorCode rval =
+    rval =
         read_sparse_tag_indices( tn.c_str(), id_table, base_offset, offset_range, handle_range, handle_vect );
     if( MB_SUCCESS != rval ) MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
-
-    DataType mbtype;
-    rval = iFace->tag_get_data_type( tag_handle, mbtype );
-    if( MB_SUCCESS != rval ) MB_SET_ERR( rval, "ReadHDF5 Failure" );
 
     int read_size;
     rval = iFace->tag_get_bytes( tag_handle, read_size );
@@ -3342,10 +3409,16 @@ ErrorCode ReadHDF5::read_sparse_tag( Tag tag_handle,
             dbgOut.printf( 3, "Reading chunk %d of \"%s\" values\n", ++nn, tn.c_str() );
             size_t count;
             val_reader.read( dataBuffer, count );
-            if( MB_TYPE_HANDLE == mbtype )
+            if( MB_TYPE_HANDLE == mb_type )
             {
                 rval = convert_id_to_handle( (EntityHandle*)dataBuffer, count * handles_per_tag );
                 if( MB_SUCCESS != rval ) MB_SET_ERR( rval, "ReadHDF5 Failure" );
+            }
+            else if( is_global_id_conversion )
+            {
+                // Convert 32-bit integers to 64-bit longs using H5Tconvert
+                herr_t err = H5Tconvert( H5T_NATIVE_INT, H5T_NATIVE_LONG, count, dataBuffer, 0, H5P_DEFAULT );
+                if( err < 0 ) MB_SET_ERR( rval, "ReadHDF5 Failure" );
             }
 
             if( !handle_vect.empty() )

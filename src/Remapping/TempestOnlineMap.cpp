@@ -170,7 +170,7 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
                                                               DataArray3D< int >* tgtdataGLLNodes )
 {
     std::vector< bool > dgll_cgll_row_ldofmap, dgll_cgll_col_ldofmap, dgll_cgll_covcol_ldofmap;
-    std::vector< int > src_soln_gdofs, locsrc_soln_gdofs, tgt_soln_gdofs;
+    std::vector< mbGIDType > src_soln_gdofs, locsrc_soln_gdofs, tgt_soln_gdofs;
 
     // We are assuming that these are element based tags that are sized: np * np
     m_srcDiscType  = srcType;
@@ -393,7 +393,7 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
     return moab::MB_SUCCESS;
 }
 
-moab::ErrorCode moab::TempestOnlineMap::set_col_dc_dofs( std::vector< int >& values_entities )
+moab::ErrorCode moab::TempestOnlineMap::set_col_dc_dofs( std::vector< mbGIDType >& values_entities )
 {
     // col_gdofmap has global dofs , that should be in the list of values, such that
     // row_dtoc_dofmap[offsetDOF] = localDOF;
@@ -412,7 +412,7 @@ moab::ErrorCode moab::TempestOnlineMap::set_col_dc_dofs( std::vector< int >& val
     return moab::MB_SUCCESS;
 }
 
-moab::ErrorCode moab::TempestOnlineMap::set_row_dc_dofs( std::vector< int >& values_entities )
+moab::ErrorCode moab::TempestOnlineMap::set_row_dc_dofs( std::vector< mbGIDType >& values_entities )
 {
     //  we need to find row_dtoc_dofmap such that: row_gdofmap[ row_dtoc_dofmap[i] ] == values_entities [i];
     // resize and initialize to -1 to signal that this value should not be used, if not set below

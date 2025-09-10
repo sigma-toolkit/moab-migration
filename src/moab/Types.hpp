@@ -28,6 +28,15 @@
  */
 /*@{*/
 
+/** Global ID type for MOAB entities */
+typedef long mbGIDType;
+
+#ifdef MOAB_HAVE_MPI
+#include <mpi.h>
+/** MPI datatype for mbGIDType */
+#define MB_MPI_GIDTYPE MPI_LONG
+#endif
+
 #ifdef __cplusplus
 namespace moab
 {

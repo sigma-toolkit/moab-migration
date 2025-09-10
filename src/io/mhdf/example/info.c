@@ -119,6 +119,8 @@ static const char* string_tag_value( const void* value, enum mhdf_TagDataType ty
     char* offset     = buffer;
     int print, i;
     const int* intptr          = value;
+    const int* longptr         = value;
+    const int* llongptr        = value;
     const double* dblptr       = value;
     const unsigned long* idptr = value;
 
@@ -152,9 +154,6 @@ static const char* string_tag_value( const void* value, enum mhdf_TagDataType ty
             break;
         case mhdf_INTEGER:
         case mhdf_UNSIGNED_INTEGER:
-        case mhdf_LONG:
-        case mhdf_UNSIGNED_LONG:
-        case mhdf_UNSIGNED_LONG_LONG:
             if( size == 1 )
             {
                 offset += snprintf( offset, 1024, "%d", intptr[0] );
@@ -164,6 +163,33 @@ static const char* string_tag_value( const void* value, enum mhdf_TagDataType ty
                 offset += snprintf( offset, 1024, "{%d", intptr[0] );
                 for( i = 1; i < size; ++i )
                     offset += snprintf( offset, 1024, ",%d", intptr[i] );
+                offset += snprintf( offset, 1024, "}" );
+            }
+            break;
+        case mhdf_LONG:
+        case mhdf_UNSIGNED_LONG:
+            if( size == 1 )
+            {
+                offset += snprintf( offset, 1024, "%d", longptr[0] );
+            }
+            else
+            {
+                offset += snprintf( offset, 1024, "{%d", longptr[0] );
+                for( i = 1; i < size; ++i )
+                    offset += snprintf( offset, 1024, ",%d", longptr[i] );
+                offset += snprintf( offset, 1024, "}" );
+            }
+            break;
+        case mhdf_UNSIGNED_LONG_LONG:
+            if( size == 1 )
+            {
+                offset += snprintf( offset, 1024, "%d", llongptr[0] );
+            }
+            else
+            {
+                offset += snprintf( offset, 1024, "{%d", llongptr[0] );
+                for( i = 1; i < size; ++i )
+                    offset += snprintf( offset, 1024, ",%d", llongptr[i] );
                 offset += snprintf( offset, 1024, "}" );
             }
             break;

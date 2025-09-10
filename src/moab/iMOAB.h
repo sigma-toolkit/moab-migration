@@ -48,10 +48,12 @@
 #include <stdlib.h>
 #endif
 
+#include "moab/Types.hpp"
+
 #define iMOAB_AppID    int*
 #define iMOAB_String   char*
-#define iMOAB_GlobalID long
-#define iMOAB_LocalID  long
+#define iMOAB_GlobalID mbGIDType
+#define iMOAB_LocalID  mbGIDType
 #ifdef __cplusplus
 #define ErrCode moab::ErrorCode
 #else
@@ -563,7 +565,7 @@ ErrCode iMOAB_GetVisibleElementsInfo( iMOAB_AppID pid,
 ErrCode iMOAB_GetBlockElementConnectivities( iMOAB_AppID pid,
                                              iMOAB_GlobalID* global_block_ID,
                                              int* connectivity_length,
-                                             int* element_connectivity );
+                                             iMOAB_LocalID* element_connectivity );
 
 /**
  * \brief Get the connectivity for one element only.
@@ -584,7 +586,7 @@ ErrCode iMOAB_GetBlockElementConnectivities( iMOAB_AppID pid,
 ErrCode iMOAB_GetElementConnectivity( iMOAB_AppID pid,
                                       iMOAB_LocalID* elem_index,
                                       int* connectivity_length,
-                                      int* element_connectivity );
+                                      iMOAB_LocalID* element_connectivity );
 
 /**
  * \brief Get the element ownership within a certain block i.e., processor ID of the element owner.
@@ -603,7 +605,7 @@ ErrCode iMOAB_GetElementConnectivity( iMOAB_AppID pid,
  */
 ErrCode iMOAB_GetElementOwnership( iMOAB_AppID pid,
                                    iMOAB_GlobalID* global_block_ID,
-                                   int* num_elements_in_block,
+                                   iMOAB_LocalID* num_elements_in_block,
                                    int* element_ownership );
 
 /**
@@ -648,7 +650,7 @@ ErrCode iMOAB_GetElementID( iMOAB_AppID pid,
 ErrCode iMOAB_GetPointerToSurfaceBC( iMOAB_AppID pid,
                                      int* surface_BC_length,
                                      iMOAB_LocalID* local_element_ID,
-                                     int* reference_surface_ID,
+                                     iMOAB_LocalID* reference_surface_ID,
                                      int* boundary_condition_value );
 
 /**
@@ -716,6 +718,27 @@ ErrCode iMOAB_SetIntTagStorage( iMOAB_AppID pid,
                                 int* num_tag_storage_length,
                                 int* entity_type,
                                 int* tag_storage_data );
+
+/**
+ * \brief Get the specified values in a MOAB integer Tag.
+ *
+ * \note <B>Operations:</B> Collective
+ *
+ * \param[in]  pid (iMOAB_AppID)                       The unique pointer to the application ID.
+ * \param[in]  tag_storage_name (iMOAB_String)         The tag name to store/retreive the data in MOAB.
+ * \param[in]  num_tag_storage_length (int*)           The size of tag storage data (e.g., num_visible_vertices*components_per_entity or
+ *                                                     num_visible_elements*components_per_entity).
+ * \param[in]  entity_type (int*)                      Type=0 for vertices, and Type=1 for primary elements.
+ * \param[out] tag_storage_data (int*)                 The array data of type <I>int</I> to be copied from the internal tag memory;
+ *                                                     The data is assumed to be contiguous over the local set of visible
+ *                                                     entities (either vertices or elements).
+ * \return ErrCode                                     The error code indicating success or failure.
+ */
+ErrCode iMOAB_GetGIDStorage( iMOAB_AppID pid,
+                                const iMOAB_String tag_storage_name,
+                                int* num_tag_storage_length,
+                                int* ent_type,
+                                iMOAB_GlobalID* tag_storage_data );
 
 /**
  * \brief Get the specified values in a MOAB integer Tag.

@@ -72,16 +72,16 @@ void test_read_nodes()
 
     Tag id_tag = mb.globalId_tag();
 
-    std::vector< int > ids( nodes.size() );
+    std::vector< size_t > ids( nodes.size() );
     rval = mb.tag_get_data( id_tag, &nodes[0], nodes.size(), &ids[0] );CHECK_ERR( rval );
 
-    std::vector< int > sorted_ids( ids );
+    std::vector< size_t > sorted_ids( ids );
     std::sort( sorted_ids.begin(), sorted_ids.end() );
 
     std::vector< double > coords( 3 * nodes.size() );
     rval = mb.get_coords( &nodes[0], nodes.size(), &coords[0] );CHECK_ERR( rval );
 
-    int idx, pos = 0;
+    size_t idx, pos = 0;
     CHECK_EQUAL( pos + 1, sorted_ids[pos] );
     idx = std::find( ids.begin(), ids.end(), pos + 1 ) - ids.begin();
     CHECK_REAL_EQUAL( coords[3 * idx + 0], 0.0, eps );
@@ -137,7 +137,7 @@ void test_read_quads()
 
     Tag id_tag = mb.globalId_tag();
 
-    std::vector< int > ids( quads.size() );
+    std::vector< size_t > ids( quads.size() );
     rval = mb.tag_get_data( id_tag, &quads[0], quads.size(), &ids[0] );CHECK_ERR( rval );
 
     if( ids[0] != 1 )
@@ -146,19 +146,19 @@ void test_read_quads()
         std::swap( quads[0], quads[1] );
     }
 
-    int vtx_ids[4];
+    size_t vtx_ids[4];
     const EntityHandle* conn;
     int len;
 
-    const int conn1[] = { 1, 2, 3, 4 };
-    int pos           = 0;
+    const size_t conn1[] = { 1, 2, 3, 4 };
+    size_t pos           = 0;
     CHECK_EQUAL( pos + 1, ids[pos] );
     rval = mb.get_connectivity( quads[pos], conn, len );CHECK_ERR( rval );
     CHECK_EQUAL( 4, len );
     rval = mb.tag_get_data( id_tag, conn, len, vtx_ids );CHECK_ERR( rval );
     CHECK_ARRAYS_EQUAL( conn1, 4, vtx_ids, len );
 
-    const int conn2[] = { 2, 5, 6, 3 };
+    const size_t conn2[] = { 2, 5, 6, 3 };
     ++pos;
     CHECK_EQUAL( pos + 1, ids[pos] );
     rval = mb.get_connectivity( quads[pos], conn, len );CHECK_ERR( rval );

@@ -38,22 +38,24 @@ TagInfo::~TagInfo()
 //     MB_TYPE_FLOAT    = 6, /**< native 'float' type */
 //     MB_TYPE_DOUBLE   = 7, /**< native 'double' type */
 //     MB_TYPE_BIT      = 8, /**< mandatory type for tags with MB_TAG_BIT storage */
-//     MB_TYPE_HANDLE   = 8, /**< EntityHandle */
+//     MB_TYPE_HANDLE   = 9, /**< EntityHandle */
 //     MB_MAX_DATA_TYPE = MB_TYPE_HANDLE
 // };
 int TagInfo::size_from_data_type( DataType t )
 {
-    static const int sizes[] = { 1,  // MB_TYPE_OPAQUE
-                                sizeof( int ), // MB_TYPE_INTEGER
-                                sizeof( unsigned int ), // MB_TYPE_UNSIGNED_INTEGER
-                                sizeof( long ), // MB_TYPE_LONG
-                                sizeof( unsigned long ), // MB_TYPE_UNSIGNED_LONG
-                                sizeof( unsigned long long ), // MB_TYPE_UNSIGNED_LONG_LONG
-                                sizeof( float ), // MB_TYPE_FLOAT
-                                sizeof( double ), // MB_TYPE_DOUBLE
-                                1, // MB_TYPE_BIT
-                                sizeof( EntityHandle ), // MB_TYPE_HANDLE
+    static const int sizes[] = { 1,  // MB_TYPE_OPAQUE (0)
+                                sizeof( int ), // MB_TYPE_INTEGER (1)
+                                sizeof( unsigned int ), // MB_TYPE_UNSIGNED_INTEGER (2)
+                                sizeof( long ), // MB_TYPE_LONG (3)
+                                sizeof( unsigned long ), // MB_TYPE_UNSIGNED_LONG (4)
+                                sizeof( unsigned long long ), // MB_TYPE_UNSIGNED_LONG_LONG (5)
+                                sizeof( float ), // MB_TYPE_FLOAT (6)
+                                sizeof( double ), // MB_TYPE_DOUBLE (7)
+                                1, // MB_TYPE_BIT (8)
+                                sizeof( EntityHandle ), // MB_TYPE_HANDLE (9)
                                 0 };
+    // Add bounds checking to prevent array out-of-bounds access
+    if( t < 0 || t > MB_MAX_DATA_TYPE ) return 0;
     return sizes[t];
 }
 

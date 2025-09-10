@@ -53,20 +53,24 @@ int main( int argc, char* argv[] )
     int num_components = 1;
 
     iMOAB_GlobalID *element_global_IDs, *block_IDs;
-    int vertices_per_element, num_elements_in_block;
-    int conn[27], nv, eindex;
+    int vertices_per_element;
+    iMOAB_LocalID num_elements_in_block;
+    iMOAB_LocalID conn[27], eindex;
+    int nv;
 
     int* int_tag_vals;
     double* double_tag_vals;
 
-    int local_index           = 0;  /* test element with local index 0 */
+    iMOAB_LocalID local_index = 0;  /* test element with local index 0 */
     int num_adjacent_elements = 10; /* we can have maximum 6 actually */
     iMOAB_LocalID adjacent_element_IDs[10], *element_connectivity, *local_element_ID;
     int size_conn, *element_ownership;
     iMOAB_GlobalID* global_element_ID;
 
     iMOAB_LocalID *vertBC_ID, *surfBC_ID;
-    int *vertBC_value, *ref_surf, *bc_value;
+    int *vertBC_value;
+    iMOAB_LocalID *ref_surf;
+    int *bc_value;
 
     char *outputFile, *writeOptions;
 
@@ -195,7 +199,7 @@ int main( int argc, char* argv[] )
      * They also correspond to block IDs in a Cubit model.
      * Local visible blocks might contain ghost cells, owned by other
      * processes.
-     * 
+     *
      * Inside MOAB, a block will correspond to a meshset with a MATERIAL_SET tag,
      * with value the block ID.
      * A MATERIAL_SET tag in moab if SPARSE and type INTEGER.
@@ -241,7 +245,7 @@ int main( int argc, char* argv[] )
             /* print some of the vertex id infos */
             printf( "on rank %d vertex info:\n", rank );
             for( i = 0; i < nverts[2]; i++ )
-                printf( " vertex local id: %3d, rank ID:%d  global ID: %3d  coords: %g, %g, %g\n", i, vranks[i],
+                printf( " vertex local id: %3d, rank ID:%d  global ID: %3ld  coords: %g, %g, %g\n", i, vranks[i],
                         vGlobalID[i], coords[3 * i], coords[3 * i + 1], coords[3 * i + 2] );
 
             element_global_IDs = (iMOAB_GlobalID*)malloc( nelem[2] * sizeof( iMOAB_GlobalID ) );
@@ -254,7 +258,7 @@ int main( int argc, char* argv[] )
             rc = iMOAB_GetVisibleElementsInfo( pid, &nelem[2], element_global_IDs, ranks, block_IDs );
             CHECKRC( rc, "failed to get all elem info" );
             for( i = 0; i < nelem[2]; i++ )
-                printf( " element local id: %3d,  global ID: %3d  rank:%d  block ID: %2d \n", i, element_global_IDs[i],
+                printf( " element local id: %3d,  global ID: %3ld  rank:%d  block ID: %2ld \n", i, element_global_IDs[i],
                         ranks[i], block_IDs[i] );
             free( element_global_IDs );
             free( ranks );
@@ -270,7 +274,7 @@ int main( int argc, char* argv[] )
             CHECKRC( rc, "failed to get first element connectivity" );
             printf( " conn for first element: \n" );
             for( i = 0; i < nv; i++ )
-                printf( " %3d", conn[i] );
+                printf( " %3ld", conn[i] );
             printf( "\n" );
 
             /*
@@ -283,13 +287,13 @@ int main( int argc, char* argv[] )
             printf( "  neighbors for first element:\n" );
             for( i = 0; i < num_adjacent_elements; i++ )
             {
-                printf( "  %4d", adjacent_element_IDs[i] );
+                printf( "  %4ld", adjacent_element_IDs[i] );
             }
             printf( "\n" );
 
             for( i = 0; i < nblocks[2]; i++ )
             {
-                printf( " block index: %3d, block ID: %3d \n", i, gbIDs[i] );
+                printf( " block index: %3d, block ID: %3ld \n", i, gbIDs[i] );
                 /*
                  * Blocks should have the same type of primary elements. Number of elements in block
                  * and number of vertices per element are found with this call. The method refers
@@ -330,10 +334,10 @@ int main( int argc, char* argv[] )
                 CHECKRC( rc, "failed to get block elem IDs" );
                 for( j = 0; j < num_elements_in_block; j++ )
                 {
-                    printf( "  elem %3d owned by %d gid: %4d lid: %4d  -- ", j, element_ownership[j],
+                    printf( "  elem %3d owned by %d gid: %4ld lid: %4ld  -- ", j, element_ownership[j],
                             global_element_ID[j], local_element_ID[j] );
                     for( k = 0; k < vertices_per_element; k++ )
-                        printf( " %5d", element_connectivity[j * vertices_per_element + k] );
+                        printf( " %5ld", element_connectivity[j * vertices_per_element + k] );
                     printf( "\n" );
                 }
                 free( global_element_ID );
@@ -378,7 +382,7 @@ int main( int argc, char* argv[] )
 
             /* query surface BCs */
             surfBC_ID = (iMOAB_LocalID*)malloc( sizeof( iMOAB_LocalID ) * nsbc[2] );
-            ref_surf  = (int*)malloc( sizeof( int ) * nsbc[2] );
+            ref_surf  = (iMOAB_LocalID*)malloc( sizeof( iMOAB_LocalID ) * nsbc[2] );
             bc_value  = (int*)malloc( sizeof( int ) * nsbc[2] );
             /*
              * Surface boundary condition information is returned for all visible Neumann conditions
@@ -390,7 +394,7 @@ int main( int argc, char* argv[] )
             printf( " Surface boundary conditions:\n" );
             for( i = 0; i < nsbc[2]; i++ )
             {
-                printf( "  elem_localID %4d  side:%d  BC:%2d\n", surfBC_ID[i], ref_surf[i], bc_value[i] );
+                printf( "  elem_localID %4ld  side:%ld  BC:%2d\n", surfBC_ID[i], ref_surf[i], bc_value[i] );
             }
             free( surfBC_ID );
             free( ref_surf );
@@ -398,19 +402,18 @@ int main( int argc, char* argv[] )
 
             /* Query vertex BCs */
             vertBC_ID    = (iMOAB_LocalID*)malloc( sizeof( iMOAB_LocalID ) * ndbc[2] );
-            vertBC_value = (int*)malloc( sizeof( int ) * ndbc[2] );
+            vertBC_value = (iMOAB_GlobalID*)malloc( sizeof( iMOAB_GlobalID ) * ndbc[2] );
             rc           = iMOAB_GetPointerToVertexBC( pid, &ndbc[2], vertBC_ID, vertBC_value );
             CHECKRC( rc, "failed to get vertex boundary conditions" );
             printf( "  Vertex boundary conditions:\n" );
             for( i = 0; i < ndbc[2]; i++ )
             {
-                printf( "   vertex %4d   BC:%2d\n", vertBC_ID[i], vertBC_value[i] );
+                printf( "   vertex %4ld   BC:%4ld\n", vertBC_ID[i], vertBC_value[i] );
             }
             free( vertBC_ID );
             free( vertBC_value );
         }
 #ifdef MOAB_HAVE_MPI
-        MPI_Barrier( comm ); /* to avoid printing problems */
 #endif
     }
 

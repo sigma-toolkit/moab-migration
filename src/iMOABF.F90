@@ -7,6 +7,10 @@ module iMOAB
    use iso_c_binding
    implicit none
 
+! #define c_gidtype c_int
+#define c_gidtype c_long
+#define c_lidtype c_long
+
 ! Interface to all the API routines
    interface
 
@@ -71,19 +75,19 @@ module iMOAB
 
       integer(c_int) function iMOAB_CreateElements(pid, num_elem, type, num_nodes_per_element, &
                                                    connectivity, block_ID) bind(C, name='iMOAB_CreateElements')
-        use, intrinsic :: iso_c_binding, only: c_int
+        use, intrinsic :: iso_c_binding, only: c_int, c_gidtype
         integer(c_int), intent(in) :: pid
         integer(c_int), intent(in) :: num_elem
         integer(c_int), intent(in) :: type
         integer(c_int), intent(in) :: num_nodes_per_element
-        integer(c_int), intent(in) :: connectivity(*)
-        integer(c_int), intent(in) :: block_ID
+        integer(c_lidtype), intent(in) :: connectivity(*)
+        integer(c_gidtype), intent(in) :: block_ID
       end function iMOAB_CreateElements
 
       integer(c_int) function iMOAB_ResolveSharedEntities(pid, num_verts, marker) bind(C, name='iMOAB_ResolveSharedEntities')
-        use, intrinsic :: iso_c_binding, only: c_int
+        use, intrinsic :: iso_c_binding, only: c_int, c_lidtype
         integer(c_int), intent(in) :: pid
-        integer(c_int), intent(in) :: num_verts
+        integer(c_lidtype), intent(in) :: num_verts
         integer(c_int), intent(in) :: marker(*)
       end function iMOAB_ResolveSharedEntities
 
@@ -121,10 +125,10 @@ module iMOAB
       end function iMOAB_GetMeshInfo
 
       integer(c_int) function iMOAB_GetVertexID(pid, vertices_length, global_vertex_ID) bind(C, name='iMOAB_GetVertexID')
-        use, intrinsic :: iso_c_binding, only: c_int
+        use, intrinsic :: iso_c_binding, only: c_int, c_gidtype
         integer(c_int), intent(in) :: pid
         integer(c_int), intent(in) :: vertices_length
-        integer(c_int), intent(out) :: global_vertex_ID(*)
+        integer(c_gidtype), intent(out) :: global_vertex_ID(*)
       end function iMOAB_GetVertexID
 
       integer(c_int) function iMOAB_GetVertexOwnership(pid, vertices_length, visible_global_rank_ID) &
@@ -144,86 +148,86 @@ module iMOAB
       end function iMOAB_GetVisibleVerticesCoordinates
 
       integer(c_int) function iMOAB_GetBlockID(pid, block_length, global_block_IDs) bind(C, name='iMOAB_GetBlockID')
-        use, intrinsic :: iso_c_binding, only: c_int
+        use, intrinsic :: iso_c_binding, only: c_int, c_gidtype
         integer(c_int), intent(in) :: pid
         integer(c_int), intent(in) :: block_length
-        integer(c_int), intent(out) :: global_block_IDs(*)
+        integer(c_gidtype), intent(out) :: global_block_IDs(*)
       end function iMOAB_GetBlockID
 
       integer(c_int) function iMOAB_GetBlockInfo(pid, global_block_ID, vertices_per_element, &
                                                 num_elements_in_block) bind(C, name='iMOAB_GetBlockInfo')
-        use, intrinsic :: iso_c_binding, only: c_int
+        use, intrinsic :: iso_c_binding, only: c_int, c_gidtype
         integer(c_int), intent(in) :: pid
-        integer(c_int), intent(in) :: global_block_ID
+        integer(c_gidtype), intent(in) :: global_block_ID
         integer(c_int), intent(out) :: vertices_per_element
         integer(c_int), intent(out) :: num_elements_in_block
       end function iMOAB_GetBlockInfo
 
       integer(c_int) function iMOAB_GetVisibleElementsInfo(pid, num_visible_elements, element_global_IDs, &
                                                           ranks, block_IDs) bind(C, name='iMOAB_GetVisibleElementsInfo')
-        use, intrinsic :: iso_c_binding, only: c_int
+        use, intrinsic :: iso_c_binding, only: c_int, c_gidtype
         integer(c_int), intent(in) :: pid
         integer(c_int), intent(out) :: num_visible_elements
-        integer(c_int), intent(out) :: element_global_IDs(*)
+        integer(c_gidtype), intent(out) :: element_global_IDs(*)
         integer(c_int), intent(out) :: ranks(*)
-        integer(c_int), intent(out) :: block_IDs(*)
+        integer(c_gidtype), intent(out) :: block_IDs(*)
       end function iMOAB_GetVisibleElementsInfo
 
       integer(c_int) function iMOAB_GetBlockElementConnectivities(pid, global_block_ID, connectivity_length, &
                                                                   element_connectivity) &
                                                                   bind(C, name='iMOAB_GetBlockElementConnectivities')
-        use, intrinsic :: iso_c_binding, only: c_int
+        use, intrinsic :: iso_c_binding, only: c_int, c_gidtype
         integer(c_int), intent(in) :: pid
-        integer(c_int), intent(in) :: global_block_ID
+        integer(c_gidtype), intent(in) :: global_block_ID
         integer(c_int), intent(in) :: connectivity_length
-        integer(c_int), intent(out) :: element_connectivity(*)
+        integer(c_gidtype), intent(out) :: element_connectivity(*)
       end function iMOAB_GetBlockElementConnectivities
 
       integer(c_int) function iMOAB_GetElementConnectivity(pid, elem_index, connectivity_length, &
                                                           element_connectivity) bind(C, name='iMOAB_GetElementConnectivity')
-        use, intrinsic :: iso_c_binding, only: c_int
+        use, intrinsic :: iso_c_binding, only: c_int, c_lidtype
         integer(c_int), intent(in) :: pid
-        integer(c_int), intent(in) :: elem_index
+        integer(c_lidtype), intent(in) :: elem_index
         integer(c_int), intent(in) :: connectivity_length
-        integer(c_int), intent(out) :: element_connectivity(*)
+        integer(c_lidtype), intent(out) :: element_connectivity(*)
       end function iMOAB_GetElementConnectivity
 
       integer(c_int) function iMOAB_GetElementOwnership(pid, global_block_ID, num_elements_in_block, &
                                                         element_ownership) bind(C, name='iMOAB_GetElementOwnership')
-        use, intrinsic :: iso_c_binding, only: c_int
+        use, intrinsic :: iso_c_binding, only: c_int, c_gidtype
         integer(c_int), intent(in) :: pid
-        integer(c_int), intent(in) :: global_block_ID
+        integer(c_gidtype), intent(in) :: global_block_ID
         integer(c_int), intent(out) :: num_elements_in_block
         integer(c_int), intent(out) :: element_ownership(*)
       end function iMOAB_GetElementOwnership
 
       integer(c_int) function iMOAB_GetElementID(pid, global_block_ID, num_elements_in_block, &
                                                 global_element_ID, local_element_ID) bind(C, name='iMOAB_GetElementID')
-        use, intrinsic :: iso_c_binding, only: c_int
+        use, intrinsic :: iso_c_binding, only: c_int, c_gidtype
         integer(c_int), intent(in) :: pid
-        integer(c_int), intent(in) :: global_block_ID
+        integer(c_gidtype), intent(in) :: global_block_ID
         integer(c_int), intent(in) :: num_elements_in_block
-        integer(c_int), intent(in) :: global_element_ID
+        integer(c_gidtype), intent(in) :: global_element_ID
         integer(c_int), intent(out) :: local_element_ID
       end function iMOAB_GetElementID
 
       integer(c_int) function iMOAB_GetPointerToSurfaceBC(pid, surface_BC_length, local_element_ID, &
                                                           reference_surface_ID, boundary_condition_value) &
                                                           bind(C, name='iMOAB_GetPointerToSurfaceBC')
-        use, intrinsic :: iso_c_binding, only: c_int
+        use, intrinsic :: iso_c_binding, only: c_int, c_lidtype
         integer(c_int), intent(in) :: pid
         integer(c_int), intent(in) :: surface_BC_length
-        integer(c_int), intent(in) :: local_element_ID
-        integer(c_int), intent(in) :: reference_surface_ID
+        integer(c_lidtype), intent(in) :: local_element_ID
+        integer(c_lidtype), intent(in) :: reference_surface_ID
         integer(c_int), intent(out) :: boundary_condition_value
       end function iMOAB_GetPointerToSurfaceBC
 
       integer(c_int) function iMOAB_GetPointerToVertexBC(pid, vertex_BC_length, local_vertex_ID, &
                                                         boundary_condition_value) bind(C, name='iMOAB_GetPointerToVertexBC')
-        use, intrinsic :: iso_c_binding, only: c_int
+        use, intrinsic :: iso_c_binding, only: c_int, c_lidtype
         integer(c_int), intent(in) :: pid
         integer(c_int), intent(in) :: vertex_BC_length
-        integer(c_int), intent(in) :: local_vertex_ID
+        integer(c_lidtype), intent(in) :: local_vertex_ID
         integer(c_int), intent(out) :: boundary_condition_value
       end function iMOAB_GetPointerToVertexBC
 
@@ -257,6 +261,16 @@ module iMOAB
         integer(c_int), intent(out) :: tag_storage_data(*)
       end function iMOAB_GetIntTagStorage
 
+      integer(c_int) function iMOAB_GetGIDStorage(pid, tag_storage_name, num_tag_storage_length, entity_type, &
+                                                    tag_storage_data) bind(C, name='iMOAB_GetGIDStorage')
+        use, intrinsic :: iso_c_binding, only: c_int, c_char, c_gidtype
+        integer(c_int), intent(in) :: pid
+        character(kind=c_char), intent(in) :: tag_storage_name(*)
+        integer(c_int), intent(in) :: num_tag_storage_length
+        integer(c_int), intent(in) :: entity_type
+        integer(c_gidtype), intent(out) :: tag_storage_data(*)
+      end function iMOAB_GetGIDStorage
+
       integer(c_int) function iMOAB_SetDoubleTagStorage(pid, tag_storage_name, num_tag_storage_length, entity_type, &
                                                         tag_storage_data) bind(C, name='iMOAB_SetDoubleTagStorage')
         use, intrinsic :: iso_c_binding, only: c_int, c_char, c_double
@@ -269,15 +283,14 @@ module iMOAB
 
       integer(c_int) function iMOAB_SetDoubleTagStorageWithGid(pid, tag_storage_name, num_tag_storage_length, entity_type, &
                                          tag_storage_data, globalIds) bind(C, name='iMOAB_SetDoubleTagStorageWithGid')
-        use, intrinsic :: iso_c_binding, only: c_int, c_char, c_double
+        use, intrinsic :: iso_c_binding, only: c_int, c_char, c_double, c_gidtype
         integer(c_int), intent(in) :: pid
         character(kind=c_char), intent(in) :: tag_storage_name(*)
         integer(c_int), intent(in) :: num_tag_storage_length
         integer(c_int), intent(in) :: entity_type
         real(c_double), intent(in) :: tag_storage_data(*)
-        integer(c_int), intent(in) :: globalIds(*)
+        integer(c_gidtype), intent(in) :: globalIds(*)
       end function iMOAB_SetDoubleTagStorageWithGid
-
 
       integer(c_int) function iMOAB_GetDoubleTagStorage(pid, tag_storage_name, num_tag_storage_length, entity_type, &
                                                         tag_storage_data) bind(C, name='iMOAB_GetDoubleTagStorage')
@@ -306,59 +319,59 @@ module iMOAB
 
       integer(c_int) function iMOAB_GetNeighborElements(pid, local_index, num_adjacent_elements, adjacent_element_IDs) &
                               bind(C, name='iMOAB_GetNeighborElements')
-        use, intrinsic :: iso_c_binding, only: c_int
+        use, intrinsic :: iso_c_binding, only: c_int, c_lidtype
         integer(c_int), intent(in) :: pid
         integer(c_int), intent(in) :: local_index
         integer(c_int), intent(out) :: num_adjacent_elements
-        integer(c_int), intent(out) :: adjacent_element_IDs
+        integer(c_lidtype), intent(out) :: adjacent_element_IDs
       end function iMOAB_GetNeighborElements
 
       integer(c_int) function iMOAB_GetNeighborVertices(pid, local_index, num_adjacent_vertices, adjacent_vertex_IDs) &
                               bind(C, name='iMOAB_GetNeighborVertices')
-        use, intrinsic :: iso_c_binding, only: c_int
+        use, intrinsic :: iso_c_binding, only: c_int, c_lidtype
         integer(c_int), intent(in) :: pid
         integer(c_int), intent(in) :: local_index
         integer(c_int), intent(out) :: num_adjacent_vertices
-        integer(c_int), intent(out) :: adjacent_vertex_IDs
+        integer(c_lidtype), intent(out) :: adjacent_vertex_IDs
       end function iMOAB_GetNeighborVertices
 
       integer(c_int) function iMOAB_SetGlobalInfo(pid, num_global_verts, num_global_elems) bind(C, name='iMOAB_SetGlobalInfo')
-        use, intrinsic :: iso_c_binding, only: c_int
+        use, intrinsic :: iso_c_binding, only: c_int, c_gidtype
         integer(c_int), intent(in) :: pid
-        integer(c_int), intent(in) :: num_global_verts
-        integer(c_int), intent(in) :: num_global_elems
+        integer(c_gidtype), intent(in) :: num_global_verts
+        integer(c_gidtype), intent(in) :: num_global_elems
       end function iMOAB_SetGlobalInfo
 
       integer(c_int) function iMOAB_GetGlobalInfo(pid, num_global_verts, num_global_elems) bind(C, name='iMOAB_GetGlobalInfo')
-        use, intrinsic :: iso_c_binding, only: c_int
+        use, intrinsic :: iso_c_binding, only: c_int, c_gidtype
         integer(c_int), intent(in) :: pid
-        integer(c_int), intent(out) :: num_global_verts
-        integer(c_int), intent(out) :: num_global_elems
+        integer(c_gidtype), intent(out) :: num_global_verts
+        integer(c_gidtype), intent(out) :: num_global_elems
       end function iMOAB_GetGlobalInfo
 
-  integer(c_int) function iMOAB_WriteLocalMesh(pid, prefix) bind(C, name='iMOAB_WriteLocalMesh')
-    use, intrinsic :: iso_c_binding, only : c_int, c_char
-    integer(c_int), intent(in) :: pid
-    character(kind=c_char), intent(in) :: prefix(*)
-  end function iMOAB_WriteLocalMesh
+      integer(c_int) function iMOAB_WriteLocalMesh(pid, prefix) bind(C, name='iMOAB_WriteLocalMesh')
+        use, intrinsic :: iso_c_binding, only : c_int, c_char
+        integer(c_int), intent(in) :: pid
+        character(kind=c_char), intent(in) :: prefix(*)
+      end function iMOAB_WriteLocalMesh
 
 #ifdef MOAB_HAVE_MPI
 
-      integer(c_int) function iMOAB_SendMesh(pid, joint_comm, receivingGroup, rcompid, method) bind(C, name='iMOAB_SendMesh')
+      integer(c_int) function iMOAB_SendMesh(pid, joint_communicator, receiving_group, receiver_compid, method) bind(C, name='iMOAB_SendMesh')
         use, intrinsic :: iso_c_binding, only: c_int, c_ptr
         integer(c_int), intent(in) :: pid
-        integer, intent(in) :: joint_comm ! MPI_Comm
-        integer, intent(in) :: receivingGroup ! MPI_Group
-        integer(c_int), intent(in) :: rcompid
+        integer, intent(in) :: joint_communicator ! MPI_Comm
+        integer, intent(in) :: receiving_group ! MPI_Group
+        integer(c_int), intent(in) :: receiver_compid
         integer(c_int), intent(in) :: method
       end function iMOAB_SendMesh
 
-      integer(c_int) function iMOAB_ReceiveMesh(pid, joint_comm, sendingGroup, scompid) bind(C, name='iMOAB_ReceiveMesh')
+      integer(c_int) function iMOAB_ReceiveMesh(pid, joint_communicator, sending_group, sender_compid) bind(C, name='iMOAB_ReceiveMesh')
         use, intrinsic :: iso_c_binding, only: c_int, c_ptr
         integer(c_int), intent(in) :: pid
-        integer, intent(in) :: joint_comm ! MPI_Comm
-        integer, intent(in) :: sendingGroup ! MPI_Group
-        integer(c_int), intent(in) :: scompid
+        integer, intent(in) :: joint_communicator ! MPI_Comm
+        integer, intent(in) :: sending_group ! MPI_Group
+        integer(c_int), intent(in) :: sender_compid
       end function iMOAB_ReceiveMesh
 
       integer(c_int) function iMOAB_FreeSenderBuffers(pid, context_id) bind(C, name='iMOAB_FreeSenderBuffers')
@@ -367,45 +380,45 @@ module iMOAB
         integer(c_int), intent(in) :: context_id
       end function iMOAB_FreeSenderBuffers
 
-      integer(c_int) function iMOAB_SendElementTag(pid, tag_storage_name, joint_comm, context_id) &
+      integer(c_int) function iMOAB_SendElementTag(pid, tag_storage_name, joint_communicator, context_id) &
                               bind(C, name='iMOAB_SendElementTag')
         use, intrinsic :: iso_c_binding, only: c_int, c_char, c_ptr
         integer(c_int), intent(in) :: pid
         character(kind=c_char), intent(in) :: tag_storage_name(*)
-        integer, intent(in) :: joint_comm ! MPI_Comm
+        integer, intent(in) :: joint_communicator ! MPI_Comm
         integer(c_int), intent(in) :: context_id
       end function iMOAB_SendElementTag
 
-      integer(c_int) function iMOAB_ReceiveElementTag(pid, tag_storage_name, joint_comm, context_id) &
+      integer(c_int) function iMOAB_ReceiveElementTag(pid, tag_storage_name, joint_communicator, context_id) &
                               bind(C, name='iMOAB_ReceiveElementTag')
         use, intrinsic :: iso_c_binding, only: c_int, c_char, c_ptr
         integer(c_int), intent(in) :: pid
         character(kind=c_char), intent(in) :: tag_storage_name(*)
-        integer, intent(in) :: joint_comm ! MPI_Comm
+        integer, intent(in) :: joint_communicator ! MPI_Comm
         integer(c_int), intent(in) :: context_id
       end function iMOAB_ReceiveElementTag
 
-      integer(c_int) function iMOAB_ComputeCommGraph(pid1, pid2, joint_comm, group1, group2, type1, type2, &
-                                                     comp1, comp2) bind(C, name='iMOAB_ComputeCommGraph')
+      integer(c_int) function iMOAB_ComputeCommGraph(source_pid, destination_pid, joint_communicator, source_group, destination_group, source_type, destination_type, &
+                                                     source_comp_id, destination_comp_id) bind(C, name='iMOAB_ComputeCommGraph')
         use, intrinsic :: iso_c_binding, only: c_int, c_ptr
-        integer(c_int), intent(in) :: pid1
-        integer(c_int), intent(in) :: pid2
-        integer, intent(in) :: joint_comm ! MPI_Comm
-        integer, intent(in) :: group1     ! MPI_Group
-        integer, intent(in) :: group2     ! MPI_Group
-        integer(c_int), intent(in) :: type1
-        integer(c_int), intent(in) :: type2
-        integer(c_int), intent(in) :: comp1
-        integer(c_int), intent(in) :: comp2
+        integer(c_int), intent(in) :: source_pid
+        integer(c_int), intent(in) :: destination_pid
+        integer, intent(in) :: joint_communicator ! MPI_Comm
+        integer, intent(in) :: source_group     ! MPI_Group
+        integer, intent(in) :: destination_group     ! MPI_Group
+        integer(c_int), intent(in) :: source_type
+        integer(c_int), intent(in) :: destination_type
+        integer(c_int), intent(in) :: source_comp_id
+        integer(c_int), intent(in) :: destination_comp_id
       end function iMOAB_ComputeCommGraph
 
-      integer(c_int) function iMOAB_CoverageGraph(joint_comm, pid_source, pid_migration, pid_intx, source_id, &
+      integer(c_int) function iMOAB_CoverageGraph(joint_communicator, source_pid, migration_pid, intersection_pid, source_id, &
                                                   migration_id, context_id) bind(C, name='iMOAB_CoverageGraph')
         use, intrinsic :: iso_c_binding, only: c_int, c_ptr
-        integer, intent(in) :: joint_comm ! MPI_Comm
-        integer(c_int), intent(in) :: pid_source
-        integer(c_int), intent(in) :: pid_migration
-        integer(c_int), intent(in) :: pid_intx
+        integer, intent(in) :: joint_communicator ! MPI_Comm
+        integer(c_int), intent(in) :: source_pid
+        integer(c_int), intent(in) :: migration_pid
+        integer(c_int), intent(in) :: intersection_pid
         integer(c_int), intent(in) :: source_id
         integer(c_int), intent(in) :: migration_id
         integer(c_int), intent(in) :: context_id
@@ -424,17 +437,17 @@ module iMOAB
         integer(c_int), intent(in) :: pid
       end function iMOAB_MergeVertices
 
-      integer(c_int) function iMOAB_MigrateMapMesh( pid1, pid2, jointcomm, groupA, groupB, type, comp1, comp2) &
+      integer(c_int) function iMOAB_MigrateMapMesh( source_pid, destination_pid, joint_communicator, source_group, destination_group, type, source_comp_id, destination_comp_id) &
             bind(C, name='iMOAB_MigrateMapMesh')
         use, intrinsic :: iso_c_binding, only : c_int
-        integer(c_int), intent(in) :: pid1
-        integer(c_int), intent(in) :: pid2
-        integer, intent(in) :: jointcomm  ! MPI_Comm
-        integer, intent(in) :: groupA     ! MPI_Group
-        integer, intent(in) :: groupB     ! MPI_Group
+        integer(c_int), intent(in) :: source_pid
+        integer(c_int), intent(in) :: destination_pid
+        integer, intent(in) :: joint_communicator  ! MPI_Comm
+        integer, intent(in) :: source_group     ! MPI_Group
+        integer, intent(in) :: destination_group     ! MPI_Group
         integer(c_int), intent(in) :: type
-        integer(c_int), intent(in) :: comp1
-        integer(c_int), intent(in) :: comp2
+        integer(c_int), intent(in) :: source_comp_id
+        integer(c_int), intent(in) :: destination_comp_id
       end function iMOAB_MigrateMapMesh
 
       integer(c_int) function iMOAB_SetMapGhostLayers(pid, num_src_layers, num_tgt_layers) bind(C, name='iMOAB_SetMapGhostLayers')
@@ -447,10 +460,10 @@ module iMOAB
 ! closing endif: MOAB_HAVE_MPI
 #endif
 
-      integer(c_int) function iMOAB_ComputeCoverageMesh(pid_source, pid_target, pid_intersection) &
+      integer(c_int) function iMOAB_ComputeCoverageMesh(source_pid, pid_target, pid_intersection) &
                                                     bind(C, name='iMOAB_ComputeCoverageMesh')
         use, intrinsic :: iso_c_binding, only: c_int
-        integer(c_int), intent(in) :: pid_source
+        integer(c_int), intent(in) :: source_pid
         integer(c_int), intent(in) :: pid_target
         integer(c_int), intent(in) :: pid_intersection
       end function iMOAB_ComputeCoverageMesh
@@ -463,29 +476,29 @@ module iMOAB
         character(kind=c_char), intent(in) :: prefix
       end function iMOAB_WriteCoverageMesh
 
-      integer(c_int) function iMOAB_ComputeMeshIntersectionOnSphere(pid_source, pid_target, pid_intersection) &
+      integer(c_int) function iMOAB_ComputeMeshIntersectionOnSphere(source_pid, pid_target, pid_intersection) &
                                                                   bind(C, name='iMOAB_ComputeMeshIntersectionOnSphere')
         use, intrinsic :: iso_c_binding, only: c_int
-        integer(c_int), intent(in) :: pid_source
+        integer(c_int), intent(in) :: source_pid
         integer(c_int), intent(in) :: pid_target
         integer(c_int), intent(in) :: pid_intersection
       end function iMOAB_ComputeMeshIntersectionOnSphere
 
-      integer(c_int) function iMOAB_ComputePointDoFIntersection(pid_source, pid_target, pid_intersection) &
+      integer(c_int) function iMOAB_ComputePointDoFIntersection(source_pid, pid_target, pid_intersection) &
                                                                 bind(C, name='iMOAB_ComputePointDoFIntersection')
         use, intrinsic :: iso_c_binding, only: c_int
-        integer(c_int), intent(in) :: pid_source
+        integer(c_int), intent(in) :: source_pid
         integer(c_int), intent(in) :: pid_target
         integer(c_int), intent(in) :: pid_intersection
       end function iMOAB_ComputePointDoFIntersection
 
 #ifdef MOAB_HAVE_NETCDF
 
-      integer(c_int) function iMOAB_LoadMapFile(pid_source, pid_target, pid_intersection, src_disc_type, tgt_disc_type, &
+      integer(c_int) function iMOAB_LoadMapFile(source_pid, pid_target, pid_intersection, src_disc_type, tgt_disc_type, &
                                                             arearead, solution_weights_identifier, remap_weights_filename) &
                                                                   bind(C, name='iMOAB_LoadMapFile')
             use, intrinsic :: iso_c_binding, only : c_int, c_char
-            integer(c_int), intent(in) :: pid_source
+            integer(c_int), intent(in) :: source_pid
             integer(c_int), intent(in) :: pid_target
             integer(c_int), intent(in) :: pid_intersection
             integer(c_int), intent(in) :: src_disc_type

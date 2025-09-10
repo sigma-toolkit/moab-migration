@@ -31,8 +31,8 @@ include 'mpif.h'
       character :: fname*1024
       character :: readopts*1024
       integer ngv, nge, ndim, nparts
-      integer nghlay
-      integer nverts(3), nelem(3), nblocks(3), nsbc(3), ndbc(3)
+      integer(4) nghlay
+      integer(4) nverts(3), nelem(3), nblocks(3), nsbc(3), ndbc(3)
       !      large enough work arrays
       integer(4) iwork(100000)
       integer(8) iwork8(100000)
@@ -53,7 +53,9 @@ include 'mpif.h'
 
       integer      eRA, beID, eID
       !     vertices per element, number of elements in block
-      integer  vpere, nebl, blockID
+      integer  vpere
+      integer(4) nebl
+      integer(8) blockID
       !      iWORK(eCO) start for connectivity
       integer    sizeconn, eCO
       !      IWORK(egID) , IWORK(elID) starts for global el ID, local elem ID
@@ -186,31 +188,31 @@ include 'mpif.h'
             print *, 'on rank ', my_id, ' vertex info:'
             do i=1,nverts(3)
             write(*, 100)  i, IWORK(vRA+i-1), IWORK( vID+i-1), DWORK(vCO+3*i-3), DWORK(vCO+3*i-2), DWORK(vCO+3*i-1)
-100         FORMAT(' vertex local id ', I3, ' rank ID', I3, ' global ID:', I3, '  coords:',  3F11.3)
+100         FORMAT(' vertex local id ', I3, ' rank ID', I3, ' global ID:', I8, '  coords:',  3F11.3)
       enddo
 
       eID = ifree
       beID = eID + nelem(3)
       eRA = beID + nelem(3)
-      ierr = iMOAB_GetVisibleElementsInfo(pid, nelem(3),IWORK(eID), IWORK(eRA), IWORK(beID) )
+      ierr = iMOAB_GetVisibleElementsInfo(pid, nelem(3),iwork8(eID), IWORK(eRA), iwork8(beID) )
       call errorout(ierr, 'failed to get all elem info')
       ifree = eRA + nelem(3)
       do i=1, nelem(3)
-          write(*, 101) IWORK(eID+i-1), IWORK(eRA+i-1), IWORK(beID+i-1)
-101       FORMAT( ' global ID ', I5, ' rank: ', I3, ' block ID: ', I4)
+          write(*, 101) iwork8(eID+i-1), IWORK(eRA+i-1), iwork8(beID+i-1)
+101       FORMAT( ' global ID ', I8, ' rank: ', I3, ' block ID: ', I8)
       enddo
 
       do  i=1,nblocks(3)
 
-            print *,' block index:', i, ' block ID ', IWORK(bID+i-1)
-            blockID = IWORK(bID+i-1)
+            print *,' block index:', i, ' block ID ', iwork8(bID+i-1)
+            blockID = iwork8(bID+i-1)
             ierr = iMOAB_GetBlockInfo(pid, blockID, vpere, nebl)
             call errorout(ierr, 'failed to elem block info')
             print *, '  has' , nebl, ' elements with ', vpere, 'verts'
 
             sizeconn = nebl * vpere
             eCO = ifree
-            ierr = iMOAB_GetBlockElementConnectivities(pid, blockID, sizeconn, IWORK(eCO) )
+            ierr = iMOAB_GetBlockElementConnectivities(pid, blockID, sizeconn, iwork8(eCO) )
             print *, ierr
             call errorout(ierr, 'failed to get block elem connectivity')
 
@@ -222,13 +224,13 @@ include 'mpif.h'
 
             egID = ifree
             elID = ifree + nebl
-            ierr = iMOAB_GetElementID(pid, blockID, nebl, IWORK(egID), IWORK(elID)  )
+            ierr = iMOAB_GetElementID(pid, blockID, nebl, iwork8(egID), iwork(elID)  )
             call errorout(ierr, 'failed to get block elem IDs')
             ifree = elID + nebl
 
             do j=1, nebl
-                  write (*, 102) j,  IWORK(eOWN+j-1),IWORK(egID+j-1), IWORK(elID+j-1), (IWORK(eCO-1+(j-1)*vpere+k), k=1,vpere)
-102               FORMAT(' elem ', I3, ' owned by', I3, ' gid:', I3, ' lid:', I3, ' : ', 10I5)
+                  write (*, 102) j,  IWORK(eOWN+j-1),iwork8(egID+j-1), iwork8(elID+j-1), (iwork8(eCO-1+(j-1)*vpere+k), k=1,vpere)
+102               FORMAT(' elem ', I3, ' owned by', I3, ' gid:', I8, ' lid:', I8, ' : ', 10I8)
             enddo
       enddo
 
@@ -257,24 +259,24 @@ include 'mpif.h'
       irBC = isBC + nsbc(3)
       ivBC = irBC + nsbc(3)
 
-      ierr = iMOAB_GetPointerToSurfaceBC(pid, nsbc(3), IWORK(isBC),IWORK(irBC), IWORK(ivBC))
+      ierr = iMOAB_GetPointerToSurfaceBC(pid, nsbc(3), iwork8(isBC),iwork8(irBC), IWORK(ivBC))
       call errorout(ierr, 'failed to get surf boundary conditions')
       ifree = ivBC + nsbc(3)
       print * , 'Surface boundary conditions '
-      write (*, 105) (IWORK(isBC+k-1),IWORK(irBC+k-1), IWORK(ivBC+k-1), k=1, nsbc(3))
-105     FORMAT (' elem localID: ', I3, ' side:', I1, ' val:', I4)
+      write (*, 105) (iwork8(isBC+k-1),iwork8(irBC+k-1), IWORK(ivBC+k-1), k=1, nsbc(3))
+105     FORMAT (' elem localID: ', I8, ' side:', I8, ' val:', I4)
 
       ! query vertex BCs
       iveBC = ifree
       ivaBC = iveBC + ndbc(3)
 
-      ierr = iMOAB_GetPointerToVertexBC(pid, ndbc(3), IWORK(iveBC),IWORK(ivaBC))
+      ierr = iMOAB_GetPointerToVertexBC(pid, ndbc(3), iwork8(iveBC),IWORK(ivaBC))
       call errorout(ierr, 'failed to get vertex boundary conditions')
       ifree = ivaBC + ndbc(3)
 
       print *, '  Vertex boundary conditions:'
-      write (*, 106) (IWORK(iveBC+k-1),IWORK(ivaBC+k-1), k=1, ndbc(3))
-106     FORMAT (' vertex: ', I3, ' BC:', I6 )
+      write (*, 106) (iwork8(iveBC+k-1),IWORK(ivaBC+k-1), k=1, ndbc(3))
+106     FORMAT (' vertex: ', I8, ' BC:', I6 )
 
       endif
 

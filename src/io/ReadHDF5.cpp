@@ -3076,7 +3076,8 @@ ErrorCode ReadHDF5::create_tag( const mhdf_TagDesc& info, Tag& handle, hid_t& hd
             iFace->tag_get_data_type( handle, existing_type );
             if( existing_type != MB_TYPE_LONG )
             {
-                if( hdf_type && hdf_type != H5T_NATIVE_INT ) H5Tclose( hdf_type );
+                // if( hdf_type && hdf_type != H5T_NATIVE_INT ) H5Tclose( hdf_type );
+                if( hdf_type ) H5Tclose( hdf_type );
                 MB_SET_ERR( MB_FAILURE, "GLOBAL_ID tag must be MB_TYPE_LONG in memory, found: " << existing_type );
             }
         }
@@ -3094,7 +3095,8 @@ ErrorCode ReadHDF5::create_tag( const mhdf_TagDesc& info, Tag& handle, hid_t& hd
 
     if( MB_SUCCESS != rval )
     {
-        if( hdf_type && hdf_type != H5T_NATIVE_INT ) H5Tclose( hdf_type );
+        // if( hdf_type && hdf_type != H5T_NATIVE_INT ) H5Tclose( hdf_type );
+        if( hdf_type ) H5Tclose( hdf_type );
         MB_SET_ERR( MB_FAILURE, "Tag type in file does not match type in database for \"" << info.name << "\"" );
     }
 
@@ -3112,7 +3114,8 @@ ErrorCode ReadHDF5::create_tag( const mhdf_TagDesc& info, Tag& handle, hid_t& hd
         }
         if( MB_SUCCESS != rval )
         {
-            if( hdf_type && hdf_type != H5T_NATIVE_INT ) H5Tclose( hdf_type );
+            // if( hdf_type && hdf_type != H5T_NATIVE_INT ) H5Tclose( hdf_type );
+            if( hdf_type ) H5Tclose( hdf_type );
             MB_SET_ERR( rval, "ReadHDF5 Failure" );
         }
     }

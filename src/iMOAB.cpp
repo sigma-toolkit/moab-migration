@@ -981,7 +981,7 @@ ErrCode iMOAB_GetVertexID( iMOAB_AppID pid, int* vertices_length, iMOAB_GlobalID
 
     const Range& verts = context.appDatas[*pid].all_verts;
     // check for problems with array length
-    IMOAB_ASSERT( *vertices_length == static_cast< int >( verts.size() ), "Invalid vertices length provided" );
+    IMOAB_ASSERT( static_cast<size_t>(*vertices_length) == verts.size(), "Invalid vertices length provided" );
 
     // global id tag is context.globalID_tag
     return context.MBI->tag_get_data( context.globalID_tag, verts, global_vertex_ID );
@@ -1166,7 +1166,7 @@ ErrCode iMOAB_GetVisibleElementsInfo( iMOAB_AppID pid,
 ErrCode iMOAB_GetBlockElementConnectivities( iMOAB_AppID pid,
                                              iMOAB_GlobalID* global_block_ID,
                                              int* connectivity_length,
-                                             int* element_connectivity )
+                                             iMOAB_LocalID* element_connectivity )
 {
     assert( global_block_ID );      // ensure global block ID argument is not null
     assert( connectivity_length );  // ensure connectivity length argument is not null
@@ -1184,7 +1184,7 @@ ErrCode iMOAB_GetBlockElementConnectivities( iMOAB_AppID pid,
     EntityHandle matMeshSet = data.mat_sets[blockIndex];
     std::vector< EntityHandle > elems;
 
-    ErrorCode rval = context.MBI->get_entities_by_handle( matMeshSet, elems );MB_CHK_ERR( rval );
+    MB_CHK_ERR( context.MBI->get_entities_by_handle( matMeshSet, elems ) );
 
     if( elems.empty() )
     {
@@ -1192,16 +1192,16 @@ ErrCode iMOAB_GetBlockElementConnectivities( iMOAB_AppID pid,
     }
 
     std::vector< EntityHandle > vconnect;
-    rval = context.MBI->get_connectivity( &elems[0], elems.size(), vconnect );MB_CHK_ERR( rval );
+    MB_CHK_ERR( context.MBI->get_connectivity( &elems[0], elems.size(), vconnect ) );
 
     if( *connectivity_length != (int)vconnect.size() )
     {
         return moab::MB_FAILURE;
     }  // mismatched sizes
 
-    for( int i = 0; i < *connectivity_length; i++ )
+    for( size_t i = 0; i < vconnect.size(); i++ )
     {
-        int inx = data.all_verts.index( vconnect[i] );
+        iMOAB_LocalID inx = data.all_verts.index( vconnect[i] );
 
         if( -1 == inx )
         {
@@ -1217,7 +1217,7 @@ ErrCode iMOAB_GetBlockElementConnectivities( iMOAB_AppID pid,
 ErrCode iMOAB_GetElementConnectivity( iMOAB_AppID pid,
                                       iMOAB_LocalID* elem_index,
                                       int* connectivity_length,
-                                      int* element_connectivity )
+                                      iMOAB_LocalID* element_connectivity )
 {
     assert( elem_index );           // ensure element index argument is not null
     assert( connectivity_length );  // ensure connectivity length argument is not null
@@ -1239,7 +1239,7 @@ ErrCode iMOAB_GetElementConnectivity( iMOAB_AppID pid,
 
     for( int i = 0; i < num_nodes; i++ )
     {
-        int index = data.all_verts.index( conn[i] );
+        iMOAB_LocalID index = data.all_verts.index( conn[i] );
 
         if( -1 == index )
         {
@@ -1282,7 +1282,7 @@ ErrCode iMOAB_GetElementOwnership( iMOAB_AppID pid,
         return moab::MB_FAILURE;
     }
 
-    if( *num_elements_in_block != (int)elems.size() )
+    if( elems.size() - *num_elements_in_block > 0 )
     {
         return moab::MB_FAILURE;
     }  // bad memory allocation
@@ -1297,7 +1297,7 @@ ErrCode iMOAB_GetElementOwnership( iMOAB_AppID pid,
 #ifdef MOAB_HAVE_MPI
         rval = pco->get_owner( *vit, element_ownership[i] );MB_CHK_ERR( rval );
 #else
-        element_ownership[i] = 0; /* owned by 0 */
+        element_ownership[i] = 0; /* owned by root rank */
 #endif
     }
 
@@ -1308,7 +1308,7 @@ ErrCode iMOAB_GetElementID( iMOAB_AppID pid,
                             iMOAB_GlobalID* global_block_ID,
                             int* num_elements_in_block,
                             iMOAB_GlobalID* global_element_ID,
-                            iMOAB_LocalID* local_element_ID )
+                            int* local_element_ID )
 {
     assert( global_block_ID );        // ensure global block ID argument is not null
     assert( num_elements_in_block );  // ensure number of elements in block argument is not null
@@ -1357,7 +1357,7 @@ ErrCode iMOAB_GetElementID( iMOAB_AppID pid,
 ErrCode iMOAB_GetPointerToSurfaceBC( iMOAB_AppID pid,
                                      int* surface_BC_length,
                                      iMOAB_LocalID* local_element_ID,
-                                     int* reference_surface_ID,
+                                     iMOAB_LocalID* reference_surface_ID,
                                      int* boundary_condition_value )
 {
     // we have to fill bc data for neumann sets;/
@@ -1813,7 +1813,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
                                           int* num_tag_storage_length,
                                           int* ent_type,
                                           double* tag_storage_data,
-                                          int* globalIds )
+                                          iMOAB_GlobalID* globalIds )
 {
     ErrorCode rval;
     std::string tag_names( tag_storage_names );

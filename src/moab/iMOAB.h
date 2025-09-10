@@ -36,17 +36,16 @@
  *     Preferably local numbering else lot of deciphering for global.
  */
 #include "moab/MOABConfig.h"
-#include "moab/Types.hpp"
 
 #ifdef __cplusplus
 #include <cstdio>
 #include <cassert>
 #include <cstdlib>
-#else
+#else // __cplusplus
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
-#endif
+#endif // __cplusplus
 
 #include "moab/Types.hpp"
 
@@ -54,19 +53,20 @@
 #define iMOAB_String   char*
 #define iMOAB_GlobalID mbGIDType
 #define iMOAB_LocalID  mbGIDType
+
 #ifdef __cplusplus
 #define ErrCode moab::ErrorCode
-#else
+#else // __cplusplus
 #define ErrCode int
-#endif
+#endif // __cplusplus
 
 #ifdef _MSC_VER
 #define __PRETTY_FUNCTION__ __FUNCSIG__
-#else
+#else // _MSC_VER
 #if !defined( __cplusplus ) || !defined( __PRETTY_FUNCTION__ )
 #define __PRETTY_FUNCTION__ __func__
-#endif
-#endif
+#endif // !defined( __cplusplus ) || !defined( __PRETTY_FUNCTION__ )
+#endif // _MSC_VER
 
 /**
  * @brief MOAB tag types can be: dense/sparse, and of int/double/EntityHandle types.
@@ -75,11 +75,13 @@
 enum MOAB_TAG_TYPE
 {
     DENSE_INTEGER       = 0,
-    DENSE_DOUBLE        = 1,
-    DENSE_ENTITYHANDLE  = 2,
-    SPARSE_INTEGER      = 3,
-    SPARSE_DOUBLE       = 4,
-    SPARSE_ENTITYHANDLE = 5
+    DENSE_LONG          = 1,
+    DENSE_DOUBLE        = 2,
+    DENSE_ENTITYHANDLE  = 3,
+    SPARSE_INTEGER      = 4,
+    SPARSE_LONG         = 5,
+    SPARSE_DOUBLE       = 6,
+    SPARSE_ENTITYHANDLE = 7
 };
 
 /**
@@ -127,10 +129,10 @@ enum MOAB_TAG_OWNER_TYPE
 
 #define IMOAB_ASSERT( condition, message ) IMOAB_ASSERT_RET( condition, message, moab::MB_UNHANDLED_OPTION )
 
-#else
-#define IMOAB_ASSERT( condition, message )
+#else // NDEBUG
 #define IMOAB_ASSERT_RET( condition, message, retval )
-#endif
+#define IMOAB_ASSERT( condition, message )
+#endif // NDEBUG
 
 #ifdef __cplusplus
 extern "C" {
@@ -605,7 +607,7 @@ ErrCode iMOAB_GetElementConnectivity( iMOAB_AppID pid,
  */
 ErrCode iMOAB_GetElementOwnership( iMOAB_AppID pid,
                                    iMOAB_GlobalID* global_block_ID,
-                                   iMOAB_LocalID* num_elements_in_block,
+                                   int* num_elements_in_block,
                                    int* element_ownership );
 
 /**
@@ -630,7 +632,7 @@ ErrCode iMOAB_GetElementID( iMOAB_AppID pid,
                             iMOAB_GlobalID* global_block_ID,
                             int* num_elements_in_block,
                             iMOAB_GlobalID* global_element_ID,
-                            iMOAB_LocalID* local_element_ID );
+                            int* local_element_ID );
 
 /**
  * \brief Get the surface boundary condition information.
@@ -805,7 +807,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
                                           int* num_tag_storage_length,
                                           int* entity_type,
                                           double* tag_storage_data,
-                                          int* globalIds );
+                                          iMOAB_GlobalID* globalIds );
 /**
  * \brief Retrieve the specified values in a MOAB double Tag.
  *

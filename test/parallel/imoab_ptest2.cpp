@@ -83,7 +83,7 @@ int main( int argc, char** argv )
     char appname[10] = "IMTEST";
     /* coordinates for 9 vertices */
     double coordinates[27], deltax, deltay;
-    int ids[9]     = { 1, 2, 3, 6, 7, 8, 11, 12, 13 };
+    mbGIDType ids[9]     = { 1, 2, 3, 6, 7, 8, 11, 12, 13 };
     int connec[16] = { 1, 2, 5, 4, 2, 3, 6, 5, 4, 5, 8, 7, 5, 6, 9, 8 };
     /*      used for ghosting */
     int dimgh, bridge, num_layers;

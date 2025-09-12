@@ -75,14 +75,15 @@ C      implicit none
 #include "mpif.h"
 
       integer ierr, my_id, num_procs, pid, i, ix, iy, numv, nume
-      integer dime, lco, mbtype, blockid, npe
+      integer dime, lco, mbtype, npe
       integer compid
+      integer(8) blockid
       character :: appname*10
       character :: outfile*100, wopts*100
 C coordinates for 9 vertices
       double precision  coordinates(27) , coords_core(27), deltax, deltay
-      integer ids(9)
-      integer connec(16)
+      integer(8) ids(9)
+      integer(8) connec(16)
 C      used for ghosting
       integer dimgh, bridge, num_layers
 
@@ -115,7 +116,7 @@ C      used for ghosting
 
       ! find out MY process ID, and how many processes were started.
       if (my_id .eq. 0) then
-        print *, " I'm process ", my_id, " out of ", 
+        print *, " I'm process ", my_id, " out of ",
      &           num_procs, " processes."
       end if
 
@@ -150,7 +151,7 @@ C      used for ghosting
       mbtype = 3
       blockid  = 100
       npe = 4
-      ierr = iMOAB_CreateElements(pid, nume, mbtype, npe, 
+      ierr = iMOAB_CreateElements(pid, nume, mbtype, npe,
      &                           connec, blockid)
       call errorout(ierr, 'fail to create quads')
 

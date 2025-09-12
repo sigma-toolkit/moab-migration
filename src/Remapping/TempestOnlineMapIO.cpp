@@ -100,7 +100,7 @@ int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< mbGIDTy
         if( gdofmap[i] > localmax ) localmax = gdofmap[i];
 
     // decide partitioning based on maxdof/size
-    MPI_Allreduce( &localmax, &maxdof, 1, MB_MPI_GIDTYPE, MPI_MAX, m_pcomm->comm() );
+    MPI_Allreduce( &localmax, &maxdof, 1, MB_GID_MPI_TYPE, MPI_MAX, m_pcomm->comm() );
     // maxdof is 0 based, so actual number is +1
     // maxdof
     mbGIDType size_per_task = ( maxdof + 1 ) / size;  // based on this, processor to process dof x is x/size_per_task
@@ -166,7 +166,7 @@ int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< mbGIDTy
     masks.resize( nb_unique );
 
     // Initialize all arrays to prevent uninitialized memory access
-    for( unsigned k = 0; k < nb_unique; k++ )
+    for( int k = 0; k < nb_unique; k++ )
     {
         vecFaceArea[k] = 0.0;
         dCenterLon[k] = 0.0;
@@ -1356,7 +1356,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     }
 
     // Let us declare the map object for every process
-    SparseMatrix< double >& sparseMatrix = this->GetSparseMatrix();
+    // SparseMatrix< double >& sparseMatrix = this->GetSparseMatrix();
 
     int localSize   = nS / size;
     long offsetRead = rank * localSize;
@@ -1426,9 +1426,9 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         ERR_PARNC( ncmpi_inq_varid( ncfile, "S", &varid ) );
         ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &start, &count, &vecS[0] ) );
         ERR_PARNC( ncmpi_inq_varid( ncfile, "row", &varid ) );
-        ERR_PARNC( ncmpi_get_vara_all( ncfile, varid, &start, &count, &vecRow[0], count, MB_MPI_GIDTYPE ) );
+        ERR_PARNC( ncmpi_get_vara_all( ncfile, varid, &start, &count, &vecRow[0], count, MB_GID_MPI_TYPE ) );
         ERR_PARNC( ncmpi_inq_varid( ncfile, "col", &varid ) );
-        ERR_PARNC( ncmpi_get_vara_all( ncfile, varid, &start, &count, &vecCol[0], count, MB_MPI_GIDTYPE ) );
+        ERR_PARNC( ncmpi_get_vara_all( ncfile, varid, &start, &count, &vecCol[0], count, MB_GID_MPI_TYPE ) );
 
         if( readAreaA )
         {

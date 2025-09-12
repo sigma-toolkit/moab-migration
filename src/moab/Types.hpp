@@ -23,19 +23,14 @@
 
 #include "moab/win32_config.h"
 
+#ifdef MOAB_HAVE_MPI
+#include <mpi.h>
+#endif
+
 /**\name Types and names
  * Types used in the MOAB interface
  */
 /*@{*/
-
-/** Global ID type for MOAB entities */
-typedef long mbGIDType;
-
-#ifdef MOAB_HAVE_MPI
-#include <mpi.h>
-/** MPI datatype for mbGIDType */
-#define MB_MPI_GIDTYPE MPI_LONG
-#endif
 
 #ifdef __cplusplus
 namespace moab
@@ -178,6 +173,17 @@ extern const char* const* const SenseTypeStr;
 #ifdef __cplusplus
 } /* namespace moab */
 #endif
+
+// Define it outside namespace moab: anonymous
+/** Global ID type for MOAB entities */
+typedef long mbGIDType;
+static const moab::DataType MB_GID_TAG_TYPE = moab::MB_TYPE_LONG;
+
+#ifdef MOAB_HAVE_MPI
+/** MPI datatype for mbGIDType */
+#define MB_GID_MPI_TYPE MPI_LONG
+#endif
+
 
 /*@}*/
 

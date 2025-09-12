@@ -85,10 +85,10 @@ module iMOAB
       end function iMOAB_CreateElements
 
       integer(c_int) function iMOAB_ResolveSharedEntities(pid, num_verts, marker) bind(C, name='iMOAB_ResolveSharedEntities')
-        use, intrinsic :: iso_c_binding, only: c_int, c_lidtype
+        use, intrinsic :: iso_c_binding, only: c_int, c_gidtype
         integer(c_int), intent(in) :: pid
-        integer(c_lidtype), intent(in) :: num_verts
-        integer(c_int), intent(in) :: marker(*)
+        integer(c_int), intent(in) :: num_verts
+        integer(c_gidtype), intent(in) :: marker(*)
       end function iMOAB_ResolveSharedEntities
 
       integer(c_int) function iMOAB_DetermineGhostEntities(pid, ghost_dim, num_ghost_layers, bridge_dim) &

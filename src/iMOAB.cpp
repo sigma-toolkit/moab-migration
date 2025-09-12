@@ -2382,12 +2382,12 @@ ErrCode iMOAB_GetGlobalInfo( iMOAB_AppID pid, int* num_global_verts, int* num_gl
 #ifdef MOAB_HAVE_MPI
 
 // this makes sense only for parallel runs
-ErrCode iMOAB_ResolveSharedEntities( iMOAB_AppID pid, int* num_verts, int* marker )
+ErrCode iMOAB_ResolveSharedEntities( iMOAB_AppID pid, int* num_verts, iMOAB_GlobalID* marker )
 {
     appData& data     = context.appDatas[*pid];
     ParallelComm* pco = context.appDatas[*pid].pcomm;
     EntityHandle cset = data.file_set;
-    int dum_id        = 0;
+    iMOAB_GlobalID gid_default = 0;
     ErrorCode rval;
     if( data.primary_elems.empty() )
     {
@@ -2400,25 +2400,25 @@ ErrCode iMOAB_ResolveSharedEntities( iMOAB_AppID pid, int* num_verts, int* marke
         // (more than 2 B vertices;)
 
         Tag stag;
-        rval = context.MBI->tag_get_handle( "__sharedmarker", 1, MB_TYPE_INTEGER, stag, MB_TAG_CREAT | MB_TAG_DENSE,
-                                            &dum_id );MB_CHK_ERR( rval );
+        rval = context.MBI->tag_get_handle( "__sharedmarker", 1, MB_GID_TAG_TYPE, stag, MB_TAG_CREAT | MB_TAG_DENSE,
+                                            &gid_default );MB_CHK_ERR( rval );
 
         if( *num_verts > (int)data.local_verts.size() )
         {
             return moab::MB_FAILURE;
         }  // we are not setting the size
 
-        rval = context.MBI->tag_set_data( stag, data.local_verts, (void*)marker );MB_CHK_ERR( rval );  // assumes integer tag
+        MB_CHK_ERR( context.MBI->tag_set_data( stag, data.local_verts, (void*)marker ) );  // assumes integer tag
 
-        rval = pco->resolve_shared_ents( cset, -1, -1, &stag );MB_CHK_ERR( rval );
+        MB_CHK_ERR( pco->resolve_shared_ents( cset, -1, -1, &stag ) );
 
-        rval = context.MBI->tag_delete( stag );MB_CHK_ERR( rval );
+        MB_CHK_ERR( context.MBI->tag_delete( stag ) );
     }
     // provide partition tag equal to rank
     Tag part_tag;
-    dum_id = -1;
-    rval   = context.MBI->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_tag,
-                                          MB_TAG_CREAT | MB_TAG_SPARSE, &dum_id );
+    int part_default = -1;
+    rval = context.MBI->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_tag,
+                                          MB_TAG_CREAT | MB_TAG_SPARSE, &part_default );
 
     if( part_tag == nullptr || ( ( rval != MB_SUCCESS ) && ( rval != MB_ALREADY_ALLOCATED ) ) )
     {
@@ -2427,7 +2427,7 @@ ErrCode iMOAB_ResolveSharedEntities( iMOAB_AppID pid, int* num_verts, int* marke
     }
 
     int rank = pco->rank();
-    rval     = context.MBI->tag_set_data( part_tag, &cset, 1, &rank );MB_CHK_ERR( rval );
+    MB_CHK_ERR( context.MBI->tag_set_data( part_tag, &cset, 1, &rank ) );
 
     return moab::MB_SUCCESS;
 }

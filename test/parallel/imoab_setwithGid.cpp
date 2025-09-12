@@ -122,8 +122,8 @@ int main( int argc, char* argv[] )
     CHECKIERR( ierr, "Cannot get tag on lnd2 on coupler pes" )
 
     int ngids = ( mctEntType == 1 ) ? nelem[0] : nverts[0];
-    std::vector< int > gids( ngids );
-    ierr = iMOAB_GetIntTagStorage( cplLnd2PID, "GLOBAL_ID", &ngids, &mctEntType, &gids[0] );
+    std::vector< mbGIDType > gids( ngids );
+    ierr = iMOAB_GetGIDStorage( cplLnd2PID, "GLOBAL_ID", &ngids, &mctEntType, &gids[0] );
     CHECKIERR( ierr, "Cannot get global id tag on lnd2 on coupler pes" )
 
     // now on moab mesh

@@ -483,7 +483,7 @@ void read_map_from_disk()
     moab::ErrorCode rval;
     NcError error( NcError::verbose_nonfatal );
     MPI_Comm commW = MPI_COMM_WORLD;
-    std::vector< int > tgt_owned_ids;
+    std::vector< mbGIDType > tgt_owned_ids;
     double dTolerance = 1e-08;
 
     std::string remap_weights_filename = TestDir + "unittest/outCS5ICOD5_map.nc";

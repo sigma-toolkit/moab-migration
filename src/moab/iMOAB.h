@@ -337,10 +337,10 @@ ErrCode iMOAB_CreateElements( iMOAB_AppID pid,
  *
  * \param[in] pid (iMOAB_AppID)            The unique pointer to the application ID.
  * \param[in] num_verts (int*)             Number of vertices.
- * \param[in] marker (int*)                Resolving marker (global id marker).
+ * \param[in] marker (iMOAB_GlobalID*)     Resolving marker (global id marker).
  * \return ErrCode                         The error code indicating success or failure.
  */
-ErrCode iMOAB_ResolveSharedEntities( iMOAB_AppID pid, int* num_verts, int* marker );
+ErrCode iMOAB_ResolveSharedEntities( iMOAB_AppID pid, int* num_verts, iMOAB_GlobalID* marker );
 
 /**
  * \brief Create the requested number of ghost layers for the parallel mesh.

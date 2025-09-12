@@ -460,10 +460,8 @@ int main( int argc, char* argv[] )
         int nverts[3], nelem[3];
         ierr = iMOAB_GetMeshInfo( cmpOcnPID, nverts, nelem, 0, 0, 0 );
         CHECKIERR( ierr, "failed to get ocn mesh info" );
-        std::vector< mbGIDType > gidElems;
-        gidElems.resize( nelem[2] );
-        std::vector< double > tempElems;
-        tempElems.resize( nelem[2] );
+        std::vector< mbGIDType > gidElems( nelem[2] );
+        std::vector< double > tempElems( nelem[2] );
         // get global id storage
         const std::string GidStr = "GLOBAL_ID";  // hard coded too
         int tag_type = DENSE_INTEGER, ncomp = 1, tagInd = 0;

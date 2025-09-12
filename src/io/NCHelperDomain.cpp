@@ -241,8 +241,8 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     ErrorCode rval;
     int success = 0;
 
-    int local_elems = ( lDims[4] - lDims[1] ) * ( lDims[3] - lDims[0] );
-    dbgOut.tprintf( 1, "local cells: %d \n", local_elems );
+    size_t local_elems = ( lDims[4] - lDims[1] ) * ( lDims[3] - lDims[0] );
+    dbgOut.tprintf( 1, "local cells: %zu \n", local_elems );
 
     // count how many will be with mask 1 here
     // basically, read the mask variable on the local elements;
@@ -368,13 +368,13 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
         // Redistribute local cells after trivial partition (e.g. apply Zoltan partition)
         rval = redistribute_cells( myPcomm, xc, yc, xv, yv, frac, mask, area, gids, nv, nv_last );MB_CHK_SET_ERR( rval, "Failed to redistribute local cells" );
         local_elems = (int)xc.size();
-        dbgOut.tprintf( 1, "local cells after repartition: %d \n", local_elems );
+        dbgOut.tprintf( 1, "local cells after repartition: %zu \n", local_elems );
     }
 
 #endif
 
     int nb_with_mask1 = 0;
-    for( int i = 0; i < local_elems; i++ )
+    for( size_t i = 0; i < local_elems; i++ )
         if( 1 == mask[i] ) nb_with_mask1++;
     dbgOut.tprintf( 1, "local cells with mask 1: %d \n", nb_with_mask1 );
 
@@ -405,12 +405,10 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
 
     // Create vertices; first identify different ones, with a tolerance
     std::map< Node3D, EntityHandle > vertex_map;
-
     if( num_actual_cells > 0 )
     {
         // Set vertex coordinates
         // will read all xv, yv, but use only those with correct mask on
-
         // total index in netcdf arrays
         const double pideg = acos( -1.0 ) / 180.0;
 
@@ -419,7 +417,7 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
             if( culling && 0 == mask[elem_index] )
                 continue;  // nothing to do, do not advance elem_index in actual moab arrays
             // set area and fraction on those elements too
-            dbgOut.tprintf( 3, "elem index  %d \n", elem_index );
+            dbgOut.tprintf( 3, "elem index  %ld \n", elem_index );
             for( int k = 0; k < nv; k++ )
             {
                 int index_v_arr = nv * elem_index + k;
@@ -472,7 +470,6 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
 
         // int local_row_size  = lCDims[3] - lCDims[0];
         int index = 0;  // consider the mask for advancing in moab arrays;
-
         // create now vertex arrays, size vertex_map.size()
         for( elem_index = 0; elem_index < local_elems; elem_index++ )
         {
@@ -505,8 +502,8 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
             rval = mbImpl->tag_set_data( maskTag, &cell, 1, &mask[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set mask tag" );
 
             // set the global id too:
-            int globalId = gids[elem_index];
-            rval         = mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId );MB_CHK_SET_ERR( rval, "Failed to set global id tag" );
+            mbGIDType globalId = gids[elem_index];
+            rval = mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId );MB_CHK_SET_ERR( rval, "Failed to set global id tag" );
             index++;
         }
 

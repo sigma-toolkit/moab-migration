@@ -828,7 +828,7 @@ ErrorCode WriteHDF5::gather_mesh_info( const std::vector< EntityHandle >& export
         range.clear();
         rval = iFace->get_entities_by_type( meshset, MBENTITYSET, range );
         CHK_MB_ERR_0( rval );
-        for( Range::iterator ritor = range.begin(); ritor != range.end(); ++ritor )
+        for( auto ritor = range.begin(); ritor != range.end(); ++ritor )
         {
             if( ranges[4].find( *ritor ) == ranges[4].end() ) stack.push_back( *ritor );
         }
@@ -837,7 +837,7 @@ ErrorCode WriteHDF5::gather_mesh_info( const std::vector< EntityHandle >& export
         set_children.clear();
         rval = iFace->get_child_meshsets( meshset, set_children, 1 );
         CHK_MB_ERR_0( rval );
-        for( std::vector< EntityHandle >::iterator vitor = set_children.begin(); vitor != set_children.end(); ++vitor )
+        for( auto vitor = set_children.begin(); vitor != set_children.end(); ++vitor )
         {
             if( ranges[4].find( *vitor ) == ranges[4].end() ) stack.push_back( *vitor );
         }

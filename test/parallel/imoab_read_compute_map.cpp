@@ -590,7 +590,7 @@ int main( int argc, char* argv[] )
                 // get temp field on ocean, from conservative, the global ids, and dump to the baseline file
                 // first get GlobalIds from OCN, and fields:
                 int nverts[3], nelem[3];
-                std::vector< int > gidElems;
+                std::vector< mbGIDType > gidElems;
                 std::vector< double > tempElems;
                 int err_code = 1, ent_type = 1;
 
@@ -602,7 +602,7 @@ int main( int argc, char* argv[] )
                 gidElems.resize( nelem[2] );
                 tempElems.resize( nelem[2] );
 
-                CHECKIERR( iMOAB_GetIntTagStorage( cmpOcnPID, gidStr, &nelem[2], &ent_type, gidElems.data() ),
+                CHECKIERR( iMOAB_GetGIDStorage( cmpOcnPID, gidStr, &nelem[2], &ent_type, gidElems.data() ),
                            "failed to get global ids" );
                 CHECKIERR( iMOAB_GetDoubleTagStorage( cmpOcnPID, bottomProjectedFieldsM, &nelem[2], &ent_type,
                                                       tempElems.data() ),
@@ -622,7 +622,7 @@ int main( int argc, char* argv[] )
                 // we should not have to define global id tag, it is always defined
                 CHECKIERR( iMOAB_DefineTagStorage( cmpAtmPID, gidStr, &tag_type, &ncomp, &tagInd ),
                            "Failed to define GLOBAL_ID tag" );
-                CHECKIERR( iMOAB_GetIntTagStorage( cmpAtmPID, gidStr, &nelem[2], &ent_type, gidElems.data() ),
+                CHECKIERR( iMOAB_GetGIDStorage( cmpAtmPID, gidStr, &nelem[2], &ent_type, gidElems.data() ),
                            "failed to get global ids" );
                 CHECKIERR( iMOAB_GetDoubleTagStorage( cmpAtmPID, bottomProjectedFieldsS, &nelem[2], &ent_type,
                                                       tempElems.data() ),
@@ -663,7 +663,7 @@ int main( int argc, char* argv[] )
                 gidElems.resize( nelem[2] );
                 tempElems.resize( nelem[2] );
 
-                CHECKIERR( iMOAB_GetIntTagStorage( cmpOcnPID, gidStr, &nelem[2], &ent_type, gidElems.data() ),
+                CHECKIERR( iMOAB_GetGIDStorage( cmpOcnPID, gidStr, &nelem[2], &ent_type, gidElems.data() ),
                            "failed to get global ids" );
                 CHECKIERR( iMOAB_GetDoubleTagStorage( cmpOcnPID, bottomProjectedFieldsF, &nelem[2], &ent_type,
                                                       tempElems.data() ),

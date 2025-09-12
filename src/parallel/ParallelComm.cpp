@@ -471,7 +471,7 @@ ErrorCode ParallelComm::assign_global_ids( Range entities[],
     if( procConfig.proc_size() > 1 && parallel )
     {
         int retval =
-            MPI_Allgather( local_num_elements, 4, MB_MPI_GIDTYPE, num_elements.data(), 4, MB_MPI_GIDTYPE, procConfig.proc_comm() );
+            MPI_Allgather( local_num_elements, 4, MB_GID_MPI_TYPE, num_elements.data(), 4, MB_GID_MPI_TYPE, procConfig.proc_comm() );
         if( 0 != retval ) return MB_FAILURE;
     }
     else

@@ -75,13 +75,14 @@
 enum MOAB_TAG_TYPE
 {
     DENSE_INTEGER       = 0,
-    DENSE_LONG          = 1,
-    DENSE_DOUBLE        = 2,
-    DENSE_ENTITYHANDLE  = 3,
-    SPARSE_INTEGER      = 4,
-    SPARSE_LONG         = 5,
-    SPARSE_DOUBLE       = 6,
-    SPARSE_ENTITYHANDLE = 7
+    DENSE_DOUBLE        = 1,
+    DENSE_ENTITYHANDLE  = 2,
+    SPARSE_INTEGER      = 3,
+    SPARSE_DOUBLE       = 4,
+    SPARSE_ENTITYHANDLE = 5,
+    DENSE_LONG          = 6,
+    SPARSE_LONG         = 7,
+    TAG_TYPE_MAX        = SPARSE_LONG
 };
 
 /**

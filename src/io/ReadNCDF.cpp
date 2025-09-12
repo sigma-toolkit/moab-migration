@@ -102,10 +102,31 @@ namespace moab
             }                                                                                 \
             ( vals ).resize( ntmp );                                                          \
             size_t ntmp1 = 0;                                                                 \
-            ivfail       = nc_get_vara_int( ncFile, id, &ntmp1, &ntmp, &( vals )[0] );        \
+            /* Check variable type and read accordingly */                                    \
+            nc_type var_type;                                                                 \
+            ivfail = nc_inq_vartype( ncFile, id, &var_type );                                 \
             if( NC_NOERR != ivfail )                                                          \
             {                                                                                 \
-                MB_SET_ERR( MB_FAILURE, "ReadNCDF:: Problem getting variable " << ( name ) ); \
+                MB_SET_ERR( MB_FAILURE, "ReadNCDF:: Couldn't get variable type" );            \
+            }                                                                                 \
+            if( var_type == NC_INT64 || var_type == NC_LONG )                                 \
+            {                                                                                 \
+                std::vector<long> ll_vals(ntmp);                                         \
+                ivfail = nc_get_vara_long( ncFile, id, &ntmp1, &ntmp, &ll_vals[0] );      \
+                if( NC_NOERR != ivfail )                                                      \
+                {                                                                             \
+                    MB_SET_ERR( MB_FAILURE, "ReadNCDF:: Problem getting variable " << ( name ) ); \
+                }                                                                             \
+                for( size_t i = 0; i < ntmp; ++i )                                            \
+                    ( vals )[i] = static_cast<int>( ll_vals[i] );                              \
+            }                                                                                 \
+            else                                                                              \
+            {                                                                                 \
+                ivfail = nc_get_vara_int( ncFile, id, &ntmp1, &ntmp, &( vals )[0] );          \
+                if( NC_NOERR != ivfail )                                                      \
+                {                                                                             \
+                    MB_SET_ERR( MB_FAILURE, "ReadNCDF:: Problem getting variable " << ( name ) ); \
+                }                                                                             \
             }                                                                                 \
         }                                                                                     \
     }
@@ -141,6 +162,27 @@ namespace moab
                     for( size_t i = 0; i < ntmp; ++i )                                        \
                         ( vals )[i] = static_cast< long >( int_vals[i] );                      \
                 }                                                                             \
+            }                                                                                 \
+        }                                                                                     \
+    }
+
+#define GET_1D_LL_VAR( name, id, vals )                                                       \
+    {                                                                                         \
+        std::vector< int > dum_dims;                                                          \
+        GET_VAR( name, id, dum_dims );                                                        \
+        if( -1 != ( id ) )                                                                    \
+        {                                                                                     \
+            size_t ntmp;                                                                      \
+            int ivfail = nc_inq_dimlen( ncFile, dum_dims[0], &ntmp );                         \
+            if( NC_NOERR != ivfail )                                                          \
+            {                                                                                 \
+                MB_SET_ERR( MB_FAILURE, "ReadNCDF:: Couldn't get dimension length" );         \
+            }                                                                                 \
+            size_t ntmp1 = 0;                                                                 \
+            ivfail       = nc_get_vara_longlong( ncFile, id, &ntmp1, &ntmp, vals );            \
+            if( NC_NOERR != ivfail )                                                          \
+            {                                                                                 \
+                MB_SET_ERR( MB_FAILURE, "ReadNCDF:: Problem getting variable " << ( name ) ); \
             }                                                                                 \
         }                                                                                     \
     }
@@ -1032,7 +1074,7 @@ ErrorCode ReadNCDF::read_elements( const Tag* file_id_tag )
 ErrorCode ReadNCDF::read_global_ids()
 {
     // Read in the map from the exodus file
-    std::vector< long > ids( std::max( numberElements_loading, numberNodes_loading ) );
+    std::vector< mbGIDType > ids( std::max( numberElements_loading, numberNodes_loading ) );
 
     int varid = -1;
     GET_1D_LONG_VAR( "elem_map", varid, ids );
@@ -1205,7 +1247,7 @@ ErrorCode ReadNCDF::read_nodesets()
             // TODO: create this tag another way
 
             int nodeset_id = id_array[i];
-            long nodeset_idl = static_cast<long>(id_array[i]);
+            mbGIDType nodeset_idl = static_cast<mbGIDType>(id_array[i]);
             if( mdbImpl->tag_set_data( mDirichletSetTag, &ns_handle, 1, &nodeset_id ) != MB_SUCCESS ) return MB_FAILURE;
             if( mdbImpl->tag_set_data( mGlobalIdTag, &ns_handle, 1, &nodeset_idl ) != MB_SUCCESS ) return MB_FAILURE;
 
@@ -1336,7 +1378,8 @@ ErrorCode ReadNCDF::read_sidesets()
                 int sideset_id = id_array[i];
                 if( mdbImpl->tag_set_data( mNeumannSetTag, &ss_handle, 1, &sideset_id ) != MB_SUCCESS )
                     return MB_FAILURE;
-                if( mdbImpl->tag_set_data( mGlobalIdTag, &ss_handle, 1, &sideset_id ) != MB_SUCCESS ) return MB_FAILURE;
+                mbGIDType sideset_idl = static_cast<mbGIDType>(id_array[i]);
+                if( mdbImpl->tag_set_data( mGlobalIdTag, &ss_handle, 1, &sideset_idl ) != MB_SUCCESS ) return MB_FAILURE;
 
                 if( !reverse_entities.empty() )
                 {
@@ -2034,22 +2077,22 @@ ErrorCode ReadNCDF::update( const char* exodus_file_name,
     double average_magnitude = 0;
     int found                = 0;
     int lost                 = 0;
-    std::map< int, EntityHandle > cub_verts_id_map;
+    std::map< mbGIDType, EntityHandle > cub_verts_id_map;
     AdaptiveKDTree kdtree( mdbImpl );
     EntityHandle root;
 
     // Should not use cub verts unless they have been matched. Place in a map
     // for fast handle_by_id lookup.
-    std::map< int, EntityHandle > matched_cub_vert_id_map;
+    std::map< mbGIDType, EntityHandle > matched_cub_vert_id_map;
 
     // Place cub verts in a map for searching by id
     if( match_node_ids )
     {
-        std::vector< int > cub_ids( cub_verts.size() );
+        std::vector< mbGIDType > cub_ids( cub_verts.size() );
         rval = mdbImpl->tag_get_data( mGlobalIdTag, cub_verts, &cub_ids[0] );MB_CHK_ERR( rval );
         for( unsigned i = 0; i != cub_verts.size(); ++i )
         {
-            cub_verts_id_map.insert( std::pair< int, EntityHandle >( cub_ids[i], cub_verts[i] ) );
+            cub_verts_id_map.insert( std::pair< mbGIDType, EntityHandle >( cub_ids[i], cub_verts[i] ) );
         }
 
         // Place cub verts in a kdtree for searching by proximity
@@ -2073,8 +2116,7 @@ ErrorCode ReadNCDF::update( const char* exodus_file_name,
         // By id
         if( match_node_ids )
         {
-            std::map< int, EntityHandle >::iterator i_iter;
-            i_iter = cub_verts_id_map.find( exo_id );
+            auto i_iter = cub_verts_id_map.find( exo_id );
             if( i_iter != cub_verts_id_map.end() )
             {
                 found_match = true;
@@ -2143,15 +2185,14 @@ ErrorCode ReadNCDF::update( const char* exodus_file_name,
     if( matched_cub_vert_id_map.size() < cub_verts.size() )
     {
         Range unmatched_cub_verts = cub_verts;
-        for( std::map< int, EntityHandle >::const_iterator i = matched_cub_vert_id_map.begin();
-             i != matched_cub_vert_id_map.end(); ++i )
+        for( auto i = matched_cub_vert_id_map.begin(); i != matched_cub_vert_id_map.end(); ++i )
         {
             unmatched_cub_verts.erase( i->second );
         }
 
-        for( Range::const_iterator i = unmatched_cub_verts.begin(); i != unmatched_cub_verts.end(); ++i )
+        for( auto i = unmatched_cub_verts.begin(); i != unmatched_cub_verts.end(); ++i )
         {
-            int cub_id;
+            mbGIDType cub_id;
             rval = mdbImpl->tag_get_data( mGlobalIdTag, &( *i ), 1, &cub_id );MB_CHK_ERR( rval );
 
             CartVect cub_coords;
@@ -2250,10 +2291,10 @@ ErrorCode ReadNCDF::update( const char* exodus_file_name,
 
     // Get the element id map. The ids in the map are from the elements in the blocks.
     // elem_num_map(blk1 elem ids, blk2 elem ids, blk3 elem ids, ...)
-    std::vector< int > elem_ids( numberNodes_loading );
+    std::vector< mbGIDType > elem_ids( numberNodes_loading );
     if( !match_elems_by_connectivity )
     {
-        GET_1D_INT_VAR( "elem_num_map", varid, elem_ids );
+        GET_1D_LONG_VAR( "elem_num_map", varid, elem_ids );
         if( -1 == varid )
         {
             MB_SET_ERR( MB_FAILURE, "ReadNCDF: Problem getting element number map data" );
@@ -2371,9 +2412,7 @@ ErrorCode ReadNCDF::update( const char* exodus_file_name,
                     // MOAB's linear tag search takes 5-10 minutes.
                     for( unsigned int k = 0; k < nodes_per_element; ++k )
                     {
-                        std::map< int, EntityHandle >::iterator k_iter;
-                        k_iter = matched_cub_vert_id_map.find( elem_conn_node_ids[k] );
-
+                        auto k_iter = matched_cub_vert_id_map.find( elem_conn_node_ids[k] );
                         if( k_iter == matched_cub_vert_id_map.end() )
                         {
                             std::cout << "ReadNCDF: Found no cub node with id=" << elem_conn_node_ids[k]
@@ -2406,7 +2445,7 @@ ErrorCode ReadNCDF::update( const char* exodus_file_name,
                 else
                 {
                     // Get dead element's id
-                    int elem_id = elem_ids[first_elem_id_in_block + j];
+                    mbGIDType elem_id = elem_ids[first_elem_id_in_block + j];
                     void* id[]  = { &elem_id };
                     // Get the element by id
                     rval = mdbImpl->get_entities_by_type_and_tag( cub_file_set, mb_type, &mGlobalIdTag, id, 1, cub_elem,

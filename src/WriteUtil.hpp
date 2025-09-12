@@ -225,7 +225,7 @@ class WriteUtil : public WriteUtilIface
 
     //! Assign ids to input elements starting with start_id, written to id_tag
     //! if zero, assigns to GLOBAL_ID_TAG_NAME
-    ErrorCode assign_ids( Range& elements, Tag id_tag, const int start_id );
+    ErrorCode assign_ids( Range& elements, Tag id_tag, const mbGIDType start_id );
 
     /** Get explicit adjacencies
      *

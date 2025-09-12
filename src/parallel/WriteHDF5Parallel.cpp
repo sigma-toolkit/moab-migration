@@ -235,8 +235,9 @@ static void print_type_sets( Interface* iFace, DebugOutput* str, Range& sets )
             dim = 2;
         else if( MB_SUCCESS == iFace->tag_get_data( did, &*riter, 1, &dim ) )
         {
-            id = 0;
-            iFace->tag_get_data( gid, &*riter, 1, &id );
+            mbGIDType idl;
+            iFace->tag_get_data( gid, &*riter, 1, &idl );
+            id = static_cast<int>(idl);
             dim += 3;
         }
         else
@@ -1515,7 +1516,7 @@ void WriteHDF5Parallel::print_shared_sets()
     id = iFace->globalId_tag();
 
     const char* geom_names[] = { "vertex", "curve", "surface", "volume" };
-    for( int d = 0; d <= 3; ++d )
+    for( mbGIDType d = 0; d <= 3; ++d )
     {
         Range tagged;
         const void* vals[] = { &d };

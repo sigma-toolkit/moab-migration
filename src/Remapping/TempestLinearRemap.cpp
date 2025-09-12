@@ -1014,9 +1014,7 @@ moab::ErrorCode moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3(bool pe
         }
         else
         {
-            Tag gdofTag;
-            MB_CHK_SET_ERR( m_interface->tag_get_handle("GLOBAL_DOFS", gdofTag), "failed to get GLOBAL_DOFS tag");
-            MB_CHK_SET_ERR( determine_communication_pattern_from_tag(m_pcomm, "GLOBAL_DOFS", gdofTag, comm_pattern, all_row_sharers),
+            MB_CHK_SET_ERR( determine_communication_pattern_from_tag(m_pcomm, "GLOBAL_DOFS", m_dofTagDest, comm_pattern, all_row_sharers),
                                 "determine_communication_pattern_from_tag failed");
 
             // For now, just print some debug information about the triplets

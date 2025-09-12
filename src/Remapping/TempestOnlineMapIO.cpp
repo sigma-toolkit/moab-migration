@@ -92,18 +92,18 @@ int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< mbGIDTy
                                                       std::vector< int >& masks,
                                                       unsigned& N,  // will have the local, after
                                                       int nv,
-                                                      int& maxdof )
+                                                      mbGIDType& maxdof )
 {
     // first decide maxdof, for partitioning
-    unsigned int localmax = 0;
+    mbGIDType localmax = 0;
     for( unsigned i = 0; i < N; i++ )
         if( gdofmap[i] > localmax ) localmax = gdofmap[i];
 
     // decide partitioning based on maxdof/size
-    MPI_Allreduce( &localmax, &maxdof, 1, MPI_INT, MPI_MAX, m_pcomm->comm() );
+    MPI_Allreduce( &localmax, &maxdof, 1, MB_MPI_GIDTYPE, MPI_MAX, m_pcomm->comm() );
     // maxdof is 0 based, so actual number is +1
     // maxdof
-    int size_per_task = ( maxdof + 1 ) / size;  // based on this, processor to process dof x is x/size_per_task
+    mbGIDType size_per_task = ( maxdof + 1 ) / size;  // based on this, processor to process dof x is x/size_per_task
     // so we decide to reorder by actual dof, such that task 0 has dofs from [0 to size_per_task), etc
     moab::TupleList tl;
     unsigned numr = 2 * nv + 3;         //  doubles: area, centerlon, center lat, nv (vertex lon, vertex lat)
@@ -112,14 +112,27 @@ int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< mbGIDTy
     // populate
     for( unsigned i = 0; i < N; i++ )
     {
-        int gdof    = gdofmap[i];
-        int to_proc = gdof / size_per_task;
-        int mask    = masks[i];
+        // Bounds check for all input arrays
+        // if( i >= gdofmap.size() || i >= masks.size() )
+        // {
+        //     _EXCEPTION1( "Array index exceeds bounds", i );
+        // }
+
+        mbGIDType gdof    = gdofmap[i];
+        mbGIDType to_proc = gdof / size_per_task;
+        int mask          = masks[i];
         if( to_proc >= size ) to_proc = size - 1;  // the last ones go to last proc
         int n                  = tl.get_n();
         tl.vi_wr[3 * n]        = to_proc;
         tl.vi_wr[3 * n + 1]    = gdof;
         tl.vi_wr[3 * n + 2]    = mask;
+        // Additional bounds checking for DataArray access
+        if( i >= vecFaceArea.GetRows() || i >= dCenterLon.GetRows() || i >= dCenterLat.GetRows() ||
+            i >= dVertexLon.GetRows() || i >= dVertexLat.GetRows() )
+        {
+            _EXCEPTION1( "DataArray index exceeds array bounds", i );
+        }
+
         tl.vr_wr[n * numr]     = vecFaceArea[i];
         tl.vr_wr[n * numr + 1] = dCenterLon[i];
         tl.vr_wr[n * numr + 2] = dCenterLat[i];
@@ -151,21 +164,46 @@ int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< mbGIDTy
     dVertexLon.Allocate( nb_unique, nv );
     dVertexLat.Allocate( nb_unique, nv );
     masks.resize( nb_unique );
-    int current_size = 1;
-    vecFaceArea[0]   = tl.vr_wr[0];
-    dCenterLon[0]    = tl.vr_wr[1];
-    dCenterLat[0]    = tl.vr_wr[2];
-    masks[0]         = tl.vi_wr[2];
-    for( int j = 0; j < nv; j++ )
+
+    // Initialize all arrays to prevent uninitialized memory access
+    for( unsigned k = 0; k < nb_unique; k++ )
     {
-        dVertexLon[0][j] = tl.vr_wr[3 + j];
-        dVertexLat[0][j] = tl.vr_wr[3 + nv + j];
+        vecFaceArea[k] = 0.0;
+        dCenterLon[k] = 0.0;
+        dCenterLat[k] = 0.0;
+        masks[k] = 0;
+        for( int j = 0; j < nv; j++ )
+        {
+            dVertexLon[k][j] = 0.0;
+            dVertexLat[k][j] = 0.0;
+        }
     }
+
+    // Now set the first element from received data
+    if( tl.get_n() > 0 )
+    {
+        vecFaceArea[0]   = tl.vr_wr[0];
+        dCenterLon[0]    = tl.vr_wr[1];
+        dCenterLat[0]    = tl.vr_wr[2];
+        masks[0]         = tl.vi_wr[2];
+        for( int j = 0; j < nv; j++ )
+        {
+            dVertexLon[0][j] = tl.vr_wr[3 + j];
+            dVertexLat[0][j] = tl.vr_wr[3 + nv + j];
+        }
+    }
+    int current_size = 1;
     for( unsigned i = 0; i < tl.get_n() - 1; i++ )
     {
         int i1 = i + 1;
         if( tl.vi_wr[3 * i + 1] != tl.vi_wr[3 * i + 4] )
         {
+            // Bounds check before accessing arrays
+            if( current_size >= nb_unique )
+            {
+                _EXCEPTION1( "current_size exceeds nb_unique", current_size );
+            }
+
             vecFaceArea[current_size] = tl.vr_wr[i1 * numr];
             dCenterLon[current_size]  = tl.vr_wr[i1 * numr + 1];
             dCenterLat[current_size]  = tl.vr_wr[i1 * numr + 2];
@@ -336,13 +374,19 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     // right now, do this only for source  mesh; copy the logic for target mesh
     for( unsigned i = 0; i < nA; i++ )
     {
+        // Bounds check to prevent invalid reads
+        // if( i >= m_meshInput->faces.size() )
+        // {
+        //     _EXCEPTION1( "Face index exceeds mesh face count", i );
+        // }
+
         const Face& face = m_meshInput->faces[i];
 
-        int nNodes          = face.edges.size();
+        size_t nNodes = face.edges.size();
         int indexNodeAtPole = -1;
         if( 3 == nNodes )  // check if one node at the poles
         {
-            for( int j = 0; j < nNodes; j++ )
+            for( size_t j = 0; j < nNodes; j++ )
                 if( fabs( fabs( dSourceVertexLat[i][j] ) - 90.0 ) < 1.0e-12 )
                 {
                     indexNodeAtPole = j;
@@ -354,7 +398,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
         int nodeAtPole = face[indexNodeAtPole];  // use the overloaded operator
         Node nodePole  = m_meshInput->nodes[nodeAtPole];
         Node newCenter = nodePole * 2;
-        for( int j = 1; j < nNodes; j++ )
+        for( size_t j = 1; j < nNodes; j++ )
         {
             int indexi       = ( indexNodeAtPole + j ) % nNodes;  // nNodes is 3 !
             const Node& node = m_meshInput->nodes[face[indexi]];
@@ -376,7 +420,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
 
     // first move data if in parallel
 #if defined( MOAB_HAVE_MPI )
-    int max_row_dof, max_col_dof;  // output; arrays will be re-distributed in chunks [maxdof/size]
+    mbGIDType max_row_dof, max_col_dof;  // output; arrays will be re-distributed in chunks [maxdof/size]
     // if (size > 1)
     {
         int ierr = rearrange_arrays_by_dofs( srccol_gdofmap, vecSourceFaceArea, dSourceCenterLon, dSourceCenterLat,
@@ -1382,9 +1426,9 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         ERR_PARNC( ncmpi_inq_varid( ncfile, "S", &varid ) );
         ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &start, &count, &vecS[0] ) );
         ERR_PARNC( ncmpi_inq_varid( ncfile, "row", &varid ) );
-        ERR_PARNC( ncmpi_get_vara_all( ncfile, varid, &start, &count, &vecRow[0], count, MPI_INT ) );
+        ERR_PARNC( ncmpi_get_vara_all( ncfile, varid, &start, &count, &vecRow[0], count, MB_MPI_GIDTYPE ) );
         ERR_PARNC( ncmpi_inq_varid( ncfile, "col", &varid ) );
-        ERR_PARNC( ncmpi_get_vara_all( ncfile, varid, &start, &count, &vecCol[0], count, MPI_INT ) );
+        ERR_PARNC( ncmpi_get_vara_all( ncfile, varid, &start, &count, &vecCol[0], count, MB_MPI_GIDTYPE ) );
 
         if( readAreaA )
         {

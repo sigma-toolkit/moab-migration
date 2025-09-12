@@ -50,8 +50,9 @@ class Tqdcfr : public ReaderIface
     void FREADD( unsigned num_ents );                        // read doubles into dbl_buf
     void FREADC( unsigned num_ents );                        // read characters into char_buf
     void FREADIA( unsigned num_ents, unsigned int* array );  // read integers
+    void FREADLA( unsigned num_ents, mbGIDType* array );     // read long integers with conversion
     void FREADDA( unsigned num_ents, double* array );        // read doubles
-    void FREADCA( unsigned num_ents, char* arrat );          // read bytes
+    void FREADCA( unsigned num_ents, char* array );          // read bytes
     void CONVERT_TO_INTS( unsigned int num_ents );           // convert uint_buf to int_buf in-place
 
     // class for holding the file table of contents
@@ -281,12 +282,13 @@ class Tqdcfr : public ReaderIface
     long currElementIdOffset[MBMAXTYPE];
     Tag globalIdTag, cubIdTag, geomTag, uniqueIdTag, blockTag, nsTag, ssTag, attribVectorTag, entityNameTag,
         categoryTag, hasMidNodesTag;
-    std::map< int, EntityHandle > uidSetMap;
-    std::map< int, EntityHandle > gidSetMap[6];
+    std::map< mbGIDType, EntityHandle > uidSetMap;
+    std::map< mbGIDType, EntityHandle > gidSetMap[6];
     bool swapForEndianness;
 
-    std::vector< unsigned int > uint_buf;
-    int* int_buf;
+    std::vector< unsigned int > uint_buf;  // File I/O buffer (32-bit)
+    std::vector< mbGIDType > gid_buf;      // Memory buffer (64-bit)
+    mbGIDType* int_buf;
     std::vector< double > dbl_buf;
     std::vector< char > char_buf;
 
@@ -440,28 +442,28 @@ class Tqdcfr : public ReaderIface
     //! get entities with individually-specified types; if is_group is false,
     //! increment each mem_type by 2 since they're CSOEntityType's and not group types
     ErrorCode get_entities( const unsigned int* mem_types,
-                            int* id_buf,
+                            mbGIDType* id_buf,
                             const unsigned int id_buf_size,
                             const bool is_group,
                             std::vector< EntityHandle >& entities );
 
     //! get entities specified by type and ids, append to entities
     ErrorCode get_entities( const unsigned int this_type,
-                            int* id_buf,
+                            mbGIDType* id_buf,
                             const unsigned int id_buf_size,
                             std::vector< EntityHandle >& entities,
                             std::vector< EntityHandle >& excl_entities );
 
     //! get ref entity sets with specified type and ids
     ErrorCode get_ref_entities( const unsigned int this_type,
-                                int* id_buf,
+                                mbGIDType* id_buf,
                                 const unsigned id_buf_size,
                                 std::vector< EntityHandle >& entities );
 
     //! get mesh entities with specified type and ids
     ErrorCode get_mesh_entities( const unsigned int this_type,
-                                 int* id_buf,
-                                 const unsigned id_buf_size,
+                                 mbGIDType* id_buf,
+                                 const unsigned int id_buf_size,
                                  std::vector< EntityHandle >& entities,
                                  std::vector< EntityHandle >& excl_entities );
 

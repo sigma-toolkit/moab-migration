@@ -1441,10 +1441,10 @@ ErrorCode IntxUtils::fix_degenerate_quads( Interface* mb, EntityHandle set )
             {
                 // form a triangle and delete the quad
                 // first get the global id, to set it on triangle later
-                int global_id = 0;
-                rval          = mb->tag_get_data( gid, &quad, 1, &global_id );MB_CHK_ERR( rval );
-                int i2                = ( i + 2 ) % num_nodes;
-                int i3                = ( i + 3 ) % num_nodes;
+                mbGIDType global_id = 0;
+                rval = mb->tag_get_data( gid, &quad, 1, &global_id );MB_CHK_ERR( rval );
+                int i2 = ( i + 2 ) % num_nodes;
+                int i3 = ( i + 3 ) % num_nodes;
                 EntityHandle conn3[3] = { conn4[i], conn4[i2], conn4[i3] };
                 EntityHandle tri;
                 rval = mb->create_element( MBTRI, conn3, 3, tri );MB_CHK_ERR( rval );
@@ -2003,7 +2003,7 @@ ErrorCode IntxUtils::deep_copy_set_with_quads( Interface* mb, EntityHandle sourc
         CartVect posi;
         rval = mb->get_coords( &oldV, 1, &( posi[0] ) );MB_CHK_ERR( rval );
 
-        int global_id;
+        mbGIDType global_id;
         rval = mb->tag_get_data( gid, &oldV, 1, &global_id );MB_CHK_ERR( rval );
         EntityHandle new_vert = start_vert + i;
         // Cppcheck warning (false positive): variable coords is assigned a value that is never used
@@ -2033,7 +2033,7 @@ ErrorCode IntxUtils::deep_copy_set_with_quads( Interface* mb, EntityHandle sourc
         int nnodes;
         const EntityHandle* conn;
         rval = mb->get_connectivity( q, conn, nnodes );MB_CHK_ERR( rval );
-        int global_id;
+        mbGIDType global_id;
         rval = mb->tag_get_data( gid, &q, 1, &global_id );MB_CHK_ERR( rval );
 
         for( int ii = 0; ii < nnodes; ii++ )

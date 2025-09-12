@@ -1501,64 +1501,79 @@ ErrCode iMOAB_DefineTagStorage( iMOAB_AppID pid,
 {
     // we have 6 types of tags supported so far
     // check if tag type is valid
-    if( *tag_type < 0 || *tag_type > 5 ) return moab::MB_FAILURE;
+    if( *tag_type < 0 || *tag_type > TAG_TYPE_MAX ) return moab::MB_FAILURE;
 
     DataType tagDataType;
     TagType tagType;
     void* defaultVal        = nullptr;
     int* defInt             = new int[*components_per_entity];
+    long* defLong           = new long[*components_per_entity];
     double* defDouble       = new double[*components_per_entity];
     EntityHandle* defHandle = new EntityHandle[*components_per_entity];
 
     for( int i = 0; i < *components_per_entity; i++ )
     {
         defInt[i]    = 0;
+        defLong[i]   = 0;
         defDouble[i] = -1e+10;
         defHandle[i] = static_cast< EntityHandle >( 0 );
     }
 
     switch( *tag_type )
     {
-        case 0:
+        case 0:  // DENSE_INTEGER
             tagDataType = MB_TYPE_INTEGER;
             tagType     = MB_TAG_DENSE;
             defaultVal  = defInt;
             break;
 
-        case 1:
+        case 1:  // DENSE_DOUBLE
             tagDataType = MB_TYPE_DOUBLE;
             tagType     = MB_TAG_DENSE;
             defaultVal  = defDouble;
             break;
 
-        case 2:
+        case 2:  // DENSE_HANDLE
             tagDataType = MB_TYPE_HANDLE;
             tagType     = MB_TAG_DENSE;
             defaultVal  = defHandle;
             break;
 
-        case 3:
+        case 3:  // SPARSE_INTEGER
             tagDataType = MB_TYPE_INTEGER;
             tagType     = MB_TAG_SPARSE;
             defaultVal  = defInt;
             break;
 
-        case 4:
+        case 4:  // SPARSE_DOUBLE
             tagDataType = MB_TYPE_DOUBLE;
             tagType     = MB_TAG_SPARSE;
             defaultVal  = defDouble;
             break;
 
-        case 5:
+        case 5:  // SPARSE_HANDLE
             tagDataType = MB_TYPE_HANDLE;
             tagType     = MB_TAG_SPARSE;
             defaultVal  = defHandle;
+            break;
+
+        case 6:  // DENSE_LONG
+            tagDataType = MB_TYPE_LONG;
+            tagType     = MB_TAG_DENSE;
+            defaultVal  = defLong;
+            break;
+
+        case 7:  // SPARSE_LONG
+            tagDataType = MB_TYPE_LONG;
+            tagType     = MB_TAG_SPARSE;
+            defaultVal  = defLong;
             break;
 
         default: {
             delete[] defInt;
             delete[] defDouble;
             delete[] defHandle;
+            delete[] defLong;
             return moab::MB_FAILURE;
         }  // error
     }
@@ -3559,8 +3574,8 @@ static ErrCode set_aream_from_trivial_distribution( iMOAB_AppID pid, int N, std:
         // tags are unrolled, we loop over global ids first, then careful about tags
         for( size_t i = 0; i < nents_to_be_set; i++ )
         {
-            int gid = globalIds[i];
-            int indexInVal =
+            mbGIDType gid = globalIds[i];
+            mbGIDType indexInVal =
                 gid - 1;  // assume the values are in order of global id, starting from 1 to number of cells
             assert( indexInVal < N );
             EntityHandle eh = ents_to_set[i];

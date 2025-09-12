@@ -304,9 +304,9 @@ static ErrorCode check_int_tag( Interface* mb, Tag tag )
     DataType type;
     ErrorCode rval = mb->tag_get_bytes( tag, size );
     if( MB_SUCCESS != rval ) return rval;
-    if( size != sizeof( int ) ) return MB_TYPE_OUT_OF_RANGE;
+    if( size != sizeof( int ) && size != sizeof( mbGIDType ) ) return MB_TYPE_OUT_OF_RANGE;
     rval = mb->tag_get_data_type( tag, type );
-    if( type != MB_TYPE_OPAQUE && type != MB_TYPE_INTEGER ) return MB_TYPE_OUT_OF_RANGE;
+    if( type != MB_TYPE_OPAQUE && (type != MB_TYPE_INTEGER && type != MB_TYPE_LONG && type != MB_TYPE_UNSIGNED_LONG ) ) return MB_TYPE_OUT_OF_RANGE;
 
     return MB_SUCCESS;
 }
@@ -317,16 +317,15 @@ ErrorCode ReadUtil::assign_ids( Tag id_tag, const Range& ents, int start )
     if( MB_SUCCESS != rval ) return rval;
 
     Range tmp_range;
-    std::vector< int > data;
-    for( Range::const_pair_iterator i = ents.pair_begin(); i != ents.pair_end(); ++i )
+    std::vector< mbGIDType > data;
+    for( auto i = ents.pair_begin(); i != ents.pair_end(); ++i )
     {
         data.resize( i->second + 1 - i->first );
-        for( std::vector< int >::iterator j = data.begin(); j != data.end(); ++j )
+        for( auto j = data.begin(); j != data.end(); ++j )
             *j = start++;
         tmp_range.clear();
         tmp_range.insert( i->first, i->second );
-        rval = mMB->tag_set_data( id_tag, tmp_range, &data[0] );
-        if( MB_SUCCESS != rval ) return rval;
+        MB_CHK_ERR( mMB->tag_set_data( id_tag, tmp_range, &data[0] ) );
     }
 
     return MB_SUCCESS;
@@ -337,7 +336,7 @@ ErrorCode ReadUtil::assign_ids( Tag id_tag, const EntityHandle* ents, size_t num
     ErrorCode rval = check_int_tag( mMB, id_tag );
     if( MB_SUCCESS != rval ) return rval;
 
-    std::vector< int > data;
+    std::vector< mbGIDType > data;
     const EntityHandle* const end = ents + num_ents;
     const EntityHandle* i         = ents;
     while( i != end )
@@ -352,11 +351,10 @@ ErrorCode ReadUtil::assign_ids( Tag id_tag, const EntityHandle* ents, size_t num
 
         int id = start + ( i - ents );
         data.resize( size );
-        for( std::vector< int >::iterator j = data.begin(); j != data.end(); ++j )
+        for( auto j = data.begin(); j != data.end(); ++j )
             *j = id++;
 
-        rval = mMB->tag_set_data( id_tag, i, size, &data[0] );
-        if( MB_SUCCESS != rval ) return rval;
+        MB_CHK_ERR( mMB->tag_set_data( id_tag, i, size, &data[0] ) );
     }
 
     return MB_SUCCESS;
@@ -364,16 +362,13 @@ ErrorCode ReadUtil::assign_ids( Tag id_tag, const EntityHandle* ents, size_t num
 
 ErrorCode ReadUtil::create_gather_set( EntityHandle& gather_set )
 {
-    ErrorCode rval = mMB->create_meshset( MESHSET_SET, gather_set );
-    if( MB_SUCCESS != rval ) return rval;
+    MB_CHK_ERR( mMB->create_meshset( MESHSET_SET, gather_set ) );
 
     Tag gather_set_tag;
-    rval = mMB->tag_get_handle( "GATHER_SET", 1, MB_TYPE_INTEGER, gather_set_tag, MB_TAG_CREAT | MB_TAG_SPARSE );
-    if( MB_SUCCESS != rval ) return rval;
+    MB_CHK_ERR( mMB->tag_get_handle( "GATHER_SET", 1, MB_TYPE_INTEGER, gather_set_tag, MB_TAG_CREAT | MB_TAG_SPARSE ) );
 
     int gather_val = 1;
-    rval           = mMB->tag_set_data( gather_set_tag, &gather_set, 1, &gather_val );
-    if( MB_SUCCESS != rval ) return rval;
+    MB_CHK_ERR( mMB->tag_set_data( gather_set_tag, &gather_set, 1, &gather_val ) );
 
     return MB_SUCCESS;
 }
@@ -381,14 +376,12 @@ ErrorCode ReadUtil::create_gather_set( EntityHandle& gather_set )
 ErrorCode ReadUtil::get_gather_set( EntityHandle& gather_set )
 {
     Tag gather_set_tag;
-    ErrorCode rval = mMB->tag_get_handle( "GATHER_SET", 1, MB_TYPE_INTEGER, gather_set_tag, MB_TAG_SPARSE );
-    if( MB_SUCCESS != rval ) return rval;
+    MB_CHK_ERR( mMB->tag_get_handle( "GATHER_SET", 1, MB_TYPE_INTEGER, gather_set_tag, MB_TAG_SPARSE ) );
 
     int gather_val = 1;
     void* vals[]   = { &gather_val };
     Range gather_sets;
-    rval = mMB->get_entities_by_type_and_tag( 0, MBENTITYSET, &gather_set_tag, vals, 1, gather_sets );
-    if( MB_SUCCESS != rval ) return rval;
+    MB_CHK_ERR( mMB->get_entities_by_type_and_tag( 0, MBENTITYSET, &gather_set_tag, vals, 1, gather_sets ) );
 
     if( gather_sets.empty() ) return MB_ENTITY_NOT_FOUND;
 

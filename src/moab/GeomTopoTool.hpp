@@ -143,10 +143,10 @@ class GeomTopoTool
      *
      * @param this_set EntitySet for which the global ID will be returned
      */
-    int global_id( EntityHandle this_set );
+    mbGIDType global_id( EntityHandle this_set );
 
     //! Map from dimension & global ID to EntityHandle
-    EntityHandle entity_by_id( int dimension, int id );
+    EntityHandle entity_by_id( int dimension, mbGIDType id );
 
     ErrorCode find_geomsets( Range* ranges = NULL );
 

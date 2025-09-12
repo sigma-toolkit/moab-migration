@@ -845,10 +845,16 @@ ErrorCode WriteNCDF::write_nodes( int num_nodes, Range& nodes, int dimension )
 
     std::vector< double* > coord_arrays( 3 );
     coord_arrays[0] = new double[num_nodes];
+    std::fill_n(coord_arrays[0], num_nodes, 0.0);
     coord_arrays[1] = new double[num_nodes];
-    coord_arrays[2] = NULL;
+    std::fill_n(coord_arrays[1], num_nodes, 0.0);
+    coord_arrays[2] = nullptr;
 
-    if( num_coords_to_fill == 3 ) coord_arrays[2] = new double[num_nodes];
+    if( num_coords_to_fill == 3 ) 
+    {
+        coord_arrays[2] = new double[num_nodes];
+        std::fill_n(coord_arrays[2], num_nodes, 0.0);
+    }
 
     result = mWriteIface->get_node_coords( dimension, num_nodes, nodes, mGlobalIdTag, 1, coord_arrays );
     if( result != MB_SUCCESS )
@@ -863,7 +869,7 @@ ErrorCode WriteNCDF::write_nodes( int num_nodes, Range& nodes, int dimension )
     {
         double trans_matrix[16];
         const EntityHandle mesh = 0;
-        result                  = mdbImpl->tag_get_data( trans_tag, &mesh, 0, trans_matrix );MB_CHK_SET_ERR( result, "Couldn't get transform data" );
+        MB_CHK_SET_ERR( mdbImpl->tag_get_data( trans_tag, &mesh, 0, trans_matrix ), "Couldn't get transform data" );
 
         for( int i = 0; i < num_nodes; i++ )
         {
@@ -872,7 +878,7 @@ ErrorCode WriteNCDF::write_nodes( int num_nodes, Range& nodes, int dimension )
 
             vec2[0] = coord_arrays[0][i];
             vec2[1] = coord_arrays[1][i];
-            vec2[2] = coord_arrays[2][i];
+            if( num_coords_to_fill == 3 ) vec2[2] = coord_arrays[2][i];
 
             for( int row = 0; row < 3; row++ )
             {
@@ -883,7 +889,7 @@ ErrorCode WriteNCDF::write_nodes( int num_nodes, Range& nodes, int dimension )
 
             coord_arrays[0][i] = vec1[0];
             coord_arrays[1][i] = vec1[1];
-            coord_arrays[2][i] = vec1[2];
+            if( num_coords_to_fill == 3 ) coord_arrays[2][i] = vec1[2];
         }
     }
 
@@ -909,11 +915,14 @@ ErrorCode WriteNCDF::write_nodes( int num_nodes, Range& nodes, int dimension )
         MB_SET_ERR( MB_FAILURE, "Trouble writing y coordinate" );
     }
 
-    start[0] = 2;
-    fail     = nc_put_vara_double( ncFile, nc_var, start, count, &( coord_arrays[2][0] ) );
-    if( NC_NOERR != fail )
+    if( coord_arrays[2] )
     {
-        MB_SET_ERR( MB_FAILURE, "Trouble writing z coordinate" );
+        start[0] = 2;
+        fail     = nc_put_vara_double( ncFile, nc_var, start, count, &( coord_arrays[2][0] ) );
+        if( NC_NOERR != fail )
+        {
+            MB_SET_ERR( MB_FAILURE, "Trouble writing z coordinate" );
+        }
     }
 
     delete[] coord_arrays[0];
@@ -1381,7 +1390,8 @@ ErrorCode WriteNCDF::write_BCs( std::vector< NeumannSetData >& sidesets, std::ve
         id = ( *ns_it ).id;
 
         // Build new array to old exodus ids
-        int* exodus_id_array      = new int[number_nodes];
+        mbGIDType* exodus_id_array      = new mbGIDType[number_nodes];
+        std::fill_n(exodus_id_array, number_nodes, 0);
         double* dist_factor_array = new double[number_nodes];
 
         std::vector< EntityHandle >::iterator begin_iter, end_iter;
@@ -1391,7 +1401,7 @@ ErrorCode WriteNCDF::write_BCs( std::vector< NeumannSetData >& sidesets, std::ve
         other_iter = ( *ns_it ).node_dist_factors.begin();
 
         j = 0;
-        int exodus_id;
+        mbGIDType exodus_id;
         ErrorCode result;
         // Fill up node array and dist. factor array at the same time
         for( ; begin_iter != end_iter; ++begin_iter )
@@ -1429,7 +1439,7 @@ ErrorCode WriteNCDF::write_BCs( std::vector< NeumannSetData >& sidesets, std::ve
         }
 
         size_t start = 0, count = number_nodes;
-        int fail = nc_put_vara_int( ncFile, nc_var, &start, &count, exodus_id_array );
+        int fail = nc_put_vara_long( ncFile, nc_var, &start, &count, exodus_id_array );
         if( NC_NOERR != fail )
         {
             MB_SET_ERR( MB_FAILURE, "Failed writing exodus id array" );
@@ -1469,7 +1479,9 @@ ErrorCode WriteNCDF::write_BCs( std::vector< NeumannSetData >& sidesets, std::ve
 
         // Build new array to old exodus ids
         int* output_element_ids          = new int[number_elements];
+        std::fill_n(output_element_ids, number_elements, 0);
         int* output_element_side_numbers = new int[number_elements];
+        std::fill_n(output_element_side_numbers, number_elements, 0);
 
         std::vector< EntityHandle >::iterator begin_iter, end_iter;
         begin_iter                             = sideset_data.elements.begin();
@@ -1478,7 +1490,7 @@ ErrorCode WriteNCDF::write_BCs( std::vector< NeumannSetData >& sidesets, std::ve
 
         // Get the tag handle
         j = 0;
-        int exodus_id;
+        mbGIDType exodus_id;
 
         // For each "side"
         for( ; begin_iter != end_iter; ++begin_iter, ++side_iter )

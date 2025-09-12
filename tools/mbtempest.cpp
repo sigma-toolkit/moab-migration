@@ -69,6 +69,7 @@
 #include <cstdlib>
 #include <vector>
 #include <string>
+#include <memory>
 #include <sstream>
 #include <cassert>
 

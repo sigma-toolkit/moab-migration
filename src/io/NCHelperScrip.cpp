@@ -381,10 +381,23 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
         rval = mbImpl->tag_set_data( areaTag, &cell, 1, &area[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set area tag" );
         rval = mbImpl->tag_set_data( fracTag, &cell, 1, &frac[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set frac tag" );
 */
+
+        // Check tag type to handle properly
+        DataType tag_type;
+        rval = mbImpl->tag_get_data_type( mGlobalIdTag, tag_type );MB_CHK_SET_ERR( rval, "Failed to get global id tag type" );
+
         // set the global id too:
         int globalId = localGidCells[elem_index];
+        if( moab::data_type_size(tag_type) != sizeof(int) )
+        {
+            mbGIDType mbGIDType_globalId = static_cast<mbGIDType>( globalId );
+            rval = mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &mbGIDType_globalId );MB_CHK_SET_ERR( rval, "Failed to set global id tag" );
+        }
+        else
+        {
+            rval = mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId );MB_CHK_SET_ERR( rval, "Failed to set global id tag" );
+        }
 
-        rval = mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId );MB_CHK_SET_ERR( rval, "Failed to set global id tag" );
         if( gmId >= 0 )
         {
             int localMask = masks[elem_index];

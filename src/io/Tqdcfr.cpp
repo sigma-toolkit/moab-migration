@@ -134,9 +134,17 @@ void Tqdcfr::FREADI( unsigned num_ents )
     if( uint_buf.size() < num_ents )
     {
         uint_buf.resize( num_ents );
-        int_buf = (int*)&uint_buf[0];
     }
+    if( gid_buf.size() < num_ents )
+    {
+        gid_buf.resize( num_ents );
+        int_buf = &gid_buf[0];
+    }
+    // Read 32-bit data from file
     FREADIA( num_ents, &uint_buf[0] );
+    // Convert to 64-bit format
+    for( unsigned i = 0; i < num_ents; i++ )
+        gid_buf[i] = static_cast<mbGIDType>(uint_buf[i]);
 }
 
 void Tqdcfr::FREADD( unsigned num_ents )
@@ -218,10 +226,24 @@ void Tqdcfr::FREADCA( unsigned num_ents, char* array )
     IO_ASSERT( rval == num_ents );
 }
 
+void Tqdcfr::FREADLA( unsigned num_ents, mbGIDType* array )
+{
+    // Ensure we have enough space in temp buffer
+    if( uint_buf.size() < num_ents )
+        uint_buf.resize( num_ents );
+    
+    // Read 32-bit data from file
+    FREADIA( num_ents, &uint_buf[0] );
+    
+    // Convert to 64-bit format
+    for( unsigned i = 0; i < num_ents; i++ )
+        array[i] = static_cast<mbGIDType>(uint_buf[i]);
+}
+
 void Tqdcfr::CONVERT_TO_INTS( unsigned int num_ents )
 {
     for( unsigned int i = 0; i < num_ents; i++ )
-        int_buf[i] = uint_buf[i];
+        int_buf[i] = static_cast<mbGIDType>(uint_buf[i]);
 }
 
 ReaderIface* Tqdcfr::factory( Interface* iface )
@@ -519,25 +541,25 @@ ErrorCode Tqdcfr::convert_nodesets_sidesets()
     if( MB_SUCCESS != result || blocks.empty() ) return result;
 
     // Get the id tag for them
-    std::vector< int > block_ids( blocks.size() );
+    std::vector< mbGIDType > block_ids( blocks.size() );
     result = mdbImpl->tag_get_data( globalIdTag, blocks, &block_ids[0] );
     if( MB_SUCCESS != result ) return result;
 
     unsigned int i      = 0;
     Range::iterator rit = blocks.begin();
     Range new_nodesets, new_sidesets;
-    std::vector< int > new_nodeset_ids, new_sideset_ids;
+    std::vector< mbGIDType > new_nodeset_ids, new_sideset_ids;
     for( ; rit != blocks.end(); i++, ++rit )
     {
-        if( 0 != nodeset_offset && block_ids[i] >= (int)nodeset_offset &&
-            ( nodeset_offset > sideset_offset || block_ids[i] < (int)sideset_offset ) )
+        if( 0 != nodeset_offset && block_ids[i] >= (mbGIDType)nodeset_offset &&
+            ( nodeset_offset > sideset_offset || block_ids[i] < (mbGIDType)sideset_offset ) )
         {
             // This is a nodeset
             new_nodesets.insert( *rit );
             new_nodeset_ids.push_back( block_ids[i] );
         }
-        else if( 0 != sideset_offset && block_ids[i] >= (int)sideset_offset &&
-                 ( sideset_offset > nodeset_offset || block_ids[i] < (int)nodeset_offset ) )
+        else if( 0 != sideset_offset && block_ids[i] >= (mbGIDType)sideset_offset &&
+                 ( sideset_offset > nodeset_offset || block_ids[i] < (mbGIDType)nodeset_offset ) )
         {
             // This is a sideset
             new_sidesets.insert( *rit );
@@ -847,6 +869,7 @@ ErrorCode Tqdcfr::process_sideset_10( const int this_type,
                                       Tqdcfr::SidesetHeader* sideseth )
 {
     std::vector< EntityHandle > forward, reverse;
+
     if( this_type == 3      // Surface
         && sense_size == 1  // Byte size
     )
@@ -1240,7 +1263,7 @@ ErrorCode Tqdcfr::put_into_set( EntityHandle set_handle,
 }
 
 ErrorCode Tqdcfr::get_entities( const unsigned int* mem_types,
-                                int* id_buf,
+                                mbGIDType* id_buf,
                                 const unsigned int id_buf_size,
                                 const bool is_group,
                                 std::vector< EntityHandle >& entities )
@@ -1262,7 +1285,7 @@ ErrorCode Tqdcfr::get_entities( const unsigned int* mem_types,
 }
 
 ErrorCode Tqdcfr::get_entities( const unsigned int this_type,
-                                int* id_buf,
+                                mbGIDType* id_buf,
                                 const unsigned int id_buf_size,
                                 std::vector< EntityHandle >& entities,
                                 std::vector< EntityHandle >& excl_entities )
@@ -1278,7 +1301,7 @@ ErrorCode Tqdcfr::get_entities( const unsigned int this_type,
 }
 
 ErrorCode Tqdcfr::get_ref_entities( const unsigned int this_type,
-                                    int* id_buf,
+                                    mbGIDType* id_buf,
                                     const unsigned int id_buf_size,
                                     std::vector< EntityHandle >& entities )
 {
@@ -1289,7 +1312,7 @@ ErrorCode Tqdcfr::get_ref_entities( const unsigned int this_type,
 }
 
 ErrorCode Tqdcfr::get_mesh_entities( const unsigned int this_type,
-                                     int* id_buf,
+                                     mbGIDType* id_buf,
                                      const unsigned int id_buf_size,
                                      std::vector< EntityHandle >& entities,
                                      std::vector< EntityHandle >& excl_entities )
@@ -1344,14 +1367,14 @@ ErrorCode Tqdcfr::get_mesh_entities( const unsigned int this_type,
         if( MB_SUCCESS != result ) return result;
         if( tmp_ents.empty() && 0 != id_buf_size ) return MB_FAILURE;
 
-        std::vector< int > cub_ids( tmp_ents.size() );
+        std::vector< mbGIDType > cub_ids( tmp_ents.size() );
         result = mdbImpl->tag_get_data( globalIdTag, tmp_ents, &cub_ids[0] );
         if( MB_SUCCESS != result && MB_TAG_NOT_FOUND != result ) return result;
 
         // Now go through id list, finding each entity by id
         for( unsigned int i = 0; i < id_buf_size; i++ )
         {
-            std::vector< int >::iterator vit = std::find( cub_ids.begin(), cub_ids.end(), id_buf[i] );
+            auto vit = std::find( cub_ids.begin(), cub_ids.end(), id_buf[i] );
             if( vit != cub_ids.end() )
             {
                 EntityHandle this_ent = tmp_ents[vit - cub_ids.begin()];

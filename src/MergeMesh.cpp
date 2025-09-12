@@ -76,40 +76,31 @@ ErrorCode MergeMesh::merge_entities( Range& elems,
     // get the skin of the entities
     Skinner skinner( mbImpl );
     Range skin_range;
-    ErrorCode result = skinner.find_skin( 0, elems, 0, skin_range, false, false );
-    if( MB_SUCCESS != result ) return result;
+    MB_CHK_ERR( skinner.find_skin( 0, elems, 0, skin_range, false, false ) );
 
     // create a tag to mark merged-to entity; reuse tree_root
     EntityHandle tree_root = 0;
     if( 0 == merge_tag )
     {
-        result = mbImpl->tag_get_handle( "__merge_tag", 1, MB_TYPE_HANDLE, mbMergeTag, MB_TAG_DENSE | MB_TAG_EXCL,
-                                         &tree_root );
-        if( MB_SUCCESS != result ) return result;
+        MB_CHK_ERR( mbImpl->tag_get_handle( "__merge_tag", 1, MB_TYPE_HANDLE, mbMergeTag, MB_TAG_DENSE | MB_TAG_EXCL,
+                                         &tree_root ) );
     }
     else
         mbMergeTag = merge_tag;
 
     // build a kd tree with the vertices
     AdaptiveKDTree kd( mbImpl );
-    result = kd.build_tree( skin_range, &tree_root );
-    if( MB_SUCCESS != result ) return result;
+    MB_CHK_ERR( kd.build_tree( skin_range, &tree_root ) );
 
     // find matching vertices, mark them
-    result = find_merged_to( tree_root, kd, mbMergeTag );
-    if( MB_SUCCESS != result ) return result;
+    MB_CHK_ERR( find_merged_to( tree_root, kd, mbMergeTag ) );
 
     // merge them if requested
-    if( do_merge )
-    {
-        result = perform_merge( mbMergeTag );
-        if( MB_SUCCESS != result ) return result;
-    }
+    if( do_merge ) MB_CHK_ERR( perform_merge( mbMergeTag ) );
 
     if( merge_higher_dim && deadEnts.size() != 0 )
     {
-        result = merge_higher_dimensions( elems );
-        if( MB_SUCCESS != result ) return result;
+        MB_CHK_ERR( merge_higher_dimensions( elems ) );
     }
 
     return MB_SUCCESS;
@@ -159,47 +150,41 @@ ErrorCode MergeMesh::perform_merge( Tag merge_tag )
     // we start with an empty range of vertices that are "merged to"
     // they are used (eventually) for higher dim entities
     mergedToVertices.clear();
-    ErrorCode result;
     if( deadEnts.size() == 0 )
     {
         if( printError ) std::cout << "\nWarning: Geometries don't have a common face; Nothing to merge" << std::endl;
         return MB_SUCCESS;  // nothing to merge carry on with the program
     }
+
     if( mbImpl->type_from_handle( *deadEnts.begin() ) != MBVERTEX ) return MB_FAILURE;
     std::vector< EntityHandle > merge_tag_val( deadEnts.size() );
     Range deadEntsRange;
     std::copy( deadEnts.rbegin(), deadEnts.rend(), range_inserter( deadEntsRange ) );
-    result = mbImpl->tag_get_data( merge_tag, deadEntsRange, &merge_tag_val[0] );
-    if( MB_SUCCESS != result ) return result;
+    MB_CHK_ERR( mbImpl->tag_get_data( merge_tag, deadEntsRange, &merge_tag_val[0] ) );
 
-    std::set< EntityHandle >::iterator rit;
-    unsigned int i;
-    for( rit = deadEnts.begin(), i = 0; rit != deadEnts.end(); ++rit, i++ )
+    unsigned int i = 0;
+    for( auto rit = deadEnts.begin(); rit != deadEnts.end(); ++rit, i++ )
     {
         assert( merge_tag_val[i] );
         if( MBVERTEX == TYPE_FROM_HANDLE( merge_tag_val[i] ) ) mergedToVertices.insert( merge_tag_val[i] );
-        result = mbImpl->merge_entities( merge_tag_val[i], *rit, false, false );
-        if( MB_SUCCESS != result )
-        {
-            return result;
-        }
+        MB_CHK_ERR( mbImpl->merge_entities( merge_tag_val[i], *rit, false, false ) );
     }
-    result = mbImpl->delete_entities( deadEntsRange );
-    return result;
+    MB_CHK_ERR( mbImpl->delete_entities( deadEntsRange ) );
+    return MB_SUCCESS;
 }
+
 // merge vertices according to an input tag
 // merge them if the tags are equal
 struct handle_id
 {
     EntityHandle eh;
-    int val;
+    mbGIDType val;
 };
 
 // handle structure comparison function for qsort
 // if the id is the same , compare the handle.
 int compare_handle_id( const void* a, const void* b )
 {
-
     handle_id* ia = (handle_id*)a;
     handle_id* ib = (handle_id*)b;
     if( ia->val == ib->val )
@@ -217,11 +202,20 @@ ErrorCode MergeMesh::merge_using_integer_tag( Range& verts, Tag user_tag, Tag me
     ErrorCode rval;
     DataType tag_type;
     rval = mbImpl->tag_get_data_type( user_tag, tag_type );
-    if( rval != MB_SUCCESS || tag_type != MB_TYPE_INTEGER ) return MB_FAILURE;
+    if( rval != MB_SUCCESS || (tag_type != MB_TYPE_INTEGER && tag_type != MB_TYPE_LONG && tag_type != MB_TYPE_UNSIGNED_LONG) ) return MB_FAILURE;
 
-    std::vector< int > vals( verts.size() );
-    rval = mbImpl->tag_get_data( user_tag, verts, &vals[0] );
-    if( rval != MB_SUCCESS ) return rval;
+    std::vector< int > vali;
+    std::vector< mbGIDType > vals( verts.size() );
+    if (tag_type == MB_TYPE_INTEGER)
+    {
+        vali.resize(verts.size());
+        MB_CHK_ERR( mbImpl->tag_get_data( user_tag, verts, &vali[0] ) );
+        std::copy( vali.begin(), vali.end(), vals.begin() );
+    }
+    else
+    {
+        MB_CHK_ERR( mbImpl->tag_get_data( user_tag, verts, &vals[0] ) );
+    }
 
     if( 0 == merge_tag )
     {

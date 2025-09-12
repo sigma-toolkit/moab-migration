@@ -3143,6 +3143,7 @@ class OffsetHexCenterNodes : public Interface::HONodeAddedRemoved
     double mCoords[3];
     double mOffset[3];
 };
+
 #ifdef MOAB_HAVE_NETCDF
 ErrorCode mb_entity_conversion_test()
 {

@@ -248,7 +248,7 @@ class WriteUtilIface
     //! \param id_tag Tag used to store entity id
     //! \param start_id Starting value for entity ids
     //! \return status Return status
-    virtual ErrorCode assign_ids( Range& elements, Tag id_tag, const int start_id ) = 0;
+    virtual ErrorCode assign_ids( Range& elements, Tag id_tag, const mbGIDType start_id ) = 0;
 
     /** Get explicit adjacencies
      *

@@ -51,8 +51,9 @@ if( MOAB_HAVE_NETCDF )
           NCWriteEuler.hpp  NCWriteEuler.cpp
           NCHelperFV.hpp    NCHelperFV.cpp
           NCHelperDomain.hpp    NCHelperDomain.cpp
-          NCHelperScrip.hpp    NCHelperScrip.cpp
-          NCHelperESMF.hpp NCHelperESMF.cpp
+          NCHelperScrip.hpp NCHelperScrip.cpp
+          NCHelperESMF.hpp  NCHelperESMF.cpp
+          NCHelperTOPO.hpp  NCHelperTOPO.cpp
           NCWriteFV.hpp     NCWriteFV.cpp
           NCHelperGCRM.hpp  NCHelperGCRM.cpp
           NCWriteGCRM.hpp   NCWriteGCRM.cpp

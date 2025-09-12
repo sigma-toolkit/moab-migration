@@ -109,6 +109,35 @@ enum MOAB_EXPORT DataType
 };
 
 #ifdef __cplusplus
+inline int data_type_size(enum DataType dt)
+{
+    switch(dt)
+    {
+        case MB_TYPE_INTEGER:
+            return sizeof(int);
+        case MB_TYPE_UNSIGNED_INTEGER:
+            return sizeof(unsigned int);
+        case MB_TYPE_LONG:
+            return sizeof(long);
+        case MB_TYPE_UNSIGNED_LONG:
+            return sizeof(unsigned long);
+        case MB_TYPE_UNSIGNED_LONG_LONG:
+            return sizeof(unsigned long long);
+        case MB_TYPE_FLOAT:
+            return sizeof(float);
+        case MB_TYPE_DOUBLE:
+            return sizeof(double);
+        case MB_TYPE_BIT:
+            return sizeof(char);
+        case MB_TYPE_HANDLE:
+            return sizeof(moab::EntityHandle);
+        default: // MB_TYPE_OPAQUE
+            return 0;
+    }
+}
+#endif
+
+#ifdef __cplusplus
 extern const char* const DataTypeStr[];
 #endif
 

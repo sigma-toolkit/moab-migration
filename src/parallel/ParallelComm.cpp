@@ -513,8 +513,8 @@ ErrorCode ParallelComm::assign_global_ids( Range entities[],
 
 int ParallelComm::get_buffers( int to_proc, bool* is_new )
 {
-    int ind                                   = -1;
-    std::vector< unsigned int >::iterator vit = std::find( buffProcs.begin(), buffProcs.end(), to_proc );
+    int ind = -1;
+    auto vit = std::find( buffProcs.begin(), buffProcs.end(), to_proc );
     if( vit == buffProcs.end() )
     {
         assert( "shouldn't need buffer to myself" && to_proc != (int)procConfig.proc_rank() );
@@ -4077,7 +4077,7 @@ ErrorCode ParallelComm::resolve_shared_ents( EntityHandle this_set,
     {  // It is a special id tag
         result = mbImpl->tag_get_data( gid_tag, skin_ents[0], lgid_data.data() );MB_CHK_SET_ERR( result, "Couldn't get gid tag for skin vertices" );
     }
-    else if( 4 == bytes_per_tag )
+    else if( sizeof(int) == bytes_per_tag )
     {  // Must be GLOBAL_ID tag or 32 bits ...
         std::vector< int > gid_data( lgid_data.size() );
         result = mbImpl->tag_get_data( gid_tag, skin_ents[0], gid_data.data() );MB_CHK_SET_ERR( result, "Failed to get gid tag for skin vertices" );
@@ -4092,7 +4092,7 @@ ErrorCode ParallelComm::resolve_shared_ents( EntityHandle this_set,
     else
     {
         // Not supported flag
-        MB_SET_ERR( MB_FAILURE, "Unsupported id tag" );
+        MB_SET_ERR( MB_FAILURE, "Unsupported id tag size" );
     }
 
     // Put handles in vector for passing to gs setup
@@ -4521,7 +4521,7 @@ ErrorCode ParallelComm::resolve_shared_sets( EntityHandle file, const Tag* idtag
         if( NULL != gid ) result = mbImpl->tag_get_handle( GEOM_DIMENSION_TAG_NAME, 1, MB_TYPE_INTEGER, tag );
         if( MB_SUCCESS == result )
         {
-            for( int d = 0; d < 4; d++ )
+            for( mbGIDType d = 0; d < 4; d++ )
             {
                 candidate_sets.clear();
                 const void* vals[] = { &d };
@@ -4554,11 +4554,11 @@ ErrorCode ParallelComm::resolve_shared_sets( EntityHandle file, const Tag* idtag
     }
 
     // Find any additional sets that contain shared entities
-    Range::iterator hint = candidate_sets.begin();
+    auto hint = candidate_sets.begin();
     Range all_sets;
     mbImpl->get_entities_by_type( file, MBENTITYSET, all_sets );
-    all_sets           = subtract( all_sets, candidate_sets );
-    Range::iterator it = all_sets.begin();
+    all_sets = subtract( all_sets, candidate_sets );
+    auto it = all_sets.begin();
     while( it != all_sets.end() )
     {
         Range contents;
@@ -4893,7 +4893,7 @@ ErrorCode ParallelComm::augment_default_sets_with_ghosts( EntityHandle file_set 
         }
         // if the local entity has a global id, send it too, so we avoid
         // another "exchange_tags" for global id
-        int gid;
+        mbGIDType gid;
         rval = mbImpl->tag_get_data( tags[num_tags], &geh, 1, &gid );MB_CHK_SET_ERR( rval, "Failed to get global id" );
         if( gid != 0 )
         {
@@ -4945,7 +4945,7 @@ ErrorCode ParallelComm::augment_default_sets_with_ghosts( EntityHandle file_set 
             std::cout << " unexpected receive from my rank " << my_rank << " during augmenting with ghosts\n ";
         int tag_type = remoteEnts.vi_rd[3 * i + 1];
         assert( ( 0 <= tag_type ) && ( tag_type <= num_tags ) );
-        int value = remoteEnts.vi_rd[3 * i + 2];
+        mbGIDType value = remoteEnts.vi_rd[3 * i + 2];
         if( tag_type == num_tags )
         {
             // it is global id
@@ -5544,7 +5544,7 @@ ErrorCode ParallelComm::check_global_ids( EntityHandle this_set,
 {
     // Global id tag
     Tag gid_tag = mbImpl->globalId_tag();
-    int def_val = -1;
+    mbGIDType def_val = -1;
     Range dum_range;
 
     void* tag_ptr    = &def_val;

@@ -2964,7 +2964,7 @@ ErrorCode WriteHDF5::get_tag_size( Tag tag,
             break;
         case MB_TYPE_UNSIGNED_LONG:
             type_size      = sizeof( size_t );
-            file_type      = mhdf_INTEGER;
+            file_type      = mhdf_UNSIGNED_LONG;
             hdf_type       = H5T_NATIVE_ULONG;
             close_hdf_type = false;
             break;
@@ -2974,9 +2974,15 @@ ErrorCode WriteHDF5::get_tag_size( Tag tag,
             hdf_type       = H5T_NATIVE_LONG;
             close_hdf_type = false;
             break;
+        case MB_TYPE_FLOAT:
+            type_size      = sizeof( float );
+            file_type      = mhdf_FLOAT;
+            hdf_type       = H5T_NATIVE_FLOAT;
+            close_hdf_type = false;
+            break;
         case MB_TYPE_DOUBLE:
             type_size      = sizeof( double );
-            file_type      = mhdf_FLOAT;
+            file_type      = mhdf_DOUBLE;
             hdf_type       = H5T_NATIVE_DOUBLE;
             close_hdf_type = false;
             break;

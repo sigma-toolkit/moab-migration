@@ -273,7 +273,7 @@ ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType /*meshT
 
     // Set the data for the vertices
     std::vector< double* > arrays;
-    std::vector< int > gidsv( nodes.size() );
+    std::vector< mbGIDType > gidsv( nodes.size() );
     EntityHandle startv;
     rval = iface->get_node_coords( 3, nodes.size(), 0, startv, arrays );MB_CHK_SET_ERR( rval, "Can't get node coords" );
     for( unsigned iverts = 0; iverts < nodes.size(); ++iverts )
@@ -293,7 +293,7 @@ ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType /*meshT
 
     Tag srcParentTag, tgtParentTag;
     std::vector< int > srcParent( faces.size(), -1 ), tgtParent( faces.size(), -1 );
-    std::vector< int > gidse( faces.size(), -1 );
+    std::vector< mbGIDType > gidse( faces.size(), -1 );
     bool storeParentInfo = ( mesh->vecSourceFaceIx.size() > 0 );
 
     if( storeParentInfo )
@@ -406,7 +406,7 @@ ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType meshTyp
 
     // Set the data for the vertices
     std::vector< double* > arrays;
-    std::vector< int > gidsv( nodes.size() );
+    std::vector< mbGIDType > gidsv( nodes.size() );
     EntityHandle startv;
     rval = iface->get_node_coords( 3, nodes.size(), 0, startv, arrays );MB_CHK_SET_ERR( rval, "Can't get node coords" );
     for( unsigned iverts = 0; iverts < nodes.size(); ++iverts )
@@ -449,7 +449,7 @@ ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType meshTyp
             dbgprint.printf( 0, "..Mesh size: Nodes [%zu]  Elements [%zu].\n", nodes.size(), faces.size() );
         const int NMAXPOLYEDGES = 15;
         std::vector< unsigned > nPolys( NMAXPOLYEDGES, 0 );
-        std::vector< std::vector< int > > typeNSeqs( NMAXPOLYEDGES );
+        std::vector< std::vector< mbGIDType > > typeNSeqs( NMAXPOLYEDGES );
         for( unsigned ifaces = 0; ifaces < faces.size(); ++ifaces )
         {
             const int iType = faces[ifaces].edges.size();
@@ -495,7 +495,7 @@ ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType meshTyp
                 tgtParent.resize( mbcells.size(), -1 );
             }
 
-            std::vector< int > gids( typeNSeqs[iType].size() );
+            std::vector< mbGIDType > gids( typeNSeqs[iType].size() );
             for( unsigned ifaces = 0, offset = 0; ifaces < typeNSeqs[iType].size(); ++ifaces )
             {
                 const int fIndex = typeNSeqs[iType][ifaces];
@@ -638,6 +638,12 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
 
     // resize the number of elements in Tempest mesh
     faces.resize( nelems );
+    
+    // Initialize all Face objects to prevent uninitialized access
+    for( size_t i = 0; i < nelems; ++i )
+    {
+        faces[i].edges.clear();
+    }
 
     // let us now get the vertices from all the elements
     rval = m_interface->get_connectivity( elems, verts );MB_CHK_ERR( rval );
@@ -672,7 +678,7 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
                    [&globIds]( mbGIDType i1, mbGIDType i2 ) { return globIds[i1] < globIds[i2]; } );
     }
 
-    for( mbGIDType iface = 0; iface < nelems; ++iface )
+    for( int iface = 0; iface < nelems; ++iface )
     {
         Face& face           = faces[iface];
         EntityHandle ehandle = ( offlineWorkflow ? elems[sortedIdx[iface]] : elems[iface] );
@@ -1011,7 +1017,7 @@ ErrorCode TempestRemapper::assign_vertex_element_IDs( Tag idtag,
     if( entities.size() == 0 ) return moab::MB_SUCCESS;
 
     int idoffset = start_id;
-    std::vector< int > gid( entities.size() );
+    std::vector< mbGIDType > gid( entities.size() );
     for( unsigned i = 0; i < entities.size(); ++i )
         gid[i] = idoffset++;
 
@@ -1420,8 +1426,8 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                 Range covEnts;
                 rval = m_interface->get_entities_by_dimension( m_covering_source_set, 2, covEnts );MB_CHK_ERR( rval );
 
-                std::map< int, int > loc_gid_to_lid_covsrc;
-                std::vector< int > gids( covEnts.size(), -1 );
+                std::map< mbGIDType, mbGIDType > loc_gid_to_lid_covsrc;
+                std::vector< mbGIDType > gids( covEnts.size(), -1 );
 
                 Tag gidtag = m_interface->globalId_tag();
                 rval       = m_interface->tag_get_data( gidtag, covEnts, gids.data() );MB_CHK_ERR( rval );
@@ -1436,7 +1442,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                 Tag srcParentTag;
                 rval = m_interface->tag_get_handle( "SourceParent", srcParentTag );MB_CHK_ERR( rval );
                 rval = m_interface->get_entities_by_dimension( m_overlap_set, 2, intxCells );MB_CHK_ERR( rval );
-                for( Range::iterator it = intxCells.begin(); it != intxCells.end(); it++ )
+                for( auto it = intxCells.begin(); it != intxCells.end(); ++it )
                 {
                     EntityHandle intxCell = *it;
                     int srcParent         = -1;
@@ -1590,10 +1596,10 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
     // now that we have the boundary cells, see which overlap polys have these as parents;
     //   find the ids of the boundary cells;
     Tag gid = m_interface->globalId_tag();
-    std::set< int > targetBoundaryIds;
+    std::set< mbGIDType > targetBoundaryIds;
     for( Range::iterator it = boundaryCells.begin(); it != boundaryCells.end(); it++ )
     {
-        int tid;
+        mbGIDType tid;
         EntityHandle targetCell = *it;
         MB_CHK_SET_ERR( m_interface->tag_get_data( gid, &targetCell, 1, &tid ),
                         "Can't get global id tag on target cell" );
@@ -1604,7 +1610,7 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
     Range overlapCells;
     MB_CHK_ERR( m_interface->get_entities_by_dimension( m_overlap_set, 2, overlapCells ) );
 
-    std::set< int > affectedSourceCellsIds;
+    std::set< mbGIDType > affectedSourceCellsIds;
     Tag targetParentTag, sourceParentTag;  // do not use blue/red, as it is more confusing
     MB_CHK_ERR( m_interface->tag_get_handle( "TargetParent", targetParentTag ) );
     MB_CHK_ERR( m_interface->tag_get_handle( "SourceParent", sourceParentTag ) );
@@ -1640,7 +1646,7 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
     for( Range::iterator it = covCells.begin(); it != covCells.end(); it++ )
     {
         EntityHandle covCell = *it;  //
-        int covID;
+        mbGIDType covID;
         MB_CHK_ERR( m_interface->tag_get_data( gid, &covCell, 1, &covID ) );
         if( affectedSourceCellsIds.find( covID ) != affectedSourceCellsIds.end() )
         {

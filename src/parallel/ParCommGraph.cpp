@@ -854,8 +854,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
         // we know that we will need to receive some tag data in a specific order (by ids stored)
         // first, get the ids of the local elements, from owned Range; unpack the buffer in order
         Tag gidTag = mb->globalId_tag();
-        std::vector< mbGIDType > gids;
-        gids.resize( owned.size() );
+        std::vector< mbGIDType > gids( owned.size() );
         rval = mb->tag_get_data( gidTag, owned, gids.data() );MB_CHK_ERR( rval );
         std::map< mbGIDType, EntityHandle > gidToHandle;
         size_t i = 0;
@@ -1000,11 +999,11 @@ ErrorCode ParCommGraph::settle_send_graph( TupleList& TLcovIDs )
     for( int i = 0; i < n; i++ )
     {
         int to_proc      = TLcovIDs.vi_wr[2 * i];
-        int globalIdElem = TLcovIDs.vi_wr[2 * i + 1];
+        mbGIDType globalIdElem = TLcovIDs.vi_wr[2 * i + 1];
         involved_IDs_map[to_proc].push_back( globalIdElem );
     }
 #ifdef VERBOSE
-    for( std::map< int, std::vector< int > >::iterator mit = involved_IDs_map.begin(); mit != involved_IDs_map.end();
+    for( auto mit = involved_IDs_map.begin(); mit != involved_IDs_map.end();
          ++mit )
     {
         std::cout << " towards task " << mit->first << " send: " << mit->second.size() << " cells " << std::endl;
@@ -1074,7 +1073,7 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
     for( auto it = uniqueIDs.begin(); it != uniqueIDs.end(); ++it )
     {
         int procId                  = it->first;
-        std::set< mbGIDType >& nums       = it->second;
+        std::set< mbGIDType >& nums = it->second;
         std::vector< int >& indx    = map_ptr[procId];
         std::vector< mbGIDType >& indices = map_index[procId];
         indx.resize( nums.size() + 1 );
@@ -1192,7 +1191,7 @@ ErrorCode ParCommGraph::compute_partition( ParallelComm* pco, Range& owned, int 
             if( adjEnts.size() > 0 )
             {
                 EntityHandle adjCell = adjEnts[0];
-                int gid;
+                mbGIDType gid;
                 rval = mb->tag_get_data( gidTag, &adjCell, 1, &gid );MB_CHK_ERR( rval );
                 rval = pco->get_sharing_data( edge, shprocs.data() , shhandles.data() , pstatus, np );MB_CHK_ERR( rval );
                 int n                = TLe.get_n();

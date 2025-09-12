@@ -21,10 +21,15 @@ namespace moab
 const char* VtkUtil::vtkTypeNames[] = {
     "unsigned_char",  // MB_TYPE_OPAQUE
     "int",            // MB_TYPE_INTEGER
+    "unsigned_int",            // MB_TYPE_INTEGER
+    "unsigned_long",  // MB_TYPE_UNSIGNED_LONG
+    "unsigned_long_long",  // MB_TYPE_UNSIGNED_LONG_LONG
+    "float",         // MB_TYPE_FLOAT
     "double",         // MB_TYPE_DOUBLE
     "bit",            // MB_TYPE_BIT
-    "unsigned_long",  // MB_TYPE_HANDLE
+    "unsigned_long_handle",  // MB_TYPE_HANDLE
 };
+
 
 /*
 const unsigned VtkUtil::typeSizes[] = {
@@ -33,6 +38,7 @@ const unsigned VtkUtil::typeSizes[] = {
  sizeof(double),         // MB_TYPE_DOUBLE
  1,                      // MB_TYPE_BIT
  sizeof(EntityHandle), // MB_TYPE_HANDLE
+ sizeof(long),           // MB_TYPE_LONG
 };
 */
 

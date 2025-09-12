@@ -144,7 +144,7 @@ ErrorCode DualTool::construct_dual( EntityHandle* entities, const int num_entiti
         if( MB_SUCCESS != result ) return result;
 
         // get the max global id for hexes, we'll need for modification ops
-        std::vector< int > gid_vec( regions.size() );
+        std::vector< mbGIDType > gid_vec( regions.size() );
         result = mbImpl->tag_get_data( globalId_tag(), regions, &gid_vec[0] );
         if( MB_SUCCESS != result ) return result;
         maxHexId = -1;
@@ -968,7 +968,7 @@ ErrorCode DualTool::traverse_hyperplane( const Tag hp_tag, EntityHandle& this_hp
             std::cout << "Constructed new " << hp_name << " with ";
         else
         {
-            int this_id;
+            mbGIDType this_id;
             result = mbImpl->tag_get_data( globalId_tag(), &this_hp, 1, &this_id );RR;
             std::cout << "Added to " << hp_name << " " << this_id << " ";
         }
@@ -989,7 +989,7 @@ ErrorCode DualTool::traverse_hyperplane( const Tag hp_tag, EntityHandle& this_hp
     if( 0 == this_hp )
     {
         // ok, doesn't have one; make a new hyperplane
-        int new_id = -1;
+        mbGIDType new_id = -1;
         result     = construct_new_hyperplane( dim, this_hp, new_id );
         if( MB_SUCCESS != result ) return result;
 
@@ -1080,7 +1080,7 @@ ErrorCode DualTool::order_chord( EntityHandle chord_set )
     return MB_SUCCESS;
 }
 
-ErrorCode DualTool::construct_new_hyperplane( const int dim, EntityHandle& new_hyperplane, int& id )
+ErrorCode DualTool::construct_new_hyperplane( const int dim, EntityHandle& new_hyperplane, mbGIDType& id )
 {
     ErrorCode result;
     if( 1 == dim )
@@ -1093,7 +1093,7 @@ ErrorCode DualTool::construct_new_hyperplane( const int dim, EntityHandle& new_h
     {
         Range all_hyperplanes;
         result = get_dual_hyperplanes( mbImpl, dim, all_hyperplanes );RR;
-        std::vector< int > gids( all_hyperplanes.size() );
+        std::vector< mbGIDType > gids( all_hyperplanes.size() );
         result = mbImpl->tag_get_data( globalIdTag, all_hyperplanes, ( gids.empty() ) ? NULL : &gids[0] );RR;
         for( unsigned int i = 0; i < gids.size(); i++ )
             if( gids[i] > id ) id = gids[i];
@@ -1696,7 +1696,7 @@ void DualTool::print_cell( EntityHandle cell )
     if( MB_SUCCESS != result ) return;
     bool first = true;
     EntityHandle primals[20];
-    std::vector< int > ids;
+    std::vector< mbGIDType > ids;
 
     assert( num_connect < 20 );
     result = mbImpl->tag_get_data( dualEntityTag, connect, num_connect, primals );
@@ -2608,7 +2608,7 @@ ErrorCode DualTool::list_entities( const Range& entities ) const
         if( TYPE_FROM_HANDLE( *iter ) == MBENTITYSET )
         {
             EntityHandle chord = 0, sheet = 0;
-            int id;
+            mbGIDType id;
             result = mbImpl->tag_get_data( dualCurve_tag(), &( *iter ), 1, &chord );
             if( MB_SUCCESS != result ) return result;
             result = mbImpl->tag_get_data( dualSurface_tag(), &( *iter ), 1, &sheet );
@@ -2771,7 +2771,7 @@ ErrorCode DualTool::face_shrink( EntityHandle odedge )
     // now fixup other two hexes; start by getting hex through quads 0, 1
     // make this first hex switch to the other side, to make the dual look like
     // a hex push
-    int tmp_ids[2];
+    mbGIDType tmp_ids[2];
     result = mbImpl->tag_get_data( globalId_tag(), hexes, 2, tmp_ids );
     if( MB_SUCCESS != result ) return result;
 

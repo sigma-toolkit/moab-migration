@@ -126,7 +126,7 @@ ErrorCode WriteUtil::get_node_coords( const int num_arrays,
 
     // Now assign tags
     std::vector< mbGIDType > ids( num_nodes );
-    mbGIDType node_id = start_node_id;
+    mbGIDType node_id = static_cast< mbGIDType >( start_node_id );
     for( int i = 0; i < num_nodes; i++ )
         ids[i] = node_id++;
     result = mMB->tag_set_data( node_id_tag, entities, &ids[0] );
@@ -651,7 +651,7 @@ ErrorCode WriteUtil::gather_nodes_from_elements( const Range& elements, const Ta
 
 //! Assign ids to input elements starting with start_id, written to id_tag
 //! if zero, assigns to GLOBAL_ID_TAG_NAME
-ErrorCode WriteUtil::assign_ids( Range& elements, Tag id_tag, const int start_id )
+ErrorCode WriteUtil::assign_ids( Range& elements, Tag id_tag, const mbGIDType start_id )
 {
     ErrorCode result;
     if( 0 == id_tag )
@@ -661,7 +661,7 @@ ErrorCode WriteUtil::assign_ids( Range& elements, Tag id_tag, const int start_id
     }
 
     // Now assign the ids
-    int i;
+    mbGIDType i;
     Range::iterator rit;
     ErrorCode tmp_result;
     result = MB_SUCCESS;

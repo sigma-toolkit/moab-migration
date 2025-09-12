@@ -394,22 +394,22 @@ class TempestOnlineMap : public OfflineMap
     ///	<summary>
     ///		Get the global Degrees-Of-Freedom ID on the destination mesh.
     ///	</summary>
-    int GetRowGlobalDoF( int localID ) const;
+    mbGIDType GetRowGlobalDoF( int localID ) const;
 
     /// <summary>
     ///     Get the index of globaRowDoF.
     /// </summary>
-    inline int GetIndexOfRowGlobalDoF( int globalRowDoF ) const;
+    // inline int GetIndexOfRowGlobalDoF( mbGIDType globalRowDoF ) const;
 
     ///	<summary>
     ///		Get the global Degrees-Of-Freedom ID on the source mesh.
     ///	</summary>
-    int GetColGlobalDoF( int localID ) const;
+    mbGIDType GetColGlobalDoF( int localID ) const;
 
     /// <summary>
     ///     Get the index of globaColDoF.
     /// </summary>
-    inline int GetIndexOfColGlobalDoF( int globalColDoF ) const;
+    // inline int GetIndexOfColGlobalDoF( mbGIDType globalColDoF ) const;
 
     ///	<summary>
     ///		Apply the weight matrix onto the source vector (tag) provided as input, and return the
@@ -503,7 +503,7 @@ class TempestOnlineMap : public OfflineMap
                                   std::vector< int >& masks,
                                   unsigned& N,  // this will be output too now
                                   int nv,
-                                  int& maxdof );
+                                  mbGIDType& maxdof );
 #endif
 
     ///	<summary>
@@ -568,26 +568,26 @@ class TempestOnlineMap : public OfflineMap
 
 ///////////////////////////////////////////////////////////////////////////////
 
-inline int moab::TempestOnlineMap::GetRowGlobalDoF( int localRowID ) const
+inline mbGIDType moab::TempestOnlineMap::GetRowGlobalDoF( int localRowID ) const
 {
     return row_gdofmap[localRowID];
 }
 
-inline int moab::TempestOnlineMap::GetIndexOfRowGlobalDoF( int globalRowDoF ) const /* 0 based */
-{
-    return globalRowDoF + 1;
-}
+// inline int moab::TempestOnlineMap::GetIndexOfRowGlobalDoF( mbGIDType globalRowDoF ) const /* 0 based */
+// {
+//     return globalRowDoF + 1;
+// }
 ///////////////////////////////////////////////////////////////////////////////
 
-inline int moab::TempestOnlineMap::GetColGlobalDoF( int localColID ) const
+inline mbGIDType moab::TempestOnlineMap::GetColGlobalDoF( int localColID ) const
 {
     return col_gdofmap[localColID];
 }
 
-inline int moab::TempestOnlineMap::GetIndexOfColGlobalDoF( int globalColDoF ) const /* 0 based */
-{
-    return globalColDoF + 1;  // temporary
-}
+// inline int moab::TempestOnlineMap::GetIndexOfColGlobalDoF( mbGIDType globalColDoF ) const /* 0 based */
+// {
+//     return globalColDoF + 1;  // temporary
+// }
 ///////////////////////////////////////////////////////////////////////////////
 
 inline int moab::TempestOnlineMap::GetSourceNDofsPerElement()

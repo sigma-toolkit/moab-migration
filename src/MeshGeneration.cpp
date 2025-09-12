@@ -124,8 +124,9 @@ ErrorCode MeshGeneration::BrickInstance( MeshGeneration::BrickOpts& opts )
     if( !parmerge )
     {
         rval =
-            mb->tag_get_handle( "HANDLEID", sizeof( long ), MB_TYPE_OPAQUE, new_id_tag, MB_TAG_CREAT | MB_TAG_DENSE );MB_CHK_SET_ERR( rval, "Can't get handle id tag" );
+            mb->tag_get_handle( "HANDLEID", 1, MB_TYPE_LONG, new_id_tag, MB_TAG_CREAT | MB_TAG_DENSE );MB_CHK_SET_ERR( rval, "Can't get handle id tag" );
     }
+
     Tag part_tag;
     int dum_id = -1;
     rval =
@@ -154,8 +155,8 @@ ErrorCode MeshGeneration::BrickInstance( MeshGeneration::BrickOpts& opts )
                 int y  = n * B * q * blockSize + b * q * blockSize;
                 int z  = k * C * q * blockSize + c * q * blockSize;
                 int ix = 0;
-                vector< int > gids( num_nodes );
-                vector< long > lgids( num_nodes );
+                vector< mbGIDType > gids( num_nodes );
+                vector< mbGIDType > lgids( num_nodes );
                 Range verts( startv, startv + num_nodes - 1 );
                 for( int kk = 0; kk < blockSize1; kk++ )
                 {

@@ -1115,7 +1115,7 @@ ErrorCode Intx2Mesh::create_departure_mesh_2nd_alg( EntityHandle& euler_set, Ent
     int n = TLv.get_n();  // the size of the points received
     for( int i = 0; i < n; i++ )
     {
-        int globalId = TLv.vi_rd[2 * i + 1];
+        mbGIDType globalId = TLv.vi_rd[2 * i + 1];
         if( globalID_to_handle.find( globalId ) == globalID_to_handle.end() )
         {
             EntityHandle new_vert;
@@ -1142,7 +1142,7 @@ ErrorCode Intx2Mesh::create_departure_mesh_2nd_alg( EntityHandle& euler_set, Ent
         {
             EntityHandle v1    = conn4[i];
             unsigned int index = local_verts.find( v1 ) - local_verts.begin();
-            int globalId       = gids[index];
+            mbGIDType globalId = gids[index];
             if( globalID_to_handle.find( globalId ) == globalID_to_handle.end() )
             {
                 // we need to create that vertex, at this position dep_points
@@ -1151,7 +1151,7 @@ ErrorCode Intx2Mesh::create_departure_mesh_2nd_alg( EntityHandle& euler_set, Ent
                 rval = mb->create_vertex( dp_pos, new_vert );ERRORR( rval, "can't create new vertex " );
                 globalID_to_handle[globalId] = new_vert;
             }
-            new_conn[i] = globalID_to_handle[gids[index]];
+            new_conn[i] = globalID_to_handle[globalId];
         }
         EntityHandle new_element;
         //
@@ -1404,7 +1404,7 @@ ErrorCode Intx2Mesh::create_departure_mesh_3rd_alg( EntityHandle& lagr_set, Enti
     int n = TLv.get_n();  // the size of the points received
     for( int i = 0; i < n; i++ )
     {
-        int globalId = TLv.vi_rd[2 * i + 1];
+        mbGIDType globalId = TLv.vi_rd[2 * i + 1];
         if( globalID_to_handle.find( globalId ) == globalID_to_handle.end() )
         {
             EntityHandle new_vert;

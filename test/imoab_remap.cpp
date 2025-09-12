@@ -302,19 +302,19 @@ int main( int argc, char* argv[] )
         // first get GlobalIds from ocn, and fields:
         ierr = iMOAB_GetMeshInfo( ocnPID, nverts, nelem, 0, 0, 0 );
         CHECKIERR( ierr, "failed to get ocn mesh info" );
-        std::vector< int > gidElems;
+        std::vector< mbGIDType > gidElems;
         gidElems.resize( nelem[2] );
         std::vector< double > tempElems;
         tempElems.resize( nelem[2] );
         // get global id storage
         const std::string GidStr = "GLOBAL_ID";  // hard coded too
 
-        int tag_type = DENSE_INTEGER, ncomp = 1, tagInd = 0;
+        int tag_type = DENSE_LONG, ncomp = 1, tagInd = 0;
         // we should not have to define global id tag, it is always defined
         ierr = iMOAB_DefineTagStorage( ocnPID, GidStr.c_str(), &tag_type, &ncomp, &tagInd );
         CHECKIERR( ierr, "failed to define global id tag" );
         int ent_type = 1;
-        ierr         = iMOAB_GetIntTagStorage( ocnPID, GidStr.c_str(), &nelem[2], &ent_type, &gidElems[0] );
+        ierr         = iMOAB_GetGIDStorage( ocnPID, GidStr.c_str(), &nelem[2], &ent_type, &gidElems[0] );
         CHECKIERR( ierr, "failed to get global ids" );
         ierr =
             iMOAB_GetDoubleTagStorage( ocnPID, bottomTempProjectedField.c_str(), &nelem[2], &ent_type, &tempElems[0] );
@@ -339,7 +339,7 @@ int main( int argc, char* argv[] )
         // get global id storage
         const std::string GidStr = "GLOBAL_ID";  // hard coded too
 
-        int tag_type = DENSE_INTEGER, ncomp = 1, tagInd = 0;
+        int tag_type = DENSE_LONG, ncomp = 1, tagInd = 0;
         ierr = iMOAB_DefineTagStorage( ocnPID, GidStr.c_str(), &tag_type, &ncomp, &tagInd );
         CHECKIERR( ierr, "failed to define global id tag" );
 

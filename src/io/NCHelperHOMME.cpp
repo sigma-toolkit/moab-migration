@@ -242,7 +242,21 @@ ErrorCode NCHelperHOMME::check_existing_mesh()
             std::vector< int > gids( local_verts.size() );
 
             // !IMPORTANT : this has to be the GLOBAL_ID tag
-            rval = mbImpl->tag_get_data( mGlobalIdTag, local_verts, &gids[0] );MB_CHK_SET_ERR( rval, "Trouble getting local gid values of vertices" );
+            // Check tag type to handle properly
+            DataType tag_type;
+            rval = mbImpl->tag_get_data_type( mGlobalIdTag, tag_type );MB_CHK_SET_ERR( rval, "Failed to get global id tag type" );
+            
+            if( tag_type == MB_TYPE_LONG )
+            {
+                std::vector< long > long_gids( local_verts.size() );
+                rval = mbImpl->tag_get_data( mGlobalIdTag, local_verts, &long_gids[0] );MB_CHK_SET_ERR( rval, "Trouble getting local gid values of vertices" );
+                for( size_t i = 0; i < long_gids.size(); ++i )
+                    gids[i] = static_cast<int>( long_gids[i] );
+            }
+            else
+            {
+                rval = mbImpl->tag_get_data( mGlobalIdTag, local_verts, &gids[0] );MB_CHK_SET_ERR( rval, "Trouble getting local gid values of vertices" );
+            }
 
             // Restore localGidVerts
             std::copy( gids.rbegin(), gids.rend(), range_inserter( localGidVerts ) );
@@ -468,8 +482,21 @@ ErrorCode NCHelperHOMME::create_mesh( Range& faces )
     int count;
     rval = mbImpl->tag_iterate( mGlobalIdTag, vert_range.begin(), vert_range.end(), count, data );MB_CHK_SET_ERR( rval, "Failed to iterate global id tag on local vertices" );
     assert( count == nLocalVertices );
-    int* gid_data = (int*)data;
-    std::copy( localGidVerts.begin(), localGidVerts.end(), gid_data );
+    
+    // Check tag type to handle properly
+    DataType tag_type;
+    rval = mbImpl->tag_get_data_type( mGlobalIdTag, tag_type );MB_CHK_SET_ERR( rval, "Failed to get global id tag type" );
+    
+    if( tag_type == MB_TYPE_LONG )
+    {
+        long* gid_data = (long*)data;
+        std::copy( localGidVerts.begin(), localGidVerts.end(), gid_data );
+    }
+    else
+    {
+        int* gid_data = (int*)data;
+        std::copy( localGidVerts.begin(), localGidVerts.end(), gid_data );
+    }
 
     // Duplicate global id data, which will be used to resolve sharing
     if( mpFileIdTag )
@@ -480,8 +507,8 @@ ErrorCode NCHelperHOMME::create_mesh( Range& faces )
         rval              = mbImpl->tag_get_bytes( *mpFileIdTag, bytes_per_tag );MB_CHK_SET_ERR( rval, "Can't get number of bytes for file id tag" );
         if( 4 == bytes_per_tag )
         {
-            gid_data = (int*)data;
-            std::copy( localGidVerts.begin(), localGidVerts.end(), gid_data );
+            int* file_id_data = (int*)data;
+            std::copy( localGidVerts.begin(), localGidVerts.end(), file_id_data );
         }
         else if( 8 == bytes_per_tag )
         {  // Should be a handle tag on 64 bit machine?
@@ -551,9 +578,23 @@ ErrorCode NCHelperHOMME::create_mesh( Range& faces )
         rval = mbImpl->tag_iterate( mGlobalIdTag, gather_set_verts_range.begin(), gather_set_verts_range.end(), count,
                                     data );MB_CHK_SET_ERR( rval, "Failed to iterate global id tag on gather set vertices" );
         assert( count == nVertices );
-        gid_data = (int*)data;
-        for( int j = 1; j <= nVertices; j++ )
-            gid_data[j - 1] = j;
+        
+        // Check tag type to handle properly
+        DataType tag_type;
+        rval = mbImpl->tag_get_data_type( mGlobalIdTag, tag_type );MB_CHK_SET_ERR( rval, "Failed to get global id tag type" );
+        
+        if( tag_type == MB_TYPE_LONG )
+        {
+            long* gid_data_long = (long*)data;
+            for( int j = 1; j <= nVertices; j++ )
+                gid_data_long[j - 1] = j;
+        }
+        else
+        {
+            int* gid_data = (int*)data;
+            for( int j = 1; j <= nVertices; j++ )
+                gid_data[j - 1] = j;
+        }
         // Set the file id tag too, it should be bigger something not interfering with global id
         if( mpFileIdTag )
         {
@@ -564,9 +605,9 @@ ErrorCode NCHelperHOMME::create_mesh( Range& faces )
             rval              = mbImpl->tag_get_bytes( *mpFileIdTag, bytes_per_tag );MB_CHK_SET_ERR( rval, "Can't get number of bytes for file id tag" );
             if( 4 == bytes_per_tag )
             {
-                gid_data = (int*)data;
+                int* file_id_data = (int*)data;
                 for( int j = 1; j <= nVertices; j++ )
-                    gid_data[j - 1] = nVertices + j;  // Bigger than global id tag
+                    file_id_data[j - 1] = nVertices + j;  // Bigger than global id tag
             }
             else if( 8 == bytes_per_tag )
             {  // Should be a handle tag on 64 bit machine?

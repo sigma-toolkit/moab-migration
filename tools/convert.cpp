@@ -188,7 +188,8 @@ int main( int argc, char* argv[] )
     std::list< std::string > in;  // input file name list
     std::string out;              // output file name
     bool verbose = false;
-    std::set< int > geom[4], mesh[4];      // user-specified IDs
+    std::set< int > geom[4];
+    std::set< int > mesh[4];      // user-specified IDs
     std::vector< EntityHandle > set_list;  // list of user-specified sets to write
     std::vector< std::string > write_opts, read_opts;
     std::string metis_partition_file;
@@ -615,7 +616,7 @@ int main( int argc, char* argv[] )
 
                     const Range& faces = remapper->GetMeshEntities( moab::Remapper::SourceMesh );
 
-                    std::vector< int > gids( faces.size() ), srcpar( faces.size() ), tgtpar( faces.size() );
+                    std::vector< mbGIDType > gids( faces.size() ), srcpar( faces.size() ), tgtpar( faces.size() );
                     result = gMB->tag_get_data( id_tag, faces, &gids[0] );MB_CHK_ERR( result );
 
                     for( unsigned ii = 0; ii < faces.size(); ++ii )
@@ -732,13 +733,13 @@ int main( int argc, char* argv[] )
     // Get geometry sets
     if( have_geom )
     {
-        int id_val;
+        mbGIDType id_val;
         Tag tags[]         = { id_tag, dim_tag };
         const void* vals[] = { &id_val, &dim };
         for( dim = 0; dim <= 3; ++dim )
         {
             int init_count = set_list.size();
-            for( std::set< int >::iterator iter = geom[dim].begin(); iter != geom[dim].end(); ++iter )
+            for( auto iter = geom[dim].begin(); iter != geom[dim].end(); ++iter )
             {
                 id_val = *iter;
                 range.clear();
@@ -776,7 +777,7 @@ int main( int argc, char* argv[] )
 
         // get entity sets
         int init_count = set_list.size();
-        for( std::set< int >::iterator iter = mesh[i].begin(); iter != mesh[i].end(); ++iter )
+        for( auto iter = mesh[i].begin(); iter != mesh[i].end(); ++iter )
         {
             range.clear();
             const void* vals[] = { &*iter };
@@ -1035,7 +1036,7 @@ bool parse_id_list( const char* string, std::set< int >& results )
         }
 
         for( ; val <= val2; ++val )
-            if( !results.insert( (int)val ).second ) std::cerr << "Warning: duplicate Id: " << val << std::endl;
+            if( !results.insert( val ).second ) std::cerr << "Warning: duplicate Id: " << val << std::endl;
     }
 
     free( mystr );
@@ -1053,7 +1054,7 @@ void print_id_list( const char* head, std::ostream& stream, const std::set< int 
     }
 
     int start, prev;
-    std::set< int >::const_iterator iter = list.begin();
+    auto iter = list.begin();
     start = prev = *( iter++ );
     for( ;; )
     {
@@ -1289,9 +1290,9 @@ int process_partition_file( Interface* mb, std::string& metis_partition_file )
     std::ifstream partfile;
     partfile.open( metis_partition_file.c_str() );
     std::string line;
-    std::vector< int > parts;
+    std::vector< mbGIDType > parts;
     parts.resize( faces.size(), -1 );
-    int i = 0;
+    mbGIDType i = 0;
     if( partfile.is_open() )
     {
         while( getline( partfile, line ) )
@@ -1306,8 +1307,8 @@ int process_partition_file( Interface* mb, std::string& metis_partition_file )
         }
         partfile.close();
     }
-    std::vector< int >::iterator pmax = max_element( parts.begin(), parts.end() );
-    std::vector< int >::iterator pmin = min_element( parts.begin(), parts.end() );
+    auto pmax = max_element( parts.begin(), parts.end() );
+    auto pmin = min_element( parts.begin(), parts.end() );
     if( *pmin <= -1 )
     {
         std::cerr << " partition file is incomplete, *pmin is -1 !! \n";
@@ -1328,8 +1329,7 @@ int process_partition_file( Interface* mb, std::string& metis_partition_file )
         rval = mb->clear_meshset( tagged_sets );MB_CHK_ERR( rval );
         rval = mb->tag_delete_data( part_set_tag, tagged_sets );MB_CHK_ERR( rval );
     }
-    Tag gid;
-    rval = mb->tag_get_handle( "GLOBAL_ID", gid );MB_CHK_ERR( rval );
+    Tag gid = mb->globalId_tag();
     int num_sets = *pmax + 1;
     if( *pmin != 0 )
     {
@@ -1349,14 +1349,14 @@ int process_partition_file( Interface* mb, std::string& metis_partition_file )
     rval = mb->tag_set_data( part_set_tag, tagged_sets, dum_ids );MB_CHK_ERR( rval );
     delete[] dum_ids;
 
-    std::vector< int > gids;
-    int num_faces = (int)faces.size();
+    std::vector< mbGIDType > gids;
+    size_t num_faces = faces.size();
     gids.resize( num_faces );
     rval = mb->tag_get_data( gid, faces, &gids[0] );MB_CHK_ERR( rval );
 
-    for( int j = 0; j < num_faces; j++ )
+    for( size_t j = 0; j < num_faces; j++ )
     {
-        int eid         = gids[j];
+        mbGIDType eid         = gids[j];
         EntityHandle eh = faces[j];
         int partition   = parts[eid - 1];
         if( partition < 0 || partition >= num_sets )

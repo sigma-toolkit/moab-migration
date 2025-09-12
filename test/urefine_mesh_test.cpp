@@ -385,18 +385,18 @@ ErrorCode refine_entities( Interface* mb,
 
 #ifdef MOAB_HAVE_MPI
     Range averts, aedges, afaces, acells;
-    error = mb->get_entities_by_dimension( fset, 0, averts );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fset, 1, aedges );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fset, 2, afaces );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fset, 3, acells );MB_CHK_ERR( error );
+    MB_CHK_ERR( mb->get_entities_by_dimension( fset, 0, averts ) );
+    MB_CHK_ERR( mb->get_entities_by_dimension( fset, 1, aedges ) );
+    MB_CHK_ERR( mb->get_entities_by_dimension( fset, 2, afaces ) );
+    MB_CHK_ERR( mb->get_entities_by_dimension( fset, 3, acells ) );
 
     /* filter based on parallel status */
     if( pc )
     {
-        error = pc->filter_pstatus( averts, PSTATUS_GHOST, PSTATUS_NOT, -1, &init_ents[0] );MB_CHK_ERR( error );
-        error = pc->filter_pstatus( aedges, PSTATUS_GHOST, PSTATUS_NOT, -1, &init_ents[1] );MB_CHK_ERR( error );
-        error = pc->filter_pstatus( afaces, PSTATUS_GHOST, PSTATUS_NOT, -1, &init_ents[2] );MB_CHK_ERR( error );
-        error = pc->filter_pstatus( acells, PSTATUS_GHOST, PSTATUS_NOT, -1, &init_ents[3] );MB_CHK_ERR( error );
+        MB_CHK_ERR( pc->filter_pstatus( averts, PSTATUS_GHOST, PSTATUS_NOT, -1, &init_ents[0] ) );
+        MB_CHK_ERR( pc->filter_pstatus( aedges, PSTATUS_GHOST, PSTATUS_NOT, -1, &init_ents[1] ) );
+        MB_CHK_ERR( pc->filter_pstatus( afaces, PSTATUS_GHOST, PSTATUS_NOT, -1, &init_ents[2] ) );
+        MB_CHK_ERR( pc->filter_pstatus( acells, PSTATUS_GHOST, PSTATUS_NOT, -1, &init_ents[3] ) );
     }
     else
     {
@@ -406,10 +406,10 @@ ErrorCode refine_entities( Interface* mb,
         init_ents[3] = acells;
     }
 #else
-    error = mb->get_entities_by_dimension( fset, 0, init_ents[0] );CHECK_ERR( error );
-    error = mb->get_entities_by_dimension( fset, 1, init_ents[1] );CHECK_ERR( error );
-    error = mb->get_entities_by_dimension( fset, 2, init_ents[2] );CHECK_ERR( error );
-    error = mb->get_entities_by_dimension( fset, 3, init_ents[3] );CHECK_ERR( error );
+    MB_CHK_ERR( mb->get_entities_by_dimension( fset, 0, init_ents[0] ) );
+    MB_CHK_ERR( mb->get_entities_by_dimension( fset, 1, init_ents[1] ) );
+    MB_CHK_ERR( mb->get_entities_by_dimension( fset, 2, init_ents[2] ) );
+    MB_CHK_ERR( mb->get_entities_by_dimension( fset, 3, init_ents[3] ) );
 #endif
 
     NestedRefine uref( dynamic_cast< Core* >( mb ), pc, fset );
@@ -462,7 +462,6 @@ ErrorCode refine_entities( Interface* mb,
             int factor = 1;
             if( !ents[type + 1].empty() )
             {
-
                 for( int p = 0; p <= l; p++ )
                 {
                     for( int d = 0; d < dim[type]; d++ )

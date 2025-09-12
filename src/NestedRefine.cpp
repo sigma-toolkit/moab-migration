@@ -715,11 +715,7 @@ ErrorCode NestedRefine::generate_hm( int* level_degrees, int num_level, EntityHa
 {
     ErrorCode error;
 
-    Tag gidtag;
-    error = mbImpl->tag_get_handle( GLOBAL_ID_TAG_NAME, gidtag );MB_CHK_ERR( error );
-
     nlevels = num_level;
-
     timeall.tm_total   = 0;
     timeall.tm_refine  = 0;
     timeall.tm_resolve = 0;

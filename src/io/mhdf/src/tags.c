@@ -499,7 +499,7 @@ static hid_t create_tag_common( mhdf_FileHandle file_handle,
 #if defined( H5Tcommit_vers ) && H5Tcommit_vers > 1
     rval = H5Tcommit2( tag_id, TAG_TYPE_NAME, hdf_type, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT );
 #else
-    rval     = H5Tcommit( tag_id, TAG_TYPE_NAME, hdf_type );
+    rval = H5Tcommit( tag_id, TAG_TYPE_NAME, hdf_type );
 #endif
     if( rval < 0 )
     {
@@ -976,7 +976,31 @@ void mhdf_getTagInfo( mhdf_FileHandle file_handle,
     switch( class_tmp )
     {
         case H5T_INTEGER:
-            *class_out = ( size == 1  ? mhdf_BOOLEAN : ( size == sizeof(int) ? mhdf_INTEGER : ( size == sizeof(long) ? mhdf_LONG : ( size == sizeof(long long) ? mhdf_UNSIGNED_LONG_LONG : mhdf_UNSIGNED_INTEGER ) ) ) );
+            /* Check the actual HDF5 type to determine the correct mhdf type */
+            if( size == 1 )
+                *class_out = mhdf_BOOLEAN;
+            else if( H5Tequal( type_id, H5T_NATIVE_INT ) > 0 || H5Tequal( type_id, H5T_STD_I32LE ) > 0 || H5Tequal( type_id, H5T_STD_I32BE ) > 0 )
+                *class_out = mhdf_INTEGER;
+            else if( H5Tequal( type_id, H5T_NATIVE_UINT ) > 0 || H5Tequal( type_id, H5T_STD_U32LE ) > 0 || H5Tequal( type_id, H5T_STD_U32BE ) > 0 )
+                *class_out = mhdf_UNSIGNED_INTEGER;
+            else if( H5Tequal( type_id, H5T_NATIVE_LONG ) > 0 || H5Tequal( type_id, H5T_STD_I64LE ) > 0 || H5Tequal( type_id, H5T_STD_I64BE ) > 0 )
+                *class_out = mhdf_LONG;
+            else if( H5Tequal( type_id, H5T_NATIVE_ULONG ) > 0 || H5Tequal( type_id, H5T_STD_U64LE ) > 0 || H5Tequal( type_id, H5T_STD_U64BE ) > 0 )
+                *class_out = mhdf_UNSIGNED_LONG;
+            else if( H5Tequal( type_id, H5T_NATIVE_ULLONG ) > 0 )
+                *class_out = mhdf_UNSIGNED_LONG_LONG;
+            else
+            {
+                /* Fallback to size-based detection for unknown types */
+                if( size == sizeof(int) )
+                    *class_out = mhdf_INTEGER;
+                else if( size == sizeof(long) )
+                    *class_out = mhdf_LONG;
+                else if( size == sizeof(long long) )
+                    *class_out = mhdf_UNSIGNED_LONG_LONG;
+                else
+                    *class_out = mhdf_UNSIGNED_INTEGER;
+            }
             *size_out  = 1;
             break;
 
@@ -1041,19 +1065,43 @@ void mhdf_getTagInfo( mhdf_FileHandle file_handle,
             }
 
             sup_size = H5Tget_size( super_id );
-            H5Tclose( super_id );
             if( sup_size <= 0 )
             {
                 mhdf_setFail( status, "H5Tget_size failed." );
                 H5Gclose( tag_id );
                 H5Tclose( type_id );
+                H5Tclose( super_id );
                 return;
             }
 
             switch( class_tmp )
             {
                 case H5T_INTEGER:
-                    *class_out = ( sup_size == 1  ? mhdf_BOOLEAN : ( sup_size == sizeof(int) ? mhdf_INTEGER : ( sup_size == sizeof(long) ? mhdf_LONG : ( sup_size == sizeof(long long) ? mhdf_UNSIGNED_LONG_LONG : mhdf_UNSIGNED_INTEGER ) ) ) );
+                    /* Check the actual HDF5 array element type to determine the correct mhdf type */
+                    if( sup_size == 1 )
+                        *class_out = mhdf_BOOLEAN;
+                    else if( H5Tequal( super_id, H5T_NATIVE_INT ) > 0 || H5Tequal( super_id, H5T_STD_I32LE ) > 0 || H5Tequal( super_id, H5T_STD_I32BE ) > 0 )
+                        *class_out = mhdf_INTEGER;
+                    else if( H5Tequal( super_id, H5T_NATIVE_UINT ) > 0 || H5Tequal( super_id, H5T_STD_U32LE ) > 0 || H5Tequal( super_id, H5T_STD_U32BE ) > 0 )
+                        *class_out = mhdf_UNSIGNED_INTEGER;
+                    else if( H5Tequal( super_id, H5T_NATIVE_LONG ) > 0 || H5Tequal( super_id, H5T_STD_I64LE ) > 0 || H5Tequal( super_id, H5T_STD_I64BE ) > 0 )
+                        *class_out = mhdf_LONG;
+                    else if( H5Tequal( super_id, H5T_NATIVE_ULONG ) > 0 || H5Tequal( super_id, H5T_STD_U64LE ) > 0 || H5Tequal( super_id, H5T_STD_U64BE ) > 0 )
+                        *class_out = mhdf_UNSIGNED_LONG;
+                    else if( H5Tequal( super_id, H5T_NATIVE_ULLONG ) > 0 )
+                        *class_out = mhdf_UNSIGNED_LONG_LONG;
+                    else
+                    {
+                        /* Fallback to size-based detection for unknown types */
+                        if( sup_size == sizeof(int) )
+                            *class_out = mhdf_INTEGER;
+                        else if( sup_size == sizeof(long) )
+                            *class_out = mhdf_LONG;
+                        else if( sup_size == sizeof(long long) )
+                            *class_out = mhdf_UNSIGNED_LONG_LONG;
+                        else
+                            *class_out = mhdf_UNSIGNED_INTEGER;
+                    }
                     *size_out  = dims[0];
                     break;
 
@@ -1068,6 +1116,7 @@ void mhdf_getTagInfo( mhdf_FileHandle file_handle,
                     break;
             }
 
+            H5Tclose( super_id );
             break;
     }
     H5Tclose( type_id );

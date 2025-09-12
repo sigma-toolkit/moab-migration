@@ -106,7 +106,7 @@ ErrorCode write_geometry( const char* output_file_name )
 
     std::vector< int > dims( num_surfs, 2 );
     rval = moab->tag_set_data( dim_tag, surfs, num_surfs, &dims[0] );CHKERR;
-    std::vector< int > ids( num_surfs );
+    std::vector< mbGIDType > ids( num_surfs );
     for( size_t i = 0; i < ids.size(); ++i )
         ids[i] = i + 1;
     rval = moab->tag_set_data( id_tag, surfs, num_surfs, &ids[0] );CHKERR;
@@ -124,8 +124,8 @@ ErrorCode write_geometry( const char* output_file_name )
     rval = moab->tag_set_data( sense_tag, surfs, num_surfs, &senses[0] );CHKERR;
 
     const int three = 3;
-    const int one   = 1;
-    rval            = moab->tag_set_data( dim_tag, &volume, 1, &three );CHKERR;
+    const mbGIDType one = 1;
+    rval = moab->tag_set_data( dim_tag, &volume, 1, &three );CHKERR;
     rval = moab->tag_set_data( id_tag, &volume, 1, &one );CHKERR;
 
     rval = moab->write_mesh( output_file_name );CHKERR;
@@ -194,7 +194,7 @@ ErrorCode overlap_write_geometry( const char* output_file_name )
 
     std::vector< int > dims( num_surfs, 2 );
     rval = moab->tag_set_data( dim_tag, surfs, num_surfs, &dims[0] );CHKERR;
-    std::vector< int > ids( num_surfs );
+    std::vector< mbGIDType > ids( num_surfs );
     for( size_t i = 0; i < ids.size(); ++i )
         ids[i] = i + 1;
     rval = moab->tag_set_data( id_tag, surfs, num_surfs, &ids[0] );CHKERR;
@@ -212,8 +212,8 @@ ErrorCode overlap_write_geometry( const char* output_file_name )
     rval = moab->tag_set_data( sense_tag, surfs, num_surfs, &senses[0] );CHKERR;
 
     const int three = 3;
-    const int one   = 1;
-    rval            = moab->tag_set_data( dim_tag, &volume, 1, &three );CHKERR;
+    const mbGIDType one   = 1;
+    rval = moab->tag_set_data( dim_tag, &volume, 1, &three );CHKERR;
     rval = moab->tag_set_data( id_tag, &volume, 1, &one );CHKERR;
 
     rval = moab->write_mesh( output_file_name );CHKERR;
@@ -513,7 +513,7 @@ ErrorCode test_measure_area( GeomQueryTool* gqt )
         return MB_FAILURE;
     }
 
-    int ids[6];
+    mbGIDType ids[6];
     rval = moab->tag_get_data( gqt->gttool()->get_gid_tag(), surfs, ids );CHKERR;
 
     // expect area of 4 for all faces except face 6.
@@ -525,7 +525,6 @@ ErrorCode test_measure_area( GeomQueryTool* gqt )
         if( ids[i] == 6 ) expected *= ROOT2;
 
         double result;
-
         rval = gqt->measure_area( *iter, result );CHKERR;
         if( fabs( result - expected ) > std::numeric_limits< double >::epsilon() )
         {
@@ -556,7 +555,7 @@ ErrorCode overlap_test_measure_area( GeomQueryTool* gqt )
         return MB_FAILURE;
     }
 
-    int ids[num_surfs];
+    mbGIDType ids[num_surfs];
     rval = moab->tag_get_data( gqt->gttool()->get_gid_tag(), surfs, ids );CHKERR;
 
     const double x_area   = 2 * 2;
@@ -637,7 +636,7 @@ ErrorCode test_ray_fire( GeomQueryTool* gqt )
         return MB_FAILURE;
     }
 
-    int ids[6];
+    mbGIDType ids[6];
     rval = moab->tag_get_data( gqt->gttool()->get_gid_tag(), surfs, ids );CHKERR;
     EntityHandle surf[6];
     std::copy( surfs.begin(), surfs.end(), surf );
@@ -645,7 +644,7 @@ ErrorCode test_ray_fire( GeomQueryTool* gqt )
     const int num_test = sizeof( tests ) / sizeof( tests[0] );
     for( int i = 0; i < num_test; ++i )
     {
-        int* ptr = std::find( ids, ids + 6, tests[i].prev_surf );
+        mbGIDType* ptr = std::find( ids, ids + 6, tests[i].prev_surf );
         int idx  = ptr - ids;
         if( idx >= 6 )
         {
@@ -672,7 +671,7 @@ ErrorCode test_ray_fire( GeomQueryTool* gqt )
         {
             EntityHandle* p = std::find( surf, surf + 6, result );
             idx             = p - surf;
-            int id          = idx > 5 ? 0 : ids[idx];
+            mbGIDType id    = idx > 5 ? 0 : ids[idx];
 
             std::cerr << "Rayfire test failed for " << std::endl
                       << "\t ray from (" << tests[i].origin[0] << ", " << tests[i].origin[1] << ", "
@@ -781,7 +780,7 @@ ErrorCode overlap_test_ray_fire( GeomQueryTool* gqt )
         return MB_FAILURE;
     }
 
-    int ids[num_surf];
+    mbGIDType ids[num_surf];
     rval = moab->tag_get_data( gqt->gttool()->get_gid_tag(), surfs, ids );CHKERR;
     EntityHandle surf[num_surf];
     std::copy( surfs.begin(), surfs.end(), surf );
@@ -789,7 +788,7 @@ ErrorCode overlap_test_ray_fire( GeomQueryTool* gqt )
     const int num_test = sizeof( tests ) / sizeof( tests[0] );
     for( int i = 0; i < num_test; ++i )
     {
-        int* ptr     = std::find( ids, ids + num_surf, tests[i].prev_surf );
+        mbGIDType* ptr     = std::find( ids, ids + num_surf, tests[i].prev_surf );
         unsigned idx = ptr - ids;
         if( idx >= num_surf )
         {
@@ -814,8 +813,8 @@ ErrorCode overlap_test_ray_fire( GeomQueryTool* gqt )
         if( result != hit_surf || fabs( dist - tests[i].distance ) > 1e-6 )
         {
             EntityHandle* p = std::find( surf, surf + 6, result );
-            idx             = p - surf;
-            int id          = idx > num_surf - 1 ? 0 : ids[idx];
+            idx = p - surf;
+            mbGIDType id = idx > num_surf - 1 ? 0 : ids[idx];
 
             std::cerr << "Rayfire test failed for " << std::endl
                       << "\t ray from (" << tests[i].origin[0] << ", " << tests[i].origin[1] << ", "

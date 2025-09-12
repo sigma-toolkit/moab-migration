@@ -54,7 +54,7 @@ int main( int argc, char* argv[] )
 
     iMOAB_GlobalID *element_global_IDs, *block_IDs;
     int vertices_per_element;
-    iMOAB_LocalID num_elements_in_block;
+    int num_elements_in_block;
     iMOAB_LocalID conn[27], eindex;
     int nv;
 
@@ -63,7 +63,8 @@ int main( int argc, char* argv[] )
 
     iMOAB_LocalID local_index = 0;  /* test element with local index 0 */
     int num_adjacent_elements = 10; /* we can have maximum 6 actually */
-    iMOAB_LocalID adjacent_element_IDs[10], *element_connectivity, *local_element_ID;
+    iMOAB_LocalID adjacent_element_IDs[10], *element_connectivity;
+    int *local_element_ID;
     int size_conn, *element_ownership;
     iMOAB_GlobalID* global_element_ID;
 
@@ -324,7 +325,7 @@ int main( int argc, char* argv[] )
                 rc = iMOAB_GetElementOwnership( pid, &gbIDs[i], &num_elements_in_block, element_ownership );
                 CHECKRC( rc, "failed to get block elem ownership" );
                 global_element_ID = (iMOAB_GlobalID*)malloc( sizeof( iMOAB_GlobalID ) * num_elements_in_block );
-                local_element_ID  = (iMOAB_LocalID*)malloc( sizeof( iMOAB_LocalID ) * num_elements_in_block );
+                local_element_ID  = (int*)malloc( sizeof( int ) * num_elements_in_block );
 
                 /*
                  * Global element IDs are determined with this call. Local indices within the
@@ -334,7 +335,7 @@ int main( int argc, char* argv[] )
                 CHECKRC( rc, "failed to get block elem IDs" );
                 for( j = 0; j < num_elements_in_block; j++ )
                 {
-                    printf( "  elem %3d owned by %d gid: %4ld lid: %4ld  -- ", j, element_ownership[j],
+                    printf( "  elem %3d owned by %d gid: %4ld lid: %4d  -- ", j, element_ownership[j],
                             global_element_ID[j], local_element_ID[j] );
                     for( k = 0; k < vertices_per_element; k++ )
                         printf( " %5ld", element_connectivity[j * vertices_per_element + k] );
@@ -402,13 +403,13 @@ int main( int argc, char* argv[] )
 
             /* Query vertex BCs */
             vertBC_ID    = (iMOAB_LocalID*)malloc( sizeof( iMOAB_LocalID ) * ndbc[2] );
-            vertBC_value = (iMOAB_GlobalID*)malloc( sizeof( iMOAB_GlobalID ) * ndbc[2] );
+            vertBC_value = (int*)malloc( sizeof( int ) * ndbc[2] );
             rc           = iMOAB_GetPointerToVertexBC( pid, &ndbc[2], vertBC_ID, vertBC_value );
             CHECKRC( rc, "failed to get vertex boundary conditions" );
             printf( "  Vertex boundary conditions:\n" );
             for( i = 0; i < ndbc[2]; i++ )
             {
-                printf( "   vertex %4ld   BC:%4ld\n", vertBC_ID[i], vertBC_value[i] );
+                printf( "   vertex %4ld   BC:%4d\n", vertBC_ID[i], vertBC_value[i] );
             }
             free( vertBC_ID );
             free( vertBC_value );

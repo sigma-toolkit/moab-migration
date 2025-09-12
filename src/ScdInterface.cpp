@@ -258,7 +258,7 @@ ErrorCode ScdInterface::assign_global_ids( ScdBox* box )
     Range tmp_range( box->start_vertex(), box->start_vertex() + box->num_vertices() );
     ErrorCode rval = mbImpl->tag_iterate( gid_tag, tmp_range.begin(), tmp_range.end(), count, data );ERRORR( rval, "Failed to get tag iterator." );
     assert( count == box->num_vertices() );
-    int* gid_data = (int*)data;
+    mbGIDType* gid_data = (mbGIDType*)data;
     int di        = box->par_data().gDims[3] - box->par_data().gDims[0] + 1;
     int dj        = box->par_data().gDims[4] - box->par_data().gDims[1] + 1;
 

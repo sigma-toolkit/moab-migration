@@ -119,7 +119,7 @@ int GeomTopoTool::dimension( EntityHandle this_set )
         return dim;
 }
 
-int GeomTopoTool::global_id( EntityHandle this_set )
+mbGIDType GeomTopoTool::global_id( EntityHandle this_set )
 {
     ErrorCode result;
     if( 0 == gidTag )
@@ -138,7 +138,7 @@ int GeomTopoTool::global_id( EntityHandle this_set )
     }
 
     // get the data for those tags
-    int id;
+    mbGIDType id;
     result = mdbImpl->tag_get_data( gidTag, &this_set, 1, &id );
     if( MB_SUCCESS != result )
         return -1;
@@ -146,7 +146,7 @@ int GeomTopoTool::global_id( EntityHandle this_set )
         return id;
 }
 
-EntityHandle GeomTopoTool::entity_by_id( int dimension1, int id )
+EntityHandle GeomTopoTool::entity_by_id( int dimension1, mbGIDType id )
 {
     if( 0 > dimension1 || 3 < dimension1 )
     {
@@ -748,7 +748,7 @@ ErrorCode GeomTopoTool::separate_by_dimension( const Range& geom_sets )
         for( Range::iterator it = geomRanges[i].begin(); it != geomRanges[i].end(); ++it )
         {
             EntityHandle set = *it;
-            int gid;
+            mbGIDType gid;
 
             result = mdbImpl->tag_get_data( gidTag, &set, 1, &gid );
             if( MB_SUCCESS == result )

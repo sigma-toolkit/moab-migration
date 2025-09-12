@@ -233,14 +233,13 @@ void test_vertices()
     CHECK_EQUAL( num_nodes, (size_t)verts.size() );
 
     // check global ids (should be 1 to 45 for vertices.)
-    Tag gid_tag;
-    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_LONG, gid_tag );CHECK_ERR( rval );
-    std::vector< long > ids( num_nodes );
+    Tag gid_tag = mb.globalId_tag();
+    std::vector< mbGIDType > ids( num_nodes );
     rval = mb.tag_get_data( gid_tag, verts, &ids[0] );CHECK_ERR( rval );
-    std::vector< long > sorted( ids );
+    std::vector< mbGIDType > sorted( ids );
     std::sort( sorted.begin(), sorted.end() );
     for( size_t i = 0; i < num_nodes; ++i )
-        CHECK_EQUAL( (long)( i + 1 ), sorted[i] );
+        CHECK_EQUAL( (mbGIDType)( i + 1 ), sorted[i] );
 
     // check coordinates of each vertex
     std::vector< double > coords( 3 * num_nodes );
@@ -267,19 +266,18 @@ void test_element( const std::string& filename, EntityType type, int num_elem, i
     CHECK_EQUAL( num_elem, (int)elems.size() );
 
     // get global ids
-    Tag gid_tag;
-    rval = mb.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_LONG, gid_tag );CHECK_ERR( rval );
-    std::vector< long > ids( num_elem );
+    Tag gid_tag = mb.globalId_tag();
+    std::vector< mbGIDType > ids( num_elem );
     rval = mb.tag_get_data( gid_tag, elems, &ids[0] );CHECK_ERR( rval );
 
     // check that global ids are consecutive, beginning with 1
-    std::vector< long > sorted( ids );
+    std::vector< mbGIDType > sorted( ids );
     std::sort( sorted.begin(), sorted.end() );
     for( int i = 0; i < num_elem; ++i )
-        CHECK_EQUAL( (long)( i + 1 ), sorted[i] );
+        CHECK_EQUAL( (mbGIDType)( i + 1 ), sorted[i] );
 
     // check connectivity of each element
-    std::vector< int > conn_ids( node_per_elem );
+    std::vector< mbGIDType > conn_ids( node_per_elem );
     std::vector< EntityHandle > conn_h;
     Range::iterator j = elems.begin();
     for( int i = 0; i < num_elem; ++i, ++j )
@@ -290,7 +288,7 @@ void test_element( const std::string& filename, EntityType type, int num_elem, i
         rval = mb.tag_get_data( gid_tag, &conn_h[0], node_per_elem, &conn_ids[0] );CHECK_ERR( rval );
         const int* exp = conn_list + node_per_elem * ( ids[i] - 1 );
         for( int k = 0; k < node_per_elem; ++k )
-            CHECK_EQUAL( exp[k], conn_ids[k] );
+            CHECK_EQUAL( static_cast<mbGIDType>(exp[k]), conn_ids[k] );
     }
 }
 
@@ -353,15 +351,15 @@ std::vector< int > find_parents( const int parent_conn[][L], int num_parent, int
 
 int check_geometric_set( Interface& moab,
                          int dim,
-                         int id,
+                         mbGIDType id,
                          const int* children,
                          int num_children,
                          std::vector< int > parents )
 {
     ErrorCode rval;
-    Tag gid_tag, dim_tag;
+    Tag dim_tag;
 
-    rval = moab.tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_LONG, gid_tag );CHECK_ERR( rval );
+    Tag gid_tag = moab.globalId_tag();
     rval = moab.tag_get_handle( "GEOM_DIMENSION", 1, MB_TYPE_INTEGER, dim_tag );CHECK_ERR( rval );
     void* tag_vals[] = { &dim, &id };
     Tag tags[]       = { dim_tag, gid_tag };
@@ -370,11 +368,11 @@ int check_geometric_set( Interface& moab,
     CHECK_EQUAL( 1u, (unsigned)ents.size() );
 
     const EntityHandle geom = ents.front();
-    std::vector< long > exp_rel, act_rel;
     std::vector< EntityHandle > rel;
 
     if( num_children )
     {
+        std::vector< mbGIDType > exp_rel, act_rel;
         exp_rel.resize( num_children );
         std::copy( children, children + num_children, exp_rel.begin() );
         std::sort( exp_rel.begin(), exp_rel.end() );
@@ -389,7 +387,9 @@ int check_geometric_set( Interface& moab,
 
     if( !parents.empty() )
     {
-        exp_rel = parents;
+        std::vector< mbGIDType > exp_rel(parents.size()), act_rel;
+        for (mbGIDType parent : parents)
+            exp_rel.push_back(static_cast<mbGIDType>(parent));
         std::sort( exp_rel.begin(), exp_rel.end() );
         rel.clear();
         rval = moab.get_parent_meshsets( geom, rel );CHECK_ERR( rval );
@@ -431,22 +431,22 @@ void test_geometric_topology()
 
     // check all vertices
     for( unsigned i = 0; i < ( sizeof( vertex_ids ) / sizeof( vertex_ids[0] ) ); ++i )
-        check_geometric_set( mb, 0, vertex_ids[i], 0, 0, find_parents< 2 >( curve_verts, 24, vertex_ids[i] ) );
+        check_geometric_set( mb, 0, static_cast<mbGIDType>(vertex_ids[i]), 0, 0, find_parents< 2 >( curve_verts, 24, vertex_ids[i] ) );
 
     // check all curves
     for( int i = 1; i <= 24; ++i )
         if( curve_verts[i - 1][0] )
-            check_geometric_set( mb, 1, i, curve_verts[i - 1], 2, find_parents< 4 >( surf_curves, 12, i ) );
+            check_geometric_set( mb, 1, static_cast<mbGIDType>(i), curve_verts[i - 1], 2, find_parents< 4 >( surf_curves, 12, i ) );
 
     // check all surfs
     for( int i = 1; i <= 12; ++i )
         if( surf_curves[i - 1][0] )
-            check_geometric_set( mb, 2, i, surf_curves[i - 1], 4, find_parents< 6 >( volume_surfs, 2, i ) );
+            check_geometric_set( mb, 2, static_cast<mbGIDType>(i), surf_curves[i - 1], 4, find_parents< 6 >( volume_surfs, 2, i ) );
 
     // check all volumes
     std::vector< int > empty;
     for( int i = 1; i <= 2; ++i )
-        check_geometric_set( mb, 3, i, volume_surfs[i - 1], 6, empty );
+        check_geometric_set( mb, 3, static_cast<mbGIDType>(i), volume_surfs[i - 1], 6, empty );
 }
 
 void test_geometric_sets()
@@ -582,7 +582,7 @@ void test_blocks()
 //\param set_surfs One list for each id in "ids" containing the
 //                 ids of the geometric surfaces expected to be
 //                 contained in the boundary condition set.
-void test_bc_sets( const char* tag_name, unsigned count, const int* ids, const std::vector< int > set_surfs[] )
+void test_bc_sets( const char* tag_name, unsigned count, const int* ids, const std::vector< mbGIDType > set_surfs[] )
 {
     ErrorCode rval;
     Core mb_impl;
@@ -647,7 +647,7 @@ void test_bc_sets( const char* tag_name, unsigned count, const int* ids, const s
 void test_side_sets()
 {
     int ids[] = { 1, 2 };
-    std::vector< int > surfs[2];
+    std::vector< mbGIDType > surfs[2];
     surfs[0].push_back( 1 );
     surfs[0].push_back( 7 );
     surfs[1].push_back( 5 );
@@ -658,7 +658,7 @@ void test_side_sets()
 void test_node_sets()
 {
     int ids[] = { 1, 2 };
-    std::vector< int > surfs[2];
+    std::vector< mbGIDType > surfs[2];
     surfs[0].push_back( 2 );
     surfs[0].push_back( 8 );
     surfs[1].push_back( 3 );

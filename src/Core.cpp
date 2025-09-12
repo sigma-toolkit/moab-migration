@@ -2631,6 +2631,19 @@ Tag Core::globalId_tag()
             // Create new GLOBAL_ID tag with MB_TYPE_LONG
             tag_get_handle( GLOBAL_ID_TAG_NAME, 1, MB_TYPE_LONG, globalIdTag, MB_TAG_CREAT | MB_TAG_DENSE, &negone );
         }
+        else
+        {
+            // Check if existing tag has wrong type and recreate if needed
+            DataType tag_type;
+            rval = tag_get_data_type( globalIdTag, tag_type );
+            if( MB_SUCCESS == rval && tag_type != MB_TYPE_LONG )
+            {
+                // Delete the old tag and recreate with correct type
+                tag_delete( globalIdTag );
+                globalIdTag = 0;
+                tag_get_handle( GLOBAL_ID_TAG_NAME, 1, MB_TYPE_LONG, globalIdTag, MB_TAG_CREAT | MB_TAG_DENSE, &negone );
+            }
+        }
     }
     return globalIdTag;
 }

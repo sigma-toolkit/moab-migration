@@ -901,7 +901,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     // need to decide if the mesh has that tag; will affect the size of the tuple list involved in
     // the crystal routing
     int size_gdofs_tag = 0;
-    std::vector< int > valsDOFs;
+    std::vector< mbGIDType > valsDOFs;
     Tag gdsTag;
     rval = mb->tag_get_handle( "GLOBAL_DOFS", gdsTag );
 
@@ -913,7 +913,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         {
             DataType dtype;
             rval = mb->tag_get_data_type( gdsTag, dtype );
-            if( MB_SUCCESS == rval && MB_TYPE_INTEGER == dtype )
+            if( MB_SUCCESS == rval && MB_TYPE_LONG == dtype )
             {
                 // find the values on first cell
                 int lenTag = 0;
@@ -930,6 +930,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
                     }
                 }
             }
+            else MB_CHK_SET_ERR(MB_TAG_NOT_FOUND, "Failed to get GLOBAL_DOFS tag handle due to invalid type.");
         }
     }
 
@@ -1219,8 +1220,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     // the first mesh elements are in localEnts; we do not need them at all
 
     // maps from global ids to new vertex and cell handles, that are added
-
-    std::map< int, EntityHandle > globalID_to_vertex_handle;
+    std::map< mbGIDType, EntityHandle > globalID_to_vertex_handle;
     // we already have some vertices from second mesh set; they are already in the processor, even
     // before receiving other verts from neighbors this is an inverse map from gid to vertex handle,
     // which is local here, we do not want to duplicate vertices their identifier is the global ID!!
@@ -1237,7 +1237,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     int n = TLv.get_n();  // the size of the points received
     for( int i = 0; i < n; i++ )
     {
-        mbGIDType globalId = TLv.vi_rd[2 * i + 1];
+        mbGIDType globalId = static_cast<mbGIDType>(TLv.vi_rd[2 * i + 1]);
         if( globalID_to_vertex_handle.find( globalId ) ==
             globalID_to_vertex_handle.end() )  // we do not have locally this vertex (yet)
                                                // so we have to create it, and add to the inverse map

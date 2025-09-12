@@ -268,12 +268,12 @@ ErrorCode MetisPartitioner::assemble_taggedsets_graph( const int dimension,
 
     // assign globla ids to elem sets based on aggregating_tag data
     Tag gid_tag;
-    idx_t zero1 = -1;
+    mbGIDType zero1 = -1;
     result =
-        mbImpl->tag_get_handle( "GLOBAL_ID_AGGLO", 1, MB_TYPE_INTEGER, gid_tag, MB_TAG_SPARSE | MB_TAG_CREAT, &zero1 );MB_CHK_ERR( result );
+        mbImpl->tag_get_handle( "GLOBAL_ID_AGGLO", 1, MB_TYPE_LONG, gid_tag, MB_TAG_SPARSE | MB_TAG_CREAT, &zero1 );MB_CHK_ERR( result );
     for( Range::iterator rit = elems.begin(); rit != elems.end(); rit++ )
     {
-        idx_t partSet;
+        mbGIDType partSet;
         result = mbImpl->tag_get_data( partSetTag, &( *rit ), 1, &partSet );MB_CHK_ERR( result );
         result = mbImpl->tag_set_data( gid_tag, &( *rit ), 1, &partSet );MB_CHK_ERR( result );
     }
@@ -551,11 +551,11 @@ ErrorCode MetisPartitioner::write_aggregationtag_partition( const idx_t nparts,
     if( write_as_tags )
     {
         Tag gid_tag;
-        result = mbImpl->tag_get_handle( "GLOBAL_ID_AGGLO", 1, MB_TYPE_INTEGER, gid_tag, MB_TAG_SPARSE );MB_CHK_ERR( result );
+        result = mbImpl->tag_get_handle( "GLOBAL_ID_AGGLO", 1, MB_TYPE_LONG, gid_tag, MB_TAG_SPARSE );MB_CHK_ERR( result );
 
         // allocate idx_teger-size partitions
         unsigned int i = 0;
-        idx_t gid;
+        mbGIDType gid;
         for( Range::iterator rit = elems.begin(); rit != elems.end(); rit++ )
         {
             result = mbImpl->tag_get_data( gid_tag, &( *rit ), 1, &gid );

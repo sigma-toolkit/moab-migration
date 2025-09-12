@@ -205,7 +205,7 @@ void ReadHDF5Dataset::set_file_ids( const Range& file_ids, EntityHandle start_id
     if( equal < 0 ) throw Exception( __LINE__ );
     doConversion = !equal;
 
-    // We always read in the format of the file to avoid stupind HDF5
+    // We always read in the format of the file to avoid stupid HDF5
     // library behavior when reading in parallel.  We call H5Tconvert
     // ourselves to do the data conversion.  If the type we're reading
     // from the file is larger than the type we want in memory, then

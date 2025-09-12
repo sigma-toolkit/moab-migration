@@ -264,7 +264,7 @@ class DualTool
 
     //! make a new dual hyperplane with the specified id; if the id specified is -1,
     //! set the new one's id to the max found
-    ErrorCode construct_new_hyperplane( const int dim, EntityHandle& new_hyperplane, int& id );
+    ErrorCode construct_new_hyperplane( const int dim, EntityHandle& new_hyperplane, mbGIDType& id );
 
     //! traverse the cells of a dual hyperplane, starting with this_ent (dimension
     //! of this_ent determines hyperplane dimension)

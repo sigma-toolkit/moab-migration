@@ -745,7 +745,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
             int receiver_proc                   = mit->first;
             std::vector< mbGIDType >& eids      = mit->second;
             std::vector< mbGIDType >& index_in_values = map_index[receiver_proc];
-            std::vector< int >& index_ptr       = map_ptr[receiver_proc];  // this is eids.size()+1;
+            std::vector< mbGIDType >& index_ptr       = map_ptr[receiver_proc];  // this is eids.size()+1;
             size_t size_buffer                     = 4 + total_bytes_per_entity *
                                       eids.size();  // hopefully, below 2B; if more, we have a big problem ...
             ParallelComm::Buffer* buffer = new ParallelComm::Buffer( size_buffer );
@@ -892,7 +892,6 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
             // data is arranged by tag , and repeat the loop for each entity ()
             // maybe it should be arranged by entity now, not by tag (so one loop for entities,
             // outside)
-
             for( auto it = eids.begin(); it != eids.end(); ++it )
             {
                 mbGIDType eID = *it;
@@ -947,13 +946,13 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
         }
         // now, unpack the data and set the tags
         sendReqs.resize( involved_IDs_map.size() );
-        for( std::map< int, std::vector< mbGIDType > >::iterator mit = involved_IDs_map.begin();
+        for( auto mit = involved_IDs_map.begin();
              mit != involved_IDs_map.end(); ++mit )
         {
             int sender_proc                     = mit->first;
             std::vector< mbGIDType >& eids      = mit->second;
             std::vector< mbGIDType >& index_in_values = map_index[sender_proc];
-            std::vector< int >& index_ptr       = map_ptr[sender_proc];  // this is eids.size()+1;
+            std::vector< mbGIDType >& index_ptr       = map_ptr[sender_proc];  // this is eids.size()+1;
             int size_buffer                     = 4 + total_bytes_per_entity *
                                       (int)eids.size();  // hopefully, below 2B; if more, we have a big problem ...
             ParallelComm::Buffer* buffer = new ParallelComm::Buffer( size_buffer );
@@ -964,7 +963,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
             if( ierr != 0 ) return MB_FAILURE;
             // use the values in buffer to populate valuesTag arrays, fill it up!
             int j = 0;
-            for( std::vector< mbGIDType >::iterator it = eids.begin(); it != eids.end(); ++it, ++j )
+            for( auto it = eids.begin(); it != eids.end(); ++it, ++j )
             {
                 for( size_t i = 0; i < tag_handles.size(); i++ )
                 {
@@ -1019,26 +1018,25 @@ ErrorCode ParCommGraph::settle_send_graph( TupleList& TLcovIDs )
 
 // this will set involved_IDs_map will store all ids to be received from one sender task
 void ParCommGraph::SetReceivingAfterCoverage(
-    std::map< int, std::set< int > >& idsFromProcs )  // will make sense only on receivers, right now after cov
+    std::map< int, std::set< mbGIDType > >& idsFromProcs )  // will make sense only on receivers, right now after cov
 {
     for( auto mt = idsFromProcs.begin(); mt != idsFromProcs.end(); ++mt )
     {
         int fromProc            = mt->first;
-        std::set< int >& setIds = mt->second;
+        std::set< mbGIDType >& setIds = mt->second;
         involved_IDs_map[fromProc].resize( setIds.size() );
         std::vector< mbGIDType >& listIDs = involved_IDs_map[fromProc];
         size_t indx                 = 0;
-        for( std::set< int >::iterator st = setIds.begin(); st != setIds.end(); st++ )
+        for( auto st = setIds.begin(); st != setIds.end(); st++ )
         {
-            int valueID     = *st;
-            listIDs[indx++] = valueID;
+            listIDs[indx++] = *st;
         }
     }
     graph_type = COVERAGE;
     return;
 }
 
-void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::vector< long >& valuesComp )
+void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::vector< mbGIDType >& valuesComp )
 {
     // settle comm graph on comp
     if( rootSender || rootReceiver ) std::cout << " settle comm graph by id on component " << comp << "\n";
@@ -1055,7 +1053,7 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
 
     // Vector to store element
     // with respective present index
-    std::vector< std::pair< size_t, size_t > > vp;
+    std::vector< std::pair< mbGIDType, mbGIDType > > vp;
     vp.reserve( valuesComp.size() );
 
     // Inserting element in pair vector
@@ -1074,7 +1072,7 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
     {
         int procId                  = it->first;
         std::set< mbGIDType >& nums = it->second;
-        std::vector< int >& indx    = map_ptr[procId];
+        std::vector< mbGIDType >& indx    = map_ptr[procId];
         std::vector< mbGIDType >& indices = map_index[procId];
         indx.resize( nums.size() + 1 );
         size_t indexInVp = 0;
@@ -1082,7 +1080,7 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
         indx[0]       = 0;  // start from 0
         for( auto sst = nums.begin(); sst != nums.end(); ++sst, ++indexVal )
         {
-            mbGIDType val = *sst;
+            const mbGIDType val = *sst;
             involved_IDs_map[procId].push_back( val );
             indx[indexVal + 1] = indx[indexVal];
             while( ( indexInVp < valuesComp.size() ) && ( vp[indexInVp].first <= val ) )  // should be equal !
@@ -1127,6 +1125,7 @@ void ParCommGraph::settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::v
     // spectral to phys
 }
 //#undef VERBOSE
+
 // new partition calculation
 ErrorCode ParCommGraph::compute_partition( ParallelComm* pco, Range& owned, int met )
 {
@@ -1180,7 +1179,7 @@ ErrorCode ParCommGraph::compute_partition( ParallelComm* pco, Range& owned, int 
         TLe.initialize( 2, 0, 1, 0, sharedEdges.size() );  // send to, id of adj cell, remote edge
         TLe.enableWriteAccess();
 
-        std::map< EntityHandle, int > edgeToCell;  // from local boundary edge to adjacent cell id
+        std::map< EntityHandle, mbGIDType > edgeToCell;  // from local boundary edge to adjacent cell id
         // will be changed after
         for( Range::iterator eit = sharedEdges.begin(); eit != sharedEdges.end(); eit++ )
         {
@@ -1216,22 +1215,23 @@ ErrorCode ParCommGraph::compute_partition( ParallelComm* pco, Range& owned, int 
         for( int i = 0; i < ne; i++ )
         {
             int sharedProc         = TLe.vi_rd[2 * i];       // this info is coming from here, originally
-            int remoteCellID       = TLe.vi_rd[2 * i + 1];   // this is the id of the remote cell, on sharedProc
+            mbGIDType remoteCellID       = TLe.vi_rd[2 * i + 1];   // this is the id of the remote cell, on sharedProc
             EntityHandle localCell = TLe.vul_rd[i];          // this is now local edge/face on this proc
-            int localCellId        = edgeToCell[localCell];  // this is the local cell  adjacent to edge/face
+            mbGIDType localCellId        = edgeToCell[localCell];  // this is the local cell  adjacent to edge/face
             // now, we will need to add to the graph the pair <localCellId, remoteCellID>
-            std::pair< int, int > extraAdj = std::make_pair( localCellId, remoteCellID );
+            std::pair< mbGIDType, mbGIDType > extraAdj = std::make_pair( localCellId, remoteCellID );
             extraGraphEdges.insert( extraAdj );
             // adjCellsId [edgeToCell[localCell]] = remoteCellID;
             extraCellsProc[remoteCellID] = sharedProc;
 #ifdef VERBOSE
-            std::cout << "local ID " << edgeToCell[localCell] << " remote cell ID: " << remoteCellID << "\n";
+            std::cout << "local ID " << localCellId << " remote cell ID: " << remoteCellID << "\n";
 #endif
         }
     }
     t2 = MPI_Wtime();
     if( rootSender ) std::cout << " time preparing the input for Zoltan:" << t2 - t1 << " seconds. \n";
-        // so adj cells ids; need to call zoltan for parallel partition
+
+    // so adj cells ids; need to call zoltan for parallel partition
 #ifdef MOAB_HAVE_ZOLTAN
     ZoltanPartitioner* mbZTool = new ZoltanPartitioner( mb, pco );
     if( 1 <= met )  //  partition in zoltan, either graph or geometric partitioner

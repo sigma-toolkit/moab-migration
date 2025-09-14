@@ -61,7 +61,7 @@ C  #define ERROR(rval) if (0 .ne. rval) call exit(1)
       integer ierr
       character*(*) message
       if (ierr.ne.0) then
-        print *, message
+        print *, "Failure: ", ierr, " -- ",  message
         call exit (1)
       end if
       return
@@ -149,7 +149,7 @@ C      used for ghosting
 
       ! create now 4 quads with those 9 vertices
       mbtype = 3
-      blockid  = 100
+      blockid = 100
       npe = 4
       ierr = iMOAB_CreateElements(pid, nume, mbtype, npe,
      &                           connec, blockid)
@@ -169,7 +169,7 @@ C      used for ghosting
       ! write out the mesh file to disk, in parallel, if h5m
 #ifdef MOAB_HAVE_HDF5
       outfile = 'wholeF.h5m'//CHAR(0)
-      wopts   = 'PARALLEL=WRITE_PART'//CHAR(0)
+      wopts = 'PARALLEL=WRITE_PART'//CHAR(0)
       ierr = iMOAB_WriteMesh(pid, outfile, wopts)
       call errorout(ierr, 'fail to write the mesh file')
 #endif
@@ -180,7 +180,6 @@ C      used for ghosting
 
       ierr = iMOAB_Finalize()
       call errorout(ierr, 'fail to finalize iMOAB')
-
 
       call MPI_FINALIZE ( ierr )
       call errorout(ierr, 'fail to finalize MPI')

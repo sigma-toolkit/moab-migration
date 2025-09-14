@@ -131,23 +131,20 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapTags( const std::string srcDofT
                                                        const std::string tgtDofTagName )
 {
     moab::ErrorCode rval;
+    int tagSize;
 
-    int tagSize = 0;
-    tagSize     = ( m_eInputType == DiscretizationType_FV ? 1 : m_nDofsPEl_Src * m_nDofsPEl_Src );
-    rval =
-        m_interface->tag_get_handle( srcDofTagName.c_str(), tagSize, MB_TYPE_INTEGER, this->m_dofTagSrc, MB_TAG_ANY );
-
-    if( rval == moab::MB_TAG_NOT_FOUND && m_eInputType != DiscretizationType_FV )
+    rval = m_interface->tag_get_handle( srcDofTagName.c_str(), this->m_dofTagSrc );
+    MB_CHK_ERR( m_interface->tag_get_length( this->m_dofTagSrc, tagSize ) );
+    if( tagSize != ( m_eInputType == DiscretizationType_FV ? 1 : m_nDofsPEl_Src * m_nDofsPEl_Src ) || rval == moab::MB_TAG_NOT_FOUND )
     {
         MB_CHK_SET_ERR( MB_FAILURE, "DoF tag is not set correctly for source mesh." );
     }
     else
         MB_CHK_ERR( rval );
 
-    tagSize = ( m_eOutputType == DiscretizationType_FV ? 1 : m_nDofsPEl_Dest * m_nDofsPEl_Dest );
-    rval =
-        m_interface->tag_get_handle( tgtDofTagName.c_str(), tagSize, MB_TYPE_INTEGER, this->m_dofTagDest, MB_TAG_ANY );
-    if( rval == moab::MB_TAG_NOT_FOUND && m_eOutputType != DiscretizationType_FV )
+    rval = m_interface->tag_get_handle( tgtDofTagName.c_str(), this->m_dofTagDest );
+    MB_CHK_ERR( m_interface->tag_get_length( this->m_dofTagDest, tagSize ) );
+    if( tagSize != ( m_eOutputType == DiscretizationType_FV ? 1 : m_nDofsPEl_Dest * m_nDofsPEl_Dest ) || rval == moab::MB_TAG_NOT_FOUND )
     {
         MB_CHK_SET_ERR( MB_FAILURE, "DoF tag is not set correctly for target mesh." );
     }
@@ -227,6 +224,7 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
             for (size_t i = 0; i < src_soln_gdofs_casted.size(); ++i)
             {
                 src_soln_gdofs[i] = static_cast<mbGIDType>(src_soln_gdofs_casted[i]);
+                if (!is_root) std::cout << i << " -- " << src_soln_gdofs_casted[i] << ", " << src_soln_gdofs[i] << "\n";
             }
         }
         else
@@ -235,6 +233,7 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
         }
     }
 
+    // vprint = is_root;
     m_nTotDofs_SrcCov = 0;
     if( srcdataGLLNodes == nullptr )
     {
@@ -268,16 +267,17 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
                         dgll_cgll_covcol_ldofmap[localDOF] = true;
                     }
                     if( !isSrcContinuous ) m_nTotDofs_SrcCov++;
-                    assert( src_soln_gdofs[offsetDOF] > 0 );
                     col_gdofmap[localDOF]      = src_soln_gdofs[offsetDOF] - 1;
                     col_dtoc_dofmap[offsetDOF] = localDOF;
                     if( vprint )
-                        std::cout << "Col: " << offsetDOF << ", " << localDOF << ", " << col_gdofmap[localDOF] << ", "
-                                  << m_nTotDofs_SrcCov << "\n";
+                    std::cout << "Col: " << offsetDOF << ", " << localDOF << ", " << col_gdofmap[localDOF] << ", "
+                        << m_nTotDofs_SrcCov << "\n";
+                    assert( src_soln_gdofs[offsetDOF] > 0 );
                 }
             }
         }
     }
+    vprint = false;
 
     if( m_remapper->point_cloud_source )
     {

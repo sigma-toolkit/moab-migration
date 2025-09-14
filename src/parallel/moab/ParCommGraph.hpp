@@ -216,12 +216,12 @@ class ParCommGraph
 
     // this will set after_cov_rec_sizes
     void SetReceivingAfterCoverage(
-        std::map< int, std::set< int > >& idsFromProcs );  // will make sense only on receivers, right now after cov
+        std::map< int, std::set< mbGIDType > >& idsFromProcs );  // will make sense only on receivers, right now after cov
 
     // strideComp is np x np, or 1, in our cases
     // will fill up ordered lists for corresponding IDs on the other component
     // will form back and forth information, from ordered list of IDs, to valuesComp
-    void settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::vector< long >& valuesComp );
+    void settle_comm_by_ids( int comp, TupleList& TLBackToComp, std::vector< mbGIDType >& valuesComp );
 
     // new partition calculation
     ErrorCode compute_partition( ParallelComm* pco, Range& owned, int met );
@@ -291,7 +291,7 @@ class ParCommGraph
     // used only for third method: DOF_BASED
     std::map< int, std::vector< mbGIDType > >
         map_index;  // from index in involved[] to index in values[] of tag, for each corr task
-    std::map< int, std::vector< int > > map_ptr;  //  lmap[ie], lmap[ie+1], pointer into map_index[corrTask]
+    std::map< int, std::vector< mbGIDType > > map_ptr;  //  lmap[ie], lmap[ie+1], pointer into map_index[corrTask]
 };
 
 }  // namespace moab

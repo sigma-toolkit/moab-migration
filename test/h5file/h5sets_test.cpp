@@ -726,47 +726,54 @@ void test_set_flags()
     CHECK_EQUAL( (unsigned)( MESHSET_ORDERED | MESHSET_TRACK_OWNER ), opts );
 
     // check that sets have correct contents
+    long set_ids1_long[num_verts1], set_ids2_long[num_verts2];
     int set_ids1[num_verts1], set_ids2[num_verts2];
 
     tmp.clear();
     rval = mb.get_entities_by_handle( sets[0], tmp );CHECK_ERR( rval );
     CHECK_EQUAL( num_verts1, (int)tmp.size() );
-    rval = mb.tag_get_data( tag, tmp, set_ids1 );CHECK_ERR( rval );
+    rval = mb.tag_get_data( tag, tmp, set_ids1_long );CHECK_ERR( rval );
+    for( int i = 0; i < num_verts1; ++i ) set_ids1[i] = static_cast<int>( set_ids1_long[i] );
     std::sort( set_ids1, set_ids1 + num_verts1 );
     CHECK_ARRAYS_EQUAL( set_verts1, num_verts1, set_ids1, num_verts1 );
 
     tmp.clear();
     rval = mb.get_entities_by_handle( sets[1], tmp );CHECK_ERR( rval );
     CHECK_EQUAL( num_verts2, (int)tmp.size() );
-    rval = mb.tag_get_data( tag, tmp, set_ids2 );CHECK_ERR( rval );
+    rval = mb.tag_get_data( tag, tmp, set_ids2_long );CHECK_ERR( rval );
+    for( int i = 0; i < num_verts2; ++i ) set_ids2[i] = static_cast<int>( set_ids2_long[i] );
     std::sort( set_ids2, set_ids2 + num_verts2 );
     CHECK_ARRAYS_EQUAL( set_verts2, num_verts2, set_ids2, num_verts2 );
 
     tmp.clear();
     rval = mb.get_entities_by_handle( sets[2], tmp );CHECK_ERR( rval );
     CHECK_EQUAL( num_verts1, (int)tmp.size() );
-    rval = mb.tag_get_data( tag, tmp, set_ids1 );CHECK_ERR( rval );
+    rval = mb.tag_get_data( tag, tmp, set_ids1_long );CHECK_ERR( rval );
+    for( int i = 0; i < num_verts1; ++i ) set_ids1[i] = static_cast<int>( set_ids1_long[i] );
     std::sort( set_ids1, set_ids1 + num_verts1 );
     CHECK_ARRAYS_EQUAL( set_verts1, num_verts1, set_ids1, num_verts1 );
 
     tmp.clear();
     rval = mb.get_entities_by_handle( sets[3], tmp );CHECK_ERR( rval );
     CHECK_EQUAL( num_verts2, (int)tmp.size() );
-    rval = mb.tag_get_data( tag, tmp, set_ids2 );CHECK_ERR( rval );
+    rval = mb.tag_get_data( tag, tmp, set_ids2_long );CHECK_ERR( rval );
+    for( int i = 0; i < num_verts2; ++i ) set_ids2[i] = static_cast<int>( set_ids2_long[i] );
     std::sort( set_ids2, set_ids2 + num_verts2 );
     CHECK_ARRAYS_EQUAL( set_verts2, num_verts2, set_ids2, num_verts2 );
 
     tmp.clear();
     rval = mb.get_entities_by_handle( sets[4], tmp );CHECK_ERR( rval );
     CHECK_EQUAL( num_verts1, (int)tmp.size() );
-    rval = mb.tag_get_data( tag, tmp, set_ids1 );CHECK_ERR( rval );
+    rval = mb.tag_get_data( tag, tmp, set_ids1_long );CHECK_ERR( rval );
+    for( int i = 0; i < num_verts1; ++i ) set_ids1[i] = static_cast<int>( set_ids1_long[i] );
     std::sort( set_ids1, set_ids1 + num_verts1 );
     CHECK_ARRAYS_EQUAL( set_verts1, num_verts1, set_ids1, num_verts1 );
 
     tmp.clear();
     rval = mb.get_entities_by_handle( sets[5], tmp );CHECK_ERR( rval );
     CHECK_EQUAL( num_verts2, (int)tmp.size() );
-    rval = mb.tag_get_data( tag, tmp, set_ids2 );CHECK_ERR( rval );
+    rval = mb.tag_get_data( tag, tmp, set_ids2_long );CHECK_ERR( rval );
+    for( int i = 0; i < num_verts2; ++i ) set_ids2[i] = static_cast<int>( set_ids2_long[i] );
     std::sort( set_ids2, set_ids2 + num_verts2 );
     CHECK_ARRAYS_EQUAL( set_verts2, num_verts2, set_ids2, num_verts2 );
 }

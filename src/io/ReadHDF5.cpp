@@ -684,7 +684,9 @@ ErrorCode ReadHDF5::find_int_tag( const char* name, int& index )
         MB_SET_ERR( MB_TAG_NOT_FOUND, "File does not contain subset tag '" << name << "'" );
     }
 
-    if( fileInfo->tags[index].type != mhdf_INTEGER || fileInfo->tags[index].size != 1 )
+    // Accept both mhdf_INTEGER and mhdf_LONG for backward compatibility with GLOBAL_ID
+    if( (fileInfo->tags[index].type != mhdf_INTEGER && fileInfo->tags[index].type != mhdf_LONG) || 
+        fileInfo->tags[index].size != 1 )
     {
         MB_SET_ERR( MB_TAG_NOT_FOUND, "Tag ' " << name << "' does not contain single integer value" );
     }
@@ -3880,10 +3882,21 @@ ErrorCode ReadHDF5::read_tag_values_partial( int tag_index, const Range& file_id
 
             tag_values.clear();
             tag_values.reserve( offsets.size() );
-            const size_t data_buffer_size = bufferSize / sizeof( int );
-            int* data_buffer              = reinterpret_cast< int* >( dataBuffer );
+            
+            // Handle both int and long data types based on the tag type in file
             ReadHDF5Dataset vals( ( tn + " sparse vals" ).c_str(), handles[1], nativeParallel, mpiComm );
-            vals.set_file_ids( offsets, 0, data_buffer_size, H5T_NATIVE_INT );
+            if( tag.type == mhdf_LONG )
+            {
+                const size_t data_buffer_size = bufferSize / sizeof( long );
+                long* data_buffer = reinterpret_cast< long* >( dataBuffer );
+                vals.set_file_ids( offsets, 0, data_buffer_size, H5T_NATIVE_LONG );
+            }
+            else
+            {
+                const size_t data_buffer_size = bufferSize / sizeof( int );
+                int* data_buffer = reinterpret_cast< int* >( dataBuffer );
+                vals.set_file_ids( offsets, 0, data_buffer_size, H5T_NATIVE_INT );
+            }
             dbgOut.printf( 3, "Reading sparse values for tag \"%s\" in %lu chunks\n", tag.name, vals.get_read_count() );
             nn = 0;
             // Should normally only have one read call, unless sparse nature
@@ -3891,8 +3904,20 @@ ErrorCode ReadHDF5::read_tag_values_partial( int tag_index, const Range& file_id
             while( !vals.done() )
             {
                 dbgOut.printf( 3, "Reading chunk %d of values for \"%s\"\n", ++nn, tag.name );
-                vals.read( data_buffer, count );
-                tag_values.insert( tag_values.end(), data_buffer, data_buffer + count );
+                if( tag.type == mhdf_LONG )
+                {
+                    long* data_buffer = reinterpret_cast< long* >( dataBuffer );
+                    vals.read( data_buffer, count );
+                    // Convert long values to int for output vector
+                    for( size_t i = 0; i < count; ++i )
+                        tag_values.push_back( static_cast<int>( data_buffer[i] ) );
+                }
+                else
+                {
+                    int* data_buffer = reinterpret_cast< int* >( dataBuffer );
+                    vals.read( data_buffer, count );
+                    tag_values.insert( tag_values.end(), data_buffer, data_buffer + count );
+                }
             }
         }
         catch( ReadHDF5Dataset::Exception )
@@ -3943,21 +3968,43 @@ ErrorCode ReadHDF5::read_tag_values_partial( int tag_index, const Range& file_id
         {
             curr_data.clear();
             tag_values.reserve( subset.size() );
-            const size_t data_buffer_size = bufferSize / sizeof( int );
-            int* data_buffer              = reinterpret_cast< int* >( dataBuffer );
 
             ReadHDF5Dataset reader( ( tn + " dense vals" ).c_str(), handle, nativeParallel, mpiComm );
-            reader.set_file_ids( subset, desc->start_id, data_buffer_size, H5T_NATIVE_INT );
-            dbgOut.printf( 3, "Reading dense data for tag \"%s\" and group \"%s\" in %lu chunks\n", tag.name,
-                           fileInfo->elems[grp].handle, reader.get_read_count() );
-            int nn = 0;
-            // Should normally only have one read call, unless sparse nature
-            // of file_ids caused reader to do something strange
-            while( !reader.done() )
+            
+            // Handle both int and long data types based on the tag type in file
+            if( tag.type == mhdf_LONG )
             {
-                dbgOut.printf( 3, "Reading chunk %d of \"%s\"/\"%s\"\n", ++nn, tag.name, fileInfo->elems[grp].handle );
-                reader.read( data_buffer, count );
-                curr_data.insert( curr_data.end(), data_buffer, data_buffer + count );
+                const size_t data_buffer_size = bufferSize / sizeof( long );
+                long* data_buffer = reinterpret_cast< long* >( dataBuffer );
+                reader.set_file_ids( subset, desc->start_id, data_buffer_size, H5T_NATIVE_LONG );
+                
+                dbgOut.printf( 3, "Reading dense data for tag \"%s\" and group \"%s\" in %lu chunks\n", tag.name,
+                               fileInfo->elems[grp].handle, reader.get_read_count() );
+                int nn = 0;
+                while( !reader.done() )
+                {
+                    dbgOut.printf( 3, "Reading chunk %d of \"%s\"/\"%s\"\n", ++nn, tag.name, fileInfo->elems[grp].handle );
+                    reader.read( data_buffer, count );
+                    // Convert long values to int for output vector
+                    for( size_t i = 0; i < count; ++i )
+                        curr_data.push_back( static_cast<int>( data_buffer[i] ) );
+                }
+            }
+            else
+            {
+                const size_t data_buffer_size = bufferSize / sizeof( int );
+                int* data_buffer = reinterpret_cast< int* >( dataBuffer );
+                reader.set_file_ids( subset, desc->start_id, data_buffer_size, H5T_NATIVE_INT );
+                
+                dbgOut.printf( 3, "Reading dense data for tag \"%s\" and group \"%s\" in %lu chunks\n", tag.name,
+                               fileInfo->elems[grp].handle, reader.get_read_count() );
+                int nn = 0;
+                while( !reader.done() )
+                {
+                    dbgOut.printf( 3, "Reading chunk %d of \"%s\"/\"%s\"\n", ++nn, tag.name, fileInfo->elems[grp].handle );
+                    reader.read( data_buffer, count );
+                    curr_data.insert( curr_data.end(), data_buffer, data_buffer + count );
+                }
             }
         }
         catch( ReadHDF5Dataset::Exception )
@@ -4003,16 +4050,37 @@ ErrorCode ReadHDF5::read_tag_values_all( int tag_index, std::vector< int >& tag_
         }
 
         hid_t file_type = H5Dget_type( handles[1] );
-        tag_values.resize( num_val );
-        mhdf_readTagValuesWithOpt( handles[1], 0, num_val, file_type, &tag_values[0], collIO, &status );
-        if( mhdf_isError( &status ) )
+        
+        // Handle both int and long data types
+        if( tag.type == mhdf_LONG )
         {
-            MB_SET_ERR_CONT( mhdf_message( &status ) );
-            H5Tclose( file_type );
-            mhdf_closeData( filePtr, handles[1], &status );
-            MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
+            std::vector< long > long_values( num_val );
+            mhdf_readTagValuesWithOpt( handles[1], 0, num_val, file_type, &long_values[0], collIO, &status );
+            if( mhdf_isError( &status ) )
+            {
+                MB_SET_ERR_CONT( mhdf_message( &status ) );
+                H5Tclose( file_type );
+                mhdf_closeData( filePtr, handles[1], &status );
+                MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
+            }
+            // Convert long values to int for output vector
+            tag_values.resize( num_val );
+            for( long i = 0; i < num_val; ++i )
+                tag_values[i] = static_cast<int>( long_values[i] );
         }
-        H5Tconvert( file_type, H5T_NATIVE_INT, num_val, &tag_values[0], 0, H5P_DEFAULT );
+        else
+        {
+            tag_values.resize( num_val );
+            mhdf_readTagValuesWithOpt( handles[1], 0, num_val, file_type, &tag_values[0], collIO, &status );
+            if( mhdf_isError( &status ) )
+            {
+                MB_SET_ERR_CONT( mhdf_message( &status ) );
+                H5Tclose( file_type );
+                mhdf_closeData( filePtr, handles[1], &status );
+                MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
+            }
+            H5Tconvert( file_type, H5T_NATIVE_INT, num_val, &tag_values[0], 0, H5P_DEFAULT );
+        }
         H5Tclose( file_type );
 
         mhdf_closeData( filePtr, handles[1], &status );

@@ -209,7 +209,8 @@ EntityHandle make_set( unsigned int options, EntityHandle* entities, size_t num_
     }
 
     Tag id_tag = iface->globalId_tag();
-    if( MB_SUCCESS != iface->tag_set_data( id_tag, &handle, 1, &id ) ) moab_error( "tag_set_data" );
+    mbGIDType gid = static_cast<mbGIDType>(id);
+    if( MB_SUCCESS != iface->tag_set_data( id_tag, &handle, 1, &gid ) ) moab_error( "tag_set_data" );
 
     return handle;
 }
@@ -429,16 +430,19 @@ bool compare_sets( int id, const char* tag_name = 0 )
     bool ok;
     ErrorCode rval;
 
+    fprintf( stderr, "Comparing sets with ID %d\n", id );
+
     // get sets
 
     Tag id_tag = iface->globalId_tag();
 
     Range range;
-    const void* tag_data[] = { &id };
+    mbGIDType gid = static_cast<mbGIDType>(id);
+    const void* tag_data[] = { &gid };
     rval                   = iface->get_entities_by_type_and_tag( 0, MBENTITYSET, &id_tag, tag_data, 1, range );
     if( MB_ENTITY_NOT_FOUND == rval || range.size() != 2 )
     {
-        fprintf( stderr, "Could not find set with id %d pair in file\n", id );
+        fprintf( stderr, "Could not find set with id %d pair in file (found %d sets)\n", id, (int)range.size() );
         return false;
     }
     else if( MB_SUCCESS != rval )
@@ -466,6 +470,8 @@ bool compare_sets( int id, const char* tag_name = 0 )
         return false;
     }
 
+    fprintf( stderr, "Set %d options match\n", id );
+
     // Compare set contents
     // First check if same number of entities.
     // Then select from three possible methods to compare set contents
@@ -478,17 +484,18 @@ bool compare_sets( int id, const char* tag_name = 0 )
     rval = iface->get_entities_by_handle( set2, list2 );
     if( MB_SUCCESS != rval ) moab_error( "get_entities_by_handle for set2 failed" );
 
+    fprintf( stderr, "Set %d: list1 size=%lu, list2 size=%lu\n", id, (unsigned long)list1.size(), (unsigned long)list2.size() );
+
     if( list1.size() != list2.size() )
     {
-        fprintf( stderr,
-                 "Sets with id %d do not have the same number of entities.\n"
-                 "Set 1 : %u  Set 2 : %u\n",
-                 id, (unsigned)list1.size(), (unsigned)list2.size() );
+        fprintf( stderr, "Sets with id %d do not have same number of entities (%lu vs %lu)\n", id,
+                 (unsigned long)list1.size(), (unsigned long)list2.size() );
         return false;
     }
 
     if( tag_name )  // compare contents using tag value
     {
+        fprintf( stderr, "Set %d: comparing using tag %s\n", id, tag_name );
         Tag tag;
         if( MB_SUCCESS != iface->tag_get_handle( tag_name, 0, MB_TYPE_OPAQUE, tag, MB_TAG_ANY ) )
         {
@@ -496,10 +503,15 @@ bool compare_sets( int id, const char* tag_name = 0 )
             return false;
         }
 
-        // Make sure tag is integer type
+        // Make sure tag is integer or long type
         DataType type;
         if( MB_SUCCESS != iface->tag_get_data_type( tag, type ) ) moab_error( "tag_get_data_type" );
-        if( MB_TYPE_INTEGER != type && MB_TYPE_OPAQUE != type ) moab_error( "compare_sets" );
+        fprintf( stderr, "Set %d: tag %s has type %d\n", id, tag_name, (int)type );
+        if( MB_TYPE_INTEGER != type && MB_TYPE_OPAQUE != type && MB_TYPE_LONG != type )
+        {
+            fprintf( stderr, "Tag %s has unsupported type %d\n", tag_name, (int)type );
+            return false;
+        }
 
         std::vector< int > data1( list1.size() ), data2( list2.size() );
         if( MB_SUCCESS != iface->tag_get_data( tag, &list1[0], list1.size(), &data1[0] ) ||
@@ -787,9 +799,31 @@ bool compare()
 
     // compare sets
 
-    if( !compare_sets( VERTEX_SET_ID, tagname ) || !compare_sets( FACE_SET_ID ) || !compare_sets( REGION_SET_ID ) ||
-        !compare_sets( EMPTY_SET_ID ) || !compare_sets( SET_SET_ID, GLOBAL_ID_TAG_NAME ) )
+    if( !compare_sets( VERTEX_SET_ID, tagname ) )
+    {
+        fprintf( stderr, "VERTEX_SET_ID comparison failed\n" );
         return false;
+    }
+    if( !compare_sets( FACE_SET_ID ) )
+    {
+        fprintf( stderr, "FACE_SET_ID comparison failed\n" );
+        return false;
+    }
+    if( !compare_sets( REGION_SET_ID ) )
+    {
+        fprintf( stderr, "REGION_SET_ID comparison failed\n" );
+        return false;
+    }
+    if( !compare_sets( EMPTY_SET_ID ) )
+    {
+        fprintf( stderr, "EMPTY_SET_ID comparison failed\n" );
+        return false;
+    }
+    if( !compare_sets( SET_SET_ID, GLOBAL_ID_TAG_NAME ) )
+    {
+        fprintf( stderr, "SET_SET_ID comparison failed\n" );
+        return false;
+    }
 
     // check tags
     if( !compare_tags( dod ) ) return false;

@@ -951,7 +951,6 @@ moab::ErrorCode determine_communication_pattern_from_tag(
         }
     }
 
-
     return moab::MB_SUCCESS;
 }
 
@@ -1719,7 +1718,7 @@ inline void deterministicSparseMatTransposeVecMulNative( const typename moab::Te
     result = A.adjoint() * x;  // Perform the adjoint.matrix-vector multiplication using Eigen3
 }
 ///////////////////////////////////////////////////////////////////////////////
-
+// #define VERBOSE
 moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& srcVals,
                                                       std::vector< double >& tgtVals,
                                                       bool transpose )
@@ -1764,7 +1763,7 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
         output_file << "ColVector: " << m_colVector.size() << ", SrcVals: " << srcVals.size()
                     << ", Sizes: " << m_nTotDofs_SrcCov << ", " << col_dtoc_dofmap.size() << "\n";
 #endif
-        for( unsigned i = 0; i < srcVals.size(); ++i )
+        for( size_t i = 0; i < srcVals.size(); ++i )
         {
             if( col_dtoc_dofmap[i] >= 0 )
                 m_colVector( col_dtoc_dofmap[i] ) = srcVals[i];  // permute and set the row (source) vector properly
@@ -1783,7 +1782,7 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
         output_file << "RowVector: " << m_rowVector.size() << ", TgtVals:" << tgtVals.size()
                     << ", Sizes: " << m_nTotDofs_Dest << ", " << row_gdofmap.size() << "\n";
 #endif
-        for( unsigned i = 0; i < tgtVals.size(); ++i )
+        for( size_t i = 0; i < tgtVals.size(); ++i )
         {
             if( row_dtoc_dofmap[i] >= 0 )
             {
@@ -1819,7 +1818,7 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
     // All done with matvec application
     return moab::MB_SUCCESS;
 }
-
+// #undef VERBOSE
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////

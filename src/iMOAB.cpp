@@ -2944,11 +2944,11 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
     // tags of interest are either GLOBAL_DOFS or GLOBAL_ID
     Tag gdsTag;
     // find the values on first cell
-    int lenTagType1 = 1;
+    int gdsTagLength = 1;
     if( 1 == *type1 || 1 == *type2 )
     {
         rval = context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag );MB_CHK_ERR( rval );
-        rval = context.MBI->tag_get_length( gdsTag, lenTagType1 );MB_CHK_ERR( rval );  // usually it is 16
+        rval = context.MBI->tag_get_length( gdsTag, gdsTagLength );MB_CHK_ERR( rval );  // usually it is 16
     }
     Tag gidTag = context.MBI->globalId_tag();
 
@@ -2968,7 +2968,7 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
         {
             assert( gdsTag );
             rval = context.MBI->get_entities_by_type( fset1, MBQUAD, ents_of_interest );MB_CHK_ERR( rval );
-            valuesComp1.resize( ents_of_interest.size() * lenTagType1 );
+            valuesComp1.resize( ents_of_interest.size() * gdsTagLength );
             rval = context.MBI->tag_get_data( gdsTag, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );
         }
         else if( *type1 == 2 )
@@ -3040,7 +3040,7 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
         {
             assert( gdsTag );
             rval = context.MBI->get_entities_by_type( fset2, MBQUAD, ents_of_interest );MB_CHK_ERR( rval );
-            valuesComp2.resize( ents_of_interest.size() * lenTagType1 );
+            valuesComp2.resize( ents_of_interest.size() * gdsTagLength );
             rval = context.MBI->tag_get_data( gdsTag, ents_of_interest, &valuesComp2[0] );MB_CHK_ERR( rval );
         }
         else if( *type2 == 2 )
@@ -3376,7 +3376,7 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
         // so then just get the cells from covering mesh (no need to filter participating elements only)
 
         // send that info back to enhance parCommGraph cache
-        std::map< int, std::set< int > > idsFromProcs;
+        std::map< int, std::set< mbGIDType > > idsFromProcs;
         if( intx_cells.size() )
         {
             Tag parentTag;
@@ -3475,11 +3475,11 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
                 MB_CHK_SET_ERR( moab::MB_FAILURE, "ParCommGraph for context_id="
                                                       << *context_id << " already exists. Check the workflow" );
         }
-        for( std::map< int, std::set< int > >::iterator mit = idsFromProcs.begin(); mit != idsFromProcs.end(); ++mit )
+        for( auto mit = idsFromProcs.begin(); mit != idsFromProcs.end(); ++mit )
         {
-            int procToSendTo       = mit->first;
-            std::set< int >& idSet = mit->second;
-            for( std::set< int >::iterator sit = idSet.begin(); sit != idSet.end(); ++sit )
+            int procToSendTo = mit->first;
+            auto& idSet = mit->second;
+            for( auto sit = idSet.begin(); sit != idSet.end(); ++sit )
             {
                 int n = TLcovIDs.get_n();
                 TLcovIDs.reserve();
@@ -3924,13 +3924,14 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
 
     // tags of interest are either GLOBAL_DOFS or GLOBAL_ID
     Tag gdsTag;
-
     // find the values on first cell
-    int lenTagType1 = 1;
+    int gdsTagLength = 1;
+    DataType gdsTagDatatype;
     if( *type == 1 )
     {
-        rval = context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag );MB_CHK_ERR( rval );
-        rval = context.MBI->tag_get_length( gdsTag, lenTagType1 );MB_CHK_ERR( rval );  // usually it is 16
+        MB_CHK_SET_ERR( context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag ), "can't get GLOBAL_DOFS tag handle" );
+        MB_CHK_SET_ERR( context.MBI->tag_get_length( gdsTag, gdsTagLength ), "can't get length of GLOBAL_DOFS tag" );  // usually it is 16
+        MB_CHK_SET_ERR( context.MBI->tag_get_data_type( gdsTag, gdsTagDatatype ), "can't get data type of GLOBAL_DOFS tag" );
     }
     Tag gidTag = context.MBI->globalId_tag();
 
@@ -3947,21 +3948,21 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         if( *type == 1 )
         {
             assert( gdsTag );
-            rval = context.MBI->get_entities_by_type( fset1, MBQUAD, ents_of_interest );MB_CHK_ERR( rval );
-            valuesComp1.resize( ents_of_interest.size() * lenTagType1 );
-            rval = context.MBI->tag_get_data( gdsTag, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( context.MBI->get_entities_by_type( fset1, MBQUAD, ents_of_interest ), "can't get entities by type" );
+            valuesComp1.resize( ents_of_interest.size() * gdsTagLength );
+            MB_CHK_SET_ERR( context.MBI->tag_get_data( gdsTag, ents_of_interest, &valuesComp1[0] ), "can't get tag data" );
         }
         else if( *type == 2 )
         {
-            rval = context.MBI->get_entities_by_type( fset1, MBVERTEX, ents_of_interest );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( context.MBI->get_entities_by_type( fset1, MBVERTEX, ents_of_interest ), "can't get entities by type" );
             valuesComp1.resize( ents_of_interest.size() );
-            rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );  // just global ids
+            MB_CHK_SET_ERR( context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] ), "can't get tag data" );  // just global ids
         }
         else if( *type == 3 )  // for FV meshes, just get the global id of cell
         {
-            rval = context.MBI->get_entities_by_dimension( fset1, 2, ents_of_interest );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( context.MBI->get_entities_by_dimension( fset1, 2, ents_of_interest ), "can't get entities by dimension" );
             valuesComp1.resize( ents_of_interest.size() );
-            rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );  // just global ids
+            MB_CHK_SET_ERR( context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] ), "can't get GLOBAL_ID tag data" );  // just global ids
         }
         else
         {
@@ -4078,7 +4079,6 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     int indexInTLComp2 = 0;  // advance both, according to the marker
     if( n1 > 0 && n2 > 0 )
     {
-
         while( indexInTLComp1 < n1 && indexInTLComp2 < n2 )  // if any is over, we are done
         {
             int currentValue1 = TLcomp1.vi_rd[2 * indexInTLComp1 + 1];
@@ -4155,9 +4155,9 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         for( size_t i = 0; i < ents_of_interest.size(); i++ )
         {
             EntityHandle ent = ents_of_interest[i];
-            for( int j = 0; j < lenTagType1; j++ )
+            for( int j = 0; j < gdsTagLength; j++ )
             {
-                int marker = valuesComp1[i * lenTagType1 + j];
+                int marker = valuesComp1[i * gdsTagLength + j];
                 for( auto mit = uniqueIDs.begin(); mit != uniqueIDs.end(); mit++ )
                 {
                     int proc                = mit->first;
@@ -4209,9 +4209,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         {
             // to proc, ID cell, gdsTag, nbv, id conn,
             int size_tuple =
-                2 + ( ( *type != 1 ) ? 0 : lenTagType1 ) + 1 + 10;  // 10 is the max number of vertices in cell
-
-            std::vector< int > gdvals;
+                2 + ( ( *type != 1 ) ? 0 : gdsTagLength ) + 1 + 10;  // 10 is the max number of vertices in cell
 
             TLc.initialize( size_tuple, 0, 0, 0, numc );  // to proc, GLOBAL ID, 3 real coordinates
             TLc.enableWriteAccess();
@@ -4230,7 +4228,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                     {
                         rval = context.MBI->tag_get_data( gdsTag, &cell, 1,
                                                           &( TLc.vi_wr[size_tuple * n + current_index] ) );MB_CHK_ERR( rval );
-                        current_index += lenTagType1;
+                        current_index += gdsTagLength;
                     }
                     // now get connectivity
                     const EntityHandle* conn = NULL;
@@ -4255,7 +4253,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         if( *type != 2 )                  // for point cloud, we do not need to initialize TLc (for cells)
         {
             // we still need to initialize the tuples with the right size, as in form_tuples_to_migrate_mesh
-            int size_tuple = 2 + ( ( *type != 1 ) ? 0 : lenTagType1 ) + 1 +
+            int size_tuple = 2 + ( ( *type != 1 ) ? 0 : gdsTagLength ) + 1 +
                              10;  // 10 is the max number of vertices in cell; kind of arbitrary
             TLc.initialize( size_tuple, 0, 0, 0, 0 );
             TLc.enableWriteAccess();
@@ -4269,8 +4267,13 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         appData& dataIntx        = context.appDatas[*pid2];
         TempestMapAppData& tdata = dataIntx.tempestData;
         Range primary_ents;                  // vertices for type 2, cells of dim 2 for type 1 or 3
-        std::vector< mbGIDType > values_entities;  // will be the size of primary_ents3 * lenTagType1
+        std::vector< mbGIDType > values_entities;  // will be the size of primary_ents3 * gdsTagLength
+        std::vector< int > values_entities_int;  // will be the size of primary_ents3 * gdsTagLength
         EntityHandle fset3 = tdata.remapper->GetMeshSet( Remapper::CoveringMesh );
+
+        DataType gid_dtype, gds_dtype;
+        MB_CHK_SET_ERR( mb->tag_get_data_type( gidTag, gid_dtype ), "can't get data type of GLOBAL_DOFS tag" );
+        MB_CHK_SET_ERR( mb->tag_get_data_type( gdsTag, gds_dtype ), "can't get data type of GLOBAL_DOFS tag" );
 
         // start copy
         std::map< int, EntityHandle > vertexMap;  //
@@ -4287,14 +4290,36 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                 rval = context.MBI->create_vertex( &( TLv.vr_rd[3 * i] ), vertex );MB_CHK_ERR( rval );
                 vertexMap[gid] = vertex;
                 verts.insert( vertex );
-                rval = context.MBI->tag_set_data( gidTag, &vertex, 1, &gid );MB_CHK_ERR( rval );
+                if ( MB_GID_TAG_TYPE == gid_dtype )
+                {
+                    rval = context.MBI->tag_set_data( gidTag, &vertex, 1, &gid );MB_CHK_ERR( rval );
+                }
+                else
+                {
+                    // Need this for backward compatibility
+                    int gid_int = static_cast<int>(gid);
+                    rval = context.MBI->tag_set_data( gidTag, &vertex, 1, &gid_int );MB_CHK_ERR( rval );
+                }
             }
         }
         rval = context.MBI->add_entities( fset3, verts );MB_CHK_ERR( rval );
         if( 2 == *type )
         {
             values_entities.resize( verts.size() );  // just get the ids of vertices
-            rval = context.MBI->tag_get_data( gidTag, verts, &values_entities[0] );MB_CHK_ERR( rval );
+            if ( MB_GID_TAG_TYPE == gid_dtype )
+            {
+                rval = context.MBI->tag_get_data( gidTag, verts, &values_entities[0] );MB_CHK_ERR( rval );
+            }
+            else
+            {
+                // Need this for backward compatibility
+                values_entities_int.resize( verts.size() );
+                rval = context.MBI->tag_get_data( gidTag, verts, &values_entities_int[0] );MB_CHK_ERR( rval );
+                for (size_t index = 0; index < values_entities_int.size(); ++index)
+                {
+                    values_entities[index] = static_cast<mbGIDType>(values_entities_int[index]);
+                }
+            }
             primary_ents = verts;
             //return MB_SUCCESS;
         }
@@ -4302,7 +4327,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         {
             n = TLc.get_n();
             int size_tuple =
-                2 + ( ( *type != 1 ) ? 0 : lenTagType1 ) + 1 + 10;  // 10 is the max number of vertices in cell
+                2 + ( ( *type != 1 ) ? 0 : gdsTagLength ) + 1 + 10;  // 10 is the max number of vertices in cell
 
             EntityHandle new_element;
 
@@ -4310,12 +4335,12 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                 cellMap;  // do not create one if it already exists, maybe from other processes
             for( int i = 0; i < n; i++ )
             {
-                int from_proc  = TLc.vi_rd[size_tuple * i];
+                // int from_proc  = TLc.vi_rd[size_tuple * i];
                 mbGIDType globalIdEl = TLc.vi_rd[size_tuple * i + 1];
                 if( cellMap.find( globalIdEl ) == cellMap.end() )  // need to create the cell
                 {
                     int current_index = 2;
-                    if( 1 == *type ) current_index += lenTagType1;
+                    if( 1 == *type ) current_index += gdsTagLength;
                     int nnodes = TLc.vi_rd[size_tuple * i + current_index];
                     std::vector< EntityHandle > conn;
                     conn.resize( nnodes );
@@ -4330,7 +4355,16 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                     rval = context.MBI->create_element( entType, &conn[0], nnodes, new_element );MB_CHK_SET_ERR( rval, "can't create new element " );
                     primary_ents.insert( new_element );
                     cellMap[globalIdEl] = new_element;
-                    rval                = context.MBI->tag_set_data( gidTag, &new_element, 1, &globalIdEl );MB_CHK_SET_ERR( rval, "can't set global id tag on cell " );
+                    if ( MB_GID_TAG_TYPE == gid_dtype )
+                    {
+                        MB_CHK_SET_ERR( context.MBI->tag_set_data( gidTag, &new_element, 1, &globalIdEl ), "can't set global id tag on cell " );
+                    }
+                    else
+                    {
+                        // Need this for backward compatibility
+                        int gid_int = static_cast<int>(globalIdEl);
+                        MB_CHK_SET_ERR( context.MBI->tag_set_data( gidTag, &new_element, 1, &gid_int ), "can't set global id tag on cell " );
+                    }
                     if( 1 == *type )
                     {
                         // set the gds tag
@@ -4341,7 +4375,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
             rval = context.MBI->add_entities( fset3, primary_ents );MB_CHK_ERR( rval );
             if( 1 == *type )
             {
-                values_entities.resize( lenTagType1 * primary_ents.size() );
+                values_entities.resize( gdsTagLength * primary_ents.size() );
                 rval = context.MBI->tag_get_data( gdsTag, primary_ents, &values_entities[0] );MB_CHK_ERR( rval );
             }
             else  // *type == 3
@@ -4352,7 +4386,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         }
 
         int ndofPerEl = 1;
-        if( 1 == *type ) ndofPerEl = (int)( sqrt( lenTagType1 ) );
+        if( 1 == *type ) ndofPerEl = (int)( sqrt( gdsTagLength ) );
 
         tdata.remapper->SetMeshSet( Remapper::CoveringMesh, fset3, &primary_ents );
         // dump covering mesh in a file, to look at it

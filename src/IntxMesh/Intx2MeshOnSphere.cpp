@@ -17,6 +17,7 @@
 #include "moab/ParallelComm.hpp"
 #endif
 #include "MBTagConventions.hpp"
+#include "TagDataVariant.hpp"
 
 #include <cassert>
 
@@ -900,51 +901,39 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     // decide if we need to transfer global DOFs info attached to each HOMME coarse cell; first we
     // need to decide if the mesh has that tag; will affect the size of the tuple list involved in
     // the crystal routing
-    DataType gds_dtype;
     int size_gdofs_tag = 0;
     std::vector< mbGIDType > valsDOFs;
-    std::vector< int > valsDOFs_int;
-    Tag gdsTag;
-    rval = mb->tag_get_handle( "GLOBAL_DOFS", gdsTag );
 
     if( meshCells.size() > 0 )
     {
         oneCell = meshCells[0];  // it is possible we do not have any cells, even after migration
         MB_CHK_SET_ERR( mb->tag_get_data( orgSendProcTag, &oneCell, 1, &orig_sender ), "can't get original sending processor value" );
-        if( gdsTag )
-        {
-            MB_CHK_SET_ERR( mb->tag_get_data_type( gdsTag, gds_dtype ), "can't get data type of GLOBAL_DOFS tag" );
+        
+        try {
+            // Use TypeSafeTagInterface for GLOBAL_DOFS - automatic type handling
+            auto gds_interface = moab::make_tag_interface( mb, "GLOBAL_DOFS" );
+            
+            // Get tag length for sizing
+            size_gdofs_tag = gds_interface.get_length();
+            valsDOFs.resize( size_gdofs_tag );
+            
+            // Get data with automatic type conversion
+            Range single_cell;
+            single_cell.insert( oneCell );
+            rval = gds_interface.get_data( single_cell, valsDOFs );
+            
+            if( MB_SUCCESS == rval && valsDOFs[0] > 0 )
             {
-                // find the values on first cell
-                int lenTag = 0;
-                rval = mb->tag_get_length( gdsTag, lenTag );
-                if( MB_SUCCESS == rval && lenTag > 0 )
-                {
-                    valsDOFs.resize( lenTag );
-                    if ( MB_GID_TAG_TYPE == gds_dtype )
-                    {
-                        rval = mb->tag_get_data( gdsTag, &oneCell, 1, &valsDOFs[0] );
-                    }
-                    else
-                    {
-                        // Need this for backward compatibility
-                        valsDOFs_int.resize(lenTag);
-                        MB_CHK_SET_ERR( mb->tag_get_data( gdsTag, &oneCell, 1, &valsDOFs_int[0] ), "can't get GLOBAL_DOFS data for elements" );
-                        for (size_t index = 0; index < valsDOFs_int.size(); ++index)
-                        {
-                            valsDOFs[index] = static_cast<mbGIDType>(valsDOFs_int[index]);
-                        }
-                    }
-                    if( MB_SUCCESS == rval && valsDOFs[0] > 0 )
-                    {
-                        // first value positive means we really need to transport this data during
-                        // coverage
-                        size_gdofs_tag = lenTag;
-                    }
-                    else MB_CHK_SET_ERR(MB_INDEX_OUT_OF_RANGE, "Failed to get positive GLOBAL_DOFS tag data.");
-                }
-                else MB_CHK_SET_ERR(MB_INVALID_SIZE, "Failed to get GLOBAL_DOFS tag handle due to invalid type.");
+                // first value positive means we really need to transport this data during coverage
+                // size_gdofs_tag already set above
             }
+            else 
+            {
+                size_gdofs_tag = 0;  // Don't transport if first value is not positive
+            }
+        } catch( const std::exception& e ) {
+            // GLOBAL_DOFS tag doesn't exist or other error - that's okay
+            size_gdofs_tag = 0;
         }
     }
 
@@ -1215,19 +1204,14 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
             // GLOBAL_DOFS info, if available
             if( size_gdofs_tag )
             {
-                if ( MB_GID_TAG_TYPE == gds_dtype )
-                {
-                    MB_CHK_SET_ERR( mb->tag_get_data( gdsTag, &q, 1, &valsDOFs[0] ), "can't get GLOBAL_DOFS data for elements" );
-                }
-                else
-                {
-                    // Need this for backward compatibility
-                    valsDOFs_int.resize(valsDOFs.size());
-                    MB_CHK_SET_ERR( mb->tag_get_data( gdsTag, &q, 1, &valsDOFs_int[0] ), "can't get GLOBAL_DOFS data for elements" );
-                    for (size_t index = 0; index < valsDOFs_int.size(); ++index)
-                    {
-                        valsDOFs[index] = static_cast<mbGIDType>(valsDOFs_int[index]);
-                    }
+                try {
+                    // Use TypeSafeTagInterface for automatic type conversion
+                    auto gds_interface = moab::make_tag_interface( mb, "GLOBAL_DOFS" );
+                    Range single_cell;
+                    single_cell.insert( q );
+                    MB_CHK_SET_ERR( gds_interface.get_data( single_cell, valsDOFs ), "can't get GLOBAL_DOFS data for elements" );
+                } catch( const std::exception& e ) {
+                    MB_CHK_SET_ERR( MB_TAG_NOT_FOUND, "GLOBAL_DOFS tag operation failed: " << e.what() );
                 }
 
                 for( int i = 0; i < size_gdofs_tag; i++ )
@@ -1350,19 +1334,18 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         // check if we need to retrieve and set GLOBAL_DOFS data
         if( size_gdofs_tag )
         {
-            if ( MB_GID_TAG_TYPE == gds_dtype )
-            {
-                for( int j = 0; j < size_gdofs_tag; j++ )
-                    valsDOFs[j] = TLq.vi_wr[sizeTuple * i + currentIndexIntTuple + j];
-                MB_CHK_SET_ERR( mb->tag_set_data( gdsTag, &new_element, 1, &valsDOFs[0] ), "can't set GLOBAL_DOFS data on coverage mesh" );
-            }
-            else
-            {
-                // Need this for backward compatibility
-                valsDOFs_int.resize(size_gdofs_tag);
-                for( int j = 0; j < size_gdofs_tag; j++ )
-                    valsDOFs_int[j] = TLq.vi_wr[sizeTuple * i + currentIndexIntTuple + j];
-                MB_CHK_SET_ERR( mb->tag_set_data( gdsTag, &new_element, 1, &valsDOFs_int[0] ), "can't set GLOBAL_DOFS data on coverage mesh" );
+            // Extract values from tuple list
+            for( int j = 0; j < size_gdofs_tag; j++ )
+                valsDOFs[j] = TLq.vi_wr[sizeTuple * i + currentIndexIntTuple + j];
+            
+            try {
+                // Use TypeSafeTagInterface for automatic type conversion
+                auto gds_interface = moab::make_tag_interface( mb, "GLOBAL_DOFS" );
+                Range single_element;
+                single_element.insert( new_element );
+                MB_CHK_SET_ERR( gds_interface.set_data( single_element, valsDOFs ), "can't set GLOBAL_DOFS data on coverage mesh" );
+            } catch( const std::exception& e ) {
+                MB_CHK_SET_ERR( MB_TAG_NOT_FOUND, "GLOBAL_DOFS tag set operation failed: " << e.what() );
             }
         }
     }

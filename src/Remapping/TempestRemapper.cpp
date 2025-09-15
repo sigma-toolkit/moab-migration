@@ -638,7 +638,7 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
 
     // resize the number of elements in Tempest mesh
     faces.resize( nelems );
-    
+
     // Initialize all Face objects to prevent uninitialized access
     for( size_t i = 0; i < nelems; ++i )
     {
@@ -1336,6 +1336,10 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
             // rval = tree.reset_tree();MB_CHK_ERR(rval);
             std::cout << "[INFO] - Total covering source entities = " << m_covering_source_entities.size() << std::endl;
             rval = m_interface->add_entities( m_covering_source_set, m_covering_source_entities );MB_CHK_ERR( rval );
+            if (m_covering_source_entities.size() == 0)
+            {
+                rval = m_interface->add_entities( m_covering_source_set, m_covering_source_vertices );MB_CHK_ERR( rval );
+            }
         }
         else
         {

@@ -248,7 +248,7 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
                                std::vector< facet > facet_data,
                                std::vector< tet > tet_data,
                                const std::map< int, EntityHandle > surface_map,
-                               const std::map< int, EntityHandle > volume_map )
+                               const std::map< int, EntityHandle > /*volume_map*/ )
 {
     ErrorCode rval;
     EntityHandle file_set;
@@ -268,7 +268,7 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
     rval = MBI->add_entities( file_set, mb_coords );MB_CHK_ERR( rval );
 
     // add facets to the file set
-    create_facets( facet_data, surface_map, mb_coords, file_set );
+    MB_CHK_ERR( create_facets( facet_data, surface_map, mb_coords, file_set ) );
 
     // material number tag
     Tag mat_num_tag;
@@ -324,17 +324,16 @@ ErrorCode ReadRTT::create_material_group( const std::string& material_name, int 
     return MB_SUCCESS;
 }
 
-void ReadRTT::create_facets( const std::vector< facet >& facet_data,
+moab::ErrorCode ReadRTT::create_facets( const std::vector< facet >& facet_data,
                              const std::map< int, EntityHandle >& surface_map,
                              Range& mb_coords,
                              EntityHandle file_set )
 {
-    ErrorCode rval;
     Tag side_id_tag, surface_number_tag;
     // Obtain or create tags for side IDs and surface numbers
-    rval = MBI->tag_get_handle( "SIDEID_TAG", 1, MB_TYPE_INTEGER, side_id_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
-    rval =
-        MBI->tag_get_handle( "SURFACE_NUMBER", 1, MB_TYPE_INTEGER, surface_number_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
+    MB_CHK_ERR( MBI->tag_get_handle( "SIDEID_TAG", 1, MB_TYPE_INTEGER, side_id_tag, MB_TAG_SPARSE | MB_TAG_CREAT ) );
+    MB_CHK_ERR(
+        MBI->tag_get_handle( "SURFACE_NUMBER", 1, MB_TYPE_INTEGER, surface_number_tag, MB_TAG_SPARSE | MB_TAG_CREAT ) );
 
     EntityHandle triangle;
     Range mb_tris;  // For storing triangles
@@ -343,24 +342,26 @@ void ReadRTT::create_facets( const std::vector< facet >& facet_data,
     {
         EntityHandle tri_nodes[3] = { mb_coords[tmp.connectivity[0] - 1], mb_coords[tmp.connectivity[1] - 1],
                                       mb_coords[tmp.connectivity[2] - 1] };
-        rval                      = MBI->create_element( MBTRI, tri_nodes, 3, triangle );
+        MB_CHK_ERR( MBI->create_element( MBTRI, tri_nodes, 3, triangle ) );
         // tag in side id on the triangle
-        rval = MBI->tag_set_data( side_id_tag, &triangle, 1, &tmp.side_id );
+        MB_CHK_ERR( MBI->tag_set_data( side_id_tag, &triangle, 1, &tmp.side_id ) );
         // tag the surface number on the triangle
-        rval = MBI->tag_set_data( surface_number_tag, &triangle, 1, &tmp.surface_number );
+        MB_CHK_ERR( MBI->tag_set_data( surface_number_tag, &triangle, 1, &tmp.surface_number ) );
         // insert vertices and triangles into the appropriate surface meshset
         EntityHandle meshset_handle = surface_map.at( tmp.surface_number );
         // also set surface tag
-        rval = MBI->tag_set_data( side_id_tag, &meshset_handle, 1, &tmp.side_id );
-        rval = MBI->tag_set_data( surface_number_tag, &meshset_handle, 1, &tmp.surface_number );
+        MB_CHK_ERR( MBI->tag_set_data( side_id_tag, &meshset_handle, 1, &tmp.side_id ) );
+        MB_CHK_ERR( MBI->tag_set_data( surface_number_tag, &meshset_handle, 1, &tmp.surface_number ) );
         // add vertices to the mesh
-        rval = MBI->add_entities( meshset_handle, tri_nodes, 3 );
+        MB_CHK_ERR( MBI->add_entities( meshset_handle, tri_nodes, 3 ) );
         // add triangles to the meshset
-        rval = MBI->add_entities( meshset_handle, &triangle, 1 );
+        MB_CHK_ERR( MBI->add_entities( meshset_handle, &triangle, 1 ) );
         // insert triangles into mb_tris
         mb_tris.insert( triangle );
     }
-    rval = MBI->add_entities( file_set, mb_tris );
+    MB_CHK_ERR( MBI->add_entities( file_set, mb_tris ) );
+
+    return moab::MB_SUCCESS;
 }
 
 moab::ErrorCode ReadRTT::add_metadata( EntityHandle file_set )

@@ -25,6 +25,7 @@
 #include "moab/MeshTopoUtil.hpp"
 #include "moab/ReadUtilIface.hpp"
 #include "moab/MergeMesh.hpp"
+#include "TagDataVariant.hpp"
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
 #include "STLStringHelper.h"
@@ -2950,7 +2951,8 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
         rval = context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag );MB_CHK_ERR( rval );
         rval = context.MBI->tag_get_length( gdsTag, gdsTagLength );MB_CHK_ERR( rval );  // usually it is 16
     }
-    Tag gidTag = context.MBI->globalId_tag();
+    // Tag gidTag = context.MBI->globalId_tag();
+    auto gid_interface = make_tag_interface(context.MBI, "GLOBAL_ID");
 
     std::vector< mbGIDType > valuesComp1;
     // populate first tuple
@@ -2967,21 +2969,31 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
         if( *type1 == 1 )
         {
             assert( gdsTag );
-            rval = context.MBI->get_entities_by_type( fset1, MBQUAD, ents_of_interest );MB_CHK_ERR( rval );
+            // GLOBAL_DOFS tag case
+            auto gds_interface = make_tag_interface(context.MBI, "GLOBAL_DOFS");
+
+            MB_CHK_ERR( context.MBI->get_entities_by_type(fset1, MBQUAD, ents_of_interest) );
+
+            // Automatic type conversion - no need to check tag data type!
             valuesComp1.resize( ents_of_interest.size() * gdsTagLength );
-            rval = context.MBI->tag_get_data( gdsTag, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );
+            MB_CHK_ERR( gds_interface.get_data(ents_of_interest, valuesComp1) );
+            // rval = context.MBI->get_entities_by_type( fset1, MBQUAD, ents_of_interest );MB_CHK_ERR( rval );
+            // rval = context.MBI->tag_get_data( gdsTag, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );
         }
         else if( *type1 == 2 )
         {
-            rval = context.MBI->get_entities_by_type( fset1, MBVERTEX, ents_of_interest );MB_CHK_ERR( rval );
+            MB_CHK_ERR( context.MBI->get_entities_by_type(fset1, MBVERTEX, ents_of_interest) );
             valuesComp1.resize( ents_of_interest.size() );
-            rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );  // just global ids
+            MB_CHK_ERR( gid_interface.get_data(ents_of_interest, valuesComp1) );
+            // rval = context.MBI->get_entities_by_type( fset1, MBVERTEX, ents_of_interest );MB_CHK_ERR( rval );
+            // rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );  // just global ids
         }
         else if( *type1 == 3 )  // for FV meshes, just get the global id of cell
         {
-            rval = context.MBI->get_entities_by_dimension( fset1, 2, ents_of_interest );MB_CHK_ERR( rval );
+            MB_CHK_ERR( context.MBI->get_entities_by_dimension(fset1, 2, ents_of_interest) );
             valuesComp1.resize( ents_of_interest.size() );
-            rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );  // just global ids
+            MB_CHK_ERR( gid_interface.get_data(ents_of_interest, valuesComp1) );
+            // rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );  // just global ids
         }
         else
         {
@@ -3039,21 +3051,34 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
         if( *type2 == 1 )
         {
             assert( gdsTag );
-            rval = context.MBI->get_entities_by_type( fset2, MBQUAD, ents_of_interest );MB_CHK_ERR( rval );
-            valuesComp2.resize( ents_of_interest.size() * gdsTagLength );
-            rval = context.MBI->tag_get_data( gdsTag, ents_of_interest, &valuesComp2[0] );MB_CHK_ERR( rval );
+            // GLOBAL_DOFS tag case
+            auto gds_interface = make_tag_interface(context.MBI, "GLOBAL_DOFS");
+
+            MB_CHK_ERR( context.MBI->get_entities_by_type(fset2, MBQUAD, ents_of_interest) );
+
+            // Automatic type conversion - no need to check tag data type!
+            valuesComp1.resize( ents_of_interest.size() * gdsTagLength );
+            MB_CHK_ERR( gds_interface.get_data(ents_of_interest, valuesComp2) );
+
+            // rval = context.MBI->get_entities_by_type( fset2, MBQUAD, ents_of_interest );MB_CHK_ERR( rval );
+            // valuesComp2.resize( ents_of_interest.size() * gdsTagLength );
+            // rval = context.MBI->tag_get_data( gdsTag, ents_of_interest, &valuesComp2[0] );MB_CHK_ERR( rval );
         }
         else if( *type2 == 2 )
         {
-            rval = context.MBI->get_entities_by_type( fset2, MBVERTEX, ents_of_interest );MB_CHK_ERR( rval );
-            valuesComp2.resize( ents_of_interest.size() );  // stride is 1 here
-            rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp2[0] );MB_CHK_ERR( rval );  // just global ids
+            MB_CHK_ERR( context.MBI->get_entities_by_type(fset2, MBVERTEX, ents_of_interest) );
+
+            // Automatic type conversion - no need to check tag data type!
+            valuesComp2.resize( ents_of_interest.size() );
+            MB_CHK_ERR( gid_interface.get_data(ents_of_interest, valuesComp2) );
         }
         else if( *type2 == 3 )
         {
             rval = context.MBI->get_entities_by_dimension( fset2, 2, ents_of_interest );MB_CHK_ERR( rval );
             valuesComp2.resize( ents_of_interest.size() );  // stride is 1 here
-            rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp2[0] );MB_CHK_ERR( rval );  // just global ids
+            // rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp2[0] );MB_CHK_ERR( rval );  // just global ids
+            // Automatic type conversion - no need to check tag data type!
+            MB_CHK_ERR( gid_interface.get_data(ents_of_interest, valuesComp2) );
         }
         else
         {
@@ -3922,20 +3947,17 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
     // will push_back a new tuple, if needed
     TLcomp1.enableWriteAccess();
 
-    // tags of interest are either GLOBAL_DOFS or GLOBAL_ID
-    Tag gdsTag;
-    // find the values on first cell
-    int gdsTagLength = 1;
-    DataType gdsTagDatatype;
-    if( *type == 1 )
-    {
-        MB_CHK_SET_ERR( context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag ), "can't get GLOBAL_DOFS tag handle" );
-        MB_CHK_SET_ERR( context.MBI->tag_get_length( gdsTag, gdsTagLength ), "can't get length of GLOBAL_DOFS tag" );  // usually it is 16
-        MB_CHK_SET_ERR( context.MBI->tag_get_data_type( gdsTag, gdsTagDatatype ), "can't get data type of GLOBAL_DOFS tag" );
-    }
-    Tag gidTag = context.MBI->globalId_tag();
-
     std::vector< mbGIDType > valuesComp1;
+
+    // Use TypeSafeTagInterface for type-safe tag operations
+    auto gid_interface = moab::make_tag_interface(context.MBI, GLOBAL_ID_TAG_NAME);
+    auto gidTag = gid_interface.get_tag();  // For backward compatibility
+
+    // Initialize GDS tag interface if needed
+    // moab::TypeSafeTagInterface<mbGIDType> gds_interface;
+    Tag gdsTag = 0;  // Will be set if GLOBAL_DOFS tag exists
+    int gdsTagLength = 1;  // Default value, will be updated if GLOBAL_DOFS tag exists
+    bool has_gds_tag = false;
 
     // populate first tuple
     Range ents_of_interest;  // will be filled with entities on pid1, that need to be distributed,
@@ -3945,28 +3967,57 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         appData& data1     = context.appDatas[*pid1];
         EntityHandle fset1 = data1.file_set;
 
-        if( *type == 1 )
-        {
-            assert( gdsTag );
-            MB_CHK_SET_ERR( context.MBI->get_entities_by_type( fset1, MBQUAD, ents_of_interest ), "can't get entities by type" );
-            valuesComp1.resize( ents_of_interest.size() * gdsTagLength );
-            MB_CHK_SET_ERR( context.MBI->tag_get_data( gdsTag, ents_of_interest, &valuesComp1[0] ), "can't get tag data" );
+        try {
+            if( *type == 1 )
+            {
+                // GLOBAL_DOFS case - automatic type handling
+                auto gds_interface = moab::make_tag_interface(context.MBI, "GLOBAL_DOFS");
+                gdsTag = gds_interface.get_tag();  // Set for backward compatibility
+                gdsTagLength = gds_interface.get_length();  // Update for backward compatibility
+                has_gds_tag = true;
+                MB_CHK_SET_ERR( context.MBI->get_entities_by_type( fset1, MBQUAD, ents_of_interest ), "can't get entities by type" );
+                std::vector<mbGIDType> gdofs;
+                MB_CHK_SET_ERR( gds_interface.get_data( ents_of_interest, gdofs ), "can't get GLOBAL_DOFS data" );
+                valuesComp1.assign(gdofs.begin(), gdofs.end());
+            }
+            else if( *type == 2 )
+            {
+                // Vertex GLOBAL_ID case - automatic type handling
+                MB_CHK_SET_ERR( context.MBI->get_entities_by_type( fset1, MBVERTEX, ents_of_interest ), "can't get entities by type" );
+                std::vector<mbGIDType> gids;
+                MB_CHK_SET_ERR( gid_interface.get_data( ents_of_interest, gids ), "can't get vertex GLOBAL_ID data" );
+                valuesComp1.assign(gids.begin(), gids.end());
+            }
+            else if( *type == 3 )  // for FV meshes, just get the global id of cell
+            {
+                // Cell GLOBAL_ID case - automatic type handling
+                MB_CHK_SET_ERR( context.MBI->get_entities_by_dimension( fset1, 2, ents_of_interest ), "can't get entities by dimension" );
+                std::vector<mbGIDType> gids;
+                MB_CHK_SET_ERR( gid_interface.get_data( ents_of_interest, gids ), "can't get cell GLOBAL_ID data" );
+                valuesComp1.assign(gids.begin(), gids.end());
+            }
+            else
+            {
+                MB_CHK_ERR( MB_FAILURE );  // we know only type 1 or 2 or 3
+            }
+        } catch( const std::exception& e ) {
+            MB_CHK_SET_ERR( MB_TAG_NOT_FOUND, "Tag operation failed: " << e.what() );
         }
-        else if( *type == 2 )
-        {
-            MB_CHK_SET_ERR( context.MBI->get_entities_by_type( fset1, MBVERTEX, ents_of_interest ), "can't get entities by type" );
-            valuesComp1.resize( ents_of_interest.size() );
-            MB_CHK_SET_ERR( context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] ), "can't get tag data" );  // just global ids
-        }
-        else if( *type == 3 )  // for FV meshes, just get the global id of cell
-        {
-            MB_CHK_SET_ERR( context.MBI->get_entities_by_dimension( fset1, 2, ents_of_interest ), "can't get entities by dimension" );
-            valuesComp1.resize( ents_of_interest.size() );
-            MB_CHK_SET_ERR( context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] ), "can't get GLOBAL_ID tag data" );  // just global ids
-        }
-        else
-        {
-            MB_CHK_ERR( MB_FAILURE );  // we know only type 1 or 2 or 3
+
+        // Set gdsTag if not already set (for backward compatibility)
+        if( !has_gds_tag && *type == 1 ) {
+            ErrorCode rval = context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag );
+            if( MB_SUCCESS == rval ) {
+                has_gds_tag = true;
+                context.MBI->tag_get_length( gdsTag, gdsTagLength );
+
+                // Verify the tag is 64-bit
+                DataType dtype;
+                rval = context.MBI->tag_get_data_type( gdsTag, dtype );
+                if( MB_SUCCESS != rval || dtype != MB_TYPE_LONG ) {
+                    MB_CHK_SET_ERR( MB_TYPE_OUT_OF_RANGE, "GLOBAL_DOFS tag must be 64-bit integer type (MB_TYPE_LONG)" );
+                }
+            }
         }
         // now fill the tuple list with info and markers
         // because we will send only the ids, order and compress the list
@@ -4140,15 +4191,15 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
 #endif
         // so we are now on pid1, we know now each cell where it has to go
         int n = TLBackToComp1.get_n();
-        std::map< int, std::set< int > > uniqueIDs;
+        std::map< int, std::set< mbGIDType > > uniqueIDs;
         for( int i = 0; i < n; i++ )
         {
             int to_proc  = TLBackToComp1.vi_wr[3 * i + 2];
-            int globalId = TLBackToComp1.vi_wr[3 * i + 1];
+            mbGIDType globalId = TLBackToComp1.vi_wr[3 * i + 1];
             uniqueIDs[to_proc].insert( globalId );
         }
-        // gidTag is gid tag
-        // gdsTag is GLOBAL_DOFS , used only for spectral (type 1)
+        // gidTag is GLOBAL_ID tag (64-bit)
+        // gdsTag is GLOBAL_DOFS (64-bit), used only for spectral (type 1)
         // (*type 1 is spectral, right now not used in E3SM)
 
         std::map< int, Range > splits;
@@ -4161,7 +4212,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                 for( auto mit = uniqueIDs.begin(); mit != uniqueIDs.end(); mit++ )
                 {
                     int proc                = mit->first;
-                    std::set< int >& setIds = mit->second;
+                    auto& setIds = mit->second;
                     if( setIds.find( marker ) != setIds.end() )
                     {
                         splits[proc].insert( ent );
@@ -4200,7 +4251,14 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                 int n            = TLv.get_n();  // current size of tuple list
                 TLv.vi_wr[2 * n] = to_proc;      // send to processor
 
-                rval = context.MBI->tag_get_data( gidTag, &v, 1, &( TLv.vi_wr[2 * n + 1] ) );MB_CHK_ERR( rval );
+                // Use TypeSafeTagInterface for GLOBAL_ID tag
+                try {
+                    mbGIDType gid;
+                    MB_CHK_SET_ERR( gid_interface.get_data(v, gid), "can't get GLOBAL_ID tag data for vertex" );
+                    TLv.vi_wr[2 * n + 1] = static_cast<int>(gid);
+                } catch( const std::exception& e ) {
+                    MB_CHK_SET_ERR( MB_TAG_NOT_FOUND, "GLOBAL_ID tag get operation failed: " << e.what() );
+                }
                 rval = context.MBI->get_coords( &v, 1, &( TLv.vr_wr[3 * n] ) );MB_CHK_ERR( rval );
                 TLv.inc_n();  // increment tuple list size
             }
@@ -4223,12 +4281,31 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                     int n                     = TLc.get_n();  // current size of tuple list
                     TLc.vi_wr[size_tuple * n] = to_proc;
                     int current_index         = 2;
-                    rval = context.MBI->tag_get_data( gidTag, &cell, 1, &( TLc.vi_wr[size_tuple * n + 1] ) );MB_CHK_ERR( rval );
+                    // Use TypeSafeTagInterface for GLOBAL_ID tag
+                    try {
+                        mbGIDType gid;
+                        MB_CHK_SET_ERR( gid_interface.get_data(cell, gid), "can't get GLOBAL_ID tag data for cell" );
+                        TLc.vi_wr[size_tuple * n + 1] = static_cast<int>(gid);
+                    } catch( const std::exception& e ) {
+                        MB_CHK_SET_ERR( MB_TAG_NOT_FOUND, "GLOBAL_ID tag get operation failed: " << e.what() );
+                    }
+
                     if( 1 == *type )
                     {
-                        rval = context.MBI->tag_get_data( gdsTag, &cell, 1,
-                                                          &( TLc.vi_wr[size_tuple * n + current_index] ) );MB_CHK_ERR( rval );
-                        current_index += gdsTagLength;
+                        try {
+                            // GLOBAL_DOFS case - automatic type handling
+                            auto gds_interface = moab::make_tag_interface(context.MBI, "GLOBAL_DOFS");
+                            std::vector<mbGIDType> gds_data(gdsTagLength);
+                            MB_CHK_SET_ERR( gds_interface.get_data(cell, gds_data),
+                                          "can't get GLOBAL_DOFS tag data for cell" );
+                            // Copy to tuple list
+                            for (int j = 0; j < gdsTagLength; j++) {
+                                TLc.vi_wr[size_tuple * n + current_index + j] = static_cast<int>(gds_data[j]);
+                            }
+                            current_index += gdsTagLength;
+                        } catch( const std::exception& e ) {
+                            MB_CHK_SET_ERR( MB_TAG_NOT_FOUND, "GLOBAL_DOFS tag get operation failed: " << e.what() );
+                        }
                     }
                     // now get connectivity
                     const EntityHandle* conn = NULL;
@@ -4236,8 +4313,21 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                     rval                     = context.MBI->get_connectivity( cell, conn, nnodes );MB_CHK_ERR( rval );
                     // fill nnodes:
                     TLc.vi_wr[size_tuple * n + current_index] = nnodes;
-                    rval                                      = context.MBI->tag_get_data( gidTag, conn, nnodes,
-                                                                                           &( TLc.vi_wr[size_tuple * n + current_index + 1] ) );MB_CHK_ERR( rval );
+
+                    // Use TypeSafeTagInterface for GLOBAL_ID tag
+                    try {
+                        std::vector<mbGIDType> gids(nnodes);
+                        const std::vector<EntityHandle> conn_vec(conn, conn + nnodes);
+                        MB_CHK_SET_ERR( gid_interface.get_data(conn_vec, gids),
+                                      "can't get GLOBAL_ID tag data for connectivity" );
+                        // Copy to tuple list
+                        for (int j = 0; j < nnodes; j++) {
+                            TLc.vi_wr[size_tuple * n + current_index + 1 + j] = static_cast<int>(gids[j]);
+                        }
+                    } catch( const std::exception& e ) {
+                        MB_CHK_SET_ERR( MB_TAG_NOT_FOUND, "GLOBAL_ID tag get operation failed: " << e.what() );
+                    }
+
                     TLc.inc_n();  // increment tuple list size
                 }
             }
@@ -4271,12 +4361,22 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         std::vector< int > values_entities_int;  // will be the size of primary_ents3 * gdsTagLength
         EntityHandle fset3 = tdata.remapper->GetMeshSet( Remapper::CoveringMesh );
 
+        // Verify tag data types are compatible with 64-bit GIDs
         DataType gid_dtype, gds_dtype;
-        MB_CHK_SET_ERR( mb->tag_get_data_type( gidTag, gid_dtype ), "can't get data type of GLOBAL_DOFS tag" );
-        MB_CHK_SET_ERR( mb->tag_get_data_type( gdsTag, gds_dtype ), "can't get data type of GLOBAL_DOFS tag" );
+        MB_CHK_SET_ERR( context.MBI->tag_get_data_type( gidTag, gid_dtype ), "can't get data type of GLOBAL_ID tag" );
+        if (gid_dtype != MB_TYPE_LONG) {
+            MB_SET_ERR(MB_TYPE_OUT_OF_RANGE, "GLOBAL_ID tag must be 64-bit integer type (MB_TYPE_LONG)");
+        }
+
+        if (has_gds_tag) {
+            MB_CHK_SET_ERR( context.MBI->tag_get_data_type( gdsTag, gds_dtype ), "can't get data type of GLOBAL_DOFS tag" );
+            if (gds_dtype != MB_TYPE_LONG) {
+                MB_SET_ERR(MB_TYPE_OUT_OF_RANGE, "GLOBAL_DOFS tag must be 64-bit integer type (MB_TYPE_LONG)");
+            }
+        }
 
         // start copy
-        std::map< int, EntityHandle > vertexMap;  //
+        std::map< mbGIDType, EntityHandle > vertexMap;  //
         Range verts;
         // always form vertices and add them to the fset3;
         int n = TLv.get_n();
@@ -4288,40 +4388,33 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
             {
                 // need to form this vertex
                 rval = context.MBI->create_vertex( &( TLv.vr_rd[3 * i] ), vertex );MB_CHK_ERR( rval );
-                vertexMap[gid] = vertex;
+                vertexMap.insert(std::pair<mbGIDType, EntityHandle>(gid, vertex));
                 verts.insert( vertex );
-                if ( MB_GID_TAG_TYPE == gid_dtype )
-                {
-                    rval = context.MBI->tag_set_data( gidTag, &vertex, 1, &gid );MB_CHK_ERR( rval );
-                }
-                else
-                {
-                    // Need this for backward compatibility
-                    int gid_int = static_cast<int>(gid);
-                    rval = context.MBI->tag_set_data( gidTag, &vertex, 1, &gid_int );MB_CHK_ERR( rval );
+                // Use TypeSafeTagInterface for automatic type conversion
+                try {
+                    auto gid_interface = moab::make_tag_interface( context.MBI, gidTag );
+                    Range single_vertex;
+                    single_vertex.insert( vertex );
+                    std::vector<mbGIDType> gid_vec(1, static_cast<mbGIDType>(gid));
+                    MB_CHK_SET_ERR( gid_interface.set_data( single_vertex, gid_vec ),
+                                     "can't set global id tag on vertex" );
+                } catch( const std::exception& e ) {
+                    MB_CHK_SET_ERR( MB_TAG_NOT_FOUND, "GLOBAL_ID tag set operation failed: " << e.what() );
                 }
             }
         }
         rval = context.MBI->add_entities( fset3, verts );MB_CHK_ERR( rval );
         if( 2 == *type )
         {
-            values_entities.resize( verts.size() );  // just get the ids of vertices
-            if ( MB_GID_TAG_TYPE == gid_dtype )
-            {
-                rval = context.MBI->tag_get_data( gidTag, verts, &values_entities[0] );MB_CHK_ERR( rval );
-            }
-            else
-            {
-                // Need this for backward compatibility
-                values_entities_int.resize( verts.size() );
-                rval = context.MBI->tag_get_data( gidTag, verts, &values_entities_int[0] );MB_CHK_ERR( rval );
-                for (size_t index = 0; index < values_entities_int.size(); ++index)
-                {
-                    values_entities[index] = static_cast<mbGIDType>(values_entities_int[index]);
-                }
+            // Use TypeSafeTagInterface for automatic type conversion to 64-bit
+            try {
+                std::vector<mbGIDType> gids;
+                MB_CHK_SET_ERR( gid_interface.get_data( verts, gids ), "can't get vertex GLOBAL_ID data" );
+                values_entities.assign(gids.begin(), gids.end());
+            } catch( const std::exception& e ) {
+                MB_CHK_SET_ERR( MB_TAG_NOT_FOUND, "GLOBAL_ID tag get operation failed: " << e.what() );
             }
             primary_ents = verts;
-            //return MB_SUCCESS;
         }
         else
         {
@@ -4331,7 +4424,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
 
             EntityHandle new_element;
 
-            std::map< int, EntityHandle >
+            std::map< mbGIDType, EntityHandle >
                 cellMap;  // do not create one if it already exists, maybe from other processes
             for( int i = 0; i < n; i++ )
             {
@@ -4346,7 +4439,11 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                     conn.resize( nnodes );
                     for( int j = 0; j < nnodes; j++ )
                     {
-                        conn[j] = vertexMap[TLc.vi_rd[size_tuple * i + current_index + j + 1]];
+                        auto vtx = vertexMap.find(static_cast<mbGIDType>(TLc.vi_rd[size_tuple * i + current_index + j + 1]));
+                        if (vtx == vertexMap.end()) {
+                            MB_CHK_SET_ERR(MB_TAG_NOT_FOUND, "Vertex with GLOBAL_ID " << TLc.vi_rd[size_tuple * i + current_index + j + 1] << " not found in vertex map");
+                        }
+                        conn[j] = vtx->second;
                     }
                     //
                     EntityType entType = MBQUAD;
@@ -4355,33 +4452,59 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                     rval = context.MBI->create_element( entType, &conn[0], nnodes, new_element );MB_CHK_SET_ERR( rval, "can't create new element " );
                     primary_ents.insert( new_element );
                     cellMap[globalIdEl] = new_element;
-                    if ( MB_GID_TAG_TYPE == gid_dtype )
-                    {
-                        MB_CHK_SET_ERR( context.MBI->tag_set_data( gidTag, &new_element, 1, &globalIdEl ), "can't set global id tag on cell " );
+                    // Use TypeSafeTagInterface for automatic type conversion
+                    try {
+                        auto gid_interface = moab::make_tag_interface( context.MBI, gidTag );
+                        Range single_element;
+                        single_element.insert( new_element );
+                        std::vector<mbGIDType> gid_vec(1, static_cast<mbGIDType>(globalIdEl));
+                        MB_CHK_SET_ERR( gid_interface.set_data( single_element, gid_vec ),
+                                         "can't set global id tag on cell" );
+                    } catch( const std::exception& e ) {
+                        MB_CHK_SET_ERR( MB_TAG_NOT_FOUND, "GLOBAL_ID tag set operation failed: " << e.what() );
                     }
-                    else
+                    if( 1 == *type && has_gds_tag )
                     {
-                        // Need this for backward compatibility
-                        int gid_int = static_cast<int>(globalIdEl);
-                        MB_CHK_SET_ERR( context.MBI->tag_set_data( gidTag, &new_element, 1, &gid_int ), "can't set global id tag on cell " );
-                    }
-                    if( 1 == *type )
-                    {
-                        // set the gds tag
-                        rval = context.MBI->tag_set_data( gdsTag, &new_element, 1, &( TLc.vi_rd[size_tuple * i + 2] ) );MB_CHK_SET_ERR( rval, "can't set gds tag on cell " );
+                        // Use existing GDS tag interface for GLOBAL_DOFS tag
+                        try {
+                            Range single_element;
+                            single_element.insert( new_element );
+                            std::vector<mbGIDType> gds_vec(gdsTagLength);
+                            for( int j = 0; j < gdsTagLength; j++ ) {
+                                gds_vec[j] = TLc.vi_rd[size_tuple * i + 2 + j];
+                            }
+                            // GLOBAL_DOFS case - automatic type handling
+                            auto gds_interface = moab::make_tag_interface(context.MBI, "GLOBAL_DOFS");
+                            MB_CHK_SET_ERR( gds_interface.set_data( single_element, gds_vec ), "can't set GLOBAL_DOFS tag on cell" );
+                        } catch( const std::exception& e ) {
+                            MB_CHK_SET_ERR( MB_TAG_NOT_FOUND, "GLOBAL_DOFS tag set operation failed: " << e.what() );
+                        }
                     }
                 }
             }
             rval = context.MBI->add_entities( fset3, primary_ents );MB_CHK_ERR( rval );
-            if( 1 == *type )
+            if( 1 == *type && has_gds_tag )
             {
-                values_entities.resize( gdsTagLength * primary_ents.size() );
-                rval = context.MBI->tag_get_data( gdsTag, primary_ents, &values_entities[0] );MB_CHK_ERR( rval );
+                // Use existing GDS tag interface for GLOBAL_DOFS tag
+                try {
+                    std::vector<mbGIDType> gdofs(gdsTagLength * primary_ents.size());
+                    // GLOBAL_DOFS case - automatic type handling
+                    auto gds_interface = moab::make_tag_interface(context.MBI, "GLOBAL_DOFS");
+                    MB_CHK_SET_ERR( gds_interface.get_data( primary_ents, gdofs ), "can't get GLOBAL_DOFS data" );
+                    values_entities.assign(gdofs.begin(), gdofs.end());
+                } catch( const std::exception& e ) {
+                    MB_CHK_SET_ERR( MB_TAG_NOT_FOUND, "GLOBAL_DOFS tag get operation failed: " << e.what() );
+                }
             }
             else  // *type == 3
             {
-                values_entities.resize( primary_ents.size() );  // just get the global ids !
-                rval = context.MBI->tag_get_data( gidTag, primary_ents, &values_entities[0] );MB_CHK_ERR( rval );
+                // Use TypeSafeTagInterface for GLOBAL_ID tag
+                try {
+                    auto gid_interface = moab::make_tag_interface( context.MBI, gidTag );
+                    MB_CHK_SET_ERR( gid_interface.get_data( primary_ents, values_entities ), "can't get GLOBAL_ID data" );
+                } catch( const std::exception& e ) {
+                    MB_CHK_SET_ERR( MB_TAG_NOT_FOUND, "GLOBAL_ID tag get operation failed: " << e.what() );
+                }
             }
         }
 

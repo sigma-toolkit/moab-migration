@@ -772,7 +772,7 @@ class ToolContext
             // Validate method values
             for( const auto& method : this->disc_methods )
             {
-                if( method != "fv" && method != "cgll" && method != "dgll" )
+                if( method != "fv" && method != "cgll" && method != "dgll" && method != "pcloud" )
                 {
                     throw std::runtime_error( "Invalid method '" + method + "'. Must be one of: fv, cgll, dgll" );
                 }

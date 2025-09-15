@@ -640,7 +640,7 @@ class ReadRTT : public ReaderIface
      */
     int count_sides( std::vector< side > side_data, std::vector< int >& surface_numbers );
 
-    void create_facets( const std::vector< facet >& facet_data,
+    ErrorCode create_facets( const std::vector< facet >& facet_data,
                         const std::map< int, EntityHandle >& surface_map,
                         Range& mb_coords,
                         EntityHandle file_set );

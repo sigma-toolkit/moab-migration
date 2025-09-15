@@ -4048,14 +4048,14 @@ ErrorCode ParallelComm::resolve_shared_ents( EntityHandle this_set,
     else
     {
         bool tag_created = false;
-        mbGIDType def_val = -1;
-        result = mbImpl->tag_get_handle( GLOBAL_ID_TAG_NAME, 1, MB_TYPE_LONG, gid_tag, MB_TAG_DENSE | MB_TAG_CREAT,
-                                         &def_val, &tag_created );
-        if( MB_ALREADY_ALLOCATED != result && MB_SUCCESS != result )
+        result = mbImpl->tag_get_handle( GLOBAL_ID_TAG_NAME, gid_tag );
+        if( MB_SUCCESS != result )
         {
-            MB_SET_ERR( result, "Failed to create/get gid tag handle" );
+            gid_tag = mbImpl->globalId_tag();
+            tag_created = true;
         }
-        else if( tag_created )
+
+        if( tag_created )
         {
             // Just created it, so we need global ids
             result = assign_global_ids( this_set, skin_dim + 1, true, true, true );MB_CHK_SET_ERR( result, "Failed to assign global ids" );
@@ -4069,30 +4069,53 @@ ErrorCode ParallelComm::resolve_shared_ents( EntityHandle this_set,
     // On 64 bits, long and int are different
     // On 32 bits, they are not; if size of long is 8, it is a 64 bit machine (really?)
 
-    // Get gids for skin ents in a vector, to pass to gs
+    // // Get gids for skin ents in a vector, to pass to gs
     std::vector< long > lgid_data( skin_ents[0].size() );
-    // Size is either long or int
-    // On 64 bit is 8 or 4
-    if( sizeof( long ) == bytes_per_tag && ( ( MB_TYPE_HANDLE == tag_type ) || ( MB_TYPE_OPAQUE == tag_type ) ) )
-    {  // It is a special id tag
-        result = mbImpl->tag_get_data( gid_tag, skin_ents[0], lgid_data.data() );MB_CHK_SET_ERR( result, "Couldn't get gid tag for skin vertices" );
-    }
-    else if( sizeof(int) == bytes_per_tag )
-    {  // Must be GLOBAL_ID tag or 32 bits ...
-        std::vector< int > gid_data( lgid_data.size() );
-        result = mbImpl->tag_get_data( gid_tag, skin_ents[0], gid_data.data() );MB_CHK_SET_ERR( result, "Failed to get gid tag for skin vertices" );
-        std::copy( gid_data.begin(), gid_data.end(), lgid_data.begin() );
-    }
-    else if( sizeof(mbGIDType) == bytes_per_tag )
-    {  // Must be mbGIDType (long) tag
-        std::vector< mbGIDType > gid_data( lgid_data.size() );
-        result = mbImpl->tag_get_data( gid_tag, skin_ents[0], gid_data.data() );MB_CHK_SET_ERR( result, "Failed to get gid tag for skin vertices" );
-        std::copy( gid_data.begin(), gid_data.end(), lgid_data.begin() );
-    }
-    else
-    {
-        // Not supported flag
-        MB_SET_ERR( MB_FAILURE, "Unsupported id tag size" );
+    // // Size is either long or int
+    // // On 64 bit is 8 or 4
+    // if( sizeof( long ) == bytes_per_tag && ( ( MB_TYPE_HANDLE == tag_type ) || ( MB_TYPE_OPAQUE == tag_type ) ) )
+    // {  // It is a special id tag
+    //     result = mbImpl->tag_get_data( gid_tag, skin_ents[0], lgid_data.data() );MB_CHK_SET_ERR( result, "Couldn't get gid tag for skin vertices" );
+    // }
+    // else if( sizeof(int) == bytes_per_tag )
+    // {  // Must be GLOBAL_ID tag or 32 bits ...
+    //     std::vector< int > gid_data( lgid_data.size() );
+    //     result = mbImpl->tag_get_data( gid_tag, skin_ents[0], gid_data.data() );MB_CHK_SET_ERR( result, "Failed to get gid tag for skin vertices" );
+    //     std::copy( gid_data.begin(), gid_data.end(), lgid_data.begin() );
+    // }
+    // else if( sizeof(mbGIDType) == bytes_per_tag )
+    // {  // Must be mbGIDType (long) tag
+    //     std::vector< mbGIDType > gid_data( lgid_data.size() );
+    //     result = mbImpl->tag_get_data( gid_tag, skin_ents[0], gid_data.data() );MB_CHK_SET_ERR( result, "Failed to get gid tag for skin vertices" );
+    //     std::copy( gid_data.begin(), gid_data.end(), lgid_data.begin() );
+    // }
+    // else
+    // {
+    //     // Not supported flag
+    //     MB_SET_ERR( MB_FAILURE, "Unsupported id tag size" );
+    // }
+    // Get tag data in the most appropriate type and convert to long
+    if (bytes_per_tag == sizeof(long) &&
+        (tag_type == MB_TYPE_HANDLE || tag_type == MB_TYPE_OPAQUE)) {
+        // Directly read into long vector for special id tags
+        result = mbImpl->tag_get_data(gid_tag, skin_ents[0], lgid_data.data());
+        MB_CHK_SET_ERR(result, "Couldn't get gid tag for skin vertices");
+    } else {
+        // For other types, use a temporary buffer of the correct type
+        std::vector<char> buffer(skin_ents[0].size() * bytes_per_tag);
+        result = mbImpl->tag_get_data(gid_tag, skin_ents[0], buffer.data());
+        MB_CHK_SET_ERR(result, "Failed to get gid tag for skin vertices");
+
+        // Copy the data with proper type conversion
+        if (bytes_per_tag == sizeof(int)) {
+            const int* src = reinterpret_cast<const int*>(buffer.data());
+            std::copy(src, src + skin_ents[0].size(), lgid_data.begin());
+        } else if (bytes_per_tag == sizeof(mbGIDType)) {
+            const mbGIDType* src = reinterpret_cast<const mbGIDType*>(buffer.data());
+            std::copy(src, src + skin_ents[0].size(), lgid_data.begin());
+        } else {
+            MB_SET_ERR(MB_FAILURE, "Unsupported id tag size");
+        }
     }
 
     // Put handles in vector for passing to gs setup
@@ -4521,7 +4544,7 @@ ErrorCode ParallelComm::resolve_shared_sets( EntityHandle file, const Tag* idtag
         if( NULL != gid ) result = mbImpl->tag_get_handle( GEOM_DIMENSION_TAG_NAME, 1, MB_TYPE_INTEGER, tag );
         if( MB_SUCCESS == result )
         {
-            for( mbGIDType d = 0; d < 4; d++ )
+            for( int d = 0; d < 4; d++ )
             {
                 candidate_sets.clear();
                 const void* vals[] = { &d };

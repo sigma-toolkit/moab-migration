@@ -177,8 +177,8 @@ extern const char* const* const SenseTypeStr;
 // Define it outside namespace moab: anonymous
 /** Global ID type for MOAB entities */
 typedef long mbGIDType;
-static const moab::DataType MB_GID_TAG_TYPE = moab::MB_TYPE_LONG;
-
+//static const moab::DataType MB_GID_TAG_TYPE = moab::MB_TYPE_LONG;
+#define MB_GID_TAG_TYPE moab::MB_TYPE_LONG
 #ifdef MOAB_HAVE_MPI
 /** MPI datatype for mbGIDType */
 #define MB_GID_MPI_TYPE MPI_LONG

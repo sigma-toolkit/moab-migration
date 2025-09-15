@@ -552,7 +552,7 @@ static moab::ErrorCode perform_distributed_reduction(
     // Owners perform the reduction.
     if (reduce_recv_buffers.size() > 0) {
         for (const auto& pair : reduce_recv_buffers) {
-            int global_row = pair.first;
+            // int global_row = pair.first;
             const std::vector<char>& recv_buffer = pair.second;
             const Eigen::Triplet<double>* received_triplets = reinterpret_cast<const Eigen::Triplet<double>*>(recv_buffer.data());
             int num_triplets = recv_buffer.size() / sizeof(Eigen::Triplet<double>);
@@ -714,7 +714,7 @@ moab::ErrorCode determine_communication_pattern_from_tag(
     moab::ErrorCode rval;
     moab::Interface* mb = pcomm->get_moab();
     int rank = pcomm->rank();
-    int size = pcomm->size();
+    //int size = pcomm->size();
     MPI_Comm comm = pcomm->comm();
 
     // Clear output parameters
@@ -3018,21 +3018,22 @@ struct MOABCentroidCloud
 };
 
 using KDTree = nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor< double, MOABCentroidCloud >,
-                                                    MOABCentroidCloud,
-                                                    3  // 3D
+                                                    MOABCentroidCloud,  // DatasetAdaptor
+                                                    3,                  // 3D
+                                                    size_t              // IndexType
                                                     >;
 
 // ----------------------
 // Radius search wrapper
 // ----------------------
-std::vector< int > radius_search_kdtree( const KDTree& tree,
-                                         const MOABCentroidCloud& cloud,
-                                         const std::array< double, 3 >& query_pt,
-                                         double radius )
+std::vector< size_t > radius_search_kdtree( const KDTree& tree,
+                                            const MOABCentroidCloud& cloud,
+                                            const std::array< double, 3 >& query_pt,
+                                            double radius )
 {
     double radius_sq = radius * radius;
     // double radius_sq = radius;
-    std::vector< nanoflann::ResultItem< unsigned, double > > matches;
+    std::vector< nanoflann::ResultItem< size_t, double > > matches;
     nanoflann::SearchParameters params;
     params.sorted = true;
 
@@ -3041,7 +3042,7 @@ std::vector< int > radius_search_kdtree( const KDTree& tree,
 
     tree.radiusSearch( query_pt.data(), radius_sq, matches, params );
 
-    std::vector< int > found_elements;
+    std::vector< size_t > found_elements;
     if( !matches.empty() )
     {
         // Return all matches within the radius
@@ -3051,7 +3052,7 @@ std::vector< int > radius_search_kdtree( const KDTree& tree,
     else
     {
         // Fallback to nearest neighbor
-        unsigned nearest_index;
+        size_t nearest_index;
         double nearest_dist_sq;
         tree.knnSearch( query_pt.data(), 1, &nearest_index, &nearest_dist_sq );
         found_elements.emplace_back( cloud.elements[nearest_index] );
@@ -3064,7 +3065,7 @@ std::vector< int > radius_search_kdtree( const KDTree& tree,
 
 moab::ErrorCode moab::TempestOnlineMap::LinearRemapFVtoGLL_Averaged( const DataArray3D< int >& dataGLLNodes,
                                                                      const DataArray3D< double >& dataGLLJacobian,
-                                                                     const DataArray1D< double >& dataGLLNodalArea,
+                                                                     const DataArray1D< double >& /*dataGLLNodalArea*/,
                                                                      int nOrder,
                                                                      bool fContinuous )
 {
@@ -3123,6 +3124,8 @@ moab::ErrorCode moab::TempestOnlineMap::LinearRemapFVtoGLL_Averaged( const DataA
     // kd-tree for nearest neighbor search
     // kdtree* kdSource = kd_create( 3 );
 
+    Range& source_vertices = m_remapper->m_covering_source_vertices;
+
     MOABCentroidCloud cloud;
     // {
     //     const moab::Range& elems = m_remapper->m_covering_source_entities;
@@ -3143,30 +3146,23 @@ moab::ErrorCode moab::TempestOnlineMap::LinearRemapFVtoGLL_Averaged( const DataA
     // }
     {
         // Initialize the kd-tree
-        cloud.init( m_meshInputCov->faces.size() );
+        cloud.init( source_vertices.size() );
+
+        std::vector<double> srccoords(source_vertices.size() * 3);
+        MB_CHK_ERR( m_interface->get_coords( source_vertices, srccoords.data() ) );
 
         // Loop through all elements and add to the tree
-        for( size_t ielem = 0; ielem < m_meshInputCov->faces.size(); ielem++ )
+        for( size_t ielem = 0; ielem < source_vertices.size(); ielem++ )
         {
-            // Loop through all elements and add to the tree
-            Node nodeRef = GetFaceCentroid( m_meshInputCov->faces[ielem], m_meshInputCov->nodes );
-
+            const size_t offset = ielem * 3;
             const double query_pt_sq =
-                std::sqrt( nodeRef.x * nodeRef.x + nodeRef.y * nodeRef.y + nodeRef.z * nodeRef.z );
+                std::sqrt( srccoords[offset] * srccoords[offset] + srccoords[offset+1] * srccoords[offset+1] + srccoords[offset+2] * srccoords[offset+2] );
 
-            // Rescale the coordinates to the unit sphere
-            nodeRef.x /= query_pt_sq;
-            nodeRef.y /= query_pt_sq;
-            nodeRef.z /= query_pt_sq;
+            // Rescale the coordinates to the unit sphere and add to the point cloud
+            cloud.points.emplace_back( std::array< double, 3 >( { srccoords[offset]/query_pt_sq, srccoords[offset+1]/query_pt_sq, srccoords[offset+2]/query_pt_sq } ) );
 
-            cloud.points.emplace_back( std::array< double, 3 >( { nodeRef.x, nodeRef.y, nodeRef.z } ) );
-
-            // Get the centroid of the element
+            // Get the vertex index
             cloud.elements.emplace_back( ielem );
-
-            // printf( "Adding element %zu to kd-tree: %f, %f\n", ielem, nodeRef.x, nodeRef.y, nodeRef.z );
-
-            // kd_insert3( kdSource, nodeRef.x, nodeRef.y, nodeRef.z, (void*)( &( ielem ) ) );
         }
     }
 
@@ -3264,10 +3260,10 @@ moab::ErrorCode moab::TempestOnlineMap::LinearRemapFVtoGLL_Averaged( const DataA
                 {
                     // std::cout << "\t[ " << ixOutputGlobal << "] Found association of point " << query[0] << ", "
                     //           << query[1] << ", " << query[2] << " to " << ixFirstElement << "\n";
-                    if ( ixFirstElement < 0 || ixFirstElement >= m_meshInputCov->faces.size() )
+                    if ( ixFirstElement < 0 || ixFirstElement >= source_vertices.size() )
                     {
                         _EXCEPTION3( "Logic error: source element has to be between 0 and %d, but received %d for row %d\n",
-                                     m_meshInputCov->faces.size(), ixFirstElement, ixOutputGlobal );
+                                     source_vertices.size(), ixFirstElement, ixOutputGlobal );
                     }
                     smatMap( ixOutputGlobal, ixFirstElement ) += dWeight;
                 }

@@ -224,7 +224,7 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
             for (size_t i = 0; i < src_soln_gdofs_casted.size(); ++i)
             {
                 src_soln_gdofs[i] = static_cast<mbGIDType>(src_soln_gdofs_casted[i]);
-                if (!is_root) std::cout << i << " -- " << src_soln_gdofs_casted[i] << ", " << src_soln_gdofs[i] << "\n";
+                // if (!is_root) std::cout << i << " -- " << src_soln_gdofs_casted[i] << ", " << src_soln_gdofs[i] << "\n";
             }
         }
         else
@@ -698,9 +698,9 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             }
             else if( it == "fvse-averaged" )
             {
-                if( m_eInputType != DiscretizationType_FV || m_eOutputType == DiscretizationType_FV )
+                if( m_eInputType != DiscretizationType_PCLOUD && m_eOutputType == DiscretizationType_CGLL )
                 {
-                    _EXCEPTIONT( "--method \"fvse-averaged\" may only be used for FV->SE remapping" );
+                    _EXCEPTIONT( "--method \"fvse-averaged\" may only be used for PCloud->SE remapping" );
                 }
                 strMapAlgorithm = "fvse-averaged";
             }
@@ -987,12 +987,6 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                                                dataGLLJacobian, this->GetTargetAreas(), mapOptions.nPin, *this,
                                                nMonotoneType, fContinuous, mapOptions.fNoConservation );
             }
-            else if( strMapAlgorithm == "fvse-averaged" )
-            {
-                if( is_root ) dbgprint.printf( 0, "Calculating remapping weights for FV->GLL (averaged)\n" );
-                this->LinearRemapFVtoGLL_Averaged( dataGLLNodesDest, dataGLLJacobian, this->GetTargetAreas(),
-                                                   mapOptions.nPin, fContinuous );
-            }
             else
             {
                 if( is_root ) dbgprint.printf( 0, "Calculating remapping weights for FV->GLL\n" );
@@ -1057,7 +1051,17 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
 
             // Construct remap
             if( is_root ) dbgprint.printf( 0, "Calculating remap weights with Nearest-Neighbor method\n" );
-            rval = LinearRemapNN_MOAB( true /*use_GID_matching*/, false /*strict_check*/ );MB_CHK_ERR( rval );
+
+            if( strMapAlgorithm == "fvse-averaged" )
+            {
+                if( is_root ) dbgprint.printf( 0, "Calculating remapping weights for FV->GLL (averaged)\n" );
+                this->LinearRemapFVtoGLL_Averaged( dataGLLNodesDest, dataGLLJacobian, this->GetTargetAreas(),
+                                                   mapOptions.nPin, true /*only cgll supported*/ );
+            }
+            else
+            {
+                MB_CHK_ERR( LinearRemapNN_MOAB( true /*use_GID_matching*/, false /*strict_check*/ ) );
+            }
         }
         else if( ( eInputType != DiscretizationType_FV ) && ( eOutputType == DiscretizationType_FV ) )
         {
@@ -1571,7 +1575,7 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
     if (this->rank == 0)
     {
         moab::EntityHandle& covSrcSet = m_remapper->GetMeshSet( moab::Remapper::CoveringMesh );
-        MB_CHK_SET_ERR(m_interface->write_file("source_rank0.h5m", nullptr, "", &covSrcSet, 1), "Failed to write solSTagVals");
+        // MB_CHK_SET_ERR(m_interface->write_file("source_rank0.h5m", nullptr, "", &covSrcSet, 1), "Failed to write solSTagVals");
     }
 
     // Compute the application of weights on the suorce solution data and store it in the
@@ -1600,7 +1604,7 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
     if (this->rank == 0)
     {
         moab::EntityHandle& tgtSet = m_remapper->GetMeshSet( moab::Remapper::TargetMesh );
-        MB_CHK_SET_ERR(m_interface->write_file("target_rank0.h5m", nullptr, "", &tgtSet, 1), "Failed to write solSTagVals");
+        //MB_CHK_SET_ERR(m_interface->write_file("target_rank0.h5m", nullptr, "", &tgtSet, 1), "Failed to write solSTagVals");
     }
 
     if( caasType != CAAS_NONE )

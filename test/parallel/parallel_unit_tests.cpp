@@ -90,7 +90,7 @@ ErrorCode get_sharing_processors( Interface& moab, EntityHandle entity, std::vec
 // largest contained process rank, where the last entry is zero if
 // there is only one additional set.
 ErrorCode parallel_create_mesh( Interface& mb,
-                                int output_vertx_ids[9],
+                                mbGIDType output_vertx_ids[9],
                                 EntityHandle output_vertex_handles[9],
                                 Range& output_elements,
                                 EntityHandle output_sets[3] = 0 );
@@ -310,7 +310,7 @@ int is_any_proc_error( int is_my_error )
 }
 
 ErrorCode parallel_create_mesh( Interface& mb,
-                                int vtx_ids[9],
+                                mbGIDType vtx_ids[9],
                                 EntityHandle vtx_handles[9],
                                 Range& range,
                                 EntityHandle* entity_sets )
@@ -352,15 +352,15 @@ ErrorCode parallel_create_mesh( Interface& mb,
     MPI_Comm_size( MPI_COMM_WORLD, &size );
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );
 
-    const int first_vtx_id = 10 * ( rank / 2 ) + 2 * ( rank % 2 ) + 1;
+    const mbGIDType first_vtx_id = 10 * ( rank / 2 ) + 2 * ( rank % 2 ) + 1;
     const double x         = 2.0 * ( rank / 2 );
     const double y         = 2.0 * ( rank % 2 );
 
     // create vertices
-    const int idoff  = ( size % 2 && rank / 2 == size / 2 ) ? 0 : 2;
-    const int idoff1 = rank ? 2 : idoff;
-    const int idoff2 = idoff1 + idoff;
-    const int ids[9] = { first_vtx_id,     first_vtx_id + 3 + idoff1, first_vtx_id + 6 + idoff2,
+    const mbGIDType idoff  = ( size % 2 && rank / 2 == size / 2 ) ? 0 : 2;
+    const mbGIDType idoff1 = rank ? 2 : idoff;
+    const mbGIDType idoff2 = idoff1 + idoff;
+    const mbGIDType ids[9] = { first_vtx_id,     first_vtx_id + 3 + idoff1, first_vtx_id + 6 + idoff2,
                          first_vtx_id + 1, first_vtx_id + 4 + idoff1, first_vtx_id + 7 + idoff2,
                          first_vtx_id + 2, first_vtx_id + 5 + idoff1, first_vtx_id + 8 + idoff2 };
     memcpy( vtx_ids, ids, sizeof( ids ) );
@@ -383,7 +383,7 @@ ErrorCode parallel_create_mesh( Interface& mb,
                                       { vtx_handles[4], vtx_handles[7], vtx_handles[8], vtx_handles[5] } };
     for( int i = 0; i < 4; ++i )
     {
-        const int id = 4 * rank + i + 1;
+        const mbGIDType id = 4 * rank + i + 1;
         EntityHandle h;
         rval = mb.create_element( MBQUAD, conn[i], 4, h );CHKERR( rval );
         range.insert( h );
@@ -392,9 +392,9 @@ ErrorCode parallel_create_mesh( Interface& mb,
 
     if( !entity_sets ) return MB_SUCCESS;
 
-    int set_ids[3] = { size + 1, rank / 2, rank / 2 + 1 };
-    int nsets      = 0;
-    rval           = mb.create_meshset( MESHSET_SET, entity_sets[nsets++] );CHKERR( rval );
+    mbGIDType set_ids[3] = { size + 1, rank / 2, rank / 2 + 1 };
+    int nsets            = 0;
+    rval                 = mb.create_meshset( MESHSET_SET, entity_sets[nsets++] );CHKERR( rval );
     rval = mb.create_meshset( MESHSET_SET, entity_sets[nsets++] );CHKERR( rval );
     entity_sets[nsets] = 0;
     if( rank < 2 )
@@ -578,7 +578,7 @@ ErrorCode get_ghost_entities( ParallelComm& pcomm, Range& ghost_ents )
 ErrorCode get_ents_from_geometric_sets( Interface& moab,
                                         const Tag tags[2],
                                         int dimension,
-                                        const std::vector< int >& ids,
+                                        const std::vector< mbGIDType >& ids,
                                         Range& results )
 {
     ErrorCode rval;
@@ -604,8 +604,8 @@ ErrorCode get_ents_from_geometric_sets( Interface& moab,
  *\param ghost_entity_ids   output list
  */
 ErrorCode get_expected_ghosts( Interface& moab,
-                               const std::vector< int > partition_geom_ids[4],
-                               std::vector< int >& ghost_entity_ids,
+                               const std::vector< mbGIDType > partition_geom_ids[4],
+                               std::vector< mbGIDType >& ghost_entity_ids,
                                int ghost_dimension,
                                int bridge_dimension,
                                int num_layers )
@@ -764,7 +764,7 @@ ErrorCode test_ghost_elements( const char* filename, int ghost_dimension, int br
         partition_geom[0].merge( ents );
     }
 
-    std::vector< int > partn_geom_ids[4];
+    std::vector< mbGIDType > partn_geom_ids[4];
     for( int dim = 0; dim <= 3; ++dim )
     {
         partn_geom_ids[dim].resize( partition_geom[dim].size() );
@@ -776,7 +776,7 @@ ErrorCode test_ghost_elements( const char* filename, int ghost_dimension, int br
     rval = get_ghost_entities( *pcomm, ghost_ents );CHKERR( rval );
     std::pair< Range::iterator, Range::iterator > vtx = ghost_ents.equal_range( MBVERTEX );
     ghost_ents.erase( vtx.first, vtx.second );
-    std::vector< int > actual_ghost_ent_ids( ghost_ents.size() );
+    std::vector< mbGIDType > actual_ghost_ent_ids( ghost_ents.size() );
     rval = moab.tag_get_data( id_tag, ghost_ents, &actual_ghost_ent_ids[0] );CHKERR( rval );
 
     // read file in serial
@@ -785,7 +785,7 @@ ErrorCode test_ghost_elements( const char* filename, int ghost_dimension, int br
     PCHECK( MB_SUCCESS == rval );
 
     // get the global IDs of the entities we expect to be ghosted
-    std::vector< int > expected_ghost_ent_ids;
+    std::vector< mbGIDType > expected_ghost_ent_ids;
     rval = get_expected_ghosts( moab2, partn_geom_ids, expected_ghost_ent_ids, ghost_dimension, bridge_dimension,
                                 num_layers );
     PCHECK( MB_SUCCESS == rval );
@@ -1019,10 +1019,10 @@ int MPI_swap( void* buffer, int num_val, MPI_Datatype val_type, int other_proc )
     return 0;
 }
 
-int valid_ghosting_owners( int comm_size, const int* ids, const int* owners )
+int valid_ghosting_owners( int comm_size, const mbGIDType* ids, const int* owners )
 {
     // for each vertex ID, build list of {rank,owner} tuples
-    std::map< int, std::vector< int > > verts;
+    std::map< mbGIDType, std::vector< int > > verts;
     for( int p = 0; p < comm_size; ++p )
     {
         for( int i = 0; i < 9; ++i )
@@ -1037,12 +1037,12 @@ int valid_ghosting_owners( int comm_size, const int* ids, const int* owners )
     // each processor is the same
     bool print_desc = true;
     int error_count = 0;
-    std::map< int, std::vector< int > >::iterator it;
+    std::map< mbGIDType, std::vector< int > >::iterator it;
     for( it = verts.begin(); it != verts.end(); ++it )
     {
-        int id                   = it->first;
-        std::vector< int >& list = it->second;
-        bool all_same            = true;
+        mbGIDType id                   = it->first;
+        std::vector< int >& list       = it->second;
+        bool all_same                 = true;
         for( size_t i = 2; i < list.size(); i += 2 )
             if( list[i + 1] != list[1] ) all_same = false;
         if( all_same ) continue;
@@ -1074,7 +1074,7 @@ ErrorCode test_interface_owners_common( int num_ghost_layers )
     // build distributed quad mesh
     Range quads;
     EntityHandle verts[9];
-    int ids[9];
+    mbGIDType ids[9];
     rval = parallel_create_mesh( mb, ids, verts, quads );
     PCHECK( MB_SUCCESS == rval );
     rval = pcomm.resolve_shared_ents( 0, quads, 2, 1 );
@@ -1098,8 +1098,9 @@ ErrorCode test_interface_owners_common( int num_ghost_layers )
     int rank, size, ierr;
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );
     MPI_Comm_size( MPI_COMM_WORLD, &size );
-    std::vector< int > all_ids( 9 * size ), all_owner( 9 * size );
-    ierr = MPI_Gather( ids, 9, MPI_INT, &all_ids[0], 9, MPI_INT, 0, MPI_COMM_WORLD );
+    std::vector< mbGIDType > all_ids( 9 * size );
+    std::vector< int > all_owner( 9 * size );
+    ierr = MPI_Gather( ids, 9, MB_GID_MPI_TYPE, &all_ids[0], 9, MB_GID_MPI_TYPE, 0, MPI_COMM_WORLD );
     if( ierr ) return MB_FAILURE;
     ierr = MPI_Gather( owner, 9, MPI_INT, &all_owner[0], 9, MPI_INT, 0, MPI_COMM_WORLD );
     if( ierr ) return MB_FAILURE;
@@ -1143,7 +1144,7 @@ ErrorCode test_ghosted_entity_shared_data( const char* )
     // build distributed quad mesh
     Range quads;
     EntityHandle verts[9];
-    int ids[9];
+    mbGIDType ids[9];
     rval = parallel_create_mesh( mb, ids, verts, quads );
     PCHECK( MB_SUCCESS == rval );
     rval = pcomm.resolve_shared_ents( 0, quads, 2, 1 );
@@ -1159,7 +1160,7 @@ ErrorCode test_ghosted_entity_shared_data( const char* )
 
 ErrorCode check_consistent_ids( Interface& mb,
                                 const EntityHandle* entities,
-                                const int* orig_ids,
+                                const mbGIDType* orig_ids,
                                 int num_ents,
                                 const char* singular_name,
                                 const char* plural_name )
@@ -1170,7 +1171,7 @@ ErrorCode check_consistent_ids( Interface& mb,
     MPI_Comm_size( MPI_COMM_WORLD, &size );
 
     Tag id_tag = mb.globalId_tag();
-    std::vector< int > new_ids( num_ents );
+    std::vector< mbGIDType > new_ids( num_ents );
     rval = mb.tag_get_data( id_tag, entities, num_ents, &new_ids[0] );CHKERR( rval );
     // This test is wrong.  a) The caller can select a start ID so there's
     // no guarantee that the IDs will be in any specific range and b) There
@@ -1188,10 +1189,10 @@ ErrorCode check_consistent_ids( Interface& mb,
     //  return rval;
 
     // Gather up all data on root proc for consistency check
-    std::vector< int > all_orig_ids( num_ents * size ), all_new_ids( num_ents * size );
-    ierr = MPI_Gather( (void*)orig_ids, num_ents, MPI_INT, &all_orig_ids[0], num_ents, MPI_INT, 0, MPI_COMM_WORLD );
+    std::vector< mbGIDType > all_orig_ids( num_ents * size ), all_new_ids( num_ents * size );
+    ierr = MPI_Gather( (void*)orig_ids, num_ents, MB_GID_MPI_TYPE, &all_orig_ids[0], num_ents, MB_GID_MPI_TYPE, 0, MPI_COMM_WORLD );
     if( ierr ) return MB_FAILURE;
-    ierr = MPI_Gather( &new_ids[0], num_ents, MPI_INT, &all_new_ids[0], num_ents, MPI_INT, 0, MPI_COMM_WORLD );
+    ierr = MPI_Gather( &new_ids[0], num_ents, MB_GID_MPI_TYPE, &all_new_ids[0], num_ents, MB_GID_MPI_TYPE, 0, MPI_COMM_WORLD );
     if( ierr ) return MB_FAILURE;
 
     // build a local map from original ID to new ID and use it
@@ -1201,11 +1202,11 @@ ErrorCode check_consistent_ids( Interface& mb,
     if( 0 == rank )
     {
         // check for two processors having different global ID for same entity
-        std::map< int, int > idmap;  // index by original ID and contains new ID
-        std::map< int, int > owner;  // index by original ID and contains owning rank
+        std::map< mbGIDType, mbGIDType > idmap;  // index by original ID and contains new ID
+        std::map< mbGIDType, int > owner;  // index by original ID and contains owning rank
         for( int i = 0; i < num_ents * size; ++i )
         {
-            std::map< int, int >::iterator it = idmap.find( all_orig_ids[i] );
+            auto it = idmap.find( all_orig_ids[i] );
             if( it == idmap.end() )
             {
                 idmap[all_orig_ids[i]] = all_new_ids[i];
@@ -1224,7 +1225,7 @@ ErrorCode check_consistent_ids( Interface& mb,
         owner.clear();
         for( int i = 0; i < num_ents * size; ++i )
         {
-            std::map< int, int >::iterator it = idmap.find( all_new_ids[i] );
+            auto it = idmap.find( all_new_ids[i] );
             if( it == idmap.end() )
             {
                 idmap[all_new_ids[i]] = all_orig_ids[i];
@@ -1255,7 +1256,7 @@ ErrorCode test_assign_global_ids( const char* )
     // build distributed quad mesh
     Range quad_range;
     EntityHandle verts[9];
-    int vert_ids[9];
+    mbGIDType vert_ids[9];
     rval = parallel_create_mesh( mb, vert_ids, verts, quad_range );
     PCHECK( MB_SUCCESS == rval );
     rval = pcomm.resolve_shared_ents( 0, quad_range, 2, 1 );
@@ -1266,12 +1267,12 @@ ErrorCode test_assign_global_ids( const char* )
     assert( 4u == quad_range.size() );
     EntityHandle quads[4];
     std::copy( quad_range.begin(), quad_range.end(), quads );
-    int quad_ids[4];
+    mbGIDType quad_ids[4];
     rval = mb.tag_get_data( id_tag, quads, 4, quad_ids );CHKERR( rval );
 
     // clear GLOBAL_ID tag
-    int zero[9] = { 0 };
-    rval        = mb.tag_set_data( id_tag, verts, 9, zero );CHKERR( rval );
+    mbGIDType zero[9] = { 0 };
+    rval = mb.tag_set_data( id_tag, verts, 9, zero );CHKERR( rval );
     rval = mb.tag_set_data( id_tag, quads, 4, zero );CHKERR( rval );
 
     // assign new global IDs
@@ -1301,7 +1302,7 @@ ErrorCode test_shared_sets( const char* )
     // build distributed quad mesh
     Range quads, sets;
     EntityHandle verts[9], set_arr[3];
-    int ids[9];
+    mbGIDType ids[9];
     rval = parallel_create_mesh( mb, ids, verts, quads, set_arr );
     PCHECK( MB_SUCCESS == rval );
     rval = pcomm.resolve_shared_ents( 0, quads, 2, 1 );
@@ -1318,7 +1319,7 @@ ErrorCode test_shared_sets( const char* )
     }
 
     Tag id_tag = mb.globalId_tag();
-    rval       = pcomm.resolve_shared_sets( sets, id_tag );
+    rval = pcomm.resolve_shared_sets( sets, id_tag );
     PCHECK( MB_SUCCESS == rval );
 
     // check that set data is consistent
@@ -1403,8 +1404,10 @@ ErrorCode test_shared_sets( const char* )
     std::vector< unsigned > recv_list( 6 * nproc );
     for( size_t i = 0; i < 3; ++i )
     {
-        mb.tag_get_data( id_tag, set_arr + i, 1, &send_list[2 * i] );
+        mbGIDType gid;
+        mb.tag_get_data( id_tag, set_arr + i, 1, &gid );
         pcomm.get_entityset_owner( set_arr[i], set_owners[i] );
+        send_list[2 * i] = gid;
         send_list[2 * i + 1] = set_owners[i];
     }
     MPI_Allgather( send_list, 6, MPI_UNSIGNED, &recv_list[0], 6, MPI_UNSIGNED, MPI_COMM_WORLD );
@@ -1529,7 +1532,7 @@ ErrorCode test_reduce_tags( const char*, DataType tp )
     // build distributed quad mesh
     Range quad_range;
     EntityHandle verts[9];
-    int vert_ids[9];
+    mbGIDType vert_ids[9];
     rval = parallel_create_mesh( mb, vert_ids, verts, quad_range );
     PCHECK( MB_SUCCESS == rval );
     rval = pcomm.resolve_shared_ents( 0, quad_range, 2, 1 );
@@ -1595,7 +1598,7 @@ ErrorCode test_reduce_tag_failures( const char* )
     // build distributed quad mesh
     Range quad_range;
     EntityHandle verts[9];
-    int vert_ids[9];
+    mbGIDType vert_ids[9];
     rval = parallel_create_mesh( mb, vert_ids, verts, quad_range );
     PCHECK( MB_SUCCESS == rval );
     rval = pcomm.resolve_shared_ents( 0, quad_range, 2, 1 );
@@ -1663,7 +1666,7 @@ ErrorCode test_reduce_tag_explicit_dest( const char* )
     // build distributed quad mesh
     Range quad_range;
     EntityHandle verts[9];
-    int vert_ids[9];
+    mbGIDType vert_ids[9];
     rval = parallel_create_mesh( mb, vert_ids, verts, quad_range );
     PCHECK( MB_SUCCESS == rval );
     rval = pcomm.resolve_shared_ents( 0, quad_range, 2, 1 );

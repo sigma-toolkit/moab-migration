@@ -6,6 +6,10 @@
  */
 
 #include "moab/IntxMesh/Intx2MeshEdges.hpp"
+#ifdef MOAB_HAVE_MPI
+#include "moab/ParallelComm.hpp"
+#endif
+
 namespace moab
 {
 

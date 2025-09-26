@@ -9,9 +9,6 @@
 
 #include "moab/CartVect.hpp"
 #include "moab/Core.hpp"
-#ifdef MOAB_HAVE_MPI
-#include "moab/ParallelComm.hpp"
-#endif
 namespace moab
 {
 

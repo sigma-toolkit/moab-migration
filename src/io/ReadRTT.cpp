@@ -291,6 +291,15 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
         int mat_no = t.flag_values[cell_flag_idx[mat_flag]];
         rval       = MBI->tag_set_data( mat_num_tag, &tet_h, 1, &mat_no );MB_CHK_ERR( rval );
 
+        int volume_no = t.flag_values[cell_flag_idx[vol_flag]];
+        if( volume_map.find( volume_no ) != volume_map.end() )
+        {
+            EntityHandle vol_set = volume_map.at( volume_no );
+            rval                 = MBI->add_entities( vol_set, &tet_h, 1 );MB_CHK_ERR( rval );
+        } else {
+            std::cout << "Warning: volume number " << volume_no << " not found in volume map" << std::endl;
+        }
+
         mb_tets.insert( tet_h );
     }
     rval = MBI->add_entities( file_set, mb_tets );MB_CHK_ERR( rval );

@@ -31,8 +31,6 @@ project( MOAB
          DESCRIPTION "Mesh-Oriented datABase (MOAB) library"
          LANGUAGES C CXX Fortran
        )
-set (PACKAGE_NAME "MOAB")
-set (PACKAGE_VERSION "5.5.1")
 
 # Include standard CMake macros
 include(GNUInstallDirs)
@@ -422,7 +420,6 @@ if ( ENABLE_MPI )
       message (STATUS "        ${var}   : ${${var}}")
     endforeach ()
 
-    #set( MOAB_LIBRARIES ${MPI_CXX_LINK_FLAGS} ${MPI_CXX_LIBRARIES} ${MOAB_LIBRARIES} )
     LIST(APPEND LOGGING_WATCHED_VARIABLES
       MPI_DIR
       MPI_C_COMPILER

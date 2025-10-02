@@ -9,6 +9,7 @@
 #ifdef MOAB_HAVE_MPI
 #include "moab_mpi.h"
 #endif
+#include <limits>
 
 /* Define these here because they are used by many tests
  * to find the add directory for input files */
@@ -798,7 +799,8 @@ void check_baseline_file( std::string basefile,
 
         if( fabs( it->second - vals[i] ) > eps )
         {
-            printf( "[%d]: value out of range. Index: %zu, GID: %d, Value: %2.14f, Expected: %3.14f\n", rank, i, gids[i], vals[i], it->second );
+            printf( "[%d]: value out of range. Index: %zu, GID: %d, Value: %2.14f, Expected: %3.14f, Error: %3.14f\n", 
+                    rank, i, gids[i], vals[i], it->second, fabs( it->second - vals[i] ) );
             flag_error();
             return;
         }

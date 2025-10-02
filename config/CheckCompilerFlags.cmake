@@ -1,6 +1,7 @@
 
 # Include ability to add flags unless already present
 include (config/ForceAddFlags.cmake)
+include(CheckFortranCompilerFlag)
 
 SET(MOAB_CXX_FLAGS "")
 
@@ -12,6 +13,8 @@ IF(NOT (CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-pedantic")
 ENDIF()
 
+ENABLE_IF_SUPPORTED_FC(CMAKE_Fortran_FLAGS "-fp-model source")
+ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-fp-model=precise")
 # Check for compiler types and add flags accordingly
 if ( CMAKE_COMPILER_IS_GNUCXX OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang") )
 
@@ -20,6 +23,7 @@ if ( CMAKE_COMPILER_IS_GNUCXX OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang") )
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-pipe")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wno-long-long")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wextra")
+  ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wshadow")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wno-cast-align")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wsign-compare")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wpointer-arith")
@@ -27,9 +31,10 @@ if ( CMAKE_COMPILER_IS_GNUCXX OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang") )
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wformat-security")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wunused-parameter")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-fstack-protector-all")
-  FORCE_ADD_FLAGS(CMAKE_C_FLAGS "${MOAB_CXX_FLAGS}")
-  #FORCE_ADD_FLAGS(CMAKE_Fortran_FLAGS "${MOAB_CXX_FLAGS}")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-fpermissive")
+  ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-fsignaling-nans")
+  ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-ftrapping-math")
+  ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-fnon-call-exceptions")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wno-ignored-attributes")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wno-variadic-macros")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wno-deprecated-declarations")
@@ -43,9 +48,12 @@ if ( CMAKE_COMPILER_IS_GNUCXX OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang") )
     ENABLE_IF_SUPPORTED(CMAKE_CXX_FLAGS "-stdlib=libc++")
   endif()
   # gfortran
-  set (CMAKE_Fortran_FLAGS_RELEASE "-funroll-all-loops -fno-f2c")
-  set (CMAKE_Fortran_FLAGS_DEBUG   "-fno-f2c")
-  FORCE_ADD_FLAGS(CMAKE_Fortran_FLAGS "-ffree-line-length-0")
+  ENABLE_IF_SUPPORTED_FC(CMAKE_Fortran_FLAGS_RELEASE "-funroll-all-loops;-fno-f2c")
+  ENABLE_IF_SUPPORTED_FC(CMAKE_Fortran_FLAGS_DEBUG "-ffpe-trap=invalid,zero,overflow") 
+  ENABLE_IF_SUPPORTED_FC(CMAKE_Fortran_FLAGS "-ffree-line-length-none")
+  ENABLE_IF_SUPPORTED_FC(CMAKE_Fortran_FLAGS "-ffixed-line-length-none")
+  ENABLE_IF_SUPPORTED_FC(CMAKE_Fortran_FLAGS "-fallow-argument-mismatch")
+  ENABLE_IF_SUPPORTED_FC(CMAKE_Fortran_FLAGS "-fconvert=big-endian")
 else ( CMAKE_COMPILER_IS_GNUCXX OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang") )
   IF(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
     ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-ansi")  # standard compliant
@@ -59,8 +67,7 @@ else ( CMAKE_COMPILER_IS_GNUCXX OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang") )
     ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-wd1572")
     ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-wd383")
     ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-wd2259")
-    FORCE_ADD_FLAGS(CMAKE_C_FLAGS "${MOAB_CXX_FLAGS}")
-    FORCE_ADD_FLAGS(CMAKE_Fortran_FLAGS "${MOAB_CXX_FLAGS}")
+    
     # ifort (untested)
     set (CMAKE_Fortran_FLAGS_RELEASE "-f77rtl -O2")
     set (CMAKE_Fortran_FLAGS_DEBUG   "-f77rtl -O0 -g")
@@ -120,6 +127,9 @@ IF (CMAKE_BUILD_TYPE MATCHES "Debug")
 
 ENDIF()
 
+# Force C99 standard support
+FORCE_ADD_FLAGS(CMAKE_C_FLAGS "-std=c99")
+
 # Release targets
 IF (CMAKE_BUILD_TYPE MATCHES "Release")
   #
@@ -143,4 +153,4 @@ IF (CMAKE_BUILD_TYPE MATCHES "Release")
 
 ENDIF()
 
-mark_as_advanced(CMAKE_Fortran_FLAGS MOAB_CXX_FLAGS)
+mark_as_advanced(CMAKE_Fortran_FLAGS CMAKE_C_FLAGS CMAKE_CXX_FLAGS MOAB_CXX_FLAGS)

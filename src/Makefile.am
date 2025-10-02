@@ -321,6 +321,7 @@ if HAVE_TEMPESTREMAP
   libMOAB_la_LIBADD += $(TEMPESTREMAP_LIBS)
 
   MOAB_REMAPPING_SRCS += \
+     Remapping/ApplyWeights.cpp \
      Remapping/TempestRemapper.cpp  \
      Remapping/TempestLinearRemap.cpp \
      Remapping/TempestOnlineMap.cpp \

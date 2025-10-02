@@ -73,4 +73,14 @@ MACRO(ENABLE_IF_SUPPORTED _variable _flag)
   ENDIF()
 ENDMACRO()
 
+include(CheckFortranCompilerFlag)
+MACRO(ENABLE_IF_SUPPORTED_FC _variable _flag)
+
+check_fortran_compiler_flag(-fallow-argument-mismatch HAVE_FORTRAN_FLAG)
+check_fortran_compiler_flag("${_flag}" _valid_flag_value_)
+if(_valid_flag_value_)
+  set(_variable ${_variable} "${_flag}")
+endif(_valid_flag_value_)
+
+ENDMACRO()
 

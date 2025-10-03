@@ -258,8 +258,6 @@ ErrorCode NCHelperMPAS::check_existing_mesh()
 
     if( noMesh )
     {
-        ErrorCode rval;
-
         // Restore numCellGroups
         if( 0 == numCellGroups )
         {

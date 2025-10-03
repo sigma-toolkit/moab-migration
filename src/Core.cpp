@@ -365,9 +365,9 @@ int Core::QueryInterface( const MBuuid& uuid, UnknownInterface** iface )
 
 float Core::impl_version( std::string* version_string )
 {
-    if( version_string ) *version_string = MOAB_VERSION_STRING;
+    if( version_string ) *version_string = MOAB_PACKAGE_VERSION_STRING;
 
-    return MOAB_VERSION_MAJOR + MOAB_VERSION_MINOR / 100.0f;
+    return MOAB_PACKAGE_VERSION_MAJOR + MOAB_PACKAGE_VERSION_MINOR / 100.0f;
 }
 
 //! get the type from a handle, returns type

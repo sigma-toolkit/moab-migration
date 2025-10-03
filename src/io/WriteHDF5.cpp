@@ -2401,7 +2401,7 @@ ErrorCode WriteHDF5::write_tag_values( Tag tag_id,
 ErrorCode WriteHDF5::write_qa( const std::vector< std::string >& list )
 {
     const char* app  = "MOAB";
-    const char* vers = MOAB_VERSION;
+    const char* vers = MOAB_PACKAGE_VERSION_STRING;
     char date_str[64];
     char time_str[64];
 

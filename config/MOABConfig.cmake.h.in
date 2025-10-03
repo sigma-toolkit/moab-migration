@@ -262,25 +262,34 @@
 #cmakedefine MOAB_OLD_STD_COUNT @MOAB_OLD_STD_COUNT@
 
 /* Name of package */
-#define MOAB_PACKAGE "@MOAB_PACKAGE@"
+#define MOAB_PACKAGE "moab"
 
 /* Define to the address where bug reports for this package should be sent. */
-#define MOAB_PACKAGE_BUGREPORT "@MOAB_PACKAGE_BUGREPORT@"
+#define MOAB_PACKAGE_BUGREPORT "moab-dev@mcs.anl.gov"
 
 /* Define to the full name of this package. */
-#define MOAB_PACKAGE_NAME "@MOAB_PACKAGE_NAME@"
-
-/* Define to the full name and version of this package. */
-#define MOAB_PACKAGE_STRING "@MOAB_PACKAGE_STRING@"
+#define MOAB_PACKAGE_NAME "MOAB"
 
 /* Define to the one symbol short name of this package. */
-#define MOAB_PACKAGE_TARNAME "@MOAB_PACKAGE_TARNAME@"
+#define MOAB_PACKAGE_TARNAME "moab-@MOAB_VERSION_STRING@"
 
 /* Define to the home page for this package. */
-#define MOAB_PACKAGE_URL "@MOAB_PACKAGE_URL@"
+#define MOAB_PACKAGE_URL "http://sigma.mcs.anl.gov"
 
 /* Define to the version of this package. */
-#define MOAB_PACKAGE_VERSION @MOAB_PACKAGE_VERSION@
+#define MOAB_PACKAGE_VERSION @MOAB_VERSION_STRING@
+
+/* Define to the version of this package. */
+#define MOAB_PACKAGE_VERSION_STRING "@CMAKE_PROJECT_VERSION@"
+
+/* MOAB Major Version */
+#define MOAB_PACKAGE_VERSION_MAJOR @CMAKE_PROJECT_VERSION_MAJOR@
+
+/* MOAB Minor Version */
+#define MOAB_PACKAGE_VERSION_MINOR @CMAKE_PROJECT_VERSION_MINOR@
+
+/* MOAB Patch Level */
+#define MOAB_PACKAGE_VERSION_PATCH @CMAKE_PROJECT_VERSION_PATCH@
 
 /* "Value of C SEEK_CUR" */
 #cmakedefine MOAB_SEEK_CUR @MOAB_SEEK_CUR@
@@ -311,21 +320,6 @@
 
 /* Unordered map namespace */
 #cmakedefine MOAB_UNORDERED_MAP_NS @MOAB_UNORDERED_MAP_NS@
-
-/* MOAB Version */
-#define MOAB_VERSION "@MOAB_VERSION@"
-
-/* MOAB Major Version */
-#define MOAB_VERSION_MAJOR @MOAB_VERSION_MAJOR@
-
-/* MOAB Minor Version */
-#define MOAB_VERSION_MINOR @MOAB_VERSION_MINOR@
-
-/* MOAB Patch Level */
-#define MOAB_VERSION_PATCH @MOAB_VERSION_PATCH@
-
-/* MOAB Version String */
-#define MOAB_VERSION_STRING "@MOAB_VERSION_STRING@"
 
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */

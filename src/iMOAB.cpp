@@ -3823,7 +3823,7 @@ ErrCode iMOAB_WriteMapFile(
     attrMap["concave_a"]   = "false";  // defaults
     attrMap["concave_b"]   = "false";  // defaults
     attrMap["bubble"]      = "true";   // defaults
-    attrMap["MOABversion"] = std::string( MOAB_VERSION );
+    attrMap["MOABversion"] = std::string( MOAB_PACKAGE_VERSION_STRING );
 
     // Write the map file to disk in parallel using either HDF5 or SCRIP interface
     rval = weightMap->WriteParallelMap( filename, attrMap );MB_CHK_ERR( rval );

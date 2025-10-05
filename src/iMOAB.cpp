@@ -2408,68 +2408,129 @@ ErrCode iMOAB_DetermineGhostEntities( iMOAB_AppID pid, int* ghost_dim, int* num_
     return iMOAB_UpdateMeshInfo( pid );
 }
 
+/**
+ * Transfer mesh data from the calling component (sender group) to another component (receiver group).
+ *
+ * ALGORITHM OVERVIEW:
+ * This function implements a distributed mesh transfer protocol that moves mesh entities
+ * (elements, vertices, and associated data) from one set of MPI processes to another.
+ * The transfer is orchestrated through a communication graph that maps sender processes
+ * to receiver processes based on either trivial or computed partitioning strategies.
+ *
+ * DETAILED WORKFLOW:
+ * 1. COMMUNICATOR SETUP:
+ *    - Resolve MPI communicator and group handles (handles Fortran F2C conversions)
+ *    - Extract sender group from MOAB ParallelComm; receiver group provided as input
+ *    - Create ParCommGraph instance to manage sender→receiver process mapping
+ *
+ * 2. ENTITY SELECTION:
+ *    - Determine owned entities to transfer: `owned_elems` (primary elements) or
+ *      `local_verts` (if point cloud mode)
+ *    - Store ParCommGraph in `context.appDatas[pid].pgraph[rcompid]` for later use
+ *
+ * 3. PARTITIONING STRATEGY:
+ *    - method == 0 (TRIVIAL PARTITION):
+ *      * Gather global entity counts from all sender processes via MPI_Allgather
+ *      * Compute simple block distribution: each receiver gets roughly equal share
+ *      * Broadcast partition mapping to all processes via `send_graph`
+ *    - method != 0 (COMPUTED PARTITION):
+ *      * Use graph-based or geometric partitioning via `compute_partition`
+ *      * Consider entity connectivity and spatial distribution
+ *      * Send partition mapping via `send_graph_partition`
+ *
+ * 4. MESH TRANSFER:
+ *    - Pack mesh entities and associated data (coordinates, connectivity, tags)
+ *    - Use ParCommGraph to determine which entities go to which receiver processes
+ *    - Execute point-to-point transfers via `send_mesh_parts`
+ *
+ * DATA BEING TRANSFERRED:
+ * - Mesh entities: elements (triangles, quads, etc.) and vertices
+ * - Geometric data: vertex coordinates, element connectivity
+ * - Metadata: material sets, boundary conditions, tags
+ * - Global IDs: for entity identification across processes
+ *
+ * COMMUNICATION PATTERN:
+ * - Collective operations: MPI_Allgather for trivial partition, graph broadcast
+ * - Point-to-point: actual mesh data transfer based on partition mapping
+ * - Non-blocking: ParCommGraph methods use non-blocking sends for efficiency
+ *
+ * ERROR HANDLING:
+ * - Uses MOAB error checking macros (MB_CHK_ERR, MB_CHK_SET_ERR)
+ * - Cleans up MPI groups on early return
+ * - Validates input parameters with assertions
+ */
 ErrCode iMOAB_SendMesh( iMOAB_AppID pid,
                         MPI_Comm* joint_communicator,
                         MPI_Group* receivingGroup,
                         int* rcompid,
                         int* method )
 {
+    // Validate input parameters to ensure they are not null pointers
     assert( joint_communicator != nullptr );
     assert( receivingGroup != nullptr );
     assert( rcompid != nullptr );
 
     ErrorCode rval;
     int ierr;
+    // Get application data and parallel communicator for this component
     appData& data     = context.appDatas[*pid];
     ParallelComm* pco = context.appDatas[*pid].pcomm;
 
+    // Handle Fortran-to-C MPI handle conversion if needed
+    // Fortran passes MPI handles as integers, C++ expects MPI_Comm/MPI_Group objects
     MPI_Comm global = ( data.is_fortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( joint_communicator ) )
                                         : *joint_communicator );
     MPI_Group recvGroup =
         ( data.is_fortran ? MPI_Group_f2c( *reinterpret_cast< MPI_Fint* >( receivingGroup ) ) : *receivingGroup );
-    MPI_Comm sender = pco->comm();  // the sender comm is obtained from parallel comm in moab; no need to pass it along
-    // first see what are the processors in each group; get the sender group too, from the sender communicator
+
+    // Extract sender communicator from MOAB's parallel communicator
+    // This represents the group of processes that will send mesh data
+    MPI_Comm sender = pco->comm();
+    // Extract sender group from the sender communicator to understand sender process topology
     MPI_Group senderGroup;
     ierr = MPI_Comm_group( sender, &senderGroup );
     if( ierr != 0 ) return moab::MB_FAILURE;
 
-    // instantiate the par comm graph
-    // ParCommGraph::ParCommGraph(MPI_Comm joincomm, MPI_Group group1, MPI_Group group2, int coid1,
-    // int coid2)
+    // Create communication graph to manage sender->receiver process mapping
+    // This graph will determine which entities go to which receiver processes
     ParCommGraph* cgraph =
         new ParCommGraph( global, senderGroup, recvGroup, context.appDatas[*pid].global_id, *rcompid );
-    // we should search if we have another pcomm with the same comp ids in the list already
-    // sort of check existing comm graphs in the map context.appDatas[*pid].pgraph
+
+    // Store the communication graph in the application's graph map for later use
+    // The key is the receiver component ID (*rcompid)
     context.appDatas[*pid].pgraph[*rcompid] = cgraph;
 
+    // Get current sender rank for potential debugging/logging
     int sender_rank = -1;
     MPI_Comm_rank( sender, &sender_rank );
 
-    // decide how to distribute elements to each processor
-    // now, get the entities on local processor, and pack them into a buffer for various processors
-    // we will do trivial partition: first get the total number of elements from "sender"
+    // Determine which entities to send: primary elements or vertices (for point clouds)
     std::vector< int > number_elems_per_part;
-    // how to distribute local elements to receiving tasks?
-    // trivial partition: compute first the total number of elements need to be sent
     Range owned = context.appDatas[*pid].owned_elems;
     if( owned.size() == 0 )
     {
-        // must be vertices that we want to send then
+        // If no elements, this must be a point cloud - send vertices instead
         owned = context.appDatas[*pid].local_verts;
-        // we should have some vertices here
     }
 
-    if( *method == 0 )  // trivial partitioning, old method
+    // Choose partitioning strategy based on method parameter
+    if( *method == 0 )  // Trivial partitioning: simple block distribution
     {
+        // Count local entities on this sender process
         int local_owned_elem = (int)owned.size();
         int size             = pco->size();
         int rank             = pco->rank();
-        number_elems_per_part.resize( size );  //
+
+        // Prepare array to hold entity counts from all sender processes
+        number_elems_per_part.resize( size );
         number_elems_per_part[rank] = local_owned_elem;
+        // Gather entity counts from all sender processes using MPI_Allgather
+        // This allows each sender to know the total entity count for load balancing
 #if( MPI_VERSION >= 2 )
-        // Use "in place" option
+        // Use "in place" option for efficiency (MPI 2.0+)
         ierr = MPI_Allgather( MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, &number_elems_per_part[0], 1, MPI_INT, sender );
 #else
+        // Fallback for older MPI versions
         {
             std::vector< int > all_tmp( size );
             ierr = MPI_Allgather( &number_elems_per_part[rank], 1, MPI_INT, &all_tmp[0], 1, MPI_INT, sender );
@@ -2482,83 +2543,147 @@ ErrCode iMOAB_SendMesh( iMOAB_AppID pid,
             return moab::MB_FAILURE;
         }
 
-        // every sender computes the trivial partition, it is cheap, and we need to send it anyway
-        // to each sender
+        // Compute trivial partition: each receiver gets roughly equal share of entities
+        // This creates a simple block distribution based on entity counts
         rval = cgraph->compute_trivial_partition( number_elems_per_part );MB_CHK_ERR( rval );
 
+        // Send the partition mapping to all receiver processes
+        // This tells receivers which senders will send them data
         rval = cgraph->send_graph( global );MB_CHK_ERR( rval );
     }
-    else  // *method != 0, so it is either graph or geometric, parallel
+    else  // Advanced partitioning: graph-based or geometric partitioning
     {
-        // owned are the primary elements on this app
+        // Use sophisticated partitioning that considers entity connectivity or spatial distribution
+        // This can lead to better load balancing and reduced communication
         rval = cgraph->compute_partition( pco, owned, *method );MB_CHK_ERR( rval );
 
-        // basically, send the graph to the receiver side, with unblocking send
+        // Send the computed partition mapping to receiver processes
+        // This includes more complex sender->receiver mappings than trivial partition
         rval = cgraph->send_graph_partition( pco, global );MB_CHK_ERR( rval );
     }
-    // pco is needed to pack, not for communication
+    // Execute the actual mesh transfer based on the communication graph
+    // This packs mesh entities and sends them to appropriate receiver processes
+    // pco is needed for MOAB operations (packing), not for MPI communication
     rval = cgraph->send_mesh_parts( global, pco, owned );MB_CHK_ERR( rval );
 
-    // mark for deletion
+    // Clean up temporary MPI group to prevent memory leaks
     MPI_Group_free( &senderGroup );
     return moab::MB_SUCCESS;
 }
 
+/**
+ * Receive mesh data on the target component from a sending component.
+ *
+ * ALGORITHM OVERVIEW:
+ * This function implements the receiver side of the distributed mesh transfer protocol.
+ * It receives mesh entities and data from multiple sender processes, consolidates them
+ * into a local mesh, and handles entity deduplication based on global IDs.
+ *
+ * DETAILED WORKFLOW:
+ * 1. COMMUNICATOR SETUP:
+ *    - Resolve MPI communicator and group handles (handles Fortran F2C conversions)
+ *    - Extract receiver group from MOAB ParallelComm; sender group provided as input
+ *    - Create ParCommGraph instance with reverse mapping (sender→receiver)
+ *    - Store ParCommGraph in `context.appDatas[pid].pgraph[scompid]`
+ *
+ * 2. COMMUNICATION GRAPH RECEPTION:
+ *    - Receive the communication graph/matrix via `receive_comm_graph`
+ *    - This graph contains the mapping of which senders contribute to which receivers
+ *    - Parse the packed graph array to extract sender ranks for this receiver process
+ *
+ * 3. SENDER IDENTIFICATION:
+ *    - Determine current receiver's rank index within the receiver group
+ *    - Walk through the packed graph array to find all sender ranks that contribute
+ *    - Build `senders_local` list containing contributing sender process ranks
+ *
+ * 4. MESH RECEPTION:
+ *    - Invoke `receive_mesh` to pull mesh parts from identified sender processes
+ *    - Mesh entities are deposited into `data.file_set` (the local mesh container)
+ *    - Receive includes: elements, vertices, coordinates, connectivity, tags, global IDs
+ *
+ * 5. POST-PROCESSING:
+ *    - Optional vertex merging: entities with identical GLOBAL_ID from different senders
+ *      are merged to avoid duplication
+ *    - Re-establish mesh information and update local mesh metadata
+ *
+ * DATA BEING RECEIVED:
+ * - Mesh entities: elements and vertices with their geometric data
+ * - Connectivity: element-to-vertex relationships
+ * - Tags: material properties, boundary conditions, custom data
+ * - Global IDs: for entity identification and deduplication
+ *
+ * COMMUNICATION PATTERN:
+ * - Collective: receiving the communication graph from senders
+ * - Point-to-point: receiving actual mesh data from identified sender processes
+ * - Synchronous: receiver waits for all expected data from all senders
+ *
+ * ERROR HANDLING:
+ * - Uses MOAB error checking macros for robust error propagation
+ * - Validates that senders are found for this receiver process
+ * - Handles cases where no senders contribute to this receiver
+ */
 ErrCode iMOAB_ReceiveMesh( iMOAB_AppID pid, MPI_Comm* joint_communicator, MPI_Group* sendingGroup, int* scompid )
 {
+    // Validate input parameters to ensure they are not null pointers
     assert( joint_communicator != nullptr );
     assert( sendingGroup != nullptr );
     assert( scompid != nullptr );
 
     ErrorCode rval;
+    // Get application data and parallel communicator for this component
     appData& data          = context.appDatas[*pid];
     ParallelComm* pco      = context.appDatas[*pid].pcomm;
     MPI_Comm receive       = pco->comm();
     EntityHandle local_set = data.file_set;
 
+    // Handle Fortran-to-C MPI handle conversion if needed
     MPI_Comm global = ( data.is_fortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( joint_communicator ) )
                                         : *joint_communicator );
     MPI_Group sendGroup =
         ( data.is_fortran ? MPI_Group_f2c( *reinterpret_cast< MPI_Fint* >( sendingGroup ) ) : *sendingGroup );
 
-    // first see what are the processors in each group; get the sender group too, from the sender
-    // communicator
+    // Extract receiver group from the receiver communicator to understand receiver process topology
     MPI_Group receiverGroup;
     int ierr = MPI_Comm_group( receive, &receiverGroup );CHK_MPI_ERR( ierr );
 
-    // instantiate the par comm graph
+    // Create communication graph with reverse mapping (sender->receiver)
+    // This graph will manage the reception of mesh data from sender processes
     ParCommGraph* cgraph =
         new ParCommGraph( global, sendGroup, receiverGroup, *scompid, context.appDatas[*pid].global_id );
-    // TODO we should search if we have another pcomm with the same comp ids in the list already
-    // sort of check existing comm graphs in the map context.appDatas[*pid].pgraph
+
+    // Store the communication graph in the application's graph map for later use
+    // The key is the sender component ID (*scompid)
     context.appDatas[*pid].pgraph[*scompid] = cgraph;
 
+    // Get current receiver rank for process identification
     int receiver_rank = -1;
     MPI_Comm_rank( receive, &receiver_rank );
 
-    // first, receive from sender_rank 0, the communication graph (matrix), so each receiver
-    // knows what data to expect
+    // Receive the communication graph from sender processes
+    // This graph tells this receiver which senders will send it data
     std::vector< int > pack_array;
     rval = cgraph->receive_comm_graph( global, pco, pack_array );MB_CHK_ERR( rval );
 
-    // senders across for the current receiver
+    // Determine this receiver's index within the receiver group
     int current_receiver = cgraph->receiver( receiver_rank );
 
+    // Parse the packed communication graph to find which senders contribute to this receiver
     std::vector< int > senders_local;
     size_t n = 0;
 
+    // Walk through the packed graph array to find sender ranks for this receiver
     while( n < pack_array.size() )
     {
         if( current_receiver == pack_array[n] )
         {
+            // Found this receiver's entry - extract all contributing sender ranks
             for( int j = 0; j < pack_array[n + 1]; j++ )
             {
                 senders_local.push_back( pack_array[n + 2 + j] );
             }
-
             break;
         }
-
+        // Move to next receiver's entry in the packed array
         n = n + 2 + pack_array[n + 1];
     }
 
@@ -2574,61 +2699,69 @@ ErrCode iMOAB_ReceiveMesh( iMOAB_AppID pid, MPI_Comm* joint_communicator, MPI_Gr
     std::cout << "\n";
 #endif
 
+    // Validate that we have senders contributing to this receiver
     if( senders_local.empty() )
     {
         std::cout << " we do not have any senders for receiver rank " << receiver_rank << "\n";
     }
+
+    // Receive mesh data from all identified sender processes
+    // This unpacks mesh entities and deposits them into the local mesh set
     rval = cgraph->receive_mesh( global, pco, local_set, senders_local );MB_CHK_ERR( rval );
 
-    // after we are done, we could merge vertices that come from different senders, but
-    // have the same global id
+    // Post-process received mesh data to handle potential vertex duplication
+    // Vertices with identical GLOBAL_ID from different senders need to be merged
     Tag idtag;
     rval = context.MBI->tag_get_handle( "GLOBAL_ID", idtag );MB_CHK_ERR( rval );
 
-    //   data.point_cloud = false;
+    // Get all entities in the local mesh set
     Range local_ents;
     rval = context.MBI->get_entities_by_handle( local_set, local_ents );MB_CHK_ERR( rval );
 
-    // do not do merge if point cloud
+    // Only perform vertex merging for regular meshes (not point clouds)
     if( !local_ents.all_of_type( MBVERTEX ) )
     {
-        if( (int)senders_local.size() >= 2 )  // need to remove duplicate vertices
-        // that might come from different senders
+        // Merge vertices only if we received data from multiple senders
+        if( (int)senders_local.size() >= 2 )  // Need to remove duplicate vertices
         {
 
+            // Separate vertices from elements for processing
             Range local_verts = local_ents.subset_by_type( MBVERTEX );
             Range local_elems = subtract( local_ents, local_verts );
 
-            // remove from local set the vertices
+            // Temporarily remove vertices from local set for merging
             rval = context.MBI->remove_entities( local_set, local_verts );MB_CHK_ERR( rval );
 
 #ifdef VERBOSE
             std::cout << "current_receiver " << current_receiver << " local verts: " << local_verts.size() << "\n";
 #endif
+            // Merge vertices with identical GLOBAL_ID values
             MergeMesh mm( context.MBI );
-
             rval = mm.merge_using_integer_tag( local_verts, idtag );MB_CHK_ERR( rval );
 
-            Range new_verts;  // local elems are local entities without vertices
+            // Get the merged vertices back from element connectivity
+            Range new_verts;
             rval = context.MBI->get_connectivity( local_elems, new_verts );MB_CHK_ERR( rval );
 
 #ifdef VERBOSE
             std::cout << "after merging: new verts: " << new_verts.size() << "\n";
 #endif
+            // Add the merged vertices back to the local set
             rval = context.MBI->add_entities( local_set, new_verts );MB_CHK_ERR( rval );
         }
     }
     else
+        // Mark this as a point cloud if we only have vertices
         data.point_cloud = true;
 
     if( !data.point_cloud )
     {
-        // still need to resolve shared entities (in this case, vertices )
+        // For regular meshes, resolve shared entities (vertices) across process boundaries
         rval = pco->resolve_shared_ents( local_set, -1, -1, &idtag );MB_CHK_ERR( rval );
     }
     else
     {
-        // if partition tag exists, set it to current rank; just to make it visible in VisIt
+        // For point clouds, set partition tag to current rank for visualization
         Tag densePartTag;
         rval = context.MBI->tag_get_handle( "partition", densePartTag );
         if( nullptr != densePartTag && MB_SUCCESS == rval )
@@ -2641,7 +2774,7 @@ ErrCode iMOAB_ReceiveMesh( iMOAB_AppID pid, MPI_Comm* joint_communicator, MPI_Gr
             rval = context.MBI->tag_set_data( densePartTag, local_verts, &vals[0] );MB_CHK_ERR( rval );
         }
     }
-    // set the parallel partition tag
+    // Set the parallel partition tag to identify which process owns this mesh set
     Tag part_tag;
     int dum_id = -1;
     rval       = context.MBI->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_tag,
@@ -2653,32 +2786,94 @@ ErrCode iMOAB_ReceiveMesh( iMOAB_AppID pid, MPI_Comm* joint_communicator, MPI_Gr
         return moab::MB_FAILURE;
     }
 
+    // Tag the local set with the current process rank
     int rank = pco->rank();
     rval     = context.MBI->tag_set_data( part_tag, &local_set, 1, &rank );MB_CHK_ERR( rval );
 
-    // make sure that the GLOBAL_ID is defined as a tag
+    // Ensure that the GLOBAL_ID tag is properly defined for entity identification
     int tagtype = 0;  // dense, integer
     int numco   = 1;  // size
     int tagindex;     // not used
     rval = iMOAB_DefineTagStorage( pid, "GLOBAL_ID", &tagtype, &numco, &tagindex );MB_CHK_ERR( rval );
-    // populate the mesh with current data info
+
+    // Update mesh information with current data statistics
     rval = iMOAB_UpdateMeshInfo( pid );MB_CHK_ERR( rval );
 
-    // mark for deletion
+    // Clean up temporary MPI group to prevent memory leaks
     MPI_Group_free( &receiverGroup );
 
     return moab::MB_SUCCESS;
 }
 
+/**
+ * Send element tag data from the calling component to another component.
+ *
+ * ALGORITHM OVERVIEW:
+ * This function transfers tag data (scalar or vector values) associated with mesh elements
+ * from one component to another using a pre-established communication graph. The transfer
+ * is based on the communication patterns determined by previous mesh transfer or communication
+ * graph computation operations.
+ *
+ * DETAILED WORKFLOW:
+ * 1. COMMUNICATION GRAPH VALIDATION:
+ *    - Look up the ParCommGraph for the specified context_id
+ *    - Validate that the communication graph exists and is properly initialized
+ *    - Extract the graph and parallel communicator for this component
+ *
+ * 2. ENTITY SELECTION:
+ *    - Determine target entities based on component type:
+ *      * Point cloud mode: use `local_verts` (vertices)
+ *      * Regular mesh: use `owned_elems` (primary elements)
+ *    - Handle special cases:
+ *      * TempestRemap coverage mesh: use covering mesh entities
+ *      * Intersection applications: use coverage set entities
+ *
+ * 3. TAG PROCESSING:
+ *    - Parse tag names using colon (":") separator for multiple tags
+ *    - Resolve tag handles for each specified tag name
+ *    - Validate that all requested tags exist and are accessible
+ *    - Support both scalar and vector tag data
+ *
+ * 4. DATA TRANSFER:
+ *    - Use ParCommGraph to determine which tag data goes to which receiver processes
+ *    - Pack tag values associated with selected entities
+ *    - Execute non-blocking point-to-point transfers via `send_tag_values`
+ *    - Transfer includes entity-to-tag-value mappings
+ *
+ * DATA BEING TRANSFERRED:
+ * - Tag values: Scalar or vector data associated with mesh entities
+ * - Entity mappings: Which entities the tag values belong to
+ * - Tag metadata: Tag type, size, and component information
+ * - Global IDs: For entity identification across processes
+ *
+ * COMMUNICATION PATTERN:
+ * - Point-to-point: Direct transfers based on communication graph
+ * - Non-blocking: Asynchronous sends for efficiency
+ * - Selective: Only entities with tag data are transferred
+ *
+ * USE CASES:
+ * - Transfer solution data between coupled components
+ * - Send material properties or boundary conditions
+ * - Exchange computed quantities (fluxes, forces, etc.)
+ * - Propagate state variables in multi-physics simulations
+ *
+ * ERROR HANDLING:
+ * - Validates communication graph existence
+ * - Checks tag handle resolution
+ * - Uses MOAB error checking throughout
+ * - Provides detailed error messages for debugging
+ */
 ErrCode iMOAB_SendElementTag( iMOAB_AppID pid,
                               const iMOAB_String tag_storage_name,
                               MPI_Comm* joint_communicator,
                               int* context_id )
 {
+    // Get application data and look up the communication graph for this context
     appData& data                               = context.appDatas[*pid];
     std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *context_id );
     if( mt == data.pgraph.end() )
     {
+        // Communication graph not found - this means mesh transfer hasn't been performed yet
         std::cout << " no par com graph for context_id:" << *context_id << " available contexts:";
         for( auto mit = data.pgraph.begin(); mit != data.pgraph.end(); mit++ )
             std::cout << "  " << mit->first;
@@ -2686,37 +2881,41 @@ ErrCode iMOAB_SendElementTag( iMOAB_AppID pid,
         return moab::MB_FAILURE;
     }
 
+    // Extract communication graph and parallel communicator
     ParCommGraph* cgraph = mt->second;
     ParallelComm* pco    = context.appDatas[*pid].pcomm;
+
+    // Handle Fortran-to-C MPI handle conversion if needed
     MPI_Comm global      = ( data.is_fortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( joint_communicator ) )
                                              : *joint_communicator );
+
+    // Determine target entities: vertices for point clouds, elements for regular meshes
     Range owned          = ( data.point_cloud ? data.local_verts : data.owned_elems );
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
-    if( data.tempestData.remapper != nullptr )  // this is the case this is part of intx;;
+    // Handle TempestRemap coverage mesh entities for intersection applications
+    if( data.tempestData.remapper != nullptr )  // This is the case for intersection operations
     {
         EntityHandle cover_set = data.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
         MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, owned ) );
     }
 #else
-    // now, in case we are sending from intx between ocn and atm, we involve coverage set
-    // how do I know if this receiver already participated in an intersection driven by coupler?
-    // also, what if this was the "source" mesh in intx?
-    // in that case, the elements might have been instantiated in the coverage set locally, the
-    // "owned" range can be different the elements are now in tempestRemap coverage_set
-    EntityHandle cover_set = cgraph->get_cover_set();  // this will be non null only for intx app ?
+    // Handle coverage set entities for intersection applications (non-TempestRemap case)
+    // This covers cases where elements have been instantiated in coverage sets during intersection
+    EntityHandle cover_set = cgraph->get_cover_set();  // Non-null only for intersection applications
     if( 0 != cover_set ) MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, owned ) );
 #endif
 
+    // Parse tag names from the input string (multiple tags separated by colons)
     std::string tag_name( tag_storage_name );
 
-    // basically, we assume everything is defined already on the tag,
-    //   and we can get the tags just by its name
-    // we assume that there are separators ":" between the tag names
+    // Parse multiple tag names separated by colons
     std::vector< std::string > tagNames;
     std::vector< Tag > tagHandles;
     std::string separator( ":" );
     split_tag_names( tag_name, separator, tagNames );
+
+    // Resolve tag handles for each specified tag name
     for( size_t i = 0; i < tagNames.size(); i++ )
     {
         Tag tagHandle;
@@ -2729,23 +2928,83 @@ ErrCode iMOAB_SendElementTag( iMOAB_AppID pid,
         tagHandles.push_back( tagHandle );
     }
 
-    // pco is needed to pack, and for moab instance, not for communication!
-    // still use nonblocking communication, over the joint comm
+    // Execute the tag data transfer using the communication graph
+    // This packs tag values and sends them to appropriate receiver processes
+    // pco is needed for MOAB operations (packing), not for MPI communication
     MB_CHK_ERR( cgraph->send_tag_values( global, pco, owned, tagHandles ) );
-    // now, send to each corr_tasks[i] tag data for corr_sizes[i] primary entities
 
     return moab::MB_SUCCESS;
 }
 
+/**
+ * Receive element tag data from another component.
+ *
+ * ALGORITHM OVERVIEW:
+ * This function receives tag data (scalar or vector values) associated with mesh elements
+ * from another component using a pre-established communication graph. The received tag
+ * values are applied to the corresponding entities in the local mesh, enabling data
+ * exchange between coupled components.
+ *
+ * DETAILED WORKFLOW:
+ * 1. COMMUNICATION GRAPH VALIDATION:
+ *    - Look up the ParCommGraph for the specified context_id
+ *    - Validate that the communication graph exists and is properly initialized
+ *    - Extract the graph and parallel communicator for this component
+ *
+ * 2. ENTITY SELECTION:
+ *    - Determine target entities based on component type:
+ *      * Point cloud mode: use `local_verts` (vertices)
+ *      * Regular mesh: use `owned_elems` (primary elements)
+ *    - Handle special cases:
+ *      * Coverage set entities: for intersection applications
+ *      * TempestRemap coverage mesh: for remapping operations
+ *
+ * 3. TAG PROCESSING:
+ *    - Parse tag names using colon (":") separator for multiple tags
+ *    - Resolve tag handles for each specified tag name
+ *    - Validate that all requested tags exist and are accessible
+ *    - Support both scalar and vector tag data
+ *
+ * 4. DATA RECEPTION:
+ *    - Use ParCommGraph to receive tag data from sender processes
+ *    - Unpack received tag values and associate with local entities
+ *    - Execute non-blocking point-to-point receives via `receive_tag_values`
+ *    - Apply tag values to corresponding entities in local mesh
+ *
+ * DATA BEING RECEIVED:
+ * - Tag values: Scalar or vector data from sender component
+ * - Entity mappings: Which entities the tag values belong to
+ * - Tag metadata: Tag type, size, and component information
+ * - Global IDs: For entity identification and matching
+ *
+ * COMMUNICATION PATTERN:
+ * - Point-to-point: Direct receives based on communication graph
+ * - Non-blocking: Asynchronous receives for efficiency
+ * - Selective: Only entities with tag data are received
+ *
+ * USE CASES:
+ * - Receive solution data from coupled components
+ * - Get material properties or boundary conditions
+ * - Accept computed quantities (fluxes, forces, etc.)
+ * - Receive state variables in multi-physics simulations
+ *
+ * ERROR HANDLING:
+ * - Validates communication graph existence
+ * - Checks tag handle resolution
+ * - Uses MOAB error checking throughout
+ * - Provides detailed error messages for debugging
+ */
 ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid,
                                  const iMOAB_String tag_storage_name,
                                  MPI_Comm* joint_communicator,
                                  int* context_id )
 {
+    // Get application data and look up the communication graph for this context
     appData& data                               = context.appDatas[*pid];
     std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *context_id );
     if( mt == data.pgraph.end() )
     {
+        // Communication graph not found - this means mesh transfer hasn't been performed yet
         std::cout << " no par com graph for context_id:" << *context_id << " available contexts:";
         for( auto mit = data.pgraph.begin(); mit != data.pgraph.end(); mit++ )
             std::cout << "  " << mit->first;
@@ -2753,36 +3012,41 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid,
         return moab::MB_FAILURE;
     }
 
+    // Extract communication graph and parallel communicator
     ParCommGraph* cgraph = mt->second;
     ParallelComm* pco    = context.appDatas[*pid].pcomm;
+
+    // Handle Fortran-to-C MPI handle conversion if needed
     MPI_Comm global      = ( data.is_fortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( joint_communicator ) )
                                              : *joint_communicator );
+
+    // Determine target entities: vertices for point clouds, elements for regular meshes
     Range owned          = ( data.point_cloud ? data.local_verts : data.owned_elems );
 
-    // how do I know if this receiver already participated in an intersection driven by coupler?
-    // also, what if this was the "source" mesh in intx?
-    // in that case, the elements might have been instantiated in the coverage set locally, the
-    // "owned" range can be different the elements are now in tempestRemap coverage_set
+    // Handle coverage set entities for intersection applications
+    // This covers cases where elements have been instantiated in coverage sets during intersection
     EntityHandle cover_set = cgraph->get_cover_set();
     if( 0 != cover_set ) MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, owned ) );
 
-        // another possibility is for par comm graph to be computed from iMOAB_ComputeCommGraph, for
-        // after atm ocn intx, from phys (case from imoab_phatm_ocn_coupler.cpp) get then the cover set
-        // from ints remapper
 #ifdef MOAB_HAVE_TEMPESTREMAP
-    if( data.tempestData.remapper != nullptr )  // this is the case this is part of intx;;
+    // Handle TempestRemap coverage mesh entities for intersection applications
+    if( data.tempestData.remapper != nullptr )  // This is the case for intersection operations
     {
         cover_set = data.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
         MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, owned ) );
     }
 #endif
 
+    // Parse tag names from the input string (multiple tags separated by colons)
     std::string tag_name( tag_storage_name );
-    // we assume that there are separators ";" between the tag names
+
+    // Parse multiple tag names separated by colons
     std::vector< std::string > tagNames;
     std::vector< Tag > tagHandles;
     std::string separator( ":" );
     split_tag_names( tag_name, separator, tagNames );
+
+    // Resolve tag handles for each specified tag name
     for( size_t i = 0; i < tagNames.size(); i++ )
     {
         Tag tagHandle;
@@ -2799,8 +3063,9 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid,
     std::cout << pco->rank() << ". Looking to receive data for tags: " << tag_name
               << " and file set = " << ( data.file_set ) << "\n";
 #endif
-    // pco is needed to pack, and for moab instance, not for communication!
-    // still use nonblocking communication
+    // Execute the tag data reception using the communication graph
+    // This receives tag values from sender processes and applies them to local entities
+    // pco is needed for MOAB operations (unpacking), not for MPI communication
     MB_CHK_SET_ERR( cgraph->receive_tag_values( global, pco, owned, tagHandles ), "failed to receive tag values" );
 
 #ifdef VERBOSE
@@ -2812,16 +3077,83 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid,
 
 ErrCode iMOAB_FreeSenderBuffers( iMOAB_AppID pid, int* context_id )
 {
-    // need first to find the pgraph that holds the information we need
-    // this will be called on sender side only
+    // Find the communication graph that holds the send buffer information
+    // This function is called on the sender side only to clean up after data transfer
     appData& data                               = context.appDatas[*pid];
     std::map< int, ParCommGraph* >::iterator mt = data.pgraph.find( *context_id );
-    if( mt == data.pgraph.end() ) return moab::MB_FAILURE;  // error
+    if( mt == data.pgraph.end() ) return moab::MB_FAILURE;  // Communication graph not found
 
+    // Release all non-blocking send buffers associated with this communication context
+    // This frees memory and completes any pending asynchronous send operations
     mt->second->release_send_buffers();
     return moab::MB_SUCCESS;
 }
 
+/**
+ * Compute communication graph between two components using a rendezvous algorithm.
+ *
+ * ALGORITHM OVERVIEW:
+ * This function implements a sophisticated rendezvous-based algorithm to determine
+ * which processes from component 1 need to communicate with which processes from
+ * component 2. The algorithm uses global entity IDs (or DOFs) as "rendezvous points"
+ * to discover communication patterns between the two components.
+ *
+ * DETAILED WORKFLOW:
+ * 1. COMMUNICATOR SETUP:
+ *    - Resolve MPI communicator and group handles (handles Fortran F2C conversions)
+ *    - Create bidirectional ParCommGraph instances for both components
+ *    - Store graphs in respective component's pgraph maps
+ *
+ * 2. ENTITY ID COLLECTION:
+ *    - Component 1: Extract entity IDs based on type1:
+ *      * type1=1: GLOBAL_DOFS from MBQUAD elements (for spectral elements)
+ *      * type1=2: GLOBAL_ID from MBVERTEX entities (for vertex-based coupling)
+ *      * type1=3: GLOBAL_ID from 2D elements (for finite volume meshes)
+ *    - Component 2: Extract entity IDs based on type2 (same logic as type1)
+ *    - Handle special case: TempestRemap coverage mesh entities
+ *
+ * 3. RENDEZVOUS ALGORITHM:
+ *    - Create TupleList for each component containing (target_proc, entity_id) pairs
+ *    - Use hash-based distribution: entity_id % numProcs determines target process
+ *    - Execute crystal router (gs_transfer) to send entity IDs to rendezvous processes
+ *    - Sort received data by entity ID for efficient matching
+ *
+ * 4. COMMUNICATION DISCOVERY:
+ *    - Synchronously iterate through both sorted TupleLists
+ *    - Find matching entity IDs between components (intersection)
+ *    - For each match, record which processes from each component share the entity
+ *    - Build reverse communication maps: who needs to talk to whom
+ *
+ * 5. GRAPH CONSTRUCTION:
+ *    - Send communication information back to original processes
+ *    - Each process learns which other processes it needs to communicate with
+ *    - Store communication patterns in ParCommGraph for later use
+ *
+ * DATA BEING PROCESSED:
+ * - Entity IDs: Global identifiers that serve as rendezvous points
+ * - Process mappings: Which processes own which entities
+ * - Communication patterns: Sender→receiver relationships
+ *
+ * COMMUNICATION PATTERN:
+ * - Crystal router: Efficient all-to-all communication for rendezvous
+ * - Hash distribution: entity_id % numProcs for load balancing
+ * - Bidirectional: Both components learn their communication partners
+ *
+ * ALGORITHM COMPLEXITY:
+ * - O(N log N) for sorting entity IDs
+ * - O(N/P) communication per process where N=total entities, P=processes
+ * - Memory: O(unique_entities_per_process)
+ *
+ * USE CASES:
+ * - Coupling between different mesh types (spectral, finite volume, finite element)
+ * - Establishing communication for data transfer between components
+ * - Preparing for mesh intersection or remapping operations
+ *
+ * ERROR HANDLING:
+ * - Validates entity types (1, 2, or 3)
+ * - Handles missing tags gracefully
+ * - Uses MOAB error checking throughout
+ */
 //#define VERBOSE
 ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
                                 iMOAB_AppID pid2,
@@ -2833,322 +3165,342 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
                                 int* comp1,
                                 int* comp2 )
 {
+    // Validate input parameters
     assert( joint_communicator );
     assert( group1 );
     assert( group2 );
     ErrorCode rval = MB_SUCCESS;
     int localRank = 0, numProcs = 1;
 
+    // Determine if either component is using Fortran (affects MPI handle conversion)
     bool isFortran = false;
     if( *pid1 >= 0 ) isFortran = isFortran || context.appDatas[*pid1].is_fortran;
     if( *pid2 >= 0 ) isFortran = isFortran || context.appDatas[*pid2].is_fortran;
 
+    // Handle Fortran-to-C MPI handle conversion if needed
     MPI_Comm global =
         ( isFortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( joint_communicator ) ) : *joint_communicator );
     MPI_Group srcGroup = ( isFortran ? MPI_Group_f2c( *reinterpret_cast< MPI_Fint* >( group1 ) ) : *group1 );
     MPI_Group tgtGroup = ( isFortran ? MPI_Group_f2c( *reinterpret_cast< MPI_Fint* >( group2 ) ) : *group2 );
 
+    // Get process information for the joint communicator
     MPI_Comm_rank( global, &localRank );
     MPI_Comm_size( global, &numProcs );
-    // instantiate the par comm graph
 
-    // we should search if we have another pcomm with the same comp ids in the list already
-    // sort of check existing comm graphs in the map context.appDatas[*pid].pgraph
+    // Create bidirectional communication graphs for both components
+
+    // Create communication graphs for both components (bidirectional)
     ParCommGraph* cgraph     = nullptr;
     ParCommGraph* cgraph_rev = nullptr;
+
     if( *pid1 >= 0 )
     {
+        // Create communication graph for component 1 -> component 2
         appData& data = context.appDatas[*pid1];
         auto mt       = data.pgraph.find( *comp2 );
-        if( mt != data.pgraph.end() ) data.pgraph.erase( mt );
-        // now let us compute the new communication graph
+        if( mt != data.pgraph.end() ) data.pgraph.erase( mt );  // Remove existing graph if present
         cgraph                                 = new ParCommGraph( global, srcGroup, tgtGroup, *comp1, *comp2 );
-        context.appDatas[*pid1].pgraph[*comp2] = cgraph;  // the context will be the other comp
+        context.appDatas[*pid1].pgraph[*comp2] = cgraph;  // Store with target component ID as key
     }
+
     if( *pid2 >= 0 )
     {
+        // Create reverse communication graph for component 2 -> component 1
         appData& data = context.appDatas[*pid2];
         auto mt       = data.pgraph.find( *comp1 );
-        if( mt != data.pgraph.end() ) data.pgraph.erase( mt );
-        // now let us compute the new communication graph
+        if( mt != data.pgraph.end() ) data.pgraph.erase( mt );  // Remove existing graph if present
         cgraph_rev                             = new ParCommGraph( global, tgtGroup, srcGroup, *comp2, *comp1 );
-        context.appDatas[*pid2].pgraph[*comp1] = cgraph_rev;  // from 2 to 1
+        context.appDatas[*pid2].pgraph[*comp1] = cgraph_rev;  // Store with source component ID as key
     }
 
-    // each model has a list of global ids that will need to be sent by gs to rendezvous the other
-    // model on the joint comm
+    // Initialize TupleLists for rendezvous algorithm
+    // Each tuple contains: (target_process, entity_id) pairs for hash-based distribution
     TupleList TLcomp1;
-    TLcomp1.initialize( 2, 0, 0, 0, 0 );  // to proc, marker
+    TLcomp1.initialize( 2, 0, 0, 0, 0 );  // 2 integers: target_proc, entity_id
     TupleList TLcomp2;
-    TLcomp2.initialize( 2, 0, 0, 0, 0 );  // to proc, marker
-    // will push_back a new tuple, if needed
+    TLcomp2.initialize( 2, 0, 0, 0, 0 );  // 2 integers: target_proc, entity_id
 
+    // Enable write access for building the tuple lists
     TLcomp1.enableWriteAccess();
 
-    // tags of interest are either GLOBAL_DOFS or GLOBAL_ID
+    // Get tag handles for entity identification
+    // GLOBAL_DOFS: for spectral elements (type 1)
+    // GLOBAL_ID: for vertices (type 2) and 2D elements (type 3)
     Tag gdsTag;
-    // find the values on first cell
     int lenTagType1 = 1;
     if( 1 == *type1 || 1 == *type2 )
     {
+        // Get GLOBAL_DOFS tag for spectral elements (usually 16 DOFs per element)
         rval = context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag );MB_CHK_ERR( rval );
-        rval = context.MBI->tag_get_length( gdsTag, lenTagType1 );MB_CHK_ERR( rval );  // usually it is 16
+        rval = context.MBI->tag_get_length( gdsTag, lenTagType1 );MB_CHK_ERR( rval );  // Usually 16 DOFs per element
     }
-    Tag gidTag = context.MBI->globalId_tag();
+    Tag gidTag = context.MBI->globalId_tag();  // Standard GLOBAL_ID tag
 
+    // Collect entity IDs from component 1 for rendezvous algorithm
     std::vector< int > valuesComp1;
-    // populate first tuple
     if( *pid1 >= 0 )
     {
         appData& data1     = context.appDatas[*pid1];
         EntityHandle fset1 = data1.file_set;
-        // in case of tempest remap, get the coverage set
+
+        // Handle TempestRemap coverage mesh for intersection applications
 #ifdef MOAB_HAVE_TEMPESTREMAP
-        if( data1.tempestData.remapper != nullptr )  // this is the case this is part of intx;
+        if( data1.tempestData.remapper != nullptr )  // This is the case for intersection operations
             fset1 = data1.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
 #endif
+
         Range ents_of_interest;
-        if( *type1 == 1 )
+        if( *type1 == 1 )  // Spectral elements: get GLOBAL_DOFS from MBQUAD elements
         {
             assert( gdsTag );
             rval = context.MBI->get_entities_by_type( fset1, MBQUAD, ents_of_interest );MB_CHK_ERR( rval );
             valuesComp1.resize( ents_of_interest.size() * lenTagType1 );
             rval = context.MBI->tag_get_data( gdsTag, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );
         }
-        else if( *type1 == 2 )
+        else if( *type1 == 2 )  // Vertex-based coupling: get GLOBAL_ID from MBVERTEX entities
         {
             rval = context.MBI->get_entities_by_type( fset1, MBVERTEX, ents_of_interest );MB_CHK_ERR( rval );
             valuesComp1.resize( ents_of_interest.size() );
-            rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );  // just global ids
+            rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );
         }
-        else if( *type1 == 3 )  // for FV meshes, just get the global id of cell
+        else if( *type1 == 3 )  // Finite volume meshes: get GLOBAL_ID from 2D elements
         {
             rval = context.MBI->get_entities_by_dimension( fset1, 2, ents_of_interest );MB_CHK_ERR( rval );
             valuesComp1.resize( ents_of_interest.size() );
-            rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );  // just global ids
+            rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] );MB_CHK_ERR( rval );
         }
         else
         {
-            MB_CHK_ERR( MB_FAILURE );  // we know only type 1 or 2 or 3
+            MB_CHK_ERR( MB_FAILURE );  // Only types 1, 2, or 3 are supported
         }
-        // now fill the tuple list with info and markers
-        // because we will send only the ids, order and compress the list
-        std::set< int > uniq( valuesComp1.begin(), valuesComp1.end() );
+
+        // Build tuple list for component 1: (target_process, entity_id) pairs
+        // Use hash-based distribution: entity_id % numProcs determines target process
+        std::set< int > uniq( valuesComp1.begin(), valuesComp1.end() );  // Remove duplicates
         TLcomp1.resize( uniq.size() );
         for( std::set< int >::iterator sit = uniq.begin(); sit != uniq.end(); sit++ )
         {
-            // to proc, marker, element local index, index in el
-            int marker               = *sit;
-            int to_proc              = marker % numProcs;
+            int marker               = *sit;  // Entity ID
+            int to_proc              = marker % numProcs;  // Hash-based target process
             int n                    = TLcomp1.get_n();
-            TLcomp1.vi_wr[2 * n]     = to_proc;  // send to processor
-            TLcomp1.vi_wr[2 * n + 1] = marker;
+            TLcomp1.vi_wr[2 * n]     = to_proc;  // Target process
+            TLcomp1.vi_wr[2 * n + 1] = marker;   // Entity ID
             TLcomp1.inc_n();
         }
     }
 
-    ProcConfig pc( global );  // proc config does the crystal router
-    pc.crystal_router()->gs_transfer( 1, TLcomp1,
-                                      0 );  // communication towards joint tasks, with markers
-    // sort by value (key 1)
+    // Execute crystal router transfer for component 1 entity IDs
+    // This sends entity IDs to rendezvous processes based on hash distribution
+    ProcConfig pc( global );  // Process configuration for crystal router
+    pc.crystal_router()->gs_transfer( 1, TLcomp1, 0 );  // Transfer to joint tasks with markers
+
+    // Sort component 1 tuple list by entity ID (key 1) for efficient matching
 #ifdef VERBOSE
     std::stringstream ff1;
     ff1 << "TLcomp1_" << localRank << ".txt";
-    TLcomp1.print_to_file( ff1.str().c_str() );  // it will append!
+    TLcomp1.print_to_file( ff1.str().c_str() );  // Debug output before sorting
 #endif
     moab::TupleList::buffer sort_buffer;
     sort_buffer.buffer_init( TLcomp1.get_n() );
-    TLcomp1.sort( 1, &sort_buffer );
+    TLcomp1.sort( 1, &sort_buffer );  // Sort by entity ID (column 1)
     sort_buffer.reset();
 #ifdef VERBOSE
-    // after sorting
-    TLcomp1.print_to_file( ff1.str().c_str() );  // it will append!
+    TLcomp1.print_to_file( ff1.str().c_str() );  // Debug output after sorting
 #endif
-    // do the same, for the other component, number2, with type2
-    // start copy
+    // Now process component 2 in the same way as component 1
     TLcomp2.enableWriteAccess();
-    // populate second tuple
+
+    // Collect entity IDs from component 2 for rendezvous algorithm
     std::vector< int > valuesComp2;
     if( *pid2 >= 0 )
     {
         appData& data2     = context.appDatas[*pid2];
         EntityHandle fset2 = data2.file_set;
-        // in case of tempest remap, get the coverage set
+
+        // Handle TempestRemap coverage mesh for intersection applications
 #ifdef MOAB_HAVE_TEMPESTREMAP
-        if( data2.tempestData.remapper != nullptr )  // this is the case this is part of intx;
+        if( data2.tempestData.remapper != nullptr )  // This is the case for intersection operations
             fset2 = data2.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
 #endif
 
         Range ents_of_interest;
-        if( *type2 == 1 )
+        if( *type2 == 1 )  // Spectral elements: get GLOBAL_DOFS from MBQUAD elements
         {
             assert( gdsTag );
             rval = context.MBI->get_entities_by_type( fset2, MBQUAD, ents_of_interest );MB_CHK_ERR( rval );
             valuesComp2.resize( ents_of_interest.size() * lenTagType1 );
             rval = context.MBI->tag_get_data( gdsTag, ents_of_interest, &valuesComp2[0] );MB_CHK_ERR( rval );
         }
-        else if( *type2 == 2 )
+        else if( *type2 == 2 )  // Vertex-based coupling: get GLOBAL_ID from MBVERTEX entities
         {
             rval = context.MBI->get_entities_by_type( fset2, MBVERTEX, ents_of_interest );MB_CHK_ERR( rval );
-            valuesComp2.resize( ents_of_interest.size() );  // stride is 1 here
-            rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp2[0] );MB_CHK_ERR( rval );  // just global ids
+            valuesComp2.resize( ents_of_interest.size() );
+            rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp2[0] );MB_CHK_ERR( rval );
         }
-        else if( *type2 == 3 )
+        else if( *type2 == 3 )  // Finite volume meshes: get GLOBAL_ID from 2D elements
         {
             rval = context.MBI->get_entities_by_dimension( fset2, 2, ents_of_interest );MB_CHK_ERR( rval );
-            valuesComp2.resize( ents_of_interest.size() );  // stride is 1 here
-            rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp2[0] );MB_CHK_ERR( rval );  // just global ids
+            valuesComp2.resize( ents_of_interest.size() );
+            rval = context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp2[0] );MB_CHK_ERR( rval );
         }
         else
         {
-            MB_CHK_ERR( MB_FAILURE );  // we know only type 1 or 2
+            MB_CHK_ERR( MB_FAILURE );  // Only types 1, 2, or 3 are supported
         }
-        // now fill the tuple list with info and markers
-        std::set< int > uniq( valuesComp2.begin(), valuesComp2.end() );
+        // Build tuple list for component 2: (target_process, entity_id) pairs
+        // Use hash-based distribution: entity_id % numProcs determines target process
+        std::set< int > uniq( valuesComp2.begin(), valuesComp2.end() );  // Remove duplicates
         TLcomp2.resize( uniq.size() );
         for( std::set< int >::iterator sit = uniq.begin(); sit != uniq.end(); sit++ )
         {
-            // to proc, marker, element local index, index in el
-            int marker               = *sit;
-            int to_proc              = marker % numProcs;
+            int marker               = *sit;  // Entity ID
+            int to_proc              = marker % numProcs;  // Hash-based target process
             int n                    = TLcomp2.get_n();
-            TLcomp2.vi_wr[2 * n]     = to_proc;  // send to processor
-            TLcomp2.vi_wr[2 * n + 1] = marker;
+            TLcomp2.vi_wr[2 * n]     = to_proc;  // Target process
+            TLcomp2.vi_wr[2 * n + 1] = marker;   // Entity ID
             TLcomp2.inc_n();
         }
     }
-    pc.crystal_router()->gs_transfer( 1, TLcomp2,
-                                      0 );  // communication towards joint tasks, with markers
-    // sort by value (key 1)
+
+    // Execute crystal router transfer for component 2 entity IDs
+    pc.crystal_router()->gs_transfer( 1, TLcomp2, 0 );  // Transfer to joint tasks with markers
+
+    // Sort component 2 tuple list by entity ID (key 1) for efficient matching
 #ifdef VERBOSE
     std::stringstream ff2;
     ff2 << "TLcomp2_" << localRank << ".txt";
-    TLcomp2.print_to_file( ff2.str().c_str() );
+    TLcomp2.print_to_file( ff2.str().c_str() );  // Debug output before sorting
 #endif
     sort_buffer.buffer_reserve( TLcomp2.get_n() );
-    TLcomp2.sort( 1, &sort_buffer );
+    TLcomp2.sort( 1, &sort_buffer );  // Sort by entity ID (column 1)
     sort_buffer.reset();
-    // end copy
 #ifdef VERBOSE
-    TLcomp2.print_to_file( ff2.str().c_str() );
+    TLcomp2.print_to_file( ff2.str().c_str() );  // Debug output after sorting
 #endif
-    // need to send back the info, from the rendezvous point, for each of the values
-    /* so go over each value, on local process in joint communicator
+    // RENDEZVOUS ALGORITHM: Find matching entity IDs between components
+    // Now we need to send back communication information from the rendezvous point
+    // Loop synchronously over both sorted tuple lists to find matching entity IDs
+    // Build new tuple lists to send communication information back to original processes
 
-    now have to send back the info needed for communication;
-     loop in in sync over both TLComp1 and TLComp2, in local process;
-      So, build new tuple lists, to send synchronous communication
-      populate them at the same time, based on marker, that is indexed
-    */
-
+    // Tuple lists for sending communication info back to components
+    // Format: (target_process, entity_id, source_process_from_other_component)
     TupleList TLBackToComp1;
-    TLBackToComp1.initialize( 3, 0, 0, 0, 0 );  // to proc, marker, from proc on comp2,
+    TLBackToComp1.initialize( 3, 0, 0, 0, 0 );  // 3 integers: target_proc, entity_id, source_proc_from_comp2
     TLBackToComp1.enableWriteAccess();
 
     TupleList TLBackToComp2;
-    TLBackToComp2.initialize( 3, 0, 0, 0, 0 );  // to proc, marker,  from proc,
+    TLBackToComp2.initialize( 3, 0, 0, 0, 0 );  // 3 integers: target_proc, entity_id, source_proc_from_comp1
     TLBackToComp2.enableWriteAccess();
 
+    // Get sizes of both tuple lists for synchronized iteration
     int n1 = TLcomp1.get_n();
     int n2 = TLcomp2.get_n();
 
+    // Synchronized iteration through both sorted tuple lists to find matching entity IDs
     int indexInTLComp1 = 0;
-    int indexInTLComp2 = 0;  // advance both, according to the marker
+    int indexInTLComp2 = 0;
     if( n1 > 0 && n2 > 0 )
     {
-        while( indexInTLComp1 < n1 && indexInTLComp2 < n2 )  // if any is over, we are done
+        while( indexInTLComp1 < n1 && indexInTLComp2 < n2 )  // Continue until either list is exhausted
         {
-            int currentValue1 = TLcomp1.vi_rd[2 * indexInTLComp1 + 1];
-            int currentValue2 = TLcomp2.vi_rd[2 * indexInTLComp2 + 1];
+            // Get current entity IDs from both components
+            int currentValue1 = TLcomp1.vi_rd[2 * indexInTLComp1 + 1];  // Entity ID from comp1
+            int currentValue2 = TLcomp2.vi_rd[2 * indexInTLComp2 + 1];  // Entity ID from comp2
+
             if( currentValue1 < currentValue2 )
             {
-                // we have a big problem; basically, we are saying that
-                // dof currentValue is on one model and not on the other
-                // std::cout << " currentValue1:" << currentValue1 << " missing in comp2" << "\n";
+                // Entity ID exists in comp1 but not in comp2 - skip comp1 entry
+                // This is normal for non-overlapping meshes
                 indexInTLComp1++;
                 continue;
             }
             if( currentValue1 > currentValue2 )
             {
-                // std::cout << " currentValue2:" << currentValue2 << " missing in comp1" << "\n";
+                // Entity ID exists in comp2 but not in comp1 - skip comp2 entry
+                // This is normal for non-overlapping meshes
                 indexInTLComp2++;
                 continue;
             }
+            // Found matching entity ID! Count consecutive entries with same ID in both lists
             int size1 = 1;
             int size2 = 1;
             while( indexInTLComp1 + size1 < n1 && currentValue1 == TLcomp1.vi_rd[2 * ( indexInTLComp1 + size1 ) + 1] )
-                size1++;
+                size1++;  // Count consecutive entries with same entity ID in comp1
             while( indexInTLComp2 + size2 < n2 && currentValue2 == TLcomp2.vi_rd[2 * ( indexInTLComp2 + size2 ) + 1] )
-                size2++;
-            // must be found in both lists, find the start and end indices
+                size2++;  // Count consecutive entries with same entity ID in comp2
+
+            // Create communication pairs for all combinations of processes that share this entity ID
             for( int i1 = 0; i1 < size1; i1++ )
             {
                 for( int i2 = 0; i2 < size2; i2++ )
                 {
-                    // send the info back to components
+                    // Send communication info back to component 1 processes
                     int n = TLBackToComp1.get_n();
                     TLBackToComp1.reserve();
-                    TLBackToComp1.vi_wr[3 * n] =
-                        TLcomp1.vi_rd[2 * ( indexInTLComp1 + i1 )];  // send back to the proc marker
-                                                                     // came from, info from comp2
-                    TLBackToComp1.vi_wr[3 * n + 1] = currentValue1;  // initial value (resend?)
-                    TLBackToComp1.vi_wr[3 * n + 2] = TLcomp2.vi_rd[2 * ( indexInTLComp2 + i2 )];  // from proc on comp2
-                    n                              = TLBackToComp2.get_n();
+                    TLBackToComp1.vi_wr[3 * n]     = TLcomp1.vi_rd[2 * ( indexInTLComp1 + i1 )];  // Target process from comp1
+                    TLBackToComp1.vi_wr[3 * n + 1] = currentValue1;  // Shared entity ID
+                    TLBackToComp1.vi_wr[3 * n + 2] = TLcomp2.vi_rd[2 * ( indexInTLComp2 + i2 )];  // Source process from comp2
+
+                    // Send communication info back to component 2 processes
+                    n = TLBackToComp2.get_n();
                     TLBackToComp2.reserve();
-                    TLBackToComp2.vi_wr[3 * n] =
-                        TLcomp2.vi_rd[2 * ( indexInTLComp2 + i2 )];  // send back info to original
-                    TLBackToComp2.vi_wr[3 * n + 1] = currentValue1;  // initial value (resend?)
-                    TLBackToComp2.vi_wr[3 * n + 2] = TLcomp1.vi_rd[2 * ( indexInTLComp1 + i1 )];  // from proc on comp1
-                    // what if there are repeated markers in TLcomp2? increase just index2
+                    TLBackToComp2.vi_wr[3 * n]     = TLcomp2.vi_rd[2 * ( indexInTLComp2 + i2 )];  // Target process from comp2
+                    TLBackToComp2.vi_wr[3 * n + 1] = currentValue1;  // Shared entity ID
+                    TLBackToComp2.vi_wr[3 * n + 2] = TLcomp1.vi_rd[2 * ( indexInTLComp1 + i1 )];  // Source process from comp1
                 }
             }
+
+            // Advance indices past all entries with the current entity ID
             indexInTLComp1 += size1;
             indexInTLComp2 += size2;
         }
     }
-    pc.crystal_router()->gs_transfer( 1, TLBackToComp1, 0 );  // communication towards original tasks, with info about
-    pc.crystal_router()->gs_transfer( 1, TLBackToComp2, 0 );
+    // Send communication information back to original component processes
+    pc.crystal_router()->gs_transfer( 1, TLBackToComp1, 0 );  // Send to component 1 processes
+    pc.crystal_router()->gs_transfer( 1, TLBackToComp2, 0 );  // Send to component 2 processes
 
+    // Process communication information on component 1 processes
     if( *pid1 >= 0 )
     {
-        // we are on original comp 1 tasks
-        // before ordering
-        // now for each value in TLBackToComp1.vi_rd[3*i+1], on current proc, we know the
-        // processors it communicates with
+        // Sort received communication information by entity ID for efficient processing
 #ifdef VERBOSE
         std::stringstream f1;
         f1 << "TLBack1_" << localRank << ".txt";
-        TLBackToComp1.print_to_file( f1.str().c_str() );
+        TLBackToComp1.print_to_file( f1.str().c_str() );  // Debug output before sorting
 #endif
         sort_buffer.buffer_reserve( TLBackToComp1.get_n() );
-        TLBackToComp1.sort( 1, &sort_buffer );
+        TLBackToComp1.sort( 1, &sort_buffer );  // Sort by entity ID (column 1)
         sort_buffer.reset();
 #ifdef VERBOSE
-        TLBackToComp1.print_to_file( f1.str().c_str() );
+        TLBackToComp1.print_to_file( f1.str().c_str() );  // Debug output after sorting
 #endif
-        // so we are now on pid1, we know now each marker were it has to go
-        // add a new method to ParCommGraph, to set up the involved_IDs_map
+
+        // Set up communication graph for component 1 based on discovered communication patterns
+        // This establishes which processes component 1 needs to communicate with
         cgraph->settle_comm_by_ids( *comp1, TLBackToComp1, valuesComp1 );
     }
+    // Process communication information on component 2 processes
     if( *pid2 >= 0 )
     {
-        // we are on original comp 1 tasks
-        // before ordering
-        // now for each value in TLBackToComp1.vi_rd[3*i+1], on current proc, we know the
-        // processors it communicates with
+        // Sort received communication information by source process for efficient processing
 #ifdef VERBOSE
         std::stringstream f2;
         f2 << "TLBack2_" << localRank << ".txt";
-        TLBackToComp2.print_to_file( f2.str().c_str() );
+        TLBackToComp2.print_to_file( f2.str().c_str() );  // Debug output before sorting
 #endif
         sort_buffer.buffer_reserve( TLBackToComp2.get_n() );
-        TLBackToComp2.sort( 2, &sort_buffer );
+        TLBackToComp2.sort( 2, &sort_buffer );  // Sort by source process (column 2)
         sort_buffer.reset();
 #ifdef VERBOSE
-        TLBackToComp2.print_to_file( f2.str().c_str() );
+        TLBackToComp2.print_to_file( f2.str().c_str() );  // Debug output after sorting
 #endif
+
+        // Set up reverse communication graph for component 2 based on discovered communication patterns
+        // This establishes which processes component 2 needs to communicate with
         cgraph_rev->settle_comm_by_ids( *comp2, TLBackToComp2, valuesComp2 );
     }
+
+    // Communication graph computation complete - both components now know their communication partners
     return moab::MB_SUCCESS;
 }
 

@@ -252,7 +252,60 @@ ErrorCode Intx2Mesh::DetermineOrderedNeighbors( EntityHandle inputSet, int max_e
     return MB_SUCCESS;
 }
 
-// slow interface; this will not do the advancing front trick
+/**
+ * Slow KD-tree-based mesh intersection routine (no advancing-front).
+ *
+ * Overview:
+ * - Builds a KD-tree over source (mbs1) faces and, for each target (mbs2) face,
+ *   queries nearby source leaves using a distance-based search around target vertices.
+ * - For the candidate source faces gathered from nearby KD-tree leaves, computes
+ *   exact polygonal intersections in a gnomonic plane, accumulates overlap area,
+ *   and creates intersection polygons/nodes in `outSet` via `findNodes`.
+ * - This path is intentionally simpler and potentially more expensive than the
+ *   advancing-front algorithm used by `intersect_meshes`.
+ *
+ * Inputs/Assumptions:
+ * - `mbset1` (source) fully covers `mbset2` (target) on the sphere.
+ * - Both sets contain 2D elements (triangles, quads, or generic convex polygons).
+ * - On-sphere intersection math is performed using gnomonic projection; tolerances
+ *   are derived from maximum edge lengths on the source mesh.
+ *
+ * High-level Steps:
+ * 1) Cache 2D entities of source (`rs1`) and target (`rs2`). Optionally filter by
+ *    `GRID_IMASK` tag to exclude masked-out elements.
+ * 2) Precompute and tag target-edge adjacency (`__tgtEdgeNeighbors`) for quick
+ *    access when locating/creating intersection points on target boundaries.
+ * 3) Estimate tolerances: compute maximum source edge length to derive KD-tree
+ *    search tolerance and box overlap epsilon; reduce across ranks under MPI.
+ * 4) Build an `AdaptiveKDTree` on the source faces with spherical options
+ *    (`PLANE_SET=1;SPLITS_PER_DIR=2;SPHERICAL;RADIUS=1.0;`).
+ * 5) For each target face:
+ *    - Gather its vertex coordinates; compute an average edge length `av_len`.
+ *    - For each target vertex, perform `kd.distance_search` within radius `av_len`
+ *      to collect nearby KD-tree leaves; accumulate their contained 2D source faces
+ *      into `close_source_cells`.
+ *    - For each candidate source face in that range, call
+ *      `computeIntersectionBetweenTgtAndSrc` to compute polygon intersection points
+ *      and area; if area > 0, call `findNodes` to create nodes/polygons in `outSet`.
+ *    - Track recovered area vs. the target cell area (diagnostic).
+ * 6) Under MPI, reconcile shared intersection points across process boundaries via
+ *    `resolve_intersection_sharing`.
+ * 7) Cleanup transient state and return.
+ *
+ * Complexity Notes:
+ * - Building the KD-tree is roughly O(N log N). For each target face, the search
+ *   radius heuristic (`av_len`) aims to limit candidates; worst-case behavior can
+ *   still approach quadratic if meshes overlap densely.
+ *
+ * Key Data/Tags:
+ * - `tgtParentTag`, `srcParentTag`, `countTag` maintain provenance and counters for
+ *   created intersection entities; they are (re)created in this routine.
+ * - `__tgtEdgeNeighbors` stores per-target-face edge handles to speed boundary ops.
+ *
+ * Error handling:
+ * - Uses MB_CHK_ERR/MB_CHK_SET_ERR macros for MOAB `ErrorCode` propagation.
+ * - Cleans up tags and temporary state before returning on success.
+ */
 // some are triangles, some are quads, some are polygons ...
 ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle mbset2, EntityHandle& outputSet )
 {

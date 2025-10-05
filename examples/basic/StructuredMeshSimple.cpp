@@ -50,104 +50,229 @@
 #include "moab/ScdInterface.hpp"
 #include "moab/ProgOptions.hpp"
 #include "moab/CN.hpp"
+
 #ifdef MOAB_HAVE_MPI
 #include "moab_mpi.h"
+#include <mpi.h>
 #endif
+
+#include <array>
+#include <cmath>
 #include <iostream>
+#include <memory>
+#include <stdexcept>
 #include <vector>
 
-using namespace moab;
-using namespace std;
+// Using declarations for cleaner code
+using moab::Core;
+using moab::EntityHandle;
+using moab::ErrorCode;
+using moab::Range;
+using moab::ScdBox;
+using moab::ScdInterface;
 
-int main( int argc, char** argv )
-{
-    int N = 10, dim = 3;
+// Constants
+namespace {
+    constexpr int DEFAULT_DIMENSION = 3;
+    constexpr int DEFAULT_ELEMENTS_PER_SIDE = 10;
+} // namespace
 
+int main(int argc, char** argv) {
+    // Initialize MPI if available
 #ifdef MOAB_HAVE_MPI
-    MPI_Init( &argc, &argv );
+    if (MPI_Init(&argc, &argv) != MPI_SUCCESS) {
+        std::cerr << "MPI_Init failed" << std::endl;
+        return 1;
+    }
+
+    // Ensure MPI is properly finalized when we exit
+    struct MPIFinalizer {
+        void operator()(int*) const { MPI_Finalize(); }
+    };
+    std::unique_ptr<int, MPIFinalizer> mpi_guard(nullptr);
 #endif
 
-    ProgOptions opts;
-    opts.addOpt< int >( string( "dim,d" ), string( "Dimension of mesh (default=3)" ), &dim );
-    opts.addOpt< int >( string( ",n" ), string( "Number of elements on a side (default=10)" ), &N );
-    opts.parseCommandLine( argc, argv );
+    // Parse command line options
+    int dimension = DEFAULT_DIMENSION;
+    int elements_per_side = DEFAULT_ELEMENTS_PER_SIDE;
 
-    // 0. Instantiate MOAB and get the structured mesh interface
-    Interface* mb = new( std::nothrow ) Core;
-    if( NULL == mb ) return 1;
-    ScdInterface* scdiface;
-    MB_CHK_ERR( mb->query_interface( scdiface ) );  // Get a ScdInterface object through moab instance
+    try {
+        ProgOptions opts;
+        opts.addOpt<int>("dim,d", "Dimension of mesh (default=3)", &dimension);
+        opts.addOpt<int>(",n", "Number of elements on a side (default=10)", &elements_per_side);
+        opts.parseCommandLine(argc, argv);
 
-    // 1. Decide what the local parameters of the mesh will be, based on parallel/serial and rank.
-#ifdef MOAB_HAVE_MPI
-    int rank = 0, nprocs = 1;
-    MPI_Comm_size( MPI_COMM_WORLD, &nprocs );
-    MPI_Comm_rank( MPI_COMM_WORLD, &rank );
-    int ilow = rank * N, ihigh = ilow + N;
-#else
+        // Validate input
+        if (dimension < 1 || dimension > 3) {
+            throw std::invalid_argument("Dimension must be 1, 2, or 3");
+        }
+        if (elements_per_side < 1) {
+            throw std::invalid_argument("Number of elements must be positive");
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error parsing command line: " << e.what() << std::endl;
+        return 1;
+    }
+
+    // Initialize MOAB
+    std::unique_ptr<Core> moab_instance = std::make_unique<Core>();
+    if (!moab_instance) {
+        std::cerr << "Failed to create MOAB instance" << std::endl;
+        return 1;
+    }
+
+    // Get the structured mesh interface
+    ScdInterface* scd_interface = nullptr;
+    MB_CHK_SET_ERR(
+        moab_instance->query_interface(scd_interface),
+        "Failed to get ScdInterface"
+    );
+    if (!scd_interface) {
+        std::cerr << "Failed to get ScdInterface: null pointer returned" << std::endl;
+        return 1;
+    }
+
+    // 1. Determine local parameters based on parallel/serial and rank
     int rank = 0;
-    int ilow = 0, ihigh = N;
+    int ilow = 0;
+    int ihigh = elements_per_side;
+
+#ifdef MOAB_HAVE_MPI
+    int nprocs = 1;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+
+    // Calculate local range for this process
+    const int elements_per_proc = elements_per_side / nprocs;
+    const int remainder = elements_per_side % nprocs;
+
+    // Distribute elements among processes
+    ilow = rank * elements_per_proc + std::min(rank, remainder);
+    ihigh = ilow + elements_per_proc + (rank < remainder ? 1 : 0);
 #endif
+
+    std::string write_options = "";
+    if (nprocs > 1) write_options = "PARALLEL=WRITE_PART";
 
     // 2. Create a N^d structured mesh, which includes (N+1)^d vertices and N^d elements.
-    ScdBox* box;
-    MB_CHK_ERR( scdiface->construct_box(
-        HomCoord( ilow, ( dim > 1 ? 0 : -1 ),
-                  ( dim > 2 ? 0 : -1 ) ),  // Use in-line logical tests to handle dimensionality
-        HomCoord( ihigh, ( dim > 1 ? N : -1 ), ( dim > 2 ? N : -1 ) ), NULL,
-        0,        // NULL coords vector and 0 coords (don't specify coords for now)
-        box ) );  // box is the structured box object providing the parametric
-                  // structured mesh interface for this rectangle of elements
+    ScdBox* box = nullptr;
 
-    // 3. Get the vertices and elements from moab and check their numbers against (N+1)^d and N^d,
-    // resp.
-    Range verts, elems;
-    // First '0' specifies "root set", or entire MOAB instance, second the
-    // entity dimension being requested
-    MB_CHK_ERR( mb->get_entities_by_dimension( 0, 0, verts ) );
-    MB_CHK_ERR( mb->get_entities_by_dimension( 0, dim, elems ) );
+    // Calculate box bounds based on dimension
+    const moab::HomCoord low(
+        ilow,
+        (dimension > 1) ? 0 : -1,
+        (dimension > 2) ? 0 : -1
+    );
 
-#define MYSTREAM( a ) \
-    if( !rank ) cout << a << endl
+    const moab::HomCoord high(
+        ihigh,
+        (dimension > 1) ? elements_per_side : -1,
+        (dimension > 2) ? elements_per_side : -1
+    );
 
-    if( pow( N, dim ) == (int)elems.size() && pow( N + 1, dim ) == (int)verts.size() )
-    {  // Expected #e and #v are N^d and (N+1)^d, resp.
-#ifdef MOAB_HAVE_MPI
-        MYSTREAM( "Proc 0: " );
-#endif
-        MYSTREAM( "Created " << elems.size() << " " << CN::EntityTypeName( mb->type_from_handle( *elems.begin() ) )
-                             << " elements and " << verts.size() << " vertices." << endl );
+    // Create the structured mesh box
+    MB_CHK_SET_ERR(
+        scd_interface->construct_box(
+            low, high,
+            nullptr,    // No coordinates array
+            0,          // No coordinates
+            box,        // Output parameter
+            nullptr,    // Periodicity
+            nullptr,    // Parallel data
+            true,       // No coordinates
+            0 // Resolve dimensionality
+        ),
+        "Failed to construct structured box"
+    );
+
+    if (!box) {
+        std::cerr << "Failed to construct structured box: null box returned" << std::endl;
+        return 1;
     }
-    else
-        cout << "Created the wrong number of vertices or hexes!" << endl;
 
-    // 4. Loop over elements in 3 nested loops over i, j, k; for each (i,j,k):
-    vector< double > coords( 3 * pow( N + 1, dim ) );
-    vector< EntityHandle > connect;
-    for( int k = 0; k < ( dim > 2 ? N : 1 ); k++ )
-    {
-        for( int j = 0; j < ( dim > 1 ? N : 1 ); j++ )
-        {
-            for( int i = 0; i < N - 1; i++ )
-            {
+    // 3. Get the vertices and elements from moab and check their numbers against (N+1)^d and N^d
+    Range vertices, elements;
+
+    // Get all vertices (dimension = 0) and elements (dimension = mesh dimension)
+    MB_CHK_SET_ERR(moab_instance->get_entities_by_dimension(0, 0, vertices), "Failed to get vertices");
+    MB_CHK_SET_ERR(moab_instance->get_entities_by_dimension(0, dimension, elements), "Failed to get elements");
+
+#ifdef MOAB_HAVE_MPI
+    std::size_t local_entities_size[2] = {vertices.size(), elements.size()}, global_entities_size[2] = {0, 0};
+    MPI_Allreduce(local_entities_size, global_entities_size, 2, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
+#endif
+
+    // Calculate expected number of vertices and elements
+    const std::size_t expected_vertices = static_cast<std::size_t>(std::pow(elements_per_side + 1, dimension));
+    const std::size_t expected_elements = static_cast<std::size_t>(std::pow(elements_per_side, dimension));
+
+    // Only print from rank 0 in parallel
+    auto print_message = [rank](const auto& message) {
+        if (rank == 0) {
+            std::cout << message << std::endl;
+        }
+    };
+
+    // Verify the number of created elements and vertices
+    if (expected_elements == global_entities_size[1]) {
+        const auto element_type = moab_instance->type_from_handle(*elements.begin());
+        std::ostringstream msg;
+        msg << "Created " << global_entities_size[1] << " "
+            << moab::CN::EntityTypeName(element_type) << " elements and "
+            << global_entities_size[0] << " vertices.";
+        print_message(msg.str());
+    } else {
+        std::ostringstream err_msg;
+        err_msg << "Error: Expected " << expected_elements << " elements and "
+                << expected_vertices << " vertices, but got "
+                << global_entities_size[1] << " elements and "
+                << global_entities_size[0] << " vertices.";
+        print_message(err_msg.str());
+        return 1;
+    }
+
+    // 4. Loop over elements in nested loops over i, j, k based on dimension
+    // const int i_max = elements_per_side - 1;  // 0-based indexing
+    const int j_max = (dimension > 1) ? elements_per_side - 1 : 0;
+    const int k_max = (dimension > 2) ? elements_per_side - 1 : 0;
+
+    // Pre-allocate vectors to avoid reallocation
+
+    std::vector<double> coordinates;
+    for (int k = 0; k <= k_max; ++k) {
+        for (int j = 0; j <= j_max; ++j) {
+            for (int i = ilow; i < ihigh; ++i) {
                 // 4a. Get the element corresponding to (i,j,k)
-                EntityHandle ehandle = box->get_element( i, j, k );
-                if( 0 == ehandle ) return MB_FAILURE;
+                const EntityHandle element = box->get_element(i, j, k);
+                if (0 == element) {
+                    std::cerr << "Failed to get element at (" << i << ", " << j << ", " << k << ")" << std::endl;
+                    // return 1;
+                    continue;
+                }
+
                 // 4b. Get the connectivity of the element
-                MB_CHK_ERR( mb->get_connectivity( &ehandle, 1, connect ) );  // Get the connectivity, in canonical order
+                std::vector< EntityHandle > connectivity;
+                MB_CHK_SET_ERR(
+                    moab_instance->get_connectivity(&element, 1, connectivity),
+                    "Failed to get connectivity for element at (" << i << ", " << j << ", " << k << ") with handle " << element
+                );
+
                 // 4c. Get the coordinates of the vertices comprising that element
-                MB_CHK_ERR( mb->get_coords( &connect[0], connect.size(),
-                                            &coords[0] ) );  // Get the coordinates of those vertices
+                coordinates.resize(3 * connectivity.size());
+                MB_CHK_SET_ERR(
+                    moab_instance->get_coords(connectivity.data(), connectivity.size(), coordinates.data()),
+                    "Failed to get coordinates for element at (" << i << ", " << j << ", " << k << ") with handle " << element
+                );
             }
         }
     }
 
-    // 5. Release the structured mesh interface and destroy the MOAB instance
-    mb->release_interface( scdiface );  // Tell MOAB we're done with the ScdInterface
+    // 5. Write the mesh file to disk
+    MB_CHK_SET_ERR(moab_instance->write_file("structured_mesh.h5m", "h5m", write_options.c_str() ), "Failed to write mesh file");
 
-#ifdef MOAB_HAVE_MPI
-    MPI_Finalize();
-#endif
+    // 6. Clean up
+    MB_CHK_SET_ERR(moab_instance->release_interface(scd_interface), "Failed to release interface");
 
+    // MPI_Finalize is handled by the mpi_guard destructor if MPI is enabled
     return 0;
 }

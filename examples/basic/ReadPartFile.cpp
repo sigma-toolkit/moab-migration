@@ -24,6 +24,7 @@
 #include "moab/Core.hpp"
 #include <iostream>
 #include <fstream>
+#include <memory>
 
 using namespace moab;
 using namespace std;
@@ -39,84 +40,66 @@ int nparts;
 
 int main( int argc, char** argv )
 {
-    // Get MOAB instance
-    Interface* mb = new( std::nothrow ) Core;
-    if( NULL == mb ) return 1;
-
-    // Need option handling here for input filename
-    if( argc > 4 )
+    if( argc < 5 )
     {
-        // User has input a mesh file
-        test_file_name = argv[1];
-        part_file_name = argv[2];
-        nparts         = atoi( argv[3] );
+        std::cerr << "Usage: " << argv[0] << " <input file> <part file> <#parts> <output file>\n";
+        return 1;
     }
-    else
-    {
-        cerr << " usage is " << argv[0] << " <input file> <part file> <#parts> <output file> \n";
-        exit( 0 );
-    }
+    std::string mesh_file = argv[1];
+    std::string part_file = argv[2];
+    int nparts            = std::stoi( argv[3] );
+    std::string out_file  = argv[4];
 
-    ifstream inFile;
-    inFile.open( part_file_name.c_str() );
-    if( !inFile )
-    {
-        cerr << "Unable to open file " << part_file_name << "\n";
-        exit( 1 );  // call system to stop
-    }
+    auto mb = std::make_unique< Core >();
+    MB_CHK_SET_ERR( mb ? MB_SUCCESS : MB_FAILURE, "Error: Could not allocate MOAB Core instance." );
 
-    // Load the mesh from file
-    MB_CHK_ERR( mb->load_mesh( test_file_name.c_str() ) );
+    std::ifstream inFile( part_file );
+    MB_CHK_SET_ERR( inFile.is_open() ? MB_SUCCESS : MB_FAILURE, "Unable to open file " + part_file );
 
-    // Get sets entities, by type
+    MB_CHK_SET_ERR( mb->load_mesh( mesh_file.c_str() ), "Error: Could not load mesh file '" + mesh_file + "'" );
+
     Range sets;
-    MB_CHK_ERR( mb->get_entities_by_type( 0, MBENTITYSET, sets ) );
+    MB_CHK_SET_ERR( mb->get_entities_by_type( 0, MBENTITYSET, sets ), "Error: Could not get entity sets." );
+    std::cout << "Number of sets is " << sets.size() << std::endl;
 
-    // Output the number of sets
-    cout << "Number of sets is " << sets.size() << endl;
-
-    // remove the sets that have a PARALLEL_PARTITION tag
     Tag tag;
-    MB_CHK_ERR( mb->tag_get_handle( "PARALLEL_PARTITION", tag ) );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "PARALLEL_PARTITION", tag ), "Error: Could not get PARALLEL_PARTITION tag." );
 
-    int i                = 0;
     int num_deleted_sets = 0;
-    ErrorCode rval;
-    for( Range::iterator it = sets.begin(); it != sets.end(); it++, i++ )
+    for( auto it = sets.begin(); it != sets.end(); ++it )
     {
         EntityHandle eh = *it;
-        // cout << " set :" << mb->id_from_handle(eh) <<"\n";
-        int val = -1;
-        rval    = mb->tag_get_data( tag, &eh, 1, &val );
+        int val         = -1;
+        MB_CHK_SET_ERR( mb->tag_get_data( tag, &eh, 1, &val ), "Error: Unable to get tag data" );
         if( val != -1 )
         {
             num_deleted_sets++;
-            rval = mb->delete_entities( &eh, 1 );  // delete the set, we will have a new partition soon
+            MB_CHK_SET_ERR( mb->delete_entities( &eh, 1 ), "Error: Unable to delete entities" );
         }
     }
-    if( num_deleted_sets ) cout << "delete " << num_deleted_sets << " existing  partition sets, and create new ones \n";
 
-    Range cells;  // get them by dimension 2!
-    MB_CHK_ERR( mb->get_entities_by_dimension( 0, 2, cells ) );
-    EntityHandle* psets = new EntityHandle[nparts];
+    if( num_deleted_sets )
+        std::cout << "Deleted " << num_deleted_sets << " existing partition sets, and created new ones.\n";
+
+    Range cells;
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 2, cells ), "Error: Could not get dimension-2 entities." );
+    std::vector< EntityHandle > psets( nparts );
     for( int i = 0; i < nparts; i++ )
     {
-        MB_CHK_ERR( mb->create_meshset( MESHSET_SET, psets[i] ) );
-        MB_CHK_ERR( mb->tag_set_data( tag, &( psets[i] ), 1, &i ) );
+        MB_CHK_SET_ERR( mb->create_meshset( MESHSET_SET, psets[i] ), "Error: Could not create meshset." );
+        MB_CHK_SET_ERR( mb->tag_set_data( tag, &( psets[i] ), 1, &i ), "Error: Could not set tag data." );
     }
 
-    for( Range::iterator it = cells.begin(); it != cells.end(); it++ )
+    for( auto it = cells.begin(); it != cells.end(); ++it )
     {
         int part;
         EntityHandle eh = *it;
         inFile >> part;
-        MB_CHK_ERR( mb->add_entities( psets[part], &eh, 1 ) );
+        MB_CHK_SET_ERR( mb->add_entities( psets[part], &eh, 1 ), "Error: Could not add entity to partition set." );
     }
 
-    MB_CHK_ERR( mb->write_file( argv[4] ) );
-
-    delete[] psets;
-    delete mb;
+    MB_CHK_SET_ERR( mb->write_file( out_file.c_str() ), "Error: Could not write output mesh file '" + out_file + "'" );
+    std::cout << "Partitioned mesh written to '" << out_file << "'.\n";
 
     return 0;
 }

@@ -79,7 +79,7 @@ int main( int argc, char* argv[] )
         }
         else
         {
-            std::cerr << "Usage: " << argv[0] << " [-r \c n] [-w \c n]" << std::endl;
+            std::cerr << "Usage: " << argv[0] << " [-r <n>] [-w <n>]" << std::endl;
             return 1;
         }
     }

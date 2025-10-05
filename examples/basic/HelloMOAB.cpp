@@ -1,10 +1,11 @@
 /** @example HelloMOAB.cpp
- * A simple example demonstrating basic MOAB functionality.
+ * @brief A simple example demonstrating basic MOAB functionality.
+ *
  * This example demonstrates the fundamental operations in MOAB:
  * - Creating a MOAB instance
  * - Loading a mesh from a file
  * - Querying entities by type and dimension
- * - Basic error handling
+ * - Basic error handling with MB_CHK_ERR
  *
  * The program reads a mesh file (default: 3k-tri-sphere.vtk) and reports
  * the number of vertices, edges, faces, and elements in the mesh.
@@ -15,56 +16,66 @@
 
 #include "moab/Core.hpp"
 #include <iostream>
+#include <memory>
+#include <string>
 
-using namespace moab;
-using namespace std;
+// Using declarations for cleaner code
+using moab::Core;
+using moab::ErrorCode;
+using moab::Range;
+using moab::MBVERTEX;
+using moab::MBEDGE;
 
-#ifndef MESH_DIR
-#define MESH_DIR "."
-#endif
+// Constants
+namespace {
+    const char* const DEFAULT_MESH_FILE = "3k-tri-sphere.vtk";
+} // namespace
 
-// Note: change the file name below to test a trivial "No such file or directory" error
-string test_file_name = string( MESH_DIR ) + string( "/3k-tri-sphere.vtk" );
+int main(int argc, char** argv) {
+    try {
+        // Create MOAB instance with smart pointer for automatic cleanup
+        auto moab = std::make_unique<Core>();
+        if (!moab) {
+            std::cerr << "Error: Failed to create MOAB instance\n";
+            return 1;
+        }
 
-int main( int argc, char** argv )
-{
-    // Get MOAB instance
-    Interface* mb = new( std::nothrow ) Core;
-    if( NULL == mb ) return 1;
+        // Parse input filename
+        const std::string mesh_file = (argc > 1)
+            ? argv[1]
+            : std::string(MESH_DIR) + "/" + std::string(DEFAULT_MESH_FILE);
 
-    // Need option handling here for input filename
-    if( argc > 1 )
-    {
-        // User has input a mesh file
-        test_file_name = argv[1];
+        // Load the mesh from file with error checking
+        MB_CHK_SET_ERR(
+            moab->load_mesh(mesh_file.c_str()),
+            "Error: Could not load mesh file: " << mesh_file
+        );
+
+        // Get entities by type/dimension
+        Range vertices, edges, faces, elements;
+        MB_CHK_ERR(moab->get_entities_by_type(0, MBVERTEX, vertices));
+        MB_CHK_ERR(moab->get_entities_by_type(0, MBEDGE, edges));
+        MB_CHK_ERR(moab->get_entities_by_dimension(0, 2, faces));
+        MB_CHK_ERR(moab->get_entities_by_dimension(0, 3, elements));
+
+        // Output the number of entities with formatted output
+        const auto print_entity_count = [](const std::string& name, const auto& range) {
+            std::cout << "Number of " << name << ": " << range.size() << "\n";
+        };
+
+        print_entity_count("vertices", vertices);
+        print_entity_count("edges   ", edges);
+        print_entity_count("faces   ", faces);
+        print_entity_count("elements", elements);
+
+        return 0;
     }
-
-    // Load the mesh from vtk file
-    MB_CHK_ERR( mb->load_mesh( test_file_name.c_str() ) );
-
-    // Get verts entities, by type
-    Range verts;
-    MB_CHK_ERR( mb->get_entities_by_type( 0, MBVERTEX, verts ) );
-
-    // Get edge entities, by type
-    Range edges;
-    MB_CHK_ERR( mb->get_entities_by_type( 0, MBEDGE, edges ) );
-
-    // Get faces, by dimension, so we stay generic to entity type
-    Range faces;
-    MB_CHK_ERR( mb->get_entities_by_dimension( 0, 2, faces ) );
-
-    // Get regions, by dimension, so we stay generic to entity type
-    Range elems;
-    MB_CHK_ERR( mb->get_entities_by_dimension( 0, 3, elems ) );
-
-    // Output the number of entities
-    cout << "Number of vertices is " << verts.size() << endl;
-    cout << "Number of edges is " << edges.size() << endl;
-    cout << "Number of faces is " << faces.size() << endl;
-    cout << "Number of elements is " << elems.size() << endl;
-
-    delete mb;
-
-    return 0;
+    catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << "\n";
+        return 1;
+    }
+    catch (...) {
+        std::cerr << "Error: Unknown exception occurred\n";
+        return 1;
+    }
 }

@@ -24,6 +24,7 @@
  *    -# TestExodusII (This uses the default <mesh-file>: MeshFiles/unittest/mbtest2.g)
  */
 #include <iostream>
+#include <memory>
 
 // Include header for MOAB instance and range
 #include "moab/Core.hpp"
@@ -31,12 +32,11 @@
 using namespace moab;
 using namespace std;
 
-string test_file_name = string( MESH_DIR ) + string( "/mbtest2.g" );
 int main( int argc, char** argv )
 {
 #ifdef MOAB_HAVE_NETCDF
     // Get MOAB instance
-    Interface* mb = new( std::nothrow ) Core;
+    std::unique_ptr<Interface> mb( new( std::nothrow ) Core );
     if( NULL == mb ) return 1;
 
     // Get the material set tag handle
@@ -68,11 +68,8 @@ int main( int argc, char** argv )
         MB_CHK_ERR( mb->get_entities_by_type_and_tag( 0, MBENTITYSET, &mtag, NULL, 1, sets ) );
 
         // Iterate over each set, getting entities
-        Range::iterator set_it;
-        for( set_it = sets.begin(); set_it != sets.end(); ++set_it )
+        for( EntityHandle this_set : sets )
         {
-            EntityHandle this_set = *set_it;
-
             // Get the id for this set
             int set_id;
             MB_CHK_ERR( mb->tag_get_data( mtag, &this_set, 1, &set_id ) );
@@ -88,7 +85,6 @@ int main( int argc, char** argv )
         }
     }
 
-    delete mb;
 #else
     cout << " This test needs moab configured with netcdf \n";
 #endif

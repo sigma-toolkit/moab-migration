@@ -31,6 +31,7 @@
 #endif
 
 #include <iostream>
+#include <memory>
 
 using namespace moab;
 using namespace std;

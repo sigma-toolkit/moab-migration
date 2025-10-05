@@ -301,7 +301,6 @@ ErrorCode NCHelperESMF::create_mesh( Range& faces )
 #ifdef MOAB_HAVE_MPI
 ErrorCode NCHelperESMF::redistribute_local_cells( int start_cell_idx, ParallelComm* pco )
 {
-
     // If possible, apply Zoltan partition
     // will start from trivial partition in cell space
     // will read cell connectivities, coordinates of vertices in conn, and then compute centers of the cells
@@ -489,6 +488,8 @@ ErrorCode NCHelperESMF::redistribute_local_cells( int start_cell_idx, ParallelCo
         localGidVerts.clear();
         return MB_SUCCESS;
     }
+#else
+    UNUSED(pco);
 #endif
 
     // By default, apply trivial partition

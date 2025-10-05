@@ -1800,6 +1800,9 @@ ErrorCode WriteHDF5Parallel::unpack_set( EntityHandle set, const unsigned long* 
     // Use local variables for readability
     assert( buffer_size >= 4 );
     assert( buffer[1] + buffer[2] + buffer[3] <= buffer_size );
+#ifdef NDEBUG
+    UNUSED(buffer_size);
+#endif
     const unsigned long flags      = buffer[0];
     unsigned long num_content      = buffer[1];
     const unsigned long num_child  = buffer[2];

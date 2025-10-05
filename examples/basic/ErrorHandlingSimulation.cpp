@@ -39,6 +39,7 @@
 
 #include <iostream>
 #include <cstdlib>
+#include <memory>
 
 using namespace moab;
 using namespace std;

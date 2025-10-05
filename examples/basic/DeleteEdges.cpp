@@ -16,6 +16,7 @@
 #include "moab/Range.hpp"
 #include "moab/CN.hpp"
 #include <iostream>
+#include <memory>
 
 using namespace moab;
 using namespace std;
@@ -29,28 +30,31 @@ string out_file       = string( "outFile.h5m" );
 
 int main( int argc, char** argv )
 {
-    if( argc > 1 )
+    if( argc == 1 )
     {
-        // User has input a mesh file
-        test_file_name = argv[1];
+        std::cout << "Usage: " << argv[0] << " [meshfile] [outfile]\n";
+        return 0;
     }
-    if( argc > 2 )
-    {
-        // User has specified an output file
-        out_file = argv[2];
-    }
+    std::string mesh_file = ( argc > 1 ) ? argv[1] : std::string( MESH_DIR ) + "/hex01.vtk";
+    std::string out_file  = ( argc > 2 ) ? argv[2] : "outFile.h5m";
 
-    // Instantiate & load a mesh from a file
-    Core* mb = new( std::nothrow ) Core;
-    if( NULL == mb ) return 1;
-    MB_CHK_ERR( mb->load_mesh( test_file_name.c_str() ) );
+    auto mb = std::make_unique< Core >();
+    if( !mb )
+    {
+        std::cerr << "Error: Could not allocate MOAB Core instance.\n";
+        return 1;
+    }
+    if( MB_SUCCESS != mb->load_mesh( mesh_file.c_str() ) )
+    {
+        std::cerr << "Error: Could not load mesh file '" << mesh_file << "'\n";
+        return 1;
+    }
 
     Range edges;
     MB_CHK_ERR( mb->get_entities_by_dimension( 0, 1, edges ) );
     MB_CHK_ERR( mb->delete_entities( edges ) );
 
-    MB_CHK_ERR( mb->write_file( out_file.c_str() ) );
-    delete mb;
-
+    MB_CHK_SET_ERR( mb->write_file( out_file.c_str() ), "Error: Could not write output mesh file '" + out_file + "'" );
+    std::cout << "Deleted " << edges.size() << " edges. Output written to '" << out_file << "'.\n";
     return 0;
 }

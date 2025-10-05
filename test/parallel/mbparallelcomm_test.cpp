@@ -228,7 +228,7 @@ void print_usage( const char* command )
               << "===   =====" << std::endl
               << " 1     <linear_ints> <shared_verts> " << std::endl
               << " 2     <n_ints> " << std::endl
-              << " 3*    <# files> <file_names...> [\c tag_name=\"MATERIAL_SET\" [tag_val] "
+              << " 3*    <# files> <file_names...> [<tag_name>=\"MATERIAL_SET\" [tag_val] "
                  "[distribute=1] [resolve_shared=1] [with_ghosts=1] [use_mpio=0]"
               << std::endl
               << " 4    <file_name> " << std::endl

@@ -511,6 +511,8 @@ ErrorCode NCHelperScrip::redistribute_local_cells( int start_cell_idx, ParallelC
 
         return MB_SUCCESS;
     }
+#else
+    UNUSED(pco);
 #endif
 
     // By default, apply trivial partition

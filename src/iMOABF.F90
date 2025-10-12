@@ -310,7 +310,7 @@ module iMOAB
         integer(c_int), intent(in) :: pid
         integer(c_int), intent(in) :: local_index
         integer(c_int), intent(out) :: num_adjacent_elements
-        integer(c_int), intent(out) :: adjacent_element_IDs
+        integer(c_int), intent(out) :: adjacent_element_IDs(*)
       end function iMOAB_GetNeighborElements
 
       integer(c_int) function iMOAB_GetNeighborVertices(pid, local_index, num_adjacent_vertices, adjacent_vertex_IDs) &

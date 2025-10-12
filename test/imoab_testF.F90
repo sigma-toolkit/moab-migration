@@ -16,9 +16,9 @@ use iMOAB
 
 #include "moab/MOABConfig.h"
 #ifdef MOAB_HAVE_MPI
-include 'mpif.h'
+!include 'mpif.h'
 #endif
-
+use mpi
 #ifndef MOAB_MESH_DIR
 #error Specify MOAB_MESH_DIR path
 #endif
@@ -55,10 +55,13 @@ include 'mpif.h'
       integer  vpere, nebl, blockID
       !      iWORK(eCO) start for connectivity
       integer    sizeconn, eCO
+      integer :: local_index
+      integer :: num_adjacent_elements
+      integer :: adjacent_element_IDs(64)
       !      IWORK(egID) , IWORK(elID) starts for global el ID, local elem ID
       integer    egID, elID, eOWN
       integer    iTAG, dTAG
-
+      integer    i, j
       !       indices for surface BC element, reference surf BC, value
       integer    isBC, irBC, ivBC
 
@@ -195,8 +198,28 @@ include 'mpif.h'
       call errorout(ierr, 'failed to get all elem info')
       ifree = eRA + nelem(3)
       do i=1, nelem(3)
-          write(*, 101) IWORK(eID+i-1), IWORK(eRA+i-1), IWORK(beID+i-1)
+          local_index = i-1
+          write(*, 101) IWORK(eID+local_index), IWORK(eRA+local_index), IWORK(beID+local_index)
 101       FORMAT( ' global ID ', I5, ' rank: ', I3, ' block ID: ', I4)
+
+          !--------------------------------------------------------------------
+          !  Test neighbors:
+          !  Neighbor elements that share a face with current element
+          !  can be determined with this call.
+          !  Elements are identified by their local index.
+          !--------------------------------------------------------------------
+          if (i < 5) then
+            num_adjacent_elements = 64 ! initial allocation
+            ierr = iMOAB_GetNeighborElements(pid, local_index, num_adjacent_elements, adjacent_element_IDs)
+            call errorout(ierr, "failed to get element neighbors")
+
+            print *, "  neighbors for first element:"
+            do j = 1, num_adjacent_elements
+                write(*,'(I6)', advance='no') adjacent_element_IDs(j)
+            end do
+            print *, ""
+          endif
+
       enddo
 
       do  i=1,nblocks(3)
@@ -229,6 +252,7 @@ include 'mpif.h'
                   write (*, 102) j,  IWORK(eOWN+j-1),IWORK(egID+j-1), IWORK(elID+j-1), (IWORK(eCO-1+(j-1)*vpere+k), k=1,vpere)
 102               FORMAT(' elem ', I3, ' owned by', I3, ' gid:', I3, ' lid:', I3, ' : ', 10I5)
             enddo
+
       enddo
 
       ! query int tag values on vertices

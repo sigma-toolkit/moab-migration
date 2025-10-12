@@ -1,5 +1,66 @@
-/** \file iMOAB.cpp
+/**
+ * @file iMOAB.cpp
+ * @brief Implementation of iMOAB C API for MOAB mesh database operations
+ *
+ * This file implements the iMOAB interface - a C API for MOAB (Mesh Oriented datABase)
+ * that provides simplified access to MOAB functionality for coupled applications,
+ * particularly in climate and multiphysics simulations.
  */
+
+/**
+ * @defgroup iMOAB iMOAB C Interface
+ * @brief C API for MOAB mesh database operations in coupled applications
+ *
+ * The iMOAB interface provides a simplified C API for accessing MOAB functionality,
+ * designed for use in coupled climate and multiphysics applications. It handles
+ * mesh I/O, parallel communication, remapping, and data transfer between components.
+ *
+ * @{
+ */
+
+/**
+ * @defgroup iMOABInit Initialization and Finalization
+ * @brief Functions for initializing and finalizing the iMOAB library
+ * @ingroup iMOAB
+ */
+
+/**
+ * @defgroup iMOABApp Application Management
+ * @brief Functions for registering and managing application instances
+ * @ingroup iMOAB
+ */
+
+/**
+ * @defgroup iMOABIO Mesh I/O Operations
+ * @brief Functions for reading and writing mesh files
+ * @ingroup iMOAB
+ */
+
+/**
+ * @defgroup iMOABQuery Mesh Query Operations
+ * @brief Functions for querying mesh information (vertices, elements, blocks, BCs)
+ * @ingroup iMOAB
+ */
+
+/**
+ * @defgroup iMOABTag Tag Operations
+ * @brief Functions for defining and accessing tag data on mesh entities
+ * @ingroup iMOAB
+ */
+
+/**
+ * @defgroup iMOABParallel Parallel Communication
+ * @brief Functions for parallel mesh operations and data transfer
+ * @ingroup iMOAB
+ */
+
+/**
+ * @defgroup iMOABRemap Remapping and Intersection
+ * @brief Functions for mesh intersection and field remapping (TempestRemap integration)
+ * @ingroup iMOAB
+ */
+
+/** @} */  // end of iMOAB group
 
 #include "moab/MOABConfig.h"
 #include "moab/Core.hpp"
@@ -130,32 +191,67 @@ struct GlobalContext
 
 static struct GlobalContext context;
 
+/**
+ * @brief Initialize iMOAB library and create MOAB instance.
+ * @ingroup iMOABInit
+ *
+ * @details Initializes the iMOAB interface by creating a MOAB Core instance and setting up
+ * standard tags for material sets, boundary conditions, and global IDs. Uses reference counting
+ * to support multiple initialization calls. Detects MPI initialization status if built with MPI support.
+ *
+ * @par Initialization Steps:
+ * -# Store command-line arguments (argc/argv) for later use
+ * -# Create MOAB Core instance on first initialization (refCountMB == 0)
+ * -# Retrieve standard tag handles: MATERIAL_SET, NEUMANN_SET, DIRICHLET_SET, GLOBAL_ID
+ * -# Store tag handles in global context for efficient access
+ * -# Detect MPI initialization and store world size/rank if MPI is active
+ * -# Increment reference count to support nested initialization
+ *
+ * @param[in] argc  Number of command-line arguments (can be 0)
+ * @param[in] argv  Array of command-line argument strings (can be NULL if argc is 0)
+ *
+ * @pre MPI must be initialized before calling if using parallel features
+ * @post MOAB Core instance created and ready for use
+ * @post Standard tags available via context.material_tag, context.neumann_tag, etc.
+ *
+ * @note Uses reference counting - safe to call multiple times
+ * @note Fortran interface should use iMOAB_InitializeFortran() instead
+ *
+ * @return moab::MB_SUCCESS on success, error code otherwise
+ *
+ * @see iMOAB_Finalize()
+ */
 ErrCode iMOAB_Initialize( int argc, iMOAB_String* argv )
 {
     if( argc ) IMOAB_CHECKPOINTER( argv, 1 );
 
+    // Store command-line arguments for potential later use
     context.iArgc = argc;
-    context.iArgv = argv;  // shallow copy
+    context.iArgv = argv;  // Shallow copy - caller must maintain argv lifetime
 
+    // Create MOAB instance only on first initialization
     if( 0 == context.refCountMB )
     {
         context.MBI = new( std::nothrow ) moab::Core;
-        // retrieve the default tags
+
+        // Retrieve standard MOAB tags that are commonly used across applications
         const char* const shared_set_tag_names[] = { MATERIAL_SET_TAG_NAME, NEUMANN_SET_TAG_NAME,
                                                      DIRICHLET_SET_TAG_NAME, GLOBAL_ID_TAG_NAME };
-        // materials (blocks), surface-BC (neumann), vertex-BC (Dirichlet), global-id
+        // Tag purposes: materials (blocks), surface-BC (Neumann), vertex-BC (Dirichlet), global-id
         Tag gtags[4];
         for( int i = 0; i < 4; i++ )
         {
             MB_CHK_ERR(
                 context.MBI->tag_get_handle( shared_set_tag_names[i], 1, MB_TYPE_INTEGER, gtags[i], MB_TAG_ANY ) );
         }
-        // now set the relevant (standard) tags for future use
-        context.material_tag  = gtags[0];
-        context.neumann_tag   = gtags[1];
-        context.dirichlet_tag = gtags[2];
-        context.globalID_tag  = gtags[3];
 
+        // Cache standard tag handles in global context for efficient repeated access
+        context.material_tag  = gtags[0];  // Material/block identification
+        context.neumann_tag   = gtags[1];  // Surface boundary conditions
+        context.dirichlet_tag = gtags[2];  // Vertex boundary conditions
+        context.globalID_tag  = gtags[3];  // Global entity identification
+
+        // Check if MPI is initialized and cache world communicator info
         context.MPI_initialized = false;
 #ifdef MOAB_HAVE_MPI
         int flagInit;
@@ -170,19 +266,51 @@ ErrCode iMOAB_Initialize( int argc, iMOAB_String* argv )
 #endif
     }
 
+    // Increment reference count to track active users
     context.refCountMB++;
     return moab::MB_SUCCESS;
 }
 
+/**
+ * @brief Fortran-compatible wrapper for iMOAB_Initialize.
+ * @ingroup iMOABInit
+ *
+ * @details Calls iMOAB_Initialize with zero arguments, suitable for Fortran applications
+ * that don't pass command-line arguments through the interface.
+ *
+ * @return moab::MB_SUCCESS on success, error code otherwise
+ *
+ * @see iMOAB_Initialize()
+ */
 ErrCode iMOAB_InitializeFortran()
 {
     return iMOAB_Initialize( 0, 0 );
 }
 
+/**
+ * @brief Finalize iMOAB library and cleanup MOAB instance.
+ * @ingroup iMOABInit
+ *
+ * @details Decrements reference count and deletes MOAB Core instance when count reaches zero.
+ * Safe to call multiple times - must be called once for each Initialize call.
+ *
+ * @post Reference count decremented
+ * @post MOAB instance deleted when refCountMB reaches 0
+ * @post All application data should be cleaned up before final Finalize
+ *
+ * @warning Must call iMOAB_DeregisterApplication for all applications before final Finalize
+ * @note Uses reference counting to support nested Initialize/Finalize pairs
+ *
+ * @return moab::MB_SUCCESS on success
+ *
+ * @see iMOAB_Initialize()
+ */
 ErrCode iMOAB_Finalize()
 {
+    // Decrement reference count
     context.refCountMB--;
 
+    // Delete MOAB instance only when last user finalizes
     if( 0 == context.refCountMB )
     {
         delete context.MBI;
@@ -191,22 +319,33 @@ ErrCode iMOAB_Finalize()
     return MB_SUCCESS;
 }
 
-// A string to integer hash function that is fast and robust
-// Based on the Fowler–Noll–Vo (or FNV) algorithm
+/**
+ * @brief Fast string-to-integer hash function for generating application IDs.
+ *
+ * @details Uses Fowler-Noll-Vo (FNV) hash algorithm to generate unique integer IDs from
+ * application names combined with component IDs. Non-cryptographic but fast and robust.
+ *
+ * @param[in] str        Application name string to hash
+ * @param[in] identifier Optional component ID to incorporate into hash (default 0)
+ *
+ * @return Positive integer hash value (masked to ensure non-negative)
+ *
+ * @see https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
+ */
 static int apphash( const iMOAB_String str, int identifier = 0 )
 {
-    // A minimal perfect hash function (MPHF)
     std::string appstr( str );
-    // Fowler–Noll–Vo (or FNV) is a non-cryptographic hash function created
-    // by Glenn Fowler, Landon Curt Noll, and Kiem-Phong Vo.
-    // Ref: https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
+    // FNV-1a: Fast non-cryptographic hash by Fowler, Noll, and Vo
     unsigned int h = 2166136261u;  // FNV offset basis
+
+    // Hash the application name string
     for( char c : appstr )
     {
-        h ^= static_cast< unsigned char >( c );
-        h *= 16777619u;  // FNV prime
+        h ^= static_cast< unsigned char >( c );  // XOR with byte
+        h *= 16777619u;                          // Multiply by FNV prime
     }
-    // Incorporate the integer into the hash
+
+    // Incorporate component identifier into the hash for uniqueness
     if( identifier )
     {
         h ^= static_cast< unsigned int >( identifier & 0xFFFFFFFF );
@@ -215,6 +354,43 @@ static int apphash( const iMOAB_String str, int identifier = 0 )
     return static_cast< int >( h & 0x7FFFFFFF );  // Mask to ensure positive value
 }
 
+/**
+ * @brief Register a new application instance with iMOAB.
+ * @ingroup iMOABApp
+ *
+ * @details Creates a new application context with unique ID, allocates a mesh set for data storage,
+ * and sets up parallel communicator if MPI is enabled. Each application represents a distinct
+ * component in a coupled simulation (e.g., atmosphere, ocean, land).
+ *
+ * @par Registration Process:
+ * -# Validate application name is unique (not already registered)
+ * -# Generate unique application ID using FNV hash of name + component ID
+ * -# Create MOAB mesh set for storing application's mesh data
+ * -# Initialize application data structure (appData) with default values
+ * -# Create ParallelComm instance for parallel operations if MPI enabled
+ * -# Store application context in global map indexed by application ID
+ *
+ * @param[in]  app_name  Unique name for this application instance
+ * @param[in]  comm      MPI communicator for this application (MPI builds only)
+ * @param[in]  compid    External component ID (must be positive)
+ * @param[out] pid       Generated application ID (output parameter)
+ *
+ * @pre iMOAB_Initialize must have been called
+ * @pre app_name must be unique (not already registered)
+ * @pre compid must be positive
+ *
+ * @post Application registered and ready for mesh loading
+ * @post Application ID stored in pid
+ * @post Mesh set created and stored in context.appDatas[pid]
+ * @post ParallelComm created if MPI enabled
+ *
+ * @note Application ID is computed as hash(app_name, compid) for uniqueness
+ * @note Fortran interface should use iMOAB_RegisterApplicationFortran()
+ *
+ * @return moab::MB_SUCCESS on success, moab::MB_FAILURE if already registered or compid invalid
+ *
+ * @see iMOAB_DeregisterApplication()
+ */
 ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
 #ifdef MOAB_HAVE_MPI
                                    MPI_Comm* comm,
@@ -261,7 +437,7 @@ ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
 
     // create now the file set that will be used for loading the model in
     EntityHandle file_set;
-    ErrorCode rval = context.MBI->create_meshset( MESHSET_SET, file_set );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( context.MBI->create_meshset( MESHSET_SET, file_set ), "can't create file set" );
 
     appData app_data;
     app_data.file_set  = file_set;
@@ -285,10 +461,29 @@ ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
 #ifdef MOAB_HAVE_MPI
     if( *comm ) app_data.pcomm = new ParallelComm( context.MBI, *comm );
 #endif
-    context.appDatas[*pid] = app_data;  // it will correspond to app_FileSets[*pid] will be the file set of interest
+    context.appDatas[*pid] = app_data;  // Store application data indexed by generated ID
     return moab::MB_SUCCESS;
 }
 
+/**
+ * @brief Fortran-compatible wrapper for iMOAB_RegisterApplication.
+ * @ingroup iMOABApp
+ *
+ * @details Registers application from Fortran code by converting Fortran MPI communicator to C
+ * and calling C-style registration. Sets is_fortran flag to enable proper MPI handle conversions.
+ *
+ * @param[in]  app_name  Unique name for this application instance
+ * @param[in]  comm      Fortran MPI communicator (integer handle, MPI builds only)
+ * @param[in]  compid    External component ID (must be positive)
+ * @param[out] pid       Generated application ID (output parameter)
+ *
+ * @note Automatically converts Fortran MPI_Comm to C MPI_Comm using MPI_Comm_f2c
+ * @note Sets is_fortran flag in application data for future MPI handle conversions
+ *
+ * @return moab::MB_SUCCESS on success, moab::MB_FAILURE otherwise
+ *
+ * @see iMOAB_RegisterApplication(), MPI_Comm_f2c()
+ */
 ErrCode iMOAB_RegisterApplicationFortran( const iMOAB_String app_name,
 #ifdef MOAB_HAVE_MPI
                                           int* comm,
@@ -312,34 +507,61 @@ ErrCode iMOAB_RegisterApplicationFortran( const iMOAB_String app_name,
     MPI_Comm ccomm;
     if( comm )
     {
-        // Convert from Fortran communicator to a C communicator
-        // NOTE: see transfer of handles at
-        // http://www.mpi-forum.org/docs/mpi-2.2/mpi22-report/node361.htm
+        // Convert from Fortran communicator (integer) to C communicator
+        // See MPI standard: http://www.mpi-forum.org/docs/mpi-2.2/mpi22-report/node361.htm
         ccomm = MPI_Comm_f2c( (MPI_Fint)*comm );
     }
 #endif
 
-    // now call C style registration function:
+    // Call C-style registration function with converted communicator
     err = iMOAB_RegisterApplication( app_name,
 #ifdef MOAB_HAVE_MPI
                                      &ccomm,
 #endif
                                      compid, pid );
 
-    // Now that we have created the application context, store that
-    // the application being registered is from a Fortran context
+    // Mark application as Fortran-based for proper MPI handle conversions in future calls
     context.appDatas[*pid].is_fortran = true;
 
     return err;
 }
 
+/**
+ * @brief Deregister an application instance and cleanup associated resources.
+ * @ingroup iMOABApp
+ *
+ * @details Removes application from iMOAB, deletes mesh entities, frees parallel communicator,
+ * and cleans up all associated data structures. Must be called before iMOAB_Finalize().
+ *
+ * @par Cleanup Process:
+ * -# Validate application ID exists
+ * -# Delete all mesh entities in application's file set
+ * -# Delete communication graphs (ParCommGraph instances)
+ * -# Delete parallel communicator if MPI enabled
+ * -# Delete TempestRemap objects if present
+ * -# Delete application's mesh set
+ * -# Remove application from global context maps
+ *
+ * @param[in] pid  Application ID to deregister
+ *
+ * @pre Application must have been registered via iMOAB_RegisterApplication
+ * @post All mesh data deleted
+ * @post Parallel communicator deleted
+ * @post Application ID invalid and cannot be reused
+ *
+ * @warning Do not access application ID after deregistration
+ * @note Safe to deregister in any order relative to other applications
+ *
+ * @return moab::MB_SUCCESS on success, moab::MB_FAILURE if application not found
+ *
+ * @see iMOAB_RegisterApplication()
+ */
 ErrCode iMOAB_DeregisterApplication( iMOAB_AppID pid )
 {
-    // the file set , parallel comm are all in vectors indexed by *pid
-    // assume we did not delete anything yet
-    // *pid will not be reused if we register another application
+    // Look up application in global context
     auto appIterator = context.appDatas.find( *pid );
-    // ensure that the application exists before we attempt to delete it
+
+    // Validate application exists before attempting deletion
     if( appIterator == context.appDatas.end() ) return MB_FAILURE;
 
     // we found the application
@@ -355,9 +577,11 @@ ErrCode iMOAB_DeregisterApplication( iMOAB_AppID pid )
     EntityHandle fileSet = data.file_set;
     // get all entities part of the file set
     Range fileents;
-    MB_CHK_ERR( context.MBI->get_entities_by_handle( fileSet, fileents, /*recursive */ true ) );
+    MB_CHK_SET_ERR( context.MBI->get_entities_by_handle( fileSet, fileents, /*recursive */ true ),
+                    "can't get file entities" );
     fileents.insert( fileSet );
-    MB_CHK_ERR( context.MBI->get_entities_by_type( fileSet, MBENTITYSET, fileents ) );  // append all mesh sets
+    MB_CHK_SET_ERR( context.MBI->get_entities_by_type( fileSet, MBENTITYSET, fileents ),
+                    "can't get file entities" );  // append all mesh sets
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
     if( data.tempestData.remapper ) delete data.tempestData.remapper;
@@ -391,21 +615,24 @@ ErrCode iMOAB_DeregisterApplication( iMOAB_AppID pid )
     Range vertices = fileents.subset_by_type( MBVERTEX );
     Range noverts  = subtract( fileents, vertices );
 
-    MB_CHK_ERR( context.MBI->delete_entities( noverts ) );
+    MB_CHK_SET_ERR( context.MBI->delete_entities( noverts ), "can't delete entities" );
     // now retrieve connected elements that still exist (maybe in other sets, pids?)
     Range adj_ents_left;
-    MB_CHK_ERR( context.MBI->get_adjacencies( vertices, 1, false, adj_ents_left, Interface::UNION ) );
-    MB_CHK_ERR( context.MBI->get_adjacencies( vertices, 2, false, adj_ents_left, Interface::UNION ) );
-    MB_CHK_ERR( context.MBI->get_adjacencies( vertices, 3, false, adj_ents_left, Interface::UNION ) );
+    MB_CHK_SET_ERR( context.MBI->get_adjacencies( vertices, 1, false, adj_ents_left, Interface::UNION ),
+                    "can't get 1D adjacencies" );
+    MB_CHK_SET_ERR( context.MBI->get_adjacencies( vertices, 2, false, adj_ents_left, Interface::UNION ),
+                    "can't get 2D adjacencies" );
+    MB_CHK_SET_ERR( context.MBI->get_adjacencies( vertices, 3, false, adj_ents_left, Interface::UNION ),
+                    "can't get 3D adjacencies" );
 
     if( !adj_ents_left.empty() )
     {
         Range conn_verts;
-        MB_CHK_ERR( context.MBI->get_connectivity( adj_ents_left, conn_verts ) );
+        MB_CHK_SET_ERR( context.MBI->get_connectivity( adj_ents_left, conn_verts ), "can't get connectivity" );
         vertices = subtract( vertices, conn_verts );
     }
 
-    MB_CHK_ERR( context.MBI->delete_entities( vertices ) );
+    MB_CHK_SET_ERR( context.MBI->delete_entities( vertices ), "can't delete vertices" );
 
     for( auto mit = context.appIdMap.begin(); mit != context.appIdMap.end(); ++mit )
     {
@@ -429,15 +656,61 @@ ErrCode iMOAB_DeregisterApplication( iMOAB_AppID pid )
     return moab::MB_SUCCESS;
 }
 
+/**
+ * @brief Fortran-compatible wrapper for iMOAB_DeregisterApplication.
+ * @ingroup iMOABApp
+ *
+ * @details Deregisters application from Fortran code by clearing Fortran flag and calling
+ * C-style deregistration.
+ *
+ * @param[in] pid  Application ID to deregister
+ *
+ * @return moab::MB_SUCCESS on success, moab::MB_FAILURE if application not found
+ *
+ * @see iMOAB_DeregisterApplication()
+ */
 ErrCode iMOAB_DeregisterApplicationFortran( iMOAB_AppID pid )
 {
-    // release any Fortran specific allocations here before we pass it on
+    // Clear Fortran-specific flag before passing to C-style deregistration
     context.appDatas[*pid].is_fortran = false;
 
-    // release all datastructure allocations
+    // Release all data structure allocations via C-style function
     return iMOAB_DeregisterApplication( pid );
 }
 
+/**
+ * @brief Read mesh file header information without loading full mesh.
+ * @ingroup iMOABIO
+ *
+ * @details Quickly extracts metadata from HDF5 mesh file including vertex count, element count,
+ * spatial dimension, and partition count. Useful for memory planning before full load.
+ *
+ * @par Implementation:
+ * - Opens HDF5 file in read-only mode using mhdf library
+ * - Reads file summary without loading actual mesh data
+ * - Counts elements by type (edges, faces, regions)
+ * - Extracts partition information from parallel decomposition tags
+ *
+ * @param[in]  filename             Path to HDF5 mesh file
+ * @param[out] num_global_vertices  Total number of vertices in mesh
+ * @param[out] num_global_elements  Total number of elements in mesh (all types)
+ * @param[out] num_dimension        Spatial dimension (2D or 3D)
+ * @param[out] num_parts            Number of parallel partitions
+ *
+ * @pre HDF5 support must be enabled (MOAB_HAVE_HDF5)
+ * @pre File must be valid HDF5 mesh file
+ *
+ * @post Output parameters populated with file metadata
+ * @post File remains closed (no mesh data loaded)
+ *
+ * @note Lightweight operation - does not load mesh into memory
+ * @note All output parameters are optional (can be NULL)
+ * @warning Returns failure if HDF5 support not enabled
+ *
+ * @return moab::MB_SUCCESS on success, moab::MB_FAILURE on error
+ *
+ * @see iMOAB_LoadMesh()
+ */
 ErrCode iMOAB_ReadHeaderInfo( const iMOAB_String filename,
                               int* num_global_vertices,
                               int* num_global_elements,
@@ -582,6 +855,43 @@ ErrCode iMOAB_ReadHeaderInfo( const iMOAB_String filename,
     return moab::MB_SUCCESS;
 }
 
+/**
+ * @brief Load mesh file into application's mesh set.
+ * @ingroup iMOABIO
+ *
+ * @details Loads mesh from file (HDF5, Exodus, VTK, etc.) into application's mesh set with optional
+ * ghost layer exchange for parallel simulations. Automatically configures parallel reading options.
+ *
+ * @par Loading Process:
+ * -# Construct read options string from user options + automatic parallel settings
+ * -# Add PARALLEL_COMM option for parallel HDF5/NetCDF files
+ * -# Add ghost layer options (PARALLEL_GHOSTS, PARTITION_DISTRIBUTE) if requested
+ * -# Load mesh into application's file set using MOAB::load_file()
+ * -# Update mesh information (vertex/element counts, ranges, etc.)
+ * -# Exchange ghost layers if num_ghost_layers > 0
+ *
+ * @param[in] pid              Application ID
+ * @param[in] filename         Path to mesh file to load
+ * @param[in] read_options     Optional reader options (semicolon-separated, can be NULL)
+ * @param[in] num_ghost_layers Number of ghost element layers to exchange (0 for none)
+ *
+ * @pre Application must be registered via iMOAB_RegisterApplication
+ * @pre File must exist and be readable
+ * @pre For parallel: MPI must be initialized
+ *
+ * @post Mesh loaded into application's file set
+ * @post Mesh info updated (vertices, elements, ranges)
+ * @post Ghost layers exchanged if requested
+ *
+ * @note Supported formats: HDF5 (.h5m), Exodus (.exo), VTK (.vtk), NetCDF (.nc), etc.
+ * @note PARALLEL_COMM option automatically added for parallel HDF5/NetCDF
+ * @note Ghost exchange requires PARALLEL_GHOSTS and PARTITION_DISTRIBUTE options
+ * @warning Do not manually specify PARALLEL_COMM in read_options (will cause error)
+ *
+ * @return moab::MB_SUCCESS on success, error code otherwise
+ *
+ * @see iMOAB_WriteMesh(), iMOAB_UpdateMeshInfo()
+ */
 ErrCode iMOAB_LoadMesh( iMOAB_AppID pid,
                         const iMOAB_String filename,
                         const iMOAB_String read_options,
@@ -651,7 +961,8 @@ ErrCode iMOAB_LoadMesh( iMOAB_AppID pid,
 #endif
 
     // Now let us actually load the MOAB file with the appropriate read options
-    ErrorCode rval = context.MBI->load_file( filename, &context.appDatas[*pid].file_set, newopts.str().c_str() );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( context.MBI->load_file( filename, &context.appDatas[*pid].file_set, newopts.str().c_str() ),
+                    "can't load file" );
 
 #ifdef VERBOSE
     // some debugging stuff
@@ -666,7 +977,8 @@ ErrCode iMOAB_LoadMesh( iMOAB_AppID pid,
 #endif
     // the mesh contains ghosts too, but they are not part of mat/neumann set
     // write in serial the file, to see what tags are missing
-    rval = context.MBI->write_file( outfile.str().c_str() );MB_CHK_ERR( rval );  // everything on current task, written in serial
+    MB_CHK_SET_ERR( context.MBI->write_file( outfile.str().c_str() ),
+                    "can't write file" );  // everything on current task, written in serial
 #endif
 
     // Update ghost layer information
@@ -758,16 +1070,70 @@ static ErrCode internal_WriteMesh( iMOAB_AppID pid,
     return moab::MB_SUCCESS;
 }
 
+/**
+ * @brief Write application's mesh to file.
+ * @ingroup iMOABIO
+ *
+ * @details Writes mesh data from application's mesh set to file in various formats (HDF5, Exodus, VTK, etc.).
+ * Automatically includes GLOBAL_ID and PARALLEL_PARTITION tags for parallel simulations.
+ *
+ * @par Writing Process:
+ * -# Construct write options from user options + automatic parallel settings
+ * -# Add PARALLEL=WRITE_PART for parallel HDF5 output if needed
+ * -# Append GLOBAL_ID tag if not already in tag list
+ * -# Append PARALLEL_PARTITION tag if available and not in tag list
+ * -# Write mesh using MOAB::write_file() with appropriate options
+ *
+ * @param[in] pid           Application ID
+ * @param[in] filename      Output file path
+ * @param[in] write_options Optional writer options (semicolon-separated, can be NULL)
+ *
+ * @pre Application must be registered and mesh loaded
+ * @pre For parallel: output directory must be writable by all processes
+ *
+ * @post Mesh written to file with requested format
+ * @post GLOBAL_ID and PARALLEL_PARTITION tags included if available
+ *
+ * @note Supported formats: HDF5 (.h5m), Exodus (.exo), VTK (.vtk), etc.
+ * @note For parallel writes, use PARALLEL=WRITE_PART option
+ * @note Tags in application's tagList are automatically written
+ *
+ * @return moab::MB_SUCCESS on success, error code otherwise
+ *
+ * @see iMOAB_LoadMesh(), iMOAB_WriteLocalMesh()
+ */
 ErrCode iMOAB_WriteMesh( iMOAB_AppID pid, const iMOAB_String filename, const iMOAB_String write_options )
 {
     return internal_WriteMesh( pid, filename, write_options );
 }
 
+/**
+ * @brief Write each process's local mesh to separate file for debugging.
+ * @ingroup iMOABIO
+ *
+ * @details Creates per-process HDF5 file with naming convention: prefix_nprocs_rank.h5m.
+ * Useful for debugging parallel mesh distribution and ghost layer issues.
+ *
+ * @param[in] pid     Application ID
+ * @param[in] prefix  Output file prefix (rank and process count appended automatically)
+ *
+ * @pre Application must be registered and mesh loaded
+ *
+ * @post Each process writes its local mesh to: prefix_<nprocs>_<rank>.h5m
+ *
+ * @note Output files show per-process mesh partition (useful for parallel debugging)
+ * @note Files include both owned and ghost entities
+ *
+ * @return moab::MB_SUCCESS on success, error code otherwise
+ *
+ * @see iMOAB_WriteMesh()
+ */
 ErrCode iMOAB_WriteLocalMesh( iMOAB_AppID pid, iMOAB_String prefix )
 {
     IMOAB_CHECKPOINTER( prefix, 2 );
     IMOAB_ASSERT( strlen( prefix ), "Invalid prefix string length." );
 
+    // Construct filename with parallel decomposition info: prefix_nprocs_rank.h5m
     std::ostringstream file_name;
     int rank = 0, size = 1;
 #ifdef MOAB_HAVE_MPI
@@ -776,12 +1142,47 @@ ErrCode iMOAB_WriteLocalMesh( iMOAB_AppID pid, iMOAB_String prefix )
     size                = pcomm->size();
 #endif
     file_name << prefix << "_" << size << "_" << rank << ".h5m";
-    // Now let us actually write the file to disk with appropriate options
-    ErrorCode rval = context.MBI->write_file( file_name.str().c_str(), 0, 0, &context.appDatas[*pid].file_set, 1 );MB_CHK_ERR( rval );
+
+    // Write this process's local mesh partition to its own file
+    MB_CHK_ERR( context.MBI->write_file( file_name.str().c_str(), 0, 0, &context.appDatas[*pid].file_set, 1 ) );
 
     return moab::MB_SUCCESS;
 }
 
+/**
+ * @brief Update application's mesh information after loading or modification.
+ * @ingroup iMOABQuery
+ *
+ * @details Refreshes all cached mesh metadata including vertex/element counts, ranges, owned/ghost
+ * entities, and material/boundary condition sets. Must be called after mesh loading or ghosting.
+ *
+ * @par Update Process:
+ * -# Clear all existing cached ranges (vertices, elements, sets)
+ * -# Query all vertices from file set
+ * -# Determine mesh dimension (3D → 2D → 1D → 0D) by checking for elements
+ * -# Extract primary elements of detected dimension
+ * -# Separate owned vs ghost entities based on parallel ownership
+ * -# Query material sets (MATERIAL_SET tag)
+ * -# Query boundary condition sets (NEUMANN_SET, DIRICHLET_SET tags)
+ * -# Separate local vs owned vertices based on parallel partitioning
+ *
+ * @param[in] pid  Application ID
+ *
+ * @pre Application must be registered and mesh loaded
+ *
+ * @post Mesh dimension determined and cached
+ * @post All vertex/element ranges updated
+ * @post Owned/ghost entity ranges computed
+ * @post Material and BC sets identified
+ *
+ * @note Call this after iMOAB_LoadMesh or ghost layer exchange
+ * @note Automatically called by iMOAB_LoadMesh
+ * @warning Clears all existing cached mesh information
+ *
+ * @return moab::MB_SUCCESS on success, error code otherwise
+ *
+ * @see iMOAB_LoadMesh(), iMOAB_GetMeshInfo()
+ */
 ErrCode iMOAB_UpdateMeshInfo( iMOAB_AppID pid )
 {
     // this will include ghost elements info
@@ -801,23 +1202,27 @@ ErrCode iMOAB_UpdateMeshInfo( iMOAB_AppID pid )
     data.diri_sets.clear();
 
     // Let us get all the vertex entities
-    ErrorCode rval = context.MBI->get_entities_by_type( fileSet, MBVERTEX, data.all_verts, true );MB_CHK_ERR( rval );  // recursive
+    MB_CHK_SET_ERR( context.MBI->get_entities_by_type( fileSet, MBVERTEX, data.all_verts, true ),
+                    "can't get vertices" );
 
     // Let us check first entities of dimension = 3
     data.dimension = 3;
-    rval           = context.MBI->get_entities_by_dimension( fileSet, data.dimension, data.primary_elems, true );MB_CHK_ERR( rval );  // recursive
+    MB_CHK_SET_ERR( context.MBI->get_entities_by_dimension( fileSet, data.dimension, data.primary_elems, true ),
+                    "can't get primary elements" );
 
     if( data.primary_elems.empty() )
     {
         // Now 3-D elements. Let us check entities of dimension = 2
         data.dimension = 2;
-        rval           = context.MBI->get_entities_by_dimension( fileSet, data.dimension, data.primary_elems, true );MB_CHK_ERR( rval );  // recursive
+        MB_CHK_SET_ERR( context.MBI->get_entities_by_dimension( fileSet, data.dimension, data.primary_elems, true ),
+                        "can't get primary elements" );
 
         if( data.primary_elems.empty() )
         {
             // Now 3-D/2-D elements. Let us check entities of dimension = 1
             data.dimension = 1;
-            rval = context.MBI->get_entities_by_dimension( fileSet, data.dimension, data.primary_elems, true );MB_CHK_ERR( rval );  // recursive
+            MB_CHK_SET_ERR( context.MBI->get_entities_by_dimension( fileSet, data.dimension, data.primary_elems, true ),
+                            "can't get primary elements" );
 
             if( data.primary_elems.empty() )
             {
@@ -837,24 +1242,27 @@ ErrCode iMOAB_UpdateMeshInfo( iMOAB_AppID pid )
         ParallelComm* pco = context.appDatas[*pid].pcomm;
 
         // filter ghost vertices, from local
-        rval = pco->filter_pstatus( data.all_verts, PSTATUS_GHOST, PSTATUS_NOT, -1, &data.local_verts );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( pco->filter_pstatus( data.all_verts, PSTATUS_GHOST, PSTATUS_NOT, -1, &data.local_verts ),
+                        "can't filter ghost vertices" );
 
         // Store handles for all ghosted entities
         data.ghost_vertices = subtract( data.all_verts, data.local_verts );
 
         // filter ghost elements, from local
-        rval = pco->filter_pstatus( data.primary_elems, PSTATUS_GHOST, PSTATUS_NOT, -1, &data.owned_elems );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( pco->filter_pstatus( data.primary_elems, PSTATUS_GHOST, PSTATUS_NOT, -1, &data.owned_elems ),
+                        "can't filter ghost elements" );
 
         data.ghost_elems = subtract( data.primary_elems, data.owned_elems );
         // now update global number of primary cells and global number of vertices
         // determine first number of owned vertices
         // Get local owned vertices
-        rval = pco->filter_pstatus( data.all_verts, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &data.owned_verts );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( pco->filter_pstatus( data.all_verts, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &data.owned_verts ),
+                        "can't filter ghost vertices" );
         int local[2], global[2];
         local[0] = data.owned_verts.size();
         local[1] = data.owned_elems.size();
         MPI_Allreduce( local, global, 2, MPI_INT, MPI_SUM, pco->comm() );
-        rval = iMOAB_SetGlobalInfo( pid, &( global[0] ), &( global[1] ) );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( iMOAB_SetGlobalInfo( pid, &( global[0] ), &( global[1] ) ), "can't set global info" );
     }
     else
     {
@@ -870,18 +1278,57 @@ ErrCode iMOAB_UpdateMeshInfo( iMOAB_AppID pid )
 #endif
 
     // Get the references for some standard internal tags such as material blocks, BCs, etc
-    rval = context.MBI->get_entities_by_type_and_tag( fileSet, MBENTITYSET, &( context.material_tag ), 0, 1,
-                                                      data.mat_sets, Interface::UNION );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( context.MBI->get_entities_by_type_and_tag( fileSet, MBENTITYSET, &( context.material_tag ), 0, 1,
+                                                               data.mat_sets, Interface::UNION ),
+                    "can't get material sets" );
 
-    rval = context.MBI->get_entities_by_type_and_tag( fileSet, MBENTITYSET, &( context.neumann_tag ), 0, 1,
-                                                      data.neu_sets, Interface::UNION );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( context.MBI->get_entities_by_type_and_tag( fileSet, MBENTITYSET, &( context.neumann_tag ), 0, 1,
+                                                               data.neu_sets, Interface::UNION ),
+                    "can't get neumann sets" );
 
-    rval = context.MBI->get_entities_by_type_and_tag( fileSet, MBENTITYSET, &( context.dirichlet_tag ), 0, 1,
-                                                      data.diri_sets, Interface::UNION );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( context.MBI->get_entities_by_type_and_tag( fileSet, MBENTITYSET, &( context.dirichlet_tag ), 0, 1,
+                                                               data.diri_sets, Interface::UNION ),
+                    "can't get dirichlet sets" );
 
     return moab::MB_SUCCESS;
 }
 
+/**
+ * @brief Query mesh statistics including vertices, elements, and boundary conditions.
+ * @ingroup iMOABQuery
+ *
+ * @details Retrieves counts of vertices, elements, material blocks, and boundary condition sets.
+ * Each output array has 3 components: [owned, ghost, total]. Useful for memory allocation
+ * and understanding parallel mesh distribution.
+ *
+ * @par Array Format:
+ * All output arrays use 3-element format: [owned, ghost, total]
+ * - owned: Entities owned by this process
+ * - ghost: Ghost/halo entities from neighboring processes
+ * - total: Sum of owned and ghost entities
+ *
+ * @param[in]  pid                   Application ID
+ * @param[out] num_visible_vertices  Vertex counts [local(non-ghost), ghost, total]
+ * @param[out] num_visible_elements  Element counts [owned, ghost, total]
+ * @param[out] num_visible_blocks    Material block counts [owned, ghost, total]
+ * @param[out] num_visible_surfaceBC Surface BC counts (total face count across all BC sets)
+ * @param[out] num_visible_vertexBC  Vertex BC counts (total vertex count across all BC sets)
+ *
+ * @pre Application must be registered and mesh loaded
+ * @pre iMOAB_UpdateMeshInfo must have been called
+ *
+ * @post Output arrays populated with mesh statistics
+ *
+ * @note All parameters are optional (can be NULL if not needed)
+ * @note Surface BC count includes all faces in Neumann sets
+ * @note Vertex BC count includes all vertices in Dirichlet sets
+ * @note Material blocks queried via MATERIAL_SET tag
+ * @note BCs queried via NEUMANN_SET and DIRICHLET_SET tags
+ *
+ * @return moab::MB_SUCCESS on success, error code otherwise
+ *
+ * @see iMOAB_UpdateMeshInfo(), iMOAB_LoadMesh()
+ */
 ErrCode iMOAB_GetMeshInfo( iMOAB_AppID pid,
                            int* num_visible_vertices,
                            int* num_visible_elements,
@@ -889,7 +1336,6 @@ ErrCode iMOAB_GetMeshInfo( iMOAB_AppID pid,
                            int* num_visible_surfaceBC,
                            int* num_visible_vertexBC )
 {
-    ErrorCode rval;
     appData& data        = context.appDatas[*pid];
     EntityHandle fileSet = data.file_set;
 
@@ -912,8 +1358,9 @@ ErrCode iMOAB_GetMeshInfo( iMOAB_AppID pid,
 
     if( num_visible_blocks )
     {
-        rval = context.MBI->get_entities_by_type_and_tag( fileSet, MBENTITYSET, &( context.material_tag ), 0, 1,
-                                                          data.mat_sets, Interface::UNION );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( context.MBI->get_entities_by_type_and_tag( fileSet, MBENTITYSET, &( context.material_tag ), 0,
+                                                                   1, data.mat_sets, Interface::UNION ),
+                        "can't get material sets" );
 
         num_visible_blocks[2] = data.mat_sets.size();
         num_visible_blocks[0] = num_visible_blocks[2];
@@ -922,8 +1369,9 @@ ErrCode iMOAB_GetMeshInfo( iMOAB_AppID pid,
 
     if( num_visible_surfaceBC )
     {
-        rval = context.MBI->get_entities_by_type_and_tag( fileSet, MBENTITYSET, &( context.neumann_tag ), 0, 1,
-                                                          data.neu_sets, Interface::UNION );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( context.MBI->get_entities_by_type_and_tag( fileSet, MBENTITYSET, &( context.neumann_tag ), 0, 1,
+                                                                   data.neu_sets, Interface::UNION ),
+                        "can't get neumann sets" );
 
         num_visible_surfaceBC[2] = 0;
         // count how many faces are in each neu set, and how many regions are
@@ -934,13 +1382,15 @@ ErrCode iMOAB_GetMeshInfo( iMOAB_AppID pid,
         {
             Range subents;
             EntityHandle nset = data.neu_sets[i];
-            rval              = context.MBI->get_entities_by_dimension( nset, data.dimension - 1, subents );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( context.MBI->get_entities_by_dimension( nset, data.dimension - 1, subents ),
+                            "can't get neumann sets" );
 
             for( Range::iterator it = subents.begin(); it != subents.end(); ++it )
             {
                 EntityHandle subent = *it;
                 Range adjPrimaryEnts;
-                rval = context.MBI->get_adjacencies( &subent, 1, data.dimension, false, adjPrimaryEnts );MB_CHK_ERR( rval );
+                MB_CHK_SET_ERR( context.MBI->get_adjacencies( &subent, 1, data.dimension, false, adjPrimaryEnts ),
+                                "can't get adjacencies" );
 
                 num_visible_surfaceBC[2] += (int)adjPrimaryEnts.size();
             }
@@ -952,8 +1402,9 @@ ErrCode iMOAB_GetMeshInfo( iMOAB_AppID pid,
 
     if( num_visible_vertexBC )
     {
-        rval = context.MBI->get_entities_by_type_and_tag( fileSet, MBENTITYSET, &( context.dirichlet_tag ), 0, 1,
-                                                          data.diri_sets, Interface::UNION );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( context.MBI->get_entities_by_type_and_tag( fileSet, MBENTITYSET, &( context.dirichlet_tag ), 0,
+                                                                   1, data.diri_sets, Interface::UNION ),
+                        "can't get dirichlet sets" );
 
         num_visible_vertexBC[2] = 0;
         int numDiriSets         = (int)data.diri_sets.size();
@@ -962,7 +1413,7 @@ ErrCode iMOAB_GetMeshInfo( iMOAB_AppID pid,
         {
             Range verts;
             EntityHandle diset = data.diri_sets[i];
-            rval               = context.MBI->get_entities_by_dimension( diset, 0, verts );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( context.MBI->get_entities_by_dimension( diset, 0, verts ), "can't get dirichlet sets" );
 
             num_visible_vertexBC[2] += (int)verts.size();
         }
@@ -974,48 +1425,101 @@ ErrCode iMOAB_GetMeshInfo( iMOAB_AppID pid,
     return moab::MB_SUCCESS;
 }
 
+/**
+ * @brief Retrieve global IDs for all vertices in application's mesh.
+ * @ingroup iMOABQuery
+ *
+ * @details Extracts GLOBAL_ID tag values for all vertices. Global IDs are unique across all
+ * processes and are used for parallel mesh operations and entity identification.
+ *
+ * @param[in]  pid              Application ID
+ * @param[in]  vertices_length  Number of vertices (must match actual vertex count)
+ * @param[out] global_vertex_ID Array of global IDs (size = vertices_length)
+ *
+ * @pre Application must be registered and mesh loaded
+ * @pre vertices_length must equal total vertex count from iMOAB_GetMeshInfo
+ * @pre global_vertex_ID array must be pre-allocated
+ *
+ * @post global_vertex_ID populated with GLOBAL_ID tag values
+ *
+ * @note Global IDs are 1-indexed and unique across all processes
+ * @note Array must be sized correctly or assertion will fail
+ *
+ * @return moab::MB_SUCCESS on success, error code otherwise
+ *
+ * @see iMOAB_GetMeshInfo(), iMOAB_GetVertexOwnership()
+ */
 ErrCode iMOAB_GetVertexID( iMOAB_AppID pid, int* vertices_length, iMOAB_GlobalID* global_vertex_ID )
 {
     IMOAB_CHECKPOINTER( vertices_length, 2 );
     IMOAB_CHECKPOINTER( global_vertex_ID, 3 );
 
     const Range& verts = context.appDatas[*pid].all_verts;
-    // check for problems with array length
+
+    // Validate array size matches actual vertex count to prevent buffer overruns
     IMOAB_ASSERT( *vertices_length == static_cast< int >( verts.size() ), "Invalid vertices length provided" );
 
-    // global id tag is context.globalID_tag
+    // Extract GLOBAL_ID tag values for all vertices in order
     return context.MBI->tag_get_data( context.globalID_tag, verts, global_vertex_ID );
 }
 
+/**
+ * @brief Retrieve parallel ownership information for all vertices.
+ * @ingroup iMOABQuery
+ *
+ * @details Queries which MPI rank owns each vertex. In parallel simulations, each vertex is owned
+ * by exactly one process, though it may be ghosted on others.
+ *
+ * @param[in]  pid                      Application ID
+ * @param[in]  vertices_length          Number of vertices (must match actual count)
+ * @param[out] visible_global_rank_ID   Array of owning ranks (size = vertices_length)
+ *
+ * @pre Application must be registered and mesh loaded
+ * @pre For parallel: mesh must have parallel ownership information
+ * @pre visible_global_rank_ID array must be pre-allocated
+ *
+ * @post visible_global_rank_ID[i] = rank that owns vertex i
+ *
+ * @note In serial runs, all vertices owned by rank 0
+ * @note Ghost vertices report the rank of their owner, not local rank
+ *
+ * @return moab::MB_SUCCESS on success, moab::MB_FAILURE if count mismatch
+ *
+ * @see iMOAB_GetVertexID(), iMOAB_GetElementOwnership()
+ */
 ErrCode iMOAB_GetVertexOwnership( iMOAB_AppID pid, int* vertices_length, int* visible_global_rank_ID )
 {
     assert( vertices_length && *vertices_length );
     assert( visible_global_rank_ID );
 
     Range& verts = context.appDatas[*pid].all_verts;
-    int i        = 0;
+
 #ifdef MOAB_HAVE_MPI
+    // Parallel: query actual ownership from ParallelComm
     ParallelComm* pco = context.appDatas[*pid].pcomm;
 
-    for( Range::iterator vit = verts.begin(); vit != verts.end(); vit++, i++ )
+    size_t i = 0;
+    for( Range::iterator vit = verts.begin(); vit != verts.end(); ++vit, i++ )
     {
-        ErrorCode rval = pco->get_owner( *vit, visible_global_rank_ID[i] );MB_CHK_ERR( rval );
+        // Get owning rank for this vertex (may be local or remote)
+        MB_CHK_SET_ERR( pco->get_owner( *vit, visible_global_rank_ID[i] ), "can't get owner" );
     }
 
+    // Validate we processed exactly the expected number of vertices
     if( i != *vertices_length )
     {
-        return moab::MB_FAILURE;
-    }  // warning array allocation problem
+        return moab::MB_INVALID_SIZE;  // Array size mismatch
+    }
 
 #else
-
-    /* everything owned by proc 0 */
+    // Serial: all vertices owned by rank 0
     if( (int)verts.size() != *vertices_length )
     {
-        return moab::MB_FAILURE;
+        return moab::MB_INVALID_SIZE;  // Array size mismatch
     }  // warning array allocation problem
 
-    for( Range::iterator vit = verts.begin(); vit != verts.end(); vit++, i++ )
+    size_t i = 0;
+    for( Range::iterator vit = verts.begin(); vit != verts.end(); ++vit, i++ )
     {
         visible_global_rank_ID[i] = 0;
     }  // all vertices are owned by processor 0, as this is serial run
@@ -1025,45 +1529,124 @@ ErrCode iMOAB_GetVertexOwnership( iMOAB_AppID pid, int* vertices_length, int* vi
     return moab::MB_SUCCESS;
 }
 
+/**
+ * @brief Retrieve coordinates for all vertices in interleaved format.
+ * @ingroup iMOABQuery
+ *
+ * @details Extracts 3D coordinates (x,y,z) for all vertices in interleaved format:
+ * [x0,y0,z0, x1,y1,z1, ...]. Coordinates are returned in same order as vertex IDs.
+ *
+ * @param[in]  pid           Application ID
+ * @param[in]  coords_length Length of coordinates array (must equal 3 * num_vertices)
+ * @param[out] coordinates   Interleaved coordinate array (size = 3 * num_vertices)
+ *
+ * @pre Application must be registered and mesh loaded
+ * @pre coords_length must equal 3 * vertex count
+ * @pre coordinates array must be pre-allocated
+ *
+ * @post coordinates filled with interleaved x,y,z values
+ *
+ * @note Format: [x0,y0,z0, x1,y1,z1, x2,y2,z2, ...]
+ * @note Always returns 3D coordinates even for 2D meshes (z=0)
+ * @warning Array size must be exact or function returns failure
+ *
+ * @return moab::MB_SUCCESS on success, moab::MB_FAILURE if size mismatch
+ *
+ * @see iMOAB_GetVertexID(), iMOAB_GetMeshInfo()
+ */
 ErrCode iMOAB_GetVisibleVerticesCoordinates( iMOAB_AppID pid, int* coords_length, double* coordinates )
 {
     Range& verts = context.appDatas[*pid].all_verts;
 
-    // interleaved coordinates, so that means deep copy anyway
+    // Validate array size: need 3 coordinates (x,y,z) per vertex
     if( *coords_length != 3 * (int)verts.size() )
     {
-        return moab::MB_FAILURE;
+        return moab::MB_INVALID_SIZE;  // Size mismatch
     }
 
-    ErrorCode rval = context.MBI->get_coords( verts, coordinates );MB_CHK_ERR( rval );
+    // Extract coordinates in interleaved format (deep copy)
+    MB_CHK_SET_ERR( context.MBI->get_coords( verts, coordinates ), "can't get coordinates" );
 
     return moab::MB_SUCCESS;
 }
 
+/**
+ * @brief Retrieve global IDs for all material blocks in mesh.
+ * @ingroup iMOABQuery
+ *
+ * @details Extracts MATERIAL_SET tag values for all material blocks. Blocks are identified by
+ * unique integer IDs and contain elements with similar material properties.
+ *
+ * @param[in]  pid              Application ID
+ * @param[in]  block_length     Number of blocks (must match actual count)
+ * @param[out] global_block_IDs Array of material set IDs (size = block_length)
+ *
+ * @pre Application must be registered and mesh loaded
+ * @pre block_length must match block count from iMOAB_GetMeshInfo
+ * @pre global_block_IDs array must be pre-allocated
+ *
+ * @post global_block_IDs populated with MATERIAL_SET tag values
+ * @post Internal matIndex map populated for fast block lookup
+ *
+ * @note Material blocks are mesh sets containing elements of same material
+ * @note Creates internal index map for subsequent block queries
+ * @note Block IDs are user-defined and may not be consecutive
+ *
+ * @return moab::MB_SUCCESS on success, moab::MB_FAILURE if count mismatch
+ *
+ * @see iMOAB_GetBlockInfo(), iMOAB_GetMeshInfo()
+ */
 ErrCode iMOAB_GetBlockID( iMOAB_AppID pid, int* block_length, iMOAB_GlobalID* global_block_IDs )
 {
-    // local id blocks? they are counted from 0 to number of visible blocks ...
-    // will actually return material set tag value for global
     Range& matSets = context.appDatas[*pid].mat_sets;
 
+    // Validate array size matches actual block count
     if( *block_length != (int)matSets.size() )
     {
-        return moab::MB_FAILURE;
+        return moab::MB_INVALID_SIZE;  // Size mismatch
     }
 
-    // return material set tag gtags[0 is material set tag
-    ErrorCode rval = context.MBI->tag_get_data( context.material_tag, matSets, global_block_IDs );MB_CHK_ERR( rval );
+    // Extract MATERIAL_SET tag values for all material blocks
+    MB_CHK_SET_ERR( context.MBI->tag_get_data( context.material_tag, matSets, global_block_IDs ),
+                    "can't get material IDs" );
 
-    // populate map with index
+    // Build internal index map: block_id -> array_index for fast lookup
     std::map< int, int >& matIdx = context.appDatas[*pid].matIndex;
     for( unsigned i = 0; i < matSets.size(); i++ )
     {
-        matIdx[global_block_IDs[i]] = i;
+        matIdx[global_block_IDs[i]] = i;  // Cache block index for future queries
     }
 
     return moab::MB_SUCCESS;
 }
 
+/**
+ * @brief Retrieve information about a specific material block.
+ * @ingroup iMOABQuery
+ *
+ * @details Queries element count and connectivity size for specified material block.
+ * Assumes all elements in block have same topology type.
+ *
+ * @param[in]  pid                   Application ID
+ * @param[in]  global_block_ID       Material block ID to query
+ * @param[out] vertices_per_element  Number of vertices per element in this block
+ * @param[out] num_elements_in_block Total number of elements in this block
+ *
+ * @pre Application must be registered and mesh loaded
+ * @pre iMOAB_GetBlockID must have been called first (to populate matIndex)
+ * @pre global_block_ID must be valid block ID from iMOAB_GetBlockID
+ *
+ * @post vertices_per_element set to connectivity size
+ * @post num_elements_in_block set to element count
+ *
+ * @note All elements in block assumed to have same topology
+ * @note vertices_per_element depends on element type (4=tet, 8=hex, etc.)
+ * @warning Returns failure if block ID not found in matIndex map
+ *
+ * @return moab::MB_SUCCESS on success, moab::MB_FAILURE if block not found
+ *
+ * @see iMOAB_GetBlockID(), iMOAB_GetBlockElementConnectivities()
+ */
 ErrCode iMOAB_GetBlockInfo( iMOAB_AppID pid,
                             iMOAB_GlobalID* global_block_ID,
                             int* vertices_per_element,
@@ -1082,23 +1665,17 @@ ErrCode iMOAB_GetBlockInfo( iMOAB_AppID pid,
     int blockIndex          = matMap[*global_block_ID];
     EntityHandle matMeshSet = context.appDatas[*pid].mat_sets[blockIndex];
     Range blo_elems;
-    ErrorCode rval = context.MBI->get_entities_by_handle( matMeshSet, blo_elems );
+    MB_CHK_SET_ERR( context.MBI->get_entities_by_handle( matMeshSet, blo_elems ), "can't get block elements" );
 
-    if( MB_SUCCESS != rval || blo_elems.empty() )
-    {
-        return moab::MB_FAILURE;
-    }
+    if( blo_elems.empty() ) return moab::MB_FAILURE;
 
     EntityType type = context.MBI->type_from_handle( blo_elems[0] );
 
-    if( !blo_elems.all_of_type( type ) )
-    {
-        return moab::MB_FAILURE;
-    }  // not all of same  type
+    if( !blo_elems.all_of_type( type ) ) return moab::MB_FAILURE;
 
     const EntityHandle* conn = nullptr;
     int num_verts            = 0;
-    rval                     = context.MBI->get_connectivity( blo_elems[0], conn, num_verts );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( context.MBI->get_connectivity( blo_elems[0], conn, num_verts ), "can't get connectivity" );
 
     *vertices_per_element  = num_verts;
     *num_elements_in_block = (int)blo_elems.size();
@@ -1117,14 +1694,15 @@ ErrCode iMOAB_GetVisibleElementsInfo( iMOAB_AppID pid,
     ParallelComm* pco = context.appDatas[*pid].pcomm;
 #endif
 
-    ErrorCode rval = context.MBI->tag_get_data( context.globalID_tag, data.primary_elems, element_global_IDs );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( context.MBI->tag_get_data( context.globalID_tag, data.primary_elems, element_global_IDs ),
+                    "can't get global IDs" );
 
     int i = 0;
 
     for( Range::iterator eit = data.primary_elems.begin(); eit != data.primary_elems.end(); ++eit, ++i )
     {
 #ifdef MOAB_HAVE_MPI
-        rval = pco->get_owner( *eit, ranks[i] );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( pco->get_owner( *eit, ranks[i] ), "can't get owner" );
 
 #else
         /* everything owned by task 0 */
@@ -1136,10 +1714,11 @@ ErrCode iMOAB_GetVisibleElementsInfo( iMOAB_AppID pid,
     {
         EntityHandle matMeshSet = *mit;
         Range elems;
-        rval = context.MBI->get_entities_by_handle( matMeshSet, elems );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( context.MBI->get_entities_by_handle( matMeshSet, elems ), "can't get block elements" );
 
         int valMatTag;
-        rval = context.MBI->tag_get_data( context.material_tag, &matMeshSet, 1, &valMatTag );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( context.MBI->tag_get_data( context.material_tag, &matMeshSet, 1, &valMatTag ),
+                        "can't get material tag" );
 
         for( Range::iterator eit = elems.begin(); eit != elems.end(); ++eit )
         {
@@ -1184,15 +1763,12 @@ ErrCode iMOAB_GetBlockElementConnectivities( iMOAB_AppID pid,
     EntityHandle matMeshSet = data.mat_sets[blockIndex];
     std::vector< EntityHandle > elems;
 
-    ErrorCode rval = context.MBI->get_entities_by_handle( matMeshSet, elems );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( context.MBI->get_entities_by_handle( matMeshSet, elems ), "can't get block elements" );
 
-    if( elems.empty() )
-    {
-        return moab::MB_FAILURE;
-    }
+    if( elems.empty() ) return moab::MB_FAILURE;
 
     std::vector< EntityHandle > vconnect;
-    rval = context.MBI->get_connectivity( &elems[0], elems.size(), vconnect );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( context.MBI->get_connectivity( &elems[0], elems.size(), vconnect ), "can't get connectivity" );
 
     if( *connectivity_length != (int)vconnect.size() )
     {
@@ -1230,7 +1806,7 @@ ErrCode iMOAB_GetElementConnectivity( iMOAB_AppID pid,
 
     EntityHandle eh = data.primary_elems[*elem_index];
 
-    ErrorCode rval = context.MBI->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( context.MBI->get_connectivity( eh, conn, num_nodes ), "can't get connectivity" );
 
     if( *connectivity_length < num_nodes )
     {
@@ -1275,12 +1851,9 @@ ErrCode iMOAB_GetElementOwnership( iMOAB_AppID pid,
     EntityHandle matMeshSet = context.appDatas[*pid].mat_sets[blockIndex];
     Range elems;
 
-    ErrorCode rval = context.MBI->get_entities_by_handle( matMeshSet, elems );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( context.MBI->get_entities_by_handle( matMeshSet, elems ), "can't get block elements" );
 
-    if( elems.empty() )
-    {
-        return moab::MB_FAILURE;
-    }
+    if( elems.empty() ) return moab::MB_FAILURE;
 
     if( *num_elements_in_block != (int)elems.size() )
     {
@@ -1295,7 +1868,7 @@ ErrCode iMOAB_GetElementOwnership( iMOAB_AppID pid,
     for( Range::iterator vit = elems.begin(); vit != elems.end(); vit++, i++ )
     {
 #ifdef MOAB_HAVE_MPI
-        rval = pco->get_owner( *vit, element_ownership[i] );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( pco->get_owner( *vit, element_ownership[i] ), "can't get owner" );
 #else
         element_ownership[i] = 0; /* owned by 0 */
 #endif
@@ -1326,19 +1899,17 @@ ErrCode iMOAB_GetElementID( iMOAB_AppID pid,
     int blockIndex          = matMap[*global_block_ID];
     EntityHandle matMeshSet = data.mat_sets[blockIndex];
     Range elems;
-    ErrorCode rval = context.MBI->get_entities_by_handle( matMeshSet, elems );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( context.MBI->get_entities_by_handle( matMeshSet, elems ), "can't get block elements" );
 
-    if( elems.empty() )
-    {
-        return moab::MB_FAILURE;
-    }
+    if( elems.empty() ) return moab::MB_FAILURE;
 
     if( *num_elements_in_block != (int)elems.size() )
     {
         return moab::MB_FAILURE;
     }  // bad memory allocation
 
-    rval = context.MBI->tag_get_data( context.globalID_tag, elems, global_element_ID );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( context.MBI->tag_get_data( context.globalID_tag, elems, global_element_ID ),
+                    "can't get global IDs" );
 
     // check that elems are among primary_elems in data
     for( int i = 0; i < *num_elements_in_block; i++ )
@@ -1361,7 +1932,6 @@ ErrCode iMOAB_GetPointerToSurfaceBC( iMOAB_AppID pid,
                                      int* boundary_condition_value )
 {
     // we have to fill bc data for neumann sets;/
-    ErrorCode rval;
 
     // it was counted above, in GetMeshInfo
     appData& data  = context.appDatas[*pid];
@@ -1373,16 +1943,18 @@ ErrCode iMOAB_GetPointerToSurfaceBC( iMOAB_AppID pid,
     {
         Range subents;
         EntityHandle nset = data.neu_sets[i];
-        rval              = context.MBI->get_entities_by_dimension( nset, data.dimension - 1, subents );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( context.MBI->get_entities_by_dimension( nset, data.dimension - 1, subents ),
+                        "can't get subentities" );
 
         int neuVal;
-        rval = context.MBI->tag_get_data( context.neumann_tag, &nset, 1, &neuVal );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( context.MBI->tag_get_data( context.neumann_tag, &nset, 1, &neuVal ), "can't get neumann tag" );
 
         for( Range::iterator it = subents.begin(); it != subents.end(); ++it )
         {
             EntityHandle subent = *it;
             Range adjPrimaryEnts;
-            rval = context.MBI->get_adjacencies( &subent, 1, data.dimension, false, adjPrimaryEnts );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( context.MBI->get_adjacencies( &subent, 1, data.dimension, false, adjPrimaryEnts ),
+                            "can't get adjacencies" );
 
             // get global id of the primary ents, and side number of the quad/subentity
             // this is moab ordering
@@ -1405,7 +1977,8 @@ ErrCode iMOAB_GetPointerToSurfaceBC( iMOAB_AppID pid,
                 }  // did not find the element locally
 
                 int side_number, sense, offset;
-                rval = context.MBI->side_number( primaryEnt, subent, side_number, sense, offset );MB_CHK_ERR( rval );
+                MB_CHK_SET_ERR( context.MBI->side_number( primaryEnt, subent, side_number, sense, offset ),
+                                "can't get side number" );
 
                 reference_surface_ID[index]     = side_number + 1;  // moab is from 0 to 5, it needs 1 to 6
                 boundary_condition_value[index] = neuVal;
@@ -1427,8 +2000,6 @@ ErrCode iMOAB_GetPointerToVertexBC( iMOAB_AppID pid,
                                     iMOAB_LocalID* local_vertex_ID,
                                     int* boundary_condition_value )
 {
-    ErrorCode rval;
-
     // it was counted above, in GetMeshInfo
     appData& data   = context.appDatas[*pid];
     int numDiriSets = (int)data.diri_sets.size();
@@ -1438,10 +2009,11 @@ ErrCode iMOAB_GetPointerToVertexBC( iMOAB_AppID pid,
     {
         Range verts;
         EntityHandle diset = data.diri_sets[i];
-        rval               = context.MBI->get_entities_by_dimension( diset, 0, verts );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( context.MBI->get_entities_by_dimension( diset, 0, verts ), "can't get vertices" );
 
         int diriVal;
-        rval = context.MBI->tag_get_data( context.dirichlet_tag, &diset, 1, &diriVal );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( context.MBI->tag_get_data( context.dirichlet_tag, &diset, 1, &diriVal ),
+                        "can't get dirichlet tag" );
 
         for( Range::iterator vit = verts.begin(); vit != verts.end(); ++vit )
         {
@@ -1798,7 +2370,8 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
     {
         eh_by_gid[gids[i]] = *it;
     }
-    // TODO: allow for tags of different length
+
+    /// @todo Allow for tags of different length
     size_t nbLocalVals = *num_tag_storage_length / tagNames.size();  // assumes all tags have the same length?
     // check global ids to have different values
     std::set< int > globalIdsSet;
@@ -2127,10 +2700,10 @@ ErrCode iMOAB_SynchronizeTags( iMOAB_AppID pid, int* num_tag, int* tag_indices, 
 
 #else
     /* do nothing if serial */
-    UNUSED(pid);
-    UNUSED(num_tag);
-    UNUSED(tag_indices);
-    UNUSED(ent_type);
+    UNUSED( pid );
+    UNUSED( num_tag );
+    UNUSED( tag_indices );
+    UNUSED( ent_type );
 #endif
 
     return moab::MB_SUCCESS;
@@ -2168,9 +2741,9 @@ ErrCode iMOAB_ReduceTagsMax( iMOAB_AppID pid, int* tag_index, int* ent_type )
 
 #else
     /* do nothing if serial */
-    UNUSED(pid);
-    UNUSED(tag_index);
-    UNUSED(ent_type);
+    UNUSED( pid );
+    UNUSED( tag_index );
+    UNUSED( ent_type );
 #endif
     return moab::MB_SUCCESS;
 }
@@ -2409,55 +2982,39 @@ ErrCode iMOAB_DetermineGhostEntities( iMOAB_AppID pid, int* ghost_dim, int* num_
 }
 
 /**
- * Transfer mesh data from the calling component (sender group) to another component (receiver group).
+ * @brief Transfer mesh data from sender component to receiver component.
+ * @ingroup iMOABParallel
  *
- * ALGORITHM OVERVIEW:
- * This function implements a distributed mesh transfer protocol that moves mesh entities
- * (elements, vertices, and associated data) from one set of MPI processes to another.
- * The transfer is orchestrated through a communication graph that maps sender processes
- * to receiver processes based on either trivial or computed partitioning strategies.
+ * @details Implements distributed mesh transfer protocol that moves mesh entities (elements, vertices,
+ * and associated data) from one set of MPI processes to another. Transfer is orchestrated through a
+ * communication graph that maps sender processes to receiver processes based on partitioning strategy.
  *
- * DETAILED WORKFLOW:
- * 1. COMMUNICATOR SETUP:
- *    - Resolve MPI communicator and group handles (handles Fortran F2C conversions)
- *    - Extract sender group from MOAB ParallelComm; receiver group provided as input
- *    - Create ParCommGraph instance to manage sender→receiver process mapping
+ * @par Algorithm Workflow:
+ * -# <b>COMMUNICATOR SETUP:</b> Resolve MPI communicator and group handles (handles Fortran F2C conversions).
+ *    Extract sender group from MOAB ParallelComm. Create ParCommGraph for sender→receiver mapping.
+ * -# <b>ENTITY SELECTION:</b> Determine owned entities to transfer: owned_elems or local_verts (point cloud mode).
+ *    Store ParCommGraph in context.appDatas[pid].pgraph[rcompid].
+ * -# <b>PARTITIONING STRATEGY:</b>
+ *    - method == 0 (TRIVIAL): Gather global entity counts, compute block distribution, broadcast via send_graph
+ *    - method != 0 (COMPUTED): Use graph/geometric partitioning considering connectivity and spatial distribution
+ * -# <b>MESH TRANSFER:</b> Pack mesh entities and data, use ParCommGraph to route to receivers via send_mesh_parts
  *
- * 2. ENTITY SELECTION:
- *    - Determine owned entities to transfer: `owned_elems` (primary elements) or
- *      `local_verts` (if point cloud mode)
- *    - Store ParCommGraph in `context.appDatas[pid].pgraph[rcompid]` for later use
+ * @par Data Transferred:
+ * - <b>Mesh entities:</b> elements (triangles, quads, etc.) and vertices
+ * - <b>Geometric data:</b> vertex coordinates, element connectivity
+ * - <b>Metadata:</b> material sets, boundary conditions, tags
+ * - <b>Global IDs:</b> for entity identification across processes
  *
- * 3. PARTITIONING STRATEGY:
- *    - method == 0 (TRIVIAL PARTITION):
- *      * Gather global entity counts from all sender processes via MPI_Allgather
- *      * Compute simple block distribution: each receiver gets roughly equal share
- *      * Broadcast partition mapping to all processes via `send_graph`
- *    - method != 0 (COMPUTED PARTITION):
- *      * Use graph-based or geometric partitioning via `compute_partition`
- *      * Consider entity connectivity and spatial distribution
- *      * Send partition mapping via `send_graph_partition`
+ * @param[in] pid                Application ID for sender component
+ * @param[in] joint_communicator MPI communicator spanning both sender and receiver groups
+ * @param[in] receivingGroup     MPI group of receiving processes
+ * @param[in] rcompid            Receiver component ID (key for communication graph storage)
+ * @param[in] method             Partitioning method: 0=trivial, !=0=computed
  *
- * 4. MESH TRANSFER:
- *    - Pack mesh entities and associated data (coordinates, connectivity, tags)
- *    - Use ParCommGraph to determine which entities go to which receiver processes
- *    - Execute point-to-point transfers via `send_mesh_parts`
+ * @note <b>Communication:</b> Collective (MPI_Allgather) and point-to-point (non-blocking sends)
+ * @warning Cleans up MPI groups on early return to avoid resource leaks
  *
- * DATA BEING TRANSFERRED:
- * - Mesh entities: elements (triangles, quads, etc.) and vertices
- * - Geometric data: vertex coordinates, element connectivity
- * - Metadata: material sets, boundary conditions, tags
- * - Global IDs: for entity identification across processes
- *
- * COMMUNICATION PATTERN:
- * - Collective operations: MPI_Allgather for trivial partition, graph broadcast
- * - Point-to-point: actual mesh data transfer based on partition mapping
- * - Non-blocking: ParCommGraph methods use non-blocking sends for efficiency
- *
- * ERROR HANDLING:
- * - Uses MOAB error checking macros (MB_CHK_ERR, MB_CHK_SET_ERR)
- * - Cleans up MPI groups on early return
- * - Validates input parameters with assertions
+ * @return moab::MB_SUCCESS on success, moab::MB_FAILURE on error
  */
 ErrCode iMOAB_SendMesh( iMOAB_AppID pid,
                         MPI_Comm* joint_communicator,
@@ -2526,7 +3083,7 @@ ErrCode iMOAB_SendMesh( iMOAB_AppID pid,
         number_elems_per_part[rank] = local_owned_elem;
         // Gather entity counts from all sender processes using MPI_Allgather
         // This allows each sender to know the total entity count for load balancing
-#if( MPI_VERSION >= 2 )
+#if ( MPI_VERSION >= 2 )
         // Use "in place" option for efficiency (MPI 2.0+)
         ierr = MPI_Allgather( MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, &number_elems_per_part[0], 1, MPI_INT, sender );
 #else
@@ -2572,55 +3129,40 @@ ErrCode iMOAB_SendMesh( iMOAB_AppID pid,
 }
 
 /**
- * Receive mesh data on the target component from a sending component.
+ * @brief Receive mesh data on target component from sending component.
+ * @ingroup iMOABParallel
  *
- * ALGORITHM OVERVIEW:
- * This function implements the receiver side of the distributed mesh transfer protocol.
- * It receives mesh entities and data from multiple sender processes, consolidates them
- * into a local mesh, and handles entity deduplication based on global IDs.
+ * @details Implements receiver side of distributed mesh transfer protocol. Receives mesh entities
+ * and data from multiple sender processes, consolidates them into local mesh, and handles entity
+ * deduplication based on global IDs.
  *
- * DETAILED WORKFLOW:
- * 1. COMMUNICATOR SETUP:
- *    - Resolve MPI communicator and group handles (handles Fortran F2C conversions)
- *    - Extract receiver group from MOAB ParallelComm; sender group provided as input
- *    - Create ParCommGraph instance with reverse mapping (sender→receiver)
- *    - Store ParCommGraph in `context.appDatas[pid].pgraph[scompid]`
+ * @par Algorithm Workflow:
+ * -# <b>COMMUNICATOR SETUP:</b> Resolve MPI communicator and group handles (Fortran F2C conversions).
+ *    Extract receiver group from MOAB ParallelComm. Create ParCommGraph with reverse mapping.
+ * -# <b>COMMUNICATION GRAPH RECEPTION:</b> Receive communication graph via receive_comm_graph.
+ *    Parse packed graph array to extract sender ranks for this receiver process.
+ * -# <b>SENDER IDENTIFICATION:</b> Determine current receiver's rank index. Walk through packed
+ *    graph array to find all sender ranks that contribute. Build senders_local list.
+ * -# <b>MESH RECEPTION:</b> Invoke receive_mesh to pull mesh parts from identified sender processes.
+ *    Deposit mesh entities into data.file_set (local mesh container).
+ * -# <b>POST-PROCESSING:</b> Optional vertex merging for entities with identical GLOBAL_ID from
+ *    different senders. Re-establish mesh information and update local mesh metadata.
  *
- * 2. COMMUNICATION GRAPH RECEPTION:
- *    - Receive the communication graph/matrix via `receive_comm_graph`
- *    - This graph contains the mapping of which senders contribute to which receivers
- *    - Parse the packed graph array to extract sender ranks for this receiver process
+ * @par Data Received:
+ * - <b>Mesh entities:</b> elements and vertices with geometric data
+ * - <b>Connectivity:</b> element-to-vertex relationships
+ * - <b>Tags:</b> material properties, boundary conditions, custom data
+ * - <b>Global IDs:</b> for entity identification and deduplication
  *
- * 3. SENDER IDENTIFICATION:
- *    - Determine current receiver's rank index within the receiver group
- *    - Walk through the packed graph array to find all sender ranks that contribute
- *    - Build `senders_local` list containing contributing sender process ranks
+ * @param[in] pid                Application ID for receiver component
+ * @param[in] joint_communicator MPI communicator spanning both sender and receiver groups
+ * @param[in] sendingGroup       MPI group of sending processes
+ * @param[in] scompid            Sender component ID (key for communication graph storage)
  *
- * 4. MESH RECEPTION:
- *    - Invoke `receive_mesh` to pull mesh parts from identified sender processes
- *    - Mesh entities are deposited into `data.file_set` (the local mesh container)
- *    - Receive includes: elements, vertices, coordinates, connectivity, tags, global IDs
+ * @note <b>Communication:</b> Collective (receive graph) and point-to-point (receive mesh data)
+ * @warning Vertex merging only performed if receiving from 2+ senders
  *
- * 5. POST-PROCESSING:
- *    - Optional vertex merging: entities with identical GLOBAL_ID from different senders
- *      are merged to avoid duplication
- *    - Re-establish mesh information and update local mesh metadata
- *
- * DATA BEING RECEIVED:
- * - Mesh entities: elements and vertices with their geometric data
- * - Connectivity: element-to-vertex relationships
- * - Tags: material properties, boundary conditions, custom data
- * - Global IDs: for entity identification and deduplication
- *
- * COMMUNICATION PATTERN:
- * - Collective: receiving the communication graph from senders
- * - Point-to-point: receiving actual mesh data from identified sender processes
- * - Synchronous: receiver waits for all expected data from all senders
- *
- * ERROR HANDLING:
- * - Uses MOAB error checking macros for robust error propagation
- * - Validates that senders are found for this receiver process
- * - Handles cases where no senders contribute to this receiver
+ * @return moab::MB_SUCCESS on success, moab::MB_FAILURE on error
  */
 ErrCode iMOAB_ReceiveMesh( iMOAB_AppID pid, MPI_Comm* joint_communicator, MPI_Group* sendingGroup, int* scompid )
 {
@@ -2806,62 +3348,38 @@ ErrCode iMOAB_ReceiveMesh( iMOAB_AppID pid, MPI_Comm* joint_communicator, MPI_Gr
 }
 
 /**
- * Send element tag data from the calling component to another component.
+ * @brief Send element tag data from calling component to another component.
+ * @ingroup iMOABParallel
  *
- * ALGORITHM OVERVIEW:
- * This function transfers tag data (scalar or vector values) associated with mesh elements
- * from one component to another using a pre-established communication graph. The transfer
- * is based on the communication patterns determined by previous mesh transfer or communication
- * graph computation operations.
+ * @details Transfers tag data (scalar or vector values) associated with mesh elements from one
+ * component to another using pre-established communication graph. Transfer based on communication
+ * patterns determined by previous mesh transfer or communication graph computation operations.
  *
- * DETAILED WORKFLOW:
- * 1. COMMUNICATION GRAPH VALIDATION:
- *    - Look up the ParCommGraph for the specified context_id
- *    - Validate that the communication graph exists and is properly initialized
- *    - Extract the graph and parallel communicator for this component
+ * @par Algorithm Workflow:
+ * -# <b>COMMUNICATION GRAPH VALIDATION:</b> Look up ParCommGraph for specified context_id,
+ *    validate existence and initialization, extract graph and parallel communicator.
+ * -# <b>ENTITY SELECTION:</b> Determine target entities based on component type (point cloud: local_verts,
+ *    regular mesh: owned_elems). Handle special cases (TempestRemap coverage mesh, intersection coverage sets).
+ * -# <b>TAG PROCESSING:</b> Parse tag names using colon separator for multiple tags, resolve tag handles,
+ *    validate existence. Support scalar and vector tag data.
+ * -# <b>DATA TRANSFER:</b> Use ParCommGraph to determine routing, pack tag values associated with selected
+ *    entities, execute non-blocking point-to-point transfers via send_tag_values.
  *
- * 2. ENTITY SELECTION:
- *    - Determine target entities based on component type:
- *      * Point cloud mode: use `local_verts` (vertices)
- *      * Regular mesh: use `owned_elems` (primary elements)
- *    - Handle special cases:
- *      * TempestRemap coverage mesh: use covering mesh entities
- *      * Intersection applications: use coverage set entities
+ * @par Data Transferred:
+ * - <b>Tag values:</b> Scalar or vector data associated with mesh entities
+ * - <b>Entity mappings:</b> Which entities the tag values belong to
+ * - <b>Tag metadata:</b> Tag type, size, and component information
+ * - <b>Global IDs:</b> For entity identification across processes
  *
- * 3. TAG PROCESSING:
- *    - Parse tag names using colon (":") separator for multiple tags
- *    - Resolve tag handles for each specified tag name
- *    - Validate that all requested tags exist and are accessible
- *    - Support both scalar and vector tag data
+ * @param[in] pid                 Application ID for sender component
+ * @param[in] tag_storage_name    Tag name(s) to send (colon-separated for multiple tags)
+ * @param[in] joint_communicator  MPI communicator spanning sender and receiver groups
+ * @param[in] context_id          Communication graph context ID
  *
- * 4. DATA TRANSFER:
- *    - Use ParCommGraph to determine which tag data goes to which receiver processes
- *    - Pack tag values associated with selected entities
- *    - Execute non-blocking point-to-point transfers via `send_tag_values`
- *    - Transfer includes entity-to-tag-value mappings
+ * @note <b>Use cases:</b> Transfer solution data, send material properties/BCs, exchange computed quantities
+ * @warning Communication graph must exist before calling (establish via mesh transfer or compute graph)
  *
- * DATA BEING TRANSFERRED:
- * - Tag values: Scalar or vector data associated with mesh entities
- * - Entity mappings: Which entities the tag values belong to
- * - Tag metadata: Tag type, size, and component information
- * - Global IDs: For entity identification across processes
- *
- * COMMUNICATION PATTERN:
- * - Point-to-point: Direct transfers based on communication graph
- * - Non-blocking: Asynchronous sends for efficiency
- * - Selective: Only entities with tag data are transferred
- *
- * USE CASES:
- * - Transfer solution data between coupled components
- * - Send material properties or boundary conditions
- * - Exchange computed quantities (fluxes, forces, etc.)
- * - Propagate state variables in multi-physics simulations
- *
- * ERROR HANDLING:
- * - Validates communication graph existence
- * - Checks tag handle resolution
- * - Uses MOAB error checking throughout
- * - Provides detailed error messages for debugging
+ * @return moab::MB_SUCCESS on success, moab::MB_FAILURE if graph missing or tags not found
  */
 ErrCode iMOAB_SendElementTag( iMOAB_AppID pid,
                               const iMOAB_String tag_storage_name,
@@ -2886,11 +3404,11 @@ ErrCode iMOAB_SendElementTag( iMOAB_AppID pid,
     ParallelComm* pco    = context.appDatas[*pid].pcomm;
 
     // Handle Fortran-to-C MPI handle conversion if needed
-    MPI_Comm global      = ( data.is_fortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( joint_communicator ) )
-                                             : *joint_communicator );
+    MPI_Comm global = ( data.is_fortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( joint_communicator ) )
+                                        : *joint_communicator );
 
     // Determine target entities: vertices for point clouds, elements for regular meshes
-    Range owned          = ( data.point_cloud ? data.local_verts : data.owned_elems );
+    Range owned = ( data.point_cloud ? data.local_verts : data.owned_elems );
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
     // Handle TempestRemap coverage mesh entities for intersection applications
@@ -2937,62 +3455,38 @@ ErrCode iMOAB_SendElementTag( iMOAB_AppID pid,
 }
 
 /**
- * Receive element tag data from another component.
+ * @brief Receive element tag data from another component.
+ * @ingroup iMOABParallel
  *
- * ALGORITHM OVERVIEW:
- * This function receives tag data (scalar or vector values) associated with mesh elements
- * from another component using a pre-established communication graph. The received tag
- * values are applied to the corresponding entities in the local mesh, enabling data
- * exchange between coupled components.
+ * @details Receives tag data (scalar or vector values) associated with mesh elements from another
+ * component using pre-established communication graph. Received tag values are applied to
+ * corresponding entities in local mesh, enabling data exchange between coupled components.
  *
- * DETAILED WORKFLOW:
- * 1. COMMUNICATION GRAPH VALIDATION:
- *    - Look up the ParCommGraph for the specified context_id
- *    - Validate that the communication graph exists and is properly initialized
- *    - Extract the graph and parallel communicator for this component
+ * @par Algorithm Workflow:
+ * -# <b>COMMUNICATION GRAPH VALIDATION:</b> Look up ParCommGraph for specified context_id,
+ *    validate existence and initialization, extract graph and parallel communicator.
+ * -# <b>ENTITY SELECTION:</b> Determine target entities based on component type (point cloud: local_verts,
+ *    regular mesh: owned_elems). Handle special cases (coverage set, TempestRemap coverage mesh).
+ * -# <b>TAG PROCESSING:</b> Parse tag names using colon separator for multiple tags, resolve tag handles,
+ *    validate existence. Support scalar and vector tag data.
+ * -# <b>DATA RECEPTION:</b> Use ParCommGraph to receive tag data via receive_tag_values, unpack received
+ *    tag values and associate with local entities, execute non-blocking point-to-point receives.
  *
- * 2. ENTITY SELECTION:
- *    - Determine target entities based on component type:
- *      * Point cloud mode: use `local_verts` (vertices)
- *      * Regular mesh: use `owned_elems` (primary elements)
- *    - Handle special cases:
- *      * Coverage set entities: for intersection applications
- *      * TempestRemap coverage mesh: for remapping operations
+ * @par Data Received:
+ * - <b>Tag values:</b> Scalar or vector data from sender component
+ * - <b>Entity mappings:</b> Which entities the tag values belong to
+ * - <b>Tag metadata:</b> Tag type, size, and component information
+ * - <b>Global IDs:</b> For entity identification and matching
  *
- * 3. TAG PROCESSING:
- *    - Parse tag names using colon (":") separator for multiple tags
- *    - Resolve tag handles for each specified tag name
- *    - Validate that all requested tags exist and are accessible
- *    - Support both scalar and vector tag data
+ * @param[in] pid                 Application ID for receiver component
+ * @param[in] tag_storage_name    Tag name(s) to receive (colon-separated for multiple tags)
+ * @param[in] joint_communicator  MPI communicator spanning sender and receiver groups
+ * @param[in] context_id          Communication graph context ID
  *
- * 4. DATA RECEPTION:
- *    - Use ParCommGraph to receive tag data from sender processes
- *    - Unpack received tag values and associate with local entities
- *    - Execute non-blocking point-to-point receives via `receive_tag_values`
- *    - Apply tag values to corresponding entities in local mesh
+ * @note <b>Use cases:</b> Receive solution data, get material properties/BCs, accept computed quantities
+ * @warning Communication graph must exist before calling (establish via mesh transfer or compute graph)
  *
- * DATA BEING RECEIVED:
- * - Tag values: Scalar or vector data from sender component
- * - Entity mappings: Which entities the tag values belong to
- * - Tag metadata: Tag type, size, and component information
- * - Global IDs: For entity identification and matching
- *
- * COMMUNICATION PATTERN:
- * - Point-to-point: Direct receives based on communication graph
- * - Non-blocking: Asynchronous receives for efficiency
- * - Selective: Only entities with tag data are received
- *
- * USE CASES:
- * - Receive solution data from coupled components
- * - Get material properties or boundary conditions
- * - Accept computed quantities (fluxes, forces, etc.)
- * - Receive state variables in multi-physics simulations
- *
- * ERROR HANDLING:
- * - Validates communication graph existence
- * - Checks tag handle resolution
- * - Uses MOAB error checking throughout
- * - Provides detailed error messages for debugging
+ * @return moab::MB_SUCCESS on success, moab::MB_FAILURE if graph missing or tags not found
  */
 ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid,
                                  const iMOAB_String tag_storage_name,
@@ -3017,11 +3511,11 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid,
     ParallelComm* pco    = context.appDatas[*pid].pcomm;
 
     // Handle Fortran-to-C MPI handle conversion if needed
-    MPI_Comm global      = ( data.is_fortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( joint_communicator ) )
-                                             : *joint_communicator );
+    MPI_Comm global = ( data.is_fortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( joint_communicator ) )
+                                        : *joint_communicator );
 
     // Determine target entities: vertices for point clouds, elements for regular meshes
-    Range owned          = ( data.point_cloud ? data.local_verts : data.owned_elems );
+    Range owned = ( data.point_cloud ? data.local_verts : data.owned_elems );
 
     // Handle coverage set entities for intersection applications
     // This covers cases where elements have been instantiated in coverage sets during intersection
@@ -3090,69 +3584,50 @@ ErrCode iMOAB_FreeSenderBuffers( iMOAB_AppID pid, int* context_id )
 }
 
 /**
- * Compute communication graph between two components using a rendezvous algorithm.
+ * @brief Compute communication graph between two components using rendezvous algorithm.
+ * @ingroup iMOABParallel
  *
- * ALGORITHM OVERVIEW:
- * This function implements a sophisticated rendezvous-based algorithm to determine
- * which processes from component 1 need to communicate with which processes from
- * component 2. The algorithm uses global entity IDs (or DOFs) as "rendezvous points"
- * to discover communication patterns between the two components.
+ * @details Implements sophisticated rendezvous-based algorithm to determine which processes from
+ * component 1 need to communicate with which processes from component 2. Uses global entity IDs
+ * (or DOFs) as "rendezvous points" to discover communication patterns between components.
  *
- * DETAILED WORKFLOW:
- * 1. COMMUNICATOR SETUP:
- *    - Resolve MPI communicator and group handles (handles Fortran F2C conversions)
- *    - Create bidirectional ParCommGraph instances for both components
- *    - Store graphs in respective component's pgraph maps
+ * @par Algorithm Workflow:
+ * -# <b>COMMUNICATOR SETUP:</b> Resolve MPI communicator and group handles (Fortran F2C conversions),
+ *    create bidirectional ParCommGraph instances for both components, store graphs in pgraph maps.
+ * -# <b>ENTITY ID COLLECTION:</b> Extract entity IDs based on type parameter:
+ *    - type=1: GLOBAL_DOFS from MBQUAD elements (spectral elements)
+ *    - type=2: GLOBAL_ID from MBVERTEX entities (vertex-based coupling)
+ *    - type=3: GLOBAL_ID from 2D elements (finite volume meshes)
+ *    - Handle TempestRemap coverage mesh entities
+ * -# <b>RENDEZVOUS ALGORITHM:</b> Create TupleList for each component with (target_proc, entity_id) pairs.
+ *    Use hash-based distribution (entity_id % numProcs). Execute crystal router (gs_transfer) to send
+ *    entity IDs to rendezvous processes. Sort received data by entity ID for efficient matching.
+ * -# <b>COMMUNICATION DISCOVERY:</b> Synchronously iterate through both sorted TupleLists, find matching
+ *    entity IDs between components (intersection), record which processes share each entity, build
+ *    reverse communication maps.
+ * -# <b>GRAPH CONSTRUCTION:</b> Send communication information back to original processes via crystal
+ *    router. Each process learns communication partners. Store patterns in ParCommGraph.
  *
- * 2. ENTITY ID COLLECTION:
- *    - Component 1: Extract entity IDs based on type1:
- *      * type1=1: GLOBAL_DOFS from MBQUAD elements (for spectral elements)
- *      * type1=2: GLOBAL_ID from MBVERTEX entities (for vertex-based coupling)
- *      * type1=3: GLOBAL_ID from 2D elements (for finite volume meshes)
- *    - Component 2: Extract entity IDs based on type2 (same logic as type1)
- *    - Handle special case: TempestRemap coverage mesh entities
+ * @par Data Processed:
+ * - <b>Entity IDs:</b> Global identifiers serving as rendezvous points
+ * - <b>Process mappings:</b> Which processes own which entities
+ * - <b>Communication patterns:</b> Sender→receiver relationships
  *
- * 3. RENDEZVOUS ALGORITHM:
- *    - Create TupleList for each component containing (target_proc, entity_id) pairs
- *    - Use hash-based distribution: entity_id % numProcs determines target process
- *    - Execute crystal router (gs_transfer) to send entity IDs to rendezvous processes
- *    - Sort received data by entity ID for efficient matching
+ * @param[in] pid1               Application ID for component 1 (or negative if not on these ranks)
+ * @param[in] pid2               Application ID for component 2 (or negative if not on these ranks)
+ * @param[in] joint_communicator MPI communicator spanning both component groups
+ * @param[in] group1             MPI group for component 1 processes
+ * @param[in] group2             MPI group for component 2 processes
+ * @param[in] type1              Entity type for component 1 (1=DOFs, 2=vertices, 3=elements)
+ * @param[in] type2              Entity type for component 2 (1=DOFs, 2=vertices, 3=elements)
+ * @param[in] comp1              Component 1 external ID
+ * @param[in] comp2              Component 2 external ID
  *
- * 4. COMMUNICATION DISCOVERY:
- *    - Synchronously iterate through both sorted TupleLists
- *    - Find matching entity IDs between components (intersection)
- *    - For each match, record which processes from each component share the entity
- *    - Build reverse communication maps: who needs to talk to whom
+ * @note <b>Complexity:</b> O(N log N) sorting, O(N/P) communication per process
+ * @note <b>Use cases:</b> Coupling different mesh types, establishing comm for data transfer, mesh intersection prep
+ * @warning Both components must have consistent global entity IDs for rendezvous to work
  *
- * 5. GRAPH CONSTRUCTION:
- *    - Send communication information back to original processes
- *    - Each process learns which other processes it needs to communicate with
- *    - Store communication patterns in ParCommGraph for later use
- *
- * DATA BEING PROCESSED:
- * - Entity IDs: Global identifiers that serve as rendezvous points
- * - Process mappings: Which processes own which entities
- * - Communication patterns: Sender→receiver relationships
- *
- * COMMUNICATION PATTERN:
- * - Crystal router: Efficient all-to-all communication for rendezvous
- * - Hash distribution: entity_id % numProcs for load balancing
- * - Bidirectional: Both components learn their communication partners
- *
- * ALGORITHM COMPLEXITY:
- * - O(N log N) for sorting entity IDs
- * - O(N/P) communication per process where N=total entities, P=processes
- * - Memory: O(unique_entities_per_process)
- *
- * USE CASES:
- * - Coupling between different mesh types (spectral, finite volume, finite element)
- * - Establishing communication for data transfer between components
- * - Preparing for mesh intersection or remapping operations
- *
- * ERROR HANDLING:
- * - Validates entity types (1, 2, or 3)
- * - Handles missing tags gracefully
- * - Uses MOAB error checking throughout
+ * @return moab::MB_SUCCESS on success, error code otherwise
  */
 //#define VERBOSE
 ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
@@ -3280,7 +3755,7 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
         TLcomp1.resize( uniq.size() );
         for( std::set< int >::iterator sit = uniq.begin(); sit != uniq.end(); sit++ )
         {
-            int marker               = *sit;  // Entity ID
+            int marker               = *sit;               // Entity ID
             int to_proc              = marker % numProcs;  // Hash-based target process
             int n                    = TLcomp1.get_n();
             TLcomp1.vi_wr[2 * n]     = to_proc;  // Target process
@@ -3291,7 +3766,7 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
 
     // Execute crystal router transfer for component 1 entity IDs
     // This sends entity IDs to rendezvous processes based on hash distribution
-    ProcConfig pc( global );  // Process configuration for crystal router
+    ProcConfig pc( global );                            // Process configuration for crystal router
     pc.crystal_router()->gs_transfer( 1, TLcomp1, 0 );  // Transfer to joint tasks with markers
 
     // Sort component 1 tuple list by entity ID (key 1) for efficient matching
@@ -3353,7 +3828,7 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
         TLcomp2.resize( uniq.size() );
         for( std::set< int >::iterator sit = uniq.begin(); sit != uniq.end(); sit++ )
         {
-            int marker               = *sit;  // Entity ID
+            int marker               = *sit;               // Entity ID
             int to_proc              = marker % numProcs;  // Hash-based target process
             int n                    = TLcomp2.get_n();
             TLcomp2.vi_wr[2 * n]     = to_proc;  // Target process
@@ -3437,16 +3912,20 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
                     // Send communication info back to component 1 processes
                     int n = TLBackToComp1.get_n();
                     TLBackToComp1.reserve();
-                    TLBackToComp1.vi_wr[3 * n]     = TLcomp1.vi_rd[2 * ( indexInTLComp1 + i1 )];  // Target process from comp1
+                    TLBackToComp1.vi_wr[3 * n] =
+                        TLcomp1.vi_rd[2 * ( indexInTLComp1 + i1 )];  // Target process from comp1
                     TLBackToComp1.vi_wr[3 * n + 1] = currentValue1;  // Shared entity ID
-                    TLBackToComp1.vi_wr[3 * n + 2] = TLcomp2.vi_rd[2 * ( indexInTLComp2 + i2 )];  // Source process from comp2
+                    TLBackToComp1.vi_wr[3 * n + 2] =
+                        TLcomp2.vi_rd[2 * ( indexInTLComp2 + i2 )];  // Source process from comp2
 
                     // Send communication info back to component 2 processes
                     n = TLBackToComp2.get_n();
                     TLBackToComp2.reserve();
-                    TLBackToComp2.vi_wr[3 * n]     = TLcomp2.vi_rd[2 * ( indexInTLComp2 + i2 )];  // Target process from comp2
+                    TLBackToComp2.vi_wr[3 * n] =
+                        TLcomp2.vi_rd[2 * ( indexInTLComp2 + i2 )];  // Target process from comp2
                     TLBackToComp2.vi_wr[3 * n + 1] = currentValue1;  // Shared entity ID
-                    TLBackToComp2.vi_wr[3 * n + 2] = TLcomp1.vi_rd[2 * ( indexInTLComp1 + i1 )];  // Source process from comp1
+                    TLBackToComp2.vi_wr[3 * n + 2] =
+                        TLcomp1.vi_rd[2 * ( indexInTLComp1 + i1 )];  // Source process from comp1
                 }
             }
 
@@ -3504,74 +3983,300 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
     return moab::MB_SUCCESS;
 }
 
+/**
+ * @brief Merge duplicate vertices in a mesh and update connectivity information.
+ * @ingroup iMOABParallel
+ *
+ * @details This function consolidates duplicate vertices that may exist after mesh operations
+ * such as intersection or migration. Vertices with identical GLOBAL_ID values are
+ * merged, and connectivity of elements is updated accordingly. The function performs
+ * both local (within-process) and parallel (across-process) vertex merging.
+ *
+ * @par Algorithm Workflow:
+ * -# <b>TAG COLLECTION:</b> Collect critical tags that need to be preserved during merge:
+ *    - GLOBAL_ID: Required for vertex identification (fatal error if missing)
+ *    - area: Optional - element area values to preserve
+ *    - frac: Optional - fraction values for conservation
+ * -# <b>LOCAL VERTEX DEDUPLICATION:</b> Remove duplicate vertices within each process using
+ *    spatial tolerance (1.0e-9). IntxUtils::remove_duplicate_vertices merges vertices and
+ *    updates connectivity, preserving tag values from first occurrence.
+ * -# <b>MATERIAL SET CLEANUP:</b> Clear all elements from material sets and re-populate with
+ *    valid elements from the current file set. Ensures material set integrity after topology changes.
+ * -# <b>MESH INFO UPDATE:</b> Refresh internal mesh information (vertex counts, element counts,
+ *    owned/ghosted entity information) and recalculate mesh statistics.
+ * -# <b>PARALLEL VERTEX MERGING:</b> ParallelMergeMesh handles vertices shared across process
+ *    boundaries. Identifies vertices with identical GLOBAL_ID on different processes and merges
+ *    them while updating parallel communication graph.
+ * -# <b>GLOBAL ID ASSIGNMENT:</b> Reassign consistent global IDs to vertices after merge.
+ *    Only updates vertex global IDs (cells already have correct IDs).
+ * -# <b>PARTITION TAG SETUP:</b> Create/retrieve PARALLEL_PARTITION tag for visualization
+ *    indicating which process owns each mesh set.
+ *
+ * @par Data Processed:
+ * - <b>Vertices:</b> Spatial coordinates and associated tags
+ * - <b>Elements:</b> Connectivity information referencing vertices
+ * - <b>Tags:</b> GLOBAL_ID (required), area, frac (optional)
+ * - <b>Material sets:</b> Collections of elements with shared properties
+ *
+ * @par Common Use Cases:
+ * - After mesh intersection: Overlapping meshes create duplicate vertices
+ * - After mesh migration: Vertices copied to multiple processes need merging
+ * - After remapping: Source/target vertices may coincide
+ * - Quality improvement: Remove numerical duplicates from mesh operations
+ *
+ * @param[in] pid  Application ID for the mesh
+ *
+ * @pre GLOBAL_ID tag must exist on vertices
+ * @post Duplicate vertices merged both locally and across processes
+ * @post Element connectivity updated to reference merged vertices
+ * @post PARALLEL_PARTITION tag set for visualization
+ *
+ * @note <b>Parallelism:</b> Performs both local (per-process) and parallel (across-process) merging
+ * @warning Modifies mesh topology and connectivity - may invalidate cached entity handles
+ *
+ * @return moab::MB_SUCCESS on success, moab::MB_FAILURE if GLOBAL_ID tag missing
+ */
 ErrCode iMOAB_MergeVertices( iMOAB_AppID pid )
 {
+    // =========================================================================
+    // FUNCTION PROLOGUE: Validate inputs and initialize local variables
+    // =========================================================================
+
+    // Validate application ID and retrieve application data structure
+    IMOAB_CHECKPID( *pid );  // Verify pid corresponds to a valid registered application
+
+    // Get application data and parallel communicator for this component
+    // data contains mesh info, ranges, and pcomm holds parallel communication state
     appData& data     = context.appDatas[*pid];
-    ParallelComm* pco = context.appDatas[*pid].pcomm;
-    // collapse vertices and transform cells into triangles/quads /polys
-    // tags we care about: area, frac, global id
+    ParallelComm* pco = data.pcomm;
+
+    // Initialize return value to success state
+    ErrorCode rval = MB_SUCCESS;
+
+    // =========================================================================
+    // STEP 1: Collect tags that need to be preserved during vertex merging
+    // =========================================================================
+
+    // Initialize vector to hold tags that should be preserved during merge
+    // These tags contain important data that must be maintained when vertices are merged
+    // The merge operation will preserve tag values from the first vertex in each duplicate set
     std::vector< Tag > tagsList;
     Tag tag;
-    ErrorCode rval = context.MBI->tag_get_handle( "GLOBAL_ID", tag );
-    if( !tag || rval != MB_SUCCESS ) return moab::MB_FAILURE;  // fatal error, abort
+
+    // GLOBAL_ID is mandatory - used to identify duplicate vertices across processes
+    // Without this tag, we cannot determine which vertices should be merged
+    tag = context.MBI->globalId_tag();
+    if( !tag )
+    {
+        // Fatal error: GLOBAL_ID tag is required for merge operations
+        // Return failure as merge cannot proceed without vertex identification capability
+        return moab::MB_FAILURE;
+    }
+    // Add GLOBAL_ID to the list of tags to preserve during merge
     tagsList.push_back( tag );
+
+    // Area tag (optional) - contains element area values for conservation checks
+    // Used in remapping applications to ensure conservation properties
     rval = context.MBI->tag_get_handle( "area", tag );
-    if( tag && rval == MB_SUCCESS ) tagsList.push_back( tag );
+    if( tag && MB_SUCCESS == rval )
+    {
+        // Area tag found, include it in preserved tags
+        tagsList.push_back( tag );
+    }
+
+    // frac tag (optional) - contains fractional coverage for remapping conservation
+    // Used to track fractional ownership in intersection-based remapping
     rval = context.MBI->tag_get_handle( "frac", tag );
-    if( tag && rval == MB_SUCCESS ) tagsList.push_back( tag );
-    double tol = 1.0e-9;
-    rval       = IntxUtils::remove_duplicate_vertices( context.MBI, data.file_set, tol, tagsList );MB_CHK_ERR( rval );
+    if( tag && MB_SUCCESS == rval )
+    {
+        // Fraction tag found, include it in preserved tags
+        tagsList.push_back( tag );
+    }
 
-    // clean material sets of cells that were deleted
-    rval = context.MBI->get_entities_by_type_and_tag( data.file_set, MBENTITYSET, &( context.material_tag ), 0, 1,
-                                                      data.mat_sets, Interface::UNION );MB_CHK_ERR( rval );
+    // ========================================================================
+    // STEP 2: Remove duplicate vertices within this process (local merge)
+    // ========================================================================
 
+    // Set spatial tolerance for considering vertices identical (meters on unit sphere)
+    // This tolerance accounts for numerical precision issues in floating-point coordinates
+    // 1.0e-9 is a typical tolerance for spherical meshes near unit radius
+    const double tol = 1.0e-9;
+
+    // Perform local vertex deduplication using MOAB's IntxUtils
+    // This function:
+    // 1. Identifies spatially coincident vertices within tolerance
+    // 2. Updates element connectivity to reference merged vertices
+    // 3. Preserves tag values from the first vertex in each duplicate set
+    // 4. Removes duplicate vertices from the mesh
+    MB_CHK_ERR( IntxUtils::remove_duplicate_vertices( context.MBI, data.file_set, tol,
+                                                      tagsList ) );  // Exit on failure to merge local vertices
+
+    // ========================================================================
+    // STEP 3: Clean up material sets that may reference deleted elements
+    // ========================================================================
+
+    // Material sets organize elements by material properties (e.g., land, ocean, ice)
+    // After vertex merge, some elements may have been deleted or connectivity modified
+    // Update material sets to maintain mesh data integrity
+
+    // Retrieve all material sets currently defined on the file set
+    // Material sets are identified by having a MATERIAL_SET_TAG_NAME tag
+    MB_CHK_ERR( context.MBI->get_entities_by_type_and_tag(
+        data.file_set, MBENTITYSET, &( context.material_tag ), nullptr, 1, data.mat_sets,
+        Interface::UNION ) );  // Exit if we can't retrieve material sets
+
+    // Update material sets if any were found
     if( !data.mat_sets.empty() )
     {
+        // For simplicity, we only clean the first material set
+        // In production code, all material sets should be systematically updated
+        // This is a limitation that could be improved in future versions
         EntityHandle matSet = data.mat_sets[0];
         Range elems;
-        rval = context.MBI->get_entities_by_dimension( matSet, 2, elems );MB_CHK_ERR( rval );
-        rval = context.MBI->remove_entities( matSet, elems );MB_CHK_ERR( rval );
-        // put back only cells from data.file_set
-        elems.clear();
-        rval = context.MBI->get_entities_by_dimension( data.file_set, 2, elems );MB_CHK_ERR( rval );
-        rval = context.MBI->add_entities( matSet, elems );MB_CHK_ERR( rval );
+
+        // Get current 2D elements in this material set (may include stale references)
+        MB_CHK_ERR(
+            context.MBI->get_entities_by_dimension( matSet, 2, elems ) );  // Exit if we can't get material set contents
+
+        // Remove all current elements from the material set
+        // This clears potentially stale element references
+        MB_CHK_ERR( context.MBI->remove_entities( matSet, elems ) );  // Exit on failure to remove stale elements
+
+        // Get only valid 2D elements from the current file set
+        // This excludes any elements that may have been deleted during merge
+        elems.clear();  // Reset range for reuse
+        MB_CHK_ERR(
+            context.MBI->get_entities_by_dimension( data.file_set, 2, elems ) );  // Exit if we can't get valid elements
+
+        // Add back only the valid elements to the material set
+        // This ensures material set consistency after topology changes
+        MB_CHK_ERR( context.MBI->add_entities( matSet, elems ) );  // Exit on failure to update material set
     }
-    rval = iMOAB_UpdateMeshInfo( pid );MB_CHK_ERR( rval );
 
+    // ========================================================================
+    // STEP 4: Update internal mesh information after topology changes
+    // ========================================================================
+
+    // Recalculate mesh statistics and update internal data structures
+    // This includes vertex/element counts, owned/ghosted entity information
+    // iMOAB_UpdateMeshInfo() refreshes all cached mesh information
+    MB_CHK_ERR( iMOAB_UpdateMeshInfo( pid ) );  // Exit on failure to update mesh info
+
+    // ========================================================================
+    // STEP 5: Perform parallel merge of vertices shared across processes
+    // ========================================================================
+
+    // Create parallel merge mesh object with the same spatial tolerance
+    // ParallelMergeMesh handles vertices shared across process boundaries
     ParallelMergeMesh pmm( pco, tol );
-    rval = pmm.merge( data.file_set,
-                      /* do not do local merge*/ false,
-                      /*  2d cells*/ 2 );MB_CHK_ERR( rval );
 
-    // assign global ids only for vertices, cells have them fine
-    rval = pco->assign_global_ids( data.file_set, /*dim*/ 0 );MB_CHK_ERR( rval );
+    // Perform parallel vertex merging across all processes
+    // This identifies vertices with identical GLOBAL_ID on different processes
+    // and merges them while updating the parallel communication graph
+    // Parameters:
+    //   - data.file_set: The mesh set to operate on
+    //   - false: Skip local merge (already done in step 2)
+    //   - 2: Update 2D elements after merge (dimension of elements to fix connectivity for)
+    MB_CHK_ERR( pmm.merge( data.file_set,
+                           /* do not do local merge*/ false,
+                           /*  2d cells*/ 2 ) );  // Exit on failure of parallel merge
 
-    // set the partition tag on the file set
-    Tag part_tag;
-    int dum_id = -1;
-    rval       = context.MBI->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_tag,
-                                              MB_TAG_CREAT | MB_TAG_SPARSE, &dum_id );
+    // ========================================================================
+    // STEP 6: Assign consistent global IDs to vertices after merge
+    // ========================================================================
 
-    if( part_tag == nullptr || ( ( rval != MB_SUCCESS ) && ( rval != MB_ALREADY_ALLOCATED ) ) )
+    // After merging, vertices need new globally unique IDs to maintain consistency
+    // Only update vertices (dimension 0) - elements already have correct IDs
+    // assign_global_ids() coordinates across all processes to ensure uniqueness
+    MB_CHK_ERR( pco->assign_global_ids( data.file_set, /*dim*/ 0 ) );  // Exit on failure to assign global IDs
+
+    // ========================================================================
+    // STEP 7: Set partition tag for visualization and debugging
+    // ========================================================================
+
+    // Set up PARALLEL_PARTITION tag to indicate which process owns each mesh set
+    // This is essential for visualization tools like ParaView/VisIt to show
+    // domain decomposition and parallel partitioning
+
+    Tag part_tag;     // Handle for the partition tag
+    int dum_id = -1;  // Default value if tag doesn't exist yet
+
+    // Create or retrieve the partition tag (sparse storage, one int per set)
+    // Sparse storage is efficient since we only need one value per mesh set
+    rval = context.MBI->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_tag,
+                                        MB_TAG_CREAT | MB_TAG_SPARSE, &dum_id );
+
+    // Validate that partition tag was created or retrieved successfully
+    if( part_tag == nullptr || ( ( MB_SUCCESS != rval ) && ( MB_ALREADY_ALLOCATED != rval ) ) )
     {
-        std::cout << " can't get par part tag.\n";
+        // Error creating/retrieving partition tag
+        std::cout << "Failed to create/retrieve PARALLEL_PARTITION tag.\n";
         return moab::MB_FAILURE;
     }
 
+    // Tag the file set with this process's rank to show ownership
+    // This allows visualization tools to distinguish between different process domains
     int rank = pco->rank();
-    rval     = context.MBI->tag_set_data( part_tag, &data.file_set, 1, &rank );MB_CHK_ERR( rval );
+    MB_CHK_ERR(
+        context.MBI->tag_set_data( part_tag, &data.file_set, 1, &rank ) );  // Exit on failure to set partition data
 
+    // ========================================================================
+    // FUNCTION EPILOGUE: Return success status
+    // ========================================================================
+
+    // All merge operations completed successfully
     return moab::MB_SUCCESS;
 }
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
 
-// this call must be collective on the joint communicator
-//  intersection tasks on coupler will need to send to the components tasks the list of
-// id elements that are relevant: they intersected some of the target elements (which are not needed
-// here)
-//  in the intersection
+/**
+ * @brief Establishes parallel communication graph for coverage mesh data exchange in coupled simulations.
+ *
+ * @details In multi-physics coupling (e.g., atmosphere-ocean), components run on different MPI task sets
+ * with non-identical mesh decompositions. This function builds optimized communication patterns
+ * based on intersection results, enabling targeted data exchange instead of all-to-all communication.
+ *
+ * @par Algorithm - Two-Hop Crystal Router:
+ * -# <b>DISCOVERY PHASE:</b> Intersection/coupler tasks analyze coverage mesh elements, identify which
+ *    source tasks originally owned them (via orig_sending_processor tag), and send ID requirements
+ *    back to original source tasks via crystal router.
+ * -# <b>GRAPH CONSTRUCTION:</b> Source tasks receive requirements and create new ParCommGraph with
+ *    coverage-specific send patterns. Receiver tasks create corresponding receive-side graph.
+ *    Both graphs stored with unique context_id for later data operations.
+ *
+ * @par Workflow:
+ * - Validate application IDs and retrieve existing ParCommGraphs
+ * - On receiver tasks: analyze intersection/coverage elements, build idsFromProcs map, create
+ *   receiver-side graph, pack requirements into TupleList
+ * - Crystal router exchange: receivers send requirements to senders
+ * - On sender tasks: create sender-side graph from received requirements
+ *
+ * @par Data Structures:
+ * - <b>ParCommGraph:</b> Manages point-to-point MPI communication with sender/receiver ID mappings
+ * - <b>TupleList:</b> Bulk MPI communication structure (vi_wr/vi_rd for integers, vr_wr/vr_rd for reals)
+ * - <b>Tags:</b> GLOBAL_ID (element IDs), orig_sending_processor (source task), SourceParent (parent ID)
+ *
+ * @param[in] joint_communicator  MPI communicator spanning all participating tasks (component + coupler)
+ * @param[in] pid_src            Source component application ID
+ * @param[in] pid_migr           Migrated/coverage mesh application ID (on coupler)
+ * @param[in] pid_intx           Intersection mesh application ID
+ * @param[in] source_id          External ID of source component
+ * @param[in] migration_id       External ID of migration/coupler component
+ * @param[in] context_id         Unique identifier for this coverage graph
+ *
+ * @pre Existing ParCommGraph between pid_src and pid_migr must exist
+ * @pre Coverage mesh computed with orig_sending_processor tags
+ * @pre Global IDs assigned consistently across all tasks
+ *
+ * @post New ParCommGraphs created on both sender and receiver sides with context_id
+ * @post Graphs contain precise send/receive ID mappings for coverage data exchange
+ *
+ * @note <b>Performance:</b> O(N_cov * log(P)) time complexity, O(N_cov) communication volume
+ * @warning <b>Collective operation:</b> Must be called on all tasks in joint_communicator
+ *
+ * @return moab::MB_SUCCESS on success, moab::MB_FAILURE on error
+ */
 ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
                              iMOAB_AppID pid_src,
                              iMOAB_AppID pid_migr,
@@ -3580,11 +4285,17 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
                              int* migration_id,
                              int* context_id )
 {
-    // first, based on the scompid and migrcomp, find the parCommGraph corresponding to this exchange
-    std::vector< int > srcSenders, receivers;
-    ParCommGraph* sendGraph = nullptr;
-    bool is_fortran_context = false;
+    // =========================================================================
+    // STEP 1: Input validation and retrieve existing communication graphs
+    // =========================================================================
 
+    assert( joint_communicator != nullptr );
+
+    std::vector< int > srcSenders, receivers;  // Process lists from existing graphs
+    ParCommGraph* sendGraph = nullptr;         // Original send graph (source → migration)
+    bool is_fortran_context = false;           // Handle Fortran/C communicator conversion
+
+    // Validate application IDs exist before accessing application data
     if( pid_src && *pid_src > 0 && context.appDatas.find( *pid_src ) == context.appDatas.end() )
         MB_CHK_SET_ERR( moab::MB_FAILURE, "Invalid source application ID specified: " << *pid_src );
     if( pid_migr && *pid_migr > 0 && context.appDatas.find( *pid_migr ) == context.appDatas.end() )
@@ -3592,20 +4303,20 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
     if( pid_intx && *pid_intx > 0 && context.appDatas.find( *pid_intx ) == context.appDatas.end() )
         MB_CHK_SET_ERR( moab::MB_FAILURE, "Invalid intersection application ID specified: " << *pid_intx );
 
-    // First, find the original graph between PE sets
-    // And based on this one, we will build the newly modified one for coverage
+    // Retrieve existing send graph from source application
+    // This was created during initial migration and defines original communication pattern
     if( *pid_src >= 0 )
     {
         appData& dataSrc       = context.appDatas[*pid_src];
-        int default_context_id = *migration_id;  // the other one
+        int default_context_id = *migration_id;  // Original context uses migration_id as key
         assert( dataSrc.global_id == *source_id );
         is_fortran_context = dataSrc.is_fortran || is_fortran_context;
         if( dataSrc.pgraph.find( default_context_id ) != dataSrc.pgraph.end() )
-            sendGraph = dataSrc.pgraph[default_context_id];  // maybe check if it does not exist
+            sendGraph = dataSrc.pgraph[default_context_id];
         else
             MB_CHK_SET_ERR( moab::MB_FAILURE, "Could not find source ParCommGraph with default migration context" );
 
-        // report the sender and receiver tasks in the joint comm
+        // Extract sender/receiver process lists from existing graph
         srcSenders = sendGraph->senders();
         receivers  = sendGraph->receivers();
 #ifdef VERBOSE
@@ -3613,20 +4324,21 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
 #endif
     }
 
-    ParCommGraph* recvGraph = nullptr;  // will be non null on receiver tasks (intx tasks)
+    // Retrieve existing receive graph from migration/coupler application
+    // This graph will be copied and modified for coverage-specific communication
+    ParCommGraph* recvGraph = nullptr;
     if( *pid_migr >= 0 )
     {
-        appData& dataMigr  = context.appDatas[*pid_migr];
-        is_fortran_context = dataMigr.is_fortran || is_fortran_context;
-        // find the original one
-        int default_context_id = *source_id;
+        appData& dataMigr      = context.appDatas[*pid_migr];
+        is_fortran_context     = dataMigr.is_fortran || is_fortran_context;
+        int default_context_id = *source_id;  // Original context uses source_id as key
         assert( dataMigr.global_id == *migration_id );
         if( dataMigr.pgraph.find( default_context_id ) != dataMigr.pgraph.end() )
             recvGraph = dataMigr.pgraph[default_context_id];
         else
             MB_CHK_SET_ERR( moab::MB_FAILURE,
                             "Could not find coverage receiver ParCommGraph with default migration context" );
-        // report the sender and receiver tasks in the joint comm, from migrated mesh pt of view
+        // Extract sender/receiver lists from migration perspective
         srcSenders = recvGraph->senders();
         receivers  = recvGraph->receivers();
 #ifdef VERBOSE
@@ -3634,97 +4346,99 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
 #endif
     }
 
+    // =========================================================================
+    // STEP 2: Initialize TupleList for coverage ID exchange and get rank
+    // =========================================================================
+
     if( *pid_intx >= 0 ) is_fortran_context = context.appDatas[*pid_intx].is_fortran || is_fortran_context;
 
-    // loop over pid_intx elements, to see what original processors in joint comm have sent the
-    // coverage mesh; If we are on intx tasks, send coverage info towards original component tasks,
-    // about needed cells
+    // TupleList for packing coverage element IDs to send back to source tasks
+    // Format: (destination_proc, global_id)
     TupleList TLcovIDs;
-    TLcovIDs.initialize( 2, 0, 0, 0, 0 );  // to proc, GLOBAL ID; estimate about 100 IDs to be sent
-    // will push_back a new tuple, if needed
+    TLcovIDs.initialize( 2, 0, 0, 0, 0 );  // 2 integers per tuple, dynamic growth
     TLcovIDs.enableWriteAccess();
-    // the crystal router will send ID cell to the original source, on the component task
-    // if we are on intx tasks, loop over all intx elements and
 
+    // Handle Fortran vs C communicator conversion
     MPI_Comm global = ( is_fortran_context ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( joint_communicator ) )
                                            : *joint_communicator );
     int currentRankInJointComm = -1;CHK_MPI_ERR( MPI_Comm_rank( global, &currentRankInJointComm ) );
 
-    // Global id of the coverage source elements
+    // Get global ID tag for element identification
     Tag gidTag = context.MBI->globalId_tag();
-    if( !gidTag ) return moab::MB_TAG_NOT_FOUND;  // fatal error, abort
+    if( !gidTag ) return moab::MB_TAG_NOT_FOUND;
 
-    // if currentRankInJointComm is in receivers list, it means that we are on intx tasks too, we
-    // need to send information towards component tasks
-    if( find( receivers.begin(), receivers.end(), currentRankInJointComm ) !=
-        receivers.end() )  // we are on receivers tasks, we can request intx info
+    // =========================================================================
+    // STEP 3: On receiver tasks, analyze coverage mesh and build ID requirements
+    // =========================================================================
+
+    // Check if this rank is a receiver (intersection/coupler task)
+    if( find( receivers.begin(), receivers.end(), currentRankInJointComm ) != receivers.end() )
     {
         appData& dataIntx      = context.appDatas[*pid_intx];
         EntityHandle intx_set  = dataIntx.file_set;
         EntityHandle cover_set = dataIntx.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
 
+        // Get tag that identifies which source task originally sent each element
         Tag orgSendProcTag;
         MB_CHK_ERR( context.MBI->tag_get_handle( "orig_sending_processor", orgSendProcTag ) );
-        if( !orgSendProcTag ) return moab::MB_TAG_NOT_FOUND;  // fatal error, abort
+        if( !orgSendProcTag ) return moab::MB_TAG_NOT_FOUND;
 
+        // Get intersection elements (if they exist)
         Range intx_cells;
-        // get all entities from the intersection set, and look at their SourceParent
         MB_CHK_ERR( context.MBI->get_entities_by_dimension( intx_set, 2, intx_cells ) );
-        // we did not compute the intersection (perhaps it was loaded from disk)
-        // so then just get the cells from covering mesh (no need to filter participating elements only)
 
-        // send that info back to enhance parCommGraph cache
+        // Build map: source_processor → set_of_required_global_IDs
+        // This tells each source task which elements we need from it
         std::map< int, std::set< int > > idsFromProcs;
+        // Process intersection elements to find required source element IDs
         if( intx_cells.size() )
         {
+            // SourceParent tag contains global ID of source element that created this intx element
             Tag parentTag;
-            // global id of the source element corresponding to intersection cell
             MB_CHK_ERR( context.MBI->tag_get_handle( "SourceParent", parentTag ) );
-            if( !parentTag ) return moab::MB_TAG_NOT_FOUND;  // fatal error, abort
+            if( !parentTag ) return moab::MB_TAG_NOT_FOUND;
 
             for( auto it = intx_cells.begin(); it != intx_cells.end(); ++it )
             {
                 EntityHandle intx_cell = *it;
 
-                int origProc;  // look at receivers
+                // Get original processor that sent this element during migration
+                int origProc;
                 MB_CHK_ERR( context.MBI->tag_get_data( orgSendProcTag, &intx_cell, 1, &origProc ) );
 
-                // we have augmented the overlap set with ghost cells ; in that case, the
-                // orig_sending_processor is not set so it will be -1;
-                // if( origProc < 0 || currentRankInJointComm == origProc ) continue;
+                // Skip ghost elements (origProc == -1)
                 if( origProc < 0 ) continue;
 
-                int gidCell;  // get the global id of the cell for association
+                // Get global ID of source parent element
+                int gidCell;
                 MB_CHK_ERR( context.MBI->tag_get_data( parentTag, &intx_cell, 1, &gidCell ) );
+
+                // Record that we need gidCell from origProc
                 idsFromProcs[origProc].insert( gidCell );
-                // printf( "%d: active-intx: adding %d for proc %d\n", currentRankInJointComm, gidCell, origProc );
             }
         }
 
-        // NOTE: if we have no intx cells, we fall back to coverage set anyway
-        // In either case, let us iterate over the coverage mesh and compute
-        // the right connections needed for the coverage graph
+        // Process coverage mesh elements (superset of intersection elements)
+        // Coverage includes all source elements needed, not just those in active intersection
         {
-            // get all entities from the source covering set
             Range cover_cells;
             MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, cover_cells ) );
 
-            // get all cells from coverage set
             Tag gidTag = context.MBI->globalId_tag();
 
-            // look at their orig_sending_processor and associate to global ID
             for( auto it = cover_cells.begin(); it != cover_cells.end(); ++it )
             {
                 const EntityHandle cov_cell = *it;
 
-                int origProc;  // look at receivers
+                // Get original source processor for this coverage element
+                int origProc;
                 MB_CHK_ERR( context.MBI->tag_get_data( orgSendProcTag, &cov_cell, 1, &origProc ) );
 
-                // we have augmented the overlap set with ghost cells ; in that case, the
-                // orig_sending_processor is not set so it will be -1;
+                // Skip unassigned/ghost elements
                 if( origProc < 0 ) continue;
 
-                int gidCell;  // get the global id of the cell for association
+                // Get global ID and add to requirements for this source processor
+                int gidCell;
                 MB_CHK_ERR( context.MBI->tag_get_data( gidTag, &cov_cell, 1, &gidCell ) );
                 assert( gidCell > 0 );
                 idsFromProcs[origProc].insert( gidCell );
@@ -3759,50 +4473,64 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
         dbfile.close();
 #endif
 
+        // Create new receiver-side ParCommGraph for coverage-specific communication
         if( nullptr != recvGraph )
         {
-            ParCommGraph* newRecvGraph = new ParCommGraph( *recvGraph );  // just copy
-            newRecvGraph->set_context_id( *context_id );
-            newRecvGraph->SetReceivingAfterCoverage( idsFromProcs );
-            // this par comm graph will need to use the coverage set
-            // so we are for sure on intx pes (the receiver is the coupler mesh)
-            newRecvGraph->set_cover_set( cover_set );
+            ParCommGraph* newRecvGraph = new ParCommGraph( *recvGraph );  // Copy original structure
+            newRecvGraph->set_context_id( *context_id );                  // Differentiate from original graph
+            newRecvGraph->SetReceivingAfterCoverage( idsFromProcs );      // Store coverage requirements
+            newRecvGraph->set_cover_set( cover_set );                     // Associate with coverage mesh set
+
+            // Store in application's graph map with unique context_id
             if( context.appDatas[*pid_migr].pgraph.find( *context_id ) == context.appDatas[*pid_migr].pgraph.end() )
                 context.appDatas[*pid_migr].pgraph[*context_id] = newRecvGraph;
-            else  // possible memory leak if context_id is same
+            else
                 MB_CHK_SET_ERR( moab::MB_FAILURE, "ParCommGraph for context_id="
                                                       << *context_id << " already exists. Check the workflow" );
         }
+
+        // Pack requirements into TupleList for crystal router communication
+        // Format: (destination_processor, required_global_id)
         for( std::map< int, std::set< int > >::iterator mit = idsFromProcs.begin(); mit != idsFromProcs.end(); ++mit )
         {
-            int procToSendTo       = mit->first;
+            int procToSendTo       = mit->first;  // Source task that owns these IDs
             std::set< int >& idSet = mit->second;
             for( std::set< int >::iterator sit = idSet.begin(); sit != idSet.end(); ++sit )
             {
                 int n = TLcovIDs.get_n();
                 TLcovIDs.reserve();
-                TLcovIDs.vi_wr[2 * n]     = procToSendTo;  // send to processor
-                TLcovIDs.vi_wr[2 * n + 1] = *sit;          // global id needs index in the local_verts range
+                TLcovIDs.vi_wr[2 * n]     = procToSendTo;  // Destination processor
+                TLcovIDs.vi_wr[2 * n + 1] = *sit;          // Required global ID
             }
         }
     }
 
-    ProcConfig pc( global );  // proc config does the crystal router
-    // communication towards component tasks, with what ids are needed
-    // for each task from receiver
+    // =========================================================================
+    // STEP 4: Crystal router exchange - send ID requirements to source tasks
+    // =========================================================================
+
+    ProcConfig pc( global );
+    // Collective operation: receivers send requirements → senders receive them
     pc.crystal_router()->gs_transfer( 1, TLcovIDs, 0 );
 
-    // a test to know if we are on the sender tasks (original component, in this case, atmosphere)
+    // =========================================================================
+    // STEP 5: On sender tasks, create sender-side graph from received requirements
+    // =========================================================================
+
     if( nullptr != sendGraph )
     {
         appData& dataSrc = context.appDatas[*pid_src];
-        // collect TLcovIDs tuple, will set in a local map/set, the ids that are sent to each receiver task
-        ParCommGraph* newSendGraph = new ParCommGraph( *sendGraph );  // just copy
-        newSendGraph->set_context_id( *context_id );
+
+        // Create new sender-side ParCommGraph for coverage communication
+        ParCommGraph* newSendGraph = new ParCommGraph( *sendGraph );  // Copy original structure
+        newSendGraph->set_context_id( *context_id );                  // Unique context for this graph
         dataSrc.pgraph[*context_id] = newSendGraph;
+
+        // Process received TLcovIDs to build send patterns: receiver → vector<ids_to_send>
         MB_CHK_ERR( newSendGraph->settle_send_graph( TLcovIDs ) );
     }
-    return moab::MB_SUCCESS;  // success
+
+    return moab::MB_SUCCESS;
 }
 
 ErrCode iMOAB_DumpCommGraph( iMOAB_AppID pid, int* context_id, int* is_sender, const iMOAB_String prefix )
@@ -3830,17 +4558,58 @@ ErrCode iMOAB_DumpCommGraph( iMOAB_AppID pid, int* context_id, int* is_sender, c
 
 #ifdef MOAB_HAVE_NETCDF
 
+/**
+ * @brief Internal helper: redistributes area values from trivial to arbitrary mesh distribution.
+ *
+ * @details NetCDF remapping files store areas in "trivial" distribution (contiguous blocks: rank 0 owns
+ * IDs 1 to N/P, rank 1 owns N/P+1 to 2N/P, etc.), but MOAB meshes use spatial/graph partitioning
+ * with non-contiguous global IDs. This function bridges the gap using two-hop crystal router.
+ *
+ * @par Algorithm - Two-Hop Rendezvous:
+ * <b>TRIVIAL DISTRIBUTION:</b> Rank r owns global IDs [r*nL+1, (r+1)*nL] where nL=N/size @n
+ * <b>MESH DISTRIBUTION:</b> Ranks own arbitrary non-contiguous IDs from spatial decomposition
+ *
+ * -# <b>HOP 1 (REQUESTS):</b> Each rank sends requests to trivial owners for its local element IDs
+ *    - For each local element with gid, compute trivial owner: (gid-1)/nL
+ *    - Pack tuple: (owner_rank, gid, local_index)
+ *    - Crystal router sends requests to trivial owners
+ * -# <b>HOP 2 (RESPONSES):</b> Trivial owners look up areas and send back to requesters
+ *    - For each request, compute local index: gid - 1 - rank*nL
+ *    - Look up area value: trvArea[local_index]
+ *    - Pack response: (requester_rank, gid, original_index, area_value)
+ *    - Crystal router sends responses back
+ *    - Requesters apply area values to mesh elements using original_index
+ *
+ * @par Serial Optimization:
+ * Direct mapping when size==1 (no communication needed)
+ *
+ * @par Data Structures:
+ * - <b>TupleList:</b> Bulk MPI communication (vi_wr/vi_rd for ints, vr_wr/vr_rd for doubles)
+ * - <b>Crystal router:</b> Collective all-to-all with O(log P) communication stages
+ *
+ * @param[in] pid       Application ID for mesh
+ * @param[in] N         Total number of elements (global size)
+ * @param[in] trvArea   Area values in trivial distribution order
+ *                      (size = N/size for most ranks, N/size + N%size for last rank)
+ *
+ * @pre Global IDs numbered 1 to N (1-indexed)
+ * @pre "aream" tag exists on mesh elements
+ * @pre trvArea on each rank contains its trivial partition slice
+ *
+ * @todo Auto-create "aream" tag if missing instead of failing
+ * @todo Support variable-length tags, not just single double values
+ *
+ * @note <b>Performance:</b> O(n_local + log P) time, O(N) communication, 2 crystal router passes
+ * @warning <b>Collective operation:</b> All ranks must call (crystal router is collective)
+ *
+ * @return moab::MB_SUCCESS on success, error code otherwise
+ */
 static ErrCode set_aream_from_trivial_distribution( iMOAB_AppID pid, int N, std::vector< double >& trvArea )
 {
-    // this needs several rounds of communication, because the mesh is distributed differently than trivially
-    // get all the cells from the pid_source
-    // get global ids of the cells
-    // number of local cells: [n/size] nL = [n/size]
-    // last one extraN = n%size; nL += extraN
-    // start id = [ rank*nL + 1; endId = (rank+1)*nL
-    // lst one (rank = =size-1; endId = na
-    // the last cells get the rest
-    // construct global ids that correspond to trvArea [, rank *
+    // =========================================================================
+    // STEP 1: Setup - Get parallel context and retrieve tags
+    // =========================================================================
+
     appData& data = context.appDatas[*pid];
     int size = 1, rank = 0;
 #ifdef MOAB_HAVE_MPI
@@ -3849,13 +4618,12 @@ static ErrCode set_aream_from_trivial_distribution( iMOAB_AppID pid, int N, std:
     rank                = pcomm->rank();
 #endif
 
-    /// The "aream" tag should be created already; error out if not
-    /// NOTE: This is a bad assumption
-    /// TODO: Fix it.
+    // Get "aream" tag for storing area values on mesh elements
+    /// @todo Auto-create if missing instead of failing
     Tag areaTag;
     MB_CHK_ERR( context.MBI->tag_get_handle( "aream", areaTag ) );
 
-    // start copy
+    // Get local mesh elements and their global IDs
     const Range& ents_to_set = data.primary_elems;
     size_t nents_to_be_set   = ents_to_set.size();
 
@@ -3863,88 +4631,116 @@ static ErrCode set_aream_from_trivial_distribution( iMOAB_AppID pid, int N, std:
     std::vector< int > globalIds( nents_to_be_set );
     MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_to_set, &globalIds[0] ) );
 
+    // =========================================================================
+    // STEP 2: Serial path - direct mapping without communication
+    // =========================================================================
+
     const bool serial = ( size == 1 );
     if( serial )
     {
-        // we do not assume anymore that the number of entities has to match
-        // we will set only what matches, and skip entities that do not have corresponding global ids
-        //assert( total_tag_len * nents_to_be_set - *num_tag_storage_length == 0 );
-        // tags are unrolled, we loop over global ids first, then careful about tags
+        // Single process: directly map global IDs to trivial array indices
+        // Since there's only one rank, trivial and mesh distributions are identical
         for( size_t i = 0; i < nents_to_be_set; i++ )
         {
-            int gid = globalIds[i];
-            int indexInVal =
-                gid - 1;  // assume the values are in order of global id, starting from 1 to number of cells
-            assert( indexInVal < N );
+            int gid        = globalIds[i];  // Global ID (1-indexed)
+            int indexInVal = gid - 1;       // Convert to 0-indexed array position
+            assert( indexInVal < N );       // Safety: prevent out-of-bounds
             EntityHandle eh = ents_to_set[i];
+            // Direct lookup and assignment
             MB_CHK_ERR( context.MBI->tag_set_data( areaTag, &eh, 1, &trvArea[indexInVal] ) );
         }
     }
 #ifdef MOAB_HAVE_MPI
-    else  // it can be not serial only if size > 1, parallel
+    // =========================================================================
+    // STEP 3: Parallel path - HOP 1: Build and send requests
+    // =========================================================================
+    else
     {
-        int nL = N / size;  // how many global ids per task, except the last one
+        // Compute trivial distribution parameters
+        int nL = N / size;  // Base number of elements per rank in trivial distribution
 
-        // in this case, we have to use 2 crystal routers, to send data to the processor that needs it
-        // we will create first a tuple to rendevous points, then from there send to the processor that requested it
-        // it is a 2-hop global gather scatter
-        // TODO: allow for tags of different length; this is wrong
-        //assert( nbLocalVals * tagNames.size() - *num_tag_storage_length == 0 );
+        // Initialize request TupleList: (destination_rank, global_id, local_index)
+        /// @todo Extend to support variable-length tags, not just single double values
         TupleList TLreq;
-        TLreq.initialize( 3, 0, 0, 0, nents_to_be_set );  //  to proc, marker(gid),
+        TLreq.initialize( 3, 0, 0, 0, nents_to_be_set );  // 3 integers per tuple
         TLreq.enableWriteAccess();
-        // the processor id that processes global_id is global_id / num_ents_per_proc
 
-        // send requests to processor that has the global id
+        // Build requests: for each local element, determine trivial owner and request area
         for( size_t i = 0; i < nents_to_be_set; i++ )
         {
-            // to proc, marker, element local index, index in el
-            int marker  = globalIds[i];
-            int to_proc = ( marker - 1 ) / nL;  // proc from 0 to size - 1
+            int marker  = globalIds[i];         // Global ID we need area for
+            int to_proc = ( marker - 1 ) / nL;  // Rank that owns this ID in trivial layout
 
-            if( to_proc == size ) to_proc = size - 1;  // the last array is the longest
+            // Handle last rank which may own extra elements (N % size)
+            if( to_proc == size ) to_proc = size - 1;
+
+            // Pack request tuple
             int n                  = TLreq.get_n();
-            TLreq.vi_wr[3 * n]     = to_proc;  // send to processor
-            TLreq.vi_wr[3 * n + 1] = marker;
-            TLreq.vi_wr[3 * n + 2] = i;  // local index for this global id
+            TLreq.vi_wr[3 * n]     = to_proc;  // Destination: trivial owner rank
+            TLreq.vi_wr[3 * n + 1] = marker;   // Global ID being requested
+            TLreq.vi_wr[3 * n + 2] = i;        // Local index (for response routing)
             TLreq.inc_n();
         }
 
-        // send now requests, basically inform the rendez-vous point who needs a particular global id
-        // send the data to the other processors:
+        // Crystal router: send requests to trivial owners (collective operation)
         ( pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLreq, 0 );
 
-        int sizeBack = TLreq.get_n();
-        // start copy from comm graph settle
+        // =====================================================================
+        // STEP 4: Process received requests and build responses
+        // =====================================================================
+
+        int sizeBack = TLreq.get_n();  // Number of requests received by this rank
+
+        // Initialize response TupleList: (requester_rank, global_id, orig_index, area_value)
         TupleList TLBack;
-        TLBack.initialize( 3, 0, 0, 1, sizeBack );  // to proc, marker, tag from proc , tag values
+        TLBack.initialize( 3, 0, 0, 1, sizeBack );  // 3 ints + 1 double per tuple
         TLBack.enableWriteAccess();
+
+        // Process each request: lookup area value and prepare response
         for( int i = 0; i < sizeBack; i++ )
         {
-            int from_proc           = TLreq.vi_wr[3 * i];  // send to processor
-            TLBack.vi_wr[3 * i]     = from_proc;
-            int marker              = TLreq.vi_wr[3 * i + 1];  // the actual global id
-            TLBack.vi_wr[3 * i + 1] = marker;
-            TLBack.vi_wr[3 * i + 2] = TLreq.vi_wr[3 * i + 2];  // the original index this came from
-            // this marker should give an idea of what index is actually needed for value
+            int from_proc  = TLreq.vi_wr[3 * i];      // Who requested this
+            int marker     = TLreq.vi_wr[3 * i + 1];  // Which global ID
+            int orig_index = TLreq.vi_wr[3 * i + 2];  // Their local index
+
+            // Compute local index in trvArea for this rank's trivial partition
+            // Formula: global_id - 1 - rank_offset where rank_offset = rank * nL
             int index       = marker - 1 - rank * nL;
-            TLBack.vr_wr[i] = trvArea[index];  // !!! big assumptions about indices
+            double area_val = trvArea[index];  // Lookup area value
+
+            // Pack response tuple
+            TLBack.vi_wr[3 * i]     = from_proc;   // Destination: original requester
+            TLBack.vi_wr[3 * i + 1] = marker;      // Echo back global ID
+            TLBack.vi_wr[3 * i + 2] = orig_index;  // Echo back their local index
+            TLBack.vr_wr[i]         = area_val;    // Area value payload
             TLBack.inc_n();
         }
 
+        // =====================================================================
+        // STEP 5: Crystal router - send responses back to requesters
+        // =====================================================================
+
         ( pcomm->proc_config().crystal_router() )->gs_transfer( 1, TLBack, 0 );
 
-        int n1 = TLBack.get_n();  // should be the number of nents_to_be_set
+        // =====================================================================
+        // STEP 6: Apply received area values to local mesh elements
+        // =====================================================================
+
+        int n1 = TLBack.get_n();  // Number of responses received (should equal nents_to_be_set)
+
         for( int i = 0; i < n1; i++ )
         {
-            // int gid  = TLBack.vi_rd[3 * i + 1];  // marker
-            int origIndex   = TLBack.vi_rd[3 * i + 2];
+            // Extract response data
+            // int gid         = TLBack.vi_rd[3 * i + 1];  // Global ID (unused, we have orig_index)
+            int origIndex   = TLBack.vi_rd[3 * i + 2];  // Local element index from step 3
+            double area_val = TLBack.vr_rd[i];          // Area value from trivial owner
+
+            // Get element handle and set area tag
             EntityHandle eh = ents_to_set[origIndex];
-            MB_CHK_ERR( context.MBI->tag_set_data( areaTag, &eh, 1, &TLBack.vr_rd[i] ) );
+            MB_CHK_ERR( context.MBI->tag_set_data( areaTag, &eh, 1, &area_val ) );
         }
     }
 #endif
-    // end copy
 
     return MB_SUCCESS;
 }
@@ -4093,10 +4889,9 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
     tdata.pid_src  = pid_source;
     tdata.pid_dest = pid_target;
 
-    // TODO: now if coverage set exists, let us perform a filter based on
-    // available source/target nnz data in the map. The idea is to look at the
-    // source coverage and target meshes and to figure out only relevant elements
-    // that need to participate in the meshes.
+    /// @todo Perform filter based on available source/target nnz data in the map when coverage set exists.
+    /// The idea is to look at the source coverage and target meshes and figure out only relevant elements
+    /// that need to participate in the meshes.
 
     //tdata.remapper->SetMeshSet( Remapper::SourceMesh, source_set, &srcc_ents_of_interest );
     // we have read the area A from map file, and we will set it as a aream double tag on the source set, knowing that we
@@ -4117,7 +4912,7 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
     weightMap->SetDestinationNDofsPerElement( tgt_elem_dof_length );
     weightMap->set_row_dc_dofs( tgtDofValues );  // will set row_dtoc_dofmap
 
-    // TODO: ideally, we should get this from the remap_weights_filename and just propagate it
+    /// @todo Ideally, we should get this metadata from remap_weights_filename and propagate it
     std::string metadataStr = std::string( remap_weights_filename ) + ";FV:1:GLOBAL_ID;FV:1:GLOBAL_ID";
 
     data_intx.metadataMap[std::string( solution_weights_identifier )] = metadataStr;
@@ -4125,10 +4920,9 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
     return moab::MB_SUCCESS;
 }
 
-ErrCode iMOAB_WriteMapFile(
-    iMOAB_AppID pid_intersection,
-    const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
-    const iMOAB_String remap_weights_filename )
+ErrCode iMOAB_WriteMapFile( iMOAB_AppID pid_intersection,
+                            const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
+                            const iMOAB_String remap_weights_filename )
 {
     assert( solution_weights_identifier && strlen( solution_weights_identifier ) );
     assert( remap_weights_filename && strlen( remap_weights_filename ) );
@@ -4698,7 +5492,7 @@ static ErrCode ComputeSphereRadius( iMOAB_AppID pid, double* radius )
     rval = context.MBI->get_coords( &( firstVertex ), 1, (double*)&( pos[0] ) );MB_CHK_ERR( rval );
 
     // compute the distance from origin
-    // TODO: we could do this in a loop to verify if the pid represents a spherical mesh
+    /// @todo We could do this in a loop to verify if the pid represents a spherical mesh
     *radius = pos.length();
     return moab::MB_SUCCESS;
 }

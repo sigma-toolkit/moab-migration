@@ -308,6 +308,7 @@ td.memItemLeft, td.memItemRight {
 
 .paramname, .paramname em {
 	font-style: italic;
+	color: #d849d1;
 }
 
 .memdoc {

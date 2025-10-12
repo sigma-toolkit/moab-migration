@@ -2176,14 +2176,15 @@ ErrCode iMOAB_GetNeighborElements( iMOAB_AppID pid,
                                    int* num_adjacent_elements,
                                    iMOAB_LocalID* adjacent_element_IDs )
 {
-    ErrorCode rval;
+    assert( local_index && *local_index >=0 );
 
     // one neighbor for each subentity of dimension-1
     MeshTopoUtil mtu( context.MBI );
     appData& data   = context.appDatas[*pid];
     EntityHandle eh = data.primary_elems[*local_index];
     Range adjs;
-    rval = mtu.get_bridge_adjacencies( eh, data.dimension - 1, data.dimension, adjs );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( mtu.get_bridge_adjacencies( eh, data.dimension - 1, data.dimension, adjs ), 
+                    "Getting bridge adjacencies failed" );
 
     if( *num_adjacent_elements < (int)adjs.size() )
     {

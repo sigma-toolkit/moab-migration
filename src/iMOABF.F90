@@ -309,7 +309,7 @@ module iMOAB
         use, intrinsic :: iso_c_binding, only: c_int
         integer(c_int), intent(in) :: pid
         integer(c_int), intent(in) :: local_index
-        integer(c_int), intent(out) :: num_adjacent_elements
+        integer(c_int), intent(inout) :: num_adjacent_elements
         integer(c_int), intent(out) :: adjacent_element_IDs(*)
       end function iMOAB_GetNeighborElements
 

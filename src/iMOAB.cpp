@@ -4039,11 +4039,8 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
 ErrCode iMOAB_MergeVertices( iMOAB_AppID pid )
 {
     // =========================================================================
-    // FUNCTION PROLOGUE: Validate inputs and initialize local variables
+    // Validate inputs and initialize local variables
     // =========================================================================
-
-    // Validate application ID and retrieve application data structure
-    IMOAB_CHECKPID( *pid );  // Verify pid corresponds to a valid registered application
 
     // Get application data and parallel communicator for this component
     // data contains mesh info, ranges, and pcomm holds parallel communication state

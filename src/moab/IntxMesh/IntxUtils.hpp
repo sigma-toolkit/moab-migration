@@ -9,7 +9,6 @@
 
 #include "moab/CartVect.hpp"
 #include "moab/Core.hpp"
-
 namespace moab
 {
 
@@ -79,6 +78,20 @@ class IntxUtils
 
     static ErrorCode gnomonic_projection( const CartVect& pos, double R, int plane, double& c1, double& c2 );
 
+    // point on a sphere is projected on plane decided by gnomonic center P, and u, v computed in a previous method
+    // these points are in a list axis[3], P, u and v
+
+    static ErrorCode gnomonic_projection_generalized( const CartVect& pos,
+                                                      const CartVect axis[3],
+                                                      double& c1,
+                                                      double& c2 );
+
+    // given a mesh on a hemisphere, and a point P that defines the hemisphere, project the mesh
+    // on a plane tangent at P (gnomonic plane at P)
+    static ErrorCode global_gnomonic_projection_general( Interface* mb,
+                                                         EntityHandle inSet,
+                                                         CartVect P,
+                                                         EntityHandle& outSet );
     // given the position on plane (one out of 6), find out the position on sphere
     static ErrorCode reverse_gnomonic_projection( const double& c1,
                                                   const double& c2,
@@ -95,6 +108,15 @@ class IntxUtils
                                                  double R,
                                                  bool centers_only,
                                                  EntityHandle& outSet );
+
+    // given a point P, |P| > 0, find u,v directions for the gnomonic projection plane perpendicular to OP
+    // the result will be a cartesian coordinate system centered at P, and 2 unit vectors at P that
+    // define the gnomonic plane orientation around P, such as a positive oriented triangle on a sphere will
+    // remain positive oriented after projection in the plane.
+    // all vertices in this projection will be on one hemisphere to the side of P
+    // the orientation of u and v uniquely determine the gnomonic plane orientation, and u x v should be in OP direction
+    // also, u and v are in plane, and perpendicular to each other
+    static ErrorCode gnomonic_projection_plane_at_point( CartVect P, CartVect& u, CartVect& v );
 
     static void transform_coordinates( double* avg_position, int projection_type );
     /*
@@ -204,7 +226,7 @@ class IntxUtils
 
     static ErrorCode remove_padded_vertices( Interface* mb, EntityHandle file_set, std::vector< Tag >& tagList );
     // used now to compute maximum diagonal for a range of cells
-    static ErrorCode max_diagonal(Interface* mb, Range cells, int max_edges, double & diagonal);
+    static ErrorCode max_diagonal( Interface* mb, Range cells, int max_edges, double& diagonal );
 };
 
 class IntxAreaUtils

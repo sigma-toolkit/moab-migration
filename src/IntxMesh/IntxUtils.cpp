@@ -10,11 +10,10 @@
 #include <cmath>
 #include <cassert>
 #include <iostream>
+#include <iomanip>
 
 #include "moab/IntxMesh/IntxUtils.hpp"
-// this is from mbcoupler; maybe it should be moved somewhere in moab src
-// right now, add a dependency to mbcoupler
-// #include "ElemUtil.hpp"
+
 #include "moab/MergeMesh.hpp"
 #include "moab/ReadUtilIface.hpp"
 #include "MBTagConventions.hpp"
@@ -452,6 +451,110 @@ void IntxUtils::decide_gnomonic_plane( const CartVect& pos, int& plane )
     return;
 }
 
+ErrorCode IntxUtils::gnomonic_projection_plane_at_point( CartVect P, CartVect& u, CartVect& v )
+{
+
+    double d = P.length();
+    if( d == 0.0 )
+    {
+        MB_CHK_SET_ERR( MB_FAILURE, "point P is at the origin" );
+    }
+    double x = P[0];
+    double y = P[1];
+    double z = P[2];
+    // easy cases
+    if( x == 0.0 && y == 0.0 )
+    {
+        if( z > 0. )
+        {
+            u = CartVect( 1., 0., 0. );
+            v = CartVect( 0., 1., 0. );  // gnomonic plane 6
+        }
+        else
+        {
+            u = CartVect( 0., 1., 0. );
+            v = CartVect( 1., 0., 0. );  // gnomonic plane 5
+        }
+        return MB_SUCCESS;
+    }
+    if( x == 0.0 && z == 0.0 )
+    {
+        if( y > 0. )
+        {
+            u = CartVect( -1., 0., 0. );
+            v = CartVect( 0., 0., 1. );  // gnomonic plane 2
+        }
+        else
+        {
+            u = CartVect( 0., 0., 1. );
+            v = CartVect( -1., 0., 0. );  // gnomonic plane 4
+        }
+        return MB_SUCCESS;
+    }
+    if( z == 0.0 && y == 0.0 )
+    {
+        if( x > 0. )
+        {
+            u = CartVect( 0., 1., 0. );
+            v = CartVect( 0., 0., 1. );  // gnomonic plane 1
+        }
+        else
+        {
+            u = CartVect( 0., 0., 1. );
+            v = CartVect( 0., 1., 0. );  // gnomonic plane 3
+        }
+        return MB_SUCCESS;
+    }
+    int plane;
+    IntxUtils::decide_gnomonic_plane( P, plane );
+    if( 1 == plane )  // towards x > 0
+    {
+        u = CartVect( 1., 0., 0. ) * P;
+    }
+
+    if( 2 == plane )  // towards y > 0
+    {
+        u = CartVect( 0., 1., 0. ) * P;
+    }
+    if( 3 == plane )  // towards x < 0
+    {
+        u = CartVect( -1., 0., 0. ) * P;
+    }
+    if( 4 == plane )  // towards y < 0
+    {
+        u = CartVect( 0., -1., 0. ) * P;
+    }
+    if( 5 == plane )  // towards z < 0
+    {
+        u = CartVect( 0., 0., -1. ) * P;
+    }
+    if( 6 == plane )  // towards z > 0
+    {
+        u = CartVect( 0., 0., 1. ) * P;
+    }
+    v = P * u;
+    u.normalize();
+    v.normalize();
+
+    return MB_SUCCESS;
+}
+
+ErrorCode IntxUtils::gnomonic_projection_generalized( const CartVect& pos,
+                                                      const CartVect axis[3],
+                                                      double& c1,
+                                                      double& c2 )
+{
+    double ang = angle( pos, axis[0] );
+    if( ang > 1.57 )  // pi/2 do not project if very close to hemisphere
+        return MB_FAILURE;
+    // solve the equation in plane, (alfa * pos - axis[0]) % axis[0] = 0.0
+    double alpha       = axis[0] % axis[0] / ( pos % axis[0] );  // we know this denominator is greater than 0
+    CartVect planeVect = alpha * pos - axis[0];                  // axis[0] is P
+    c1                 = planeVect % axis[1];
+    c2                 = planeVect % axis[2];
+    return MB_SUCCESS;
+}
+
 // point on a sphere is projected on one of six planes, decided earlier
 ErrorCode IntxUtils::gnomonic_projection( const CartVect& pos, double R, int plane, double& c1, double& c2 )
 {
@@ -607,6 +710,131 @@ void IntxUtils::gnomonic_unroll( double& c1, double& c2, double R, int plane )
     }
     return;
 }
+
+// given a mesh on a hemisphere, and a point P that defines the hemisphere, project the mesh
+// on a plane tangent at P (gnomonic plane at P)
+ErrorCode IntxUtils::global_gnomonic_projection_general( Interface* mb,
+                                                         EntityHandle inSet,
+                                                         CartVect P,
+                                                         EntityHandle& outSet )
+{
+    std::string parTagName( "PARALLEL_PARTITION" );
+    Tag part_tag;
+    Tag gidTag = mb->globalId_tag();
+    Tag targetParentTag, sourceParentTag;
+    mb->tag_get_handle( "TargetParent", targetParentTag );
+    mb->tag_get_handle( "SourceParent", sourceParentTag );
+    bool intxMesh = false;
+    if( targetParentTag != NULL && sourceParentTag != NULL )
+        intxMesh = true;  // interested in source and target parent tags then
+    Range partSets;
+    ErrorCode rval = mb->tag_get_handle( parTagName.c_str(), part_tag );
+    if( MB_SUCCESS == rval && part_tag != 0 )
+    {
+        rval = mb->get_entities_by_type_and_tag( inSet, MBENTITYSET, &part_tag, NULL, 1, partSets, Interface::UNION );MB_CHK_ERR( rval );
+    }
+    rval = ScaleToRadius( mb, inSet, 1.0 );MB_CHK_ERR( rval );
+    // Get all entities of dimension 2
+    Range inputRange;  // get
+    rval = mb->get_entities_by_dimension( inSet, 1, inputRange );MB_CHK_ERR( rval );
+    rval = mb->get_entities_by_dimension( inSet, 2, inputRange );MB_CHK_ERR( rval );
+
+    std::map< EntityHandle, int > partsAssign;
+    std::map< int, EntityHandle > newPartSets;
+    if( !partSets.empty() )
+    {
+        // get all cells, and assign parts
+        for( Range::iterator setIt = partSets.begin(); setIt != partSets.end(); ++setIt )
+        {
+            EntityHandle pSet = *setIt;
+            Range ents;
+            rval = mb->get_entities_by_handle( pSet, ents );MB_CHK_ERR( rval );
+            int val;
+            rval = mb->tag_get_data( part_tag, &pSet, 1, &val );MB_CHK_ERR( rval );
+            // create a new set with the same part id tag, in the outSet
+            EntityHandle newPartSet;
+            rval = mb->create_meshset( MESHSET_SET, newPartSet );MB_CHK_ERR( rval );
+            rval = mb->tag_set_data( part_tag, &newPartSet, 1, &val );MB_CHK_ERR( rval );
+            newPartSets[val] = newPartSet;
+            rval             = mb->add_entities( outSet, &newPartSet, 1 );MB_CHK_ERR( rval );
+            for( Range::iterator it = ents.begin(); it != ents.end(); ++it )
+            {
+                partsAssign[*it] = val;
+            }
+        }
+    }
+
+    // decide gnomonic plane
+    CartVect axis[3];
+    axis[0] = P;
+    IntxUtils::gnomonic_projection_plane_at_point( axis[0], axis[1], axis[2] );
+    // project all vertices, and then create new cells
+
+    Range verts;
+    rval = mb->get_connectivity( inputRange, verts );MB_CHK_ERR( rval );
+    std::map< EntityHandle, EntityHandle > corr;
+    for( Range::iterator vt = verts.begin(); vt != verts.end(); ++vt )
+    {
+        CartVect vect;
+        EntityHandle v = *vt;
+        rval           = mb->get_coords( &v, 1, vect.array() );MB_CHK_ERR( rval );
+        double c[3];
+        c[2] = 0.;
+        IntxUtils::gnomonic_projection_generalized( vect, axis, c[0], c[1] );
+
+        EntityHandle vertex;
+        rval = mb->create_vertex( c, vertex );MB_CHK_ERR( rval );
+        int vID;
+        if( !intxMesh )
+        {
+            rval = mb->tag_get_data( gidTag, &v, 1, &vID );MB_CHK_SET_ERR( rval, "can't get id tag on vertex" );
+            // new vertex will get old ID
+            rval = mb->tag_set_data( gidTag, &vertex, 1, &vID );MB_CHK_SET_ERR( rval, "can't get id tag on vertex" );
+        }
+        corr[v] = vertex;  // for new connectivity
+    }
+    EntityHandle new_conn[20];  // max edges in 2d ?
+    for( Range::iterator eit = inputRange.begin(); eit != inputRange.end(); ++eit )
+    {
+        EntityHandle eh          = *eit;
+        const EntityHandle* conn = NULL;
+        int num_nodes;
+        rval = mb->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
+        // build a new vertex array
+        for( int j = 0; j < num_nodes; j++ )
+            new_conn[j] = corr[conn[j]];
+        EntityType type = mb->type_from_handle( eh );
+        EntityHandle newCell;
+        rval = mb->create_element( type, new_conn, num_nodes, newCell );MB_CHK_ERR( rval );
+        rval = mb->add_entities( outSet, &newCell, 1 );MB_CHK_ERR( rval );
+        int eID;
+        if( !intxMesh )
+        {
+            rval = mb->tag_get_data( gidTag, &eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get id tag on entity handle" );
+            // new vertex will get old ID
+            rval = mb->tag_set_data( gidTag, &newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set id tag on new cell" );
+        }
+        else
+        {
+            // look for parent tags if intx mesh targetParentTag  ,  sourceParentTag
+            if( type >= moab::MBPOLYGON )
+            {
+                rval = mb->tag_get_data( targetParentTag, &eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get parent tag on entity handle" );
+                rval = mb->tag_set_data( targetParentTag, &newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set parent tag on entity handle" );
+                rval = mb->tag_get_data( sourceParentTag, &eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get parent tag on entity handle" );
+                rval = mb->tag_set_data( sourceParentTag, &newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set parent tag on entity handle" );
+            }
+        }
+        std::map< EntityHandle, int >::iterator mit = partsAssign.find( eh );
+        if( mit != partsAssign.end() )
+        {
+            int val = mit->second;
+            rval    = mb->add_entities( newPartSets[val], &newCell, 1 );MB_CHK_ERR( rval );
+        }
+    }
+    return MB_SUCCESS;
+}
+
 // given a mesh on the sphere, project all centers in 6 gnomonic planes, or project mesh too
 ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
                                                  EntityHandle inSet,
@@ -616,6 +844,13 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
 {
     std::string parTagName( "PARALLEL_PARTITION" );
     Tag part_tag;
+    Tag gidTag = mb->globalId_tag();
+    Tag targetParentTag, sourceParentTag;
+    mb->tag_get_handle( "TargetParent", targetParentTag );
+    mb->tag_get_handle( "SourceParent", sourceParentTag );
+    bool intxMesh = false;
+    if( targetParentTag != NULL && sourceParentTag != NULL )
+        intxMesh = true;  // interested in source and target parent tags then
     Range partSets;
     ErrorCode rval = mb->tag_get_handle( parTagName.c_str(), part_tag );
     if( MB_SUCCESS == rval && part_tag != 0 )
@@ -660,6 +895,11 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
             CartVect center;
             EntityHandle cell = *it;
             rval              = mb->get_coords( &cell, 1, center.array() );MB_CHK_ERR( rval );
+            int globalID = 0;
+            if( !intxMesh )
+            {
+                rval = mb->tag_get_data( gidTag, &cell, 1, &globalID );MB_CHK_SET_ERR( rval, "can't get id tag on cell" );
+            }
             int plane;
             decide_gnomonic_plane( center, plane );
             double c[3];
@@ -670,6 +910,10 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
 
             EntityHandle vertex;
             rval = mb->create_vertex( c, vertex );MB_CHK_ERR( rval );
+            if( !intxMesh )
+            {
+                rval = mb->tag_set_data( gidTag, &vertex, 1, &globalID );MB_CHK_SET_ERR( rval, "can't set id tag on center" );
+            }
             rval = mb->add_entities( outSet, &vertex, 1 );MB_CHK_ERR( rval );
         }
     }
@@ -684,7 +928,7 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
             rval              = mb->get_coords( &cell, 1, center.array() );MB_CHK_ERR( rval );
             int plane;
             decide_gnomonic_plane( center, plane );
-            subranges[plane - 1].insert( cell );
+            subranges[plane - 1].insert( cell );  // includes edges if they exist
         }
         for( int i = 1; i <= 6; i++ )
         {
@@ -702,6 +946,13 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
                 gnomonic_unroll( c[0], c[1], R, i );
                 EntityHandle vertex;
                 rval = mb->create_vertex( c, vertex );MB_CHK_ERR( rval );
+                int vID;
+                if( !intxMesh )
+                {
+                    rval = mb->tag_get_data( gidTag, &v, 1, &vID );MB_CHK_SET_ERR( rval, "can't get id tag on vertex" );
+                    // new vertex will get old ID
+                    rval = mb->tag_set_data( gidTag, &vertex, 1, &vID );MB_CHK_SET_ERR( rval, "can't get id tag on vertex" );
+                }
                 corr[v] = vertex;  // for new connectivity
             }
             EntityHandle new_conn[20];  // max edges in 2d ?
@@ -718,6 +969,24 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
                 EntityHandle newCell;
                 rval = mb->create_element( type, new_conn, num_nodes, newCell );MB_CHK_ERR( rval );
                 rval = mb->add_entities( outSet, &newCell, 1 );MB_CHK_ERR( rval );
+                int eID;
+                if( !intxMesh )
+                {
+                    rval = mb->tag_get_data( gidTag, &eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get id tag on entity handle" );
+                    // new vertex will get old ID
+                    rval = mb->tag_set_data( gidTag, &newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set id tag on new cell" );
+                }
+                else
+                {
+                    // look for parent tags if intx mesh targetParentTag  ,  sourceParentTag
+                    if( type >= moab::MBPOLYGON )
+                    {
+                        rval = mb->tag_get_data( targetParentTag, &eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get parent tag on entity handle" );
+                        rval = mb->tag_set_data( targetParentTag, &newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set parent tag on entity handle" );
+                        rval = mb->tag_get_data( sourceParentTag, &eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get parent tag on entity handle" );
+                        rval = mb->tag_set_data( sourceParentTag, &newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set parent tag on entity handle" );
+                    }
+                }
                 std::map< EntityHandle, int >::iterator mit = partsAssign.find( eh );
                 if( mit != partsAssign.end() )
                 {
@@ -730,6 +999,7 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
 
     return MB_SUCCESS;
 }
+
 void IntxUtils::transform_coordinates( double* avg_position, int projection_type )
 {
     if( projection_type == 1 )
@@ -1165,8 +1435,8 @@ double IntxAreaUtils::area_spherical_triangle_lHuiller( const double* ptA,
     {
         double area = area_spherical_triangle_GQ( ptA, ptB, ptC ) * sign;
 #ifdef VERBOSE
-        std::cout << " very obtuse angle, use TR to compute area " << " a1:" << a1 << " b1:" << b1 << " c1:" << c1
-                  << "\n";
+        std::cout << " very obtuse angle, use TR to compute area "
+                  << " a1:" << a1 << " b1:" << b1 << " c1:" << c1 << "\n";
         std::cout << " area with TR: " << area << "\n";
 #endif
         return area;

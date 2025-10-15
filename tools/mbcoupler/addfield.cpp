@@ -136,7 +136,7 @@ int main( int argc, char** argv )
 
     if( argc < 3 )
     {
-        cout << "Usage: " << argv[0] << " <infile> \c outfile [factor]\n"
+        cout << "Usage: " << argv[0] << " <infile> <outfile> [factor]\n"
              << "Writes both vertex and element fields.\n";
         return 0;
     }

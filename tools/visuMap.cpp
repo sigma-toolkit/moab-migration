@@ -197,7 +197,6 @@ int main( int argc, char* argv[] )
     // we read the matrix; now read moab source and target
     Core core;
     Interface* mb = &core;
-    ErrorCode rval;
     Tag gtag = mb->globalId_tag();
 
     // a dense tag for weights

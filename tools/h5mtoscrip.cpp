@@ -80,7 +80,6 @@ void ReadFileMetaData( std::string& metaFilename, std::map< std::string, std::st
 
 int main( int argc, char* argv[] )
 {
-    moab::ErrorCode rval;
     int dimension = 2;
     NcError error2( NcError::verbose_nonfatal );
     std::stringstream sstr;

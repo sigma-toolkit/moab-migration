@@ -400,6 +400,7 @@ int main( int argc, char* argv[] )
     std::cout << " euclidian norm for difference: " << diff.norm()
               << " \n squared norm for difference: " << diff.squaredNorm() << "\n"
               << " minv: " << minv << " maxv: " << maxv << "\n";
+
     // print out the largest 20 absolute values and position in diff sparse matrix
     std::priority_queue< Triplet, std::vector< Triplet >, CompareTriplets > largestDiffs;
 

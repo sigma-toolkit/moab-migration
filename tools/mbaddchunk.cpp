@@ -30,26 +30,21 @@ using namespace std;
 
 int main( int argc, char* argv[] )
 {
-
     ProgOptions opts;
 
     std::string inputfile( "penta3d.h5m" ), outfile( "penta3d_ch.h5m" ), chunkfile_name, gsmapfile;
-
     opts.addOpt< std::string >( "input,i", "input mesh filename", &inputfile );
     opts.addOpt< std::string >( "chunkFile,n", "chunk file from cam run", &chunkfile_name );
     opts.addOpt< std::string >( "gsMAPfile,g", "gsmap file", &gsmapfile );
-
     opts.addOpt< std::string >( "output,o", "output mesh filename", &outfile );
 
     opts.parseCommandLine( argc, argv );
 
-    ErrorCode rval;
     Core* mb = new Core();
 
-    MB_CHK_SET_ERR( mb->load_file( inputfile.c_str() ), "can't load input file" );
-
-    std::cout << " opened " << inputfile << " with initial h5m data.\n";
     // open the netcdf file, and see if it has that variable we are looking for
+    MB_CHK_SET_ERR( mb->load_file( inputfile.c_str() ), "can't load input file" );
+    std::cout << " opened " << inputfile << " with initial h5m data.\n";
 
     Range nodes;
     MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 0, nodes ), "can't get nodes" );
@@ -67,8 +62,8 @@ int main( int argc, char* argv[] )
     std::map< int, EntityHandle > eGidHandle;
     std::map< int, EntityHandle > cGidHandle;
     std::vector< int > gids;
-    Tag gid;
-    MB_CHK_SET_ERR( mb->tag_get_handle( "GLOBAL_ID", gid ), "can't get global id tag" );
+    Tag gid = mb->globalId_tag();
+    
     gids.resize( nodes.size() );
     MB_CHK_SET_ERR( mb->tag_get_data( gid, nodes, &gids[0] ), "can't get global id on vertices" );
     int i = 0;
@@ -95,16 +90,15 @@ int main( int argc, char* argv[] )
 
     if( chunkfile_name.length() > 0 )
     {
-
         // Open chunk file
         ifstream inFile;
-
         inFile.open( chunkfile_name.c_str() );
         if( !inFile )
         {
             cout << "Unable to open chunk file";
             exit( 1 );  // terminate with error
         }
+
         Tag pTag, cTag;
         int def_val = -1;
         MB_CHK_SET_ERR( mb->tag_get_handle( "ProcID", 1, MB_TYPE_INTEGER, pTag, MB_TAG_CREAT | MB_TAG_DENSE, &def_val ),
@@ -132,7 +126,6 @@ int main( int argc, char* argv[] )
 
     if( gsmapfile.length() > 0 )
     {
-
         // Open chunk file
         ifstream inFile;
 
@@ -142,6 +135,7 @@ int main( int argc, char* argv[] )
             cout << "Unable to open gsmap file";
             exit( 1 );  // terminate with error
         }
+
         Tag pTag, cTag;
         int def_val             = -1;
         std::string procTagName = gsmapfile + "_proc";
@@ -176,3 +170,4 @@ int main( int argc, char* argv[] )
     std::cout << " wrote file " << outfile << "\n";
     return 0;
 }
+

@@ -46,10 +46,12 @@ int main( int argc, char* argv[] )
 
     Core core;
     Interface* mb = &core;
-    ErrorCode rval;
+    
     MB_CHK_ERR( mb->load_file( inputfile.c_str() ) );
+
     vector< Tag > existingTags;
     MB_CHK_ERR( mb->tag_get_tags( existingTags ) );
+
     vector< string > tagsToDelete;
     if( !keepTags.empty() )
     {
@@ -66,19 +68,22 @@ int main( int argc, char* argv[] )
             if( !deleteTag ) tagsToDelete.push_back( tname );
         }
     }
+
     if( !deleteTags.empty() )
     {
         tagsToDelete = split( deleteTags, string( ":" ) );
     }
+
     for( size_t i = 0; i < tagsToDelete.size(); i++ )
     {
         Tag tag;
-        if( MB_CHK_ERR( mb->tag_get_handle( tagsToDelete[i].c_str(), tag ) ) && tag != nullptr )
+        if( mb->tag_get_handle( tagsToDelete[i].c_str(), tag ) == MB_SUCCESS && tag != nullptr )
         {
             MB_CHK_ERR( mb->tag_delete( tag ) );
         }
     }
-    cout << "write file " << outputfile << endl;
+    
+    cout << "writing file " << outputfile << endl;
     MB_CHK_ERR( mb->write_file( outputfile.c_str() ) );
 
     return 0;

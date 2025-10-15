@@ -483,7 +483,6 @@ std::string get_file_read_options( ToolContext& ctx, std::string filename )
 //#define MOAB_DBG
 int main( int argc, char* argv[] )
 {
-    moab::ErrorCode rval;
     NcError error( NcError::verbose_nonfatal );
     std::stringstream sstr;
     std::string historyStr;
@@ -689,7 +688,7 @@ int main( int argc, char* argv[] )
             std::map< std::string, std::string > mapAttributes;
             if( err )
             {
-                rval = moab::MB_FAILURE;
+                MB_SET_ERR( moab::MB_FAILURE, "Generating offline map with meshes failed." );
             }
             else
             {

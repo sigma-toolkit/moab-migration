@@ -37,7 +37,7 @@ const char* DEFAULT_FILE_NAME = "parallel_write_test.h5m";
 // root of the comm size such that there are no disjoint regions.
 ErrorCode generate_mesh( Interface& moab, int intervals );
 
-const char args[] = "[-i <intervals>] [-o <filename>] [-L <filename>] [-g \c n]";
+const char args[] = "[-i <intervals>] [-o <filename>] [-L <filename>] [-g <n>]";
 void help()
 {
     std::cout << "parallel_write_test " << args << std::endl
@@ -45,7 +45,7 @@ void help()
               << std::endl
               << "  -o <name> Retain output file and name it as specified." << std::endl
               << "  -L <name> Write local mesh to file name prefixed with MPI rank" << std::endl
-              << "  -g \c n    Specify writer debug output level" << std::endl
+              << "  -g <n>    Specify writer debug output level" << std::endl
               << "  -R        Skip resolve of shared entities (interface ents will be duplicated in file)" << std::endl
               << std::endl
               << "This program creates a (non-strict) subset of a regular hex mesh "

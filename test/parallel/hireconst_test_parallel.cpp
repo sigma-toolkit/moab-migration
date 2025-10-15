@@ -65,7 +65,6 @@ int main( int argc, char* argv[] )
 #endif
     int degree = 3, dim = 2;
     bool interp = false;
-    ErrorCode rval;
 
 #ifdef MOAB_HAVE_HDF5
     std::string infile = TestDir + "unittest/mbcslam/fine4.h5m";
@@ -181,7 +180,6 @@ ErrorCode load_meshset_hirec( const char* infile,
                               const int degree,
                               const int dim )
 {
-    ErrorCode rval;
     MB_CHK_ERR( mbimpl->create_meshset( moab::MESHSET_SET, meshset ) );
 #ifdef MOAB_HAVE_MPI
     int nprocs, rank;
@@ -238,7 +236,7 @@ ErrorCode load_meshset_hirec( const char* infile,
     assert( !pc && degree && dim );
     MB_CHK_ERR( mbimpl->load_file( infile, &meshset ) );
 #endif
-    return rval;
+    return MB_SUCCESS;
 }
 
 ErrorCode test_mesh( const char* infile, const int degree, const bool interp, const int dim )

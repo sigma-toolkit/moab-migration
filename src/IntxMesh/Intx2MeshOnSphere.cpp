@@ -910,8 +910,9 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     // the crystal routing
     int size_gdofs_tag = 0;
     std::vector< int > valsDOFs;
-    Tag gdsTag;
-    MB_CHK_SET_ERR( mb->tag_get_handle( "GLOBAL_DOFS", gdsTag ), "can't get global DoF tag handle" );
+    Tag gdsTag = nullptr;
+    // do not check errors. If gdsTag == nullptr, then no tag found
+    mb->tag_get_handle( "GLOBAL_DOFS", gdsTag );
 
     if( meshCells.size() > 0 )
     {

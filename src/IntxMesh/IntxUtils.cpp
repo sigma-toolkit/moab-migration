@@ -1570,16 +1570,12 @@ ErrorCode IntxUtils::enforce_convexity( Interface* mb, EntityHandle lset, int my
     Range inputRange;
     MB_CHK_ERR( mb->get_entities_by_dimension( lset, 2, inputRange ) );
 
-    Tag corrTag       = 0;
+    Tag corrTag       = nullptr;
     EntityHandle dumH = 0;
-    MB_CHK_ERR( mb->tag_get_handle( CORRTAGNAME, 1, MB_TYPE_HANDLE, corrTag, MB_TAG_DENSE, &dumH ) );
-    if( MB_TAG_NOT_FOUND == mb->tag_get_handle( CORRTAGNAME, 1, MB_TYPE_HANDLE, corrTag, MB_TAG_DENSE, &dumH ) )
-    {
-        corrTag = 0;
-    }
+    // no need to check return error
+    mb->tag_get_handle( CORRTAGNAME, 1, MB_TYPE_HANDLE, corrTag, MB_TAG_DENSE, &dumH );
 
-    Tag gidTag;
-    MB_CHK_ERR( mb->tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, gidTag, MB_TAG_DENSE ) );
+    Tag gidTag = mb->globalId_tag();
 
     std::vector< double > coords;
     coords.resize( 3 * MAXEDGES );  // at most 10 vertices per polygon

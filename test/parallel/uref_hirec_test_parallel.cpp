@@ -46,7 +46,6 @@ ErrorCode load_meshset_hirec( const char* infile,
                               const int degree,
                               const int dim )
 {
-    ErrorCode rval;
     MB_CHK_ERR( mbimpl->create_meshset( moab::MESHSET_SET, meshset ) );
 #ifdef MOAB_HAVE_MPI
     int nprocs, rank;
@@ -122,7 +121,7 @@ ErrorCode load_meshset_hirec( const char* infile,
     assert( !pc && degree && dim );
     MB_CHK_ERR( mbimpl->load_file( infile, &meshset ) );
 #endif
-    return rval;
+    return MB_SUCCESS;
 }
 
 ErrorCode closedsurface_uref_hirec_convergence_study( const char* infile,
@@ -147,7 +146,6 @@ ErrorCode closedsurface_uref_hirec_convergence_study( const char* infile,
     MPI_Comm_rank( comm, &rank );
 #endif
 
-    ErrorCode rval;
     // mesh will be loaded and communicator pc will be updated
     int mxdeg = 1;
     for( size_t i = 0; i < degs2fit.size(); ++i )
@@ -408,7 +406,7 @@ ErrorCode closedsurface_uref_hirec_convergence_study( const char* infile,
         }*/
     }
 
-    return rval;
+    return MB_SUCCESS;
 }
 
 void usage()
@@ -430,7 +428,6 @@ int main( int argc, char* argv[] )
     std::string prefix, suffix, istr, iend;
     int dim = 2, geom = 0;
     bool interp = false;
-    ErrorCode rval;
 
     if( argc == 1 )
     {

@@ -211,7 +211,8 @@ int main( int argc, char* argv[] )
     size_t pos = name_map.rfind( '/', name_map.length() );
     if( pos != std::string::npos ) name_map = name_map.erase( 0, pos + 1 );
 
-    MB_CHK_SET_ERR( mb->tag_get_handle( "weight", 1, MB_TYPE_DOUBLE, wtag, MB_TAG_CREAT | MB_TAG_DENSE, &defVal ), "Failed to create weight"  );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "weight", 1, MB_TYPE_DOUBLE, wtag, MB_TAG_CREAT | MB_TAG_DENSE, &defVal ),
+                    "Failed to create weight" );
 
     if( 2 == otype )
     {
@@ -243,15 +244,16 @@ int main( int argc, char* argv[] )
             vertex_coords_src[3 * i + 2] = pos[2];
         }
         Range source_verts;
-        MB_CHK_SET_ERR( mb->create_vertices( &vertex_coords_src[0], na1, source_verts ), "can't create source vertices"  );
+        MB_CHK_SET_ERR( mb->create_vertices( &vertex_coords_src[0], na1, source_verts ),
+                        "can't create source vertices" );
         // create a set with source vertices
         EntityHandle srcSet;
-        MB_CHK_SET_ERR( mb->create_meshset( MESHSET_SET, srcSet ), "can't create source set for vertices"  );
-        MB_CHK_SET_ERR( mb->add_entities( srcSet, source_verts ), "can't add vertices"  );
+        MB_CHK_SET_ERR( mb->create_meshset( MESHSET_SET, srcSet ), "can't create source set for vertices" );
+        MB_CHK_SET_ERR( mb->add_entities( srcSet, source_verts ), "can't add vertices" );
         std::vector< int > vgid( na1 );
         for( int i = 0; i < na1; i++ )
             vgid[i] = i + 1;
-        MB_CHK_SET_ERR( mb->tag_set_data( gtag, source_verts, &vgid[0] ), "can't set global id on source verts"  );
+        MB_CHK_SET_ERR( mb->tag_set_data( gtag, source_verts, &vgid[0] ), "can't set global id on source verts" );
 
         std::vector< double > vertex_coords_tgt( 3 * nb1 );
         // xc_a and yc_a are in degrees, usually
@@ -267,14 +269,15 @@ int main( int argc, char* argv[] )
             vertex_coords_tgt[3 * i + 2] = pos[2];
         }
         Range target_verts;
-        MB_CHK_SET_ERR( mb->create_vertices( &vertex_coords_tgt[0], nb1, target_verts ), "can't create target vertices"  );
+        MB_CHK_SET_ERR( mb->create_vertices( &vertex_coords_tgt[0], nb1, target_verts ),
+                        "can't create target vertices" );
         EntityHandle tgtSet;
-        MB_CHK_SET_ERR( mb->create_meshset( MESHSET_SET, tgtSet ), "can't create target set for vertices"  );
-        MB_CHK_SET_ERR( mb->add_entities( tgtSet, target_verts ), "can't add vertices"  );
+        MB_CHK_SET_ERR( mb->create_meshset( MESHSET_SET, tgtSet ), "can't create target set for vertices" );
+        MB_CHK_SET_ERR( mb->add_entities( tgtSet, target_verts ), "can't add vertices" );
         vgid.resize( nb1 );
         for( int i = 0; i < nb1; i++ )
             vgid[i] = i + 1;
-        MB_CHK_SET_ERR( mb->tag_set_data( gtag, target_verts, &vgid[0] ), "can't set global id on target verts"  );
+        MB_CHK_SET_ERR( mb->tag_set_data( gtag, target_verts, &vgid[0] ), "can't set global id on target verts" );
         // create ns1 edges
 
         ReadUtilIface* read_iface;
@@ -291,12 +294,12 @@ int main( int argc, char* argv[] )
         }
         Range edges( actual_start_handle, actual_start_handle + ns1 - 1 );
 
-        MB_CHK_SET_ERR( mb->tag_set_data( wtag, edges, &val1[0] ), "can't set tag on edges"  );
+        MB_CHK_SET_ERR( mb->tag_set_data( wtag, edges, &val1[0] ), "can't set tag on edges" );
 
         vgid.resize( ns1 );
         for( int i = 0; i < ns1; i++ )
             vgid[i] = i + 1;
-        MB_CHK_SET_ERR( mb->tag_set_data( gtag, edges, &vgid[0] ), "can't set global id on edges"  );
+        MB_CHK_SET_ERR( mb->tag_set_data( gtag, edges, &vgid[0] ), "can't set global id on edges" );
 
         std::string name_file = name_map + extension;
         MB_CHK_ERR( mb->write_mesh( name_file.c_str() ) );
@@ -324,16 +327,16 @@ int main( int argc, char* argv[] )
     //   which are corresponding to the global DOFs
     map< int, EntityHandle > sourceHandles;
     map< int, EntityHandle > targetHandles;
-    MB_CHK_SET_ERR( mb->create_meshset( MESHSET_SET, sourceSet ), "can't create source mesh set"  );
-    MB_CHK_SET_ERR( mb->create_meshset( MESHSET_SET, targetSet ), "can't create target mesh set"  );
+    MB_CHK_SET_ERR( mb->create_meshset( MESHSET_SET, sourceSet ), "can't create source mesh set" );
+    MB_CHK_SET_ERR( mb->create_meshset( MESHSET_SET, targetSet ), "can't create target mesh set" );
     const char* readopts = "";
-    MB_CHK_SET_ERR( mb->load_file( inputSource.c_str(), &sourceSet, readopts ), "Failed to read"  );
-    MB_CHK_SET_ERR( mb->load_file( inputTarget.c_str(), &targetSet, readopts ), "Failed to read"  );
+    MB_CHK_SET_ERR( mb->load_file( inputSource.c_str(), &sourceSet, readopts ), "Failed to read" );
+    MB_CHK_SET_ERR( mb->load_file( inputTarget.c_str(), &targetSet, readopts ), "Failed to read" );
     Range sRange;
-    MB_CHK_SET_ERR( mb->get_entities_by_dimension( sourceSet, dimSource, sRange ), "Failed to get sRange"  );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( sourceSet, dimSource, sRange ), "Failed to get sRange" );
     vector< int > sids;
     sids.resize( sRange.size() );
-    MB_CHK_SET_ERR( mb->tag_get_data( gtag, sRange, &sids[0] ), "Failed to get ids for srange"  );
+    MB_CHK_SET_ERR( mb->tag_get_data( gtag, sRange, &sids[0] ), "Failed to get ids for srange" );
     // all global ids are 1 based in the source file, and they correspond to the dofs in the map file
     for( size_t i = 0; i < sids.size(); i++ )
     {
@@ -342,10 +345,10 @@ int main( int argc, char* argv[] )
         sourceHandles[gid] = eh;
     }
     Range tRange;
-    MB_CHK_SET_ERR( mb->get_entities_by_dimension( targetSet, dimTarget, tRange ), "Failed to get tRange"  );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( targetSet, dimTarget, tRange ), "Failed to get tRange" );
     vector< int > tids;
     tids.resize( tRange.size() );
-    MB_CHK_SET_ERR( mb->tag_get_data( gtag, tRange, &tids[0] ), "Failed to get ids for trange"  );
+    MB_CHK_SET_ERR( mb->tag_get_data( gtag, tRange, &tids[0] ), "Failed to get ids for trange" );
     // all global ids are 1 based in the target file, and they correspond to the dofs in the map file
     for( size_t i = 0; i < tids.size(); i++ )
     {
@@ -354,7 +357,7 @@ int main( int argc, char* argv[] )
         targetHandles[gid] = eh;
     }
     EntityHandle partialSet;
-    MB_CHK_SET_ERR( mb->create_meshset( MESHSET_SET, partialSet ), "can't create partial set"  );
+    MB_CHK_SET_ERR( mb->create_meshset( MESHSET_SET, partialSet ), "can't create partial set" );
     // how to get a complete row in sparse matrix? Or a complete column ?
     for( int col = startSourceID - 1; col <= endSourceID - 1; col++ )
     {
@@ -370,23 +373,24 @@ int main( int argc, char* argv[] )
             int globalIdRow = it.index() + 1;
             EntityHandle th = targetHandles[globalIdRow];
             targetEnts.insert( th );
-            MB_CHK_SET_ERR( mb->tag_set_data( wtag, &th, 1, &weight ), "Failed to set weight tag on target"  );
+            MB_CHK_SET_ERR( mb->tag_set_data( wtag, &th, 1, &weight ), "Failed to set weight tag on target" );
         }
 
         if( dimTarget == 0 )
         {
             Range adjCells;
-            MB_CHK_SET_ERR( mb->get_adjacencies( targetEnts, 2, false, adjCells, Interface::UNION ), " can't get adj cells "  );
+            MB_CHK_SET_ERR( mb->get_adjacencies( targetEnts, 2, false, adjCells, Interface::UNION ),
+                            " can't get adj cells " );
             targetEnts.merge( adjCells );
         }
 
-        MB_CHK_SET_ERR( mb->add_entities( partialSet, targetEnts ), "Failed to add target entities to partial set"  );
+        MB_CHK_SET_ERR( mb->add_entities( partialSet, targetEnts ), "Failed to add target entities to partial set" );
         // write now the set in a numbered file
         std::stringstream fff;
         fff << name_map << "_column" << col + 1 << extension;
         MB_CHK_ERR( mb->write_mesh( fff.str().c_str(), &partialSet, 1 ) );
         // remove from partial set the entities it has
-        MB_CHK_SET_ERR( mb->clear_meshset( &partialSet, 1 ), "Failed to empty partial set"  );
+        MB_CHK_SET_ERR( mb->clear_meshset( &partialSet, 1 ), "Failed to empty partial set" );
     }
 
     // how to get a complete row in sparse matrix?
@@ -403,20 +407,21 @@ int main( int argc, char* argv[] )
             int globalIdCol = it.index() + 1;
             EntityHandle sh = sourceHandles[globalIdCol];
             sourceEnts.insert( sh );
-            MB_CHK_SET_ERR( mb->tag_set_data( wtag, &sh, 1, &weight ), "Failed to set weight tag on source"  );
+            MB_CHK_SET_ERR( mb->tag_set_data( wtag, &sh, 1, &weight ), "Failed to set weight tag on source" );
         }
         if( dimSource == 0 )
         {
             Range adjCells;
-            MB_CHK_SET_ERR( mb->get_adjacencies( sourceEnts, 2, false, adjCells, Interface::UNION ), " can't get adj cells "  );
+            MB_CHK_SET_ERR( mb->get_adjacencies( sourceEnts, 2, false, adjCells, Interface::UNION ),
+                            " can't get adj cells " );
             sourceEnts.merge( adjCells );
         }
-        MB_CHK_SET_ERR( mb->add_entities( partialSet, sourceEnts ), "Failed to add source entities"  );
+        MB_CHK_SET_ERR( mb->add_entities( partialSet, sourceEnts ), "Failed to add source entities" );
         // write now the set in a numbered file
         std::stringstream fff;
         fff << name_map << "_row" << row + 1 << extension;
         MB_CHK_ERR( mb->write_mesh( fff.str().c_str(), &partialSet, 1 ) );
-        MB_CHK_SET_ERR( mb->clear_meshset( &partialSet, 1 ), "Failed to empty partial set"  );
+        MB_CHK_SET_ERR( mb->clear_meshset( &partialSet, 1 ), "Failed to empty partial set" );
     }
     return 0;
 }

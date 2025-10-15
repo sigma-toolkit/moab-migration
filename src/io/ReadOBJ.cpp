@@ -73,21 +73,27 @@ ReadOBJ::ReadOBJ( Interface* impl )
     int negone = -1;
     ErrorCode rval;
     rval = MBI->tag_get_handle( GEOM_DIMENSION_TAG_NAME, 1, MB_TYPE_INTEGER, geom_tag, MB_TAG_SPARSE | MB_TAG_CREAT,
-                                &negone );MB_CHK_ERR_RET( rval );
+                                &negone );
+    MB_CHK_ERR_RET( rval );
 
     id_tag = MBI->globalId_tag();
 
-    rval = MBI->tag_get_handle( NAME_TAG_NAME, NAME_TAG_SIZE, MB_TYPE_OPAQUE, name_tag, MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_ERR_RET( rval );
+    rval = MBI->tag_get_handle( NAME_TAG_NAME, NAME_TAG_SIZE, MB_TYPE_OPAQUE, name_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
+    MB_CHK_ERR_RET( rval );
 
     rval = MBI->tag_get_handle( CATEGORY_TAG_NAME, CATEGORY_TAG_SIZE, MB_TYPE_OPAQUE, category_tag,
-                                MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_ERR_RET( rval );
+                                MB_TAG_SPARSE | MB_TAG_CREAT );
+    MB_CHK_ERR_RET( rval );
 
-    rval = MBI->tag_get_handle( "OBJECT_NAME", 32, MB_TYPE_OPAQUE, obj_name_tag, MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_ERR_RET( rval );
+    rval = MBI->tag_get_handle( "OBJECT_NAME", 32, MB_TYPE_OPAQUE, obj_name_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
+    MB_CHK_ERR_RET( rval );
 
-    rval = MBI->tag_get_handle( "FACETING_TOL", 1, MB_TYPE_DOUBLE, faceting_tol_tag, MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_ERR_RET( rval );
+    rval = MBI->tag_get_handle( "FACETING_TOL", 1, MB_TYPE_DOUBLE, faceting_tol_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
+    MB_CHK_ERR_RET( rval );
 
     rval =
-        MBI->tag_get_handle( "GEOMETRY_RESABS", 1, MB_TYPE_DOUBLE, geometry_resabs_tag, MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_ERR_RET( rval );
+        MBI->tag_get_handle( "GEOMETRY_RESABS", 1, MB_TYPE_DOUBLE, geometry_resabs_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
+    MB_CHK_ERR_RET( rval );
 }
 
 // Destructor
@@ -199,7 +205,8 @@ ErrorCode ReadOBJ::load_file( const char* filename,
                     vertex_list.push_back( new_vertex_eh );
 
                     // Add new vertex EH to the meshset
-                    MB_CHK_SET_ERR( MBI->add_entities( vert_meshset, &new_vertex_eh, 1 ), "Failed to add vertex to global meshset." );
+                    MB_CHK_SET_ERR( MBI->add_entities( vert_meshset, &new_vertex_eh, 1 ),
+                                    "Failed to add vertex to global meshset." );
                     break;
                 }
 
@@ -363,43 +370,50 @@ ErrorCode ReadOBJ::create_new_object( std::string object_name, int curr_object, 
 {
     // Create meshset to store object
     // This is also referred to as the surface meshset
-    MB_CHK_SET_ERR( MBI->create_meshset( MESHSET_SET, object_meshset ), "Failed to generate object mesh set."  );
+    MB_CHK_SET_ERR( MBI->create_meshset( MESHSET_SET, object_meshset ), "Failed to generate object mesh set." );
 
     // Set surface meshset tags
-    MB_CHK_SET_ERR( MBI->tag_set_data( name_tag, &object_meshset, 1, object_name.c_str() ), "Failed to set mesh set name tag."  );
+    MB_CHK_SET_ERR( MBI->tag_set_data( name_tag, &object_meshset, 1, object_name.c_str() ),
+                    "Failed to set mesh set name tag." );
 
-    MB_CHK_SET_ERR( MBI->tag_set_data( id_tag, &object_meshset, 1, &( curr_object ) ), "Failed to set mesh set ID tag."  );
+    MB_CHK_SET_ERR( MBI->tag_set_data( id_tag, &object_meshset, 1, &( curr_object ) ),
+                    "Failed to set mesh set ID tag." );
 
     int dim = 2;
-    MB_CHK_SET_ERR( MBI->tag_set_data( geom_tag, &object_meshset, 1, &( dim ) ), "Failed to set mesh set dim tag."  );
+    MB_CHK_SET_ERR( MBI->tag_set_data( geom_tag, &object_meshset, 1, &( dim ) ), "Failed to set mesh set dim tag." );
 
-    MB_CHK_SET_ERR( MBI->tag_set_data( category_tag, &object_meshset, 1, geom_category[2] ), "Failed to set mesh set category tag."  );
+    MB_CHK_SET_ERR( MBI->tag_set_data( category_tag, &object_meshset, 1, geom_category[2] ),
+                    "Failed to set mesh set category tag." );
 
     /* Create volume entity set corresponding to surface
        The volume meshset will have one child--
        the meshset of the surface that bounds the object.
      */
     EntityHandle vol_meshset;
-    MB_CHK_SET_ERR( MBI->create_meshset( MESHSET_SET, vol_meshset ), "Failed to create volume mesh set."  );
+    MB_CHK_SET_ERR( MBI->create_meshset( MESHSET_SET, vol_meshset ), "Failed to create volume mesh set." );
 
-    MB_CHK_SET_ERR( MBI->add_parent_child( vol_meshset, object_meshset ), "Failed to add object mesh set as child of volume mesh set."  );
+    MB_CHK_SET_ERR( MBI->add_parent_child( vol_meshset, object_meshset ),
+                    "Failed to add object mesh set as child of volume mesh set." );
 
     /* Set volume meshset tags
        The volume meshset is tagged with the same name as the surface meshset
        for each object because of the direct relation between these entities.
      */
-    MB_CHK_SET_ERR( MBI->tag_set_data( obj_name_tag, &vol_meshset, 1, object_name.c_str() ), "Failed to set mesh set name tag."  );
+    MB_CHK_SET_ERR( MBI->tag_set_data( obj_name_tag, &vol_meshset, 1, object_name.c_str() ),
+                    "Failed to set mesh set name tag." );
 
-    MB_CHK_SET_ERR( MBI->tag_set_data( id_tag, &vol_meshset, 1, &( curr_object ) ), "Failed to set mesh set ID tag."  );
+    MB_CHK_SET_ERR( MBI->tag_set_data( id_tag, &vol_meshset, 1, &( curr_object ) ), "Failed to set mesh set ID tag." );
 
-    dim  = 3;
-    MB_CHK_SET_ERR( MBI->tag_set_data( geom_tag, &vol_meshset, 1, &( dim ) ), "Failed to set mesh set dim tag."  );
+    dim = 3;
+    MB_CHK_SET_ERR( MBI->tag_set_data( geom_tag, &vol_meshset, 1, &( dim ) ), "Failed to set mesh set dim tag." );
 
-    MB_CHK_SET_ERR( MBI->tag_set_data( name_tag, &vol_meshset, 1, geom_name[3] ), "Failed to set mesh set name tag."  );
+    MB_CHK_SET_ERR( MBI->tag_set_data( name_tag, &vol_meshset, 1, geom_name[3] ), "Failed to set mesh set name tag." );
 
-    MB_CHK_SET_ERR( MBI->tag_set_data( category_tag, &vol_meshset, 1, geom_category[3] ), "Failed to set mesh set category tag."  );
+    MB_CHK_SET_ERR( MBI->tag_set_data( category_tag, &vol_meshset, 1, geom_category[3] ),
+                    "Failed to set mesh set category tag." );
 
-    MB_CHK_SET_ERR( myGeomTool->set_sense( object_meshset, vol_meshset, SENSE_FORWARD ), "Failed to set surface sense."  );
+    MB_CHK_SET_ERR( myGeomTool->set_sense( object_meshset, vol_meshset, SENSE_FORWARD ),
+                    "Failed to set surface sense." );
 
     return moab::MB_SUCCESS;
 }
@@ -411,12 +425,13 @@ ErrorCode ReadOBJ::create_new_object( std::string object_name, int curr_object, 
 ErrorCode ReadOBJ::create_new_group( std::string group_name, int curr_group, EntityHandle& group_meshset )
 {
     // Create meshset to store group
-    MB_CHK_SET_ERR( MBI->create_meshset( MESHSET_SET, group_meshset ), "Failed to generate group mesh set."  );
+    MB_CHK_SET_ERR( MBI->create_meshset( MESHSET_SET, group_meshset ), "Failed to generate group mesh set." );
 
     // Set meshset tags
-    MB_CHK_SET_ERR( MBI->tag_set_data( name_tag, &group_meshset, 1, group_name.c_str() ), "Failed to set mesh set name tag."  );
+    MB_CHK_SET_ERR( MBI->tag_set_data( name_tag, &group_meshset, 1, group_name.c_str() ),
+                    "Failed to set mesh set name tag." );
 
-    MB_CHK_SET_ERR( MBI->tag_set_data( id_tag, &group_meshset, 1, &( curr_group ) ), "Failed to set mesh set ID tag."  );
+    MB_CHK_SET_ERR( MBI->tag_set_data( id_tag, &group_meshset, 1, &( curr_group ) ), "Failed to set mesh set ID tag." );
 
     return moab::MB_SUCCESS;
 }
@@ -433,7 +448,7 @@ ErrorCode ReadOBJ::create_new_vertex( std::vector< std::string > v_tokens, Entit
     for( int i = 1; i < 4; i++ )
         next_vertex.coord[i - 1] = atof( v_tokens[i].c_str() );
 
-    MB_CHK_SET_ERR( MBI->create_vertex( next_vertex.coord, vertex_eh ), "Unbale to create vertex."  );
+    MB_CHK_SET_ERR( MBI->create_vertex( next_vertex.coord, vertex_eh ), "Unbale to create vertex." );
 
     return moab::MB_SUCCESS;
 }
@@ -465,7 +480,7 @@ ErrorCode ReadOBJ::create_new_face( std::vector< std::string > f_tokens,
         next_face.conn[i - 1] = vertex_list[vertex_id - 1];
     }
 
-    MB_CHK_SET_ERR( MBI->create_element( MBTRI, next_face.conn, 3, face_eh ), "Unable to create new face."  );
+    MB_CHK_SET_ERR( MBI->create_element( MBTRI, next_face.conn, 3, face_eh ), "Unable to create new face." );
 
     return moab::MB_SUCCESS;
 }
@@ -492,7 +507,7 @@ ErrorCode ReadOBJ::split_quad( std::vector< std::string > f_tokens,
     }
 
     // Create new tri faces
-    MB_CHK_SET_ERR( create_tri_faces( quad_vert_eh, face_eh ), "Failed to create triangles when splitting quad."  );
+    MB_CHK_SET_ERR( create_tri_faces( quad_vert_eh, face_eh ), "Failed to create triangles when splitting quad." );
 
     return moab::MB_SUCCESS;
 }

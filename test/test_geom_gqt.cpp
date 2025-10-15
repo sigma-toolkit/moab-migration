@@ -240,7 +240,7 @@ int main( int argc, char* argv[] )
     if( fail ) return fail;
 #endif
 
-    MB_CHK_SET_ERR( write_geometry( filename ), "Failed to create input file: " << filename  );
+    MB_CHK_SET_ERR( write_geometry( filename ), "Failed to create input file: " << filename );
 
     Interface* MBI = new Core();
 
@@ -254,13 +254,13 @@ int main( int argc, char* argv[] )
     errors += run_regular_tests( gqt );
 
     // clear out moab instance
-    MB_CHK_SET_ERR( MBI->delete_mesh(), "Failed to delete mesh"  );
+    MB_CHK_SET_ERR( MBI->delete_mesh(), "Failed to delete mesh" );
 
     delete gtt;
     delete gqt;
 
     // Now load a different geometry: two cubes that slightly overlap
-    MB_CHK_SET_ERR( overlap_write_geometry( filename ), "Failed to create input file: " << filename  );
+    MB_CHK_SET_ERR( overlap_write_geometry( filename ), "Failed to create input file: " << filename );
 
     MB_CHK_SET_ERR( MBI->load_file( filename ), "Failed to load file with overlaps" );
     remove( filename );
@@ -271,7 +271,7 @@ int main( int argc, char* argv[] )
     errors += run_overlap_tests( gqt );
 
     // clear moab instance
-    MB_CHK_SET_ERR( MBI->delete_mesh(), "Failed to delete mesh"  );
+    MB_CHK_SET_ERR( MBI->delete_mesh(), "Failed to delete mesh" );
 
     delete gtt;
     delete gqt;
@@ -281,7 +281,7 @@ int main( int argc, char* argv[] )
     std::cout << "Re-running tests with MBI constructor" << std::endl;
     std::cout << "-------------------------------------" << std::endl;
 
-    MB_CHK_SET_ERR( write_geometry( filename ), "Failed to create input file"  );
+    MB_CHK_SET_ERR( write_geometry( filename ), "Failed to create input file" );
 
     MB_CHK_SET_ERR( MBI->load_file( filename ), "Failed to load file" );
     remove( filename );
@@ -291,12 +291,12 @@ int main( int argc, char* argv[] )
     errors += run_regular_tests( gqt );
 
     // clear moab and dagmc instance
-    MB_CHK_SET_ERR( MBI->delete_mesh(), "Failed to delete mesh"  );
+    MB_CHK_SET_ERR( MBI->delete_mesh(), "Failed to delete mesh" );
 
     delete gqt;
 
     // Now load a different geometry: two cubes that slightly overlap
-    MB_CHK_SET_ERR( overlap_write_geometry( filename ), "Failed to create input file: "  );
+    MB_CHK_SET_ERR( overlap_write_geometry( filename ), "Failed to create input file: " );
 
     MB_CHK_SET_ERR( MBI->load_file( filename ), "Failed to load file with overlaps." );
     remove( filename );

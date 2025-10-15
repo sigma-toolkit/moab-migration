@@ -135,7 +135,7 @@ namespace Element
         class ArgError
         {
           public:
-            ArgError(){};
+            ArgError() {};
         };  // class ArgError
       protected:
         std::vector< CartVect > vertex;
@@ -146,7 +146,7 @@ namespace Element
     class LinearHex : public Map
     {
       public:
-        LinearHex( const std::vector< CartVect >& vertices ) : Map( vertices ){};
+        LinearHex( const std::vector< CartVect >& vertices ) : Map( vertices ) {};
         LinearHex();
         virtual ~LinearHex();
 
@@ -172,7 +172,7 @@ namespace Element
     class QuadraticHex : public Map
     {
       public:
-        QuadraticHex( const std::vector< CartVect >& vertices ) : Map( vertices ){};
+        QuadraticHex( const std::vector< CartVect >& vertices ) : Map( vertices ) {};
         QuadraticHex();
         virtual ~QuadraticHex();
         virtual CartVect evaluate( const CartVect& xi ) const;
@@ -284,7 +284,7 @@ namespace Element
     class LinearQuad : public Map
     {
       public:
-        LinearQuad( const std::vector< CartVect >& vertices ) : Map( vertices ){};
+        LinearQuad( const std::vector< CartVect >& vertices ) : Map( vertices ) {};
         LinearQuad();
         virtual ~LinearQuad();
         virtual CartVect evaluate( const CartVect& xi ) const;
@@ -313,7 +313,7 @@ namespace Element
     {
       public:
         SphericalQuad( const std::vector< CartVect >& vertices );
-        virtual ~SphericalQuad(){};
+        virtual ~SphericalQuad() {};
         virtual bool inside_box( const CartVect& pos, double& tol ) const;
         CartVect ievaluate( const CartVect& x, double tol = 1e-6, const CartVect& x0 = CartVect( 0.0 ) ) const;
 
@@ -383,7 +383,7 @@ namespace Element
     {
       public:
         SphericalTri( const std::vector< CartVect >& vertices );
-        virtual ~SphericalTri(){};
+        virtual ~SphericalTri() {};
         virtual bool inside_box( const CartVect& pos, double& tol ) const;
         CartVect ievaluate( const CartVect& x, double tol = 1e-6, const CartVect& x0 = CartVect( 0.0 ) ) const;
 
@@ -399,7 +399,7 @@ namespace Element
     class LinearEdge : public Map
     {
       public:
-        LinearEdge( const std::vector< CartVect >& vertices ) : Map( vertices ){};
+        LinearEdge( const std::vector< CartVect >& vertices ) : Map( vertices ) {};
         LinearEdge();
         virtual CartVect evaluate( const CartVect& xi ) const;
         // virtual CartVect ievaluate(const CartVect& x, double tol) const ;

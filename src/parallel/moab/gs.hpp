@@ -211,7 +211,7 @@ class gs_data
     /**Default constructor (Note:  moab_gs_data must be initialized
      * before use!)
      */
-    gs_data(){};
+    gs_data() {};
 
     ~gs_data()
     {

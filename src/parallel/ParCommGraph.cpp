@@ -277,7 +277,7 @@ ErrorCode ParCommGraph::send_graph( MPI_Comm jcomm )
         if( MB_SUCCESS != rval ) return rval;
 
         int size_pack_array = (int)packed_recv_array.size();
-        comm_graph          = new int[size_pack_array + 1]; // this should be at least size 2
+        comm_graph          = new int[size_pack_array + 1];  // this should be at least size 2
         comm_graph[0]       = size_pack_array;
         for( int k = 0; k < size_pack_array; k++ )
             comm_graph[k + 1] = packed_recv_array[k];
@@ -427,7 +427,8 @@ ErrorCode ParCommGraph::receive_mesh( MPI_Comm jcomm,
     // mesh
     int defaultInt = -1;  // no processor, so it was not migrated from somewhere else
     MB_CHK_SET_ERR( pco->get_moab()->tag_get_handle( "orig_sending_processor", 1, MB_TYPE_INTEGER, orgSendProcTag,
-                                                      MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt ), "can't create original sending processor tag" );
+                                                     MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt ),
+                    "can't create original sending processor tag" );
     int mtag = compid2;
     if( !senders_local.empty() )
     {
@@ -1142,9 +1143,8 @@ ErrorCode ParCommGraph::compute_partition( ParallelComm* pco, Range& owned, int 
     // not need any ghost exchange
 
     // find first edges that are shared
-    if( owned.empty() )
-        return MB_SUCCESS;  // nothing to do? empty partition is not allowed, maybe we should return
-                            // error?
+    if( owned.empty() ) return MB_SUCCESS;  // nothing to do? empty partition is not allowed, maybe we should return
+                                            // error?
     Core* mb = (Core*)pco->get_moab();
 
     double t1, t2, t3;
@@ -1168,7 +1168,7 @@ ErrorCode ParCommGraph::compute_partition( ParallelComm* pco, Range& owned, int 
     if( 1 == met )
     {
         MB_CHK_ERR( pco->get_shared_entities( /*int other_proc*/ -1, sharedEdges, interfaceDim,
-                                         /*const bool iface*/ true ) );
+                                              /*const bool iface*/ true ) );
 
 #ifdef VERBOSE
         std::cout << " on sender task " << pco->rank() << " number of shared interface cells " << sharedEdges.size()
@@ -1194,7 +1194,7 @@ ErrorCode ParCommGraph::compute_partition( ParallelComm* pco, Range& owned, int 
                 EntityHandle adjCell = adjEnts[0];
                 int gid;
                 MB_CHK_ERR( mb->tag_get_data( gidTag, &adjCell, 1, &gid ) );
-                MB_CHK_ERR( pco->get_sharing_data( edge, shprocs.data() , shhandles.data() , pstatus, np ) );
+                MB_CHK_ERR( pco->get_sharing_data( edge, shprocs.data(), shhandles.data(), pstatus, np ) );
                 int n                = TLe.get_n();
                 TLe.vi_wr[2 * n]     = shprocs[0];
                 TLe.vi_wr[2 * n + 1] = gid;
@@ -1232,7 +1232,7 @@ ErrorCode ParCommGraph::compute_partition( ParallelComm* pco, Range& owned, int 
     }
     t2 = MPI_Wtime();
     if( rootSender ) std::cout << " time preparing the input for Zoltan:" << t2 - t1 << " seconds. \n";
-        // so adj cells ids; need to call zoltan for parallel partition
+    // so adj cells ids; need to call zoltan for parallel partition
 #ifdef MOAB_HAVE_ZOLTAN
     ZoltanPartitioner* mbZTool = new ZoltanPartitioner( mb, pco );
     if( 1 <= met )  //  partition in zoltan, either graph or geometric partitioner
@@ -1242,7 +1242,7 @@ ErrorCode ParCommGraph::compute_partition( ParallelComm* pco, Range& owned, int 
         int numNewPartitions = (int)receiverTasks.size();
         Range primaryCells   = owned.subset_by_dimension( primaryDim );
         MB_CHK_ERR( mbZTool->partition_owned_cells( primaryCells, extraGraphEdges, extraCellsProc, numNewPartitions,
-                                               distribution, met ) );
+                                                    distribution, met ) );
         for( std::map< int, Range >::iterator mit = distribution.begin(); mit != distribution.end(); mit++ )
         {
             int part_index = mit->first;
@@ -1295,8 +1295,8 @@ ErrorCode ParCommGraph::send_graph_partition( ParallelComm* pco, MPI_Comm jcomm 
     {
         recvs.push_back( mit->first );
     }
-    ierr =
-        MPI_Gatherv( recvs.data(), numberReceivers, MPI_INT, buffer.data(), counts.data(), displs.data(), MPI_INT, 0, pco->comm() );
+    ierr = MPI_Gatherv( recvs.data(), numberReceivers, MPI_INT, buffer.data(), counts.data(), displs.data(), MPI_INT, 0,
+                        pco->comm() );
     if( ierr != MPI_SUCCESS ) return MB_FAILURE;
 
     // now form recv_graph map; points from the

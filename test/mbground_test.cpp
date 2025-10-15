@@ -87,7 +87,7 @@ int main( int argc, char* argv[] )
     Core mbcore;
     Interface* mb = &mbcore;
 
-    MB_CHK_SET_ERR( mb->load_file( filename.c_str() ), "failed to load input file"  );
+    MB_CHK_SET_ERR( mb->load_file( filename.c_str() ), "failed to load input file" );
 
     FBEngine* pFacet = new FBEngine( mb, NULL, true );  // smooth facetting, no OBB tree passed
 
@@ -95,7 +95,7 @@ int main( int argc, char* argv[] )
 
     // should the init be part of constructor or not?
     // this is where the obb tree is constructed, and smooth faceting initialized, too.
-    MB_CHK_SET_ERR( pFacet->Init(), "failed to initialize smoothing"  );
+    MB_CHK_SET_ERR( pFacet->Init(), "failed to initialize smoothing" );
 
     delete pFacet;
     pFacet = NULL;
@@ -124,18 +124,18 @@ ErrorCode split_test_across()
     Core mbcore;
     Interface* mb = &mbcore;
 
-    MB_CHK_SET_ERR( mb->load_file( filename.c_str() ), "failed to load already modified file"  );
+    MB_CHK_SET_ERR( mb->load_file( filename.c_str() ), "failed to load already modified file" );
 
     FBEngine* pFacet = new FBEngine( mb, NULL, true );
 
-    MB_CHK_SET_ERR( pFacet->Init(), "failed to initialize smoothing"  );
+    MB_CHK_SET_ERR( pFacet->Init(), "failed to initialize smoothing" );
 
     EntityHandle root_set;
-    MB_CHK_SET_ERR( pFacet->getRootSet( &root_set ), "ERROR : getRootSet failed!"  );
+    MB_CHK_SET_ERR( pFacet->getRootSet( &root_set ), "ERROR : getRootSet failed!" );
     int top = 2;  //  iBase_FACE;
 
     Range faces;
-    MB_CHK_SET_ERR( pFacet->getEntities( root_set, top, faces ), "Failed to get faces in split_test."  );
+    MB_CHK_SET_ERR( pFacet->getEntities( root_set, top, faces ), "Failed to get faces in split_test." );
 
     if( faces.size() != 1 )
     {
@@ -189,14 +189,14 @@ ErrorCode split_test_across()
     EntityHandle newFace;  // this test is with a "grounding" line
     // the second face should be the one that we want for test
     MB_CHK_ERR( pFacet->split_surface_with_direction( second_face, xyz, direction, /*closed*/ 0,
-                                                 /*min_dot */ 0.8, newFace ) );
+                                                      /*min_dot */ 0.8, newFace ) );
 
     // save a new database, with 3 faces, eventually
     pFacet->delete_smooth_tags();
     delete pFacet;
     pFacet = NULL;  // try not to write the obb tree
 
-    MB_CHK_SET_ERR( mb->write_file( filename_out.c_str() ), "Writing mesh file failed\n"  );
+    MB_CHK_SET_ERR( mb->write_file( filename_out.c_str() ), "Writing mesh file failed\n" );
 
     return MB_SUCCESS;
 }
@@ -205,7 +205,7 @@ ErrorCode verify_split()
 {
     Interface* mb = new Core();
 
-    MB_CHK_SET_ERR( mb->load_file( filename_out.c_str() ), "Loading mesh file failed\n"  );
+    MB_CHK_SET_ERR( mb->load_file( filename_out.c_str() ), "Loading mesh file failed\n" );
 
     moab::GeomTopoTool gTopoTool( mb, true, 0, true, false );
 

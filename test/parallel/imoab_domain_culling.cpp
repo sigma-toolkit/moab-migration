@@ -158,8 +158,7 @@ int main( int argc, char* argv[] )
     CHECKIERR( ierr, "cannot compute scalar projection weights" )
 
     const std::string atmocn_map_file_name = "atmDOCN_map.nc";
-    ierr =
-        iMOAB_WriteMapFile( cplAtmOcnPID, weights_identifiers[0].c_str(), atmocn_map_file_name.c_str() );
+    ierr = iMOAB_WriteMapFile( cplAtmOcnPID, weights_identifiers[0].c_str(), atmocn_map_file_name.c_str() );
     CHECKIERR( ierr, "failed to write map file to disk" );
 
     // as always, use nonblocking sends

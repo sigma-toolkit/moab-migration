@@ -1964,8 +1964,8 @@ ErrorCode AdaptiveKDTree::ray_intersect_triangles( EntityHandle root,
         const double inv_dir = 1.0 / ray_dir[plane.norm];                       // only do division once
         const double t       = ( plane.coord - ray_pt[plane.norm] ) * inv_dir;  // intersection with plane
         const double diff    = tol * inv_dir;                                   // t adjustment for +tol plane
-            // const double t0 = t - diff; // intersection with -tol plane
-            // const double t1 = t + diff; // intersection with +tol plane
+        // const double t0 = t - diff; // intersection with -tol plane
+        // const double t1 = t + diff; // intersection with +tol plane
 
         // The index of the child tree node (0 or 1) that is on the
         // side of the plane to which the ray direction points.  That is,
@@ -2134,18 +2134,18 @@ ErrorCode AdaptiveKDTree::print()
     moab()->get_child_meshsets( myRoot, tree_sets, 0 );
 
     {
-        std::vector<EntityHandle> elem2d_vec, elem3d_vec, verts_vec;
+        std::vector< EntityHandle > elem2d_vec, elem3d_vec, verts_vec;
         for( Range::iterator rit = tree_sets.begin(); rit != tree_sets.end(); ++rit )
         {
             moab()->get_entities_by_dimension( *rit, 2, elem2d_vec );
             moab()->get_entities_by_dimension( *rit, 3, elem3d_vec );
             moab()->get_entities_by_type( *rit, MBVERTEX, verts_vec );
         }
-        std::sort(elem2d_vec.begin(), elem2d_vec.end());
+        std::sort( elem2d_vec.begin(), elem2d_vec.end() );
         std::copy( elem2d_vec.rbegin(), elem2d_vec.rend(), range_inserter( elem2d ) );
-        std::sort(elem3d_vec.begin(), elem3d_vec.end());
+        std::sort( elem3d_vec.begin(), elem3d_vec.end() );
         std::copy( elem3d_vec.rbegin(), elem3d_vec.rend(), range_inserter( elem3d ) );
-        std::sort(verts_vec.begin(), verts_vec.end());
+        std::sort( verts_vec.begin(), verts_vec.end() );
         std::copy( verts_vec.rbegin(), verts_vec.rend(), range_inserter( verts ) );
     }
 

@@ -191,7 +191,8 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
         col_gdofmap.resize( m_remapper->m_covering_source_vertices.size(), UINT_MAX );
         col_dtoc_dofmap.resize( m_remapper->m_covering_source_vertices.size(), UINT_MAX );
         src_soln_gdofs.resize( m_remapper->m_covering_source_vertices.size(), UINT_MAX );
-        MB_CHK_ERR( m_interface->tag_get_data( m_dofTagSrc, m_remapper->m_covering_source_vertices, &src_soln_gdofs[0] ) );
+        MB_CHK_ERR(
+            m_interface->tag_get_data( m_dofTagSrc, m_remapper->m_covering_source_vertices, &src_soln_gdofs[0] ) );
         srcTagSize = 1;
     }
     else
@@ -199,7 +200,8 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
         col_gdofmap.resize( m_remapper->m_covering_source_entities.size() * srcTagSize, UINT_MAX );
         col_dtoc_dofmap.resize( m_remapper->m_covering_source_entities.size() * srcTagSize, UINT_MAX );
         src_soln_gdofs.resize( m_remapper->m_covering_source_entities.size() * srcTagSize, UINT_MAX );
-        MB_CHK_ERR( m_interface->tag_get_data( m_dofTagSrc, m_remapper->m_covering_source_entities, &src_soln_gdofs[0] ) );
+        MB_CHK_ERR(
+            m_interface->tag_get_data( m_dofTagSrc, m_remapper->m_covering_source_entities, &src_soln_gdofs[0] ) );
     }
 
     m_nTotDofs_SrcCov = 0;
@@ -667,7 +669,8 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             if( is_root ) dbgprint.printf( 0, "Calculating output mesh Face areas\n" );
             local_areas[1] = m_meshOutput->CalculateFaceAreas( mapOptions.fTargetConcave );
             // Set target element areas as tag on the target mesh
-            MB_CHK_ERR( m_interface->tag_set_data( areaTag, m_remapper->m_target_entities, m_meshOutput->vecFaceArea ) );
+            MB_CHK_ERR(
+                m_interface->tag_set_data( areaTag, m_remapper->m_target_entities, m_meshOutput->vecFaceArea ) );
         }
 
         if( !m_bPointCloud )
@@ -784,7 +787,7 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
 
             // Finite volume input / Finite element output
             MB_CHK_ERR( this->SetDOFmapAssociation( eInputType, mapOptions.nPin, false, nullptr, nullptr, eOutputType,
-                                               mapOptions.nPout, false, nullptr ) );
+                                                    mapOptions.nPout, false, nullptr ) );
 
             // Construct remap for FV-FV
             if( is_root ) dbgprint.printf( 0, "Calculating remap weights\n" );
@@ -887,8 +890,8 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
 
             // Finite volume input / Finite element output
             MB_CHK_ERR( this->SetDOFmapAssociation( eInputType, mapOptions.nPin, false, nullptr, nullptr, eOutputType,
-                                               mapOptions.nPout, ( eOutputType == DiscretizationType_CGLL ),
-                                               &dataGLLNodesDest ) );
+                                                    mapOptions.nPout, ( eOutputType == DiscretizationType_CGLL ),
+                                                    &dataGLLNodesDest ) );
 
             // Generate remap weights
             if( strMapAlgorithm == "volumetric" )
@@ -998,9 +1001,9 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             }
 
             // Finite element input / Finite volume output
-            MB_CHK_ERR( this->SetDOFmapAssociation( eInputType, mapOptions.nPin, ( eInputType == DiscretizationType_CGLL ),
-                                               &dataGLLNodesSrcCov, &dataGLLNodesSrc, eOutputType, mapOptions.nPout,
-                                               false, nullptr ) );
+            MB_CHK_ERR( this->SetDOFmapAssociation( eInputType, mapOptions.nPin,
+                                                    ( eInputType == DiscretizationType_CGLL ), &dataGLLNodesSrcCov,
+                                                    &dataGLLNodesSrc, eOutputType, mapOptions.nPout, false, nullptr ) );
 
             // Generate remap
             if( is_root ) dbgprint.printf( 0, "Calculating remap weights\n" );
@@ -1070,9 +1073,10 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             }
 
             // Input Finite Element to Output Finite Element
-            MB_CHK_ERR( this->SetDOFmapAssociation( eInputType, mapOptions.nPin, ( eInputType == DiscretizationType_CGLL ),
-                                               &dataGLLNodesSrcCov, &dataGLLNodesSrc, eOutputType, mapOptions.nPout,
-                                               ( eOutputType == DiscretizationType_CGLL ), &dataGLLNodesDest ) );
+            MB_CHK_ERR( this->SetDOFmapAssociation( eInputType, mapOptions.nPin,
+                                                    ( eInputType == DiscretizationType_CGLL ), &dataGLLNodesSrcCov,
+                                                    &dataGLLNodesSrc, eOutputType, mapOptions.nPout,
+                                                    ( eOutputType == DiscretizationType_CGLL ), &dataGLLNodesDest ) );
 
             this->m_pdataGLLNodesIn  = &dataGLLNodesSrcCov;
             this->m_pdataGLLNodesOut = &dataGLLNodesDest;
@@ -1106,7 +1110,8 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             moab::Range ghostedEnts;
             MB_CHK_ERR( m_remapper->GetOverlapAugmentedEntities( ghostedEnts ) );
             moab::EntityHandle m_meshOverlapSet = m_remapper->GetMeshSet( moab::Remapper::OverlapMesh );
-            MB_CHK_SET_ERR( m_interface->remove_entities( m_meshOverlapSet, ghostedEnts ), "Deleting ghosted entities failed" );
+            MB_CHK_SET_ERR( m_interface->remove_entities( m_meshOverlapSet, ghostedEnts ),
+                            "Deleting ghosted entities failed" );
         }
 #endif
         // Verify consistency, conservation and monotonicity, globally
@@ -1561,7 +1566,7 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
     // Let us create teh solution tag with appropriate information for name, discretization order
     // (DoF space)
     MB_CHK_ERR( m_interface->tag_get_handle( solnName.c_str(), discOrder * discOrder, MB_TYPE_DOUBLE, solnTag,
-                                        MB_TAG_DENSE | MB_TAG_CREAT ) );
+                                             MB_TAG_DENSE | MB_TAG_CREAT ) );
     if( clonedSolnTag != nullptr )
     {
         if( cloneSolnName.size() == 0 )
@@ -1569,7 +1574,7 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
             cloneSolnName = solnName + std::string( "Cloned" );
         }
         MB_CHK_ERR( m_interface->tag_get_handle( cloneSolnName.c_str(), discOrder * discOrder, MB_TYPE_DOUBLE,
-                                            *clonedSolnTag, MB_TAG_DENSE | MB_TAG_CREAT ) );
+                                                 *clonedSolnTag, MB_TAG_DENSE | MB_TAG_CREAT ) );
     }
 
     // Triangular quadrature rule

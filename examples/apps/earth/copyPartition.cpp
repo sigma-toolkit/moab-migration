@@ -66,36 +66,36 @@ int main( int argc, char* argv[] )
     ErrorCode rval;
     Core* mb = new Core();
 
-    MB_CHK_SET_ERR( mb->load_file( physfile.c_str() ), "can't load phys grid file"  );
+    MB_CHK_SET_ERR( mb->load_file( physfile.c_str() ), "can't load phys grid file" );
 
     Core* mb2 = new Core();
-    MB_CHK_SET_ERR( mb2->load_file( pg2file.c_str() ), "can't load pg2 mesh file"  );
+    MB_CHK_SET_ERR( mb2->load_file( pg2file.c_str() ), "can't load pg2 mesh file" );
 
     Tag globalIDTag1 = mb->globalId_tag();
     Tag parti;
-    MB_CHK_SET_ERR( mb->tag_get_handle( "partition", parti ), "can't get partition tag phys grid mesh "  );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "partition", parti ), "can't get partition tag phys grid mesh " );
 
     Tag globalIDTag2 = mb2->globalId_tag();
 
     Range verts1;
-    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 0, verts1 ), "can't get vertices "  );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 0, verts1 ), "can't get vertices " );
 
     std::vector< int > partValues;
     partValues.resize( verts1.size() );
-    MB_CHK_SET_ERR( mb->tag_get_data( parti, verts1, &partValues[0] ), "can't get parts values on vertices "  );
+    MB_CHK_SET_ERR( mb->tag_get_data( parti, verts1, &partValues[0] ), "can't get parts values on vertices " );
 
     Range cells;
-    MB_CHK_SET_ERR( mb2->get_entities_by_dimension( 0, 2, cells ), "can't get 2d cells "  );
+    MB_CHK_SET_ERR( mb2->get_entities_by_dimension( 0, 2, cells ), "can't get 2d cells " );
     std::vector< int > globalIdsCells;
     globalIdsCells.resize( cells.size() );
-    MB_CHK_SET_ERR( mb2->tag_get_data( globalIDTag2, cells, &globalIdsCells[0] ), "can't get global ids cells "  );
+    MB_CHK_SET_ERR( mb2->tag_get_data( globalIDTag2, cells, &globalIdsCells[0] ), "can't get global ids cells " );
 
     std::vector< int > globalIdsVerts;
     globalIdsVerts.resize( verts1.size() );
-    MB_CHK_SET_ERR( mb->tag_get_data( globalIDTag1, verts1, &globalIdsVerts[0] ), "can't get global ids cells "  );
+    MB_CHK_SET_ERR( mb->tag_get_data( globalIDTag1, verts1, &globalIdsVerts[0] ), "can't get global ids cells " );
 
     Tag partTag;
-    MB_CHK_SET_ERR( mb2->tag_get_handle( "PARALLEL_PARTITION", partTag ), "can't partition tag "  );
+    MB_CHK_SET_ERR( mb2->tag_get_handle( "PARALLEL_PARTITION", partTag ), "can't partition tag " );
 
     Range sets;
     MB_CHK_ERR( mb2->get_entities_by_type_and_tag( 0, MBENTITYSET, &partTag, NULL, 1, sets ) );
@@ -131,7 +131,7 @@ int main( int argc, char* argv[] )
         MB_CHK_ERR( mb2->add_entities( set1, &cell, 1 ) );
     }
 
-    MB_CHK_SET_ERR( mb2->write_file( outfile.c_str() ), "can't write file"  );
+    MB_CHK_SET_ERR( mb2->write_file( outfile.c_str() ), "can't write file" );
 
     delete mb;
     delete mb2;

@@ -25,8 +25,8 @@ void find_volume_tests();
 int main()
 {
 
-    MBI            = new Core();
-    MB_CHK_SET_ERR( MBI->load_file( input_file.c_str() ), "Failed to load test file"  );
+    MBI = new Core();
+    MB_CHK_SET_ERR( MBI->load_file( input_file.c_str() ), "Failed to load test file" );
 
     GTT = new GeomTopoTool( MBI );
     GQT = new GeomQueryTool( GTT );
@@ -55,7 +55,7 @@ ErrorCode id_lookup( EntityHandle eh, int& id )
         id_tag = MBI->globalId_tag();
     }
 
-    MB_CHK_SET_ERR( MBI->tag_get_data( id_tag, &eh, 1, (void*)&id ), "Failed to lookup volume id"  );
+    MB_CHK_SET_ERR( MBI->tag_get_data( id_tag, &eh, 1, (void*)&id ), "Failed to lookup volume id" );
 
     return MB_SUCCESS;
 }
@@ -192,5 +192,5 @@ void find_volume_tests()
             volume_found = 0;
             vol_id       = -1;
         }  // repeat loop
-    }      // test loop
+    }  // test loop
 }

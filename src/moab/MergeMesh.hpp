@@ -52,7 +52,6 @@ class MergeMesh
     ErrorCode merge_all( EntityHandle meshset, const double merge_tol );
 
   private:
-
     //- given a kdtree, set tag on vertices in leaf nodes with vertices
     //- to which they should be merged
     ErrorCode find_merged_to( EntityHandle& tree_root, AdaptiveKDTree& tree, Tag merged_to );

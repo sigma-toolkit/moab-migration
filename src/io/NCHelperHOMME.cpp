@@ -135,7 +135,7 @@ ErrorCode NCHelperHOMME::init_mesh_vals()
     // Store lat values in yVertVals
     if( ( vmit = varInfo.find( "lat" ) ) != varInfo.end() && ( *vmit ).second.varDims.size() == 1 )
     {
-        MB_CHK_SET_ERR( read_coordinate( "lat", 0, nVertices - 1, yVertVals ), "Trouble reading 'lat' variable"  );
+        MB_CHK_SET_ERR( read_coordinate( "lat", 0, nVertices - 1, yVertVals ), "Trouble reading 'lat' variable" );
     }
     else
     {
@@ -151,7 +151,7 @@ ErrorCode NCHelperHOMME::init_mesh_vals()
     {
         if( ( vmit = varInfo.find( "lev" ) ) != varInfo.end() && ( *vmit ).second.varDims.size() == 1 )
         {
-            MB_CHK_SET_ERR( read_coordinate( "lev", 0, nLevels - 1, levVals ), "Trouble reading 'lev' variable"  );
+            MB_CHK_SET_ERR( read_coordinate( "lev", 0, nLevels - 1, levVals ), "Trouble reading 'lev' variable" );
 
             // Decide whether down is positive
             char posval[10] = { 0 };
@@ -177,11 +177,11 @@ ErrorCode NCHelperHOMME::init_mesh_vals()
     {
         if( ( vmit = varInfo.find( "time" ) ) != varInfo.end() && ( *vmit ).second.varDims.size() == 1 )
         {
-            MB_CHK_SET_ERR( read_coordinate( "time", 0, nTimeSteps - 1, tVals ), "Trouble reading 'time' variable"  );
+            MB_CHK_SET_ERR( read_coordinate( "time", 0, nTimeSteps - 1, tVals ), "Trouble reading 'time' variable" );
         }
         else if( ( vmit = varInfo.find( "t" ) ) != varInfo.end() && ( *vmit ).second.varDims.size() == 1 )
         {
-            MB_CHK_SET_ERR( read_coordinate( "t", 0, nTimeSteps - 1, tVals ), "Trouble reading 't' variable"  );
+            MB_CHK_SET_ERR( read_coordinate( "t", 0, nTimeSteps - 1, tVals ), "Trouble reading 't' variable" );
         }
         else
         {
@@ -210,7 +210,7 @@ ErrorCode NCHelperHOMME::init_mesh_vals()
 
     // Hack: create dummy variables for dimensions (like ncol) with no corresponding coordinate
     // variables
-    MB_CHK_SET_ERR( create_dummy_variables(), "Failed to create dummy variables"  );
+    MB_CHK_SET_ERR( create_dummy_variables(), "Failed to create dummy variables" );
 
     return MB_SUCCESS;
 }
@@ -234,14 +234,16 @@ ErrorCode NCHelperHOMME::check_existing_mesh()
 
         // Get all vertices from current file set (it is the input set in no_mesh scenario)
         Range local_verts;
-        MB_CHK_SET_ERR( mbImpl->get_entities_by_dimension( _fileSet, 0, local_verts ), "Trouble getting local vertices in current file set"  );
+        MB_CHK_SET_ERR( mbImpl->get_entities_by_dimension( _fileSet, 0, local_verts ),
+                        "Trouble getting local vertices in current file set" );
 
         if( !local_verts.empty() )
         {
             std::vector< int > gids( local_verts.size() );
 
             // !IMPORTANT : this has to be the GLOBAL_ID tag
-            MB_CHK_SET_ERR( mbImpl->tag_get_data( mGlobalIdTag, local_verts, &gids[0] ), "Trouble getting local gid values of vertices"  );
+            MB_CHK_SET_ERR( mbImpl->tag_get_data( mGlobalIdTag, local_verts, &gids[0] ),
+                            "Trouble getting local gid values of vertices" );
 
             // Restore localGidVerts
             std::copy( gids.rbegin(), gids.rend(), range_inserter( localGidVerts ) );
@@ -318,7 +320,8 @@ ErrorCode NCHelperHOMME::create_mesh( Range& faces )
 
     std::vector< std::string > conn_names;
     std::vector< int > conn_vals;
-    MB_CHK_SET_ERR( _readNC->get_dimensions( connectId, conn_names, conn_vals ), "Failed to get dimensions for connectivity"  );
+    MB_CHK_SET_ERR( _readNC->get_dimensions( connectId, conn_names, conn_vals ),
+                    "Failed to get dimensions for connectivity" );
 
     // Read connectivity into temporary variable
     int num_fine_quads   = 0;
@@ -407,10 +410,11 @@ ErrorCode NCHelperHOMME::create_mesh( Range& faces )
     SpectralMeshTool smt( mbImpl, _spectralOrder );
     if( !spectralMesh )
     {
-        MB_CHK_SET_ERR( _readNC->readMeshIface->get_element_connect( num_coarse_quads, 4, MBQUAD, 0, start_quad, conn_arr,
-                                                            // Might have to create gather mesh later
-                                                            ( create_gathers ? num_coarse_quads + num_quads
-                                                                             : num_coarse_quads ) ), "Failed to create local quads"  );
+        MB_CHK_SET_ERR( _readNC->readMeshIface->get_element_connect(
+                            num_coarse_quads, 4, MBQUAD, 0, start_quad, conn_arr,
+                            // Might have to create gather mesh later
+                            ( create_gathers ? num_coarse_quads + num_quads : num_coarse_quads ) ),
+                        "Failed to create local quads" );
         tmp_range.insert( start_quad, start_quad + num_coarse_quads - 1 );
         int* tmp_conn_end = ( &tmp_conn[start_idx + 4 * num_fine_quads - 1] ) + 1;
         std::copy( &tmp_conn[start_idx], tmp_conn_end, conn_arr );
@@ -418,19 +422,25 @@ ErrorCode NCHelperHOMME::create_mesh( Range& faces )
     }
     else
     {
-        MB_CHK_SET_ERR( smt.create_spectral_elems( &tmp_conn[0], num_fine_quads, 2, tmp_range, start_idx, &localGidVerts ), "Failed to create spectral elements"  );
+        MB_CHK_SET_ERR( smt.create_spectral_elems( &tmp_conn[0], num_fine_quads, 2, tmp_range, start_idx,
+                                                   &localGidVerts ),
+                        "Failed to create spectral elements" );
         int count, v_per_e;
-        MB_CHK_SET_ERR( mbImpl->connect_iterate( tmp_range.begin(), tmp_range.end(), conn_arr, v_per_e, count ), "Failed to get connectivity of spectral elements"  );
-        MB_CHK_SET_ERR( mbImpl->tag_iterate( smt.spectral_vertices_tag( true ), tmp_range.begin(), tmp_range.end(), count,
-                                    (void*&)sv_ptr ), "Failed to get fine connectivity of spectral elements"  );
+        MB_CHK_SET_ERR( mbImpl->connect_iterate( tmp_range.begin(), tmp_range.end(), conn_arr, v_per_e, count ),
+                        "Failed to get connectivity of spectral elements" );
+        MB_CHK_SET_ERR( mbImpl->tag_iterate( smt.spectral_vertices_tag( true ), tmp_range.begin(), tmp_range.end(),
+                                             count, (void*&)sv_ptr ),
+                        "Failed to get fine connectivity of spectral elements" );
     }
 
     // Create vertices
     nLocalVertices = localGidVerts.size();
     std::vector< double* > arrays;
-    MB_CHK_SET_ERR( _readNC->readMeshIface->get_node_coords( 3, nLocalVertices, 0, start_vertex, arrays,
-                                                    // Might have to create gather mesh later
-                                                    ( create_gathers ? nLocalVertices + nVertices : nLocalVertices ) ), "Failed to create local vertices"  );
+    MB_CHK_SET_ERR(
+        _readNC->readMeshIface->get_node_coords( 3, nLocalVertices, 0, start_vertex, arrays,
+                                                 // Might have to create gather mesh later
+                                                 ( create_gathers ? nLocalVertices + nVertices : nLocalVertices ) ),
+        "Failed to create local vertices" );
 
     // Set vertex coordinates
     Range::iterator rit;
@@ -463,7 +473,8 @@ ErrorCode NCHelperHOMME::create_mesh( Range& faces )
     Range vert_range( start_vertex, start_vertex + nLocalVertices - 1 );
     void* data;
     int count;
-    MB_CHK_SET_ERR( mbImpl->tag_iterate( mGlobalIdTag, vert_range.begin(), vert_range.end(), count, data ), "Failed to iterate global id tag on local vertices"  );
+    MB_CHK_SET_ERR( mbImpl->tag_iterate( mGlobalIdTag, vert_range.begin(), vert_range.end(), count, data ),
+                    "Failed to iterate global id tag on local vertices" );
     assert( count == nLocalVertices );
     int* gid_data = (int*)data;
     std::copy( localGidVerts.begin(), localGidVerts.end(), gid_data );
@@ -471,10 +482,12 @@ ErrorCode NCHelperHOMME::create_mesh( Range& faces )
     // Duplicate global id data, which will be used to resolve sharing
     if( mpFileIdTag )
     {
-        MB_CHK_SET_ERR( mbImpl->tag_iterate( *mpFileIdTag, vert_range.begin(), vert_range.end(), count, data ), "Failed to iterate file id tag on local vertices"  );
+        MB_CHK_SET_ERR( mbImpl->tag_iterate( *mpFileIdTag, vert_range.begin(), vert_range.end(), count, data ),
+                        "Failed to iterate file id tag on local vertices" );
         assert( count == nLocalVertices );
         int bytes_per_tag = 4;
-        MB_CHK_SET_ERR( mbImpl->tag_get_bytes( *mpFileIdTag, bytes_per_tag ), "Can't get number of bytes for file id tag"  );
+        MB_CHK_SET_ERR( mbImpl->tag_get_bytes( *mpFileIdTag, bytes_per_tag ),
+                        "Can't get number of bytes for file id tag" );
         if( 4 == bytes_per_tag )
         {
             gid_data = (int*)data;
@@ -511,23 +524,28 @@ ErrorCode NCHelperHOMME::create_mesh( Range& faces )
     // Add new vertices and quads to current file set
     faces.merge( tmp_range );
     tmp_range.insert( start_vertex, start_vertex + nLocalVertices - 1 );
-    MB_CHK_SET_ERR( mbImpl->add_entities( _fileSet, tmp_range ), "Failed to add new vertices and quads to current file set"  );
+    MB_CHK_SET_ERR( mbImpl->add_entities( _fileSet, tmp_range ),
+                    "Failed to add new vertices and quads to current file set" );
 
     // Mark the set with the spectral order
     Tag sporder;
-    MB_CHK_SET_ERR( mbImpl->tag_get_handle( "SPECTRAL_ORDER", 1, MB_TYPE_INTEGER, sporder, MB_TAG_SPARSE | MB_TAG_CREAT ), "Trouble creating SPECTRAL_ORDER tag"  );
-    MB_CHK_SET_ERR( mbImpl->tag_set_data( sporder, &_fileSet, 1, &_spectralOrder ), "Trouble setting data to SPECTRAL_ORDER tag"  );
+    MB_CHK_SET_ERR( mbImpl->tag_get_handle( "SPECTRAL_ORDER", 1, MB_TYPE_INTEGER, sporder,
+                                            MB_TAG_SPARSE | MB_TAG_CREAT ),
+                    "Trouble creating SPECTRAL_ORDER tag" );
+    MB_CHK_SET_ERR( mbImpl->tag_set_data( sporder, &_fileSet, 1, &_spectralOrder ),
+                    "Trouble setting data to SPECTRAL_ORDER tag" );
 
     if( create_gathers )
     {
         EntityHandle gather_set;
-        MB_CHK_SET_ERR( _readNC->readMeshIface->create_gather_set( gather_set ), "Failed to create gather set"  );
+        MB_CHK_SET_ERR( _readNC->readMeshIface->create_gather_set( gather_set ), "Failed to create gather set" );
 
         // Create vertices
         arrays.clear();
         // Don't need to specify allocation number here, because we know enough verts were created
         // before
-        MB_CHK_SET_ERR( _readNC->readMeshIface->get_node_coords( 3, nVertices, 0, start_vertex, arrays ), "Failed to create gather set vertices"  );
+        MB_CHK_SET_ERR( _readNC->readMeshIface->get_node_coords( 3, nVertices, 0, start_vertex, arrays ),
+                        "Failed to create gather set vertices" );
 
         xptr = arrays[0];
         yptr = arrays[1];
@@ -545,8 +563,9 @@ ErrorCode NCHelperHOMME::create_mesh( Range& faces )
 
         // Get ptr to gid memory for vertices
         Range gather_set_verts_range( start_vertex, start_vertex + nVertices - 1 );
-        MB_CHK_SET_ERR( mbImpl->tag_iterate( mGlobalIdTag, gather_set_verts_range.begin(), gather_set_verts_range.end(), count,
-                                    data ), "Failed to iterate global id tag on gather set vertices"  );
+        MB_CHK_SET_ERR( mbImpl->tag_iterate( mGlobalIdTag, gather_set_verts_range.begin(), gather_set_verts_range.end(),
+                                             count, data ),
+                        "Failed to iterate global id tag on gather set vertices" );
         assert( count == nVertices );
         gid_data = (int*)data;
         for( int j = 1; j <= nVertices; j++ )
@@ -554,11 +573,13 @@ ErrorCode NCHelperHOMME::create_mesh( Range& faces )
         // Set the file id tag too, it should be bigger something not interfering with global id
         if( mpFileIdTag )
         {
-            MB_CHK_SET_ERR( mbImpl->tag_iterate( *mpFileIdTag, gather_set_verts_range.begin(), gather_set_verts_range.end(),
-                                        count, data ), "Failed to iterate file id tag on gather set vertices"  );
+            MB_CHK_SET_ERR( mbImpl->tag_iterate( *mpFileIdTag, gather_set_verts_range.begin(),
+                                                 gather_set_verts_range.end(), count, data ),
+                            "Failed to iterate file id tag on gather set vertices" );
             assert( count == nVertices );
             int bytes_per_tag = 4;
-            MB_CHK_SET_ERR( mbImpl->tag_get_bytes( *mpFileIdTag, bytes_per_tag ), "Can't get number of bytes for file id tag"  );
+            MB_CHK_SET_ERR( mbImpl->tag_get_bytes( *mpFileIdTag, bytes_per_tag ),
+                            "Can't get number of bytes for file id tag" );
             if( 4 == bytes_per_tag )
             {
                 gid_data = (int*)data;
@@ -573,19 +594,22 @@ ErrorCode NCHelperHOMME::create_mesh( Range& faces )
             }
         }
 
-        MB_CHK_SET_ERR( mbImpl->add_entities( gather_set, gather_set_verts_range ), "Failed to add vertices to the gather set"  );
+        MB_CHK_SET_ERR( mbImpl->add_entities( gather_set, gather_set_verts_range ),
+                        "Failed to add vertices to the gather set" );
 
         // Create quads
         Range gather_set_quads_range;
         // Don't need to specify allocation number here, because we know enough quads were created
         // before
-        MB_CHK_SET_ERR( _readNC->readMeshIface->get_element_connect( num_quads, 4, MBQUAD, 0, start_quad, conn_arr ), "Failed to create gather set quads"  );
+        MB_CHK_SET_ERR( _readNC->readMeshIface->get_element_connect( num_quads, 4, MBQUAD, 0, start_quad, conn_arr ),
+                        "Failed to create gather set quads" );
         gather_set_quads_range.insert( start_quad, start_quad + num_quads - 1 );
         int* tmp_conn_end = ( &tmp_conn[4 * num_quads - 1] ) + 1;
         std::copy( &tmp_conn[0], tmp_conn_end, conn_arr );
         for( i = 0; i != 4 * num_quads; i++ )
             conn_arr[i] += start_vertex - 1;  // Connectivity array is shifted by where the gather verts start
-        MB_CHK_SET_ERR( mbImpl->add_entities( gather_set, gather_set_quads_range ), "Failed to add quads to the gather set"  );
+        MB_CHK_SET_ERR( mbImpl->add_entities( gather_set, gather_set_quads_range ),
+                        "Failed to add quads to the gather set" );
     }
 
     return MB_SUCCESS;
@@ -602,7 +626,8 @@ ErrorCode NCHelperHOMME::read_ucd_variables_to_nonset_allocate( std::vector< Rea
 
     // Get vertices
     Range verts;
-    MB_CHK_SET_ERR( mbImpl->get_entities_by_dimension( _fileSet, 0, verts ), "Trouble getting vertices in current file set"  );
+    MB_CHK_SET_ERR( mbImpl->get_entities_by_dimension( _fileSet, 0, verts ),
+                    "Trouble getting vertices in current file set" );
     assert( "Should only have a single vertex subrange, since they were read in one shot" && verts.psize() == 1 );
 
     for( unsigned int i = 0; i < vdatas.size(); i++ )
@@ -657,13 +682,15 @@ ErrorCode NCHelperHOMME::read_ucd_variables_to_nonset_allocate( std::vector< Rea
             // Get the tag to read into
             if( !vdatas[i].varTags[t] )
             {
-                MB_CHK_SET_ERR( get_tag_to_nonset( vdatas[i], tstep_nums[t], vdatas[i].varTags[t], vdatas[i].numLev ), "Trouble getting tag for variable " << vdatas[i].varName  );
+                MB_CHK_SET_ERR( get_tag_to_nonset( vdatas[i], tstep_nums[t], vdatas[i].varTags[t], vdatas[i].numLev ),
+                                "Trouble getting tag for variable " << vdatas[i].varName );
             }
 
             // Get ptr to tag space
             void* data;
             int count;
-            MB_CHK_SET_ERR( mbImpl->tag_iterate( vdatas[i].varTags[t], range->begin(), range->end(), count, data ), "Failed to iterate tag for variable " << vdatas[i].varName  );
+            MB_CHK_SET_ERR( mbImpl->tag_iterate( vdatas[i].varTags[t], range->begin(), range->end(), count, data ),
+                            "Failed to iterate tag for variable " << vdatas[i].varName );
             assert( (unsigned)count == range->size() );
             vdatas[i].varDatas[t] = data;
         }
@@ -678,7 +705,8 @@ ErrorCode NCHelperHOMME::read_ucd_variables_to_nonset_async( std::vector< ReadNC
 {
     DebugOutput& dbgOut = _readNC->dbgOut;
 
-    MB_CHK_SET_ERR( read_ucd_variables_to_nonset_allocate( vdatas, tstep_nums ), "Trouble allocating space to read non-set variables"  );
+    MB_CHK_SET_ERR( read_ucd_variables_to_nonset_allocate( vdatas, tstep_nums ),
+                    "Trouble allocating space to read non-set variables" );
 
     // Finally, read into that space
     int success;
@@ -781,7 +809,8 @@ ErrorCode NCHelperHOMME::read_ucd_variables_to_nonset( std::vector< ReadNC::VarD
 {
     DebugOutput& dbgOut = _readNC->dbgOut;
 
-    MB_CHK_SET_ERR( read_ucd_variables_to_nonset_allocate( vdatas, tstep_nums ), "Trouble allocating space to read non-set variables"  );
+    MB_CHK_SET_ERR( read_ucd_variables_to_nonset_allocate( vdatas, tstep_nums ),
+                    "Trouble allocating space to read non-set variables" );
 
     // Finally, read into that space
     int success;

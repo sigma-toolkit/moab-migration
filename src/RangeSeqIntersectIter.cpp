@@ -75,8 +75,8 @@ ErrorCode RangeSeqIntersectIter::step()
     mEndHandle = ( *rangeIter ).second;
     if( mEndHandle > mLastHandle ) mEndHandle = mLastHandle;
 
-        // Now trim up the range (decrease mEndHandle) as necessary
-        // for the corresponding EntitySquence
+    // Now trim up the range (decrease mEndHandle) as necessary
+    // for the corresponding EntitySquence
 #if MB_RANGE_SEQ_INTERSECT_ITER_STATS
     ErrorCode result = update_entity_sequence();
     update_stats( mEndHandle - mStartHandle + 1 );

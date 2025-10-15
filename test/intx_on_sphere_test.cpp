@@ -136,10 +136,12 @@ int main( int argc, char* argv[] )
     if( size > 1 )
     {
         double elapsed = MPI_Wtime();
-        MB_CHK_SET_ERR( mb->create_meshset( moab::MESHSET_SET, covering_set ), "Can't create new set"  );
-        bool gnomonic = true;
+        MB_CHK_SET_ERR( mb->create_meshset( moab::MESHSET_SET, covering_set ), "Can't create new set" );
+        bool gnomonic       = true;
         int nb_ghost_layers = 0;
-        MB_CHK_ERR( worker.construct_covering_set( sf1, covering_set, gnomonic, nb_ghost_layers ) );  // lots of communication if mesh is distributed very differently
+        MB_CHK_ERR( worker.construct_covering_set(
+            sf1, covering_set, gnomonic,
+            nb_ghost_layers ) );  // lots of communication if mesh is distributed very differently
         elapsed = MPI_Wtime() - elapsed;
         if( 0 == rank ) std::cout << "\nTime to communicate the mesh = " << elapsed << std::endl;
         // area fraction of the covering set that needed to be communicated from other processors
@@ -150,7 +152,8 @@ int main( int argc, char* argv[] )
             EntityHandle comm_set;  // set with elements communicated from other tasks
             MB_CHK_ERR( mb->create_meshset( MESHSET_SET, comm_set ) );
             // see how much more different is compared to sf1
-            MB_CHK_ERR( mb->unite_meshset( comm_set, covering_set ) );  // will have to subtract from covering set, initial set
+            MB_CHK_ERR(
+                mb->unite_meshset( comm_set, covering_set ) );  // will have to subtract from covering set, initial set
             // subtract
             MB_CHK_ERR( mb->subtract_meshset( comm_set, sf1 ) );
             // compute fractions
@@ -200,11 +203,12 @@ int main( int argc, char* argv[] )
 #endif
     if( brute_force )
     {
-        MB_CHK_SET_ERR( worker.intersect_meshes_kdtree( covering_set, sf2, outputSet ), "failed to intersect meshes with slow method"  );
+        MB_CHK_SET_ERR( worker.intersect_meshes_kdtree( covering_set, sf2, outputSet ),
+                        "failed to intersect meshes with slow method" );
     }
     else
     {
-        MB_CHK_SET_ERR( worker.intersect_meshes( covering_set, sf2, outputSet ), "failed to intersect meshes"  );
+        MB_CHK_SET_ERR( worker.intersect_meshes( covering_set, sf2, outputSet ), "failed to intersect meshes" );
     }
 #ifdef MOAB_HAVE_MPI
     elapsed = MPI_Wtime() - elapsed;
@@ -237,17 +241,18 @@ int main( int argc, char* argv[] )
 
 #ifdef MOAB_HAVE_MPI
 #ifdef MOAB_HAVE_HDF5_PARALLEL
-    MB_CHK_SET_ERR( mb->write_file( outputFile.c_str(), 0, "PARALLEL=WRITE_PART", &outputSet, 1 ), "failed to write intx file"  );
+    MB_CHK_SET_ERR( mb->write_file( outputFile.c_str(), 0, "PARALLEL=WRITE_PART", &outputSet, 1 ),
+                    "failed to write intx file" );
 #else
     // write intx set on rank 0, in serial; we cannot write in parallel
     if( 0 == rank )
     {
-        MB_CHK_SET_ERR( mb->write_file( outputFile.c_str(), 0, 0, &outputSet, 1 ), "failed to write intx file"  );
+        MB_CHK_SET_ERR( mb->write_file( outputFile.c_str(), 0, 0, &outputSet, 1 ), "failed to write intx file" );
     }
 #endif
     MPI_Finalize();
 #else
-    MB_CHK_SET_ERR( mb->write_file( outputFile.c_str(), 0, 0, &outputSet, 1 ), "failed to write intx file"  );
+    MB_CHK_SET_ERR( mb->write_file( outputFile.c_str(), 0, 0, &outputSet, 1 ), "failed to write intx file" );
 #endif
     return 0;
 }

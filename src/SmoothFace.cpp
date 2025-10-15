@@ -198,7 +198,7 @@ int SmoothFace::init_gradient()
     unsigned long setId = _mb->id_from_handle( _set );
     char name[50]       = { 0 };
     snprintf( name, 50, "GRADIENT%lu",
-             setId );  // name should be something like GRADIENT29, where 29 is the set ID of the face
+              setId );  // name should be something like GRADIENT29, where 29 is the set ID of the face
     rval = _mb->tag_get_handle( name, 3, MB_TYPE_DOUBLE, _gradientTag, MB_TAG_DENSE | MB_TAG_CREAT, &defNormal );
     assert( rval == MB_SUCCESS );
 
@@ -633,11 +633,11 @@ void SmoothFace::DumpModelControlPoints()
     point3DFile << "# x y z \n";
     std::ofstream point3DEdgeFile;
     snprintf( name, 50, "%lucontrolEdge.Point3D", setId );  //
-    point3DEdgeFile.open( name );                      //("controlEdge.Point3D");
+    point3DEdgeFile.open( name );                           //("controlEdge.Point3D");
     point3DEdgeFile << "# x y z \n";
     std::ofstream smoothPoints;
     snprintf( name, 50, "%lusmooth.Point3D", setId );  //
-    smoothPoints.open( name );                    //("smooth.Point3D");
+    smoothPoints.open( name );                         //("smooth.Point3D");
     smoothPoints << "# x y z \n";
     CartVect controlPoints[3];  // edge control points
     for( Range::iterator it = _edges.begin(); it != _edges.end(); ++it )
@@ -951,7 +951,7 @@ void SmoothFace::facet_area_coordinate( EntityHandle facet, CartVect& pt_on_plan
     assert( rval == MB_SUCCESS );
     if( rval )
     {
-    }                              // empty statement to prevent compiler warning
+    }  // empty statement to prevent compiler warning
     CartVect normal( &plane[0] );  // just first 3 components are used
 
     double area2;

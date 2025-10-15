@@ -40,7 +40,6 @@
 #endif
 #endif
 
-
 #endif
 
 /** Public Compiler-Specifc Pre-Processor Macros */
@@ -69,8 +68,7 @@
 #define MB_PRINTF( START )
 #endif
 
-
-#define UNUSED(x) (void)(x)
+#define UNUSED( x ) (void)( x )
 
 /**\def MB_DLL_EXPORT
  *\brief Declare a function or class to be visible in shared library.

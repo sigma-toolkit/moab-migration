@@ -723,7 +723,8 @@ ErrorCode WriteUtil::get_tag_list( std::vector< Tag >& result_list,
         for( int i = 0; i < user_tag_list_length; ++i )
         {
             std::string name;
-            MB_CHK_SET_ERR( mMB->tag_get_name( user_tag_list[i], name ), "Error getting name (" << name << ") for tag (Invalid input tag handle?)" );
+            MB_CHK_SET_ERR( mMB->tag_get_name( user_tag_list[i], name ),
+                            "Error getting name (" << name << ") for tag (Invalid input tag handle?)" );
 
             if( name.empty() )
             {
@@ -743,7 +744,7 @@ ErrorCode WriteUtil::get_tag_list( std::vector< Tag >& result_list,
     else
     {
         std::vector< Tag > temp_list;
-        MB_CHK_SET_ERR( mMB->tag_get_tags( temp_list ), "Interface::tag_get_tags failed"  );
+        MB_CHK_SET_ERR( mMB->tag_get_tags( temp_list ), "Interface::tag_get_tags failed" );
 
         result_list.clear();
         result_list.reserve( temp_list.size() );
@@ -752,7 +753,8 @@ ErrorCode WriteUtil::get_tag_list( std::vector< Tag >& result_list,
         for( i = temp_list.begin(); i != temp_list.end(); ++i )
         {
             std::string name;
-            MB_CHK_SET_ERR( mMB->tag_get_name( *i, name ), "Error getting name (" << name << ") for tag (Stale tag handle?)" );
+            MB_CHK_SET_ERR( mMB->tag_get_name( *i, name ),
+                            "Error getting name (" << name << ") for tag (Stale tag handle?)" );
 
             // Skip anonymous tags
             if( name.empty() ) continue;

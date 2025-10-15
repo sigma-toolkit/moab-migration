@@ -68,7 +68,7 @@ class SetIterator
                         int ent_dim,
                         bool check_valid = false )
         : myCore( core ), entSet( eset ), chunkSize( chunk_sz ), entType( ent_tp ), entDimension( ent_dim ),
-          checkValid( check_valid ){};
+          checkValid( check_valid ) {};
 
     //! Core instance
     Core* myCore;

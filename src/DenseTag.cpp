@@ -267,7 +267,8 @@ ErrorCode DenseTag::get_data( const SequenceManager* seqman,
 
     for( const EntityHandle* i = entities; i != end; ++i, ++pointers )
     {
-        result = get_array( seqman, NULL, *i, ptr, junk );MB_CHK_ERR( result );
+        result = get_array( seqman, NULL, *i, ptr, junk );
+        MB_CHK_ERR( result );
 
         if( ptr )
             *pointers = ptr;

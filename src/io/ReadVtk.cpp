@@ -110,7 +110,8 @@ class Modulator : public std::map< Hash, EntityHandle >
         Hash h( bytes, len );
         EntityHandle mset = this->congruence_class( h, bytes );
         ErrorCode rval;
-        rval = this->mesh->add_entities( mset, &ent, 1 );MB_CHK_SET_ERR_RET( rval, "Failed to add entities to mesh" );
+        rval = this->mesh->add_entities( mset, &ent, 1 );
+        MB_CHK_SET_ERR_RET( rval, "Failed to add entities to mesh" );
     }
 
     void add_entities( Range& range, const unsigned char* bytes, size_t bytes_per_ent )
@@ -120,7 +121,8 @@ class Modulator : public std::map< Hash, EntityHandle >
             Hash h( bytes, bytes_per_ent );
             EntityHandle mset = this->congruence_class( h, bytes );
             ErrorCode rval;
-            rval = this->mesh->add_entities( mset, &*it, 1 );MB_CHK_SET_ERR_RET( rval, "Failed to add entities to mesh" );
+            rval = this->mesh->add_entities( mset, &*it, 1 );
+            MB_CHK_SET_ERR_RET( rval, "Failed to add entities to mesh" );
         }
     }
 
@@ -132,15 +134,18 @@ class Modulator : public std::map< Hash, EntityHandle >
             EntityHandle mset;
             Range preexist;
             ErrorCode rval;
-            rval = this->mesh->get_entities_by_type_and_tag( 0, MBENTITYSET, &this->tag, &tag_data, 1, preexist );MB_CHK_SET_ERR_RET_VAL( rval, "Failed to get entities by type and tag", (EntityHandle)0 );
+            rval = this->mesh->get_entities_by_type_and_tag( 0, MBENTITYSET, &this->tag, &tag_data, 1, preexist );
+            MB_CHK_SET_ERR_RET_VAL( rval, "Failed to get entities by type and tag", (EntityHandle)0 );
             if( preexist.size() )
             {
                 mset = *preexist.begin();
             }
             else
             {
-                rval = this->mesh->create_meshset( MESHSET_SET, mset );MB_CHK_SET_ERR_RET_VAL( rval, "Failed to create mesh set", (EntityHandle)0 );
-                rval = this->mesh->tag_set_data( this->tag, &mset, 1, tag_data );MB_CHK_SET_ERR_RET_VAL( rval, "Failed to set tag data", (EntityHandle)0 );
+                rval = this->mesh->create_meshset( MESHSET_SET, mset );
+                MB_CHK_SET_ERR_RET_VAL( rval, "Failed to create mesh set", (EntityHandle)0 );
+                rval = this->mesh->tag_set_data( this->tag, &mset, 1, tag_data );
+                MB_CHK_SET_ERR_RET_VAL( rval, "Failed to set tag data", (EntityHandle)0 );
             }
             ( *this )[h] = mset;
             return mset;
@@ -832,7 +837,8 @@ ErrorCode ReadVtk::vtk_read_unstructured_grid( FileTokenizer& tokens,
                     }
                     Range adjFaces;
                     // find a face with these vertices; if not, we need to create one, on the fly :(
-                    rv = mdbImpl->get_adjacencies( connec, numverticesInFace, 2, false, adjFaces );MB_CHK_ERR( rv );
+                    rv = mdbImpl->get_adjacencies( connec, numverticesInFace, 2, false, adjFaces );
+                    MB_CHK_ERR( rv );
                     if( adjFaces.size() >= 1 )
                     {
                         conn_array[j] = adjFaces[0];  // get the first face found
@@ -844,7 +850,8 @@ ErrorCode ReadVtk::vtk_read_unstructured_grid( FileTokenizer& tokens,
                         if( 4 == numverticesInFace ) etype = MBQUAD;
                         if( 4 < numverticesInFace ) etype = MBPOLYGON;
 
-                        rv = mdbImpl->create_element( etype, connec, numverticesInFace, conn_array[j] );MB_CHK_ERR( rv );
+                        rv = mdbImpl->create_element( etype, connec, numverticesInFace, conn_array[j] );
+                        MB_CHK_ERR( rv );
                     }
                 }
 
@@ -1048,7 +1055,8 @@ ErrorCode ReadVtk::vtk_read_tag_data( FileTokenizer& tokens,
                    // 64-bit ints.
     }
     Modulator materialMap( this->mdbImpl );
-    result = materialMap.initialize( this->mPartitionTagName, mb_type, size, per_elem );MB_CHK_SET_ERR( result, "MaterialMap tag (" << this->mPartitionTagName << ") creation failed." );
+    result = materialMap.initialize( this->mPartitionTagName, mb_type, size, per_elem );
+    MB_CHK_SET_ERR( result, "MaterialMap tag (" << this->mPartitionTagName << ") creation failed." );
     bool isMaterial = size * per_elem <= 4 &&              // Must have int-sized values (ParallelComm requires it)
                       !this->mPartitionTagName.empty() &&  // Must have a non-empty field name...
                       !strcmp( name, this->mPartitionTagName.c_str() );  // ... that matches our spec.
@@ -1056,7 +1064,8 @@ ErrorCode ReadVtk::vtk_read_tag_data( FileTokenizer& tokens,
 
     // Get/create tag
     Tag handle;
-    result = mdbImpl->tag_get_handle( name, per_elem, mb_type, handle, MB_TAG_DENSE | MB_TAG_CREAT );MB_CHK_SET_ERR( result, "Tag name conflict for attribute \"" << name << "\" at line " << tokens.line_number() );
+    result = mdbImpl->tag_get_handle( name, per_elem, mb_type, handle, MB_TAG_DENSE | MB_TAG_CREAT );
+    MB_CHK_SET_ERR( result, "Tag name conflict for attribute \"" << name << "\" at line " << tokens.line_number() );
 
     std::vector< Range >::iterator iter;
 
@@ -1210,7 +1219,8 @@ ErrorCode ReadVtk::vtk_read_field_attrib( FileTokenizer& tokens, std::vector< Ra
         int type = tokens.match_token( vtk_type_names );
         if( !type ) return MB_FAILURE;
 
-        ErrorCode result = vtk_read_tag_data( tokens, type, num_comp, entities, name_alloc.c_str() );MB_CHK_SET_ERR( result, "Error reading data for field \"" << name_alloc << "\" (" << num_comp << " components, "
+        ErrorCode result = vtk_read_tag_data( tokens, type, num_comp, entities, name_alloc.c_str() );
+        MB_CHK_SET_ERR( result, "Error reading data for field \"" << name_alloc << "\" (" << num_comp << " components, "
                                                                   << num_tuples << " tuples, type " << type
                                                                   << ") at line " << tokens.line_number() );
     }

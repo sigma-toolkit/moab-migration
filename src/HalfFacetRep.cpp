@@ -137,7 +137,8 @@ bool HalfFacetRep::check_mixed_entity_type()
         ErrorCode error;
         Range felems, celems;
 
-        error = mb->get_entities_by_dimension( this->_rset, 2, felems );MB_CHK_ERR( error );
+        error = mb->get_entities_by_dimension( this->_rset, 2, felems );
+        MB_CHK_ERR( error );
 
         if( felems.size() )
         {
@@ -152,7 +153,8 @@ bool HalfFacetRep::check_mixed_entity_type()
             if( is_mixed ) return is_mixed;
         }
 
-        error = mb->get_entities_by_dimension( this->_rset, 3, celems );MB_CHK_ERR( error );
+        error = mb->get_entities_by_dimension( this->_rset, 3, celems );
+        MB_CHK_ERR( error );
         if( celems.size() )
         {
             Range tet, pyr, prism, hex, polyhed;
@@ -171,11 +173,13 @@ bool HalfFacetRep::check_mixed_entity_type()
         }
 
         ScdInterface* scdi = NULL;
-        error              = mb->query_interface( scdi );MB_CHK_ERR( error );
+        error              = mb->query_interface( scdi );
+        MB_CHK_ERR( error );
         if( scdi )
         {
             Range boxes;
-            error = scdi->find_boxes( boxes );MB_CHK_ERR( error );
+            error = scdi->find_boxes( boxes );
+            MB_CHK_ERR( error );
 
             if( !boxes.empty() ) is_mixed = true;
         }
@@ -198,29 +202,45 @@ ErrorCode HalfFacetRep::initialize()
         if( pcomm && _filterghost )
         {
             moab::Range _averts, _aedgs, _afacs, _acels;
-            error = mb->get_entities_by_dimension( this->_rset, 0, _averts, true );MB_CHK_ERR( error );
-            error = mb->get_entities_by_dimension( this->_rset, 1, _aedgs, true );MB_CHK_ERR( error );
-            error = mb->get_entities_by_dimension( this->_rset, 2, _afacs, true );MB_CHK_ERR( error );
-            error = mb->get_entities_by_dimension( this->_rset, 3, _acels, true );MB_CHK_ERR( error );
+            error = mb->get_entities_by_dimension( this->_rset, 0, _averts, true );
+            MB_CHK_ERR( error );
+            error = mb->get_entities_by_dimension( this->_rset, 1, _aedgs, true );
+            MB_CHK_ERR( error );
+            error = mb->get_entities_by_dimension( this->_rset, 2, _afacs, true );
+            MB_CHK_ERR( error );
+            error = mb->get_entities_by_dimension( this->_rset, 3, _acels, true );
+            MB_CHK_ERR( error );
 
             // filter based on parallel status
-            error = pcomm->filter_pstatus( _averts, PSTATUS_GHOST, PSTATUS_NOT, -1, &_verts );MB_CHK_ERR( error );
-            error = pcomm->filter_pstatus( _aedgs, PSTATUS_GHOST, PSTATUS_NOT, -1, &_edges );MB_CHK_ERR( error );
-            error = pcomm->filter_pstatus( _afacs, PSTATUS_GHOST, PSTATUS_NOT, -1, &_faces );MB_CHK_ERR( error );
-            error = pcomm->filter_pstatus( _acels, PSTATUS_GHOST, PSTATUS_NOT, -1, &_cells );MB_CHK_ERR( error );
+            error = pcomm->filter_pstatus( _averts, PSTATUS_GHOST, PSTATUS_NOT, -1, &_verts );
+            MB_CHK_ERR( error );
+            error = pcomm->filter_pstatus( _aedgs, PSTATUS_GHOST, PSTATUS_NOT, -1, &_edges );
+            MB_CHK_ERR( error );
+            error = pcomm->filter_pstatus( _afacs, PSTATUS_GHOST, PSTATUS_NOT, -1, &_faces );
+            MB_CHK_ERR( error );
+            error = pcomm->filter_pstatus( _acels, PSTATUS_GHOST, PSTATUS_NOT, -1, &_cells );
+            MB_CHK_ERR( error );
         }
         else
         {
-            error = mb->get_entities_by_dimension( this->_rset, 0, _verts, true );MB_CHK_ERR( error );
-            error = mb->get_entities_by_dimension( this->_rset, 1, _edges, true );MB_CHK_ERR( error );
-            error = mb->get_entities_by_dimension( this->_rset, 2, _faces, true );MB_CHK_ERR( error );
-            error = mb->get_entities_by_dimension( this->_rset, 3, _cells, true );MB_CHK_ERR( error );
+            error = mb->get_entities_by_dimension( this->_rset, 0, _verts, true );
+            MB_CHK_ERR( error );
+            error = mb->get_entities_by_dimension( this->_rset, 1, _edges, true );
+            MB_CHK_ERR( error );
+            error = mb->get_entities_by_dimension( this->_rset, 2, _faces, true );
+            MB_CHK_ERR( error );
+            error = mb->get_entities_by_dimension( this->_rset, 3, _cells, true );
+            MB_CHK_ERR( error );
         }
 #else
-        error = mb->get_entities_by_dimension( this->_rset, 0, _verts, true );MB_CHK_ERR( error );
-        error = mb->get_entities_by_dimension( this->_rset, 1, _edges, true );MB_CHK_ERR( error );
-        error = mb->get_entities_by_dimension( this->_rset, 2, _faces, true );MB_CHK_ERR( error );
-        error = mb->get_entities_by_dimension( this->_rset, 3, _cells, true );MB_CHK_ERR( error );
+        error = mb->get_entities_by_dimension( this->_rset, 0, _verts, true );
+        MB_CHK_ERR( error );
+        error = mb->get_entities_by_dimension( this->_rset, 1, _edges, true );
+        MB_CHK_ERR( error );
+        error = mb->get_entities_by_dimension( this->_rset, 2, _faces, true );
+        MB_CHK_ERR( error );
+        error = mb->get_entities_by_dimension( this->_rset, 3, _cells, true );
+        MB_CHK_ERR( error );
 
 #endif
 
@@ -235,36 +255,48 @@ ErrorCode HalfFacetRep::initialize()
         // Initialize mesh type specific maps
         if( thismeshtype == CURVE )
         {
-            error = init_curve();MB_CHK_ERR( error );
+            error = init_curve();
+            MB_CHK_ERR( error );
         }
         else if( thismeshtype == SURFACE )
         {
-            error = init_surface();MB_CHK_ERR( error );
+            error = init_surface();
+            MB_CHK_ERR( error );
         }
         else if( thismeshtype == SURFACE_MIXED )
         {
-            error = init_curve();MB_CHK_ERR( error );
-            error = init_surface();MB_CHK_ERR( error );
+            error = init_curve();
+            MB_CHK_ERR( error );
+            error = init_surface();
+            MB_CHK_ERR( error );
         }
         else if( thismeshtype == VOLUME )
         {
-            error = init_volume();MB_CHK_ERR( error );
+            error = init_volume();
+            MB_CHK_ERR( error );
         }
         else if( thismeshtype == VOLUME_MIXED_1 )
         {
-            error = init_curve();MB_CHK_ERR( error );
-            error = init_volume();MB_CHK_ERR( error );
+            error = init_curve();
+            MB_CHK_ERR( error );
+            error = init_volume();
+            MB_CHK_ERR( error );
         }
         else if( thismeshtype == VOLUME_MIXED_2 )
         {
-            error = init_surface();MB_CHK_ERR( error );
-            error = init_volume();MB_CHK_ERR( error );
+            error = init_surface();
+            MB_CHK_ERR( error );
+            error = init_volume();
+            MB_CHK_ERR( error );
         }
         else if( thismeshtype == VOLUME_MIXED )
         {
-            error = init_curve();MB_CHK_ERR( error );
-            error = init_surface();MB_CHK_ERR( error );
-            error = init_volume();MB_CHK_ERR( error );
+            error = init_curve();
+            MB_CHK_ERR( error );
+            error = init_surface();
+            MB_CHK_ERR( error );
+            error = init_volume();
+            MB_CHK_ERR( error );
         }
     }
     return MB_SUCCESS;
@@ -285,8 +317,10 @@ ErrorCode HalfFacetRep::init_curve()
     v2hv.resize( nv, 0 );
     sibhvs.resize( ne * 2, 0 );
 
-    error = determine_sibling_halfverts( _verts, _edges );MB_CHK_ERR( error );
-    error = determine_incident_halfverts( _edges );MB_CHK_ERR( error );
+    error = determine_sibling_halfverts( _verts, _edges );
+    MB_CHK_ERR( error );
+    error = determine_incident_halfverts( _edges );
+    MB_CHK_ERR( error );
 
     return MB_SUCCESS;
 }
@@ -304,8 +338,10 @@ ErrorCode HalfFacetRep::init_surface()
     sibhes.resize( nf * nepf, 0 );
 
     // Construct ahf maps
-    error = determine_sibling_halfedges( _faces );MB_CHK_ERR( error );
-    error = determine_incident_halfedges( _faces );MB_CHK_ERR( error );
+    error = determine_sibling_halfedges( _faces );
+    MB_CHK_ERR( error );
+    error = determine_incident_halfedges( _faces );
+    MB_CHK_ERR( error );
 
     // Initialize queues for storing face and local id's during local search
     for( int i = 0; i < MAXSIZE; i++ )
@@ -338,8 +374,10 @@ ErrorCode HalfFacetRep::init_volume()
     sibhfs.resize( nc * nfpc, 0 );
 
     // Construct the maps
-    error = determine_sibling_halffaces( _cells );MB_CHK_ERR( error );
-    error = determine_incident_halffaces( _cells );MB_CHK_ERR( error );
+    error = determine_sibling_halffaces( _cells );
+    MB_CHK_ERR( error );
+    error = determine_incident_halffaces( _cells );
+    MB_CHK_ERR( error );
 
     // Initialize queues for storing face and local id's during local search
     for( int i = 0; i < MAXSIZE; i++ )
@@ -498,7 +536,8 @@ ErrorCode HalfFacetRep::get_adjacencies( const EntityHandle source_entity,
 
     if( mInitAHFmaps == false )
     {
-        error = initialize();MB_CHK_ERR( error );
+        error = initialize();
+        MB_CHK_ERR( error );
     }
 
     int mindex       = get_index_for_meshtype( thismeshtype );
@@ -508,15 +547,18 @@ ErrorCode HalfFacetRep::get_adjacencies( const EntityHandle source_entity,
     {
         if( source_dimension < target_dimension )
         {
-            error = get_up_adjacencies( source_entity, target_dimension, target_entities );MB_CHK_ERR( error );
+            error = get_up_adjacencies( source_entity, target_dimension, target_entities );
+            MB_CHK_ERR( error );
         }
         else if( source_dimension == target_dimension )
         {
-            error = get_neighbor_adjacencies( source_entity, target_entities );MB_CHK_ERR( error );
+            error = get_neighbor_adjacencies( source_entity, target_entities );
+            MB_CHK_ERR( error );
         }
         else
         {
-            error = get_down_adjacencies( source_entity, target_dimension, target_entities );MB_CHK_ERR( error );
+            error = get_down_adjacencies( source_entity, target_dimension, target_entities );
+            MB_CHK_ERR( error );
         }
     }
     else
@@ -538,29 +580,35 @@ ErrorCode HalfFacetRep::get_up_adjacencies( EntityHandle ent,
     {
         if( out_dim == 1 )
         {
-            error = get_up_adjacencies_1d( ent, adjents, lids );MB_CHK_ERR( error );
+            error = get_up_adjacencies_1d( ent, adjents, lids );
+            MB_CHK_ERR( error );
         }
         else if( out_dim == 2 )
         {
-            error = get_up_adjacencies_vert_2d( ent, adjents );MB_CHK_ERR( error );
+            error = get_up_adjacencies_vert_2d( ent, adjents );
+            MB_CHK_ERR( error );
         }
         else if( out_dim == 3 )
         {
-            error = get_up_adjacencies_vert_3d( ent, adjents );MB_CHK_ERR( error );
+            error = get_up_adjacencies_vert_3d( ent, adjents );
+            MB_CHK_ERR( error );
         }
     }
 
     else if( ( in_dim == 1 ) && ( out_dim == 2 ) )
     {
-        error = get_up_adjacencies_2d( ent, adjents, lids );MB_CHK_ERR( error );
+        error = get_up_adjacencies_2d( ent, adjents, lids );
+        MB_CHK_ERR( error );
     }
     else if( ( in_dim == 1 ) && ( out_dim == 3 ) )
     {
-        error = get_up_adjacencies_edg_3d( ent, adjents, lids );MB_CHK_ERR( error );
+        error = get_up_adjacencies_edg_3d( ent, adjents, lids );
+        MB_CHK_ERR( error );
     }
     else if( ( in_dim == 2 ) && ( out_dim == 3 ) )
     {
-        error = get_up_adjacencies_face_3d( ent, adjents, lids );MB_CHK_ERR( error );
+        error = get_up_adjacencies_face_3d( ent, adjents, lids );
+        MB_CHK_ERR( error );
     }
     return MB_SUCCESS;
 }
@@ -573,16 +621,19 @@ ErrorCode HalfFacetRep::get_neighbor_adjacencies( EntityHandle ent, std::vector<
 
     if( in_dim == 1 )
     {
-        error = get_neighbor_adjacencies_1d( ent, adjents );MB_CHK_ERR( error );
+        error = get_neighbor_adjacencies_1d( ent, adjents );
+        MB_CHK_ERR( error );
     }
 
     else if( in_dim == 2 )
     {
-        error = get_neighbor_adjacencies_2d( ent, adjents );MB_CHK_ERR( error );
+        error = get_neighbor_adjacencies_2d( ent, adjents );
+        MB_CHK_ERR( error );
     }
     else if( in_dim == 3 )
     {
-        error = get_neighbor_adjacencies_3d( ent, adjents );MB_CHK_ERR( error );
+        error = get_neighbor_adjacencies_3d( ent, adjents );
+        MB_CHK_ERR( error );
     }
     return MB_SUCCESS;
 }
@@ -595,15 +646,18 @@ ErrorCode HalfFacetRep::get_down_adjacencies( EntityHandle ent, int out_dim, std
 
     if( ( in_dim == 2 ) && ( out_dim == 1 ) )
     {
-        error = get_down_adjacencies_2d( ent, adjents );MB_CHK_ERR( error );
+        error = get_down_adjacencies_2d( ent, adjents );
+        MB_CHK_ERR( error );
     }
     else if( ( in_dim == 3 ) && ( out_dim == 1 ) )
     {
-        error = get_down_adjacencies_edg_3d( ent, adjents );MB_CHK_ERR( error );
+        error = get_down_adjacencies_edg_3d( ent, adjents );
+        MB_CHK_ERR( error );
     }
     else if( ( in_dim == 3 ) && ( out_dim == 2 ) )
     {
-        error = get_down_adjacencies_face_3d( ent, adjents );MB_CHK_ERR( error );
+        error = get_down_adjacencies_face_3d( ent, adjents );
+        MB_CHK_ERR( error );
     }
     return MB_SUCCESS;
 }
@@ -623,7 +677,8 @@ ErrorCode HalfFacetRep::count_subentities( Range& edges, Range& faces, Range& ce
     }
     else if( cells.size() )
     {
-        error = find_total_edges_faces_3d( cells, nedges, nfaces );MB_CHK_ERR( error );
+        error = find_total_edges_faces_3d( cells, nedges, nfaces );
+        MB_CHK_ERR( error );
     }
     return MB_SUCCESS;
 }
@@ -645,7 +700,8 @@ ErrorCode HalfFacetRep::determine_sibling_halfverts( Range& verts, Range& edges 
     {
         const EntityHandle* conn;
         int num_conn = 0;
-        error        = mb->get_connectivity( *eid, conn, num_conn, true );MB_CHK_ERR( error );
+        error        = mb->get_connectivity( *eid, conn, num_conn, true );
+        MB_CHK_ERR( error );
 
         int index = verts.index( conn[0] );
         is_index[index + 1] += 1;
@@ -665,7 +721,8 @@ ErrorCode HalfFacetRep::determine_sibling_halfverts( Range& verts, Range& edges 
     {
         const EntityHandle* conn;
         int num_conn = 0;
-        error        = mb->get_connectivity( *eid, conn, num_conn, true );MB_CHK_ERR( error );
+        error        = mb->get_connectivity( *eid, conn, num_conn, true );
+        MB_CHK_ERR( error );
 
         for( int j = 0; j < 2; j++ )
         {
@@ -717,7 +774,8 @@ ErrorCode HalfFacetRep::determine_incident_halfverts( Range& edges )
         EntityHandle cur_eid = *e_it;
         const EntityHandle* conn;
         int num_conn = 0;
-        error        = mb->get_connectivity( *e_it, conn, num_conn, true );MB_CHK_ERR( error );
+        error        = mb->get_connectivity( *e_it, conn, num_conn, true );
+        MB_CHK_ERR( error );
 
         for( int i = 0; i < 2; ++i )
         {
@@ -847,7 +905,8 @@ ErrorCode HalfFacetRep::determine_sibling_halfedges( Range& faces )
     for( Range::iterator fid = faces.begin(); fid != faces.end(); ++fid )
     {
         const EntityHandle* conn;
-        error = mb->get_connectivity( *fid, conn, nepf, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( *fid, conn, nepf, true );
+        MB_CHK_ERR( error );
 
         for( int i = 0; i < nepf; i++ )
         {
@@ -868,7 +927,8 @@ ErrorCode HalfFacetRep::determine_sibling_halfedges( Range& faces )
     for( Range::iterator fid = faces.begin(); fid != faces.end(); ++fid )
     {
         const EntityHandle* conn;
-        error = mb->get_connectivity( *fid, conn, nepf, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( *fid, conn, nepf, true );
+        MB_CHK_ERR( error );
 
         for( int j = 0; j < nepf; j++ )
         {
@@ -889,7 +949,8 @@ ErrorCode HalfFacetRep::determine_sibling_halfedges( Range& faces )
     for( Range::iterator fid = faces.begin(); fid != faces.end(); ++fid )
     {
         const EntityHandle* conn;
-        error = mb->get_connectivity( *fid, conn, nepf, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( *fid, conn, nepf, true );
+        MB_CHK_ERR( error );
 
         int fidx = ID_FROM_HANDLE( *fid ) - 1;
         for( int k = 0; k < nepf; k++ )
@@ -964,7 +1025,8 @@ ErrorCode HalfFacetRep::determine_incident_halfedges( Range& faces )
     {
         EntityHandle fid = *it;
         const EntityHandle* conn;
-        error = mb->get_connectivity( fid, conn, nepf, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( fid, conn, nepf, true );
+        MB_CHK_ERR( error );
 
         for( int i = 0; i < nepf; ++i )
         {
@@ -976,7 +1038,8 @@ ErrorCode HalfFacetRep::determine_incident_halfedges( Range& faces )
             {
                 // This is the first time a half-facet is assigned to a vertex.
                 HFacet nwhf = 0;
-                error       = mark_halfedges( v, fid, i, faces, markEdges, nwhf );MB_CHK_ERR( error );
+                error       = mark_halfedges( v, fid, i, faces, markEdges, nwhf );
+                MB_CHK_ERR( error );
 
                 if( nwhf == 0 ) nwhf = create_halffacet( fid, i );
 
@@ -988,7 +1051,8 @@ ErrorCode HalfFacetRep::determine_incident_halfedges( Range& faces )
                 // in v2he[v] to the multimap.
                 v2hes.insert( std::pair< EntityHandle, HFacet >( v, hf ) );
                 HFacet nwhf = 0;
-                error       = mark_halfedges( v, fid, i, faces, markEdges, nwhf );MB_CHK_ERR( error );
+                error       = mark_halfedges( v, fid, i, faces, markEdges, nwhf );
+                MB_CHK_ERR( error );
 
                 if( nwhf == 0 ) nwhf = create_halffacet( fid, i );
 
@@ -1001,7 +1065,8 @@ ErrorCode HalfFacetRep::determine_incident_halfedges( Range& faces )
                 // This is check if reached if the vertex is non-manifold and has encountered a
                 // half-facet to a new component.
                 HFacet nwhf = 0;
-                error       = mark_halfedges( v, fid, i, faces, markEdges, nwhf );MB_CHK_ERR( error );
+                error       = mark_halfedges( v, fid, i, faces, markEdges, nwhf );
+                MB_CHK_ERR( error );
 
                 if( nwhf == 0 ) nwhf = create_halffacet( fid, i );
 
@@ -1030,7 +1095,8 @@ ErrorCode HalfFacetRep::mark_halfedges( EntityHandle vid,
     int qsize = 0, count = -1;
     int num_qvals = 0;
 
-    error = gather_halfedges( vid, he_fid, he_lid, &qsize, &count );MB_CHK_ERR( error );
+    error = gather_halfedges( vid, he_fid, he_lid, &qsize, &count );
+    MB_CHK_ERR( error );
 
     while( num_qvals < qsize )
     {
@@ -1041,7 +1107,8 @@ ErrorCode HalfFacetRep::mark_halfedges( EntityHandle vid,
         int fidx = ID_FROM_HANDLE( curfid ) - 1;
 
         const EntityHandle* conn;
-        error = mb->get_connectivity( curfid, conn, nepf, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( curfid, conn, nepf, true );
+        MB_CHK_ERR( error );
 
         if( !markHEdgs[nepf * faces.index( curfid ) + curlid] && ( conn[curlid] == vid ) )
         {
@@ -1053,7 +1120,8 @@ ErrorCode HalfFacetRep::mark_halfedges( EntityHandle vid,
 
         EntityHandle he2_fid = 0;
         int he2_lid          = 0;
-        error                = another_halfedge( vid, curfid, curlid, &he2_fid, &he2_lid );MB_CHK_ERR( error );
+        error                = another_halfedge( vid, curfid, curlid, &he2_fid, &he2_lid );
+        MB_CHK_ERR( error );
 
         if( !markHEdgs[nepf * faces.index( curfid ) + he2_lid] && ( conn[he2_lid] == vid ) )
         {
@@ -1070,7 +1138,8 @@ ErrorCode HalfFacetRep::mark_halfedges( EntityHandle vid,
         count += 1;
         trackfaces[count] = he2_fid;
 
-        error = get_up_adjacencies_2d( he2_fid, he2_lid, &qsize, &count );MB_CHK_ERR( error );
+        error = get_up_adjacencies_2d( he2_fid, he2_lid, &qsize, &count );
+        MB_CHK_ERR( error );
     }
 
     // Change the visited faces to false, also empty the queue
@@ -1125,7 +1194,8 @@ ErrorCode HalfFacetRep::get_up_adjacencies_vert_2d( EntityHandle vid, std::vecto
     for( int i = 0; i < (int)start_fids.size(); i++ )
     {
         adjents.push_back( start_fids[i] );
-        error = gather_halfedges( vid, start_fids[i], start_lids[i], &qsize, &count );MB_CHK_ERR( error );
+        error = gather_halfedges( vid, start_fids[i], start_lids[i], &qsize, &count );
+        MB_CHK_ERR( error );
     }
 
     while( num_qvals < qsize )
@@ -1136,7 +1206,8 @@ ErrorCode HalfFacetRep::get_up_adjacencies_vert_2d( EntityHandle vid, std::vecto
 
         EntityHandle he2_fid = 0;
         int he2_lid          = 0;
-        error                = another_halfedge( vid, curfid, curlid, &he2_fid, &he2_lid );MB_CHK_ERR( error );
+        error                = another_halfedge( vid, curfid, curlid, &he2_fid, &he2_lid );
+        MB_CHK_ERR( error );
 
         bool val = find_match_in_array( he2_fid, trackfaces, count );
 
@@ -1145,7 +1216,8 @@ ErrorCode HalfFacetRep::get_up_adjacencies_vert_2d( EntityHandle vid, std::vecto
         count += 1;
         trackfaces[count] = he2_fid;
 
-        error = get_up_adjacencies_2d( he2_fid, he2_lid, &qsize, &count );MB_CHK_ERR( error );
+        error = get_up_adjacencies_2d( he2_fid, he2_lid, &qsize, &count );
+        MB_CHK_ERR( error );
 
         adjents.push_back( he2_fid );
     }
@@ -1181,7 +1253,8 @@ ErrorCode HalfFacetRep::get_up_adjacencies_2d( EntityHandle eid,
     // incident faces.
     if( found )
     {
-        error = get_up_adjacencies_2d( he_fid, he_lid, true, adjents, leids );MB_CHK_ERR( error );
+        error = get_up_adjacencies_2d( he_fid, he_lid, true, adjents, leids );
+        MB_CHK_ERR( error );
     }
 
     return MB_SUCCESS;
@@ -1229,7 +1302,8 @@ ErrorCode HalfFacetRep::get_up_adjacencies_2d( EntityHandle fid,
     {
         // get connectivity and match their directions
         const EntityHandle* fid_conn;
-        error = mb->get_connectivity( fid, fid_conn, nepf, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( fid, fid_conn, nepf, true );
+        MB_CHK_ERR( error );
 
         int nidx = lConnMap2D[ftype - 2].next[leid];
         fedge[0] = fid_conn[leid];
@@ -1251,7 +1325,8 @@ ErrorCode HalfFacetRep::get_up_adjacencies_2d( EntityHandle fid,
         {
             // get connectivity and match their directions
             const EntityHandle* conn;
-            error = mb->get_connectivity( curfid, conn, nepf, true );MB_CHK_ERR( error );
+            error = mb->get_connectivity( curfid, conn, nepf, true );
+            MB_CHK_ERR( error );
 
             int nidx = lConnMap2D[ftype - 2].next[curlid];
 
@@ -1322,7 +1397,8 @@ bool HalfFacetRep::find_matching_halfedge( EntityHandle eid, EntityHandle* hefid
 
     const EntityHandle* conn;
     int num_conn = 0;
-    error        = mb->get_connectivity( eid, conn, num_conn, true );MB_CHK_ERR( error );
+    error        = mb->get_connectivity( eid, conn, num_conn, true );
+    MB_CHK_ERR( error );
 
     EntityHandle vid = conn[0];
     int vidx         = ID_FROM_HANDLE( conn[0] ) - 1;
@@ -1346,9 +1422,11 @@ bool HalfFacetRep::find_matching_halfedge( EntityHandle eid, EntityHandle* hefid
     bool found = false;
     int qsize = 0, count = -1;
 
-    error = gather_halfedges( vid, fid, lid, &qsize, &count );MB_CHK_ERR( error );
+    error = gather_halfedges( vid, fid, lid, &qsize, &count );
+    MB_CHK_ERR( error );
 
-    found = collect_and_compare( vid, conn, &qsize, &count, hefid, helid );MB_CHK_ERR( error );
+    found = collect_and_compare( vid, conn, &qsize, &count, hefid, helid );
+    MB_CHK_ERR( error );
 
     // Change the visited faces to false
     for( int i = 0; i < qsize; i++ )
@@ -1369,7 +1447,8 @@ ErrorCode HalfFacetRep::gather_halfedges( EntityHandle vid, EntityHandle he_fid,
     EntityHandle he2_fid = 0;
     int he2_lid          = 0;
 
-    error = another_halfedge( vid, he_fid, he_lid, &he2_fid, &he2_lid );MB_CHK_ERR( error );
+    error = another_halfedge( vid, he_fid, he_lid, &he2_fid, &he2_lid );
+    MB_CHK_ERR( error );
 
     queue_fid[*qsize] = he_fid;
     queue_lid[*qsize] = he_lid;
@@ -1382,8 +1461,10 @@ ErrorCode HalfFacetRep::gather_halfedges( EntityHandle vid, EntityHandle he_fid,
     *count += 1;
     trackfaces[*count] = he_fid;
 
-    error = get_up_adjacencies_2d( he_fid, he_lid, qsize, count );MB_CHK_ERR( error );
-    error = get_up_adjacencies_2d( he2_fid, he2_lid, qsize, count );MB_CHK_ERR( error );
+    error = get_up_adjacencies_2d( he_fid, he_lid, qsize, count );
+    MB_CHK_ERR( error );
+    error = get_up_adjacencies_2d( he2_fid, he2_lid, qsize, count );
+    MB_CHK_ERR( error );
 
     return MB_SUCCESS;
 }
@@ -1400,7 +1481,8 @@ ErrorCode HalfFacetRep::another_halfedge( EntityHandle vid,
     int nepf         = lConnMap2D[ftype - 2].num_verts_in_face;
 
     const EntityHandle* conn;
-    error = mb->get_connectivity( he_fid, conn, nepf, true );MB_CHK_ERR( error );
+    error = mb->get_connectivity( he_fid, conn, nepf, true );
+    MB_CHK_ERR( error );
 
     *he2_fid = he_fid;
     if( conn[he_lid] == vid )
@@ -1433,7 +1515,8 @@ bool HalfFacetRep::collect_and_compare( const EntityHandle vid,
         num_qvals += 1;
 
         const EntityHandle* conn;
-        error = mb->get_connectivity( curfid, conn, nepf, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( curfid, conn, nepf, true );
+        MB_CHK_ERR( error );
 
         int id = lConnMap2D[ftype - 2].next[curlid];
         if( ( ( conn[curlid] == edg_vert[0] ) && ( conn[id] == edg_vert[1] ) ) ||
@@ -1454,8 +1537,10 @@ bool HalfFacetRep::collect_and_compare( const EntityHandle vid,
 
         EntityHandle he2_fid;
         int he2_lid;
-        error = another_halfedge( vid, curfid, curlid, &he2_fid, &he2_lid );MB_CHK_ERR( error );
-        error = get_up_adjacencies_2d( he2_fid, he2_lid, qsize, count );MB_CHK_ERR( error );
+        error = another_halfedge( vid, curfid, curlid, &he2_fid, &he2_lid );
+        MB_CHK_ERR( error );
+        error = get_up_adjacencies_2d( he2_fid, he2_lid, qsize, count );
+        MB_CHK_ERR( error );
 
         counter += 1;
     }
@@ -1474,7 +1559,8 @@ ErrorCode HalfFacetRep::get_neighbor_adjacencies_2d( EntityHandle fid, std::vect
 
         for( int lid = 0; lid < nepf; ++lid )
         {
-            error = get_up_adjacencies_2d( fid, lid, false, adjents );MB_CHK_ERR( error );
+            error = get_up_adjacencies_2d( fid, lid, false, adjents );
+            MB_CHK_ERR( error );
         }
     }
 
@@ -1491,7 +1577,8 @@ ErrorCode HalfFacetRep::get_down_adjacencies_2d( EntityHandle fid, std::vector< 
     int nepf         = lConnMap2D[ftype - 2].num_verts_in_face;
 
     const EntityHandle* conn;
-    error = mb->get_connectivity( fid, conn, nepf, true );MB_CHK_ERR( error );
+    error = mb->get_connectivity( fid, conn, nepf, true );
+    MB_CHK_ERR( error );
 
     std::vector< EntityHandle > temp;
 
@@ -1513,14 +1600,16 @@ ErrorCode HalfFacetRep::get_down_adjacencies_2d( EntityHandle fid, std::vector< 
         EntityHandle vprev = conn[pidx];
 
         // Get incident edges on v
-        error = get_up_adjacencies_1d( v, temp );MB_CHK_ERR( error );
+        error = get_up_adjacencies_1d( v, temp );
+        MB_CHK_ERR( error );
 
         // Loop over the incident edges and check if its end vertices match those in the face
         for( int k = 0; k < (int)temp.size(); k++ )
         {
             const EntityHandle* econn;
             int num_conn = 0;
-            error        = mb->get_connectivity( temp[k], econn, num_conn, true );MB_CHK_ERR( error );
+            error        = mb->get_connectivity( temp[k], econn, num_conn, true );
+            MB_CHK_ERR( error );
 
             if( ( econn[0] == v && econn[1] == vnext ) || ( econn[0] == v && econn[1] == vprev ) ||
                 ( econn[0] == vnext && econn[1] == v ) || ( econn[0] == vprev && econn[1] == v ) )
@@ -1567,7 +1656,8 @@ int HalfFacetRep::find_total_edges_2d( Range& faces )
             int id = nepf * ( faces.index( *f ) ) + l;
             if( !trackF[id] )
             {
-                error = get_up_adjacencies_2d( *f, l, false, adj_fids, &adj_lids );MB_CHK_ERR( error );
+                error = get_up_adjacencies_2d( *f, l, false, adj_fids, &adj_lids );
+                MB_CHK_ERR( error );
 
                 total_edges -= adj_fids.size();
 
@@ -1589,7 +1679,8 @@ ErrorCode HalfFacetRep::get_face_edges( EntityHandle fid, std::vector< EntityHan
     int nepf         = lConnMap2D[ftype - 2].num_verts_in_face;
 
     std::vector< EntityHandle > conn;
-    error = mb->get_connectivity( &fid, 1, conn );MB_CHK_ERR( error );
+    error = mb->get_connectivity( &fid, 1, conn );
+    MB_CHK_ERR( error );
 
     for( int i = 0; i < nepf; i++ )
     {
@@ -1597,8 +1688,10 @@ ErrorCode HalfFacetRep::get_face_edges( EntityHandle fid, std::vector< EntityHan
         EntityHandle v1 = conn[lConnMap2D[ftype - 2].next[i]];
 
         std::vector< EntityHandle > e0, e1, ecom;
-        error = get_up_adjacencies_1d( v0, e0 );MB_CHK_ERR( error );
-        error = get_up_adjacencies_1d( v1, e1 );MB_CHK_ERR( error );
+        error = get_up_adjacencies_1d( v0, e0 );
+        MB_CHK_ERR( error );
+        error = get_up_adjacencies_1d( v1, e1 );
+        MB_CHK_ERR( error );
 
         std::sort( e0.begin(), e0.end() );
         std::sort( e1.begin(), e1.end() );
@@ -1744,7 +1837,8 @@ ErrorCode HalfFacetRep::determine_sibling_halffaces( Range& cells )
     for( Range::iterator cid = cells.begin(); cid != cells.end(); ++cid )
     {
         const EntityHandle* conn;
-        error = mb->get_connectivity( *cid, conn, nvpc, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( *cid, conn, nvpc, true );
+        MB_CHK_ERR( error );
 
         for( int i = 0; i < nfpc; ++i )
         {
@@ -1773,7 +1867,8 @@ ErrorCode HalfFacetRep::determine_sibling_halffaces( Range& cells )
     for( Range::iterator cid = cells.begin(); cid != cells.end(); ++cid )
     {
         const EntityHandle* conn;
-        error = mb->get_connectivity( *cid, conn, nvpc, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( *cid, conn, nvpc, true );
+        MB_CHK_ERR( error );
 
         for( int i = 0; i < nfpc; i++ )
         {
@@ -1812,7 +1907,8 @@ ErrorCode HalfFacetRep::determine_sibling_halffaces( Range& cells )
     for( Range::iterator cid = cells.begin(); cid != cells.end(); ++cid )
     {
         const EntityHandle* conn;
-        error = mb->get_connectivity( *cid, conn, nvpc, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( *cid, conn, nvpc, true );
+        MB_CHK_ERR( error );
 
         int cidx = ID_FROM_HANDLE( *cid ) - 1;
         for( int i = 0; i < nfpc; i++ )
@@ -1877,7 +1973,8 @@ ErrorCode HalfFacetRep::determine_incident_halffaces( Range& cells )
     {
         EntityHandle cell = *cid;
         const EntityHandle* conn;
-        error = mb->get_connectivity( *cid, conn, nvpc, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( *cid, conn, nvpc, true );
+        MB_CHK_ERR( error );
 
         for( int i = 0; i < nvpc; ++i )
         {
@@ -1890,14 +1987,16 @@ ErrorCode HalfFacetRep::determine_incident_halffaces( Range& cells )
             if( hf == 0 && !found && ( v2hfs.empty() || ( v2hfs.find( v ) == v2hfs.end() ) ) )
             {
                 nwhf  = 0;
-                error = add_cells_of_single_component( v, cell, lConnMap3D[index].v2hf[i][0], comps, nwhf );MB_CHK_ERR( error );
+                error = add_cells_of_single_component( v, cell, lConnMap3D[index].v2hf[i][0], comps, nwhf );
+                MB_CHK_ERR( error );
 
                 v2hf[vidx] = nwhf;
             }
             else if( hf != 0 && !found )
             {
                 nwhf  = 0;
-                error = add_cells_of_single_component( v, cell, lConnMap3D[index].v2hf[i][0], comps, nwhf );MB_CHK_ERR( error );
+                error = add_cells_of_single_component( v, cell, lConnMap3D[index].v2hf[i][0], comps, nwhf );
+                MB_CHK_ERR( error );
 
                 v2hfs.insert( std::pair< EntityHandle, HFacet >( v, hf ) );
                 v2hfs.insert( std::pair< EntityHandle, HFacet >( v, nwhf ) );
@@ -1906,7 +2005,8 @@ ErrorCode HalfFacetRep::determine_incident_halffaces( Range& cells )
             else if( hf == 0 && !found && ( !v2hfs.empty() ) && ( v2hfs.find( v ) != v2hfs.end() ) )
             {
                 nwhf  = 0;
-                error = add_cells_of_single_component( v, cell, lConnMap3D[index].v2hf[i][0], comps, nwhf );MB_CHK_ERR( error );
+                error = add_cells_of_single_component( v, cell, lConnMap3D[index].v2hf[i][0], comps, nwhf );
+                MB_CHK_ERR( error );
                 v2hfs.insert( std::pair< EntityHandle, HFacet >( v, nwhf ) );
             }
         }
@@ -1932,7 +2032,8 @@ ErrorCode HalfFacetRep::determine_border_vertices( Range& cells, Tag isborder )
     {
 
         const EntityHandle* conn;
-        error = mb->get_connectivity( *t, conn, nvpc, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( *t, conn, nvpc, true );
+        MB_CHK_ERR( error );
 
         int cidx = ID_FROM_HANDLE( *t ) - 1;
         for( int i = 0; i < nfpc; ++i )
@@ -1947,7 +2048,8 @@ ErrorCode HalfFacetRep::determine_border_vertices( Range& cells, Tag isborder )
                 for( int j = 0; j < nvF; ++j )
                 {
                     int ind = lConnMap3D[index].hf2v[i][j];
-                    error   = mb->tag_set_data( isborder, &conn[ind], 1, &val );MB_CHK_ERR( error );
+                    error   = mb->tag_set_data( isborder, &conn[ind], 1, &val );
+                    MB_CHK_ERR( error );
                 }
             }
         }
@@ -1992,7 +2094,8 @@ ErrorCode HalfFacetRep::add_cells_of_single_component( EntityHandle vid,
 
         // Connectivity of the cell
         const EntityHandle* conn;
-        error = mb->get_connectivity( cur_cid, conn, nvpc, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( cur_cid, conn, nvpc, true );
+        MB_CHK_ERR( error );
 
         // Local id of vid in the cell and the half-faces incident on it
         int lv = -1;
@@ -2117,7 +2220,8 @@ ErrorCode HalfFacetRep::get_up_adjacencies_vert_3d( EntityHandle vid, std::vecto
 
         // Connectivity of the cell
         const EntityHandle* conn;
-        error = mb->get_connectivity( cur_cid, conn, nvpc, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( cur_cid, conn, nvpc, true );
+        MB_CHK_ERR( error );
 
         // Local id of vid in the cell and the half-faces incident on it
         int lv = -1;
@@ -2179,7 +2283,8 @@ ErrorCode HalfFacetRep::get_up_adjacencies_edg_3d( EntityHandle eid,
     // Find the edge vertices
     const EntityHandle* econn;
     int num_conn = 0;
-    error        = mb->get_connectivity( eid, econn, num_conn, true );MB_CHK_ERR( error );
+    error        = mb->get_connectivity( eid, econn, num_conn, true );
+    MB_CHK_ERR( error );
 
     EntityHandle v_start = econn[0], v_end = econn[1];
     int v1idx = ID_FROM_HANDLE( v_start ) - 1;
@@ -2240,7 +2345,8 @@ ErrorCode HalfFacetRep::get_up_adjacencies_edg_3d( EntityHandle eid,
         num_qvals += 1;
 
         const EntityHandle* conn;
-        error = mb->get_connectivity( cell_id, conn, nvpc, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( cell_id, conn, nvpc, true );
+        MB_CHK_ERR( error );
 
         int lv0 = -1, lv1 = -1, lv = -1;
 
@@ -2321,7 +2427,8 @@ ErrorCode HalfFacetRep::get_up_adjacencies_edg_3d( EntityHandle cid,
     }
 
     const EntityHandle* econn;
-    error = mb->get_connectivity( cid, econn, nvpc, true );MB_CHK_ERR( error );
+    error = mb->get_connectivity( cid, econn, nvpc, true );
+    MB_CHK_ERR( error );
 
     // Get the end vertices of the edge <cid,leid>
     int id               = lConnMap3D[index].e2v[leid][0];
@@ -2387,7 +2494,8 @@ ErrorCode HalfFacetRep::get_up_adjacencies_edg_3d( EntityHandle cid,
         num_qvals += 1;
 
         const EntityHandle* conn;
-        error = mb->get_connectivity( cell_id, conn, nvpc, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( cell_id, conn, nvpc, true );
+        MB_CHK_ERR( error );
 
         int lv0 = -1, lv1 = -1, lv = -1;
 
@@ -2478,7 +2586,8 @@ ErrorCode HalfFacetRep::get_up_adjacencies_edg_3d_comp( EntityHandle cid,
     }
 
     const EntityHandle* econn;
-    error = mb->get_connectivity( cid, econn, nvpc );MB_CHK_ERR( error );
+    error = mb->get_connectivity( cid, econn, nvpc );
+    MB_CHK_ERR( error );
 
     // Get the end vertices of the edge <cid,leid>
     int id               = lConnMap3D[index].e2v[leid][0];
@@ -2528,7 +2637,8 @@ ErrorCode HalfFacetRep::get_up_adjacencies_edg_3d_comp( EntityHandle cid,
             num_qvals += 1;
 
             const EntityHandle* conn;
-            error = mb->get_connectivity( cell_id, conn, nvpc );MB_CHK_ERR( error );
+            error = mb->get_connectivity( cell_id, conn, nvpc );
+            MB_CHK_ERR( error );
 
             int lv0 = -1, lv1 = -1, lv = -1;
 
@@ -2611,7 +2721,8 @@ ErrorCode HalfFacetRep::get_up_adjacencies_face_3d( EntityHandle fid,
 
     if( found )
     {
-        error = get_up_adjacencies_face_3d( cid, lid, adjents, lfids );MB_CHK_ERR( error );
+        error = get_up_adjacencies_face_3d( cid, lid, adjents, lfids );
+        MB_CHK_ERR( error );
     }
 
     return MB_SUCCESS;
@@ -2665,7 +2776,8 @@ bool HalfFacetRep::find_matching_implicit_edge_in_cell( EntityHandle eid,
     // Find the edge vertices
     const EntityHandle* econn;
     int num_conn = 0;
-    error        = mb->get_connectivity( eid, econn, num_conn, true );MB_CHK_ERR( error );
+    error        = mb->get_connectivity( eid, econn, num_conn, true );
+    MB_CHK_ERR( error );
 
     EntityHandle v_start = econn[0], v_end = econn[1];
     int v1idx = ID_FROM_HANDLE( v_start ) - 1;
@@ -2730,7 +2842,8 @@ bool HalfFacetRep::find_matching_implicit_edge_in_cell( EntityHandle eid,
         num_qvals += 1;
 
         const EntityHandle* conn;
-        error = mb->get_connectivity( cell_id, conn, nvpc, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( cell_id, conn, nvpc, true );
+        MB_CHK_ERR( error );
 
         int lv0 = -1, lv1 = -1, lv = -1;
 
@@ -2799,7 +2912,8 @@ bool HalfFacetRep::find_matching_halfface( EntityHandle fid, EntityHandle* cid, 
     int nvF                 = lConnMap2D[ftype - 2].num_verts_in_face;
 
     const EntityHandle* fid_verts;
-    error = mb->get_connectivity( fid, fid_verts, nvF, true );MB_CHK_ERR( error );
+    error = mb->get_connectivity( fid, fid_verts, nvF, true );
+    MB_CHK_ERR( error );
 
     std::vector< EntityHandle > start_cells;
     int vidx, locfv0 = -1;
@@ -2851,7 +2965,8 @@ bool HalfFacetRep::find_matching_halfface( EntityHandle fid, EntityHandle* cid, 
         trackcells[count] = cur_cid;
 
         const EntityHandle* conn;
-        error = mb->get_connectivity( cur_cid, conn, nvpc, true );MB_CHK_ERR( error );
+        error = mb->get_connectivity( cur_cid, conn, nvpc, true );
+        MB_CHK_ERR( error );
 
         int lv[4] = { -1, -1, -1, -1 };
         int cnt   = 0;
@@ -2960,7 +3075,8 @@ ErrorCode HalfFacetRep::get_down_adjacencies_edg_3d( EntityHandle cid, std::vect
     int nvpc  = lConnMap3D[index].num_verts_in_cell;
 
     const EntityHandle* conn;
-    error = mb->get_connectivity( cid, conn, nvpc, true );MB_CHK_ERR( error );
+    error = mb->get_connectivity( cid, conn, nvpc, true );
+    MB_CHK_ERR( error );
 
     // Gather all the incident edges on each vertex of the face
     int ns = lConnMap3D[index].search_everts[0];
@@ -2969,7 +3085,8 @@ ErrorCode HalfFacetRep::get_down_adjacencies_edg_3d( EntityHandle cid, std::vect
     {
         temp.clear();
         int lv0 = lConnMap3D[index].search_everts[i + 1];
-        error   = get_up_adjacencies_1d( conn[lv0], temp );MB_CHK_ERR( error );
+        error   = get_up_adjacencies_1d( conn[lv0], temp );
+        MB_CHK_ERR( error );
 
         int nle   = lConnMap3D[index].v2le[i][0];
         int count = 0;
@@ -2977,7 +3094,8 @@ ErrorCode HalfFacetRep::get_down_adjacencies_edg_3d( EntityHandle cid, std::vect
         {
             const EntityHandle* econn;
             int nvpe = 0;
-            error    = mb->get_connectivity( temp[j], econn, nvpe, true );MB_CHK_ERR( error );
+            error    = mb->get_connectivity( temp[j], econn, nvpe, true );
+            MB_CHK_ERR( error );
 
             for( int k = 0; k < nle; k++ )
             {
@@ -3006,7 +3124,8 @@ ErrorCode HalfFacetRep::get_down_adjacencies_face_3d( EntityHandle cid, std::vec
 
     // Get the connectivity of the input cell
     const EntityHandle* conn;
-    error = mb->get_connectivity( cid, conn, nvpc, true );MB_CHK_ERR( error );
+    error = mb->get_connectivity( cid, conn, nvpc, true );
+    MB_CHK_ERR( error );
 
     // Collect all the half-faces of the cell
     EntityHandle half_faces[6][4];
@@ -3032,7 +3151,8 @@ ErrorCode HalfFacetRep::get_down_adjacencies_face_3d( EntityHandle cid, std::vec
         // Get the incident faces on the local vertex
         int lv = search_verts[i];
         temp.clear();
-        error = get_up_adjacencies_vert_2d( conn[lv], temp );MB_CHK_ERR( error );
+        error = get_up_adjacencies_vert_2d( conn[lv], temp );
+        MB_CHK_ERR( error );
 
         if( temp.size() == 0 ) continue;
 
@@ -3042,7 +3162,8 @@ ErrorCode HalfFacetRep::get_down_adjacencies_face_3d( EntityHandle cid, std::vec
         {
             const EntityHandle* fid_verts;
             int fsize = 0;
-            error     = mb->get_connectivity( temp[k], fid_verts, fsize, true );MB_CHK_ERR( error );
+            error     = mb->get_connectivity( temp[k], fid_verts, fsize, true );
+            MB_CHK_ERR( error );
 
             for( int j = 0; j < nhfthisv; j++ )
             {
@@ -3102,7 +3223,8 @@ ErrorCode HalfFacetRep::find_total_edges_faces_3d( const Range& cells, int* nedg
             int id = nepc * ( cells.index( *it ) ) + i;
             if( !trackE[id] )
             {
-                error = get_up_adjacencies_edg_3d( *it, i, inc_cids, &inc_leids );MB_CHK_ERR( error );
+                error = get_up_adjacencies_edg_3d( *it, i, inc_cids, &inc_leids );
+                MB_CHK_ERR( error );
 
                 total_edges -= inc_cids.size() - 1;
                 for( int j = 0; j < (int)inc_cids.size(); j++ )
@@ -3119,7 +3241,8 @@ ErrorCode HalfFacetRep::find_total_edges_faces_3d( const Range& cells, int* nedg
             int id = nfpc * ( cells.index( *it ) ) + i;
             if( !trackF[id] )
             {
-                error = get_up_adjacencies_face_3d( *it, i, sib_cids, &sib_lfids );MB_CHK_ERR( error );
+                error = get_up_adjacencies_face_3d( *it, i, sib_cids, &sib_lfids );
+                MB_CHK_ERR( error );
 
                 if( sib_cids.size() == 1 ) continue;
 
@@ -3172,11 +3295,13 @@ ErrorCode HalfFacetRep::get_half_facet_in_comp( EntityHandle cid,
     // Get all incident cells
     std::vector< EntityHandle > adjents;
     std::vector< int > adjlids;
-    error = get_up_adjacencies_edg_3d( cid, leid, adjents, &adjlids );MB_CHK_ERR( error );
+    error = get_up_adjacencies_edg_3d( cid, leid, adjents, &adjlids );
+    MB_CHK_ERR( error );
 
     // Get the end vertices of the edge <cid,leid>
     const EntityHandle* econn;
-    error = mb->get_connectivity( cid, econn, nvpc, true );MB_CHK_ERR( error );
+    error = mb->get_connectivity( cid, econn, nvpc, true );
+    MB_CHK_ERR( error );
     int id              = lConnMap3D[index].e2v[leid][0];
     EntityHandle vstart = econn[id];
     id                  = lConnMap3D[index].e2v[leid][1];
@@ -3214,7 +3339,8 @@ ErrorCode HalfFacetRep::get_half_facet_in_comp( EntityHandle cid,
                 if( ( cur_cell == adjents[k] ) || ( cur_cell == 0 ) ) break;
 
                 const EntityHandle* sib_conn;
-                error = mb->get_connectivity( cur_cell, sib_conn, nvpc, true );MB_CHK_ERR( error );
+                error = mb->get_connectivity( cur_cell, sib_conn, nvpc, true );
+                MB_CHK_ERR( error );
 
                 // Find the local edge id wrt to sibhf
                 int nv_curF = lConnMap3D[index].hf2v_num[lfid];
@@ -3662,13 +3788,17 @@ ErrorCode HalfFacetRep::update_entity_ranges( EntityHandle fileset )
 {
     ErrorCode error;
 
-    error = mb->get_entities_by_dimension( fileset, 0, _verts, true );MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset, 0, _verts, true );
+    MB_CHK_ERR( error );
 
-    error = mb->get_entities_by_dimension( fileset, 1, _edges, true );MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset, 1, _edges, true );
+    MB_CHK_ERR( error );
 
-    error = mb->get_entities_by_dimension( fileset, 2, _faces, true );MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset, 2, _faces, true );
+    MB_CHK_ERR( error );
 
-    error = mb->get_entities_by_dimension( fileset, 3, _cells, true );MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset, 3, _cells, true );
+    MB_CHK_ERR( error );
 
     return MB_SUCCESS;
 }
@@ -3703,7 +3833,8 @@ EntityHandle HalfFacetRep::fid_from_halfacet( const HFacet facet, EntityType typ
     EntityHandle handle = 0;
     if( id == 0 ) return handle;
 
-    ErrorCode error = mb->handle_from_id( type, id, handle );MB_CHK_ERR( error );
+    ErrorCode error = mb->handle_from_id( type, id, handle );
+    MB_CHK_ERR( error );
     return handle;
 }
 

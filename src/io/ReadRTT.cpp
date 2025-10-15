@@ -248,12 +248,12 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
                                std::vector< facet > facet_data,
                                std::vector< tet > tet_data,
                                const std::map< int, EntityHandle > surface_map,
-                               const std::map< int, EntityHandle > volume_map  )
+                               const std::map< int, EntityHandle > volume_map )
 {
     ErrorCode rval;
     EntityHandle file_set;
 
-    UNUSED(volume_map);
+    UNUSED( volume_map );
 
     rval = MBI->create_meshset( MESHSET_SET, file_set );
     if( MB_SUCCESS != rval ) return rval;
@@ -274,7 +274,8 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
 
     // material number tag
     Tag mat_num_tag;
-    MB_CHK_ERR( MBI->tag_get_handle( "MATERIAL_NUMBER", 1, MB_TYPE_INTEGER, mat_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT ) );
+    MB_CHK_ERR(
+        MBI->tag_get_handle( "MATERIAL_NUMBER", 1, MB_TYPE_INTEGER, mat_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT ) );
 
     // adding material groups
     std::string mat_flag = get_material_ref_flag();
@@ -298,7 +299,9 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
         {
             EntityHandle vol_set = volume_map.at( volume_no );
             rval                 = MBI->add_entities( vol_set, &tet_h, 1 );MB_CHK_ERR( rval );
-        } else {
+        }
+        else
+        {
             std::cout << "Warning: volume number " << volume_no << " not found in volume map" << std::endl;
         }
 
@@ -336,15 +339,15 @@ ErrorCode ReadRTT::create_material_group( const std::string& material_name, int 
 }
 
 ErrorCode ReadRTT::create_facets( const std::vector< facet >& facet_data,
-                             const std::map< int, EntityHandle >& surface_map,
-                             Range& mb_coords,
-                             EntityHandle file_set )
+                                  const std::map< int, EntityHandle >& surface_map,
+                                  Range& mb_coords,
+                                  EntityHandle file_set )
 {
     Tag side_id_tag, surface_number_tag;
     // Obtain or create tags for side IDs and surface numbers
-    MB_CHK_ERR( MBI->tag_get_handle( "SIDEID_TAG", 1, MB_TYPE_INTEGER, side_id_tag, MB_TAG_SPARSE | MB_TAG_CREAT ));
+    MB_CHK_ERR( MBI->tag_get_handle( "SIDEID_TAG", 1, MB_TYPE_INTEGER, side_id_tag, MB_TAG_SPARSE | MB_TAG_CREAT ) );
     MB_CHK_ERR(
-        MBI->tag_get_handle( "SURFACE_NUMBER", 1, MB_TYPE_INTEGER, surface_number_tag, MB_TAG_SPARSE | MB_TAG_CREAT ));
+        MBI->tag_get_handle( "SURFACE_NUMBER", 1, MB_TYPE_INTEGER, surface_number_tag, MB_TAG_SPARSE | MB_TAG_CREAT ) );
 
     EntityHandle triangle;
     Range mb_tris;  // For storing triangles
@@ -353,24 +356,24 @@ ErrorCode ReadRTT::create_facets( const std::vector< facet >& facet_data,
     {
         EntityHandle tri_nodes[3] = { mb_coords[tmp.connectivity[0] - 1], mb_coords[tmp.connectivity[1] - 1],
                                       mb_coords[tmp.connectivity[2] - 1] };
-        MB_CHK_ERR( MBI->create_element( MBTRI, tri_nodes, 3, triangle ));
+        MB_CHK_ERR( MBI->create_element( MBTRI, tri_nodes, 3, triangle ) );
         // tag in side id on the triangle
-        MB_CHK_ERR( MBI->tag_set_data( side_id_tag, &triangle, 1, &tmp.side_id ));
+        MB_CHK_ERR( MBI->tag_set_data( side_id_tag, &triangle, 1, &tmp.side_id ) );
         // tag the surface number on the triangle
-        MB_CHK_ERR( MBI->tag_set_data( surface_number_tag, &triangle, 1, &tmp.surface_number ));
+        MB_CHK_ERR( MBI->tag_set_data( surface_number_tag, &triangle, 1, &tmp.surface_number ) );
         // insert vertices and triangles into the appropriate surface meshset
         EntityHandle meshset_handle = surface_map.at( tmp.surface_number );
         // also set surface tag
-        MB_CHK_ERR( MBI->tag_set_data( side_id_tag, &meshset_handle, 1, &tmp.side_id ));
-        MB_CHK_ERR( MBI->tag_set_data( surface_number_tag, &meshset_handle, 1, &tmp.surface_number ));
+        MB_CHK_ERR( MBI->tag_set_data( side_id_tag, &meshset_handle, 1, &tmp.side_id ) );
+        MB_CHK_ERR( MBI->tag_set_data( surface_number_tag, &meshset_handle, 1, &tmp.surface_number ) );
         // add vertices to the mesh
-        MB_CHK_ERR( MBI->add_entities( meshset_handle, tri_nodes, 3 ));
+        MB_CHK_ERR( MBI->add_entities( meshset_handle, tri_nodes, 3 ) );
         // add triangles to the meshset
-        MB_CHK_ERR( MBI->add_entities( meshset_handle, &triangle, 1 ));
+        MB_CHK_ERR( MBI->add_entities( meshset_handle, &triangle, 1 ) );
         // insert triangles into mb_tris
         mb_tris.insert( triangle );
     }
-    MB_CHK_ERR( MBI->add_entities( file_set, mb_tris ));
+    MB_CHK_ERR( MBI->add_entities( file_set, mb_tris ) );
 
     return MB_SUCCESS;
 }
@@ -381,8 +384,8 @@ moab::ErrorCode ReadRTT::add_metadata( EntityHandle file_set )
     Tag contiguity_tag;
     const char* contiguity_value = header_data.contiguity.c_str();
     MB_CHK_ERR( MBI->tag_get_handle( "CONTIGUITY", strlen( contiguity_value ) + 1, MB_TYPE_OPAQUE, contiguity_tag,
-                                MB_TAG_SPARSE | MB_TAG_CREAT ));
-    MB_CHK_ERR( MBI->tag_set_data( contiguity_tag, &file_set, 1, contiguity_value ));
+                                     MB_TAG_SPARSE | MB_TAG_CREAT ) );
+    MB_CHK_ERR( MBI->tag_set_data( contiguity_tag, &file_set, 1, contiguity_value ) );
 
     return moab::MB_SUCCESS;
 }

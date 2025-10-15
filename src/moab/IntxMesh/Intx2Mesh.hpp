@@ -114,7 +114,7 @@ class Intx2Mesh
 
     virtual ErrorCode createTags();
 
-    virtual ErrorCode filterByMask(Range & cells);
+    virtual ErrorCode filterByMask( Range& cells );
 
     ErrorCode DetermineOrderedNeighbors( EntityHandle inputSet, int max_edges, Tag& neighTag );
 
@@ -223,7 +223,7 @@ class Intx2Mesh
     Tag neighTgtEdgeTag;  // will store edge borders for each tgt cell
 
     Tag orgSendProcTag;  /// for coverage mesh, will store the original sender
-    Tag imaskTag;       // if it exists, use it for filtering the source or target cells
+    Tag imaskTag;        // if it exists, use it for filtering the source or target cells
 
     // EntityType type; // this will be tri, quad or MBPOLYGON...
 
@@ -255,9 +255,9 @@ class Intx2Mesh
 
 #ifdef MOAB_HAVE_MPI
     ParallelComm* parcomm;
-    TupleList* remote_cells;                       // not used anymore for communication, just a container
-    TupleList* remote_cells_with_tracers;          // these will be used now to update tracers on remote procs
-    std::map< int, EntityHandle > globalID_to_eh;  // needed for parallel, mostly
+    TupleList* remote_cells;                          // not used anymore for communication, just a container
+    TupleList* remote_cells_with_tracers;             // these will be used now to update tracers on remote procs
+    std::map< int, EntityHandle > globalID_to_eh;     // needed for parallel, mostly
     std::map< int, EntityHandle > globalID_to_edgeh;  // needed for parallel, mostly
 #endif
     int max_edges_1;  // maximum number of edges in the lagrange set (first set, src)

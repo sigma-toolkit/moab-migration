@@ -112,9 +112,7 @@ ErrorCode NCHelperESMF::init_mesh_vals()
     if( success ) MB_CHK_SET_ERR( MB_FAILURE, "Trouble getting nodeCoords" );
 
     auto vmit = varInfo.find( "nodeCoords" );
-    if( varInfo.end() == vmit )
-        MB_SET_ERR( MB_FAILURE, "Couldn't find variable "
-                                    << "nodeCoords" );
+    if( varInfo.end() == vmit ) MB_SET_ERR( MB_FAILURE, "Couldn't find variable " << "nodeCoords" );
     ReadNC::VarData& glData = vmit->second;
     auto attIt              = glData.varAtts.find( "units" );
     if( attIt != glData.varAtts.end() )
@@ -175,7 +173,8 @@ ErrorCode NCHelperESMF::create_mesh( Range& faces )
         start_cell_idx++;  // 0 based -> 1 based
 
         // Redistribute local cells after trivial partition (e.g. apply Zoltan partition)
-        MB_CHK_SET_ERR( redistribute_local_cells( start_cell_idx, myPcomm ), "Failed to redistribute local cells after trivial partition"  );
+        MB_CHK_SET_ERR( redistribute_local_cells( start_cell_idx, myPcomm ),
+                        "Failed to redistribute local cells after trivial partition" );
     }
     else
     {
@@ -282,16 +281,19 @@ ErrorCode NCHelperESMF::create_mesh( Range& faces )
 
     // Create local vertices
     EntityHandle start_vertex;
-    MB_CHK_SET_ERR( create_local_vertices( vertices_on_local_cells, start_vertex ), "Failed to create local vertices for MPAS mesh"  );
+    MB_CHK_SET_ERR( create_local_vertices( vertices_on_local_cells, start_vertex ),
+                    "Failed to create local vertices for MPAS mesh" );
 
     // Create local cells, either unpadded or padded
     if( noMixedElements )
     {
-        MB_CHK_SET_ERR( create_padded_local_cells( vertices_on_local_cells, start_vertex, faces ), "Failed to create padded local cells for MPAS mesh"  );
+        MB_CHK_SET_ERR( create_padded_local_cells( vertices_on_local_cells, start_vertex, faces ),
+                        "Failed to create padded local cells for MPAS mesh" );
     }
     else
     {
-        MB_CHK_SET_ERR( create_local_cells( vertices_on_local_cells, num_edges_on_local_cells, start_vertex, faces ), "Failed to create local cells for MPAS mesh"  );
+        MB_CHK_SET_ERR( create_local_cells( vertices_on_local_cells, num_edges_on_local_cells, start_vertex, faces ),
+                        "Failed to create local cells for MPAS mesh" );
     }
 
     return MB_SUCCESS;
@@ -476,7 +478,8 @@ ErrorCode NCHelperESMF::redistribute_local_cells( int start_cell_idx, ParallelCo
         Interface*& mbImpl         = _readNC->mbImpl;
         DebugOutput& dbgOut        = _readNC->dbgOut;
         ZoltanPartitioner* mbZTool = new ZoltanPartitioner( mbImpl, pco, false, 0, NULL );
-        MB_CHK_SET_ERR( mbZTool->repartition( xverts, yverts, zverts, start_cell_idx, "RCB", localGidCells ), "Error in Zoltan partitioning"  );
+        MB_CHK_SET_ERR( mbZTool->repartition( xverts, yverts, zverts, start_cell_idx, "RCB", localGidCells ),
+                        "Error in Zoltan partitioning" );
         delete mbZTool;
 
         dbgOut.tprintf( 1, "After Zoltan partitioning, localGidCells.psize() = %d\n", (int)localGidCells.psize() );
@@ -488,7 +491,7 @@ ErrorCode NCHelperESMF::redistribute_local_cells( int start_cell_idx, ParallelCo
         return MB_SUCCESS;
     }
 #else
-    UNUSED(pco);
+    UNUSED( pco );
 #endif
 
     // By default, apply trivial partition
@@ -519,16 +522,21 @@ ErrorCode NCHelperESMF::create_local_vertices( const std::vector< int >& vertice
 
     // Create local vertices
     std::vector< double* > arrays;
-    MB_CHK_SET_ERR( _readNC->readMeshIface->get_node_coords( 3, nLocalVertices, 0, start_vertex, arrays, nLocalVertices ), "Failed to create local vertices"  );
+    MB_CHK_SET_ERR( _readNC->readMeshIface->get_node_coords( 3, nLocalVertices, 0, start_vertex, arrays,
+                                                             nLocalVertices ),
+                    "Failed to create local vertices" );
 
     // Add local vertices to current file set
     Range local_verts_range( start_vertex, start_vertex + nLocalVertices - 1 );
-    MB_CHK_SET_ERR( _readNC->mbImpl->add_entities( _fileSet, local_verts_range ), "Failed to add local vertices to current file set"  );
+    MB_CHK_SET_ERR( _readNC->mbImpl->add_entities( _fileSet, local_verts_range ),
+                    "Failed to add local vertices to current file set" );
 
     // Get ptr to GID memory for local vertices
     int count  = 0;
     void* data = NULL;
-    MB_CHK_SET_ERR( mbImpl->tag_iterate( mGlobalIdTag, local_verts_range.begin(), local_verts_range.end(), count, data ), "Failed to iterate global id tag on local vertices"  );
+    MB_CHK_SET_ERR( mbImpl->tag_iterate( mGlobalIdTag, local_verts_range.begin(), local_verts_range.end(), count,
+                                         data ),
+                    "Failed to iterate global id tag on local vertices" );
     assert( count == nLocalVertices );
     int* gid_data = (int*)data;
     std::copy( localGidVerts.begin(), localGidVerts.end(), gid_data );
@@ -536,10 +544,13 @@ ErrorCode NCHelperESMF::create_local_vertices( const std::vector< int >& vertice
     // Duplicate GID data, which will be used to resolve sharing
     if( mpFileIdTag )
     {
-        MB_CHK_SET_ERR( mbImpl->tag_iterate( *mpFileIdTag, local_verts_range.begin(), local_verts_range.end(), count, data ), "Failed to iterate file id tag on local vertices"  );
+        MB_CHK_SET_ERR( mbImpl->tag_iterate( *mpFileIdTag, local_verts_range.begin(), local_verts_range.end(), count,
+                                             data ),
+                        "Failed to iterate file id tag on local vertices" );
         assert( count == nLocalVertices );
         int bytes_per_tag = 4;
-        MB_CHK_SET_ERR( mbImpl->tag_get_bytes( *mpFileIdTag, bytes_per_tag ), "Can't get number of bytes for file id tag"  );
+        MB_CHK_SET_ERR( mbImpl->tag_get_bytes( *mpFileIdTag, bytes_per_tag ),
+                        "Can't get number of bytes for file id tag" );
         if( 4 == bytes_per_tag )
         {
             gid_data = (int*)data;
@@ -647,19 +658,23 @@ ErrorCode NCHelperESMF::create_local_cells( const std::vector< int >& vertices_o
         if( num_edges_per_cell > 4 ) typeEl = MBPOLYGON;
         // Create local cells for each non-empty cell group
         EntityHandle start_element;
-        MB_CHK_SET_ERR( _readNC->readMeshIface->get_element_connect( num_group_cells, num_edges_per_cell, typeEl, 0, start_element,
-                                                         conn_arr_local_cells_with_n_edges[num_edges_per_cell],
-                                                         num_group_cells ), "Failed to create local cells"  );
+        MB_CHK_SET_ERR( _readNC->readMeshIface->get_element_connect(
+                            num_group_cells, num_edges_per_cell, typeEl, 0, start_element,
+                            conn_arr_local_cells_with_n_edges[num_edges_per_cell], num_group_cells ),
+                        "Failed to create local cells" );
         faces.insert( start_element, start_element + num_group_cells - 1 );
 
         // Add local cells to current file set
         Range local_cells_range( start_element, start_element + num_group_cells - 1 );
-        MB_CHK_SET_ERR( _readNC->mbImpl->add_entities( _fileSet, local_cells_range ), "Failed to add local cells to current file set"  );
+        MB_CHK_SET_ERR( _readNC->mbImpl->add_entities( _fileSet, local_cells_range ),
+                        "Failed to add local cells to current file set" );
 
         // Get ptr to gid memory for local cells
         int count  = 0;
         void* data = NULL;
-        MB_CHK_SET_ERR( mbImpl->tag_iterate( mGlobalIdTag, local_cells_range.begin(), local_cells_range.end(), count, data ), "Failed to iterate global id tag on local cells"  );
+        MB_CHK_SET_ERR( mbImpl->tag_iterate( mGlobalIdTag, local_cells_range.begin(), local_cells_range.end(), count,
+                                             data ),
+                        "Failed to iterate global id tag on local cells" );
         assert( count == num_group_cells );
         int* gid_data = (int*)data;
         std::copy( local_cells_with_n_edges[num_edges_per_cell].begin(),
@@ -699,17 +714,21 @@ ErrorCode NCHelperESMF::create_padded_local_cells( const std::vector< int >& ver
     EntityHandle start_element;
     EntityHandle* conn_arr_local_cells = NULL;
     MB_CHK_SET_ERR( _readNC->readMeshIface->get_element_connect( nLocalCells, maxEdgesPerCell, MBPOLYGON, 0,
-                                                                  start_element, conn_arr_local_cells, nLocalCells ), "Failed to create local cells"  );
+                                                                 start_element, conn_arr_local_cells, nLocalCells ),
+                    "Failed to create local cells" );
     faces.insert( start_element, start_element + nLocalCells - 1 );
 
     // Add local cells to current file set
     Range local_cells_range( start_element, start_element + nLocalCells - 1 );
-    MB_CHK_SET_ERR( _readNC->mbImpl->add_entities( _fileSet, local_cells_range ), "Failed to add local cells to current file set"  );
+    MB_CHK_SET_ERR( _readNC->mbImpl->add_entities( _fileSet, local_cells_range ),
+                    "Failed to add local cells to current file set" );
 
     // Get ptr to GID memory for local cells
     int count  = 0;
     void* data = NULL;
-    MB_CHK_SET_ERR( mbImpl->tag_iterate( mGlobalIdTag, local_cells_range.begin(), local_cells_range.end(), count, data ), "Failed to iterate global id tag on local cells"  );
+    MB_CHK_SET_ERR( mbImpl->tag_iterate( mGlobalIdTag, local_cells_range.begin(), local_cells_range.end(), count,
+                                         data ),
+                    "Failed to iterate global id tag on local cells" );
     assert( count == nLocalCells );
     int* gid_data = (int*)data;
     std::copy( localGidCells.begin(), localGidCells.end(), gid_data );

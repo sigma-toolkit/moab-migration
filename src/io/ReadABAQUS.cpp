@@ -527,7 +527,7 @@ ErrorCode ReadABAQUS::read_instance( EntityHandle assembly_set, EntityHandle fil
             default:
                 MB_SET_ERR( MB_FAILURE, "Error reading INSTANCE" );
         }  // switch (next_line_type)
-    }      // while (next_line_type != abq_eof && !end_instance)
+    }  // while (next_line_type != abq_eof && !end_instance)
 
     status = create_instance_of_part( file_set, assembly_set, part_name, instance_name, instance_set, translation,
                                       rotation );
@@ -1480,7 +1480,8 @@ ErrorCode ReadABAQUS::get_set_by_name( EntityHandle parent_set,
 
     Range sets;
     void* tag_data[] = { &ABQ_set_type };
-    status = mdbImpl->get_entities_by_type_and_tag( parent_set, MBENTITYSET, &mSetTypeTag, tag_data, 1, sets );MB_CHK_SET_ERR( status, "Did not find any sets of that type" );
+    status = mdbImpl->get_entities_by_type_and_tag( parent_set, MBENTITYSET, &mSetTypeTag, tag_data, 1, sets );
+    MB_CHK_SET_ERR( status, "Did not find any sets of that type" );
 
     for( Range::iterator this_set = sets.begin(); this_set != sets.end() && 0 == set_handle; ++this_set )
     {

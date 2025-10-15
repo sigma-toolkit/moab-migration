@@ -792,7 +792,7 @@ std::pair< double, double > moab::TempestOnlineMap::ApplyBoundsLimiting( std::ve
                 dataLowerBound[i] = dSourceMin - dataOutDouble[i];
                 dataUpperBound[i] = dSourceMax - dataOutDouble[i];
             }
-        }     // if( caasType == CAAS_GLOBAL )
+        }  // if( caasType == CAAS_GLOBAL )
         else  // caasType == CAAS_LOCAL
         {
             // Compute the local min and max values of the target data

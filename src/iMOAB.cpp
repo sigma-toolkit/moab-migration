@@ -1706,7 +1706,7 @@ ErrCode iMOAB_GetVisibleElementsInfo( iMOAB_AppID pid,
 
 #else
         /* everything owned by task 0 */
-        ranks[i]             = 0;
+        ranks[i] = 0;
 #endif
     }
 
@@ -2375,7 +2375,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
     for( int j = 0; j < nbLocalVals; j++ )
         globalIdsSet.insert( globalIds[j] );
 
-    if( static_cast<int>(globalIdsSet.size()) < nbLocalVals )
+    if( static_cast< int >( globalIdsSet.size() ) < nbLocalVals )
     {
         std::cout << "iMOAB_SetDoubleTagStorageWithGid: for pid:" << *pid << " tags[0]:" << tagNames[0]
                   << " global ids passed are not unique, major error\n";
@@ -2749,14 +2749,14 @@ ErrCode iMOAB_GetNeighborElements( iMOAB_AppID pid,
                                    int* num_adjacent_elements,
                                    iMOAB_LocalID* adjacent_element_IDs )
 {
-    assert( local_index && *local_index >=0 );
+    assert( local_index && *local_index >= 0 );
 
     // one neighbor for each subentity of dimension-1
     MeshTopoUtil mtu( context.MBI );
     appData& data   = context.appDatas[*pid];
     EntityHandle eh = data.primary_elems[*local_index];
     Range adjs;
-    MB_CHK_SET_ERR( mtu.get_bridge_adjacencies( eh, data.dimension - 1, data.dimension, adjs ), 
+    MB_CHK_SET_ERR( mtu.get_bridge_adjacencies( eh, data.dimension - 1, data.dimension, adjs ),
                     "Getting bridge adjacencies failed" );
 
     if( *num_adjacent_elements < (int)adjs.size() )
@@ -2819,7 +2819,8 @@ ErrCode iMOAB_CreateElements( iMOAB_AppID pid,
     EntityType mbtype = (EntityType)( *type );
     EntityHandle actual_start_handle;
     EntityHandle* array = nullptr;
-    MB_CHK_ERR( read_iface->get_element_connect( *num_elem, *num_nodes_per_element, mbtype, 1, actual_start_handle, array ) );
+    MB_CHK_ERR(
+        read_iface->get_element_connect( *num_elem, *num_nodes_per_element, mbtype, 1, actual_start_handle, array ) );
 
     // fill up with actual connectivity from input; assume the vertices are in order, and start
     // vertex is the first in the current data vertex range
@@ -2914,8 +2915,8 @@ ErrCode iMOAB_ResolveSharedEntities( iMOAB_AppID pid, int* num_verts, int* marke
         // (more than 2 B vertices;)
 
         Tag stag;
-        MB_CHK_ERR( context.MBI->tag_get_handle( "__sharedmarker", 1, MB_TYPE_INTEGER, stag, MB_TAG_CREAT | MB_TAG_DENSE,
-                                            &dum_id ) );
+        MB_CHK_ERR( context.MBI->tag_get_handle( "__sharedmarker", 1, MB_TYPE_INTEGER, stag,
+                                                 MB_TAG_CREAT | MB_TAG_DENSE, &dum_id ) );
 
         if( *num_verts > (int)data.local_verts.size() )
         {
@@ -2961,12 +2962,12 @@ ErrCode iMOAB_DetermineGhostEntities( iMOAB_AppID pid, int* ghost_dim, int* num_
     // maybe we should be passing this too; most of the time we do not need additional ents collective call
     constexpr int addl_ents = 0;
     MB_CHK_ERR( pco->exchange_ghost_cells( *ghost_dim, *bridge_dim, 1,  // get only one layer of ghost entities
-                                      addl_ents, true, true, &data.file_set ) );
+                                           addl_ents, true, true, &data.file_set ) );
     for( int i = 2; i <= *num_ghost_layers; i++ )
     {
-        MB_CHK_ERR( pco->correct_thin_ghost_layers() );                                            // correct for thin layers
+        MB_CHK_ERR( pco->correct_thin_ghost_layers() );                     // correct for thin layers
         MB_CHK_ERR( pco->exchange_ghost_cells( *ghost_dim, *bridge_dim, i,  // iteratively get one extra layer
-                                          addl_ents, true, true, &data.file_set ) );
+                                               addl_ents, true, true, &data.file_set ) );
     }
 
     // Update ghost layer information
@@ -4796,7 +4797,7 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
 
     // EntityHandle source_set   = data_source.file_set;
     // EntityHandle covering_set = tdata.remapper->GetMeshSet( Remapper::CoveringMesh );
-    EntityHandle target_set   = data_target.file_set;  // default: row based partition
+    EntityHandle target_set = data_target.file_set;  // default: row based partition
 
     int src_elem_dof_length = 1, tgt_elem_dof_length = 1;  // default=1: FV - element average DoF value
     // tags of interest are either GLOBAL_DOFS (SE) or GLOBAL_ID (FV)
@@ -5308,7 +5309,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                     if( 1 == *type )
                     {
                         MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, &cell, 1,
-                                                          &( TLc.vi_wr[size_tuple * n + current_index] ) ) );
+                                                               &( TLc.vi_wr[size_tuple * n + current_index] ) ) );
                         current_index += lenTagType1;
                     }
                     // now get connectivity
@@ -5318,7 +5319,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                     // fill nnodes:
                     TLc.vi_wr[size_tuple * n + current_index] = nnodes;
                     MB_CHK_ERR( context.MBI->tag_get_data( gidTag, conn, nnodes,
-                                                                                           &( TLc.vi_wr[size_tuple * n + current_index + 1] ) ) );
+                                                           &( TLc.vi_wr[size_tuple * n + current_index + 1] ) ) );
                     TLc.inc_n();  // increment tuple list size
                 }
             }
@@ -5406,14 +5407,18 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                     EntityType entType = MBQUAD;
                     if( nnodes > 4 ) entType = MBPOLYGON;
                     if( nnodes < 4 ) entType = MBTRI;
-                    MB_CHK_SET_ERR( context.MBI->create_element( entType, &conn[0], nnodes, new_element ), "can't create new element "  );
+                    MB_CHK_SET_ERR( context.MBI->create_element( entType, &conn[0], nnodes, new_element ),
+                                    "can't create new element " );
                     primary_ents.insert( new_element );
                     cellMap[globalIdEl] = new_element;
-                    MB_CHK_SET_ERR( context.MBI->tag_set_data( gidTag, &new_element, 1, &globalIdEl ), "can't set global id tag on cell "  );
+                    MB_CHK_SET_ERR( context.MBI->tag_set_data( gidTag, &new_element, 1, &globalIdEl ),
+                                    "can't set global id tag on cell " );
                     if( 1 == *type )
                     {
                         // set the gds tag
-                        MB_CHK_SET_ERR( context.MBI->tag_set_data( gdsTag, &new_element, 1, &( TLc.vi_rd[size_tuple * i + 2] ) ), "can't set gds tag on cell "  );
+                        MB_CHK_SET_ERR( context.MBI->tag_set_data( gdsTag, &new_element, 1,
+                                                                   &( TLc.vi_rd[size_tuple * i + 2] ) ),
+                                        "can't set gds tag on cell " );
                     }
                 }
             }
@@ -5633,7 +5638,9 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
 
     // First, compute the covering source set.
     if( tdata.num_src_ghost_layers >= 1 ) gnomonic = false;  // do not use gnomonic when we need ghost layers;
-    MB_CHK_ERR( tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic, tdata.num_src_ghost_layers ) );
+    MB_CHK_SET_ERR( tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic,
+                                                          tdata.num_src_ghost_layers ),
+                    "failed to compute covering set" );
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
     // set the reference to the covering set in the source PID
@@ -5642,6 +5649,7 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
 
     return moab::MB_SUCCESS;
 }
+
 #ifdef MOAB_HAVE_TEMPESTREMAP
 ErrCode iMOAB_WriteCoverageMesh( iMOAB_AppID pid, const iMOAB_String prefix )
 {

@@ -42,7 +42,8 @@ ErrorCode NCWriteHOMME::collect_mesh_info()
     nLevels = dimLens[levDim];
 
     // Get local vertices
-    MB_CHK_SET_ERR( mbImpl->get_entities_by_dimension( _fileSet, 0, localVertsOwned ), "Trouble getting local vertices in current file set" );
+    MB_CHK_SET_ERR( mbImpl->get_entities_by_dimension( _fileSet, 0, localVertsOwned ),
+                    "Trouble getting local vertices in current file set" );
     assert( !localVertsOwned.empty() );
 
 #ifdef MOAB_HAVE_MPI
@@ -57,7 +58,8 @@ ErrorCode NCWriteHOMME::collect_mesh_info()
 #ifndef NDEBUG
             unsigned int num_local_verts = localVertsOwned.size();
 #endif
-            MB_CHK_SET_ERR( myPcomm->filter_pstatus( localVertsOwned, PSTATUS_NOT_OWNED, PSTATUS_NOT ), "Trouble getting owned vertices in current set"  );
+            MB_CHK_SET_ERR( myPcomm->filter_pstatus( localVertsOwned, PSTATUS_NOT_OWNED, PSTATUS_NOT ),
+                            "Trouble getting owned vertices in current set" );
 
             // Assume that PARALLEL_RESOLVE_SHARED_ENTS option is set
             // Verify that not all local vertices are owned by the last processor
@@ -68,7 +70,8 @@ ErrorCode NCWriteHOMME::collect_mesh_info()
 #endif
 
     std::vector< int > gids( localVertsOwned.size() );
-    MB_CHK_SET_ERR( mbImpl->tag_get_data( mGlobalIdTag, localVertsOwned, &gids[0] ), "Trouble getting global IDs on local vertices"  );
+    MB_CHK_SET_ERR( mbImpl->tag_get_data( mGlobalIdTag, localVertsOwned, &gids[0] ),
+                    "Trouble getting global IDs on local vertices" );
 
     // Get localGidVertsOwned
     std::copy( gids.rbegin(), gids.rend(), range_inserter( localGidVertsOwned ) );
@@ -238,7 +241,8 @@ ErrorCode NCWriteHOMME::write_nonset_variables( std::vector< WriteNC::VarData >&
             // deep copy for transpose
             if( tDim == variableData.varDims[0] ) variableData.writeStarts[0] = t;  // This is start for time
             std::vector< double > tag_data( num_local_verts_owned * num_lev );
-            MB_CHK_SET_ERR( mbImpl->tag_get_data( variableData.varTags[t], localVertsOwned, &tag_data[0] ), "Trouble getting tag data on owned vertices"  );
+            MB_CHK_SET_ERR( mbImpl->tag_get_data( variableData.varTags[t], localVertsOwned, &tag_data[0] ),
+                            "Trouble getting tag data on owned vertices" );
 
 #ifdef MOAB_HAVE_PNETCDF
             size_t nb_writes = localGidVertsOwned.psize();

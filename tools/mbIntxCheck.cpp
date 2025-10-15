@@ -80,12 +80,12 @@ int main( int argc, char* argv[] )
     MB_CHK_ERR( mb->create_meshset( MESHSET_SET, tset ) );
     MB_CHK_ERR( mb->create_meshset( MESHSET_SET, ixset ) );
     if( 0 == rank ) std::cout << "Loading source file " << sourceFile << "\n";
-    MB_CHK_SET_ERR( mb->load_file( sourceFile.c_str(), &sset, opts_read.c_str() ), "failed reading source file"  );
+    MB_CHK_SET_ERR( mb->load_file( sourceFile.c_str(), &sset, opts_read.c_str() ), "failed reading source file" );
     if( 0 == rank ) std::cout << "Loading target file " << targetFile << "\n";
-    MB_CHK_SET_ERR( mb->load_file( targetFile.c_str(), &tset, opts_read.c_str() ), "failed reading target file"  );
+    MB_CHK_SET_ERR( mb->load_file( targetFile.c_str(), &tset, opts_read.c_str() ), "failed reading target file" );
 
     if( 0 == rank ) std::cout << "Loading intersection file " << intxFile << "\n";
-    MB_CHK_SET_ERR( mb->load_file( intxFile.c_str(), &ixset, opts_read.c_str() ), "failed reading intersection file"  );
+    MB_CHK_SET_ERR( mb->load_file( intxFile.c_str(), &ixset, opts_read.c_str() ), "failed reading intersection file" );
     double R = 1.;
     if( sphere )
     {
@@ -106,13 +106,13 @@ int main( int argc, char* argv[] )
     Tag targetParentTag;
     if( oldNamesParents )
     {
-        MB_CHK_SET_ERR( mb->tag_get_handle( "RedParent", targetParentTag ), "can't find target parent tag"  );
-        MB_CHK_SET_ERR( mb->tag_get_handle( "BlueParent", sourceParentTag ), "can't find source parent tag"  );
+        MB_CHK_SET_ERR( mb->tag_get_handle( "RedParent", targetParentTag ), "can't find target parent tag" );
+        MB_CHK_SET_ERR( mb->tag_get_handle( "BlueParent", sourceParentTag ), "can't find source parent tag" );
     }
     else
     {
-        MB_CHK_SET_ERR( mb->tag_get_handle( "TargetParent", targetParentTag ), "can't find target parent tag"  );
-        MB_CHK_SET_ERR( mb->tag_get_handle( "SourceParent", sourceParentTag ), "can't find source parent tag"  );
+        MB_CHK_SET_ERR( mb->tag_get_handle( "TargetParent", targetParentTag ), "can't find target parent tag" );
+        MB_CHK_SET_ERR( mb->tag_get_handle( "SourceParent", sourceParentTag ), "can't find source parent tag" );
     }
 
     // error sets, for better visualization
@@ -272,7 +272,7 @@ int main( int argc, char* argv[] )
             // add the intx cells that have these as source parent
             std::vector< int > sourceIDs;
             sourceIDs.resize( sourceErrorCells.size() );
-            MB_CHK_SET_ERR( mb->tag_get_data( gidTag, sourceErrorCells, &sourceIDs[0] ), "can't get source IDs"  );
+            MB_CHK_SET_ERR( mb->tag_get_data( gidTag, sourceErrorCells, &sourceIDs[0] ), "can't get source IDs" );
             std::sort( sourceIDs.begin(), sourceIDs.end() );
             for( Range::iterator eit = intxCells.begin(); eit != intxCells.end(); ++eit )
             {
@@ -328,7 +328,7 @@ int main( int argc, char* argv[] )
             // add the intx cells that have these as target parent
             std::vector< int > targetIDs;
             targetIDs.resize( targetErrorCells.size() );
-            MB_CHK_SET_ERR( mb->tag_get_data( gidTag, targetErrorCells, &targetIDs[0] ), "can't get target IDs"  );
+            MB_CHK_SET_ERR( mb->tag_get_data( gidTag, targetErrorCells, &targetIDs[0] ), "can't get target IDs" );
             std::sort( targetIDs.begin(), targetIDs.end() );
             for( Range::iterator eit = intxCells.begin(); eit != intxCells.end(); ++eit )
             {

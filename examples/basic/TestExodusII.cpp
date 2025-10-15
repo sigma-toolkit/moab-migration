@@ -36,7 +36,7 @@ int main( int argc, char** argv )
 {
 #ifdef MOAB_HAVE_NETCDF
     // Get MOAB instance
-    std::unique_ptr<Interface> mb( new( std::nothrow ) Core );
+    std::unique_ptr< Interface > mb( new( std::nothrow ) Core );
     if( NULL == mb ) return 1;
 
     // Get the material set tag handle

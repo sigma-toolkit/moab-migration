@@ -109,16 +109,19 @@ ErrorCode mb_vertex_coordinate_test()
 {
     Core moab;
     Interface* MB   = &moab;
-    ErrorCode error = create_some_mesh( MB );MB_CHK_ERR( error );
+    ErrorCode error = create_some_mesh( MB );
+    MB_CHK_ERR( error );
 
     Range vertices;
-    error = MB->get_entities_by_type( 0, MBVERTEX, vertices );MB_CHK_ERR( error );
+    error = MB->get_entities_by_type( 0, MBVERTEX, vertices );
+    MB_CHK_ERR( error );
 
     std::vector< double > all_coords( 3 * vertices.size() );
     double* coord_iter = &all_coords[0];
     for( Range::iterator iter = vertices.begin(); iter != vertices.end(); ++iter )
     {
-        error = MB->get_coords( &( *iter ), 1, coord_iter );MB_CHK_ERR( error );
+        error = MB->get_coords( &( *iter ), 1, coord_iter );
+        MB_CHK_ERR( error );
         coord_iter += 3;
     }
 
@@ -147,9 +150,11 @@ ErrorCode mb_vertex_coordinate_test()
 
     // Try getting coordinates for a hex (should fail)
     Range hexes;
-    error = MB->get_entities_by_type( 0, MBHEX, hexes );MB_CHK_ERR( error );
+    error = MB->get_entities_by_type( 0, MBHEX, hexes );
+    MB_CHK_ERR( error );
     EntityHandle handle = hexes.front();
-    error               = MB->get_coords( &handle, 1, &x[0] );MB_CHK_ERR( error );
+    error               = MB->get_coords( &handle, 1, &x[0] );
+    MB_CHK_ERR( error );
     CHECK_REAL_EQUAL( 0.5, x[0], 1E-12 );
     CHECK_REAL_EQUAL( 0.5, x[1], 1E-12 );
     CHECK_REAL_EQUAL( 0.5, x[2], 1E-12 );
@@ -2551,7 +2556,8 @@ static ErrorCode check_meshset_internal( Interface& mb,
     int length;
     unsigned char flags;
     MB_CHK_ERR( tool->get_entity_list_pointers( &set, 1, &contents, WriteUtilIface::CONTENTS, &length, &flags ) );
-    ErrorCode rval1 = mb.release_interface( tool );MB_CHK_ERR( rval1 );
+    ErrorCode rval1 = mb.release_interface( tool );
+    MB_CHK_ERR( rval1 );
 
     if( flags & MESHSET_ORDERED )
         rval = check_list_meshset_internal( expected, num_expected, contents, length );
@@ -5688,7 +5694,8 @@ ErrorCode mb_skin_fileset_test()
     EntityHandle verts[num_vtx], cells[num_elems];
     for( size_t i = 0; i < num_vtx; ++i )
     {
-        error = mb->create_vertex( coords + 3 * i, verts[i] );MB_CHK_ERR( error );
+        error = mb->create_vertex( coords + 3 * i, verts[i] );
+        MB_CHK_ERR( error );
     }
 
     for( size_t i = 0; i < num_elems; ++i )
@@ -5697,29 +5704,41 @@ ErrorCode mb_skin_fileset_test()
         for( int j = 0; j < 8; j++ )
             c[j] = verts[conn[8 * i + j]];
 
-        error = mb->create_element( MBHEX, c, 8, cells[i] );MB_CHK_ERR( error );
+        error = mb->create_element( MBHEX, c, 8, cells[i] );
+        MB_CHK_ERR( error );
     }
 
     EntityHandle fileset;
-    error = mb->create_meshset( MESHSET_SET, fileset );MB_CHK_ERR( error );
-    error = mb->add_entities( fileset, &verts[0], num_vtx );MB_CHK_ERR( error );
-    error = mb->add_entities( fileset, &cells[0], num_elems );MB_CHK_ERR( error );
+    error = mb->create_meshset( MESHSET_SET, fileset );
+    MB_CHK_ERR( error );
+    error = mb->add_entities( fileset, &verts[0], num_vtx );
+    MB_CHK_ERR( error );
+    error = mb->add_entities( fileset, &cells[0], num_elems );
+    MB_CHK_ERR( error );
 
     Range fverts, fedges, ffaces, fcells;
-    error = mb->get_entities_by_dimension( fileset, 0, fverts );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fileset, 1, fedges );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fileset, 2, ffaces );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fileset, 3, fcells );MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset, 0, fverts );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset, 1, fedges );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset, 2, ffaces );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset, 3, fcells );
+    MB_CHK_ERR( error );
 
     assert( fverts.size() == 18 && fedges.size() == 0 && ffaces.size() == 0 && fcells.size() == 4 );
 
     Skinner sk( mb );
     Range skin_ents;
-    error = sk.find_skin( fileset, fcells, 2, skin_ents, false, true );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fileset, 2, ffaces );MB_CHK_ERR( error );
+    error = sk.find_skin( fileset, fcells, 2, skin_ents, false, true );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset, 2, ffaces );
+    MB_CHK_ERR( error );
     assert( ffaces.size() == 16 );
-    error = sk.find_skin( fileset, fcells, 1, skin_ents, false, true );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fileset, 1, fedges );MB_CHK_ERR( error );
+    error = sk.find_skin( fileset, fcells, 1, skin_ents, false, true );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset, 1, fedges );
+    MB_CHK_ERR( error );
     assert( fedges.size() == 32 );
 
     const double fcoords[] = { 0, 0, 3, 1, 0, 3, 2, 0, 3, 2, 1, 3, 1, 1, 3, 0, 1, 3 };
@@ -5730,7 +5749,8 @@ ErrorCode mb_skin_fileset_test()
     EntityHandle nwverts[num_fvtx], faces[num_faces];
     for( size_t i = 0; i < num_fvtx; ++i )
     {
-        error = mb->create_vertex( fcoords + 3 * i, nwverts[i] );MB_CHK_ERR( error );
+        error = mb->create_vertex( fcoords + 3 * i, nwverts[i] );
+        MB_CHK_ERR( error );
     }
 
     for( size_t i = 0; i < num_faces; ++i )
@@ -5739,23 +5759,32 @@ ErrorCode mb_skin_fileset_test()
         for( int j = 0; j < 4; j++ )
             c[j] = nwverts[fconn[4 * i + j]];
 
-        error = mb->create_element( MBQUAD, c, 4, faces[i] );MB_CHK_ERR( error );
+        error = mb->create_element( MBQUAD, c, 4, faces[i] );
+        MB_CHK_ERR( error );
     }
     EntityHandle fileset1;
-    error = mb->create_meshset( MESHSET_SET, fileset1 );MB_CHK_ERR( error );
-    error = mb->add_entities( fileset1, &nwverts[0], num_fvtx );MB_CHK_ERR( error );
-    error = mb->add_entities( fileset1, &faces[0], num_faces );MB_CHK_ERR( error );
+    error = mb->create_meshset( MESHSET_SET, fileset1 );
+    MB_CHK_ERR( error );
+    error = mb->add_entities( fileset1, &nwverts[0], num_fvtx );
+    MB_CHK_ERR( error );
+    error = mb->add_entities( fileset1, &faces[0], num_faces );
+    MB_CHK_ERR( error );
 
     Range verts1, edges1, faces1;
-    error = mb->get_entities_by_dimension( fileset1, 0, verts1 );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fileset1, 1, edges1 );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fileset1, 2, faces1 );MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset1, 0, verts1 );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset1, 1, edges1 );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset1, 2, faces1 );
+    MB_CHK_ERR( error );
 
     assert( verts1.size() == 6 && edges1.size() == 0 && faces1.size() == 2 );
 
     //  error = sk.find_skin(fileset1, faces1, 1, skin_ents, false, true);MB_CHK_ERR(error);
-    error = sk.find_skin( fileset1, faces1, false, skin_ents, NULL, true, true, false );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fileset1, 1, edges1 );MB_CHK_ERR( error );
+    error = sk.find_skin( fileset1, faces1, false, skin_ents, NULL, true, true, false );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset1, 1, edges1 );
+    MB_CHK_ERR( error );
     assert( edges1.size() == 6 );
 
     return MB_SUCCESS;
@@ -7326,7 +7355,8 @@ ErrorCode mb_type_is_maxtype_test()
     r1.clear();
     r2.clear();
     MB_CHK_ERR( mb->get_entities_by_type_and_tag( 0, MBMAXTYPE, &t1, vallist, 1, r1, Interface::INTERSECT, false ) );
-    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( 0, MBMAXTYPE, &t1, vallist, 1, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( 0, MBMAXTYPE, &t1, vallist, 1, c1, Interface::INTERSECT, false ) );
     MB_CHK_ERR( get_by_all_types_and_tag( mb, 0, &t1, vallist, 1, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
@@ -7334,7 +7364,8 @@ ErrorCode mb_type_is_maxtype_test()
     r1.clear();
     r2.clear();
     MB_CHK_ERR( mb->get_entities_by_type_and_tag( s1, MBMAXTYPE, &t1, vallist, 1, r1, Interface::INTERSECT, false ) );
-    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( s1, MBMAXTYPE, &t1, vallist, 1, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s1, MBMAXTYPE, &t1, vallist, 1, c1, Interface::INTERSECT, false ) );
     MB_CHK_ERR( get_by_all_types_and_tag( mb, s1, &t1, vallist, 1, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
@@ -7342,7 +7373,8 @@ ErrorCode mb_type_is_maxtype_test()
     r1.clear();
     r2.clear();
     MB_CHK_ERR( mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, vallist, 1, r1, Interface::INTERSECT, false ) );
-    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, vallist, 1, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, vallist, 1, c1, Interface::INTERSECT, false ) );
     MB_CHK_ERR( get_by_all_types_and_tag( mb, s2, &t1, vallist, 1, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
@@ -7350,7 +7382,8 @@ ErrorCode mb_type_is_maxtype_test()
     r1.clear();
     r2.clear();
     MB_CHK_ERR( mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, vallist, 1, r1, Interface::INTERSECT, true ) );
-    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, vallist, 1, c1, Interface::INTERSECT, true ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, vallist, 1, c1, Interface::INTERSECT, true ) );
     MB_CHK_ERR( get_by_all_types_and_tag( mb, s2, &t1, vallist, 1, r2, Interface::INTERSECT, true ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
@@ -7412,7 +7445,8 @@ ErrorCode mb_type_is_maxtype_test()
     r1.clear();
     r2.clear();
     MB_CHK_ERR( mb->get_entities_by_type_and_tag( 0, MBMAXTYPE, tags, vallist, 2, r1, Interface::INTERSECT, false ) );
-    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( 0, MBMAXTYPE, tags, vallist, 2, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( 0, MBMAXTYPE, tags, vallist, 2, c1, Interface::INTERSECT, false ) );
     MB_CHK_ERR( get_by_all_types_and_tag( mb, 0, tags, vallist, 2, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
@@ -7420,7 +7454,8 @@ ErrorCode mb_type_is_maxtype_test()
     r1.clear();
     r2.clear();
     MB_CHK_ERR( mb->get_entities_by_type_and_tag( s1, MBMAXTYPE, tags, vallist, 2, r1, Interface::INTERSECT, false ) );
-    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( s1, MBMAXTYPE, tags, vallist, 2, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s1, MBMAXTYPE, tags, vallist, 2, c1, Interface::INTERSECT, false ) );
     MB_CHK_ERR( get_by_all_types_and_tag( mb, s1, tags, vallist, 2, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
@@ -7428,7 +7463,8 @@ ErrorCode mb_type_is_maxtype_test()
     r1.clear();
     r2.clear();
     MB_CHK_ERR( mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, r1, Interface::INTERSECT, false ) );
-    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, c1, Interface::INTERSECT, false ) );
     MB_CHK_ERR( get_by_all_types_and_tag( mb, s2, tags, vallist, 2, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
@@ -7436,7 +7472,8 @@ ErrorCode mb_type_is_maxtype_test()
     r1.clear();
     r2.clear();
     MB_CHK_ERR( mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, r1, Interface::INTERSECT, true ) );
-    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, c1, Interface::INTERSECT, true ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, c1, Interface::INTERSECT, true ) );
     MB_CHK_ERR( get_by_all_types_and_tag( mb, s2, tags, vallist, 2, r2, Interface::INTERSECT, true ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
@@ -7444,7 +7481,8 @@ ErrorCode mb_type_is_maxtype_test()
     r1.clear();
     r2.clear();
     MB_CHK_ERR( mb->get_entities_by_type_and_tag( 0, MBMAXTYPE, tags, vallist, 2, r1, Interface::UNION, false ) );
-    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( 0, MBMAXTYPE, tags, vallist, 2, c1, Interface::UNION, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( 0, MBMAXTYPE, tags, vallist, 2, c1, Interface::UNION, false ) );
     MB_CHK_ERR( get_by_all_types_and_tag( mb, 0, tags, vallist, 2, r2, Interface::UNION, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
@@ -7452,7 +7490,8 @@ ErrorCode mb_type_is_maxtype_test()
     r1.clear();
     r2.clear();
     MB_CHK_ERR( mb->get_entities_by_type_and_tag( s1, MBMAXTYPE, tags, vallist, 2, r1, Interface::UNION, false ) );
-    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( s1, MBMAXTYPE, tags, vallist, 2, c1, Interface::UNION, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s1, MBMAXTYPE, tags, vallist, 2, c1, Interface::UNION, false ) );
     MB_CHK_ERR( get_by_all_types_and_tag( mb, s1, tags, vallist, 2, r2, Interface::UNION, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
@@ -7460,7 +7499,8 @@ ErrorCode mb_type_is_maxtype_test()
     r1.clear();
     r2.clear();
     MB_CHK_ERR( mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, r1, Interface::UNION, false ) );
-    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, c1, Interface::UNION, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, c1, Interface::UNION, false ) );
     MB_CHK_ERR( get_by_all_types_and_tag( mb, s2, tags, vallist, 2, r2, Interface::UNION, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
@@ -7468,7 +7508,8 @@ ErrorCode mb_type_is_maxtype_test()
     r1.clear();
     r2.clear();
     MB_CHK_ERR( mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, r1, Interface::UNION, true ) );
-    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, c1, Interface::UNION, true ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, c1, Interface::UNION, true ) );
     MB_CHK_ERR( get_by_all_types_and_tag( mb, s2, tags, vallist, 2, r2, Interface::UNION, true ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );

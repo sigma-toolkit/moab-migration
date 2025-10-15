@@ -641,9 +641,9 @@ class ReadRTT : public ReaderIface
     int count_sides( std::vector< side > side_data, std::vector< int >& surface_numbers );
 
     ErrorCode create_facets( const std::vector< facet >& facet_data,
-                        const std::map< int, EntityHandle >& surface_map,
-                        Range& mb_coords,
-                        EntityHandle file_set );
+                             const std::map< int, EntityHandle >& surface_map,
+                             Range& mb_coords,
+                             EntityHandle file_set );
 
     ErrorCode create_material_group( const std::string& material_name, int material_id, EntityHandle& handle );
 

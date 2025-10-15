@@ -364,8 +364,9 @@ ErrorCode closedsurface_uref_hirec_convergence_study( const char* infile,
         for( Range::iterator ielem = elems_owned.begin(); ielem != elems_owned.end(); ++ielem, ++index )
         {
             // Projection
-            MB_CHK_ERR( hirec.hiproj_walf_in_element( *ielem, nvpe, nsamples, &( testnaturalcoords[nvpe * nsamples * index] ),
-                                              &( testpnts[3 * nsamples * index] ) ) );
+            MB_CHK_ERR( hirec.hiproj_walf_in_element( *ielem, nvpe, nsamples,
+                                                      &( testnaturalcoords[nvpe * nsamples * index] ),
+                                                      &( testpnts[3 * nsamples * index] ) ) );
             // for debug
             /*obj->compute_projecterror(3,nsamples,&(testpnts[3*nsamples*index]),eleml1err,eleml2err,elemlinferr);
             if(elemlinferr>maxlinferr){
@@ -592,7 +593,7 @@ int main( int argc, char* argv[] )
         std::cout << "Processor " << rank << " is working on file " << infile << std::endl;
 #endif
         MB_CHK_ERR( closedsurface_uref_hirec_convergence_study( infile.c_str(), degs2fit, interp, dim, obj, ntestverts,
-                                                           geoml1errs, geoml2errs, geomlinferrs ) );
+                                                                geoml1errs, geoml2errs, geomlinferrs ) );
         assert( geoml1errs.size() == 1 + degs2fit.size() && geoml2errs.size() == 1 + degs2fit.size() &&
                 geomlinferrs.size() == 1 + degs2fit.size() );
 #ifdef MOAB_HAVE_MPI

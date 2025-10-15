@@ -155,11 +155,12 @@ ErrorCode SparseTag::get_data( const SequenceManager*,
 
     for( size_t i = 0; i < num_entities; ++i, ++pointers )
     {
-        if ( MB_SUCCESS != get_data_ptr( entities[i], *pointers ) )
+        if( MB_SUCCESS != get_data_ptr( entities[i], *pointers ) )
         {
             if( get_default_value() )
                 *pointers = get_default_value();
-            else return MB_TAG_NOT_FOUND;
+            else
+                return MB_TAG_NOT_FOUND;
         }
     }
 
@@ -183,9 +184,10 @@ ErrorCode SparseTag::get_data( const SequenceManager*,
     {
         if( MB_SUCCESS != get_data_ptr( *i, *pointers ) )
         {
-            if ( get_default_value() )
+            if( get_default_value() )
                 *pointers = get_default_value();
-            else return MB_TAG_NOT_FOUND;
+            else
+                return MB_TAG_NOT_FOUND;
         }
     }
 
@@ -485,7 +487,7 @@ ErrorCode SparseTag::find_entities_with_value(
         for( Range::const_pair_iterator p = intersect_entities->begin(); p != intersect_entities->end(); ++p )
         {
             iter = mData.lower_bound( p->first );
-            end = mData.upper_bound( p->second );
+            end  = mData.upper_bound( p->second );
             find_tag_values_equal( *this, value, get_size(), iter, end, output_entities );
         }
     }
@@ -494,12 +496,12 @@ ErrorCode SparseTag::find_entities_with_value(
         if( type == MBMAXTYPE )
         {
             iter = mData.begin();
-            end = mData.end();
+            end  = mData.end();
         }
         else
         {
             iter = mData.lower_bound( CREATE_HANDLE( type, MB_START_ID ) );
-            end = mData.upper_bound( CREATE_HANDLE( type, MB_END_ID ) );
+            end  = mData.upper_bound( CREATE_HANDLE( type, MB_END_ID ) );
         }
         find_tag_values_equal( *this, value, get_size(), iter, end, output_entities );
     }

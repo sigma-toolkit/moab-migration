@@ -174,7 +174,7 @@ int main( int argc, char* argv[] )
     ErrorCode result;
     Range range;
 
-#if( defined( MOAB_HAVE_MPI ) && defined( MOAB_HAVE_TEMPESTREMAP ) )
+#if ( defined( MOAB_HAVE_MPI ) && defined( MOAB_HAVE_TEMPESTREMAP ) )
     moab::ParallelComm* pcomm = new moab::ParallelComm( gMB, MPI_COMM_WORLD, 0 );
 #endif
 
@@ -457,7 +457,8 @@ int main( int argc, char* argv[] )
                 moab::EntityHandle& srcmesh = remapper->GetMeshSet( moab::Remapper::SourceMesh );
 
                 // convert
-                result = remapper->LoadMesh( moab::Remapper::SourceMesh, inFileName, moab::TempestRemapper::DEFAULT );MB_CHK_ERR( result );
+                result = remapper->LoadMesh( moab::Remapper::SourceMesh, inFileName, moab::TempestRemapper::DEFAULT );
+                MB_CHK_ERR( result );
 
                 Mesh* tempestMesh = remapper->GetMesh( moab::Remapper::SourceMesh );
                 tempestMesh->RemoveZeroEdges();
@@ -468,7 +469,8 @@ int main( int argc, char* argv[] )
 
                 if( unitscaling )
                 {
-                    result = moab::IntxUtils::ScaleToRadius( gMB, srcmesh, 1.0 );MB_CHK_ERR( result );
+                    result = moab::IntxUtils::ScaleToRadius( gMB, srcmesh, 1.0 );
+                    MB_CHK_ERR( result );
                 }
 
                 // Check if we are converting a RLL grid
@@ -486,7 +488,8 @@ int main( int argc, char* argv[] )
                 //          Example:  CS(0)/ICO(1)/ICOD(2),  num_elements,   num_nodes
                 //                 :       RLL(3),           num_lat,        num_lon
                 result = gMB->tag_get_handle( "ClimateMetadata", 3, MB_TYPE_INTEGER, rectilinearTag,
-                                              MB_TAG_SPARSE | MB_TAG_CREAT, vecDimSizes.data() );MB_CHK_SET_ERR( result, "can't create rectilinear sizes tag" );
+                                              MB_TAG_SPARSE | MB_TAG_CREAT, vecDimSizes.data() );
+                MB_CHK_SET_ERR( result, "can't create rectilinear sizes tag" );
 
                 if( attRectilinear != nullptr )
                 {
@@ -577,7 +580,8 @@ int main( int argc, char* argv[] )
                 }
                 moab::EntityHandle mSet = 0;
                 // mSet   = remapper->GetMeshSet( moab::Remapper::SourceMesh );
-                result = gMB->tag_set_data( rectilinearTag, &mSet, 1, vecDimSizes.data() );MB_CHK_ERR( result );
+                result = gMB->tag_set_data( rectilinearTag, &mSet, 1, vecDimSizes.data() );
+                MB_CHK_ERR( result );
 
                 switch( vecDimSizes[0] )
                 {
@@ -608,15 +612,18 @@ int main( int argc, char* argv[] )
                     // Check if our MOAB mesh has RED and BLUE tags; this would indicate we are
                     // converting an overlap grid
                     result = gMB->tag_get_handle( "TargetParent", 1, MB_TYPE_INTEGER, tgtParentTag,
-                                                  MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );MB_CHK_SET_ERR( result, "can't create target parent tag" );
+                                                  MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );
+                    MB_CHK_SET_ERR( result, "can't create target parent tag" );
 
                     result = gMB->tag_get_handle( "SourceParent", 1, MB_TYPE_INTEGER, srcParentTag,
-                                                  MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );MB_CHK_SET_ERR( result, "can't create source parent tag" );
+                                                  MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );
+                    MB_CHK_SET_ERR( result, "can't create source parent tag" );
 
                     const Range& faces = remapper->GetMeshEntities( moab::Remapper::SourceMesh );
 
                     std::vector< int > gids( faces.size() ), srcpar( faces.size() ), tgtpar( faces.size() );
-                    result = gMB->tag_get_data( id_tag, faces, &gids[0] );MB_CHK_ERR( result );
+                    result = gMB->tag_get_data( id_tag, faces, &gids[0] );
+                    MB_CHK_ERR( result );
 
                     for( unsigned ii = 0; ii < faces.size(); ++ii )
                     {
@@ -624,8 +631,10 @@ int main( int argc, char* argv[] )
                         tgtpar[ii] = tempestMesh->vecTargetFaceIx[gids[ii] - 1];
                     }
 
-                    result = gMB->tag_set_data( srcParentTag, faces, &srcpar[0] );MB_CHK_ERR( result );
-                    result = gMB->tag_set_data( tgtParentTag, faces, &tgtpar[0] );MB_CHK_ERR( result );
+                    result = gMB->tag_set_data( srcParentTag, faces, &srcpar[0] );
+                    MB_CHK_ERR( result );
+                    result = gMB->tag_set_data( tgtParentTag, faces, &tgtpar[0] );
+                    MB_CHK_ERR( result );
 
                     srcpar.clear();
                     tgtpar.clear();
@@ -639,11 +648,13 @@ int main( int argc, char* argv[] )
 
                 // load the mesh in MOAB format
                 std::vector< int > metadata( 2 );
-                result = remapper->LoadNativeMesh( *j, srcmesh, metadata );MB_CHK_ERR( result );
+                result = remapper->LoadNativeMesh( *j, srcmesh, metadata );
+                MB_CHK_ERR( result );
 
                 if( unitscaling )
                 {
-                    result = moab::IntxUtils::ScaleToRadius( gMB, srcmesh, 1.0 );MB_CHK_ERR( result );
+                    result = moab::IntxUtils::ScaleToRadius( gMB, srcmesh, 1.0 );
+                    MB_CHK_ERR( result );
                 }
 
                 // Check if our MOAB mesh has RED and BLUE tags; this would indicate we are converting
@@ -656,15 +667,20 @@ int main( int argc, char* argv[] )
                     ovmesh              = srcmesh;
 
                     Tag countTag;
-                    result = gMB->tag_get_handle( "Counting", countTag );MB_CHK_ERR( result );
+                    result = gMB->tag_get_handle( "Counting", countTag );
+                    MB_CHK_ERR( result );
 
                     // Load the meshes and validate
                     Tag order;
                     ReorderTool reorder_tool( &core );
-                    result = reorder_tool.handle_order_from_int_tag( srcParentTag, -1, order );MB_CHK_ERR( result );
-                    result = reorder_tool.reorder_entities( order );MB_CHK_ERR( result );
-                    result = gMB->tag_delete( order );MB_CHK_ERR( result );
-                    result = remapper->ConvertMeshToTempest( moab::Remapper::OverlapMesh );MB_CHK_ERR( result );
+                    result = reorder_tool.handle_order_from_int_tag( srcParentTag, -1, order );
+                    MB_CHK_ERR( result );
+                    result = reorder_tool.reorder_entities( order );
+                    MB_CHK_ERR( result );
+                    result = gMB->tag_delete( order );
+                    MB_CHK_ERR( result );
+                    result = remapper->ConvertMeshToTempest( moab::Remapper::OverlapMesh );
+                    MB_CHK_ERR( result );
                 }
                 else
                 {
@@ -676,7 +692,8 @@ int main( int argc, char* argv[] )
                     }
 
                     // Convert the mesh and validate
-                    result = remapper->ConvertMeshToTempest( moab::Remapper::SourceMesh );MB_CHK_ERR( result );
+                    result = remapper->ConvertMeshToTempest( moab::Remapper::SourceMesh );
+                    MB_CHK_ERR( result );
                 }
             }
         }
@@ -911,7 +928,8 @@ int main( int argc, char* argv[] )
             remapper->GetMesh( ( use_overlap_context ? moab::Remapper::OverlapMesh : moab::Remapper::SourceMesh ) );
         moab::EntityHandle& srcmesh =
             remapper->GetMeshSet( ( use_overlap_context ? moab::Remapper::OverlapMesh : moab::Remapper::SourceMesh ) );
-        result = gMB->get_entities_by_dimension( srcmesh, 2, faces );MB_CHK_ERR( result );
+        result = gMB->get_entities_by_dimension( srcmesh, 2, faces );
+        MB_CHK_ERR( result );
         int ntot_elements = 0, nelements = faces.size();
 #ifdef MOAB_HAVE_MPI
         int ierr = MPI_Allreduce( &nelements, &ntot_elements, 1, MPI_INT, MPI_SUM, pcomm->comm() );
@@ -922,15 +940,19 @@ int main( int argc, char* argv[] )
 
         Tag gidTag = gMB->globalId_tag();
         std::vector< int > gids( faces.size() );
-        result = gMB->tag_get_data( gidTag, faces, &gids[0] );MB_CHK_ERR( result );
+        result = gMB->tag_get_data( gidTag, faces, &gids[0] );
+        MB_CHK_ERR( result );
 
         if( faces.size() > 1 && gids[0] == gids[1] && !use_overlap_context )
         {
 #ifdef MOAB_HAVE_MPI
-            result = pcomm->assign_global_ids( srcmesh, 2, 1, false );MB_CHK_ERR( result );
+            result = pcomm->assign_global_ids( srcmesh, 2, 1, false );
+            MB_CHK_ERR( result );
 #else
-            result = remapper->assign_vertex_element_IDs( gidTag, srcmesh, 2, 1 );MB_CHK_ERR( result );
-            result = remapper->assign_vertex_element_IDs( gidTag, srcmesh, 0, 1 );MB_CHK_ERR( result );
+            result = remapper->assign_vertex_element_IDs( gidTag, srcmesh, 2, 1 );
+            MB_CHK_ERR( result );
+            result = remapper->assign_vertex_element_IDs( gidTag, srcmesh, 0, 1 );
+            MB_CHK_ERR( result );
 #endif
         }
 
@@ -940,7 +962,8 @@ int main( int argc, char* argv[] )
         if( spectral_order > 1 && globalid_tag_name.size() > 1 )
         {
             result = remapper->GenerateMeshMetadata( *tempestMesh, ntot_elements, faces, NULL, globalid_tag_name,
-                                                     spectral_order );MB_CHK_ERR( result );
+                                                     spectral_order );
+            MB_CHK_ERR( result );
         }
 
         if( tempestout )
@@ -953,8 +976,10 @@ int main( int argc, char* argv[] )
                 // Overlap mesh: resize the source and target connection arrays
                 tempestMesh->vecSourceFaceIx.resize( nOverlapFaces );  // 0-based indices corresponding to source mesh
                 tempestMesh->vecTargetFaceIx.resize( nOverlapFaces );  // 0-based indices corresponding to target mesh
-                result = gMB->tag_get_data( srcParentTag, faces, &tempestMesh->vecSourceFaceIx[0] );MB_CHK_ERR( result );
-                result = gMB->tag_get_data( tgtParentTag, faces, &tempestMesh->vecTargetFaceIx[0] );MB_CHK_ERR( result );
+                result = gMB->tag_get_data( srcParentTag, faces, &tempestMesh->vecSourceFaceIx[0] );
+                MB_CHK_ERR( result );
+                result = gMB->tag_get_data( tgtParentTag, faces, &tempestMesh->vecTargetFaceIx[0] );
+                MB_CHK_ERR( result );
             }
             // Write out the mesh using TempestRemap
             tempestMesh->Write( out, NcFile::Netcdf4 );
@@ -1316,13 +1341,14 @@ int process_partition_file( Interface* mb, std::string& metis_partition_file )
     std::cout << " partitions range: " << *pmin << " " << *pmax << "\n";
     Tag part_set_tag;
     int dum_id = -1;
-    MB_CHK_ERR( mb->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_set_tag, MB_TAG_SPARSE | MB_TAG_CREAT,
-                               &dum_id ) );
+    MB_CHK_ERR( mb->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_set_tag,
+                                    MB_TAG_SPARSE | MB_TAG_CREAT, &dum_id ) );
 
     // get any sets already with this tag, and clear them
     // remove the parallel partition sets if they exist
     Range tagged_sets;
-    MB_CHK_ERR( mb->get_entities_by_type_and_tag( 0, MBENTITYSET, &part_set_tag, NULL, 1, tagged_sets, Interface::UNION ) );
+    MB_CHK_ERR(
+        mb->get_entities_by_type_and_tag( 0, MBENTITYSET, &part_set_tag, NULL, 1, tagged_sets, Interface::UNION ) );
     if( !tagged_sets.empty() )
     {
         MB_CHK_ERR( mb->clear_meshset( tagged_sets ) );

@@ -41,7 +41,7 @@ using namespace moab;
 #define ENABLE_ATMOCN_COUPLING
 #define ENABLE_ATMLND_COUPLING
 
-#if( !defined( ENABLE_ATMOCN_COUPLING ) && !defined( ENABLE_ATMLND_COUPLING ) )
+#if ( !defined( ENABLE_ATMOCN_COUPLING ) && !defined( ENABLE_ATMLND_COUPLING ) )
 #error Enable either OCN (ENABLE_ATMOCN_COUPLING) and/or LND (ENABLE_ATMLND_COUPLING) for coupling
 #endif
 
@@ -486,10 +486,9 @@ int main( int argc, char* argv[] )
             const iMOAB_String intx_from_file_identifier = "atmocn-map-from-file";
             int src_disc_type                            = 1;  // element-based SE-4
             int tgt_disc_type                            = 3;  // element-based FV
-            int arearead = 1; // read only area_a (atmosphere)
-            CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type,
-                                                         &tgt_disc_type, &arearead, intx_from_file_identifier,
-                                                         atmocn_map_file_name ),
+            int arearead                                 = 1;  // read only area_a (atmosphere)
+            CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type, &tgt_disc_type, &arearead,
+                                          intx_from_file_identifier, atmocn_map_file_name ),
                        "failed to load map file from disk" );
         }
 #endif

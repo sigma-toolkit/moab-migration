@@ -65,8 +65,8 @@ namespace moab
             ( val ) = 0;                                                              \
     }
 
-#define GET_DIMB( ncdim, name, varname, id, val ) \
-    INS_ID( name, varname, id, max_str_length + 1 );                  \
+#define GET_DIMB( ncdim, name, varname, id, val )    \
+    INS_ID( name, varname, id, max_str_length + 1 ); \
     GET_DIM( ncdim, name, val );
 
 #define GET_VAR( name, id, dims )                                                               \

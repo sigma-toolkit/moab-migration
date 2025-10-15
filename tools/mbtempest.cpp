@@ -603,7 +603,8 @@ int main( int argc, char* argv[] )
             // ghost layers are needed in coverage for bilinear map, which does not actually need intersection
             // this will be fixed in the future, bilinear map needs just coverage, not intersection
             // so I am not passing the ghost layer here, even though there is an option in runCtx for a ghost layer
-            MB_CHK_ERR( mbintx->construct_covering_set( runCtx->meshsets[0], covering_set ) );  // lots of communication if mesh is distributed very differently
+            MB_CHK_ERR( mbintx->construct_covering_set(
+                runCtx->meshsets[0], covering_set ) );  // lots of communication if mesh is distributed very differently
             runCtx->timer_pop();
 
             // print verbosely about the problem setting
@@ -636,8 +637,9 @@ int main( int argc, char* argv[] )
             // Now let's invoke the MOAB intersection algorithm in parallel with a
             // source and target mesh set representing two different decompositions
             runCtx->timer_push( "compute intersections with MOAB" );
-            MB_CHK_SET_ERR( mbCore->create_meshset( moab::MESHSET_SET, intxset ), "Can't create new set"  );
-            MB_CHK_SET_ERR( mbintx->intersect_meshes( covering_set, runCtx->meshsets[1], intxset ), "Can't compute the intersection of meshes on the sphere"  );
+            MB_CHK_SET_ERR( mbCore->create_meshset( moab::MESHSET_SET, intxset ), "Can't create new set" );
+            MB_CHK_SET_ERR( mbintx->intersect_meshes( covering_set, runCtx->meshsets[1], intxset ),
+                            "Can't compute the intersection of meshes on the sphere" );
             runCtx->timer_pop();
 
             // free the memory
@@ -748,10 +750,9 @@ int main( int argc, char* argv[] )
         // local source grid
         runCtx->timer_push( "construct covering set for intersection" );
         // if ghosting, no gnomonic
-        if (runCtx->nlayers >=1)
-            runCtx->useGnomonicProjection = false;
+        if( runCtx->nlayers >= 1 ) runCtx->useGnomonicProjection = false;
         MB_CHK_ERR( remapper.ConstructCoveringSet( runCtx->epsrel, 1.0, 1.0, runCtx->boxeps, runCtx->rrmGrids,
-                                              runCtx->useGnomonicProjection, runCtx->nlayers ) );
+                                                   runCtx->useGnomonicProjection, runCtx->nlayers ) );
         runCtx->timer_pop();
 
 #ifdef MOAB_HAVE_MPI
@@ -815,11 +816,11 @@ int main( int argc, char* argv[] )
         if( runCtx->intxFilename.size() )
         {
             moab::EntityHandle writableOverlapSet;
-            MB_CHK_SET_ERR( mbCore->create_meshset( moab::MESHSET_SET, writableOverlapSet ), "Can't create new set"  );
+            MB_CHK_SET_ERR( mbCore->create_meshset( moab::MESHSET_SET, writableOverlapSet ), "Can't create new set" );
             moab::EntityHandle meshOverlapSet = remapper.GetMeshSet( moab::Remapper::OverlapMesh );
             moab::Range ovEnts;
-            MB_CHK_SET_ERR( mbCore->get_entities_by_dimension( meshOverlapSet, 2, ovEnts ), "Can't create new set"  );
-            MB_CHK_SET_ERR( mbCore->get_entities_by_dimension( meshOverlapSet, 0, ovEnts ), "Can't create new set"  );
+            MB_CHK_SET_ERR( mbCore->get_entities_by_dimension( meshOverlapSet, 2, ovEnts ), "Can't create new set" );
+            MB_CHK_SET_ERR( mbCore->get_entities_by_dimension( meshOverlapSet, 0, ovEnts ), "Can't create new set" );
 
 #ifdef MOAB_HAVE_MPI
             // Do not remove ghosted entities if we still haven't computed weights
@@ -839,7 +840,7 @@ int main( int argc, char* argv[] )
 #endif
             }
 #endif
-            MB_CHK_SET_ERR( mbCore->add_entities( writableOverlapSet, ovEnts ), "adding local intx cells failed"  );
+            MB_CHK_SET_ERR( mbCore->add_entities( writableOverlapSet, ovEnts ), "adding local intx cells failed" );
 
 #ifdef MOAB_HAVE_MPI
 #ifdef MOAB_DBG
@@ -882,7 +883,7 @@ int main( int argc, char* argv[] )
                 runCtx->mapOptions,       // const GenerateOfflineMapAlgorithmOptions& options
                 runCtx->doftag_names[0],  // const std::string& source_tag_name
                 runCtx->doftag_names[1]   // const std::string& target_tag_name
-            ) );
+                ) );
             runCtx->timer_pop();
 
             weightMap->PrintMapStatistics();
@@ -951,14 +952,14 @@ int main( int argc, char* argv[] )
                 {
                     runCtx->timer_push( "describe a solution on source grid" );
                     MB_CHK_ERR( weightMap->DefineAnalyticalSolution( srcAnalyticalFunction, "AnalyticalSolnSrcExact",
-                                                                moab::Remapper::SourceMesh, testFunction ) );
+                                                                     moab::Remapper::SourceMesh, testFunction ) );
                     runCtx->timer_pop();
 
                     runCtx->timer_push( "describe a solution on target grid" );
 
                     MB_CHK_ERR( weightMap->DefineAnalyticalSolution( tgtAnalyticalFunction, "AnalyticalSolnTgtExact",
-                                                                moab::Remapper::TargetMesh, testFunction,
-                                                                &tgtProjectedFunction, "ProjectedSolnTgt" ) );
+                                                                     moab::Remapper::TargetMesh, testFunction,
+                                                                     &tgtProjectedFunction, "ProjectedSolnTgt" ) );
                     // rval = mbCore->write_file ( "tgtWithSolnTag.h5m", nullptr, writeOptions,
                     // &runCtx->meshsets[1], 1 ); MB_CHK_ERR ( rval );
                     runCtx->timer_pop();
@@ -967,22 +968,26 @@ int main( int argc, char* argv[] )
                 {
                     MB_CHK_ERR( mbCore->tag_get_handle( runCtx->variableToVerify.c_str(), srcAnalyticalFunction ) );
 
-                    MB_CHK_ERR( mbCore->tag_get_handle( "ProjectedSolnTgt", 1, moab::MB_TYPE_DOUBLE, tgtProjectedFunction,
-                                                   moab::MB_TAG_DENSE | moab::MB_TAG_CREAT ) );
+                    MB_CHK_ERR( mbCore->tag_get_handle( "ProjectedSolnTgt", 1, moab::MB_TYPE_DOUBLE,
+                                                        tgtProjectedFunction,
+                                                        moab::MB_TAG_DENSE | moab::MB_TAG_CREAT ) );
                 }
 
                 if( !runCtx->skip_io )
                 {
-                    MB_CHK_ERR( mbCore->write_file( "srcWithSolnTag.h5m", nullptr, writeOptions, &runCtx->meshsets[0], 1 ) );
+                    MB_CHK_ERR(
+                        mbCore->write_file( "srcWithSolnTag.h5m", nullptr, writeOptions, &runCtx->meshsets[0], 1 ) );
                 }
 
                 runCtx->timer_push( "compute solution projection on target grid" );
-                MB_CHK_ERR( weightMap->ApplyWeights( srcAnalyticalFunction, tgtProjectedFunction, false, runCtx->cassType ) );
+                MB_CHK_ERR(
+                    weightMap->ApplyWeights( srcAnalyticalFunction, tgtProjectedFunction, false, runCtx->cassType ) );
                 runCtx->timer_pop();
 
                 if( !runCtx->skip_io )
                 {
-                    MB_CHK_ERR( mbCore->write_file( "tgtWithSolnTag2.h5m", nullptr, writeOptions, &runCtx->meshsets[1], 1 ) );
+                    MB_CHK_ERR(
+                        mbCore->write_file( "tgtWithSolnTag2.h5m", nullptr, writeOptions, &runCtx->meshsets[1], 1 ) );
                 }
 
                 if( nprocs == 1 && runCtx->baselineFile.size() )
@@ -1009,7 +1014,8 @@ int main( int argc, char* argv[] )
                     // it will be used later to test, along with a target file
                     if( !runCtx->skip_io )
                     {
-                        MB_CHK_ERR( mbCore->write_file( "srcWithSolnTag.h5m", nullptr, writeOptions, &runCtx->meshsets[0], 1 ) );
+                        MB_CHK_ERR( mbCore->write_file( "srcWithSolnTag.h5m", nullptr, writeOptions,
+                                                        &runCtx->meshsets[0], 1 ) );
                     }
                 }
 
@@ -1019,7 +1025,7 @@ int main( int argc, char* argv[] )
                     runCtx->timer_push( "compute error metrics against analytical solution on target grid" );
                     std::map< std::string, double > errMetrics;
                     MB_CHK_ERR( weightMap->ComputeMetrics( moab::Remapper::TargetMesh, tgtAnalyticalFunction,
-                                                      tgtProjectedFunction, errMetrics, true ) );
+                                                           tgtProjectedFunction, errMetrics, true ) );
                     runCtx->timer_pop();
                 }
             }
@@ -1073,13 +1079,15 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
 
         ctx.timer_push( "load MOAB Source mesh" );
         // First the source
-        MB_CHK_ERR( remapper.LoadMesh( moab::Remapper::SourceMesh, ctx.inFilenames[0], moab::TempestRemapper::DEFAULT ) );
+        MB_CHK_ERR(
+            remapper.LoadMesh( moab::Remapper::SourceMesh, ctx.inFilenames[0], moab::TempestRemapper::DEFAULT ) );
         ctx.meshes[0] = remapper.GetMesh( moab::Remapper::SourceMesh );
         ctx.timer_pop();
 
         ctx.timer_push( "load MOAB Target mesh" );
         // Next the target
-        MB_CHK_ERR( remapper.LoadMesh( moab::Remapper::TargetMesh, ctx.inFilenames[1], moab::TempestRemapper::DEFAULT ) );
+        MB_CHK_ERR(
+            remapper.LoadMesh( moab::Remapper::TargetMesh, ctx.inFilenames[1], moab::TempestRemapper::DEFAULT ) );
         ctx.meshes[1] = remapper.GetMesh( moab::Remapper::TargetMesh );
         ctx.timer_pop();
 
@@ -1115,7 +1123,8 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
 
         ctx.timer_push( "load MOAB Source mesh" );
         // Load the source mesh and validate
-        MB_CHK_ERR( remapper.LoadNativeMesh( ctx.inFilenames[0], ctx.meshsets[0], smetadata, additional_read_opts_src.c_str() ) );
+        MB_CHK_ERR( remapper.LoadNativeMesh( ctx.inFilenames[0], ctx.meshsets[0], smetadata,
+                                             additional_read_opts_src.c_str() ) );
         if( smetadata.size() ) remapper.SetMeshType( moab::Remapper::SourceMesh, smetadata );
         ctx.timer_pop();
 
@@ -1131,7 +1140,7 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
 
         ctx.timer_push( "load MOAB Target mesh" );
         MB_CHK_ERR( remapper.LoadNativeMesh( ctx.inFilenames[1], ctx.meshsets[1], tmetadata,
-                                        addititional_read_opts_tgt.c_str() ) );
+                                             addititional_read_opts_tgt.c_str() ) );
         if( tmetadata.size() ) remapper.SetMeshType( moab::Remapper::TargetMesh, tmetadata );
         ctx.timer_pop();
 

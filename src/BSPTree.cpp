@@ -1170,7 +1170,7 @@ ErrorCode BSPTree::leaf_containing_point( EntityHandle root, const double point[
         rval = get_split_plane( iter.handle(), plane );
         if( MB_SUCCESS != rval ) return rval;
 
-        rval = iter.down( plane, ( BSPTreeIter::Direction )( plane.above( point ) ) );
+        rval = iter.down( plane, (BSPTreeIter::Direction)( plane.above( point ) ) );
         if( MB_SUCCESS != rval ) return rval;
     }
 }

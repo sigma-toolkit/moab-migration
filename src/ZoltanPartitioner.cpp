@@ -59,8 +59,7 @@ ZoltanPartitioner::ZoltanPartitioner( Interface* impl,
 #endif
                                       const bool use_coords,
                                       int argc,
-                                      char** argv
-                                      )
+                                      char** argv )
     : PartitionerBase< int >( impl,
                               use_coords
 #ifdef MOAB_HAVE_MPI
@@ -603,7 +602,7 @@ ErrorCode ZoltanPartitioner::partition_mesh_and_geometry( const double part_geom
     }
     else
     {
-      MB_CHK_SET_ERR( MB_FAILURE, "Geometry partitions not supported.\n" );
+        MB_CHK_SET_ERR( MB_FAILURE, "Geometry partitions not supported.\n" );
     }
     if( print_time )
     {
@@ -752,7 +751,7 @@ ErrorCode ZoltanPartitioner::partition_mesh_and_geometry( const double part_geom
     }
     else
     {
-      MB_CHK_SET_ERR( MB_FAILURE, "Geometry partitions not supported.\n" );
+        MB_CHK_SET_ERR( MB_FAILURE, "Geometry partitions not supported.\n" );
     }
 
     if( print_time )
@@ -1051,8 +1050,8 @@ void ZoltanPartitioner::SetRCB_Parameters( const bool recompute_rcb_box )
     myZZ->Set_Param( "LB_METHOD", "RCB" );  // recursive coordinate bisection
 
     // RCB parameters:
-    myZZ->Set_Param( "RCB_OUTPUT_LEVEL", "0" ); // increase to 1 for verbose details
-    myZZ->Set_Param( "KEEP_CUTS", "1" );  // save decomposition so that we can infer partitions
+    myZZ->Set_Param( "RCB_OUTPUT_LEVEL", "0" );  // increase to 1 for verbose details
+    myZZ->Set_Param( "KEEP_CUTS", "1" );         // save decomposition so that we can infer partitions
     // myZZ->Set_Param("RCB_RECTILINEAR_BLOCKS", "1"); // don't split point on boundary
     if( recompute_rcb_box ) myZZ->Set_Param( "RCB_RECOMPUTE_BOX", "1" );
 }

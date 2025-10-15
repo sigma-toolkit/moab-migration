@@ -91,7 +91,7 @@ ErrorCode Intx2MeshOnSphere::computeIntersectionBetweenTgtAndSrc( EntityHandle t
     // ordered and collapsed (eliminate doubles)
 
     // CartVect srccoords[4];
-    int num_nodes  = 0;
+    int num_nodes = 0;
     MB_CHK_ERR( mb->get_connectivity( src, srcConn, num_nodes ) );
     nsBlue = num_nodes;
     // account for possible padded polygons
@@ -120,7 +120,7 @@ ErrorCode Intx2MeshOnSphere::computeIntersectionBetweenTgtAndSrc( EntityHandle t
             for( int j = 0; j < nsBlue; j++ )
             {
                 MB_CHK_ERR( IntxUtils::gnomonic_projection( srcCoords[j], Rsrc, plane, srcCoords2D[2 * j],
-                                                       srcCoords2D[2 * j + 1] ) );
+                                                            srcCoords2D[2 * j + 1] ) );
             }
             bool overlap2d = GeomUtil::bounding_boxes_overlap_2d( srcCoords2D, nsBlue, tgtCoords2D, nsTgt, box_error );
             if( !overlap2d ) return MB_SUCCESS;  // we are sure they are not overlapping in 2d , either
@@ -146,7 +146,8 @@ ErrorCode Intx2MeshOnSphere::computeIntersectionBetweenTgtAndSrc( EntityHandle t
 
     for( int j = 0; j < nsBlue; j++ )
     {
-        MB_CHK_ERR( IntxUtils::gnomonic_projection( srcCoords[j], Rsrc, plane, srcCoords2D[2 * j], srcCoords2D[2 * j + 1] ) );
+        MB_CHK_ERR(
+            IntxUtils::gnomonic_projection( srcCoords[j], Rsrc, plane, srcCoords2D[2 * j], srcCoords2D[2 * j + 1] ) );
     }
 
 #ifdef ENABLE_DEBUG
@@ -529,7 +530,7 @@ ErrorCode Intx2MeshOnSphere::update_tracer_data( EntityHandle out_set, Tag& tagE
 
     // get all polygons out of out_set; then see where are they coming from
     Range polys;
-    MB_CHK_SET_ERR( mb->get_entities_by_dimension( out_set, 2, polys ), "can't get polygons out"  );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( out_set, 2, polys ), "can't get polygons out" );
 
     // rs2 is the target range, arrival; rs1 is src, departure;
     // there is a connection between rs1 and rs2, through the corrTag
@@ -540,11 +541,11 @@ ErrorCode Intx2MeshOnSphere::update_tracer_data( EntityHandle out_set, Tag& tagE
 
     // tagElem will have multiple tracers
     int numTracers = 0;
-    MB_CHK_SET_ERR( mb->tag_get_length( tagElem, numTracers ), "can't get number of tracers in simulation"  );
+    MB_CHK_SET_ERR( mb->tag_get_length( tagElem, numTracers ), "can't get number of tracers in simulation" );
     if( numTracers < 1 ) MB_CHK_SET_ERR( MB_FAILURE, "no tracers data" );
 
     std::vector< double > currentVals( rs2.size() * numTracers );
-    MB_CHK_SET_ERR( mb->tag_get_data( tagElem, rs2, &currentVals[0] ), "can't get existing tracers values"  );
+    MB_CHK_SET_ERR( mb->tag_get_data( tagElem, rs2, &currentVals[0] ), "can't get existing tracers values" );
 
     // create new tuple list for tracers to other processors, from remote_cells
 #ifdef MOAB_HAVE_MPI
@@ -585,11 +586,11 @@ ErrorCode Intx2MeshOnSphere::update_tracer_data( EntityHandle out_set, Tag& tagE
     {
         EntityHandle poly = *it;
         int srcIndex, tgtIndex;
-        MB_CHK_SET_ERR( mb->tag_get_data( srcParentTag, &poly, 1, &srcIndex ), "can't get source tag"  );
+        MB_CHK_SET_ERR( mb->tag_get_data( srcParentTag, &poly, 1, &srcIndex ), "can't get source tag" );
 
         EntityHandle src = rs1[srcIndex - 1];  // big assumption, it should work for meshes where global id is the same
         // as element handle (ordered from 1 to number of elements); should be OK for Homme meshes
-        MB_CHK_SET_ERR( mb->tag_get_data( tgtParentTag, &poly, 1, &tgtIndex ), "can't get target tag"  );
+        MB_CHK_SET_ERR( mb->tag_get_data( tgtParentTag, &poly, 1, &tgtIndex ), "can't get target tag" );
         // EntityHandle target = rs2[tgtIndex];
         // big assumption here, target and source are "parallel" ;we should have an index from
         // source to target (so a deformed source corresponds to an arrival tgt)
@@ -608,7 +609,8 @@ ErrorCode Intx2MeshOnSphere::update_tracer_data( EntityHandle out_set, Tag& tagE
             if( !remote_cells_with_tracers ) MB_CHK_SET_ERR( MB_FAILURE, "no remote cells, failure\n" );
             // maybe the element is remote, from another processor
             int global_id_src;
-            MB_CHK_SET_ERR( mb->tag_get_data( gid, &src, 1, &global_id_src ), "can't get arrival target for corresponding source gid"  );
+            MB_CHK_SET_ERR( mb->tag_get_data( gid, &src, 1, &global_id_src ),
+                            "can't get arrival target for corresponding source gid" );
             // find the
             int index_in_remote = remote_cells_with_tracers->find( 1, global_id_src );
             if( index_in_remote == -1 )
@@ -659,7 +661,7 @@ ErrorCode Intx2MeshOnSphere::update_tracer_data( EntityHandle out_set, Tag& tagE
     std::vector< double > total_mass_local( numTracers, 0. );
     while( iter != rs2.end() )
     {
-        MB_CHK_SET_ERR( mb->tag_iterate( tagArea, iter, rs2.end(), count, data ), "can't tag iterate"  );
+        MB_CHK_SET_ERR( mb->tag_iterate( tagArea, iter, rs2.end(), count, data ), "can't tag iterate" );
         double* ptrArea = (double*)data;
         for( int i = 0; i < count; i++, ++iter, j++, ptrArea++ )
         {
@@ -670,7 +672,7 @@ ErrorCode Intx2MeshOnSphere::update_tracer_data( EntityHandle out_set, Tag& tagE
             }
         }
     }
-    MB_CHK_SET_ERR( mb->tag_set_data( tagElem, rs2, &newValues[0] ), "can't set new values tag"  );
+    MB_CHK_SET_ERR( mb->tag_set_data( tagElem, rs2, &newValues[0] ), "can't set new values tag" );
 
 #ifdef MOAB_HAVE_MPI
     std::vector< double > total_mass( numTracers, 0. );
@@ -712,9 +714,9 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
     }
     // so here, we know that the logic is for gnomonic == true
     localEnts.clear();
-    MB_CHK_SET_ERR( mb->get_entities_by_dimension( euler_set, 2, localEnts ), "can't get local ents"  );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( euler_set, 2, localEnts ), "can't get local ents" );
 
-    MB_CHK_SET_ERR( mb->get_connectivity( localEnts, local_verts ), "can't get connectivity"  );
+    MB_CHK_SET_ERR( mb->get_connectivity( localEnts, local_verts ), "can't get connectivity" );
     int num_local_verts = (int)local_verts.size();
 
     assert( parcomm != NULL );
@@ -722,7 +724,8 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
     if( num_local_verts == 0 )
     {
         // it is probably point cloud, get the local vertices from set
-        MB_CHK_SET_ERR( mb->get_entities_by_dimension( euler_set, 0, local_verts ), "can't get local vertices from set"  );
+        MB_CHK_SET_ERR( mb->get_entities_by_dimension( euler_set, 0, local_verts ),
+                        "can't get local vertices from set" );
         num_local_verts = (int)local_verts.size();
         localEnts       = local_verts;
     }
@@ -739,7 +742,7 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
     // planes decide what gnomonic planes will be affected by each cell some elements could appear
     // in multiple gnomonic planes !
     std::vector< double > coords( 3 * num_local_verts );
-    MB_CHK_SET_ERR( mb->get_coords( local_verts, &coords[0] ), "can't get vertex coords"  );
+    MB_CHK_SET_ERR( mb->get_coords( local_verts, &coords[0] ), "can't get vertex coords" );
     // decide each local vertex to what gnomonic plane it belongs
 
     std::vector< int > gnplane;
@@ -762,7 +765,7 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
         EntityHandle c[1];
         if( typeCell != MBVERTEX )
         {
-            MB_CHK_SET_ERR( mb->get_connectivity( cell, conn, nnodes ), "can't get connectivity"  );
+            MB_CHK_SET_ERR( mb->get_connectivity( cell, conn, nnodes ), "can't get connectivity" );
         }
         else
         {
@@ -813,7 +816,7 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
 
     // now communicate to get all boxes
     int mpi_err;
-#if( MPI_VERSION >= 2 )
+#if ( MPI_VERSION >= 2 )
     // use "in place" option
     mpi_err = MPI_Allgather( MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, &allBoxes[0], 24, MPI_DOUBLE,
                              parcomm->proc_config().proc_comm() );
@@ -866,31 +869,35 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     // mesh needed for tag migrate later on
     int defaultInt = -1;  // no processor, so it was not migrated from somewhere else
     MB_CHK_SET_ERR( mb->tag_get_handle( "orig_sending_processor", 1, MB_TYPE_INTEGER, orgSendProcTag,
-                                         MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt ), "can't create original sending processor tag"  );
+                                        MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt ),
+                    "can't create original sending processor tag" );
 
     assert( parcomm != NULL );
     Range meshCells;
-    MB_CHK_SET_ERR( mb->get_entities_by_dimension( initial_distributed_set, 2, meshCells ), "can't get cells by dimension from mesh set"  );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( initial_distributed_set, 2, meshCells ),
+                    "can't get cells by dimension from mesh set" );
 
     if( 1 == parcomm->proc_config().proc_size() )
     {
         // move all initial cells to coverage set
-        MB_CHK_SET_ERR( mb->add_entities( covering_set, meshCells ), "can't add primary ents to covering set"  );
+        MB_CHK_SET_ERR( mb->add_entities( covering_set, meshCells ), "can't add primary ents to covering set" );
         // if point cloud source, add vertices
         if( 0 == meshCells.size() || max_edges_1 == 0 )
         {
             // add vertices from the source set
             Range verts;
-            MB_CHK_SET_ERR( mb->get_entities_by_dimension( initial_distributed_set, 0, verts ), "can't get vertices from mesh set"  );
-            MB_CHK_SET_ERR( mb->add_entities( covering_set, verts ), "can't add primary ents to covering set"  );
+            MB_CHK_SET_ERR( mb->get_entities_by_dimension( initial_distributed_set, 0, verts ),
+                            "can't get vertices from mesh set" );
+            MB_CHK_SET_ERR( mb->add_entities( covering_set, verts ), "can't add primary ents to covering set" );
         }
         return MB_SUCCESS;
     }
 
     // mark on the coverage mesh where this element came from
     Tag sendProcTag;  /// for coverage mesh, will store the sender
-    MB_CHK_SET_ERR( mb->tag_get_handle( "sending_processor", 1, MB_TYPE_INTEGER, sendProcTag, MB_TAG_DENSE | MB_TAG_CREAT,
-                               &defaultInt ), "can't create sending processor tag"  );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "sending_processor", 1, MB_TYPE_INTEGER, sendProcTag,
+                                        MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt ),
+                    "can't create sending processor tag" );
 
     // this information needs to be forwarded to coverage mesh, if this mesh was already migrated
     // from somewhere else
@@ -909,7 +916,8 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     if( meshCells.size() > 0 )
     {
         oneCell = meshCells[0];  // it is possible we do not have any cells, even after migration
-        MB_CHK_SET_ERR( mb->tag_get_data( orgSendProcTag, &oneCell, 1, &orig_sender ), "can't get original sending processor value" );
+        MB_CHK_SET_ERR( mb->tag_get_data( orgSendProcTag, &oneCell, 1, &orig_sender ),
+                        "can't get original sending processor value" );
         if( gdsTag )
         {
             DataType dtype;
@@ -922,7 +930,8 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
                 if( lenTag > 0 )
                 {
                     valsDOFs.resize( lenTag );
-                    MB_CHK_SET_ERR( mb->tag_get_data( gdsTag, &oneCell, 1, &valsDOFs[0] ), "can't get SE DoF tag data" );
+                    MB_CHK_SET_ERR( mb->tag_get_data( gdsTag, &oneCell, 1, &valsDOFs[0] ),
+                                    "can't get SE DoF tag data" );
                     if( valsDOFs[0] > 0 )
                     {
                         // first value positive means we really need to transport this data during
@@ -963,12 +972,12 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
 
     // get all mesh verts1
     Range mesh_verts;
-    MB_CHK_SET_ERR( mb->get_connectivity( meshCells, mesh_verts ), "can't get  mesh vertices"  );
+    MB_CHK_SET_ERR( mb->get_connectivity( meshCells, mesh_verts ), "can't get  mesh vertices" );
     size_t num_mesh_verts = mesh_verts.size();
 
     // now see the mesh points positions; to what boxes should we send them?
     std::vector< double > coords_mesh( 3 * num_mesh_verts );
-    MB_CHK_SET_ERR( mb->get_coords( mesh_verts, &coords_mesh[0] ), "can't get mesh points position"  );
+    MB_CHK_SET_ERR( mb->get_coords( mesh_verts, &coords_mesh[0] ), "can't get mesh points position" );
 
     // decide gnomonic plane for each vertex, as in the compute boxes
     std::vector< int > gnplane;
@@ -985,7 +994,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     }
 
     std::vector< int > gids( num_mesh_verts );
-    MB_CHK_SET_ERR( mb->tag_get_data( gid, mesh_verts, &gids[0] ), "can't get vertices gids"  );
+    MB_CHK_SET_ERR( mb->tag_get_data( gid, mesh_verts, &gids[0] ), "can't get vertices gids" );
 
     // ranges to send to each processor; will hold vertices and elements (quads/ polygons)
     // will look if the box of the mesh cell covers bounding box(es) (within tolerances)
@@ -999,7 +1008,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     if( nb_ghost_layers > 0 )
     {
         double diagonal;
-        MB_CHK_SET_ERR( IntxUtils::max_diagonal( mb, meshCells, max_edges_1, diagonal ), "can't get max diagonal"  );
+        MB_CHK_SET_ERR( IntxUtils::max_diagonal( mb, meshCells, max_edges_1, diagonal ), "can't get max diagonal" );
         //
         double global_diag = 0;
         mpi_err = MPI_Allreduce( &diagonal, &global_diag, 1, MPI_DOUBLE, MPI_MAX, parcomm->proc_config().proc_comm() );
@@ -1016,7 +1025,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         EntityHandle q = *eit;
         const EntityHandle* conn;
         int num_nodes;
-        MB_CHK_SET_ERR( mb->get_connectivity( q, conn, num_nodes ), "can't get connectivity on cell"  );
+        MB_CHK_SET_ERR( mb->get_connectivity( q, conn, num_nodes ), "can't get connectivity on cell" );
 
         // first decide what planes need to consider
         std::set< int > planes;  // if this list contains more than 3 planes, we have a very bad mesh!!!
@@ -1103,10 +1112,11 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     for( int p = 0; p < numprocs; p++ )
     {
         Range& range_to_P = Rto[p];
-        if (include_edges)
+        if( include_edges )
         {
             Range edgesToP;
-            MB_CHK_SET_ERR( mb->get_adjacencies( range_to_P, 1, false, edgesToP, Interface::UNION ), "can't get edges" );
+            MB_CHK_SET_ERR( mb->get_adjacencies( range_to_P, 1, false, edgesToP, Interface::UNION ),
+                            "can't get edges" );
             numq = numq + edgesToP.size();
             range_to_P.merge( edgesToP );
         }
@@ -1117,7 +1127,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
                   << " psize: " << range_to_P.psize() << "\n";
 #endif
         Range vertsToP;
-        MB_CHK_SET_ERR( mb->get_connectivity( range_to_P, vertsToP ), "can't get connectivity"  );
+        MB_CHK_SET_ERR( mb->get_connectivity( range_to_P, vertsToP ), "can't get connectivity" );
         numq = numq + range_to_P.size();
         numv = numv + vertsToP.size();
 
@@ -1165,19 +1175,19 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
             TLv.inc_n();  // increment tuple list size
         }
         // also, prep the 2d cells for sending ...
-        Range Q = subtract( range_to_P, mesh_verts ); // it could include edges too
+        Range Q = subtract( range_to_P, mesh_verts );  // it could include edges too
         for( Range::iterator it = Q.begin(); it != Q.end(); ++it )
         {
             EntityHandle q = *it;  // this is a second mesh cell (or src, lagrange set)
             int global_id;
-            MB_CHK_SET_ERR( mb->tag_get_data( gid, &q, 1, &global_id ), "can't get gid for polygon"  );
+            MB_CHK_SET_ERR( mb->tag_get_data( gid, &q, 1, &global_id ), "can't get gid for polygon" );
             int n                    = TLq.get_n();  // current size
             TLq.vi_wr[sizeTuple * n] = to_proc;      //
             TLq.vi_wr[sizeTuple * n + 1] =
                 global_id;  // global id of element, used to identify it for debug purposes only
             const EntityHandle* conn4;
             int num_nodes;  // could be up to MAXEDGES; max_edges?;
-            MB_CHK_SET_ERR( mb->get_connectivity( q, conn4, num_nodes ), "can't get connectivity for cell"  );
+            MB_CHK_SET_ERR( mb->get_connectivity( q, conn4, num_nodes ), "can't get connectivity for cell" );
             if( num_nodes > max_edges_1 )
             {
                 mb->list_entities( &q, 1 );
@@ -1200,14 +1210,15 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
             if( migrated_mesh )
             {
                 // case of extra work, maybe need to check if it is ghost ? yes, next loop !
-                MB_CHK_SET_ERR( mb->tag_get_data( orgSendProcTag, &q, 1, &orig_sender ), "can't get original sender for polygon, in migrate scenario"  );
+                MB_CHK_SET_ERR( mb->tag_get_data( orgSendProcTag, &q, 1, &orig_sender ),
+                                "can't get original sender for polygon, in migrate scenario" );
                 TLq.vi_wr[sizeTuple * n + currentIndexIntTuple] = orig_sender;  // should be different than -1
                 currentIndexIntTuple++;
             }
             // GLOBAL_DOFS info, if available
             if( size_gdofs_tag )
             {
-                MB_CHK_SET_ERR( mb->tag_get_data( gdsTag, &q, 1, &valsDOFs[0] ), "can't get gdofs data in HOMME"  );
+                MB_CHK_SET_ERR( mb->tag_get_data( gdsTag, &q, 1, &valsDOFs[0] ), "can't get gdofs data in HOMME" );
                 for( int i = 0; i < size_gdofs_tag; i++ )
                 {
                     TLq.vi_wr[sizeTuple * n + currentIndexIntTuple + i] =
@@ -1253,10 +1264,11 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         {
             EntityHandle new_vert;
             double dp_pos[3] = { TLv.vr_wr[3 * i], TLv.vr_wr[3 * i + 1], TLv.vr_wr[3 * i + 2] };
-            MB_CHK_SET_ERR( mb->create_vertex( dp_pos, new_vert ), "can't create new vertex "  );
+            MB_CHK_SET_ERR( mb->create_vertex( dp_pos, new_vert ), "can't create new vertex " );
             globalID_to_vertex_handle[globalId] = new_vert;  // now add it to the map
             // set the GLOBAL ID tag on the new vertex
-            MB_CHK_SET_ERR( mb->tag_set_data( gid, &new_vert, 1, &globalId ), "can't set global ID tag on new vertex "  );
+            MB_CHK_SET_ERR( mb->tag_set_data( gid, &new_vert, 1, &globalId ),
+                            "can't set global ID tag on new vertex " );
         }
     }
 
@@ -1272,13 +1284,13 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     {
         EntityHandle q = *it;  // these are from source cells, local
         int gid_el;
-        MB_CHK_SET_ERR( mb->tag_get_data( gid, &q, 1, &gid_el ), "can't get global id of cell "  );
+        MB_CHK_SET_ERR( mb->tag_get_data( gid, &q, 1, &gid_el ), "can't get global id of cell " );
         assert( gid_el >= 0 );
         globalID_to_eh[gid_el] = q;  // do we need this? yes, now we do; parent tags are now using it heavily
-        MB_CHK_SET_ERR( mb->tag_set_data( sendProcTag, &q, 1, &my_rank ), "can't set sender for cell"  );
+        MB_CHK_SET_ERR( mb->tag_set_data( sendProcTag, &q, 1, &my_rank ), "can't set sender for cell" );
     }
 
-    if (include_edges)
+    if( include_edges )
     {
         for( Range::iterator it = local_e.begin(); it != local_e.end(); ++it )
         {
@@ -1298,26 +1310,24 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
 
     for( int i = 0; i < n; i++ )
     {
-        bool isEdge = TLq.vi_rd[sizeTuple * i + 4 ] == 0; // this would be the third node id; if 0, it means edge entity handle
+        bool isEdge =
+            TLq.vi_rd[sizeTuple * i + 4] == 0;  // this would be the third node id; if 0, it means edge entity handle
         int globalIdEl = TLq.vi_rd[sizeTuple * i + 1];
         // int from_proc=TLq.vi_rd[sizeTuple * i ]; // we do not need from_proc anymore
 
         // do we already have a cell with this global ID, represented?
         // yes, it could happen for extraWork !
-        if ((globalID_to_eh.find(globalIdEl) != globalID_to_eh.end()) && (!isEdge))
-             continue;
-        if ((globalID_to_edgeh.find(globalIdEl) != globalID_to_edgeh.end()) && (isEdge))
-             continue;
+        if( ( globalID_to_eh.find( globalIdEl ) != globalID_to_eh.end() ) && ( !isEdge ) ) continue;
+        if( ( globalID_to_edgeh.find( globalIdEl ) != globalID_to_edgeh.end() ) && ( isEdge ) ) continue;
         // construct the conn edge, triangle , quad or polygon
         EntityHandle new_conn[MAXEDGES];  // we should use std::vector with max_edges_1
         int nnodes = -1;
         for( int j = 0; j < max_edges_1; j++ )
         {
             int vgid = TLq.vi_rd[sizeTuple * i + 2 + j];  // vertex global ID
-            if( vgid == 0 )
-                new_conn[j] = 0;  // this can actually happen for polygon mesh (when we have less
-                                  // number of vertices than max_edges)
-                                  // also it could happen if we send edges in coverage set
+            if( vgid == 0 ) new_conn[j] = 0;  // this can actually happen for polygon mesh (when we have less
+                                              // number of vertices than max_edges)
+                                              // also it could happen if we send edges in coverage set
             else
             {
                 assert( globalID_to_vertex_handle.find( vgid ) != globalID_to_vertex_handle.end() );
@@ -1328,30 +1338,32 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         EntityHandle new_element;
         //
         EntityType entType = MBEDGE;
-        if(nnodes == 3) entType = MBTRI;
-        if(nnodes == 4) entType = MBQUAD;
+        if( nnodes == 3 ) entType = MBTRI;
+        if( nnodes == 4 ) entType = MBQUAD;
         if( nnodes > 4 ) entType = MBPOLYGON;
-        MB_CHK_SET_ERR( mb->create_element( entType, new_conn, nnodes, new_element ), "can't create new element for second mesh "  );
+        MB_CHK_SET_ERR( mb->create_element( entType, new_conn, nnodes, new_element ),
+                        "can't create new element for second mesh " );
 
-        if (isEdge) // it could be true only for incldue_edges true
-            globalID_to_edgeh[globalIdEl] = new_element; // it is actually an edge in this case
+        if( isEdge )                                      // it could be true only for incldue_edges true
+            globalID_to_edgeh[globalIdEl] = new_element;  // it is actually an edge in this case
         else
             globalID_to_eh[globalIdEl] = new_element;
         local_q.insert( new_element );
         // set the global ID now
-        MB_CHK_SET_ERR( mb->tag_set_data( gid, &new_element, 1, &globalIdEl ), "can't set gid for cell "  );
+        MB_CHK_SET_ERR( mb->tag_set_data( gid, &new_element, 1, &globalIdEl ), "can't set gid for cell " );
 
         int currentIndexIntTuple = 2 + max_edges_1;
         if( migrated_mesh )
         {
             orig_sender = TLq.vi_wr[sizeTuple * i + currentIndexIntTuple];
-            MB_CHK_SET_ERR( mb->tag_set_data( orgSendProcTag, &new_element, 1, &orig_sender ), "can't set original sender for cell, in migrate scenario"  );
+            MB_CHK_SET_ERR( mb->tag_set_data( orgSendProcTag, &new_element, 1, &orig_sender ),
+                            "can't set original sender for cell, in migrate scenario" );
             currentIndexIntTuple++;  // add one more
         }
 
         // store also the processor this coverage element came from
         int from_proc = TLq.vi_rd[sizeTuple * i];
-        MB_CHK_SET_ERR( mb->tag_set_data( sendProcTag, &new_element, 1, &from_proc ), "can't set sender for cell"  );
+        MB_CHK_SET_ERR( mb->tag_set_data( sendProcTag, &new_element, 1, &from_proc ), "can't set sender for cell" );
 
         // check if we need to retrieve and set GLOBAL_DOFS data
         if( size_gdofs_tag )
@@ -1360,12 +1372,13 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
             {
                 valsDOFs[j] = TLq.vi_wr[sizeTuple * i + currentIndexIntTuple + j];
             }
-            MB_CHK_SET_ERR( mb->tag_set_data( gdsTag, &new_element, 1, &valsDOFs[0] ), "can't set GLOBAL_DOFS data on coverage mesh"  );
+            MB_CHK_SET_ERR( mb->tag_set_data( gdsTag, &new_element, 1, &valsDOFs[0] ),
+                            "can't set GLOBAL_DOFS data on coverage mesh" );
         }
     }
 
     // now, add to the covering_set the elements created in the local_q range
-    MB_CHK_SET_ERR( mb->add_entities( covering_set, local_q ), "can't add entities to new mesh set "  );
+    MB_CHK_SET_ERR( mb->add_entities( covering_set, local_q ), "can't add entities to new mesh set " );
 #ifdef VERBOSE
     std::cout << " proc " << my_rank << " add " << local_q.size() << " cells to covering set \n";
 #endif

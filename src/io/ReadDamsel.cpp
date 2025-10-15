@@ -335,8 +335,8 @@ ErrorCode ReadDamsel::process_ent_info( const damsel_entity_buf_type& einfo )
     {
         // Create the moab entities
         MB_CHK_ERR( readMeshIface->get_element_connect( einfo.count, einfo.vertices_per_entity,
-                                                   DamselUtil::dtom_entity_type[einfo.entity_type], 0, start_handle,
-                                                   connect ) );
+                                                        DamselUtil::dtom_entity_type[einfo.entity_type], 0,
+                                                        start_handle, connect ) );
         these_ents.insert( start_handle, start_handle + einfo.count - 1 );
 
         // Create an app-side sequence and map to file-side container
@@ -346,7 +346,8 @@ ErrorCode ReadDamsel::process_ent_info( const damsel_entity_buf_type& einfo )
 
         // Map connectivity
         assert( DMSLcontainer_count( einfo.vertex_container ) == (int)( einfo.vertices_per_entity * einfo.count ) );
-        MB_CHK_SET_ERR( get_contents( dU.dmslModel, einfo.vertex_container, connect ), "Error returned mapping connectivity"  );
+        MB_CHK_SET_ERR( get_contents( dU.dmslModel, einfo.vertex_container, connect ),
+                        "Error returned mapping connectivity" );
     }
     else
     {
@@ -421,7 +422,8 @@ ErrorCode ReadDamsel::process_entity_tags( int count,
         assert( tagh );
         void* tag_data;
         int ecount = these_ents.size();
-        MB_CHK_SET_ERR( mbImpl->tag_iterate( tagh, these_ents.begin(), these_ents.end(), ecount, tag_data ), "Problem getting tag iterator"  );
+        MB_CHK_SET_ERR( mbImpl->tag_iterate( tagh, these_ents.begin(), these_ents.end(), ecount, tag_data ),
+                        "Problem getting tag iterator" );
         assert( ecount == (int)these_ents.size() );
         damsel_err_t err = DMSLmodel_map_tag( tag_data, app_cont, (damsel_handle_ptr)&tagh );
         CHK_DMSL_ERR( err, "Problem calling DMSLmodel_map_tag" );

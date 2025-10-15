@@ -855,7 +855,8 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
     ErrorCode rval = mb->tag_get_handle( parTagName.c_str(), part_tag );
     if( MB_SUCCESS == rval && part_tag != 0 )
     {
-        MB_CHK_ERR( mb->get_entities_by_type_and_tag( inSet, MBENTITYSET, &part_tag, NULL, 1, partSets, Interface::UNION ) );
+        MB_CHK_ERR(
+            mb->get_entities_by_type_and_tag( inSet, MBENTITYSET, &part_tag, NULL, 1, partSets, Interface::UNION ) );
     }
     MB_CHK_ERR( ScaleToRadius( mb, inSet, 1.0 ) );
     // Get all entities of dimension 2
@@ -987,10 +988,14 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
                     // look for parent tags if intx mesh targetParentTag  ,  sourceParentTag
                     if( type >= moab::MBPOLYGON )
                     {
-                        MB_CHK_SET_ERR( mb->tag_get_data( targetParentTag, &eh, 1, &eID ), "can't get parent tag on entity handle" );
-                        MB_CHK_SET_ERR( mb->tag_set_data( targetParentTag, &newCell, 1, &eID ), "can't set parent tag on entity handle" );
-                        MB_CHK_SET_ERR( mb->tag_get_data( sourceParentTag, &eh, 1, &eID ), "can't get parent tag on entity handle" );
-                        MB_CHK_SET_ERR( mb->tag_set_data( sourceParentTag, &newCell, 1, &eID ), "can't set parent tag on entity handle" );
+                        MB_CHK_SET_ERR( mb->tag_get_data( targetParentTag, &eh, 1, &eID ),
+                                        "can't get parent tag on entity handle" );
+                        MB_CHK_SET_ERR( mb->tag_set_data( targetParentTag, &newCell, 1, &eID ),
+                                        "can't set parent tag on entity handle" );
+                        MB_CHK_SET_ERR( mb->tag_get_data( sourceParentTag, &eh, 1, &eID ),
+                                        "can't get parent tag on entity handle" );
+                        MB_CHK_SET_ERR( mb->tag_set_data( sourceParentTag, &newCell, 1, &eID ),
+                                        "can't set parent tag on entity handle" );
                     }
                 }
 
@@ -1247,9 +1252,8 @@ double IntxAreaUtils::area_spherical_polygon_lHuiller( const double* A, int N, d
     {
         int i1              = i + 1;
         double areaTriangle = area_spherical_triangle_lHuiller( A, A + 3 * i, A + 3 * i1, Radius );
-        if( areaTriangle < 0 )
-            lsign = -1;  // signal that we have at least one triangle with negative orientation ;
-                         // possible nonconvex polygon
+        if( areaTriangle < 0 ) lsign = -1;  // signal that we have at least one triangle with negative orientation ;
+                                            // possible nonconvex polygon
         area += areaTriangle;
     }
     if( sign ) *sign = lsign;
@@ -1568,7 +1572,8 @@ ErrorCode IntxUtils::enforce_convexity( Interface* mb, EntityHandle lset, int my
     Tag corrTag       = 0;
     EntityHandle dumH = 0;
     MB_CHK_ERR( mb->tag_get_handle( CORRTAGNAME, 1, MB_TYPE_HANDLE, corrTag, MB_TAG_DENSE, &dumH ) );
-    if( MB_TAG_NOT_FOUND == mb->tag_get_handle( CORRTAGNAME, 1, MB_TYPE_HANDLE, corrTag, MB_TAG_DENSE, &dumH ) ) {
+    if( MB_TAG_NOT_FOUND == mb->tag_get_handle( CORRTAGNAME, 1, MB_TYPE_HANDLE, corrTag, MB_TAG_DENSE, &dumH ) )
+    {
         corrTag = 0;
     }
 
@@ -2414,22 +2419,24 @@ ErrorCode IntxUtils::remove_padded_vertices( Interface* mb, EntityHandle file_se
 
             // create new cell
             EntityHandle newCell;
-            MB_CHK_SET_ERR( mb->create_element( type, &newConnec[0], new_size, newCell ), "Failed to create new cell"  );
+            MB_CHK_SET_ERR( mb->create_element( type, &newConnec[0], new_size, newCell ), "Failed to create new cell" );
             // set the old id to the new element
             newCells.insert( newCell );
             double value;  // use the same value to reset the tags, even if the tags are int (like Global ID)
             for( size_t i = 0; i < tagList.size(); i++ )
             {
-                MB_CHK_SET_ERR( mb->tag_get_data( tagList[i], &cell, 1, (void*)( &value ) ), "Failed to get tag value"  );
-                MB_CHK_SET_ERR( mb->tag_set_data( tagList[i], &newCell, 1, (void*)( &value ) ), "Failed to set tag value on new cell"  );
+                MB_CHK_SET_ERR( mb->tag_get_data( tagList[i], &cell, 1, (void*)( &value ) ),
+                                "Failed to get tag value" );
+                MB_CHK_SET_ERR( mb->tag_set_data( tagList[i], &newCell, 1, (void*)( &value ) ),
+                                "Failed to set tag value on new cell" );
             }
         }
     }
 
-    MB_CHK_SET_ERR( mb->remove_entities( file_set, modifiedCells ), "Failed to remove old cells from file set"  );
-    MB_CHK_SET_ERR( mb->delete_entities( modifiedCells ), "Failed to delete old cells"  );
-    MB_CHK_SET_ERR( mb->add_entities( file_set, newCells ), "Failed to add new cells to file set"  );
-    MB_CHK_SET_ERR( mb->add_entities( file_set, verts ), "Failed to add verts to the file set"  );
+    MB_CHK_SET_ERR( mb->remove_entities( file_set, modifiedCells ), "Failed to remove old cells from file set" );
+    MB_CHK_SET_ERR( mb->delete_entities( modifiedCells ), "Failed to delete old cells" );
+    MB_CHK_SET_ERR( mb->add_entities( file_set, newCells ), "Failed to add new cells to file set" );
+    MB_CHK_SET_ERR( mb->add_entities( file_set, verts ), "Failed to add verts to the file set" );
 
     return MB_SUCCESS;
 }

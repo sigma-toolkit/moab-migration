@@ -64,9 +64,11 @@ ErrorCode NCHelperScrip::init_mesh_vals()
     Tag convTagsCreated = 0;
     int def_val         = 0;
     MB_CHK_SET_ERR( mbImpl->tag_get_handle( "__CONV_TAGS_CREATED", 1, MB_TYPE_INTEGER, convTagsCreated,
-                                                  MB_TAG_SPARSE | MB_TAG_CREAT, &def_val ), "Trouble getting _CONV_TAGS_CREATED tag" );
+                                            MB_TAG_SPARSE | MB_TAG_CREAT, &def_val ),
+                    "Trouble getting _CONV_TAGS_CREATED tag" );
     int create_conv_tags_flag = 1;
-    MB_CHK_SET_ERR( mbImpl->tag_set_data( convTagsCreated, &_fileSet, 1, &create_conv_tags_flag ), "Trouble setting _CONV_TAGS_CREATED tag" );
+    MB_CHK_SET_ERR( mbImpl->tag_set_data( convTagsCreated, &_fileSet, 1, &create_conv_tags_flag ),
+                    "Trouble setting _CONV_TAGS_CREATED tag" );
 
     // decide now the units, by looking at grid_center_lon
     int xCellVarId;
@@ -74,9 +76,7 @@ ErrorCode NCHelperScrip::init_mesh_vals()
     if( success ) MB_CHK_SET_ERR( MB_FAILURE, "Trouble getting grid_center_lon" );
     std::map< std::string, ReadNC::VarData >& varInfo = _readNC->varInfo;
     auto vmit                                         = varInfo.find( "grid_center_lon" );
-    if( varInfo.end() == vmit )
-        MB_SET_ERR( MB_FAILURE, "Couldn't find variable "
-                                    << "grid_center_lon" );
+    if( varInfo.end() == vmit ) MB_SET_ERR( MB_FAILURE, "Couldn't find variable " << "grid_center_lon" );
     ReadNC::VarData& glData = vmit->second;
     auto attIt              = glData.varAtts.find( "units" );
     if( attIt != glData.varAtts.end() )
@@ -134,7 +134,8 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
         start_cell_idx++;  // 0 based -> 1 based
 
         // Redistribute local cells after trivial partition (e.g. apply Zoltan partition)
-        MB_CHK_SET_ERR( redistribute_local_cells( start_cell_idx, myPcomm ), "Failed to redistribute local cells after trivial partition"  );
+        MB_CHK_SET_ERR( redistribute_local_cells( start_cell_idx, myPcomm ),
+                        "Failed to redistribute local cells after trivial partition" );
     }
     else
     {
@@ -176,7 +177,9 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
 #endif
         // create the maskTag GRID_IMASK, with default value of 1
         int def_val = 1;
-        MB_CHK_SET_ERR( mbImpl->tag_get_handle( "GRID_IMASK", 1, MB_TYPE_INTEGER, maskTag, MB_TAG_DENSE | MB_TAG_CREAT, &def_val ), "Trouble creating GRID_IMASK tag"  );
+        MB_CHK_SET_ERR( mbImpl->tag_get_handle( "GRID_IMASK", 1, MB_TYPE_INTEGER, maskTag, MB_TAG_DENSE | MB_TAG_CREAT,
+                                                &def_val ),
+                        "Trouble creating GRID_IMASK tag" );
     }
 
     std::vector< double > xv( nLocalCells * grid_corners );
@@ -208,7 +211,7 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
 #endif
         if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read grid_corner_lon data in a loop" );
 
-            // Do a partial read in each subrange
+        // Do a partial read in each subrange
 #ifdef MOAB_HAVE_PNETCDF
         success = NCFUNCREQG( _vara_double )( _fileId, yvId, read_starts, read_counts, &( yv[indexInArray] ),
                                               &requests[idxReq++] );
@@ -320,7 +323,8 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
     int nLocalVertices = (int)vertex_map.size();
     std::vector< double* > arrays;
     EntityHandle start_vertex, vtx_handle;
-    MB_CHK_SET_ERR( _readNC->readMeshIface->get_node_coords( 3, nLocalVertices, 0, start_vertex, arrays ), "Failed to create local vertices"  );
+    MB_CHK_SET_ERR( _readNC->readMeshIface->get_node_coords( 3, nLocalVertices, 0, start_vertex, arrays ),
+                    "Failed to create local vertices" );
 
     vtx_handle = start_vertex;
     // Copy vertex coordinates into entity sequence coordinate arrays
@@ -351,7 +355,8 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
     Range tmp_range;
     EntityHandle* conn_arr;
 
-    MB_CHK_SET_ERR( _readNC->readMeshIface->get_element_connect( nLocalCells, nv, mdb_type, 0, start_cell, conn_arr ), "Failed to create local cells"  );
+    MB_CHK_SET_ERR( _readNC->readMeshIface->get_element_connect( nLocalCells, nv, mdb_type, 0, start_cell, conn_arr ),
+                    "Failed to create local cells" );
     tmp_range.insert( start_cell, start_cell + nLocalCells - 1 );
 
     elem_index = 0;
@@ -383,21 +388,22 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
         // set the global id too:
         int globalId = localGidCells[elem_index];
 
-        MB_CHK_SET_ERR( mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId ), "Failed to set global id tag"  );
+        MB_CHK_SET_ERR( mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId ), "Failed to set global id tag" );
         if( gmId >= 0 )
         {
             int localMask = masks[elem_index];
-            MB_CHK_SET_ERR( mbImpl->tag_set_data( maskTag, &cell, 1, &localMask ), "Failed to set mask tag"  );
+            MB_CHK_SET_ERR( mbImpl->tag_set_data( maskTag, &cell, 1, &localMask ), "Failed to set mask tag" );
         }
     }
 
-    MB_CHK_SET_ERR( mbImpl->add_entities( _fileSet, tmp_range ), "Failed to add new cells to current file set"  );
+    MB_CHK_SET_ERR( mbImpl->add_entities( _fileSet, tmp_range ), "Failed to add new cells to current file set" );
 
     // modify local file set, to merge coincident vertices, and to correct repeated vertices in elements
     std::vector< Tag > tagList;
     tagList.push_back( mGlobalIdTag );
     if( gmId >= 0 ) tagList.push_back( maskTag );
-    MB_CHK_SET_ERR( IntxUtils::remove_padded_vertices( mbImpl, _fileSet, tagList ), "Failed to remove duplicate vertices"  );
+    MB_CHK_SET_ERR( IntxUtils::remove_padded_vertices( mbImpl, _fileSet, tagList ),
+                    "Failed to remove duplicate vertices" );
 
     MB_CHK_ERR( mbImpl->get_entities_by_dimension( _fileSet, 2, faces ) );
     Range all_verts;
@@ -427,8 +433,9 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
         double tol = 1.e-12;  // this is the same as static tolerance in NCHelper
         ParallelMergeMesh pmm( myPcomm, tol );
         MB_CHK_SET_ERR( pmm.merge( _fileSet,
-                          /* do not do local merge*/ false,
-                          /*  2d cells*/ 2 ), "Failed to merge vertices in parallel"  );
+                                   /* do not do local merge*/ false,
+                                   /*  2d cells*/ 2 ),
+                        "Failed to merge vertices in parallel" );
 
         // assign global ids only for vertices, cells have them fine
         MB_CHK_ERR( myPcomm->assign_global_ids( _fileSet, /*dim*/ 0 ) );
@@ -499,7 +506,8 @@ ErrorCode NCHelperScrip::redistribute_local_cells( int start_cell_idx, ParallelC
             xCell[i] = cosphi * cos( x * pideg );
             yCell[i] = cosphi * sin( x * pideg );
         }
-        MB_CHK_SET_ERR( mbZTool->repartition( xCell, yCell, zCell, start_cell_idx, "RCB", localGidCells ), "Error in Zoltan partitioning"  );
+        MB_CHK_SET_ERR( mbZTool->repartition( xCell, yCell, zCell, start_cell_idx, "RCB", localGidCells ),
+                        "Error in Zoltan partitioning" );
         delete mbZTool;
 
         dbgOut.tprintf( 1, "After Zoltan partitioning, localGidCells.psize() = %d\n", (int)localGidCells.psize() );
@@ -511,7 +519,7 @@ ErrorCode NCHelperScrip::redistribute_local_cells( int start_cell_idx, ParallelC
         return MB_SUCCESS;
     }
 #else
-    UNUSED(pco);
+    UNUSED( pco );
 #endif
 
     // By default, apply trivial partition

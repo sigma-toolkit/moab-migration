@@ -121,7 +121,7 @@ ErrorCode MergeMesh::merge_all( EntityHandle meshset, const double merge_tol )
     {
         EntityHandle def_val = 0;
         MB_CHK_ERR( mbImpl->tag_get_handle( "__merge_tag", 1, MB_TYPE_HANDLE, mbMergeTag, MB_TAG_DENSE | MB_TAG_EXCL,
-                                       &def_val ) );
+                                            &def_val ) );
     }
     // get all entities;
     // get all vertices connected

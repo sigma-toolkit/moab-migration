@@ -52,25 +52,25 @@ int main( int argc, char* argv[] )
     ErrorCode rval;
     Core* mb = new Core();
 
-    MB_CHK_SET_ERR( mb->load_file( inputfile1.c_str() ), "can't load input file 1"  );
+    MB_CHK_SET_ERR( mb->load_file( inputfile1.c_str() ), "can't load input file 1" );
 
     Core* mb2 = new Core();
-    MB_CHK_SET_ERR( mb2->load_file( inputfile2.c_str() ), "can't load input file 2"  );
+    MB_CHK_SET_ERR( mb2->load_file( inputfile2.c_str() ), "can't load input file 2" );
 
     std::cout << " opened " << inputfile1 << " and " << inputfile2 << " with initial h5m data.\n";
     // open the netcdf file, and see if it has that variable we are looking for
 
     Range nodes;
-    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 0, nodes ), "can't get nodes"  );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 0, nodes ), "can't get nodes" );
 
     Range edges;
-    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 1, edges ), "can't get edges"  );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 1, edges ), "can't get edges" );
 
     Range cells;
-    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 2, cells ), "can't get cells"  );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 2, cells ), "can't get cells" );
 
     Range solids;
-    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 3, solids ), "can't get cells"  );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 3, solids ), "can't get cells" );
 
     std::cout << inputfile1 << " has " << nodes.size() << " vertices " << edges.size() << " edges " << cells.size()
               << " cells " << solids.size() << " solids \n";
@@ -80,14 +80,14 @@ int main( int argc, char* argv[] )
     std::map< int, EntityHandle > cGidHandle;
     std::vector< int > gids;
     Tag gid;
-    MB_CHK_SET_ERR( mb->tag_get_handle( "GLOBAL_ID", gid ), "can't get global id tag"  );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "GLOBAL_ID", gid ), "can't get global id tag" );
 
     Range ents = cells;
     if( dim == 0 ) ents = nodes;
     if( dim == 1 ) ents = edges;
     if( dim == 3 ) ents = solids;
     gids.resize( ents.size() );
-    MB_CHK_SET_ERR( mb->tag_get_data( gid, ents, &gids[0] ), "can't get global id on entities"  );
+    MB_CHK_SET_ERR( mb->tag_get_data( gid, ents, &gids[0] ), "can't get global id on entities" );
 
     int i = 0;
     for( Range::iterator vit = ents.begin(); vit != ents.end(); ++vit )
@@ -96,16 +96,16 @@ int main( int argc, char* argv[] )
     }
 
     Range nodes2;
-    MB_CHK_SET_ERR( mb2->get_entities_by_dimension( 0, 0, nodes2 ), "can't get nodes2"  );
+    MB_CHK_SET_ERR( mb2->get_entities_by_dimension( 0, 0, nodes2 ), "can't get nodes2" );
 
     Range edges2;
-    MB_CHK_SET_ERR( mb2->get_entities_by_dimension( 0, 1, edges2 ), "can't get edges2"  );
+    MB_CHK_SET_ERR( mb2->get_entities_by_dimension( 0, 1, edges2 ), "can't get edges2" );
 
     Range cells2;
-    MB_CHK_SET_ERR( mb2->get_entities_by_dimension( 0, 2, cells2 ), "can't get cells2"  );
+    MB_CHK_SET_ERR( mb2->get_entities_by_dimension( 0, 2, cells2 ), "can't get cells2" );
 
     Range solids2;
-    MB_CHK_SET_ERR( mb2->get_entities_by_dimension( 0, 3, solids2 ), "can't get solids2"  );
+    MB_CHK_SET_ERR( mb2->get_entities_by_dimension( 0, 3, solids2 ), "can't get solids2" );
 
     std::cout << inputfile2 << " has " << nodes2.size() << " vertices " << edges2.size() << " edges " << cells2.size()
               << " cells " << solids2.size() << " solids \n";
@@ -118,10 +118,10 @@ int main( int argc, char* argv[] )
     std::map< int, EntityHandle > cGidHandle2;
 
     Tag gid2;
-    MB_CHK_SET_ERR( mb2->tag_get_handle( "GLOBAL_ID", gid2 ), "can't get global id tag2"  );
+    MB_CHK_SET_ERR( mb2->tag_get_handle( "GLOBAL_ID", gid2 ), "can't get global id tag2" );
 
     std::vector< int > gids2( ents2.size() );
-    MB_CHK_SET_ERR( mb2->tag_get_data( gid2, ents2, &gids2[0] ), "can't get global id on second entities"  );
+    MB_CHK_SET_ERR( mb2->tag_get_data( gid2, ents2, &gids2[0] ), "can't get global id on second entities" );
     i = 0;
     for( Range::iterator vit = ents2.begin(); vit != ents2.end(); ++vit )
     {
@@ -137,13 +137,13 @@ int main( int argc, char* argv[] )
     if( tag_name.length() > 0 )  // old tool
     {
         Tag tag;
-        MB_CHK_SET_ERR( mb->tag_get_handle( tag_name.c_str(), tag ), "can't get tag on file 1"  );
+        MB_CHK_SET_ERR( mb->tag_get_handle( tag_name.c_str(), tag ), "can't get tag on file 1" );
 
         int len_tag = 0;
-        MB_CHK_SET_ERR( mb->tag_get_length( tag, len_tag ), "can't get tag length on tag"  );
+        MB_CHK_SET_ERR( mb->tag_get_length( tag, len_tag ), "can't get tag length on tag" );
         std::cout << "length tag : " << len_tag << "\n";
         moab::DataType dtype;
-        MB_CHK_SET_ERR( mb->tag_get_data_type( tag, dtype ), "can't get tag data type"  );
+        MB_CHK_SET_ERR( mb->tag_get_data_type( tag, dtype ), "can't get tag data type" );
         if( dtype != MB_TYPE_INTEGER && dtype != MB_TYPE_DOUBLE )
         {
             std::cout << "tag data type is not integer or double, do not compare \n";
@@ -155,112 +155,117 @@ int main( int argc, char* argv[] )
         if( doubleType )
         {
             vals.resize( len_tag * ents.size() );
-            MB_CHK_SET_ERR( mb->tag_get_data( tag, ents, &vals[0] ), "can't get tag data on double tag"  );
+            MB_CHK_SET_ERR( mb->tag_get_data( tag, ents, &vals[0] ), "can't get tag data on double tag" );
         }
         else
         {
             ivals.resize( len_tag * ents.size() );
-            MB_CHK_SET_ERR( mb->tag_get_data( tag, ents, &ivals[0] ), "can't get tag data on integer tag"  );
+            MB_CHK_SET_ERR( mb->tag_get_data( tag, ents, &ivals[0] ), "can't get tag data on integer tag" );
         }
 
         Tag tag2;
-        MB_CHK_SET_ERR( mb2->tag_get_handle( tag_name.c_str(), tag2 ), "can't get tag on file 2"  );
+        MB_CHK_SET_ERR( mb2->tag_get_handle( tag_name.c_str(), tag2 ), "can't get tag on file 2" );
         std::vector< double > vals2;
         std::vector< int > ivals2;
         if( doubleType )
         {
             vals2.resize( len_tag * ents2.size() );
-            MB_CHK_SET_ERR( mb2->tag_get_data( tag2, ents2, &vals2[0] ), "can't get tag data on file 2"  );
+            MB_CHK_SET_ERR( mb2->tag_get_data( tag2, ents2, &vals2[0] ), "can't get tag data on file 2" );
         }
         else
         {
             ivals2.resize( len_tag * ents2.size() );
-            MB_CHK_SET_ERR( mb2->tag_get_data( tag2, ents2, &ivals2[0] ), "can't get tag data on file 2"  );
+            MB_CHK_SET_ERR( mb2->tag_get_data( tag2, ents2, &ivals2[0] ), "can't get tag data on file 2" );
         }
         std::string new_tag_name = tag_name + "_2";
         Tag newTag, newTagDiff;
         std::string tag_name_diff = tag_name + "_diff";
         if( doubleType )
         {
-            std::vector<double> def_vald(len_tag);
-            MB_CHK_SET_ERR( mb->tag_get_default_value( tag, &def_vald[0] ), "can't get default"  );
-            MB_CHK_SET_ERR( mb->tag_get_handle( new_tag_name.c_str(), len_tag, dtype, newTag, MB_TAG_CREAT | MB_TAG_DENSE, &def_vald[0] ), "can't define new tag"  );
-            for (int k=0; k<len_tag; k++)
+            std::vector< double > def_vald( len_tag );
+            MB_CHK_SET_ERR( mb->tag_get_default_value( tag, &def_vald[0] ), "can't get default" );
+            MB_CHK_SET_ERR( mb->tag_get_handle( new_tag_name.c_str(), len_tag, dtype, newTag,
+                                                MB_TAG_CREAT | MB_TAG_DENSE, &def_vald[0] ),
+                            "can't define new tag" );
+            for( int k = 0; k < len_tag; k++ )
                 def_vald[k] = 0.;
             MB_CHK_SET_ERR( mb->tag_get_handle( tag_name_diff.c_str(), len_tag, dtype, newTagDiff,
-                                       MB_TAG_CREAT | MB_TAG_DENSE | MB_TAG_DFTOK, &def_vald[0] ), "can't define new tag diff"  );
+                                                MB_TAG_CREAT | MB_TAG_DENSE | MB_TAG_DFTOK, &def_vald[0] ),
+                            "can't define new tag diff" );
         }
         else
         {
-            std::vector<int> def_vali(len_tag);
-            MB_CHK_SET_ERR( mb->tag_get_default_value( tag, &def_vali[0] ), "can't get default"  );
+            std::vector< int > def_vali( len_tag );
+            MB_CHK_SET_ERR( mb->tag_get_default_value( tag, &def_vali[0] ), "can't get default" );
             // the difference should be the same size tag
-            MB_CHK_SET_ERR( mb->tag_get_handle( new_tag_name.c_str(), len_tag, dtype, newTag, MB_TAG_CREAT | MB_TAG_DENSE, &def_vali[0] ), "can't define new tag"  );
-            for (int k=0; k<len_tag; k++)
+            MB_CHK_SET_ERR( mb->tag_get_handle( new_tag_name.c_str(), len_tag, dtype, newTag,
+                                                MB_TAG_CREAT | MB_TAG_DENSE, &def_vali[0] ),
+                            "can't define new tag" );
+            for( int k = 0; k < len_tag; k++ )
                 def_vali[k] = 0.;
             MB_CHK_SET_ERR( mb->tag_get_handle( tag_name_diff.c_str(), len_tag, dtype, newTagDiff,
-                                       MB_TAG_CREAT | MB_TAG_DENSE | MB_TAG_DFTOK, &def_vali[0] ), "can't define new tag diff"  );
+                                                MB_TAG_CREAT | MB_TAG_DENSE | MB_TAG_DFTOK, &def_vali[0] ),
+                            "can't define new tag diff" );
         }
 
         i             = 0;
         double l2norm = 0;
         for( Range::iterator c2it = ents2.begin(); c2it != ents2.end(); ++c2it )
         {
-            double *val2 = nullptr;
-            int * ival2= nullptr;
+            double* val2 = nullptr;
+            int* ival2   = nullptr;
             if( doubleType )
-                val2 = &vals2[i*len_tag];
+                val2 = &vals2[i * len_tag];
             else
-                ival2 = &ivals2[i*len_tag];
+                ival2 = &ivals2[i * len_tag];
 
             int id2 = gids2[i];
             i++;
             EntityHandle c1 = cGidHandle[id2];
             if( doubleType )
             {
-                MB_CHK_SET_ERR( mb->tag_set_data( newTag, &c1, 1, val2 ), "can't set new tag"  );
+                MB_CHK_SET_ERR( mb->tag_set_data( newTag, &c1, 1, val2 ), "can't set new tag" );
             }
             else
             {
-                MB_CHK_SET_ERR( mb->tag_set_data( newTag, &c1, 1, ival2 ), "can't set new tag"  );
+                MB_CHK_SET_ERR( mb->tag_set_data( newTag, &c1, 1, ival2 ), "can't set new tag" );
             }
-            int indx    = ents.index( c1 );
+            int indx = ents.index( c1 );
             if( doubleType )
             {
-                double *diff = &vals[indx * len_tag];
-                for (int k=0; k<len_tag; k++)
+                double* diff = &vals[indx * len_tag];
+                for( int k = 0; k < len_tag; k++ )
                 {
                     diff[k] -= val2[k];
                     l2norm += diff[k] * diff[k];
                 }
-                MB_CHK_SET_ERR( mb->tag_set_data( newTagDiff, &c1, 1, diff ), "can't set diff double tag"  );
+                MB_CHK_SET_ERR( mb->tag_set_data( newTagDiff, &c1, 1, diff ), "can't set diff double tag" );
             }
             else
             {
-                int *diffi   = &ivals[indx * len_tag];
-                for (int k=0; k<len_tag; k++)
+                int* diffi = &ivals[indx * len_tag];
+                for( int k = 0; k < len_tag; k++ )
                 {
                     diffi[k] -= ival2[k];
                     l2norm += diffi[k] * diffi[k];
                 }
-                MB_CHK_SET_ERR( mb->tag_set_data( newTagDiff, &c1, 1, diffi ), "can't set diff int tag"  );
+                MB_CHK_SET_ERR( mb->tag_set_data( newTagDiff, &c1, 1, diffi ), "can't set diff int tag" );
             }
         }
         l2norm = sqrt( l2norm );
 
-        if (!outfile.empty())
+        if( !outfile.empty() )
         {
-            MB_CHK_SET_ERR( mb->write_file( outfile.c_str() ), "can't write file"  );
+            MB_CHK_SET_ERR( mb->write_file( outfile.c_str() ), "can't write file" );
             std::cout << " wrote file " << outfile << "\n";
         }
         std::cout << " l2norm of the diff: " << l2norm << "\n";
-
     }
     else  // look at all tags that can be compared on ents
     {
         // compare all tags
         std::vector< Tag > list1;
-        MB_CHK_SET_ERR( mb->tag_get_tags( list1 ), "can't get tags 1"  );
+        MB_CHK_SET_ERR( mb->tag_get_tags( list1 ), "can't get tags 1" );
 
         std::map< int, int > gidMap2;
         for( size_t i = 0; i < ents2.size(); i++ )
@@ -276,22 +281,22 @@ int main( int argc, char* argv[] )
         for( size_t i = 0; i < list1.size(); i++ )
         {
             Tag tag = list1[i];
-            if (tag == gid) continue; // do not compare global id tag
+            if( tag == gid ) continue;  // do not compare global id tag
             std::string name;
-            MB_CHK_SET_ERR( mb->tag_get_name( tag, name ), "can't get tag name"  );
+            MB_CHK_SET_ERR( mb->tag_get_name( tag, name ), "can't get tag name" );
             DataType type;
-            MB_CHK_SET_ERR( mb->tag_get_data_type( tag, type ), "can't get tag data type"  );
+            MB_CHK_SET_ERR( mb->tag_get_data_type( tag, type ), "can't get tag data type" );
             if( MB_TYPE_DOUBLE != type && MB_TYPE_INTEGER != type ) continue;
             bool doubleType = ( type == MB_TYPE_DOUBLE );
             TagType tag_type;
-            MB_CHK_SET_ERR( mb->tag_get_type( tag, tag_type ), "can't get tag type"  );
+            MB_CHK_SET_ERR( mb->tag_get_type( tag, tag_type ), "can't get tag type" );
             if( MB_TAG_DENSE != tag_type ) continue;
             int length = 0;
-            MB_CHK_SET_ERR( mb->tag_get_length( tag, length ), "can't get tag length"  );
+            MB_CHK_SET_ERR( mb->tag_get_length( tag, length ), "can't get tag length" );
             if( 1 != length ) continue;
             Tag tag2;
             //std::cout <<" tag : " << name << "\n";
-            MB_CHK_SET_ERR( mb2->tag_get_handle( name.c_str(), tag2 ), "can't get tag on second model"  );
+            MB_CHK_SET_ERR( mb2->tag_get_handle( name.c_str(), tag2 ), "can't get tag on second model" );
             std::vector< double > vals1;
             std::vector< int > ivals1;
             if( doubleType )
@@ -404,7 +409,7 @@ int main( int argc, char* argv[] )
                 k1++;
             }
         }
-        if( k > 0 && !outfile.empty())
+        if( k > 0 && !outfile.empty() )
         {
             MB_CHK_ERR( mb->write_file( outfile.c_str(), 0, 0, 0, 0, &diffTags[0], diffTags.size() ) );
             std::cout << " wrote difference file: " << outfile << "\n";

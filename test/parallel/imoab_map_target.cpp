@@ -178,11 +178,11 @@ int main( int argc, char* argv[] )
     iMOAB_AppID cplAtmPID = &cplAtmAppID;  // atm on coupler PEs
 
     int cmpOcnAppID       = -1;
-    iMOAB_AppID cmpOcnPID = &cmpOcnAppID;        // ocn
-    int cplOcnAppID = -1, cplAtmOcnAppID = -1;   // -1 means it is not initialized
-    iMOAB_AppID cplOcnPID    = &cplOcnAppID;     // ocn on coupler PEs
-    iMOAB_AppID cplAtmOcnPID = &cplAtmOcnAppID;  // intx atm -ocn on coupler PEs
-    int cplAtmCovOcn = -1;
+    iMOAB_AppID cmpOcnPID = &cmpOcnAppID;           // ocn
+    int cplOcnAppID = -1, cplAtmOcnAppID = -1;      // -1 means it is not initialized
+    iMOAB_AppID cplOcnPID       = &cplOcnAppID;     // ocn on coupler PEs
+    iMOAB_AppID cplAtmOcnPID    = &cplAtmOcnAppID;  // intx atm -ocn on coupler PEs
+    int cplAtmCovOcn            = -1;
     iMOAB_AppID cplAtmCovOcnPID = &cplAtmCovOcn;
 
     if( couComm != MPI_COMM_NULL )
@@ -219,7 +219,7 @@ int main( int argc, char* argv[] )
 
     ierr =
         setup_component_coupler_meshes( cmpAtmPID, cmpatm, cplAtmPID, cplatm, &atmComm, &atmPEGroup, &couComm,
-                                            &couPEGroup, &atmCouComm, atmFilename, readopts, nghlay, repartitioner_scheme );
+                                        &couPEGroup, &atmCouComm, atmFilename, readopts, nghlay, repartitioner_scheme );
 
     CHECKIERR( ierr, "Cannot set-up target meshes" )
 
@@ -236,14 +236,14 @@ int main( int argc, char* argv[] )
     {
         int src_disc_type = 3;  // element-based FV
         int tgt_disc_type = 3;  // element-based FV
-        int arearead = 0;
-        CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type, &tgt_disc_type,
-                                              &arearead, intx_from_file_identifier.c_str(), mapFilename.c_str() ),
+        int arearead      = 0;
+        CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type, &tgt_disc_type, &arearead,
+                                      intx_from_file_identifier.c_str(), mapFilename.c_str() ),
                    "failed to load map file from disk" );
-        int type      = types[0];  // FV
+        int type = types[0];  // FV
         // because it is like "coverage", context will be atmocnid
-        ierr = iMOAB_MigrateMapMesh( cplAtmPID, cplAtmOcnPID, &couComm, &couPEGroup, &couPEGroup, &type,
-                                     &cplatm, &atmocnid);
+        ierr = iMOAB_MigrateMapMesh( cplAtmPID, cplAtmOcnPID, &couComm, &couPEGroup, &couPEGroup, &type, &cplatm,
+                                     &atmocnid );
         CHECKIERR( ierr, "failed to migrate mesh for atm on coupler" );
 #ifdef VERBOSE
         if( *cplAtmPID >= 0 )
@@ -398,7 +398,6 @@ int main( int argc, char* argv[] )
             CHECKIERR( ierr, "cannot free buffers used to resend atm tag towards the coverage mesh" )
         }
         POP_TIMER( MPI_COMM_WORLD, rankInGlobalComm )
-
 
         if( couComm != MPI_COMM_NULL )
         {

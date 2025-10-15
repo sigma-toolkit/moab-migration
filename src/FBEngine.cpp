@@ -1817,7 +1817,7 @@ ErrorCode FBEngine::separate( EntityHandle face,
                     queue1.push( tri2 );
                 }
             }  // end edge do not cross
-        }      // end while
+        }  // end while
     }
 
     std::sort( arr1.begin(), arr1.end() );

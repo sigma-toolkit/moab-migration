@@ -424,7 +424,7 @@ ErrorCode VarLenSparseTag::find_entities_with_value(
         for( Range::const_pair_iterator p = intersect_entities->begin(); p != intersect_entities->end(); ++p )
         {
             iter = mData.lower_bound( p->first );
-            end = mData.upper_bound( p->second );
+            end  = mData.upper_bound( p->second );
             find_tag_varlen_values_equal( *this, value, get_size(), iter, end, output_entities );
         }
     }
@@ -433,12 +433,12 @@ ErrorCode VarLenSparseTag::find_entities_with_value(
         if( type == MBMAXTYPE )
         {
             iter = mData.begin();
-            end = mData.end();
+            end  = mData.end();
         }
         else
         {
             iter = mData.lower_bound( CREATE_HANDLE( type, MB_START_ID ) );
-            end = mData.upper_bound( CREATE_HANDLE( type, MB_END_ID ) );
+            end  = mData.upper_bound( CREATE_HANDLE( type, MB_END_ID ) );
         }
         find_tag_varlen_values_equal( *this, value, get_size(), iter, end, output_entities );
     }

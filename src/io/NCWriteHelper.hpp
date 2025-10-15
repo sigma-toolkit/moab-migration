@@ -27,7 +27,7 @@ class NCWriteHelper
           tDim( -1 ), levDim( -1 )
     {
     }
-    virtual ~NCWriteHelper(){};
+    virtual ~NCWriteHelper() {};
 
     //! Get appropriate helper instance for WriteNC class based on some info in the file set
     static NCWriteHelper* get_nc_helper( WriteNC* writeNC, int fileId, const FileOptions& opts, EntityHandle fileSet );

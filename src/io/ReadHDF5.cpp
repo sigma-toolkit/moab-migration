@@ -96,7 +96,8 @@ static herr_t handle_hdf5_error( hid_t stack, void* data )
 {
     ReadHDF5::HDF5ErrorHandler* h = reinterpret_cast< ReadHDF5::HDF5ErrorHandler* >( data );
     herr_t result                 = 0;
-    if( h->func ) result = ( *h->func )( stack, h->data );MB_CHK_ERR_CONT( MB_FAILURE );
+    if( h->func ) result = ( *h->func )( stack, h->data );
+    MB_CHK_ERR_CONT( MB_FAILURE );
     return result;
 }
 #else
@@ -104,7 +105,8 @@ static herr_t handle_hdf5_error( void* data )
 {
     ReadHDF5::HDF5ErrorHandler* h = reinterpret_cast< ReadHDF5::HDF5ErrorHandler* >( data );
     herr_t result                 = 0;
-    if( h->func ) result = ( *h->func )( h->data );MB_CHK_ERR_CONT( MB_FAILURE );
+    if( h->func ) result = ( *h->func )( h->data );
+    MB_CHK_ERR_CONT( MB_FAILURE );
     return result;
 }
 #endif
@@ -262,7 +264,7 @@ ErrorCode ReadHDF5::set_up_read( const char* filename, const FileOptions& opts )
 #if defined( H5Eset_auto_vers ) && H5Eset_auto_vers > 1
         err = H5Eset_auto( H5E_DEFAULT, &handle_hdf5_error, &errorHandler );
 #else
-        err           = H5Eset_auto( &handle_hdf5_error, &errorHandler );
+        err = H5Eset_auto( &handle_hdf5_error, &errorHandler );
 #endif
         if( err < 0 )
         {
@@ -2040,7 +2042,7 @@ ErrorCode ReadHDF5::read_all_set_meta()
         int ierr = MPI_Bcast( (void*)setMeta, num_sets * 4, MPI_LONG, 0, comm );
         if( MPI_SUCCESS != ierr ) MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
 #else
-        assert( rank == 0 );              // If not MPI, then only one proc
+        assert( rank == 0 );  // If not MPI, then only one proc
 #endif
     }
 
@@ -2338,7 +2340,7 @@ ErrorCode ReadHDF5::find_sets_containing( hid_t contents_handle,
                 int ierr = MPI_Bcast( content_buffer, read_num, MPI_LONG, 0, comm );
                 if( MPI_SUCCESS != ierr ) MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
 #else
-                assert( rank == 0 );      // If not MPI, then only one proc
+                assert( rank == 0 );  // If not MPI, then only one proc
 #endif
             }
 
@@ -3347,7 +3349,8 @@ ErrorCode ReadHDF5::read_var_len_tag( Tag tag_handle,
     int mbsize;
     if( MB_VARIABLE_DATA_LENGTH != iFace->tag_get_bytes( tag_handle, mbsize ) )
     {
-        assert( false );MB_CHK_ERR( MB_VARIABLE_DATA_LENGTH );
+        assert( false );
+        MB_CHK_ERR( MB_VARIABLE_DATA_LENGTH );
     }
 
     int read_size;
@@ -3398,7 +3401,8 @@ ErrorCode ReadHDF5::read_var_len_tag( Tag tag_handle,
             if( isHandle )
             {
                 if( readSize != sizeof( EntityHandle ) ) MB_CHK_SET_ERR( MB_FAILURE, "Invalid read size" );
-                rval1 = readHDF5->convert_id_to_handle( (EntityHandle*)data, count );MB_CHK_ERR( rval1 );
+                rval1 = readHDF5->convert_id_to_handle( (EntityHandle*)data, count );
+                MB_CHK_ERR( rval1 );
             }
             int n = count;
             return readHDF5->moab()->tag_set_by_ptr( tagHandle, &file_id, 1, &data, &n );

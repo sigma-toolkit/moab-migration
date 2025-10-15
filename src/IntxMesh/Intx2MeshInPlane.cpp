@@ -56,7 +56,7 @@ ErrorCode Intx2MeshInPlane::computeIntersectionBetweenTgtAndSrc( EntityHandle tg
                                                                  bool check_boxes_first )
 {
 
-    int num_nodes  = 0;
+    int num_nodes = 0;
     MB_CHK_SET_ERR( mb->get_connectivity( src, srcConn, num_nodes ), "can't get connectivity" );
 
     nsSrc = num_nodes;

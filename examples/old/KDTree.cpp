@@ -58,7 +58,7 @@ int main()
     moab::ErrorCode rval;
     moab::Core moab;
     moab::Interface& mb = moab;
-    MB_CHK_SET_ERR( mb.load_file( filename.c_str() ), "File load failed"  );
+    MB_CHK_SET_ERR( mb.load_file( filename.c_str() ), "File load failed" );
 
     // Get all hex elemeents
     moab::Range elems;

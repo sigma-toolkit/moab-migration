@@ -584,7 +584,8 @@ ErrorCode DeformMeshRemap::deform_master( Range& fluid_elems, Range& solid_elems
     {
         // 3 tags, specifying xyz individual data, integrate into one tag
         MB_CHK_SET_ERR( mbImpl->tag_get_handle( ( tag_name ? tag_name : "" ), 3, MB_TYPE_DOUBLE, xNew,
-                                       MB_TAG_CREAT | MB_TAG_DENSE ), "Failed to create xnew tag"  );
+                                                MB_TAG_CREAT | MB_TAG_DENSE ),
+                        "Failed to create xnew tag" );
         vector< double > disps( num_verts );
         for( int i = 0; i < 3; i++ )
         {

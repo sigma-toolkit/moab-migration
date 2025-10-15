@@ -74,7 +74,7 @@ ErrorCode IntxRllCssphere::computeIntersectionBetweenTgtAndSrc( EntityHandle tgt
     // ordered and collapsed (eliminate doubles)
 
     // CartVect srccoords[4];
-    int num_nodes  = 0;
+    int num_nodes = 0;
     MB_CHK_ERR( mb->get_connectivity( src, srcConn, num_nodes ) );
 
     nsSrc = num_nodes;
@@ -119,7 +119,8 @@ ErrorCode IntxRllCssphere::computeIntersectionBetweenTgtAndSrc( EntityHandle tgt
 #endif
     for( int j = 0; j < nsSrc; j++ )
     {
-        MB_CHK_ERR( IntxUtils::gnomonic_projection( srcCoords[j], R, plane, srcCoords2D[2 * j], srcCoords2D[2 * j + 1] ) );
+        MB_CHK_ERR(
+            IntxUtils::gnomonic_projection( srcCoords[j], R, plane, srcCoords2D[2 * j], srcCoords2D[2 * j + 1] ) );
     }
 #ifdef ENABLE_DEBUG
     if( dbg_1 )
@@ -136,8 +137,8 @@ ErrorCode IntxRllCssphere::computeIntersectionBetweenTgtAndSrc( EntityHandle tgt
         }
     }
 #endif
-    MB_CHK_ERR( IntxUtils::EdgeIntxRllCs( srcCoords2D, srcCoords, srcEdgeType, nsSrc, tgtCoords2D, tgtCoords, nsTgt, markb,
-                                     markr, plane, R, P, nP ) );
+    MB_CHK_ERR( IntxUtils::EdgeIntxRllCs( srcCoords2D, srcCoords, srcEdgeType, nsSrc, tgtCoords2D, tgtCoords, nsTgt,
+                                          markb, markr, plane, R, P, nP ) );
 
     int side[MAXEDGES] = { 0 };  // this refers to what side? src or tgt?// more tolerant here with epsilon_area
     int extraPoints    = IntxUtils::borderPointsOfXinY2( srcCoords2D, nsSrc, tgtCoords2D, nsTgt, &( P[2 * nP] ), side,

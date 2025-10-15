@@ -632,10 +632,11 @@ int get_imesh_mesh( MBMesquite::Mesh** mesh, const char* file_name, int dimensio
         moab::Interface* mbi       = reinterpret_cast< MBiMesh* >( instance )->mbImpl;
         moab::EntityHandle currset = 0;
         moab::Tag fixed;
-        int def_val          = 0;
-        err                  = 0;
+        int def_val = 0;
+        err         = 0;
         moab::MB_CHK_SET_ERR( mbi->tag_get_handle( "fixed", 1, moab::MB_TYPE_INTEGER, fixed,
-                                                    moab::MB_TAG_CREAT | moab::MB_TAG_DENSE, &def_val ), "Getting tag handle failed"  );
+                                                   moab::MB_TAG_CREAT | moab::MB_TAG_DENSE, &def_val ),
+                              "Getting tag handle failed" );
         moab::Range verts, cells, skin_verts;
         MB_CHK_SET_ERR( mbi->get_entities_by_type( currset, moab::MBVERTEX, verts ), "Querying vertices failed" );
         MB_CHK_SET_ERR( mbi->get_entities_by_dimension( currset, dimension, cells ), "Querying elements failed" );
@@ -661,7 +662,8 @@ int get_imesh_mesh( MBMesquite::Mesh** mesh, const char* file_name, int dimensio
         moab::Tag solindTag;
         double def_val_dbl = 0.0;
         MB_CHK_SET_ERR( mbi->tag_get_handle( "solution_indicator", 1, moab::MB_TYPE_DOUBLE, solindTag,
-                                                  moab::MB_TAG_CREAT | moab::MB_TAG_DENSE, &def_val_dbl ), "Getting tag handle failed"  );
+                                             moab::MB_TAG_CREAT | moab::MB_TAG_DENSE, &def_val_dbl ),
+                        "Getting tag handle failed" );
         solution_indicator.resize( cells.size(), 0.01 );
         for( unsigned i = 0; i < cells.size() / 4; i++ )
             solution_indicator[i] = 0.1;

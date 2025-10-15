@@ -7,8 +7,8 @@ namespace moab
 
 class DGMSolver
 {
-    DGMSolver(){};
-    ~DGMSolver(){};
+    DGMSolver() {};
+    ~DGMSolver() {};
 
   public:
     //! \brief compute combinational number, n choose k, maximum output is

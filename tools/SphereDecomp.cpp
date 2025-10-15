@@ -232,9 +232,9 @@ ErrorCode SphereDecomp::subdivide_tet( EntityHandle tet,
 #define V2INDEX     2
 #define V3INDEX     3
 #define CV( a )     tet_conn[a]
-#define ESV( a, b ) subdiv_verts[(a)*9 + ( b )]
-#define FSV( a, b ) subdiv_verts[54 + (a)*9 + ( b )]
-#define TSV( a, b ) subdiv_verts[90 + (a)*9 + ( b )]
+#define ESV( a, b ) subdiv_verts[( a ) * 9 + ( b )]
+#define FSV( a, b ) subdiv_verts[54 + ( a ) * 9 + ( b )]
+#define TSV( a, b ) subdiv_verts[90 + ( a ) * 9 + ( b )]
 
     EntityHandle this_connect[8], this_hex;
 

@@ -109,7 +109,7 @@ int main( int argc, char** argv )
     mb->query_interface( readMeshIface );
     Range verts;
 
-    MB_CHK_SET_ERR( mb->create_vertices( &coords[0], coords.size() / 3, verts ), "do not create boundary vertices"  );
+    MB_CHK_SET_ERR( mb->create_vertices( &coords[0], coords.size() / 3, verts ), "do not create boundary vertices" );
 
     Tag gid = mb->globalId_tag();
 
@@ -120,7 +120,7 @@ int main( int argc, char** argv )
     }
     EntityHandle handle;
     EntityHandle* conn_array;
-    MB_CHK_SET_ERR( readMeshIface->get_element_connect( num_edges, 2, MBEDGE, 1, handle, conn_array ), "do not elems"  );
+    MB_CHK_SET_ERR( readMeshIface->get_element_connect( num_edges, 2, MBEDGE, 1, handle, conn_array ), "do not elems" );
     int i1 = 0;  // index in edge connectivity
     for( size_t i = 0; i < loopsindx.size() / 2; i++ )
     {
@@ -138,9 +138,9 @@ int main( int argc, char** argv )
 
     Range bedges( handle, handle + num_edges - 1 );
     EntityHandle bound_set;
-    MB_CHK_SET_ERR( mb->create_meshset( MESHSET_SET, bound_set ), "Can't create boundary edges set"  );
+    MB_CHK_SET_ERR( mb->create_meshset( MESHSET_SET, bound_set ), "Can't create boundary edges set" );
 
-    MB_CHK_SET_ERR( mb->add_entities( bound_set, bedges ), "Can't add edges to boundary set"  );
+    MB_CHK_SET_ERR( mb->add_entities( bound_set, bedges ), "Can't add edges to boundary set" );
 
     // set global ids for vertices and edges
     vector< int > gids;
@@ -149,9 +149,9 @@ int main( int argc, char** argv )
     {
         gids[j] = j + 1;
     }
-    MB_CHK_SET_ERR( mb->tag_set_data( gid, verts, &gids[0] ), "Can't set global ids on verts"  );
+    MB_CHK_SET_ERR( mb->tag_set_data( gid, verts, &gids[0] ), "Can't set global ids on verts" );
     // we have less edges than vertices, we can reuse the array for edges too
-    MB_CHK_SET_ERR( mb->tag_set_data( gid, bedges, &gids[0] ), "Can't set global ids on edges"  );
+    MB_CHK_SET_ERR( mb->tag_set_data( gid, bedges, &gids[0] ), "Can't set global ids on edges" );
 
     mb->write_file( "bound.vtk", 0, 0, &bound_set, 1 );
 
@@ -159,7 +159,7 @@ int main( int argc, char** argv )
     // get all the vertices coordinates
     std::vector< CartVect > co3;
     co3.resize( verts.size() );
-    MB_CHK_SET_ERR( mb->get_coords( verts, &( co3[0][0] ) ), "Can't get vertex coords"  );
+    MB_CHK_SET_ERR( mb->get_coords( verts, &( co3[0][0] ) ), "Can't get vertex coords" );
     for( size_t i = 0; i < verts.size(); i++ )
     {
         CartVect p  = co3[i];
@@ -167,7 +167,7 @@ int main( int argc, char** argv )
         double lon1 = getLon( p );
         co3[i]      = CartVect( lon1, lat1, 0. );
     }
-    MB_CHK_SET_ERR( mb->set_coords( verts, &( co3[0][0] ) ), "Can't set new vertex coords"  );
+    MB_CHK_SET_ERR( mb->set_coords( verts, &( co3[0][0] ) ), "Can't set new vertex coords" );
     // remove edges in 2d that are too long (longer than 6; they are on the other side..., periodic)
 
     Range longEdges;

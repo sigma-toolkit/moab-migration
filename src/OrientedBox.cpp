@@ -77,7 +77,7 @@ static double point_perp( const CartVect& p,   // closest to this point
 #if MB_ORIENTED_BOX_UNIT_VECTORS
     double t = ( m % ( p - b ) );
 #else
-    double t           = ( m % ( p - b ) ) / ( m % m );
+    double t = ( m % ( p - b ) ) / ( m % m );
 #endif
     return Util::is_finite( t ) ? t : 0.0;
 }
@@ -143,7 +143,7 @@ ErrorCode OrientedBox::tag_handle( Tag& handle_out, Interface* instance, const c
 #if MB_ORIENTED_BOX_UNIT_VECTORS
     const int SIZE = rad_size + 15;
 #else
-    const int SIZE     = rad_size + 12;
+    const int SIZE = rad_size + 12;
 #endif
     assert( sizeof( OrientedBox ) == SIZE * sizeof( double ) );
 
@@ -301,7 +301,7 @@ ErrorCode OrientedBox::covariance_data_from_tris( CovarienceData& result, Interf
                 tri_area2 * ( 9 * outer_product( centroid, centroid ) + outer_product( coords[0], coords[0] ) +
                               outer_product( coords[1], coords[1] ) + outer_product( coords[2], coords[2] ) );
         }  // for each triangle
-    }      // for each element
+    }  // for each element
 
     return MB_SUCCESS;
 }

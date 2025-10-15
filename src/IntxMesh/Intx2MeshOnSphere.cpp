@@ -571,7 +571,7 @@ ErrorCode Intx2MeshOnSphere::update_tracer_data( EntityHandle out_set, Tag& tagE
             }
         }
         delete remote_cells;
-        remote_cells = NULL;
+        remote_cells = nullptr;
     }
 #endif
     // for each polygon, we have 2 indices: target and source parents
@@ -656,7 +656,7 @@ ErrorCode Intx2MeshOnSphere::update_tracer_data( EntityHandle out_set, Tag& tagE
     // now divide by target area (current)
     int j                = 0;
     Range::iterator iter = rs2.begin();
-    void* data           = NULL;  // used for stored area
+    void* data           = nullptr;  // used for stored area
     int count            = 0;
     std::vector< double > total_mass_local( numTracers, 0. );
     while( iter != rs2.end() )
@@ -694,7 +694,7 @@ ErrorCode Intx2MeshOnSphere::update_tracer_data( EntityHandle out_set, Tag& tagE
     if( remote_cells_with_tracers )
     {
         delete remote_cells_with_tracers;
-        remote_cells_with_tracers = NULL;
+        remote_cells_with_tracers = nullptr;
     }
 #else
     for( int k = 0; k < numTracers; k++ )
@@ -719,7 +719,7 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
     MB_CHK_SET_ERR( mb->get_connectivity( localEnts, local_verts ), "can't get connectivity" );
     int num_local_verts = (int)local_verts.size();
 
-    assert( parcomm != NULL );
+    assert( parcomm != nullptr );
 
     if( num_local_verts == 0 )
     {
@@ -761,7 +761,7 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
         EntityType typeCell = mb->type_from_handle( cell );  // could be vertex, for point cloud
         // get coordinates, and decide gnomonic planes for it
         int nnodes;
-        const EntityHandle* conn = NULL;
+        const EntityHandle* conn = nullptr;
         EntityHandle c[1];
         if( typeCell != MBVERTEX )
         {
@@ -872,7 +872,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
                                         MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt ),
                     "can't create original sending processor tag" );
 
-    assert( parcomm != NULL );
+    assert( parcomm != nullptr );
     Range meshCells;
     MB_CHK_SET_ERR( mb->get_entities_by_dimension( initial_distributed_set, 2, meshCells ),
                     "can't get cells by dimension from mesh set" );

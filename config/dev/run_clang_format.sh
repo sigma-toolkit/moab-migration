@@ -7,6 +7,7 @@
 #   git ls-tree --name-only HEAD -r |  grep "cpp\|hpp" | xargs config/dev/run_clang_format.sh
 #   git ls-tree --name-only HEAD -r |  grep "\.c$" | xargs config/dev/run_clang_format.sh
 #   Best: git ls-tree --name-only HEAD -r |  grep "\.cpp\|\.hpp" | grep -v "^deprecated"  | xargs config/dev/run_clang_format.sh
+#   Format only modified files: git ls-files -m  | xargs config/dev/run_clang_format.sh
 CLANGFORMAT_EXE=`which clang-format`
 SEDWITHOPTIONS="sed -i.bak"
 

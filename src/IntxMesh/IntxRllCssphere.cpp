@@ -412,7 +412,7 @@ ErrorCode IntxRllCssphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandle 
     }
     // disable_debug();
     delete[] foundIds;
-    foundIds = NULL;
+    foundIds = nullptr;
     return MB_SUCCESS;
 }
 

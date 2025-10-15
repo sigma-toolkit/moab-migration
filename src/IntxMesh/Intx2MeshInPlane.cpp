@@ -409,7 +409,7 @@ ErrorCode Intx2MeshInPlane::findNodes( EntityHandle tgt, int nsTgt, EntityHandle
 #endif
     }
     delete[] foundIds;
-    foundIds = NULL;
+    foundIds = nullptr;
     return MB_SUCCESS;
     // end copy
 }

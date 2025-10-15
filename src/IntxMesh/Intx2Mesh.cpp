@@ -600,7 +600,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
     for( auto it = rs22.begin(); it != rs22.end(); ++it )
     {
         EntityHandle cell        = *it;
-        const EntityHandle* conn = NULL;
+        const EntityHandle* conn = nullptr;
         int nnodes               = 0;
         rval                     = mb->get_connectivity( cell, conn, nnodes );MB_CHK_ERR( rval );
         std::cout << " cell: \t" << " ht:" << mb->id_from_handle( cell ) << " nodes: " << nnodes
@@ -622,7 +622,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
             for( auto it = rs22.begin(); it != rs22.end(); ++it )
             {
                 EntityHandle cell        = *it;
-                const EntityHandle* conn = NULL;
+                const EntityHandle* conn = nullptr;
                 int nnodes               = 0;
                 rval                     = mb->get_connectivity( cell, conn, nnodes );MB_CHK_ERR( rval );
                 std::cout << " cell: \t" << " ht:" << mb->id_from_handle( cell ) << " nodes: " << nnodes

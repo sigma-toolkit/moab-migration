@@ -725,13 +725,14 @@ ErrorCode IntxUtils::global_gnomonic_projection_general( Interface* mb,
     mb->tag_get_handle( "TargetParent", targetParentTag );
     mb->tag_get_handle( "SourceParent", sourceParentTag );
     bool intxMesh = false;
-    if( targetParentTag != NULL && sourceParentTag != NULL )
+    if( targetParentTag != nullptr && sourceParentTag != nullptr )
         intxMesh = true;  // interested in source and target parent tags then
     Range partSets;
     ErrorCode rval = mb->tag_get_handle( parTagName.c_str(), part_tag );
     if( MB_SUCCESS == rval && part_tag != 0 )
     {
-        rval = mb->get_entities_by_type_and_tag( inSet, MBENTITYSET, &part_tag, NULL, 1, partSets, Interface::UNION );MB_CHK_ERR( rval );
+        rval =
+            mb->get_entities_by_type_and_tag( inSet, MBENTITYSET, &part_tag, nullptr, 1, partSets, Interface::UNION );MB_CHK_ERR( rval );
     }
     rval = ScaleToRadius( mb, inSet, 1.0 );MB_CHK_ERR( rval );
     // Get all entities of dimension 2
@@ -797,7 +798,7 @@ ErrorCode IntxUtils::global_gnomonic_projection_general( Interface* mb,
     for( Range::iterator eit = inputRange.begin(); eit != inputRange.end(); ++eit )
     {
         EntityHandle eh          = *eit;
-        const EntityHandle* conn = NULL;
+        const EntityHandle* conn = nullptr;
         int num_nodes;
         rval = mb->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
         // build a new vertex array
@@ -849,14 +850,14 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
     mb->tag_get_handle( "TargetParent", targetParentTag );
     mb->tag_get_handle( "SourceParent", sourceParentTag );
     bool intxMesh = false;
-    if( targetParentTag != NULL && sourceParentTag != NULL )
+    if( targetParentTag != nullptr && sourceParentTag != nullptr )
         intxMesh = true;  // interested in source and target parent tags then
     Range partSets;
     ErrorCode rval = mb->tag_get_handle( parTagName.c_str(), part_tag );
     if( MB_SUCCESS == rval && part_tag != 0 )
     {
         MB_CHK_ERR(
-            mb->get_entities_by_type_and_tag( inSet, MBENTITYSET, &part_tag, NULL, 1, partSets, Interface::UNION ) );
+            mb->get_entities_by_type_and_tag( inSet, MBENTITYSET, &part_tag, nullptr, 1, partSets, Interface::UNION ) );
     }
     MB_CHK_ERR( ScaleToRadius( mb, inSet, 1.0 ) );
     // Get all entities of dimension 2
@@ -963,7 +964,7 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
             for( Range::iterator eit = subranges[i - 1].begin(); eit != subranges[i - 1].end(); ++eit )
             {
                 EntityHandle eh          = *eit;
-                const EntityHandle* conn = NULL;
+                const EntityHandle* conn = nullptr;
                 int num_nodes;
                 MB_CHK_ERR( mb->get_connectivity( eh, conn, num_nodes ) );
 
@@ -1712,12 +1713,12 @@ ErrorCode IntxUtils::fix_degenerate_quads( Interface* mb, EntityHandle set )
 {
     Range quads;
     MB_CHK_ERR( mb->get_entities_by_type( set, MBQUAD, quads ) );
-    Tag gid;
-    gid = mb->globalId_tag();
+
+    Tag gid = mb->globalId_tag();
     for( Range::iterator qit = quads.begin(); qit != quads.end(); ++qit )
     {
         EntityHandle quad         = *qit;
-        const EntityHandle* conn4 = NULL;
+        const EntityHandle* conn4 = nullptr;
         int num_nodes             = 0;
         MB_CHK_ERR( mb->get_connectivity( quad, conn4, num_nodes ) );
         for( int i = 0; i < num_nodes; i++ )
@@ -1734,9 +1735,9 @@ ErrorCode IntxUtils::fix_degenerate_quads( Interface* mb, EntityHandle set )
                 EntityHandle conn3[3] = { conn4[i], conn4[i2], conn4[i3] };
                 EntityHandle tri;
                 MB_CHK_ERR( mb->create_element( MBTRI, conn3, 3, tri ) );
-                mb->add_entities( set, &tri, 1 );
-                mb->remove_entities( set, &quad, 1 );
-                mb->delete_entities( &quad, 1 );
+                MB_CHK_ERR( mb->add_entities( set, &tri, 1 ) );
+                MB_CHK_ERR( mb->remove_entities( set, &quad, 1 ) );
+                MB_CHK_ERR( mb->delete_entities( &quad, 1 ) );
                 MB_CHK_ERR( mb->tag_set_data( gid, &tri, 1, &global_id ) );
             }
         }
@@ -1751,7 +1752,7 @@ ErrorCode IntxAreaUtils::positive_orientation( Interface* mb, EntityHandle set, 
     for( Range::iterator qit = cells2d.begin(); qit != cells2d.end(); ++qit )
     {
         EntityHandle cell        = *qit;
-        const EntityHandle* conn = NULL;
+        const EntityHandle* conn = nullptr;
         int num_nodes            = 0;
         MB_CHK_ERR( mb->get_connectivity( cell, conn, num_nodes ) );
         if( num_nodes < 3 ) return MB_FAILURE;
@@ -2380,7 +2381,7 @@ ErrorCode IntxUtils::remove_padded_vertices( Interface* mb, EntityHandle file_se
     for( Range::iterator cit = cells.begin(); cit != cells.end(); ++cit )
     {
         EntityHandle cell          = *cit;
-        const EntityHandle* connec = NULL;
+        const EntityHandle* connec = nullptr;
         int num_verts              = 0;
         MB_CHK_SET_ERR( mb->get_connectivity( cell, connec, num_verts ), "Failed to get connectivity" );
 
@@ -2449,7 +2450,7 @@ ErrorCode IntxUtils::max_diagonal( Interface* mb, Range cells, int max_edges, do
     {
         // get the connectivity, then the coordinates
         EntityHandle cell          = *it;
-        const EntityHandle* connec = NULL;
+        const EntityHandle* connec = nullptr;
         int num_verts              = 0;
         MB_CHK_SET_ERR( mb->get_connectivity( cell, connec, num_verts ), "Failed to get connectivity" );
         MB_CHK_SET_ERR( mb->get_coords( connec, num_verts, &( coords[0][0] ) ), "Failed to get coordinates" );

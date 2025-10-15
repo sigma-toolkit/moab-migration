@@ -34,7 +34,6 @@ vector< string > split( const string& i_str, const string& i_delim )
 
 int main( int argc, char* argv[] )
 {
-
     ProgOptions opts;
 
     string inputfile, outputfile, deleteTags, keepTags;
@@ -74,10 +73,9 @@ int main( int argc, char* argv[] )
     for( size_t i = 0; i < tagsToDelete.size(); i++ )
     {
         Tag tag;
-        rval = mb->tag_get_handle( tagsToDelete[i].c_str(), tag );
-        if( MB_CHK_ERR( = MB_SUCCESS && tag != NULL )
+        if( MB_CHK_ERR( mb->tag_get_handle( tagsToDelete[i].c_str(), tag ) ) && tag != nullptr )
         {
-            rval = mb->tag_delete( tag ) );
+            MB_CHK_ERR( mb->tag_delete( tag ) );
         }
     }
     cout << "write file " << outputfile << endl;

@@ -80,10 +80,10 @@ int main( int argc, char* argv[] )
     Core mbcore;
     Interface* mb = &mbcore;
 
-    ErrorCode rval = mb->load_file( filename_bot.c_str() );MB_CHK_SET_ERR( rval, "failed to load bed file" );
+    MB_CHK_SET_ERR( mb->load_file( filename_bot.c_str() ), "failed to load bed file"  );
 
-    rval = mb->load_file( filename_top.c_str() );  // load the second face (we know we have one face in each file)
-    MB_CHK_SET_ERR( rval, "failed to load top file" );
+    // load the second face (we know we have one face in each file)
+    MB_CHK_SET_ERR( mb->load_file( filename_top.c_str() ), "failed to load top file" );
 
     FBEngine* pFacet = new FBEngine( mb, NULL, true );  // smooth facetting, no OBB tree passed
 
@@ -91,11 +91,10 @@ int main( int argc, char* argv[] )
 
     // should the init be part of constructor or not?
     // this is where the obb tree is constructed, and smooth faceting initialized, too.
-    rval = pFacet->Init();MB_CHK_SET_ERR( rval, "failed to initialize smoothing" );
+    MB_CHK_SET_ERR( pFacet->Init(), "failed to initialize smoothing"  );
 
     std::cout << "volume creation test: ";
-    rval = volume_test( pFacet );
-    handle_error_code( rval, number_tests_failed, number_tests_successful );
+    handle_error_code( volume_test( pFacet ), number_tests_failed, number_tests_successful );
     std::cout << "\n";
 
     if( remove_output )
@@ -145,12 +144,12 @@ ErrorCode volume_test( FBEngine* pFacet )
         return MB_FAILURE;
     }
     EntityHandle root_set;
-    ErrorCode rval = pFacet->getRootSet( &root_set );MB_CHK_SET_ERR( rval, "ERROR : getRootSet failed!" );
+    MB_CHK_SET_ERR( pFacet->getRootSet( &root_set ), "ERROR : getRootSet failed!"  );
 
     int top = 2;  //  iBase_FACE;
 
     Range faces;
-    rval = pFacet->getEntities( root_set, top, faces );MB_CHK_SET_ERR( rval, "Failed to get faces in volume_test." );
+    MB_CHK_SET_ERR( pFacet->getEntities( root_set, top, faces ), "Failed to get faces in volume_test."  );
 
     if( 2 != faces.size() )
     {
@@ -158,14 +157,14 @@ ErrorCode volume_test( FBEngine* pFacet )
         return MB_FAILURE;
     }
     EntityHandle newFace1;  // first test is with closed surface
-    rval = pFacet->split_surface_with_direction( faces[0], xyz, direction, /*closed*/ 1, min_dot, newFace1 );MB_CHK_SET_ERR( rval, "Failed to crop first face." );
+    MB_CHK_SET_ERR( pFacet->split_surface_with_direction( faces[0], xyz, direction, /*closed*/ 1, min_dot, newFace1 ), "Failed to crop first face."  );
 
     EntityHandle newFace2;  // first test is with closed surface
-    rval = pFacet->split_surface_with_direction( faces[1], xyz, direction, /*closed*/ 1, min_dot, newFace2 );MB_CHK_SET_ERR( rval, "Failed to crop second face." );
+    MB_CHK_SET_ERR( pFacet->split_surface_with_direction( faces[1], xyz, direction, /*closed*/ 1, min_dot, newFace2 ), "Failed to crop second face."  );
 
     // here we make the assumption that the edges, vertices are matching fine...
     EntityHandle volume;
-    rval = pFacet->create_volume_with_direction( newFace1, newFace2, direction, volume );MB_CHK_SET_ERR( rval, "Failed to create volume." );
+    MB_CHK_SET_ERR( pFacet->create_volume_with_direction( newFace1, newFace2, direction, volume ), "Failed to create volume."  );
 
     Interface* mb = pFacet->moab_instance();
     pFacet->delete_smooth_tags();
@@ -174,12 +173,14 @@ ErrorCode volume_test( FBEngine* pFacet )
     GeomTopoTool* duplicate = NULL;
     std::vector< EntityHandle > gents;
     gents.push_back( volume );
-    rval = gtt->duplicate_model( duplicate, &gents );MB_CHK_SET_ERR( rval, "Failed to extract volume." );
+    MB_CHK_SET_ERR( gtt->duplicate_model( duplicate, &gents ), "Failed to extract volume."  );
     EntityHandle newRootSet = duplicate->get_root_model_set();
     delete pFacet;
     pFacet = NULL;  // try not to write the obb tree
     delete duplicate;
-    rval = mb->write_file( vol_file.c_str(), NULL, NULL, &newRootSet, 1 );
+    
+    MB_CHK_ERR( mb->write_file( vol_file.c_str(), NULL, NULL, &newRootSet, 1 ) );
 
-    return rval;
+    return MB_SUCCESS;
 }
+

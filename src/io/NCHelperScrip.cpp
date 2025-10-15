@@ -63,10 +63,10 @@ ErrorCode NCHelperScrip::init_mesh_vals()
     // do not need conventional tags
     Tag convTagsCreated = 0;
     int def_val         = 0;
-    ErrorCode rval      = mbImpl->tag_get_handle( "__CONV_TAGS_CREATED", 1, MB_TYPE_INTEGER, convTagsCreated,
-                                                  MB_TAG_SPARSE | MB_TAG_CREAT, &def_val );MB_CHK_SET_ERR( rval, "Trouble getting _CONV_TAGS_CREATED tag" );
+    MB_CHK_SET_ERR( mbImpl->tag_get_handle( "__CONV_TAGS_CREATED", 1, MB_TYPE_INTEGER, convTagsCreated,
+                                                  MB_TAG_SPARSE | MB_TAG_CREAT, &def_val ), "Trouble getting _CONV_TAGS_CREATED tag" );
     int create_conv_tags_flag = 1;
-    rval                      = mbImpl->tag_set_data( convTagsCreated, &_fileSet, 1, &create_conv_tags_flag );MB_CHK_SET_ERR( rval, "Trouble setting _CONV_TAGS_CREATED tag" );
+    MB_CHK_SET_ERR( mbImpl->tag_set_data( convTagsCreated, &_fileSet, 1, &create_conv_tags_flag ), "Trouble setting _CONV_TAGS_CREATED tag" );
 
     // decide now the units, by looking at grid_center_lon
     int xCellVarId;
@@ -134,7 +134,7 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
         start_cell_idx++;  // 0 based -> 1 based
 
         // Redistribute local cells after trivial partition (e.g. apply Zoltan partition)
-        ErrorCode rval = redistribute_local_cells( start_cell_idx, myPcomm );MB_CHK_SET_ERR( rval, "Failed to redistribute local cells after trivial partition" );
+        MB_CHK_SET_ERR( redistribute_local_cells( start_cell_idx, myPcomm ), "Failed to redistribute local cells after trivial partition"  );
     }
     else
     {
@@ -176,8 +176,7 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
 #endif
         // create the maskTag GRID_IMASK, with default value of 1
         int def_val = 1;
-        rval =
-            mbImpl->tag_get_handle( "GRID_IMASK", 1, MB_TYPE_INTEGER, maskTag, MB_TAG_DENSE | MB_TAG_CREAT, &def_val );MB_CHK_SET_ERR( rval, "Trouble creating GRID_IMASK tag" );
+        MB_CHK_SET_ERR( mbImpl->tag_get_handle( "GRID_IMASK", 1, MB_TYPE_INTEGER, maskTag, MB_TAG_DENSE | MB_TAG_CREAT, &def_val ), "Trouble creating GRID_IMASK tag"  );
     }
 
     std::vector< double > xv( nLocalCells * grid_corners );
@@ -321,7 +320,7 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
     int nLocalVertices = (int)vertex_map.size();
     std::vector< double* > arrays;
     EntityHandle start_vertex, vtx_handle;
-    rval = _readNC->readMeshIface->get_node_coords( 3, nLocalVertices, 0, start_vertex, arrays );MB_CHK_SET_ERR( rval, "Failed to create local vertices" );
+    MB_CHK_SET_ERR( _readNC->readMeshIface->get_node_coords( 3, nLocalVertices, 0, start_vertex, arrays ), "Failed to create local vertices"  );
 
     vtx_handle = start_vertex;
     // Copy vertex coordinates into entity sequence coordinate arrays
@@ -352,7 +351,7 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
     Range tmp_range;
     EntityHandle* conn_arr;
 
-    rval = _readNC->readMeshIface->get_element_connect( nLocalCells, nv, mdb_type, 0, start_cell, conn_arr );MB_CHK_SET_ERR( rval, "Failed to create local cells" );
+    MB_CHK_SET_ERR( _readNC->readMeshIface->get_element_connect( nLocalCells, nv, mdb_type, 0, start_cell, conn_arr ), "Failed to create local cells"  );
     tmp_range.insert( start_cell, start_cell + nLocalCells - 1 );
 
     elem_index = 0;
@@ -376,34 +375,34 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
         }
         EntityHandle cell = start_cell + elem_index;
         // set other tags, like xc, yc, frac, area
-        /*rval = mbImpl->tag_set_data( xcTag, &cell, 1, &xc[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set xc tag" );
-        rval = mbImpl->tag_set_data( ycTag, &cell, 1, &yc[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set yc tag" );
-        rval = mbImpl->tag_set_data( areaTag, &cell, 1, &area[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set area tag" );
-        rval = mbImpl->tag_set_data( fracTag, &cell, 1, &frac[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set frac tag" );
+        /*MB_CHK_SET_ERR( mbImpl->tag_set_data( xcTag, &cell, 1, &xc[elem_index] ), "Failed to set xc tag"  );
+        MB_CHK_SET_ERR( mbImpl->tag_set_data( ycTag, &cell, 1, &yc[elem_index] ), "Failed to set yc tag"  );
+        MB_CHK_SET_ERR( mbImpl->tag_set_data( areaTag, &cell, 1, &area[elem_index] ), "Failed to set area tag"  );
+        MB_CHK_SET_ERR( mbImpl->tag_set_data( fracTag, &cell, 1, &frac[elem_index] ), "Failed to set frac tag"  );
 */
         // set the global id too:
         int globalId = localGidCells[elem_index];
 
-        rval = mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId );MB_CHK_SET_ERR( rval, "Failed to set global id tag" );
+        MB_CHK_SET_ERR( mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId ), "Failed to set global id tag"  );
         if( gmId >= 0 )
         {
             int localMask = masks[elem_index];
-            rval          = mbImpl->tag_set_data( maskTag, &cell, 1, &localMask );MB_CHK_SET_ERR( rval, "Failed to set mask tag" );
+            MB_CHK_SET_ERR( mbImpl->tag_set_data( maskTag, &cell, 1, &localMask ), "Failed to set mask tag"  );
         }
     }
 
-    rval = mbImpl->add_entities( _fileSet, tmp_range );MB_CHK_SET_ERR( rval, "Failed to add new cells to current file set" );
+    MB_CHK_SET_ERR( mbImpl->add_entities( _fileSet, tmp_range ), "Failed to add new cells to current file set"  );
 
     // modify local file set, to merge coincident vertices, and to correct repeated vertices in elements
     std::vector< Tag > tagList;
     tagList.push_back( mGlobalIdTag );
     if( gmId >= 0 ) tagList.push_back( maskTag );
-    rval = IntxUtils::remove_padded_vertices( mbImpl, _fileSet, tagList );MB_CHK_SET_ERR( rval, "Failed to remove duplicate vertices" );
+    MB_CHK_SET_ERR( IntxUtils::remove_padded_vertices( mbImpl, _fileSet, tagList ), "Failed to remove duplicate vertices"  );
 
-    rval = mbImpl->get_entities_by_dimension( _fileSet, 2, faces );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbImpl->get_entities_by_dimension( _fileSet, 2, faces ) );
     Range all_verts;
-    rval = mbImpl->get_connectivity( faces, all_verts );MB_CHK_ERR( rval );
-    rval = mbImpl->add_entities( _fileSet, all_verts );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbImpl->get_connectivity( faces, all_verts ) );
+    MB_CHK_ERR( mbImpl->add_entities( _fileSet, all_verts ) );
     // need to add adjacencies; TODO: fix this for all nc readers
     // copy this logic from migrate mesh in par comm graph
     Core* mb                 = (Core*)mbImpl;
@@ -417,7 +416,7 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
             EntityHandle eh          = *it;
             const EntityHandle* conn = NULL;
             int num_nodes            = 0;
-            rval                     = mb->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_connectivity( eh, conn, num_nodes ) );
             adj_fact->notify_create_entity( eh, conn, num_nodes );
         }
     }
@@ -427,29 +426,29 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
     {
         double tol = 1.e-12;  // this is the same as static tolerance in NCHelper
         ParallelMergeMesh pmm( myPcomm, tol );
-        rval = pmm.merge( _fileSet,
+        MB_CHK_SET_ERR( pmm.merge( _fileSet,
                           /* do not do local merge*/ false,
-                          /*  2d cells*/ 2 );MB_CHK_SET_ERR( rval, "Failed to merge vertices in parallel" );
+                          /*  2d cells*/ 2 ), "Failed to merge vertices in parallel"  );
 
         // assign global ids only for vertices, cells have them fine
-        rval = myPcomm->assign_global_ids( _fileSet, /*dim*/ 0 );MB_CHK_ERR( rval );
+        MB_CHK_ERR( myPcomm->assign_global_ids( _fileSet, /*dim*/ 0 ) );
         // remove all sets, edges and vertices from the file set
         Range edges, vertices;
-        rval = mbImpl->get_entities_by_dimension( _fileSet, 1, edges, /*recursive*/ true );MB_CHK_ERR( rval );
-        rval = mbImpl->get_entities_by_dimension( _fileSet, 0, vertices, /*recursive*/ true );MB_CHK_ERR( rval );
-        rval = mbImpl->remove_entities( _fileSet, edges );MB_CHK_ERR( rval );
-        rval = mbImpl->remove_entities( _fileSet, vertices );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mbImpl->get_entities_by_dimension( _fileSet, 1, edges, /*recursive*/ true ) );
+        MB_CHK_ERR( mbImpl->get_entities_by_dimension( _fileSet, 0, vertices, /*recursive*/ true ) );
+        MB_CHK_ERR( mbImpl->remove_entities( _fileSet, edges ) );
+        MB_CHK_ERR( mbImpl->remove_entities( _fileSet, vertices ) );
 
         Range intfSets = myPcomm->interface_sets();
         // empty intf sets
-        rval = mbImpl->clear_meshset( intfSets );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mbImpl->clear_meshset( intfSets ) );
         // delete the sets without shame :)
         //sets.merge(intfSets);
-        //rval = myPcomm->delete_entities(sets);MB_CHK_ERR( rval ); // will also clean shared ents !
-        rval = myPcomm->delete_entities( edges );MB_CHK_ERR( rval );  // will also clean shared ents !
+        //MB_CHK_ERR( myPcomm->delete_entities(sets) ); // will also clean shared ents !
+        MB_CHK_ERR( myPcomm->delete_entities( edges ) );  // will also clean shared ents !
     }
 #else
-    rval = mbImpl->remove_entities( _fileSet, all_verts );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbImpl->remove_entities( _fileSet, all_verts ) );
 #endif
 
     return MB_SUCCESS;
@@ -500,7 +499,7 @@ ErrorCode NCHelperScrip::redistribute_local_cells( int start_cell_idx, ParallelC
             xCell[i] = cosphi * cos( x * pideg );
             yCell[i] = cosphi * sin( x * pideg );
         }
-        ErrorCode rval = mbZTool->repartition( xCell, yCell, zCell, start_cell_idx, "RCB", localGidCells );MB_CHK_SET_ERR( rval, "Error in Zoltan partitioning" );
+        MB_CHK_SET_ERR( mbZTool->repartition( xCell, yCell, zCell, start_cell_idx, "RCB", localGidCells ), "Error in Zoltan partitioning"  );
         delete mbZTool;
 
         dbgOut.tprintf( 1, "After Zoltan partitioning, localGidCells.psize() = %d\n", (int)localGidCells.psize() );

@@ -218,27 +218,27 @@ int main( int argc, char** argv )
     opts.parseCommandLine( argc, argv );
 
     moab::EntityHandle triangle_set, dual_set;
-    rval = mb->create_meshset( moab::MESHSET_SET, triangle_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
-    rval = mb->create_meshset( moab::MESHSET_SET, dual_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
+    MB_CHK_SET_ERR( mb->create_meshset( moab::MESHSET_SET, triangle_set ), "Can't create new set"  );
+    MB_CHK_SET_ERR( mb->create_meshset( moab::MESHSET_SET, dual_set ), "Can't create new set"  );
 
     // This file is in the mesh files directory
     const char* readopts = "";
-    rval                 = mb->load_file( inputFile.c_str(), &triangle_set, readopts );MB_CHK_SET_ERR( rval, "Failed to read" );
+    MB_CHK_SET_ERR( mb->load_file( inputFile.c_str(), &triangle_set, readopts ), "Failed to read"  );
 
     // get all cells of dimension 2;
     moab::Range cells;
-    rval = mb->get_entities_by_dimension( triangle_set, 2, cells );MB_CHK_SET_ERR( rval, "Failed to get cells" );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( triangle_set, 2, cells ), "Failed to get cells"  );
 
     std::cout << "Original number of triangular cells : " << cells.size() << "\n";
 
     // call the routine to compute the dual grid
-    rval = compute_dual_mesh( mb, dual_set, cells );MB_CHK_SET_ERR( rval, "Failed to compute dual mesh" );
+    MB_CHK_SET_ERR( compute_dual_mesh( mb, dual_set, cells ), "Failed to compute dual mesh"  );
 
     // write the mesh to disk
-    rval = mb->write_file( outputFile.c_str() );MB_CHK_SET_ERR( rval, "Failed to write new file" );
+    MB_CHK_SET_ERR( mb->write_file( outputFile.c_str() ), "Failed to write new file"  );
 
     cells.clear();
-    rval = mb->get_entities_by_dimension( dual_set, 2, cells );MB_CHK_SET_ERR( rval, "Failed to get cells" );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( dual_set, 2, cells ), "Failed to get cells"  );
     std::cout << "Wrote the dual mesh: " << outputFile << " containing " << cells.size() << " polygonal cells\n";
 
     delete mb;

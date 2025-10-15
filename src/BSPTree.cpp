@@ -355,7 +355,7 @@ ErrorCode BSPTree::merge_leaf( BSPTreeIter& iter )
         if( MB_SUCCESS != rval ) return rval;
 
         iter.childVect.clear();
-        rval = moab()->get_child_meshsets( h, iter.childVect );MB_CHK_ERR( rval );
+        MB_CHK_ERR( moab()->get_child_meshsets( h, iter.childVect ) );
         if( !iter.childVect.empty() )
         {
             moab()->remove_child_meshset( h, iter.childVect[0] );

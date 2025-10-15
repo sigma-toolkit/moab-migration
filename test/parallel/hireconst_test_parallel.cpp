@@ -167,7 +167,7 @@ int main( int argc, char* argv[] )
 #endif
     }
 
-    rval = test_mesh( infile.c_str(), degree, interp, dim );MB_CHK_ERR( rval );
+    MB_CHK_ERR( test_mesh( infile.c_str(), degree, interp, dim ) );
 
 #ifdef MOAB_HAVE_MPI
     MPI_Finalize();
@@ -182,14 +182,14 @@ ErrorCode load_meshset_hirec( const char* infile,
                               const int dim )
 {
     ErrorCode rval;
-    rval = mbimpl->create_meshset( moab::MESHSET_SET, meshset );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbimpl->create_meshset( moab::MESHSET_SET, meshset ) );
 #ifdef MOAB_HAVE_MPI
     int nprocs, rank;
     MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Comm_size( comm, &nprocs );
     MPI_Comm_rank( comm, &rank );
     EntityHandle partnset;
-    rval = mbimpl->create_meshset( moab::MESHSET_SET, partnset );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbimpl->create_meshset( moab::MESHSET_SET, partnset ) );
 
     if( nprocs > 1 )
     {
@@ -227,16 +227,16 @@ ErrorCode load_meshset_hirec( const char* infile,
             read_options = part_method + ";PARALLEL_RESOLVE_SHARED_ENTS;";
         }
 
-        rval = mbimpl->load_file( infile, &meshset, read_options.c_str() );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mbimpl->load_file( infile, &meshset, read_options.c_str() ) );
     }
     else
     {
-        rval = mbimpl->load_file( infile, &meshset );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mbimpl->load_file( infile, &meshset ) );
     }
 
 #else
     assert( !pc && degree && dim );
-    rval = mbimpl->load_file( infile, &meshset );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbimpl->load_file( infile, &meshset ) );
 #endif
     return rval;
 }
@@ -256,18 +256,18 @@ ErrorCode test_mesh( const char* infile, const int degree, const bool interp, co
 
     ErrorCode rval;
     // mesh will be loaded and communicator pc will be updated
-    rval = load_meshset_hirec( infile, mbimpl, meshset, pc, degree, dim );MB_CHK_ERR( rval );
+    MB_CHK_ERR( load_meshset_hirec( infile, mbimpl, meshset, pc, degree, dim ) );
     // initialize
     HiReconstruction hirec( dynamic_cast< Core* >( mbimpl ), pc, meshset );
     Range elems, elems_owned;
-    rval = mbimpl->get_entities_by_dimension( meshset, dim, elems );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbimpl->get_entities_by_dimension( meshset, dim, elems ) );
     int nelems = elems.size();
 
 #ifdef MOAB_HAVE_MPI
 
     if( pc )
     {
-        rval = pc->filter_pstatus( elems, PSTATUS_GHOST, PSTATUS_NOT, -1, &elems_owned );MB_CHK_ERR( rval );
+        MB_CHK_ERR( pc->filter_pstatus( elems, PSTATUS_GHOST, PSTATUS_NOT, -1, &elems_owned ) );
     }
     else
     {
@@ -286,11 +286,11 @@ ErrorCode test_mesh( const char* infile, const int degree, const bool interp, co
     // reconstruction
     if( dim == 2 )
     {
-        rval = hirec.reconstruct3D_surf_geom( degree, interp, false );MB_CHK_ERR( rval );
+        MB_CHK_ERR( hirec.reconstruct3D_surf_geom( degree, interp, false ) );
     }
     else if( dim == 1 )
     {
-        rval = hirec.reconstruct3D_curve_geom( degree, interp, false );MB_CHK_ERR( rval );
+        MB_CHK_ERR( hirec.reconstruct3D_curve_geom( degree, interp, false ) );
     }
 
 #ifdef MOAB_HAVE_MPI
@@ -305,7 +305,7 @@ ErrorCode test_mesh( const char* infile, const int degree, const bool interp, co
     {
         int nvpe;
         const EntityHandle* conn;
-        rval = mbimpl->get_connectivity( *ielem, conn, nvpe );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mbimpl->get_connectivity( *ielem, conn, nvpe ) );
         double w = 1.0 / (double)nvpe;
         std::vector< double > naturalcoords2fit( nvpe, w );
         CartVect newcoords, linearcoords;
@@ -317,7 +317,7 @@ ErrorCode test_mesh( const char* infile, const int degree, const bool interp, co
         }
 
         std::vector< double > coords( 3 * nvpe );
-        rval = mbimpl->get_coords( conn, nvpe, &( coords[0] ) );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mbimpl->get_coords( conn, nvpe, &( coords[0] ) ) );
         compute_linear_coords( nvpe, &( coords[0] ), &( naturalcoords2fit[0] ), linearcoords.array() );
         CartVect nlcoords = newcoords - linearcoords;
         mxdist            = std::max( mxdist, nlcoords.length() );

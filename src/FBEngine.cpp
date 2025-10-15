@@ -1955,7 +1955,7 @@ ErrorCode FBEngine::create_new_gedge( std::vector< EntityHandle >& nodesAlongPol
         MBERRORR( rval, "Failed to add parent child relation" );
     }
     // finally, put the edge in the range of edges
-    rval = _my_geomTopoTool->add_geo_set( new_geo_edge, 1 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( _my_geomTopoTool->add_geo_set( new_geo_edge, 1 ) );
 
     return rval;
 }

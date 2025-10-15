@@ -153,19 +153,19 @@ int main( int argc, char* argv[] )
 
     Core* mb = new Core();
 
-    rval = mb->load_file( inputfile.c_str() );MB_CHK_SET_ERR( rval, "can't load input file" );
+    MB_CHK_SET_ERR( mb->load_file( inputfile.c_str() ), "can't load input file"  );
 
     std::cout << " opened " << inputfile << " with initial h5m data.\n";
     // open the netcdf file, and see if it has that variable we are looking for
 
     Range nodes;
-    rval = mb->get_entities_by_dimension( 0, 0, nodes );MB_CHK_SET_ERR( rval, "can't get nodes" );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 0, nodes ), "can't get nodes"  );
 
     Range edges;
-    rval = mb->get_entities_by_dimension( 0, 1, edges );MB_CHK_SET_ERR( rval, "can't get edges" );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 1, edges ), "can't get edges"  );
 
     Range cells;
-    rval = mb->get_entities_by_dimension( 0, 2, cells );MB_CHK_SET_ERR( rval, "can't get cells" );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 2, cells ), "can't get cells"  );
 
     std::cout << " it has " << nodes.size() << " vertices " << edges.size() << " edges " << cells.size() << " cells\n";
 
@@ -175,9 +175,9 @@ int main( int argc, char* argv[] )
     std::map< int, EntityHandle > cGidHandle;
     std::vector< int > gids;
     Tag gid;
-    rval = mb->tag_get_handle( "GLOBAL_ID", gid );MB_CHK_SET_ERR( rval, "can't get global id tag" );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "GLOBAL_ID", gid ), "can't get global id tag"  );
     gids.resize( nodes.size() );
-    rval = mb->tag_get_data( gid, nodes, &gids[0] );MB_CHK_SET_ERR( rval, "can't get global id on vertices" );
+    MB_CHK_SET_ERR( mb->tag_get_data( gid, nodes, &gids[0] ), "can't get global id on vertices"  );
     int i = 0;
     for( Range::iterator vit = nodes.begin(); vit != nodes.end(); vit++ )
     {
@@ -185,7 +185,7 @@ int main( int argc, char* argv[] )
     }
 
     gids.resize( edges.size() );
-    rval = mb->tag_get_data( gid, edges, &gids[0] );MB_CHK_SET_ERR( rval, "can't get global id on edges" );
+    MB_CHK_SET_ERR( mb->tag_get_data( gid, edges, &gids[0] ), "can't get global id on edges"  );
     i = 0;
     for( Range::iterator vit = edges.begin(); vit != edges.end(); vit++ )
     {
@@ -193,7 +193,7 @@ int main( int argc, char* argv[] )
     }
 
     gids.resize( cells.size() );
-    rval = mb->tag_get_data( gid, cells, &gids[0] );MB_CHK_SET_ERR( rval, "can't get global id on cells" );
+    MB_CHK_SET_ERR( mb->tag_get_data( gid, cells, &gids[0] ), "can't get global id on cells"  );
     i = 0;
     for( Range::iterator vit = cells.begin(); vit != cells.end(); vit++ )
     {
@@ -286,8 +286,8 @@ int main( int argc, char* argv[] )
         }
 
         int def_val = 0;
-        rval = mb->tag_get_handle( variable_name.c_str(), (int)size_tag, mbtype, newTag, MB_TAG_CREAT | MB_TAG_DENSE,
-                                   &def_val );MB_CHK_SET_ERR( rval, "can't define new tag" );
+        MB_CHK_SET_ERR( mb->tag_get_handle( variable_name.c_str(), (int)size_tag, mbtype, newTag, MB_TAG_CREAT | MB_TAG_DENSE,
+                                   &def_val ), "can't define new tag"  );
 
         if( NC_INT == dataType )
         {
@@ -300,7 +300,7 @@ int main( int argc, char* argv[] )
                     for( size_t k = 0; k < vals.size(); k++ )
                     {
                         EntityHandle vh = vGidHandle[k + 1];
-                        rval            = mb->tag_set_data( newTag, &vh, 1, &vals[k] );MB_CHK_SET_ERR( rval, "can't set tag on vertex" );
+                        MB_CHK_SET_ERR( mb->tag_set_data( newTag, &vh, 1, &vals[k] ), "can't set tag on vertex"  );
                     }
                 }
                 else if (cell_data) // cell_data
@@ -308,7 +308,7 @@ int main( int argc, char* argv[] )
                     for( size_t k = 0; k < vals.size(); k++ )
                     {
                         EntityHandle ch = cGidHandle[k + 1];  // cell handle
-                        rval            = mb->tag_set_data( newTag, &ch, 1, &vals[k] );MB_CHK_SET_ERR( rval, "can't set tag on cell" );
+                        MB_CHK_SET_ERR( mb->tag_set_data( newTag, &ch, 1, &vals[k] ), "can't set tag on cell"  );
                     }
                 }
                 else if (edge_data) // edge_data
@@ -338,7 +338,7 @@ int main( int argc, char* argv[] )
                         size_t start_in_vals = k * size_tag, stride = 1;
                         for( size_t j = 0; j < size_tag; j++ )
                             evals[j] = vals[start_in_vals + j * stride];
-                        rval = mb->tag_set_data( newTag, &vh, 1, &evals[0] );MB_CHK_SET_ERR( rval, "can't set tag on vertex" );
+                        MB_CHK_SET_ERR( mb->tag_set_data( newTag, &vh, 1, &evals[0] ), "can't set tag on vertex"  );
                     }
                 }
                 else  // cell_data
@@ -349,7 +349,7 @@ int main( int argc, char* argv[] )
                         size_t start_in_vals = k * size_tag, stride = 1;
                         for( size_t j = 0; j < size_tag; j++ )
                             evals[j] = vals[start_in_vals + j * stride];
-                        rval = mb->tag_set_data( newTag, &ch, 1, &evals[0] );MB_CHK_SET_ERR( rval, "can't set tag on cell" );
+                        MB_CHK_SET_ERR( mb->tag_set_data( newTag, &ch, 1, &evals[0] ), "can't set tag on cell"  );
                     }
                 }
             }
@@ -365,7 +365,7 @@ int main( int argc, char* argv[] )
                     for( size_t k = 0; k < vals.size(); k++ )
                     {
                         EntityHandle vh = vGidHandle[k + 1];
-                        rval            = mb->tag_set_data( newTag, &vh, 1, &vals[k] );MB_CHK_SET_ERR( rval, "can't set tag on vertex" );
+                        MB_CHK_SET_ERR( mb->tag_set_data( newTag, &vh, 1, &vals[k] ), "can't set tag on vertex"  );
                     }
                 }
                 else if (cell_data)// cell_data
@@ -373,7 +373,7 @@ int main( int argc, char* argv[] )
                     for( size_t k = 0; k < vals.size(); k++ )
                     {
                         EntityHandle ch = cGidHandle[k + 1];  // cell handle
-                        rval            = mb->tag_set_data( newTag, &ch, 1, &vals[k] );MB_CHK_SET_ERR( rval, "can't set tag on cell" );
+                        MB_CHK_SET_ERR( mb->tag_set_data( newTag, &ch, 1, &vals[k] ), "can't set tag on cell"  );
                     }
                 }
                 else // edge_data
@@ -381,7 +381,7 @@ int main( int argc, char* argv[] )
                     for( size_t k = 0; k < vals.size(); k++ )
                     {
                         EntityHandle edgeh = eGidHandle[k + 1];  // edge handle
-                        rval            = mb->tag_set_data( newTag, &edgeh, 1, &vals[k] );MB_CHK_SET_ERR( rval, "can't set tag on edge" );
+                        MB_CHK_SET_ERR( mb->tag_set_data( newTag, &edgeh, 1, &vals[k] ), "can't set tag on edge"  );
                     }
                 }
             }
@@ -403,7 +403,7 @@ int main( int argc, char* argv[] )
                         size_t start_in_vals = k * size_tag, stride = 1;
                         for( size_t j = 0; j < size_tag; j++ )
                             dvals[j] = vals[start_in_vals + j * stride];
-                        rval = mb->tag_set_data( newTag, &vh, 1, &dvals[0] );MB_CHK_SET_ERR( rval, "can't set tag on vertex" );
+                        MB_CHK_SET_ERR( mb->tag_set_data( newTag, &vh, 1, &dvals[0] ), "can't set tag on vertex"  );
                     }
                 }
                 else  // cell_data
@@ -414,7 +414,7 @@ int main( int argc, char* argv[] )
                         size_t start_in_vals = k * size_tag, stride = 1;
                         for( size_t j = 0; j < size_tag; j++ )
                             dvals[j] = vals[start_in_vals + j * stride];
-                        rval = mb->tag_set_data( newTag, &ch, 1, &dvals[0] );MB_CHK_SET_ERR( rval, "can't set tag on cell" );
+                        MB_CHK_SET_ERR( mb->tag_set_data( newTag, &ch, 1, &dvals[0] ), "can't set tag on cell"  );
                     }
                 }
             }
@@ -451,8 +451,8 @@ int main( int argc, char* argv[] )
                 std::stringstream tag_name;
                 tag_name << variable_name << "_t" << times[k];
                 std::vector< double > defvals( dim1, 0. );
-                rval = mb->tag_get_handle( tag_name.str().c_str(), (int)dim1, mbtype, newTag,
-                                           MB_TAG_CREAT | MB_TAG_DENSE, &defvals[0] );MB_CHK_SET_ERR( rval, "can't define new tag" );
+                MB_CHK_SET_ERR( mb->tag_get_handle( tag_name.str().c_str(), (int)dim1, mbtype, newTag,
+                                           MB_TAG_CREAT | MB_TAG_DENSE, &defvals[0] ), "can't define new tag"  );
                 start[0] = k;
 
                 if( float_var )
@@ -478,12 +478,12 @@ int main( int argc, char* argv[] )
                 for( size_t ii = 0; ii < nodes.size(); ii++ )
                 {
                     EntityHandle vh = vGidHandle[ii + 1];
-                    rval            = mb->tag_set_data( newTag, &vh, 1, &transp[ii * dim1] );MB_CHK_SET_ERR( rval, "can't set tag on nodes" );
+                    MB_CHK_SET_ERR( mb->tag_set_data( newTag, &vh, 1, &transp[ii * dim1] ), "can't set tag on nodes"  );
                 }
             }
         }
     }
-    rval = mb->write_file( outfile.c_str() );MB_CHK_SET_ERR( rval, "can't write file" );
+    MB_CHK_SET_ERR( mb->write_file( outfile.c_str() ), "can't write file"  );
     std::cout << " wrote file " << outfile << "\n";
 
     // now, if s option, load the coarse mesh and put data on each element, according to a matrix
@@ -491,39 +491,39 @@ int main( int argc, char* argv[] )
     {
         // load the file, check for GLOBAL_DOFS tag, and create a new tag with the data associated
         Core* mb2 = new Core();
-        rval      = mb2->load_file( sefile_name.c_str() );MB_CHK_SET_ERR( rval, "can't load spectral element file" );
+        MB_CHK_SET_ERR( mb2->load_file( sefile_name.c_str() ), "can't load spectral element file"  );
         std::cout << " loaded spectral file " << sefile_name << "\n";
         // look for GLOBAL_DOFS tag
         Tag gdofeTag;
-        rval = mb2->tag_get_handle( "GLOBAL_DOFS", gdofeTag );MB_CHK_SET_ERR( rval, "file does not have GLOBAL_DOFS file" );
+        MB_CHK_SET_ERR( mb2->tag_get_handle( "GLOBAL_DOFS", gdofeTag ), "file does not have GLOBAL_DOFS file"  );
         int sizeTag;
-        rval = mb2->tag_get_length( gdofeTag, sizeTag );MB_CHK_SET_ERR( rval, "can't get size of tag" );
+        MB_CHK_SET_ERR( mb2->tag_get_length( gdofeTag, sizeTag ), "can't get size of tag"  );
         int np = (int)sqrt( 1.0 * sizeTag );
         std::cout << " size of tag: " << sizeTag << " np = " << np << "\n";
         std::vector< int > gdofs;
         Range cells2;
-        rval = mb2->get_entities_by_dimension( 0, 2, cells2 );MB_CHK_SET_ERR( rval, "can't get cells on spectral mesh" );
+        MB_CHK_SET_ERR( mb2->get_entities_by_dimension( 0, 2, cells2 ), "can't get cells on spectral mesh"  );
         gdofs.resize( cells2.size() * sizeTag );
-        rval = mb2->tag_get_data( gdofeTag, cells2, &gdofs[0] );MB_CHK_SET_ERR( rval, "can't get global dofs tag" );
+        MB_CHK_SET_ERR( mb2->tag_get_data( gdofeTag, cells2, &gdofs[0] ), "can't get global dofs tag"  );
         // create a new tag for element data arranged as DFIELD
 
         std::vector< double > dfield;
         dfield.resize( sizeTag, 0.0 );
         Tag newTag2;
-        rval = mb2->tag_get_handle( variable_name.c_str(), (int)sizeTag, mbtype, newTag2, MB_TAG_CREAT | MB_TAG_DENSE,
-                                    &dfield[0] );MB_CHK_SET_ERR( rval, "can't define new tag" );
+        MB_CHK_SET_ERR( mb2->tag_get_handle( variable_name.c_str(), (int)sizeTag, mbtype, newTag2, MB_TAG_CREAT | MB_TAG_DENSE,
+                                    &dfield[0] ), "can't define new tag"  );
 
         int i1 = 0;  // index in the gdofs array, per element
 
         // get the tag values from the other moab core, for newTag
         int dataTagLen;
-        rval = mb->tag_get_length( newTag, dataTagLen );MB_CHK_SET_ERR( rval, "can't get size of newTag" );
+        MB_CHK_SET_ERR( mb->tag_get_length( newTag, dataTagLen ), "can't get size of newTag"  );
         //
         std::vector< double > oldData;
         oldData.resize( dataTagLen * nodes.size() );  //
 
         // get the "old" values
-        rval = mb->tag_get_data( newTag, nodes, &oldData[0] );MB_CHK_SET_ERR( rval, "can't get old values" );
+        MB_CHK_SET_ERR( mb->tag_get_data( newTag, nodes, &oldData[0] ), "can't get old values"  );
         for( Range::iterator it = cells2.begin(); it != cells2.end(); it++ )
         {
             EntityHandle cel = *it;
@@ -538,11 +538,11 @@ int main( int argc, char* argv[] )
                 dfield[k]  = val;
             }
             i1   = i1 + sizeTag;
-            rval = mb2->tag_set_data( newTag2, &cel, 1, &dfield[0] );MB_CHK_SET_ERR( rval, "can't set new tag" );
+            MB_CHK_SET_ERR( mb2->tag_set_data( newTag2, &cel, 1, &dfield[0] ), "can't set new tag"  );
         }
 
         // write the appended file with the new field:
-        rval = mb2->write_file( "atm2.h5m" );MB_CHK_SET_ERR( rval, "can't write new spectral file" );
+        MB_CHK_SET_ERR( mb2->write_file( "atm2.h5m" ), "can't write new spectral file"  );
         std::cout << " wrote file atm2.h5m \n";
     }
     return 0;

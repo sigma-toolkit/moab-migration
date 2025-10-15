@@ -26,7 +26,7 @@ int main()
 {
 
     MBI            = new Core();
-    ErrorCode rval = MBI->load_file( input_file.c_str() );MB_CHK_SET_ERR( rval, "Failed to load test file" );
+    MB_CHK_SET_ERR( MBI->load_file( input_file.c_str() ), "Failed to load test file"  );
 
     GTT = new GeomTopoTool( MBI );
     GQT = new GeomQueryTool( GTT );
@@ -50,13 +50,12 @@ int main()
 
 ErrorCode id_lookup( EntityHandle eh, int& id )
 {
-    ErrorCode rval;
     if( !id_tag )
     {
         id_tag = MBI->globalId_tag();
     }
 
-    rval = MBI->tag_get_data( id_tag, &eh, 1, (void*)&id );MB_CHK_SET_ERR( rval, "Failed to lookup volume id" );
+    MB_CHK_SET_ERR( MBI->tag_get_data( id_tag, &eh, 1, (void*)&id ), "Failed to lookup volume id"  );
 
     return MB_SUCCESS;
 }

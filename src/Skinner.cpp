@@ -1480,10 +1480,10 @@ ErrorCode Skinner::create_side( const EntityHandle this_set,
         else if( conn[nextIndex] != side_conn[1] )
             return MB_FAILURE;  // it is not adjacent to the polygon
 
-        rval = thisMB->create_element( MBEDGE, conn2, 2, side_elem );MB_CHK_ERR( rval );
+        MB_CHK_ERR( thisMB->create_element( MBEDGE, conn2, 2, side_elem ) );
         if( this_set )
         {
-            rval = thisMB->add_entities( this_set, &side_elem, 1 );MB_CHK_ERR( rval );
+            MB_CHK_ERR( thisMB->add_entities( this_set, &side_elem, 1 ) );
         }
         return MB_SUCCESS;
     }
@@ -1501,10 +1501,10 @@ ErrorCode Skinner::create_side( const EntityHandle this_set,
     for( int i = 0; i < side_len; ++i )
         side_conn_full[i] = conn[indices[i]];
 
-    rval = thisMB->create_element( side_type, side_conn_full, side_len, side_elem );MB_CHK_ERR( rval );
+    MB_CHK_ERR( thisMB->create_element( side_type, side_conn_full, side_len, side_elem ) );
     if( this_set )
     {
-        rval = thisMB->add_entities( this_set, &side_elem, 1 );MB_CHK_ERR( rval );
+        MB_CHK_ERR( thisMB->add_entities( this_set, &side_elem, 1 ) );
     }
     return MB_SUCCESS;
     ;

@@ -634,8 +634,8 @@ int get_imesh_mesh( MBMesquite::Mesh** mesh, const char* file_name, int dimensio
         moab::Tag fixed;
         int def_val          = 0;
         err                  = 0;
-        moab::ErrorCode rval = mbi->tag_get_handle( "fixed", 1, moab::MB_TYPE_INTEGER, fixed,
-                                                    moab::MB_TAG_CREAT | moab::MB_TAG_DENSE, &def_val );MB_CHK_SET_ERR( rval, "Getting tag handle failed" );
+        moab::MB_CHK_SET_ERR( mbi->tag_get_handle( "fixed", 1, moab::MB_TYPE_INTEGER, fixed,
+                                                    moab::MB_TAG_CREAT | moab::MB_TAG_DENSE, &def_val ), "Getting tag handle failed"  );
         moab::Range verts, cells, skin_verts;
         MB_CHK_SET_ERR( mbi->get_entities_by_type( currset, moab::MBVERTEX, verts ), "Querying vertices failed" );
         MB_CHK_SET_ERR( mbi->get_entities_by_dimension( currset, dimension, cells ), "Querying elements failed" );
@@ -651,8 +651,8 @@ int get_imesh_mesh( MBMesquite::Mesh** mesh, const char* file_name, int dimensio
         std::cout << "Found " << skin_verts.size() << " vertices on the skin of the domain." << std::endl;
 
         // fix_tag.resize(verts.size(),0);
-        // rval = mbi->tag_get_data(fixed, verts, &fix_tag[0]); MB_CHK_SET_ERR(rval, "Getting tag
-        // data failed");
+        // MB_CHK_SET_ERR( mbi->tag_get_data(fixed, verts, &fix_tag[0]), "Getting tag
+        // data failed" );
 
         iMesh_getTagHandle( instance, "fixed", &fixed_tag, &err, strlen( "fixed" ) );
         CHECK_IMESH( "Getting tag handle (fixed) failed" );
@@ -660,8 +660,8 @@ int get_imesh_mesh( MBMesquite::Mesh** mesh, const char* file_name, int dimensio
         // Set some arbitrary solution indicator
         moab::Tag solindTag;
         double def_val_dbl = 0.0;
-        rval               = mbi->tag_get_handle( "solution_indicator", 1, moab::MB_TYPE_DOUBLE, solindTag,
-                                                  moab::MB_TAG_CREAT | moab::MB_TAG_DENSE, &def_val_dbl );MB_CHK_SET_ERR( rval, "Getting tag handle failed" );
+        MB_CHK_SET_ERR( mbi->tag_get_handle( "solution_indicator", 1, moab::MB_TYPE_DOUBLE, solindTag,
+                                                  moab::MB_TAG_CREAT | moab::MB_TAG_DENSE, &def_val_dbl ), "Getting tag handle failed"  );
         solution_indicator.resize( cells.size(), 0.01 );
         for( unsigned i = 0; i < cells.size() / 4; i++ )
             solution_indicator[i] = 0.1;

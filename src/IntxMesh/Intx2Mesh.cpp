@@ -42,11 +42,11 @@ int char_stat_ent(Interface* mbi, EntityHandle eh, Tag glid)
 Intx2Mesh::Intx2Mesh( Interface* mbimpl )
     : mb( mbimpl ), mbs1( 0 ), mbs2( 0 ), outSet( 0 ), gid( 0 ), TgtFlagTag( 0 ), tgtParentTag( 0 ), srcParentTag( 0 ),
       countTag( 0 ), srcNeighTag( 0 ), tgtNeighTag( 0 ), neighTgtEdgeTag( 0 ), orgSendProcTag( 0 ), imaskTag( 0 ),
-      tgtConn( NULL ), srcConn( NULL ), epsilon_1( 0.0 ), epsilon_area( 0.0 ), box_error( 0.0 ), localRoot( 0 ),
+      tgtConn( nullptr ), srcConn( nullptr ), epsilon_1( 0.0 ), epsilon_area( 0.0 ), box_error( 0.0 ), localRoot( 0 ),
       my_rank( 0 )
 #ifdef MOAB_HAVE_MPI
       ,
-      parcomm( NULL ), remote_cells( NULL ), remote_cells_with_tracers( NULL )
+      parcomm( nullptr ), remote_cells( nullptr ), remote_cells_with_tracers( nullptr )
 #endif
       ,
       max_edges_1( 0 ), max_edges_2( 0 ), counting( 0 )
@@ -61,7 +61,7 @@ Intx2Mesh::~Intx2Mesh()
     if( remote_cells )
     {
         delete remote_cells;
-        remote_cells = NULL;
+        remote_cells = nullptr;
     }
 #endif
 }
@@ -69,7 +69,7 @@ Intx2Mesh::~Intx2Mesh()
 ErrorCode Intx2Mesh::FindMaxEdgesInSet( EntityHandle eset, int& max_edges )
 {
     Range cells;
-    ErrorCode rval = mb->get_entities_by_dimension( eset, 2, cells );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( eset, 2, cells ), "can't get entities by dimension" );
 
     max_edges = 0;  // can be 0 for point clouds
     for( Range::iterator cit = cells.begin(); cit != cells.end(); cit++ )
@@ -77,7 +77,7 @@ ErrorCode Intx2Mesh::FindMaxEdgesInSet( EntityHandle eset, int& max_edges )
         EntityHandle cell = *cit;
         const EntityHandle* conn4;
         int nnodes = 3;
-        rval       = mb->get_connectivity( cell, conn4, nnodes );MB_CHK_SET_ERR( rval, "can't get connectivity of a cell" );
+        MB_CHK_SET_ERR( mb->get_connectivity( cell, conn4, nnodes ), "can't get connectivity of a cell" );
         if( nnodes > max_edges ) max_edges = nnodes;
     }
     // if in parallel, communicate the actual max_edges; it is not needed for tgt mesh (to be
@@ -98,8 +98,8 @@ ErrorCode Intx2Mesh::FindMaxEdgesInSet( EntityHandle eset, int& max_edges )
 
 ErrorCode Intx2Mesh::FindMaxEdges( EntityHandle set1, EntityHandle set2 )
 {
-    ErrorCode rval = FindMaxEdgesInSet( set1, max_edges_1 );MB_CHK_SET_ERR( rval, "can't determine max_edges in set 1" );
-    rval = FindMaxEdgesInSet( set2, max_edges_2 );MB_CHK_SET_ERR( rval, "can't determine max_edges in set 2" );
+    MB_CHK_SET_ERR( FindMaxEdgesInSet( set1, max_edges_1 ), "can't determine max_edges in set 1" );
+    MB_CHK_SET_ERR( FindMaxEdgesInSet( set2, max_edges_2 ), "can't determine max_edges in set 2" );
 
     return MB_SUCCESS;
 }
@@ -113,10 +113,10 @@ ErrorCode Intx2Mesh::createTags()
     unsigned char def_data_bit = 0;  // unused by default
     // maybe the tgt tag is better to be deleted every time, and recreated;
     // or is it easy to set all values to something again? like 0?
-    ErrorCode rval = mb->tag_get_handle( "tgtFlag", 1, MB_TYPE_BIT, TgtFlagTag, MB_TAG_CREAT, &def_data_bit );MB_CHK_SET_ERR( rval, "can't get tgt flag tag" );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "tgtFlag", 1, MB_TYPE_BIT, TgtFlagTag, MB_TAG_CREAT, &def_data_bit ), "can't get tgt flag tag" );
     // create tgt edges if they do not exist yet; so when they are looked upon, they are found
     // this is the only call that is potentially NlogN, in the whole method
-    rval = mb->get_adjacencies( rs2, 1, true, TgtEdges, Interface::UNION );MB_CHK_SET_ERR( rval, "can't get adjacent tgt edges" );
+    MB_CHK_SET_ERR( mb->get_adjacencies( rs2, 1, true, TgtEdges, Interface::UNION ), "can't get adjacent tgt edges" );
 
     // now, create a map from each edge to a list of potential new nodes on a tgt edge
     // this memory has to be cleaned up
@@ -131,32 +131,34 @@ ErrorCode Intx2Mesh::createTags()
 
     int defaultInt = -1;
 
-    rval = mb->tag_get_handle( "TargetParent", 1, MB_TYPE_INTEGER, tgtParentTag, MB_TAG_DENSE | MB_TAG_CREAT,
-                               &defaultInt );MB_CHK_SET_ERR( rval, "can't create positive tag" );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "TargetParent", 1, MB_TYPE_INTEGER, tgtParentTag, MB_TAG_DENSE | MB_TAG_CREAT,
+                                        &defaultInt ),
+                    "can't create TargetParent tag" );
 
-    rval = mb->tag_get_handle( "SourceParent", 1, MB_TYPE_INTEGER, srcParentTag, MB_TAG_DENSE | MB_TAG_CREAT,
-                               &defaultInt );MB_CHK_SET_ERR( rval, "can't create negative tag" );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "SourceParent", 1, MB_TYPE_INTEGER, srcParentTag, MB_TAG_DENSE | MB_TAG_CREAT,
+                                        &defaultInt ),
+                    "can't create SourceParent tag" );
 
-    rval = mb->tag_get_handle( "Counting", 1, MB_TYPE_INTEGER, countTag, MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );MB_CHK_SET_ERR( rval, "can't create Counting tag" );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "Counting", 1, MB_TYPE_INTEGER, countTag, MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt ), "can't create Counting tag" );
 
-    // for each cell in set 1, determine its neigh in set 1 (could be null too)
+    // for each cell in set 1, determine its neigh in set 1 (could be nullptr too)
     // for each cell in set 2, determine its neigh in set 2 (if on boundary, could be 0)
-    rval = DetermineOrderedNeighbors( mbs1, max_edges_1, srcNeighTag );MB_CHK_SET_ERR( rval, "can't determine neighbors for set 1" );
-    rval = DetermineOrderedNeighbors( mbs2, max_edges_2, tgtNeighTag );MB_CHK_SET_ERR( rval, "can't determine neighbors for set 2" );
+    MB_CHK_SET_ERR( DetermineOrderedNeighbors( mbs1, max_edges_1, srcNeighTag ), "can't determine neighbors for set 1" );
+    MB_CHK_SET_ERR( DetermineOrderedNeighbors( mbs2, max_edges_2, tgtNeighTag ), "can't determine neighbors for set 2" );
 
     // for tgt cells, save a dense tag with the bordering edges, so we do not have to search for
     // them each time edges were for sure created before (tgtEdges)
     std::vector< EntityHandle > zeroh( max_edges_2, 0 );
-    // if we have a tag with this name, it could be of a different size, so delete it
-    rval = mb->tag_get_handle( "__tgtEdgeNeighbors", neighTgtEdgeTag );
-    if( rval == MB_SUCCESS && neighTgtEdgeTag ) mb->tag_delete( neighTgtEdgeTag );
-    rval = mb->tag_get_handle( "__tgtEdgeNeighbors", max_edges_2, MB_TYPE_HANDLE, neighTgtEdgeTag,
-                               MB_TAG_DENSE | MB_TAG_CREAT, &zeroh[0] );MB_CHK_SET_ERR( rval, "can't create tgt edge neighbors tag" );
+    // if we have a tag with this name, it could be of a different size, so delete it if it exists
+    if( mb->tag_get_handle( "__tgtEdgeNeighbors", neighTgtEdgeTag ) == MB_SUCCESS )
+        mb->tag_delete( neighTgtEdgeTag );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "__tgtEdgeNeighbors", max_edges_2, MB_TYPE_HANDLE, neighTgtEdgeTag,
+                               MB_TAG_DENSE | MB_TAG_CREAT, &zeroh[0] ), "can't create target edge neighbors tag" );
     for( Range::iterator rit = rs2.begin(); rit != rs2.end(); rit++ )
     {
         EntityHandle tgtCell = *rit;
         int num_nodes        = 0;
-        rval                 = mb->get_connectivity( tgtCell, tgtConn, num_nodes );MB_CHK_SET_ERR( rval, "can't get  tgt conn" );
+        MB_CHK_SET_ERR( mb->get_connectivity( tgtCell, tgtConn, num_nodes ), "can't get target connectivity" );
         // account for padded polygons
         while( tgtConn[num_nodes - 2] == tgtConn[num_nodes - 1] && num_nodes > 3 )
             num_nodes--;
@@ -167,8 +169,8 @@ ErrorCode Intx2Mesh::createTags()
             EntityHandle v[2] = { tgtConn[i],
                                   tgtConn[( i + 1 ) % num_nodes] };  // this is fine even for padded polygons
             std::vector< EntityHandle > adj_entities;
-            rval = mb->get_adjacencies( v, 2, 1, false, adj_entities, Interface::INTERSECT );
-            if( rval != MB_SUCCESS || adj_entities.size() < 1 ) return rval;  // get out , big error
+            MB_CHK_SET_ERR( mb->get_adjacencies( v, 2, 1, false, adj_entities, Interface::INTERSECT ), "can't get adjacencies" );
+            if( !adj_entities.size() ) MB_CHK_SET_ERR( MB_FAILURE, "no adjacencies found" );  // get out , big error
             zeroh[i] = adj_entities[0];                                       // should be only one edge between 2 nodes
             // also, even if number of edges is less than max_edges_2, they will be ignored, even if
             // the tag is dense
@@ -177,7 +179,7 @@ ErrorCode Intx2Mesh::createTags()
         for (i =num_nodes; i< max_edges_2; i++)
             zeroh[i] = 0;
         // now set the value of the tag
-        rval = mb->tag_set_data( neighTgtEdgeTag, &tgtCell, 1, &( zeroh[0] ) );MB_CHK_SET_ERR( rval, "can't set edge tgt tag" );
+        MB_CHK_SET_ERR( mb->tag_set_data( neighTgtEdgeTag, &tgtCell, 1, &( zeroh[0] ) ), "can't set edge target edge neighbors tag" );
     }
     return MB_SUCCESS;
 }
@@ -185,13 +187,13 @@ ErrorCode Intx2Mesh::createTags()
 ErrorCode Intx2Mesh::DetermineOrderedNeighbors( EntityHandle inputSet, int max_edges, Tag& neighTag )
 {
     Range cells;
-    ErrorCode rval = mb->get_entities_by_dimension( inputSet, 2, cells );MB_CHK_SET_ERR( rval, "can't get cells in set" );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( inputSet, 2, cells ), "can't get cells in set" );
 
     std::vector< EntityHandle > neighbors( max_edges );
     std::vector< EntityHandle > zeroh( max_edges, 0 );
     // nameless tag, as the name is not important; we will have 2 related tags, but one on tgt mesh,
     // one on src mesh
-    rval = mb->tag_get_handle( "", max_edges, MB_TYPE_HANDLE, neighTag, MB_TAG_DENSE | MB_TAG_CREAT, &zeroh[0] );MB_CHK_SET_ERR( rval, "can't create neighbors tag" );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "", max_edges, MB_TYPE_HANDLE, neighTag, MB_TAG_DENSE | MB_TAG_CREAT, &zeroh[0] ), "can't create neighbors tag" );
 
     for( Range::iterator cit = cells.begin(); cit != cells.end(); cit++ )
     {
@@ -200,7 +202,7 @@ ErrorCode Intx2Mesh::DetermineOrderedNeighbors( EntityHandle inputSet, int max_e
         // will get the nnodes ordered neighbors;
         // first cell is for nodes 0, 1, second to 1, 2, third to 2, 3, last to nnodes-1,
         const EntityHandle* conn4;
-        rval = mb->get_connectivity( cell, conn4, nnodes );MB_CHK_SET_ERR( rval, "can't get connectivity of a cell" );
+        MB_CHK_SET_ERR( mb->get_connectivity( cell, conn4, nnodes ), "can't get connectivity of a cell" );
         int nsides = nnodes;
         // account for possible padded polygons
         while( conn4[nsides - 2] == conn4[nsides - 1] && nsides > 3 )
@@ -214,7 +216,7 @@ ErrorCode Intx2Mesh::DetermineOrderedNeighbors( EntityHandle inputSet, int max_e
             // get all cells adjacent to these 2 vertices on the edge
             std::vector< EntityHandle > adjcells;
             std::vector< EntityHandle > cellsInSet;
-            rval = mb->get_adjacencies( v, 2, 2, false, adjcells, Interface::INTERSECT );MB_CHK_SET_ERR( rval, "can't adjacency to 2 verts" );
+            MB_CHK_SET_ERR( mb->get_adjacencies( v, 2, 2, false, adjcells, Interface::INTERSECT ), "can't get adjacency to 2 verts" );
             // now look for the cells contained in the input set;
             // the input set should be a correct mesh, not overlapping cells, and manifold
             size_t siz = adjcells.size();
@@ -247,7 +249,7 @@ ErrorCode Intx2Mesh::DetermineOrderedNeighbors( EntityHandle inputSet, int max_e
             neighbors[i] = 0;
         // now simply set the neighbors tag; the last few positions will not be used, but for
         // simplicity will keep them all (MAXEDGES)
-        rval = mb->tag_set_data( neighTag, &cell, 1, &neighbors[0] );MB_CHK_SET_ERR( rval, "can't set neigh tag" );
+        MB_CHK_SET_ERR( mb->tag_set_data( neighTag, &cell, 1, &neighbors[0] ), "can't set neighbors tag" );
     }
     return MB_SUCCESS;
 }
@@ -313,22 +315,22 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
     mbs1   = mbset1;  // set 1 is departure, and it is completely covering the euler set on proc
     mbs2   = mbset2;
     outSet = outputSet;
-    rval   = mb->get_entities_by_dimension( mbs1, 2, rs1 );MB_CHK_ERR( rval );
-    rval = mb->get_entities_by_dimension( mbs2, 2, rs2 );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( mbs1, 2, rs1 ), "can't get source entities by dimension" );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( mbs2, 2, rs2 ), "can't get target entities by dimension" );
     // from create tags, copy relevant ones
     if( tgtParentTag ) mb->tag_delete( tgtParentTag );
     if( srcParentTag ) mb->tag_delete( srcParentTag );
     if( countTag ) mb->tag_delete( countTag );
 
     // filter rs1 and rs2 by mask; remove everything with 0 mask
-    // get the mask tag if it exists; if not, leave it uninitialized (NULL)
+    // get the mask tag if it exists; if not, leave it uninitialized (nullptr)
     rval = mb->tag_get_handle( "GRID_IMASK", imaskTag );
-    if( imaskTag != NULL && rval != MB_SUCCESS ) MB_CHK_SET_ERR( rval, "can't get GRID_IMASK tag" );
-    rval = filterByMask( rs1 );MB_CHK_ERR( rval );
-    rval = filterByMask( rs2 );MB_CHK_ERR( rval );
+    if( imaskTag != nullptr && rval != MB_SUCCESS ) MB_CHK_SET_ERR( rval, "can't get GRID_IMASK tag" );
+    MB_CHK_SET_ERR( filterByMask( rs1 ), "can't filter source by mask" );
+    MB_CHK_SET_ERR( filterByMask( rs2 ), "can't filter target by mask" );
     // create tgt edges if they do not exist yet; so when they are looked upon, they are found
     // this is the only call that is potentially NlogN, in the whole method
-    rval = mb->get_adjacencies( rs2, 1, true, TgtEdges, Interface::UNION );MB_CHK_SET_ERR( rval, "can't get adjacent tgt edges" );
+    MB_CHK_SET_ERR( mb->get_adjacencies( rs2, 1, true, TgtEdges, Interface::UNION ), "can't get adjacent target edges" );
 
     int index = 0;
     extraNodesVec.resize( TgtEdges.size() );
@@ -340,11 +342,11 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
 
     int defaultInt = -1;
     // Now let us create the association tags to source and target parent, along with internal counters
-    rval = mb->tag_get_handle( "TargetParent", 1, MB_TYPE_INTEGER, tgtParentTag, MB_TAG_DENSE | MB_TAG_CREAT,
-                               &defaultInt );MB_CHK_SET_ERR( rval, "can't create positive tag" );
-    rval = mb->tag_get_handle( "SourceParent", 1, MB_TYPE_INTEGER, srcParentTag, MB_TAG_DENSE | MB_TAG_CREAT,
-                               &defaultInt );MB_CHK_SET_ERR( rval, "can't create negative tag" );
-    rval = mb->tag_get_handle( "Counting", 1, MB_TYPE_INTEGER, countTag, MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );MB_CHK_SET_ERR( rval, "can't create Counting tag" );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "TargetParent", 1, MB_TYPE_INTEGER, tgtParentTag, MB_TAG_DENSE | MB_TAG_CREAT,
+                               &defaultInt ), "can't create target parent tag" );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "SourceParent", 1, MB_TYPE_INTEGER, srcParentTag, MB_TAG_DENSE | MB_TAG_CREAT,
+                               &defaultInt ), "can't create source parent tag" );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "Counting", 1, MB_TYPE_INTEGER, countTag, MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt ), "can't create Counting tag" );
 
     // for tgt cells, save a dense tag with the bordering edges, so we do not have to search for
     // them each time edges were for sure created before (tgtEdges)
@@ -352,14 +354,14 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
     rval = mb->tag_get_handle( "__tgtEdgeNeighbors", neighTgtEdgeTag );
     if( rval == MB_SUCCESS && neighTgtEdgeTag ) mb->tag_delete( neighTgtEdgeTag );
     std::vector< EntityHandle > zeroh( max_edges_2, 0 );
-    rval = mb->tag_get_handle( "__tgtEdgeNeighbors", max_edges_2, MB_TYPE_HANDLE, neighTgtEdgeTag,
-                               MB_TAG_DENSE | MB_TAG_CREAT, &zeroh[0] );MB_CHK_SET_ERR( rval, "can't create tgt edge neighbors tag" );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "__tgtEdgeNeighbors", max_edges_2, MB_TYPE_HANDLE, neighTgtEdgeTag,
+                               MB_TAG_DENSE | MB_TAG_CREAT, &zeroh[0] ), "can't create tgt edge neighbors tag" );
 
     for( Range::iterator rit = rs2.begin(); rit != rs2.end(); rit++ )
     {
         EntityHandle tgtCell = *rit;
         int num_nodes        = 0;
-        rval                 = mb->get_connectivity( tgtCell, tgtConn, num_nodes );MB_CHK_SET_ERR( rval, "can't get  tgt conn" );
+        MB_CHK_SET_ERR( mb->get_connectivity( tgtCell, tgtConn, num_nodes ), "can't get target connectivity" );
         // account for padded polygons
         while( tgtConn[num_nodes - 2] == tgtConn[num_nodes - 1] && num_nodes > 3 )
             num_nodes--;
@@ -376,7 +378,7 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
             // the tag is dense
         }
         // now set the value of the tag
-        rval = mb->tag_set_data( neighTgtEdgeTag, &tgtCell, 1, &( zeroh[0] ) );MB_CHK_SET_ERR( rval, "can't set edge tgt tag" );
+        MB_CHK_SET_ERR( mb->tag_set_data( neighTgtEdgeTag, &tgtCell, 1, &( zeroh[0] ) ), "can't set edge target edge neighbors tag" );
     }
 
     // find out max edge on source mesh;
@@ -385,12 +387,12 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
         std::vector< double > coords( 3 * max_edges_1, 0.0 );
         for( Range::iterator it = rs1.begin(); it != rs1.end(); it++ )
         {
-            const EntityHandle* conn = NULL;
+            const EntityHandle* conn = nullptr;
             int nnodes;
-            rval = mb->get_connectivity( *it, conn, nnodes );MB_CHK_SET_ERR( rval, "can't get connectivity" );
+            MB_CHK_SET_ERR( mb->get_connectivity( *it, conn, nnodes ), "can't get source connectivity" );
             while( conn[nnodes - 2] == conn[nnodes - 1] && nnodes > 3 )
                 nnodes--;
-            rval = mb->get_coords( conn, nnodes, &coords[0] );MB_CHK_SET_ERR( rval, "can't get coordinates" );
+            MB_CHK_SET_ERR( mb->get_coords( conn, nnodes, &coords[0] ), "can't get source coordinates" );
             for( int j = 0; j < nnodes; j++ )
             {
                 int next = ( j + 1 ) % nnodes;
@@ -434,21 +436,21 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
     AdaptiveKDTree kd( mb );
     kd.parse_options( kdOpts );
     EntityHandle tree_root = 0;
-    rval                   = kd.build_tree( rs1, &tree_root );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( kd.build_tree( rs1, &tree_root ), "can't build Kd-tree on source cells" );
 
     for( Range::iterator it = rs2.begin(); it != rs2.end(); ++it )
     {
         EntityHandle tcell = *it;
         // find vertex positions
-        const EntityHandle* conn = NULL;
+        const EntityHandle* conn = nullptr;
         int nnodes               = 0;
-        rval                     = mb->get_connectivity( tcell, conn, nnodes );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( mb->get_connectivity( tcell, conn, nnodes ), "can't get target connectivity" );
         // find leaves close to those positions
         double areaTgtCell   = setup_tgt_cell( tcell, nnodes );  // this is the area in the gnomonic plane
         double recoveredArea = 0;
         std::vector< double > positions;
         positions.resize( nnodes * 3 );
-        rval = mb->get_coords( conn, nnodes, &positions[0] );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( mb->get_coords( conn, nnodes, &positions[0] ), "can't get target coordinates" );
 
         // distance to search will be based on average edge length
         double av_len = 0;
@@ -471,12 +473,12 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
         for( int i = 0; i < nnodes; i++ )
         {
             leaves.clear();
-            rval = kd.distance_search( &positions[3 * i], av_len, leaves, tolerance, epsilon_1 );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( kd.distance_search( &positions[3 * i], av_len, leaves, tolerance, epsilon_1 ), "can't search for leaves" );
 
             for( std::vector< EntityHandle >::iterator j = leaves.begin(); j != leaves.end(); ++j )
             {
                 Range tmp;
-                rval = mb->get_entities_by_dimension( *j, 2, tmp );MB_CHK_ERR( rval );
+                MB_CHK_SET_ERR( mb->get_entities_by_dimension( *j, 2, tmp ), "can't get entities by dimension" );
 
                 close_source_cells.merge( tmp.begin(), tmp.end() );
             }
@@ -498,12 +500,12 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
             int nP = 0;
             int nb[MAXEDGES], nr[MAXEDGES];  // sides 3 or 4? also, check boxes first
             int nsTgt, nsSrc;
-            rval = computeIntersectionBetweenTgtAndSrc( tcell, startSrc, P, nP, area, nb, nr, nsSrc, nsTgt, true );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( computeIntersectionBetweenTgtAndSrc( tcell, startSrc, P, nP, area, nb, nr, nsSrc, nsTgt, true ), "can't compute intersection between target and source" );
             if( area > 0 )
             {
                 if( nP > 1 )
                 {  // this will also construct triangles/polygons in the new mesh, if needed
-                    rval = findNodes( tcell, nnodes, startSrc, nsSrc, P, nP );MB_CHK_ERR( rval );
+                    MB_CHK_SET_ERR( findNodes( tcell, nnodes, startSrc, nsSrc, P, nP ), "can't find nodes" );
 #ifdef ENABLE_DEBUG
                     std::cout << " intersect: " << " ht:" << mb->id_from_handle( tcell ) << " "
                                       << " hs:" << mb->id_from_handle( startSrc ) << " g:" <<
@@ -522,7 +524,7 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
 #ifdef MOAB_HAVE_MPI
     if ( nullptr != parcomm)
     {
-        rval = resolve_intersection_sharing();MB_CHK_SET_ERR( rval, "can't correct position, Intx2Mesh.cpp \n" );
+        MB_CHK_SET_ERR( resolve_intersection_sharing(), "can't resolve intersection sharing (correct position)" );
     }
 #endif
 
@@ -534,32 +536,31 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
 // some are triangles, some are quads, some are polygons ...
 ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2, EntityHandle& outputSet )
 {
-    ErrorCode rval;
     mbs1   = mbset1;  // set 1 is departure, and it is completely covering the euler set on proc
     mbs2   = mbset2;
     outSet = outputSet;
 #ifdef VERBOSE
     std::stringstream ffs, fft;
     ffs << "source_rank0" << my_rank << ".vtk";
-    rval = mb->write_mesh( ffs.str().c_str(), &mbset1, 1 );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( mb->write_mesh( ffs.str().c_str(), &mbset1, 1 ), "can't write source mesh" );
     fft << "target_rank0" << my_rank << ".vtk";
-    rval = mb->write_mesh( fft.str().c_str(), &mbset2, 1 );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( mb->write_mesh( fft.str().c_str(), &mbset2, 1 ), "can't write target mesh" );
 
 #endif
     // really, should be something from t1 and t2; src is 1 (lagrange), tgt is 2 (euler)
 
     EntityHandle startSrc = 0, startTgt = 0;
 
-    rval = mb->get_entities_by_dimension( mbs1, 2, rs1 );MB_CHK_ERR( rval );
-    rval = mb->get_entities_by_dimension( mbs2, 2, rs2 );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( mbs1, 2, rs1 ), "can't get source entities by dimension" );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( mbs2, 2, rs2 ), "can't get target entities by dimension" );
 
     // filter rs1 and rs2 by mask; remove everything with 0 mask
-    // get the mask tag if it exists; if not, leave it uninitialized (NULL)
-    mb->tag_get_handle( "GRID_IMASK", imaskTag );
-    if( imaskTag != NULL && rval != MB_SUCCESS ) MB_CHK_SET_ERR( rval, "can't get GRID_IMASK tag" );
+    // get the mask tag if it exists; if not, leave it uninitialized (nullptr)
+    ErrorCode rval = mb->tag_get_handle( "GRID_IMASK", imaskTag );
+    if( imaskTag != nullptr && rval != MB_SUCCESS ) MB_CHK_SET_ERR( rval, "can't get GRID_IMASK tag" );
 
-    rval = filterByMask( rs1 );MB_CHK_ERR( rval );
-    rval = filterByMask( rs2 );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( filterByMask( rs1 ), "can't filter source by mask" );
+    MB_CHK_SET_ERR( filterByMask( rs2 ), "can't filter target by mask" );
 
     createTags();  // will also determine max_edges_1, max_edges_2 (for src and tgt meshes)
 
@@ -570,13 +571,13 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
     // more efficiently for the seeds in advancing front;
     // some of the target cells will not be covered by source cells, and they need to be eliminated
     // early from contention
-
-    // build a kd tree with the rs1 (source) cells
     FileOptions kdOpts( "PLANE_SET=1;SPLITS_PER_DIR=2;SPHERICAL;RADIUS=1.0;" );
     AdaptiveKDTree kd( mb );
     kd.parse_options( kdOpts );
     EntityHandle tree_root = 0;
-    rval                   = kd.build_tree( rs1, &tree_root );MB_CHK_ERR( rval );
+
+    // build a kd tree with the rs1 (source) cells
+    MB_CHK_SET_ERR( kd.build_tree( rs1, &tree_root ), "can't build kd tree on source cells" );
 #if defined( ENABLE_DEBUG )
        for (auto it=rs22.begin();  it != rs22.end(); ++it)
        {
@@ -588,6 +589,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                    << " gt:" << global_id_ent(mb, cell, gid) << " stat: " << char_stat_ent(mb, cell, TgtFlagTag) << "\n";
        }
 #endif
+
     while( !rs22.empty() )
     {
 #if defined( ENABLE_DEBUG ) || defined( VERBOSE )
@@ -597,7 +599,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                       << " rs22.size():" << rs22.size() << "\n";
             std::stringstream ffo;
             ffo << "file0" << counting << "rank0" << my_rank << ".h5m";
-            rval = mb->write_mesh( ffo.str().c_str(), &outSet, 1 );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( mb->write_mesh( ffo.str().c_str(), &outSet, 1 ), "can't write output mesh" );
             for (auto it=rs22.begin();  it != rs22.end(); ++it)
             {
                 EntityHandle cell=*it;
@@ -623,13 +625,13 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
             }
             int found = 0;
             // find vertex positions
-            const EntityHandle* conn = NULL;
+            const EntityHandle* conn = nullptr;
             int nnodes               = 0;
-            rval                     = mb->get_connectivity( startTgt, conn, nnodes );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( mb->get_connectivity( startTgt, conn, nnodes ), "can't get target connectivity" );
             // find leaves close to those positions
             std::vector< double > positions;
             positions.resize( nnodes * 3 );
-            rval = mb->get_coords( conn, nnodes, &positions[0] );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( mb->get_coords( conn, nnodes, &positions[0] ), "can't get target coordinates" );
             // find leaves within a distance from each vertex of target
             // in those leaves, collect all cells; we will try for an intx in there, instead of
             // looping over all rs1 cells, as before
@@ -638,12 +640,12 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
             for( int i = 0; i < nnodes; i++ )
             {
                 leaves.clear();
-                rval = kd.distance_search( &positions[3 * i], epsilon_1, leaves, epsilon_1, epsilon_1 );MB_CHK_ERR( rval );
+                MB_CHK_SET_ERR( kd.distance_search( &positions[3 * i], epsilon_1, leaves, epsilon_1, epsilon_1 ), "can't search for leaves" );
 
                 for( std::vector< EntityHandle >::iterator j = leaves.begin(); j != leaves.end(); ++j )
                 {
                     Range tmp;
-                    rval = mb->get_entities_by_dimension( *j, 2, tmp );MB_CHK_ERR( rval );
+                    MB_CHK_SET_ERR( mb->get_entities_by_dimension( *j, 2, tmp ), "can't get entities by dimension" );
 
                     close_source_cells.merge( tmp.begin(), tmp.end() );
                 }
@@ -659,8 +661,8 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                 int nP = 0;
                 int nb[MAXEDGES], nr[MAXEDGES];  // sides 3 or 4? also, check boxes first
                 int nsTgt, nsSrc;
-                rval =
-                    computeIntersectionBetweenTgtAndSrc( startTgt, startSrc, P, nP, area, nb, nr, nsSrc, nsTgt, true );MB_CHK_ERR( rval );
+                MB_CHK_SET_ERR(
+                    computeIntersectionBetweenTgtAndSrc( startTgt, startSrc, P, nP, area, nb, nr, nsSrc, nsTgt, true ), "can't compute intersection between target and source" );
                 if( area > 0 )
                 {
                     found     = 1;
@@ -689,7 +691,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
 
         unsigned char used = 1;
         // mark the start tgt quad as used, so it will not come back again
-        rval = mb->tag_set_data( TgtFlagTag, &startTgt, 1, &used );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( mb->tag_set_data( TgtFlagTag, &startTgt, 1, &used ), "can't set target flag" );
         while( !tgtQueue.empty() )
         {
             // flags for the side : 0 means a src cell not found on side
@@ -705,7 +707,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
             // get the neighbors of tgt, and if they are solved already, do not bother with that
             // side of tgt
             EntityHandle tgtNeighbors[MAXEDGES] = { 0 };
-            rval                                = mb->tag_get_data( tgtNeighTag, &currentTgt, 1, tgtNeighbors );MB_CHK_SET_ERR( rval, "can't get neighbors of current tgt" );
+            MB_CHK_SET_ERR( mb->tag_get_data( tgtNeighTag, &currentTgt, 1, tgtNeighbors ), "can't get target neighbors" );
 #ifdef ENABLE_DEBUG
             if( dbg_1 )
             {
@@ -727,7 +729,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                 EntityHandle tgtNeigh = tgtNeighbors[j];
                 unsigned char status  = 1;
                 if( tgtNeigh == 0 ) continue;
-                rval = mb->tag_get_data( TgtFlagTag, &tgtNeigh, 1, &status );MB_CHK_ERR( rval );                     // status 0 is unused
+                MB_CHK_SET_ERR( mb->tag_get_data( TgtFlagTag, &tgtNeigh, 1, &status ), "can't get target flag" );                     // status 0 is unused
                 if( 1 == status ) tgtNeighbors[j] = 0;  // so will not look anymore on this side of tgt
             }
 
@@ -765,9 +767,10 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                 // nb [j] = 1 means that the side j (from j to j+1) of src poly intersects the
                 // tgt poly.  A potential next poly in the tgt queue is the tgt poly that is
                 // adjacent to this side
-                rval = computeIntersectionBetweenTgtAndSrc( /* tgt */ currentTgt, srcT, P, nP, area, nb, nr, nsidesSrc,
-                                                            nsidesTgt );MB_CHK_ERR( rval );
+                MB_CHK_SET_ERR( computeIntersectionBetweenTgtAndSrc( /* tgt */ currentTgt, srcT, P, nP, area, nb, nr, nsidesSrc,
+                                                            nsidesTgt ), "can't compute intersection between target and source" );
                 localSrcAlreadyTested.insert(srcT);
+
                 if( nP > 0 )
                 {
 #ifdef ENABLE_DEBUG
@@ -791,12 +794,9 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
 
                     // intersection found: output P and original triangles if nP > 2
                     EntityHandle neighbors[MAXEDGES] = { 0 };
-                    rval                             = mb->tag_get_data( srcNeighTag, &srcT, 1, neighbors );
-                    if( rval != MB_SUCCESS )
-                    {
-                        std::cout << " can't get the neighbors for src element " << " hs:" << mb->id_from_handle( srcT );
-                        return MB_FAILURE;
-                    }
+
+                    MB_CHK_SET_ERR( mb->tag_get_data( srcNeighTag, &srcT, 1, neighbors ),
+                                    "failed to get the neighbors for source element " << mb->id_from_handle( srcT ) );
 
                     Range newPotentialSrc;
                     // add neighbors to the localSrc queue, if they are not marked
@@ -850,7 +850,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                     }
                     if( nP > 1 )
                     {  // this will also construct triangles/polygons in the new mesh, if needed
-                        rval = findNodes( currentTgt, nsidesTgt, srcT, nsidesSrc, P, nP );MB_CHK_ERR( rval );
+                        MB_CHK_SET_ERR( findNodes( currentTgt, nsidesTgt, srcT, nsidesSrc, P, nP ), "can't find nodes" );
 #ifdef ENABLE_DEBUG
                         std::cout << " intersect: " << " ht:" << mb->id_from_handle( currentTgt ) << " "
                                       << " hs:" << mb->id_from_handle( srcT ) << " g:" <<
@@ -911,8 +911,8 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                     int nr[MAXEDGES] = { 0 };
 
                     int nsidesSrc;  ///
-                    rval = computeIntersectionBetweenTgtAndSrc(
-                        /* tgt */ tgtNeigh, nextB, P, nP, area, nb, nr, nsidesSrc, nsidesTgt2 );MB_CHK_ERR( rval );
+                    MB_CHK_SET_ERR( computeIntersectionBetweenTgtAndSrc(
+                        /* tgt */ tgtNeigh, nextB, P, nP, area, nb, nr, nsidesSrc, nsidesTgt2 ), "can't compute intersection between target and source" );
                     if( area > 0 )
                     {
                         unsigned char is_used = 0;
@@ -926,7 +926,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
                                 std::cout << "new polys pushed: src, tgt:" << " ht:" << mb->id_from_handle( tgtNeigh )
                                           << " hs:" << mb->id_from_handle( nextB ) <<  " counting: "<< counting <<std::endl;
 #endif
-                            rval = mb->tag_set_data( TgtFlagTag, &tgtNeigh, 1, &used );MB_CHK_ERR( rval );
+                            MB_CHK_SET_ERR( mb->tag_set_data( TgtFlagTag, &tgtNeigh, 1, &used ), "can't set target flag" );
                         }
                         break;  // so we are done with this side of tgt, we have found a proper next
                                 // seed
@@ -941,7 +941,7 @@ ErrorCode Intx2Mesh::intersect_meshes( EntityHandle mbset1, EntityHandle mbset2,
     // on the boundary edges
     // this needs to be collective, so we should maybe wait something
 #ifdef MOAB_HAVE_MPI
-    rval = resolve_intersection_sharing();MB_CHK_SET_ERR( rval, "can't correct position, Intx2Mesh.cpp \n" );
+    MB_CHK_SET_ERR( resolve_intersection_sharing(), "can't resolve intersection sharing" );
 #endif
 
     this->clean();
@@ -954,7 +954,7 @@ ErrorCode Intx2Mesh::filterByMask( Range& cells )
     size_t sz = cells.size();
     std::vector< int > masks( sz );
 
-    ErrorCode rval = mb->tag_get_data( imaskTag, cells, &masks[0] );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( mb->tag_get_data( imaskTag, cells, &masks[0] ), "can't get mask tag" );
     Range cellsToRemove;
     size_t indx = 0;
     for( Range::iterator eit = cells.begin(); eit != cells.end(); ++eit, ++indx )
@@ -1031,7 +1031,7 @@ ErrorCode Intx2Mesh::build_processor_euler_boxes( EntityHandle euler_set, Range&
     rval                = mb->get_connectivity( localEnts, local_verts );
     int num_local_verts = (int)local_verts.size();ERRORR( rval, "can't get local vertices" );
 
-    assert( parcomm != NULL );
+    assert( parcomm != nullptr );
 
     // get the position of local vertices, and decide local boxes (allBoxes...)
     double bmin[3] = { std::numeric_limits< double >::max(), std::numeric_limits< double >::max(),
@@ -1098,7 +1098,7 @@ ErrorCode Intx2Mesh::build_processor_euler_boxes( EntityHandle euler_set, Range&
 ErrorCode Intx2Mesh::create_departure_mesh_2nd_alg( EntityHandle& euler_set, EntityHandle& covering_lagr_set )
 {
     // compute the bounding box on each proc
-    assert( parcomm != NULL );
+    assert( parcomm != nullptr );
 
     localEnts.clear();
     ErrorCode rval = mb->get_entities_by_dimension( euler_set, 2, localEnts );ERRORR( rval, "can't get ents by dimension" );
@@ -1372,7 +1372,7 @@ ErrorCode Intx2Mesh::create_departure_mesh_3rd_alg( EntityHandle& lagr_set, Enti
     ErrorCode rval = mb->tag_get_handle( CORRTAGNAME, 1, MB_TYPE_HANDLE, corrTag, MB_TAG_DENSE | MB_TAG_CREAT, &dum );
     // start copy from 2nd alg
     // compute the bounding box on each proc
-    assert( parcomm != NULL );
+    assert( parcomm != nullptr );
     if( 1 == parcomm->proc_config().proc_size() )
     {
         covering_set = lagr_set;  // nothing to communicate, it must be serial
@@ -1636,10 +1636,10 @@ ErrorCode Intx2Mesh::resolve_intersection_sharing()
         Range nonOwnedVerts;
         Range vertsInIntx;
         Range intxCells;
-        ErrorCode rval = mb->get_entities_by_dimension( outSet, 2, intxCells );MB_CHK_ERR( rval );
-        rval = mb->get_connectivity( intxCells, vertsInIntx );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( mb->get_entities_by_dimension( outSet, 2, intxCells ), "can't get entities by dimension" );
+        MB_CHK_SET_ERR( mb->get_connectivity( intxCells, vertsInIntx ), "can't get connectivity" );
 
-        rval = parcomm->filter_pstatus( vertsInIntx, PSTATUS_NOT_OWNED, PSTATUS_AND, -1, &nonOwnedVerts );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( parcomm->filter_pstatus( vertsInIntx, PSTATUS_NOT_OWNED, PSTATUS_AND, -1, &nonOwnedVerts ), "can't filter pstatus" );
 
         // some of these vertices can be in original set 1, which was covered, transported;
         // but they should not be "shared" from the intx point of view, because they are not shared
@@ -1647,16 +1647,16 @@ ErrorCode Intx2Mesh::resolve_intersection_sharing()
         // sharing property ?
 
         Range coverVerts;
-        rval = mb->get_connectivity( rs1, coverVerts );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( mb->get_connectivity( rs1, coverVerts ), "can't get connectivity" );
         // find out those that are on the interface
         Range vertsCovInterface;
-        rval = parcomm->filter_pstatus( coverVerts, PSTATUS_INTERFACE, PSTATUS_AND, -1, &vertsCovInterface );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( parcomm->filter_pstatus( coverVerts, PSTATUS_INTERFACE, PSTATUS_AND, -1, &vertsCovInterface ), "can't filter pstatus" );
         // how many of these are in
         Range nodesToDuplicate = intersect( vertsCovInterface, nonOwnedVerts );
         // first, get all cells connected to these vertices, from intxCells
 
         Range connectedCells;
-        rval = mb->get_adjacencies( nodesToDuplicate, 2, false, connectedCells, Interface::UNION );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->get_adjacencies( nodesToDuplicate, 2, false, connectedCells, Interface::UNION ) );
         // only those in intx set:
         connectedCells = intersect( connectedCells, intxCells );
         // first duplicate vertices in question:
@@ -1665,9 +1665,9 @@ ErrorCode Intx2Mesh::resolve_intersection_sharing()
         {
             EntityHandle vertex = *vit;
             double coords[3];
-            rval = mb->get_coords( &vertex, 1, coords );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( mb->get_coords( &vertex, 1, coords ), "can't get coords" );
             EntityHandle newVertex;
-            rval = mb->create_vertex( coords, newVertex );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( mb->create_vertex( coords, newVertex ), "can't create vertex" );
             duplicatedVerticesMap[vertex] = newVertex;
         }
 
@@ -1677,7 +1677,7 @@ ErrorCode Intx2Mesh::resolve_intersection_sharing()
             EntityHandle intxCell = *eit;
             // replace connectivity
             std::vector< EntityHandle > connectivity;
-            rval = mb->get_connectivity( &intxCell, 1, connectivity );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( mb->get_connectivity( &intxCell, 1, connectivity ), "can't get connectivity" );
             for( size_t i = 0; i < connectivity.size(); i++ )
             {
                 EntityHandle currentVertex                           = connectivity[i];
@@ -1688,7 +1688,7 @@ ErrorCode Intx2Mesh::resolve_intersection_sharing()
                 }
             }
             int nnodes = (int)connectivity.size();
-            rval       = mb->set_connectivity( intxCell, &connectivity[0], nnodes );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( mb->set_connectivity( intxCell, &connectivity[0], nnodes ), "can't set connectivity" );
         }
     }
     return MB_SUCCESS;

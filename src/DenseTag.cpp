@@ -202,7 +202,7 @@ ErrorCode DenseTag::get_data( const SequenceManager* seqman,
     for( const EntityHandle* i = entities; i != end; ++i, ptr += get_size() )
     {
         const unsigned char* data = 0;
-        ErrorCode rval            = get_array( seqman, NULL, *i, data, junk );MB_CHK_ERR( rval );
+        MB_CHK_ERR( get_array( seqman, NULL, *i, data, junk ) );
 
         if( data )
             memcpy( ptr, data, get_size() );
@@ -220,7 +220,6 @@ ErrorCode DenseTag::get_data( const SequenceManager* seqman,
                               const Range& entities,
                               void* values ) const
 {
-    ErrorCode rval;
     size_t avail               = 0;
     const unsigned char* array = NULL;  // Initialize to get rid of warning
     unsigned char* data        = reinterpret_cast< unsigned char* >( values );
@@ -230,7 +229,7 @@ ErrorCode DenseTag::get_data( const SequenceManager* seqman,
         EntityHandle start = p->first;
         while( start <= p->second )
         {
-            rval = get_array( seqman, NULL, start, array, avail );MB_CHK_ERR( rval );
+            MB_CHK_ERR( get_array( seqman, NULL, start, array, avail ) );
 
             const size_t count = std::min< size_t >( p->second - start + 1, avail );
             if( array )
@@ -287,7 +286,6 @@ ErrorCode DenseTag::get_data( const SequenceManager* seqman,
                               const void** pointers,
                               int* data_lengths ) const
 {
-    ErrorCode rval;
     size_t avail               = 0;
     const unsigned char* array = NULL;
 
@@ -302,7 +300,7 @@ ErrorCode DenseTag::get_data( const SequenceManager* seqman,
         EntityHandle start = p->first;
         while( start <= p->second )
         {
-            rval = get_array( seqman, NULL, start, array, avail );MB_CHK_ERR( rval );
+            MB_CHK_ERR( get_array( seqman, NULL, start, array, avail ) );
 
             const size_t count = std::min< size_t >( p->second - start + 1, avail );
             if( array )
@@ -336,7 +334,6 @@ ErrorCode DenseTag::set_data( SequenceManager* seqman,
                               size_t num_entities,
                               const void* data )
 {
-    ErrorCode rval;
     const unsigned char* ptr      = reinterpret_cast< const unsigned char* >( data );
     const EntityHandle* const end = entities + num_entities;
     unsigned char* array          = NULL;
@@ -344,7 +341,7 @@ ErrorCode DenseTag::set_data( SequenceManager* seqman,
 
     for( const EntityHandle* i = entities; i != end; ++i, ptr += get_size() )
     {
-        rval = get_array_private( seqman, NULL, *i, array, junk, true );MB_CHK_ERR( rval );
+        MB_CHK_ERR( get_array_private( seqman, NULL, *i, array, junk, true ) );
 
         memcpy( array, ptr, get_size() );
     }
@@ -354,7 +351,6 @@ ErrorCode DenseTag::set_data( SequenceManager* seqman,
 
 ErrorCode DenseTag::set_data( SequenceManager* seqman, Error* /* error */, const Range& entities, const void* values )
 {
-    ErrorCode rval;
     const char* data     = reinterpret_cast< const char* >( values );
     unsigned char* array = NULL;
     size_t avail         = 0;
@@ -364,7 +360,7 @@ ErrorCode DenseTag::set_data( SequenceManager* seqman, Error* /* error */, const
         EntityHandle start = p->first;
         while( start <= p->second )
         {
-            rval = get_array_private( seqman, NULL, start, array, avail, true );MB_CHK_ERR( rval );
+            MB_CHK_ERR( get_array_private( seqman, NULL, start, array, avail, true ) );
 
             const size_t count = std::min< size_t >( p->second - start + 1, avail );
             memcpy( array, data, get_size() * count );
@@ -383,7 +379,7 @@ ErrorCode DenseTag::set_data( SequenceManager* seqman,
                               void const* const* pointers,
                               const int* data_lengths )
 {
-    ErrorCode rval = validate_lengths( NULL, data_lengths, num_entities );MB_CHK_ERR( rval );
+    MB_CHK_ERR( validate_lengths( NULL, data_lengths, num_entities ) );
 
     const EntityHandle* const end = entities + num_entities;
     unsigned char* array          = NULL;
@@ -391,7 +387,7 @@ ErrorCode DenseTag::set_data( SequenceManager* seqman,
 
     for( const EntityHandle* i = entities; i != end; ++i, ++pointers )
     {
-        rval = get_array_private( seqman, NULL, *i, array, junk, true );MB_CHK_ERR( rval );
+        MB_CHK_ERR( get_array_private( seqman, NULL, *i, array, junk, true ) );
 
         memcpy( array, *pointers, get_size() );
     }
@@ -405,7 +401,6 @@ ErrorCode DenseTag::set_data( SequenceManager* seqman,
                               void const* const* pointers,
                               const int* /* data_lengths */ )
 {
-    ErrorCode rval;
     unsigned char* array = NULL;
     size_t avail         = 0;
 
@@ -414,7 +409,7 @@ ErrorCode DenseTag::set_data( SequenceManager* seqman,
         EntityHandle start = p->first;
         while( start <= p->second )
         {
-            rval = get_array_private( seqman, NULL, start, array, avail, true );MB_CHK_ERR( rval );
+            MB_CHK_ERR( get_array_private( seqman, NULL, start, array, avail, true ) );
 
             const EntityHandle end = std::min< EntityHandle >( p->second + 1, start + avail );
             while( start != end )
@@ -437,14 +432,13 @@ ErrorCode DenseTag::clear_data( bool allocate,
                                 size_t num_entities,
                                 const void* value_ptr )
 {
-    ErrorCode rval;
     const EntityHandle* const end = entities + num_entities;
     unsigned char* array          = NULL;
     size_t junk                   = 0;
 
     for( const EntityHandle* i = entities; i != end; ++i )
     {
-        rval = get_array_private( seqman, NULL, *i, array, junk, allocate );MB_CHK_ERR( rval );
+        MB_CHK_ERR( get_array_private( seqman, NULL, *i, array, junk, allocate ) );
 
         if( array )  // Array should never be null if allocate == true
             memcpy( array, value_ptr, get_size() );
@@ -459,7 +453,6 @@ ErrorCode DenseTag::clear_data( bool allocate,
                                 const Range& entities,
                                 const void* value_ptr )
 {
-    ErrorCode rval;
     unsigned char* array = NULL;
     size_t avail         = 0;
 
@@ -468,7 +461,7 @@ ErrorCode DenseTag::clear_data( bool allocate,
         EntityHandle start = p->first;
         while( start <= p->second )
         {
-            rval = get_array_private( seqman, NULL, start, array, avail, allocate );MB_CHK_ERR( rval );
+            MB_CHK_ERR( get_array_private( seqman, NULL, start, array, avail, allocate ) );
 
             const size_t count = std::min< size_t >( p->second - start + 1, avail );
             if( array )  // Array should never be null if allocate == true
@@ -544,7 +537,7 @@ ErrorCode DenseTag::tag_iterate( SequenceManager* seqman,
 
     unsigned char* array = NULL;
     size_t avail         = 0;
-    ErrorCode rval       = get_array_private( seqman, NULL, *iter, array, avail, allocate );MB_CHK_ERR( rval );
+    MB_CHK_ERR( get_array_private( seqman, NULL, *iter, array, avail, allocate ) );
     data_ptr = array;
 
     size_t count = std::min< size_t >( avail, *( iter.end_of_block() ) - *iter + 1 );
@@ -629,7 +622,6 @@ ErrorCode DenseTag::find_entities_with_value( const SequenceManager* seqman,
     {
         const unsigned char* array = NULL;  // Initialize to get rid of warning
         size_t count;
-        ErrorCode rval;
 
         Range::const_pair_iterator p = intersect_entities->begin();
         if( type != MBMAXTYPE )
@@ -644,7 +636,7 @@ ErrorCode DenseTag::find_entities_with_value( const SequenceManager* seqman,
             EntityHandle start = p->first;
             while( start <= p->second )
             {
-                rval = get_array( seqman, NULL, start, array, count );MB_CHK_ERR( rval );
+                MB_CHK_ERR( get_array( seqman, NULL, start, array, count ) );
 
                 if( p->second - start < count - 1 ) count = p->second - start + 1;
 

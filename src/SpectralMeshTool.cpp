@@ -128,8 +128,8 @@ ErrorCode SpectralMeshTool::create_spectral_elems( const T* conn,
 
     int verts_per_felem = spectralOrderp1 * spectralOrderp1, verts_per_celem = std::pow( (double)2.0, dim );
 
-    rval = rmi->get_element_connect( num_coarse_elems, verts_per_celem, ( 2 == dim ? MBQUAD : MBHEX ), 0, start_elem,
-                                     new_conn );MB_CHK_SET_ERR( rval, "Failed to create elems" );
+    MB_CHK_SET_ERR( rmi->get_element_connect( num_coarse_elems, verts_per_celem, ( 2 == dim ? MBQUAD : MBHEX ), 0, start_elem,
+                                     new_conn ), "Failed to create elems" );
 
     output_range.insert( start_elem, start_elem + num_coarse_elems - 1 );
 
@@ -143,8 +143,8 @@ ErrorCode SpectralMeshTool::create_spectral_elems( const T* conn,
     // we're assuming here that elems was empty on input
     int count;
     EntityHandle* sv_ptr = NULL;
-    rval = mbImpl->tag_iterate( spectral_vertices_tag( true ), output_range.begin(), output_range.end(), count,
-                                (void*&)sv_ptr );MB_CHK_SET_ERR( rval, "Failed to get SPECTRAL_VERTICES ptr" );
+    MB_CHK_SET_ERR( mbImpl->tag_iterate( spectral_vertices_tag( true ), output_range.begin(), output_range.end(), count,
+                                (void*&)sv_ptr ), "Failed to get SPECTRAL_VERTICES ptr"  );
     assert( count == num_coarse_elems );
     int f = start_idx, fs = 0, fl = 0;
     for( int c = 0; c < num_coarse_elems; c++ )

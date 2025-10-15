@@ -450,11 +450,11 @@ ErrorCode Core::load_file( const char* file_name,
             return rval;
         if( set_tag_name && num_set_tag_vals )
         {
-            rval = ReadParallel( this, pcomm ).load_file( file_name, file_set, opts, &sl );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( ReadParallel( this, pcomm ).load_file( file_name, file_set, opts, &sl ), "can't load subset file in parallel"  );
         }
         else
         {
-            rval = ReadParallel( this, pcomm ).load_file( file_name, file_set, opts );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( ReadParallel( this, pcomm ).load_file( file_name, file_set, opts ), "can't load file in parallel"  );
         }
 #else
         MB_SET_GLB_ERR( MB_FAILURE, "PARALLEL option not valid, this instance compiled for serial execution" );
@@ -464,11 +464,11 @@ ErrorCode Core::load_file( const char* file_name,
     {
         if( set_tag_name && num_set_tag_vals )
         {
-            rval = serial_load_file( file_name, file_set, opts, &sl );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( serial_load_file( file_name, file_set, opts, &sl ), "can't load subset file in serial"  );
         }
         else
         {
-            rval = serial_load_file( file_name, file_set, opts );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( serial_load_file( file_name, file_set, opts ), "can't load file in serial"  );
         }
     }
 
@@ -539,17 +539,17 @@ ErrorCode Core::serial_load_file( const char* file_name,
     const ReaderWriterSet* set = reader_writer_set();
 
     Range initial_ents;
-    ErrorCode rval = get_entities_by_handle( 0, initial_ents );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( get_entities_by_handle( 0, initial_ents ), "can't get entities by handle" );
 
     std::vector< Tag > initial_tags;
-    rval = tag_get_tags( initial_tags );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( tag_get_tags( initial_tags ), "can't get tags" );
 
     // otherwise try using the file extension to select a reader
     std::string ext = set->extension_from_filename( file_name );
 
     // Try all the readers
     ReaderWriterSet::iterator iter;
-    rval           = MB_FAILURE;
+    ErrorCode rval           = MB_FAILURE;
     bool tried_one = false;
     for( iter = set->begin(); iter != set->end(); ++iter )
     {
@@ -559,9 +559,10 @@ ErrorCode Core::serial_load_file( const char* file_name,
         if( NULL != reader )
         {
             tried_one = true;
-            rval      = reader->load_file( file_name, file_set, opts, subsets, id_tag );
+            rval = reader->load_file( file_name, file_set, opts, subsets, id_tag );
             delete reader;
-            if( MB_SUCCESS == rval ) break;
+            if( MB_SUCCESS == rval )
+                break;
             clean_up_failed_read( initial_ents, initial_tags );
         }
     }
@@ -577,8 +578,7 @@ ErrorCode Core::serial_load_file( const char* file_name,
             delete reader;
             if( MB_SUCCESS == rval )
                 break;
-            else
-                clean_up_failed_read( initial_ents, initial_tags );
+            clean_up_failed_read( initial_ents, initial_tags );
         }
     }
 
@@ -885,7 +885,7 @@ ErrorCode Core::get_coords( const Range& entities, double* coords ) const
         }
 
         double const *x, *y, *z;
-        ErrorCode rval = vseq->get_coordinate_arrays( x, y, z );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( vseq->get_coordinate_arrays( x, y, z ), "can't get coordinate arrays" );
         x += offset;
         y += offset;
         z += offset;
@@ -902,7 +902,7 @@ ErrorCode Core::get_coords( const Range& entities, double* coords ) const
     ErrorCode rval = MB_SUCCESS;
     for( Range::const_iterator rit( &( *i ), i->first ); rit != entities.end(); ++rit )
     {
-        rval = get_coords( &( *rit ), 1, coords );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( get_coords( &( *rit ), 1, coords ), "can't get coords" );
         coords += 3;
     }
 
@@ -939,7 +939,7 @@ ErrorCode Core::get_coords( const Range& entities, double* x_coords, double* y_c
         }
 
         double const *x, *y, *z;
-        ErrorCode rval = vseq->get_coordinate_arrays( x, y, z );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( vseq->get_coordinate_arrays( x, y, z ), "can't get coordinate arrays" );
         if( x_coords )
         {
             memcpy( x_coords, x + offset, count * sizeof( double ) );
@@ -962,7 +962,7 @@ ErrorCode Core::get_coords( const Range& entities, double* x_coords, double* y_c
     double xyz[3];
     for( Range::const_iterator rit( &( *i ), i->first ); rit != entities.end(); ++rit )
     {
-        rval = get_coords( &( *rit ), 1, xyz );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( get_coords( &( *rit ), 1, xyz ), "can't get coords" );
         *x_coords++ = xyz[0];
         *y_coords++ = xyz[1];
         *z_coords++ = xyz[2];
@@ -1164,14 +1164,13 @@ ErrorCode Core::get_connectivity( const EntityHandle* entity_handles,
                            // but changing it breaks lost of code, so I'm leaving
                            // it in.  - j.kraftcheck 2009-11-06
 
-    ErrorCode rval;
     std::vector< EntityHandle > tmp_storage;  // used only for structured mesh
     const EntityHandle* conn;
     int len;
     if( offsets ) offsets->push_back( 0 );
     for( int i = 0; i < num_handles; ++i )
     {
-        rval = get_connectivity( entity_handles[i], conn, len, corners_only, &tmp_storage );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( get_connectivity( entity_handles[i], conn, len, corners_only, &tmp_storage ), "can't get connectivity" );
         connectivity.insert( connectivity.end(), conn, conn + len );
         if( offsets ) offsets->push_back( connectivity.size() );
     }
@@ -1408,7 +1407,7 @@ static inline ErrorCode get_adjacencies_intersection( Core* mb,
                                                       Range& adj_entities )
 {
     std::vector< EntityHandle > results;
-    ErrorCode rval = moab::get_adjacencies_intersection( mb, begin, end, to_dimension, create_if_missing, results );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( moab::get_adjacencies_intersection( mb, begin, end, to_dimension, create_if_missing, results ), "can't get adjacencies intersection" );
 
     if( adj_entities.empty() )
     {
@@ -1721,7 +1720,7 @@ ErrorCode Core::connect_iterate( Range::const_iterator iter,
 ErrorCode Core::get_vertices( const Range& from_entities, Range& vertices )
 {
     Range range;
-    ErrorCode rval = get_connectivity( from_entities, range );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( get_connectivity( from_entities, range ), "can't get connectivity" );
 
     // If input contained polyhedra, connectivity will contain faces.
     // Get vertices from faces.
@@ -1731,7 +1730,7 @@ ErrorCode Core::get_vertices( const Range& from_entities, Range& vertices )
         Range polygons;
         polygons.merge( it, range.end() );
         range.erase( it, range.end() );
-        rval = get_connectivity( polygons, range );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( get_connectivity( polygons, range ), "can't get connectivity" );
     }
 
     if( vertices.empty() )
@@ -2485,7 +2484,7 @@ ErrorCode Core::tag_delete( Tag tag_handle )
     std::list< TagInfo* >::iterator i = std::find( tagList.begin(), tagList.end(), tag_handle );
     if( i == tagList.end() ) return MB_TAG_NOT_FOUND;
 
-    ErrorCode rval = tag_handle->release_all_data( sequenceManager, mError, true );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( tag_handle->release_all_data( sequenceManager, mError, true ), "can't release all data" );
 
     tagList.erase( i );
     delete tag_handle;
@@ -3895,10 +3894,9 @@ ErrorCode Core::create_set_iterator( EntityHandle meshset,
 {
     // check the type of set
     unsigned int setoptions;
-    ErrorCode rval = MB_SUCCESS;
     if( meshset )
     {
-        rval = get_meshset_options( meshset, setoptions );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( get_meshset_options( meshset, setoptions ), "can't get meshset options" );
     }
 
     if( !meshset || ( setoptions & MESHSET_SET ) )
@@ -4268,8 +4266,8 @@ ErrorCode Core::create_scd_sequence( const HomCoord& coord_min,
 
     if( !scdInterface ) scdInterface = new ScdInterface( this );
     ScdBox* newBox = NULL;
-    ErrorCode rval = scdInterface->create_scd_sequence( coord_min, coord_max, entity_type,
-                                                        /*starting_id*/ (int)start_id_hint, newBox );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( scdInterface->create_scd_sequence( coord_min, coord_max, entity_type,
+                                                        /*starting_id*/ (int)start_id_hint, newBox ), "can't create scd sequence" );
 
     if( MBVERTEX == entity_type )
         first_handle_out = newBox->get_vertex( coord_min );

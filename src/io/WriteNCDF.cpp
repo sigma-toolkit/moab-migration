@@ -467,7 +467,7 @@ ErrorCode WriteNCDF::gather_mesh_information( ExodusMeshInfo& mesh_info,
                 EntityHandle polg        = *eit;
                 int nnodes               = 0;
                 const EntityHandle* conn = NULL;
-                rval                     = mdbImpl->get_connectivity( polg, conn, nnodes );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mdbImpl->get_connectivity( polg, conn, nnodes ) );
                 numconn += nnodes;
             }
             block_data.number_nodes_per_element = numconn;
@@ -488,7 +488,7 @@ ErrorCode WriteNCDF::gather_mesh_information( ExodusMeshInfo& mesh_info,
         // if polyhedra block
         if( EXOII_POLYHEDRON == block_data.element_type )
         {
-            rval = mdbImpl->get_connectivity( block_data.elements, mesh_info.polyhedronFaces );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mdbImpl->get_connectivity( block_data.elements, mesh_info.polyhedronFaces ) );
             mesh_info.num_polyhedra_blocks++;
         }
 
@@ -960,7 +960,7 @@ ErrorCode WriteNCDF::write_poly_faces( ExodusMeshInfo& mesh_info )
             EntityHandle polyg       = *eit;
             int nnodes               = 0;
             const EntityHandle* conn = NULL;
-            ErrorCode rval           = mdbImpl->get_connectivity( polyg, conn, nnodes );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mdbImpl->get_connectivity( polyg, conn, nnodes ) );
             for( int k = 0; k < nnodes; k++ )
                 connectivity[ixcon++] = conn[k];
             fbepe[j++] = nnodes;
@@ -1135,7 +1135,7 @@ ErrorCode WriteNCDF::write_elementblocks( ExodusMeshInfo& mesh_info, std::vector
                 EntityHandle polg        = *eit;
                 int nnodes               = 0;
                 const EntityHandle* conn = NULL;
-                ErrorCode rval           = mdbImpl->get_connectivity( polg, conn, nnodes );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mdbImpl->get_connectivity( polg, conn, nnodes ) );
                 connectivity[j] = nnodes;
             }
             fail = nc_put_vara_int( ncFile, nc_var, start, count, connectivity );
@@ -1191,7 +1191,7 @@ ErrorCode WriteNCDF::write_elementblocks( ExodusMeshInfo& mesh_info, std::vector
                 EntityHandle polyh       = *eit;
                 int nfaces               = 0;
                 const EntityHandle* conn = NULL;
-                ErrorCode rval           = mdbImpl->get_connectivity( polyh, conn, nfaces );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mdbImpl->get_connectivity( polyh, conn, nfaces ) );
                 for( int k = 0; k < nfaces; k++ )
                 {
                     int index = block_faces.index( conn[k] );
@@ -1780,7 +1780,7 @@ ErrorCode WriteNCDF::initialize_exodus_file( ExodusMeshInfo& mesh_info,
             EntityHandle polyg       = *eit;
             int nnodes               = 0;
             const EntityHandle* conn = NULL;
-            ErrorCode rval           = mdbImpl->get_connectivity( polyg, conn, nnodes );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mdbImpl->get_connectivity( polyg, conn, nnodes ) );
             num_nodes_per_face += nnodes;
         }
 
@@ -1964,7 +1964,7 @@ ErrorCode WriteNCDF::initialize_exodus_file( ExodusMeshInfo& mesh_info,
                 EntityHandle polyh       = *eit;
                 int nfaces               = 0;
                 const EntityHandle* conn = NULL;
-                ErrorCode rval           = mdbImpl->get_connectivity( polyh, conn, nfaces );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mdbImpl->get_connectivity( polyh, conn, nfaces ) );
                 num_faces2 += nfaces;
             }
 

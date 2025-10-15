@@ -1119,10 +1119,11 @@ ErrorCode Tqdcfr::get_names( MetaDataContainer& md, unsigned int set_index, Enti
         if( -1 != md_index )
         {
             md_entry = &( md.metadataEntries[md_index] );
+
             Tag extra_name_tag;
-            ErrorCode rval;
-            rval = mdbImpl->tag_get_handle( moab_extra_name.str().c_str(), NAME_TAG_SIZE, MB_TYPE_OPAQUE,
-                                            extra_name_tag, MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mdbImpl->tag_get_handle( moab_extra_name.str().c_str(), NAME_TAG_SIZE, MB_TYPE_OPAQUE,
+                                            extra_name_tag, MB_TAG_SPARSE | MB_TAG_CREAT ) );
+
             memset( name_tag_data, 0, NAME_TAG_SIZE );  // Make sure any extra bytes zeroed
             strncpy( name_tag_data, md_entry->mdStringValue.c_str(), NAME_TAG_SIZE - 1 );
             result = mdbImpl->tag_set_data( extra_name_tag, &seth, 1, name_tag_data );

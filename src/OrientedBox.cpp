@@ -165,14 +165,12 @@ ErrorCode OrientedBox::tag_handle( Tag& handle_out, Interface* instance, const c
  */
 static ErrorCode box_from_axes( OrientedBox& result, Interface* instance, const Range& points )
 {
-    ErrorCode rval;
-
     // project points onto axes to get box extents
     CartVect min( std::numeric_limits< double >::max() ), max( -std::numeric_limits< double >::max() );
     for( Range::iterator i = points.begin(); i != points.end(); ++i )
     {
         CartVect coords;
-        rval = instance->get_coords( &*i, 1, coords.array() );MB_CHK_ERR( rval );
+        MB_CHK_ERR( instance->get_coords( &*i, 1, coords.array() ) );
 
         for( int d = 0; d < 3; ++d )
         {

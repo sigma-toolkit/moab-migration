@@ -34,8 +34,6 @@ ErrorCode build_cube( Interface* mbi,
 {
     GeomTopoTool* GTT = new GeomTopoTool( mbi );
 
-    ErrorCode rval;
-
     // Define a 1x1x1 cube centered at orgin
 
     // coordinates of each corner
@@ -58,7 +56,7 @@ ErrorCode build_cube( Interface* mbi,
     const int num_tris  = 12;
     EntityHandle verts[num_verts], tris[num_tris], surf;
 
-    rval = mbi->create_meshset( MESHSET_SET, surf );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbi->create_meshset( MESHSET_SET, surf ) );
     /*
       // scale coords
       int i;
@@ -91,9 +89,9 @@ ErrorCode build_cube( Interface* mbi,
     // create vertices and add to meshset
     for( int i = 0; i < num_verts; ++i )
     {
-        rval = mbi->create_vertex( trans_coords + 3 * i, verts[i] );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mbi->create_vertex( trans_coords + 3 * i, verts[i] ) );
 
-        rval = mbi->add_entities( surf, &verts[i], 1 );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mbi->add_entities( surf, &verts[i], 1 ) );
     }
 
     // create triangles and add to meshset
@@ -101,37 +99,37 @@ ErrorCode build_cube( Interface* mbi,
     {
         const EntityHandle conn[] = { verts[connectivity[3 * i]], verts[connectivity[3 * i + 1]],
                                       verts[connectivity[3 * i + 2]] };
-        rval                      = mbi->create_element( MBTRI, conn, 3, tris[i] );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mbi->create_element( MBTRI, conn, 3, tris[i] ) );
 
-        rval = mbi->add_entities( surf, &tris[i], 1 );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mbi->add_entities( surf, &tris[i], 1 ) );
     }
 
     // set name, id, geom, and category tags for SURFACE
-    rval = mbi->tag_set_data( name_tag, &surf, 1, "Surface\0" );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbi->tag_set_data( name_tag, &surf, 1, "Surface\0" ) );
     std::string object_name;
-    rval = mbi->tag_set_data( obj_name_tag, &surf, 1, object_name.c_str() );MB_CHK_ERR( rval );
-    rval = mbi->tag_set_data( id_tag, &surf, 1, &object_id );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbi->tag_set_data( obj_name_tag, &surf, 1, object_name.c_str() ) );
+    MB_CHK_ERR( mbi->tag_set_data( id_tag, &surf, 1, &object_id ) );
     int two = 2;
-    rval    = mbi->tag_set_data( geom_tag, &surf, 1, &( two ) );MB_CHK_ERR( rval );
-    rval = mbi->tag_set_data( category_tag, &surf, 1, "Surface\0" );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbi->tag_set_data( geom_tag, &surf, 1, &( two ) ) );
+    MB_CHK_ERR( mbi->tag_set_data( category_tag, &surf, 1, "Surface\0" ) );
 
     // create volume meshset associated with surface meshset
     // EntityHandle volume;
-    rval = mbi->create_meshset( MESHSET_SET, volume );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbi->create_meshset( MESHSET_SET, volume ) );
 
     // set name, id, geom, and category tags for VOLUME
-    rval = mbi->tag_set_data( name_tag, &volume, 1, "Volume\0" );MB_CHK_ERR( rval );
-    rval = mbi->tag_set_data( obj_name_tag, &surf, 1, object_name.c_str() );MB_CHK_ERR( rval );
-    rval = mbi->tag_set_data( id_tag, &volume, 1, &( object_id ) );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbi->tag_set_data( name_tag, &volume, 1, "Volume\0" ) );
+    MB_CHK_ERR( mbi->tag_set_data( obj_name_tag, &surf, 1, object_name.c_str() ) );
+    MB_CHK_ERR( mbi->tag_set_data( id_tag, &volume, 1, &( object_id ) ) );
     int three = 3;
-    rval      = mbi->tag_set_data( geom_tag, &volume, 1, &( three ) );MB_CHK_ERR( rval );
-    rval = mbi->tag_set_data( category_tag, &volume, 1, "Volume\0" );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbi->tag_set_data( geom_tag, &volume, 1, &( three ) ) );
+    MB_CHK_ERR( mbi->tag_set_data( category_tag, &volume, 1, "Volume\0" ) );
 
     // set surface as child of volume
-    rval = mbi->add_parent_child( volume, surf );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbi->add_parent_child( volume, surf ) );
 
     // set sense tag
-    rval = GTT->set_sense( surf, volume, SENSE_FORWARD );MB_CHK_ERR( rval );
+    MB_CHK_ERR( GTT->set_sense( surf, volume, SENSE_FORWARD ) );
 
     delete GTT;
 
@@ -151,22 +149,18 @@ int main()
 
 ErrorCode get_all_handles( Interface* mbi )
 {
-    ErrorCode rval;
+    MB_CHK_ERR( mbi->tag_get_handle( NAME_TAG_NAME, NAME_TAG_SIZE, MB_TYPE_OPAQUE, name_tag, MB_TAG_SPARSE | MB_TAG_CREAT ) );
 
-    rval = mbi->tag_get_handle( NAME_TAG_NAME, NAME_TAG_SIZE, MB_TYPE_OPAQUE, name_tag, MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_ERR( rval );
-
-    rval = mbi->tag_get_handle( "OBJECT_NAME", 32, MB_TYPE_OPAQUE, obj_name_tag, MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbi->tag_get_handle( "OBJECT_NAME", 32, MB_TYPE_OPAQUE, obj_name_tag, MB_TAG_SPARSE | MB_TAG_CREAT ) );
 
     int negone = -1;
-    rval = mbi->tag_get_handle( GEOM_DIMENSION_TAG_NAME, 1, MB_TYPE_INTEGER, geom_tag, MB_TAG_SPARSE | MB_TAG_CREAT,
-                                &negone );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbi->tag_get_handle( GEOM_DIMENSION_TAG_NAME, 1, MB_TYPE_INTEGER, geom_tag, MB_TAG_SPARSE | MB_TAG_CREAT,
+                                &negone ) );
 
     id_tag = mbi->globalId_tag();
 
-    rval = mbi->tag_get_handle( CATEGORY_TAG_NAME, CATEGORY_TAG_SIZE, MB_TYPE_OPAQUE, category_tag,
-                                MB_TAG_SPARSE | MB_TAG_CREAT );
-
-    MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbi->tag_get_handle( CATEGORY_TAG_NAME, CATEGORY_TAG_SIZE, MB_TYPE_OPAQUE, category_tag,
+                                MB_TAG_SPARSE | MB_TAG_CREAT ) );
     return MB_SUCCESS;
 }
 
@@ -175,12 +169,11 @@ ErrorCode get_all_handles( Interface* mbi )
 */
 bool check_tree( Interface* mbi, GeomTopoTool* GTT, std::map< int, std::set< int > >& ref_map )
 {
-    ErrorCode rval;
     int vol_id;
     std::set< int > test_set;
 
     Range vols;
-    rval = GTT->get_gsets_by_dimension( 3, vols );
+    MB_CHK_ERR_RET_VAL( GTT->get_gsets_by_dimension( 3, vols ), false);
     if( ref_map.size() != vols.size() )
     {
         return false;
@@ -190,7 +183,7 @@ bool check_tree( Interface* mbi, GeomTopoTool* GTT, std::map< int, std::set< int
     for( Range::iterator it = vols.begin(); it != vols.end(); ++it )
     {
         // get vol id
-        rval = mbi->tag_get_data( id_tag, &( *it ), 1, &vol_id );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mbi->tag_get_data( id_tag, &( *it ), 1, &vol_id ) );
 
         // check if test vol in ref map
         if( ref_map.find( vol_id ) == ref_map.end() )
@@ -207,7 +200,7 @@ bool check_tree( Interface* mbi, GeomTopoTool* GTT, std::map< int, std::set< int
         {
             int child_id;
 
-            rval = mbi->tag_get_data( id_tag, &( *j ), 1, &child_id );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mbi->tag_get_data( id_tag, &( *j ), 1, &child_id ) );
             test_set.insert( child_id );
         }
 

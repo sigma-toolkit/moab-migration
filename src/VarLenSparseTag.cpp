@@ -156,9 +156,9 @@ ErrorCode VarLenSparseTag::set_data( SequenceManager* seqman,
                                      void const* const* pointers,
                                      const int* lengths )
 {
-    ErrorCode rval = validate_lengths( NULL, lengths, num_entities );MB_CHK_ERR( rval );
+    MB_CHK_ERR( validate_lengths( NULL, lengths, num_entities ) );
 
-    rval = seqman->check_valid_entities( NULL, entities, num_entities, true );MB_CHK_ERR( rval );
+    MB_CHK_ERR( seqman->check_valid_entities( NULL, entities, num_entities, true ) );
 
     for( size_t i = 0; i < num_entities; ++i )
     {
@@ -184,9 +184,9 @@ ErrorCode VarLenSparseTag::set_data( SequenceManager* seqman,
                                      void const* const* pointers,
                                      const int* lengths )
 {
-    ErrorCode rval = validate_lengths( NULL, lengths, entities.size() );MB_CHK_ERR( rval );
+    MB_CHK_ERR( validate_lengths( NULL, lengths, entities.size() ) );
 
-    rval = seqman->check_valid_entities( NULL, entities );MB_CHK_ERR( rval );
+    MB_CHK_ERR( seqman->check_valid_entities( NULL, entities ) );
 
     Range::const_iterator i;
     for( i = entities.begin(); i != entities.end(); ++i, ++pointers, ++lengths )
@@ -220,9 +220,9 @@ ErrorCode VarLenSparseTag::clear_data( SequenceManager* seqman,
         return MB_SUCCESS;
     }
 
-    ErrorCode rval = validate_lengths( NULL, &value_len, 1 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( validate_lengths( NULL, &value_len, 1 ) );
 
-    rval = seqman->check_valid_entities( NULL, entities, num_entities, true );MB_CHK_ERR( rval );
+    MB_CHK_ERR( seqman->check_valid_entities( NULL, entities, num_entities, true ) );
 
     for( size_t i = 0; i < num_entities; ++i )
         mData[entities[i]].set( value_ptr, value_len );
@@ -242,9 +242,9 @@ ErrorCode VarLenSparseTag::clear_data( SequenceManager* seqman,
         return MB_SUCCESS;
     }
 
-    ErrorCode rval = validate_lengths( NULL, &value_len, 1 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( validate_lengths( NULL, &value_len, 1 ) );
 
-    rval = seqman->check_valid_entities( NULL, entities );MB_CHK_ERR( rval );
+    MB_CHK_ERR( seqman->check_valid_entities( NULL, entities ) );
 
     Range::const_iterator i;
     for( i = entities.begin(); i != entities.end(); ++i )

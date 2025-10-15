@@ -75,10 +75,10 @@ ErrorCode IntxRllCssphere::computeIntersectionBetweenTgtAndSrc( EntityHandle tgt
 
     // CartVect srccoords[4];
     int num_nodes  = 0;
-    ErrorCode rval = mb->get_connectivity( src, srcConn, num_nodes );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_connectivity( src, srcConn, num_nodes ) );
 
     nsSrc = num_nodes;
-    rval  = mb->get_coords( srcConn, nsSrc, &( srcCoords[0][0] ) );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_coords( srcConn, nsSrc, &( srcCoords[0][0] ) ) );
 
     // determine the type of edge: const lat or not?
     // just look at the consecutive z coordinates for the edge
@@ -119,7 +119,7 @@ ErrorCode IntxRllCssphere::computeIntersectionBetweenTgtAndSrc( EntityHandle tgt
 #endif
     for( int j = 0; j < nsSrc; j++ )
     {
-        rval = IntxUtils::gnomonic_projection( srcCoords[j], R, plane, srcCoords2D[2 * j], srcCoords2D[2 * j + 1] );MB_CHK_ERR( rval );
+        MB_CHK_ERR( IntxUtils::gnomonic_projection( srcCoords[j], R, plane, srcCoords2D[2 * j], srcCoords2D[2 * j + 1] ) );
     }
 #ifdef ENABLE_DEBUG
     if( dbg_1 )
@@ -136,8 +136,8 @@ ErrorCode IntxRllCssphere::computeIntersectionBetweenTgtAndSrc( EntityHandle tgt
         }
     }
 #endif
-    rval = IntxUtils::EdgeIntxRllCs( srcCoords2D, srcCoords, srcEdgeType, nsSrc, tgtCoords2D, tgtCoords, nsTgt, markb,
-                                     markr, plane, R, P, nP );MB_CHK_ERR( rval );
+    MB_CHK_ERR( IntxUtils::EdgeIntxRllCs( srcCoords2D, srcCoords, srcEdgeType, nsSrc, tgtCoords2D, tgtCoords, nsTgt, markb,
+                                     markr, plane, R, P, nP ) );
 
     int side[MAXEDGES] = { 0 };  // this refers to what side? src or tgt?// more tolerant here with epsilon_area
     int extraPoints    = IntxUtils::borderPointsOfXinY2( srcCoords2D, nsSrc, tgtCoords2D, nsTgt, &( P[2 * nP] ), side,
@@ -225,7 +225,7 @@ ErrorCode IntxRllCssphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandle 
     // first get the list of edges adjacent to the tgt cell
     // use the neighTgtEdgeTag
     EntityHandle adjTgtEdges[MAXEDGES];
-    ErrorCode rval = mb->tag_get_data( neighTgtEdgeTag, &tgt, 1, &( adjTgtEdges[0] ) );MB_CHK_SET_ERR( rval, "can't get edge tgt tag" );
+    MB_CHK_SET_ERR( mb->tag_get_data( neighTgtEdgeTag, &tgt, 1, &( adjTgtEdges[0] ) ), "can't get edge tgt tag" );
     // we know that we have only nsTgt edges here; [nsTgt, MAXEDGES) are ignored, but it is small
     // potatoes
 

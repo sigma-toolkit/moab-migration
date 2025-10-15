@@ -151,12 +151,12 @@ ErrorCode ReadCCMIO::load_file( const char* file_name,
     CHK_SET_CCMERR( error, "Problem opening file" );
 
     // Get the file state
-    ErrorCode rval = get_state( rootID, problemID, stateID );MB_CHK_SET_ERR( rval, "Failed to get state" );
+    MB_CHK_SET_ERR( get_state( rootID, problemID, stateID ), "Failed to get state" );
 
     // Get processors
     std::vector< CCMIOSize_t > procs;
     bool has_solution = false;
-    rval              = get_processors( stateID, processorID, verticesID, topologyID, solutionID, procs, has_solution );MB_CHK_SET_ERR( rval, "Failed to get processors" );
+    MB_CHK_SET_ERR( get_processors( stateID, processorID, verticesID, topologyID, solutionID, procs, has_solution ), "Failed to get processors"  );
 
     std::vector< CCMIOSize_t >::iterator vit;
     Range new_ents, *new_ents_ptr = NULL;
@@ -164,16 +164,16 @@ ErrorCode ReadCCMIO::load_file( const char* file_name,
 
     for( vit = procs.begin(); vit != procs.end(); ++vit )
     {
-        rval = read_processor( stateID, problemID, processorID, verticesID, topologyID, *vit, new_ents_ptr );MB_CHK_SET_ERR( rval, "Failed to read processors" );
+        MB_CHK_SET_ERR( read_processor( stateID, problemID, processorID, verticesID, topologyID, *vit, new_ents_ptr ), "Failed to read processors"  );
     }
 
     // Load some meta-data
-    rval = load_metadata( rootID, problemID, stateID, processorID, file_set );MB_CHK_SET_ERR( rval, "Failed to load some meta-data" );
+    MB_CHK_SET_ERR( load_metadata( rootID, problemID, stateID, processorID, file_set ), "Failed to load some meta-data"  );
 
     // Now, put all this into the file set, if there is one
     if( file_set )
     {
-        rval = mbImpl->add_entities( *file_set, new_ents );MB_CHK_SET_ERR( rval, "Failed to add new entities to file set" );
+        MB_CHK_SET_ERR( mbImpl->add_entities( *file_set, new_ents ), "Failed to add new entities to file set"  );
     }
 
     return rval;
@@ -216,21 +216,21 @@ ErrorCode ReadCCMIO::load_metadata( CCMIOID rootID,
         {
             // Make a tag for it and tag the read set
             Tag simname;
-            rval = mbImpl->tag_get_handle( "Title", strlen( name ), MB_TYPE_OPAQUE, simname,
-                                           MB_TAG_CREAT | MB_TAG_SPARSE );MB_CHK_SET_ERR( rval, "Simulation name tag not found or created" );
+            MB_CHK_SET_ERR( mbImpl->tag_get_handle( "Title", strlen( name ), MB_TYPE_OPAQUE, simname,
+                                           MB_TAG_CREAT | MB_TAG_SPARSE ), "Simulation name tag not found or created"  );
             EntityHandle set = file_set ? *file_set : 0;
-            rval             = mbImpl->tag_set_data( simname, &set, 1, name );MB_CHK_SET_ERR( rval, "Problem setting simulation name tag" );
+            MB_CHK_SET_ERR( mbImpl->tag_set_data( simname, &set, 1, name ), "Problem setting simulation name tag"  );
         }
         if( name ) free( name );
     }
 
     // Creating program
     EntityHandle dumh = ( file_set ? *file_set : 0 );
-    rval              = get_str_option( "CreatingProgram", dumh, mCreatingProgramTag, processorID );MB_CHK_SET_ERR( rval, "Trouble getting CreatingProgram tag" );
+    MB_CHK_SET_ERR( get_str_option( "CreatingProgram", dumh, mCreatingProgramTag, processorID ), "Trouble getting CreatingProgram tag"  );
 
-    rval = load_matset_data( problemID );MB_CHK_SET_ERR( rval, "Failure loading matset data" );
+    MB_CHK_SET_ERR( load_matset_data( problemID ), "Failure loading matset data"  );
 
-    rval = load_neuset_data( problemID );MB_CHK_SET_ERR( rval, "Failure loading neuset data" );
+    MB_CHK_SET_ERR( load_neuset_data( problemID ), "Failure loading neuset data"  );
 
     return rval;
 }
@@ -256,7 +256,7 @@ ErrorCode ReadCCMIO::load_matset_data( CCMIOID problemID )
             continue;
 
         EntityHandle dum_ent = mit->second;
-        ErrorCode rval       = mbImpl->tag_set_data( mMaterialSetTag, &dum_ent, 1, &mindex );MB_CHK_SET_ERR( rval, "Trouble setting material set tag" );
+        MB_CHK_SET_ERR( mbImpl->tag_set_data( mMaterialSetTag, &dum_ent, 1, &mindex ), "Trouble setting material set tag"  );
 
         // Set name
         CCMIOSize_t len;
@@ -267,30 +267,30 @@ ErrorCode ReadCCMIO::load_matset_data( CCMIOID problemID )
             opt_string2[NAME_TAG_SIZE - 1] = '\0';
         else
             ( opt_string2.resize( NAME_TAG_SIZE, '\0' ) );
-        rval = mbImpl->tag_set_data( mNameTag, &dum_ent, 1, &opt_string2[0] );MB_CHK_SET_ERR( rval, "Trouble setting name tag for material set" );
+        MB_CHK_SET_ERR( mbImpl->tag_set_data( mNameTag, &dum_ent, 1, &opt_string2[0] ), "Trouble setting name tag for material set"  );
 
         // Material id
-        rval = get_int_option( "MaterialId", dum_ent, mMaterialIdTag, next );MB_CHK_SET_ERR( rval, "Trouble getting MaterialId tag" );
+        MB_CHK_SET_ERR( get_int_option( "MaterialId", dum_ent, mMaterialIdTag, next ), "Trouble getting MaterialId tag"  );
 
-        rval = get_str_option( "MaterialType", dum_ent, mMaterialTypeTag, next );MB_CHK_SET_ERR( rval, "Trouble getting MaterialType tag" );
+        MB_CHK_SET_ERR( get_str_option( "MaterialType", dum_ent, mMaterialTypeTag, next ), "Trouble getting MaterialType tag"  );
 
-        rval = get_int_option( "Radiation", dum_ent, mRadiationTag, next );MB_CHK_SET_ERR( rval, "Trouble getting Radiation option" );
+        MB_CHK_SET_ERR( get_int_option( "Radiation", dum_ent, mRadiationTag, next ), "Trouble getting Radiation option"  );
 
-        rval = get_int_option( "PorosityId", dum_ent, mPorosityIdTag, next );MB_CHK_SET_ERR( rval, "Trouble getting PorosityId option" );
+        MB_CHK_SET_ERR( get_int_option( "PorosityId", dum_ent, mPorosityIdTag, next ), "Trouble getting PorosityId option"  );
 
-        rval = get_int_option( "SpinId", dum_ent, mSpinIdTag, next );MB_CHK_SET_ERR( rval, "Trouble getting SpinId option" );
+        MB_CHK_SET_ERR( get_int_option( "SpinId", dum_ent, mSpinIdTag, next ), "Trouble getting SpinId option"  );
 
-        rval = get_int_option( "GroupId", dum_ent, mGroupIdTag, next );MB_CHK_SET_ERR( rval, "Trouble getting GroupId option" );
+        MB_CHK_SET_ERR( get_int_option( "GroupId", dum_ent, mGroupIdTag, next ), "Trouble getting GroupId option"  );
 
-        rval = get_int_option( "ColorIdx", dum_ent, mColorIdxTag, next );MB_CHK_SET_ERR( rval, "Trouble getting ColorIdx option" );
+        MB_CHK_SET_ERR( get_int_option( "ColorIdx", dum_ent, mColorIdxTag, next ), "Trouble getting ColorIdx option"  );
 
-        rval = get_int_option( "ProcessorId", dum_ent, mProcessorIdTag, next );MB_CHK_SET_ERR( rval, "Trouble getting ProcessorId option" );
+        MB_CHK_SET_ERR( get_int_option( "ProcessorId", dum_ent, mProcessorIdTag, next ), "Trouble getting ProcessorId option"  );
 
-        rval = get_int_option( "LightMaterial", dum_ent, mLightMaterialTag, next );MB_CHK_SET_ERR( rval, "Trouble getting LightMaterial option" );
+        MB_CHK_SET_ERR( get_int_option( "LightMaterial", dum_ent, mLightMaterialTag, next ), "Trouble getting LightMaterial option"  );
 
-        rval = get_int_option( "FreeSurfaceMaterial", dum_ent, mFreeSurfaceMaterialTag, next );MB_CHK_SET_ERR( rval, "Trouble getting FreeSurfaceMaterial option" );
+        MB_CHK_SET_ERR( get_int_option( "FreeSurfaceMaterial", dum_ent, mFreeSurfaceMaterialTag, next ), "Trouble getting FreeSurfaceMaterial option"  );
 
-        rval = get_dbl_option( "Thickness", dum_ent, mThicknessTag, next );MB_CHK_SET_ERR( rval, "Trouble getting Thickness option" );
+        MB_CHK_SET_ERR( get_dbl_option( "Thickness", dum_ent, mThicknessTag, next ), "Trouble getting Thickness option"  );
     }
 
     return MB_SUCCESS;
@@ -304,10 +304,10 @@ ErrorCode ReadCCMIO::get_int_option( const char* opt_str, EntityHandle seth, Tag
     {
         if( !tag )
         {
-            rval = mbImpl->tag_get_handle( opt_str, 1, MB_TYPE_INTEGER, tag, MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_SET_ERR( rval, "Failed to get tag handle" );
+            MB_CHK_SET_ERR( mbImpl->tag_get_handle( opt_str, 1, MB_TYPE_INTEGER, tag, MB_TAG_SPARSE | MB_TAG_CREAT ), "Failed to get tag handle"  );
         }
 
-        rval = mbImpl->tag_set_data( tag, &seth, 1, &idum );MB_CHK_SET_ERR( rval, "Failed to set tag data" );
+        MB_CHK_SET_ERR( mbImpl->tag_set_data( tag, &seth, 1, &idum ), "Failed to set tag data"  );
     }
 
     return MB_SUCCESS;
@@ -321,11 +321,11 @@ ErrorCode ReadCCMIO::get_dbl_option( const char* opt_str, EntityHandle seth, Tag
         ErrorCode rval;
         if( !tag )
         {
-            rval = mbImpl->tag_get_handle( opt_str, 1, MB_TYPE_DOUBLE, tag, MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_SET_ERR( rval, "Failed to get tag handle" );
+            MB_CHK_SET_ERR( mbImpl->tag_get_handle( opt_str, 1, MB_TYPE_DOUBLE, tag, MB_TAG_SPARSE | MB_TAG_CREAT ), "Failed to get tag handle"  );
         }
 
         double dum_dbl = fdum;
-        rval           = mbImpl->tag_set_data( tag, &seth, 1, &dum_dbl );MB_CHK_SET_ERR( rval, "Failed to set tag data" );
+        MB_CHK_SET_ERR( mbImpl->tag_set_data( tag, &seth, 1, &dum_dbl ), "Failed to set tag data"  );
     }
 
     return MB_SUCCESS;
@@ -347,8 +347,8 @@ ErrorCode ReadCCMIO::get_str_option( const char* opt_str,
     ErrorCode rval = MB_SUCCESS;
     if( !tag )
     {
-        rval = mbImpl->tag_get_handle( other_tag_name ? other_tag_name : opt_str, NAME_TAG_SIZE, MB_TYPE_OPAQUE, tag,
-                                       MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_SET_ERR( rval, "Failed to get tag handle" );
+        MB_CHK_SET_ERR( mbImpl->tag_get_handle( other_tag_name ? other_tag_name : opt_str, NAME_TAG_SIZE, MB_TYPE_OPAQUE, tag,
+                                       MB_TAG_SPARSE | MB_TAG_CREAT ), "Failed to get tag handle"  );
     }
 
     if( opt_string.size() > NAME_TAG_SIZE )
@@ -356,7 +356,7 @@ ErrorCode ReadCCMIO::get_str_option( const char* opt_str,
     else
         ( opt_string.resize( NAME_TAG_SIZE, '\0' ) );
 
-    rval = mbImpl->tag_set_data( tag, &seth, 1, &opt_string[0] );MB_CHK_SET_ERR( rval, "Failed to set tag data" );
+    MB_CHK_SET_ERR( mbImpl->tag_set_data( tag, &seth, 1, &opt_string[0] ), "Failed to set tag data"  );
 
     return MB_SUCCESS;
 }
@@ -381,16 +381,16 @@ ErrorCode ReadCCMIO::load_neuset_data( CCMIOID problemID )
             continue;
 
         EntityHandle dum_ent = mit->second;
-        ErrorCode rval       = mbImpl->tag_set_data( mNeumannSetTag, &dum_ent, 1, &mindex );MB_CHK_SET_ERR( rval, "Trouble setting neumann set tag" );
+        MB_CHK_SET_ERR( mbImpl->tag_set_data( mNeumannSetTag, &dum_ent, 1, &mindex ), "Trouble setting neumann set tag"  );
 
         // Set name
-        rval = get_str_option( "BoundaryName", dum_ent, mNameTag, next, NAME_TAG_NAME );MB_CHK_SET_ERR( rval, "Trouble creating BoundaryName tag" );
+        MB_CHK_SET_ERR( get_str_option( "BoundaryName", dum_ent, mNameTag, next, NAME_TAG_NAME ), "Trouble creating BoundaryName tag"  );
 
         // BoundaryType
-        rval = get_str_option( "BoundaryType", dum_ent, mBoundaryTypeTag, next );MB_CHK_SET_ERR( rval, "Trouble creating BoundaryType tag" );
+        MB_CHK_SET_ERR( get_str_option( "BoundaryType", dum_ent, mBoundaryTypeTag, next ), "Trouble creating BoundaryType tag"  );
 
         // ProstarRegionNumber
-        rval = get_int_option( "ProstarRegionNumber", dum_ent, mProstarRegionNumberTag, next );MB_CHK_SET_ERR( rval, "Trouble creating ProstarRegionNumber tag" );
+        MB_CHK_SET_ERR( get_int_option( "ProstarRegionNumber", dum_ent, mProstarRegionNumberTag, next ), "Trouble creating ProstarRegionNumber tag"  );
     }
 
     return MB_SUCCESS;
@@ -409,9 +409,9 @@ ErrorCode ReadCCMIO::read_processor( CCMIOID /* stateID */,
     // vert_map fields: s: none, i: gid, ul: vert handle, r: none
     // TupleList vert_map(0, 1, 1, 0, 0);
     TupleList vert_map;
-    rval = read_vertices( proc, processorID, verticesID, topologyID, new_ents, vert_map );MB_CHK_SET_ERR( rval, "Failed to read vertices" );
+    MB_CHK_SET_ERR( read_vertices( proc, processorID, verticesID, topologyID, new_ents, vert_map ), "Failed to read vertices"  );
 
-    rval = read_cells( proc, problemID, verticesID, topologyID, vert_map, new_ents );MB_CHK_SET_ERR( rval, "Failed to read cells" );
+    MB_CHK_SET_ERR( read_cells( proc, problemID, verticesID, topologyID, vert_map, new_ents ), "Failed to read cells"  );
 
     return rval;
 }
@@ -432,26 +432,26 @@ ErrorCode ReadCCMIO::read_cells( CCMIOSize_t /* proc */,
     TupleList face_map;
     SenseList sense_map;
 #endif
-    rval = read_all_faces( topologyID, vert_map, face_map,
+    MB_CHK_SET_ERR( read_all_faces( topologyID, vert_map, face_map,
 #ifndef TUPLE_LIST
                            sense_map,
 #endif
-                           new_ents );MB_CHK_SET_ERR( rval, "Failed to read all cells" );
+                           new_ents ), "Failed to read all cells"  );
 
     // Read the cell topology types, if any exist in the file
     std::map< int, int > cell_topo_types;
-    rval = read_topology_types( topologyID, cell_topo_types );MB_CHK_SET_ERR( rval, "Problem reading cell topo types" );
+    MB_CHK_SET_ERR( read_topology_types( topologyID, cell_topo_types ), "Problem reading cell topo types"  );
 
     // Now construct the cells; sort the face map by cell ids first
 #ifdef TUPLE_LIST
-    rval = face_map.sort( 1 );MB_CHK_SET_ERR( rval, "Couldn't sort face map by cell id" );
+    MB_CHK_SET_ERR( face_map.sort( 1 ), "Couldn't sort face map by cell id"  );
 #endif
     std::vector< EntityHandle > new_cells;
-    rval = construct_cells( face_map,
+    MB_CHK_SET_ERR( construct_cells( face_map,
 #ifndef TUPLE_LIST
                             sense_map,
 #endif
-                            vert_map, cell_topo_types, new_cells );MB_CHK_SET_ERR( rval, "Failed to construct cells" );
+                            vert_map, cell_topo_types, new_cells ), "Failed to construct cells"  );
     if( new_ents )
     {
         Range::iterator rit = new_ents->end();
@@ -460,7 +460,7 @@ ErrorCode ReadCCMIO::read_cells( CCMIOSize_t /* proc */,
             rit = new_ents->insert( rit, *vit );
     }
 
-    rval = read_gids_and_types( problemID, topologyID, new_cells );MB_CHK_SET_ERR( rval, "Failed to read gids and types" );
+    MB_CHK_SET_ERR( read_gids_and_types( problemID, topologyID, new_cells ), "Failed to read gids and types"  );
 
     return MB_SUCCESS;
 }
@@ -526,7 +526,7 @@ ErrorCode ReadCCMIO::read_gids_and_types( CCMIOID /* problemID */,
     CCMIOReadMap( &error, mapID, &cell_gids[0], CCMIOINDEXC( kCCMIOStart ), CCMIOINDEXC( kCCMIOEnd ) );
     CHK_SET_CCMERR( error, "Couldn't read cell id map" );
 
-    ErrorCode rval = mbImpl->tag_set_data( mGlobalIdTag, &cells[0], cells.size(), &cell_gids[0] );MB_CHK_SET_ERR( rval, "Couldn't set gids tag" );
+    MB_CHK_SET_ERR( mbImpl->tag_set_data( mGlobalIdTag, &cells[0], cells.size(), &cell_gids[0] ), "Couldn't set gids tag"  );
 
     // Now read cell material types; reuse cell_gids
     CCMIOReadCells( &error, cellsID, NULL, &cell_gids[0], CCMIOINDEXC( kCCMIOStart ), CCMIOINDEXC( kCCMIOEnd ) );
@@ -540,10 +540,10 @@ ErrorCode ReadCCMIO::read_gids_and_types( CCMIOID /* problemID */,
     for( std::map< int, Range >::iterator mit = matset_ents.begin(); mit != matset_ents.end(); ++mit )
     {
         EntityHandle matset;
-        rval = mbImpl->create_meshset( MESHSET_SET, matset );MB_CHK_SET_ERR( rval, "Couldn't create material set" );
+        MB_CHK_SET_ERR( mbImpl->create_meshset( MESHSET_SET, matset ), "Couldn't create material set"  );
         newMatsets[mit->first] = matset;
 
-        rval = mbImpl->add_entities( matset, mit->second );MB_CHK_SET_ERR( rval, "Couldn't add entities to material set" );
+        MB_CHK_SET_ERR( mbImpl->add_entities( matset, mit->second ), "Couldn't add entities to material set"  );
     }
 
     return MB_SUCCESS;
@@ -710,13 +710,13 @@ ErrorCode ReadCCMIO::create_cell_from_faces( std::vector< EntityHandle >& facehs
 
         // Get connectivity of first face, and reverse it if sense is forward, since
         // base face always points into entity
-        rval = mbImpl->get_connectivity( &facehs[0], 1, verts );MB_CHK_SET_ERR( rval, "Couldn't get connectivity" );
+        MB_CHK_SET_ERR( mbImpl->get_connectivity( &facehs[0], 1, verts ), "Couldn't get connectivity"  );
         if( senses[0] > 0 ) std::reverse( verts.begin(), verts.end() );
 
         // Get the 4th vertex through the next tri
         const EntityHandle* conn;
         int conn_size;
-        rval = mbImpl->get_connectivity( facehs[1], conn, conn_size, true, &storage );MB_CHK_SET_ERR( rval, "Couldn't get connectivity" );
+        MB_CHK_SET_ERR( mbImpl->get_connectivity( facehs[1], conn, conn_size, true, &storage ), "Couldn't get connectivity"  );
         int i = 0;
         while( std::find( verts.begin(), verts.end(), conn[i] ) != verts.end() && i < conn_size )
             i++;
@@ -745,7 +745,7 @@ ErrorCode ReadCCMIO::create_cell_from_faces( std::vector< EntityHandle >& facehs
         Range tmp_faces, tmp_verts;
         // Get connectivity of first face, and reverse it if sense is forward, since
         // base face always points into entity
-        rval = mbImpl->get_connectivity( &facehs[0], 1, verts );MB_CHK_SET_ERR( rval, "Couldn't get connectivity" );
+        MB_CHK_SET_ERR( mbImpl->get_connectivity( &facehs[0], 1, verts ), "Couldn't get connectivity"  );
         if( senses[0] > 0 ) std::reverse( verts.begin(), verts.end() );
 
         // Get q1, which shares 2 vertices with q0
@@ -755,7 +755,7 @@ ErrorCode ReadCCMIO::create_cell_from_faces( std::vector< EntityHandle >& facehs
         tmp_faces.erase( facehs[0] );
         EntityHandle q1 = *tmp_faces.begin();
         // Get other 2 verts of q1
-        rval = mbImpl->get_connectivity( &q1, 1, tmp_verts );MB_CHK_SET_ERR( rval, "Couldn't get adj verts" );
+        MB_CHK_SET_ERR( mbImpl->get_connectivity( &q1, 1, tmp_verts ), "Couldn't get adj verts"  );
         tmp_verts.erase( verts[0] );
         tmp_verts.erase( verts[1] );
         // Get q2
@@ -765,12 +765,12 @@ ErrorCode ReadCCMIO::create_cell_from_faces( std::vector< EntityHandle >& facehs
         tmp_faces.erase( q1 );
         EntityHandle q2 = *tmp_faces.begin();
         // Get verts in q2
-        rval = mbImpl->get_connectivity( &q2, 1, storage );MB_CHK_SET_ERR( rval, "Couldn't get adj vertices" );
+        MB_CHK_SET_ERR( mbImpl->get_connectivity( &q2, 1, storage ), "Couldn't get adj vertices"  );
 
         // Get verts in q1 opposite from v[1] and v[0] in q0
         EntityHandle v0 = 0, v1 = 0;
-        rval = mtu.opposite_entity( q1, verts[1], v0 );MB_CHK_SET_ERR( rval, "Couldn't get the opposite side entity" );
-        rval = mtu.opposite_entity( q1, verts[0], v1 );MB_CHK_SET_ERR( rval, "Couldn't get the opposite side entity" );
+        MB_CHK_SET_ERR( mtu.opposite_entity( q1, verts[1], v0 ), "Couldn't get the opposite side entity"  );
+        MB_CHK_SET_ERR( mtu.opposite_entity( q1, verts[0], v1 ), "Couldn't get the opposite side entity"  );
         if( v0 && v1 )
         {
             // Offset of v0 in q2, then rotate and flip
@@ -809,7 +809,7 @@ ErrorCode ReadCCMIO::create_cell_from_faces( std::vector< EntityHandle >& facehs
 
             // Get connectivity of first tri, and reverse if necessary
             int index = std::find( facehs.begin(), facehs.end(), tris[0] ) - facehs.begin();
-            rval      = mbImpl->get_connectivity( &tris[0], 1, verts );MB_CHK_SET_ERR( rval, "Couldn't get connectivity" );
+            MB_CHK_SET_ERR( mbImpl->get_connectivity( &tris[0], 1, verts ), "Couldn't get connectivity"  );
             if( senses[index] > 0 ) std::reverse( verts.begin(), verts.end() );
 
             // Now align vertices of other tri, through a quad, similar to how we did hexes
@@ -821,17 +821,17 @@ ErrorCode ReadCCMIO::create_cell_from_faces( std::vector< EntityHandle >& facehs
             tmp_faces.erase( tris[0] );
             EntityHandle q1 = *tmp_faces.begin();
             // Get verts in q1
-            rval = mbImpl->get_connectivity( &q1, 1, storage );MB_CHK_SET_ERR( rval, "Couldn't get adj vertices" );
+            MB_CHK_SET_ERR( mbImpl->get_connectivity( &q1, 1, storage ), "Couldn't get adj vertices"  );
 
             // Get verts in q1 opposite from v[1] and v[0] in q0
             EntityHandle v0 = 0, v1 = 0;
-            rval = mtu.opposite_entity( q1, verts[1], v0 );MB_CHK_SET_ERR( rval, "Couldn't get the opposite side entity" );
-            rval = mtu.opposite_entity( q1, verts[0], v1 );MB_CHK_SET_ERR( rval, "Couldn't get the opposite side entity" );
+            MB_CHK_SET_ERR( mtu.opposite_entity( q1, verts[1], v0 ), "Couldn't get the opposite side entity"  );
+            MB_CHK_SET_ERR( mtu.opposite_entity( q1, verts[0], v1 ), "Couldn't get the opposite side entity"  );
             if( v0 && v1 )
             {
                 // Offset of v0 in t2, then rotate and flip
                 storage.clear();
-                rval = mbImpl->get_connectivity( &tris[1], 1, storage );MB_CHK_SET_ERR( rval, "Couldn't get connectivity" );
+                MB_CHK_SET_ERR( mbImpl->get_connectivity( &tris[1], 1, storage ), "Couldn't get connectivity"  );
 
                 index = std::find( facehs.begin(), facehs.end(), tris[1] ) - facehs.begin();
                 if( senses[index] < 0 ) std::reverse( storage.begin(), storage.end() );
@@ -848,11 +848,11 @@ ErrorCode ReadCCMIO::create_cell_from_faces( std::vector< EntityHandle >& facehs
             // Check for pyramid
             // Get connectivity of first tri, and reverse if necessary
             int index = std::find( facehs.begin(), facehs.end(), quads[0] ) - facehs.begin();
-            rval      = mbImpl->get_connectivity( &quads[0], 1, verts );MB_CHK_SET_ERR( rval, "Couldn't get connectivity" );
+            MB_CHK_SET_ERR( mbImpl->get_connectivity( &quads[0], 1, verts ), "Couldn't get connectivity"  );
             if( senses[index] > 0 ) std::reverse( verts.begin(), verts.end() );
 
             // Get apex node
-            rval = mbImpl->get_connectivity( &tris[0], 1, storage );MB_CHK_SET_ERR( rval, "Couldn't get connectivity" );
+            MB_CHK_SET_ERR( mbImpl->get_connectivity( &tris[0], 1, storage ), "Couldn't get connectivity"  );
             for( unsigned int i = 0; i < 3; i++ )
             {
                 if( std::find( verts.begin(), verts.end(), storage[i] ) == verts.end() )
@@ -882,11 +882,11 @@ ErrorCode ReadCCMIO::create_cell_from_faces( std::vector< EntityHandle >& facehs
     // Now make the element; if we fell back to polyhedron, use faces, otherwise use verts
     if( MBPOLYHEDRON == this_type || MBMAXTYPE == this_type )
     {
-        rval = mbImpl->create_element( MBPOLYHEDRON, &facehs[0], facehs.size(), cell );MB_CHK_SET_ERR( rval, "create_element failed" );
+        MB_CHK_SET_ERR( mbImpl->create_element( MBPOLYHEDRON, &facehs[0], facehs.size(), cell ), "create_element failed"  );
     }
     else
     {
-        rval = mbImpl->create_element( this_type, &verts[0], verts.size(), cell );MB_CHK_SET_ERR( rval, "create_element failed" );
+        MB_CHK_SET_ERR( mbImpl->create_element( this_type, &verts[0], verts.size(), cell ), "create_element failed"  );
     }
 
     return MB_SUCCESS;
@@ -927,22 +927,22 @@ ErrorCode ReadCCMIO::read_all_faces( CCMIOID topologyID,
     index = CCMIOSIZEC( 0 );
     while( kCCMIONoErr == CCMIONextEntity( NULL, topologyID, kCCMIOBoundaryFaces, &index, &faceID ) )
     {
-        rval = read_faces( faceID, kCCMIOBoundaryFaces, vert_map, face_map,
+        MB_CHK_SET_ERR( read_faces( faceID, kCCMIOBoundaryFaces, vert_map, face_map,
 #ifndef TUPLE_LIST
                            sense_map,
 #endif
-                           new_faces );MB_CHK_SET_ERR( rval, "Trouble reading boundary faces" );
+                           new_faces ), "Trouble reading boundary faces"  );
     }
 
     // Now get internal faces
     CCMIOGetEntity( &error, topologyID, kCCMIOInternalFaces, 0, &faceID );
     CHK_SET_CCMERR( error, "Couldn't get internal faces" );
 
-    rval = read_faces( faceID, kCCMIOInternalFaces, vert_map, face_map,
+    MB_CHK_SET_ERR( read_faces( faceID, kCCMIOInternalFaces, vert_map, face_map,
 #ifndef TUPLE_LIST
                        sense_map,
 #endif
-                       new_faces );MB_CHK_SET_ERR( rval, "Trouble reading internal faces" );
+                       new_faces ), "Trouble reading internal faces"  );
 
     return rval;
 }
@@ -983,7 +983,7 @@ ErrorCode ReadCCMIO::read_faces( CCMIOID faceID,
     CHK_SET_CCMERR( error, "Trouble reading face connectivity" );
 
     std::vector< EntityHandle > face_handles;
-    ErrorCode rval = make_faces( farray, vert_map, face_handles, num_faces );MB_CHK_SET_ERR( rval, "Failed to make the faces" );
+    MB_CHK_SET_ERR( make_faces( farray, vert_map, face_handles, num_faces ), "Failed to make the faces"  );
 
     // Read face cells and make tuples
     int* face_cells;
@@ -1016,24 +1016,24 @@ ErrorCode ReadCCMIO::read_faces( CCMIOID faceID,
     CCMIOReadMap( &error, mapID, face_cells, CCMIOINDEXC( kCCMIOStart ), CCMIOINDEXC( kCCMIOEnd ) );
     CHK_SET_CCMERR( error, "Trouble reading face gids" );
 
-    rval = mbImpl->tag_set_data( mGlobalIdTag, &face_handles[0], face_handles.size(), face_cells );MB_CHK_SET_ERR( rval, "Couldn't set face global ids" );
+    MB_CHK_SET_ERR( mbImpl->tag_set_data( mGlobalIdTag, &face_handles[0], face_handles.size(), face_cells ), "Couldn't set face global ids"  );
 
     // Make a neumann set for these faces if they're all in a boundary face set
     if( kCCMIOBoundaryFaces == bdy_or_int )
     {
         EntityHandle neuset;
-        rval = mbImpl->create_meshset( MESHSET_SET, neuset );MB_CHK_SET_ERR( rval, "Failed to create neumann set" );
+        MB_CHK_SET_ERR( mbImpl->create_meshset( MESHSET_SET, neuset ), "Failed to create neumann set"  );
 
         // Don't trust entity index passed in
         int index;
         CCMIOGetEntityIndex( &error, faceID, &index );
         newNeusets[index] = neuset;
 
-        rval = mbImpl->add_entities( neuset, &face_handles[0], face_handles.size() );MB_CHK_SET_ERR( rval, "Failed to add faces to neumann set" );
+        MB_CHK_SET_ERR( mbImpl->add_entities( neuset, &face_handles[0], face_handles.size() ), "Failed to add faces to neumann set"  );
 
         // Now tag as neumann set; will add id later
         int dum_val = 0;
-        rval        = mbImpl->tag_set_data( mNeumannSetTag, &neuset, 1, &dum_val );MB_CHK_SET_ERR( rval, "Failed to tag neumann set" );
+        MB_CHK_SET_ERR( mbImpl->tag_set_data( mNeumannSetTag, &neuset, 1, &dum_val ), "Failed to tag neumann set"  );
     }
 
     if( new_faces )
@@ -1152,7 +1152,7 @@ ErrorCode ReadCCMIO::read_vertices( CCMIOSize_t /* proc */,
 
     // Put new vertex handles into range, and set gids for them
     Range new_verts( node_handle, node_handle + nverts - 1 );
-    ErrorCode rval = mbImpl->tag_set_data( mGlobalIdTag, new_verts, &gids[0] );MB_CHK_SET_ERR( rval, "Couldn't set gids on vertices" );
+    MB_CHK_SET_ERR( mbImpl->tag_set_data( mGlobalIdTag, new_verts, &gids[0] ), "Couldn't set gids on vertices"  );
 
     // Pack vert_map with global ids and handles for these vertices
 #ifdef TUPLE_LIST

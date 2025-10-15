@@ -66,19 +66,18 @@ int main( int argc, char* argv[] )
                                              std::string( ";PARALLEL_RESOLVE_SHARED_ENTS" ) );
 
     // read meshes in 2 file sets
-    ErrorCode rval;
     Core moab;
     Interface* mb = &moab;  // global
     EntityHandle sf1, sf2, outputSet;
 
     // create meshsets and load files
 
-    rval = mb->create_meshset( MESHSET_SET, sf1 );MB_CHK_ERR( rval );
-    rval = mb->create_meshset( MESHSET_SET, sf2 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->create_meshset( MESHSET_SET, sf1 ) );
+    MB_CHK_ERR( mb->create_meshset( MESHSET_SET, sf2 ) );
     if( 0 == rank ) std::cout << "Loading mesh file " << firstModel << "\n";
-    rval = mb->load_file( firstModel.c_str(), &sf1, optsRead.c_str() );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->load_file( firstModel.c_str(), &sf1, optsRead.c_str() ) );
     if( 0 == rank ) std::cout << "Loading mesh file " << secondModel << "\n";
-    rval = mb->load_file( secondModel.c_str(), &sf2, optsRead.c_str() );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->load_file( secondModel.c_str(), &sf2, optsRead.c_str() ) );
 
     if( 0 == rank )
     {
@@ -87,20 +86,20 @@ int main( int argc, char* argv[] )
         std::cout << "box eps:  " << boxeps << "\n";
         std::cout << " use kd tree for intersection: " << brute_force << "\n";
     }
-    rval = mb->create_meshset( MESHSET_SET, outputSet );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->create_meshset( MESHSET_SET, outputSet ) );
 
     // fix radius of both meshes, to be consistent with input R
-    rval = moab::IntxUtils::ScaleToRadius( mb, sf1, R );MB_CHK_ERR( rval );
-    rval = moab::IntxUtils::ScaleToRadius( mb, sf2, R );MB_CHK_ERR( rval );
+    MB_CHK_ERR( moab::IntxUtils::ScaleToRadius( mb, sf1, R ) );
+    MB_CHK_ERR( moab::IntxUtils::ScaleToRadius( mb, sf2, R ) );
 
 #if 0
   // std::cout << "Fix orientation etc ..\n";
   //IntxUtils; those calls do nothing for a good mesh
-  rval = fix_degenerate_quads(mb, sf1);MB_CHK_ERR(rval);
-  rval = fix_degenerate_quads(mb, sf2);MB_CHK_ERR(rval);
+  MB_CHK_ERR( fix_degenerate_quads(mb, sf1) );
+  MB_CHK_ERR( fix_degenerate_quads(mb, sf2) );
 
-  rval = positive_orientation(mb, sf1, R);MB_CHK_ERR(rval);
-  rval = positive_orientation(mb, sf2, R);MB_CHK_ERR(rval);
+  MB_CHK_ERR( positive_orientation(mb, sf1, R) );
+  MB_CHK_ERR( positive_orientation(mb, sf2, R) );
 #endif
 
 #ifdef MOAB_HAVE_MPI
@@ -119,28 +118,28 @@ int main( int argc, char* argv[] )
     worker.set_radius_destination_mesh( R );
     // worker.enable_debug();
 
-    rval = worker.FindMaxEdges( sf1, sf2 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( worker.FindMaxEdges( sf1, sf2 ) );
 
     EntityHandle covering_set;
 #ifdef MOAB_HAVE_MPI
     if( size > 1 )
     {
         Range local_verts;
-        rval = worker.build_processor_euler_boxes( sf2, local_verts );MB_CHK_ERR( rval );  // output also the local_verts
+        MB_CHK_ERR( worker.build_processor_euler_boxes( sf2, local_verts ) );  // output also the local_verts
         if( write_files_rank )
         {
             std::stringstream outf;
             outf << "second_mesh" << rank << ".h5m";
-            rval = mb->write_file( outf.str().c_str(), 0, 0, &sf2, 1 );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->write_file( outf.str().c_str(), 0, 0, &sf2, 1 ) );
         }
     }
     if( size > 1 )
     {
         double elapsed = MPI_Wtime();
-        rval           = mb->create_meshset( moab::MESHSET_SET, covering_set );MB_CHK_SET_ERR( rval, "Can't create new set" );
+        MB_CHK_SET_ERR( mb->create_meshset( moab::MESHSET_SET, covering_set ), "Can't create new set"  );
         bool gnomonic = true;
         int nb_ghost_layers = 0;
-        rval          = worker.construct_covering_set( sf1, covering_set, gnomonic, nb_ghost_layers );MB_CHK_ERR( rval );  // lots of communication if mesh is distributed very differently
+        MB_CHK_ERR( worker.construct_covering_set( sf1, covering_set, gnomonic, nb_ghost_layers ) );  // lots of communication if mesh is distributed very differently
         elapsed = MPI_Wtime() - elapsed;
         if( 0 == rank ) std::cout << "\nTime to communicate the mesh = " << elapsed << std::endl;
         // area fraction of the covering set that needed to be communicated from other processors
@@ -149,19 +148,19 @@ int main( int argc, char* argv[] )
         if( output_fraction )
         {
             EntityHandle comm_set;  // set with elements communicated from other tasks
-            rval = mb->create_meshset( MESHSET_SET, comm_set );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->create_meshset( MESHSET_SET, comm_set ) );
             // see how much more different is compared to sf1
-            rval = mb->unite_meshset( comm_set, covering_set );MB_CHK_ERR( rval );  // will have to subtract from covering set, initial set
+            MB_CHK_ERR( mb->unite_meshset( comm_set, covering_set ) );  // will have to subtract from covering set, initial set
             // subtract
-            rval = mb->subtract_meshset( comm_set, sf1 );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->subtract_meshset( comm_set, sf1 ) );
             // compute fractions
             double area_cov_set = areaAdaptor.area_on_sphere( mb, covering_set, R );
             assert( area_cov_set > 0 );
             double comm_area = areaAdaptor.area_on_sphere( mb, comm_set, R );
             // more important is actually the number of elements communicated
             int num_cov_cells, num_comm_cells;
-            rval = mb->get_number_entities_by_dimension( covering_set, 2, num_cov_cells );MB_CHK_ERR( rval );
-            rval = mb->get_number_entities_by_dimension( comm_set, 2, num_comm_cells );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_number_entities_by_dimension( covering_set, 2, num_cov_cells ) );
+            MB_CHK_ERR( mb->get_number_entities_by_dimension( comm_set, 2, num_comm_cells ) );
             double fraction_area = comm_area / area_cov_set;
             double fraction_num_cells =
                 (double)num_comm_cells / num_cov_cells;  // determine min, max, average of these fractions
@@ -188,7 +187,7 @@ int main( int argc, char* argv[] )
         {
             std::stringstream cof;
             cof << "covering_mesh" << rank << ".h5m";
-            rval = mb->write_file( cof.str().c_str(), 0, 0, &covering_set, 1 );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->write_file( cof.str().c_str(), 0, 0, &covering_set, 1 ) );
         }
     }
     else
@@ -201,11 +200,11 @@ int main( int argc, char* argv[] )
 #endif
     if( brute_force )
     {
-        rval = worker.intersect_meshes_kdtree( covering_set, sf2, outputSet );MB_CHK_SET_ERR( rval, "failed to intersect meshes with slow method" );
+        MB_CHK_SET_ERR( worker.intersect_meshes_kdtree( covering_set, sf2, outputSet ), "failed to intersect meshes with slow method"  );
     }
     else
     {
-        rval = worker.intersect_meshes( covering_set, sf2, outputSet );MB_CHK_SET_ERR( rval, "failed to intersect meshes" );
+        MB_CHK_SET_ERR( worker.intersect_meshes( covering_set, sf2, outputSet ), "failed to intersect meshes"  );
     }
 #ifdef MOAB_HAVE_MPI
     elapsed = MPI_Wtime() - elapsed;
@@ -229,7 +228,7 @@ int main( int argc, char* argv[] )
     {
         std::stringstream outf;
         outf << "intersect" << rank << ".h5m";
-        rval = mb->write_file( outf.str().c_str(), 0, 0, &outputSet, 1 );
+        MB_CHK_SET_ERR( mb->write_file( outf.str().c_str(), 0, 0, &outputSet, 1 ), "failed to write file" );
     }
     double intx_area    = areaAdaptor.area_on_sphere( mb, outputSet, R );
     double arrival_area = areaAdaptor.area_on_sphere( mb, sf2, R );
@@ -238,17 +237,17 @@ int main( int argc, char* argv[] )
 
 #ifdef MOAB_HAVE_MPI
 #ifdef MOAB_HAVE_HDF5_PARALLEL
-    rval = mb->write_file( outputFile.c_str(), 0, "PARALLEL=WRITE_PART", &outputSet, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
+    MB_CHK_SET_ERR( mb->write_file( outputFile.c_str(), 0, "PARALLEL=WRITE_PART", &outputSet, 1 ), "failed to write intx file"  );
 #else
     // write intx set on rank 0, in serial; we cannot write in parallel
     if( 0 == rank )
     {
-        rval = mb->write_file( outputFile.c_str(), 0, 0, &outputSet, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
+        MB_CHK_SET_ERR( mb->write_file( outputFile.c_str(), 0, 0, &outputSet, 1 ), "failed to write intx file"  );
     }
 #endif
     MPI_Finalize();
 #else
-    rval = mb->write_file( outputFile.c_str(), 0, 0, &outputSet, 1 );MB_CHK_SET_ERR( rval, "failed to write intx file" );
+    MB_CHK_SET_ERR( mb->write_file( outputFile.c_str(), 0, 0, &outputSet, 1 ), "failed to write intx file"  );
 #endif
     return 0;
 }

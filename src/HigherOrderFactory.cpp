@@ -862,8 +862,7 @@ bool HigherOrderFactory::tag_for_deletion( EntityHandle parent_handle, int conn_
 
             // just get corner nodes of target_entity
             connectivity.clear();
-            ErrorCode rval;
-            rval = mMB->get_connectivity( &( target_entity ), 1, connectivity, true );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mMB->get_connectivity( &( target_entity ), 1, connectivity, true ) );
 
             // for each node, get all common adjacencies of nodes in 'parent_handle'
             std::vector< EntityHandle > adj_list_1, adj_list_2, adj_entities;

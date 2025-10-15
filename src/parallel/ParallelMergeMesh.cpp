@@ -27,37 +27,36 @@ ParallelMergeMesh::ParallelMergeMesh( ParallelComm* pc, const double epsilon ) :
 // Merges elements within a proximity of epsilon
 ErrorCode ParallelMergeMesh::merge( EntityHandle levelset, bool skip_local_merge, int dim )
 {
-    ErrorCode rval = PerformMerge( levelset, skip_local_merge, dim );MB_CHK_ERR( rval );
+    MB_CHK_ERR( PerformMerge( levelset, skip_local_merge, dim ) );
     CleanUp();
-    return rval;
+    return MB_SUCCESS;
 }
 
 // Perform the merge
 ErrorCode ParallelMergeMesh::PerformMerge( EntityHandle levelset, bool skip_local_merge, int dim )
 {
     // Get the mesh dimension
-    ErrorCode rval;
     if( dim < 0 )
     {
-        rval = myMB->get_dimension( dim );MB_CHK_ERR( rval );
+        MB_CHK_ERR( myMB->get_dimension( dim ) );
     }
 
     // Get the local skin elements
-    rval = PopulateMySkinEnts( levelset, dim, skip_local_merge );
+    MB_CHK_ERR( PopulateMySkinEnts( levelset, dim, skip_local_merge ) );
     // If there is only 1 proc, we can return now
-    if( rval != MB_SUCCESS || myPcomm->size() == 1 )
+    if( myPcomm->size() == 1 )
     {
-        return rval;
+        return MB_SUCCESS;
     }
 
     // Determine the global bounding box
     double gbox[6];
-    rval = GetGlobalBox( gbox );MB_CHK_ERR( rval );
+    MB_CHK_ERR( GetGlobalBox( gbox ) );
 
     /* Assemble The Destination Tuples */
     // Get a list of tuples which contain (toProc, handle, x,y,z)
     myTup.initialize( 1, 0, 1, 3, mySkinEnts[0].size() );
-    rval = PopulateMyTup( gbox );MB_CHK_ERR( rval );
+    MB_CHK_ERR( PopulateMyTup( gbox ) );
 
     /* Gather-Scatter Tuple
        -tup comes out as (remoteProc,handle,x,y,z) */
@@ -74,7 +73,7 @@ ErrorCode ParallelMergeMesh::PerformMerge( EntityHandle levelset, bool skip_loca
     myMatches.initialize( 2, 0, 2, 0, mySkinEnts[0].size() );
 
     // ID the matching tuples
-    rval = PopulateMyMatches();MB_CHK_ERR( rval );
+    MB_CHK_ERR( PopulateMyMatches() );
 
     // We can free up the tuple myTup now
     myTup.reset();
@@ -89,11 +88,11 @@ ErrorCode ParallelMergeMesh::PerformMerge( EntityHandle levelset, bool skip_loca
     SortMyMatches();
 
     // Tag the shared elements
-    rval = TagSharedElements( dim );MB_CHK_ERR( rval );
+    MB_CHK_ERR( TagSharedElements( dim ) );
 
     // Free up the matches tuples
     myMatches.reset();
-    return rval;
+    return MB_SUCCESS;
 }
 
 // Sets mySkinEnts with all of the skin entities on the processor
@@ -102,28 +101,28 @@ ErrorCode ParallelMergeMesh::PopulateMySkinEnts( const EntityHandle meshset, int
     /*Merge Mesh Locally*/
     // Get all dim dimensional entities
     Range ents;
-    ErrorCode rval = myMB->get_entities_by_dimension( meshset, dim, ents );MB_CHK_ERR( rval );
+    MB_CHK_ERR( myMB->get_entities_by_dimension( meshset, dim, ents ) );
 
     if( ents.empty() && dim == 3 )
     {
         dim--;
-        rval = myMB->get_entities_by_dimension( meshset, dim, ents );MB_CHK_ERR( rval );  // maybe dimension 2
+        MB_CHK_ERR( myMB->get_entities_by_dimension( meshset, dim, ents ) );  // maybe dimension 2
     }
 
     // Merge Mesh Locally
     if( !skip_local_merge )
     {
         MergeMesh merger( myMB, false );
-        merger.merge_entities( ents, myEps );
+        ErrorCode merge_result = merger.merge_entities( ents, myEps );
         // We can return if there is only 1 proc
-        if( rval != MB_SUCCESS || myPcomm->size() == 1 )
+        if( merge_result != MB_SUCCESS || myPcomm->size() == 1 )
         {
-            return rval;
+            return merge_result;
         }
 
         // Rebuild the ents range
         ents.clear();
-        rval = myMB->get_entities_by_dimension( meshset, dim, ents );MB_CHK_ERR( rval );
+        MB_CHK_ERR( myMB->get_entities_by_dimension( meshset, dim, ents ) );
     }
 
     /*Get Skin
@@ -132,7 +131,7 @@ ErrorCode ParallelMergeMesh::PopulateMySkinEnts( const EntityHandle meshset, int
     Skinner skinner( myMB );
     for( int skin_dim = dim; skin_dim >= 0; skin_dim-- )
     {
-        rval = skinner.find_skin( meshset, ents, skin_dim, mySkinEnts[skin_dim] );MB_CHK_ERR( rval );
+        MB_CHK_ERR( skinner.find_skin( meshset, ents, skin_dim, mySkinEnts[skin_dim] ) );
     }
     return MB_SUCCESS;
 }
@@ -140,13 +139,11 @@ ErrorCode ParallelMergeMesh::PopulateMySkinEnts( const EntityHandle meshset, int
 // Determine the global assembly box
 ErrorCode ParallelMergeMesh::GetGlobalBox( double* gbox )
 {
-    ErrorCode rval;
-
     /*Get Bounding Box*/
     BoundBox box;
     if( mySkinEnts[0].size() != 0 )
     {
-        rval = box.update( *myMB, mySkinEnts[0] );MB_CHK_ERR( rval );
+        MB_CHK_ERR( box.update( *myMB, mySkinEnts[0] ) );
     }
 
     // Invert the max
@@ -170,20 +167,19 @@ ErrorCode ParallelMergeMesh::PopulateMyTup( double* gbox )
     /*Figure out how do partition the global box*/
     double lengths[3];
     int parts[3];
-    ErrorCode rval = PartitionGlobalBox( gbox, lengths, parts );MB_CHK_ERR( rval );
+    MB_CHK_ERR( PartitionGlobalBox( gbox, lengths, parts ) );
 
     /* Get Skin Coordinates, Vertices */
     double* x = new double[mySkinEnts[0].size()];
     double* y = new double[mySkinEnts[0].size()];
     double* z = new double[mySkinEnts[0].size()];
-    rval      = myMB->get_coords( mySkinEnts[0], x, y, z );
-    if( rval != MB_SUCCESS )
+    if( myMB->get_coords( mySkinEnts[0], x, y, z ) != MB_SUCCESS )
     {
         // Prevent Memory Leak
         delete[] x;
         delete[] y;
         delete[] z;
-        return rval;
+        return moab::MB_FAILURE;
     }
 
     // Initialize variable to be used in the loops
@@ -535,17 +531,12 @@ ErrorCode ParallelMergeMesh::TagSharedElements( int dim )
     // Manipulate the matches list to tag vertices and entities
     // Set up proc ents
     Range proc_ents;
-    ErrorCode rval;
 
     // get the entities in the partition sets
     for( Range::iterator rit = myPcomm->partitionSets.begin(); rit != myPcomm->partitionSets.end(); ++rit )
     {
         Range tmp_ents;
-        rval = myMB->get_entities_by_handle( *rit, tmp_ents, true );
-        if( MB_SUCCESS != rval )
-        {
-            return rval;
-        }
+        MB_CHK_ERR( myMB->get_entities_by_handle( *rit, tmp_ents, true ) );
         proc_ents.merge( tmp_ents );
     }
     if( myMB->dimension_from_handle( *proc_ents.rbegin() ) != myMB->dimension_from_handle( *proc_ents.begin() ) )
@@ -563,51 +554,30 @@ ErrorCode ParallelMergeMesh::TagSharedElements( int dim )
     // get ents shared by 1 or n procs
     std::map< std::vector< int >, std::vector< EntityHandle > > proc_nranges;
     Range proc_verts;
-    rval = myMB->get_adjacencies( proc_ents, 0, false, proc_verts, Interface::UNION );
-    if( rval != MB_SUCCESS )
-    {
-        return rval;
-    }
+    MB_CHK_ERR( myMB->get_adjacencies( proc_ents, 0, false, proc_verts, Interface::UNION ) );
 
-    rval = myPcomm->tag_shared_verts( myMatches, proc_nranges, proc_verts );
-    if( rval != MB_SUCCESS )
-    {
-        return rval;
-    }
+    MB_CHK_ERR( myPcomm->tag_shared_verts( myMatches, proc_nranges, proc_verts ) );
 
     // get entities shared by 1 or n procs
-    rval = myPcomm->get_proc_nvecs( dim, dim - 1, mySkinEnts.data(), proc_nranges );
-    if( rval != MB_SUCCESS )
-    {
-        return rval;
-    }
+    MB_CHK_ERR( myPcomm->get_proc_nvecs( dim, dim - 1, mySkinEnts.data(), proc_nranges ) );
 
     // create the sets for each interface; store them as tags on
     // the interface instance
     Range iface_sets;
-    rval = myPcomm->create_interface_sets( proc_nranges );
-    if( rval != MB_SUCCESS )
-    {
-        return rval;
-    }
+    MB_CHK_ERR( myPcomm->create_interface_sets( proc_nranges ) );
+
     // establish comm procs and buffers for them
     std::set< unsigned int > procs;
-    rval = myPcomm->get_interface_procs( procs, true );
-    if( rval != MB_SUCCESS )
-    {
-        return rval;
-    }
+    MB_CHK_ERR( myPcomm->get_interface_procs( procs, true ) );
 
     // resolve shared entity remote handles; implemented in ghost cell exchange
     // code because it's so similar
-    rval = myPcomm->exchange_ghost_cells( -1, -1, 0, true, true );
-    if( rval != MB_SUCCESS )
-    {
-        return rval;
-    }
+    MB_CHK_ERR( myPcomm->exchange_ghost_cells( -1, -1, 0, true, true ) );
+
     // now build parent/child links for interface sets
-    rval = myPcomm->create_iface_pc_links();
-    return rval;
+    MB_CHK_ERR( myPcomm->create_iface_pc_links() );
+
+    return MB_SUCCESS;
 }
 
 // Make sure to free up any allocated data

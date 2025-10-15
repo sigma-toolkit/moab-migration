@@ -1282,7 +1282,7 @@ int process_partition_file( Interface* mb, std::string& metis_partition_file )
     // mpas atmosphere files can be downloaded from here
     // https://mpas-dev.github.io/atmosphere/atmosphere_meshes.html
     Range faces;
-    ErrorCode rval = mb->get_entities_by_dimension( 0, 2, faces );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_dimension( 0, 2, faces ) );
     std::cout << " MPAS model has " << faces.size() << " polygons\n";
 
     // read the partition file
@@ -1316,20 +1316,20 @@ int process_partition_file( Interface* mb, std::string& metis_partition_file )
     std::cout << " partitions range: " << *pmin << " " << *pmax << "\n";
     Tag part_set_tag;
     int dum_id = -1;
-    rval = mb->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_set_tag, MB_TAG_SPARSE | MB_TAG_CREAT,
-                               &dum_id );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_set_tag, MB_TAG_SPARSE | MB_TAG_CREAT,
+                               &dum_id ) );
 
     // get any sets already with this tag, and clear them
     // remove the parallel partition sets if they exist
     Range tagged_sets;
-    rval = mb->get_entities_by_type_and_tag( 0, MBENTITYSET, &part_set_tag, NULL, 1, tagged_sets, Interface::UNION );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( 0, MBENTITYSET, &part_set_tag, NULL, 1, tagged_sets, Interface::UNION ) );
     if( !tagged_sets.empty() )
     {
-        rval = mb->clear_meshset( tagged_sets );MB_CHK_ERR( rval );
-        rval = mb->tag_delete_data( part_set_tag, tagged_sets );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->clear_meshset( tagged_sets ) );
+        MB_CHK_ERR( mb->tag_delete_data( part_set_tag, tagged_sets ) );
     }
     Tag gid;
-    rval = mb->tag_get_handle( "GLOBAL_ID", gid );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_get_handle( "GLOBAL_ID", gid ) );
     int num_sets = *pmax + 1;
     if( *pmin != 0 )
     {
@@ -1339,20 +1339,20 @@ int process_partition_file( Interface* mb, std::string& metis_partition_file )
     for( i = 0; i < num_sets; i++ )
     {
         EntityHandle new_set;
-        rval = mb->create_meshset( MESHSET_SET, new_set );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->create_meshset( MESHSET_SET, new_set ) );
         tagged_sets.insert( new_set );
     }
     int* dum_ids = new int[num_sets];
     for( i = 0; i < num_sets; i++ )
         dum_ids[i] = i;
 
-    rval = mb->tag_set_data( part_set_tag, tagged_sets, dum_ids );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_set_data( part_set_tag, tagged_sets, dum_ids ) );
     delete[] dum_ids;
 
     std::vector< int > gids;
     int num_faces = (int)faces.size();
     gids.resize( num_faces );
-    rval = mb->tag_get_data( gid, faces, &gids[0] );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_get_data( gid, faces, &gids[0] ) );
 
     for( int j = 0; j < num_faces; j++ )
     {
@@ -1364,7 +1364,7 @@ int process_partition_file( Interface* mb, std::string& metis_partition_file )
             std::cout << " wrong partition number \n";
             return 1;
         }
-        rval = mb->add_entities( tagged_sets[partition], &eh, 1 );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->add_entities( tagged_sets[partition], &eh, 1 ) );
     }
     return 0;
 }

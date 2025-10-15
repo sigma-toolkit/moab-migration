@@ -1569,7 +1569,7 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
     // get the global id tag handle
     Tag gid = mbImpl->globalId_tag();
 
-    ErrorCode rval = mbImpl->tag_get_data( gid, primary, &ids[0] );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbImpl->tag_get_data( gid, primary, &ids[0] ) );
 
     // mbpc is member in base class, PartitionerBase
     int rank = mbpc->rank();  // current rank , will be put on regular neighbors
@@ -1581,13 +1581,13 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
         if( 1 == partition_method )
         {
             adjs.clear();
-            rval = mtu.get_bridge_adjacencies( cell, ( primaryDim > 0 ? primaryDim - 1 : 3 ), primaryDim, adjs );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mtu.get_bridge_adjacencies( cell, ( primaryDim > 0 ? primaryDim - 1 : 3 ), primaryDim, adjs ) );
 
             // get the graph vertex ids of those
             if( !adjs.empty() )
             {
                 assert( adjs.size() < 5 * MAX_SUB_ENTITIES );
-                rval = mbImpl->tag_get_data( gid, adjs, neighbors );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mbImpl->tag_get_data( gid, adjs, neighbors ) );
             }
             // if adjacent to neighbor partitions, add to the list
             int size_adjs = (int)adjs.size();
@@ -1618,11 +1618,11 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
         {
             if( TYPE_FROM_HANDLE( cell ) == MBVERTEX )
             {
-                rval = mbImpl->get_coords( &cell, 1, avg_position );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mbImpl->get_coords( &cell, 1, avg_position ) );
             }
             else
             {
-                rval = mtu.get_average_position( cell, avg_position );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mtu.get_average_position( cell, avg_position ) );
             }
             std::copy( avg_position, avg_position + 3, std::back_inserter( coords ) );
         }

@@ -87,16 +87,16 @@ ErrorCode TestErrorHandling_4()
     const int NUM_VTX = 100;
     vector< double > coords( 3 * NUM_VTX );
     Range verts;
-    ErrorCode rval = mb.create_vertices( &coords[0], NUM_VTX, verts );MB_CHK_SET_ERR( rval, "Failed to create vertices" );
+    MB_CHK_SET_ERR( mb.create_vertices( &coords[0], NUM_VTX, verts ), "Failed to create vertices"  );
 
     // Create a variable-length dense tag
     Tag tag;
-    rval = mb.tag_get_handle( "var_len_den", 1, MB_TYPE_INTEGER, tag, MB_TAG_VARLEN | MB_TAG_DENSE | MB_TAG_CREAT );MB_CHK_SET_ERR( rval, "Failed to create a tag" );
+    MB_CHK_SET_ERR( mb.tag_get_handle( "var_len_den", 1, MB_TYPE_INTEGER, tag, MB_TAG_VARLEN | MB_TAG_DENSE | MB_TAG_CREAT ), "Failed to create a tag"  );
 
     // Attempt to iterate over a variable-length tag, which will never be possible
     void* ptr = NULL;
     int count = 0;
-    rval      = mb.tag_iterate( tag, verts.begin(), verts.end(), count, ptr );MB_CHK_SET_ERR( rval, "Failed to iterate over tag on " << NUM_VTX << " vertices" );
+    MB_CHK_SET_ERR( mb.tag_iterate( tag, verts.begin(), verts.end(), count, ptr ), "Failed to iterate over tag on " << NUM_VTX << " vertices"  );
 
     return MB_SUCCESS;
 }
@@ -122,16 +122,16 @@ int main( int argc, char** argv )
     switch( test_case_num )
     {
         case 1:
-            rval = TestErrorHandling_1();MB_CHK_ERR( rval );
+            MB_CHK_ERR( TestErrorHandling_1() );
             break;
         case 2:
-            rval = TestErrorHandling_2();MB_CHK_ERR( rval );
+            MB_CHK_ERR( TestErrorHandling_2() );
             break;
         case 3:
-            rval = TestErrorHandling_3();MB_CHK_ERR( rval );
+            MB_CHK_ERR( TestErrorHandling_3() );
             break;
         case 4:
-            rval = TestErrorHandling_4();MB_CHK_ERR( rval );
+            MB_CHK_ERR( TestErrorHandling_4() );
             break;
         default:
             break;

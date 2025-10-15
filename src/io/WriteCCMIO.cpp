@@ -382,7 +382,7 @@ ErrorCode WriteCCMIO::write_problem_description( CCMIOID rootID,
             rval = mbImpl->get_entities_by_type_and_tag( 0, MBENTITYSET, &simname, NULL, 1, dum_sets );
             if( MB_SUCCESS == rval && !dum_sets.empty() )
             {
-                rval = mbImpl->tag_get_data( simname, &( *dum_sets.begin() ), 1, &title_tag[0] );MB_CHK_SET_ERR( rval, "Problem getting simulation name tag" );
+                MB_CHK_SET_ERR( mbImpl->tag_get_data( simname, &( *dum_sets.begin() ), 1, &title_tag[0] ), "Problem getting simulation name tag" );
                 other_set_tagged = true;
             }
             else if( MB_SUCCESS == rval )
@@ -418,7 +418,7 @@ ErrorCode WriteCCMIO::write_problem_description( CCMIOID rootID,
             rval = mbImpl->get_entities_by_type_and_tag( 0, MBENTITYSET, &mCreatingProgramTag, NULL, 1, dum_sets );
             if( MB_SUCCESS == rval && !dum_sets.empty() )
             {
-                rval = mbImpl->tag_get_data( mCreatingProgramTag, &( *dum_sets.begin() ), 1, &cp_tag[0] );MB_CHK_SET_ERR( rval, "Problem getting creating program tag" );
+                MB_CHK_SET_ERR( mbImpl->tag_get_data( mCreatingProgramTag, &( *dum_sets.begin() ), 1, &cp_tag[0] ), "Problem getting creating program tag"  );
                 other_set_tagged = true;
             }
             else if( MB_SUCCESS == rval )
@@ -474,27 +474,27 @@ ErrorCode WriteCCMIO::write_problem_description( CCMIOID rootID,
 
             os.str( "" );
         }
-        rval = write_int_option( "MaterialId", matset_data[i].setHandle, mMaterialIdTag, id );MB_CHK_SET_ERR( rval, "Trouble writing MaterialId option" );
+        MB_CHK_SET_ERR( write_int_option( "MaterialId", matset_data[i].setHandle, mMaterialIdTag, id ), "Trouble writing MaterialId option"  );
 
-        rval = write_int_option( "Radiation", matset_data[i].setHandle, mRadiationTag, id );MB_CHK_SET_ERR( rval, "Trouble writing Radiation option" );
+        MB_CHK_SET_ERR( write_int_option( "Radiation", matset_data[i].setHandle, mRadiationTag, id ), "Trouble writing Radiation option"  );
 
-        rval = write_int_option( "PorosityId", matset_data[i].setHandle, mPorosityIdTag, id );MB_CHK_SET_ERR( rval, "Trouble writing PorosityId option" );
+        MB_CHK_SET_ERR( write_int_option( "PorosityId", matset_data[i].setHandle, mPorosityIdTag, id ), "Trouble writing PorosityId option"  );
 
-        rval = write_int_option( "SpinId", matset_data[i].setHandle, mSpinIdTag, id );MB_CHK_SET_ERR( rval, "Trouble writing SpinId option" );
+        MB_CHK_SET_ERR( write_int_option( "SpinId", matset_data[i].setHandle, mSpinIdTag, id ), "Trouble writing SpinId option"  );
 
-        rval = write_int_option( "GroupId", matset_data[i].setHandle, mGroupIdTag, id );MB_CHK_SET_ERR( rval, "Trouble writing GroupId option" );
+        MB_CHK_SET_ERR( write_int_option( "GroupId", matset_data[i].setHandle, mGroupIdTag, id ), "Trouble writing GroupId option"  );
 
-        rval = write_int_option( "ColorIdx", matset_data[i].setHandle, mColorIdxTag, id );MB_CHK_SET_ERR( rval, "Trouble writing ColorIdx option" );
+        MB_CHK_SET_ERR( write_int_option( "ColorIdx", matset_data[i].setHandle, mColorIdxTag, id ), "Trouble writing ColorIdx option"  );
 
-        rval = write_int_option( "ProcessorId", matset_data[i].setHandle, mProcessorIdTag, id );MB_CHK_SET_ERR( rval, "Trouble writing ProcessorId option" );
+        MB_CHK_SET_ERR( write_int_option( "ProcessorId", matset_data[i].setHandle, mProcessorIdTag, id ), "Trouble writing ProcessorId option"  );
 
-        rval = write_int_option( "LightMaterial", matset_data[i].setHandle, mLightMaterialTag, id );MB_CHK_SET_ERR( rval, "Trouble writing LightMaterial option." );
+        MB_CHK_SET_ERR( write_int_option( "LightMaterial", matset_data[i].setHandle, mLightMaterialTag, id ), "Trouble writing LightMaterial option."  );
 
-        rval = write_int_option( "FreeSurfaceMaterial", matset_data[i].setHandle, mFreeSurfaceMaterialTag, id );MB_CHK_SET_ERR( rval, "Trouble writing FreeSurfaceMaterial option" );
+        MB_CHK_SET_ERR( write_int_option( "FreeSurfaceMaterial", matset_data[i].setHandle, mFreeSurfaceMaterialTag, id ), "Trouble writing FreeSurfaceMaterial option"  );
 
-        rval = write_dbl_option( "Thickness", matset_data[i].setHandle, mThicknessTag, id );MB_CHK_SET_ERR( rval, "Trouble writing Thickness option" );
+        MB_CHK_SET_ERR( write_dbl_option( "Thickness", matset_data[i].setHandle, mThicknessTag, id ), "Trouble writing Thickness option"  );
 
-        rval = write_str_option( "MaterialType", matset_data[i].setHandle, mMaterialTypeTag, id );MB_CHK_SET_ERR( rval, "Trouble writing MaterialType option" );
+        MB_CHK_SET_ERR( write_str_option( "MaterialType", matset_data[i].setHandle, mMaterialTypeTag, id ), "Trouble writing MaterialType option"  );
     }
 
     // Write neumann set info
@@ -507,11 +507,11 @@ ErrorCode WriteCCMIO::write_problem_description( CCMIOID rootID,
                                &id );
         CHK_SET_CCMERR( error, "Failure creating BoundaryRegion node" );
 
-        rval = write_str_option( "BoundaryName", neuset_data[i].setHandle, mNameTag, id );MB_CHK_SET_ERR( rval, "Trouble writing boundary type number" );
+        MB_CHK_SET_ERR( write_str_option( "BoundaryName", neuset_data[i].setHandle, mNameTag, id ), "Trouble writing boundary type number"  );
 
-        rval = write_str_option( "BoundaryType", neuset_data[i].setHandle, mBoundaryTypeTag, id );MB_CHK_SET_ERR( rval, "Trouble writing boundary type number" );
+        MB_CHK_SET_ERR( write_str_option( "BoundaryType", neuset_data[i].setHandle, mBoundaryTypeTag, id ), "Trouble writing boundary type number"  );
 
-        rval = write_int_option( "ProstarRegionNumber", neuset_data[i].setHandle, mProstarRegionNumberTag, id );MB_CHK_SET_ERR( rval, "Trouble writing prostar region number" );
+        MB_CHK_SET_ERR( write_int_option( "ProstarRegionNumber", neuset_data[i].setHandle, mProstarRegionNumberTag, id ), "Trouble writing prostar region number"  );
     }
 
     CCMIOWriteState( &error, stateID, problemID, "Example state" );

@@ -69,7 +69,7 @@ int main( int argc, char** argv )
         EntityHandle cell          = *cit;
         const EntityHandle* connec = NULL;
         int num_verts              = 0;
-        rval                       = mb->get_connectivity( cell, connec, num_verts );MB_CHK_SET_ERR( rval, "Failed to get connectivity" );
+        MB_CHK_SET_ERR( mb->get_connectivity( cell, connec, num_verts ), "Failed to get connectivity"  );
 
         vector< EntityHandle > newConnec;
         newConnec.push_back( connec[0] );  // at least one vertex

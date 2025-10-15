@@ -96,7 +96,7 @@ int main( int argc, char** argv )
     // non-fixed so we only need to set the fixed tag for skin vertices
     Tag fixed;
     int def_val = 0;
-    rval        = mb->tag_get_handle( "fixed", 1, MB_TYPE_INTEGER, fixed, MB_TAG_CREAT | MB_TAG_DENSE, &def_val );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_get_handle( "fixed", 1, MB_TYPE_INTEGER, fixed, MB_TAG_CREAT | MB_TAG_DENSE, &def_val ) );
 
     // Get all vertices and faces
     Range verts, faces, skin_verts;

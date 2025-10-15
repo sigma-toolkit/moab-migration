@@ -4797,14 +4797,14 @@ ErrorCode ParallelComm::augment_default_sets_with_ghosts( EntityHandle file_set 
 
         rval = mbImpl->tag_get_handle( shared_set_tag_names[i], 1, MB_TYPE_INTEGER, tags[i], MB_TAG_ANY );
         if( MB_SUCCESS != rval ) continue;
-        rval = mbImpl->get_entities_by_type_and_tag( file_set, MBENTITYSET, &( tags[i] ), 0, 1, rangeSets[i],
-                                                     Interface::UNION );MB_CHK_SET_ERR( rval, "can't get sets with a tag" );
+        MB_CHK_SET_ERR( mbImpl->get_entities_by_type_and_tag( file_set, MBENTITYSET, &( tags[i] ), 0, 1, rangeSets[i],
+                                                     Interface::UNION ), "can't get sets with a tag" );
 
         if( rangeSets[i].size() > 0 )
         {
             tagVals[i] = new int[rangeSets[i].size()];
             // fill up with the tag values
-            rval = mbImpl->tag_get_data( tags[i], rangeSets[i], tagVals[i] );MB_CHK_SET_ERR( rval, "can't get set tag values" );
+            MB_CHK_SET_ERR( mbImpl->tag_get_data( tags[i], rangeSets[i], tagVals[i] ), "can't get set tag values"  );
             // now for inverse mapping:
             for( int j = 0; j < (int)rangeSets[i].size(); j++ )
             {
@@ -4888,7 +4888,7 @@ ErrorCode ParallelComm::augment_default_sets_with_ghosts( EntityHandle file_set 
         // if the local entity has a global id, send it too, so we avoid
         // another "exchange_tags" for global id
         int gid;
-        rval = mbImpl->tag_get_data( tags[num_tags], &geh, 1, &gid );MB_CHK_SET_ERR( rval, "Failed to get global id" );
+        MB_CHK_SET_ERR( mbImpl->tag_get_data( tags[num_tags], &geh, 1, &gid ), "Failed to get global id"  );
         if( gid != 0 )
         {
             for( int k = 0; k < nprocs; k++ )
@@ -4922,7 +4922,7 @@ ErrorCode ParallelComm::augment_default_sets_with_ghosts( EntityHandle file_set 
     gs_data::crystal_data* cd = this->procConfig.crystal_router();
     // All communication happens here; no other mpi calls
     // Also, this is a collective call
-    rval = cd->gs_transfer( 1, remoteEnts, 0 );MB_CHK_SET_ERR( rval, "Error in tuple transfer" );
+    MB_CHK_SET_ERR( cd->gs_transfer( 1, remoteEnts, 0 ), "Error in tuple transfer"  );
 #ifndef NDEBUG
     if( my_rank == 0 && 1 == get_debug_verbosity() ) remoteEnts.print( " on rank 0, after augment routing" );
     MPI_Barrier( procConfig.proc_comm() );
@@ -4943,7 +4943,7 @@ ErrorCode ParallelComm::augment_default_sets_with_ghosts( EntityHandle file_set 
         if( tag_type == num_tags )
         {
             // it is global id
-            rval = mbImpl->tag_set_data( tags[num_tags], &geh, 1, &value );MB_CHK_SET_ERR( rval, "Error in setting gid tag" );
+            MB_CHK_SET_ERR( mbImpl->tag_set_data( tags[num_tags], &geh, 1, &value ), "Error in setting gid tag"  );
         }
         else
         {
@@ -4954,19 +4954,19 @@ ErrorCode ParallelComm::augment_default_sets_with_ghosts( EntityHandle file_set 
             {
                 // the value was not found yet in the local map, so we have to create the set
                 EntityHandle newSet;
-                rval = mbImpl->create_meshset( MESHSET_SET, newSet );MB_CHK_SET_ERR( rval, "can't create new set" );
+                MB_CHK_SET_ERR( mbImpl->create_meshset( MESHSET_SET, newSet ), "can't create new set"  );
                 lmap[value] = newSet;
                 // set the tag value
-                rval = mbImpl->tag_set_data( tags[tag_type], &newSet, 1, &value );MB_CHK_SET_ERR( rval, "can't set tag for new set" );
+                MB_CHK_SET_ERR( mbImpl->tag_set_data( tags[tag_type], &newSet, 1, &value ), "can't set tag for new set"  );
 
                 // we also need to add the new created set to the file set, if not null
                 if( file_set )
                 {
-                    rval = mbImpl->add_entities( file_set, &newSet, 1 );MB_CHK_SET_ERR( rval, "can't add new set to the file set" );
+                    MB_CHK_SET_ERR( mbImpl->add_entities( file_set, &newSet, 1 ), "can't add new set to the file set"  );
                 }
             }
             // add the entity to the set pointed to by the map
-            rval = mbImpl->add_entities( lmap[value], &geh, 1 );MB_CHK_SET_ERR( rval, "can't add ghost ent to the set" );
+            MB_CHK_SET_ERR( mbImpl->add_entities( lmap[value], &geh, 1 ), "can't add ghost ent to the set"  );
         }
     }
 
@@ -9288,7 +9288,7 @@ ErrorCode ParallelComm::delete_entities( Range& to_delete )
     gs_data::crystal_data* cd = this->procConfig.crystal_router();
     // All communication happens here; no other mpi calls
     // Also, this is a collective call
-    rval = cd->gs_transfer( 1, ents_to_delete, 0 );MB_CHK_SET_ERR( rval, "Error in tuple transfer" );
+    MB_CHK_SET_ERR( cd->gs_transfer( 1, ents_to_delete, 0 ), "Error in tuple transfer"  );
 
     // Add to the range of ents to delete the new ones that were sent from other procs
     unsigned int received = ents_to_delete.get_n();
@@ -9298,7 +9298,7 @@ ErrorCode ParallelComm::delete_entities( Range& to_delete )
         unsigned long valrec = ents_to_delete.vul_rd[i];
         to_delete.insert( (EntityHandle)valrec );
     }
-    rval = mbImpl->delete_entities( to_delete );MB_CHK_SET_ERR( rval, "Error in deleting actual entities" );
+    MB_CHK_SET_ERR( mbImpl->delete_entities( to_delete ), "Error in deleting actual entities"  );
 
     std::set< EntityHandle > good_ents;
     for( std::set< EntityHandle >::iterator sst = sharedEnts.begin(); sst != sharedEnts.end(); sst++ )

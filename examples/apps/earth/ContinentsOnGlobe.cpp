@@ -144,22 +144,22 @@ int main( int argc, char** argv )
         coords2d[2 * i + 1] = getLon( p );
     }
 
-    ErrorCode rval = mb->load_file( input_file.c_str() );MB_CHK_SET_ERR( rval, "Can't load file" );
+    MB_CHK_SET_ERR( mb->load_file( input_file.c_str() ), "Can't load file"  );
     // look at the center of element, and see if it is inside the loop
 
     Range cells;
-    rval = mb->get_entities_by_dimension( 0, 2, cells );MB_CHK_SET_ERR( rval, "Can't get cells" );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 2, cells ), "Can't get cells"  );
 
     cout << "number of cells: " << cells.size() << "\n";
 
     // tag for continents
     Tag tag1;
     int defa = -1;
-    rval     = mb->tag_get_handle( "continent", 1, MB_TYPE_INTEGER, tag1, MB_TAG_DENSE | MB_TAG_CREAT, &defa );MB_CHK_SET_ERR( rval, "Trouble creating continent tag" );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "continent", 1, MB_TYPE_INTEGER, tag1, MB_TAG_DENSE | MB_TAG_CREAT, &defa ), "Trouble creating continent tag"  );
     EntityHandle islandSets[6];
     for( int loop_index = 0; loop_index < 6; loop_index++ )
     {
-        rval = mb->create_meshset( MESHSET_SET, islandSets[loop_index] );MB_CHK_SET_ERR( rval, "Can't create island set" );
+        MB_CHK_SET_ERR( mb->create_meshset( MESHSET_SET, islandSets[loop_index] ), "Can't create island set"  );
         int startLoop = loopsindx[2 * loop_index];
         int endLoop   = loopsindx[2 * loop_index + 1];
 
@@ -169,7 +169,7 @@ int main( int argc, char** argv )
             EntityHandle cell = *cit;
             // see if it is in the interior of the loop
             CartVect center;
-            rval = mb->get_coords( &cell, 1, &( center[0] ) );MB_CHK_SET_ERR( rval, "Can't get cell center coords" );
+            MB_CHK_SET_ERR( mb->get_coords( &cell, 1, &( center[0] ) ), "Can't get cell center coords"  );
             double lat = getLat( center ), lon = getLon( center );
             // if NA, use some boxes too, for lat/lon
             // if (NorthAmerica && (lat < 0.15 || lon < M_PI || lon > 2*M_PI - 0.5) )
@@ -178,17 +178,17 @@ int main( int argc, char** argv )
             if( interior_point( coords2d, startLoop, endLoop, lat, lon ) )
             {
                 interiorCells.push_back( cell );
-                rval = mb->tag_set_data( tag1, &cell, 1, &loop_index );MB_CHK_SET_ERR( rval, "Can't get tag on cell" );
+                MB_CHK_SET_ERR( mb->tag_set_data( tag1, &cell, 1, &loop_index ), "Can't get tag on cell"  );
             }
         }
 
-        rval = mb->add_entities( islandSets[loop_index], &interiorCells[0], interiorCells.size() );MB_CHK_SET_ERR( rval, "Can't add entities to set" );
+        MB_CHK_SET_ERR( mb->add_entities( islandSets[loop_index], &interiorCells[0], interiorCells.size() ), "Can't add entities to set"  );
     }
 
     std::stringstream islandFile;
 
     islandFile << "map.h5m";
 
-    rval = mb->write_file( islandFile.str().c_str() );MB_CHK_SET_ERR( rval, "Can't write island file" );
+    MB_CHK_SET_ERR( mb->write_file( islandFile.str().c_str() ), "Can't write island file"  );
     return 0;
 }

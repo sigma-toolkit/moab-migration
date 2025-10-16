@@ -19,8 +19,9 @@ Tag dim_tag, id_tag;
 bool check_tree( Interface* mbi, GeomTopoTool* GTT, std::map< int, std::set< int > >& ref_map );
 ErrorCode get_all_handles( Interface* mbi );
 Range get_children_by_dimension( Interface* mbi, EntityHandle parent, int desired_dimension );
-void heappermute( Interface* mbi, int v[], int n, std::map< int, std::set< int > > ref_map, int len );
-void swap( int* x, int* y );
+void heappermute( Interface* mbi, mbGIDType v[], int n, std::map< int, std::set< int > > ref_map, int len );
+template<typename T>
+void swap( T* x, T* y );
 void get_cube_info( int cube_id, std::vector< double >& scale, std::vector< double >& trans );
 void test_two_cubes();
 void test_three_cubes();
@@ -29,7 +30,7 @@ void test_four_cubes();
 ErrorCode build_cube( Interface* mbi,
                       std::vector< double > scale_vec,
                       std::vector< double > trans_vec,
-                      int object_id,
+                      mbGIDType object_id,
                       EntityHandle& volume )
 {
     GeomTopoTool* GTT = new GeomTopoTool( mbi );
@@ -302,7 +303,7 @@ void test_two_cubes()
     rval = get_all_handles( mbi );MB_CHK_ERR_RET( rval );
 
     int len    = 2;
-    int num[2] = { 1, 2 };
+    mbGIDType num[2] = { 1, 2 };
 
     // build reference map
     std::map< int, std::set< int > > ref_map;
@@ -329,7 +330,7 @@ void test_three_cubes()
     rval = get_all_handles( mbi );MB_CHK_ERR_RET( rval );
 
     int len    = 3;
-    int num[3] = { 1, 2, 3 };
+    mbGIDType num[3] = { 1, 2, 3 };
 
     // build reference map
     std::map< int, std::set< int > > ref_map;
@@ -357,7 +358,7 @@ void test_four_cubes()
     rval = get_all_handles( mbi );MB_CHK_ERR_RET( rval );
 
     int len    = 4;
-    int num[4] = { 1, 2, 3, 4 };
+    mbGIDType num[4] = { 1, 2, 3, 4 };
 
     // build reference map
     std::map< int, std::set< int > > ref_map;
@@ -378,7 +379,7 @@ void test_four_cubes()
    This function is a modification of code found here:
    http://www.sanfoundry.com/c-program-implement-heap-algorithm-permutation-n-numbers
 */
-void heappermute( Interface* mbi, int v[], int n, std::map< int, std::set< int > > ref_map, int len )
+void heappermute( Interface* mbi, mbGIDType v[], int n, std::map< int, std::set< int > > ref_map, int len )
 {
 
     ErrorCode rval;
@@ -430,11 +431,13 @@ void heappermute( Interface* mbi, int v[], int n, std::map< int, std::set< int >
     }
 }
 
-void swap( int* x, int* y )
+template<typename T>
+void swap( T* x, T* y )
 {
-    int temp;
+    T temp;
 
     temp = *x;
     *x   = *y;
     *y   = temp;
 }
+

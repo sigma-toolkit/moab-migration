@@ -83,7 +83,7 @@ foreach( fname ${TESTS} )
 endforeach()
 
 if(MOAB_HAVE_TEMPESTREMAP)
-  set( MBTR_TESTS imoab_remap.cpp )
+  set( MBTR_TESTS imoab_remap.cpp test_remapping.cpp )
   
   foreach( fname ${MBTR_TESTS} )
     string( REPLACE ".cpp" "" base ${fname} )

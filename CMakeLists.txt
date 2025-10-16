@@ -125,27 +125,28 @@ macro(AUTO_ENABLE_PACKAGE PACKAGE_NAME)
     endif()
 endmacro()
 
-################################################################################
-# Options that the user controls
-################################################################################
-option ( BUILD_SHARED_LIBS   "Should shared or static libraries be created?"   ON  )
-option ( ENABLE_CPM       "Should build with C++/CMake Package Manager (CPM) support?"  OFF )
-option ( ENABLE_CGNS       "Should build with CGNS support?"                 OFF )
-option ( ENABLE_MPI        "Should MOAB be compiled with MPI support?"       OFF )
-option ( ENABLE_HDF5       "Include HDF I/O interfaces in the build?"                   OFF )
-option ( ENABLE_NETCDF     "Include NetCDF (ExodusII) interfaces in the build?" OFF )
-option ( ENABLE_PNETCDF    "Include PNetCDF interfaces in the build (Requires NetCDF) ?" OFF )
-option ( ENABLE_METIS      "Include Metis support for partitioning algorithms?" OFF )
-option ( ENABLE_PARMETIS   "Include ParMetis support for partitioning algorithms?" OFF )
-option ( ENABLE_ZOLTAN     "Include Zoltan support for partitioning algorithms?" OFF )
-option ( ENABLE_TESTING    "Enable Testing"                                  ON  )
-option ( MOAB_FORCE_64_BIT_HANDLES "Force MBEntityHandle to be 64 bits (uint64_t)" OFF )
-option ( MOAB_FORCE_32_BIT_HANDLES "Force MBEntityHandle to be 32 bits (uint32_t)" OFF )
-option ( ENABLE_PYMOAB       "Build python interface to MOAB?" OFF )
-option ( ENABLE_BLASLAPACK   "Should require BLAS/LAPACK?" ON )
-option ( ENABLE_EIGEN3       "Should require Eigen3 header-only library?" OFF )
-option ( ENABLE_FORTRAN      "Should enable FORTRAN?" ON )
-option ( ENABLE_TEMPESTREMAP "Should enable TempestRemap dependency?" OFF )
+###############################################################################################
+#                   Options that the user controls                                            #
+###############################################################################################
+option( BUILD_SHARED_LIBS "Should shared or static libraries be created?"               ON  ) #
+option( ENABLE_CPM        "Should build with C++/CMake Package Manager (CPM) support?"  OFF ) #
+option( ENABLE_BLASLAPACK "Should require BLAS/LAPACK?"                                 ON  ) #
+option( ENABLE_EIGEN3     "Should require Eigen3 header-only library?"                  OFF ) #
+option( ENABLE_CGNS       "Should build with CGNS support?"                             OFF ) #
+option( ENABLE_MPI        "Should MOAB be compiled with MPI support?"                   OFF ) #
+option( ENABLE_HDF5       "Include HDF I/O interfaces in the build?"                    OFF ) #
+option( ENABLE_NETCDF     "Include NetCDF (ExodusII) interfaces in the build?"          OFF ) #
+option( ENABLE_PNETCDF    "Include PNetCDF interfaces in the build (Requires NetCDF) ?" OFF ) #
+option( ENABLE_METIS      "Include Metis support for partitioning algorithms?"          OFF ) #
+option( ENABLE_PARMETIS   "Include ParMetis support for partitioning algorithms?"       OFF ) #
+option( ENABLE_ZOLTAN     "Include Zoltan support for partitioning algorithms?"         OFF ) #
+option( MOAB_FORCE_64_BIT_HANDLES "Force MBEntityHandle to be 64 bits (uint64_t)"       OFF ) #
+option( MOAB_FORCE_32_BIT_HANDLES "Force MBEntityHandle to be 32 bits (uint32_t)"       OFF ) #
+option( ENABLE_PYMOAB       "Build python interface to MOAB?"                           OFF ) #
+option( ENABLE_TEMPESTREMAP "Should enable TempestRemap dependency?"                    OFF ) #
+option( ENABLE_FORTRAN      "Should enable FORTRAN?"                                    ON  ) #
+option( ENABLE_TESTING      "Enable Testing"                                            ON  ) #
+###############################################################################################
 
 add_feature_info(SharedLibs BUILD_SHARED_LIBS "Should shared or static libraries be created?")
 add_feature_info(EnableFortran ENABLE_FORTRAN "Should FORTRAN support be enabled?")

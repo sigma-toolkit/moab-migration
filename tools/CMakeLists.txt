@@ -22,6 +22,7 @@ set( MOAB_BUILD_MBTEMPEST    FALSE CACHE INTERNAL  "Build the TempestRemap coupl
 set( MOAB_BUILD_MBCMPMAPS    FALSE CACHE INTERNAL  "Build the remapping weights comparison tool?"  )
 set( MOAB_BUILD_MBCMPFILES   FALSE CACHE INTERNAL  "Build the h5m mesh/data comparison tool?"      )
 set( MOAB_BUILD_MBVISUMAP    FALSE CACHE INTERNAL  "Build the remapping weight visualization tool?")
+set( MOAB_BUILD_MBCLEANTAGS  FALSE CACHE INTERNAL  "Build the tag modification and cleaning tool?" )
 
 include_directories(
   ${CMAKE_BINARY_DIR}
@@ -159,6 +160,12 @@ endif( )
 if ( MOAB_BUILD_MBQUALITY )
   add_moab_tool( mbquality quality.cpp MOAB_HAVE_MBQUALITY )
 endif( )
+
+# MOAB_BUILD_MBCLEANTAGS
+if ( MOAB_BUILD_MBCLEANTAGS )
+  add_moab_tool( mbcleantags cleanTags.cpp MOAB_BUILD_MBCLEANTAGS )
+endif( )
+
 
 # MBPART
 if ( MOAB_BUILD_MBPART )

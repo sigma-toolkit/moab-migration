@@ -52,7 +52,7 @@
  *  but rather the global id set on the vertices in a consistent manner
  *
  *  -d and -i options can be used to add some artificial tags on the model;
- *  you can have multiple -d and -i options; -i <tag_name> will set an integer
+ *  you can have multiple -d and -i options; -i \c tag_name will set an integer
  *  tag with name tag_name on the vertices; -d < tag_name2> will generate
  *  double tags on cells (3d elements). You can have multiple tags, like
  *  -i tag1 -i tag2 -i tag3 -d tag4
@@ -60,7 +60,7 @@
  *  -x, -y, -z options will control the geometric dimensions of the final mesh, in
  *  x, y and z directions.
  *
- *  -o <out_file> controls the name of the output file; it needs to have extension h5m,
+ *  -o \c out_file controls the name of the output file; it needs to have extension h5m,
  *  because the file is written in parallel.
  *
  *  -k will keep the edges and faces that are generated as part of resolving shared entities
@@ -180,7 +180,7 @@ int main( int argc, char** argv )
 #endif
 
     EntityHandle fileset;
-    ErrorCode rval = mb->create_meshset( MESHSET_SET, fileset );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->create_meshset( MESHSET_SET, fileset ) );
 #ifdef MOAB_HAVE_MPI
     ParallelComm* pc     = new ParallelComm( mb, MPI_COMM_WORLD );
     MeshGeneration* mgen = new MeshGeneration( mb, pc, fileset );
@@ -190,10 +190,10 @@ int main( int argc, char** argv )
 
     clock_t tt = clock();
 
-    rval = mgen->BrickInstance( bopts );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mgen->BrickInstance( bopts ) );
 
     Range all3dcells;
-    rval = mb->get_entities_by_dimension( fileset, 3, all3dcells );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_dimension( fileset, 3, all3dcells ) );
 
     if( 0 == rank )
     {
@@ -205,15 +205,16 @@ int main( int argc, char** argv )
              << " order:" << ( bopts.quadratic ? "quadratic" : "linear" ) << endl;
     }
     Range verts;
-    rval = mb->get_entities_by_dimension( 0, 0, verts );MB_CHK_SET_ERR( rval, "Can't get all vertices" );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 0, verts ), "Can't get all vertices" );
 
     if( !nosave )
     {
 #ifdef MOAB_HAVE_HDF5_PARALLEL
-        rval = mb->write_file( outFileName.c_str(), 0, ";;PARALLEL=WRITE_PART;CPUTIME;", &fileset, 1 );MB_CHK_SET_ERR( rval, "Can't write in parallel" );
+        MB_CHK_SET_ERR( mb->write_file( outFileName.c_str(), 0, ";;PARALLEL=WRITE_PART;CPUTIME;", &fileset, 1 ),
+                        "Can't write in parallel" );
 #else
         // should be a vtk file, actually, maybe make sure of that
-        rval = mb->write_file( outFileName.c_str(), 0, "", &fileset, 1 );MB_CHK_SET_ERR( rval, "Can't write in serial" );
+        MB_CHK_SET_ERR( mb->write_file( outFileName.c_str(), 0, "", &fileset, 1 ), "Can't write in serial" );
 #endif
         if( 0 == rank )
         {
@@ -236,7 +237,7 @@ int main( int argc, char** argv )
         std::string read_opts( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_"
                                "SHARED_ENTS;CPUTIME;" );
         if( readAndGhost ) read_opts += "PARALLEL_GHOSTS=3.0.1;";
-        rval = mb2.load_file( outFileName.c_str(), 0, read_opts.c_str() );MB_CHK_SET_ERR( rval, "Can't read in parallel" );
+        MB_CHK_SET_ERR( mb2.load_file( outFileName.c_str(), 0, read_opts.c_str() ), "Can't read in parallel" );
         if( 0 == rank )
         {
             cout << "read back file " << outFileName << " with options: \n"
@@ -244,8 +245,8 @@ int main( int argc, char** argv )
             tt = clock();
         }
         moab::Range nverts, ncells;
-        rval = mb2.get_entities_by_dimension( 0, 0, nverts );MB_CHK_SET_ERR( rval, "Can't get all vertices" );
-        rval = mb2.get_entities_by_dimension( 0, 3, ncells );MB_CHK_SET_ERR( rval, "Can't get all 3d cells elements" );
+        MB_CHK_SET_ERR( mb2.get_entities_by_dimension( 0, 0, nverts ), "Can't get all vertices" );
+        MB_CHK_SET_ERR( mb2.get_entities_by_dimension( 0, 3, ncells ), "Can't get all 3d cells elements" );
 
         if( readAndGhost && size > 1 )
         {
@@ -253,8 +254,9 @@ int main( int argc, char** argv )
             // first get the parallel comm
             ParallelComm* pcomm2 = ParallelComm::get_pcomm( &mb2, 0 );
             if( NULL == pcomm2 ) MB_SET_ERR( MB_FAILURE, "can't get parallel comm." );
-            rval = pcomm2->filter_pstatus( nverts, PSTATUS_GHOST, PSTATUS_NOT );MB_CHK_SET_ERR( rval, "Can't filter ghost vertices" );
-            rval = pcomm2->filter_pstatus( ncells, PSTATUS_GHOST, PSTATUS_NOT );MB_CHK_SET_ERR( rval, "Can't filter ghost cells" );
+            MB_CHK_SET_ERR( pcomm2->filter_pstatus( nverts, PSTATUS_GHOST, PSTATUS_NOT ),
+                            "Can't filter ghost vertices" );
+            MB_CHK_SET_ERR( pcomm2->filter_pstatus( ncells, PSTATUS_GHOST, PSTATUS_NOT ), "Can't filter ghost cells" );
         }
         if( nverts.size() != nLocalVerts && ncells.size() != nLocalCells )
         {

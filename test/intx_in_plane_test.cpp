@@ -57,11 +57,11 @@ int main( int argc, char* argv[] )
 
     Intx2MeshInPlane worker( mb );
     IntxAreaUtils areaAdaptor;
-    rval = areaAdaptor.positive_orientation( mb, sf1, -1 );MB_CHK_ERR( rval );
-    rval = areaAdaptor.positive_orientation( mb, sf2, -1 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( areaAdaptor.positive_orientation( mb, sf1, -1 ) );
+    MB_CHK_ERR( areaAdaptor.positive_orientation( mb, sf2, -1 ) );
 
     worker.set_error_tolerance( 1.e-5 );
-    rval = worker.FindMaxEdges( sf1, sf2 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( worker.FindMaxEdges( sf1, sf2 ) );
     // worker.enable_debug();
     rval = worker.intersect_meshes( sf1, sf2, outputSet );
     if( MB_SUCCESS != rval ) return 1;

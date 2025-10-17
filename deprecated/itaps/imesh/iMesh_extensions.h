@@ -171,7 +171,7 @@ void iMesh_MBCNType( /*in*/ const int imesh_entity_topology,
  * function may be used with sparse tags, but if it is used, it
  * will return data for a single entity at a time.
  *
- *\Note If this function is called for entities for which no tag value
+ *\note If this function is called for entities for which no tag value
  *      has been set, but for which a default value exists, it will
  *      force the allocation of explicit storage for each such entity
  *      even though MOAB would normally not explicitly store tag values

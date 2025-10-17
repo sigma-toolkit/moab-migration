@@ -193,7 +193,8 @@ ErrorCode MeshTag::set_data( SequenceManager*,
 {
     if( !all_root_set( get_name(), entities, num_entities ) ) return MB_TAG_NOT_FOUND;
 
-    ErrorCode valid = validate_lengths( NULL, data_lengths, num_entities );MB_CHK_ERR( valid );
+    ErrorCode valid = validate_lengths( NULL, data_lengths, num_entities );
+    MB_CHK_ERR( valid );
 
     if( num_entities > 0 )
     {
@@ -221,7 +222,8 @@ ErrorCode MeshTag::clear_data( SequenceManager*,
 {
     if( !all_root_set( get_name(), entities, num_entities ) ) return MB_TAG_NOT_FOUND;
 
-    ErrorCode valid = validate_lengths( NULL, value_len ? &value_len : 0, 1 );MB_CHK_ERR( valid );
+    ErrorCode valid = validate_lengths( NULL, value_len ? &value_len : 0, 1 );
+    MB_CHK_ERR( valid );
 
     if( num_entities > 0 )
     {

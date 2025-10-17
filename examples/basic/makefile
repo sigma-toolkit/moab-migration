@@ -24,18 +24,26 @@ endif
 
 all: $(ALLEXAMPLES)
 
-HelloMOAB: HelloMOAB.o ${MOAB_LIBDIR}/libMOAB.la
+HelloMOAB: HelloMOAB.o
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
 run-HelloMOAB: HelloMOAB
 	${RUNSERIAL} ./HelloMOAB
 
-GetEntities: GetEntities.o ${MOAB_LIBDIR}/libMOAB.la
+CompareH5mFiles: CompareH5mFiles.o
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
-DeleteEdges: DeleteEdges.o ${MOAB_LIBDIR}/libMOAB.la
+ProjectToSphere: ProjectToSphere.o
+	@echo "[CXXLD]  $@"
+	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
+	
+GetEntities: GetEntities.o
+	@echo "[CXXLD]  $@"
+	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
+
+DeleteEdges: DeleteEdges.o
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
@@ -45,28 +53,28 @@ run-GetEntities: GetEntities
 run-DeleteEdges: DeleteEdges
 	${RUNSERIAL} ./DeleteEdges
 
-SetsNTags: SetsNTags.o ${MOAB_LIBDIR}/libMOAB.la
+SetsNTags: SetsNTags.o
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
 run-SetsNTags: SetsNTags
 	${RUNSERIAL} ./SetsNTags
 
-StructuredMeshSimple: StructuredMeshSimple.o ${MOAB_LIBDIR}/libMOAB.la
+StructuredMeshSimple: StructuredMeshSimple.o
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
 run-StructuredMeshSimple: StructuredMeshSimple
 	${RUNSERIAL} ./StructuredMeshSimple -d 3 -n 5
 
-ReadPartFile: ReadPartFile.o ${MOAB_LIBDIR}/libMOAB.la
+ReadPartFile: ReadPartFile.o
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
 run-ReadPartFile: ReadPartFile
 	${RUNSERIAL} ./ReadPartFile
 
-HelloParMOAB: HelloParMOAB.o ${MOAB_LIBDIR}/libMOAB.la
+HelloParMOAB: HelloParMOAB.o
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
@@ -75,14 +83,14 @@ ifeq ("$(MOAB_MPI_ENABLED)-$(MOAB_HDF5_ENABLED)","yes-yes")
 	${RUNPARALLEL} ./HelloParMOAB
 endif
 
-TestExodusII: TestExodusII.o ${MOAB_LIBDIR}/libMOAB.la
+TestExodusII: TestExodusII.o
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
 run-TestExodusII: TestExodusII
 	${RUNSERIAL} ./TestExodusII
 
-ReadWriteTest: ReadWriteTest.o ${MOAB_LIBDIR}/libMOAB.la
+ReadWriteTest: ReadWriteTest.o
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
@@ -91,19 +99,19 @@ ifeq ("$(MOAB_MPI_ENABLED)-$(MOAB_HDF5_ENABLED)-$(MOAB_NETCDF_ENABLED)","yes-yes
 	${RUNPARALLEL} ./ReadWriteTest
 endif
 
-ErrorHandlingSimulation: ErrorHandlingSimulation.o ${MOAB_LIBDIR}/libMOAB.la
+ErrorHandlingSimulation: ErrorHandlingSimulation.o
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
-TestErrorHandling: TestErrorHandling.o ${MOAB_LIBDIR}/libMOAB.la
+TestErrorHandling: TestErrorHandling.o
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
-TestErrorHandlingPar: TestErrorHandlingPar.o ${MOAB_LIBDIR}/libMOAB.la
+TestErrorHandlingPar: TestErrorHandlingPar.o
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK} 
 
-UniformRefinement: UniformRefinement.o ${MOAB_LIBDIR}/libMOAB.la
+UniformRefinement: UniformRefinement.o
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 

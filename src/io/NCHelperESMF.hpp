@@ -17,13 +17,11 @@ class ParallelComm;
 
 class NCHelperESMF : public UcdNCHelper
 {
-public:
+  public:
     NCHelperESMF( ReadNC* readNC, int fileId, const FileOptions& opts, EntityHandle fileSet );
     static bool can_read_file( ReadNC* readNC );
 
-
-private:
-
+  private:
     //! Implementation of NCHelper::init_mesh_vals()
     virtual ErrorCode init_mesh_vals();
 
@@ -34,7 +32,6 @@ private:
     {
         return "ESMF";
     }
-
 
 #ifdef MOAB_HAVE_MPI
     //! Redistribute local cells after trivial partition (e.g. Zoltan partition, if applicable)
@@ -56,7 +53,10 @@ private:
                                          EntityHandle start_vertex,
                                          Range& faces );
 
-    virtual ErrorCode check_existing_mesh() {return MB_SUCCESS;}
+    virtual ErrorCode check_existing_mesh()
+    {
+        return MB_SUCCESS;
+    }
 
     //! Implementation of UcdNCHelper::read_ucd_variables_to_nonset_allocate()
     virtual ErrorCode read_ucd_variables_to_nonset_allocate( std::vector< ReadNC::VarData >& /*vdatas*/,

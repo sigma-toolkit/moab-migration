@@ -32,10 +32,10 @@ class DebugOutputStream;
  * for output should have an associated verbosity level greater
  * than or equal to one.
  *
- * \Note Any output not terminated with an newline character or
+ * \note Any output not terminated with an newline character or
  *       followed by later output containing a newline character
  *       will not be flushed until the destructor is invoked.
- * \Note C++-style IO (i.e. std::ostream) is not supported because
+ * \note C++-style IO (i.e. std::ostream) is not supported because
  *       it is necessarily inefficient for debug-type output.  All
  *       formatting (e.g. converting arguments to strings, etc.) must
  *       be done even when output is disabled.

@@ -109,16 +109,19 @@ ErrorCode mb_vertex_coordinate_test()
 {
     Core moab;
     Interface* MB   = &moab;
-    ErrorCode error = create_some_mesh( MB );MB_CHK_ERR( error );
+    ErrorCode error = create_some_mesh( MB );
+    MB_CHK_ERR( error );
 
     Range vertices;
-    error = MB->get_entities_by_type( 0, MBVERTEX, vertices );MB_CHK_ERR( error );
+    error = MB->get_entities_by_type( 0, MBVERTEX, vertices );
+    MB_CHK_ERR( error );
 
     std::vector< double > all_coords( 3 * vertices.size() );
     double* coord_iter = &all_coords[0];
     for( Range::iterator iter = vertices.begin(); iter != vertices.end(); ++iter )
     {
-        error = MB->get_coords( &( *iter ), 1, coord_iter );MB_CHK_ERR( error );
+        error = MB->get_coords( &( *iter ), 1, coord_iter );
+        MB_CHK_ERR( error );
         coord_iter += 3;
     }
 
@@ -147,9 +150,11 @@ ErrorCode mb_vertex_coordinate_test()
 
     // Try getting coordinates for a hex (should fail)
     Range hexes;
-    error = MB->get_entities_by_type( 0, MBHEX, hexes );MB_CHK_ERR( error );
+    error = MB->get_entities_by_type( 0, MBHEX, hexes );
+    MB_CHK_ERR( error );
     EntityHandle handle = hexes.front();
-    error               = MB->get_coords( &handle, 1, &x[0] );MB_CHK_ERR( error );
+    error               = MB->get_coords( &handle, 1, &x[0] );
+    MB_CHK_ERR( error );
     CHECK_REAL_EQUAL( 0.5, x[0], 1E-12 );
     CHECK_REAL_EQUAL( 0.5, x[1], 1E-12 );
     CHECK_REAL_EQUAL( 0.5, x[2], 1E-12 );
@@ -762,7 +767,7 @@ ErrorCode mb_upward_adjacencies_test()
 
     // create a simple mesh containing 2 hexes
     EntityHandle vertices[12], hexes[2], hex1_faces[6], hex2_faces[6], hex1_edges[12], hex2_edges[12];
-    rval = create_two_hex_full_mesh( mb, vertices, hexes, hex1_faces, hex2_faces, hex1_edges, hex2_edges );MB_CHK_ERR( rval );
+    MB_CHK_ERR( create_two_hex_full_mesh( mb, vertices, hexes, hex1_faces, hex2_faces, hex1_edges, hex2_edges ) );
 
     // test adjacences from dim to 3
     for( int dim = 0; dim < 3; ++dim )
@@ -773,8 +778,8 @@ ErrorCode mb_upward_adjacencies_test()
         switch( dim )
         {
             case 0:
-                rval = mb->get_connectivity( hexes[0], list1, n );MB_CHK_ERR( rval );
-                rval = mb->get_connectivity( hexes[1], list2, n );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mb->get_connectivity( hexes[0], list1, n ) );
+                MB_CHK_ERR( mb->get_connectivity( hexes[1], list2, n ) );
                 break;
             case 1:
                 list1 = hex1_edges;
@@ -801,7 +806,7 @@ ErrorCode mb_upward_adjacencies_test()
         for( size_t j = 0; j < shared.size(); ++j )
         {
             std::vector< EntityHandle > adj;
-            rval = mb->get_adjacencies( &shared[j], 1, 3, false, adj );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_adjacencies( &shared[j], 1, 3, false, adj ) );
             if( adj.size() != 2 )
             {
                 std::cout << "Expected 2 hexes adjacent to " << dim << "D entity " << j << ". Got " << adj.size()
@@ -818,14 +823,14 @@ ErrorCode mb_upward_adjacencies_test()
         for( size_t j = 0; j < hex1_ent.size(); ++j )
         {
             std::vector< EntityHandle > adj;
-            rval = mb->get_adjacencies( &hex1_ent[j], 1, 3, false, adj );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_adjacencies( &hex1_ent[j], 1, 3, false, adj ) );
             CHECK( adj.size() == 1 && adj[0] == hexes[0] );
         }
 
         for( size_t j = 0; j < hex2_ent.size(); ++j )
         {
             std::vector< EntityHandle > adj;
-            rval = mb->get_adjacencies( &hex2_ent[j], 1, 3, false, adj );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_adjacencies( &hex2_ent[j], 1, 3, false, adj ) );
             CHECK( adj.size() == 1 && adj[0] == hexes[1] );
         }
     }
@@ -841,9 +846,9 @@ ErrorCode mb_upward_adjacencies_test()
     for( size_t j = 0; j < all_edges.size(); ++j )
     {
         std::vector< EntityHandle > edge_hexes, edge_faces, face_hexes;
-        rval = mb->get_adjacencies( &all_edges[j], 1, 3, false, edge_hexes );MB_CHK_ERR( rval );
-        rval = mb->get_adjacencies( &all_edges[j], 1, 2, false, edge_faces );MB_CHK_ERR( rval );
-        rval = mb->get_adjacencies( &edge_faces[0], edge_faces.size(), 3, false, face_hexes, Interface::UNION );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->get_adjacencies( &all_edges[j], 1, 3, false, edge_hexes ) );
+        MB_CHK_ERR( mb->get_adjacencies( &all_edges[j], 1, 2, false, edge_faces ) );
+        MB_CHK_ERR( mb->get_adjacencies( &edge_faces[0], edge_faces.size(), 3, false, face_hexes, Interface::UNION ) );
         if( edge_hexes.size() != face_hexes.size() )
         {
             std::cout << "Inconsistent adjacency data for edge " << j << ". edge->face->hex resulted in "
@@ -879,15 +884,15 @@ ErrorCode mb_adjacent_create_test()
     EntityHandle verts[8]    = { 0 };
     for( int i = 0; i < 8; ++i )
     {
-        rval = mb.create_vertex( coords[i], verts[i] );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb.create_vertex( coords[i], verts[i] ) );
     }
     // create a single hex
     const EntityHandle hconn[8] = { verts[0], verts[1], verts[2], verts[3], verts[4], verts[5], verts[6], verts[7] };
     EntityHandle hex;
-    rval = mb.create_element( MBHEX, hconn, 8, hex );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.create_element( MBHEX, hconn, 8, hex ) );
     // create hex faces
     std::vector< EntityHandle > quads;
-    rval = mb.get_adjacencies( &hex, 1, 2, true, quads, Interface::UNION );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.get_adjacencies( &hex, 1, 2, true, quads, Interface::UNION ) );
     CHECK_EQUAL( (size_t)6, quads.size() );
     // check that we got each of the 6 expected faces, with outwards
     // normals assuming CCW order and correct connectivity
@@ -907,7 +912,7 @@ ErrorCode mb_adjacent_create_test()
         for( ; j < 6; ++j )
         {
             conn.clear();
-            rval = mb.get_connectivity( &quads[j], 1, conn );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb.get_connectivity( &quads[j], 1, conn ) );
             CHECK_EQUAL( (size_t)4, conn.size() );
             std::vector< EntityHandle > sorted( conn );
             std::sort( sorted.begin(), sorted.end() );
@@ -1939,24 +1944,24 @@ ErrorCode mb_mesh_set_set_replace_test()
     Range r;
     // create 10 vertices to put in set
     std::vector< double > coords( 30 );
-    rval = mb->create_vertices( &coords[0], 10, r );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->create_vertices( &coords[0], 10, r ) );
     std::vector< EntityHandle > verts( r.size() );
     std::copy( r.begin(), r.end(), verts.begin() );
     r.clear();
     // create a set
     EntityHandle set;
-    rval = mb->create_meshset( MESHSET_SET, set );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->create_meshset( MESHSET_SET, set ) );
     // put every other vertex in set
     for( size_t i = 0; i < 10; i += 2 )
         r.insert( verts[i] );
-    rval = mb->add_entities( set, r );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->add_entities( set, r ) );
     r.clear();
     // swap 3 of the vertices
     EntityHandle old_ents[3] = { verts[2], verts[4], verts[6] };
     EntityHandle new_ents[3] = { verts[1], verts[9], verts[5] };
-    rval                     = mb->replace_entities( set, old_ents, new_ents, 3 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->replace_entities( set, old_ents, new_ents, 3 ) );
     // check new set contents
-    rval = mb->get_entities_by_handle( set, r );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_handle( set, r ) );
     Range r2;
     r2.insert( verts[0] );
     r2.insert( verts[1] );
@@ -1982,24 +1987,24 @@ ErrorCode mb_mesh_set_list_replace_test()
     // create 10 vertices to put in set
     Range r;
     std::vector< double > coords( 30 );
-    rval = mb->create_vertices( &coords[0], 10, r );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->create_vertices( &coords[0], 10, r ) );
     std::vector< EntityHandle > verts( r.size() );
     std::copy( r.begin(), r.end(), verts.begin() );
     r.clear();
     // create a set
     EntityHandle set;
-    rval = mb->create_meshset( MESHSET_ORDERED, set );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->create_meshset( MESHSET_ORDERED, set ) );
     // put all vertices in set, but add the first one a second time
     std::vector< EntityHandle > list( verts );
     list.push_back( verts.front() );
-    rval = mb->add_entities( set, &list[0], list.size() );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->add_entities( set, &list[0], list.size() ) );
     // swap 3 of the vertices
     EntityHandle old_ents[3] = { verts[2], verts[4], verts[6] };
     EntityHandle new_ents[3] = { verts[1], verts[9], verts[5] };
-    rval                     = mb->replace_entities( set, old_ents, new_ents, 3 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->replace_entities( set, old_ents, new_ents, 3 ) );
     // check new set contents
     std::vector< EntityHandle > list2;
-    rval = mb->get_entities_by_handle( set, list2 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_handle( set, list2 ) );
     list[2] = verts[1];
     list[4] = verts[9];
     list[6] = verts[5];
@@ -2014,10 +2019,10 @@ ErrorCode mb_mesh_set_list_replace_test()
         return MB_FAILURE;
     }
     // now try replacing a repeated value
-    rval = mb->replace_entities( set, &verts[0], &verts[3], 1 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->replace_entities( set, &verts[0], &verts[3], 1 ) );
     list[0] = list[10] = verts[3];
     list2.clear();
-    rval = mb->get_entities_by_handle( set, list2 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_handle( set, list2 ) );
     if( list != list2 )
     {
         std::cerr << "Range does not contain expected values." << std::endl;
@@ -2047,16 +2052,16 @@ ErrorCode mb_mesh_set_flag_test()
     // create 10 vertices to put in set
     Range verts;
     std::vector< double > coords( 30 );
-    rval = mb->create_vertices( &coords[0], 10, verts );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->create_vertices( &coords[0], 10, verts ) );
 
     // CHECK SET->TRACKING
     // create a set and add the verts
     EntityHandle set;
-    rval = mb->create_meshset( MESHSET_SET, set );MB_CHK_ERR( rval );
-    rval = mb->add_entities( set, verts );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->create_meshset( MESHSET_SET, set ) );
+    MB_CHK_ERR( mb->add_entities( set, verts ) );
     // the verts should not be tracking adjacencies
     Range adj_sets;
-    rval = mb->get_adjacencies( verts, 4, false, adj_sets );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_adjacencies( verts, 4, false, adj_sets ) );
     if( !adj_sets.empty() )
     {
         std::cerr << "range should be empty but contains:" << std::endl;
@@ -2065,22 +2070,22 @@ ErrorCode mb_mesh_set_flag_test()
     }
     // check to make sure the flags on MESHSET_SET
     unsigned int flags;
-    rval = mb->get_meshset_options( set, flags );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_meshset_options( set, flags ) );
     if( !( MESHSET_SET & flags ) || ( MESHSET_TRACK_OWNER & flags ) || ( MESHSET_ORDERED & flags ) )
     {
         std::cerr << "set should be MESHSET_SET only, flags=" << flags << std::endl;
         return MB_FAILURE;
     }
     // change to a tracking set and check flags
-    rval = mb->set_meshset_options( set, MESHSET_TRACK_OWNER );MB_CHK_ERR( rval );
-    rval = mb->get_meshset_options( set, flags );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->set_meshset_options( set, MESHSET_TRACK_OWNER ) );
+    MB_CHK_ERR( mb->get_meshset_options( set, flags ) );
     if( ( MESHSET_SET & flags ) || !( MESHSET_TRACK_OWNER & flags ) || ( MESHSET_ORDERED & flags ) )
     {
         std::cerr << "set should be MESHSET_TRACK_OWNER only, flags=" << flags << std::endl;
         return MB_FAILURE;
     }
     // check adjacencies
-    rval = mb->get_adjacencies( verts, 4, false, adj_sets );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_adjacencies( verts, 4, false, adj_sets ) );
     if( 1 != adj_sets.size() )
     {
         std::cerr << "range should contain a set, adj_sets.size()=" << adj_sets.size() << std::endl;
@@ -2090,8 +2095,8 @@ ErrorCode mb_mesh_set_flag_test()
 
     // CHECK TRACKING->SET
     // change to a standard set and check flags
-    rval = mb->set_meshset_options( set, MESHSET_SET );MB_CHK_ERR( rval );
-    rval = mb->get_meshset_options( set, flags );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->set_meshset_options( set, MESHSET_SET ) );
+    MB_CHK_ERR( mb->get_meshset_options( set, flags ) );
     if( !( MESHSET_SET & flags ) || ( MESHSET_TRACK_OWNER & flags ) || ( MESHSET_ORDERED & flags ) )
     {
         std::cerr << "set should be MESHSET_SET only, flags=" << flags << std::endl;
@@ -2099,7 +2104,7 @@ ErrorCode mb_mesh_set_flag_test()
     }
     // the set should no longer be adjacent to the vertices
     adj_sets.clear();
-    rval = mb->get_adjacencies( verts, 4, false, adj_sets );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_adjacencies( verts, 4, false, adj_sets ) );
     if( !adj_sets.empty() )
     {
         std::cerr << "range should be empty but contains:" << std::endl;
@@ -2108,7 +2113,7 @@ ErrorCode mb_mesh_set_flag_test()
     }
     // CHECK UNORDERED->ORDERED
     // add a duplicate vert
-    rval = mb->add_entities( set, &verts.front(), 1 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->add_entities( set, &verts.front(), 1 ) );
     // unordered sets cannot hold duplicates so size shouldn't change
     std::vector< EntityHandle > entities;
     rval = mb->get_entities_by_handle( set, entities );
@@ -2118,20 +2123,20 @@ ErrorCode mb_mesh_set_flag_test()
         return MB_FAILURE;
     }
     // change to an ordered set and check flags
-    rval = mb->set_meshset_options( set, MESHSET_ORDERED );MB_CHK_ERR( rval );
-    rval = mb->get_meshset_options( set, flags );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->set_meshset_options( set, MESHSET_ORDERED ) );
+    MB_CHK_ERR( mb->get_meshset_options( set, flags ) );
     if( ( MESHSET_SET & flags ) || ( MESHSET_TRACK_OWNER & flags ) || !( MESHSET_ORDERED & flags ) )
     {
         std::cerr << "set should be MESHSET_ORDERED only, flags=" << flags << std::endl;
         return MB_FAILURE;
     }
     // swap the order with some entities to that the handles aren't ordered
-    rval = mb->clear_meshset( &set, 1 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->clear_meshset( &set, 1 ) );
     entities.clear();
     entities.resize( 2 );
     entities[0] = verts[1];
     entities[1] = verts[0];
-    rval        = mb->add_entities( set, &entities[0], 2 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->add_entities( set, &entities[0], 2 ) );
     // check to ensure the entities keep their order
     entities.clear();
     rval = mb->get_entities_by_handle( set, entities );
@@ -2143,8 +2148,8 @@ ErrorCode mb_mesh_set_flag_test()
 
     // CHECK ORDERED->UNORDERED
     // change to an unordered set and check flags
-    rval = mb->set_meshset_options( set, MESHSET_SET );MB_CHK_ERR( rval );
-    rval = mb->get_meshset_options( set, flags );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->set_meshset_options( set, MESHSET_SET ) );
+    MB_CHK_ERR( mb->get_meshset_options( set, flags ) );
     if( !( MESHSET_SET & flags ) || ( MESHSET_TRACK_OWNER & flags ) || MESHSET_ORDERED & flags )
     {
         std::cerr << "set should be MESHSET_SET only, flags=" << flags << std::endl;
@@ -2545,18 +2550,19 @@ static ErrorCode check_meshset_internal( Interface& mb,
 {
     ErrorCode rval;
     WriteUtilIface* tool = 0;
-    rval                 = mb.query_interface( tool );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.query_interface( tool ) );
 
     const EntityHandle* contents;
     int length;
     unsigned char flags;
-    rval = tool->get_entity_list_pointers( &set, 1, &contents, WriteUtilIface::CONTENTS, &length, &flags );MB_CHK_ERR( rval );
-    ErrorCode rval1 = mb.release_interface( tool );MB_CHK_ERR( rval1 );
+    MB_CHK_ERR( tool->get_entity_list_pointers( &set, 1, &contents, WriteUtilIface::CONTENTS, &length, &flags ) );
+    ErrorCode rval1 = mb.release_interface( tool );
+    MB_CHK_ERR( rval1 );
 
     if( flags & MESHSET_ORDERED )
         rval = check_list_meshset_internal( expected, num_expected, contents, length );
     else
-        rval = check_ranged_meshset_internal( expected, num_expected, contents, length );MB_CHK_ERR( rval );
+        MB_CHK_ERR( check_ranged_meshset_internal( expected, num_expected, contents, length ) );
     return MB_SUCCESS;
 }
 
@@ -2565,70 +2571,70 @@ ErrorCode mb_mesh_set_set_add_remove_test()
     Core core;
     Interface& mb = core;
     EntityHandle set;
-    ErrorCode rval = mb.create_meshset( MESHSET_SET, set );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.create_meshset( MESHSET_SET, set ) );
 
     EntityHandle list1[] = { 10, 16, 18, 20, 24, 27 };
     size_t len1          = sizeof( list1 ) / sizeof( list1[0] );
     EntityHandle list2[] = { 10, 16, 17, 18, 19, 20, 24, 27 };
     size_t len2          = sizeof( list2 ) / sizeof( list2[0] );
-    rval                 = mb.add_entities( set, list1, len1 );MB_CHK_ERR( rval );
-    rval = check_meshset_internal( mb, set, list1, len1 );MB_CHK_ERR( rval );
-    rval = mb.add_entities( set, list2, len2 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.add_entities( set, list1, len1 ) );
+    MB_CHK_ERR( check_meshset_internal( mb, set, list1, len1 ) );
+    MB_CHK_ERR( mb.add_entities( set, list2, len2 ) );
     EntityHandle exp12[] = { 10, 16, 17, 18, 19, 20, 24, 27 };
     size_t len12         = sizeof( exp12 ) / sizeof( exp12[0] );
-    rval                 = check_meshset_internal( mb, set, exp12, len12 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( check_meshset_internal( mb, set, exp12, len12 ) );
 
     EntityHandle list3[] = { 15, 16, 18, 20, 21, 24, 28 };
     size_t len3          = sizeof( list3 ) / sizeof( list3[0] );
-    rval                 = mb.remove_entities( set, list3, len3 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.remove_entities( set, list3, len3 ) );
     EntityHandle exp123[] = { 10, 17, 19, 27 };
     size_t len123         = sizeof( exp123 ) / sizeof( exp123[0] );
-    rval                  = check_meshset_internal( mb, set, exp123, len123 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( check_meshset_internal( mb, set, exp123, len123 ) );
 
     EntityHandle list4[] = { 18, 10, 11, 12, 13, 14, 15, 16 };
     size_t len4          = sizeof( list4 ) / sizeof( list4[0] );
-    rval                 = mb.add_entities( set, list4, len4 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.add_entities( set, list4, len4 ) );
     EntityHandle exp14[] = { 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 27 };
     size_t len14         = sizeof( exp14 ) / sizeof( exp14[0] );
-    rval                 = check_meshset_internal( mb, set, exp14, len14 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( check_meshset_internal( mb, set, exp14, len14 ) );
 
     EntityHandle list5[] = { 9, 10, 12, 13, 14, 15, 19, 20 };
-    rval                 = mb.remove_entities( set, list5, sizeof( list5 ) / sizeof( list5[0] ) );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.remove_entities( set, list5, sizeof( list5 ) / sizeof( list5[0] ) ) );
     EntityHandle exp5[] = { 11, 16, 17, 18, 27 };
-    rval                = check_meshset_internal( mb, set, exp5, sizeof( exp5 ) / sizeof( exp5[0] ) );MB_CHK_ERR( rval );
+    MB_CHK_ERR( check_meshset_internal( mb, set, exp5, sizeof( exp5 ) / sizeof( exp5[0] ) ) );
 
     EntityHandle list6[] = { 9, 10, 15, 16, 18, 19, 28 };
-    rval                 = mb.add_entities( set, list6, sizeof( list6 ) / sizeof( list6[0] ) );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.add_entities( set, list6, sizeof( list6 ) / sizeof( list6[0] ) ) );
     EntityHandle exp6[] = { 9, 10, 11, 15, 16, 17, 18, 19, 27, 28 };
-    rval                = check_meshset_internal( mb, set, exp6, sizeof( exp6 ) / sizeof( exp6[0] ) );MB_CHK_ERR( rval );
+    MB_CHK_ERR( check_meshset_internal( mb, set, exp6, sizeof( exp6 ) / sizeof( exp6[0] ) ) );
 
     EntityHandle list7[] = { 13, 19, 27, 28 };
-    rval                 = mb.add_entities( set, list7, sizeof( list7 ) / sizeof( list7[0] ) );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.add_entities( set, list7, sizeof( list7 ) / sizeof( list7[0] ) ) );
     EntityHandle exp7[] = { 9, 10, 11, 13, 15, 16, 17, 18, 19, 27, 28 };
-    rval                = check_meshset_internal( mb, set, exp7, sizeof( exp7 ) / sizeof( exp7[0] ) );MB_CHK_ERR( rval );
+    MB_CHK_ERR( check_meshset_internal( mb, set, exp7, sizeof( exp7 ) / sizeof( exp7[0] ) ) );
 
     EntityHandle list8[] = { 12, 14, 33 };
-    rval                 = mb.add_entities( set, list8, sizeof( list8 ) / sizeof( list8[0] ) );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.add_entities( set, list8, sizeof( list8 ) / sizeof( list8[0] ) ) );
     EntityHandle exp8[] = { 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 27, 28, 33 };
-    rval                = check_meshset_internal( mb, set, exp8, sizeof( exp8 ) / sizeof( exp8[0] ) );MB_CHK_ERR( rval );
+    MB_CHK_ERR( check_meshset_internal( mb, set, exp8, sizeof( exp8 ) / sizeof( exp8[0] ) ) );
 
     EntityHandle list9[] = { 29, 30, 31, 32, 34 };
-    rval                 = mb.remove_entities( set, list9, sizeof( list9 ) / sizeof( list9[0] ) );MB_CHK_ERR( rval );
-    rval = check_meshset_internal( mb, set, exp8, sizeof( exp8 ) / sizeof( exp8[0] ) );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.remove_entities( set, list9, sizeof( list9 ) / sizeof( list9[0] ) ) );
+    MB_CHK_ERR( check_meshset_internal( mb, set, exp8, sizeof( exp8 ) / sizeof( exp8[0] ) ) );
 
     EntityHandle list10[] = { 9, 11, 13, 17, 18, 19, 28, 33, 100 };
-    rval                  = mb.remove_entities( set, list10, sizeof( list10 ) / sizeof( list10[0] ) );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.remove_entities( set, list10, sizeof( list10 ) / sizeof( list10[0] ) ) );
     EntityHandle exp10[] = { 10, 12, 14, 15, 16, 27 };
-    rval                 = check_meshset_internal( mb, set, exp10, sizeof( exp10 ) / sizeof( exp10[0] ) );MB_CHK_ERR( rval );
+    MB_CHK_ERR( check_meshset_internal( mb, set, exp10, sizeof( exp10 ) / sizeof( exp10[0] ) ) );
 
     EntityHandle list11[] = { 11, 12, 13, 14, 27, 28 };
-    rval                  = mb.remove_entities( set, list11, sizeof( list11 ) / sizeof( list11[0] ) );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.remove_entities( set, list11, sizeof( list11 ) / sizeof( list11[0] ) ) );
     EntityHandle exp11[] = { 10, 15, 16 };
-    rval                 = check_meshset_internal( mb, set, exp11, sizeof( exp11 ) / sizeof( exp11[0] ) );MB_CHK_ERR( rval );
+    MB_CHK_ERR( check_meshset_internal( mb, set, exp11, sizeof( exp11 ) / sizeof( exp11[0] ) ) );
 
     EntityHandle list12[] = { 1, 10, 15, 16 };
-    rval                  = mb.remove_entities( set, list12, sizeof( list12 ) / sizeof( list12[0] ) );MB_CHK_ERR( rval );
-    rval = check_meshset_internal( mb, set, 0, 0 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb.remove_entities( set, list12, sizeof( list12 ) / sizeof( list12[0] ) ) );
+    MB_CHK_ERR( check_meshset_internal( mb, set, 0, 0 ) );
 
     return MB_SUCCESS;
 }
@@ -4339,14 +4345,14 @@ ErrorCode mb_side_number_test()
     EntityHandle quad1[] = { verts[0], verts[1], verts[5], verts[3] };
     EntityHandle quad2[] = { verts[1], verts[5], verts[4], verts[2] };
     EntityHandle quad3[] = { verts[2], verts[4], verts[3], verts[0] };
-    rval                 = mb->create_element( MBTRI, tri, 3, faces[0] );MB_CHK_ERR( rval );
-    rval = mb->create_element( MBQUAD, quad1, 4, faces[1] );MB_CHK_ERR( rval );
-    rval = mb->create_element( MBQUAD, quad2, 4, faces[2] );MB_CHK_ERR( rval );
-    rval = mb->create_element( MBQUAD, quad3, 4, faces[3] );MB_CHK_ERR( rval );
-    rval = mb->create_element( MBTRI, tri2, 3, faces[4] );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->create_element( MBTRI, tri, 3, faces[0] ) );
+    MB_CHK_ERR( mb->create_element( MBQUAD, quad1, 4, faces[1] ) );
+    MB_CHK_ERR( mb->create_element( MBQUAD, quad2, 4, faces[2] ) );
+    MB_CHK_ERR( mb->create_element( MBQUAD, quad3, 4, faces[3] ) );
+    MB_CHK_ERR( mb->create_element( MBTRI, tri2, 3, faces[4] ) );
 
     EntityHandle prism;
-    rval = mb->create_element( MBPRISM, verts, 6, prism );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->create_element( MBPRISM, verts, 6, prism ) );
 
     /*
      * side_number(const EntityHandle parent,
@@ -4356,7 +4362,7 @@ ErrorCode mb_side_number_test()
                                     int &offset)
      */
     int side_n, sen, ofs;
-    rval = mb->side_number( prism, faces[0], side_n, sen, ofs );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->side_number( prism, faces[0], side_n, sen, ofs ) );
     CHECK_EQUAL( side_n, 3 );
     CHECK_EQUAL( sen, -1 );
     CHECK_EQUAL( ofs, 0 );
@@ -4364,14 +4370,14 @@ ErrorCode mb_side_number_test()
     // this diagonal should not be on the prism (not an edge of the prism)
     EntityHandle diagonal1;
     EntityHandle diag[] = { verts[2], verts[3] };
-    rval                = mb->create_element( MBEDGE, diag, 2, diagonal1 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->create_element( MBEDGE, diag, 2, diagonal1 ) );
     rval = mb->side_number( prism, diagonal1, side_n, sen, ofs );
     // expected fail
     if( rval != MB_FAILURE ) return MB_FAILURE;
 
     // create another triangle, connected to the  prism, but not on the side
     EntityHandle tri3[] = { verts[3], verts[4], verts[6] };
-    rval                = mb->create_element( MBTRI, tri3, 3, faces[5] );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->create_element( MBTRI, tri3, 3, faces[5] ) );
     rval = mb->side_number( prism, faces[5], side_n, sen, ofs );
     // expected fail
     if( rval != MB_FAILURE ) return MB_FAILURE;
@@ -5688,7 +5694,8 @@ ErrorCode mb_skin_fileset_test()
     EntityHandle verts[num_vtx], cells[num_elems];
     for( size_t i = 0; i < num_vtx; ++i )
     {
-        error = mb->create_vertex( coords + 3 * i, verts[i] );MB_CHK_ERR( error );
+        error = mb->create_vertex( coords + 3 * i, verts[i] );
+        MB_CHK_ERR( error );
     }
 
     for( size_t i = 0; i < num_elems; ++i )
@@ -5697,29 +5704,41 @@ ErrorCode mb_skin_fileset_test()
         for( int j = 0; j < 8; j++ )
             c[j] = verts[conn[8 * i + j]];
 
-        error = mb->create_element( MBHEX, c, 8, cells[i] );MB_CHK_ERR( error );
+        error = mb->create_element( MBHEX, c, 8, cells[i] );
+        MB_CHK_ERR( error );
     }
 
     EntityHandle fileset;
-    error = mb->create_meshset( MESHSET_SET, fileset );MB_CHK_ERR( error );
-    error = mb->add_entities( fileset, &verts[0], num_vtx );MB_CHK_ERR( error );
-    error = mb->add_entities( fileset, &cells[0], num_elems );MB_CHK_ERR( error );
+    error = mb->create_meshset( MESHSET_SET, fileset );
+    MB_CHK_ERR( error );
+    error = mb->add_entities( fileset, &verts[0], num_vtx );
+    MB_CHK_ERR( error );
+    error = mb->add_entities( fileset, &cells[0], num_elems );
+    MB_CHK_ERR( error );
 
     Range fverts, fedges, ffaces, fcells;
-    error = mb->get_entities_by_dimension( fileset, 0, fverts );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fileset, 1, fedges );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fileset, 2, ffaces );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fileset, 3, fcells );MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset, 0, fverts );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset, 1, fedges );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset, 2, ffaces );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset, 3, fcells );
+    MB_CHK_ERR( error );
 
     assert( fverts.size() == 18 && fedges.size() == 0 && ffaces.size() == 0 && fcells.size() == 4 );
 
     Skinner sk( mb );
     Range skin_ents;
-    error = sk.find_skin( fileset, fcells, 2, skin_ents, false, true );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fileset, 2, ffaces );MB_CHK_ERR( error );
+    error = sk.find_skin( fileset, fcells, 2, skin_ents, false, true );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset, 2, ffaces );
+    MB_CHK_ERR( error );
     assert( ffaces.size() == 16 );
-    error = sk.find_skin( fileset, fcells, 1, skin_ents, false, true );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fileset, 1, fedges );MB_CHK_ERR( error );
+    error = sk.find_skin( fileset, fcells, 1, skin_ents, false, true );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset, 1, fedges );
+    MB_CHK_ERR( error );
     assert( fedges.size() == 32 );
 
     const double fcoords[] = { 0, 0, 3, 1, 0, 3, 2, 0, 3, 2, 1, 3, 1, 1, 3, 0, 1, 3 };
@@ -5730,7 +5749,8 @@ ErrorCode mb_skin_fileset_test()
     EntityHandle nwverts[num_fvtx], faces[num_faces];
     for( size_t i = 0; i < num_fvtx; ++i )
     {
-        error = mb->create_vertex( fcoords + 3 * i, nwverts[i] );MB_CHK_ERR( error );
+        error = mb->create_vertex( fcoords + 3 * i, nwverts[i] );
+        MB_CHK_ERR( error );
     }
 
     for( size_t i = 0; i < num_faces; ++i )
@@ -5739,23 +5759,32 @@ ErrorCode mb_skin_fileset_test()
         for( int j = 0; j < 4; j++ )
             c[j] = nwverts[fconn[4 * i + j]];
 
-        error = mb->create_element( MBQUAD, c, 4, faces[i] );MB_CHK_ERR( error );
+        error = mb->create_element( MBQUAD, c, 4, faces[i] );
+        MB_CHK_ERR( error );
     }
     EntityHandle fileset1;
-    error = mb->create_meshset( MESHSET_SET, fileset1 );MB_CHK_ERR( error );
-    error = mb->add_entities( fileset1, &nwverts[0], num_fvtx );MB_CHK_ERR( error );
-    error = mb->add_entities( fileset1, &faces[0], num_faces );MB_CHK_ERR( error );
+    error = mb->create_meshset( MESHSET_SET, fileset1 );
+    MB_CHK_ERR( error );
+    error = mb->add_entities( fileset1, &nwverts[0], num_fvtx );
+    MB_CHK_ERR( error );
+    error = mb->add_entities( fileset1, &faces[0], num_faces );
+    MB_CHK_ERR( error );
 
     Range verts1, edges1, faces1;
-    error = mb->get_entities_by_dimension( fileset1, 0, verts1 );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fileset1, 1, edges1 );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fileset1, 2, faces1 );MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset1, 0, verts1 );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset1, 1, edges1 );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset1, 2, faces1 );
+    MB_CHK_ERR( error );
 
     assert( verts1.size() == 6 && edges1.size() == 0 && faces1.size() == 2 );
 
     //  error = sk.find_skin(fileset1, faces1, 1, skin_ents, false, true);MB_CHK_ERR(error);
-    error = sk.find_skin( fileset1, faces1, false, skin_ents, NULL, true, true, false );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fileset1, 1, edges1 );MB_CHK_ERR( error );
+    error = sk.find_skin( fileset1, faces1, false, skin_ents, NULL, true, true, false );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fileset1, 1, edges1 );
+    MB_CHK_ERR( error );
     assert( edges1.size() == 6 );
 
     return MB_SUCCESS;
@@ -7203,18 +7232,18 @@ ErrorCode mb_type_is_maxtype_test()
     if( MB_SUCCESS != rval ) return rval;
 
     Range r1, r2;
-    rval = mb->get_entities_by_type( 0, MBMAXTYPE, r1, false );MB_CHK_ERR( rval );
-    rval = mb->get_entities_by_handle( 0, r2, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type( 0, MBMAXTYPE, r1, false ) );
+    MB_CHK_ERR( mb->get_entities_by_handle( 0, r2, false ) );
     CHECK( r1 == r2 );
 
     std::vector< EntityHandle > v1, v2;
-    rval = mb->get_entities_by_type( 0, MBMAXTYPE, v1, false );MB_CHK_ERR( rval );
-    rval = mb->get_entities_by_handle( 0, v2, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type( 0, MBMAXTYPE, v1, false ) );
+    MB_CHK_ERR( mb->get_entities_by_handle( 0, v2, false ) );
     CHECK( v1 == v2 );
 
     int c1, c2;
-    rval = mb->get_number_entities_by_type( 0, MBMAXTYPE, c1, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_handle( 0, c2, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_number_entities_by_type( 0, MBMAXTYPE, c1, false ) );
+    MB_CHK_ERR( mb->get_number_entities_by_handle( 0, c2, false ) );
     CHECK( c1 == c2 );
 
     Range h1, h2;
@@ -7223,100 +7252,100 @@ ErrorCode mb_type_is_maxtype_test()
     if( it != r1.end() ) h2.insert( ++it, r1.end() );
 
     EntityHandle s1, s2;
-    rval = mb->create_meshset( MESHSET_SET, s1 );MB_CHK_ERR( rval );
-    rval = mb->create_meshset( MESHSET_ORDERED, s2 );MB_CHK_ERR( rval );
-    rval = mb->add_entities( s1, r1 );MB_CHK_ERR( rval );
-    rval = mb->add_entities( s2, r2 );MB_CHK_ERR( rval );
-    rval = mb->add_entities( s2, &s1, 1 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->create_meshset( MESHSET_SET, s1 ) );
+    MB_CHK_ERR( mb->create_meshset( MESHSET_ORDERED, s2 ) );
+    MB_CHK_ERR( mb->add_entities( s1, r1 ) );
+    MB_CHK_ERR( mb->add_entities( s2, r2 ) );
+    MB_CHK_ERR( mb->add_entities( s2, &s1, 1 ) );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type( s1, MBMAXTYPE, r1, false );MB_CHK_ERR( rval );
-    rval = mb->get_entities_by_handle( s1, r2, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type( s1, MBMAXTYPE, r1, false ) );
+    MB_CHK_ERR( mb->get_entities_by_handle( s1, r2, false ) );
     CHECK( r1 == r2 );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type( s2, MBMAXTYPE, r1, false );MB_CHK_ERR( rval );
-    rval = mb->get_entities_by_handle( s2, r2, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type( s2, MBMAXTYPE, r1, false ) );
+    MB_CHK_ERR( mb->get_entities_by_handle( s2, r2, false ) );
     CHECK( r1 == r2 );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type( s2, MBMAXTYPE, r1, true );MB_CHK_ERR( rval );
-    rval = mb->get_entities_by_handle( s2, r2, true );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type( s2, MBMAXTYPE, r1, true ) );
+    MB_CHK_ERR( mb->get_entities_by_handle( s2, r2, true ) );
     CHECK( r1 == r2 );
 
     v1.clear();
     v2.clear();
-    rval = mb->get_entities_by_type( s1, MBMAXTYPE, v1, false );MB_CHK_ERR( rval );
-    rval = mb->get_entities_by_handle( s1, v2, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type( s1, MBMAXTYPE, v1, false ) );
+    MB_CHK_ERR( mb->get_entities_by_handle( s1, v2, false ) );
     CHECK( v1 == v2 );
 
     v1.clear();
     v2.clear();
-    rval = mb->get_entities_by_type( s2, MBMAXTYPE, v1, false );MB_CHK_ERR( rval );
-    rval = mb->get_entities_by_handle( s2, v2, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type( s2, MBMAXTYPE, v1, false ) );
+    MB_CHK_ERR( mb->get_entities_by_handle( s2, v2, false ) );
     CHECK( v1 == v2 );
 
     v1.clear();
     v2.clear();
-    rval = mb->get_entities_by_type( s2, MBMAXTYPE, v1, true );MB_CHK_ERR( rval );
-    rval = mb->get_entities_by_handle( s2, v2, true );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type( s2, MBMAXTYPE, v1, true ) );
+    MB_CHK_ERR( mb->get_entities_by_handle( s2, v2, true ) );
     CHECK( v1 == v2 );
 
-    rval = mb->get_number_entities_by_type( s1, MBMAXTYPE, c1, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_handle( s1, c2, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_number_entities_by_type( s1, MBMAXTYPE, c1, false ) );
+    MB_CHK_ERR( mb->get_number_entities_by_handle( s1, c2, false ) );
     CHECK( c1 == c2 );
 
-    rval = mb->get_number_entities_by_type( s2, MBMAXTYPE, c1, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_handle( s2, c2, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_number_entities_by_type( s2, MBMAXTYPE, c1, false ) );
+    MB_CHK_ERR( mb->get_number_entities_by_handle( s2, c2, false ) );
     CHECK( c1 == c2 );
 
-    rval = mb->get_number_entities_by_type( s2, MBMAXTYPE, c1, true );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_handle( s2, c2, true );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_number_entities_by_type( s2, MBMAXTYPE, c1, true ) );
+    MB_CHK_ERR( mb->get_number_entities_by_handle( s2, c2, true ) );
     CHECK( c1 == c2 );
 
     r1.clear();
-    rval = mb->get_entities_by_handle( s1, r1 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_handle( s1, r1 ) );
     Tag t1;
-    rval = mb->tag_get_handle( "maxtype1", 1, MB_TYPE_INTEGER, t1, MB_TAG_SPARSE | MB_TAG_EXCL );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_get_handle( "maxtype1", 1, MB_TYPE_INTEGER, t1, MB_TAG_SPARSE | MB_TAG_EXCL ) );
     std::vector< int > d1( r1.size() );
     Range::iterator ri;
     std::vector< int >::iterator ii = d1.begin();
     for( ri = r1.begin(); ri != r1.end(); ++ri, ++ii )
         *ii = ( (int)ID_FROM_HANDLE( *ri ) ) % 20;
-    rval = mb->tag_set_data( t1, r1, &d1[0] );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_set_data( t1, r1, &d1[0] ) );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( 0, MBMAXTYPE, &t1, 0, 1, r1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( 0, MBMAXTYPE, &t1, 0, 1, c1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, 0, &t1, 0, 1, r2, Interface::INTERSECT, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( 0, MBMAXTYPE, &t1, 0, 1, r1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( 0, MBMAXTYPE, &t1, 0, 1, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, 0, &t1, 0, 1, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( s1, MBMAXTYPE, &t1, 0, 1, r1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( s1, MBMAXTYPE, &t1, 0, 1, c1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, s1, &t1, 0, 1, r2, Interface::INTERSECT, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( s1, MBMAXTYPE, &t1, 0, 1, r1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( s1, MBMAXTYPE, &t1, 0, 1, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, s1, &t1, 0, 1, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, 0, 1, r1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, 0, 1, c1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, s2, &t1, 0, 1, r2, Interface::INTERSECT, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, 0, 1, r1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, 0, 1, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, s2, &t1, 0, 1, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, 0, 1, r1, Interface::INTERSECT, true );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, 0, 1, c1, Interface::INTERSECT, true );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, s2, &t1, 0, 1, r2, Interface::INTERSECT, true );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, 0, 1, r1, Interface::INTERSECT, true ) );
+    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, 0, 1, c1, Interface::INTERSECT, true ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, s2, &t1, 0, 1, r2, Interface::INTERSECT, true ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
@@ -7325,84 +7354,88 @@ ErrorCode mb_type_is_maxtype_test()
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( 0, MBMAXTYPE, &t1, vallist, 1, r1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( 0, MBMAXTYPE, &t1, vallist, 1, c1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, 0, &t1, vallist, 1, r2, Interface::INTERSECT, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( 0, MBMAXTYPE, &t1, vallist, 1, r1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( 0, MBMAXTYPE, &t1, vallist, 1, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, 0, &t1, vallist, 1, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( s1, MBMAXTYPE, &t1, vallist, 1, r1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( s1, MBMAXTYPE, &t1, vallist, 1, c1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, s1, &t1, vallist, 1, r2, Interface::INTERSECT, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( s1, MBMAXTYPE, &t1, vallist, 1, r1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s1, MBMAXTYPE, &t1, vallist, 1, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, s1, &t1, vallist, 1, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, vallist, 1, r1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, vallist, 1, c1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, s2, &t1, vallist, 1, r2, Interface::INTERSECT, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, vallist, 1, r1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, vallist, 1, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, s2, &t1, vallist, 1, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, vallist, 1, r1, Interface::INTERSECT, true );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, vallist, 1, c1, Interface::INTERSECT, true );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, s2, &t1, vallist, 1, r2, Interface::INTERSECT, true );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, vallist, 1, r1, Interface::INTERSECT, true ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, &t1, vallist, 1, c1, Interface::INTERSECT, true ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, s2, &t1, vallist, 1, r2, Interface::INTERSECT, true ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_handle( s1, r1 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_handle( s1, r1 ) );
     r2.insert( r1.back() );
     r1.clear();
-    rval = mb->get_entities_by_handle( s2, r1 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_handle( s2, r1 ) );
     r2.insert( r1.front() );
 
     Tag t2;
-    rval = mb->tag_get_handle( "maxtype2", 1, MB_TYPE_INTEGER, t2, MB_TAG_DENSE | MB_TAG_EXCL );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_get_handle( "maxtype2", 1, MB_TYPE_INTEGER, t2, MB_TAG_DENSE | MB_TAG_EXCL ) );
     d1.resize( r2.size() );
     ii = d1.begin();
     ;
     for( ri = r2.begin(); ri != r2.end(); ++ri, ++ii )
         *ii = ( (int)ID_FROM_HANDLE( *ri ) ) % 2;
-    rval = mb->tag_set_data( t2, r2, &d1[0] );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_set_data( t2, r2, &d1[0] ) );
 
     Tag tags[] = { t1, t2 };
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( 0, MBMAXTYPE, tags, 0, 2, r1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( 0, MBMAXTYPE, tags, 0, 2, c1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, 0, tags, 0, 2, r2, Interface::INTERSECT, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( 0, MBMAXTYPE, tags, 0, 2, r1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( 0, MBMAXTYPE, tags, 0, 2, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, 0, tags, 0, 2, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( s1, MBMAXTYPE, tags, 0, 2, r1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( s1, MBMAXTYPE, tags, 0, 2, c1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, s1, tags, 0, 2, r2, Interface::INTERSECT, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( s1, MBMAXTYPE, tags, 0, 2, r1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( s1, MBMAXTYPE, tags, 0, 2, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, s1, tags, 0, 2, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, tags, 0, 2, r1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, 0, 2, c1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, s2, tags, 0, 2, r2, Interface::INTERSECT, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, tags, 0, 2, r1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, 0, 2, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, s2, tags, 0, 2, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, tags, 0, 2, r1, Interface::INTERSECT, true );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, 0, 2, c1, Interface::INTERSECT, true );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, s2, tags, 0, 2, r2, Interface::INTERSECT, true );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, tags, 0, 2, r1, Interface::INTERSECT, true ) );
+    MB_CHK_ERR( mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, 0, 2, c1, Interface::INTERSECT, true ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, s2, tags, 0, 2, r2, Interface::INTERSECT, true ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
@@ -7411,65 +7444,73 @@ ErrorCode mb_type_is_maxtype_test()
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( 0, MBMAXTYPE, tags, vallist, 2, r1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( 0, MBMAXTYPE, tags, vallist, 2, c1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, 0, tags, vallist, 2, r2, Interface::INTERSECT, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( 0, MBMAXTYPE, tags, vallist, 2, r1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( 0, MBMAXTYPE, tags, vallist, 2, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, 0, tags, vallist, 2, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( s1, MBMAXTYPE, tags, vallist, 2, r1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( s1, MBMAXTYPE, tags, vallist, 2, c1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, s1, tags, vallist, 2, r2, Interface::INTERSECT, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( s1, MBMAXTYPE, tags, vallist, 2, r1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s1, MBMAXTYPE, tags, vallist, 2, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, s1, tags, vallist, 2, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, r1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, c1, Interface::INTERSECT, false );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, s2, tags, vallist, 2, r2, Interface::INTERSECT, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, r1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, c1, Interface::INTERSECT, false ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, s2, tags, vallist, 2, r2, Interface::INTERSECT, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, r1, Interface::INTERSECT, true );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, c1, Interface::INTERSECT, true );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, s2, tags, vallist, 2, r2, Interface::INTERSECT, true );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, r1, Interface::INTERSECT, true ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, c1, Interface::INTERSECT, true ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, s2, tags, vallist, 2, r2, Interface::INTERSECT, true ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( 0, MBMAXTYPE, tags, vallist, 2, r1, Interface::UNION, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( 0, MBMAXTYPE, tags, vallist, 2, c1, Interface::UNION, false );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, 0, tags, vallist, 2, r2, Interface::UNION, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( 0, MBMAXTYPE, tags, vallist, 2, r1, Interface::UNION, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( 0, MBMAXTYPE, tags, vallist, 2, c1, Interface::UNION, false ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, 0, tags, vallist, 2, r2, Interface::UNION, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( s1, MBMAXTYPE, tags, vallist, 2, r1, Interface::UNION, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( s1, MBMAXTYPE, tags, vallist, 2, c1, Interface::UNION, false );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, s1, tags, vallist, 2, r2, Interface::UNION, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( s1, MBMAXTYPE, tags, vallist, 2, r1, Interface::UNION, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s1, MBMAXTYPE, tags, vallist, 2, c1, Interface::UNION, false ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, s1, tags, vallist, 2, r2, Interface::UNION, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, r1, Interface::UNION, false );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, c1, Interface::UNION, false );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, s2, tags, vallist, 2, r2, Interface::UNION, false );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, r1, Interface::UNION, false ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, c1, Interface::UNION, false ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, s2, tags, vallist, 2, r2, Interface::UNION, false ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
     r1.clear();
     r2.clear();
-    rval = mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, r1, Interface::UNION, true );MB_CHK_ERR( rval );
-    rval = mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, c1, Interface::UNION, true );MB_CHK_ERR( rval );
-    rval = get_by_all_types_and_tag( mb, s2, tags, vallist, 2, r2, Interface::UNION, true );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, r1, Interface::UNION, true ) );
+    MB_CHK_ERR(
+        mb->get_number_entities_by_type_and_tag( s2, MBMAXTYPE, tags, vallist, 2, c1, Interface::UNION, true ) );
+    MB_CHK_ERR( get_by_all_types_and_tag( mb, s2, tags, vallist, 2, r2, Interface::UNION, true ) );
     CHECK( r1 == r2 );
     CHECK( (unsigned)c1 == r2.size() );
 
@@ -7494,7 +7535,7 @@ ErrorCode mb_root_set_test()
 
     // Create a set to test with
     EntityHandle some_set;
-    rval = mb->create_meshset( MESHSET_SET, some_set );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->create_meshset( MESHSET_SET, some_set ) );
     Range sets;
     sets.insert( some_set );
 
@@ -7534,11 +7575,11 @@ ErrorCode mb_root_set_test()
     CHECK( c );
 
     Range sets2;
-    rval = mb->get_contained_meshsets( rs, sets2 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_contained_meshsets( rs, sets2 ) );
     CHECK( sets == sets2 );
 
     int count;
-    rval = mb->num_contained_meshsets( rs, &count );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->num_contained_meshsets( rs, &count ) );
     CHECK( count == (int)sets.size() );
 
     // The expected behavior for parent/child queries on the root set
@@ -7636,7 +7677,7 @@ ErrorCode check_valid_connectivity( Interface* iface )
     // check that all vertices in connectivity are valid
     // handles
     std::vector< EntityHandle > vertices, storage;
-    rval = iface->get_entities_by_type( 0, MBVERTEX, vertices );MB_CHK_ERR( rval );
+    MB_CHK_ERR( iface->get_entities_by_type( 0, MBVERTEX, vertices ) );
     std::sort( vertices.begin(), vertices.end() );
 
     // get all the elements
@@ -7644,7 +7685,7 @@ ErrorCode check_valid_connectivity( Interface* iface )
     for( int d = 1; d < 4; ++d )
     {
         tmp.clear();
-        rval = iface->get_entities_by_dimension( 0, d, tmp );MB_CHK_ERR( rval );
+        MB_CHK_ERR( iface->get_entities_by_dimension( 0, d, tmp ) );
         elements.merge( tmp );
     }
 
@@ -7655,7 +7696,7 @@ ErrorCode check_valid_connectivity( Interface* iface )
     {
         const EntityHandle* conn;
         int len;
-        rval = iface->get_connectivity( *it, conn, len, false, &storage );MB_CHK_ERR( rval );
+        MB_CHK_ERR( iface->get_connectivity( *it, conn, len, false, &storage ) );
         for( int i = 0; i < len; ++i )
         {
             if( !contained( vertices, conn[i] ) )

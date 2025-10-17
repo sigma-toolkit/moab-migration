@@ -553,7 +553,8 @@ bool test_structured_grid_3d()
 
     int len = strlen( file );
     for( unsigned i = 0; i < 27; ++i )
-        len += snprintf( file + len, 4096, "%f %f %f\n", grid_2x2x2[3 * i], grid_2x2x2[3 * i + 1], grid_2x2x2[3 * i + 2] );
+        len +=
+            snprintf( file + len, 4096, "%f %f %f\n", grid_2x2x2[3 * i], grid_2x2x2[3 * i + 1], grid_2x2x2[3 * i + 2] );
 
     return test_structured_3d( file );
 }

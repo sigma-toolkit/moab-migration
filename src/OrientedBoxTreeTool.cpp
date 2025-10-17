@@ -758,7 +758,7 @@ ErrorCode OrientedBoxTreeTool::ray_intersect_triangles( std::vector< double >& i
         rval = instance->get_entities_by_handle( *b, tris );
 #endif
         if( MB_SUCCESS != rval ) return rval;
-            // dump_fragmentation( tris );
+        // dump_fragmentation( tris );
 
 #ifndef MB_OBB_USE_VECTOR_QUERIES
         for( Range::iterator t = tris.begin(); t != tris.end(); ++t )

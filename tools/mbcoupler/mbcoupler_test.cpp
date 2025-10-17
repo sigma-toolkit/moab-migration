@@ -644,7 +644,6 @@ ErrorCode test_interpolation( Interface* mbImpl,
 
     if( !ssNormTag.empty() )
     {
-
         MB_CHK_ERR( mbc.normalize_subset( roots[0], ssNormTag.c_str(), &ssTagNames[0], ssTagNames.size(), &ssTagValues[0],
                                        Coupler::VOLUME, 4 ) );
 

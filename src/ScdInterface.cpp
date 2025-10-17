@@ -74,17 +74,17 @@ ErrorCode ScdInterface::find_boxes( std::vector< ScdBox* >& scd_boxes )
 
 ErrorCode ScdInterface::find_boxes( Range& scd_boxes )
 {
-    ErrorCode rval = MB_SUCCESS;
     box_dims_tag();
     Range boxes;
     if( !searchedBoxes )
     {
-        rval = mbImpl->get_entities_by_type_and_tag( 0, MBENTITYSET, &boxDimsTag, NULL, 1, boxes, Interface::UNION );
+        MB_CHK_SET_ERR( mbImpl->get_entities_by_type_and_tag( 0, MBENTITYSET, &boxDimsTag, NULL, 1, boxes, Interface::UNION ),
+                        "failed to get entitities by type and tag" );
         searchedBoxes = true;
         if( !boxes.empty() )
         {
             scdBoxes.resize( boxes.size() );
-            rval        = mbImpl->tag_get_data( boxSetTag, boxes, &scdBoxes[0] );
+            MB_CHK_SET_ERR( mbImpl->tag_get_data( boxSetTag, boxes, &scdBoxes[0] ), "failed to get tag data" );
             ScdBox* dum = nullptr;
             scdBoxes.erase(
                 std::remove_if(
@@ -100,7 +100,7 @@ ErrorCode ScdInterface::find_boxes( Range& scd_boxes )
     for( std::vector< ScdBox* >::iterator vit = scdBoxes.begin(); vit != scdBoxes.end(); ++vit )
         scd_boxes.insert( ( *vit )->box_set() );
 
-    return rval;
+    return MB_SUCCESS;
 }
 
 ScdBox* ScdInterface::get_scd_box( EntityHandle eh )
@@ -811,7 +811,7 @@ ErrorCode ScdInterface::tag_shared_vertices( ParallelComm* pcomm, ScdBox* box )
         int *lh = &shared_indices[offsets[p]], *rh = lh + num_indices;
         for( unsigned int i = 0; i < num_indices; i++ )
         {
-            shared_data.vi_wr[j++] = procs[p];
+            shared_data.vi_wr[j++]  = procs[p];
             shared_data.vul_wr[k++] = shandles[0] + lh[i];
             shared_data.vul_wr[k++] = rhandles[4 * p] + rh[i];
             shared_data.inc_n();
@@ -1470,8 +1470,8 @@ ErrorCode ScdInterface::get_shared_vertices( ParallelComm* pcomm,
                 if( !i && !j && !k ) continue;
                 int pto;
                 int dijk[] = { i, j, k };
-                rval = get_neighbor( pcomm->proc_config().proc_size(), pcomm->proc_config().proc_rank(),
-                                     box->par_data(), dijk, pto, ijkrem, ijkface, across_bdy );
+                rval       = get_neighbor( pcomm->proc_config().proc_size(), pcomm->proc_config().proc_rank(),
+                                           box->par_data(), dijk, pto, ijkrem, ijkface, across_bdy );
                 if( MB_SUCCESS != rval ) return rval;
                 if( -1 != pto )
                 {
@@ -1483,10 +1483,10 @@ ErrorCode ScdInterface::get_shared_vertices( ParallelComm* pcomm,
                     rval = get_indices( ldims, ijkrem, across_bdy, ijkface, shared_indices );
                     if( MB_SUCCESS != rval ) return rval;
 
-                        // check indices against known #verts on local and remote
-                        // begin of this block is shared_indices[*offsets.rbegin()], end is
-                        // shared_indices.end(), halfway is
-                        // (shared_indices.size()-*offsets.rbegin())/2
+                    // check indices against known #verts on local and remote
+                    // begin of this block is shared_indices[*offsets.rbegin()], end is
+                    // shared_indices.end(), halfway is
+                    // (shared_indices.size()-*offsets.rbegin())/2
 #ifndef NDEBUG
                     int start_idx = *offsets.rbegin(), end_idx = shared_indices.size(),
                         mid_idx = ( start_idx + end_idx ) / 2;

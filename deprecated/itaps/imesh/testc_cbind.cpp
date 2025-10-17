@@ -21,7 +21,7 @@
  * number of functions evaluating that mesh.  This test also tests mesh, set
  * and tag creation and evaluation functions.
  *
- * Usage: testcxx <mesh_file_name>
+ * Usage: testcxx \c mesh_file_name
  *
  * Compiling
  * ---------

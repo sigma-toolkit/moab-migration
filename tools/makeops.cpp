@@ -130,7 +130,8 @@ ErrorCode make_atomic_pillow()
 
     for( int i = 0; i < 8; i++ )
     {
-        result = gMB->create_vertex( &vtx_coord[3 * i], vtx_handles[i] );MB_CHK_ERR( result );
+        result = gMB->create_vertex( &vtx_coord[3 * i], vtx_handles[i] );
+        MB_CHK_ERR( result );
     }
 
     EntityHandle conn[8], elems[4];
@@ -138,23 +139,29 @@ ErrorCode make_atomic_pillow()
     // make the two hexes
     for( int i = 0; i < 8; i++ )
         conn[i] = vtx_handles[connect[i]];
-    result = gMB->create_element( MBHEX, conn, 8, elems[0] );MB_CHK_ERR( result );
+    result = gMB->create_element( MBHEX, conn, 8, elems[0] );
+    MB_CHK_ERR( result );
 
     for( int i = 0; i < 8; i++ )
         conn[i] = vtx_handles[connect[8 + i]];
-    result = gMB->create_element( MBHEX, conn, 8, elems[1] );MB_CHK_ERR( result );
+    result = gMB->create_element( MBHEX, conn, 8, elems[1] );
+    MB_CHK_ERR( result );
 
     // make one of the end quads explicitly and bind to the first hex
     for( int i = 0; i < 4; i++ )
         conn[i] = vtx_handles[connect[i]];
-    result = gMB->create_element( MBQUAD, conn, 4, elems[2] );MB_CHK_ERR( result );
+    result = gMB->create_element( MBQUAD, conn, 4, elems[2] );
+    MB_CHK_ERR( result );
 
-    result = gMB->add_adjacencies( elems[2], elems, 1, false );MB_CHK_ERR( result );
+    result = gMB->add_adjacencies( elems[2], elems, 1, false );
+    MB_CHK_ERR( result );
 
     // now the other one
-    result = gMB->create_element( MBQUAD, conn, 4, elems[3] );MB_CHK_ERR( result );
+    result = gMB->create_element( MBQUAD, conn, 4, elems[3] );
+    MB_CHK_ERR( result );
 
-    result = gMB->add_adjacencies( elems[3], &elems[1], 1, false );MB_CHK_ERR( result );
+    result = gMB->add_adjacencies( elems[3], &elems[1], 1, false );
+    MB_CHK_ERR( result );
 
     return MB_SUCCESS;
 }
@@ -175,7 +182,8 @@ ErrorCode make_face_shrink()
 
     for( int i = 0; i < 16; i++ )
     {
-        result = gMB->create_vertex( &vtx_coord[3 * i], vtx_handles[i] );MB_CHK_ERR( result );
+        result = gMB->create_vertex( &vtx_coord[3 * i], vtx_handles[i] );
+        MB_CHK_ERR( result );
     }
 
     // make all elements at once
@@ -186,7 +194,8 @@ ErrorCode make_face_shrink()
         for( int i = 0; i < 8; i++ )
             conn[i] = vtx_handles[connect[j * 8 + i]];
 
-        result = gMB->create_element( MBHEX, conn, 8, elems[j] );MB_CHK_ERR( result );
+        result = gMB->create_element( MBHEX, conn, 8, elems[j] );
+        MB_CHK_ERR( result );
     }
 
     return MB_SUCCESS;
@@ -234,7 +243,8 @@ ErrorCode make_chord_push()
 
     for( int i = 0; i < 16; i++ )
     {
-        result = gMB->create_vertex( &vtx_coord[3 * i], vtx_handles[i] );MB_CHK_ERR( result );
+        result = gMB->create_vertex( &vtx_coord[3 * i], vtx_handles[i] );
+        MB_CHK_ERR( result );
     }
 
     EntityHandle conn[8], elems[12];
@@ -244,7 +254,8 @@ ErrorCode make_chord_push()
     {
         for( int j = 0; j < 8; j++ )
             conn[j] = vtx_handles[connect[8 * i + j]];
-        result = gMB->create_element( MBHEX, conn, 8, elems[i] );MB_CHK_ERR( result );
+        result = gMB->create_element( MBHEX, conn, 8, elems[i] );
+        MB_CHK_ERR( result );
     }
 
     // make the frontmost pair of quads and bind to the front degen hex
@@ -252,7 +263,8 @@ ErrorCode make_chord_push()
     {
         for( int j = 0; j < 4; j++ )
             conn[j] = vtx_handles[connect[40 + 4 * i + j]];
-        result = gMB->create_element( MBQUAD, conn, 4, elems[5 + i] );MB_CHK_ERR( result );
+        result = gMB->create_element( MBQUAD, conn, 4, elems[5 + i] );
+        MB_CHK_ERR( result );
     }
 
     // now the back pair
@@ -260,7 +272,8 @@ ErrorCode make_chord_push()
     {
         for( int j = 0; j < 4; j++ )
             conn[j] = vtx_handles[connect[40 + 4 * i + j]];
-        result = gMB->create_element( MBQUAD, conn, 4, elems[7 + i] );MB_CHK_ERR( result );
+        result = gMB->create_element( MBQUAD, conn, 4, elems[7 + i] );
+        MB_CHK_ERR( result );
     }
 
     // make the duplicated edges explicitly too
@@ -268,40 +281,54 @@ ErrorCode make_chord_push()
     {
         for( int j = 0; j < 2; j++ )
             conn[j] = vtx_handles[connect[48 + j]];
-        result = gMB->create_element( MBEDGE, conn, 2, elems[9 + i] );MB_CHK_ERR( result );
+        result = gMB->create_element( MBEDGE, conn, 2, elems[9 + i] );
+        MB_CHK_ERR( result );
     }
 
     // now the quad between the lower pair of hexes
     for( int j = 0; j < 4; j++ )
         conn[j] = vtx_handles[connect[50 + j]];
-    result = gMB->create_element( MBQUAD, conn, 4, elems[11] );MB_CHK_ERR( result );
+    result = gMB->create_element( MBQUAD, conn, 4, elems[11] );
+    MB_CHK_ERR( result );
 
     // now set adjacencies explicitly
     // front/rear duplicated edge to front/rear pair of quads
-    result = gMB->add_adjacencies( elems[9], &elems[5], 2, false );MB_CHK_ERR( result );
-    result = gMB->add_adjacencies( elems[10], &elems[7], 2, false );MB_CHK_ERR( result );
+    result = gMB->add_adjacencies( elems[9], &elems[5], 2, false );
+    MB_CHK_ERR( result );
+    result = gMB->add_adjacencies( elems[10], &elems[7], 2, false );
+    MB_CHK_ERR( result );
 
     // rear duplicated edge to quad between lower pair of normal hexes
-    result = gMB->add_adjacencies( elems[10], &elems[11], 1, false );MB_CHK_ERR( result );
+    result = gMB->add_adjacencies( elems[10], &elems[11], 1, false );
+    MB_CHK_ERR( result );
 
     // front/rear duplicated edge to front/rear degen hex
-    result = gMB->add_adjacencies( elems[9], &elems[3], 1, false );MB_CHK_ERR( result );
-    result = gMB->add_adjacencies( elems[10], &elems[4], 1, false );MB_CHK_ERR( result );
+    result = gMB->add_adjacencies( elems[9], &elems[3], 1, false );
+    MB_CHK_ERR( result );
+    result = gMB->add_adjacencies( elems[10], &elems[4], 1, false );
+    MB_CHK_ERR( result );
 
     // rear duplicated edge to normal hexes behind it
-    result = gMB->add_adjacencies( elems[10], &elems[1], 2, false );MB_CHK_ERR( result );
+    result = gMB->add_adjacencies( elems[10], &elems[1], 2, false );
+    MB_CHK_ERR( result );
 
     // front pair of quads to front degen hex
-    result = gMB->add_adjacencies( elems[5], &elems[3], 1, false );MB_CHK_ERR( result );
-    result = gMB->add_adjacencies( elems[6], &elems[3], 1, false );MB_CHK_ERR( result );
+    result = gMB->add_adjacencies( elems[5], &elems[3], 1, false );
+    MB_CHK_ERR( result );
+    result = gMB->add_adjacencies( elems[6], &elems[3], 1, false );
+    MB_CHK_ERR( result );
 
     // rear pair of quads to rear degen hex
-    result = gMB->add_adjacencies( elems[7], &elems[4], 1, false );MB_CHK_ERR( result );
-    result = gMB->add_adjacencies( elems[8], &elems[4], 1, false );MB_CHK_ERR( result );
+    result = gMB->add_adjacencies( elems[7], &elems[4], 1, false );
+    MB_CHK_ERR( result );
+    result = gMB->add_adjacencies( elems[8], &elems[4], 1, false );
+    MB_CHK_ERR( result );
 
     // rear pair of quads to normal hexes behind them
-    result = gMB->add_adjacencies( elems[7], &elems[1], 1, false );MB_CHK_ERR( result );
-    result = gMB->add_adjacencies( elems[8], &elems[2], 1, false );MB_CHK_ERR( result );
+    result = gMB->add_adjacencies( elems[7], &elems[1], 1, false );
+    MB_CHK_ERR( result );
+    result = gMB->add_adjacencies( elems[8], &elems[2], 1, false );
+    MB_CHK_ERR( result );
 
     return MB_SUCCESS;
 }
@@ -336,7 +363,8 @@ ErrorCode make_triple_chord_push()
 
     for( int i = 0; i < 16; i++ )
     {
-        result = gMB->create_vertex( &vtx_coord[3 * i], vtx_handles[i] );MB_CHK_ERR( result );
+        result = gMB->create_vertex( &vtx_coord[3 * i], vtx_handles[i] );
+        MB_CHK_ERR( result );
     }
 
     EntityHandle conn[8], elems[12];
@@ -346,7 +374,8 @@ ErrorCode make_triple_chord_push()
     {
         for( int j = 0; j < 8; j++ )
             conn[j] = vtx_handles[connect[8 * i + j]];
-        result = gMB->create_element( MBHEX, conn, 8, elems[i] );MB_CHK_ERR( result );
+        result = gMB->create_element( MBHEX, conn, 8, elems[i] );
+        MB_CHK_ERR( result );
     }
 
     return MB_SUCCESS;

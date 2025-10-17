@@ -39,18 +39,18 @@ int main( int argc, char* argv[] )
 
     MPI_Comm_group( MPI_COMM_WORLD, &jgroup );  // all processes in jgroup
 
-    int cplrof        = 22,
-        cpllnd        = 10;  // component ids are unique over all pes, and established in advance;
+    int cplrof = 22,
+        cpllnd = 10;  // component ids are unique over all pes, and established in advance;
 
-    std::string rof_data = TestDir + "unittest/rof_comp_p32.h5m";
-    std::string rof_mesh = TestDir + "unittest/SCRIPgrid_2x2_nomask_c210211.nc";
+    std::string rof_data    = TestDir + "unittest/rof_comp_p32.h5m";
+    std::string rof_mesh    = TestDir + "unittest/SCRIPgrid_2x2_nomask_c210211.nc";
     std::string lndFilename = TestDir + "unittest/domain.lnd.ne4pg2_oQU480.200527.nc";
 #ifdef MOAB_HAVE_ZOLTAN
     std::string readopts_lnd( "PARALLEL=READ_PART;PARTITION_METHOD=SQIJ;VARIABLE=;REPARTITION" );
     std::string readopts_rof( "PARALLEL=READ_PART;PARTITION_METHOD=RCBZOLTAN" );
 #else
     std::string readopts_lnd( "PARALLEL=READ_PART;PARTITION_METHOD=SQIJ;VARIABLE=" );
-    std::string readopts_rof( "PARALLEL=READ_PART;");
+    std::string readopts_rof( "PARALLEL=READ_PART;" );
 #endif
 
     std::string mapFilename = TestDir + "unittest/map_r2_to_ne4pg2_mono.210211.nc";  // this is a netcdf file!
@@ -59,14 +59,14 @@ int main( int argc, char* argv[] )
     // this will be projected and generate a baseline after sending it to coupler
 
     std::string baseline = TestDir + "unittest/baseline_lnd.txt";
-    int cmprof = 21,
-        roflndid = 2210;  // 100*22 + 10 component ids are unique over all pes, and established in advance;
+    int cmprof           = 21,
+        roflndid         = 2210;  // 100*22 + 10 component ids are unique over all pes, and established in advance;
 
     int rankInCouComm = -1;
 
     int nghlay = 0;  // number of ghost layers for loading the file
     std::vector< int > groupTasks;
-    int startG1 = 0,  endG1 = numProcesses - 1;
+    int startG1 = 0, endG1 = numProcesses - 1;
 
     int startG4 = startG1, endG4 = endG1;  // these are for coupler layout
 
@@ -139,9 +139,9 @@ int main( int argc, char* argv[] )
     int cplRofAppID       = -1;            // -1 means it is not initialized
     iMOAB_AppID cplRofPID = &cplRofAppID;  // rof on coupler PEs
 
-    int cplLndAppID = -1;
-    iMOAB_AppID cplLndPID    = &cplLndAppID;     // lnd on coupler PEs
-    int cplRofLndAppID = -1;
+    int cplLndAppID          = -1;
+    iMOAB_AppID cplLndPID    = &cplLndAppID;  // lnd on coupler PEs
+    int cplRofLndAppID       = -1;
     iMOAB_AppID cplRofLndPID = &cplRofLndAppID;  // map rof -lnd on coupler PEs
 
     if( couComm != MPI_COMM_NULL )
@@ -149,7 +149,7 @@ int main( int argc, char* argv[] )
         MPI_Comm_rank( couComm, &rankInCouComm );
         // Register all the applications on the coupler PEs
         ierr = iMOAB_RegisterApplication( "ROFX", &couComm, &cplrof,
-                cplRofPID );  // rof on coupler pes
+                                          cplRofPID );  // rof on coupler pes
         CHECKIERR( ierr, "Cannot register ROF over coupler PEs" )
 
         ierr = iMOAB_RegisterApplication( "LNDX", &couComm, &cpllnd,
@@ -167,7 +167,6 @@ int main( int argc, char* argv[] )
 
     MPI_Barrier( MPI_COMM_WORLD );
 
-
     if( couComm != MPI_COMM_NULL )
     {
         //
@@ -177,15 +176,16 @@ int main( int argc, char* argv[] )
 
     // load rof data on component rof; fake a time step export
     // rof data is on a point cloud mesh
-    if (rofComm != MPI_COMM_NULL)
+    if( rofComm != MPI_COMM_NULL )
     {
-        std::string readopts( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS");// load a point cloud with rof data
+        std::string readopts(
+            "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS" );  // load a point cloud with rof data
         ierr = iMOAB_LoadMesh( cmpRofPID, rof_data.c_str(), readopts.c_str(), &nghlay );
         CHECKIERR( ierr, "Cannot load component data file" )
     }
 
     // load rof mesh, lnd mesh on coupler
-    if (couComm != MPI_COMM_NULL)
+    if( couComm != MPI_COMM_NULL )
     {
         ierr = iMOAB_LoadMesh( cplRofPID, rof_mesh.c_str(), readopts_rof.c_str(), &nghlay );
         CHECKIERR( ierr, "Cannot load scrip file for rof " )
@@ -198,8 +198,8 @@ int main( int argc, char* argv[] )
 
     if( rofCouComm != MPI_COMM_NULL )
     {
-        int type1 = 2; // 2: Vertex (point cloud); rof is point cloud on component side
-        int type2 = 3; // 3: fv on coupler
+        int type1 = 2;  // 2: Vertex (point cloud); rof is point cloud on component side
+        int type2 = 3;  // 3: fv on coupler
         CHECKIERR( iMOAB_ComputeCommGraph( cmpRofPID, cplRofPID, &rofCouComm, &rofPEGroup, &couPEGroup, &type1, &type2,
                                            &cmprof, &cplrof ),
                    "cannot compute graph between rof on comp and rof on coupler" )
@@ -210,21 +210,21 @@ int main( int argc, char* argv[] )
     {
         int src_disc_type = 3;  // element-based FV
         int tgt_disc_type = 3;  // element-based FV
-        int arearead = 0; // no need for aream
-        CHECKIERR( iMOAB_LoadMapFile( cplRofPID, cplLndPID, cplRofLndPID, &src_disc_type, &tgt_disc_type,
-                                              &arearead, intx_from_file_identifier.c_str(), mapFilename.c_str() ),
+        int arearead      = 0;  // no need for aream
+        CHECKIERR( iMOAB_LoadMapFile( cplRofPID, cplLndPID, cplRofLndPID, &src_disc_type, &tgt_disc_type, &arearead,
+                                      intx_from_file_identifier.c_str(), mapFilename.c_str() ),
                    "failed to load map file from disk" );
-        int type      = 3;  // FV
+        int type = 3;  // FV
         // because it is like "coverage", context will be roflndid
-        ierr = iMOAB_MigrateMapMesh( cplRofPID, cplRofLndPID, &couComm, &couPEGroup, &couPEGroup, &type,
-                                     &cplrof, &roflndid);
+        ierr = iMOAB_MigrateMapMesh( cplRofPID, cplRofLndPID, &couComm, &couPEGroup, &couPEGroup, &type, &cplrof,
+                                     &roflndid );
         CHECKIERR( ierr, "failed to migrate mesh for rof on coupler" );
     }
     MPI_Barrier( MPI_COMM_WORLD );
 
     int tagIndex;
-    int tagTypes[2]  = { DENSE_DOUBLE, DENSE_DOUBLE };
-    int compOrder = disc_orders[0] * disc_orders[0] /*FV*/;
+    int tagTypes[2] = { DENSE_DOUBLE, DENSE_DOUBLE };
+    int compOrder   = disc_orders[0] * disc_orders[0] /*FV*/;
     int filter_type = 0;
 
     if( couComm != MPI_COMM_NULL )
@@ -236,9 +236,9 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "failed to define the field tag on projection" );
     }
 
-    if( rofComm != MPI_COMM_NULL  )  // we are on source rof pes
+    if( rofComm != MPI_COMM_NULL )  // we are on source rof pes
     {
-        ierr = iMOAB_DefineTagStorage( cmpRofPID, field, &tagTypes[0], &compOrder, &tagIndex);
+        ierr = iMOAB_DefineTagStorage( cmpRofPID, field, &tagTypes[0], &compOrder, &tagIndex );
         CHECKIERR( ierr, "failed to define the field tag" );
     }
 
@@ -265,7 +265,8 @@ int main( int argc, char* argv[] )
         ierr = iMOAB_FreeSenderBuffers( cmpRofPID, &cplrof );
         CHECKIERR( ierr, "cannot free buffers used to send rof towards coupler" )
     }
-    if( couComm != MPI_COMM_NULL ){
+    if( couComm != MPI_COMM_NULL )
+    {
         ierr = iMOAB_WriteMesh( cplRofPID, "RofCpl2.h5m", fileWriteOptions );
         CHECKIERR( ierr, "cannot write rof on coupler" )
     }
@@ -287,7 +288,6 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "cannot receive tag values" )
     }
 
-
     // we can now free the sender buffers
     if( couComm != MPI_COMM_NULL )
     {
@@ -296,25 +296,24 @@ int main( int argc, char* argv[] )
     }
     if( couComm != MPI_COMM_NULL )
     {
-        ierr = iMOAB_WriteCoverageMesh( cplRofLndPID, "rof_cover_lnd");
+        ierr = iMOAB_WriteCoverageMesh( cplRofLndPID, "rof_cover_lnd" );
         CHECKIERR( ierr, "cannot write coverage mesh" )
     }
 
     POP_TIMER( MPI_COMM_WORLD, rankInGlobalComm )
-
 
     if( couComm != MPI_COMM_NULL )
     {
         /* We have the remapping weights now. Let us apply the weights onto the tag we defined
            on the source mesh and get the projection on the target mesh */
         PUSH_TIMER( "Apply Scalar projection weights" )
-        ierr = iMOAB_ApplyScalarProjectionWeights( cplRofLndPID, &filter_type, intx_from_file_identifier.c_str(),
-                                                   field, field );
+        ierr = iMOAB_ApplyScalarProjectionWeights( cplRofLndPID, &filter_type, intx_from_file_identifier.c_str(), field,
+                                                   field );
         CHECKIERR( ierr, "failed to compute projection weight application" );
         POP_TIMER( couComm, rankInCouComm )
 
         {
-            int numTasksCpl=endG4-startG4+1;
+            int numTasksCpl = endG4 - startG4 + 1;
             std::ostringstream outfile;
             outfile << "fLndOnCpl_" << numTasksCpl << ".h5m";
             ierr = iMOAB_WriteMesh( cplLndPID, outfile.str().c_str(), fileWriteOptions );
@@ -346,13 +345,11 @@ int main( int argc, char* argv[] )
             int ent_type = 1;
             ierr         = iMOAB_GetIntTagStorage( cplLndPID, GidStr.c_str(), &nelem[2], &ent_type, &gidElems[0] );
             CHECKIERR( ierr, "failed to get global ids" );
-            ierr = iMOAB_GetDoubleTagStorage( cplLndPID, field, &nelem[2], &ent_type,
-                                              &tempElems[0] );
+            ierr = iMOAB_GetDoubleTagStorage( cplLndPID, field, &nelem[2], &ent_type, &tempElems[0] );
             CHECKIERR( ierr, "failed to get temperature field" );
             int err_code = 1;
             check_baseline_file( baseline, gidElems, tempElems, 1.e-9, err_code );
-            if( 0 == err_code )
-                std::cout << " passed baseline test atm2ocn on ocean task " << rankInGlobalComm << "\n";
+            if( 0 == err_code ) std::cout << " passed baseline test atm2ocn on ocean task " << rankInGlobalComm << "\n";
         }
     }
 

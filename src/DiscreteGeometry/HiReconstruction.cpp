@@ -59,16 +59,21 @@ ErrorCode HiReconstruction::initialize( bool recwhole )
     {
         return MB_MEMORY_ALLOCATION_FAILED;
     }
-    error = ahf->initialize();MB_CHK_ERR( error );
+    error = ahf->initialize();
+    MB_CHK_ERR( error );
 #else
-    ahf        = NULL;
+    ahf = NULL;
 #endif
 
     // error = ahf->get_entity_ranges(_inverts,_inedges,_infaces,_incells); MB_CHK_ERR(error);
-    error = mbImpl->get_entities_by_dimension( _mesh2rec, 0, _inverts );MB_CHK_ERR( error );
-    error = mbImpl->get_entities_by_dimension( _mesh2rec, 1, _inedges );MB_CHK_ERR( error );
-    error = mbImpl->get_entities_by_dimension( _mesh2rec, 2, _infaces );MB_CHK_ERR( error );
-    error = mbImpl->get_entities_by_dimension( _mesh2rec, 3, _incells );MB_CHK_ERR( error );
+    error = mbImpl->get_entities_by_dimension( _mesh2rec, 0, _inverts );
+    MB_CHK_ERR( error );
+    error = mbImpl->get_entities_by_dimension( _mesh2rec, 1, _inedges );
+    MB_CHK_ERR( error );
+    error = mbImpl->get_entities_by_dimension( _mesh2rec, 2, _infaces );
+    MB_CHK_ERR( error );
+    error = mbImpl->get_entities_by_dimension( _mesh2rec, 3, _incells );
+    MB_CHK_ERR( error );
     if( _inedges.size() && _infaces.empty() && _incells.empty() )
     {
         _dim     = 1;
@@ -88,7 +93,8 @@ ErrorCode HiReconstruction::initialize( bool recwhole )
 #ifdef MOAB_HAVE_MPI
     if( pcomm )
     {
-        error = pcomm->filter_pstatus( _inverts, PSTATUS_GHOST, PSTATUS_NOT, -1, &_verts2rec );MB_CHK_ERR( error );
+        error = pcomm->filter_pstatus( _inverts, PSTATUS_GHOST, PSTATUS_NOT, -1, &_verts2rec );
+        MB_CHK_ERR( error );
     }
     else
     {
@@ -161,7 +167,8 @@ ErrorCode HiReconstruction::reconstruct3D_surf_geom( int degree, bool interp, bo
         degree_out      = &( _degrees_out[index] );
         _interps[index] = interp;
         error = polyfit3d_walf_surf_vertex( *ivert, interp, degree, _MINPNTS, safeguard, 9, coords, degree_out, ncoeffs,
-                                            coeffs );MB_CHK_ERR( error );
+                                            coeffs );
+        MB_CHK_ERR( error );
 
         // DBG
         // if( degree_out[0] < degree ) dcount += 1;
@@ -211,7 +218,8 @@ ErrorCode HiReconstruction::reconstruct3D_surf_geom( size_t npts,
         _interps[index] = interps[i];
         int ncoeffs     = ( degrees[i] + 2 ) * ( degrees[i] + 1 ) / 2;
         error = polyfit3d_walf_surf_vertex( *ivert, interps[i], degrees[i], _MINPNTS, safeguard, 9, coords, degree_out,
-                                            ncoeffs, coeffs );MB_CHK_ERR( error );
+                                            ncoeffs, coeffs );
+        MB_CHK_ERR( error );
     }
     _geom        = HISURFACE;
     _hasfittings = true;
@@ -243,7 +251,8 @@ ErrorCode HiReconstruction::reconstruct3D_curve_geom( int degree, bool interp, b
         degree_out      = &( _degrees_out[index] );
         _interps[index] = interp;
         error = polyfit3d_walf_curve_vertex( *ivert, interp, degree, _MINPNTS, safeguard, 0, coords, degree_out,
-                                             ncoeffs, coeffs );MB_CHK_ERR( error );
+                                             ncoeffs, coeffs );
+        MB_CHK_ERR( error );
     }
     _geom        = HI3DCURVE;
     _hasfittings = true;
@@ -284,7 +293,8 @@ ErrorCode HiReconstruction::reconstruct3D_curve_geom( size_t npts,
         _interps[index] = interps[i];
         int ncoeffs     = 3 * ( degrees[i] + 1 );
         error = polyfit3d_walf_curve_vertex( *ivert, interps[i], degrees[i], _MINPNTS, safeguard, 0, coords, degree_out,
-                                             ncoeffs, coeffs );MB_CHK_ERR( error );
+                                             ncoeffs, coeffs );
+        MB_CHK_ERR( error );
     }
     _geom        = HI3DCURVE;
     _hasfittings = true;
@@ -308,7 +318,8 @@ ErrorCode HiReconstruction::polyfit3d_walf_surf_vertex( const EntityHandle vid,
     // std::cout<<"ring = "<<ring<<std::endl;
     // get n-ring neighbors
     Range ngbvs;
-    error = obtain_nring_ngbvs( vid, ring, minpnts, ngbvs );MB_CHK_ERR( error );
+    error = obtain_nring_ngbvs( vid, ring, minpnts, ngbvs );
+    MB_CHK_ERR( error );
     // for debug
     /*if(_verts2rec.index(vid)==70){
         for(Range::iterator ingb=ngbvs.begin();ingb!=ngbvs.end();++ingb) std::cerr <<
@@ -319,10 +330,12 @@ ErrorCode HiReconstruction::polyfit3d_walf_surf_vertex( const EntityHandle vid,
     size_t nverts = ngbvs.size();
     assert( nverts );
     double* ngbcoords = new double[nverts * 3];
-    error             = mbImpl->get_coords( ngbvs, ngbcoords );MB_CHK_ERR( error );
+    error             = mbImpl->get_coords( ngbvs, ngbcoords );
+    MB_CHK_ERR( error );
     // get normals
     double* ngbnrms = new double[nverts * 3];
-    error           = get_normals_surf( ngbvs, ngbnrms );MB_CHK_ERR( error );
+    error           = get_normals_surf( ngbvs, ngbnrms );
+    MB_CHK_ERR( error );
     // switch vid to first one
     int index = ngbvs.index( vid );
     assert( index != -1 );
@@ -356,15 +369,18 @@ ErrorCode HiReconstruction::polyfit3d_walf_curve_vertex( const EntityHandle vid,
     int ring = estimate_num_rings( degree, interp );
     // get n-ring neighbors
     Range ngbvs;
-    error = obtain_nring_ngbvs( vid, ring, minpnts, ngbvs );MB_CHK_ERR( error );
+    error = obtain_nring_ngbvs( vid, ring, minpnts, ngbvs );
+    MB_CHK_ERR( error );
     // get coordinates
     size_t nverts = ngbvs.size();
     assert( nverts );
     double* ngbcoords = new double[nverts * 3];
-    error             = mbImpl->get_coords( ngbvs, ngbcoords );MB_CHK_ERR( error );
+    error             = mbImpl->get_coords( ngbvs, ngbcoords );
+    MB_CHK_ERR( error );
     // get tangent vectors
     double* ngbtangs = new double[nverts * 3];
-    error            = get_tangents_curve( ngbvs, ngbtangs );MB_CHK_ERR( error );
+    error            = get_tangents_curve( ngbvs, ngbtangs );
+    MB_CHK_ERR( error );
     // switch vid to first one
     int index = ngbvs.index( vid );
     assert( index != -1 );
@@ -396,7 +412,8 @@ ErrorCode HiReconstruction::hiproj_walf_in_element( EntityHandle elem,
     ErrorCode error;
     // get connectivity table
     std::vector< EntityHandle > elemconn;
-    error = mbImpl->get_connectivity( &elem, 1, elemconn );MB_CHK_ERR( error );
+    error = mbImpl->get_connectivity( &elem, 1, elemconn );
+    MB_CHK_ERR( error );
     if( nvpe != (int)elemconn.size() )
     {
         MB_SET_ERR( MB_FAILURE, "element connectivity table size doesn't match input size" );
@@ -429,7 +446,8 @@ ErrorCode HiReconstruction::hiproj_walf_in_element( EntityHandle elem,
     }
 
     double* elemcoords = new double[nvpe * 3];
-    error              = mbImpl->get_coords( &( elemconn[0] ), nvpe, elemcoords );MB_CHK_ERR( error );
+    error              = mbImpl->get_coords( &( elemconn[0] ), nvpe, elemcoords );
+    MB_CHK_ERR( error );
 
     double* coords2fit = new double[3 * npts2fit]();
     for( int i = 0; i < npts2fit; ++i )
@@ -451,7 +469,8 @@ ErrorCode HiReconstruction::hiproj_walf_in_element( EntityHandle elem,
     // for each input vertex, call nvpe fittings and take average
     for( int j = 0; j < nvpe; ++j )
     {
-        error = hiproj_walf_around_vertex( elemconn[j], npts2fit, coords2fit, hiproj_new );MB_CHK_ERR( error );
+        error = hiproj_walf_around_vertex( elemconn[j], npts2fit, coords2fit, hiproj_new );
+        MB_CHK_ERR( error );
         for( int i = 0; i < npts2fit; ++i )
         {
             newcoords[3 * i] += naturalcoords2fit[i * nvpe + j] * hiproj_new[3 * i];
@@ -484,7 +503,8 @@ ErrorCode HiReconstruction::hiproj_walf_around_vertex( EntityHandle vid,
     ErrorCode error;
     // get center of local coordinates system
     double local_origin[3];
-    error = mbImpl->get_coords( &vid, 1, local_origin );MB_CHK_ERR( error );
+    error = mbImpl->get_coords( &vid, 1, local_origin );
+    MB_CHK_ERR( error );
     // get local fitting parameters
     int index     = _verts2rec.index( vid );
     bool interp   = _interps[index];
@@ -662,9 +682,11 @@ ErrorCode HiReconstruction::vertex_get_incident_elements( const EntityHandle& vi
     ErrorCode error;
     assert( elemdim == _dim );
 #ifdef HIREC_USE_AHF
-    error = ahf->get_up_adjacencies( vid, elemdim, adjents );MB_CHK_ERR( error );
+    error = ahf->get_up_adjacencies( vid, elemdim, adjents );
+    MB_CHK_ERR( error );
 #else
-    error      = mbImpl->get_adjacencies( &vid, 1, elemdim, false, adjents );MB_CHK_ERR( error );
+    error = mbImpl->get_adjacencies( &vid, 1, elemdim, false, adjents );
+    MB_CHK_ERR( error );
 #endif
     return error;
 }
@@ -685,11 +707,13 @@ ErrorCode HiReconstruction::obtain_nring_ngbvs( const EntityHandle vid, int ring
             todo.pop_front();
             --count;
             std::vector< EntityHandle > adjents;
-            error = vertex_get_incident_elements( center, _dim, adjents );MB_CHK_ERR( error );
+            error = vertex_get_incident_elements( center, _dim, adjents );
+            MB_CHK_ERR( error );
             for( size_t j = 0; j < adjents.size(); ++j )
             {
                 std::vector< EntityHandle > elemconn;
-                error = mbImpl->get_connectivity( &adjents[j], 1, elemconn );MB_CHK_ERR( error );
+                error = mbImpl->get_connectivity( &adjents[j], 1, elemconn );
+                MB_CHK_ERR( error );
                 int nvpe = elemconn.size();
                 for( int k = 0; k < nvpe; ++k )
                 {
@@ -842,7 +866,8 @@ ErrorCode HiReconstruction::average_vertex_normal( const EntityHandle vid, doubl
 {
     ErrorCode error;
     std::vector< EntityHandle > adjfaces;
-    error = vertex_get_incident_elements( vid, 2, adjfaces );MB_CHK_ERR( error );
+    error = vertex_get_incident_elements( vid, 2, adjfaces );
+    MB_CHK_ERR( error );
     int npolys = adjfaces.size();
     if( !npolys )
     {
@@ -856,7 +881,8 @@ ErrorCode HiReconstruction::average_vertex_normal( const EntityHandle vid, doubl
         {
             // get incident "triangles"
             std::vector< EntityHandle > elemconn;
-            error = mbImpl->get_connectivity( &adjfaces[i], 1, elemconn );MB_CHK_ERR( error );
+            error = mbImpl->get_connectivity( &adjfaces[i], 1, elemconn );
+            MB_CHK_ERR( error );
             EntityHandle pre, nxt;
             int nvpe = elemconn.size();
             for( int j = 0; j < nvpe; ++j )
@@ -869,9 +895,12 @@ ErrorCode HiReconstruction::average_vertex_normal( const EntityHandle vid, doubl
                 }
             }
             // compute area weighted normals
-            error = mbImpl->get_coords( &pre, 1, a );MB_CHK_ERR( error );
-            error = mbImpl->get_coords( &vid, 1, b );MB_CHK_ERR( error );
-            error = mbImpl->get_coords( &nxt, 1, c );MB_CHK_ERR( error );
+            error = mbImpl->get_coords( &pre, 1, a );
+            MB_CHK_ERR( error );
+            error = mbImpl->get_coords( &vid, 1, b );
+            MB_CHK_ERR( error );
+            error = mbImpl->get_coords( &nxt, 1, c );
+            MB_CHK_ERR( error );
             DGMSolver::vec_linear_operation( 3, 1, c, -1, b, v1 );
             DGMSolver::vec_linear_operation( 3, 1, a, -1, b, v2 );
             DGMSolver::vec_crossprod( v1, v2, v3 );
@@ -895,7 +924,8 @@ ErrorCode HiReconstruction::compute_average_vertex_normals_surf()
     size_t index = 0;
     for( Range::iterator ivert = _verts2rec.begin(); ivert != _verts2rec.end(); ++ivert, ++index )
     {
-        error = average_vertex_normal( *ivert, &( _local_coords[9 * index + 6] ) );MB_CHK_ERR( error );
+        error = average_vertex_normal( *ivert, &( _local_coords[9 * index + 6] ) );
+        MB_CHK_ERR( error );
     }
     return error;
 }
@@ -913,7 +943,8 @@ ErrorCode HiReconstruction::get_normals_surf( const Range& vertsh, double* nrms 
             if( -1 == index )
             {
                 // ghost vertex
-                error = average_vertex_normal( *ivert, nrms + 3 * id );MB_CHK_ERR( error );
+                error = average_vertex_normal( *ivert, nrms + 3 * id );
+                MB_CHK_ERR( error );
             }
             else
             {
@@ -934,7 +965,8 @@ ErrorCode HiReconstruction::get_normals_surf( const Range& vertsh, double* nrms 
         size_t id = 0;
         for( Range::iterator ivert = vertsh.begin(); ivert != vertsh.end(); ++ivert, ++id )
         {
-            error = average_vertex_normal( *ivert, nrms + 3 * id );MB_CHK_ERR( error );
+            error = average_vertex_normal( *ivert, nrms + 3 * id );
+            MB_CHK_ERR( error );
         }
     }
     return error;
@@ -944,7 +976,8 @@ ErrorCode HiReconstruction::average_vertex_tangent( const EntityHandle vid, doub
 {
     ErrorCode error;
     std::vector< EntityHandle > adjedges;
-    error = vertex_get_incident_elements( vid, 1, adjedges );MB_CHK_ERR( error );
+    error = vertex_get_incident_elements( vid, 1, adjedges );
+    MB_CHK_ERR( error );
     int nedges = adjedges.size();
     if( !nedges )
     {
@@ -982,7 +1015,8 @@ ErrorCode HiReconstruction::compute_average_vertex_tangents_curve()
     size_t index = 0;
     for( Range::iterator ivert = _verts2rec.begin(); ivert != _verts2rec.end(); ++ivert, ++index )
     {
-        error = average_vertex_tangent( *ivert, &( _local_coords[3 * index] ) );MB_CHK_ERR( error );
+        error = average_vertex_tangent( *ivert, &( _local_coords[3 * index] ) );
+        MB_CHK_ERR( error );
     }
     return error;
 }
@@ -1005,7 +1039,8 @@ ErrorCode HiReconstruction::get_tangents_curve( const Range& vertsh, double* tan
             }
             else
             {
-                error = average_vertex_tangent( *ivert, tangs + 3 * id );MB_CHK_ERR( error );
+                error = average_vertex_tangent( *ivert, tangs + 3 * id );
+                MB_CHK_ERR( error );
             }
 #else
             assert( -1 != index );
@@ -1020,7 +1055,8 @@ ErrorCode HiReconstruction::get_tangents_curve( const Range& vertsh, double* tan
         size_t id = 0;
         for( Range::iterator ivert = vertsh.begin(); ivert != vertsh.end(); ++ivert, ++id )
         {
-            error = average_vertex_tangent( *ivert, tangs + 3 * id );MB_CHK_ERR( error );
+            error = average_vertex_tangent( *ivert, tangs + 3 * id );
+            MB_CHK_ERR( error );
         }
     }
     return error;

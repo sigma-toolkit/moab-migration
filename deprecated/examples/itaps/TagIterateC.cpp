@@ -1,3 +1,9 @@
+/** @example TagIterateC.cpp
+ * This program shows how to get a pointer to tag memory, allowing an application to work
+ * directly with tag memory instead of calling through the api.
+ * It demonstrates using iMesh interface to iterate over entities and access tag data directly.
+ */
+
 /*
  * This program shows how to get a pointer to tag memory, allowing an application to work
  * directly with tag memory instead of calling through the api.

@@ -9,7 +9,7 @@
  *
  *
  * example of usage:
- * ./mbcmpfiles -i file1.h5m -j file2.h5m -n <tag_name>  -o out.file
+ * ./mbcmpfiles -i file1.h5m -j file2.h5m -n \c tag_name  -o out.file
  *
  * if no tag name is specified, it will try to compare all tags in the files
  *
@@ -79,8 +79,7 @@ int main( int argc, char* argv[] )
 
     std::map< int, EntityHandle > cGidHandle;
     std::vector< int > gids;
-    Tag gid;
-    MB_CHK_SET_ERR( mb->tag_get_handle( "GLOBAL_ID", gid ), "can't get global id tag" );
+    Tag gid = mb->globalId_tag();
 
     Range ents = cells;
     if( dim == 0 ) ents = nodes;
@@ -117,9 +116,7 @@ int main( int argc, char* argv[] )
     // construct maps between global id and handles
     std::map< int, EntityHandle > cGidHandle2;
 
-    Tag gid2;
-    MB_CHK_SET_ERR( mb2->tag_get_handle( "GLOBAL_ID", gid2 ), "can't get global id tag2" );
-
+    Tag gid2 = mb2->globalId_tag();
     std::vector< int > gids2( ents2.size() );
     MB_CHK_SET_ERR( mb2->tag_get_data( gid2, ents2, &gids2[0] ), "can't get global id on second entities" );
 
@@ -186,26 +183,26 @@ int main( int argc, char* argv[] )
         std::string tag_name_diff = tag_name + "_diff";
         if( doubleType )
         {
-            std::vector< double > def_vald( len_tag );
-            MB_CHK_SET_ERR( mb->tag_get_default_value( tag, &def_vald[0] ), "can't get default" );
-            MB_CHK_SET_ERR( mb->tag_get_handle( new_tag_name.c_str(), len_tag, dtype, newTag, MB_TAG_CREAT | MB_TAG_DENSE,
-                                       &def_vald[0] ), "can't define new tag" );
-            for( int k = 0; k < len_tag; k++ )
-                def_vald[k] = 0.;
+            std::vector< double > def_vald( len_tag, 0.0 );
+            MB_CHK_SET_ERR( mb->tag_get_default_value( tag, &def_vald[0] ), "can't get default double tag value" );
+            MB_CHK_SET_ERR( mb->tag_get_handle( new_tag_name.c_str(), len_tag, dtype, newTag,
+                                                MB_TAG_CREAT | MB_TAG_DENSE, &def_vald[0] ),
+                            "can't define new double tag" );
             MB_CHK_SET_ERR( mb->tag_get_handle( tag_name_diff.c_str(), len_tag, dtype, newTagDiff,
-                                       MB_TAG_CREAT | MB_TAG_DENSE | MB_TAG_DFTOK, &def_vald[0] ), "can't define new tag diff" );
+                                                MB_TAG_CREAT | MB_TAG_DENSE | MB_TAG_DFTOK, &def_vald[0] ),
+                            "can't define new double tag diff" );
         }
         else
         {
-            std::vector< int > def_vali( len_tag );
-            MB_CHK_SET_ERR( mb->tag_get_default_value( tag, &def_vali[0] ), "can't get default" );
+            std::vector< int > def_vali( len_tag, 0 );
+            MB_CHK_SET_ERR( mb->tag_get_default_value( tag, &def_vali[0] ), "can't get default integer tag value" );
             // the difference should be the same size tag
-            MB_CHK_SET_ERR( mb->tag_get_handle( new_tag_name.c_str(), len_tag, dtype, newTag, MB_TAG_CREAT | MB_TAG_DENSE,
-                                       &def_vali[0] ), "can't define new tag" );
-            for( int k = 0; k < len_tag; k++ )
-                def_vali[k] = 0.;
+            MB_CHK_SET_ERR( mb->tag_get_handle( new_tag_name.c_str(), len_tag, dtype, newTag,
+                                                MB_TAG_CREAT | MB_TAG_DENSE, &def_vali[0] ),
+                            "can't define new integer tag" );
             MB_CHK_SET_ERR( mb->tag_get_handle( tag_name_diff.c_str(), len_tag, dtype, newTagDiff,
-                                       MB_TAG_CREAT | MB_TAG_DENSE | MB_TAG_DFTOK, &def_vali[0] ), "can't define new tag diff" );
+                                                MB_TAG_CREAT | MB_TAG_DENSE | MB_TAG_DFTOK, &def_vali[0] ),
+                            "can't define new integer tag diff" );
         }
 
         i             = 0;

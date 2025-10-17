@@ -54,7 +54,7 @@ int main( int argc, char* argv[] )
     int fail = MPI_Init( &argc, &argv );
     if( fail ) return 1;
 #else
-    argv[0]   = argv[argc - argc];  // To remove the warnings in serial mode about unused variables
+    argv[0] = argv[argc - argc];  // To remove the warnings in serial mode about unused variables
 #endif
 
     result += RUN_TEST( test_read_eul_all );
@@ -589,7 +589,7 @@ void test_read_scrip()
     std::string orig, opts;
     rval = get_options( orig );CHECK_ERR( rval );
 
-    opts = orig + std::string( ";VARIABLE=" );
+    opts = orig + std::string( ";VARIABLE=;REPARTITION" );
     rval = mb.load_file( example_scrip.c_str(), &set, opts.c_str() );CHECK_ERR( rval );
 }
 
@@ -600,7 +600,7 @@ ErrorCode get_options( std::string& opts )
     opts = std::string( ";;PARALLEL=READ_PART;PARTITION_METHOD=SQIJ;DEBUG_IO=2;" );
     return MB_SUCCESS;
 #else
-    opts      = std::string( ";;" );
+    opts = std::string( ";;" );
     return MB_SUCCESS;
 #endif
 }

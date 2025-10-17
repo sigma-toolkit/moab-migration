@@ -88,7 +88,7 @@ void usage( const char* argv0, bool brief = true )
     std::ostream& str = brief ? std::cerr : std::cout;
 
     str << "Usage: " << argv0 << " [-o <output_file>]"
-        << " [-f|-F] [-t|-T] [-n|-c] [-i <n>]"
+        << " [-f|-F] [-t|-T] [-n|-c] [-i \c n]"
         << " [-m <x>,<y>[,<w>,<h>]]"
         << " [-r <x>,<y>[,<w>,<h>]]" << std::endl;
     if( brief )

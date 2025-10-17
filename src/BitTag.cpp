@@ -98,7 +98,7 @@ ErrorCode BitTag::set_data( SequenceManager* seqman,
                             size_t num_handles,
                             const void* gen_data )
 {
-    ErrorCode rval = seqman->check_valid_entities( NULL, handles, num_handles, true );MB_CHK_ERR( rval );
+    MB_CHK_ERR( seqman->check_valid_entities( NULL, handles, num_handles, true ) );
 
     EntityType type;
     size_t page;
@@ -124,7 +124,7 @@ ErrorCode BitTag::clear_data( SequenceManager* seqman,
 {
     if( value_len ) return MB_INVALID_SIZE;
 
-    ErrorCode rval = seqman->check_valid_entities( NULL, handles, num_handles, true );MB_CHK_ERR( rval );
+    MB_CHK_ERR( seqman->check_valid_entities( NULL, handles, num_handles, true ) );
 
     EntityType type;
     size_t page;
@@ -197,7 +197,7 @@ ErrorCode BitTag::get_data( const SequenceManager*, Error*, const Range& handles
 
 ErrorCode BitTag::set_data( SequenceManager* seqman, Error* /* error */, const Range& handles, const void* gen_data )
 {
-    ErrorCode rval = seqman->check_valid_entities( NULL, handles );MB_CHK_ERR( rval );
+    MB_CHK_ERR( seqman->check_valid_entities( NULL, handles ) );
 
     EntityType type;
     EntityID count;
@@ -237,7 +237,7 @@ ErrorCode BitTag::clear_data( SequenceManager* seqman,
 {
     if( value_len ) return MB_INVALID_SIZE;
 
-    ErrorCode rval = seqman->check_valid_entities( NULL, handles );MB_CHK_ERR( rval );
+    MB_CHK_ERR( seqman->check_valid_entities( NULL, handles ) );
 
     EntityType type;
     EntityID count;
@@ -474,10 +474,9 @@ ErrorCode BitTag::get_entities_with_bits( const Range& range,
 {
     if( MBMAXTYPE == in_type )
     {
-        ErrorCode rval;
         for( --in_type; in_type >= MBVERTEX; --in_type )
         {
-            rval = get_entities_with_bits( range, in_type, entities, bits );MB_CHK_ERR( rval );
+            MB_CHK_ERR( get_entities_with_bits( range, in_type, entities, bits ) );
         }
         return MB_SUCCESS;
     }

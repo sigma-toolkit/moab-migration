@@ -1264,9 +1264,9 @@ ErrorCode test_parallel_partition( int* gdims, int nprocs, int part_method )
                         std::cerr << "ScdParData: " << spd << std::endl;
                     }
                 }  // i
-            }      // j
-        }          // k
-    }              // p
+            }  // j
+        }  // k
+    }  // p
 
     return ( fails ? MB_FAILURE : MB_SUCCESS );
 }

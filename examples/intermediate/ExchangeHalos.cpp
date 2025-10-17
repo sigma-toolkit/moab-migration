@@ -1,6 +1,7 @@
-/** @example ExchangeHalos Driver
- * \brief Example program that shows the use case for performing tag data exchange
- * between parallel processors in order to sync data on shared entities.
+/** @example ExchangeHalos.cpp
+ * 
+ * Example program that shows the use case for performing tag data exchange
+ * between parallel processors in order to sync data on shared entities. \n\n
  *
  * <b>This example </b>:
  *    -# Initialize MPI and instantiates MOAB
@@ -19,9 +20,8 @@
  *    -#  Destroy the MOAB instance and finalize MPI
  *
  * <b>To run: </b>
- *      mpiexec -n np ./ExchangeHalos --input <mpas_mesh_file> --nghosts <ghostlayers> --vtaglength <vector component
- * size> \
- *                    --nexchanges <number of exchange runs>
+ *      mpiexec -n np ./ExchangeHalos --input \c mpas_mesh_file --nghosts \c ghostlayers --vtaglength \c vector_component_size 
+ *                    --nexchanges \c number_of_exchange_runs
  * <b>Example:</b>
  *      mpiexec -n 4 ./ExchangeHalos --input $MOAB_DIR/MeshFiles/unittest/io/mpasx1.642.t.2.nc --nghosts 3 --vtaglength 100
  *

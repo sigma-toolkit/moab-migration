@@ -1,28 +1,14 @@
-/// \file mbex4.cpp
-///
-/// \author Milad Fatenejad
-///
-/// \brief beginner tutorial, example 4: Create a 2D structured mesh
-///        and set some tag data on it
-///
-/// In this example, we create a 2D structured mesh (actually a 3D
-/// mesh made of quads) and then we will actually set data on the
-/// mesh. Tags represent data that is attached to entities. In this
-/// example, we will create two tags:
-///
-/// -# A "temperature" tag that is a single double precision number
-///    attached to each quad.
-/// -# A "velocity" tag that is an array of 2 double precision numbers
-///    attached to each vertex.
-///
-/// We will write the mesh out to a file, and you can visualize the
-/// data using your favorite tool.
-///
-/// In this example, I am demonstrating these operations in the
-/// clearest possible way - not using the most efficient method. MOAB
-/// has been designed so that users do not need to sacrifice
-/// performance - future examples will demonstrate how to
-/// access/manipulate the mesh using the fastest methods possible.
+/** @example mbex4.cpp
+ * \brief beginner tutorial, example 4: Demonstrates creating a structured mesh
+ *
+ * In this example, we create a 2x2x2 mesh that is identical to the
+ * previous example. However, in this case we will use the structured
+ * mesh interface since the mesh we created is logically
+ * structured. There are many advantages to using the structured mesh
+ * interface...such as memory savings, speed, ease-of-use...
+ *
+ * \author Milad Fatenejad
+ */
 
 // The moab/Core.hpp header file is needed for all MOAB work...
 #include "moab/Core.hpp"
@@ -61,11 +47,12 @@ int main()
     moab::ScdInterface* scdint;
 
     // Tell MOAB that our mesh is structured:
-    rval = mbint.query_interface( scdint );MB_CHK_SET_ERR( rval, "mbint.query_interface failed" );
+    MB_CHK_SET_ERR( mbint.query_interface( scdint ), "mbint.query_interface failed" );
 
     // Create the mesh:
     moab::ScdBox* scdbox = NULL;
-    rval = scdint->construct_box( moab::HomCoord( 0, 0, 0 ), moab::HomCoord( NI, NJ, 0 ), NULL, 0, scdbox );MB_CHK_SET_ERR( rval, "scdint->construct_box failed" );
+    MB_CHK_SET_ERR( scdint->construct_box( moab::HomCoord( 0, 0, 0 ), moab::HomCoord( NI, NJ, 0 ), NULL, 0, scdbox ),
+                    "scdint->construct_box failed" );
 
     // MOAB knows to make quads instead of hexes because the last start
     // and end indexes are the same (0). Note that it is still a "3D"
@@ -156,7 +143,8 @@ int main()
             double temperature = std::exp( -0.5 * r );
 
             // Set the temperature on a single quad:
-            rval = mbint.tag_set_data( temp_tag, &handle, 1, &temperature );MB_CHK_SET_ERR( rval, "mbint.tag_set_data(temp_tag) failed" );
+            MB_CHK_SET_ERR( mbint.tag_set_data( temp_tag, &handle, 1, &temperature ),
+                            "mbint.tag_set_data(temp_tag) failed" );
         }
 
     // Loop through each vertex and set the velocity:
@@ -168,7 +156,7 @@ int main()
             double velocity[2]        = { i, j };
 
             // Set the velocity on a vertex:
-            rval = mbint.tag_set_data( vel_tag, &handle, 1, velocity );MB_CHK_SET_ERR( rval, "mbint.tag_set_data(vel_tag) failed" );
+            MB_CHK_SET_ERR( mbint.tag_set_data( vel_tag, &handle, 1, velocity ), "mbint.tag_set_data(vel_tag) failed" );
         }
 
     // ***************************
@@ -180,7 +168,7 @@ int main()
     // plot it. But you should be able to plot the temperature on top of
     // the mesh.
 
-    rval = mbint.write_file( "mbex4.vtk" );MB_CHK_SET_ERR( rval, "write_file(mbex4.vtk) failed" );
+    MB_CHK_SET_ERR( mbint.write_file( "mbex4.vtk" ), "write_file(mbex4.vtk) failed" );
 
     return 0;
 }

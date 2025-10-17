@@ -424,7 +424,7 @@ void read_buffered_map()
                 // clear the local buffer
                 dataRowCols.clear();
             }  // if( nEntriesComm > 0 )
-        }      // if( rank != rootProc )
+        }  // if( rank != rootProc )
 
         MPI_Barrier( commW );
 #endif
@@ -502,7 +502,7 @@ void read_map_from_disk()
 
     std::vector< double > areaA, areaB;  // will not be used in this test
     int nA, nB;                          // not used by this test
-    int arearead = 0; // do not read areas
+    int arearead = 0;                    // do not read areas
     rval = onlinemap.ReadParallelMap( remap_weights_filename.c_str(), tgt_owned_ids, arearead, areaA, nA, areaB, nB );
     CHECK_EQUAL( rval, moab::MB_SUCCESS );
 

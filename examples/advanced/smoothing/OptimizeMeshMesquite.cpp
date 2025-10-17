@@ -1,3 +1,15 @@
+/** @example OptimizeMeshMesquite.cpp
+ * This example demonstrates mesh optimization using the Mesquite library.
+ * It shows how to load meshes using both native MOAB and iMesh interfaces,
+ * apply various mesh optimization algorithms from Mesquite,
+ * use different quality metrics (aspect ratio, condition number, etc.),
+ * perform global and local mesh smoothing,
+ * handle geometry constraints using domain definitions,
+ * and measure mesh quality before and after optimization.
+ * The example demonstrates integration between MOAB and Mesquite
+ * for advanced mesh optimization and quality improvement.
+ */
+
 #include "Mesquite.hpp"
 #include "MsqIBase.hpp"
 #include "MsqIGeom.hpp"
@@ -347,9 +359,9 @@ int run_local_smoother( MeshDomainAssoc& mesh_and_domain, MsqError& err, double 
         reinterpret_cast< MBiMesh* >( dynamic_cast< MsqIMesh* >( mesh )->get_imesh_instance() )->mbImpl;
 
     moab::Tag fixed;
-    moab::ErrorCode rval = mbi->tag_get_handle( "fixed", 1, moab::MB_TYPE_INTEGER, fixed );MB_CHK_SET_ERR( rval, "Getting tag handle failed" );
+    MB_CHK_SET_ERR( mbi->tag_get_handle( "fixed", 1, moab::MB_TYPE_INTEGER, fixed ), "Getting tag handle failed" );
     moab::Range cells;
-    rval = mbi->get_entities_by_dimension( 0, 2, cells );MB_CHK_SET_ERR( rval, "Querying elements failed" );
+    MB_CHK_SET_ERR( mbi->get_entities_by_dimension( 0, 2, cells ), "Querying elements failed" );
 
     moab::LloydSmoother lloyd( mbi, 0, cells, 0, 0 /*fixed*/ );
 
@@ -620,27 +632,28 @@ int get_imesh_mesh( MBMesquite::Mesh** mesh, const char* file_name, int dimensio
         moab::Interface* mbi       = reinterpret_cast< MBiMesh* >( instance )->mbImpl;
         moab::EntityHandle currset = 0;
         moab::Tag fixed;
-        int def_val          = 0;
-        err                  = 0;
-        moab::ErrorCode rval = mbi->tag_get_handle( "fixed", 1, moab::MB_TYPE_INTEGER, fixed,
-                                                    moab::MB_TAG_CREAT | moab::MB_TAG_DENSE, &def_val );MB_CHK_SET_ERR( rval, "Getting tag handle failed" );
+        int def_val = 0;
+        err         = 0;
+        moab::MB_CHK_SET_ERR( mbi->tag_get_handle( "fixed", 1, moab::MB_TYPE_INTEGER, fixed,
+                                                   moab::MB_TAG_CREAT | moab::MB_TAG_DENSE, &def_val ),
+                              "Getting tag handle failed" );
         moab::Range verts, cells, skin_verts;
-        rval = mbi->get_entities_by_type( currset, moab::MBVERTEX, verts );MB_CHK_SET_ERR( rval, "Querying vertices failed" );
-        rval = mbi->get_entities_by_dimension( currset, dimension, cells );MB_CHK_SET_ERR( rval, "Querying elements failed" );
+        MB_CHK_SET_ERR( mbi->get_entities_by_type( currset, moab::MBVERTEX, verts ), "Querying vertices failed" );
+        MB_CHK_SET_ERR( mbi->get_entities_by_dimension( currset, dimension, cells ), "Querying elements failed" );
         std::cout << "Found " << verts.size() << " vertices and " << cells.size() << " elements" << std::endl;
 
         moab::Skinner skinner( mbi );
-        rval = skinner.find_skin( currset, cells, true, skin_verts );MB_CHK_SET_ERR( rval,
+        MB_CHK_SET_ERR( skinner.find_skin( currset, cells, true, skin_verts ),
                         "Finding the skin of the mesh failed" );  // 'true' param indicates we want
                                                                   // vertices back, not cells
 
         std::vector< int > fix_tag( skin_verts.size(), 1 );  // initialized to 1 to indicate fixed
-        rval = mbi->tag_set_data( fixed, skin_verts, &fix_tag[0] );MB_CHK_SET_ERR( rval, "Setting tag data failed" );
+        MB_CHK_SET_ERR( mbi->tag_set_data( fixed, skin_verts, &fix_tag[0] ), "Setting tag data failed" );
         std::cout << "Found " << skin_verts.size() << " vertices on the skin of the domain." << std::endl;
 
         // fix_tag.resize(verts.size(),0);
-        // rval = mbi->tag_get_data(fixed, verts, &fix_tag[0]); MB_CHK_SET_ERR(rval, "Getting tag
-        // data failed");
+        // MB_CHK_SET_ERR( mbi->tag_get_data(fixed, verts, &fix_tag[0]), "Getting tag
+        // data failed" );
 
         iMesh_getTagHandle( instance, "fixed", &fixed_tag, &err, strlen( "fixed" ) );
         CHECK_IMESH( "Getting tag handle (fixed) failed" );
@@ -648,8 +661,9 @@ int get_imesh_mesh( MBMesquite::Mesh** mesh, const char* file_name, int dimensio
         // Set some arbitrary solution indicator
         moab::Tag solindTag;
         double def_val_dbl = 0.0;
-        rval               = mbi->tag_get_handle( "solution_indicator", 1, moab::MB_TYPE_DOUBLE, solindTag,
-                                                  moab::MB_TAG_CREAT | moab::MB_TAG_DENSE, &def_val_dbl );MB_CHK_SET_ERR( rval, "Getting tag handle failed" );
+        MB_CHK_SET_ERR( mbi->tag_get_handle( "solution_indicator", 1, moab::MB_TYPE_DOUBLE, solindTag,
+                                             moab::MB_TAG_CREAT | moab::MB_TAG_DENSE, &def_val_dbl ),
+                        "Getting tag handle failed" );
         solution_indicator.resize( cells.size(), 0.01 );
         for( unsigned i = 0; i < cells.size() / 4; i++ )
             solution_indicator[i] = 0.1;
@@ -660,7 +674,7 @@ int get_imesh_mesh( MBMesquite::Mesh** mesh, const char* file_name, int dimensio
         for( unsigned i = 3 * cells.size() / 4; i < cells.size(); i++ )
             solution_indicator[i] = 0.5;
 
-        rval = mbi->tag_set_data( solindTag, cells, &solution_indicator[0] );MB_CHK_SET_ERR( rval, "Setting tag data failed" );
+        MB_CHK_SET_ERR( mbi->tag_set_data( solindTag, cells, &solution_indicator[0] ), "Setting tag data failed" );
     }
 
     MsqError ierr;

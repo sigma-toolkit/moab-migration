@@ -40,12 +40,11 @@
 #endif
 #endif
 
-
 #endif
 
 /** Public Compiler-Specifc Pre-Processor Macros */
 
-/**\def PRINT_FORMAT(start)
+/**\def MB_PRINTF(start)
  *\brief Give a hint to the compiler the function is like \c printf
  *
  * Tell the compiler that the function involves a printf-style format
@@ -56,11 +55,11 @@
  *
  *\param START The position of the format string in the argument list, where
  *             the first argument is 1.
- *\NOTE This macro is designed to be used with member functions of C++ classes,
+ *\note This macro is designed to be used with member functions of C++ classes,
  *      and therefore explicitly accounts for the implicit \c this pointer
  *      in the argument list.  It will not work correctly with static or
  *      non-member functions.
- *\NOTE This macro assumes that the arguments referenced in the format string
+ *\note This macro assumes that the arguments referenced in the format string
  *      begin immediately after the format string itself.
  */
 #ifdef __GNUC__
@@ -68,6 +67,8 @@
 #else
 #define MB_PRINTF( START )
 #endif
+
+#define UNUSED( x ) (void)( x )
 
 /**\def MB_DLL_EXPORT
  *\brief Declare a function or class to be visible in shared library.

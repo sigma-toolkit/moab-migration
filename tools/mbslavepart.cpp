@@ -96,12 +96,16 @@ int main( int argc, char* argv[] )
     }
 
     EntityHandle masterfileset, slavefileset;
-    error = mbCore->create_meshset( moab::MESHSET_TRACK_OWNER | moab::MESHSET_SET, masterfileset );MB_CHK_ERR( error );
-    error = mbCore->create_meshset( moab::MESHSET_TRACK_OWNER | moab::MESHSET_SET, slavefileset );MB_CHK_ERR( error );
+    error = mbCore->create_meshset( moab::MESHSET_TRACK_OWNER | moab::MESHSET_SET, masterfileset );
+    MB_CHK_ERR( error );
+    error = mbCore->create_meshset( moab::MESHSET_TRACK_OWNER | moab::MESHSET_SET, slavefileset );
+    MB_CHK_ERR( error );
 
     // Load file
-    error = mbCore->load_file( masterfile.c_str(), &masterfileset, read_options.c_str() );MB_CHK_ERR( error );
-    error = mbCore->load_file( slavefile.c_str(), &slavefileset, read_options.c_str() );MB_CHK_ERR( error );
+    error = mbCore->load_file( masterfile.c_str(), &masterfileset, read_options.c_str() );
+    MB_CHK_ERR( error );
+    error = mbCore->load_file( slavefile.c_str(), &slavefileset, read_options.c_str() );
+    MB_CHK_ERR( error );
     // if (error != MB_SUCCESS && size > 1)
     // {
     //   std::string newread_options = "PARALLEL=BCAST_DELETE;PARALLEL_RESOLVE_SHARED_ENTS";
@@ -112,12 +116,14 @@ int main( int argc, char* argv[] )
     Tag gidtag = 0, parttag = 0, sparttag = 0;
     int dum_id = -1;
     error      = mbCore->tag_get_handle( partition_set_name.c_str(), 1, MB_TYPE_INTEGER, parttag,
-                                         MB_TAG_SPARSE | MB_TAG_CREAT, &dum_id );MB_CHK_ERR( error );
+                                         MB_TAG_SPARSE | MB_TAG_CREAT, &dum_id );
+    MB_CHK_ERR( error );
     gidtag = mbCore->globalId_tag();
     if( keepsparts )
     {
         error = mbCore->tag_get_handle( std::string( partition_set_name + "_SLAVE" ).c_str(), 1, MB_TYPE_INTEGER,
-                                        sparttag, MB_TAG_CREAT | MB_TAG_SPARSE, &dum_id );MB_CHK_ERR( error );
+                                        sparttag, MB_TAG_CREAT | MB_TAG_SPARSE, &dum_id );
+        MB_CHK_ERR( error );
     }
 
     Range melems, msets, selems, ssets;
@@ -125,7 +131,8 @@ int main( int argc, char* argv[] )
     // Get the partition sets on the master mesh
     std::map< int, int > mpartvals;
     error = mbCore->get_entities_by_type_and_tag( masterfileset, MBENTITYSET, &parttag, NULL, 1, msets,
-                                                  moab::Interface::UNION, true );MB_CHK_ERR( error );
+                                                  moab::Interface::UNION, true );
+    MB_CHK_ERR( error );
     if( msets.size() == 0 )
     {
         std::cout << "No partition sets found in the master mesh. Quitting..." << std::endl;
@@ -137,19 +144,22 @@ int main( int argc, char* argv[] )
         EntityHandle mset = msets[i];
 
         moab::Range msetelems;
-        error = mbCore->get_entities_by_dimension( mset, dimension, msetelems );MB_CHK_ERR( error );
+        error = mbCore->get_entities_by_dimension( mset, dimension, msetelems );
+        MB_CHK_ERR( error );
         melems.merge( msetelems );
 
         int partID;
-        error = mbCore->tag_get_data( parttag, &mset, 1, &partID );MB_CHK_ERR( error );
+        error = mbCore->tag_get_data( parttag, &mset, 1, &partID );
+        MB_CHK_ERR( error );
 
         // Get the global ID and use that as the indicator
         std::vector< int > gidMelems( msetelems.size() );
-        error = mbCore->tag_get_data( gidtag, msetelems, gidMelems.data() );MB_CHK_ERR( error );
+        error = mbCore->tag_get_data( gidtag, msetelems, gidMelems.data() );
+        MB_CHK_ERR( error );
 
         for( unsigned j = 0; j < msetelems.size(); ++j )
             mpartvals[gidMelems[j]] = partID;
-            // mpartvals[msetelems[j]]=partID;
+        // mpartvals[msetelems[j]]=partID;
 #ifdef VERBOSE
         std::cout << "Part " << partID << " has " << msetelems.size() << " elements." << std::endl;
 #endif
@@ -157,9 +167,11 @@ int main( int argc, char* argv[] )
 
     // Get information about the slave file set
     error = mbCore->get_entities_by_type_and_tag( slavefileset, MBENTITYSET, &parttag, NULL, 1, ssets,
-                                                  moab::Interface::UNION );MB_CHK_ERR( error );
+                                                  moab::Interface::UNION );
+    MB_CHK_ERR( error );
     // TODO: expand and add other dimensional elements
-    error = mbCore->get_entities_by_dimension( slavefileset, dimension, selems );MB_CHK_ERR( error );
+    error = mbCore->get_entities_by_dimension( slavefileset, dimension, selems );
+    MB_CHK_ERR( error );
 
     std::cout << "Master (elements, parts) : (" << melems.size() << ", " << msets.size()
               << "), Slave (elements, parts) : (" << selems.size() << ", " << ssets.size() << ")" << std::endl;
@@ -169,23 +181,29 @@ int main( int argc, char* argv[] )
     std::vector< double > mastercoords;
     Range masterverts, slaveverts;
     {
-        error = mbCore->get_entities_by_dimension( masterfileset, 0, masterverts );MB_CHK_ERR( error );
-        error = mbCore->get_entities_by_dimension( slavefileset, 0, slaveverts );MB_CHK_ERR( error );
+        error = mbCore->get_entities_by_dimension( masterfileset, 0, masterverts );
+        MB_CHK_ERR( error );
+        error = mbCore->get_entities_by_dimension( slavefileset, 0, slaveverts );
+        MB_CHK_ERR( error );
     }
     if( use_spherical )
     {
         double points[6];
         EntityHandle mfrontback[2] = { masterverts[0], masterverts[masterverts.size() - 1] };
-        error                      = mbCore->get_coords( &mfrontback[0], 2, points );MB_CHK_ERR( error );
+        error                      = mbCore->get_coords( &mfrontback[0], 2, points );
+        MB_CHK_ERR( error );
         // master_radius = 0.5 * ( std::sqrt( points[0] * points[0] + points[1] * points[1] + points[2] * points[2] ) +
         //                         std::sqrt( points[3] * points[3] + points[4] * points[4] + points[5] * points[5] ) );
         EntityHandle sfrontback[2] = { slaveverts[0], slaveverts[slaveverts.size() - 1] };
-        error                      = mbCore->get_coords( &sfrontback[0], 2, points );MB_CHK_ERR( error );
+        error                      = mbCore->get_coords( &sfrontback[0], 2, points );
+        MB_CHK_ERR( error );
         slave_radius = 0.5 * ( std::sqrt( points[0] * points[0] + points[1] * points[1] + points[2] * points[2] ) +
                                std::sqrt( points[3] * points[3] + points[4] * points[4] + points[5] * points[5] ) );
         // Let us rescale both master and slave meshes to a unit sphere
-        error = moab::IntxUtils::ScaleToRadius( mbCore, masterfileset, 1.0 );MB_CHK_ERR( error );
-        error = moab::IntxUtils::ScaleToRadius( mbCore, slavefileset, 1.0 );MB_CHK_ERR( error );
+        error = moab::IntxUtils::ScaleToRadius( mbCore, masterfileset, 1.0 );
+        MB_CHK_ERR( error );
+        error = moab::IntxUtils::ScaleToRadius( mbCore, slavefileset, 1.0 );
+        MB_CHK_ERR( error );
     }
 
     try
@@ -209,17 +227,20 @@ int main( int argc, char* argv[] )
                 selem = selems[ie];
 
                 // Get the element centroid to be queried
-                error = mbCore->get_coords( &selem, 1, point );MB_CHK_ERR( error );
+                error = mbCore->get_coords( &selem, 1, point );
+                MB_CHK_ERR( error );
 
                 std::vector< moab::EntityHandle > leaf_elems;
 
                 // Search for the closest source element in the master mesh corresponding
                 // to the target element centroid in the slave mesh
-                error = tree.point_search( point, leaf, treetolerance, btolerance );MB_CHK_ERR( error );
+                error = tree.point_search( point, leaf, treetolerance, btolerance );
+                MB_CHK_ERR( error );
 
                 // We only care about the dimension that the user specified.
                 // MOAB partitions are ordered by elements anyway.
-                error = mbCore->get_entities_by_dimension( leaf, dimension, leaf_elems, true );MB_CHK_ERR( error );
+                error = mbCore->get_entities_by_dimension( leaf, dimension, leaf_elems, true );
+                MB_CHK_ERR( error );
 
                 if( leaf != 0 && leaf_elems.size() )
                 {
@@ -227,7 +248,8 @@ int main( int argc, char* argv[] )
                     // Now get the master element centroids so that we can compute
                     // the minimum distance to the target point
                     std::vector< double > centroids( leaf_elems.size() * 3 );
-                    error = mbCore->get_coords( &leaf_elems[0], leaf_elems.size(), &centroids[0] );MB_CHK_ERR( error );
+                    error = mbCore->get_coords( &leaf_elems[0], leaf_elems.size(), &centroids[0] );
+                    MB_CHK_ERR( error );
 
                     if( !leaf_elems.size() )
                         std::cout << ie << ": "
@@ -250,7 +272,8 @@ int main( int argc, char* argv[] )
 
 #ifdef VERBOSE
                             int gidMelem;
-                            error = mbCore->tag_get_data( gidtag, &leaf_elems[il], 1, &gidMelem );MB_CHK_ERR( error );
+                            error = mbCore->tag_get_data( gidtag, &leaf_elems[il], 1, &gidMelem );
+                            MB_CHK_ERR( error );
                             std::cout << "\t Trial leaf " << il << " set " << gidMelem
                                       << " and part = " << get_map_value( mpartvals, gidMelem, -1 )
                                       << " with distance = " << locdist << std::endl;
@@ -272,7 +295,8 @@ int main( int argc, char* argv[] )
                     else
                     {
                         int gidMelem;
-                        error = mbCore->tag_get_data( gidtag, &leaf_elems[pinelem], 1, &gidMelem );MB_CHK_ERR( error );
+                        error = mbCore->tag_get_data( gidtag, &leaf_elems[pinelem], 1, &gidMelem );
+                        MB_CHK_ERR( error );
 
                         int mpartid = get_map_value( mpartvals, gidMelem, -1 );
                         if( mpartid < 0 )
@@ -295,7 +319,8 @@ int main( int argc, char* argv[] )
                     spartvals[defaultpart].insert( selems[ie] );
                 }
             }
-            error = tree.reset_tree();MB_CHK_ERR( error );
+            error = tree.reset_tree();
+            MB_CHK_ERR( error );
         }
         if( npoints_notfound )
             std::cout << "Could not find " << npoints_notfound
@@ -303,16 +328,19 @@ int main( int argc, char* argv[] )
 
         if( use_spherical )
         {
-            error = moab::IntxUtils::ScaleToRadius( mbCore, slavefileset, slave_radius );MB_CHK_ERR( error );
+            error = moab::IntxUtils::ScaleToRadius( mbCore, slavefileset, slave_radius );
+            MB_CHK_ERR( error );
         }
 
-        error = mbCore->delete_entities( &masterfileset, 1 );MB_CHK_ERR( error );
+        error = mbCore->delete_entities( &masterfileset, 1 );
+        MB_CHK_ERR( error );
         // Find parallel partition sets in the slave mesh - and delete it since we are going to
         // overwrite the sets
         if( !keepsparts )
         {
             std::cout << "Deleting " << ssets.size() << " sets in the slave mesh" << std::endl;
-            error = mbCore->remove_entities( slavefileset, ssets );MB_CHK_ERR( error );
+            error = mbCore->remove_entities( slavefileset, ssets );
+            MB_CHK_ERR( error );
             ssets.clear();
         }
 
@@ -321,9 +349,12 @@ int main( int argc, char* argv[] )
         {
             int partID = it->first;
             moab::EntityHandle pset;
-            error = mbCore->create_meshset( moab::MESHSET_SET, pset );MB_CHK_ERR( error );
-            error = mbCore->add_entities( pset, it->second );MB_CHK_ERR( error );
-            error = mbCore->add_parent_child( slavefileset, pset );MB_CHK_ERR( error );
+            error = mbCore->create_meshset( moab::MESHSET_SET, pset );
+            MB_CHK_ERR( error );
+            error = mbCore->add_entities( pset, it->second );
+            MB_CHK_ERR( error );
+            error = mbCore->add_parent_child( slavefileset, pset );
+            MB_CHK_ERR( error );
 
 #ifdef VERBOSE
             std::cout << "Slave Part " << partID << " has " << it->second.size() << " elements." << std::endl;
@@ -333,11 +364,13 @@ int main( int argc, char* argv[] )
 
             if( keepsparts )
             {
-                error = mbCore->tag_set_data( sparttag, &pset, 1, &partID );MB_CHK_ERR( error );
+                error = mbCore->tag_set_data( sparttag, &pset, 1, &partID );
+                MB_CHK_ERR( error );
             }
             else
             {
-                error = mbCore->tag_set_data( parttag, &pset, 1, &partID );MB_CHK_ERR( error );
+                error = mbCore->tag_set_data( parttag, &pset, 1, &partID );
+                MB_CHK_ERR( error );
             }
         }
         std::cout << "Slave mesh: given " << selems.size() << " elements, and assigned " << ntotslave_elems
@@ -349,9 +382,11 @@ int main( int argc, char* argv[] )
         // Write the re-partitioned slave mesh to disk
         if( nprocs == 1 )
         {
-            error = mbCore->write_file( "slavemesh.vtk", "VTK", NULL, &slavefileset, 1 );MB_CHK_ERR( error );
+            error = mbCore->write_file( "slavemesh.vtk", "VTK", NULL, &slavefileset, 1 );
+            MB_CHK_ERR( error );
         }
-        error = mbCore->write_file( outfile.c_str(), NULL, write_options.c_str(), &slavefileset, 1 );MB_CHK_ERR( error );
+        error = mbCore->write_file( outfile.c_str(), NULL, write_options.c_str(), &slavefileset, 1 );
+        MB_CHK_ERR( error );
         // error = mbCore->write_file(outfile.c_str(), NULL,
         // write_options.c_str());MB_CHK_ERR(error);
     }

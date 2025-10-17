@@ -82,10 +82,14 @@ int main( int argc, char* argv[] )
 
     if( argc == 1 )
     {
-        error = test_unitsq_tris();MB_CHK_ERR( error );
-        error = test_unitsq_quads();MB_CHK_ERR( error );
-        error = test_unitsphere();MB_CHK_ERR( error );
-        error = test_unitcircle();MB_CHK_ERR( error );
+        error = test_unitsq_tris();
+        MB_CHK_ERR( error );
+        error = test_unitsq_quads();
+        MB_CHK_ERR( error );
+        error = test_unitsphere();
+        MB_CHK_ERR( error );
+        error = test_unitcircle();
+        MB_CHK_ERR( error );
 #ifdef MOAB_HAVE_MPI
         MPI_Finalize();
 #endif
@@ -143,7 +147,8 @@ int main( int argc, char* argv[] )
         std::cout << "High order reconstruction with degree " << degree << " " << opts << std::endl;
     }
 
-    error = test_mesh( infile.c_str(), degree, interp, dim );MB_CHK_ERR( error );
+    error = test_mesh( infile.c_str(), degree, interp, dim );
+    MB_CHK_ERR( error );
 #ifdef MOAB_HAVE_MPI
     MPI_Finalize();
 #endif
@@ -158,14 +163,16 @@ ErrorCode load_meshset_hirec( const char* infile,
                               const int dim )
 {
     ErrorCode error;
-    error = mbimpl->create_meshset( moab::MESHSET_SET, meshset );MB_CHK_ERR( error );
+    error = mbimpl->create_meshset( moab::MESHSET_SET, meshset );
+    MB_CHK_ERR( error );
 #ifdef MOAB_HAVE_MPI
     int nprocs, rank;
     MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Comm_size( comm, &nprocs );
     MPI_Comm_rank( comm, &rank );
     EntityHandle partnset;
-    error = mbimpl->create_meshset( moab::MESHSET_SET, partnset );MB_CHK_ERR( error );
+    error = mbimpl->create_meshset( moab::MESHSET_SET, partnset );
+    MB_CHK_ERR( error );
 
     if( nprocs > 1 )
     {
@@ -201,16 +208,19 @@ ErrorCode load_meshset_hirec( const char* infile,
             read_options = "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS;";
         }
 
-        error = mbimpl->load_file( infile, &meshset, read_options.c_str() );MB_CHK_ERR( error );
+        error = mbimpl->load_file( infile, &meshset, read_options.c_str() );
+        MB_CHK_ERR( error );
     }
     else
     {
-        error = mbimpl->load_file( infile, &meshset );MB_CHK_ERR( error );
+        error = mbimpl->load_file( infile, &meshset );
+        MB_CHK_ERR( error );
     }
 
 #else
     assert( !pc && degree && dim );
-    error = mbimpl->load_file( infile, &meshset );MB_CHK_ERR( error );
+    error = mbimpl->load_file( infile, &meshset );
+    MB_CHK_ERR( error );
 #endif
     return error;
 }
@@ -223,7 +233,8 @@ ErrorCode test_mesh( const char* infile, const int degree, const bool interp, co
     EntityHandle meshset;
     // load mesh file
     ErrorCode error;
-    error = load_meshset_hirec( infile, mbimpl, meshset, pc, degree, dim );MB_CHK_ERR( error );
+    error = load_meshset_hirec( infile, mbimpl, meshset, pc, degree, dim );
+    MB_CHK_ERR( error );
     // project to exact surface: torus
     double center[3] = { 0, 0, 0 };
     double R = 1, r = 0.3;
@@ -231,17 +242,20 @@ ErrorCode test_mesh( const char* infile, const int degree, const bool interp, co
     // initialize
     HiReconstruction hirec( dynamic_cast< Core* >( mbimpl ), pc, meshset );
     Range elems;
-    error = mbimpl->get_entities_by_dimension( meshset, dim, elems );MB_CHK_ERR( error );
+    error = mbimpl->get_entities_by_dimension( meshset, dim, elems );
+    MB_CHK_ERR( error );
 
     // reconstruction
     if( dim == 2 )
     {
         // error = hirec.reconstruct3D_surf_geom(degree, interp, false); MB_CHK_ERR(error);
-        error = hirec.reconstruct3D_surf_geom( degree, interp, true );MB_CHK_ERR( error );
+        error = hirec.reconstruct3D_surf_geom( degree, interp, true );
+        MB_CHK_ERR( error );
     }
     else if( dim == 1 )
     {
-        error = hirec.reconstruct3D_curve_geom( degree, interp, true );MB_CHK_ERR( error );
+        error = hirec.reconstruct3D_curve_geom( degree, interp, true );
+        MB_CHK_ERR( error );
     }
 
     // fitting
@@ -252,23 +266,27 @@ ErrorCode test_mesh( const char* infile, const int degree, const bool interp, co
     {
         int nvpe;
         const EntityHandle* conn;
-        error = mbimpl->get_connectivity( *ielem, conn, nvpe );MB_CHK_ERR( error );
+        error = mbimpl->get_connectivity( *ielem, conn, nvpe );
+        MB_CHK_ERR( error );
         double w = 1.0 / (double)nvpe;
         std::vector< double > naturalcoords2fit( nvpe, w );
         double newcoords[3], linearcoords[3];
-        error = hirec.hiproj_walf_in_element( *ielem, nvpe, 1, &( naturalcoords2fit[0] ), newcoords );MB_CHK_ERR( error );
+        error = hirec.hiproj_walf_in_element( *ielem, nvpe, 1, &( naturalcoords2fit[0] ), newcoords );
+        MB_CHK_ERR( error );
         pnts_proj[3 * ( *ielem - *elems.begin() )]     = newcoords[0];
         pnts_proj[3 * ( *ielem - *elems.begin() ) + 1] = newcoords[1];
         pnts_proj[3 * ( *ielem - *elems.begin() ) + 2] = newcoords[2];
         std::vector< double > coords( 3 * nvpe );
-        error = mbimpl->get_coords( conn, nvpe, &( coords[0] ) );MB_CHK_ERR( error );
+        error = mbimpl->get_coords( conn, nvpe, &( coords[0] ) );
+        MB_CHK_ERR( error );
         compute_linear_coords( nvpe, &( coords[0] ), &( naturalcoords2fit[0] ), linearcoords );
         mxdist = std::max( mxdist, DGMSolver::vec_distance( 3, newcoords, linearcoords ) );
     }
 
     delete[] pnts_proj;
     // compute error for torus
-    error = exact_error_torus( R, r, center, (int)elems.size(), pnts_proj, errl1, errl2, errli );MB_CHK_ERR( error );
+    error = exact_error_torus( R, r, center, (int)elems.size(), pnts_proj, errl1, errl2, errli );
+    MB_CHK_ERR( error );
     std::cout << "Errors using exact torus for degree " << degree << " fit : L1 = " << errl1 << ", L2 = " << errl2
               << ", Linf = " << errli << std::endl;
     std::cout << "Maximum projection lift is " << mxdist << std::endl;
@@ -294,7 +312,8 @@ ErrorCode create_unitsq_tris( Interface* mbImpl, size_t n, std::vector< EntityHa
         {
             double coord[3] = { i * istep, j * istep, 0 };
             EntityHandle temp;
-            error = mbImpl->create_vertex( coord, temp );MB_CHK_ERR( error );
+            error = mbImpl->create_vertex( coord, temp );
+            MB_CHK_ERR( error );
             verts[j * n + i] = temp;
         }
     }
@@ -304,11 +323,13 @@ ErrorCode create_unitsq_tris( Interface* mbImpl, size_t n, std::vector< EntityHa
         for( size_t ii = 0; ii < n - 1; ++ii )
         {
             EntityHandle conn[3] = { verts[jj * n + ii], verts[( jj + 1 ) * n + ii + 1], verts[( jj + 1 ) * n + ii] };
-            error                = mbImpl->create_element( MBTRI, conn, 3, tris[istr + 2 * jj * ( n - 1 ) + 2 * ii] );MB_CHK_ERR( error );
+            error                = mbImpl->create_element( MBTRI, conn, 3, tris[istr + 2 * jj * ( n - 1 ) + 2 * ii] );
+            MB_CHK_ERR( error );
             conn[0] = verts[jj * n + ii];
             conn[1] = verts[jj * n + ii + 1];
             conn[2] = verts[( jj + 1 ) * n + ii + 1];
-            error   = mbImpl->create_element( MBTRI, conn, 3, tris[istr + 2 * jj * ( n - 1 ) + 2 * ii + 1] );MB_CHK_ERR( error );
+            error   = mbImpl->create_element( MBTRI, conn, 3, tris[istr + 2 * jj * ( n - 1 ) + 2 * ii + 1] );
+            MB_CHK_ERR( error );
         }
     }
 
@@ -333,7 +354,8 @@ ErrorCode create_unitsq_quads( Interface* mbImpl, size_t n, std::vector< EntityH
         for( size_t i = 0; i < n; ++i )
         {
             double coord[3] = { i * istep, j * istep, 0 };
-            error           = mbImpl->create_vertex( coord, verts[j * n + i] );MB_CHK_ERR( error );
+            error           = mbImpl->create_vertex( coord, verts[j * n + i] );
+            MB_CHK_ERR( error );
         }
     }
 
@@ -343,7 +365,8 @@ ErrorCode create_unitsq_quads( Interface* mbImpl, size_t n, std::vector< EntityH
         {
             EntityHandle conn[4] = { verts[jj * n + ii], verts[jj * n + ii + 1], verts[( jj + 1 ) * n + ii + 1],
                                      verts[( jj + 1 ) * n + ii] };
-            error                = mbImpl->create_element( MBQUAD, conn, 4, quads[istr + jj * ( n - 1 ) + ii] );MB_CHK_ERR( error );
+            error                = mbImpl->create_element( MBQUAD, conn, 4, quads[istr + jj * ( n - 1 ) + ii] );
+            MB_CHK_ERR( error );
         }
     }
 
@@ -359,7 +382,8 @@ ErrorCode test_unitsq_tris()
         Core moab;
         Interface* mbImpl = &moab;
         std::vector< EntityHandle > tris;
-        error = create_unitsq_tris( mbImpl, n, tris );MB_CHK_ERR( error );
+        error = create_unitsq_tris( mbImpl, n, tris );
+        MB_CHK_ERR( error );
         EntityHandle meshIn = 0;
         HiReconstruction hirec( dynamic_cast< Core* >( mbImpl ), 0, meshIn );
 
@@ -375,11 +399,14 @@ ErrorCode test_unitsq_tris()
                 const int nvpe                 = 3;
                 double naturalcoords2fit[nvpe] = { 1.0 / (double)nvpe, 1.0 / (double)nvpe, 1.0 / (double)nvpe },
                        newcoords[3];
-                error = hirec.hiproj_walf_in_element( tris[itri], nvpe, 1, naturalcoords2fit, newcoords );MB_CHK_ERR( error );
+                error = hirec.hiproj_walf_in_element( tris[itri], nvpe, 1, naturalcoords2fit, newcoords );
+                MB_CHK_ERR( error );
                 std::vector< EntityHandle > conn;
-                error = mbImpl->get_connectivity( &( tris[itri] ), 1, conn );MB_CHK_ERR( error );
+                error = mbImpl->get_connectivity( &( tris[itri] ), 1, conn );
+                MB_CHK_ERR( error );
                 double coords[3 * nvpe], linearcoords[3];
-                error = mbImpl->get_coords( &( conn[0] ), nvpe, coords );MB_CHK_ERR( error );
+                error = mbImpl->get_coords( &( conn[0] ), nvpe, coords );
+                MB_CHK_ERR( error );
                 compute_linear_coords( nvpe, coords, naturalcoords2fit, linearcoords );
                 mxdist = std::max( mxdist, DGMSolver::vec_distance( 3, newcoords, linearcoords ) );
             }
@@ -398,11 +425,14 @@ ErrorCode test_unitsq_tris()
                 const int nvpe                 = 3;
                 double naturalcoords2fit[nvpe] = { 1.0 / (double)nvpe, 1.0 / (double)nvpe, 1.0 / (double)nvpe },
                        newcoords[3];
-                error = hirec.hiproj_walf_in_element( tris[itri], nvpe, 1, naturalcoords2fit, newcoords );MB_CHK_ERR( error );
+                error = hirec.hiproj_walf_in_element( tris[itri], nvpe, 1, naturalcoords2fit, newcoords );
+                MB_CHK_ERR( error );
                 std::vector< EntityHandle > conn;
-                error = mbImpl->get_connectivity( &( tris[itri] ), 1, conn );MB_CHK_ERR( error );
+                error = mbImpl->get_connectivity( &( tris[itri] ), 1, conn );
+                MB_CHK_ERR( error );
                 double coords[3 * nvpe], linearcoords[3];
-                error = mbImpl->get_coords( &( conn[0] ), nvpe, coords );MB_CHK_ERR( error );
+                error = mbImpl->get_coords( &( conn[0] ), nvpe, coords );
+                MB_CHK_ERR( error );
                 compute_linear_coords( nvpe, coords, naturalcoords2fit, linearcoords );
                 mxdist = std::max( mxdist, DGMSolver::vec_distance( 3, newcoords, linearcoords ) );
             }
@@ -439,7 +469,8 @@ ErrorCode test_unitsq_quads()
         Core moab;
         Interface* mbImpl = &moab;
         std::vector< EntityHandle > quads;
-        error = create_unitsq_quads( mbImpl, n, quads );MB_CHK_ERR( error );
+        error = create_unitsq_quads( mbImpl, n, quads );
+        MB_CHK_ERR( error );
         EntityHandle meshIn = 0;
         HiReconstruction hirec( dynamic_cast< Core* >( mbImpl ), 0, meshIn );
 
@@ -455,11 +486,14 @@ ErrorCode test_unitsq_quads()
                 const int nvpe                 = 4;
                 double w                       = 1.0 / (double)nvpe;
                 double naturalcoords2fit[nvpe] = { w, w, w, w }, newcoords[3];
-                error = hirec.hiproj_walf_in_element( quads[iquad], nvpe, 1, naturalcoords2fit, newcoords );MB_CHK_ERR( error );
+                error = hirec.hiproj_walf_in_element( quads[iquad], nvpe, 1, naturalcoords2fit, newcoords );
+                MB_CHK_ERR( error );
                 std::vector< EntityHandle > conn;
-                error = mbImpl->get_connectivity( &( quads[iquad] ), 1, conn );MB_CHK_ERR( error );
+                error = mbImpl->get_connectivity( &( quads[iquad] ), 1, conn );
+                MB_CHK_ERR( error );
                 double coords[3 * nvpe], linearcoords[3];
-                error = mbImpl->get_coords( &( conn[0] ), nvpe, coords );MB_CHK_ERR( error );
+                error = mbImpl->get_coords( &( conn[0] ), nvpe, coords );
+                MB_CHK_ERR( error );
                 compute_linear_coords( nvpe, coords, naturalcoords2fit, linearcoords );
                 mxdist = std::max( mxdist, DGMSolver::vec_distance( 3, newcoords, linearcoords ) );
             }
@@ -476,11 +510,14 @@ ErrorCode test_unitsq_quads()
                 const int nvpe                 = 4;
                 double w                       = 1.0 / (double)nvpe;
                 double naturalcoords2fit[nvpe] = { w, w, w, w }, newcoords[3];
-                error = hirec.hiproj_walf_in_element( quads[iquad], nvpe, 1, naturalcoords2fit, newcoords );MB_CHK_ERR( error );
+                error = hirec.hiproj_walf_in_element( quads[iquad], nvpe, 1, naturalcoords2fit, newcoords );
+                MB_CHK_ERR( error );
                 std::vector< EntityHandle > conn;
-                error = mbImpl->get_connectivity( &( quads[iquad] ), 1, conn );MB_CHK_ERR( error );
+                error = mbImpl->get_connectivity( &( quads[iquad] ), 1, conn );
+                MB_CHK_ERR( error );
                 double coords[3 * nvpe], linearcoords[3];
-                error = mbImpl->get_coords( &( conn[0] ), nvpe, coords );MB_CHK_ERR( error );
+                error = mbImpl->get_coords( &( conn[0] ), nvpe, coords );
+                MB_CHK_ERR( error );
                 compute_linear_coords( nvpe, coords, naturalcoords2fit, linearcoords );
                 mxdist = std::max( mxdist, DGMSolver::vec_distance( 3, newcoords, linearcoords ) );
             }
@@ -509,11 +546,13 @@ ErrorCode test_unitsphere()
         ParallelComm* pc  = NULL;
         EntityHandle meshset;
         // load file
-        error = load_meshset_hirec( filenames[ifile].c_str(), mbimpl, meshset, pc, maxdeg );MB_CHK_ERR( error );
+        error = load_meshset_hirec( filenames[ifile].c_str(), mbimpl, meshset, pc, maxdeg );
+        MB_CHK_ERR( error );
         // initialize
         HiReconstruction hirec( &moab, pc, meshset );
         Range elems;
-        error = mbimpl->get_entities_by_dimension( meshset, 2, elems );MB_CHK_ERR( error );
+        error = mbimpl->get_entities_by_dimension( meshset, 2, elems );
+        MB_CHK_ERR( error );
 
         // reconstruction
         for( int degree = 1; degree <= maxdeg; ++degree )
@@ -526,13 +565,16 @@ ErrorCode test_unitsphere()
             {
                 int nvpe;
                 const EntityHandle* conn;
-                error = mbimpl->get_connectivity( *ielem, conn, nvpe );MB_CHK_ERR( error );
+                error = mbimpl->get_connectivity( *ielem, conn, nvpe );
+                MB_CHK_ERR( error );
                 double w = 1.0 / (double)nvpe;
                 std::vector< double > naturalcoords2fit( nvpe, w );
                 double newcoords[3], linearcoords[3];
-                error = hirec.hiproj_walf_in_element( *ielem, nvpe, 1, &( naturalcoords2fit[0] ), newcoords );MB_CHK_ERR( error );
+                error = hirec.hiproj_walf_in_element( *ielem, nvpe, 1, &( naturalcoords2fit[0] ), newcoords );
+                MB_CHK_ERR( error );
                 std::vector< double > coords( 3 * nvpe );
-                error = mbimpl->get_coords( conn, nvpe, &( coords[0] ) );MB_CHK_ERR( error );
+                error = mbimpl->get_coords( conn, nvpe, &( coords[0] ) );
+                MB_CHK_ERR( error );
                 compute_linear_coords( nvpe, &( coords[0] ), &( naturalcoords2fit[0] ), linearcoords );
                 mxdist = std::max( mxdist, DGMSolver::vec_distance( 3, newcoords, linearcoords ) );
                 mxerr  = std::max( mxerr, fabs( DGMSolver::vec_2norm( 3, newcoords ) - 1 ) );
@@ -550,13 +592,16 @@ ErrorCode test_unitsphere()
             {
                 int nvpe;
                 const EntityHandle* conn;
-                error = mbimpl->get_connectivity( *ielem, conn, nvpe );MB_CHK_ERR( error );
+                error = mbimpl->get_connectivity( *ielem, conn, nvpe );
+                MB_CHK_ERR( error );
                 double w = 1.0 / (double)nvpe;
                 std::vector< double > naturalcoords2fit( nvpe, w );
                 double newcoords[3], linearcoords[3];
-                error = hirec.hiproj_walf_in_element( *ielem, nvpe, 1, &( naturalcoords2fit[0] ), newcoords );MB_CHK_ERR( error );
+                error = hirec.hiproj_walf_in_element( *ielem, nvpe, 1, &( naturalcoords2fit[0] ), newcoords );
+                MB_CHK_ERR( error );
                 std::vector< double > coords( 3 * nvpe );
-                error = mbimpl->get_coords( conn, nvpe, &( coords[0] ) );MB_CHK_ERR( error );
+                error = mbimpl->get_coords( conn, nvpe, &( coords[0] ) );
+                MB_CHK_ERR( error );
                 compute_linear_coords( nvpe, &( coords[0] ), &( naturalcoords2fit[0] ), linearcoords );
                 mxdist = std::max( mxdist, DGMSolver::vec_distance( 3, newcoords, linearcoords ) );
                 mxerr  = std::max( mxerr, fabs( DGMSolver::vec_2norm( 3, newcoords ) - 1 ) );
@@ -588,11 +633,13 @@ ErrorCode test_unitcircle()
         EntityHandle meshset;
         int dim = 1;
         // load file
-        error = load_meshset_hirec( filenames[ifile].c_str(), mbimpl, meshset, pc, maxdeg, dim );MB_CHK_ERR( error );
+        error = load_meshset_hirec( filenames[ifile].c_str(), mbimpl, meshset, pc, maxdeg, dim );
+        MB_CHK_ERR( error );
         // initialize
         HiReconstruction hirec( &moab, pc, meshset );
         Range edges;
-        error = mbimpl->get_entities_by_dimension( meshset, dim, edges );MB_CHK_ERR( error );
+        error = mbimpl->get_entities_by_dimension( meshset, dim, edges );
+        MB_CHK_ERR( error );
 
         // reconstruction
         for( int degree = 1; degree <= maxdeg; ++degree )
@@ -605,13 +652,16 @@ ErrorCode test_unitcircle()
             {
                 int nvpe;
                 const EntityHandle* conn;
-                error = mbimpl->get_connectivity( *iedge, conn, nvpe );MB_CHK_ERR( error );
+                error = mbimpl->get_connectivity( *iedge, conn, nvpe );
+                MB_CHK_ERR( error );
                 double w = 1.0 / (double)nvpe;
                 std::vector< double > naturalcoords2fit( nvpe, w );
                 double newcoords[3], linearcoords[3];
-                error = hirec.hiproj_walf_in_element( *iedge, nvpe, 1, &( naturalcoords2fit[0] ), newcoords );MB_CHK_ERR( error );
+                error = hirec.hiproj_walf_in_element( *iedge, nvpe, 1, &( naturalcoords2fit[0] ), newcoords );
+                MB_CHK_ERR( error );
                 std::vector< double > coords( 3 * nvpe );
-                error = mbimpl->get_coords( conn, nvpe, &( coords[0] ) );MB_CHK_ERR( error );
+                error = mbimpl->get_coords( conn, nvpe, &( coords[0] ) );
+                MB_CHK_ERR( error );
                 compute_linear_coords( nvpe, &( coords[0] ), &( naturalcoords2fit[0] ), linearcoords );
                 mxdist = std::max( mxdist, DGMSolver::vec_distance( 3, newcoords, linearcoords ) );
                 mxerr  = std::max( mxerr, fabs( DGMSolver::vec_2norm( 3, newcoords ) - 1 ) );
@@ -629,13 +679,16 @@ ErrorCode test_unitcircle()
             {
                 int nvpe;
                 const EntityHandle* conn;
-                error = mbimpl->get_connectivity( *iedge, conn, nvpe );MB_CHK_ERR( error );
+                error = mbimpl->get_connectivity( *iedge, conn, nvpe );
+                MB_CHK_ERR( error );
                 double w = 1.0 / (double)nvpe;
                 std::vector< double > naturalcoords2fit( nvpe, w );
                 double newcoords[3], linearcoords[3];
-                error = hirec.hiproj_walf_in_element( *iedge, nvpe, 1, &( naturalcoords2fit[0] ), newcoords );MB_CHK_ERR( error );
+                error = hirec.hiproj_walf_in_element( *iedge, nvpe, 1, &( naturalcoords2fit[0] ), newcoords );
+                MB_CHK_ERR( error );
                 std::vector< double > coords( 3 * nvpe );
-                error = mbimpl->get_coords( conn, nvpe, &( coords[0] ) );MB_CHK_ERR( error );
+                error = mbimpl->get_coords( conn, nvpe, &( coords[0] ) );
+                MB_CHK_ERR( error );
                 compute_linear_coords( nvpe, &( coords[0] ), &( naturalcoords2fit[0] ), linearcoords );
                 mxdist = std::max( mxdist, DGMSolver::vec_distance( 3, newcoords, linearcoords ) );
                 mxerr  = std::max( mxerr, fabs( DGMSolver::vec_2norm( 3, newcoords ) - 1 ) );

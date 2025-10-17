@@ -174,6 +174,7 @@ set( MOAB_INSTALL_HEADERS
         moab/IntxMesh/IntxUtils.hpp
         moab/IntxMesh/Intx2MeshInPlane.hpp
         moab/IntxMesh/Intx2MeshOnSphere.hpp
+        moab/IntxMesh/Intx2MeshEdges.hpp
         moab/IntxMesh/IntxRllCssphere.hpp
         moab/LloydSmoother.hpp
         moab/point_locater/tree/common_tree.hpp

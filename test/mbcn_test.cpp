@@ -985,7 +985,7 @@ void test_ho_node_parent()
                 CHECK_EQUAL( 0, pidx );
             }
         }  // for ho_node combinatinos
-    }      // for each type
+    }  // for each type
 }
 
 void test_ho_node_index()
@@ -1047,7 +1047,7 @@ void test_ho_node_index()
                 CHECK_EQUAL( pos++, idx );
             }
         }  // for ho_node combinatinos
-    }      // for each type
+    }  // for each type
 }
 
 void test_sub_entity_nodes( EntityType parent, int sub_dimension )

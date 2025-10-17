@@ -87,7 +87,7 @@ class SpectralQuad
                                // on the fly; we do not have a tag yet for them, as in Nek5000 application
                                // also, these positions might need to be moved on the sphere, for HOMME grids
                                // do we project them or how do we move them on the sphere?
-};                             // class SpectralQuad
+};  // class SpectralQuad
 
 }  // namespace moab
 

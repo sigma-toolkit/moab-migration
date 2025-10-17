@@ -88,7 +88,7 @@ class ParNcFile : public NcFile
         }
     }
 
-    virtual ~ParNcFile( void ){};
+    virtual ~ParNcFile( void ) {};
 
     NcBool enable_var_par_access( NcVar* var, bool is_independent = true )  // synchronize to disk
     {

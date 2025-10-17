@@ -134,7 +134,7 @@ void build_coords( const int nelem, double*& coords )
     coords       = new double[3 * tot_numv];
 
 // use FORTRAN-like indexing
-#define VINDEX( i, j, k ) ( ( i ) + ( (j)*numv ) + ( (k)*numv_sq ) )
+#define VINDEX( i, j, k ) ( ( i ) + ( ( j ) * numv ) + ( ( k ) * numv_sq ) )
     int idx;
     double scale1, scale2, scale3;
     // use these to prevent optimization on 1-scale, etc (real map wouldn't have
@@ -587,8 +587,8 @@ void print_time( const bool print_em, double& tot_time, double& utime, double& s
 {
     struct rusage r_usage;
     getrusage( RUSAGE_SELF, &r_usage );
-    utime = (double)r_usage.ru_utime.tv_sec + ( (double)r_usage.ru_utime.tv_usec / 1.e6 );
-    stime = (double)r_usage.ru_stime.tv_sec + ( (double)r_usage.ru_stime.tv_usec / 1.e6 );
+    utime    = (double)r_usage.ru_utime.tv_sec + ( (double)r_usage.ru_utime.tv_usec / 1.e6 );
+    stime    = (double)r_usage.ru_stime.tv_sec + ( (double)r_usage.ru_stime.tv_usec / 1.e6 );
     tot_time = utime + stime;
     if( print_em )
         std::cout << "User, system, total time = " << utime << ", " << stime << ", " << tot_time << std::endl;

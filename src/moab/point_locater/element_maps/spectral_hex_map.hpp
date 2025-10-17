@@ -29,7 +29,7 @@ namespace element_utility
 
       public:
         // Constructor
-        Spectral_hex_map(){};
+        Spectral_hex_map() {};
         Spectral_hex_map( int order )
         {
             initialize_spectral_hex( order );

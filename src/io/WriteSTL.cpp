@@ -142,9 +142,9 @@ FILE* WriteSTL::open_file( const char* name, bool overwrite, bool binary )
         flags |= O_TRUNC;
     else
         flags |= O_EXCL;
-        // If platform defines a "binary" bit in the file access
-        // flags (i.e. we're building on windows), then set it
-        // if we're writing a binary file.
+    // If platform defines a "binary" bit in the file access
+    // flags (i.e. we're building on windows), then set it
+    // if we're writing a binary file.
 #ifdef O_BINARY
     if( binary ) flags |= O_BINARY;
 #endif

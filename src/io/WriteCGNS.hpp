@@ -70,8 +70,8 @@ class WriteCGNS : public WriterIface
         std::vector< cgsize_t > NbEntities;
         ElementType_t CGNSType;
 
-        SetStruct() : IdSet( -1 ), NbEdges( 0 ), NbFaces( 0 ), NbCells( 0 ){};
-        ~SetStruct(){};
+        SetStruct() : IdSet( -1 ), NbEdges( 0 ), NbFaces( 0 ), NbCells( 0 ) {};
+        ~SetStruct() {};
     };
 
     //! writes out a file

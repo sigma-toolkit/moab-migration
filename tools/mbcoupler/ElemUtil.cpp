@@ -315,7 +315,7 @@ namespace ElemUtil
         LinearHexMap hex( hex_corners );
 
         // Use the correct table of points and locations based on the num_pts parameter
-        const double( *g_pts )[2] = 0;
+        const double ( *g_pts )[2] = 0;
         switch( num_pts )
         {
             case 1:

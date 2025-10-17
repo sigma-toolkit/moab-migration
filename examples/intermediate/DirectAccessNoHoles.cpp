@@ -1,4 +1,40 @@
-/** @example DirectAccessNoHoles.cpp \n
+/**
+ * @file DirectAccessNoHoles.cpp
+ * @brief Example demonstrating direct access to MOAB data for performance optimization
+ *
+ * @details This example shows how to:
+ * - Create a structured mesh with contiguous entity handles
+ * - Use direct access iterators to avoid API overhead
+ * - Access vertex coordinates, element connectivity, and tag data directly
+ * - Work with adjacency lists for vertex-to-element relationships
+ * - Perform efficient mesh operations using pointer arithmetic
+ *
+ * The program creates a 1D row of quad elements with contiguous handles,
+ * then demonstrates direct access to MOAB's internal data structures for
+ * maximum performance when the mesh topology is static.
+ *
+ * @author MOAB Team
+ * @date 2024
+ *
+ * @param[in] argc Number of command line arguments
+ * @param[in] argv Command line arguments array
+ * @param[in] -nquads Number of quads in the mesh (default: 1000)
+ *
+ * @return 0 on success, 1 on failure
+ *
+ * @par Usage:
+ * @code
+ * ./DirectAccessNoHoles [-nquads <# quads>]
+ * @endcode
+ *
+ * @par Example:
+ * @code
+ * ./DirectAccessNoHoles -nquads 500
+ * @endcode
+ *
+ * @see Core, Interface, ReadUtilIface, ProgOptions
+ *
+
  * \brief Use direct access to MOAB data to avoid calling through API \n
  *
  * This example creates a 1d row of quad elements, such that all quad and vertex handles
@@ -58,45 +94,55 @@ int main( int argc, char** argv )
     opts.parseCommandLine( argc, argv );
 
     // Create simple structured mesh with hole, but using unstructured representation
-    ErrorCode rval = create_mesh_no_holes( mbImpl, nquads );MB_CHK_SET_ERR( rval, "Trouble creating mesh" );
+    MB_CHK_SET_ERR( create_mesh_no_holes( mbImpl, nquads ), "Trouble creating mesh" );
 
     // Get all vertices and non-vertex entities
     Range verts, quads;
-    rval = mbImpl->get_entities_by_handle( 0, quads );MB_CHK_SET_ERR( rval, "Trouble getting all entities" );
+    MB_CHK_SET_ERR( mbImpl->get_entities_by_handle( 0, quads ), "Trouble getting all entities" );
     verts = quads.subset_by_dimension( 0 );
     quads -= verts;
 
     // Create tag1 (element-based avg), tag2 (vertex-based avg), tag3 (# connected verts)
     Tag tag1, tag2, tag3;
-    rval = mbImpl->tag_get_handle( "tag1", 3, MB_TYPE_DOUBLE, tag1, MB_TAG_DENSE | MB_TAG_CREAT );MB_CHK_SET_ERR( rval, "Trouble creating tag1" );
+    MB_CHK_SET_ERR( mbImpl->tag_get_handle( "tag1", 3, MB_TYPE_DOUBLE, tag1, MB_TAG_DENSE | MB_TAG_CREAT ),
+                    "Trouble creating tag1" );
     double def_val[3] = { 0.0, 0.0, 0.0 };  // need a default value for tag2 because we sum into it
-    rval              = mbImpl->tag_get_handle( "tag2", 3, MB_TYPE_DOUBLE, tag2, MB_TAG_DENSE | MB_TAG_CREAT, def_val );MB_CHK_SET_ERR( rval, "Trouble creating tag2" );
+    MB_CHK_SET_ERR( mbImpl->tag_get_handle( "tag2", 3, MB_TYPE_DOUBLE, tag2, MB_TAG_DENSE | MB_TAG_CREAT, def_val ),
+                    "Trouble creating tag2" );
     int def_val_int = 0;  // need a default value for tag3 because we increment it
-    rval = mbImpl->tag_get_handle( "tag3", 1, MB_TYPE_INTEGER, tag3, MB_TAG_DENSE | MB_TAG_CREAT, &def_val_int );MB_CHK_SET_ERR( rval, "Trouble creating tag3" );
+    MB_CHK_SET_ERR( mbImpl->tag_get_handle( "tag3", 1, MB_TYPE_INTEGER, tag3, MB_TAG_DENSE | MB_TAG_CREAT,
+                                            &def_val_int ),
+                    "Trouble creating tag3" );
 
     // Get pointers to connectivity, coordinate, tag, and adjacency arrays; each of these returns a
     // count, which should be compared to the # entities you expect to verify there's only one chunk
     // (no holes)
     int count, vpere;
     EntityHandle* conn_ptr;
-    rval = mbImpl->connect_iterate( quads.begin(), quads.end(), conn_ptr, vpere, count );MB_CHK_SET_ERR( rval, "Error in connect_iterate" );
+    MB_CHK_SET_ERR( mbImpl->connect_iterate( quads.begin(), quads.end(), conn_ptr, vpere, count ),
+                    "Error in connect_iterate" );
     assert( count == (int)quads.size() );  // Should end up with just one contiguous chunk of quads
 
     double *x_ptr, *y_ptr, *z_ptr;
-    rval = mbImpl->coords_iterate( verts.begin(), verts.end(), x_ptr, y_ptr, z_ptr, count );MB_CHK_SET_ERR( rval, "Error in coords_iterate" );
+    MB_CHK_SET_ERR( mbImpl->coords_iterate( verts.begin(), verts.end(), x_ptr, y_ptr, z_ptr, count ),
+                    "Error in coords_iterate" );
     assert( count == (int)verts.size() );  // Should end up with just one contiguous chunk of vertices
 
     double *tag1_ptr, *tag2_ptr;
     int* tag3_ptr;
-    rval = mbImpl->tag_iterate( tag1, quads.begin(), quads.end(), count, (void*&)tag1_ptr );MB_CHK_SET_ERR( rval, "Error in tag1_iterate" );
+    MB_CHK_SET_ERR( mbImpl->tag_iterate( tag1, quads.begin(), quads.end(), count, (void*&)tag1_ptr ),
+                    "Error in tag1_iterate" );
     assert( count == (int)quads.size() );  // Should end up with just one contiguous chunk of quads
-    rval = mbImpl->tag_iterate( tag2, quads.begin(), quads.end(), count, (void*&)tag2_ptr );MB_CHK_SET_ERR( rval, "Error in tag2_iterate" );
+    MB_CHK_SET_ERR( mbImpl->tag_iterate( tag2, quads.begin(), quads.end(), count, (void*&)tag2_ptr ),
+                    "Error in tag2_iterate" );
     assert( count == (int)quads.size() );  // Should end up with just one contiguous chunk of quads
-    rval = mbImpl->tag_iterate( tag3, quads.begin(), quads.end(), count, (void*&)tag3_ptr );MB_CHK_SET_ERR( rval, "Error in tag3_iterate" );
+    MB_CHK_SET_ERR( mbImpl->tag_iterate( tag3, quads.begin(), quads.end(), count, (void*&)tag3_ptr ),
+                    "Error in tag3_iterate" );
     assert( count == (int)quads.size() );  // Should end up with just one contiguous chunk of quads
 
     const vector< EntityHandle >** adjs_ptr;
-    rval = mbImpl->adjacencies_iterate( verts.begin(), verts.end(), adjs_ptr, count );MB_CHK_SET_ERR( rval, "Error in adjacencies_iterate" );
+    MB_CHK_SET_ERR( mbImpl->adjacencies_iterate( verts.begin(), verts.end(), adjs_ptr, count ),
+                    "Error in adjacencies_iterate" );
     assert( count == (int)verts.size() );  // Should end up with just one contiguous chunk of vertices
     // Start_ handles used to compute indices into vertex/quad arrays; can use direct subtraction
     // because we know there aren't any holes in the handle spaces for verts or quads
@@ -162,14 +208,16 @@ ErrorCode create_mesh_no_holes( Interface* mbImpl, int nquads )
     // First make the mesh, a 1d array of quads with left hand side x = elem_num; vertices are
     // numbered in layers
     ReadUtilIface* read_iface;
-    ErrorCode rval = mbImpl->query_interface( read_iface );MB_CHK_SET_ERR( rval, "Error in query_interface" );
+    MB_CHK_SET_ERR( mbImpl->query_interface( read_iface ), "Error in query_interface" );
     vector< double* > coords;
     EntityHandle start_vert, start_elem, *connect;
     // Create verts, num is 2(nquads+1) because they're in a 1d row; will initialize coords in loop
     // over quads later
-    rval = read_iface->get_node_coords( 3, 2 * ( nquads + 1 ), 0, start_vert, coords );MB_CHK_SET_ERR( rval, "Error in get_node_arrays" );
+    MB_CHK_SET_ERR( read_iface->get_node_coords( 3, 2 * ( nquads + 1 ), 0, start_vert, coords ),
+                    "Error in get_node_arrays" );
     // Create quads
-    rval = read_iface->get_element_connect( nquads, 4, MBQUAD, 0, start_elem, connect );MB_CHK_SET_ERR( rval, "Error in get_element_connect" );
+    MB_CHK_SET_ERR( read_iface->get_element_connect( nquads, 4, MBQUAD, 0, start_elem, connect ),
+                    "Error in get_element_connect" );
     for( int i = 0; i < nquads; i++ )
     {
         coords[0][2 * i] = coords[0][2 * i + 1] = (double)i;  // x values are all i
@@ -192,7 +240,7 @@ ErrorCode create_mesh_no_holes( Interface* mbImpl, int nquads )
 
     // Call a vertex-quad adjacencies function to generate vertex-element adjacencies in MOAB
     Range dum_range;
-    rval = mbImpl->get_adjacencies( &start_vert, 1, 2, false, dum_range );MB_CHK_SET_ERR( rval, "Error in get_adjacencies" );
+    MB_CHK_SET_ERR( mbImpl->get_adjacencies( &start_vert, 1, 2, false, dum_range ), "Error in get_adjacencies" );
     assert( !dum_range.empty() );
 
     return MB_SUCCESS;

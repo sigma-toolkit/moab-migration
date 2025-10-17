@@ -64,7 +64,7 @@ int main( int argc, char* argv[] )
 
     popts.parseCommandLine( argc, argv );
 
-    ErrorCode rval = mb->create_meshset( MESHSET_SET, fileset );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->create_meshset( MESHSET_SET, fileset ) );
 
 #ifdef MOAB_HAVE_MPI
     ParallelComm* pc     = new ParallelComm( mb, MPI_COMM_WORLD );
@@ -73,7 +73,7 @@ int main( int argc, char* argv[] )
     MeshGeneration* mgen = new MeshGeneration( mb, fileset );
 #endif
 
-    rval = mgen->BrickInstance( opts );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mgen->BrickInstance( opts ) );
 
     return 0;
 }

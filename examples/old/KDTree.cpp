@@ -1,7 +1,8 @@
-/* Simple example of use of moab::AdaptiveKDTree class.
-
-   Given a hexahedral mesh, find the hexahedron containing each
-   input position.
+/** @example KDTree.cpp
+ * This example demonstrates adaptive kD-tree for point location in hexahedral meshes.
+ * It shows how to load a hexahedral mesh, build an adaptive kD-tree for efficient spatial queries,
+ * find hexahedra containing specified points, and use geometric utilities for point-in-hex tests.
+ * The adaptive kD-tree provides efficient spatial partitioning for point location queries in large meshes.
  */
 
 #include "moab/Core.hpp"
@@ -57,17 +58,11 @@ int main()
     moab::ErrorCode rval;
     moab::Core moab;
     moab::Interface& mb = moab;
-    rval                = mb.load_file( filename.c_str() );
-    if( moab::MB_SUCCESS != rval )
-    {
-        print_error( mb, rval );
-        std::cerr << filename << ": file load failed" << std::endl;
-        return 1;
-    }
+    MB_CHK_SET_ERR( mb.load_file( filename.c_str() ), "File load failed" );
 
     // Get all hex elemeents
     moab::Range elems;
-    rval = mb.get_entities_by_type( 0, moab::MBHEX, elems );CHKERR( rval );
+    MB_CHK_SET_ERR( mb.get_entities_by_type( 0, moab::MBHEX, elems ), "Failed to get hexahedra" );
     if( elems.empty() )
     {
         std::cerr << filename << ": file containd no hexahedra" << std::endl;
@@ -77,7 +72,7 @@ int main()
     // Build a kD-tree from hex elements
     moab::EntityHandle tree_root;
     moab::AdaptiveKDTree tool( &mb );
-    rval = tool.build_tree( elems, tree_root );CHKERR( rval );
+    MB_CHK_SET_ERR( tool.build_tree( elems, tree_root ), "Failed to build kD-tree" );
 
     // Loop forever (or until EOF), asking user for a point
     // to query and printing the hex element containing that
@@ -89,7 +84,7 @@ int main()
         if( !( std::cin >> point[0] >> point[1] >> point[2] ) ) break;
 
         moab::EntityHandle leaf;
-        rval = tool.leaf_containing_point( tree_root, point, leaf );CHKERR( rval );
+        MB_CHK_SET_ERR( tool.leaf_containing_point( tree_root, point, leaf ), "Failed to find leaf containing point" );
         moab::EntityHandle hex = hex_containing_point( mb, leaf, point );
         if( 0 == hex )
             std::cout << "Point is not contained in any hexahedron." << std::endl;
@@ -110,14 +105,14 @@ moab::EntityHandle hex_containing_point( moab::Interface& mb, moab::EntityHandle
 
     // Get hexes in leaf
     std::vector< moab::EntityHandle > hexes;
-    rval = mb.get_entities_by_type( set, moab::MBHEX, hexes );CHKERR( rval );
+    MB_CHK_SET_ERR( mb.get_entities_by_type( set, moab::MBHEX, hexes ), "Failed to get hexahedra from set" );
 
     // Check which hex the point is in
     std::vector< moab::EntityHandle >::const_iterator i;
     for( i = hexes.begin(); i != hexes.end(); ++i )
     {
-        rval = mb.get_connectivity( *i, conn, conn_len );CHKERR( rval );
-        rval = mb.get_coords( conn, 8, &coords[0][0] );CHKERR( rval );
+        MB_CHK_SET_ERR( mb.get_connectivity( *i, conn, conn_len ), "Failed to get connectivity" );
+        MB_CHK_SET_ERR( mb.get_coords( conn, 8, &coords[0][0] ), "Failed to get coordinates" );
         if( moab::GeomUtil::point_in_trilinear_hex( coords, pt, EPSILON ) ) return *i;
     }
 

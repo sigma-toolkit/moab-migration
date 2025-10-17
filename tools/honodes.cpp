@@ -11,10 +11,9 @@ std::ostringstream LONG_DESC;
 int main( int argc, char* argv[] )
 {
     moab::Core* mb = new moab::Core();
-    moab::ErrorCode rval;
-    bool edge   = false;
-    bool face   = false;
-    bool volume = false;
+    bool edge      = false;
+    bool face      = false;
+    bool volume    = false;
 
     LONG_DESC << "mbhonodes tool reads a mesh file and adds higher order nodes." << std::endl
               << "Options to add higher order nodes on all volume or face or edge elements of the mesh "
@@ -43,18 +42,19 @@ int main( int argc, char* argv[] )
     opts.parseCommandLine( argc, argv );
 
     // load the input file
-    rval = mb->load_mesh( inFileName.c_str() );MB_CHK_SET_ERR( rval, "Failed to write the mesh file" );
+    MB_CHK_SET_ERR( mb->load_mesh( inFileName.c_str() ), "Failed to write the mesh file" );
     std::cout << "Read input mesh file: " << inFileName << std::endl;
     moab::Range entities;
     moab::EntityHandle meshset;
 
-    rval = mb->get_entities_by_type( 0, MBHEX, entities );MB_CHK_SET_ERR( rval, "Failed to get hex entities" );
-    rval = mb->create_meshset( MESHSET_SET, meshset );MB_CHK_SET_ERR( rval, "Failed to create meshset" );
-    rval = mb->add_entities( meshset, entities );MB_CHK_SET_ERR( rval, "Failed to add entitites to meshset" );
+    MB_CHK_SET_ERR( mb->get_entities_by_type( 0, MBHEX, entities ), "Failed to get hex entities" );
+    MB_CHK_SET_ERR( mb->create_meshset( MESHSET_SET, meshset ), "Failed to create meshset" );
+    MB_CHK_SET_ERR( mb->add_entities( meshset, entities ), "Failed to add entitites to meshset" );
 
-    rval = mb->convert_entities( meshset, !edge, !face, !volume );MB_CHK_SET_ERR( rval, "Failed to convert to higher dimension entities" );
+    MB_CHK_SET_ERR( mb->convert_entities( meshset, !edge, !face, !volume ),
+                    "Failed to convert to higher dimension entities" );
 
-    rval = mb->write_mesh( outFileName.c_str() );MB_CHK_SET_ERR( rval, "Failed to write the mesh file" );
+    MB_CHK_SET_ERR( mb->write_mesh( outFileName.c_str() ), "Failed to write the mesh file" );
     std::cout << "Wrote mesh file: " << outFileName << std::endl;
     delete mb;
 }

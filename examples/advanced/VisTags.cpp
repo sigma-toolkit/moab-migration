@@ -1,14 +1,32 @@
-/** @example VisTags.cpp \n
+/**
+ * @file VisTags.cpp
+ * @brief Example demonstrating visualization of multi-level tags from climate data
+ *
+ * This example shows how to:
+ * - Load climate data files (NetCDF format) with multi-level tags
+ * - Extract specific tags and levels for visualization
+ * - Convert multi-level tags to individual dense tags
+ * - Handle time-indexed tags (e.g., T0, U0)
+ * - Write visualization-ready VTK files
+ * - Process tags on entities of specified dimension
+ *
+ * This tool is particularly useful for climate data analysis where
+ * variables have multiple levels (e.g., atmospheric pressure levels).
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+
  * \brief tool for visualizing multi level tags  \n
- * <b>To run</b>: VisTags  <inp_file>  <outfile> -O <read_opts> -t <tags> -l <levels>  -d <dim> \n
+ * <b>To run</b>: VisTags  \c inp_file  \c outfile -O \c read_opts -t \c tags -l \c levels  -d \c dim \n
  *
  * In this example, it is shown how to create some simple tags for those tags that come from
  *  climate data, multiple levels.
  *  you can read directly nc data, or *.h5m file that will have the tag with multi levels
  *   output will be a vtk file with dense tags of form tag_name_<level>
  * the tag name might contain a time index too, like T0 or U0
- * <tag> is a list of tags, separated by commas, no spaces
- * <levels> is a list of levels, separated by commas, no spaces
+ * \c tag is a list of tags, separated by commas, no spaces
+ * \c levels is a list of levels, separated by commas, no spaces
  *  dimension of entities with the tags will be specified with -d (default 2)
  *
  * an example of use
@@ -22,6 +40,10 @@
  *  (it will read all variables, but we need to know that u0 will be created as a tag)
  *
  *  the out.vtk file will contain u0_0, u0_1, as simple dense double tags
+ *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 
 #include <iostream>
@@ -94,10 +116,10 @@ int main( int argc, char** argv )
     fo.get_ints_option( "LEVELS", levelsArray );
 
     // Load the input file with the specified options
-    rval = mb->load_file( file_input.c_str(), 0, read_opts.c_str() );MB_CHK_SET_ERR( rval, "not loading file" );
+    MB_CHK_SET_ERR( mb->load_file( file_input.c_str(), 0, read_opts.c_str() ), "not loading file" );
 
     Range ents;
-    rval = mb->get_entities_by_dimension( 0, dimension, ents );MB_CHK_SET_ERR( rval, "not getting ents" );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, dimension, ents ), "not getting ents" );
 
     // Now create double tags for entities of dimension
     for( size_t i = 0; i < tagsNames.size(); i++ )
@@ -174,9 +196,9 @@ int main( int argc, char** argv )
         }  // for (size_t j = 0; j < levelsArray.size(); j++)
 
         mb->tag_delete( tagh );  // No need for the tag anymore, write it to the new file
-    }                            // for (size_t i = 0; i < tagsNames.size(); i++)
+    }  // for (size_t i = 0; i < tagsNames.size(); i++)
 
-    rval = mb->write_file( file_output.c_str() );MB_CHK_SET_ERR( rval, "Can't write file " << file_output );
+    MB_CHK_SET_ERR( mb->write_file( file_output.c_str() ), "Can't write file " << file_output );
     cout << "Successfully wrote file " << file_output << "\n";
 
     delete mb;

@@ -444,8 +444,8 @@ double mytime2( double& tot_time, double& utime, double& stime, long& imem, long
     stime    = (double)r_usage.ru_stime.tv_sec + ( (double)r_usage.ru_stime.tv_usec / 1.e6 );
     tot_time = utime + stime;
 #ifndef LINUX
-    imem     = r_usage.ru_idrss;
-    rmem     = r_usage.ru_maxrss;
+    imem = r_usage.ru_idrss;
+    rmem = r_usage.ru_maxrss;
 #else
     system( "ps o args,drs,rss | grep perf | grep -v grep" );  // RedHat 9.0 doesnt fill in actual
                                                                // memory data

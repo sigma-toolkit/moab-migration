@@ -583,7 +583,7 @@ ErrorCode TupleList::sort( uint key, TupleList::buffer* buf )
 #define DIGIT_BITS      8
 #define DIGIT_VALUES    ( 1 << DIGIT_BITS )
 #define DIGIT_MASK      ( (Value)( DIGIT_VALUES - 1 ) )
-#define CEILDIV( a, b ) ( ( ( a ) + (b)-1 ) / ( b ) )
+#define CEILDIV( a, b ) ( ( ( a ) + ( b ) - 1 ) / ( b ) )
 #define DIGITS          CEILDIV( CHAR_BIT * sizeof( Value ), DIGIT_BITS )
 #define VALUE_BITS      ( DIGIT_BITS * DIGITS )
 #define COUNT_SIZE      ( DIGITS * DIGIT_VALUES )

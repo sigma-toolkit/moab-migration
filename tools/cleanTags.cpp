@@ -34,7 +34,6 @@ vector< string > split( const string& i_str, const string& i_delim )
 
 int main( int argc, char* argv[] )
 {
-
     ProgOptions opts;
 
     string inputfile, outputfile, deleteTags, keepTags;
@@ -47,10 +46,12 @@ int main( int argc, char* argv[] )
 
     Core core;
     Interface* mb = &core;
-    ErrorCode rval;
-    rval = mb->load_file( inputfile.c_str() );MB_CHK_ERR( rval );
+    
+    MB_CHK_ERR( mb->load_file( inputfile.c_str() ) );
+
     vector< Tag > existingTags;
-    rval = mb->tag_get_tags( existingTags );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_get_tags( existingTags ) );
+
     vector< string > tagsToDelete;
     if( !keepTags.empty() )
     {
@@ -58,7 +59,7 @@ int main( int argc, char* argv[] )
         for( size_t i = 0; i < existingTags.size(); i++ )
         {
             string tname;
-            rval = mb->tag_get_name( existingTags[i], tname );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->tag_get_name( existingTags[i], tname ) );
             bool deleteTag = false;
             for( size_t k = 0; k < tagsToKeep.size() && !deleteTag; k++ )
             {
@@ -67,21 +68,23 @@ int main( int argc, char* argv[] )
             if( !deleteTag ) tagsToDelete.push_back( tname );
         }
     }
+
     if( !deleteTags.empty() )
     {
         tagsToDelete = split( deleteTags, string( ":" ) );
     }
+
     for( size_t i = 0; i < tagsToDelete.size(); i++ )
     {
         Tag tag;
-        rval = mb->tag_get_handle( tagsToDelete[i].c_str(), tag );
-        if( rval == MB_SUCCESS && tag != NULL )
+        if( mb->tag_get_handle( tagsToDelete[i].c_str(), tag ) == MB_SUCCESS && tag != nullptr )
         {
-            rval = mb->tag_delete( tag );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->tag_delete( tag ) );
         }
     }
-    cout << "write file " << outputfile << endl;
-    rval = mb->write_file( outputfile.c_str() );MB_CHK_ERR( rval );
+    
+    cout << "writing file " << outputfile << endl;
+    MB_CHK_ERR( mb->write_file( outputfile.c_str() ) );
 
     return 0;
 }

@@ -56,11 +56,11 @@ ErrorCode Intx2MeshInPlane::computeIntersectionBetweenTgtAndSrc( EntityHandle tg
                                                                  bool check_boxes_first )
 {
 
-    int num_nodes  = 0;
-    ErrorCode rval = mb->get_connectivity( src, srcConn, num_nodes );MB_CHK_ERR( rval );
+    int num_nodes = 0;
+    MB_CHK_SET_ERR( mb->get_connectivity( src, srcConn, num_nodes ), "can't get connectivity" );
 
     nsSrc = num_nodes;
-    rval  = mb->get_coords( srcConn, num_nodes, &( srcCoords[0][0] ) );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( mb->get_coords( srcConn, num_nodes, &( srcCoords[0][0] ) ), "can't get coords" );
 
     area = 0.;
     nP   = 0;  // number of intersection points we are marking the boundary of src!
@@ -111,7 +111,7 @@ ErrorCode Intx2MeshInPlane::computeIntersectionBetweenTgtAndSrc( EntityHandle tg
     }
 #endif
 
-    rval = IntxUtils::EdgeIntersections2( srcCoords2D, nsSrc, tgtCoords2D, nsTgt, markb, markr, P, nP );MB_CHK_ERR( rval );
+    MB_CHK_ERR( IntxUtils::EdgeIntersections2( srcCoords2D, nsSrc, tgtCoords2D, nsTgt, markb, markr, P, nP ) );
 #ifdef ENABLE_DEBUG
     if( dbg_1 )
     {
@@ -225,7 +225,7 @@ ErrorCode Intx2MeshInPlane::findNodes( EntityHandle tgt, int nsTgt, EntityHandle
     // first get the list of edges adjacent to the tgt cell
     // use the neighTgtEdgeTag
     EntityHandle adjTgtEdges[MAXEDGES];
-    ErrorCode rval = mb->tag_get_data( neighTgtEdgeTag, &tgt, 1, &( adjTgtEdges[0] ) );MB_CHK_SET_ERR( rval, "can't get edge tgt tag" );
+    MB_CHK_SET_ERR( mb->tag_get_data( neighTgtEdgeTag, &tgt, 1, &( adjTgtEdges[0] ) ), "can't get edge tgt tag" );
     // we know that we have only nsTgt edges here; [nsTgt, MAXEDGES) are ignored, but it is small
     // potatoes
 
@@ -409,7 +409,7 @@ ErrorCode Intx2MeshInPlane::findNodes( EntityHandle tgt, int nsTgt, EntityHandle
 #endif
     }
     delete[] foundIds;
-    foundIds = NULL;
+    foundIds = nullptr;
     return MB_SUCCESS;
     // end copy
 }

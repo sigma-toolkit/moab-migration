@@ -385,18 +385,26 @@ ErrorCode refine_entities( Interface* mb,
 
 #ifdef MOAB_HAVE_MPI
     Range averts, aedges, afaces, acells;
-    error = mb->get_entities_by_dimension( fset, 0, averts );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fset, 1, aedges );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fset, 2, afaces );MB_CHK_ERR( error );
-    error = mb->get_entities_by_dimension( fset, 3, acells );MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fset, 0, averts );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fset, 1, aedges );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fset, 2, afaces );
+    MB_CHK_ERR( error );
+    error = mb->get_entities_by_dimension( fset, 3, acells );
+    MB_CHK_ERR( error );
 
     /* filter based on parallel status */
     if( pc )
     {
-        error = pc->filter_pstatus( averts, PSTATUS_GHOST, PSTATUS_NOT, -1, &init_ents[0] );MB_CHK_ERR( error );
-        error = pc->filter_pstatus( aedges, PSTATUS_GHOST, PSTATUS_NOT, -1, &init_ents[1] );MB_CHK_ERR( error );
-        error = pc->filter_pstatus( afaces, PSTATUS_GHOST, PSTATUS_NOT, -1, &init_ents[2] );MB_CHK_ERR( error );
-        error = pc->filter_pstatus( acells, PSTATUS_GHOST, PSTATUS_NOT, -1, &init_ents[3] );MB_CHK_ERR( error );
+        error = pc->filter_pstatus( averts, PSTATUS_GHOST, PSTATUS_NOT, -1, &init_ents[0] );
+        MB_CHK_ERR( error );
+        error = pc->filter_pstatus( aedges, PSTATUS_GHOST, PSTATUS_NOT, -1, &init_ents[1] );
+        MB_CHK_ERR( error );
+        error = pc->filter_pstatus( afaces, PSTATUS_GHOST, PSTATUS_NOT, -1, &init_ents[2] );
+        MB_CHK_ERR( error );
+        error = pc->filter_pstatus( acells, PSTATUS_GHOST, PSTATUS_NOT, -1, &init_ents[3] );
+        MB_CHK_ERR( error );
     }
     else
     {
@@ -1124,7 +1132,8 @@ ErrorCode test_mesh( const char* filename, int* level_degrees, int num_levels )
 #ifdef MOAB_HAVE_MPI
     MPI_Comm comm = MPI_COMM_WORLD;
     EntityHandle partnset;
-    error = mbImpl->create_meshset( moab::MESHSET_SET, partnset );MB_CHK_ERR( error );
+    error = mbImpl->create_meshset( moab::MESHSET_SET, partnset );
+    MB_CHK_ERR( error );
     pc = moab::ParallelComm::get_pcomm( mbImpl, partnset, &comm );
 
     int procs = 1;

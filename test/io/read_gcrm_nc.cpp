@@ -34,7 +34,7 @@ int main( int argc, char* argv[] )
     int fail = MPI_Init( &argc, &argv );
     if( fail ) return 1;
 #else
-    argv[0]   = argv[argc - argc];  // To remove the warnings in serial mode about unused variables
+    argv[0] = argv[argc - argc];  // To remove the warnings in serial mode about unused variables
 #endif
 
     result += RUN_TEST( test_read_all );
@@ -525,6 +525,6 @@ void get_options( std::string& opts )
     // Use parallel options
     opts = std::string( ";;PARALLEL=READ_PART;PARTITION_METHOD=TRIVIAL" );
 #else
-    opts      = std::string( ";;" );
+    opts = std::string( ";;" );
 #endif
 }

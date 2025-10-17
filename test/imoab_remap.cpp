@@ -170,12 +170,14 @@ int main( int argc, char* argv[] )
     // int disc_orders[2] = {1, 1};
     // const char* disc_methods[2] = {"fv", "fv"};
     // const char* dof_tag_names[2] = {"GLOBAL_ID", "GLOBAL_ID"};
-    int disc_orders[3]  = { 4, 1, 1 };
-    int filter_weights = 0, fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 0, fNoConserve = 0, fNoBubble = 1, fInverseDistanceMap = 0;
+    int disc_orders[3] = { 4, 1, 1 };
+    int filter_weights = 0, fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 0, fNoConserve = 0, fNoBubble = 1,
+        fInverseDistanceMap = 0;
 
     const std::string disc_methods[3]        = { "cgll", "fv", "pcloud" };
     const std::string dof_tag_names[3]       = { "GLOBAL_DOFS", "GLOBAL_ID", "GLOBAL_ID" };
-    const std::string weights_identifiers[4] = { "scalar", "scalar_pointcloud", "scalar_conservative", "noname_failed_test" };
+    const std::string weights_identifiers[4] = { "scalar", "scalar_pointcloud", "scalar_conservative",
+                                                 "noname_failed_test" };
 
     const std::string bottomTempField            = "a2oTbot";
     const std::string bottomTempFieldATM         = "a2oTbotATM";
@@ -241,17 +243,16 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_NETCDF
     {
         const std::string atmocn_map_file_name = "atm_ocn_map.nc";
-        ierr =
-            iMOAB_WriteMapFile( atmocnPID, weights_identifiers[0].c_str(), atmocn_map_file_name.c_str() );
+        ierr = iMOAB_WriteMapFile( atmocnPID, weights_identifiers[0].c_str(), atmocn_map_file_name.c_str() );
         CHECKIERR( ierr, "failed to write map file to disk" );
 
         const std::string intx_from_file_identifier = "map-from-file";
         CHECKIERR( ierr, "failed to load map file from disk" );
         int src_disc_type = 1;  // element-based SE
         int tgt_disc_type = 3;  // element-based FV
-        int arearead = 0; // no aream needs
-        CHECKIERR( iMOAB_LoadMapFile( atmPID, ocnPID, atmocnPID, &src_disc_type, &tgt_disc_type,
-                                         &arearead, intx_from_file_identifier.c_str(), atmocn_map_file_name.c_str() ),
+        int arearead      = 0;  // no aream needs
+        CHECKIERR( iMOAB_LoadMapFile( atmPID, ocnPID, atmocnPID, &src_disc_type, &tgt_disc_type, &arearead,
+                                      intx_from_file_identifier.c_str(), atmocn_map_file_name.c_str() ),
                    "failed to load map file from disk" );
     }
 #endif
@@ -286,14 +287,14 @@ int main( int argc, char* argv[] )
 
     /* We have the remapping weights now. Let us apply the weights onto the tag we defined
        on the srouce mesh and get the projection on the target mesh */
-    ierr = iMOAB_ApplyScalarProjectionWeights( atmocnPID, &filter_weights, weights_identifiers[0].c_str(), bottomTempField.c_str(),
-                                               bottomTempProjectedNCField.c_str() );
+    ierr = iMOAB_ApplyScalarProjectionWeights( atmocnPID, &filter_weights, weights_identifiers[0].c_str(),
+                                               bottomTempField.c_str(), bottomTempProjectedNCField.c_str() );
     CHECKIERR( ierr, "failed to apply projection weights for scalar non-conservative field" );
 
     /* We have the remapping weights now. Let us apply the weights onto the tag we defined
        on the srouce mesh and get the projection on the target mesh */
-    ierr = iMOAB_ApplyScalarProjectionWeights( atmocnPID, &filter_weights, weights_identifiers[2].c_str(), bottomTempField.c_str(),
-                                               bottomTempProjectedField.c_str() );
+    ierr = iMOAB_ApplyScalarProjectionWeights( atmocnPID, &filter_weights, weights_identifiers[2].c_str(),
+                                               bottomTempField.c_str(), bottomTempProjectedField.c_str() );
     CHECKIERR( ierr, "failed to apply projection weights for scalar conservative field" );
 
     if( gen_baseline )
@@ -356,8 +357,8 @@ int main( int argc, char* argv[] )
 #ifdef ENABLE_ATMLND_COUPLING
     /* We have the remapping weights now. Let us apply the weights onto the tag we defined
        on the srouce mesh and get the projection on the target mesh */
-    ierr = iMOAB_ApplyScalarProjectionWeights( atmlndPID, &filter_weights, weights_identifiers[1].c_str(), bottomTempField.c_str(),
-                                               bottomTempProjectedField.c_str() );
+    ierr = iMOAB_ApplyScalarProjectionWeights( atmlndPID, &filter_weights, weights_identifiers[1].c_str(),
+                                               bottomTempField.c_str(), bottomTempProjectedField.c_str() );
     CHECKIERR( ierr, "failed to apply projection weights for ATM-LND scalar field" );
 
     /* We have the remapping weights now. Let us apply the weights onto the tag we defined
@@ -369,7 +370,8 @@ int main( int argc, char* argv[] )
     /* We expect the next test to deliberately fail since there should not be an identifier specified */
     ierr = iMOAB_ApplyScalarProjectionWeights( lndatmPID, &filter_weights, weights_identifiers[3].c_str(),
                                                bottomTempProjectedField.c_str(), bottomTempFieldATM.c_str() );
-    CHECKIERR( ierr!=moab::MB_INDEX_OUT_OF_RANGE, "failed to fail applying projection weights for LND-ATM scalar field" );
+    CHECKIERR( ierr != moab::MB_INDEX_OUT_OF_RANGE,
+               "failed to fail applying projection weights for LND-ATM scalar field" );
 
 #endif
     /*
@@ -419,7 +421,6 @@ int main( int argc, char* argv[] )
 
     ierr = iMOAB_DeregisterApplication( lndatmPID );
     CHECKIERR( ierr, "failed to de-register application1" );
-
 
     /*
      * this method will delete MOAB instance

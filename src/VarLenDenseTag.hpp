@@ -51,7 +51,7 @@ class VarLenDenseTag : public TagInfo
      *          data associated with the tag in preparation for deleting
      *          the tag itself.
      *
-     *\Note Invalidates tag if \c tag_delete_pending is true.  The only
+     *\note Invalidates tag if \c tag_delete_pending is true.  The only
      *        valid method that can be invoked that is is the destructor.
      *
      *\param seqman    Pointer to mesh entity database
@@ -62,7 +62,7 @@ class VarLenDenseTag : public TagInfo
      *
      * Get tag values for specified entities.
      *
-     *\Note Will fail for variable-length data.
+     *\note Will fail for variable-length data.
      *\param seqman Pointer to mesh entity database
      *\param entities Entity handles for which to retrieve tag data
      *\param num_entities Length of \c entities array
@@ -79,7 +79,7 @@ class VarLenDenseTag : public TagInfo
      *
      * Get tag values for specified entities.
      *
-     *\Note Will fail for variable-length data.
+     *\note Will fail for variable-length data.
      *\param seqman Pointer to mesh entity database
      *\param entities Entity handles for which to retrieve tag data
      *\param data Pointer to memory in which to store consecutive tag values,
@@ -131,7 +131,7 @@ class VarLenDenseTag : public TagInfo
     /**\brief Set tag value for passed entities
      *
      * Store tag data or update stored tag values
-     *\Note Will fail for variable-length data.
+     *\note Will fail for variable-length data.
      *\param seqman Pointer to mesh entity database
      *\param entities Entity handles for which to store tag data
      *\param num_entities Length of \c entities array
@@ -147,7 +147,7 @@ class VarLenDenseTag : public TagInfo
     /**\brief Set tag value for passed entities
      *
      * Store tag data or update stored tag values
-     *\Note Will fail for variable-length data.
+     *\note Will fail for variable-length data.
      *\param seqman Pointer to mesh entity database
      *\param entities Entity handles for which to store tag data
      *\param data Pointer to memory holding consecutive tag values,
@@ -275,7 +275,7 @@ class VarLenDenseTag : public TagInfo
      *\param data_ptr    Output: pointer to tag storage.
      *\param allocate    If true, space for this tag will be allocated, if not it wont
      *
-     *\Note If this function is called for entities for which no tag value
+     *\note If this function is called for entities for which no tag value
      *      has been set, but for which a default value exists, it will
      *      force the allocation of explicit storage for each such entity
      *      even though MOAB would normally not explicitly store tag values

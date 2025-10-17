@@ -44,28 +44,28 @@ int main( int argc, char* argv[] )
     ErrorCode rval;
     Core* mb = new Core();
 
-    rval = mb->load_file( lndfile.c_str() );MB_CHK_SET_ERR( rval, "can't load land pc file" );
+    MB_CHK_SET_ERR( mb->load_file( lndfile.c_str() ), "can't load land pc file" );
 
     Core* mb2 = new Core();
-    rval      = mb2->load_file( pg2file.c_str() );MB_CHK_SET_ERR( rval, "can't load pg2 mesh file" );
+    MB_CHK_SET_ERR( mb2->load_file( pg2file.c_str() ), "can't load pg2 mesh file" );
 
     Tag globalIDTag1 = mb->globalId_tag();
 
     Tag globalIDTag2 = mb2->globalId_tag();
 
     Range verts1;
-    rval = mb->get_entities_by_dimension( 0, 0, verts1 );MB_CHK_SET_ERR( rval, "can't get vertices " );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 0, verts1 ), "can't get vertices " );
 
     Range cells;
-    rval = mb2->get_entities_by_dimension( 0, 2, cells );MB_CHK_SET_ERR( rval, "can't get 2d cells " );
+    MB_CHK_SET_ERR( mb2->get_entities_by_dimension( 0, 2, cells ), "can't get 2d cells " );
 
     std::vector< int > globalIdsCells;
     globalIdsCells.resize( cells.size() );
-    rval = mb2->tag_get_data( globalIDTag2, cells, &globalIdsCells[0] );MB_CHK_SET_ERR( rval, "can't get global ids cells " );
+    MB_CHK_SET_ERR( mb2->tag_get_data( globalIDTag2, cells, &globalIdsCells[0] ), "can't get global ids cells " );
 
     std::vector< int > globalIdsVerts;
     globalIdsVerts.resize( verts1.size() );
-    rval = mb->tag_get_data( globalIDTag1, verts1, &globalIdsVerts[0] );MB_CHK_SET_ERR( rval, "can't get global ids cells " );
+    MB_CHK_SET_ERR( mb->tag_get_data( globalIDTag1, verts1, &globalIdsVerts[0] ), "can't get global ids cells " );
 
     // now, every cell will be put into one set, by looking at the global id of cell
 
@@ -77,7 +77,7 @@ int main( int argc, char* argv[] )
     }
     // create a new file set with land cells
     EntityHandle fileSet;
-    rval = mb2->create_meshset( MESHSET_SET, fileSet );MB_CHK_SET_ERR( rval, "Error creating file set" );
+    MB_CHK_SET_ERR( mb2->create_meshset( MESHSET_SET, fileSet ), "Error creating file set" );
     // empty all sets
 
     Range landCells;
@@ -88,21 +88,21 @@ int main( int argc, char* argv[] )
         landCells.insert( gidToCell[gid] );
     }
 
-    rval = mb2->add_entities( fileSet, landCells );
-    ;MB_CHK_SET_ERR( rval, "can't add land cells" );
+    MB_CHK_SET_ERR( mb2->add_entities( fileSet, landCells ), "can't add land cells" );
 
-    rval = mb2->write_file( outfile.c_str(), 0, 0, &fileSet, 1 );MB_CHK_SET_ERR( rval, "can't write file" );
+    MB_CHK_SET_ERR( mb2->write_file( outfile.c_str(), 0, 0, &fileSet, 1 ), "can't write file" );
 
     // write the original with mask 0/1, default -1
     Tag mask;
     double def_val = -1.;
-    rval           = mb2->tag_get_handle( "mask", 1, MB_TYPE_DOUBLE, mask, MB_TAG_CREAT | MB_TAG_DENSE, &def_val );MB_CHK_SET_ERR( rval, "can't create mask tag" );
+    MB_CHK_SET_ERR( mb2->tag_get_handle( "mask", 1, MB_TYPE_DOUBLE, mask, MB_TAG_CREAT | MB_TAG_DENSE, &def_val ),
+                    "can't create mask tag" );
     for( Range::iterator it = cells.begin(); it != cells.end(); ++it, i++ )
     {
         EntityHandle cell = *it;
         // set to 0
         double val = 0.;
-        rval       = mb2->tag_set_data( mask, &cell, 1, &val );MB_CHK_SET_ERR( rval, "can't set mask tag" );
+        MB_CHK_SET_ERR( mb2->tag_set_data( mask, &cell, 1, &val ), "can't set mask tag" );
     }
 
     for( Range::iterator it = landCells.begin(); it != landCells.end(); ++it, i++ )
@@ -110,10 +110,10 @@ int main( int argc, char* argv[] )
         EntityHandle cell = *it;
         // set to 0
         double val = 1.;
-        rval       = mb2->tag_set_data( mask, &cell, 1, &val );MB_CHK_SET_ERR( rval, "can't set mask tag" );
+        MB_CHK_SET_ERR( mb2->tag_set_data( mask, &cell, 1, &val ), "can't set mask tag" );
     }
-    rval = mb2->delete_entities( &fileSet, 1 );MB_CHK_SET_ERR( rval, "can't delete set" );
-    rval = mb2->write_file( "AtmWithLandMask.h5m" );MB_CHK_SET_ERR( rval, "can't write file" );
+    MB_CHK_SET_ERR( mb2->delete_entities( &fileSet, 1 ), "can't delete set" );
+    MB_CHK_SET_ERR( mb2->write_file( "AtmWithLandMask.h5m" ), "can't write file" );
     delete mb;
     delete mb2;
 

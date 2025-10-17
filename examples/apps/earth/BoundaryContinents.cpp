@@ -1,9 +1,32 @@
-/** @example BoundaryContinents
+/**
+ * @file BoundaryContinents.cpp
+ * @brief Example demonstrating creation of continent boundary edge meshes
+ *
+ * This example shows how to:
+ * - Load continent boundary point data and loop information
+ * - Create edge meshes from boundary point sequences
+ * - Convert 3D spherical coordinates to 2D lat-lon coordinates
+ * - Handle periodic boundary conditions for longitude wrapping
+ * - Remove long edges that cross the date line
+ * - Create mesh sets for boundary visualization
+ * - Write boundary meshes in VTK format
+ *
+ * This tool is useful for creating continent boundary meshes
+ * for climate and geophysical applications.
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+ * @example BoundaryContinents.cpp
  * Description: read boundary points and loops that form islands and continents
       and create an edge mesh file \n
  *
- *    BoundaryContinents  <boundary_points.dat> <SaveLoopCounts>
+ *    BoundaryContinents  <boundary_points.dat> \c SaveLoopCounts
  * (default values can run if users don't specify input files)
+ *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 
 #include "moab/Core.hpp"
@@ -86,7 +109,7 @@ int main( int argc, char** argv )
     mb->query_interface( readMeshIface );
     Range verts;
 
-    ErrorCode rval = mb->create_vertices( &coords[0], coords.size() / 3, verts );MB_CHK_SET_ERR( rval, "do not create boundary vertices" );
+    MB_CHK_SET_ERR( mb->create_vertices( &coords[0], coords.size() / 3, verts ), "do not create boundary vertices" );
 
     Tag gid = mb->globalId_tag();
 
@@ -97,7 +120,7 @@ int main( int argc, char** argv )
     }
     EntityHandle handle;
     EntityHandle* conn_array;
-    rval = readMeshIface->get_element_connect( num_edges, 2, MBEDGE, 1, handle, conn_array );MB_CHK_SET_ERR( rval, "do not elems" );
+    MB_CHK_SET_ERR( readMeshIface->get_element_connect( num_edges, 2, MBEDGE, 1, handle, conn_array ), "do not elems" );
     int i1 = 0;  // index in edge connectivity
     for( size_t i = 0; i < loopsindx.size() / 2; i++ )
     {
@@ -115,9 +138,9 @@ int main( int argc, char** argv )
 
     Range bedges( handle, handle + num_edges - 1 );
     EntityHandle bound_set;
-    rval = mb->create_meshset( MESHSET_SET, bound_set );MB_CHK_SET_ERR( rval, "Can't create boundary edges set" );
+    MB_CHK_SET_ERR( mb->create_meshset( MESHSET_SET, bound_set ), "Can't create boundary edges set" );
 
-    rval = mb->add_entities( bound_set, bedges );MB_CHK_SET_ERR( rval, "Can't add edges to boundary set" );
+    MB_CHK_SET_ERR( mb->add_entities( bound_set, bedges ), "Can't add edges to boundary set" );
 
     // set global ids for vertices and edges
     vector< int > gids;
@@ -126,9 +149,9 @@ int main( int argc, char** argv )
     {
         gids[j] = j + 1;
     }
-    rval = mb->tag_set_data( gid, verts, &gids[0] );MB_CHK_SET_ERR( rval, "Can't set global ids on verts" );
+    MB_CHK_SET_ERR( mb->tag_set_data( gid, verts, &gids[0] ), "Can't set global ids on verts" );
     // we have less edges than vertices, we can reuse the array for edges too
-    rval = mb->tag_set_data( gid, bedges, &gids[0] );MB_CHK_SET_ERR( rval, "Can't set global ids on edges" );
+    MB_CHK_SET_ERR( mb->tag_set_data( gid, bedges, &gids[0] ), "Can't set global ids on edges" );
 
     mb->write_file( "bound.vtk", 0, 0, &bound_set, 1 );
 
@@ -136,7 +159,7 @@ int main( int argc, char** argv )
     // get all the vertices coordinates
     std::vector< CartVect > co3;
     co3.resize( verts.size() );
-    rval = mb->get_coords( verts, &( co3[0][0] ) );MB_CHK_SET_ERR( rval, "Can't get vertex coords" );
+    MB_CHK_SET_ERR( mb->get_coords( verts, &( co3[0][0] ) ), "Can't get vertex coords" );
     for( size_t i = 0; i < verts.size(); i++ )
     {
         CartVect p  = co3[i];
@@ -144,7 +167,7 @@ int main( int argc, char** argv )
         double lon1 = getLon( p );
         co3[i]      = CartVect( lon1, lat1, 0. );
     }
-    rval = mb->set_coords( verts, &( co3[0][0] ) );MB_CHK_SET_ERR( rval, "Can't set new vertex coords" );
+    MB_CHK_SET_ERR( mb->set_coords( verts, &( co3[0][0] ) ), "Can't set new vertex coords" );
     // remove edges in 2d that are too long (longer than 6; they are on the other side..., periodic)
 
     Range longEdges;
@@ -153,15 +176,15 @@ int main( int argc, char** argv )
         EntityHandle eh = *eit;
         const EntityHandle* conn;
         int nconn;
-        rval = mb->get_connectivity( eh, conn, nconn );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->get_connectivity( eh, conn, nconn ) );
         // get coordinates of nodes
         CartVect c2[2];
-        rval = mb->get_coords( conn, 2, &( c2[0][0] ) );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->get_coords( conn, 2, &( c2[0][0] ) ) );
         double dist = ( c2[1] - c2[0] ).length_squared();
         if( dist > 36. )  // too long edge in 2d, remove it
             longEdges.insert( eh );
     }
-    rval = mb->delete_entities( longEdges );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->delete_entities( longEdges ) );
 
     mb->write_file( "bound2d.vtk" );
     delete mb;

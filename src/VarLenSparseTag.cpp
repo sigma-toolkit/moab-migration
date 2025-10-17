@@ -156,9 +156,9 @@ ErrorCode VarLenSparseTag::set_data( SequenceManager* seqman,
                                      void const* const* pointers,
                                      const int* lengths )
 {
-    ErrorCode rval = validate_lengths( NULL, lengths, num_entities );MB_CHK_ERR( rval );
+    MB_CHK_ERR( validate_lengths( NULL, lengths, num_entities ) );
 
-    rval = seqman->check_valid_entities( NULL, entities, num_entities, true );MB_CHK_ERR( rval );
+    MB_CHK_ERR( seqman->check_valid_entities( NULL, entities, num_entities, true ) );
 
     for( size_t i = 0; i < num_entities; ++i )
     {
@@ -184,9 +184,9 @@ ErrorCode VarLenSparseTag::set_data( SequenceManager* seqman,
                                      void const* const* pointers,
                                      const int* lengths )
 {
-    ErrorCode rval = validate_lengths( NULL, lengths, entities.size() );MB_CHK_ERR( rval );
+    MB_CHK_ERR( validate_lengths( NULL, lengths, entities.size() ) );
 
-    rval = seqman->check_valid_entities( NULL, entities );MB_CHK_ERR( rval );
+    MB_CHK_ERR( seqman->check_valid_entities( NULL, entities ) );
 
     Range::const_iterator i;
     for( i = entities.begin(); i != entities.end(); ++i, ++pointers, ++lengths )
@@ -220,9 +220,9 @@ ErrorCode VarLenSparseTag::clear_data( SequenceManager* seqman,
         return MB_SUCCESS;
     }
 
-    ErrorCode rval = validate_lengths( NULL, &value_len, 1 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( validate_lengths( NULL, &value_len, 1 ) );
 
-    rval = seqman->check_valid_entities( NULL, entities, num_entities, true );MB_CHK_ERR( rval );
+    MB_CHK_ERR( seqman->check_valid_entities( NULL, entities, num_entities, true ) );
 
     for( size_t i = 0; i < num_entities; ++i )
         mData[entities[i]].set( value_ptr, value_len );
@@ -242,9 +242,9 @@ ErrorCode VarLenSparseTag::clear_data( SequenceManager* seqman,
         return MB_SUCCESS;
     }
 
-    ErrorCode rval = validate_lengths( NULL, &value_len, 1 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( validate_lengths( NULL, &value_len, 1 ) );
 
-    rval = seqman->check_valid_entities( NULL, entities );MB_CHK_ERR( rval );
+    MB_CHK_ERR( seqman->check_valid_entities( NULL, entities ) );
 
     Range::const_iterator i;
     for( i = entities.begin(); i != entities.end(); ++i )
@@ -424,7 +424,7 @@ ErrorCode VarLenSparseTag::find_entities_with_value(
         for( Range::const_pair_iterator p = intersect_entities->begin(); p != intersect_entities->end(); ++p )
         {
             iter = mData.lower_bound( p->first );
-            end = mData.upper_bound( p->second );
+            end  = mData.upper_bound( p->second );
             find_tag_varlen_values_equal( *this, value, get_size(), iter, end, output_entities );
         }
     }
@@ -433,12 +433,12 @@ ErrorCode VarLenSparseTag::find_entities_with_value(
         if( type == MBMAXTYPE )
         {
             iter = mData.begin();
-            end = mData.end();
+            end  = mData.end();
         }
         else
         {
             iter = mData.lower_bound( CREATE_HANDLE( type, MB_START_ID ) );
-            end = mData.upper_bound( CREATE_HANDLE( type, MB_END_ID ) );
+            end  = mData.upper_bound( CREATE_HANDLE( type, MB_END_ID ) );
         }
         find_tag_varlen_values_equal( *this, value, get_size(), iter, end, output_entities );
     }

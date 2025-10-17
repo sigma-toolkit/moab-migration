@@ -151,6 +151,6 @@ ErrorCode quads_to_tris( Interface* MBI, EntityHandle input_meshset )
             assert( MB_SUCCESS == result );
 
         }  // end quad loop
-    }      // end surface meshset loop
+    }  // end surface meshset loop
     return MB_SUCCESS;
 }

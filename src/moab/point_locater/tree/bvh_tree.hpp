@@ -145,7 +145,7 @@ namespace
                 return *this;
             }
         };  //_Split_data
-    }       // namespace _bvh
+    }  // namespace _bvh
 }  // namespace
 
 template < typename _Entity_handles, typename _Box, typename _Moab, typename _Parametrizer >

@@ -1,7 +1,7 @@
 /** \mainpage The Mesh-Oriented datABase (MOAB)
  *
  * MOAB is a component for representing and evaluating mesh data.  MOAB can store
- * structured and unstructured mesh, consisting of elements in the finite element “zoo”,
+ * structured and unstructured mesh, consisting of elements in the finite element "zoo",
  * along with polygons and polyhedra.  The functional interface to MOAB is simple, consisting
  * of only four fundamental data types.  This data is quite powerful, allowing the representation
  * of most types of metadata commonly found on the mesh.  MOAB is optimized for efficiency in
@@ -66,13 +66,7 @@
 
 #define MBINTERFACE_IID_STR "f728830e-1dd1-11b2-9598-fb9f414f2465"
 
-#define MBINTERFACE_IID                                    \
-    {                                                      \
-        0xf728830e, 0x1dd1, 0x11b2,                        \
-        {                                                  \
-            0x95, 0x98, 0xfb, 0x9f, 0x41, 0x4f, 0x24, 0x65 \
-        }                                                  \
-    }
+#define MBINTERFACE_IID { 0xf728830e, 0x1dd1, 0x11b2, { 0x95, 0x98, 0xfb, 0x9f, 0x41, 0x4f, 0x24, 0x65 } }
 
 #endif
 
@@ -263,7 +257,7 @@ class MOAB_EXPORT Interface : public UnknownInterface
      *               the tag that is one of the values in this array.
      *\param num_set_tag_values The length of set_tag_values.
      *
-     *\Note file_set is passed by pointer rather than by value (where a
+     *\note file_set is passed by pointer rather than by value (where a
      *      zero handle value would indicate no set) so as to intentionally
      *      break compatibility with the previous version of this function
      *      because the behavior with respect to the file set was changed.
@@ -1258,7 +1252,7 @@ class MOAB_EXPORT Interface : public UnknownInterface
      *        - \c MB_VARIABLE_DATA_LENGTH  if \c MB_TAG_VARLEN and \c default_value is non-null and
      *                                      \c default_value_size is not specified.
      *
-     *\NOTE A call to tag_get_handle that includes a default value will fail
+     *\note A call to tag_get_handle that includes a default value will fail
      * if the tag already exists with a different default value.  A call without
      * a default value will succeed if the tag already exists, regardless of
      * whether or not the existing tag has a default value.
@@ -1578,7 +1572,7 @@ class MOAB_EXPORT Interface : public UnknownInterface
      *\param data_ptr    Output: pointer to tag storage.
      *\param allocate    If true, space for this tag will be allocated, if not it wont
      *
-     *\Note If this function is called for entities for which no tag value
+     *\note If this function is called for entities for which no tag value
      *      has been set, but for which a default value exists, it will
      *      force the allocation of explicit storage for each such entity
      *      even though MOAB would normally not explicitly store tag values

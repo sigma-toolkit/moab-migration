@@ -1,4 +1,23 @@
-/** @example copyPartition.cpp  copy partition info on a mesh file from a point cloud
+/**
+ * @file copyPartition.cpp
+ * @brief Example demonstrating partition information copying between mesh files
+ *
+ * This example shows how to:
+ * - Load partition information from point cloud files
+ * - Copy partition data to PG2 mesh files
+ * - Match entities between different mesh files using global IDs
+ * - Create parallel partition sets for visualization
+ * - Handle partition mapping for E3SM climate model meshes
+ * - Write partition-enhanced mesh files for VisIt visualization
+ *
+ * This tool is useful for climate model visualization where
+ * partition information needs to be transferred between different
+ * mesh representations (point cloud to structured mesh).
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+
  * this tool will take an existing h5m  phys grid partition file (point cloud) and copy the
  * partition information on a pg2 mesh file, for better viewing with VisIt
  *
@@ -9,6 +28,10 @@
  *  --res ne30pg2_r05_oECv3_ICG --compset A_WCYCL1850S_CMIP6
  *  or
  *  --res ne4pg2_ne4pg2 --compset FC5AV1C-L
+ *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 #include "moab/ProgOptions.hpp"
 #include "moab/Core.hpp"
@@ -43,43 +66,43 @@ int main( int argc, char* argv[] )
     ErrorCode rval;
     Core* mb = new Core();
 
-    rval = mb->load_file( physfile.c_str() );MB_CHK_SET_ERR( rval, "can't load phys grid file" );
+    MB_CHK_SET_ERR( mb->load_file( physfile.c_str() ), "can't load phys grid file" );
 
     Core* mb2 = new Core();
-    rval      = mb2->load_file( pg2file.c_str() );MB_CHK_SET_ERR( rval, "can't load pg2 mesh file" );
+    MB_CHK_SET_ERR( mb2->load_file( pg2file.c_str() ), "can't load pg2 mesh file" );
 
     Tag globalIDTag1 = mb->globalId_tag();
     Tag parti;
-    rval = mb->tag_get_handle( "partition", parti );MB_CHK_SET_ERR( rval, "can't get partition tag phys grid mesh " );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "partition", parti ), "can't get partition tag phys grid mesh " );
 
     Tag globalIDTag2 = mb2->globalId_tag();
 
     Range verts1;
-    rval = mb->get_entities_by_dimension( 0, 0, verts1 );MB_CHK_SET_ERR( rval, "can't get vertices " );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 0, verts1 ), "can't get vertices " );
 
     std::vector< int > partValues;
     partValues.resize( verts1.size() );
-    rval = mb->tag_get_data( parti, verts1, &partValues[0] );MB_CHK_SET_ERR( rval, "can't get parts values on vertices " );
+    MB_CHK_SET_ERR( mb->tag_get_data( parti, verts1, &partValues[0] ), "can't get parts values on vertices " );
 
     Range cells;
-    rval = mb2->get_entities_by_dimension( 0, 2, cells );MB_CHK_SET_ERR( rval, "can't get 2d cells " );
+    MB_CHK_SET_ERR( mb2->get_entities_by_dimension( 0, 2, cells ), "can't get 2d cells " );
     std::vector< int > globalIdsCells;
     globalIdsCells.resize( cells.size() );
-    rval = mb2->tag_get_data( globalIDTag2, cells, &globalIdsCells[0] );MB_CHK_SET_ERR( rval, "can't get global ids cells " );
+    MB_CHK_SET_ERR( mb2->tag_get_data( globalIDTag2, cells, &globalIdsCells[0] ), "can't get global ids cells " );
 
     std::vector< int > globalIdsVerts;
     globalIdsVerts.resize( verts1.size() );
-    rval = mb->tag_get_data( globalIDTag1, verts1, &globalIdsVerts[0] );MB_CHK_SET_ERR( rval, "can't get global ids cells " );
+    MB_CHK_SET_ERR( mb->tag_get_data( globalIDTag1, verts1, &globalIdsVerts[0] ), "can't get global ids cells " );
 
     Tag partTag;
-    rval = mb2->tag_get_handle( "PARALLEL_PARTITION", partTag );MB_CHK_SET_ERR( rval, "can't partition tag " );
+    MB_CHK_SET_ERR( mb2->tag_get_handle( "PARALLEL_PARTITION", partTag ), "can't partition tag " );
 
     Range sets;
-    rval = mb2->get_entities_by_type_and_tag( 0, MBENTITYSET, &partTag, NULL, 1, sets );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb2->get_entities_by_type_and_tag( 0, MBENTITYSET, &partTag, NULL, 1, sets ) );
 
     std::vector< int > setValues;
     setValues.resize( sets.size() );
-    rval = mb2->tag_get_data( partTag, sets, &setValues[0] );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb2->tag_get_data( partTag, sets, &setValues[0] ) );
 
     std::map< int, EntityHandle > valToSet;
     int i = 0;
@@ -96,7 +119,7 @@ int main( int argc, char* argv[] )
         gidToCell[globalIdsCells[i]] = *it;
     }
     // empty all sets
-    rval = mb2->clear_meshset( sets );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb2->clear_meshset( sets ) );
 
     // look now at parti values for vertices, and their global ids
     for( i = 0; i < (int)verts1.size(); i++ )
@@ -105,10 +128,10 @@ int main( int argc, char* argv[] )
         int gid           = globalIdsVerts[i];
         EntityHandle set1 = valToSet[part];
         EntityHandle cell = gidToCell[gid];
-        rval              = mb2->add_entities( set1, &cell, 1 );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb2->add_entities( set1, &cell, 1 ) );
     }
 
-    rval = mb2->write_file( outfile.c_str() );MB_CHK_SET_ERR( rval, "can't write file" );
+    MB_CHK_SET_ERR( mb2->write_file( outfile.c_str() ), "can't write file" );
 
     delete mb;
     delete mb2;

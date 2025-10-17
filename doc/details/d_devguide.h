@@ -1,7 +1,65 @@
 /*! \page developerguide Developer's Guide
- 
+
   \tableofcontents
- 
+
+  \section imoab-interface iMOAB Interface
+
+  MOAB provides a lightweight, language-agnostic interface called iMOAB that serves as the primary interface for applications requiring cross-language compatibility. The iMOAB interface is designed to be simple, efficient, and consistent across C and Fortran bindings.
+
+  \subsection imoab-design iMOAB Design Principles
+
+  The iMOAB interface follows these key design principles:
+  - \b Simplicity: Minimal API surface with intuitive function names
+  - \b Consistency: Uniform parameter ordering and error handling across all language bindings
+  - \b Efficiency: Direct access to MOAB's internal data structures without unnecessary overhead
+  - \b Extensibility: Easy to add new functionality while maintaining backward compatibility
+  - \b Language-agnostic: Same interface semantics across C and Fortran
+
+  \subsection imoab-core-functions Core iMOAB Functions
+
+  The iMOAB interface provides essential functions for mesh operations:
+  - \b Entity Management: Create, query, and modify mesh entities (vertices, elements, sets)
+  - \b Connectivity: Access and modify element connectivity and adjacency information
+  - \b Tags: Attach and retrieve metadata on entities and sets
+  - \b Sets: Organize entities into hierarchical groupings with parent-child relationships
+  - \b I/O: Read and write mesh files in various formats
+  - \b Parallel: Support for distributed mesh operations across multiple processes
+
+  \subsection imoab-error-handling Error Handling
+
+  iMOAB uses a consistent error handling model across all language bindings:
+  - Functions return integer error codes indicating success or failure
+  - Detailed error messages are available through dedicated query functions
+  - Error codes are standardized across all language interfaces
+  - Stack traces are generated for debugging complex error scenarios
+
+  \subsection imoab-language-bindings Language Bindings
+
+  \subsubsection imoab-c C Interface
+  The C interface provides the foundation for all other language bindings:
+  \code
+  int iMOAB_LoadMesh(iMOAB_AppID pid, const char* filename, const char* options);
+  int iMOAB_GetEntities(iMOAB_AppID pid, iMOAB_EntitySetHandle set, int dimension,
+                       iMOAB_EntityHandle* entities, int* num_entities);
+  int iMOAB_GetConnectivity(iMOAB_AppID pid, iMOAB_EntityHandle entity,
+                           iMOAB_EntityHandle* connectivity, int* num_vertices);
+  \endcode
+
+  \subsubsection imoab-fortran Fortran Interface
+  Fortran bindings provide natural Fortran-style array operations:
+  \code
+  integer function iMOAB_LoadMesh(pid, filename, options)
+  integer, intent(in) :: pid
+  character(len=*), intent(in) :: filename, options
+
+  integer function iMOAB_GetEntities(pid, set, dimension, entities, num_entities)
+  integer, intent(in) :: pid, set, dimension
+  integer, dimension(*), intent(out) :: entities
+  integer, intent(inout) :: num_entities
+  \endcode
+
+  Note: MOAB itself provides Python bindings through the separate pymoab package, which is not part of iMOAB.
+
   \section sequence  1.EntitySequence & SequenceData
 
   \subsection figure1 Figure 1: EntitySequences For One SequenceData
@@ -76,7 +134,7 @@ instances and corresponding <I>SequenceData</I> instances. It is used to manage
 all such instances for entities of a single <I>EntityType</I>. <I>TypeSequenceManager</I>
 enforces the following four rules on its contained data:
 
--# No two <I>SequenceData</I> instances may overlap.  
+-# No two <I>SequenceData</I> instances may overlap.
 -# No two <I>EntitySequence</I> instances may overlap.
 -# Every <I>EntitySequence</I> must be a subset of a <I>SequenceData</I>.
 -# Any pair of <I>EntitySequence</I> instances referencing the same <I>SequenceData</I> must be separated by at least one unallocated handle.
@@ -102,7 +160,7 @@ a <I>std::set</I> of <I>EntitySequence</I> pointers sorted using a custom compar
 operator that queries the start and end handles of the referenced sequences. The
 comparison operation is defined as: <I>a->end_handle() < b->start_handle()</I>.
 This method of comparison has the advantage that a sequence corresponding to
-a specific handle can be located by searching the set for a “sequence” beginning
+a specific handle can be located by searching the set for a "sequence" beginning
 and ending with the search value. The lower bound and find methods provided
 by the library are guaranteed to return the sequence, if it exists. Using
 such a comparison operator will result in undefined behavior if the set contains
@@ -112,7 +170,7 @@ methods in <I>TypeSequenceManager</I> so as to avoid having overlapping sequence
 as a transitory state of some operation.
 
 The second important data member of <I>TypeSequenceManager</I> is a pointer
-to the last referenced <I>EntitySequence</I>. This “cached” value is used to speed up
+to the last referenced <I>EntitySequence</I>. This "cached" value is used to speed up
 searches by entity handle. This pointer is never null unless the sequence is empty.
 This rule is maintained to avoid unnecessary branches in fast query paths. In
 cases where the last referenced sequence is deleted, <I>TypeSequenceManager</I> will
@@ -187,7 +245,7 @@ sets are stored in a sorted range-compacted format similar to that of the Range
 class.
 
 The memory for storing contents, parents, and children are each handled in
-the same way. The data in the class is composed of a 2-bit ‘size’ field and two
+the same way. The data in the class is composed of a 2-bit 'size' field and two
 values, where the two values may either be two handles or two pointers. The size
 bit-fields are grouped together to reduce the required amount of memory. If the
 numerical value of the 2-bit size field is 0 then the corresponding list is empty.
@@ -197,10 +255,10 @@ If the 2-bit size field has a value of 3 (11 binary), then the corresponding two
 data fields store the begin and end pointers of an external array of handles.
 The number of handles in the external array can be obtained by taking the
 difference of the start and end pointers. Note that unlike <I>std::vector</I>, we
-do not store both an allocated and used size. We store only the ‘used’ size
+do not store both an allocated and used size. We store only the 'used' size
 and call std::realloc whenever the used size is modified, thus we rely on the
-std::malloc implementation in the standard C library to track ‘allocated’ size
-for us. In practice this performs well but does not return memory to the ‘system’
+std::malloc implementation in the standard C library to track 'allocated' size
+for us. In practice this performs well but does not return memory to the 'system'
 when lists shrink (unless they shrink to zero). This overall scheme could exhibit
 poor performance if the size of one of the data lists in the set frequently changes
 between less than two and more than two handles, as this will result in frequent
@@ -212,17 +270,17 @@ format the number of handles stored in the array is always a multiple of two.
 Each consecutive pair of handles indicate the start and end, inclusive, of a range
 of handles contained in the set. All such handle range pairs are stored in sorted
 order and do not overlap. Nor is the end handle of one range ever one less than
-the start handle of the next. All such ‘adjacent’ range pairs are merged into a
+the start handle of the next. All such 'adjacent' range pairs are merged into a
 single pair. The code for insertion and removal of handles from range-formatted
 set content lists is fairly complex. The implementation will guarantee that a
 given call to insert entities into a range or remove entities from a range is never
-worse than O(ln n) + O(m + n), where ‘n’ is the number of handles to insert
-and ‘m’ is the number of handles already contained in the set. So it is generally
+worse than O(ln n) + O(m + n), where 'n' is the number of handles to insert
+and 'm' is the number of handles already contained in the set. So it is generally
 much more efficient to build Ranges of handles to insert (and remove) and call
 MOAB to insert (or remove) the entire list at once rather than making many
 calls to insert (or remove) one or a few handles from the contents of a set.
 The set storage could probably be further minimized by allowing up to six
-handles in one of the lists to be elided. That is, as there are six potential ‘slots’
+handles in one of the lists to be elided. That is, as there are six potential 'slots'
 in the MeshSet object then if two of the lists are empty it should be possible to
 store up to six values of the remaining list directly in the MeshSet object.
 However, the additional runtime cost of such complexity could easily outweigh
@@ -230,7 +288,7 @@ any storage advantage. Further investigation into this has not been done because
 the primary motivation for the storage optimization was to support binary trees.
 
 Another possible optimization of storage would be to remove the <I>MeshSet</I>
-object entirely and instead store the data in a ‘blocked’ format. The corresponding
+object entirely and instead store the data in a 'blocked' format. The corresponding
 <I>SequenceData</I> would contain four arrays: flags, parents, children, and
 contents instead of a single array of <I>MeshSet</I> objects. If this were done then
 no storage need ever be allocated for parent or child links if none of the sets

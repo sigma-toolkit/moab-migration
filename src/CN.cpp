@@ -723,8 +723,11 @@ void MBCN_NumSubEntities( const int t, const int d, int* rval )
 //! \param sub_dimension Topological dimension of sub-entity whose type is being queried
 //! \param index Index of sub-entity whose type is being queried
 //! \return type Entity type of sub-entity with specified dimension and index
+//! \param this_type Type of entity being queried
+//! \param sub_dimension Dimension of sub-entity being queried
+//! \param index Index of sub-entity being queried
+//! \param rval Type of sub-entity
 void MBCN_SubEntityType( const int this_type, const int sub_dimension, const int index, int* rval )
-
 {
 
     *rval = CN::SubEntityType( (EntityType)this_type, sub_dimension, index );
@@ -744,13 +747,6 @@ void MBCN_SubEntityVertexIndices( const int this_type,
 }
 
 //! return the vertices of the specified sub entity
-//! \param parent_conn Connectivity of parent entity
-//! \param parent_type Entity type of parent entity
-//! \param sub_dimension Dimension of sub-entity being queried
-//! \param sub_index Index of sub-entity being queried
-//! \param sub_entity_conn Connectivity of sub-entity, based on parent_conn and canonical
-//!           ordering for parent_type
-//! \param num_sub_vertices Number of vertices in sub-entity
 //  void MBCN_SubEntityConn(const void *parent_conn, const int parent_type,
 //                            const int sub_dimension,
 //                            const int sub_index,
@@ -877,10 +873,12 @@ void MBCN_SideNumberVoid( void* const* parent_conn,
 //! All other parent types and child dimensions return an error.
 //!
 //! \param parent_type The type of parent element
-//! \param child_type The type of child element
+//! \param parent_type The type of parent element
 //! \param child_index The index of the child element
+//! \param child_dim The dimension of the child element
 //! \param opposite_index The index of the opposite element
-//! \return status Returns 0 if successful, -1 if not
+//! \param opposite_dim The dimension of the opposite element
+//! \param rval Returns 0 if successful, -1 if not
 void MBCN_OppositeSide( const int parent_type,
                         const int child_index,
                         const int child_dim,
@@ -897,7 +895,7 @@ void MBCN_OppositeSide( const int parent_type,
 //! \param num_vertices Number of entries in <em>conn1</em> and <em>conn2</em>
 //! \param direct If positive, entities have the same sense (returned)
 //! \param offset Offset of <em>conn2</em>'s first vertex in <em>conn1</em>
-//! \return rval Returns true if <em>conn1</em> and <em>conn2</em> match
+//! \param rval Returns true if <em>conn1</em> and <em>conn2</em> match
 void MBCN_ConnectivityMatchInt( const int* conn1,
                                 const int* conn2,
                                 const int num_vertices,
@@ -951,7 +949,7 @@ void MBCN_ConnectivityMatchVoid( void* const* conn1,
 //! true if entities of a given type and number of nodes indicates mid edge nodes are present.
 //! \param this_type Type of entity for which sub-entity connectivity is being queried
 //! \param num_verts Number of nodes defining entity
-//! \return int Returns true if <em>this_type</em> combined with <em>num_nodes</em> indicates
+//! \param rval Returns true if <em>this_type</em> combined with <em>num_nodes</em> indicates
 //!  mid-edge nodes are likely
 void MBCN_HasMidEdgeNodes( const int this_type, const int num_verts, int* rval )
 {
@@ -961,7 +959,7 @@ void MBCN_HasMidEdgeNodes( const int this_type, const int num_verts, int* rval )
 //! true if entities of a given type and number of nodes indicates mid face nodes are present.
 //! \param this_type Type of entity for which sub-entity connectivity is being queried
 //! \param num_verts Number of nodes defining entity
-//! \return int Returns true if <em>this_type</em> combined with <em>num_nodes</em> indicates
+//! \param rval Returns true if <em>this_type</em> combined with <em>num_nodes</em> indicates
 //!  mid-face nodes are likely
 void MBCN_HasMidFaceNodes( const int this_type, const int num_verts, int* rval )
 {
@@ -971,7 +969,7 @@ void MBCN_HasMidFaceNodes( const int this_type, const int num_verts, int* rval )
 //! true if entities of a given type and number of nodes indicates mid region nodes are present.
 //! \param this_type Type of entity for which sub-entity connectivity is being queried
 //! \param num_verts Number of nodes defining entity
-//! \return int Returns true if <em>this_type</em> combined with <em>num_nodes</em> indicates
+//! \param rval Returns true if <em>this_type</em> combined with <em>num_nodes</em> indicates
 //!  mid-region nodes are likely
 void MBCN_HasMidRegionNodes( const int this_type, const int num_verts, int* rval )
 {
@@ -1010,7 +1008,7 @@ void MBCN_HONodeParent( int elem_type, int num_nodes, int ho_node_index, int* pa
 //! \param num_verts Number of vertices for the entity being queried
 //! \param subfacet_dim Dimension of sub-entity being queried
 //! \param subfacet_index Index of sub-entity being queried
-//! \return index Index of sub-entity's higher-order node
+//! \param rval Index of sub-entity's higher-order node
 void MBCN_HONodeIndex( const int this_type,
                        const int num_verts,
                        const int subfacet_dim,

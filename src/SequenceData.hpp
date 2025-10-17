@@ -121,7 +121,7 @@ class SequenceData
      *\param start  First handle for resulting subset
      *\param end    Last handle for resulting subset
      *\param sequence_data_sizes Bytes-per-entity for sequence-specific data.
-     *\NOTE Does not copy tag data.
+     *\note Does not copy tag data.
      */
     SequenceData* subset( EntityHandle start, EntityHandle end, const int* sequence_data_sizes ) const;
 

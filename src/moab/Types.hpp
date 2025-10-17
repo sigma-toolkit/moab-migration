@@ -56,6 +56,7 @@ enum MOAB_EXPORT ErrorCode
 };
 
 #ifdef __cplusplus
+/** Array of error code strings corresponding to ErrorCode enum values */
 extern const char* const ErrorCodeStr[];
 #endif
 
@@ -95,6 +96,7 @@ enum MOAB_EXPORT DataType
 };
 
 #ifdef __cplusplus
+/** Array of data type strings corresponding to DataType enum values */
 extern const char* const DataTypeStr[];
 #endif
 
@@ -129,6 +131,7 @@ enum MOAB_EXPORT SenseType
 };
 
 #ifdef __cplusplus
+/** Array of sense type strings corresponding to SenseType enum values */
 extern const char* const* const SenseTypeStr;
 #endif
 

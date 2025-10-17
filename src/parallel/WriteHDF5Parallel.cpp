@@ -207,7 +207,8 @@ static int my_Gatherv( void* sendbuf,
         recvbuf.resize( bytes * ( disp.back() + recvcounts.back() ) );
     }
 
-    return MPI_Gatherv( sendbuf, sendcount, sendtype, recvbuf.data(), recvcounts.data(), disp.data(), sendtype, root, comm );
+    return MPI_Gatherv( sendbuf, sendcount, sendtype, recvbuf.data(), recvcounts.data(), disp.data(), sendtype, root,
+                        comm );
 }
 
 static void print_type_sets( Interface* iFace, DebugOutput* str, Range& sets )
@@ -1095,8 +1096,8 @@ ErrorCode WriteHDF5Parallel::create_dataset( int num_datasets,
     // Gather entity counts for each processor on root
     std::vector< long > counts( rank ? 0 : nproc * num_datasets );
     (void)VALGRIND_CHECK_MEM_IS_DEFINED( &num_owned, sizeof( long ) );
-    result = MPI_Gather( const_cast< long* >( num_owned ), num_datasets, MPI_LONG, counts.data(), num_datasets, MPI_LONG,
-                         0, comm );
+    result = MPI_Gather( const_cast< long* >( num_owned ), num_datasets, MPI_LONG, counts.data(), num_datasets,
+                         MPI_LONG, 0, comm );
     CHECK_MPI( result );
 
     // Create node data in file
@@ -1297,8 +1298,8 @@ ErrorCode WriteHDF5Parallel::negotiate_type_list()
         typelist alltypes( total / 2 );
         (void)VALGRIND_MAKE_VEC_UNDEFINED( alltypes );
         (void)VALGRIND_CHECK_MEM_IS_DEFINED( non_root_types.data(), non_root_types.size() * sizeof( int ) );
-        result = MPI_Gatherv( (void*)non_root_types.data(), 2 * non_root_count, MPI_INT, (int*)alltypes.data(), counts.data(),
-                              displs.data(), MPI_INT, 0, comm );
+        result = MPI_Gatherv( (void*)non_root_types.data(), 2 * non_root_count, MPI_INT, (int*)alltypes.data(),
+                              counts.data(), displs.data(), MPI_INT, 0, comm );
         CHECK_MPI( result );
 
         // Merge type lists.
@@ -1371,7 +1372,7 @@ ErrorCode WriteHDF5Parallel::create_element_tables()
     };
 
     const int numtypes = exportList.size();
-    if (numtypes > 0)
+    if( numtypes > 0 )
     {
         std::vector< ExportSet* > groups( numtypes );
         std::vector< long > counts( numtypes ), offsets( numtypes ), max_ents( numtypes ), total_ents( numtypes );
@@ -1384,8 +1385,8 @@ ErrorCode WriteHDF5Parallel::create_element_tables()
             groups[idx] = &*ex_iter;
             counts[idx] = ex_iter->range.size();
         }
-        ErrorCode rval = create_dataset( numtypes, counts.data(), offsets.data(), max_ents.data(), total_ents.data(), ElemSetCreator(),
-                                         groups.data(), start_ids.data() );
+        ErrorCode rval = create_dataset( numtypes, counts.data(), offsets.data(), max_ents.data(), total_ents.data(),
+                                         ElemSetCreator(), groups.data(), start_ids.data() );
         CHECK_MB( rval );
 
         for( idx = 0, ex_iter = exportList.begin(); ex_iter != exportList.end(); ++ex_iter, ++idx )
@@ -1427,7 +1428,7 @@ ErrorCode WriteHDF5Parallel::create_adjacency_tables()
 
     ErrorCode rval;
     const int numtypes = groups.size();
-    if (numtypes > 0)
+    if( numtypes > 0 )
     {
         std::vector< long > counts( numtypes );
         std::vector< long > offsets( numtypes );
@@ -1441,7 +1442,8 @@ ErrorCode WriteHDF5Parallel::create_adjacency_tables()
             counts[i] = count;
         }
 
-        rval = create_dataset( numtypes, counts.data(), offsets.data(), max_ents.data(), totals.data(), AdjSetCreator(), groups.data() );
+        rval = create_dataset( numtypes, counts.data(), offsets.data(), max_ents.data(), totals.data(), AdjSetCreator(),
+                               groups.data() );
         CHECK_MB( rval );
 
         // Cppcheck warning (false positive): variable groups is assigned a value that is never used
@@ -1565,8 +1567,8 @@ ErrorCode WriteHDF5Parallel::communicate_shared_set_ids( const Range& owned, con
             recv_buf[i].resize( 2 * count + 1 );
             dbgOut.printf( 5, "Posting receive buffer of size %lu for proc %u (%lu of %lu owned sets)\n",
                            (unsigned long)recv_buf[i].size(), procs[i], count, tmp.size() );
-            mperr =
-                MPI_Irecv( recv_buf[i].data(), recv_buf[i].size(), MPI_UNSIGNED_LONG, procs[i], TAG, comm, &recv_req[i] );
+            mperr = MPI_Irecv( recv_buf[i].data(), recv_buf[i].size(), MPI_UNSIGNED_LONG, procs[i], TAG, comm,
+                               &recv_req[i] );
             CHECK_MPI( mperr );
         }
     }
@@ -1604,7 +1606,8 @@ ErrorCode WriteHDF5Parallel::communicate_shared_set_ids( const Range& owned, con
         }
         dbgOut.printf( 5, "Sending buffer of size %lu to proc %u (%lu of %lu owned sets)\n",
                        (unsigned long)send_buf[i].size(), si->first, si->second.size(), owned.size() );
-        mperr = MPI_Isend( send_buf[i].data(), send_buf[i].size(), MPI_UNSIGNED_LONG, si->first, TAG, comm, &send_req[i] );
+        mperr =
+            MPI_Isend( send_buf[i].data(), send_buf[i].size(), MPI_UNSIGNED_LONG, si->first, TAG, comm, &send_req[i] );
     }
 
     // Process received data
@@ -1800,6 +1803,9 @@ ErrorCode WriteHDF5Parallel::unpack_set( EntityHandle set, const unsigned long* 
     // Use local variables for readability
     assert( buffer_size >= 4 );
     assert( buffer[1] + buffer[2] + buffer[3] <= buffer_size );
+#ifdef NDEBUG
+    UNUSED( buffer_size );
+#endif
     const unsigned long flags      = buffer[0];
     unsigned long num_content      = buffer[1];
     const unsigned long num_child  = buffer[2];
@@ -1937,8 +1943,8 @@ ErrorCode WriteHDF5Parallel::communicate_shared_set_data( const Range& owned, co
                 CHECK_MB( MB_FAILURE );
             }
             dbgOut.printf( 5, "Posting buffer to receive set %d from proc %u\n", tag, procs[j] );
-            mperr =
-                MPI_Irecv( recv_buf[idx].data(), init_buff_size, MPI_UNSIGNED_LONG, procs[j], tag, comm, &recv_req[idx] );
+            mperr = MPI_Irecv( recv_buf[idx].data(), init_buff_size, MPI_UNSIGNED_LONG, procs[j], tag, comm,
+                               &recv_req[idx] );
             CHECK_MPI( mperr );
             ++idx;
         }

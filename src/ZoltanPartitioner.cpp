@@ -59,8 +59,7 @@ ZoltanPartitioner::ZoltanPartitioner( Interface* impl,
 #endif
                                       const bool use_coords,
                                       int argc,
-                                      char** argv
-                                      )
+                                      char** argv )
     : PartitionerBase< int >( impl,
                               use_coords
 #ifdef MOAB_HAVE_MPI
@@ -603,7 +602,7 @@ ErrorCode ZoltanPartitioner::partition_mesh_and_geometry( const double part_geom
     }
     else
     {
-      MB_CHK_SET_ERR( MB_FAILURE, "Geometry partitions not supported.\n" );
+        MB_CHK_SET_ERR( MB_FAILURE, "Geometry partitions not supported.\n" );
     }
     if( print_time )
     {
@@ -752,7 +751,7 @@ ErrorCode ZoltanPartitioner::partition_mesh_and_geometry( const double part_geom
     }
     else
     {
-      MB_CHK_SET_ERR( MB_FAILURE, "Geometry partitions not supported.\n" );
+        MB_CHK_SET_ERR( MB_FAILURE, "Geometry partitions not supported.\n" );
     }
 
     if( print_time )
@@ -1051,8 +1050,8 @@ void ZoltanPartitioner::SetRCB_Parameters( const bool recompute_rcb_box )
     myZZ->Set_Param( "LB_METHOD", "RCB" );  // recursive coordinate bisection
 
     // RCB parameters:
-    myZZ->Set_Param( "RCB_OUTPUT_LEVEL", "0" ); // increase to 1 for verbose details
-    myZZ->Set_Param( "KEEP_CUTS", "1" );  // save decomposition so that we can infer partitions
+    myZZ->Set_Param( "RCB_OUTPUT_LEVEL", "0" );  // increase to 1 for verbose details
+    myZZ->Set_Param( "KEEP_CUTS", "1" );         // save decomposition so that we can infer partitions
     // myZZ->Set_Param("RCB_RECTILINEAR_BLOCKS", "1"); // don't split point on boundary
     if( recompute_rcb_box ) myZZ->Set_Param( "RCB_RECOMPUTE_BOX", "1" );
 }
@@ -1569,7 +1568,7 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
     // get the global id tag handle
     Tag gid = mbImpl->globalId_tag();
 
-    ErrorCode rval = mbImpl->tag_get_data( gid, primary, &ids[0] );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbImpl->tag_get_data( gid, primary, &ids[0] ) );
 
     // mbpc is member in base class, PartitionerBase
     int rank = mbpc->rank();  // current rank , will be put on regular neighbors
@@ -1581,13 +1580,13 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
         if( 1 == partition_method )
         {
             adjs.clear();
-            rval = mtu.get_bridge_adjacencies( cell, ( primaryDim > 0 ? primaryDim - 1 : 3 ), primaryDim, adjs );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mtu.get_bridge_adjacencies( cell, ( primaryDim > 0 ? primaryDim - 1 : 3 ), primaryDim, adjs ) );
 
             // get the graph vertex ids of those
             if( !adjs.empty() )
             {
                 assert( adjs.size() < 5 * MAX_SUB_ENTITIES );
-                rval = mbImpl->tag_get_data( gid, adjs, neighbors );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mbImpl->tag_get_data( gid, adjs, neighbors ) );
             }
             // if adjacent to neighbor partitions, add to the list
             int size_adjs = (int)adjs.size();
@@ -1618,11 +1617,11 @@ ErrorCode ZoltanPartitioner::partition_owned_cells( Range& primary,
         {
             if( TYPE_FROM_HANDLE( cell ) == MBVERTEX )
             {
-                rval = mbImpl->get_coords( &cell, 1, avg_position );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mbImpl->get_coords( &cell, 1, avg_position ) );
             }
             else
             {
-                rval = mtu.get_average_position( cell, avg_position );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mtu.get_average_position( cell, avg_position ) );
             }
             std::copy( avg_position, avg_position + 3, std::back_inserter( coords ) );
         }

@@ -116,7 +116,7 @@ static inline void INT_IO_ERROR( bool condition, unsigned line )
     if( !condition )
     {
         char buffer[] = __FILE__ "             ";
-        snprintf( buffer, strlen(buffer), "%s:%u", __FILE__, line );
+        snprintf( buffer, strlen( buffer ), "%s:%u", __FILE__, line );
         fflush( stderr );
         perror( buffer );
         abort();
@@ -245,14 +245,18 @@ Tqdcfr::Tqdcfr( Interface* impl )
         currElementIdOffset[this_type] = -1;
 
     ErrorCode rval;
-    rval = mdbImpl->tag_get_handle( MATERIAL_SET_TAG_NAME, 1, MB_TYPE_INTEGER, blockTag );MB_CHK_SET_ERR_RET( rval, "Failed to tag_get_handle." );
-    rval = mdbImpl->tag_get_handle( DIRICHLET_SET_TAG_NAME, 1, MB_TYPE_INTEGER, nsTag );MB_CHK_SET_ERR_RET( rval, "Failed to tag_get_handle." );
-    rval = mdbImpl->tag_get_handle( NEUMANN_SET_TAG_NAME, 1, MB_TYPE_INTEGER, ssTag );MB_CHK_SET_ERR_RET( rval, "Failed to tag_get_handle." );
+    rval = mdbImpl->tag_get_handle( MATERIAL_SET_TAG_NAME, 1, MB_TYPE_INTEGER, blockTag );
+    MB_CHK_SET_ERR_RET( rval, "Failed to tag_get_handle." );
+    rval = mdbImpl->tag_get_handle( DIRICHLET_SET_TAG_NAME, 1, MB_TYPE_INTEGER, nsTag );
+    MB_CHK_SET_ERR_RET( rval, "Failed to tag_get_handle." );
+    rval = mdbImpl->tag_get_handle( NEUMANN_SET_TAG_NAME, 1, MB_TYPE_INTEGER, ssTag );
+    MB_CHK_SET_ERR_RET( rval, "Failed to tag_get_handle." );
 
     if( 0 == entityNameTag )
     {
         rval = mdbImpl->tag_get_handle( NAME_TAG_NAME, NAME_TAG_SIZE, MB_TYPE_OPAQUE, entityNameTag,
-                                        MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_SET_ERR_RET( rval, "Failed to tag_get_handle." );
+                                        MB_TAG_SPARSE | MB_TAG_CREAT );
+        MB_CHK_SET_ERR_RET( rval, "Failed to tag_get_handle." );
     }
 
     cubMOABVertexMap = NULL;
@@ -328,7 +332,8 @@ ErrorCode Tqdcfr::load_file( const char* file_name,
     }
 
     // Get "before" entities
-    result = mdbImpl->get_entities_by_handle( 0, beforeEnts );MB_CHK_SET_ERR( result, "Couldn't get \"before\" entities" );
+    result = mdbImpl->get_entities_by_handle( 0, beforeEnts );
+    MB_CHK_SET_ERR( result, "Couldn't get \"before\" entities" );
 
     // ***********************
     // Read model header type information...
@@ -1119,10 +1124,11 @@ ErrorCode Tqdcfr::get_names( MetaDataContainer& md, unsigned int set_index, Enti
         if( -1 != md_index )
         {
             md_entry = &( md.metadataEntries[md_index] );
+
             Tag extra_name_tag;
-            ErrorCode rval;
-            rval = mdbImpl->tag_get_handle( moab_extra_name.str().c_str(), NAME_TAG_SIZE, MB_TYPE_OPAQUE,
-                                            extra_name_tag, MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mdbImpl->tag_get_handle( moab_extra_name.str().c_str(), NAME_TAG_SIZE, MB_TYPE_OPAQUE,
+                                                 extra_name_tag, MB_TAG_SPARSE | MB_TAG_CREAT ) );
+
             memset( name_tag_data, 0, NAME_TAG_SIZE );  // Make sure any extra bytes zeroed
             strncpy( name_tag_data, md_entry->mdStringValue.c_str(), NAME_TAG_SIZE - 1 );
             result = mdbImpl->tag_set_data( extra_name_tag, &seth, 1, name_tag_data );

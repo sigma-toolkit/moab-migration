@@ -1,6 +1,24 @@
-/** @example LloydRelaxation.cpp \n
+/**
+ * @file LloydRelaxation.cpp
+ * @brief Example demonstrating Lloyd relaxation for mesh smoothing
+ *
+ * This example shows how to:
+ * - Load a parallel mesh with ghost layers
+ * - Perform Lloyd relaxation iterations for mesh smoothing
+ * - Handle fixed vertices (e.g., boundary vertices)
+ * - Exchange ghost data between processors
+ * - Measure convergence based on vertex movement
+ * - Write the smoothed mesh to a parallel file
+ *
+ * Lloyd relaxation is a technique to smooth out a mesh by iteratively
+ * moving vertices to the centroids of their connected cells.
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+
  * \brief Perform Lloyd relaxation on a mesh and its dual \n
- * <b>To run</b>: mpiexec -np <np> LloydRelaxation [filename]\n
+ * <b>To run</b>: mpiexec -np \c np LloydRelaxation [filename]\n
  *
  * Briefly, Lloyd relaxation is a technique to smooth out a mesh.  The centroid of each cell is
  * computed from its vertex positions, then vertices are placed at the average of their connected
@@ -15,6 +33,10 @@
  * In this implementation, a fixed number of iterations is performed.  The final mesh is output to
  * 'lloydfinal.h5m' in the current directory (H5M format must be used since the file is written in
  * parallel).
+ *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 
 #include "moab/Core.hpp"
@@ -68,34 +90,35 @@ int main( int argc, char** argv )
                   "PARALLEL_GHOSTS=2.0.1;DEBUG_IO=0;DEBUG_PIO=0";
 
     // Load the test file with specified options
-    ErrorCode rval = mb->load_file( test_file_name.c_str(), 0, options.c_str() );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->load_file( test_file_name.c_str(), 0, options.c_str() ) );
 
     // Make tag to specify fixed vertices, since it's input to the algorithm; use a default value of
     // non-fixed so we only need to set the fixed tag for skin vertices
     Tag fixed;
     int def_val = 0;
-    rval        = mb->tag_get_handle( "fixed", 1, MB_TYPE_INTEGER, fixed, MB_TAG_CREAT | MB_TAG_DENSE, &def_val );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_get_handle( "fixed", 1, MB_TYPE_INTEGER, fixed, MB_TAG_CREAT | MB_TAG_DENSE, &def_val ) );
 
     // Get all vertices and faces
     Range verts, faces, skin_verts;
-    rval = mb->get_entities_by_type( 0, MBVERTEX, verts );MB_CHK_ERR( rval );
-    rval = mb->get_entities_by_dimension( 0, 2, faces );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type( 0, MBVERTEX, verts ) );
+    MB_CHK_ERR( mb->get_entities_by_dimension( 0, 2, faces ) );
 
     // Get the skin vertices of those faces and mark them as fixed; we don't want to fix the
     // vertices on a part boundary, but since we exchanged a layer of ghost faces, those vertices
     // aren't on the skin locally ok to mark non-owned skin vertices too, I won't move those anyway
     // use MOAB's skinner class to find the skin
     Skinner skinner( mb );
-    rval = skinner.find_skin( 0, faces, true, skin_verts );MB_CHK_ERR( rval );  // 'true' param indicates we want vertices back, not faces
+    MB_CHK_ERR(
+        skinner.find_skin( 0, faces, true, skin_verts ) );  // 'true' param indicates we want vertices back, not faces
 
     vector< int > fix_tag( skin_verts.size(), 1 );  // Initialized to 1 to indicate fixed
-    rval = mb->tag_set_data( fixed, skin_verts, &fix_tag[0] );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_set_data( fixed, skin_verts, &fix_tag[0] ) );
 
     // Now perform the Lloyd relaxation
-    rval = perform_lloyd_relaxation( mb, verts, faces, fixed, num_its, report_its );MB_CHK_ERR( rval );
+    MB_CHK_ERR( perform_lloyd_relaxation( mb, verts, faces, fixed, num_its, report_its ) );
 
     // Delete fixed tag, since we created it here
-    rval = mb->tag_delete( fixed );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_delete( fixed ) );
 
     // Output file, using parallel write
 
@@ -103,7 +126,7 @@ int main( int argc, char** argv )
     options = "PARALLEL=WRITE_PART";
 #endif
 
-    rval = mb->write_file( "lloydfinal.h5m", NULL, options.c_str() );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->write_file( "lloydfinal.h5m", NULL, options.c_str() ) );
 
     // Delete MOAB instance
     delete mb;
@@ -132,33 +155,33 @@ ErrorCode perform_lloyd_relaxation( Interface* mb, Range& verts, Range& faces, T
     // Get all verts coords into tag; don't need to worry about filtering out fixed verts,
     // we'll just be setting to their fixed coords
     vector< double > vcentroids( 3 * verts.size() );
-    rval = mb->get_coords( verts, &vcentroids[0] );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_coords( verts, &vcentroids[0] ) );
 
     Tag centroid;
-    rval = mb->tag_get_handle( "centroid", 3, MB_TYPE_DOUBLE, centroid, MB_TAG_CREAT | MB_TAG_DENSE );MB_CHK_ERR( rval );
-    rval = mb->tag_set_data( centroid, verts, &vcentroids[0] );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_get_handle( "centroid", 3, MB_TYPE_DOUBLE, centroid, MB_TAG_CREAT | MB_TAG_DENSE ) );
+    MB_CHK_ERR( mb->tag_set_data( centroid, verts, &vcentroids[0] ) );
 
     // Filter verts down to owned ones and get fixed tag for them
     Range owned_verts, shared_owned_verts;
     if( nprocs > 1 )
     {
 #ifdef MOAB_HAVE_MPI
-        rval = pcomm->filter_pstatus( verts, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &owned_verts );MB_CHK_ERR( rval );
+        MB_CHK_ERR( pcomm->filter_pstatus( verts, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &owned_verts ) );
 #endif
     }
     else
         owned_verts = verts;
     vector< int > fix_tag( owned_verts.size() );
-    rval = mb->tag_get_data( fixed, owned_verts, &fix_tag[0] );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_get_data( fixed, owned_verts, &fix_tag[0] ) );
 
     // Now fill vcentroids array with positions of just owned vertices, since those are the ones
     // we're actually computing
     vcentroids.resize( 3 * owned_verts.size() );
-    rval = mb->tag_get_data( centroid, owned_verts, &vcentroids[0] );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_get_data( centroid, owned_verts, &vcentroids[0] ) );
 
 #ifdef MOAB_HAVE_MPI
     // Get shared owned verts, for exchanging tags
-    rval = pcomm->get_shared_entities( -1, shared_owned_verts, 0, false, true );MB_CHK_ERR( rval );
+    MB_CHK_ERR( pcomm->get_shared_entities( -1, shared_owned_verts, 0, false, true ) );
     // Workaround: if no shared owned verts, put a non-shared one in the list, to prevent exchanging
     // tags for all shared entities
     if( shared_owned_verts.empty() ) shared_owned_verts.insert( *verts.begin() );
@@ -182,9 +205,9 @@ ErrorCode perform_lloyd_relaxation( Interface* mb, Range& verts, Range& faces, T
         for( fit = faces.begin(), f = 0; fit != faces.end(); ++fit, f++ )
         {
             // Get verts for this face
-            rval = mb->get_connectivity( *fit, conn, nconn );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_connectivity( *fit, conn, nconn ) );
             // Get centroid tags for those verts
-            rval = mb->tag_get_data( centroid, conn, nconn, &ctag[0] );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->tag_get_data( centroid, conn, nconn, &ctag[0] ) );
             fcentroids[3 * f + 0] = fcentroids[3 * f + 1] = fcentroids[3 * f + 2] = 0.0;
             for( v = 0; v < nconn; v++ )
             {
@@ -195,7 +218,7 @@ ErrorCode perform_lloyd_relaxation( Interface* mb, Range& verts, Range& faces, T
             for( v = 0; v < 3; v++ )
                 fcentroids[3 * f + v] /= nconn;
         }
-        rval = mb->tag_set_data( centroid, faces, &fcentroids[0] );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->tag_set_data( centroid, faces, &fcentroids[0] ) );
 
         // 2b. For each owned vertex:
         for( vit = owned_verts.begin(), v = 0; vit != owned_verts.end(); ++vit, v++ )
@@ -204,8 +227,8 @@ ErrorCode perform_lloyd_relaxation( Interface* mb, Range& verts, Range& faces, T
             if( fix_tag[v] ) continue;
             // vertex centroid = sum(cell centroids)/ncells
             adj_faces.clear();
-            rval = mb->get_adjacencies( &( *vit ), 1, 2, false, adj_faces );MB_CHK_ERR( rval );
-            rval = mb->tag_get_data( centroid, &adj_faces[0], adj_faces.size(), &fcentroids[0] );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_adjacencies( &( *vit ), 1, 2, false, adj_faces ) );
+            MB_CHK_ERR( mb->tag_get_data( centroid, &adj_faces[0], adj_faces.size(), &fcentroids[0] ) );
             double vnew[] = { 0.0, 0.0, 0.0 };
             for( f = 0; f < (int)adj_faces.size(); f++ )
             {
@@ -223,13 +246,13 @@ ErrorCode perform_lloyd_relaxation( Interface* mb, Range& verts, Range& faces, T
 
         // Set the centroid tag; having them only in vcentroids array isn't enough, as vertex
         // centroids are accessed randomly in loop over faces
-        rval = mb->tag_set_data( centroid, owned_verts, &vcentroids[0] );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->tag_set_data( centroid, owned_verts, &vcentroids[0] ) );
 
         // 2c. Exchange tags on owned verts
         if( nprocs > 1 )
         {
 #ifdef MOAB_HAVE_MPI
-            rval = pcomm->exchange_tags( centroid, shared_owned_verts );MB_CHK_ERR( rval );
+            MB_CHK_ERR( pcomm->exchange_tags( centroid, shared_owned_verts ) );
 #endif
         }
 
@@ -247,10 +270,10 @@ ErrorCode perform_lloyd_relaxation( Interface* mb, Range& verts, Range& faces, T
     }
 
     // Write the tag back onto vertex coordinates
-    rval = mb->set_coords( owned_verts, &vcentroids[0] );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->set_coords( owned_verts, &vcentroids[0] ) );
 
     // Delete the centroid tag, since we don't need it anymore
-    rval = mb->tag_delete( centroid );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_delete( centroid ) );
 
     return MB_SUCCESS;
 }

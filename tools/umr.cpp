@@ -212,7 +212,8 @@ int main( int argc, char* argv[] )
     EntityHandle fileset;
 
     // Create a fileset
-    error = mb->create_meshset( MESHSET_SET, fileset );MB_CHK_ERR( error );
+    error = mb->create_meshset( MESHSET_SET, fileset );
+    MB_CHK_ERR( error );
 
     // Set the read options for parallel file loading
     std::vector< std::string > read_opts, write_opts;
@@ -242,7 +243,8 @@ int main( int argc, char* argv[] )
 
     // Load file
     std::cout << "READ OPTS=" << (char*)read_options.c_str() << std::endl;
-    error = mb->load_file( infile.c_str(), &fileset, read_options.c_str() );MB_CHK_ERR( error );
+    error = mb->load_file( infile.c_str(), &fileset, read_options.c_str() );
+    MB_CHK_ERR( error );
 
     // Create the nestedrefine instance
 
@@ -260,7 +262,8 @@ int main( int argc, char* argv[] )
     if( only_quality )
     {
         double vmax;
-        error = get_max_volume( *moab, fileset, dim, vmax );MB_CHK_ERR( error );
+        error = get_max_volume( *moab, fileset, dim, vmax );
+        MB_CHK_ERR( error );
 #ifdef MOAB_HAVE_MPI
         int rank = 0;
         MPI_Comm_rank( MPI_COMM_WORLD, &rank );
@@ -275,7 +278,8 @@ int main( int argc, char* argv[] )
     // constraint.
     if( qc_vol )
     {
-        error = get_degree_seq( *moab, fileset, dim, cvol, num_levels, level_degrees );MB_CHK_ERR( error );
+        error = get_degree_seq( *moab, fileset, dim, cvol, num_levels, level_degrees );
+        MB_CHK_ERR( error );
 
         if( dim == 0 ) print_usage( argv[0], std::cerr );
     }
@@ -299,7 +303,8 @@ int main( int argc, char* argv[] )
 
     std::cout << "opt = " << optimize << std::endl;
 
-    error = uref->generate_mesh_hierarchy( num_levels, ldeg, lsets, optimize );MB_CHK_ERR( error );
+    error = uref->generate_mesh_hierarchy( num_levels, ldeg, lsets, optimize );
+    MB_CHK_ERR( error );
 
     if( print_times )
     {
@@ -317,7 +322,8 @@ int main( int argc, char* argv[] )
     if( print_size )
     {
         Range all_ents, ents[4];
-        error = mb->get_entities_by_handle( fileset, all_ents );MB_CHK_ERR( error );
+        error = mb->get_entities_by_handle( fileset, all_ents );
+        MB_CHK_ERR( error );
 
         for( int k = 0; k < 4; k++ )
             ents[k] = all_ents.subset_by_dimension( k );
@@ -326,7 +332,8 @@ int main( int argc, char* argv[] )
         if( qc_vol )
         {
             double volume;
-            error = get_max_volume( *moab, fileset, dim, volume );MB_CHK_ERR( error );
+            error = get_max_volume( *moab, fileset, dim, volume );
+            MB_CHK_ERR( error );
             std::cout << "Mesh size for level 0"
                       << "  :: nverts = " << ents[0].size() << ", nedges = " << ents[1].size()
                       << ", nfaces = " << ents[2].size() << ", ncells = " << ents[3].size() << " :: Vmax = " << volume
@@ -344,7 +351,8 @@ int main( int argc, char* argv[] )
             ents[1].clear();
             ents[2].clear();
             ents[3].clear();
-            error = mb->get_entities_by_handle( lsets[l + 1], all_ents );MB_CHK_ERR( error );
+            error = mb->get_entities_by_handle( lsets[l + 1], all_ents );
+            MB_CHK_ERR( error );
 
             for( int k = 0; k < 4; k++ )
                 ents[k] = all_ents.subset_by_dimension( k );
@@ -354,7 +362,8 @@ int main( int argc, char* argv[] )
             if( qc_vol )
             {
                 double volume;
-                error = get_max_volume( *moab, lsets[l + 1], dim, volume );MB_CHK_ERR( error );
+                error = get_max_volume( *moab, lsets[l + 1], dim, volume );
+                MB_CHK_ERR( error );
                 std::cout << "Mesh size for level " << l + 1 << "  :: nverts = " << ents[0].size()
                           << ", nedges = " << ents[1].size() << ", nfaces = " << ents[2].size()
                           << ", ncells = " << ents[3].size() << " :: Vmax = " << volume << std::endl;
@@ -381,9 +390,11 @@ int main( int argc, char* argv[] )
             file                    = file + out.str();
             const char* output_file = file.c_str();
 #ifdef MOAB_HAVE_MPI
-            error = mb->write_file( output_file, 0, ";;PARALLEL=WRITE_PART", &lsets[l + 1], 1 );MB_CHK_ERR( error );
+            error = mb->write_file( output_file, 0, ";;PARALLEL=WRITE_PART", &lsets[l + 1], 1 );
+            MB_CHK_ERR( error );
 #else
-            error = mb->write_file( output_file, 0, NULL, &lsets[l + 1], 1 );MB_CHK_ERR( error );
+            error = mb->write_file( output_file, 0, NULL, &lsets[l + 1], 1 );
+            MB_CHK_ERR( error );
 #endif
             //   const char* output_file = file.c_str();
             //   error =  mb->write_file(output_file, 0, write_options.c_str(), &lsets[l+1],
@@ -417,7 +428,8 @@ ErrorCode get_degree_seq( Core& mb,
 {
     // Find max volume
     double vmax_global;
-    ErrorCode error = get_max_volume( mb, fileset, dim, vmax_global );MB_CHK_ERR( error );
+    ErrorCode error = get_max_volume( mb, fileset, dim, vmax_global );
+    MB_CHK_ERR( error );
 
     int init_nl = num_levels;
     num_levels  = 0;
@@ -527,8 +539,10 @@ ErrorCode get_max_volume( Core& mb, EntityHandle fileset, int dim, double& vmax 
 
     // Get all entities of the highest dimension which is passed as a command line argument.
     Range allents, owned;
-    error = mb.get_entities_by_handle( fileset, allents );MB_CHK_ERR( error );
-    owned = allents.subset_by_dimension( dim );MB_CHK_ERR( error );
+    error = mb.get_entities_by_handle( fileset, allents );
+    MB_CHK_ERR( error );
+    owned = allents.subset_by_dimension( dim );
+    MB_CHK_ERR( error );
 
     // Get all owned entities
 #ifdef MOAB_HAVE_MPI
@@ -555,7 +569,8 @@ ErrorCode get_max_volume( Core& mb, EntityHandle fileset, int dim, double& vmax 
     for( Range::iterator it = owned.begin(); it != owned.end(); it++ )
     {
         double volume;
-        error = vw.quality_measure( *it, q, volume );MB_CHK_ERR( error );
+        error = vw.quality_measure( *it, q, volume );
+        MB_CHK_ERR( error );
         if( volume > vmax_local ) vmax_local = volume;
     }
 

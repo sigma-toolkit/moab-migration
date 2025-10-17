@@ -292,9 +292,11 @@ void diff_2d_vect( const char* var_name, int n )
 
 typedef Eigen::Triplet< double > Triplet;
 
-struct CompareTriplets {
-    bool operator()( Triplet & a, Triplet & b) {
-        return  fabs( a.value() ) > fabs( b.value() ) ;
+struct CompareTriplets
+{
+    bool operator()( Triplet& a, Triplet& b )
+    {
+        return fabs( a.value() ) > fabs( b.value() );
     }
 };
 
@@ -398,23 +400,24 @@ int main( int argc, char* argv[] )
     std::cout << " euclidian norm for difference: " << diff.norm()
               << " \n squared norm for difference: " << diff.squaredNorm() << "\n"
               << " minv: " << minv << " maxv: " << maxv << "\n";
+
     // print out the largest 20 absolute values and position in diff sparse matrix
-    std::priority_queue< Triplet, std::vector<Triplet>, CompareTriplets > largestDiffs;
+    std::priority_queue< Triplet, std::vector< Triplet >, CompareTriplets > largestDiffs;
 
     for( int k = 0; ( k < diff.outerSize() ); ++k )  // this is by column
     {
-        for( Eigen::SparseMatrix< double >::InnerIterator it( diff, k ); ( it ) ; ++it )
+        for( Eigen::SparseMatrix< double >::InnerIterator it( diff, k ); ( it ); ++it )
         {
             double val = it.value();
-            Triplet tp(it.row(), it.col(), val);
-            largestDiffs.push(tp);
-            if (largestDiffs.size() > print_diff)
-                largestDiffs.pop();
+            Triplet tp( it.row(), it.col(), val );
+            largestDiffs.push( tp );
+            if( largestDiffs.size() > print_diff ) largestDiffs.pop();
         }
     }
     std::cout << std::setprecision( 16 );
-    int counter=0;
-    while (!largestDiffs.empty()) {
+    int counter = 0;
+    while( !largestDiffs.empty() )
+    {
         Triplet tp = largestDiffs.top();
         largestDiffs.pop();
 
@@ -424,7 +427,7 @@ int main( int argc, char* argv[] )
                   << "\t diff: " << tp.value();
         std::cout << "\t map1: " << weight1.coeffRef( row, col ) << "\t map2: " << weight2.coeffRef( row, col )
                   << "\n";  // row index
-        counter ++;
+        counter++;
     }
 
     // compare frac_a between maps

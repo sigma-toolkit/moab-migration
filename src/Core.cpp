@@ -450,11 +450,13 @@ ErrorCode Core::load_file( const char* file_name,
             return rval;
         if( set_tag_name && num_set_tag_vals )
         {
-            rval = ReadParallel( this, pcomm ).load_file( file_name, file_set, opts, &sl );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( ReadParallel( this, pcomm ).load_file( file_name, file_set, opts, &sl ),
+                            "can't load subset file in parallel" );
         }
         else
         {
-            rval = ReadParallel( this, pcomm ).load_file( file_name, file_set, opts );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( ReadParallel( this, pcomm ).load_file( file_name, file_set, opts ),
+                            "can't load file in parallel" );
         }
 #else
         MB_SET_GLB_ERR( MB_FAILURE, "PARALLEL option not valid, this instance compiled for serial execution" );
@@ -464,11 +466,11 @@ ErrorCode Core::load_file( const char* file_name,
     {
         if( set_tag_name && num_set_tag_vals )
         {
-            rval = serial_load_file( file_name, file_set, opts, &sl );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( serial_load_file( file_name, file_set, opts, &sl ), "can't load subset file in serial" );
         }
         else
         {
-            rval = serial_load_file( file_name, file_set, opts );MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( serial_load_file( file_name, file_set, opts ), "can't load file in serial" );
         }
     }
 
@@ -539,17 +541,17 @@ ErrorCode Core::serial_load_file( const char* file_name,
     const ReaderWriterSet* set = reader_writer_set();
 
     Range initial_ents;
-    ErrorCode rval = get_entities_by_handle( 0, initial_ents );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( get_entities_by_handle( 0, initial_ents ), "can't get entities by handle" );
 
     std::vector< Tag > initial_tags;
-    rval = tag_get_tags( initial_tags );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( tag_get_tags( initial_tags ), "can't get tags" );
 
     // otherwise try using the file extension to select a reader
     std::string ext = set->extension_from_filename( file_name );
 
     // Try all the readers
     ReaderWriterSet::iterator iter;
-    rval           = MB_FAILURE;
+    ErrorCode rval = MB_FAILURE;
     bool tried_one = false;
     for( iter = set->begin(); iter != set->end(); ++iter )
     {
@@ -575,10 +577,8 @@ ErrorCode Core::serial_load_file( const char* file_name,
             if( !reader ) continue;
             rval = reader->load_file( file_name, file_set, opts, subsets, id_tag );
             delete reader;
-            if( MB_SUCCESS == rval )
-                break;
-            else
-                clean_up_failed_read( initial_ents, initial_tags );
+            if( MB_SUCCESS == rval ) break;
+            clean_up_failed_read( initial_ents, initial_tags );
         }
     }
 
@@ -755,7 +755,8 @@ ErrorCode Core::delete_mesh()
 
     for( std::list< TagInfo* >::iterator i = tagList.begin(); i != tagList.end(); ++i )
     {
-        result = ( *i )->release_all_data( sequenceManager, mError, false );MB_CHK_ERR( result );
+        result = ( *i )->release_all_data( sequenceManager, mError, false );
+        MB_CHK_ERR( result );
     }
 
     sequenceManager->clear();
@@ -802,7 +803,8 @@ ErrorCode Core::get_vertex_coordinates( std::vector< double >& coords ) const
 {
     // INEFFICIENT implementation for now, until we get blocked tag access
     Range vertices;
-    ErrorCode result = get_entities_by_type( 0, MBVERTEX, vertices );MB_CHK_ERR( result );
+    ErrorCode result = get_entities_by_type( 0, MBVERTEX, vertices );
+    MB_CHK_ERR( result );
 
     // the least we can do is resize the vector and only go through the
     // vertex list once
@@ -812,7 +814,8 @@ ErrorCode Core::get_vertex_coordinates( std::vector< double >& coords ) const
     coords.resize( geometricDimension * num_verts );
     for( Range::iterator it = vertices.begin(); it != vertices.end(); ++it )
     {
-        result = get_coords( &( *it ), 1, xyz );MB_CHK_ERR( result );
+        result = get_coords( &( *it ), 1, xyz );
+        MB_CHK_ERR( result );
 
         coords[vec_pos]                 = xyz[0];
         coords[num_verts + vec_pos]     = xyz[1];
@@ -885,7 +888,7 @@ ErrorCode Core::get_coords( const Range& entities, double* coords ) const
         }
 
         double const *x, *y, *z;
-        ErrorCode rval = vseq->get_coordinate_arrays( x, y, z );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( vseq->get_coordinate_arrays( x, y, z ), "can't get coordinate arrays" );
         x += offset;
         y += offset;
         z += offset;
@@ -902,7 +905,7 @@ ErrorCode Core::get_coords( const Range& entities, double* coords ) const
     ErrorCode rval = MB_SUCCESS;
     for( Range::const_iterator rit( &( *i ), i->first ); rit != entities.end(); ++rit )
     {
-        rval = get_coords( &( *rit ), 1, coords );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( get_coords( &( *rit ), 1, coords ), "can't get coords" );
         coords += 3;
     }
 
@@ -939,7 +942,7 @@ ErrorCode Core::get_coords( const Range& entities, double* x_coords, double* y_c
         }
 
         double const *x, *y, *z;
-        ErrorCode rval = vseq->get_coordinate_arrays( x, y, z );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( vseq->get_coordinate_arrays( x, y, z ), "can't get coordinate arrays" );
         if( x_coords )
         {
             memcpy( x_coords, x + offset, count * sizeof( double ) );
@@ -962,7 +965,7 @@ ErrorCode Core::get_coords( const Range& entities, double* x_coords, double* y_c
     double xyz[3];
     for( Range::const_iterator rit( &( *i ), i->first ); rit != entities.end(); ++rit )
     {
-        rval = get_coords( &( *rit ), 1, xyz );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( get_coords( &( *rit ), 1, xyz ), "can't get coords" );
         *x_coords++ = xyz[0];
         *y_coords++ = xyz[1];
         *z_coords++ = xyz[2];
@@ -1003,8 +1006,10 @@ ErrorCode Core::get_coords( const EntityHandle* entities, const int num_entities
             static std::vector< double > dum_pos( 3 * CN::MAX_NODES_PER_ELEMENT );
             static const EntityHandle* conn;
             static int num_conn;
-            status = get_connectivity( *iter, conn, num_conn, false, &dum_conn );MB_CHK_ERR( status );
-            status = get_coords( conn, num_conn, &dum_pos[0] );MB_CHK_ERR( status );
+            status = get_connectivity( *iter, conn, num_conn, false, &dum_conn );
+            MB_CHK_ERR( status );
+            status = get_coords( conn, num_conn, &dum_pos[0] );
+            MB_CHK_ERR( status );
             coords[0] = coords[1] = coords[2] = 0.0;
             for( int i = 0; i < num_conn; i++ )
             {
@@ -1132,7 +1137,8 @@ ErrorCode Core::get_connectivity_by_type( const EntityType entity_type, std::vec
     for( Range::iterator this_it = this_range.begin(); this_it != this_range.end(); ++this_it )
     {
         const EntityHandle* connect_vec = NULL;
-        result                          = get_connectivity( *this_it, connect_vec, num_ents, true );MB_CHK_ERR( result );
+        result                          = get_connectivity( *this_it, connect_vec, num_ents, true );
+        MB_CHK_ERR( result );
         connect.insert( connect.end(), &connect_vec[0], &connect_vec[num_ents] );
     }
 
@@ -1146,7 +1152,8 @@ ErrorCode Core::get_connectivity( const EntityHandle* entity_handles,
                                   bool corners_only ) const
 {
     std::vector< EntityHandle > tmp_connect;
-    ErrorCode result = get_connectivity( entity_handles, num_handles, tmp_connect, corners_only );MB_CHK_ERR( result );
+    ErrorCode result = get_connectivity( entity_handles, num_handles, tmp_connect, corners_only );
+    MB_CHK_ERR( result );
 
     std::sort( tmp_connect.begin(), tmp_connect.end() );
     std::copy( tmp_connect.rbegin(), tmp_connect.rend(), range_inserter( connectivity ) );
@@ -1164,14 +1171,14 @@ ErrorCode Core::get_connectivity( const EntityHandle* entity_handles,
                            // but changing it breaks lost of code, so I'm leaving
                            // it in.  - j.kraftcheck 2009-11-06
 
-    ErrorCode rval;
     std::vector< EntityHandle > tmp_storage;  // used only for structured mesh
     const EntityHandle* conn;
     int len;
     if( offsets ) offsets->push_back( 0 );
     for( int i = 0; i < num_handles; ++i )
     {
-        rval = get_connectivity( entity_handles[i], conn, len, corners_only, &tmp_storage );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( get_connectivity( entity_handles[i], conn, len, corners_only, &tmp_storage ),
+                        "can't get connectivity" );
         connectivity.insert( connectivity.end(), conn, conn + len );
         if( offsets ) offsets->push_back( connectivity.size() );
     }
@@ -1228,7 +1235,8 @@ ErrorCode Core::set_connectivity( const EntityHandle entity_handle, EntityHandle
 
     const EntityHandle* old_conn;
     int len;
-    status = static_cast< ElementSequence* >( seq )->get_connectivity( entity_handle, old_conn, len );MB_CHK_ERR( status );
+    status = static_cast< ElementSequence* >( seq )->get_connectivity( entity_handle, old_conn, len );
+    MB_CHK_ERR( status );
 
     aEntityFactory->notify_change_connectivity( entity_handle, old_conn, connect, num_connect );
 
@@ -1342,11 +1350,13 @@ static inline ErrorCode get_adjacencies_intersection( Core* mb,
             adj_entities.push_back( *begin );
         else if( to_dimension == 0 && entity_type != MBPOLYHEDRON )
         {
-            result = mb->get_connectivity( &( *begin ), 1, adj_entities );MB_CHK_ERR( result );
+            result = mb->get_connectivity( &( *begin ), 1, adj_entities );
+            MB_CHK_ERR( result );
         }
         else
         {
-            result = mb->a_entity_factory()->get_adjacencies( *begin, to_dimension, create_if_missing, adj_entities );MB_CHK_ERR( result );
+            result = mb->a_entity_factory()->get_adjacencies( *begin, to_dimension, create_if_missing, adj_entities );
+            MB_CHK_ERR( result );
         }
         ++begin;
     }
@@ -1362,11 +1372,13 @@ static inline ErrorCode get_adjacencies_intersection( Core* mb,
             temp_vec.push_back( *from_it );
         else if( to_dimension == 0 && entity_type != MBPOLYHEDRON )
         {
-            result = mb->get_connectivity( &( *from_it ), 1, temp_vec );MB_CHK_ERR( result );
+            result = mb->get_connectivity( &( *from_it ), 1, temp_vec );
+            MB_CHK_ERR( result );
         }
         else
         {
-            result = mb->a_entity_factory()->get_adjacencies( *from_it, to_dimension, create_if_missing, temp_vec );MB_CHK_ERR( result );
+            result = mb->a_entity_factory()->get_adjacencies( *from_it, to_dimension, create_if_missing, temp_vec );
+            MB_CHK_ERR( result );
         }
 
         // otherwise intersect with the current set of results
@@ -1408,7 +1420,8 @@ static inline ErrorCode get_adjacencies_intersection( Core* mb,
                                                       Range& adj_entities )
 {
     std::vector< EntityHandle > results;
-    ErrorCode rval = moab::get_adjacencies_intersection( mb, begin, end, to_dimension, create_if_missing, results );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( moab::get_adjacencies_intersection( mb, begin, end, to_dimension, create_if_missing, results ),
+                    "can't get adjacencies intersection" );
 
     if( adj_entities.empty() )
     {
@@ -1584,13 +1597,15 @@ ErrorCode Core::get_adjacencies( const EntityHandle* from_entities,
         {
             if( to_dimension == 0 && TYPE_FROM_HANDLE( from_entities[0] ) != MBPOLYHEDRON )
             {
-                result = get_connectivity( from_entities[i], conn, len, false, &tmp_storage );MB_CHK_ERR( result );
+                result = get_connectivity( from_entities[i], conn, len, false, &tmp_storage );
+                MB_CHK_ERR( result );
                 adj_entities.insert( adj_entities.end(), conn, conn + len );
             }
             else
             {
                 result =
-                    aEntityFactory->get_adjacencies( from_entities[i], to_dimension, create_if_missing, adj_entities );MB_CHK_ERR( result );
+                    aEntityFactory->get_adjacencies( from_entities[i], to_dimension, create_if_missing, adj_entities );
+                MB_CHK_ERR( result );
             }
         }
         std::sort( adj_entities.begin(), adj_entities.end() );
@@ -1721,7 +1736,7 @@ ErrorCode Core::connect_iterate( Range::const_iterator iter,
 ErrorCode Core::get_vertices( const Range& from_entities, Range& vertices )
 {
     Range range;
-    ErrorCode rval = get_connectivity( from_entities, range );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( get_connectivity( from_entities, range ), "can't get connectivity" );
 
     // If input contained polyhedra, connectivity will contain faces.
     // Get vertices from faces.
@@ -1731,7 +1746,7 @@ ErrorCode Core::get_vertices( const Range& from_entities, Range& vertices )
         Range polygons;
         polygons.merge( it, range.end() );
         range.erase( it, range.end() );
-        rval = get_connectivity( polygons, range );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( get_connectivity( polygons, range ), "can't get connectivity" );
     }
 
     if( vertices.empty() )
@@ -1759,43 +1774,66 @@ ErrorCode Core::get_adjacencies( const Range& from_entities,
                                       adj_entities );
 }
 
-ErrorCode Core::add_adjacencies( const EntityHandle entity_handle,
-                                 const EntityHandle* adjacencies,
+/** \brief Add adjacencies between entities
+ * \param from_handle Entity from which adjacencies are being added
+ * \param to_handles Entities to which adjacencies are being added
+ * \param num_handles Number of handles in to_handles
+ * \param both_ways If true, add the adjacency information in both directions
+ * \see Interface::add_adjacencies(const EntityHandle, const EntityHandle*, const int, bool)
+ */
+ErrorCode Core::add_adjacencies( const EntityHandle from_handle,
+                                 const EntityHandle* to_handles,
                                  const int num_handles,
                                  bool both_ways )
 {
     ErrorCode result = MB_SUCCESS;
 
-    for( const EntityHandle* it = adjacencies; it != adjacencies + num_handles; it++ )
+    for( const EntityHandle* it = to_handles; it != to_handles + num_handles; it++ )
     {
-        result = aEntityFactory->add_adjacency( entity_handle, *it, both_ways );MB_CHK_ERR( result );
+        result = aEntityFactory->add_adjacency( from_handle, *it, both_ways );
+        MB_CHK_ERR( result );
     }
 
     return MB_SUCCESS;
 }
 
-ErrorCode Core::add_adjacencies( const EntityHandle entity_handle, Range& adjacencies, bool both_ways )
+/** \brief Add adjacencies between entities using Range
+ * \param from_handle Entity from which adjacencies are being added
+ * \param adjacencies Range of entities to which adjacencies are being added
+ * \param both_ways If true, add the adjacency information in both directions
+ * \see Interface::add_adjacencies(const EntityHandle, Range&, bool)
+ */
+ErrorCode Core::add_adjacencies( const EntityHandle from_handle, Range& adjacencies, bool both_ways )
 {
     ErrorCode result = MB_SUCCESS;
 
     for( Range::iterator rit = adjacencies.begin(); rit != adjacencies.end(); ++rit )
     {
-        result = aEntityFactory->add_adjacency( entity_handle, *rit, both_ways );MB_CHK_ERR( result );
+        result = aEntityFactory->add_adjacency( from_handle, *rit, both_ways );
+        MB_CHK_ERR( result );
     }
 
     return MB_SUCCESS;
 }
 
-ErrorCode Core::remove_adjacencies( const EntityHandle entity_handle,
-                                    const EntityHandle* adjacencies,
+/** \brief Remove adjacencies between entities
+ * \param from_handle Entity from which adjacencies are being removed
+ * \param to_handles Entities to which adjacencies are being removed
+ * \param num_handles Number of handles in to_handles
+ * \see Interface::remove_adjacencies(const EntityHandle, const EntityHandle*, const int)
+ */
+ErrorCode Core::remove_adjacencies( const EntityHandle from_handle,
+                                    const EntityHandle* to_handles,
                                     const int num_handles )
 {
     ErrorCode result = MB_SUCCESS;
 
-    for( const EntityHandle* it = adjacencies; it != adjacencies + num_handles; it++ )
+    for( const EntityHandle* it = to_handles; it != to_handles + num_handles; it++ )
     {
-        result = aEntityFactory->remove_adjacency( entity_handle, *it );MB_CHK_ERR( result );
-        result = aEntityFactory->remove_adjacency( *it, entity_handle );MB_CHK_ERR( result );
+        result = aEntityFactory->remove_adjacency( from_handle, *it );
+        MB_CHK_ERR( result );
+        result = aEntityFactory->remove_adjacency( *it, from_handle );
+        MB_CHK_ERR( result );
     }
 
     return MB_SUCCESS;
@@ -1840,9 +1878,11 @@ ErrorCode Core::get_entities_by_dimension( const EntityHandle meshset,
     if( meshset )
     {
         const EntitySequence* seq;
-        result = sequence_manager()->find( meshset, seq );MB_CHK_ERR( result );
+        result = sequence_manager()->find( meshset, seq );
+        MB_CHK_ERR( result );
         const MeshSetSequence* mseq = reinterpret_cast< const MeshSetSequence* >( seq );
-        result = mseq->get_dimension( sequence_manager(), meshset, dimension, entities, recursive );MB_CHK_ERR( result );
+        result = mseq->get_dimension( sequence_manager(), meshset, dimension, entities, recursive );
+        MB_CHK_ERR( result );
     }
     else if( dimension > 3 )
     {
@@ -1869,9 +1909,11 @@ ErrorCode Core::get_entities_by_dimension( const EntityHandle meshset,
     if( meshset )
     {
         const EntitySequence* seq;
-        result = sequence_manager()->find( meshset, seq );MB_CHK_ERR( result );
+        result = sequence_manager()->find( meshset, seq );
+        MB_CHK_ERR( result );
         const MeshSetSequence* mseq = reinterpret_cast< const MeshSetSequence* >( seq );
-        result = mseq->get_dimension( sequence_manager(), meshset, dimension, entities, recursive );MB_CHK_ERR( result );
+        result = mseq->get_dimension( sequence_manager(), meshset, dimension, entities, recursive );
+        MB_CHK_ERR( result );
     }
     else if( dimension > 3 )
     {
@@ -1898,9 +1940,11 @@ ErrorCode Core::get_entities_by_type( const EntityHandle meshset,
     if( meshset )
     {
         const EntitySequence* seq;
-        result = sequence_manager()->find( meshset, seq );MB_CHK_ERR( result );
+        result = sequence_manager()->find( meshset, seq );
+        MB_CHK_ERR( result );
         const MeshSetSequence* mseq = reinterpret_cast< const MeshSetSequence* >( seq );
-        result                      = mseq->get_type( sequence_manager(), meshset, entity_type, entities, recursive );MB_CHK_ERR( result );
+        result                      = mseq->get_type( sequence_manager(), meshset, entity_type, entities, recursive );
+        MB_CHK_ERR( result );
     }
     else
     {
@@ -1919,9 +1963,11 @@ ErrorCode Core::get_entities_by_type( const EntityHandle meshset,
     if( meshset )
     {
         const EntitySequence* seq;
-        result = sequence_manager()->find( meshset, seq );MB_CHK_ERR( result );
+        result = sequence_manager()->find( meshset, seq );
+        MB_CHK_ERR( result );
         const MeshSetSequence* mseq = reinterpret_cast< const MeshSetSequence* >( seq );
-        result                      = mseq->get_type( sequence_manager(), meshset, entity_type, entities, recursive );MB_CHK_ERR( result );
+        result                      = mseq->get_type( sequence_manager(), meshset, entity_type, entities, recursive );
+        MB_CHK_ERR( result );
     }
     else
     {
@@ -1943,7 +1989,8 @@ ErrorCode Core::get_entities_by_type_and_tag( const EntityHandle meshset,
     ErrorCode result;
     Range range;
 
-    result = get_entities_by_type( meshset, entity_type, range, recursive );MB_CHK_ERR( result );
+    result = get_entities_by_type( meshset, entity_type, range, recursive );
+    MB_CHK_ERR( result );
     if( !entities.empty() && Interface::INTERSECT == condition ) range = intersect( entities, range );
 
     // For each tag:
@@ -1960,18 +2007,21 @@ ErrorCode Core::get_entities_by_type_and_tag( const EntityHandle meshset,
         // get the entities with this tag/value combo
         if( NULL == values || NULL == values[it] )
         {
-            result = tags[it]->get_tagged_entities( sequenceManager, tmp_range, entity_type, &range );MB_CHK_ERR( result );
+            result = tags[it]->get_tagged_entities( sequenceManager, tmp_range, entity_type, &range );
+            MB_CHK_ERR( result );
         }
         else
         {
             result = tags[it]->find_entities_with_value( sequenceManager, mError, tmp_range, values[it], 0, entity_type,
-                                                         &range );MB_CHK_ERR( result );
+                                                         &range );
+            MB_CHK_ERR( result );
             // if there is a default value, then we should return all entities
             // that are untagged
             if( tags[it]->equals_default_value( values[it] ) )
             {
                 Range all_tagged, untagged;
-                result = tags[it]->get_tagged_entities( sequenceManager, all_tagged, entity_type, &range );MB_CHK_ERR( result );
+                result = tags[it]->get_tagged_entities( sequenceManager, all_tagged, entity_type, &range );
+                MB_CHK_ERR( result );
                 // add to 'tmp_range' any untagged entities in 'range'
                 tmp_range.merge( subtract( range, all_tagged ) );
             }
@@ -1995,9 +2045,11 @@ ErrorCode Core::get_entities_by_handle( const EntityHandle meshset, Range& entit
     if( meshset )
     {
         const EntitySequence* seq;
-        result = sequence_manager()->find( meshset, seq );MB_CHK_ERR( result );
+        result = sequence_manager()->find( meshset, seq );
+        MB_CHK_ERR( result );
         const MeshSetSequence* mseq = reinterpret_cast< const MeshSetSequence* >( seq );
-        result                      = mseq->get_entities( sequence_manager(), meshset, entities, recursive );MB_CHK_ERR( result );
+        result                      = mseq->get_entities( sequence_manager(), meshset, entities, recursive );
+        MB_CHK_ERR( result );
     }
     else
     {
@@ -2025,9 +2077,11 @@ ErrorCode Core::get_entities_by_handle( const EntityHandle meshset,
     else
     {
         const EntitySequence* seq;
-        result = sequence_manager()->find( meshset, seq );MB_CHK_ERR( result );
+        result = sequence_manager()->find( meshset, seq );
+        MB_CHK_ERR( result );
         const MeshSetSequence* mseq = reinterpret_cast< const MeshSetSequence* >( seq );
-        result                      = mseq->get_entities( meshset, entities );MB_CHK_ERR( result );
+        result                      = mseq->get_entities( meshset, entities );
+        MB_CHK_ERR( result );
     }
     return MB_SUCCESS;
 }
@@ -2052,9 +2106,11 @@ ErrorCode Core::get_number_entities_by_dimension( const EntityHandle meshset,
     else
     {
         const EntitySequence* seq;
-        result = sequence_manager()->find( meshset, seq );MB_CHK_ERR( result );
+        result = sequence_manager()->find( meshset, seq );
+        MB_CHK_ERR( result );
         const MeshSetSequence* mseq = reinterpret_cast< const MeshSetSequence* >( seq );
-        result                      = mseq->num_dimension( sequence_manager(), meshset, dim, number, recursive );MB_CHK_ERR( result );
+        result                      = mseq->num_dimension( sequence_manager(), meshset, dim, number, recursive );
+        MB_CHK_ERR( result );
     }
 
     return MB_SUCCESS;
@@ -2074,9 +2130,11 @@ ErrorCode Core::get_number_entities_by_type( const EntityHandle meshset,
     if( meshset )
     {
         const EntitySequence* seq;
-        result = sequence_manager()->find( meshset, seq );MB_CHK_ERR( result );
+        result = sequence_manager()->find( meshset, seq );
+        MB_CHK_ERR( result );
         const MeshSetSequence* mseq = reinterpret_cast< const MeshSetSequence* >( seq );
-        result                      = mseq->num_type( sequence_manager(), meshset, entity_type, num_ent, recursive );MB_CHK_ERR( result );
+        result                      = mseq->num_type( sequence_manager(), meshset, entity_type, num_ent, recursive );
+        MB_CHK_ERR( result );
     }
     else
     {
@@ -2108,7 +2166,8 @@ ErrorCode Core::get_number_entities_by_handle( const EntityHandle meshset, int& 
     if( meshset )
     {
         const EntitySequence* seq;
-        result = sequence_manager()->find( meshset, seq );MB_CHK_ERR( result );
+        result = sequence_manager()->find( meshset, seq );
+        MB_CHK_ERR( result );
         const MeshSetSequence* mseq = reinterpret_cast< const MeshSetSequence* >( seq );
         return mseq->num_entities( sequence_manager(), meshset, num_ent, recursive );
     }
@@ -2466,7 +2525,7 @@ ErrorCode Core::tag_delete( Tag tag_handle )
     std::list< TagInfo* >::iterator i = std::find( tagList.begin(), tagList.end(), tag_handle );
     if( i == tagList.end() ) return MB_TAG_NOT_FOUND;
 
-    ErrorCode rval = tag_handle->release_all_data( sequenceManager, mError, true );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( tag_handle->release_all_data( sequenceManager, mError, true ), "can't release all data" );
 
     tagList.erase( i );
     delete tag_handle;
@@ -2640,13 +2699,13 @@ Tag Core::geom_dimension_tag()
 ErrorCode Core::create_element( const EntityType entity_type,
                                 const EntityHandle* connectivity,
                                 const int num_nodes,
-                                EntityHandle& handle )
+                                EntityHandle& element_handle )
 {
     // make sure we have enough vertices for this entity type
     if( num_nodes < CN::VerticesPerEntity( entity_type ) ) return MB_FAILURE;
 
-    ErrorCode status = sequence_manager()->create_element( entity_type, connectivity, num_nodes, handle );
-    if( MB_SUCCESS == status ) status = aEntityFactory->notify_create_entity( handle, connectivity, num_nodes );
+    ErrorCode status = sequence_manager()->create_element( entity_type, connectivity, num_nodes, element_handle );
+    if( MB_SUCCESS == status ) status = aEntityFactory->notify_create_entity( element_handle, connectivity, num_nodes );
 
 #ifdef MOAB_HAVE_AHF
     mesh_modified = true;
@@ -2656,22 +2715,24 @@ ErrorCode Core::create_element( const EntityType entity_type,
 }
 
 //! creates a vertex based on coordinates, returns a handle and error code
-ErrorCode Core::create_vertex( const double coords[3], EntityHandle& handle )
+ErrorCode Core::create_vertex( const double coords[3], EntityHandle& entity_handle )
 {
     // get an available vertex handle
-    return sequence_manager()->create_vertex( coords, handle );
+    return sequence_manager()->create_vertex( coords, entity_handle );
 }
 
 ErrorCode Core::create_vertices( const double* coordinates, const int nverts, Range& entity_handles )
 {
     // Create vertices
     ReadUtilIface* read_iface;
-    ErrorCode result = Interface::query_interface( read_iface );MB_CHK_ERR( result );
+    ErrorCode result = Interface::query_interface( read_iface );
+    MB_CHK_ERR( result );
 
     std::vector< double* > arrays;
     EntityHandle start_handle_out = 0;
     result                        = read_iface->get_node_coords( 3, nverts, MB_START_ID, start_handle_out, arrays );
-    Interface::release_interface( read_iface );MB_CHK_ERR( result );
+    Interface::release_interface( read_iface );
+    MB_CHK_ERR( result );
     // Cppcheck warning (false positive): variable arrays is assigned a value that is never used
     for( int i = 0; i < nverts; i++ )
     {
@@ -2717,8 +2778,10 @@ ErrorCode Core::merge_entities( EntityHandle entity_to_keep,
     {
         std::vector< EntityHandle > conn, conn2;
 
-        result = get_connectivity( &entity_to_keep, 1, conn );MB_CHK_ERR( result );
-        result = get_connectivity( &entity_to_remove, 1, conn2 );MB_CHK_ERR( result );
+        result = get_connectivity( &entity_to_keep, 1, conn );
+        MB_CHK_ERR( result );
+        result = get_connectivity( &entity_to_remove, 1, conn2 );
+        MB_CHK_ERR( result );
 
         // Check to see if we can merge before pulling adjacencies.
         int dum1, dum2;
@@ -2939,7 +3002,8 @@ ErrorCode Core::list_entity( const EntityHandle entity ) const
     if( this_type == MBVERTEX )
     {
         double coords[3];
-        result = get_coords( &( entity ), 1, coords );MB_CHK_ERR( result );
+        result = get_coords( &( entity ), 1, coords );
+        MB_CHK_ERR( result );
         std::cout << "Coordinates: (" << coords[0] << ", " << coords[1] << ", " << coords[2] << ")" << std::endl;
     }
     else if( this_type == MBENTITYSET )
@@ -3056,7 +3120,8 @@ ErrorCode Core::side_number( const EntityHandle parent,
             }
         return MB_FAILURE;
     }
-    result = get_connectivity( child, child_conn, num_child_vertices, true );MB_CHK_ERR( result );
+    result = get_connectivity( child, child_conn, num_child_vertices, true );
+    MB_CHK_ERR( result );
 
     // call handle vector-based function
     if( TYPE_FROM_HANDLE( parent ) != MBPOLYGON && TYPE_FROM_HANDLE( parent ) != MBPOLYHEDRON )
@@ -3143,7 +3208,8 @@ ErrorCode Core::high_order_node( const EntityHandle parent_handle,
     // get the parent's connectivity
     const EntityHandle* parent_conn = NULL;
     int num_parent_vertices         = 0;
-    ErrorCode result                = get_connectivity( parent_handle, parent_conn, num_parent_vertices, false );MB_CHK_ERR( result );
+    ErrorCode result                = get_connectivity( parent_handle, parent_conn, num_parent_vertices, false );
+    MB_CHK_ERR( result );
 
     // find whether this entity has ho nodes
     int mid_nodes[4];
@@ -3210,7 +3276,8 @@ ErrorCode Core::side_element( const EntityHandle source_entity,
     // get a handle on the connectivity
     const EntityHandle* verts;
     int num_verts;
-    ErrorCode result = get_connectivity( source_entity, verts, num_verts );MB_CHK_ERR( result );
+    ErrorCode result = get_connectivity( source_entity, verts, num_verts );
+    MB_CHK_ERR( result );
 
     // special case for vertices
     if( dim == 0 )
@@ -3424,7 +3491,8 @@ ErrorCode Core::get_parent_meshsets( const EntityHandle meshset, Range& parents,
     if( 0 == meshset ) return MB_ENTITY_NOT_FOUND;
 
     std::vector< EntityHandle > parent_vec;
-    ErrorCode result = get_parent_meshsets( meshset, parent_vec, num_hops );MB_CHK_ERR( result );
+    ErrorCode result = get_parent_meshsets( meshset, parent_vec, num_hops );
+    MB_CHK_ERR( result );
     std::sort( parent_vec.begin(), parent_vec.end() );
     std::copy( parent_vec.rbegin(), parent_vec.rend(), range_inserter( parents ) );
     return MB_SUCCESS;
@@ -3449,7 +3517,8 @@ ErrorCode Core::get_child_meshsets( const EntityHandle meshset, Range& children,
     if( 0 == meshset ) return MB_ENTITY_NOT_FOUND;
 
     std::vector< EntityHandle > child_vec;
-    ErrorCode result = get_child_meshsets( meshset, child_vec, num_hops );MB_CHK_ERR( result );
+    ErrorCode result = get_child_meshsets( meshset, child_vec, num_hops );
+    MB_CHK_ERR( result );
     std::sort( child_vec.begin(), child_vec.end() );
     std::copy( child_vec.rbegin(), child_vec.rend(), range_inserter( children ) );
     return MB_SUCCESS;
@@ -3480,7 +3549,8 @@ ErrorCode Core::get_contained_meshsets( const EntityHandle meshset, Range& child
     }
 
     std::vector< EntityHandle > child_vec;
-    ErrorCode result = get_contained_meshsets( meshset, child_vec, num_hops );MB_CHK_ERR( result );
+    ErrorCode result = get_contained_meshsets( meshset, child_vec, num_hops );
+    MB_CHK_ERR( result );
     std::sort( child_vec.begin(), child_vec.end() );
     std::copy( child_vec.rbegin(), child_vec.rend(), range_inserter( children ) );
     return MB_SUCCESS;
@@ -3764,11 +3834,13 @@ ErrorCode Core::check_adjacencies()
 {
     // run through all entities, checking adjacencies and reverse-evaluating them
     Range all_ents;
-    ErrorCode result = get_entities_by_handle( 0, all_ents );MB_CHK_ERR( result );
+    ErrorCode result = get_entities_by_handle( 0, all_ents );
+    MB_CHK_ERR( result );
 
     for( Range::iterator rit = all_ents.begin(); rit != all_ents.end(); ++rit )
     {
-        result = check_adjacencies( &( *rit ), 1 );MB_CHK_ERR( result );
+        result = check_adjacencies( &( *rit ), 1 );
+        MB_CHK_ERR( result );
     }
 
     return MB_SUCCESS;
@@ -3876,10 +3948,9 @@ ErrorCode Core::create_set_iterator( EntityHandle meshset,
 {
     // check the type of set
     unsigned int setoptions;
-    ErrorCode rval = MB_SUCCESS;
     if( meshset )
     {
-        rval = get_meshset_options( meshset, setoptions );MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( get_meshset_options( meshset, setoptions ), "can't get meshset options" );
     }
 
     if( !meshset || ( setoptions & MESHSET_SET ) )
@@ -4249,8 +4320,9 @@ ErrorCode Core::create_scd_sequence( const HomCoord& coord_min,
 
     if( !scdInterface ) scdInterface = new ScdInterface( this );
     ScdBox* newBox = NULL;
-    ErrorCode rval = scdInterface->create_scd_sequence( coord_min, coord_max, entity_type,
-                                                        /*starting_id*/ (int)start_id_hint, newBox );MB_CHK_ERR( rval );
+    MB_CHK_SET_ERR( scdInterface->create_scd_sequence( coord_min, coord_max, entity_type,
+                                                       /*starting_id*/ (int)start_id_hint, newBox ),
+                    "can't create scd sequence" );
 
     if( MBVERTEX == entity_type )
         first_handle_out = newBox->get_vertex( coord_min );

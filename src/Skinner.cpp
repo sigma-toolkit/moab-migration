@@ -62,12 +62,14 @@ ErrorCode Skinner::initialize()
     void* null_ptr = NULL;
 
     ErrorCode result = thisMB->tag_get_handle( "skinner adj", sizeof( void* ), MB_TYPE_OPAQUE, mAdjTag,
-                                               MB_TAG_DENSE | MB_TAG_CREAT, &null_ptr );MB_CHK_ERR( result );
+                                               MB_TAG_DENSE | MB_TAG_CREAT, &null_ptr );
+    MB_CHK_ERR( result );
 
     if( mDeletableMBTag == 0 )
     {
         result =
-            thisMB->tag_get_handle( "skinner deletable", 1, MB_TYPE_BIT, mDeletableMBTag, MB_TAG_BIT | MB_TAG_CREAT );MB_CHK_ERR( result );
+            thisMB->tag_get_handle( "skinner deletable", 1, MB_TYPE_BIT, mDeletableMBTag, MB_TAG_BIT | MB_TAG_CREAT );
+        MB_CHK_ERR( result );
     }
 
     Range entities;
@@ -101,7 +103,8 @@ ErrorCode Skinner::deinitialize()
     if( 0 != mDeletableMBTag )
     {
         result          = thisMB->tag_delete( mDeletableMBTag );
-        mDeletableMBTag = 0;MB_CHK_ERR( result );
+        mDeletableMBTag = 0;
+        MB_CHK_ERR( result );
     }
 
     // remove the adjacency tag
@@ -112,15 +115,18 @@ ErrorCode Skinner::deinitialize()
         for( EntityType t = MBVERTEX; t != MBMAXTYPE; ++t )
         {
             Range entities;
-            result = thisMB->get_entities_by_type_and_tag( 0, t, &mAdjTag, 0, 1, entities );MB_CHK_ERR( result );
+            result = thisMB->get_entities_by_type_and_tag( 0, t, &mAdjTag, 0, 1, entities );
+            MB_CHK_ERR( result );
             adj_arr.resize( entities.size() );
-            result = thisMB->tag_get_data( mAdjTag, entities, &adj_arr[0] );MB_CHK_ERR( result );
+            result = thisMB->tag_get_data( mAdjTag, entities, &adj_arr[0] );
+            MB_CHK_ERR( result );
             for( i = adj_arr.begin(); i != adj_arr.end(); ++i )
                 delete *i;
         }
 
         result  = thisMB->tag_delete( mAdjTag );
-        mAdjTag = 0;MB_CHK_ERR( result );
+        mAdjTag = 0;
+        MB_CHK_ERR( result );
     }
 
     return MB_SUCCESS;
@@ -131,7 +137,8 @@ ErrorCode Skinner::add_adjacency( EntityHandle entity )
     std::vector< EntityHandle >* adj = NULL;
     const EntityHandle* nodes;
     int num_nodes;
-    ErrorCode result = thisMB->get_connectivity( entity, nodes, num_nodes, true );MB_CHK_ERR( result );
+    ErrorCode result = thisMB->get_connectivity( entity, nodes, num_nodes, true );
+    MB_CHK_ERR( result );
     const EntityHandle* iter = std::min_element( nodes, nodes + num_nodes );
 
     if( iter == nodes + num_nodes ) return MB_SUCCESS;
@@ -146,7 +153,8 @@ ErrorCode Skinner::add_adjacency( EntityHandle entity )
     {
         adj = new std::vector< EntityHandle >;
         adj->push_back( entity );
-        result = thisMB->tag_set_data( mAdjTag, iter, 1, &adj );MB_CHK_ERR( result );
+        result = thisMB->tag_set_data( mAdjTag, iter, 1, &adj );
+        MB_CHK_ERR( result );
     }
 
     return MB_SUCCESS;
@@ -632,7 +640,8 @@ bool Skinner::connectivity_match( const EntityHandle* conn1,
 ErrorCode Skinner::remove_adjacency( EntityHandle entity )
 {
     std::vector< EntityHandle > nodes, *adj = NULL;
-    ErrorCode result = thisMB->get_connectivity( &entity, 1, nodes );MB_CHK_ERR( result );
+    ErrorCode result = thisMB->get_connectivity( &entity, 1, nodes );
+    MB_CHK_ERR( result );
     std::vector< EntityHandle >::iterator iter = std::min_element( nodes.begin(), nodes.end() );
 
     if( iter == nodes.end() ) return MB_FAILURE;
@@ -666,20 +675,29 @@ ErrorCode Skinner::classify_2d_boundary( const Range& boundary,
 {
     Range bedges, iedges, nmedges, oedges;
     ErrorCode result =
-        classify_2d_boundary( boundary, bar_elements, bedges, iedges, nmedges, oedges, number_boundary_nodes );MB_CHK_ERR( result );
+        classify_2d_boundary( boundary, bar_elements, bedges, iedges, nmedges, oedges, number_boundary_nodes );
+    MB_CHK_ERR( result );
 
     // now set the input meshsets to the output ranges
-    result = thisMB->clear_meshset( &boundary_edges, 1 );MB_CHK_ERR( result );
-    result = thisMB->add_entities( boundary_edges, bedges );MB_CHK_ERR( result );
+    result = thisMB->clear_meshset( &boundary_edges, 1 );
+    MB_CHK_ERR( result );
+    result = thisMB->add_entities( boundary_edges, bedges );
+    MB_CHK_ERR( result );
 
-    result = thisMB->clear_meshset( &inferred_edges, 1 );MB_CHK_ERR( result );
-    result = thisMB->add_entities( inferred_edges, iedges );MB_CHK_ERR( result );
+    result = thisMB->clear_meshset( &inferred_edges, 1 );
+    MB_CHK_ERR( result );
+    result = thisMB->add_entities( inferred_edges, iedges );
+    MB_CHK_ERR( result );
 
-    result = thisMB->clear_meshset( &non_manifold_edges, 1 );MB_CHK_ERR( result );
-    result = thisMB->add_entities( non_manifold_edges, nmedges );MB_CHK_ERR( result );
+    result = thisMB->clear_meshset( &non_manifold_edges, 1 );
+    MB_CHK_ERR( result );
+    result = thisMB->add_entities( non_manifold_edges, nmedges );
+    MB_CHK_ERR( result );
 
-    result = thisMB->clear_meshset( &other_edges, 1 );MB_CHK_ERR( result );
-    result = thisMB->add_entities( other_edges, oedges );MB_CHK_ERR( result );
+    result = thisMB->clear_meshset( &other_edges, 1 );
+    MB_CHK_ERR( result );
+    result = thisMB->add_entities( other_edges, oedges );
+    MB_CHK_ERR( result );
 
     return MB_SUCCESS;
 }
@@ -729,7 +747,8 @@ ErrorCode Skinner::classify_2d_boundary( const Range& boundary,
     Tag count_tag;
     int default_count = 0;
     ErrorCode result =
-        thisMB->tag_get_handle( 0, 1, MB_TYPE_INTEGER, count_tag, MB_TAG_DENSE | MB_TAG_CREAT, &default_count );MB_CHK_ERR( result );
+        thisMB->tag_get_handle( 0, 1, MB_TYPE_INTEGER, count_tag, MB_TAG_DENSE | MB_TAG_CREAT, &default_count );
+    MB_CHK_ERR( result );
 
     Range::const_iterator iter, end_iter;
     end_iter = boundary.end();
@@ -1003,7 +1022,8 @@ ErrorCode Skinner::find_skin( const EntityHandle this_set,
     }
     else
     {
-        result = thisMB->get_adjacencies( tmp_skin, dim, create_skin_elements, skin_entities, Interface::UNION );MB_CHK_ERR( result );
+        result = thisMB->get_adjacencies( tmp_skin, dim, create_skin_elements, skin_entities, Interface::UNION );
+        MB_CHK_ERR( result );
         if( this_set ) result = thisMB->add_entities( this_set, skin_entities );
     }
 
@@ -1480,10 +1500,10 @@ ErrorCode Skinner::create_side( const EntityHandle this_set,
         else if( conn[nextIndex] != side_conn[1] )
             return MB_FAILURE;  // it is not adjacent to the polygon
 
-        rval = thisMB->create_element( MBEDGE, conn2, 2, side_elem );MB_CHK_ERR( rval );
+        MB_CHK_ERR( thisMB->create_element( MBEDGE, conn2, 2, side_elem ) );
         if( this_set )
         {
-            rval = thisMB->add_entities( this_set, &side_elem, 1 );MB_CHK_ERR( rval );
+            MB_CHK_ERR( thisMB->add_entities( this_set, &side_elem, 1 ) );
         }
         return MB_SUCCESS;
     }
@@ -1501,10 +1521,10 @@ ErrorCode Skinner::create_side( const EntityHandle this_set,
     for( int i = 0; i < side_len; ++i )
         side_conn_full[i] = conn[indices[i]];
 
-    rval = thisMB->create_element( side_type, side_conn_full, side_len, side_elem );MB_CHK_ERR( rval );
+    MB_CHK_ERR( thisMB->create_element( side_type, side_conn_full, side_len, side_elem ) );
     if( this_set )
     {
-        rval = thisMB->add_entities( this_set, &side_elem, 1 );MB_CHK_ERR( rval );
+        MB_CHK_ERR( thisMB->add_entities( this_set, &side_elem, 1 ) );
     }
     return MB_SUCCESS;
     ;

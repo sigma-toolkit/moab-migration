@@ -13,7 +13,7 @@
  *
  */
 
-/**\file Geometry.cpp
+/**\file GeomUtil.cpp
  *\author Jason Kraftcheck (kraftche@cae.wisc.edu)
  *\date 2006-07-27
  */

@@ -277,7 +277,7 @@ ErrorCode ParCommGraph::send_graph( MPI_Comm jcomm )
         if( MB_SUCCESS != rval ) return rval;
 
         int size_pack_array = (int)packed_recv_array.size();
-        comm_graph          = new int[size_pack_array + 1]; // this should be at least size 2
+        comm_graph          = new int[size_pack_array + 1];  // this should be at least size 2
         comm_graph[0]       = size_pack_array;
         for( int k = 0; k < size_pack_array; k++ )
             comm_graph[k + 1] = packed_recv_array[k];
@@ -426,8 +426,9 @@ ErrorCode ParCommGraph::receive_mesh( MPI_Comm jcomm,
     // primary element came from, in the joint communicator ; this will be forwarded by coverage
     // mesh
     int defaultInt = -1;  // no processor, so it was not migrated from somewhere else
-    rval           = pco->get_moab()->tag_get_handle( "orig_sending_processor", 1, MB_TYPE_INTEGER, orgSendProcTag,
-                                                      MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt );MB_CHK_SET_ERR( rval, "can't create original sending processor tag" );
+    MB_CHK_SET_ERR( pco->get_moab()->tag_get_handle( "orig_sending_processor", 1, MB_TYPE_INTEGER, orgSendProcTag,
+                                                     MB_TAG_DENSE | MB_TAG_CREAT, &defaultInt ),
+                    "can't create original sending processor tag" );
     int mtag = compid2;
     if( !senders_local.empty() )
     {
@@ -548,7 +549,7 @@ ErrorCode ParCommGraph::receive_mesh( MPI_Comm jcomm,
             EntityHandle eh          = *it;
             const EntityHandle* conn = NULL;
             int num_nodes            = 0;
-            rval                     = mb->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_connectivity( eh, conn, num_nodes ) );
             adj_fact->notify_create_entity( eh, conn, num_nodes );
         }
     }
@@ -597,9 +598,9 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
     for( size_t i = 0; i < tag_handles.size(); i++ )
     {
         int bytes_per_tag;
-        rval = mb->tag_get_bytes( tag_handles[i], bytes_per_tag );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->tag_get_bytes( tag_handles[i], bytes_per_tag ) );
         int tag_size1;  // length
-        rval = mb->tag_get_length( tag_handles[i], tag_size1 );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->tag_get_length( tag_handles[i], tag_size1 ) );
         if( graph_type == DOF_BASED )
             bytes_per_tag = bytes_per_tag / tag_size1;  // we know we have one double per tag , per ID sent;
                                                         // could be 8 for double, 4 for int, etc
@@ -607,7 +608,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
         vect_bytes_per_tag.push_back( bytes_per_tag );
 #ifdef VERBOSE
         int tag_size;
-        rval = mb->tag_get_length( tag_handles[i], tag_size );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->tag_get_length( tag_handles[i], tag_size ) );
         tag_sizes.push_back( tag_size );
 #endif
     }
@@ -632,7 +633,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
             {
                 // copy tag data to buffer->buff_ptr, and send the buffer (we could have used
                 // regular char arrays)
-                rval = mb->tag_get_data( tag_handles[i], ents, (void*)( buffer->buff_ptr ) );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mb->tag_get_data( tag_handles[i], ents, (void*)( buffer->buff_ptr ) ) );
                 // advance the butter
                 buffer->buff_ptr += vect_bytes_per_tag[i] * ents.size();
             }
@@ -654,7 +655,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
         Tag gidTag = mb->globalId_tag();
         std::vector< int > gids;
         gids.resize( owned.size() );
-        rval = mb->tag_get_data( gidTag, owned, gids.data() );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->tag_get_data( gidTag, owned, gids.data() ) );
         std::map< int, EntityHandle > gidToHandle;
         size_t i = 0;
         for( Range::iterator it = owned.begin(); it != owned.end(); it++ )
@@ -733,10 +734,10 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
         for( size_t i = 0; i < tag_handles.size(); i++ )
         {
             int bytes_per_tag;
-            rval = mb->tag_get_bytes( tag_handles[i], bytes_per_tag );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->tag_get_bytes( tag_handles[i], bytes_per_tag ) );
             valuesTags[i].resize( owned.size() * bytes_per_tag / sizeof( double ) );
             // fill the whole array, we will pick up from here
-            rval = mb->tag_get_data( tag_handles[i], owned, (void*)( valuesTags[i].data() ) );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->tag_get_data( tag_handles[i], owned, (void*)( valuesTags[i].data() ) ) );
         }
         // now, pack the data and send it
         sendReqs.resize( involved_IDs_map.size() );
@@ -805,12 +806,12 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
     for( size_t i = 0; i < tag_handles.size(); i++ )
     {
         int bytes_per_tag;
-        rval = mb->tag_get_bytes( tag_handles[i], bytes_per_tag );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->tag_get_bytes( tag_handles[i], bytes_per_tag ) );
         total_bytes_per_entity += bytes_per_tag;
         vect_bytes_per_tag.push_back( bytes_per_tag );
 #ifdef VERBOSE
         int tag_size;
-        rval = mb->tag_get_length( tag_handles[i], tag_size );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->tag_get_length( tag_handles[i], tag_size ) );
         tag_sizes.push_back( tag_size );
 #endif
     }
@@ -857,7 +858,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
         Tag gidTag = mb->globalId_tag();
         std::vector< int > gids;
         gids.resize( owned.size() );
-        rval = mb->tag_get_data( gidTag, owned, gids.data() );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->tag_get_data( gidTag, owned, gids.data() ) );
         std::map< int, EntityHandle > gidToHandle;
         size_t i = 0;
         for( Range::iterator it = owned.begin(); it != owned.end(); it++ )
@@ -908,7 +909,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
                 EntityHandle eh = mit2->second;
                 for( i = 0; i < tag_handles.size(); i++ )
                 {
-                    rval = mb->tag_set_data( tag_handles[i], &eh, 1, (void*)( buffer->buff_ptr ) );MB_CHK_ERR( rval );
+                    MB_CHK_ERR( mb->tag_set_data( tag_handles[i], &eh, 1, (void*)( buffer->buff_ptr ) ) );
 #ifdef VERBOSE
                     dbfile << "global ID " << eID << " local handle " << mb->id_from_handle( eh ) << " vals: ";
                     double* vals = (double*)( buffer->buff_ptr );
@@ -941,7 +942,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
         for( size_t i = 0; i < tag_handles.size(); i++ )
         {
             int bytes_per_tag;
-            rval = mb->tag_get_bytes( tag_handles[i], bytes_per_tag );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->tag_get_bytes( tag_handles[i], bytes_per_tag ) );
             valuesTags[i].resize( owned.size() * bytes_per_tag / sizeof( double ) );
             // fill the whole array, we will pick up from here
             // we will fill this array, using data from received buffer
@@ -984,7 +985,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
         for( size_t i = 0; i < tag_handles.size(); i++ )
         {
             // we will fill this array, using data from received buffer
-            rval = mb->tag_set_data( tag_handles[i], owned, (void*)( valuesTags[i].data() ) );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->tag_set_data( tag_handles[i], owned, (void*)( valuesTags[i].data() ) ) );
         }
     }
     return MB_SUCCESS;
@@ -1142,9 +1143,8 @@ ErrorCode ParCommGraph::compute_partition( ParallelComm* pco, Range& owned, int 
     // not need any ghost exchange
 
     // find first edges that are shared
-    if( owned.empty() )
-        return MB_SUCCESS;  // nothing to do? empty partition is not allowed, maybe we should return
-                            // error?
+    if( owned.empty() ) return MB_SUCCESS;  // nothing to do? empty partition is not allowed, maybe we should return
+                                            // error?
     Core* mb = (Core*)pco->get_moab();
 
     double t1, t2, t3;
@@ -1152,7 +1152,6 @@ ErrorCode ParCommGraph::compute_partition( ParallelComm* pco, Range& owned, int 
     int primaryDim   = mb->dimension_from_handle( *owned.rbegin() );
     int interfaceDim = primaryDim - 1;  // should be 1 or 2
     Range sharedEdges;
-    ErrorCode rval;
 
     std::vector< int > shprocs( MAX_SHARING_PROCS );
     std::vector< EntityHandle > shhandles( MAX_SHARING_PROCS );
@@ -1168,8 +1167,8 @@ ErrorCode ParCommGraph::compute_partition( ParallelComm* pco, Range& owned, int 
     // these maps above will be empty for method 2 (geometry)
     if( 1 == met )
     {
-        rval = pco->get_shared_entities( /*int other_proc*/ -1, sharedEdges, interfaceDim,
-                                         /*const bool iface*/ true );MB_CHK_ERR( rval );
+        MB_CHK_ERR( pco->get_shared_entities( /*int other_proc*/ -1, sharedEdges, interfaceDim,
+                                              /*const bool iface*/ true ) );
 
 #ifdef VERBOSE
         std::cout << " on sender task " << pco->rank() << " number of shared interface cells " << sharedEdges.size()
@@ -1189,13 +1188,13 @@ ErrorCode ParCommGraph::compute_partition( ParallelComm* pco, Range& owned, int 
             EntityHandle edge = *eit;
             // get the adjacent cell
             Range adjEnts;
-            rval = mb->get_adjacencies( &edge, 1, primaryDim, false, adjEnts );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_adjacencies( &edge, 1, primaryDim, false, adjEnts ) );
             if( adjEnts.size() > 0 )
             {
                 EntityHandle adjCell = adjEnts[0];
                 int gid;
-                rval = mb->tag_get_data( gidTag, &adjCell, 1, &gid );MB_CHK_ERR( rval );
-                rval = pco->get_sharing_data( edge, shprocs.data() , shhandles.data() , pstatus, np );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mb->tag_get_data( gidTag, &adjCell, 1, &gid ) );
+                MB_CHK_ERR( pco->get_sharing_data( edge, shprocs.data(), shhandles.data(), pstatus, np ) );
                 int n                = TLe.get_n();
                 TLe.vi_wr[2 * n]     = shprocs[0];
                 TLe.vi_wr[2 * n + 1] = gid;
@@ -1233,7 +1232,7 @@ ErrorCode ParCommGraph::compute_partition( ParallelComm* pco, Range& owned, int 
     }
     t2 = MPI_Wtime();
     if( rootSender ) std::cout << " time preparing the input for Zoltan:" << t2 - t1 << " seconds. \n";
-        // so adj cells ids; need to call zoltan for parallel partition
+    // so adj cells ids; need to call zoltan for parallel partition
 #ifdef MOAB_HAVE_ZOLTAN
     ZoltanPartitioner* mbZTool = new ZoltanPartitioner( mb, pco );
     if( 1 <= met )  //  partition in zoltan, either graph or geometric partitioner
@@ -1242,8 +1241,8 @@ ErrorCode ParCommGraph::compute_partition( ParallelComm* pco, Range& owned, int 
         // in how many tasks do we want to be distributed?
         int numNewPartitions = (int)receiverTasks.size();
         Range primaryCells   = owned.subset_by_dimension( primaryDim );
-        rval = mbZTool->partition_owned_cells( primaryCells, extraGraphEdges, extraCellsProc, numNewPartitions,
-                                               distribution, met );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mbZTool->partition_owned_cells( primaryCells, extraGraphEdges, extraCellsProc, numNewPartitions,
+                                                    distribution, met ) );
         for( std::map< int, Range >::iterator mit = distribution.begin(); mit != distribution.end(); mit++ )
         {
             int part_index = mit->first;
@@ -1296,8 +1295,8 @@ ErrorCode ParCommGraph::send_graph_partition( ParallelComm* pco, MPI_Comm jcomm 
     {
         recvs.push_back( mit->first );
     }
-    ierr =
-        MPI_Gatherv( recvs.data(), numberReceivers, MPI_INT, buffer.data(), counts.data(), displs.data(), MPI_INT, 0, pco->comm() );
+    ierr = MPI_Gatherv( recvs.data(), numberReceivers, MPI_INT, buffer.data(), counts.data(), displs.data(), MPI_INT, 0,
+                        pco->comm() );
     if( ierr != MPI_SUCCESS ) return MB_FAILURE;
 
     // now form recv_graph map; points from the
@@ -1355,7 +1354,7 @@ ErrorCode ParCommGraph::send_graph_partition( ParallelComm* pco, MPI_Comm jcomm 
         dbfile.close();
 #endif
         // this is the same as trivial partition
-        ErrorCode rval = send_graph( jcomm );MB_CHK_ERR( rval );
+        MB_CHK_ERR( send_graph( jcomm ) );
     }
 
     return MB_SUCCESS;

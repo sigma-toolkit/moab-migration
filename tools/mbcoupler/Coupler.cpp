@@ -162,7 +162,7 @@ ErrorCode Coupler::initialize_tree()
     if( myPc )
     {
         int mpi_err;
-#if( MPI_VERSION >= 2 )
+#if ( MPI_VERSION >= 2 )
         // Use "in place" option
         mpi_err = MPI_Allgather( MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, &allBoxes[0], 6, MPI_DOUBLE,
                                  myPc->proc_config().proc_comm() );
@@ -650,11 +650,13 @@ ErrorCode Coupler::interpolate( Coupler::Method method,
     ErrorCode result;
     if( _spectralSource )
     {
-        result = mbImpl->tag_get_handle( interp_tag.c_str(), _ntot, MB_TYPE_DOUBLE, tag );MB_CHK_SET_ERR( result, "Failed to get handle for interpolation tag \"" << interp_tag << "\"" );
+        result = mbImpl->tag_get_handle( interp_tag.c_str(), _ntot, MB_TYPE_DOUBLE, tag );
+        MB_CHK_SET_ERR( result, "Failed to get handle for interpolation tag \"" << interp_tag << "\"" );
     }
     else
     {
-        result = mbImpl->tag_get_handle( interp_tag.c_str(), 1, MB_TYPE_DOUBLE, tag );MB_CHK_SET_ERR( result, "Failed to get handle for interpolation tag \"" << interp_tag << "\"" );
+        result = mbImpl->tag_get_handle( interp_tag.c_str(), 1, MB_TYPE_DOUBLE, tag );
+        MB_CHK_SET_ERR( result, "Failed to get handle for interpolation tag \"" << interp_tag << "\"" );
     }
 
     return interpolate( method, tag, interp_vals, tl, normalize );

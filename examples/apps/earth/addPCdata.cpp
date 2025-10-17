@@ -1,4 +1,23 @@
-/** @example addPCdata.cpp  Add point cloud data
+/**
+ * @file addPCdata.cpp
+ * @brief Example demonstrating addition of point cloud data to mesh files
+ *
+ * This example shows how to:
+ * - Load mesh files and point cloud data from H5M files
+ * - Match entities between different meshes using global IDs
+ * - Copy tag data from point cloud to mesh entities
+ * - Handle different data types (integer, double)
+ * - Support dual mesh operations for polygon data
+ * - Create new mesh files with enhanced data
+ * - Write enhanced meshes for visualization
+ *
+ * This tool is useful for adding point cloud data to mesh files
+ * for better visualization and analysis in tools like VisIt.
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+
  * this tool will take an existing h5m fine atm mesh file and add data from an h5m  type file with
  * point cloud mesh will support mainly showing the data with Visit
  *
@@ -6,7 +25,7 @@
  * ./mbaddpcdata -i wholeFineATM.h5m -s wholeLND_proj01.h5m -o atm_a2l.h5m -v a2lTbot_proj
  *
  * it should work also for pentagon file style data
- * ./mbaddpcdata -i <MOABsource>/MeshFiles/unittest/penta3d.h5m -s wholeLND_proj01.h5m -o
+ * ./mbaddpcdata -i \c MOABsource/MeshFiles/unittest/penta3d.h5m -s wholeLND_proj01.h5m -o
  * atm_a2l.h5m -v a2lTbot_proj -p 1
  *
  * Basically, will output a new h5m file (atm_a2l.h5m), which has an extra tag, corresponding to the
@@ -16,6 +35,9 @@
  *
  *  file  wholeFineATM.h5m is obtained from a coupled run in e3sm, with the ne 11, np 4,
  *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 #include "moab/ProgOptions.hpp"
 #include "moab/Core.hpp"
@@ -54,22 +76,22 @@ int main( int argc, char* argv[] )
     ErrorCode rval;
     Core* mb = new Core();
 
-    rval = mb->load_file( inputfile.c_str() );MB_CHK_SET_ERR( rval, "can't load input file" );
+    MB_CHK_SET_ERR( mb->load_file( inputfile.c_str() ), "can't load input file" );
 
     Core* mb2 = new Core();
-    rval      = mb2->load_file( sourcefile.c_str() );MB_CHK_SET_ERR( rval, "can't load source file" );
+    MB_CHK_SET_ERR( mb2->load_file( sourcefile.c_str() ), "can't load source file" );
 
     Tag sourceTag;
-    rval = mb2->tag_get_handle( variable_name.c_str(), sourceTag );MB_CHK_SET_ERR( rval, "can't get tag from file" );
+    MB_CHK_SET_ERR( mb2->tag_get_handle( variable_name.c_str(), sourceTag ), "can't get tag from file" );
 
     int sizeTag = 0;
-    rval        = mb2->tag_get_length( sourceTag, sizeTag );MB_CHK_SET_ERR( rval, "can't get size of tag " );
+    MB_CHK_SET_ERR( mb2->tag_get_length( sourceTag, sizeTag ), "can't get size of tag " );
 
     DataType type;
-    rval = mb2->tag_get_data_type( sourceTag, type );MB_CHK_SET_ERR( rval, "can't get type of tag " );
+    MB_CHK_SET_ERR( mb2->tag_get_data_type( sourceTag, type ), "can't get type of tag " );
 
     int sizeInBytes = 0;
-    rval            = mb2->tag_get_bytes( sourceTag, sizeInBytes );MB_CHK_SET_ERR( rval, "can't get size in bytes of tag " );
+    MB_CHK_SET_ERR( mb2->tag_get_bytes( sourceTag, sizeInBytes ), "can't get size in bytes of tag " );
 
     Tag newTag;
     /*
@@ -92,26 +114,28 @@ int main( int argc, char* argv[] )
         defVal = (void*)( &defDouble );
     }
 
-    rval = mb->tag_get_handle( variable_name.c_str(), sizeTag, type, newTag, MB_TAG_DENSE | MB_TAG_CREAT, defVal );MB_CHK_SET_ERR( rval, "can't create new tag " );
+    MB_CHK_SET_ERR( mb->tag_get_handle( variable_name.c_str(), sizeTag, type, newTag, MB_TAG_DENSE | MB_TAG_CREAT,
+                                        defVal ),
+                    "can't create new tag " );
 
     // get vertices on ini mesh; get global id on ini mesh
     // get global id on source mesh
     Tag gid;
     Tag gid2;
-    rval = mb->tag_get_handle( "GLOBAL_ID", gid );MB_CHK_SET_ERR( rval, "can't get GLOBAL_ID tag on ini mesh " );
-    rval = mb2->tag_get_handle( "GLOBAL_ID", gid2 );MB_CHK_SET_ERR( rval, "can't get GLOBAL_ID tag on source mesh " );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "GLOBAL_ID", gid ), "can't get GLOBAL_ID tag on ini mesh " );
+    MB_CHK_SET_ERR( mb2->tag_get_handle( "GLOBAL_ID", gid2 ), "can't get GLOBAL_ID tag on source mesh " );
 
     // get vertices on ini mesh; build
     Range iniVerts;
-    rval = mb->get_entities_by_dimension( 0, 0, iniVerts );MB_CHK_SET_ERR( rval, "can't get verts on initial mesh " );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 0, iniVerts ), "can't get verts on initial mesh " );
     if( 0 != dual_mesh )
     {
         // verts will be polygons
-        rval = mb->get_entities_by_dimension( 0, 2, iniVerts );MB_CHK_SET_ERR( rval, "can't get polygons on initial mesh " );
+        MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 2, iniVerts ), "can't get polygons on initial mesh " );
     }
     std::vector< int > gids;
     gids.resize( iniVerts.size() );
-    rval = mb->tag_get_data( gid, iniVerts, &( gids[0] ) );MB_CHK_SET_ERR( rval, "can't get gid on initial verts " );
+    MB_CHK_SET_ERR( mb->tag_get_data( gid, iniVerts, &( gids[0] ) ), "can't get gid on initial verts " );
     // build now the map
     std::map< int, EntityHandle > fromGidToEh;
     int i = 0;
@@ -125,22 +149,24 @@ int main( int argc, char* argv[] )
 
     std::cout << " size of tag in bytes:" << sizeInBytes << "\n";
     Range sourceVerts;
-    rval = mb2->get_entities_by_dimension( 0, 0, sourceVerts );MB_CHK_SET_ERR( rval, "can't get verts on source mesh " );
+    MB_CHK_SET_ERR( mb2->get_entities_by_dimension( 0, 0, sourceVerts ), "can't get verts on source mesh " );
     for( Range::iterator sit = sourceVerts.begin(); sit != sourceVerts.end(); sit++ )
     {
         int globalId              = 0;
         EntityHandle sourceHandle = *sit;
-        rval                      = mb2->tag_get_data( gid2, &sourceHandle, 1, &globalId );MB_CHK_SET_ERR( rval, "can't get id on source mesh " );
+        MB_CHK_SET_ERR( mb2->tag_get_data( gid2, &sourceHandle, 1, &globalId ), "can't get id on source mesh " );
         // iniVert could be a polygon, actually
         EntityHandle iniVert = fromGidToEh[globalId];
         // find the value of source tag
-        rval = mb2->tag_get_data( sourceTag, &sourceHandle, 1, (void*)valTag );MB_CHK_SET_ERR( rval, "can't get value on source tag " );
+        MB_CHK_SET_ERR( mb2->tag_get_data( sourceTag, &sourceHandle, 1, (void*)valTag ),
+                        "can't get value on source tag " );
 
-        rval = mb->tag_set_data( newTag, &iniVert, 1, (void*)valTag );MB_CHK_SET_ERR( rval, "can't set value on initial mesh, new tag " );
+        MB_CHK_SET_ERR( mb->tag_set_data( newTag, &iniVert, 1, (void*)valTag ),
+                        "can't set value on initial mesh, new tag " );
     }
 
     // save file
-    rval = mb->write_file( outfile.c_str() );MB_CHK_SET_ERR( rval, "can't write file" );
+    MB_CHK_SET_ERR( mb->write_file( outfile.c_str() ), "can't write file" );
 
     delete[] valTag;
     delete mb;

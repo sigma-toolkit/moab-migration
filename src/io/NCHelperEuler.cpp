@@ -78,7 +78,7 @@ ErrorCode NCHelperEuler::init_mesh_vals()
 
     // Check i periodicity and set globallyPeriodic[0]
     std::vector< double > til_vals( 2 );
-    ErrorCode rval = read_coordinate( "lon", gCDims[3] - 1, gCDims[3], til_vals );MB_CHK_SET_ERR( rval, "Trouble reading 'lon' variable" );
+    MB_CHK_SET_ERR( read_coordinate( "lon", gCDims[3] - 1, gCDims[3], til_vals ), "Trouble reading 'lon' variable" );
     if( std::fabs( 2 * til_vals[1] - til_vals[0] - 360 ) < 0.001 ) globallyPeriodic[0] = 1;
 
     // Now we can set gDims for i
@@ -148,7 +148,7 @@ ErrorCode NCHelperEuler::init_mesh_vals()
         parData.partMethod = partMethod;
         int pdims[3];
 
-        rval = ScdInterface::compute_partition( procs, rank, parData, lDims, locallyPeriodic, pdims );MB_CHK_ERR( rval );
+        MB_CHK_ERR( ScdInterface::compute_partition( procs, rank, parData, lDims, locallyPeriodic, pdims ) );
         for( int i = 0; i < 3; i++ )
             parData.pDims[i] = pdims[i];
 
@@ -196,7 +196,7 @@ ErrorCode NCHelperEuler::init_mesh_vals()
     {
         if( ( vmit = varInfo.find( "lon" ) ) != varInfo.end() && ( *vmit ).second.varDims.size() == 1 )
         {
-            rval = read_coordinate( "lon", lCDims[0], lCDims[3], ilCVals );MB_CHK_SET_ERR( rval, "Trouble reading 'lon' variable" );
+            MB_CHK_SET_ERR( read_coordinate( "lon", lCDims[0], lCDims[3], ilCVals ), "Trouble reading 'lon' variable" );
         }
         else
         {
@@ -208,7 +208,7 @@ ErrorCode NCHelperEuler::init_mesh_vals()
     {
         if( ( vmit = varInfo.find( "lat" ) ) != varInfo.end() && ( *vmit ).second.varDims.size() == 1 )
         {
-            rval = read_coordinate( "lat", lCDims[1], lCDims[4], jlCVals );MB_CHK_SET_ERR( rval, "Trouble reading 'lat' variable" );
+            MB_CHK_SET_ERR( read_coordinate( "lat", lCDims[1], lCDims[4], jlCVals ), "Trouble reading 'lat' variable" );
         }
         else
         {
@@ -241,7 +241,8 @@ ErrorCode NCHelperEuler::init_mesh_vals()
             {
                 std::string gwName( "gw" );
                 std::vector< double > gwVals( lDims[4] - lDims[1] - 1 );
-                rval = read_coordinate( gwName.c_str(), lDims[1], lDims[4] - 2, gwVals );MB_CHK_SET_ERR( rval, "Trouble reading 'gw' variable" );
+                MB_CHK_SET_ERR( read_coordinate( gwName.c_str(), lDims[1], lDims[4] - 2, gwVals ),
+                                "Trouble reading 'gw' variable" );
                 // Copy the correct piece
                 jlVals[0]     = -( M_PI / 2 ) * 180 / M_PI;
                 std::size_t i = 0;
@@ -262,7 +263,8 @@ ErrorCode NCHelperEuler::init_mesh_vals()
                 if( lDims[1] == gDims[1] )
                 {
                     std::vector< double > gwVals( lDims[4] );
-                    rval = read_coordinate( gwName.c_str(), 0, lDims[4] - 1, gwVals );MB_CHK_SET_ERR( rval, "Trouble reading 'gw' variable" );
+                    MB_CHK_SET_ERR( read_coordinate( gwName.c_str(), 0, lDims[4] - 1, gwVals ),
+                                    "Trouble reading 'gw' variable" );
                     // Copy the correct piece
                     jlVals[0] = -( M_PI / 2 ) * 180 / M_PI;
                     gwSum     = -1;
@@ -276,7 +278,8 @@ ErrorCode NCHelperEuler::init_mesh_vals()
                 else if( lDims[4] == gDims[4] )
                 {
                     std::vector< double > gwVals( lDims[4] - 1 );
-                    rval = read_coordinate( gwName.c_str(), 0, lDims[4] - 2, gwVals );MB_CHK_SET_ERR( rval, "Trouble reading 'gw' variable" );
+                    MB_CHK_SET_ERR( read_coordinate( gwName.c_str(), 0, lDims[4] - 2, gwVals ),
+                                    "Trouble reading 'gw' variable" );
                     // Copy the correct piece
                     gwSum = -1;
                     for( int j = 0; j != lDims[1] - 1; j++ )
@@ -295,7 +298,8 @@ ErrorCode NCHelperEuler::init_mesh_vals()
                     int start = lDims[1] - 1;
                     int end   = lDims[4] - 1;
                     std::vector< double > gwVals( end );
-                    rval = read_coordinate( gwName.c_str(), 0, end - 1, gwVals );MB_CHK_SET_ERR( rval, "Trouble reading 'gw' variable" );
+                    MB_CHK_SET_ERR( read_coordinate( gwName.c_str(), 0, end - 1, gwVals ),
+                                    "Trouble reading 'gw' variable" );
                     gwSum = -1;
                     for( int j = 0; j != start - 1; j++ )
                         gwSum += gwVals[j];
@@ -319,11 +323,11 @@ ErrorCode NCHelperEuler::init_mesh_vals()
     {
         if( ( vmit = varInfo.find( "time" ) ) != varInfo.end() && ( *vmit ).second.varDims.size() == 1 )
         {
-            rval = read_coordinate( "time", 0, nTimeSteps - 1, tVals );MB_CHK_SET_ERR( rval, "Trouble reading 'time' variable" );
+            MB_CHK_SET_ERR( read_coordinate( "time", 0, nTimeSteps - 1, tVals ), "Trouble reading 'time' variable" );
         }
         else if( ( vmit = varInfo.find( "t" ) ) != varInfo.end() && ( *vmit ).second.varDims.size() == 1 )
         {
-            rval = read_coordinate( "t", 0, nTimeSteps - 1, tVals );MB_CHK_SET_ERR( rval, "Trouble reading 't' variable" );
+            MB_CHK_SET_ERR( read_coordinate( "t", 0, nTimeSteps - 1, tVals ), "Trouble reading 't' variable" );
         }
         else
         {
@@ -392,9 +396,12 @@ ErrorCode NCHelperEuler::init_mesh_vals()
         std::stringstream ss_tag_name;
         ss_tag_name << ijdimNames[i] << "_LOC_MINMAX";
         tag_name = ss_tag_name.str();
-        rval     = mbImpl->tag_get_handle( tag_name.c_str(), 2, MB_TYPE_INTEGER, tagh, MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_SET_ERR( rval, "Trouble creating conventional tag " << tag_name );
-        rval = mbImpl->tag_set_data( tagh, &_fileSet, 1, &val[0] );MB_CHK_SET_ERR( rval, "Trouble setting data to conventional tag " << tag_name );
-        if( MB_SUCCESS == rval ) dbgOut.tprintf( 2, "Conventional tag %s is created.\n", tag_name.c_str() );
+        MB_CHK_SET_ERR( mbImpl->tag_get_handle( tag_name.c_str(), 2, MB_TYPE_INTEGER, tagh,
+                                                MB_TAG_SPARSE | MB_TAG_CREAT ),
+                        "Trouble creating conventional tag " << tag_name );
+        MB_CHK_SET_ERR( mbImpl->tag_set_data( tagh, &_fileSet, 1, &val[0] ),
+                        "Trouble setting data to conventional tag " << tag_name );
+        dbgOut.tprintf( 2, "Conventional tag %s is created.\n", tag_name.c_str() );
     }
 
     // __<dim_name>_LOC_VALS (for virtual slon, virtual slat, lon and lat)
@@ -436,10 +443,12 @@ ErrorCode NCHelperEuler::init_mesh_vals()
         std::stringstream ss_tag_name;
         ss_tag_name << ijdimNames[i] << "_LOC_VALS";
         tag_name = ss_tag_name.str();
-        rval     = mbImpl->tag_get_handle( tag_name.c_str(), 0, MB_TYPE_DOUBLE, tagh,
-                                           MB_TAG_CREAT | MB_TAG_SPARSE | MB_TAG_VARLEN );MB_CHK_SET_ERR( rval, "Trouble creating conventional tag " << tag_name );
-        rval = mbImpl->tag_set_by_ptr( tagh, &_fileSet, 1, &val, &val_len );MB_CHK_SET_ERR( rval, "Trouble setting data to conventional tag " << tag_name );
-        if( MB_SUCCESS == rval ) dbgOut.tprintf( 2, "Conventional tag %s is created.\n", tag_name.c_str() );
+        MB_CHK_SET_ERR( mbImpl->tag_get_handle( tag_name.c_str(), 0, MB_TYPE_DOUBLE, tagh,
+                                                MB_TAG_CREAT | MB_TAG_SPARSE | MB_TAG_VARLEN ),
+                        "Trouble creating conventional tag " << tag_name );
+        MB_CHK_SET_ERR( mbImpl->tag_set_by_ptr( tagh, &_fileSet, 1, &val, &val_len ),
+                        "Trouble setting data to conventional tag " << tag_name );
+        dbgOut.tprintf( 2, "Conventional tag %s is created.\n", tag_name.c_str() );
     }
 
     // __<dim_name>_GLOBAL_MINMAX (for virtual slon, virtual slat, lon and lat)
@@ -469,14 +478,17 @@ ErrorCode NCHelperEuler::init_mesh_vals()
         std::stringstream ss_tag_name;
         ss_tag_name << ijdimNames[i] << "_GLOBAL_MINMAX";
         tag_name = ss_tag_name.str();
-        rval     = mbImpl->tag_get_handle( tag_name.c_str(), 2, MB_TYPE_INTEGER, tagh, MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_SET_ERR( rval, "Trouble creating conventional tag " << tag_name );
-        rval = mbImpl->tag_set_data( tagh, &_fileSet, 1, &val[0] );MB_CHK_SET_ERR( rval, "Trouble setting data to conventional tag " << tag_name );
-        if( MB_SUCCESS == rval ) dbgOut.tprintf( 2, "Conventional tag %s is created.\n", tag_name.c_str() );
+        MB_CHK_SET_ERR( mbImpl->tag_get_handle( tag_name.c_str(), 2, MB_TYPE_INTEGER, tagh,
+                                                MB_TAG_SPARSE | MB_TAG_CREAT ),
+                        "Trouble creating conventional tag " << tag_name );
+        MB_CHK_SET_ERR( mbImpl->tag_set_data( tagh, &_fileSet, 1, &val[0] ),
+                        "Trouble setting data to conventional tag " << tag_name );
+        dbgOut.tprintf( 2, "Conventional tag %s is created.\n", tag_name.c_str() );
     }
 
     // Hack: create dummy variables, if needed, for dimensions with no corresponding coordinate
     // variables
-    rval = create_dummy_variables();MB_CHK_SET_ERR( rval, "Failed to create dummy variables" );
+    MB_CHK_SET_ERR( create_dummy_variables(), "Failed to create dummy variables" );
 
     return MB_SUCCESS;
 }

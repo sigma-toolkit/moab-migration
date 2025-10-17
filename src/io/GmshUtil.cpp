@@ -78,10 +78,7 @@ const unsigned GmshUtil::numGmshElemType = sizeof( GmshUtil::gmshElemTypes ) / s
 
 // Define an array, indexed by EntityType and number of nodes,
 // containing the corresponding Gmsh element type.
-#define TWENTYEIGHT_ZEROS                                                                  \
-    {                                                                                      \
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 \
-    }
+#define TWENTYEIGHT_ZEROS { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 const int MAX_NODES                    = 28;
 const int mb_to_gmsh_type[][MAX_NODES] = {
     // 0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27

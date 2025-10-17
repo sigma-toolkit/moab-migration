@@ -725,13 +725,14 @@ ErrorCode IntxUtils::global_gnomonic_projection_general( Interface* mb,
     mb->tag_get_handle( "TargetParent", targetParentTag );
     mb->tag_get_handle( "SourceParent", sourceParentTag );
     bool intxMesh = false;
-    if( targetParentTag != NULL && sourceParentTag != NULL )
+    if( targetParentTag != nullptr && sourceParentTag != nullptr )
         intxMesh = true;  // interested in source and target parent tags then
     Range partSets;
     ErrorCode rval = mb->tag_get_handle( parTagName.c_str(), part_tag );
     if( MB_SUCCESS == rval && part_tag != 0 )
     {
-        rval = mb->get_entities_by_type_and_tag( inSet, MBENTITYSET, &part_tag, NULL, 1, partSets, Interface::UNION );MB_CHK_ERR( rval );
+        rval =
+            mb->get_entities_by_type_and_tag( inSet, MBENTITYSET, &part_tag, nullptr, 1, partSets, Interface::UNION );MB_CHK_ERR( rval );
     }
     rval = ScaleToRadius( mb, inSet, 1.0 );MB_CHK_ERR( rval );
     // Get all entities of dimension 2
@@ -797,7 +798,7 @@ ErrorCode IntxUtils::global_gnomonic_projection_general( Interface* mb,
     for( Range::iterator eit = inputRange.begin(); eit != inputRange.end(); ++eit )
     {
         EntityHandle eh          = *eit;
-        const EntityHandle* conn = NULL;
+        const EntityHandle* conn = nullptr;
         int num_nodes;
         rval = mb->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
         // build a new vertex array
@@ -849,19 +850,20 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
     mb->tag_get_handle( "TargetParent", targetParentTag );
     mb->tag_get_handle( "SourceParent", sourceParentTag );
     bool intxMesh = false;
-    if( targetParentTag != NULL && sourceParentTag != NULL )
+    if( targetParentTag != nullptr && sourceParentTag != nullptr )
         intxMesh = true;  // interested in source and target parent tags then
     Range partSets;
     ErrorCode rval = mb->tag_get_handle( parTagName.c_str(), part_tag );
     if( MB_SUCCESS == rval && part_tag != 0 )
     {
-        rval = mb->get_entities_by_type_and_tag( inSet, MBENTITYSET, &part_tag, NULL, 1, partSets, Interface::UNION );MB_CHK_ERR( rval );
+        MB_CHK_ERR(
+            mb->get_entities_by_type_and_tag( inSet, MBENTITYSET, &part_tag, nullptr, 1, partSets, Interface::UNION ) );
     }
-    rval = ScaleToRadius( mb, inSet, 1.0 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( ScaleToRadius( mb, inSet, 1.0 ) );
     // Get all entities of dimension 2
     Range inputRange;  // get
-    rval = mb->get_entities_by_dimension( inSet, 1, inputRange );MB_CHK_ERR( rval );
-    rval = mb->get_entities_by_dimension( inSet, 2, inputRange );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_dimension( inSet, 1, inputRange ) );
+    MB_CHK_ERR( mb->get_entities_by_dimension( inSet, 2, inputRange ) );
 
     std::map< EntityHandle, int > partsAssign;
     std::map< int, EntityHandle > newPartSets;
@@ -872,15 +874,15 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
         {
             EntityHandle pSet = *setIt;
             Range ents;
-            rval = mb->get_entities_by_handle( pSet, ents );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_entities_by_handle( pSet, ents ) );
             int val;
-            rval = mb->tag_get_data( part_tag, &pSet, 1, &val );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->tag_get_data( part_tag, &pSet, 1, &val ) );
             // create a new set with the same part id tag, in the outSet
             EntityHandle newPartSet;
-            rval = mb->create_meshset( MESHSET_SET, newPartSet );MB_CHK_ERR( rval );
-            rval = mb->tag_set_data( part_tag, &newPartSet, 1, &val );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->create_meshset( MESHSET_SET, newPartSet ) );
+            MB_CHK_ERR( mb->tag_set_data( part_tag, &newPartSet, 1, &val ) );
             newPartSets[val] = newPartSet;
-            rval             = mb->add_entities( outSet, &newPartSet, 1 );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->add_entities( outSet, &newPartSet, 1 ) );
             for( Range::iterator it = ents.begin(); it != ents.end(); ++it )
             {
                 partsAssign[*it] = val;
@@ -894,12 +896,13 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
         {
             CartVect center;
             EntityHandle cell = *it;
-            rval              = mb->get_coords( &cell, 1, center.array() );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_coords( &cell, 1, center.array() ) );
             int globalID = 0;
             if( !intxMesh )
             {
-                rval = mb->tag_get_data( gidTag, &cell, 1, &globalID );MB_CHK_SET_ERR( rval, "can't get id tag on cell" );
+                MB_CHK_SET_ERR( mb->tag_get_data( gidTag, &cell, 1, &globalID ), "can't get id tag on cell" );
             }
+
             int plane;
             decide_gnomonic_plane( center, plane );
             double c[3];
@@ -909,12 +912,13 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
             gnomonic_unroll( c[0], c[1], R, plane );
 
             EntityHandle vertex;
-            rval = mb->create_vertex( c, vertex );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->create_vertex( c, vertex ) );
+
             if( !intxMesh )
             {
-                rval = mb->tag_set_data( gidTag, &vertex, 1, &globalID );MB_CHK_SET_ERR( rval, "can't set id tag on center" );
+                MB_CHK_SET_ERR( mb->tag_set_data( gidTag, &vertex, 1, &globalID ), "can't set id tag on center" );
             }
-            rval = mb->add_entities( outSet, &vertex, 1 );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->add_entities( outSet, &vertex, 1 ) );
         }
     }
     else
@@ -925,7 +929,7 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
         {
             CartVect center;
             EntityHandle cell = *it;
-            rval              = mb->get_coords( &cell, 1, center.array() );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_coords( &cell, 1, center.array() ) );
             int plane;
             decide_gnomonic_plane( center, plane );
             subranges[plane - 1].insert( cell );  // includes edges if they exist
@@ -933,25 +937,26 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
         for( int i = 1; i <= 6; i++ )
         {
             Range verts;
-            rval = mb->get_connectivity( subranges[i - 1], verts );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_connectivity( subranges[i - 1], verts ) );
             std::map< EntityHandle, EntityHandle > corr;
             for( Range::iterator vt = verts.begin(); vt != verts.end(); ++vt )
             {
                 CartVect vect;
                 EntityHandle v = *vt;
-                rval           = mb->get_coords( &v, 1, vect.array() );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mb->get_coords( &v, 1, vect.array() ) );
                 double c[3];
                 c[2] = 0.;
                 gnomonic_projection( vect, R, i, c[0], c[1] );
                 gnomonic_unroll( c[0], c[1], R, i );
                 EntityHandle vertex;
-                rval = mb->create_vertex( c, vertex );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mb->create_vertex( c, vertex ) );
+
                 int vID;
                 if( !intxMesh )
                 {
-                    rval = mb->tag_get_data( gidTag, &v, 1, &vID );MB_CHK_SET_ERR( rval, "can't get id tag on vertex" );
+                    MB_CHK_SET_ERR( mb->tag_get_data( gidTag, &v, 1, &vID ), "can't get id tag on vertex" );
                     // new vertex will get old ID
-                    rval = mb->tag_set_data( gidTag, &vertex, 1, &vID );MB_CHK_SET_ERR( rval, "can't get id tag on vertex" );
+                    MB_CHK_SET_ERR( mb->tag_set_data( gidTag, &vertex, 1, &vID ), "can't get id tag on vertex" );
                 }
                 corr[v] = vertex;  // for new connectivity
             }
@@ -959,39 +964,47 @@ ErrorCode IntxUtils::global_gnomonic_projection( Interface* mb,
             for( Range::iterator eit = subranges[i - 1].begin(); eit != subranges[i - 1].end(); ++eit )
             {
                 EntityHandle eh          = *eit;
-                const EntityHandle* conn = NULL;
+                const EntityHandle* conn = nullptr;
                 int num_nodes;
-                rval = mb->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mb->get_connectivity( eh, conn, num_nodes ) );
+
                 // build a new vertex array
                 for( int j = 0; j < num_nodes; j++ )
                     new_conn[j] = corr[conn[j]];
+
                 EntityType type = mb->type_from_handle( eh );
                 EntityHandle newCell;
-                rval = mb->create_element( type, new_conn, num_nodes, newCell );MB_CHK_ERR( rval );
-                rval = mb->add_entities( outSet, &newCell, 1 );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mb->create_element( type, new_conn, num_nodes, newCell ) );
+                MB_CHK_ERR( mb->add_entities( outSet, &newCell, 1 ) );
+
                 int eID;
                 if( !intxMesh )
                 {
-                    rval = mb->tag_get_data( gidTag, &eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get id tag on entity handle" );
+                    MB_CHK_SET_ERR( mb->tag_get_data( gidTag, &eh, 1, &eID ), "can't get id tag on entity handle" );
                     // new vertex will get old ID
-                    rval = mb->tag_set_data( gidTag, &newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set id tag on new cell" );
+                    MB_CHK_SET_ERR( mb->tag_set_data( gidTag, &newCell, 1, &eID ), "can't set id tag on new cell" );
                 }
                 else
                 {
                     // look for parent tags if intx mesh targetParentTag  ,  sourceParentTag
                     if( type >= moab::MBPOLYGON )
                     {
-                        rval = mb->tag_get_data( targetParentTag, &eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get parent tag on entity handle" );
-                        rval = mb->tag_set_data( targetParentTag, &newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set parent tag on entity handle" );
-                        rval = mb->tag_get_data( sourceParentTag, &eh, 1, &eID );MB_CHK_SET_ERR( rval, "can't get parent tag on entity handle" );
-                        rval = mb->tag_set_data( sourceParentTag, &newCell, 1, &eID );MB_CHK_SET_ERR( rval, "can't set parent tag on entity handle" );
+                        MB_CHK_SET_ERR( mb->tag_get_data( targetParentTag, &eh, 1, &eID ),
+                                        "can't get parent tag on entity handle" );
+                        MB_CHK_SET_ERR( mb->tag_set_data( targetParentTag, &newCell, 1, &eID ),
+                                        "can't set parent tag on entity handle" );
+                        MB_CHK_SET_ERR( mb->tag_get_data( sourceParentTag, &eh, 1, &eID ),
+                                        "can't get parent tag on entity handle" );
+                        MB_CHK_SET_ERR( mb->tag_set_data( sourceParentTag, &newCell, 1, &eID ),
+                                        "can't set parent tag on entity handle" );
                     }
                 }
+
                 std::map< EntityHandle, int >::iterator mit = partsAssign.find( eh );
                 if( mit != partsAssign.end() )
                 {
                     int val = mit->second;
-                    rval    = mb->add_entities( newPartSets[val], &newCell, 1 );MB_CHK_ERR( rval );
+                    MB_CHK_ERR( mb->add_entities( newPartSets[val], &newCell, 1 ) );
                 }
             }
         }
@@ -1024,6 +1037,7 @@ void IntxUtils::transform_coordinates( double* avg_position, int projection_type
         IntxUtils::gnomonic_unroll( avg_position[0], avg_position[1], 1.0, gplane );
     }
 }
+
 /*
  *
  use physical_constants, only : dd_pi
@@ -1239,9 +1253,8 @@ double IntxAreaUtils::area_spherical_polygon_lHuiller( const double* A, int N, d
     {
         int i1              = i + 1;
         double areaTriangle = area_spherical_triangle_lHuiller( A, A + 3 * i, A + 3 * i1, Radius );
-        if( areaTriangle < 0 )
-            lsign = -1;  // signal that we have at least one triangle with negative orientation ;
-                         // possible nonconvex polygon
+        if( areaTriangle < 0 ) lsign = -1;  // signal that we have at least one triangle with negative orientation ;
+                                            // possible nonconvex polygon
         area += areaTriangle;
     }
     if( sign ) *sign = lsign;
@@ -1555,15 +1568,14 @@ double IntxUtils::distance_on_great_circle( CartVect& p1, CartVect& p2 )
 ErrorCode IntxUtils::enforce_convexity( Interface* mb, EntityHandle lset, int my_rank )
 {
     Range inputRange;
-    ErrorCode rval = mb->get_entities_by_dimension( lset, 2, inputRange );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_dimension( lset, 2, inputRange ) );
 
-    Tag corrTag       = 0;
+    Tag corrTag       = nullptr;
     EntityHandle dumH = 0;
-    rval              = mb->tag_get_handle( CORRTAGNAME, 1, MB_TYPE_HANDLE, corrTag, MB_TAG_DENSE, &dumH );
-    if( rval == MB_TAG_NOT_FOUND ) corrTag = 0;
+    // no need to check return error
+    mb->tag_get_handle( CORRTAGNAME, 1, MB_TYPE_HANDLE, corrTag, MB_TAG_DENSE, &dumH );
 
-    Tag gidTag;
-    rval = mb->tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, gidTag, MB_TAG_DENSE );MB_CHK_ERR( rval );
+    Tag gidTag = mb->globalId_tag();
 
     std::vector< double > coords;
     coords.resize( 3 * MAXEDGES );  // at most 10 vertices per polygon
@@ -1588,7 +1600,7 @@ ErrorCode IntxUtils::enforce_convexity( Interface* mb, EntityHandle lset, int my
         // get the nodes, then the coordinates
         const EntityHandle* verts;
         int num_nodes;
-        rval = mb->get_connectivity( eh, verts, num_nodes );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->get_connectivity( eh, verts, num_nodes ) );
         int nsides = num_nodes;
         // account for possible padded polygons
         while( verts[nsides - 2] == verts[nsides - 1] && nsides > 3 )
@@ -1596,14 +1608,14 @@ ErrorCode IntxUtils::enforce_convexity( Interface* mb, EntityHandle lset, int my
         EntityHandle corrHandle = 0;
         if( corrTag )
         {
-            rval = mb->tag_get_data( corrTag, &eh, 1, &corrHandle );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->tag_get_data( corrTag, &eh, 1, &corrHandle ) );
         }
         int gid = 0;
-        rval    = mb->tag_get_data( gidTag, &eh, 1, &gid );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->tag_get_data( gidTag, &eh, 1, &gid ) );
         coords.resize( 3 * nsides );
         if( nsides < 4 ) continue;  // if already triangles, don't bother
         // get coordinates
-        rval = mb->get_coords( verts, nsides, &coords[0] );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->get_coords( verts, nsides, &coords[0] ) );
         // compute each angle
         bool alreadyBroken = false;
 
@@ -1645,33 +1657,33 @@ ErrorCode IntxUtils::enforce_convexity( Interface* mb, EntityHandle lset, int my
                     conn[j - 1] = verts[( i + j + 2 ) % nsides];
                 }
                 EntityHandle newElement;
-                rval = mb->create_element( MBTRI, conn3, 3, newElement );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mb->create_element( MBTRI, conn3, 3, newElement ) );
 
-                rval = mb->add_entities( lset, &newElement, 1 );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mb->add_entities( lset, &newElement, 1 ) );
                 if( corrTag )
                 {
-                    rval = mb->tag_set_data( corrTag, &newElement, 1, &corrHandle );MB_CHK_ERR( rval );
+                    MB_CHK_ERR( mb->tag_set_data( corrTag, &newElement, 1, &corrHandle ) );
                 }
-                rval = mb->tag_set_data( gidTag, &newElement, 1, &gid );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mb->tag_set_data( gidTag, &newElement, 1, &gid ) );
                 if( nsides == 4 )
                 {
                     // create another triangle
-                    rval = mb->create_element( MBTRI, &conn[0], 3, newElement );MB_CHK_ERR( rval );
+                    MB_CHK_ERR( mb->create_element( MBTRI, &conn[0], 3, newElement ) );
                 }
                 else
                 {
                     // create another polygon, and add it to the inputRange
-                    rval = mb->create_element( MBPOLYGON, &conn[0], nsides - 1, newElement );MB_CHK_ERR( rval );
+                    MB_CHK_ERR( mb->create_element( MBPOLYGON, &conn[0], nsides - 1, newElement ) );
                     newPolys.push( newElement );  // because it has less number of edges, the
                     // reverse should work to find it.
                 }
-                rval = mb->add_entities( lset, &newElement, 1 );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mb->add_entities( lset, &newElement, 1 ) );
                 if( corrTag )
                 {
-                    rval = mb->tag_set_data( corrTag, &newElement, 1, &corrHandle );MB_CHK_ERR( rval );
+                    MB_CHK_ERR( mb->tag_set_data( corrTag, &newElement, 1, &corrHandle ) );
                 }
-                rval = mb->tag_set_data( gidTag, &newElement, 1, &gid );MB_CHK_ERR( rval );
-                rval = mb->remove_entities( lset, &eh, 1 );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mb->tag_set_data( gidTag, &newElement, 1, &gid ) );
+                MB_CHK_ERR( mb->remove_entities( lset, &eh, 1 ) );
                 brokenPolys++;
                 alreadyBroken = true;  // get out of the loop, element is broken
             }
@@ -1684,7 +1696,7 @@ ErrorCode IntxUtils::enforce_convexity( Interface* mb, EntityHandle lset, int my
 #ifdef VERBOSE
         std::stringstream fff;
         fff << "file_set" << mb->id_from_handle( lset ) << "rk_" << my_rank << ".h5m";
-        rval = mb->write_file( fff.str().c_str(), 0, 0, &lset, 1 );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->write_file( fff.str().c_str(), 0, 0, &lset, 1 ) );
         std::cout << "wrote new file set: " << fff.str() << "\n";
 #endif
     }
@@ -1696,15 +1708,15 @@ ErrorCode IntxUtils::enforce_convexity( Interface* mb, EntityHandle lset, int my
 ErrorCode IntxUtils::fix_degenerate_quads( Interface* mb, EntityHandle set )
 {
     Range quads;
-    ErrorCode rval = mb->get_entities_by_type( set, MBQUAD, quads );MB_CHK_ERR( rval );
-    Tag gid;
-    gid = mb->globalId_tag();
+    MB_CHK_ERR( mb->get_entities_by_type( set, MBQUAD, quads ) );
+
+    Tag gid = mb->globalId_tag();
     for( Range::iterator qit = quads.begin(); qit != quads.end(); ++qit )
     {
         EntityHandle quad         = *qit;
-        const EntityHandle* conn4 = NULL;
+        const EntityHandle* conn4 = nullptr;
         int num_nodes             = 0;
-        rval                      = mb->get_connectivity( quad, conn4, num_nodes );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->get_connectivity( quad, conn4, num_nodes ) );
         for( int i = 0; i < num_nodes; i++ )
         {
             int next_node_index = ( i + 1 ) % num_nodes;
@@ -1713,16 +1725,16 @@ ErrorCode IntxUtils::fix_degenerate_quads( Interface* mb, EntityHandle set )
                 // form a triangle and delete the quad
                 // first get the global id, to set it on triangle later
                 int global_id = 0;
-                rval          = mb->tag_get_data( gid, &quad, 1, &global_id );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mb->tag_get_data( gid, &quad, 1, &global_id ) );
                 int i2                = ( i + 2 ) % num_nodes;
                 int i3                = ( i + 3 ) % num_nodes;
                 EntityHandle conn3[3] = { conn4[i], conn4[i2], conn4[i3] };
                 EntityHandle tri;
-                rval = mb->create_element( MBTRI, conn3, 3, tri );MB_CHK_ERR( rval );
-                mb->add_entities( set, &tri, 1 );
-                mb->remove_entities( set, &quad, 1 );
-                mb->delete_entities( &quad, 1 );
-                rval = mb->tag_set_data( gid, &tri, 1, &global_id );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mb->create_element( MBTRI, conn3, 3, tri ) );
+                MB_CHK_ERR( mb->add_entities( set, &tri, 1 ) );
+                MB_CHK_ERR( mb->remove_entities( set, &quad, 1 ) );
+                MB_CHK_ERR( mb->delete_entities( &quad, 1 ) );
+                MB_CHK_ERR( mb->tag_set_data( gid, &tri, 1, &global_id ) );
             }
         }
     }
@@ -1732,17 +1744,17 @@ ErrorCode IntxUtils::fix_degenerate_quads( Interface* mb, EntityHandle set )
 ErrorCode IntxAreaUtils::positive_orientation( Interface* mb, EntityHandle set, double R )
 {
     Range cells2d;
-    ErrorCode rval = mb->get_entities_by_dimension( set, 2, cells2d );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_dimension( set, 2, cells2d ) );
     for( Range::iterator qit = cells2d.begin(); qit != cells2d.end(); ++qit )
     {
         EntityHandle cell        = *qit;
-        const EntityHandle* conn = NULL;
+        const EntityHandle* conn = nullptr;
         int num_nodes            = 0;
-        rval                     = mb->get_connectivity( cell, conn, num_nodes );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->get_connectivity( cell, conn, num_nodes ) );
         if( num_nodes < 3 ) return MB_FAILURE;
 
         double coords[9];
-        rval = mb->get_coords( conn, 3, coords );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->get_coords( conn, 3, coords ) );
 
         double area;
         if( R > 0 )
@@ -1754,7 +1766,7 @@ ErrorCode IntxAreaUtils::positive_orientation( Interface* mb, EntityHandle set, 
             // compute all area, do not revert if total area is positive
             std::vector< double > coords2( 3 * num_nodes );
             // get coordinates
-            rval = mb->get_coords( conn, num_nodes, &coords2[0] );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_coords( conn, num_nodes, &coords2[0] ) );
             double totArea = area_spherical_polygon_lHuiller( &coords2[0], num_nodes, R );
             if( totArea < 0 )
             {
@@ -1763,7 +1775,7 @@ ErrorCode IntxAreaUtils::positive_orientation( Interface* mb, EntityHandle set, 
                 {
                     newconn[num_nodes - 1 - i] = conn[i];
                 }
-                rval = mb->set_connectivity( cell, &newconn[0], num_nodes );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mb->set_connectivity( cell, &newconn[0], num_nodes ) );
             }
             else
             {
@@ -2243,39 +2255,39 @@ int IntxUtils::borderPointsOfCSinRLL( CartVect* redc,
 ErrorCode IntxUtils::deep_copy_set_with_quads( Interface* mb, EntityHandle source_set, EntityHandle dest_set )
 {
     ReadUtilIface* read_iface;
-    ErrorCode rval = mb->query_interface( read_iface );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->query_interface( read_iface ) );
     // create the handle tag for the corresponding element / vertex
 
     EntityHandle dum = 0;
     Tag corrTag      = 0;  // it will be created here
-    rval             = mb->tag_get_handle( CORRTAGNAME, 1, MB_TYPE_HANDLE, corrTag, MB_TAG_DENSE | MB_TAG_CREAT, &dum );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->tag_get_handle( CORRTAGNAME, 1, MB_TYPE_HANDLE, corrTag, MB_TAG_DENSE | MB_TAG_CREAT, &dum ) );
 
     // give the same global id to new verts and cells created in the lagr(departure) mesh
     Tag gid = mb->globalId_tag();
 
     Range quads;
-    rval = mb->get_entities_by_type( source_set, MBQUAD, quads );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type( source_set, MBQUAD, quads ) );
 
     Range connecVerts;
-    rval = mb->get_connectivity( quads, connecVerts );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_connectivity( quads, connecVerts ) );
 
     std::map< EntityHandle, EntityHandle > newNodes;
 
     std::vector< double* > coords;
     EntityHandle start_vert, start_elem, *connect;
     int num_verts = connecVerts.size();
-    rval          = read_iface->get_node_coords( 3, num_verts, 0, start_vert, coords );
-    if( MB_SUCCESS != rval ) return rval;
+    MB_CHK_ERR( read_iface->get_node_coords( 3, num_verts, 0, start_vert, coords ) );
+
     // fill it up
     int i = 0;
     for( Range::iterator vit = connecVerts.begin(); vit != connecVerts.end(); ++vit, i++ )
     {
         EntityHandle oldV = *vit;
         CartVect posi;
-        rval = mb->get_coords( &oldV, 1, &( posi[0] ) );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->get_coords( &oldV, 1, &( posi[0] ) ) );
 
         int global_id;
-        rval = mb->tag_get_data( gid, &oldV, 1, &global_id );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->tag_get_data( gid, &oldV, 1, &global_id ) );
         EntityHandle new_vert = start_vert + i;
         // Cppcheck warning (false positive): variable coords is assigned a value that is never used
         coords[0][i] = posi[0];
@@ -2284,28 +2296,28 @@ ErrorCode IntxUtils::deep_copy_set_with_quads( Interface* mb, EntityHandle sourc
 
         newNodes[oldV] = new_vert;
         // set also the correspondent tag :)
-        rval = mb->tag_set_data( corrTag, &oldV, 1, &new_vert );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->tag_set_data( corrTag, &oldV, 1, &new_vert ) );
 
         // also the other side
         // need to check if we really need this; the new vertex will never need the old vertex
         // we have the global id which is the same
-        rval = mb->tag_set_data( corrTag, &new_vert, 1, &oldV );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->tag_set_data( corrTag, &new_vert, 1, &oldV ) );
         // set the global id on the corresponding vertex the same as the initial vertex
-        rval = mb->tag_set_data( gid, &new_vert, 1, &global_id );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->tag_set_data( gid, &new_vert, 1, &global_id ) );
     }
     // now create new quads in order (in a sequence)
 
-    rval = read_iface->get_element_connect( quads.size(), 4, MBQUAD, 0, start_elem, connect );
-    if( MB_SUCCESS != rval ) return rval;
+    MB_CHK_ERR( read_iface->get_element_connect( quads.size(), 4, MBQUAD, 0, start_elem, connect ) );
+
     int ie = 0;
     for( Range::iterator it = quads.begin(); it != quads.end(); ++it, ie++ )
     {
         EntityHandle q = *it;
         int nnodes;
         const EntityHandle* conn;
-        rval = mb->get_connectivity( q, conn, nnodes );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->get_connectivity( q, conn, nnodes ) );
         int global_id;
-        rval = mb->tag_get_data( gid, &q, 1, &global_id );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->tag_get_data( gid, &q, 1, &global_id ) );
 
         for( int ii = 0; ii < nnodes; ii++ )
         {
@@ -2315,16 +2327,16 @@ ErrorCode IntxUtils::deep_copy_set_with_quads( Interface* mb, EntityHandle sourc
         EntityHandle newElement = start_elem + ie;
 
         // set the corresponding tag; not sure we need this one, from old to new
-        rval = mb->tag_set_data( corrTag, &q, 1, &newElement );MB_CHK_ERR( rval );
-        rval = mb->tag_set_data( corrTag, &newElement, 1, &q );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->tag_set_data( corrTag, &q, 1, &newElement ) );
+        MB_CHK_ERR( mb->tag_set_data( corrTag, &newElement, 1, &q ) );
 
         // set the global id
-        rval = mb->tag_set_data( gid, &newElement, 1, &global_id );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->tag_set_data( gid, &newElement, 1, &global_id ) );
 
-        rval = mb->add_entities( dest_set, &newElement, 1 );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->add_entities( dest_set, &newElement, 1 ) );
     }
 
-    rval = read_iface->update_adjacencies( start_elem, quads.size(), 4, connect );MB_CHK_ERR( rval );
+    MB_CHK_ERR( read_iface->update_adjacencies( start_elem, quads.size(), 4, connect ) );
 
     return MB_SUCCESS;
 }
@@ -2335,17 +2347,17 @@ ErrorCode IntxUtils::remove_duplicate_vertices( Interface* mb,
                                                 std::vector< Tag >& tagList )
 {
     Range verts;
-    ErrorCode rval = mb->get_entities_by_dimension( file_set, 0, verts );MB_CHK_ERR( rval );
-    rval = mb->remove_entities( file_set, verts );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_dimension( file_set, 0, verts ) );
+    MB_CHK_ERR( mb->remove_entities( file_set, verts ) );
 
     MergeMesh mm( mb );
 
     // remove the vertices from the set, before merging
 
-    rval = mm.merge_all( file_set, merge_tol );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mm.merge_all( file_set, merge_tol ) );
 
     // now correct vertices that are repeated in polygons
-    rval = remove_padded_vertices( mb, file_set, tagList );
+    MB_CHK_ERR( remove_padded_vertices( mb, file_set, tagList ) );
     return MB_SUCCESS;
 }
 
@@ -2354,10 +2366,10 @@ ErrorCode IntxUtils::remove_padded_vertices( Interface* mb, EntityHandle file_se
 
     // now correct vertices that are repeated in polygons
     Range cells;
-    ErrorCode rval = mb->get_entities_by_dimension( file_set, 2, cells );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_dimension( file_set, 2, cells ) );
 
     Range verts;
-    rval = mb->get_connectivity( cells, verts );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_connectivity( cells, verts ) );
 
     Range modifiedCells;  // will be deleted at the end; keep the gid
     Range newCells;
@@ -2365,9 +2377,9 @@ ErrorCode IntxUtils::remove_padded_vertices( Interface* mb, EntityHandle file_se
     for( Range::iterator cit = cells.begin(); cit != cells.end(); ++cit )
     {
         EntityHandle cell          = *cit;
-        const EntityHandle* connec = NULL;
+        const EntityHandle* connec = nullptr;
         int num_verts              = 0;
-        rval                       = mb->get_connectivity( cell, connec, num_verts );MB_CHK_SET_ERR( rval, "Failed to get connectivity" );
+        MB_CHK_SET_ERR( mb->get_connectivity( cell, connec, num_verts ), "Failed to get connectivity" );
 
         std::vector< EntityHandle > newConnec;
         newConnec.push_back( connec[0] );  // at least one vertex
@@ -2404,22 +2416,24 @@ ErrorCode IntxUtils::remove_padded_vertices( Interface* mb, EntityHandle file_se
 
             // create new cell
             EntityHandle newCell;
-            rval = mb->create_element( type, &newConnec[0], new_size, newCell );MB_CHK_SET_ERR( rval, "Failed to create new cell" );
+            MB_CHK_SET_ERR( mb->create_element( type, &newConnec[0], new_size, newCell ), "Failed to create new cell" );
             // set the old id to the new element
             newCells.insert( newCell );
             double value;  // use the same value to reset the tags, even if the tags are int (like Global ID)
             for( size_t i = 0; i < tagList.size(); i++ )
             {
-                rval = mb->tag_get_data( tagList[i], &cell, 1, (void*)( &value ) );MB_CHK_SET_ERR( rval, "Failed to get tag value" );
-                rval = mb->tag_set_data( tagList[i], &newCell, 1, (void*)( &value ) );MB_CHK_SET_ERR( rval, "Failed to set tag value on new cell" );
+                MB_CHK_SET_ERR( mb->tag_get_data( tagList[i], &cell, 1, (void*)( &value ) ),
+                                "Failed to get tag value" );
+                MB_CHK_SET_ERR( mb->tag_set_data( tagList[i], &newCell, 1, (void*)( &value ) ),
+                                "Failed to set tag value on new cell" );
             }
         }
     }
 
-    rval = mb->remove_entities( file_set, modifiedCells );MB_CHK_SET_ERR( rval, "Failed to remove old cells from file set" );
-    rval = mb->delete_entities( modifiedCells );MB_CHK_SET_ERR( rval, "Failed to delete old cells" );
-    rval = mb->add_entities( file_set, newCells );MB_CHK_SET_ERR( rval, "Failed to add new cells to file set" );
-    rval = mb->add_entities( file_set, verts );MB_CHK_SET_ERR( rval, "Failed to add verts to the file set" );
+    MB_CHK_SET_ERR( mb->remove_entities( file_set, modifiedCells ), "Failed to remove old cells from file set" );
+    MB_CHK_SET_ERR( mb->delete_entities( modifiedCells ), "Failed to delete old cells" );
+    MB_CHK_SET_ERR( mb->add_entities( file_set, newCells ), "Failed to add new cells to file set" );
+    MB_CHK_SET_ERR( mb->add_entities( file_set, verts ), "Failed to add verts to the file set" );
 
     return MB_SUCCESS;
 }
@@ -2432,7 +2446,7 @@ ErrorCode IntxUtils::max_diagonal( Interface* mb, Range cells, int max_edges, do
     {
         // get the connectivity, then the coordinates
         EntityHandle cell          = *it;
-        const EntityHandle* connec = NULL;
+        const EntityHandle* connec = nullptr;
         int num_verts              = 0;
         MB_CHK_SET_ERR( mb->get_connectivity( cell, connec, num_verts ), "Failed to get connectivity" );
         MB_CHK_SET_ERR( mb->get_coords( connec, num_verts, &( coords[0][0] ) ), "Failed to get coordinates" );

@@ -39,16 +39,16 @@ int main( int argc, char* argv[] )
     if( rank >= 2 )
     {
         Range verts;
-        rval = mb->get_entities_by_type( 0, MBVERTEX, verts );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->get_entities_by_type( 0, MBVERTEX, verts ) );
         int num_verts = (int)verts.size();
         std::vector< double > coords;
         coords.resize( num_verts * 3 );
-        rval = mb->get_coords( verts, &coords[0] );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->get_coords( verts, &coords[0] ) );
         int steps          = rank / 2;
         double z_translate = steps * 10.;  // the 2 bricks are size 10
         for( int i = 0; i < num_verts; i++ )
             coords[3 * i + 2] += z_translate;
-        rval = mb->set_coords( verts, &coords[0] );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->set_coords( verts, &coords[0] ) );
     }
 
     ParallelMergeMesh pm( pc, 0.001 );
@@ -90,10 +90,10 @@ int main( int argc, char* argv[] )
         }
     }
     Range verts, verts_owned;
-    rval = mb->get_entities_by_type( 0, MBVERTEX, verts );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type( 0, MBVERTEX, verts ) );
 
     // Get local owned vertices
-    rval = pc->filter_pstatus( verts, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &verts_owned );MB_CHK_ERR( rval );
+    MB_CHK_ERR( pc->filter_pstatus( verts, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &verts_owned ) );
     int num_owned_verts = (int)verts_owned.size();
 
     int num_total_verts = 0;
@@ -118,7 +118,7 @@ int main( int argc, char* argv[] )
         }
     }
 
-    rval = mb->write_file( "testpm.h5m", 0, "PARALLEL=WRITE_PART" );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->write_file( "testpm.h5m", 0, "PARALLEL=WRITE_PART" ) );
     if( rval != MB_SUCCESS )
     {
         std::cout << "fail to write output file \n";

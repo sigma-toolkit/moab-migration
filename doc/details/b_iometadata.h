@@ -4,7 +4,7 @@
 
   \section meta-introduction  Introduction
 
-The Mesh-Oriented datABase (MOAB) is a library for representing finite element and other types of mesh data [1].  Various types of meta-data are often used in conjunction with a mesh.  Examples include boundary condition groupings, material types, and provenance information for the mesh.  Because the data model used in MOAB is so abstract, conventions are useful for describing how meta-data is stored into that data model.  This document describes those conventions for several types of data commonly found in meshes stored in MOAB.  Because the data models used by MOAB and iMesh, the ITAPS mesh interface [2], are so similar, the conventions described here apply almost unmodified to iMesh as well as to MOAB.
+The Mesh-Oriented datABase (MOAB) is a library for representing finite element and other types of mesh data [1].  Various types of meta-data are often used in conjunction with a mesh.  Examples include boundary condition groupings, material types, and provenance information for the mesh.  Because the data model used in MOAB is so abstract, conventions are useful for describing how meta-data is stored into that data model.  This document describes those conventions for several types of data commonly found in meshes stored in MOAB.  Because the data models used by MOAB and iMOAB, the lightweight interface to MOAB, are so similar, the conventions described here apply almost unmodified to iMOAB as well as to MOAB.
 
 The meshes represented in MOAB originate in a variety of forms, including mesh read from files of various formats (e.g. CUBIT “.cub” file, VTK, etc.) as well as mesh written into MOAB directly by various software libraries (e.g. MeshKit).  Although there is no standard for naming or storing meta-data with a mesh, there is a great deal of commonality in the types of meta-data typically found with mesh data.  This document describes conventions that have been established for commonly encountered meta-data.  Various mesh readers implemented in MOAB attempt to read meta-data from a file and write it into the MOAB data model using these conventions.  Although there is no requirement to store a given type of meta-data in the form described here, a number of services have been written to handle meta-data using these conventions, no matter the source of the meta-data being processed.
 
@@ -146,7 +146,7 @@ The Spectral Element Method (SEM) is a high-order method, using a polynomial Leg
 
 - TAG_SPECTRAL_VERTICES: read option; if given, spectral variables are represented as tags on vertices
 
-- CONN=<filename>: in CAM-SE, the connectivity of the spectral mesh is stored by default in a file named “HommeMapping.nc”; this option can be given to read the connectivity from a different file
+- CONN=\c filename: in CAM-SE, the connectivity of the spectral mesh is stored by default in a file named “HommeMapping.nc”; this option can be given to read the connectivity from a different file
 
 - SPECTRAL_VERTICES: tag name for array of vertex handles
 
@@ -269,7 +269,7 @@ GEOM_SENSE_N_SENSES/I*N</td>
 <td>Data marking spectral mesh constructs</td>
 </tr>
 </table>
- 
+
   \ref meta-introduction "Back to Introduction"
 
   \subsection table2 Table 2: Summary of MOAB conventional tag names, types, and purposes.  Data types are I=integer, D=double, C=character, H=entity handle,O=opaque.  Data type with *x denote length of x elements of that data type.
@@ -514,7 +514,7 @@ Notes:
 1. If no name is present, labels the material group with “MaterialX”, where X is the index of that group.
 
 
-  \section appendixC Appendix C: ExodusII Reader/Writer Conventions 
+  \section appendixC Appendix C: ExodusII Reader/Writer Conventions
 
   \subsection table4 Table 4: Translation between ExodusII constructs and MOAB tags.
 <Table border="1">
@@ -619,7 +619,7 @@ centered variables correctly.
 <td>The number of dimensions in the netcdf file.</td>
 </tr>
 <tr>
-<td>__NUM_VARS</td> 
+<td>__NUM_VARS</td>
 <td>I</td>
 <td>S</td>
 <td>The number of variables in the netcdf file.</td>
@@ -650,7 +650,7 @@ character string, with '\0' terminating each name.
 </td>
 </tr>
 <tr>
-<td><dim_name> 
+<td>\c dim_name
 </td>
 <td>(I or D)*var</td>
 <td>S</td>
@@ -660,7 +660,7 @@ netcdf file. The length of this tag is the number of
 values stored for the dimension in the netcdf file.</td>
 </tr>
 <tr>
-<td>__<dim_name>_LOC_MIN_MAX</td>
+<td>__\c dim_name_LOC_MIN_MAX</td>
 <td>(I or D)*2</td>
 <td>S</td>
 <td>The indices (0-based) of the local min and max
@@ -670,32 +670,32 @@ minimum and maximum indices in the local partition
 of the grid. For dimensions like time, where each
 processor represents the entire dimension, this will
 likely store 0 and the number of values for that
-dimension. Only one of __<dim_name>_LOC_VALS and
-__<dim_name>_LOC_MIN_MAX can be used for a given
+dimension. Only one of __\c dim_name_LOC_VALS and
+__\c dim_name_LOC_MIN_MAX can be used for a given
 dimension.</td>
 </tr>
 <tr>
-<td>__<dim_name>_LOC_VAL </td>
+<td>__\c dim_name_LOC_VAL </td>
 <td>(I or D)*var</td>
 <td>S</td>
 <td>The indices (0-based) of the dimension stored
 locally. This tag only makes sense for dimensions
 that can be read in multiple pieces, such as time.
-Only one of __<dim_name>_LOC_VALS and
-__<dim_name>_LOC_MIN_MAX can be used for a given
+Only one of __\c dim_name_LOC_VALS and
+__\c dim_name_LOC_MIN_MAX can be used for a given
 dimension.</td>
 </tr>
 <tr>
-<td>__<dim_name>_GLOBAL_MIN_MAX</td>
+<td>__\c dim_name_GLOBAL_MIN_MAX</td>
 <td>(I or D)*2</td>
 <td>S</td>
 <td>The indices (0-based) of the global min and max
 values of dimension.</td>
 </tr>
 <tr>
-<td>__<var_name>_DIMS 
+<td>__\c var_name_DIMS
 </td>
-<td>H*n 
+<td>H*n
 </td>
 <td>S</td>
 <td>For each variable, this tag stores the tag
@@ -705,18 +705,18 @@ The size of this tag is n * sizeof(TagHandle).
 </td>
 </tr>
 <tr>
-<td><var_name><timestep_ind> 
+<td>\c var_name\c timestep_ind
 </td>
 <td>(data type)</td>
 <td>E</td>
-<td>Values of the variable for timestep <timestep_ind>
+<td>Values of the variable for timestep \c timestep_ind
 for vertices. The data type of this tag corresponds
 to that of the variable from the netcdf file.
 Timestep index is 0-based.
 </td>
 </tr>
 <tr>
-<td>__GLOBAL_ATTRIBS 
+<td>__GLOBAL_ATTRIBS
 </td>
 <td>C*var
 </td>
@@ -728,7 +728,7 @@ string, with ‘\0’ terminating each attribute name, ‘;’
 </td>
 </tr>
 <tr>
-<td>__GLOBAL_ATTRIBS_LEN 
+<td>__GLOBAL_ATTRIBS_LEN
 </td>
 <td>I*var
 </td>
@@ -738,7 +738,7 @@ each attribute (name/data type/value) in __GLOBAL_ATTRIBS tag.
 </td>
 </tr>
 <tr>
-<td>__<var_name>_ATTRIBS 
+<td>__\c var_name_ATTRIBS
 </td>
 <td>C*var
 </td>
@@ -750,14 +750,14 @@ character string, with ‘\0’ terminating each attribute
 </td>
 </tr>
 <tr>
-<td>__<var_name>_ATTRIBS_LEN 
+<td>__\c var_name_ATTRIBS_LEN
 </td>
 <td>I*var
 </td>
 <td>S</td>
 <td>A vector of integers, marking the end position of
 each attribute (name/data type/value) in
-__<var_name>_ATTRIBS tags
+__\c var_name_ATTRIBS tags
 </td>
 </tr>
 </table>

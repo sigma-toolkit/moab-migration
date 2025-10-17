@@ -134,7 +134,7 @@ ErrorCode VertexSequence::set_coordinates( EntityHandle entity, double x, double
     return MB_SUCCESS;
 }
 
-ErrorCode VertexSequence::set_coordinates( EntityHandle entity, const double* xyz )
+ErrorCode VertexSequence::set_coordinates( EntityHandle entity, const double xyz[3] )
 {
     EntityID offset   = entity - data()->start_handle();
     x_array()[offset] = xyz[0];

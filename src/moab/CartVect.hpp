@@ -218,11 +218,11 @@ inline double angle_robust( CartVect u, CartVect v )
     u.normalize();
     v.normalize();
 
-    double tmp = ( u % v ) ;
-    if( tmp - 1.  >= - 1.e-12 )
+    double tmp = ( u % v );
+    if( tmp - 1. >= -1.e-12 )
     {
-        double dist = (u - v).length();
-        return dist; // approximate sin(x) with x for very small dist
+        double dist = ( u - v ).length();
+        return dist;  // approximate sin(x) with x for very small dist
     }
 
     if( tmp < -1. ) tmp = -1.;

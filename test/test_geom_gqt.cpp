@@ -233,7 +233,6 @@ ErrorCode overlap_write_geometry( const char* output_file_name )
 
 int main( int argc, char* argv[] )
 {
-    ErrorCode rval;
     const char* filename = "test_geom.h5m";
 
 #ifdef MOAB_HAVE_MPI
@@ -241,13 +240,13 @@ int main( int argc, char* argv[] )
     if( fail ) return fail;
 #endif
 
-    rval = write_geometry( filename );MB_CHK_SET_ERR( rval, "Failed to create input file: " << filename );
+    MB_CHK_SET_ERR( write_geometry( filename ), "Failed to create input file: " << filename );
 
     Interface* MBI = new Core();
 
     int errors = 0;
-    rval       = MBI->load_file( filename );
-    remove( filename );MB_CHK_SET_ERR( rval, "Failed to load file" );
+    MB_CHK_SET_ERR( MBI->load_file( filename ), "Failed to load file" );
+    remove( filename );
 
     GeomTopoTool* gtt  = new GeomTopoTool( MBI );
     GeomQueryTool* gqt = new GeomQueryTool( gtt );
@@ -255,16 +254,16 @@ int main( int argc, char* argv[] )
     errors += run_regular_tests( gqt );
 
     // clear out moab instance
-    rval = MBI->delete_mesh();MB_CHK_SET_ERR( rval, "Failed to delete mesh" );
+    MB_CHK_SET_ERR( MBI->delete_mesh(), "Failed to delete mesh" );
 
     delete gtt;
     delete gqt;
 
     // Now load a different geometry: two cubes that slightly overlap
-    rval = overlap_write_geometry( filename );MB_CHK_SET_ERR( rval, "Failed to create input file: " << filename );
+    MB_CHK_SET_ERR( overlap_write_geometry( filename ), "Failed to create input file: " << filename );
 
-    rval = MBI->load_file( filename );
-    remove( filename );MB_CHK_SET_ERR( rval, "Failed to load file with overlaps" );
+    MB_CHK_SET_ERR( MBI->load_file( filename ), "Failed to load file with overlaps" );
+    remove( filename );
 
     gtt = new GeomTopoTool( MBI );
     gqt = new GeomQueryTool( gtt );
@@ -272,7 +271,7 @@ int main( int argc, char* argv[] )
     errors += run_overlap_tests( gqt );
 
     // clear moab instance
-    rval = MBI->delete_mesh();MB_CHK_SET_ERR( rval, "Failed to delete mesh" );
+    MB_CHK_SET_ERR( MBI->delete_mesh(), "Failed to delete mesh" );
 
     delete gtt;
     delete gqt;
@@ -282,25 +281,25 @@ int main( int argc, char* argv[] )
     std::cout << "Re-running tests with MBI constructor" << std::endl;
     std::cout << "-------------------------------------" << std::endl;
 
-    rval = write_geometry( filename );MB_CHK_SET_ERR( rval, "Failed to create input file" );
+    MB_CHK_SET_ERR( write_geometry( filename ), "Failed to create input file" );
 
-    rval = MBI->load_file( filename );
-    remove( filename );MB_CHK_SET_ERR( rval, "Failed to load file" );
+    MB_CHK_SET_ERR( MBI->load_file( filename ), "Failed to load file" );
+    remove( filename );
 
     gqt = new GeomQueryTool( MBI );
 
     errors += run_regular_tests( gqt );
 
     // clear moab and dagmc instance
-    rval = MBI->delete_mesh();MB_CHK_SET_ERR( rval, "Failed to delete mesh" );
+    MB_CHK_SET_ERR( MBI->delete_mesh(), "Failed to delete mesh" );
 
     delete gqt;
 
     // Now load a different geometry: two cubes that slightly overlap
-    rval = overlap_write_geometry( filename );MB_CHK_SET_ERR( rval, "Failed to create input file: " );
+    MB_CHK_SET_ERR( overlap_write_geometry( filename ), "Failed to create input file: " );
 
-    rval = MBI->load_file( filename );
-    remove( filename );MB_CHK_SET_ERR( rval, "Failed to load file with overlaps." );
+    MB_CHK_SET_ERR( MBI->load_file( filename ), "Failed to load file with overlaps." );
+    remove( filename );
 
     gqt = new GeomQueryTool( MBI );
 

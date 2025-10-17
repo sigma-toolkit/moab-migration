@@ -90,7 +90,7 @@ class MOAB_EXPORT FileOptions
      * If the option is found but has no value specified, then
      * pass back the user-specified default value.
      *
-     *\NOTE:  This function will not pass back the default_val, but will instead
+     *\note:  This function will not pass back the default_val, but will instead
      *        return MB_ENTITY_NOT_FOUND if the option is not specified at all.
      *        The default value is returned only when the option is specified,
      *        but is specified w/out a value.

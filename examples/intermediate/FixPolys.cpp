@@ -1,8 +1,32 @@
-/** \brief This test shows how to fix polygons that have duplicated vertices
+/**
+ * @file FixPolys.cpp
+ * @brief Example demonstrating how to fix polygons with duplicated vertices
+ *
+ * This example shows how to:
+ * - Load a mesh file containing polygons
+ * - Identify polygons with duplicated vertices
+ * - Remove consecutive duplicate vertices from polygon connectivity
+ * - Create new polygons with cleaned connectivity
+ * - Preserve global ID tags during polygon reconstruction
+ * - Write the corrected mesh to a new file
+ *
+ * The program is useful for cleaning up meshes that have been created
+ * with padded vertices to reduce data sequences, but now need to be
+ * optimized by removing redundant vertex references.
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+
+ * \brief This test shows how to fix polygons that have duplicated vertices
  *
  * We sometimes use padded vertices option, to reduce the number of data sequences
  * We identify first the polygons that have padded vertices
  * then we set the new ones with reduced number of vertices, but with the same global id tag
+ *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 
 #include <iostream>
@@ -35,13 +59,13 @@ int main( int argc, char** argv )
     // Instantiate
     Core mb;
 
-    ErrorCode rval = mb.load_file( inputFile.c_str() );MB_CHK_SET_ERR( rval, "Error loading file" );
+    MB_CHK_SET_ERR( mb.load_file( inputFile.c_str() ), "Error loading file" );
 
     cout << " reading file " << inputFile << "\n";
 
     // Get all 2d elements in the file set
     Range elems;
-    rval = mb.get_entities_by_dimension( 0, 2, elems );MB_CHK_SET_ERR( rval, "Error getting 2d elements" );
+    MB_CHK_SET_ERR( mb.get_entities_by_dimension( 0, 2, elems ), "Error getting 2d elements" );
 
     cout << "number of cells: " << elems.size() << "\n";
 
@@ -52,7 +76,7 @@ int main( int argc, char** argv )
         EntityHandle cell = *it;
         const EntityHandle* conn;
         int number_nodes;
-        rval = mb.get_connectivity( cell, conn, number_nodes );MB_CHK_SET_ERR( rval, "Error getting connectivity" );
+        MB_CHK_SET_ERR( mb.get_connectivity( cell, conn, number_nodes ), "Error getting connectivity" );
         // now check if we have consecutive duplicated vertices, and if so, create a new cell
         std::vector< EntityHandle > new_verts;
         // push to it, if we do not have duplicates
@@ -76,10 +100,11 @@ int main( int argc, char** argv )
         {
             // create a new poly, and put this in a list to be removed
             int gid;
-            rval = mb.tag_get_data( gidTag, &cell, 1, &gid );MB_CHK_SET_ERR( rval, "Error getting global id tag" );
+            MB_CHK_SET_ERR( mb.tag_get_data( gidTag, &cell, 1, &gid ), "Error getting global id tag" );
             EntityHandle newCell;
-            rval = mb.create_element( MBPOLYGON, &new_verts[0], (int)new_verts.size(), newCell );MB_CHK_SET_ERR( rval, "Error creating new polygon " );
-            rval = mb.tag_set_data( gidTag, &newCell, 1, &gid );MB_CHK_SET_ERR( rval, "Error setting global id tag" );
+            MB_CHK_SET_ERR( mb.create_element( MBPOLYGON, &new_verts[0], (int)new_verts.size(), newCell ),
+                            "Error creating new polygon " );
+            MB_CHK_SET_ERR( mb.tag_set_data( gidTag, &newCell, 1, &gid ), "Error setting global id tag" );
             cout << "delete old cell " << cell << " with num_nodes vertices: " << number_nodes
                  << " and with global id: " << gid << "\n";
             for( int i = 0; i < number_nodes; i++ )
@@ -91,7 +116,7 @@ int main( int argc, char** argv )
         }
         mb.delete_entities( OldCells );
     }
-    rval = mb.write_file( outFile.c_str() );MB_CHK_SET_ERR( rval, "Error writing file" );
+    MB_CHK_SET_ERR( mb.write_file( outFile.c_str() ), "Error writing file" );
 
     return 0;
 }

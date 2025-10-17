@@ -13,6 +13,7 @@ guide will result in severe berating and other verbal abuse.
    - moab: %MOAB core classes.
    - lotte: Computational Meshing basics.
    - parallel: Parallel mesh computation, i/o data processing methods.
+   - Remapping: Mesh remapping and interpolation algorithms.
  - test: All unit test programs should go below this directory.
    Please put the unit tests into their related subdirectories based on the test's
    purpose if possible.
@@ -22,17 +23,30 @@ subdirectories in the %MOAB source code, except when implementing a new algorith
 
 \section sourcestyle Source Code Style and Best Practices
 %MOAB code should abide by the following general rules:
+
+\subsection naming Naming Conventions
  - Names:
    - Class names should be in the CamelBack style, e.g. EdgeMesh or VertexMesher.
-   - Class member variables should be camelBack, e.g. EdgeMesh::schemeType; each member variable, e.g. int memberVariable, 
+   - Class member variables should be camelBack, e.g. EdgeMesh::schemeType; each member variable, e.g. int memberVariable,
    should have set/get functions void member_variable(int newval) and int member_variable(), respectively.
    - Enumeration values should be all captitalized, with underscores avoided if possible (the enumeration name indicates
      the general purpose of the enumeration, so e.g. we use EQUAL, not EQUAL_MESH)
+   - Function names should be descriptive and use snake_case, e.g. get_entities_by_dimension()
+   - Variable names should be descriptive and use snake_case, e.g. entity_handle, num_vertices
+   - Constants should be ALL_CAPS with underscores, e.g. MB_SUCCESS, MB_TAG_DENSE
+
+\subsection formatting Code Formatting
  - Source code should not contain tabs or MS-DOS newlines; tabs and other indentations should be set to a width of 2 spaces.
    For general tips on how to set your editor for this, see the %MOAB-dev discussion starting with <a href="https://lists.mcs.anl.gov/mailman/private/moab-dev/2011/000519.html">this message</a>.
+ - Use consistent brace placement (opening brace on same line as control statement, closing brace on its own line)
+ - Maximum line length should be 120 characters
+ - Use spaces around operators and after commas
+ - Use consistent spacing in function declarations and calls
+
+\subsection documentation Documentation Requirements
  - Each class header should be fully commented; that includes:
    - A \\file comment block at the top of the file; DO NOT include things like Author and Date blocks; this stuff is available
-     from subversion if we really need to know.
+     from git if we really need to know.
    - A \\class comment block, formatted like those in the %MOAB core classes.  THE FIELDS AFTER THE CLASS NAME ARE VERY IMPORTANT,
      as they tell developers how to include the class declaration in their code.  This information goes into the "Detailed
      Description" portion of the class documentation.  This block should include any features or limitations of the class.
@@ -42,37 +56,86 @@ subdirectories in the %MOAB source code, except when implementing a new algorith
      See the %MOAB classes for examples of how to format these comments.  As a rule of thumb, your code should run through
      Doxygen without generating any warnings; in fact, Doxygen is sometimes helpful at pointing out inconsistencies in your
      class declaration.
+
+\subsection includes Include File Management
  - Developers should avoid using \#include in header files, as they propagate dependencies more widely than necessary.  The only
    cases where other includes are needed are to import the declaration for a parent class, and to declare types used as
-   non-pointer and non-reference function arguments.  In most cases, a forward-declaration statement (e.g. 'class MKCore') 
+   non-pointer and non-reference function arguments.  In most cases, a forward-declaration statement (e.g. 'class MKCore')
    will suffice.
+ - Use include guards with the pattern MOAB_FILENAME_HPP
+ - Include files should be ordered: system headers, third-party headers, MOAB headers
+ - Use relative paths for MOAB includes, e.g. #include "moab/Interface.hpp"
+
+\subsection namespaces Namespace and Naming Guidelines
  - Naming classes and other top-level constructs:
    - No names should be added to the global namespace.  Everything should be
      in the MOAB namespace.  An exception can be made for names with a static
      scope declared in a .cpp file, but class member functions never have a
      static scope.
-   - Names should be kept as private as possible.  If declaring a struct or 
-     utility class that is used internally by some other class, consider 
-     defining it in the .cpp file of the main class or a separate header 
+   - Names should be kept as private as possible.  If declaring a struct or
+     utility class that is used internally by some other class, consider
+     defining it in the .cpp file of the main class or a separate header
      only included in that .cpp file and using (if necessary) only forward
      delcarations (e.g. \c struct \c Point3D;) in the header file used
      by other code.  If that is not possible, then consider nesting the
      definitions such that the scope of the name is limited to that of the
-     class using it. 
+     class using it.
    - Any names introduced into the top-level MOAB namespace should be
-     sufficiently unique to avoid conflicts with other code.  If you must 
+     sufficiently unique to avoid conflicts with other code.  If you must
      introduce a class to the top-level MOAB namespace, don't choose
      an overly genereric name like \c Point3D .
- - Constants and Macros
-   - Don't use a pre-processor macro where a const variable or an inline or
-     template function will suffice.
-     There is absolutely benefit to the former over the later with modern 
-     compilers.  Further, using  macros bypasses typechecking that the compiler
-     would otherwise do for you and if used in headers, introduce names into
-     the global rather than MOAB namespace.
-   - Don't define constants that are already provided by standard libraries.
-     For example, use \c M_PI as defined in \c math.h rather than defining
-     your own constant.
+
+\subsection constants Constants and Macros
+ - Don't use a pre-processor macro where a const variable or an inline or
+   template function will suffice.
+   There is absolutely benefit to the former over the later with modern
+   compilers.  Further, using  macros bypasses typechecking that the compiler
+   would otherwise do for you and if used in headers, introduce names into
+   the global rather than MOAB namespace.
+ - Don't define constants that are already provided by standard libraries.
+   For example, use \c M_PI as defined in \c math.h rather than defining
+   your own constant.
+
+\subsection errorhandling Error Handling
+MOAB uses a comprehensive error handling system based on ErrorCode return values and macros for consistent error reporting.
+
+\subsubsection errorcodes Error Codes
+- All functions that can fail should return an ErrorCode (defined in moab/Types.hpp)
+- Common error codes include: MB_SUCCESS, MB_FAILURE, MB_ENTITY_NOT_FOUND, MB_TAG_NOT_FOUND, etc.
+- Never return MB_SUCCESS for error conditions
+
+\subsubsection errormacros Error Handling Macros
+Use the following macros for consistent error handling:
+
+- \b MB_CHK_ERR(err_code): Check error code and return if not MB_SUCCESS
+  \code
+  MB_CHK_ERR( moab->load_file("mesh.h5m") );
+  \endcode
+
+- \b MB_CHK_SET_ERR(err_code, message): Check error code and set new error message if not MB_SUCCESS
+  \code
+  MB_CHK_SET_ERR( moab->load_file("mesh.h5m"), "Failed to load mesh file" );
+  \endcode
+
+- \b MB_SET_ERR(err_code, message): Set a new error and return immediately
+  \code
+  if (invalid_condition) {
+    MB_SET_ERR(MB_FAILURE, "Invalid condition encountered");
+  }
+  \endcode
+
+- \b MB_CHK_ERR_RET(err_code): Check error code and return void if not MB_SUCCESS
+- \b MB_CHK_ERR_RET_VAL(err_code, return_value): Check error code and return value if not MB_SUCCESS
+- \b MB_SET_ERR_CONT(message): Set error but continue execution
+- \b MB_SET_GLB_ERR(err_code, message): Set globally fatal error (for parallel applications)
+
+\subsubsection errorbestpractices Error Handling Best Practices
+- Always check return values from MOAB functions
+- Use descriptive error messages that help with debugging
+- Don't use MB_SET_ERR for expected conditions (like MB_TAG_NOT_FOUND)
+- For parallel applications, use MB_SET_GLB_ERR for errors that should terminate all processes
+- Include context in error messages, e.g., "Failed to load mesh file: " + filename
+
 \section commits Making Repository Commits
 As a general rule, developers should update frequently, and commit changes often.  However, the repository should always remain
 in a state where the code can be compiled.  Most of the time, the code should also successfully execute "make check" run from the
@@ -80,22 +143,23 @@ top-level directory.  If you commit code that violates this principal, it should
 code to a compilable state, and your second priority to make sure "make check" runs without errors.
 
 Commits to the repository should also come with a non-trivial, useful, non-verbose log message.  Oftentimes the best way to generate
-this message is to run 'commit -a', and include a comment on 
+this message is to run 'commit -a', and include a comment on
 each file that changed, then Ctrl+O to write out, followed by 'Enter' and Ctrl+X.  Many times it is helpful to state that 'make check runs successfully' at the end of the log message.
-Although it would be possible and many software projects do it, we prefer not to force successful execution of the test suite 
+Although it would be possible and many software projects do it, we prefer not to force successful execution of the test suite
 before every commit.  Developers should make every effort to avoid having to impose this constraint, by running a make check
 before every commit.
 
 \section git Git Repository Practices
 As most of our code repositories uses git as the revision control system, it is important to decide on a workflow that can be followed by the individual developer. The way that any individual developer interact with the upstream git repository can have an important impact on other developers and the ability to identify and manage individual changes.  This set of guidelines and practices attempts to establish some standards for how developers will interact with the upstream git repository.
-The Atlassian website <a href="https://www.atlassian.com/git/workflows">describes a number of git workflows</a> , and provides good background reading for a few standard models of such workflows.  More important than choosing any one of these workflows precisely are the adoption of some of the concepts embodied within them and understanding the implications of those concepts.
+
+MOAB uses Git as the revision control system with a pull request workflow. All contributions must go through the pull request process on Bitbucket. The Atlassian website <a href="https://www.atlassian.com/git/workflows">describes a number of git workflows</a> , and provides good background reading for a few standard models of such workflows.  More important than choosing any one of these workflows precisely are the adoption of some of the concepts embodied within them and understanding the implications of those concepts.
 
 \subsection outside-master Working Outside the Master Branch
 A critical concept is that all changes shall be developed outside of the master<sup>1</sup> branch.  Whether they are in a different branch of the upstream<sup>2</sup> repository (gitflow) or a branch of an entirely different fork (forking workflow) is secondary.  This is a well-established concept regardless of the workflow being adopted, and allows a number of other benefits as described below.
 
 \subsubsection fork Working on a Different Fork
 There are a number of benefits of working on a different fork rather than a branch of the upstream repo, although not strictly technical:
-- Developers, particularly new developers, are liberated from the constant oversight of others as they explore new code options.  The impact of this may depend on an individual developer’s personality, but for some it creates a refuge where they can be more free and creative.
+- Developers, particularly new developers, are liberated from the constant oversight of others as they explore new code options.  The impact of this may depend on an individual developer's personality, but for some it creates a refuge where they can be more free and creative.
 - Similarly, assuming that all changesets in the upstream repo are communicated to the entire development team, the team is spared a noisy stream of notifications and can focus their attention on the rarer occurrence of a pull request notification.
 
 \subsubsection pr All Changes are Committed by Pull Request
@@ -104,20 +168,57 @@ A critical consequence of this decision is that all code is reviewed before it i
 - the code under review will improve due to the review itself, and
 - those involved in the review will maintain a broad awareness of the code base resulting in better contributions from them.
 
-This practice does, however, place a substantial burden on the developers to perform timely reviews of the pull requested (PR’ed) code.  PR’s that languish without sufficient review have a number of negative consequences:
+This practice does, however, place a substantial burden on the developers to perform timely reviews of the pull requested (PR'ed) code.  PR's that languish without sufficient review have a number of negative consequences:
 - they need to be refreshed simply to keep them up-to-date with the possibly advancing upstream/master
 - they may delay further development on similar or related features
 - they breed frustration in the original developer, undermining the community as a whole.
 Bitbucket provides powerful collaboration tools that greatly facilitate this process.
 
-<sup>1</sup> Although a repository may choose a different name for its main development branch, this document will refer to that as the “master” branch.
+<sup>1</sup> Although a repository may choose a different name for its main development branch, this document will refer to that as the "master" branch.
 
-<sup>2</sup> For this discussion, the “upstream” repo will refer to the centralized authoritative repository used to synchronize changes.
+<sup>2</sup> For this discussion, the "upstream" repo will refer to the centralized authoritative repository used to synchronize changes.
 
-\subsection Some Git Mechanics to Keep it Clean
+\subsection workflow Pull Request Workflow
+1. All changes must be developed outside the master branch
+2. Create a feature branch for your changes
+3. Make your changes and commit them with descriptive messages
+4. Push your feature branch to your fork
+5. Submit a pull request to the master branch
+6. Address review comments and update the PR as needed
+7. Once approved by two reviewers, the PR can be merged
+
+\subsection branchnaming Branch Naming
+Use descriptive branch names that indicate the purpose of the changes:
+- feature/add-parallel-remapping
+- bugfix/fix-memory-leak-in-skinner
+- docs/update-user-guide
+- test/add-unit-tests-for-tag-operations
+
+\subsection commitmessages Commit Messages
+Write clear, descriptive commit messages:
+- Use present tense ("Add feature" not "Added feature")
+- Use imperative mood ("Move cursor to..." not "Moves cursor to...")
+- Limit the first line to 50 characters
+- Separate subject from body with a blank line
+- Use the body to explain what and why vs. how
+- Reference issues when applicable
+
+Example:
+\code
+Add parallel remapping support
+
+- Implement TempestOnlineMap for distributed mesh remapping
+- Add MPI-based communication for ghost entity exchange
+- Support for both source and target mesh decomposition
+- Add unit tests for parallel remapping functionality
+
+Fixes Issue #123
+\endcode
+
+\subsection gitmechanics Git Mechanics to Keep it Clean
 Given the above practices, there are some mechanical details that can help ensure that the upstream/master repository is always in a state that facilitates all repository actions and interactions.
 
--# Feature branches being used for development should be kept up-to-date with the upstream/master by rebase only.  When a feature branch is rebased against the upstream/master, all changes in the upstream/master are inserted into the feature branch at a point in its history that is prior to any of the changes of the feature branch.  This can require conflict resultion as the feature branch changes are “replayed” on top of the new upstream/master in its current state.  The primary advantage of this policy is that it keeps all of the feature branch changes contiguous.  If, by contrast, the upstream/master is merged into the feature branch, the recent changes in the upstream/master become woven into the set of changes in the feature branch.  This can make it more difficult to isolate changes later on.
+-# Feature branches being used for development should be kept up-to-date with the upstream/master by rebase only.  When a feature branch is rebased against the upstream/master, all changes in the upstream/master are inserted into the feature branch at a point in its history that is prior to any of the changes of the feature branch.  This can require conflict resultion as the feature branch changes are "replayed" on top of the new upstream/master in its current state.  The primary advantage of this policy is that it keeps all of the feature branch changes contiguous.  If, by contrast, the upstream/master is merged into the feature branch, the recent changes in the upstream/master become woven into the set of changes in the feature branch.  This can make it more difficult to isolate changes later on.
 
     Strict adoption of this practice is important since a single merge into a feature branch that is then merged back into the upstream/master can make it nearly impossible for others to rebase.
 
@@ -139,7 +240,7 @@ Given the above practices, there are some mechanical details that can help ensur
     -# now add/commit your changes to your local feature branch
     \code
      %> git add A.cpp B.hpp C.cpp
-     %> git commit -m “Make sure you have a good commit message”
+     %> git commit -m "Make sure you have a good commit message"
     \endcode
     -# push your changes to your feature branch on your fork (often called `origin`)
     \code
@@ -150,7 +251,7 @@ Given the above practices, there are some mechanical details that can help ensur
     -# add/commit your changes to your local feature branch
     \code
     %> git add B.hpp D.hpp E.cpp
-    %> git commit -m “Be sure you have another good commit message”
+    %> git commit -m "Be sure you have another good commit message"
     \endcode
     -# push your changes to your freature branch on your fork (often called `origin`)
     \code
@@ -170,7 +271,7 @@ Given the above practices, there are some mechanical details that can help ensur
      \code
      %> git push origin my_feature_branch
      \endcode
-      This may require the ‘-f’ option to force the push.  (It is frequently necessary to force this push because the act of rebasing will “replay” the commits from the feature branch on top of the master, leading to different commit hashes.  Each of the commits will contain the same actual information, but because it has a different set of hashes, git will think there is an inconsistency and ask you to force the change.)
+      This may require the '-f' option to force the push.  (It is frequently necessary to force this push because the act of rebasing will "replay" the commits from the feature branch on top of the master, leading to different commit hashes.  Each of the commits will contain the same actual information, but because it has a different set of hashes, git will think there is an inconsistency and ask you to force the change.)
 
     -# Submit a pull request on Bitbucket, from your fork to the fathomteam fork.
 
@@ -178,13 +279,13 @@ Given the above practices, there are some mechanical details that can help ensur
 -# When ready to be adopted into the upstream/master, feature branches should be combined by merge only.  This adds the changeset to the end of the upstream/master as a set of individual commits but in a contiguous block.
 
    A typical workflow to merge a pull-request might look like this, all using the command-line.
-   -# synchronize your local `master` branch before anything else (just because it’s never a bad idea!)
+   -# synchronize your local `master` branch before anything else (just because it's never a bad idea!)
    \code
    %> git checkout master
    %> git fetch upstream
    %> git rebase upstream/master
    \endcode
-   -# add a remote for the user with the pull-request, perhaps the user is ‘other_user’
+   -# add a remote for the user with the pull-request, perhaps the user is 'other_user'
    \code
    %> git remote add other_user \
          git@bitbucket.org:other_user/moab.git
@@ -205,11 +306,11 @@ Given the above practices, there are some mechanical details that can help ensur
    %> git rebase upstream/master
    \endcode
    This may generate conflicts that can be addressed at this point.  You may want to request the original author (other_user) take care of these.
-   -# once confirmed that it’s up-to-date with master, review this branch including:
+   -# once confirmed that it's up-to-date with master, review this branch including:
       -reading the code
       -building the code
       -running tests
-   -# once satisfied that the code meets the necessary standards and that all required/requested changes are fully incorporated into other_users’s feature branch, merge it into master
+   -# once satisfied that the code meets the necessary standards and that all required/requested changes are fully incorporated into other_users's feature branch, merge it into master
     \code
     %> git checkout master
     \endcode
@@ -230,12 +331,12 @@ Given the above practices, there are some mechanical details that can help ensur
 -# If a developer has ongoing work that is based on a feature branch that is under consideration in an open PR, a new feature branch (B) should be created that is based on the previous feature branch (A).  Moreover, as changes are made to the original feature branch (A) due to the review process, the new feature branch (B) should be kept up-to-date by rebase against feature branch (A).  This keeps all subsequent changes of (B) downstream from the changes in (A).  Once feature branch (A) has been adopted into the upstream/master, the new feature branch (B) can start being rebased against the upstream/master instead.
 
 
--# When a repo is forked, its branches are not automatically synchronized with the corresponding branches on the upstream repo.  This requires a manual process of synchronization via a local clone.  Assuming that the local repo’s branch has the same name as the upstream branch (<branch>), and that the fork is known as “origin”:
+-# When a repo is forked, its branches are not automatically synchronized with the corresponding branches on the upstream repo.  This requires a manual process of synchronization via a local clone.  Assuming that the local repo's branch has the same name as the upstream branch (\c branch), and that the fork is known as "origin":
     \code
      %> git fetch upstream
-     %> git checkout <branch>
-     %> git rebase upstream/<branch>
-     %> git push origin <branch>
+     %> git checkout \c branch
+     %> git rebase upstream/\c branch
+     %> git push origin \c branch
     \endcode
 The decision of which branches to keep up-to-date is up to the developers.  Developers may choose to delete some branches from their own fork to avoid (a) the need to update it and (b) accidentally assuming that it is up-to-date.
 
@@ -256,5 +357,90 @@ The decision of which branches to keep up-to-date is up to the developers.  Deve
      \endcode
 One should be careful with the branch name as a hard reset would overwrite all changes in the working directory.
 
-  
- */
+\subsection codequality Code Quality Requirements
+Before submitting a pull request, ensure:
+- Code compiles without warnings
+- All tests pass (run "make check")
+- Code follows MOAB style guidelines
+- Doxygen documentation is complete and accurate
+- Error handling uses appropriate MOAB macros
+- No memory leaks (use valgrind if available)
+- No performance regressions
+
+\subsection reviewprocess Review Process
+- All PRs require review and approval from at least two developers
+- Address all review comments promptly
+- Update the PR with requested changes
+- Request re-review when changes are made
+- Maintainers will merge approved PRs to master
+
+\subsection continuousintegration Continuous Integration
+MOAB uses continuous integration systems (Buildbot, CircleCI) to:
+- Build code on multiple platforms
+- Run test suites automatically
+- Check for code formatting issues
+- Verify documentation generation
+- Detect memory leaks and performance regressions
+
+All PRs must pass CI checks before merging.
+
+\section modernpractices Modern C++ Practices
+MOAB encourages the use of modern C++ features where appropriate:
+
+\subsection smartpointers Smart Pointers
+- Prefer std::unique_ptr over raw pointers for ownership
+- Use std::shared_ptr only when shared ownership is truly needed
+- Avoid std::auto_ptr (deprecated)
+
+\subsection containers Containers
+- Use std::vector for dynamic arrays
+- Use std::map or std::unordered_map for associative containers
+- Use MOAB's Range class for entity collections
+- Prefer range-based for loops when possible
+
+\subsection algorithms Algorithms
+- Use standard library algorithms (std::sort, std::find, etc.)
+- Use lambda expressions for simple operations
+- Consider using std::function for callbacks
+
+\subsection otherfeatures Other Modern Features
+- Use nullptr instead of NULL
+- Use override keyword for virtual function overrides
+- Use = default and = delete for special member functions
+- Use enum class for type-safe enumerations
+- Use constexpr for compile-time constants
+
+\section testing Testing Guidelines
+- Write unit tests for new functionality
+- Ensure tests are independent and repeatable
+- Use descriptive test names
+- Test both success and failure cases
+- Test edge cases and boundary conditions
+- Use appropriate test fixtures and setup/teardown
+- Aim for good test coverage
+
+\section performance Performance Considerations
+- Profile code before optimizing
+- Use appropriate data structures for the problem
+- Consider memory layout and cache locality
+- Use const references to avoid unnecessary copies
+- Use move semantics when appropriate
+- Consider parallel algorithms for large datasets
+- Use MOAB's bulk operations when possible
+
+\section security Security Guidelines
+- Validate all input data
+- Use bounds checking for array access
+- Avoid buffer overflows
+- Use secure string handling functions
+- Validate file paths and names
+- Be careful with user-provided data in error messages
+
+\section accessibility Accessibility
+- Use descriptive variable and function names
+- Write clear comments explaining complex algorithms
+- Provide examples in documentation
+- Use consistent formatting and style
+- Make error messages helpful and actionable
+
+*/

@@ -1,3 +1,10 @@
+/** @example SkinMesh.cpp
+ * This example demonstrates how to skin triangular meshes to recover boundary edges.
+ * It shows how to load a mesh file, remove existing edges, get surface sets,
+ * and call a fast skinning function that creates edges for triangles that are not paired.
+ * The skinner is optimized and assumes no edges exist in the MOAB instance initially.
+ */
+
 #include <iostream>
 #include <cstdlib>
 #include "MBCore.hpp"

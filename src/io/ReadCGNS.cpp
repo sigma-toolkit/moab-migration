@@ -94,7 +94,8 @@ ErrorCode ReadCGNS::load_file( const char* filename,
     // Process options; see src/FileOptions.hpp for API for FileOptions class, and
     // doc/metadata_info.doc for a description of various options used by some of the readers in
     // MOAB
-    result = process_options( opts );MB_CHK_SET_ERR( result, fileName << ": problem reading options" );
+    result = process_options( opts );
+    MB_CHK_SET_ERR( result, fileName << ": problem reading options" );
 
     // Open file
     int filePtr = 0;
@@ -157,7 +158,8 @@ ErrorCode ReadCGNS::load_file( const char* filename,
             // storage for vertex coordinates for those verts
             std::vector< double* > coord_arrays;
             EntityHandle handle = 0;
-            result              = readMeshIface->get_node_coords( 3, num_verts, MB_START_ID, handle, coord_arrays );MB_CHK_SET_ERR( result, fileName << ": Trouble reading vertices" );
+            result              = readMeshIface->get_node_coords( 3, num_verts, MB_START_ID, handle, coord_arrays );
+            MB_CHK_SET_ERR( result, fileName << ": Trouble reading vertices" );
 
             // Fill in vertex coordinate arrays
             cgsize_t beginPos = 1, endPos = num_verts;
@@ -457,13 +459,13 @@ ErrorCode ReadCGNS::load_file( const char* filename,
                     if( count_HEX > 0 )
                         create_elements( sectionName, file_id_tag, MBHEX, 8, section_offset, count_HEX, elemsConn_HEX );
                 }  // Mixed mesh type
-            }      // num_sections
+            }  // num_sections
 
             cg_close( filePtr );
 
             return result;
         }  // indexZone for
-    }      // indexBase for
+    }  // indexBase for
 
     return MB_SUCCESS;
 }
@@ -483,7 +485,8 @@ ErrorCode ReadCGNS::create_elements( char* sectionName,
     EntityHandle* conn_array;
     EntityHandle handle = 0;
 
-    result = readMeshIface->get_element_connect( elems_count, verts_per_elem, ent_type, 1, handle, conn_array );MB_CHK_SET_ERR( result, fileName << ": Trouble reading elements" );
+    result = readMeshIface->get_element_connect( elems_count, verts_per_elem, ent_type, 1, handle, conn_array );
+    MB_CHK_SET_ERR( result, fileName << ": Trouble reading elements" );
 
     if( sizeof( EntityHandle ) == sizeof( cgsize_t ) )
     {
@@ -549,7 +552,8 @@ ErrorCode ReadCGNS::create_sets( char* sectionName,
     mbImpl->tag_get_handle( setName, 1, MB_TYPE_INTEGER, tag_handle, MB_TAG_SPARSE | MB_TAG_CREAT );
 
     // Create set
-    result = mbImpl->create_meshset( MESHSET_SET, set_handle );MB_CHK_SET_ERR( result, fileName << ": Trouble creating set" );
+    result = mbImpl->create_meshset( MESHSET_SET, set_handle );
+    MB_CHK_SET_ERR( result, fileName << ": Trouble creating set" );
 
     //// Add dummy values to current set
     // std::vector<int> tags(set_ids.size(), 1);
@@ -557,7 +561,8 @@ ErrorCode ReadCGNS::create_sets( char* sectionName,
     // if (MB_SUCCESS != result) return result;
 
     // Add them to the set
-    result = mbImpl->add_entities( set_handle, elements );MB_CHK_SET_ERR( result, fileName << ": Trouble putting entities in set" );
+    result = mbImpl->add_entities( set_handle, elements );
+    MB_CHK_SET_ERR( result, fileName << ": Trouble putting entities in set" );
 
     return MB_SUCCESS;
 }

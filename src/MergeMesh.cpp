@@ -49,12 +49,12 @@ ErrorCode MergeMesh::merge_entities( EntityHandle* elems,
 
 /*  This function appears to be not necessary after MOAB conversion
 
- void MergeMesh::perform_merge(iBase_TagHandle merge_tag)
+ void MergeMesh::perform_merge(Tag merge_tag)
  {
  // put into a range
- ErrorCode result = perform_merge((Tag) merge_tag);
+ ErrorCode result = perform_merge(merge_tag);
  if (result != MB_SUCCESS)
- throw MKException(iBase_FAILURE, "");
+ throw std::runtime_error("Merge operation failed");
  }*/
 
 ErrorCode MergeMesh::merge_entities( Range& elems,
@@ -117,12 +117,11 @@ ErrorCode MergeMesh::merge_entities( Range& elems,
 
 ErrorCode MergeMesh::merge_all( EntityHandle meshset, const double merge_tol )
 {
-    ErrorCode rval;
     if( 0 == mbMergeTag )
     {
         EntityHandle def_val = 0;
-        rval = mbImpl->tag_get_handle( "__merge_tag", 1, MB_TYPE_HANDLE, mbMergeTag, MB_TAG_DENSE | MB_TAG_EXCL,
-                                       &def_val );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mbImpl->tag_get_handle( "__merge_tag", 1, MB_TYPE_HANDLE, mbMergeTag, MB_TAG_DENSE | MB_TAG_EXCL,
+                                            &def_val ) );
     }
     // get all entities;
     // get all vertices connected
@@ -133,24 +132,24 @@ ErrorCode MergeMesh::merge_all( EntityHandle meshset, const double merge_tol )
 
     // get all vertices
     Range entities;
-    rval = mbImpl->get_entities_by_handle( meshset, entities, /*recursive*/ true );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbImpl->get_entities_by_handle( meshset, entities, /*recursive*/ true ) );
     Range sets = entities.subset_by_type( MBENTITYSET );
     entities   = subtract( entities, sets );
     Range verts;
-    rval = mbImpl->get_connectivity( entities, verts );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mbImpl->get_connectivity( entities, verts ) );
 
     // build a kd tree with the vertices
     AdaptiveKDTree kd( mbImpl );
     EntityHandle tree_root;
-    rval = kd.build_tree( verts, &tree_root );MB_CHK_ERR( rval );
+    MB_CHK_ERR( kd.build_tree( verts, &tree_root ) );
     // find matching vertices, mark them
-    rval = find_merged_to( tree_root, kd, mbMergeTag );MB_CHK_ERR( rval );
+    MB_CHK_ERR( find_merged_to( tree_root, kd, mbMergeTag ) );
 
-    rval = perform_merge( mbMergeTag );MB_CHK_ERR( rval );
+    MB_CHK_ERR( perform_merge( mbMergeTag ) );
 
     if( deadEnts.size() != 0 )
     {
-        rval = merge_higher_dimensions( entities );MB_CHK_ERR( rval );
+        MB_CHK_ERR( merge_higher_dimensions( entities ) );
     }
     return MB_SUCCESS;
 }

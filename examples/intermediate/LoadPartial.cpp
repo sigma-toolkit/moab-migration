@@ -1,4 +1,21 @@
-/** @example LoadPartial.cpp \n
+/**
+ * @file LoadPartial.cpp
+ * @brief Example demonstrating partial loading of mesh files based on tag values
+ *
+ * This example shows how to:
+ * - Load only specific parts of a mesh file based on tag values
+ * - Use parallel partition tags to load specific partitions
+ * - Handle file organization in sets for selective loading
+ * - Work with HANDLEID tags for entity identification
+ * - Write partial mesh data to new files
+ *
+ * This is particularly useful for parallel applications where each
+ * processor needs to load only its assigned portion of a large mesh.
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+
  * \brief Load a part of a file  \n
  * <b>To run</b>: LoadPartial [file] [tag_name] [val1] [val2] ...\n
  *
@@ -9,6 +26,10 @@
  * material/block sets by default, this example will load parallel partition sets with values 1, 2,
  * and 5 from ../MeshFiles/unittest/64bricks_1khex.h5m The example will always write the output to a
  * file name part.h5m
+ *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 
 #include <iostream>
@@ -51,7 +72,7 @@ ErrorCode get_file_options( int argc, char** argv, string& filename, string& tag
     }
 
     if( argc > 1 && argc < 4 )  // print usage
-        cout << " usage is " << argv[0] << " <file> <tag_name> <value1> <value2> .. \n";
+        cout << " usage is " << argv[0] << " <file> \c tag_name <value1> <value2> .. \n";
     return MB_SUCCESS;
 }
 
@@ -63,26 +84,28 @@ int main( int argc, char** argv )
 
     std::string filename, tagname;
     vector< int > tagvals( NTAGVALS );  // Allocate for a maximum of 5 tag values
-    ErrorCode rval = get_file_options( argc, argv, filename, tagname, tagvals );MB_CHK_ERR( rval );
+    MB_CHK_ERR( get_file_options( argc, argv, filename, tagname, tagvals ) );
 
 #ifdef MOAB_HAVE_HDF5
     // This file is in the mesh files directory
-    rval = mb->load_file( filename.c_str(), 0, 0, PARALLEL_PARTITION_TAG_NAME, tagvals.data(), (int)tagvals.size() );MB_CHK_SET_ERR( rval, "Failed to read" );
+    MB_CHK_SET_ERR( mb->load_file( filename.c_str(), 0, 0, PARALLEL_PARTITION_TAG_NAME, tagvals.data(),
+                                   (int)tagvals.size() ),
+                    "Failed to read" );
 
     // If HANDLEID tag present, convert to long, and see what we read from file
     Tag handleid_tag;
-    rval = mb->tag_get_handle( "HANDLEID", handleid_tag );
+    ErrorCode rval = mb->tag_get_handle( "HANDLEID", handleid_tag );
     if( MB_SUCCESS == rval )
     {
         // Convert a few values for a few vertices
         Range verts;
-        rval = mb->get_entities_by_type( 0, MBVERTEX, verts );MB_CHK_SET_ERR( rval, "Failed to get vertices" );
+        MB_CHK_SET_ERR( mb->get_entities_by_type( 0, MBVERTEX, verts ), "Failed to get vertices" );
         vector< long > valsTag( verts.size() );
         rval = mb->tag_get_data( handleid_tag, verts, &valsTag[0] );
         if( MB_SUCCESS == rval ) cout << "First 2 long values recovered: " << valsTag[0] << " " << valsTag[1] << "\n";
     }
 
-    rval = mb->write_file( "part.h5m" );MB_CHK_SET_ERR( rval, "Failed to write partial file" );
+    MB_CHK_SET_ERR( mb->write_file( "part.h5m" ), "Failed to write partial file" );
     cout << "Wrote successfully part.h5m.\n";
 
 #else

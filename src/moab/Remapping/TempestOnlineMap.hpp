@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 ///
-///	\file    TempestOnlineMap.h
+///	\file    TempestOnlineMap.hpp
 ///	\author  Vijay Mahadevan
 ///	\version November 20, 2017
 ///
@@ -403,8 +403,8 @@ class TempestOnlineMap : public OfflineMap
     ///	<summary>
     ///		Apply the weight matrix onto the source vector (tag) provided as input, and return the
     /// column vector (solution projection) in a tag, after the map application
-    ///     Compute:        \p tgtVals = A(S->T) * \srcVals, or
-    ///     if (transpose)  \p tgtVals = [A(T->S)]^T * \srcVals
+    ///     Compute:        \p tgtVals = A(S->T) * \note Source values, or
+    ///     if (transpose)  \p tgtVals = [A(T->S)]^T * \note Source values
     ///	</summary>
     moab::ErrorCode ApplyWeights( moab::Tag srcSolutionTag,
                                   moab::Tag tgtSolutionTag,
@@ -475,8 +475,8 @@ class TempestOnlineMap : public OfflineMap
     ///	<summary>
     ///		Apply the weight matrix onto the source vector provided as input, and return the column
     /// vector (solution projection) after the map application
-    ///     Compute:        \p tgtVals = A(S->T) * \srcVals, or
-    ///     if (transpose)  \p tgtVals = [A(T->S)]^T * \srcVals
+    ///     Compute:        \p tgtVals = A(S->T) * \note Source values, or
+    ///     if (transpose)  \p tgtVals = [A(T->S)]^T * \note Source values
     ///	</summary>
     moab::ErrorCode ApplyWeights( std::vector< double >& srcVals,
                                   std::vector< double >& tgtVals,

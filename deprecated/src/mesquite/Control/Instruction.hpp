@@ -67,7 +67,7 @@ class MESQUITE_EXPORT Instruction
     //! as necessary depending on values in Settings, initialize
     //! MSQ_HARD_FIXED and MSQ_SLAVED flags on vertices, and clear
     //! MSQ_CULLED flag on all vertices.
-    //! \NOTE SLAVE_ALL setting is handled in PatchData rather than here
+    //! \note SLAVE_ALL setting is handled in PatchData rather than here
     //! for efficiency.
     static void initialize_vertex_byte( MeshDomainAssoc* mesh_and_domain, const Settings* settings, MsqError& err );
 };

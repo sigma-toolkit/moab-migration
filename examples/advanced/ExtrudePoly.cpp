@@ -1,7 +1,33 @@
-/** @example ExtrudePoly.cpp
- * Description: read a 2d mesh in plane, extrude to form  layers of prisms (polyhedra) \n
+/**
+ * @example ExtrudePoly.cpp
+ * Example demonstrating extrusion of 2D polygons to create 3D polyhedra
  *
- * To run: ./ExtrudePoly [meshfile] [outfile] [nlayers] [thickness_layer] \n
+ * This example shows how to:
+ * - Load a 2D mesh from a file
+ * - Extrude 2D polygons to create 3D polyhedra (prisms)
+ * - Create multiple layers with specified thickness
+ * - Generate lateral faces connecting the layers
+ * - Handle different polygon types (triangles, quads, etc.)
+ * - Write the extruded mesh to a new file
+ *
+ * The extrusion process creates layers of vertices above the base mesh,
+ * then connects them to form polyhedra with top, bottom, and lateral faces.
+ *
+ * \param[in] [meshfile] The 2D mesh file to load (default: io/poly8-10.vtk)
+ * \param[in] [outfile]  The output, extruded 3D mesh file name (default: polyhedra.vtk)
+ * \param[in] [nlayers]  The number of axial layers (default: 1)
+ * \param[in] [thickness_layer]  The thickness of axial layers (default: 1.0)
+ *
+ * \return 0 on success, 1 on failure
+ *
+ * \par Usage:
+ * \code
+ * ./ExtrudePoly [meshfile] [outfile] [nlayers] [thickness_layer]
+ * $> ./ExtrudePoly poly2d.h5m poly3d.h5m 5 1.0
+ * \endcode
+ *
+ * @author MOAB Development Team
+ * @date Last updated: 2025
  */
 
 #include "moab/Core.hpp"
@@ -44,21 +70,21 @@ int main( int argc, char** argv )
     std::cout << "Run: " << argv[0] << " " << test_file_name << " " << output << " " << layers << " " << layer_thick
               << "\n";
     // Load the mesh from vtk file
-    ErrorCode rval = mb->load_mesh( test_file_name.c_str() );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->load_mesh( test_file_name.c_str() ) );
 
     // Get verts entities, by type
     Range verts;
-    rval = mb->get_entities_by_type( 0, MBVERTEX, verts );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_type( 0, MBVERTEX, verts ) );
 
     // Get faces, by dimension, so we stay generic to entity type
     Range faces;
-    rval = mb->get_entities_by_dimension( 0, 2, faces );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_entities_by_dimension( 0, 2, faces ) );
     cout << "Number of vertices is " << verts.size() << endl;
     cout << "Number of faces is " << faces.size() << endl;
 
     Range edges;
     // create all edges
-    rval = mb->get_adjacencies( faces, 1, true, edges, Interface::UNION );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_adjacencies( faces, 1, true, edges, Interface::UNION ) );
 
     cout << "Number of edges is " << edges.size() << endl;
 
@@ -66,7 +92,7 @@ int main( int argc, char** argv )
     int nvPerLayer = (int)verts.size();
     coords.resize( 3 * nvPerLayer );
 
-    rval = mb->get_coords( verts, &coords[0] );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->get_coords( verts, &coords[0] ) );
     // create first vertices
     Range* newVerts = new Range[layers + 1];
     newVerts[0]     = verts;  // just for convenience
@@ -75,16 +101,17 @@ int main( int argc, char** argv )
         for( int i = 0; i < nvPerLayer; i++ )
             coords[3 * i + 2] += layer_thick;
 
-        rval = mb->create_vertices( &coords[0], nvPerLayer, newVerts[ii + 1] );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->create_vertices( &coords[0], nvPerLayer, newVerts[ii + 1] ) );
     }
     // for each edge, we will create layers quads
     int nquads = edges.size() * layers;
     ReadUtilIface* read_iface;
-    rval = mb->query_interface( read_iface );MB_CHK_SET_ERR( rval, "Error in query_interface" );
+    MB_CHK_SET_ERR( mb->query_interface( read_iface ), "Error in query_interface" );
 
     EntityHandle start_elem, *connect;
     // Create quads
-    rval = read_iface->get_element_connect( nquads, 4, MBQUAD, 0, start_elem, connect );MB_CHK_SET_ERR( rval, "Error in get_element_connect" );
+    MB_CHK_SET_ERR( read_iface->get_element_connect( nquads, 4, MBQUAD, 0, start_elem, connect ),
+                    "Error in get_element_connect" );
     int nedges = (int)edges.size();
 
     int indexConn = 0;
@@ -94,7 +121,7 @@ int main( int argc, char** argv )
 
         const EntityHandle* conn2 = NULL;
         int num_nodes;
-        rval = mb->get_connectivity( edge, conn2, num_nodes );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->get_connectivity( edge, conn2, num_nodes ) );
         if( 2 != num_nodes ) MB_CHK_ERR( MB_FAILURE );
 
         int i0 = verts.index( conn2[0] );
@@ -126,7 +153,7 @@ int main( int argc, char** argv )
 
         const EntityHandle* connp = NULL;
         int num_nodes;
-        rval = mb->get_connectivity( polyg, connp, num_nodes );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mb->get_connectivity( polyg, connp, num_nodes ) );
 
         for( int i = 0; i < num_nodes; i++ )
         {
@@ -135,7 +162,7 @@ int main( int argc, char** argv )
             EntityHandle edgeVerts[2] = { connp[i], connp[i1] };
             // get edge adjacent to these vertices
             Range adjEdges;
-            rval = mb->get_adjacencies( edgeVerts, 2, 1, false, adjEdges );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->get_adjacencies( edgeVerts, 2, 1, false, adjEdges ) );
             if( adjEdges.size() < 1 ) MB_CHK_SET_ERR( MB_FAILURE, " did not find edge " );
             indexEdges[i] = edges.index( adjEdges[0] );
             if( indexEdges[i] < 0 ) MB_CHK_SET_ERR( MB_FAILURE, "did not find edge in range" );
@@ -147,7 +174,7 @@ int main( int argc, char** argv )
             for( int i = 0; i < num_nodes; i++ )
                 newConn[i] = newVerts[ii + 1][indexVerts[i]];  // vertices in layer ii+1
 
-            rval = mb->create_element( MBPOLYGON, newConn, num_nodes, allPolygons[nfaces * ( ii + 1 ) + j] );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->create_element( MBPOLYGON, newConn, num_nodes, allPolygons[nfaces * ( ii + 1 ) + j] ) );
 
             // now create a polyhedra with top, bottom and lateral swept faces
             // first face is the bottom
@@ -164,10 +191,10 @@ int main( int argc, char** argv )
             }
             // Create polyhedron
             EntityHandle polyhedron;
-            rval = mb->create_element( MBPOLYHEDRON, polyhedronConn, 2 + num_nodes, polyhedron );MB_CHK_ERR( rval );
+            MB_CHK_ERR( mb->create_element( MBPOLYHEDRON, polyhedronConn, 2 + num_nodes, polyhedron ) );
         }
     }
-    rval = mb->write_file( output.c_str() );MB_CHK_ERR( rval );
+    MB_CHK_ERR( mb->write_file( output.c_str() ) );
 
     delete mb;
 

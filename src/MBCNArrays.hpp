@@ -575,8 +575,8 @@ const CN::UpConnMap CN::mUpConnMap[MBMAXTYPE][4][4] = {
             {                              // target dimension 3
               { 0 },                       // 0 connected elements for all vertices
               { { 0 } } }                  // end target dimension 3
-        }                                  // end source dim 3
-    },                                     // end type MBTET
+        }  // end source dim 3
+    },  // end type MBTET
 
     {
         // type MBPYRAMID
@@ -650,8 +650,8 @@ const CN::UpConnMap CN::mUpConnMap[MBMAXTYPE][4][4] = {
             {                                    // target dimension 3
               { 0 },                             // 0 connected elements for all vertices
               { { 0 } } }                        // end target dimension 3
-        }                                        // end source dim 3
-    },                                           // end type MBPYRAMID
+        }  // end source dim 3
+    },  // end type MBPYRAMID
 
     {
         // type MBPRISM
@@ -733,8 +733,8 @@ const CN::UpConnMap CN::mUpConnMap[MBMAXTYPE][4][4] = {
             {                                       // target dimension 3
               { 0 },                                // 0 connected elements for all vertices
               { { 0 } } }                           // end target dimension 3
-        }                                           // end source dim 3
-    },                                              // end type MBPRISM
+        }  // end source dim 3
+    },  // end type MBPRISM
 
     {
         // type MBKNIFE
@@ -879,8 +879,8 @@ const CN::UpConnMap CN::mUpConnMap[MBMAXTYPE][4][4] = {
             {                                                  // target dimension 3
               { 0 },                                           // 0 connected elements for all vertices
               { { 0 } } }                                      // end target dimension 3
-        }                                                      // end source dim 3
-    },                                                         // end type MBHEX
+        }  // end source dim 3
+    },  // end type MBHEX
 
     {
         // type MBPOLYHEDRON
@@ -947,7 +947,7 @@ const CN::UpConnMap CN::mUpConnMap[MBMAXTYPE][4][4] = {
         { { { 0 }, { { 0 } } }, { { 0 }, { { 0 } } }, { { 0 }, { { 0 } } } },  // source dim 1
         { { { 0 }, { { 0 } } }, { { 0 }, { { 0 } } }, { { 0 }, { { 0 } } } },  // source dim 2
         { { { 0 }, { { 0 } } }, { { 0 }, { { 0 } } }, { { 0 }, { { 0 } } } }   // source dim 3
-    }                                                                          // end type MBENTITYSET
+    }  // end type MBENTITYSET
 };
 const unsigned char E                                                         = CN::MID_EDGE_BIT;
 const unsigned char F                                                         = CN::MID_FACE_BIT;

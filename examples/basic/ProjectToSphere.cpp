@@ -29,14 +29,13 @@ int main( int argc, char** argv )
     double radius = 1.0;
     opts.addOpt< double >( std::string( "radius,R" ), std::string( "project to radius" ), &radius );
 
-    opts.addOpt<void>( "deletePartitionSets,D", "delete partition sets from output file" );
-    opts.addOpt<void>( "deleteEdges,E", "delete edges from output file" );
+    opts.addOpt< void >( "deletePartitionSets,D", "delete partition sets from output file" );
+    opts.addOpt< void >( "deleteEdges,E", "delete edges from output file" );
 
     opts.parseCommandLine( argc, argv );
 
-    bool delete_partition_sets = opts.numOptSet("deletePartitionSets") > 0;
-    bool delete_edges = opts.numOptSet("deleteEdges") > 0;
-
+    bool delete_partition_sets = opts.numOptSet( "deletePartitionSets" ) > 0;
+    bool delete_edges          = opts.numOptSet( "deleteEdges" ) > 0;
 
     Core moab;
     Interface& mb = moab;
@@ -65,7 +64,8 @@ int main( int argc, char** argv )
         z_ptr[v] = pos[2];
     }
 
-    if (delete_edges){
+    if( delete_edges )
+    {
         Range edges;
         rval = mb.get_entities_by_dimension( 0, 1, edges );
         if( MB_SUCCESS != rval ) return 1;
@@ -77,7 +77,6 @@ int main( int argc, char** argv )
         rval = mb.delete_entities( &sf1, 1 );MB_CHK_SET_ERR( rval, "can't delete edge set from database" );
         mb.delete_entities( edges );
     }
-
 
     if( delete_partition_sets )
     {

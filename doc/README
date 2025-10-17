@@ -1,21 +1,50 @@
-How to generate doxygen document for MOAB in Linux:
+How to generate doxygen document for MOAB:
 
--  Install doxygen, and include the doxygen installation path to PATH.
+## Prerequisites
+- Install doxygen, and include the doxygen installation path to PATH.
 
--  After checking out moab from bitbucket, do following under moab directory:
+## Using CMake (Recommended)
 
-   autoreconf -fi
-   ./configure [options] --enable-docs --with-doxygen=DIR
-   make
-   make check
-   cd doc
-   doxygen user.dox
+After checking out MOAB from the repository, do the following under the MOAB directory:
 
-(--ebable-docs indicates to check for doxygen installation under your given --with-doxygen directory or, if --with-doxygen is not given, under your PATH. If doxygen execuable is not found, it'll report error and exit configure.
+```bash
+mkdir build
+cd build
+cmake .. [options] -DBUILD_DOCUMENTATION=ON
+make docs
+```
+
+The documentation will be generated in the `build/html/` directory. You can view it by opening `build/html/index.html` in your web browser.
+
+To install the documentation:
+```bash
+make install
+```
+The documentation will be installed to `share/doc/moab/api/`.
+
+To clean the documentation:
+```bash
+make clean-docs
+```
+
+## Using Autotools (Legacy)
+
+After checking out MOAB from the repository, do the following under the MOAB directory:
+
+```bash
+autoreconf -fi
+./configure [options] --enable-docs --with-doxygen=DIR
+make
+make check
+cd doc
+doxygen user.dox
+```
+
+(--enable-docs indicates to check for doxygen installation under your given --with-doxygen directory or, if --with-doxygen is not given, under your PATH. If doxygen executable is not found, it'll report error and exit configure.
 
 If you are sure doxygen is installed and put into PATH, you don't need to add --enable-docs or --with-doxygen, going to doc directory and directly applying "doxygen user.dox" should generate all the documents.)
 
--  After doxygen is done, you should be able to open web browser, and view MOAB document at file://your_moab_dir/doc/html/index.html . 
+- After doxygen is done, you should be able to open web browser, and view MOAB document at file://your_moab_dir/doc/html/index.html.
 
 
 

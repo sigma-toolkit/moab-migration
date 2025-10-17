@@ -186,7 +186,7 @@ ErrorCode adj_perf( const char* filename )
     time_total = mt->time_elapsed() - time_start;
     time_avg   = time_total / (double)edges.size();
 #else
-    error = mtu.get_bridge_adjacencies( *edges.begin(), 0, 1, ngbents );
+    error      = mtu.get_bridge_adjacencies( *edges.begin(), 0, 1, ngbents );
     time_start = mt->time_elapsed();
     for( Range::iterator i = edges.begin(); i != edges.end(); ++i )
     {
@@ -194,7 +194,7 @@ ErrorCode adj_perf( const char* filename )
         error = mtu.get_bridge_adjacencies( *i, 0, 1, ngbents );
     }
     time_total = mt->time_elapsed() - time_start;
-    time_avg = time_total / (double)edges.size();
+    time_avg   = time_total / (double)edges.size();
 #endif
 
     qtime.edge_to_edges_total = time_total;
@@ -243,7 +243,7 @@ ErrorCode adj_perf( const char* filename )
     time_total = mt->time_elapsed() - time_start;
     time_avg   = time_total / (double)faces.size();
 #else
-    error = mtu.get_bridge_adjacencies( *faces.begin(), 1, 2, ngbents );
+    error      = mtu.get_bridge_adjacencies( *faces.begin(), 1, 2, ngbents );
     time_start = mt->time_elapsed();
     for( Range::iterator i = faces.begin(); i != faces.end(); ++i )
     {
@@ -251,7 +251,7 @@ ErrorCode adj_perf( const char* filename )
         error = mtu.get_bridge_adjacencies( *i, 1, 2, ngbents );
     }
     time_total = mt->time_elapsed() - time_start;
-    time_avg = time_total / (double)faces.size();
+    time_avg   = time_total / (double)faces.size();
 #endif
 
     qtime.face_to_faces_total = time_total;
@@ -326,7 +326,7 @@ ErrorCode adj_perf( const char* filename )
     time_total = mt->time_elapsed() - time_start;
     time_avg   = time_total / (double)cells.size();
 #else
-    error = mtu.get_bridge_adjacencies( *cells.begin(), 2, 3, ngbents );
+    error      = mtu.get_bridge_adjacencies( *cells.begin(), 2, 3, ngbents );
     time_start = mt->time_elapsed();
     for( Range::iterator i = cells.begin(); i != cells.end(); ++i )
     {
@@ -334,7 +334,7 @@ ErrorCode adj_perf( const char* filename )
         error = mtu.get_bridge_adjacencies( *i, 2, 3, ngbents );
     }
     time_total = mt->time_elapsed() - time_start;
-    time_avg = time_total / (double)cells.size();
+    time_avg   = time_total / (double)cells.size();
 #endif
 
     qtime.cell_to_cells_total = time_total;

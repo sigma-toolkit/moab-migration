@@ -862,18 +862,17 @@ ErrorCode FBEngine::getAdjacentEntities( const EntityHandle from, const int to_d
     // check target dimension
     if( -1 == this_dim )
     {
-        // ProcessError(iBase_FAILURE, "Entity not a geometry entity.");
+        // Entity not a geometry entity
         return MB_FAILURE;
     }
     else if( 0 > to_dim || 3 < to_dim )
     {
-        // ProcessError(iBase_FAILURE, "To dimension must be between 0 and 3.");
+        // To dimension must be between 0 and 3
         return MB_FAILURE;
     }
     else if( to_dim == this_dim )
     {
-        // ProcessError(iBase_FAILURE,
-        //      "To dimension must be different from entity dimension.");
+        // To dimension must be different from entity dimension
         return MB_FAILURE;
     }
 
@@ -916,10 +915,8 @@ ErrorCode FBEngine::getAdjacentEntities( const EntityHandle from, const int to_d
 
 ErrorCode FBEngine::createTag( const char* tag_name, int tag_size, int tag_type, Tag& tag_handle_out )
 {
-    // this is copied from iMesh_MOAB.cpp; different name to not have trouble
-    // with it
-    // also, we do not want to depend on iMesh.h...
-    // iMesh is more complicated, because of the options passed
+    // Create a tag with the specified name, size, and type
+    // This function provides a simplified interface for tag creation
 
     DataType mb_data_type_table2[] = { MB_TYPE_OPAQUE, MB_TYPE_INTEGER, MB_TYPE_DOUBLE, MB_TYPE_HANDLE,
                                        MB_TYPE_HANDLE };
@@ -931,7 +928,7 @@ ErrorCode FBEngine::createTag( const char* tag_name, int tag_size, int tag_type,
 
     if( MB_SUCCESS != result )
     {
-        std::string msg( "iMesh_createTag: " );
+        std::string msg( "createTag: " );
         if( MB_ALREADY_ALLOCATED == result )
         {
             msg += "Tag already exists with name: \"";
@@ -945,7 +942,6 @@ ErrorCode FBEngine::createTag( const char* tag_name, int tag_size, int tag_type,
         }
     }
 
-    // end copy
     return MB_SUCCESS;
 }
 
@@ -1821,7 +1817,7 @@ ErrorCode FBEngine::separate( EntityHandle face,
                     queue1.push( tri2 );
                 }
             }  // end edge do not cross
-        }      // end while
+        }  // end while
     }
 
     std::sort( arr1.begin(), arr1.end() );
@@ -1959,7 +1955,7 @@ ErrorCode FBEngine::create_new_gedge( std::vector< EntityHandle >& nodesAlongPol
         MBERRORR( rval, "Failed to add parent child relation" );
     }
     // finally, put the edge in the range of edges
-    rval = _my_geomTopoTool->add_geo_set( new_geo_edge, 1 );MB_CHK_ERR( rval );
+    MB_CHK_ERR( _my_geomTopoTool->add_geo_set( new_geo_edge, 1 ) );
 
     return rval;
 }

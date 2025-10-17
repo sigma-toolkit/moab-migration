@@ -1,4 +1,23 @@
-/** @example ContinentsOnGlobe
+/**
+ * @file ContinentsOnGlobe.cpp
+ * @brief Example demonstrating continent boundary detection on spherical meshes
+ *
+ * This example shows how to:
+ * - Load spherical mesh files and continent boundary data
+ * - Convert 3D spherical coordinates to 2D lat-lon coordinates
+ * - Perform point-in-polygon tests for continent detection
+ * - Create mesh sets for different continents and islands
+ * - Tag mesh elements with continent information
+ * - Handle complex boundary loops for major landmasses
+ * - Write continent-mapped mesh files
+ *
+ * This tool is useful for climate and geophysical applications
+ * where continent boundaries need to be identified on spherical meshes.
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+ * @example ContinentsOnGlobe.cpp
  * Description: read a mesh on a sphere and boundaries of continents and major islands,
  *   and write a boundaries mesh file (bound.vtk) and a file with sets for major continents
  * (map.h5m). Boundaries exist as 2 files, a list of boundary points and a list of loops,
@@ -6,6 +25,10 @@
  * 1239 edges/segments (Asia+Europe), while the last one has only 3. It must be a small island :)
  *    ContinentsOnGlobe  <input.h5m>
  *  default values: poly2000.h5m : a mesh with 2000 polygons on a sphere of radius 1
+ *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 
 #include "moab/Core.hpp"
@@ -121,22 +144,23 @@ int main( int argc, char** argv )
         coords2d[2 * i + 1] = getLon( p );
     }
 
-    ErrorCode rval = mb->load_file( input_file.c_str() );MB_CHK_SET_ERR( rval, "Can't load file" );
+    MB_CHK_SET_ERR( mb->load_file( input_file.c_str() ), "Can't load file" );
     // look at the center of element, and see if it is inside the loop
 
     Range cells;
-    rval = mb->get_entities_by_dimension( 0, 2, cells );MB_CHK_SET_ERR( rval, "Can't get cells" );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 2, cells ), "Can't get cells" );
 
     cout << "number of cells: " << cells.size() << "\n";
 
     // tag for continents
     Tag tag1;
     int defa = -1;
-    rval     = mb->tag_get_handle( "continent", 1, MB_TYPE_INTEGER, tag1, MB_TAG_DENSE | MB_TAG_CREAT, &defa );MB_CHK_SET_ERR( rval, "Trouble creating continent tag" );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "continent", 1, MB_TYPE_INTEGER, tag1, MB_TAG_DENSE | MB_TAG_CREAT, &defa ),
+                    "Trouble creating continent tag" );
     EntityHandle islandSets[6];
     for( int loop_index = 0; loop_index < 6; loop_index++ )
     {
-        rval = mb->create_meshset( MESHSET_SET, islandSets[loop_index] );MB_CHK_SET_ERR( rval, "Can't create island set" );
+        MB_CHK_SET_ERR( mb->create_meshset( MESHSET_SET, islandSets[loop_index] ), "Can't create island set" );
         int startLoop = loopsindx[2 * loop_index];
         int endLoop   = loopsindx[2 * loop_index + 1];
 
@@ -146,7 +170,7 @@ int main( int argc, char** argv )
             EntityHandle cell = *cit;
             // see if it is in the interior of the loop
             CartVect center;
-            rval = mb->get_coords( &cell, 1, &( center[0] ) );MB_CHK_SET_ERR( rval, "Can't get cell center coords" );
+            MB_CHK_SET_ERR( mb->get_coords( &cell, 1, &( center[0] ) ), "Can't get cell center coords" );
             double lat = getLat( center ), lon = getLon( center );
             // if NA, use some boxes too, for lat/lon
             // if (NorthAmerica && (lat < 0.15 || lon < M_PI || lon > 2*M_PI - 0.5) )
@@ -155,17 +179,18 @@ int main( int argc, char** argv )
             if( interior_point( coords2d, startLoop, endLoop, lat, lon ) )
             {
                 interiorCells.push_back( cell );
-                rval = mb->tag_set_data( tag1, &cell, 1, &loop_index );MB_CHK_SET_ERR( rval, "Can't get tag on cell" );
+                MB_CHK_SET_ERR( mb->tag_set_data( tag1, &cell, 1, &loop_index ), "Can't get tag on cell" );
             }
         }
 
-        rval = mb->add_entities( islandSets[loop_index], &interiorCells[0], interiorCells.size() );MB_CHK_SET_ERR( rval, "Can't add entities to set" );
+        MB_CHK_SET_ERR( mb->add_entities( islandSets[loop_index], &interiorCells[0], interiorCells.size() ),
+                        "Can't add entities to set" );
     }
 
     std::stringstream islandFile;
 
     islandFile << "map.h5m";
 
-    rval = mb->write_file( islandFile.str().c_str() );MB_CHK_SET_ERR( rval, "Can't write island file" );
+    MB_CHK_SET_ERR( mb->write_file( islandFile.str().c_str() ), "Can't write island file" );
     return 0;
 }

@@ -109,8 +109,7 @@ class ZoltanPartitioner : public PartitionerBase< int >
 #endif
                        const bool use_coords = false,
                        int argc              = 0,
-                       char** argv           = NULL
-    );
+                       char** argv           = NULL );
 
     virtual ~ZoltanPartitioner();
 
@@ -240,7 +239,6 @@ class ZoltanPartitioner : public PartitionerBase< int >
                             double* edge_weights = NULL,
                             int* parts           = NULL,
                             bool part_geom       = false );
-
 };
 
 inline ErrorCode ZoltanPartitioner::partition_mesh( const int nparts,

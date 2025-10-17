@@ -372,7 +372,7 @@ ErrorCode Intx2MeshEdges::write_edge_map_parallel( const char* fileName )
     for( auto it = polys.begin(); it != polys.end(); ++it )
     {
         EntityHandle polygon     = *it;
-        const EntityHandle* conn = NULL;
+        const EntityHandle* conn = nullptr;
         int nv;
         rval = mb->get_connectivity( polygon, conn, nv );MB_CHK_SET_ERR( rval, "Failed to get connectivity" );
         if( max_edge < nv ) max_edge = nv;
@@ -435,7 +435,7 @@ ErrorCode Intx2MeshEdges::write_edge_map_parallel( const char* fileName )
         rval                 = mb->tag_get_data( gid, &polygon, 1, &gidPoly );MB_CHK_SET_ERR( rval, "Failed to get id of poly" );
         int indexGidPoly = localGidCells.index( gidPoly );
 
-        const EntityHandle* conn = NULL;
+        const EntityHandle* conn = nullptr;
         int nv;
         rval = mb->get_connectivity( polygon, conn, nv );MB_CHK_SET_ERR( rval, "Failed to get connectivity" );
         for( int i = 0; i < nv; i++ )
@@ -461,7 +461,7 @@ ErrorCode Intx2MeshEdges::write_edge_map_parallel( const char* fileName )
                 latv[j]                      = sph1.lat;
             }
             // reversed edge or not?
-            const EntityHandle* edgeconn = NULL;
+            const EntityHandle* edgeconn = nullptr;
             int nve;
             rval = mb->get_connectivity( edge, edgeconn, nve );MB_CHK_SET_ERR( rval, "Failed to get edge connectivity" );
             bool reverse = false;
@@ -576,7 +576,7 @@ ErrorCode Intx2MeshEdges::write_edge_map( const char* filename )
     for( auto it = polys.begin(); it != polys.end(); ++it )
     {
         EntityHandle polygon     = *it;
-        const EntityHandle* conn = NULL;
+        const EntityHandle* conn = nullptr;
         int nv;
         rval = mb->get_connectivity( polygon, conn, nv );MB_CHK_SET_ERR( rval, "Failed to get connectivity" );
         if( max_edge < nv ) max_edge = nv;
@@ -625,7 +625,7 @@ ErrorCode Intx2MeshEdges::write_edge_map( const char* filename )
         EntityHandle polygon = *it;
         int gidPoly          = 0;
         rval                 = mb->tag_get_data( gid, &polygon, 1, &gidPoly );MB_CHK_SET_ERR( rval, "Failed to get id of poly" );
-        const EntityHandle* conn = NULL;
+        const EntityHandle* conn = nullptr;
         int nv;
         rval = mb->get_connectivity( polygon, conn, nv );MB_CHK_SET_ERR( rval, "Failed to get connectivity" );
         for( int i = 0; i < nv; i++ )
@@ -651,7 +651,7 @@ ErrorCode Intx2MeshEdges::write_edge_map( const char* filename )
                 latv[j]                      = sph1.lat;
             }
             // reversed edge or not?
-            const EntityHandle* edgeconn = NULL;
+            const EntityHandle* edgeconn = nullptr;
             int nve;
             rval = mb->get_connectivity( edge, edgeconn, nve );MB_CHK_SET_ERR( rval, "Failed to get edge connectivity" );
             bool reverse = false;

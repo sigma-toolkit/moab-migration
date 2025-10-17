@@ -1,4 +1,23 @@
-/** @example DirectAccessWithHoles.cpp \n
+/**
+ * @file DirectAccessWithHoles.cpp
+ * @brief Example demonstrating direct access to MOAB data with holes in entity handle space
+ *
+ * This example shows how to:
+ * - Create a structured mesh with holes in the entity handle space
+ * - Use direct access iterators to avoid API overhead
+ * - Handle non-contiguous entity handles efficiently
+ * - Access vertex coordinates, element connectivity, and tag data directly
+ * - Work with adjacency lists for vertex-to-element relationships
+ * - Use maps to track data chunks for non-contiguous handles
+ *
+ * The program creates a 1D row of quad elements with specified holes,
+ * then demonstrates direct access to MOAB's internal data structures
+ * even when entity handles are not contiguous.
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+
  * \brief Use direct access to MOAB data to avoid calling through API \n
  *
  * This example creates a 1d row of quad elements, with a user-specified number of "holes" (missing
@@ -32,6 +51,9 @@
  *    make DirectAccessWithHoles \n
  * <b>To run</b>: ./DirectAccess [-nquads <# quads>] [-holes <# holes>]\n
  *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 
 #include "moab/Core.hpp"
@@ -73,21 +95,25 @@ int main( int argc, char** argv )
     }
 
     // Create simple structured mesh with hole, but using unstructured representation
-    ErrorCode rval = create_mesh_with_holes( mbImpl, nquads, nholes );MB_CHK_SET_ERR( rval, "Trouble creating mesh" );
+    MB_CHK_SET_ERR( create_mesh_with_holes( mbImpl, nquads, nholes ), "Trouble creating mesh" );
 
     // Get all vertices and non-vertex entities
     Range verts, elems;
-    rval = mbImpl->get_entities_by_handle( 0, elems );MB_CHK_SET_ERR( rval, "Trouble getting all entities" );
+    MB_CHK_SET_ERR( mbImpl->get_entities_by_handle( 0, elems ), "Trouble getting all entities" );
     verts = elems.subset_by_dimension( 0 );
     elems -= verts;
 
     // Create tag1 (element-based avg), tag2 (vertex-based avg), tag3 (# connected verts)
     Tag tag1, tag2, tag3;
-    rval = mbImpl->tag_get_handle( "tag1", 3, MB_TYPE_DOUBLE, tag1, MB_TAG_DENSE | MB_TAG_CREAT );MB_CHK_SET_ERR( rval, "Trouble creating tag1" );
+    MB_CHK_SET_ERR( mbImpl->tag_get_handle( "tag1", 3, MB_TYPE_DOUBLE, tag1, MB_TAG_DENSE | MB_TAG_CREAT ),
+                    "Trouble creating tag1" );
     double def_val[3] = { 0.0, 0.0, 0.0 };  // Need a default value for tag2 because we sum into it
-    rval              = mbImpl->tag_get_handle( "tag2", 3, MB_TYPE_DOUBLE, tag2, MB_TAG_DENSE | MB_TAG_CREAT, def_val );MB_CHK_SET_ERR( rval, "Trouble creating tag2" );
+    MB_CHK_SET_ERR( mbImpl->tag_get_handle( "tag2", 3, MB_TYPE_DOUBLE, tag2, MB_TAG_DENSE | MB_TAG_CREAT, def_val ),
+                    "Trouble creating tag2" );
     int def_val_int = 0;  // Need a default value for tag3 because we increment it
-    rval = mbImpl->tag_get_handle( "tag3", 1, MB_TYPE_INTEGER, tag3, MB_TAG_DENSE | MB_TAG_CREAT, &def_val_int );MB_CHK_SET_ERR( rval, "Trouble creating tag3" );
+    MB_CHK_SET_ERR( mbImpl->tag_get_handle( "tag3", 1, MB_TYPE_INTEGER, tag3, MB_TAG_DENSE | MB_TAG_CREAT,
+                                            &def_val_int ),
+                    "Trouble creating tag3" );
 
     // Get connectivity, coordinate, tag, and adjacency iterators
     EntityHandle* conn_ptr;
@@ -104,7 +130,8 @@ int main( int argc, char** argv )
 
     // Get coordinates iterator, just need this once because we know verts handle space doesn't have
     // holes
-    rval = mbImpl->coords_iterate( verts.begin(), verts.end(), x_ptr, y_ptr, z_ptr, count );MB_CHK_SET_ERR( rval, "Error in coords_iterate" );
+    MB_CHK_SET_ERR( mbImpl->coords_iterate( verts.begin(), verts.end(), x_ptr, y_ptr, z_ptr, count ),
+                    "Error in coords_iterate" );
     assert( count == (int)verts.size() );  // Should end up with just one contiguous chunk of vertices
 
     // Iterate through elements, computing midpoint based on vertex positions, set on element-based
@@ -115,8 +142,10 @@ int main( int argc, char** argv )
     {
         // Get conn_ptr, tag1_ptr for next contiguous chunk of element handles, and coords pointers
         // for all verts
-        rval = mbImpl->connect_iterate( e_it, elems.end(), conn_ptr, vpere, count );MB_CHK_SET_ERR( rval, "Error in connect_iterate" );
-        rval = mbImpl->tag_iterate( tag1, e_it, elems.end(), count, (void*&)tag1_ptr );MB_CHK_SET_ERR( rval, "Error in tag1_iterate" );
+        MB_CHK_SET_ERR( mbImpl->connect_iterate( e_it, elems.end(), conn_ptr, vpere, count ),
+                        "Error in connect_iterate" );
+        MB_CHK_SET_ERR( mbImpl->tag_iterate( tag1, e_it, elems.end(), count, (void*&)tag1_ptr ),
+                        "Error in tag1_iterate" );
 
         // Iterate over elements in this chunk
         for( int i = 0; i < count; i++ )
@@ -156,8 +185,10 @@ int main( int argc, char** argv )
     while( e_it != elems.end() )
     {
         tag_struct ts = { NULL, NULL };
-        rval          = mbImpl->tag_iterate( tag2, e_it, elems.end(), count, (void*&)ts.avg_ptr );MB_CHK_SET_ERR( rval, "Error in tag2_iterate" );
-        rval = mbImpl->tag_iterate( tag3, e_it, elems.end(), count, (void*&)ts.nv_ptr );MB_CHK_SET_ERR( rval, "Error in tag3_iterate" );
+        MB_CHK_SET_ERR( mbImpl->tag_iterate( tag2, e_it, elems.end(), count, (void*&)ts.avg_ptr ),
+                        "Error in tag2_iterate" );
+        MB_CHK_SET_ERR( mbImpl->tag_iterate( tag3, e_it, elems.end(), count, (void*&)ts.nv_ptr ),
+                        "Error in tag3_iterate" );
         elem_map[*e_it] = ts;
         e_it += count;
     }
@@ -165,14 +196,16 @@ int main( int argc, char** argv )
     // Call a vertex-quad adjacencies function to generate vertex-element adjacencies in MOAB
     Range::iterator v_it = verts.begin();
     Range dum_range;
-    rval = mbImpl->get_adjacencies( &( *v_it ), 1, 2, false, dum_range );MB_CHK_SET_ERR( rval, "Error in get_adjacencies" );
+    MB_CHK_SET_ERR( mbImpl->get_adjacencies( &( *v_it ), 1, 2, false, dum_range ), "Error in get_adjacencies" );
     const vector< EntityHandle >** adjs_ptr;
     while( v_it != verts.end() )
     {
         // Get coords ptrs, adjs_ptr; can't set tag2_ptr by direct access, because of hole in
         // element handle space
-        rval = mbImpl->coords_iterate( v_it, verts.end(), x_ptr, y_ptr, z_ptr, count );MB_CHK_SET_ERR( rval, "Error in coords_iterate" );
-        rval = mbImpl->adjacencies_iterate( v_it, verts.end(), adjs_ptr, count );MB_CHK_SET_ERR( rval, "Error in adjacencies_iterate" );
+        MB_CHK_SET_ERR( mbImpl->coords_iterate( v_it, verts.end(), x_ptr, y_ptr, z_ptr, count ),
+                        "Error in coords_iterate" );
+        MB_CHK_SET_ERR( mbImpl->adjacencies_iterate( v_it, verts.end(), adjs_ptr, count ),
+                        "Error in adjacencies_iterate" );
 
         for( int v = 0; v < count; v++ )
         {
@@ -204,9 +237,12 @@ int main( int argc, char** argv )
     {
         // Get conn_ptr, tag1_ptr for next contiguous chunk of element handles, and coords pointers
         // for all verts
-        rval = mbImpl->tag_iterate( tag1, e_it, elems.end(), count, (void*&)tag1_ptr );MB_CHK_SET_ERR( rval, "Error in tag1_iterate" );
-        rval = mbImpl->tag_iterate( tag2, e_it, elems.end(), count, (void*&)tag2_ptr );MB_CHK_SET_ERR( rval, "Error in tag2_iterate" );
-        rval = mbImpl->tag_iterate( tag3, e_it, elems.end(), count, (void*&)tag3_ptr );MB_CHK_SET_ERR( rval, "Error in tag3_iterate" );
+        MB_CHK_SET_ERR( mbImpl->tag_iterate( tag1, e_it, elems.end(), count, (void*&)tag1_ptr ),
+                        "Error in tag1_iterate" );
+        MB_CHK_SET_ERR( mbImpl->tag_iterate( tag2, e_it, elems.end(), count, (void*&)tag2_ptr ),
+                        "Error in tag2_iterate" );
+        MB_CHK_SET_ERR( mbImpl->tag_iterate( tag3, e_it, elems.end(), count, (void*&)tag3_ptr ),
+                        "Error in tag3_iterate" );
 
         // Iterate over elements in this chunk
         for( int i = 0; i < count; i++ )
@@ -232,14 +268,16 @@ ErrorCode create_mesh_with_holes( Interface* mbImpl, int nquads, int nholes )
     // First make the mesh, a 1d array of quads with left hand side x = elem_num; vertices are
     // numbered in layers
     ReadUtilIface* read_iface;
-    ErrorCode rval = mbImpl->query_interface( read_iface );MB_CHK_SET_ERR( rval, "Error in query_interface" );
+    MB_CHK_SET_ERR( mbImpl->query_interface( read_iface ), "Error in query_interface" );
     vector< double* > coords;
     EntityHandle start_vert, start_elem, *connect;
     // Create verts, num is 4(nquads+1) because they're in a 1d row; will initialize coords in loop
     // over elems later
-    rval = read_iface->get_node_coords( 3, 2 * ( nquads + 1 ), 0, start_vert, coords );MB_CHK_SET_ERR( rval, "Error in get_node_arrays" );
+    MB_CHK_SET_ERR( read_iface->get_node_coords( 3, 2 * ( nquads + 1 ), 0, start_vert, coords ),
+                    "Error in get_node_arrays" );
     // Create elems
-    rval = read_iface->get_element_connect( nquads, 4, MBQUAD, 0, start_elem, connect );MB_CHK_SET_ERR( rval, "Error in get_element_connect" );
+    MB_CHK_SET_ERR( read_iface->get_element_connect( nquads, 4, MBQUAD, 0, start_elem, connect ),
+                    "Error in get_element_connect" );
     for( int i = 0; i < nquads; i++ )
     {
         coords[0][2 * i] = coords[0][2 * i + 1] = (double)i;  // x values are all i
@@ -263,7 +301,7 @@ ErrorCode create_mesh_with_holes( Interface* mbImpl, int nquads, int nholes )
     for( int i = 0; i < nholes; i++ )
     {
         start_elem += de;
-        rval = mbImpl->delete_entities( &start_elem, 1 );MB_CHK_SET_ERR( rval, "Error in delete_entities" );
+        MB_CHK_SET_ERR( mbImpl->delete_entities( &start_elem, 1 ), "Error in delete_entities" );
     }
 
     return MB_SUCCESS;

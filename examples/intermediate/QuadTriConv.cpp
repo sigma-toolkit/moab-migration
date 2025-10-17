@@ -1,9 +1,30 @@
-/** @example QuadTriConv.cpp \n
+/**
+ * @file QuadTriConv.cpp
+ * @brief Example demonstrating conversion of repeated-vertex cells to triangles/quads/polygons
+ *
+ * This example shows how to:
+ * - Load a mesh file with repeated vertices in 2D cells (e.g., at poles)
+ * - Merge repeated vertices in cell connectivity
+ * - Convert cells to triangles, quads, or polygons as appropriate
+ * - Preserve global ID tags during conversion
+ * - Write the modified mesh to a new file
+ *
+ * This is useful for cleaning up rll meshes or other grids with repeated
+ * vertices at the poles or other singularities.
+ *
+ * @author MOAB Development Team
+ * @date 2024
+ *
+
  * \brief Merge vertices in 2d cell, if they are repeated \n
  * <b>To run</b>: QuadTriConv  input_file output_file \n
  *
  * In this example, a mesh that has vertices repeated due to south or north pole, for
  *  example in an rll mesh, need to be converted to triangles, preserving GLOBAL_ID tag
+ *
+ * @param argc Number of command line arguments
+ * @param argv Command line arguments array
+ * @return 0 on success, 1 on failure
  */
 
 #include <iostream>
@@ -30,16 +51,16 @@ int main( int argc, char** argv )
     if( argc > 2 ) outfile = string( argv[2] );
 
     // This file is in the mesh files directory
-    ErrorCode rval = mb->load_file( filename.c_str() );MB_CHK_SET_ERR( rval, "Failed to read" );
+    MB_CHK_SET_ERR( mb->load_file( filename.c_str() ), "Failed to read" );
 
     // get all cells of dimension 2;
     Range cells;
-    rval = mb->get_entities_by_dimension( 0, 2, cells );MB_CHK_SET_ERR( rval, "Failed to get cells" );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 2, cells ), "Failed to get cells" );
 
     cout << " number of cells : " << cells.size() << "\n";
 
     Tag gid;  // global id tag
-    rval = mb->tag_get_handle( "GLOBAL_ID", gid );MB_CHK_SET_ERR( rval, "Failed to get Global ID tag" );
+    MB_CHK_SET_ERR( mb->tag_get_handle( "GLOBAL_ID", gid ), "Failed to get Global ID tag" );
 
     Range modifiedCells;  // will be deleted at the end; keep the gid
 
@@ -48,7 +69,7 @@ int main( int argc, char** argv )
         EntityHandle cell          = *cit;
         const EntityHandle* connec = NULL;
         int num_verts              = 0;
-        rval                       = mb->get_connectivity( cell, connec, num_verts );MB_CHK_SET_ERR( rval, "Failed to get connectivity" );
+        MB_CHK_SET_ERR( mb->get_connectivity( cell, connec, num_verts ), "Failed to get connectivity" );
 
         vector< EntityHandle > newConnec;
         newConnec.push_back( connec[0] );  // at least one vertex
@@ -85,11 +106,11 @@ int main( int argc, char** argv )
 
             // create new cell
             EntityHandle newCell;
-            rval = mb->create_element( type, &newConnec[0], new_size, newCell );MB_CHK_SET_ERR( rval, "Failed to create new cell" );
+            MB_CHK_SET_ERR( mb->create_element( type, &newConnec[0], new_size, newCell ), "Failed to create new cell" );
             // set the old id to the new element
             int id;
-            rval = mb->tag_get_data( gid, &cell, 1, &id );MB_CHK_SET_ERR( rval, "Failed to get global id" );
-            rval = mb->tag_set_data( gid, &newCell, 1, &id );MB_CHK_SET_ERR( rval, "Failed to set global id on new cell" );
+            MB_CHK_SET_ERR( mb->tag_get_data( gid, &cell, 1, &id ), "Failed to get global id" );
+            MB_CHK_SET_ERR( mb->tag_set_data( gid, &newCell, 1, &id ), "Failed to set global id on new cell" );
         }
     }
 
@@ -98,19 +119,19 @@ int main( int argc, char** argv )
     // they are needed for migrating later on
     //
     Range verts;
-    rval = mb->get_entities_by_dimension( 0, 0, verts );MB_CHK_SET_ERR( rval, "Failed to get vertices" );
+    MB_CHK_SET_ERR( mb->get_entities_by_dimension( 0, 0, verts ), "Failed to get vertices" );
 
     vector< int > gids;
     gids.resize( verts.size() );
-    rval = mb->tag_get_data( gid, verts, &gids[0] );MB_CHK_SET_ERR( rval, "Failed to get gids on vertices" );
+    MB_CHK_SET_ERR( mb->tag_get_data( gid, verts, &gids[0] ), "Failed to get gids on vertices" );
     if( gids[0] <= 0 )
     {
         // gids were never set, assign them
         for( size_t i = 1; i <= verts.size(); i++ )
             gids[i - 1] = (int)i;
-        rval = mb->tag_set_data( gid, verts, &gids[0] );MB_CHK_SET_ERR( rval, "Failed to set gids on vertices" );
+        MB_CHK_SET_ERR( mb->tag_set_data( gid, verts, &gids[0] ), "Failed to set gids on vertices" );
     }
-    rval = mb->write_file( outfile.c_str() );MB_CHK_SET_ERR( rval, "Failed to write new file" );
+    MB_CHK_SET_ERR( mb->write_file( outfile.c_str() ), "Failed to write new file" );
 
     cout << " wrote file " << outfile << " with " << modifiedCells.size() << " modified cells\n";
 

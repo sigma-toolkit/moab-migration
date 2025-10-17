@@ -53,7 +53,7 @@ void build_coords( const int nelem, double*& coords )
 
     double scale = LENGTH / nelem;
 // use FORTRAN-like indexing
-#define VINDEX( i, j, k ) ( ( i ) + ( (j)*numv ) + ( (k)*numv_sq ) )
+#define VINDEX( i, j, k ) ( ( i ) + ( ( j ) * numv ) + ( ( k ) * numv_sq ) )
 
     int idx;
     for( int i = 0; i < numv; i++ )

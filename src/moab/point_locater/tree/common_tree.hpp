@@ -102,7 +102,7 @@ namespace common_tree
                 return ( a + b ) / 2.0;
             }
         };  // Compute_center
-    }       // namespace
+    }  // namespace
 
     template < typename Vector >
     inline void compute_box_center( Vector& max, Vector& min, Vector& center )

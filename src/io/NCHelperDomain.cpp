@@ -47,8 +47,6 @@ ErrorCode NCHelperDomain::init_mesh_vals()
     int& partMethod     = _readNC->partMethod;
     ScdParData& parData = _readNC->parData;
 
-    ErrorCode rval;
-
     // Look for names of i/j dimensions
     // First i
     std::vector< std::string >::iterator vit;
@@ -108,7 +106,7 @@ ErrorCode NCHelperDomain::init_mesh_vals()
         int pdims[3];
 
         locallyPeriodic[0] = locallyPeriodic[1] = locallyPeriodic[2] = 0;
-        rval = ScdInterface::compute_partition( procs, rank, parData, lDims, locallyPeriodic, pdims );MB_CHK_ERR( rval );
+        MB_CHK_ERR( ScdInterface::compute_partition( procs, rank, parData, lDims, locallyPeriodic, pdims ) );
         for( int i = 0; i < 3; i++ )
             parData.pDims[i] = pdims[i];
 
@@ -200,9 +198,12 @@ ErrorCode NCHelperDomain::init_mesh_vals()
         std::stringstream ss_tag_name;
         ss_tag_name << ijdimNames[i] << "_LOC_MINMAX";
         tag_name = ss_tag_name.str();
-        rval     = mbImpl->tag_get_handle( tag_name.c_str(), 2, MB_TYPE_INTEGER, tagh, MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_SET_ERR( rval, "Trouble creating conventional tag " << tag_name );
-        rval = mbImpl->tag_set_data( tagh, &_fileSet, 1, &val[0] );MB_CHK_SET_ERR( rval, "Trouble setting data to conventional tag " << tag_name );
-        if( MB_SUCCESS == rval ) dbgOut.tprintf( 2, "Conventional tag %s is created.\n", tag_name.c_str() );
+        MB_CHK_SET_ERR( mbImpl->tag_get_handle( tag_name.c_str(), 2, MB_TYPE_INTEGER, tagh,
+                                                MB_TAG_SPARSE | MB_TAG_CREAT ),
+                        "Trouble creating conventional tag " << tag_name );
+        MB_CHK_SET_ERR( mbImpl->tag_set_data( tagh, &_fileSet, 1, &val[0] ),
+                        "Trouble setting data to conventional tag " << tag_name );
+        dbgOut.tprintf( 2, "Conventional tag %s is created.\n", tag_name.c_str() );
     }
 
     // __<dim_name>_LOC_VALS (for slon, slat, lon and lat)
@@ -219,10 +220,12 @@ ErrorCode NCHelperDomain::init_mesh_vals()
     // do not need conventional tags
     Tag convTagsCreated = 0;
     int def_val         = 0;
-    rval                = mbImpl->tag_get_handle( "__CONV_TAGS_CREATED", 1, MB_TYPE_INTEGER, convTagsCreated,
-                                                  MB_TAG_SPARSE | MB_TAG_CREAT, &def_val );MB_CHK_SET_ERR( rval, "Trouble getting _CONV_TAGS_CREATED tag" );
+    MB_CHK_SET_ERR( mbImpl->tag_get_handle( "__CONV_TAGS_CREATED", 1, MB_TYPE_INTEGER, convTagsCreated,
+                                            MB_TAG_SPARSE | MB_TAG_CREAT, &def_val ),
+                    "Trouble getting _CONV_TAGS_CREATED tag" );
     int create_conv_tags_flag = 1;
-    rval                      = mbImpl->tag_set_data( convTagsCreated, &_fileSet, 1, &create_conv_tags_flag );MB_CHK_SET_ERR( rval, "Trouble setting _CONV_TAGS_CREATED tag" );
+    MB_CHK_SET_ERR( mbImpl->tag_set_data( convTagsCreated, &_fileSet, 1, &create_conv_tags_flag ),
+                    "Trouble setting _CONV_TAGS_CREATED tag" );
 
     return MB_SUCCESS;
 }
@@ -238,7 +241,6 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     bool& culling     = _readNC->culling;
     bool& repartition = _readNC->repartition;
 
-    ErrorCode rval;
     int success = 0;
 
     int local_elems = ( lDims[4] - lDims[1] ) * ( lDims[3] - lDims[0] );
@@ -340,16 +342,22 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read double data for area variable " );
     // create tags for them
     Tag areaTag, fracTag, xcTag, ycTag;
-    rval = mbImpl->tag_get_handle( "area", 1, MB_TYPE_DOUBLE, areaTag, MB_TAG_DENSE | MB_TAG_CREAT );MB_CHK_SET_ERR( rval, "Trouble creating area tag" );
-    rval = mbImpl->tag_get_handle( "frac", 1, MB_TYPE_DOUBLE, fracTag, MB_TAG_DENSE | MB_TAG_CREAT );MB_CHK_SET_ERR( rval, "Trouble creating frac tag" );
-    rval = mbImpl->tag_get_handle( "xc", 1, MB_TYPE_DOUBLE, xcTag, MB_TAG_DENSE | MB_TAG_CREAT );MB_CHK_SET_ERR( rval, "Trouble creating xc tag" );
-    rval = mbImpl->tag_get_handle( "yc", 1, MB_TYPE_DOUBLE, ycTag, MB_TAG_DENSE | MB_TAG_CREAT );MB_CHK_SET_ERR( rval, "Trouble creating yc tag" );
+    MB_CHK_SET_ERR( mbImpl->tag_get_handle( "area", 1, MB_TYPE_DOUBLE, areaTag, MB_TAG_DENSE | MB_TAG_CREAT ),
+                    "Trouble creating area tag" );
+    MB_CHK_SET_ERR( mbImpl->tag_get_handle( "frac", 1, MB_TYPE_DOUBLE, fracTag, MB_TAG_DENSE | MB_TAG_CREAT ),
+                    "Trouble creating frac tag" );
+    MB_CHK_SET_ERR( mbImpl->tag_get_handle( "xc", 1, MB_TYPE_DOUBLE, xcTag, MB_TAG_DENSE | MB_TAG_CREAT ),
+                    "Trouble creating xc tag" );
+    MB_CHK_SET_ERR( mbImpl->tag_get_handle( "yc", 1, MB_TYPE_DOUBLE, ycTag, MB_TAG_DENSE | MB_TAG_CREAT ),
+                    "Trouble creating yc tag" );
 
     // create tags for GRID_IMASK, which will be the same name as the Scrip helper tag that holds the mask
     // create the maskTag GRID_IMASK, with default value of 1
     Tag maskTag;
     int def_val = 1;
-    rval = mbImpl->tag_get_handle( "GRID_IMASK", 1, MB_TYPE_INTEGER, maskTag, MB_TAG_DENSE | MB_TAG_CREAT, &def_val );MB_CHK_SET_ERR( rval, "Trouble creating GRID_IMASK tag" );
+    MB_CHK_SET_ERR( mbImpl->tag_get_handle( "GRID_IMASK", 1, MB_TYPE_INTEGER, maskTag, MB_TAG_DENSE | MB_TAG_CREAT,
+                                            &def_val ),
+                    "Trouble creating GRID_IMASK tag" );
 
     // will now look to repartition the cells, using zoltan, looking at the xc and yc coordinates in 2d, convert to 3d,
     // and decide based on those partitioning info to what task to send each cell, along with its vertices, and global id
@@ -366,7 +374,8 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     if( procs >= 2 && repartition )
     {
         // Redistribute local cells after trivial partition (e.g. apply Zoltan partition)
-        rval = redistribute_cells( myPcomm, xc, yc, xv, yv, frac, mask, area, gids, nv, nv_last );MB_CHK_SET_ERR( rval, "Failed to redistribute local cells" );
+        MB_CHK_SET_ERR( redistribute_cells( myPcomm, xc, yc, xv, yv, frac, mask, area, gids, nv, nv_last ),
+                        "Failed to redistribute local cells" );
         local_elems = (int)xc.size();
         dbgOut.tprintf( 1, "local cells after repartition: %d \n", local_elems );
     }
@@ -399,7 +408,9 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
 
     if( nv > 1 && num_actual_cells > 0 )
     {
-        rval = _readNC->readMeshIface->get_element_connect( num_actual_cells, nv, mdb_type, 0, start_cell, conn_arr );MB_CHK_SET_ERR( rval, "Failed to create local cells" );
+        MB_CHK_SET_ERR( _readNC->readMeshIface->get_element_connect( num_actual_cells, nv, mdb_type, 0, start_cell,
+                                                                     conn_arr ),
+                        "Failed to create local cells" );
         tmp_range.insert( start_cell, start_cell + num_actual_cells - 1 );
     }
 
@@ -450,7 +461,8 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
         int nLocalVertices = (int)vertex_map.size();
         std::vector< double* > arrays;
         EntityHandle start_vertex;
-        rval = _readNC->readMeshIface->get_node_coords( 3, nLocalVertices, 0, start_vertex, arrays );MB_CHK_SET_ERR( rval, "Failed to create local vertices" );
+        MB_CHK_SET_ERR( _readNC->readMeshIface->get_node_coords( 3, nLocalVertices, 0, start_vertex, arrays ),
+                        "Failed to create local vertices" );
 
         vtx_handle = start_vertex;
         // Copy vertex coordinates into entity sequence coordinate arrays
@@ -498,19 +510,19 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
             EntityHandle cell = start_vertex + index;
             if( nv > 1 ) cell = start_cell + index;
             // set other tags, like xc, yc, frac, area
-            rval = mbImpl->tag_set_data( xcTag, &cell, 1, &xc[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set xc tag" );
-            rval = mbImpl->tag_set_data( ycTag, &cell, 1, &yc[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set yc tag" );
-            rval = mbImpl->tag_set_data( areaTag, &cell, 1, &area[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set area tag" );
-            rval = mbImpl->tag_set_data( fracTag, &cell, 1, &frac[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set frac tag" );
-            rval = mbImpl->tag_set_data( maskTag, &cell, 1, &mask[elem_index] );MB_CHK_SET_ERR( rval, "Failed to set mask tag" );
+            MB_CHK_SET_ERR( mbImpl->tag_set_data( xcTag, &cell, 1, &xc[elem_index] ), "Failed to set xc tag" );
+            MB_CHK_SET_ERR( mbImpl->tag_set_data( ycTag, &cell, 1, &yc[elem_index] ), "Failed to set yc tag" );
+            MB_CHK_SET_ERR( mbImpl->tag_set_data( areaTag, &cell, 1, &area[elem_index] ), "Failed to set area tag" );
+            MB_CHK_SET_ERR( mbImpl->tag_set_data( fracTag, &cell, 1, &frac[elem_index] ), "Failed to set frac tag" );
+            MB_CHK_SET_ERR( mbImpl->tag_set_data( maskTag, &cell, 1, &mask[elem_index] ), "Failed to set mask tag" );
 
             // set the global id too:
             int globalId = gids[elem_index];
-            rval         = mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId );MB_CHK_SET_ERR( rval, "Failed to set global id tag" );
+            MB_CHK_SET_ERR( mbImpl->tag_set_data( mGlobalIdTag, &cell, 1, &globalId ), "Failed to set global id tag" );
             index++;
         }
 
-        rval = mbImpl->add_entities( _fileSet, tmp_range );MB_CHK_SET_ERR( rval, "Failed to add new cells to current file set" );
+        MB_CHK_SET_ERR( mbImpl->add_entities( _fileSet, tmp_range ), "Failed to add new cells to current file set" );
 
         // modify local file set, to merge coincident vertices, and to correct repeated vertices in elements
         std::vector< Tag > tagList;
@@ -520,13 +532,14 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
         tagList.push_back( areaTag );
         tagList.push_back( fracTag );
         tagList.push_back( maskTag );  // not sure this is needed though ? on cells or on vertices?
-        rval = IntxUtils::remove_padded_vertices( mbImpl, _fileSet, tagList );MB_CHK_SET_ERR( rval, "Failed to remove duplicate vertices" );
+        MB_CHK_SET_ERR( IntxUtils::remove_padded_vertices( mbImpl, _fileSet, tagList ),
+                        "Failed to remove duplicate vertices" );
 
-        rval = mbImpl->get_entities_by_dimension( _fileSet, 2, faces );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mbImpl->get_entities_by_dimension( _fileSet, 2, faces ) );
         Range all_verts;
-        rval = mbImpl->get_connectivity( faces, all_verts );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mbImpl->get_connectivity( faces, all_verts ) );
         //printf(" range vert size :%ld \n", all_verts.size());
-        rval = mbImpl->add_entities( _fileSet, all_verts );MB_CHK_ERR( rval );
+        MB_CHK_ERR( mbImpl->add_entities( _fileSet, all_verts ) );
 
         // need to add adjacencies; TODO: fix this for all nc readers
         // copy this logic from migrate mesh in par comm graph
@@ -541,7 +554,7 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
                 EntityHandle eh          = *it;
                 const EntityHandle* conn = NULL;
                 int num_nodes            = 0;
-                rval                     = mb->get_connectivity( eh, conn, num_nodes );MB_CHK_ERR( rval );
+                MB_CHK_ERR( mb->get_connectivity( eh, conn, num_nodes ) );
                 adj_fact->notify_create_entity( eh, conn, num_nodes );
             }
         }
@@ -553,11 +566,12 @@ ErrorCode NCHelperDomain::create_mesh( Range& faces )
     {
         double tol = 1.e-12;  // this is the same as static tolerance in NCHelper
         ParallelMergeMesh pmm( myPcomm, tol );
-        rval = pmm.merge( _fileSet,
-                          /* do not do local merge*/ false,
-                          /*  2d cells*/ 2 );MB_CHK_SET_ERR( rval, "Failed to merge vertices in parallel" );
+        MB_CHK_SET_ERR( pmm.merge( _fileSet,
+                                   /* do not do local merge*/ false,
+                                   /*  2d cells*/ 2 ),
+                        "Failed to merge vertices in parallel" );
         // assign global ids only for vertices, cells have them fine
-        rval = myPcomm->assign_global_ids( _fileSet, /*dim*/ 0 );MB_CHK_ERR( rval );
+        MB_CHK_ERR( myPcomm->assign_global_ids( _fileSet, /*dim*/ 0 ) );
     }
 #endif
 

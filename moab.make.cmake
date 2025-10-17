@@ -14,7 +14,7 @@ MOAB_PARMETIS_ENABLED = @MOAB_HAVE_PARMETIS@
 MOAB_ZOLTAN_ENABLED = @MOAB_HAVE_ZOLTAN@
 
 # Library and Include paths
-MOAB_LIBDIR = @abs_builddir@/src/.libs
+MOAB_LIBDIR = @abs_builddir@/lib
 MOAB_INCLUDES = -I@abs_srcdir@/src \
                 -I@abs_builddir@/src \
                 -I@abs_srcdir@/src/oldinc \

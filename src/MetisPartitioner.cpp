@@ -82,15 +82,18 @@ ErrorCode MetisPartitioner::partition_mesh( const idx_t nparts,
     ErrorCode result;
     if( !partition_tagged_sets && !partition_tagged_ents )
     {
-        result = assemble_graph( part_dim, pts, ids, adjs, length, elems );MB_CHK_ERR( result );
+        result = assemble_graph( part_dim, pts, ids, adjs, length, elems );
+        MB_CHK_ERR( result );
     }
     else if( partition_tagged_sets )
     {
-        result = assemble_taggedsets_graph( part_dim, pts, ids, adjs, length, elems, &( *aggregating_tag ) );MB_CHK_ERR( result );
+        result = assemble_taggedsets_graph( part_dim, pts, ids, adjs, length, elems, &( *aggregating_tag ) );
+        MB_CHK_ERR( result );
     }
     else if( partition_tagged_ents )
     {
-        result = assemble_taggedents_graph( part_dim, pts, ids, adjs, length, elems, &( *aggregating_tag ) );MB_CHK_ERR( result );
+        result = assemble_taggedents_graph( part_dim, pts, ids, adjs, length, elems, &( *aggregating_tag ) );
+        MB_CHK_ERR( result );
     }
     else
     {
@@ -151,7 +154,8 @@ ErrorCode MetisPartitioner::partition_mesh( const idx_t nparts,
     if( assign_global_ids )
     {
         EntityHandle rootset = 0;
-        result               = mbpc->assign_global_ids( rootset, part_dim, 1, true, false );MB_CHK_ERR( result );
+        result               = mbpc->assign_global_ids( rootset, part_dim, 1, true, false );
+        MB_CHK_ERR( result );
     }
 #endif
 
@@ -162,11 +166,13 @@ ErrorCode MetisPartitioner::partition_mesh( const idx_t nparts,
     {
         if( partition_tagged_sets || partition_tagged_ents )
         {
-            result = write_aggregationtag_partition( nparts, elems, assign_parts, write_as_sets, write_as_tags );MB_CHK_ERR( result );
+            result = write_aggregationtag_partition( nparts, elems, assign_parts, write_as_sets, write_as_tags );
+            MB_CHK_ERR( result );
         }
         else
         {
-            result = write_partition( nparts, elems, assign_parts, write_as_sets, write_as_tags );MB_CHK_ERR( result );
+            result = write_partition( nparts, elems, assign_parts, write_as_sets, write_as_tags );
+            MB_CHK_ERR( result );
         }
     }
 
@@ -259,7 +265,8 @@ ErrorCode MetisPartitioner::assemble_taggedsets_graph( const int dimension,
 
     // get the tagged elements
     Tag partSetTag;
-    ErrorCode result = mbImpl->tag_get_handle( aggregating_tag, 1, MB_TYPE_INTEGER, partSetTag );MB_CHK_ERR( result );
+    ErrorCode result = mbImpl->tag_get_handle( aggregating_tag, 1, MB_TYPE_INTEGER, partSetTag );
+    MB_CHK_ERR( result );
     // ErrorCode result = mbImpl->tag_get_handle("PARALLEL_PARTITION_SET", 1, MB_TYPE_INTEGER,
     // partSetTag);MB_CHK_ERR(result);
 
@@ -270,23 +277,29 @@ ErrorCode MetisPartitioner::assemble_taggedsets_graph( const int dimension,
     Tag gid_tag;
     idx_t zero1 = -1;
     result =
-        mbImpl->tag_get_handle( "GLOBAL_ID_AGGLO", 1, MB_TYPE_INTEGER, gid_tag, MB_TAG_SPARSE | MB_TAG_CREAT, &zero1 );MB_CHK_ERR( result );
+        mbImpl->tag_get_handle( "GLOBAL_ID_AGGLO", 1, MB_TYPE_INTEGER, gid_tag, MB_TAG_SPARSE | MB_TAG_CREAT, &zero1 );
+    MB_CHK_ERR( result );
     for( Range::iterator rit = elems.begin(); rit != elems.end(); rit++ )
     {
         idx_t partSet;
-        result = mbImpl->tag_get_data( partSetTag, &( *rit ), 1, &partSet );MB_CHK_ERR( result );
-        result = mbImpl->tag_set_data( gid_tag, &( *rit ), 1, &partSet );MB_CHK_ERR( result );
+        result = mbImpl->tag_get_data( partSetTag, &( *rit ), 1, &partSet );
+        MB_CHK_ERR( result );
+        result = mbImpl->tag_set_data( gid_tag, &( *rit ), 1, &partSet );
+        MB_CHK_ERR( result );
     }
     // clear aggregating tag data
     TagType type;
-    result = mbImpl->tag_get_type( partSetTag, type );MB_CHK_ERR( result );
+    result = mbImpl->tag_get_type( partSetTag, type );
+    MB_CHK_ERR( result );
     if( type == MB_TAG_DENSE )
     {
-        result = mbImpl->tag_delete( partSetTag );MB_CHK_ERR( result );
+        result = mbImpl->tag_delete( partSetTag );
+        MB_CHK_ERR( result );
     }
     if( type == MB_TAG_SPARSE )
     {
-        result = mbImpl->tag_delete_data( partSetTag, elems );MB_CHK_ERR( result );
+        result = mbImpl->tag_delete_data( partSetTag, elems );
+        MB_CHK_ERR( result );
     }
 
     // assemble the graph, using Skinner to get d-1 dimensional neighbors and then idx_tersecting to
@@ -305,7 +318,8 @@ ErrorCode MetisPartitioner::assemble_taggedsets_graph( const int dimension,
             part_ents.erase( lower, upper );
         }
         Skinner skinner( mbImpl );
-        result = skinner.find_skin( 0, part_ents, false, skin_subFaces[i], NULL, false, true, false );MB_CHK_ERR( result );
+        result = skinner.find_skin( 0, part_ents, false, skin_subFaces[i], NULL, false, true, false );
+        MB_CHK_ERR( result );
         i++;
     }
     std::vector< EntityHandle > adjs;
@@ -328,7 +342,8 @@ ErrorCode MetisPartitioner::assemble_taggedsets_graph( const int dimension,
         if( !adjs.empty() )
         {
             neighbors.resize( adjs.size() );
-            result = mbImpl->tag_get_data( gid_tag, &adjs[0], adjs.size(), &neighbors[0] );MB_CHK_ERR( result );
+            result = mbImpl->tag_get_data( gid_tag, &adjs[0], adjs.size(), &neighbors[0] );
+            MB_CHK_ERR( result );
         }
         // copy those idx_to adjacencies vector
         length.push_back( length.back() + (idx_t)adjs.size() );
@@ -339,8 +354,10 @@ ErrorCode MetisPartitioner::assemble_taggedsets_graph( const int dimension,
         moab_ids.push_back( moab_id );
         // get average position of vertices
         Range part_ents;
-        result = mbImpl->get_entities_by_handle( elems[k], part_ents, false );MB_CHK_ERR( result );
-        result = mtu.get_average_position( part_ents, avg_position );MB_CHK_ERR( result );
+        result = mbImpl->get_entities_by_handle( elems[k], part_ents, false );
+        MB_CHK_ERR( result );
+        result = mtu.get_average_position( part_ents, avg_position );
+        MB_CHK_ERR( result );
         std::copy( avg_position, avg_position + 3, std::back_inserter( coords ) );
     }
     for( unsigned int k = 0; k < i; k++ )
@@ -389,7 +406,8 @@ ErrorCode MetisPartitioner::assemble_graph( const int dimension,
     // assign global ids
     if( assign_global_ids )
     {
-        result = mbpc->assign_global_ids( 0, dimension, 0 );MB_CHK_ERR( result );
+        result = mbpc->assign_global_ids( 0, dimension, 0 );
+        MB_CHK_ERR( result );
     }
 #endif
 
@@ -409,7 +427,8 @@ ErrorCode MetisPartitioner::assemble_graph( const int dimension,
 
         // get bridge adjacencies
         adjs.clear();
-        result = mtu.get_bridge_adjacencies( *rit, ( dimension > 0 ? dimension - 1 : 3 ), dimension, adjs );MB_CHK_ERR( result );
+        result = mtu.get_bridge_adjacencies( *rit, ( dimension > 0 ? dimension - 1 : 3 ), dimension, adjs );
+        MB_CHK_ERR( result );
 
         // get the indices in elems range of those
         if( !adjs.empty() )
@@ -429,7 +448,8 @@ ErrorCode MetisPartitioner::assemble_graph( const int dimension,
         std::copy( neighbors, neighbors + adjs.size(), std::back_inserter( adjacencies ) );
 
         // get average position of vertices
-        result = mtu.get_average_position( *rit, avg_position );MB_CHK_ERR( result );
+        result = mtu.get_average_position( *rit, avg_position );
+        MB_CHK_ERR( result );
 
         // get the graph vertex id for this element; it is now index in elems
         moab_ids.push_back( index_in_elems );  // conversion made to idx_t
@@ -468,18 +488,21 @@ ErrorCode MetisPartitioner::write_aggregationtag_partition( const idx_t nparts,
     // get the partition set tag
     Tag part_set_tag;
     result =
-        mbImpl->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_set_tag, MB_TAG_SPARSE | MB_TAG_CREAT );MB_CHK_ERR( result );
+        mbImpl->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_set_tag, MB_TAG_SPARSE | MB_TAG_CREAT );
+    MB_CHK_ERR( result );
 
     // get any sets already with this tag, and clear them
     Range tagged_sets;
     result =
-        mbImpl->get_entities_by_type_and_tag( 0, MBENTITYSET, &part_set_tag, NULL, 1, tagged_sets, Interface::UNION );MB_CHK_ERR( result );
+        mbImpl->get_entities_by_type_and_tag( 0, MBENTITYSET, &part_set_tag, NULL, 1, tagged_sets, Interface::UNION );
+    MB_CHK_ERR( result );
     if( !tagged_sets.empty() )
     {
         result = mbImpl->clear_meshset( tagged_sets );
         if( !write_as_sets )
         {
-            result = mbImpl->tag_delete_data( part_set_tag, tagged_sets );MB_CHK_ERR( result );
+            result = mbImpl->tag_delete_data( part_set_tag, tagged_sets );
+            MB_CHK_ERR( result );
         }
     }
 
@@ -495,7 +518,8 @@ ErrorCode MetisPartitioner::write_aggregationtag_partition( const idx_t nparts,
             for( idx_t i = 0; i < num_new; i++ )
             {
                 EntityHandle new_set;
-                result = mbImpl->create_meshset( MESHSET_SET, new_set );MB_CHK_ERR( result );
+                result = mbImpl->create_meshset( MESHSET_SET, new_set );
+                MB_CHK_ERR( result );
                 tagged_sets.insert( new_set );
             }
         }
@@ -506,7 +530,8 @@ ErrorCode MetisPartitioner::write_aggregationtag_partition( const idx_t nparts,
             for( idx_t i = 0; i < num_del; i++ )
             {
                 EntityHandle old_set = tagged_sets.pop_back();
-                result               = mbImpl->delete_entities( &old_set, 1 );MB_CHK_ERR( result );
+                result               = mbImpl->delete_entities( &old_set, 1 );
+                MB_CHK_ERR( result );
             }
         }
 
@@ -519,7 +544,8 @@ ErrorCode MetisPartitioner::write_aggregationtag_partition( const idx_t nparts,
         for( idx_t i = 0; i < nparts; i++ )
             dum_ids[i] = i;
 
-        result = mbImpl->tag_set_data( part_set_tag, partSets, dum_ids );MB_CHK_ERR( result );
+        result = mbImpl->tag_set_data( part_set_tag, partSets, dum_ids );
+        MB_CHK_ERR( result );
 
         // assign entities to the relevant sets
         std::vector< EntityHandle > tmp_part_sets;
@@ -528,7 +554,8 @@ ErrorCode MetisPartitioner::write_aggregationtag_partition( const idx_t nparts,
         unsigned j = 0;
         for( rit = elems.begin(); rit != elems.end(); rit++, j++ )
         {
-            result = mbImpl->add_entities( tmp_part_sets[assignment[j]], &( *rit ), 1 );MB_CHK_ERR( result );
+            result = mbImpl->add_entities( tmp_part_sets[assignment[j]], &( *rit ), 1 );
+            MB_CHK_ERR( result );
         }
 
         // check for empty sets, warn if there are any
@@ -551,7 +578,8 @@ ErrorCode MetisPartitioner::write_aggregationtag_partition( const idx_t nparts,
     if( write_as_tags )
     {
         Tag gid_tag;
-        result = mbImpl->tag_get_handle( "GLOBAL_ID_AGGLO", 1, MB_TYPE_INTEGER, gid_tag, MB_TAG_SPARSE );MB_CHK_ERR( result );
+        result = mbImpl->tag_get_handle( "GLOBAL_ID_AGGLO", 1, MB_TYPE_INTEGER, gid_tag, MB_TAG_SPARSE );
+        MB_CHK_ERR( result );
 
         // allocate idx_teger-size partitions
         unsigned int i = 0;
@@ -561,13 +589,16 @@ ErrorCode MetisPartitioner::write_aggregationtag_partition( const idx_t nparts,
             result = mbImpl->tag_get_data( gid_tag, &( *rit ), 1, &gid );
             Range part_ents;
             //      std::cout<<"part ents "<<part_ents.size()<<std::endl;
-            result = mbImpl->get_entities_by_handle( *rit, part_ents, false );MB_CHK_ERR( result );
+            result = mbImpl->get_entities_by_handle( *rit, part_ents, false );
+            MB_CHK_ERR( result );
 
             for( Range::iterator eit = part_ents.begin(); eit != part_ents.end(); eit++ )
             {
-                result = mbImpl->tag_set_data( part_set_tag, &( *eit ), 1, &assignment[i] );MB_CHK_ERR( result );
+                result = mbImpl->tag_set_data( part_set_tag, &( *eit ), 1, &assignment[i] );
+                MB_CHK_ERR( result );
 
-                result = mbImpl->tag_set_data( gid_tag, &( *eit ), 1, &gid );MB_CHK_ERR( result );
+                result = mbImpl->tag_set_data( gid_tag, &( *eit ), 1, &gid );
+                MB_CHK_ERR( result );
             }
             i++;
         }
@@ -587,18 +618,21 @@ ErrorCode MetisPartitioner::write_partition( const idx_t nparts,
     Tag part_set_tag;
     idx_t dum_id = -1, i;
     result       = mbImpl->tag_get_handle( "PARALLEL_PARTITION", 1, MB_TYPE_INTEGER, part_set_tag,
-                                           MB_TAG_SPARSE | MB_TAG_CREAT, &dum_id );MB_CHK_ERR( result );
+                                           MB_TAG_SPARSE | MB_TAG_CREAT, &dum_id );
+    MB_CHK_ERR( result );
 
     // get any sets already with this tag, and clear them
     Range tagged_sets;
     result =
-        mbImpl->get_entities_by_type_and_tag( 0, MBENTITYSET, &part_set_tag, NULL, 1, tagged_sets, Interface::UNION );MB_CHK_ERR( result );
+        mbImpl->get_entities_by_type_and_tag( 0, MBENTITYSET, &part_set_tag, NULL, 1, tagged_sets, Interface::UNION );
+    MB_CHK_ERR( result );
     if( !tagged_sets.empty() )
     {
         result = mbImpl->clear_meshset( tagged_sets );
         if( !write_as_sets )
         {
-            result = mbImpl->tag_delete_data( part_set_tag, tagged_sets );MB_CHK_ERR( result );
+            result = mbImpl->tag_delete_data( part_set_tag, tagged_sets );
+            MB_CHK_ERR( result );
         }
     }
 
@@ -614,7 +648,8 @@ ErrorCode MetisPartitioner::write_partition( const idx_t nparts,
             for( i = 0; i < num_new; i++ )
             {
                 EntityHandle new_set;
-                result = mbImpl->create_meshset( MESHSET_SET, new_set );MB_CHK_ERR( result );
+                result = mbImpl->create_meshset( MESHSET_SET, new_set );
+                MB_CHK_ERR( result );
                 tagged_sets.insert( new_set );
             }
         }
@@ -625,7 +660,8 @@ ErrorCode MetisPartitioner::write_partition( const idx_t nparts,
             for( i = 0; i < num_del; i++ )
             {
                 EntityHandle old_set = tagged_sets.pop_back();
-                result               = mbImpl->delete_entities( &old_set, 1 );MB_CHK_ERR( result );
+                result               = mbImpl->delete_entities( &old_set, 1 );
+                MB_CHK_ERR( result );
             }
         }
 
@@ -647,7 +683,8 @@ ErrorCode MetisPartitioner::write_partition( const idx_t nparts,
         Range::iterator rit;
         for( i = 0, rit = elems.begin(); rit != elems.end(); rit++, i++ )
         {
-            result = mbImpl->add_entities( tmp_part_sets[assignment[i]], &( *rit ), 1 );MB_CHK_ERR( result );
+            result = mbImpl->add_entities( tmp_part_sets[assignment[i]], &( *rit ), 1 );
+            MB_CHK_ERR( result );
         }
 
         // check for empty sets, warn if there are any
@@ -676,11 +713,13 @@ ErrorCode MetisPartitioner::write_partition( const idx_t nparts,
             int* assg_int = new int[elems.size()];
             for( int k = 0; k < (int)elems.size(); k++ )
                 assg_int[k] = assignment[k];
-            result = mbImpl->tag_set_data( part_set_tag, elems, assg_int );MB_CHK_ERR( result );
+            result = mbImpl->tag_set_data( part_set_tag, elems, assg_int );
+            MB_CHK_ERR( result );
             delete[] assg_int;
         }
         else
-            result = mbImpl->tag_set_data( part_set_tag, elems, assignment );MB_CHK_ERR( result );
+            result = mbImpl->tag_set_data( part_set_tag, elems, assignment );
+        MB_CHK_ERR( result );
     }
 
     return MB_SUCCESS;

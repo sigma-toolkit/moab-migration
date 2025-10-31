@@ -1,7 +1,7 @@
 #
 # Find TempestRemap include directories and libraries
 #
-# TEMPESTREMAP_INCLUDES            - list of include paths to find netcdf.h
+# TEMPESTREMAP_INCLUDES            - list of include paths to find TempestRemapAPI.h
 # TEMPESTREMAP_LIBRARIES           - list of libraries to link against when using TempestRemap
 # TEMPESTREMAP_FOUND               - Do not attempt to use TempestRemap if "no", "0", or undefined.
 
@@ -40,6 +40,6 @@ mark_as_advanced(
 )
 
 include (FindPackageHandleStandardArgs)
-find_package_handle_standard_args (TempestRemap "TempestRemap not found, check environment variables TEMPESTREMAP_DIR"
+find_package_handle_standard_args (TEMPESTREMAP "TempestRemap not found, check environment variables TEMPESTREMAP_DIR"
   TEMPESTREMAP_DIR TEMPESTREMAP_INCLUDES TEMPESTREMAP_LIBRARIES)
 

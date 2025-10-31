@@ -1801,7 +1801,7 @@ static void merge_vector_ids( const unsigned long* list, size_t len, std::vector
 ErrorCode WriteHDF5Parallel::unpack_set( EntityHandle set, const unsigned long* buffer, size_t buffer_size )
 {
     // Use local variables for readability
-    assert( buffer_size >= 4 );
+    if( buffer_size < 4 ) return MB_FAILURE;
     assert( buffer[1] + buffer[2] + buffer[3] <= buffer_size );
 #ifdef NDEBUG
     UNUSED( buffer_size );

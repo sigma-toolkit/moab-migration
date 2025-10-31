@@ -79,8 +79,7 @@ int main( int argc, char* argv[] )
 
     std::map< int, EntityHandle > cGidHandle;
     std::vector< int > gids;
-    Tag gid;
-    MB_CHK_SET_ERR( mb->tag_get_handle( "GLOBAL_ID", gid ), "can't get global id tag" );
+    Tag gid = mb->globalId_tag();
 
     Range ents = cells;
     if( dim == 0 ) ents = nodes;
@@ -117,11 +116,10 @@ int main( int argc, char* argv[] )
     // construct maps between global id and handles
     std::map< int, EntityHandle > cGidHandle2;
 
-    Tag gid2;
-    MB_CHK_SET_ERR( mb2->tag_get_handle( "GLOBAL_ID", gid2 ), "can't get global id tag2" );
-
+    Tag gid2 = mb2->globalId_tag();
     std::vector< int > gids2( ents2.size() );
     MB_CHK_SET_ERR( mb2->tag_get_data( gid2, ents2, &gids2[0] ), "can't get global id on second entities" );
+
     i = 0;
     for( Range::iterator vit = ents2.begin(); vit != ents2.end(); ++vit )
     {
@@ -134,6 +132,7 @@ int main( int argc, char* argv[] )
                   << ents2.size() << "\n";
         exit( 1 );
     }
+
     if( tag_name.length() > 0 )  // old tool
     {
         Tag tag;
@@ -142,6 +141,7 @@ int main( int argc, char* argv[] )
         int len_tag = 0;
         MB_CHK_SET_ERR( mb->tag_get_length( tag, len_tag ), "can't get tag length on tag" );
         std::cout << "length tag : " << len_tag << "\n";
+
         moab::DataType dtype;
         MB_CHK_SET_ERR( mb->tag_get_data_type( tag, dtype ), "can't get tag data type" );
         if( dtype != MB_TYPE_INTEGER && dtype != MB_TYPE_DOUBLE )
@@ -149,6 +149,7 @@ int main( int argc, char* argv[] )
             std::cout << "tag data type is not integer or double, do not compare \n";
             exit( 1 );
         }
+
         bool doubleType = ( dtype == MB_TYPE_DOUBLE );
         std::vector< double > vals;
         std::vector< int > ivals;
@@ -182,30 +183,26 @@ int main( int argc, char* argv[] )
         std::string tag_name_diff = tag_name + "_diff";
         if( doubleType )
         {
-            std::vector< double > def_vald( len_tag );
-            MB_CHK_SET_ERR( mb->tag_get_default_value( tag, &def_vald[0] ), "can't get default" );
+            std::vector< double > def_vald( len_tag, 0.0 );
+            MB_CHK_SET_ERR( mb->tag_get_default_value( tag, &def_vald[0] ), "can't get default double tag value" );
             MB_CHK_SET_ERR( mb->tag_get_handle( new_tag_name.c_str(), len_tag, dtype, newTag,
                                                 MB_TAG_CREAT | MB_TAG_DENSE, &def_vald[0] ),
-                            "can't define new tag" );
-            for( int k = 0; k < len_tag; k++ )
-                def_vald[k] = 0.;
+                            "can't define new double tag" );
             MB_CHK_SET_ERR( mb->tag_get_handle( tag_name_diff.c_str(), len_tag, dtype, newTagDiff,
                                                 MB_TAG_CREAT | MB_TAG_DENSE | MB_TAG_DFTOK, &def_vald[0] ),
-                            "can't define new tag diff" );
+                            "can't define new double tag diff" );
         }
         else
         {
-            std::vector< int > def_vali( len_tag );
-            MB_CHK_SET_ERR( mb->tag_get_default_value( tag, &def_vali[0] ), "can't get default" );
+            std::vector< int > def_vali( len_tag, 0 );
+            MB_CHK_SET_ERR( mb->tag_get_default_value( tag, &def_vali[0] ), "can't get default integer tag value" );
             // the difference should be the same size tag
             MB_CHK_SET_ERR( mb->tag_get_handle( new_tag_name.c_str(), len_tag, dtype, newTag,
                                                 MB_TAG_CREAT | MB_TAG_DENSE, &def_vali[0] ),
-                            "can't define new tag" );
-            for( int k = 0; k < len_tag; k++ )
-                def_vali[k] = 0.;
+                            "can't define new integer tag" );
             MB_CHK_SET_ERR( mb->tag_get_handle( tag_name_diff.c_str(), len_tag, dtype, newTagDiff,
                                                 MB_TAG_CREAT | MB_TAG_DENSE | MB_TAG_DFTOK, &def_vali[0] ),
-                            "can't define new tag diff" );
+                            "can't define new integer tag diff" );
         }
 
         i             = 0;

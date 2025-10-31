@@ -122,7 +122,6 @@ int main( int argc, char** argv )
     std::string interpTag, gNormTag, ssNormTag, readOpts, outFile, writeOpts, dbgFile;
     Coupler::Method method = Coupler::CONSTANT;
 
-    ErrorCode result;
     bool help    = false;
     double toler = 5.e-10;
     int nprocs, rank;
@@ -131,14 +130,13 @@ int main( int argc, char** argv )
     ierr = MPI_Comm_rank( MPI_COMM_WORLD, &rank );
     assert( MPI_SUCCESS == ierr );
 
-    result = get_file_options( argc, argv, nprocs, rank, meshFiles, method, interpTag, gNormTag, ssNormTag, ssTagNames,
-                               ssTagValues, readOpts, outFile, writeOpts, dbgFile, help, toler );
+    MB_CHK_ERR( get_file_options( argc, argv, nprocs, rank, meshFiles, method, interpTag, gNormTag, ssNormTag, ssTagNames,
+                               ssTagValues, readOpts, outFile, writeOpts, dbgFile, help, toler ) );
 
-    if( result != MB_SUCCESS || help )
+    if( help )
     {
         print_usage();
-        ierr = MPI_Finalize();
-        return ierr;
+        return MPI_Finalize();
     }
 
     // Redirect stdout and stderr if dbgFile is not null
@@ -170,24 +168,19 @@ int main( int argc, char** argv )
         extraOpt << ";PARALLEL_COMM=" << index;
         newReadopts = readOpts + extraOpt.str();
 
-        result = mbImpl->create_meshset( MESHSET_SET, roots[i] );
-        MB_CHK_ERR( result );
+        MB_CHK_ERR( mbImpl->create_meshset( MESHSET_SET, roots[i] ) );
 
-        result = mbImpl->load_file( meshFiles[i].c_str(), &roots[i], newReadopts.c_str() );
-        MB_CHK_ERR( result );
-        // result = rps[i]->load_file(meshFiles[i].c_str(), &roots[i],
-        // FileOptions(readOpts.c_str()));MB_CHK_ERR(result);
+        MB_CHK_ERR( mbImpl->load_file( meshFiles[i].c_str(), &roots[i], newReadopts.c_str() ) );
+        // MB_CHK_ERR( rps[i]->load_file(meshFiles[i].c_str(), &roots[i],
+        // FileOptions(readOpts.c_str())) );
     }
 
-    result = report_iface_ents( mbImpl, pcs, true );
-    MB_CHK_ERR( result );
+    MB_CHK_ERR( report_iface_ents( mbImpl, pcs, true ) );
 
     double instant_time = 0.0, pointloc_time = 0.0, interp_time = 0.0, gnorm_time = 0.0, ssnorm_time = 0.0;
     // Test interpolation and global normalization and subset normalization
-
-    result = test_interpolation( mbImpl, method, interpTag, gNormTag, ssNormTag, ssTagNames, ssTagValues, roots, pcs,
-                                 instant_time, pointloc_time, interp_time, gnorm_time, ssnorm_time, toler );
-    MB_CHK_ERR( result );
+    MB_CHK_ERR( test_interpolation( mbImpl, method, interpTag, gNormTag, ssNormTag, ssTagNames, ssTagValues, roots, pcs,
+                                 instant_time, pointloc_time, interp_time, gnorm_time, ssnorm_time, toler ) );
 
     reduceMax( instant_time );
     reduceMax( pointloc_time );
@@ -207,8 +200,7 @@ int main( int argc, char** argv )
         std::ostringstream extraOpt;
         if( nprocs > 1 ) extraOpt << ";PARALLEL_COMM=" << 1;
         newwriteOpts = writeOpts + extraOpt.str();
-        result       = mbImpl->write_file( outFile.c_str(), NULL, newwriteOpts.c_str(), partSets );
-        MB_CHK_ERR( result );
+        MB_CHK_ERR( mbImpl->write_file( outFile.c_str(), NULL, newwriteOpts.c_str(), partSets ) );
         if( 0 == rank )
         {
             std::cout << "Wrote " << outFile << std::endl;
@@ -217,7 +209,6 @@ int main( int argc, char** argv )
     }
 
     free( roots );
-
     for( unsigned int i = 0; i < meshFiles.size(); i++ )
         delete pcs[i];
 
@@ -231,34 +222,29 @@ int main( int argc, char** argv )
 ErrorCode report_iface_ents( Interface* mbImpl, std::vector< ParallelComm* >& pcs, const bool print_results )
 {
     Range iface_ents[6];
-    ErrorCode result = MB_SUCCESS, tmp_result;
 
     // Now figure out which vertices are shared
     for( unsigned int p = 0; p < pcs.size(); p++ )
     {
         for( int i = 0; i < 4; i++ )
         {
-            tmp_result = pcs[p]->get_iface_entities( -1, i, iface_ents[i] );
-
-            if( MB_SUCCESS != tmp_result )
+            if( pcs[p]->get_iface_entities( -1, i, iface_ents[i] ) != MB_SUCCESS )
             {
                 std::cerr << "get_iface_entities returned error on proc " << pcs[p]->proc_config().proc_rank()
                           << "; message: " << std::endl;
                 std::string last_error;
-                result = mbImpl->get_last_error( last_error );
+                MB_CHK_ERR( mbImpl->get_last_error( last_error ) );
                 if( last_error.empty() )
                     std::cerr << "(none)" << std::endl;
                 else
                     std::cerr << last_error << std::endl;
-                result = tmp_result;
             }
             if( 0 != i ) iface_ents[4].merge( iface_ents[i] );
         }
     }
 
     // Report # iface entities
-    result = mbImpl->get_adjacencies( iface_ents[4], 0, false, iface_ents[5], Interface::UNION );
-    MB_CHK_ERR( result );
+    MB_CHK_ERR( mbImpl->get_adjacencies( iface_ents[4], 0, false, iface_ents[5], Interface::UNION ) );
 
     int rank;
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );
@@ -271,7 +257,7 @@ ErrorCode report_iface_ents( Interface* mbImpl, std::vector< ParallelComm* >& pc
         std::cerr << "    (" << iface_ents[5].size() << " verts adj to other iface ents)" << std::endl;
     }
 
-    return result;
+    return moab::MB_SUCCESS;
 }
 
 // Check first character for a '-'.
@@ -575,8 +561,7 @@ ErrorCode test_interpolation( Interface* mbImpl,
 
     // Source is 1st mesh, target is 2nd
     Range src_elems, targ_elems, targ_verts;
-    ErrorCode result = pcs[0]->get_part_entities( src_elems, 3 );
-    MB_CHK_ERR( result );
+    MB_CHK_ERR( pcs[0]->get_part_entities( src_elems, 3 ) );
 
     double start_time = MPI_Wtime();
 
@@ -587,7 +572,7 @@ ErrorCode test_interpolation( Interface* mbImpl,
 
     // Initialize spectral elements, if they exist
     bool specSou = false, specTar = false;
-    result = mbc.initialize_spectral_elements( roots[0], roots[1], specSou, specTar );
+    MB_CHK_ERR( mbc.initialize_spectral_elements( roots[0], roots[1], specSou, specTar ) );
 
     instant_time = MPI_Wtime();
 
@@ -597,44 +582,39 @@ ErrorCode test_interpolation( Interface* mbImpl,
     std::vector< double > vpos;  // This will have the positions we are interested in
     int numPointsOfInterest = 0;
     if( !specTar )
-    {  // Usual case
+    {
+        // Usual case
         Range tmp_verts;
 
         // First get all vertices adj to partition entities in target mesh
-        result = pcs[1]->get_part_entities( targ_elems, 3 );
-        MB_CHK_ERR( result );
-        if( Coupler::SPHERICAL == method ) result = pcs[1]->get_part_entities( targ_elems, 2 );
-        MB_CHK_ERR( result );  // get the polygons/quads on a sphere.
+        MB_CHK_ERR( pcs[1]->get_part_entities( targ_elems, 3 ) );
+        if( Coupler::SPHERICAL == method ) MB_CHK_ERR( pcs[1]->get_part_entities( targ_elems, 2 ) );  // get the polygons/quads on a sphere.
         if( Coupler::CONSTANT == method )
             targ_verts = targ_elems;
         else
-            result = mbImpl->get_adjacencies( targ_elems, 0, false, targ_verts, Interface::UNION );
-        MB_CHK_ERR( result );
+            MB_CHK_ERR( mbImpl->get_adjacencies( targ_elems, 0, false, targ_verts, Interface::UNION ) );
 
         // Then get non-owned verts and subtract
-        result = pcs[1]->get_pstatus_entities( 0, PSTATUS_NOT_OWNED, tmp_verts );
-        MB_CHK_ERR( result );
+        MB_CHK_ERR( pcs[1]->get_pstatus_entities( 0, PSTATUS_NOT_OWNED, tmp_verts ) );
         targ_verts = subtract( targ_verts, tmp_verts );
+        
         // get position of these entities; these are the target points
         numPointsOfInterest = (int)targ_verts.size();
         vpos.resize( 3 * targ_verts.size() );
-        result = mbImpl->get_coords( targ_verts, &vpos[0] );
-        MB_CHK_ERR( result );
+        MB_CHK_ERR( mbImpl->get_coords( targ_verts, &vpos[0] ) );
+        
         // Locate those points in the source mesh
         std::cout << "rank " << pcs[0]->proc_config().proc_rank() << " points of interest: " << numPointsOfInterest
                   << "\n";
-        result = mbc.locate_points( &vpos[0], numPointsOfInterest, 0, toler );
-        MB_CHK_ERR( result );
+        MB_CHK_ERR( mbc.locate_points( &vpos[0], numPointsOfInterest, 0, toler ) );
     }
     else
     {
         // In this case, the target mesh is spectral, we want values
         // interpolated on the GL positions; for each element, get the GL points, and construct
         // CartVect!!!
-        result = pcs[1]->get_part_entities( targ_elems, 3 );
-        MB_CHK_ERR( result );
-        result = mbc.get_gl_points_on_elements( targ_elems, vpos, numPointsOfInterest );
-        MB_CHK_ERR( result );
+        MB_CHK_ERR( pcs[1]->get_part_entities( targ_elems, 3 ) );
+        MB_CHK_ERR( mbc.get_gl_points_on_elements( targ_elems, vpos, numPointsOfInterest ) );
         std::cout << "rank " << pcs[0]->proc_config().proc_rank() << " points of interest: " << numPointsOfInterest
                   << "\n";
     }
@@ -644,8 +624,7 @@ ErrorCode test_interpolation( Interface* mbImpl,
     // Now interpolate tag onto target points
     std::vector< double > field( numPointsOfInterest );
 
-    result = mbc.interpolate( method, interpTag, &field[0] );
-    MB_CHK_ERR( result );
+    MB_CHK_ERR( mbc.interpolate( method, interpTag, &field[0] ) );
 
     interp_time = MPI_Wtime();
 
@@ -653,12 +632,10 @@ ErrorCode test_interpolation( Interface* mbImpl,
     if( !gNormTag.empty() )
     {
         // Normalize the source mesh
-        result = mbc.normalize_mesh( roots[0], gNormTag.c_str(), Coupler::VOLUME, 4 );
-        MB_CHK_ERR( result );
+        MB_CHK_ERR( mbc.normalize_mesh( roots[0], gNormTag.c_str(), Coupler::VOLUME, 4 ) );
 
         // Normalize the target mesh
-        result = mbc.normalize_mesh( roots[1], gNormTag.c_str(), Coupler::VOLUME, 4 );
-        MB_CHK_ERR( result );
+        MB_CHK_ERR( mbc.normalize_mesh( roots[1], gNormTag.c_str(), Coupler::VOLUME, 4 ) );
     }
 
     gnorm_time = MPI_Wtime();
@@ -667,14 +644,11 @@ ErrorCode test_interpolation( Interface* mbImpl,
 
     if( !ssNormTag.empty() )
     {
+        MB_CHK_ERR( mbc.normalize_subset( roots[0], ssNormTag.c_str(), &ssTagNames[0], ssTagNames.size(), &ssTagValues[0],
+                                       Coupler::VOLUME, 4 ) );
 
-        result = mbc.normalize_subset( roots[0], ssNormTag.c_str(), &ssTagNames[0], ssTagNames.size(), &ssTagValues[0],
-                                       Coupler::VOLUME, 4 );
-        MB_CHK_ERR( result );
-
-        result = mbc.normalize_subset( roots[1], ssNormTag.c_str(), &ssTagNames[0], ssTagNames.size(), &ssTagValues[0],
-                                       Coupler::VOLUME, 4 );
-        MB_CHK_ERR( result );
+        MB_CHK_ERR( mbc.normalize_subset( roots[1], ssNormTag.c_str(), &ssTagNames[0], ssTagNames.size(), &ssTagValues[0],
+                                       Coupler::VOLUME, 4 ) );
     }
 
     ssnorm_time = MPI_Wtime();
@@ -691,10 +665,8 @@ ErrorCode test_interpolation( Interface* mbImpl,
         // Create a new tag for the values on the target
         Tag tag;
         std::string newtag = interpTag + "_TAR";
-        result = mbImpl->tag_get_handle( newtag.c_str(), 1, MB_TYPE_DOUBLE, tag, MB_TAG_CREAT | MB_TAG_DENSE );
-        MB_CHK_ERR( result );
-        result = mbImpl->tag_set_data( tag, targ_verts, &field[0] );
-        MB_CHK_ERR( result );
+        MB_CHK_ERR( mbImpl->tag_get_handle( newtag.c_str(), 1, MB_TYPE_DOUBLE, tag, MB_TAG_CREAT | MB_TAG_DENSE ) );
+        MB_CHK_ERR( mbImpl->tag_set_data( tag, targ_verts, &field[0] ) );
     }
     else
     {
@@ -702,10 +674,8 @@ ErrorCode test_interpolation( Interface* mbImpl,
         {
             // Use original tag
             Tag tag;
-            result = mbImpl->tag_get_handle( interpTag.c_str(), 1, MB_TYPE_DOUBLE, tag );
-            MB_CHK_ERR( result );
-            result = mbImpl->tag_set_data( tag, targ_verts, &field[0] );
-            MB_CHK_ERR( result );
+            MB_CHK_ERR( mbImpl->tag_get_handle( interpTag.c_str(), 1, MB_TYPE_DOUBLE, tag ) );
+            MB_CHK_ERR( mbImpl->tag_set_data( tag, targ_verts, &field[0] ) );
         }
         else
         {
@@ -718,10 +688,8 @@ ErrorCode test_interpolation( Interface* mbImpl,
             int ntot = numPointsOfInterest / targ_elems.size();
             Tag tag;
             std::string newtag = interpTag + "_TAR";
-            result = mbImpl->tag_get_handle( newtag.c_str(), ntot, MB_TYPE_DOUBLE, tag, MB_TAG_CREAT | MB_TAG_DENSE );
-            MB_CHK_ERR( result );
-            result = mbImpl->tag_set_data( tag, targ_elems, &field[0] );
-            MB_CHK_ERR( result );
+            MB_CHK_ERR( mbImpl->tag_get_handle( newtag.c_str(), ntot, MB_TYPE_DOUBLE, tag, MB_TAG_CREAT | MB_TAG_DENSE ) );
+            MB_CHK_ERR( mbImpl->tag_set_data( tag, targ_elems, &field[0] ) );
         }
     }
 

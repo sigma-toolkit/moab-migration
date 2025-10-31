@@ -1236,7 +1236,7 @@ int moab::TempestOnlineMap::IsConservative( double dTolerance )
     ierr = MPI_Gather( senddata, nDATA, MPI_INT, nElementsInProc.data(), nDATA, MPI_INT, rootProc, m_pcomm->comm() );
     if( ierr != MPI_SUCCESS ) return -1;
 
-    int nTotVals = 0, nTotColumns = 0, nTotColumnsUnq = 0;
+    int nTotVals = 0, nTotColumns = 0; // nTotColumnsUnq = 0;
     std::vector< int > dColumnIndices;
     std::vector< double > dColumnSourceAreas;
     std::vector< double > dColumnSumsTotal;
@@ -1250,7 +1250,7 @@ int moab::TempestOnlineMap::IsConservative( double dTolerance )
         {
             nTotVals += nElementsInProc[ir * nDATA];
             nTotColumns += nElementsInProc[ir * nDATA + 1];
-            nTotColumnsUnq += nElementsInProc[ir * nDATA + 2];
+            // nTotColumnsUnq += nElementsInProc[ir * nDATA + 2];
 
             displs[ir] = gsum;
             rcount[ir] = nElementsInProc[ir * nDATA + 1];
@@ -1299,7 +1299,7 @@ int moab::TempestOnlineMap::IsConservative( double dTolerance )
             {
                 if( dColumnIndices[ips] < 0 ) continue;
                 // printf("%d, %d: dColumnIndices[ips]: %d\n", ir, ips, dColumnIndices[ips]);
-                assert( dColumnIndices[ips] < nTotColumnsUnq );
+                // assert( dColumnIndices[ips] < nTotColumnsUnq );
                 dColumnSumsOnRoot[dColumnIndices[ips]] += dColumnSumsTotal[ips];  // / dColumnSourceAreas[ips];
                 // dColumnSourceAreasOnRoot[ dColumnIndices[ips] ] = dColumnSourceAreas[ips];
                 // dColumnSourceAreas[ dColumnIndices[ips] ]

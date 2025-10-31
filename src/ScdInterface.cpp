@@ -74,28 +74,33 @@ ErrorCode ScdInterface::find_boxes( std::vector< ScdBox* >& scd_boxes )
 
 ErrorCode ScdInterface::find_boxes( Range& scd_boxes )
 {
-    ErrorCode rval = MB_SUCCESS;
     box_dims_tag();
     Range boxes;
     if( !searchedBoxes )
     {
-        rval = mbImpl->get_entities_by_type_and_tag( 0, MBENTITYSET, &boxDimsTag, NULL, 1, boxes, Interface::UNION );
+        MB_CHK_SET_ERR( mbImpl->get_entities_by_type_and_tag( 0, MBENTITYSET, &boxDimsTag, NULL, 1, boxes, Interface::UNION ),
+                        "failed to get entitities by type and tag" );
         searchedBoxes = true;
         if( !boxes.empty() )
         {
             scdBoxes.resize( boxes.size() );
-            rval         = mbImpl->tag_get_data( boxSetTag, boxes, &scdBoxes[0] );
-            ScdBox* dum  = nullptr;
-            auto new_end = std::remove_if( scdBoxes.begin(), scdBoxes.end(),
-                                           std::bind( std::equal_to< ScdBox* >(), std::placeholders::_1, dum ) );
-            scdBoxes.erase( new_end, scdBoxes.end() );
+            MB_CHK_SET_ERR( mbImpl->tag_get_data( boxSetTag, boxes, &scdBoxes[0] ), "failed to get tag data" );
+            ScdBox* dum = nullptr;
+            scdBoxes.erase(
+                std::remove_if(
+                    scdBoxes.begin(),
+                    scdBoxes.end(),
+                    [dum](ScdBox* ptr) { return ptr == dum; }
+                ),
+                scdBoxes.end()
+            );
         }
     }
 
     for( std::vector< ScdBox* >::iterator vit = scdBoxes.begin(); vit != scdBoxes.end(); ++vit )
         scd_boxes.insert( ( *vit )->box_set() );
 
-    return rval;
+    return MB_SUCCESS;
 }
 
 ScdBox* ScdInterface::get_scd_box( EntityHandle eh )

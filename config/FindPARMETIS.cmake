@@ -36,14 +36,13 @@ IF (NOT PARMETIS_FOUND)
 ENDIF (NOT PARMETIS_FOUND)
 
 mark_as_advanced(
-  PARMETIS_DIR
   PARMETIS_INCLUDES
   PARMETIS_LIBRARIES
 )
 
 include (FindPackageHandleStandardArgs)
 find_package_handle_standard_args (
-  ParMetis "ParMetis not found, check environment variables PARMETIS_DIR"
+  PARMETIS "ParMetis not found, check environment variables PARMETIS_DIR"
   PARMETIS_INCLUDES
   PARMETIS_LIBRARIES
   )

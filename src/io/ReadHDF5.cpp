@@ -95,19 +95,19 @@ const bool DEFAULT_BCAST_DUPLICATE_READS = true;
 static herr_t handle_hdf5_error( hid_t stack, void* data )
 {
     ReadHDF5::HDF5ErrorHandler* h = reinterpret_cast< ReadHDF5::HDF5ErrorHandler* >( data );
-    herr_t result                 = 0;
-    if( h->func ) result = ( *h->func )( stack, h->data );
-    MB_CHK_ERR_CONT( MB_FAILURE );
-    return result;
+    if( h->func )
+        return ( *h->func )( stack, h->data );
+    else
+        return 0;
 }
 #else
 static herr_t handle_hdf5_error( void* data )
 {
     ReadHDF5::HDF5ErrorHandler* h = reinterpret_cast< ReadHDF5::HDF5ErrorHandler* >( data );
-    herr_t result                 = 0;
-    if( h->func ) result = ( *h->func )( h->data );
-    MB_CHK_ERR_CONT( MB_FAILURE );
-    return result;
+    if( h->func )
+        return ( *h->func )( h->data );
+    else
+        return 0;
 }
 #endif
 
@@ -3336,11 +3336,9 @@ ErrorCode ReadHDF5::read_var_len_tag( Tag tag_handle,
 {
     CHECK_OPEN_HANDLES;
 
-    ErrorCode rval;
     DataType mbtype;
 
-    rval = iFace->tag_get_data_type( tag_handle, mbtype );
-    if( MB_SUCCESS != rval ) MB_SET_ERR( rval, "ReadHDF5 Failure" );
+    MB_CHK_SET_ERR( iFace->tag_get_data_type( tag_handle, mbtype ), "ReadHDF5 Failure" );
 
     // Can't do variable-length bit tags
     if( MB_TYPE_BIT == mbtype ) MB_CHK_ERR( MB_VARIABLE_DATA_LENGTH );
@@ -3348,10 +3346,7 @@ ErrorCode ReadHDF5::read_var_len_tag( Tag tag_handle,
     // If here, MOAB tag must be variable-length
     int mbsize;
     if( MB_VARIABLE_DATA_LENGTH != iFace->tag_get_bytes( tag_handle, mbsize ) )
-    {
-        assert( false );
-        MB_CHK_ERR( MB_VARIABLE_DATA_LENGTH );
-    }
+        MB_SET_ERR( MB_VARIABLE_DATA_LENGTH, "Not a variable tag length handle" );
 
     int read_size;
     if( hdf_read_type )
@@ -3376,7 +3371,9 @@ ErrorCode ReadHDF5::read_var_len_tag( Tag tag_handle,
     const EntityHandle base_offset = 1;  // Can't put zero in a Range
     std::vector< EntityHandle > handle_vect;
     Range handle_range, offset_range;
-    rval = read_sparse_tag_indices( tn.c_str(), ent_table, base_offset, offset_range, handle_range, handle_vect );
+    MB_CHK_SET_ERR( read_sparse_tag_indices( tn.c_str(), ent_table, base_offset, offset_range, handle_range,
+                                             handle_vect ),
+                    "Reading sparse tag indices failed" );
 
     // This code only works if the id_table is an ordered list.
     // This assumption was also true for the previous iteration
@@ -3397,12 +3394,10 @@ ErrorCode ReadHDF5::read_var_len_tag( Tag tag_handle,
       public:
         ErrorCode store_data( EntityHandle file_id, void* data, long count, bool )
         {
-            ErrorCode rval1;
             if( isHandle )
             {
-                if( readSize != sizeof( EntityHandle ) ) MB_CHK_SET_ERR( MB_FAILURE, "Invalid read size" );
-                rval1 = readHDF5->convert_id_to_handle( (EntityHandle*)data, count );
-                MB_CHK_ERR( rval1 );
+                if( readSize != sizeof( EntityHandle ) ) MB_SET_ERR( MB_FAILURE, "Invalid read size" );
+                MB_CHK_ERR( readHDF5->convert_id_to_handle( (EntityHandle*)data, count ) );
             }
             int n = count;
             return readHDF5->moab()->tag_set_by_ptr( tagHandle, &file_id, 1, &data, &n );
@@ -3427,14 +3422,14 @@ ErrorCode ReadHDF5::read_var_len_tag( Tag tag_handle,
         std::vector< unsigned > counts;
         Range offsets;
         ReadHDF5Dataset off_reader( ( tn + " offsets" ).c_str(), off_table, nativeParallel, mpiComm, false );
-        rval = tool.read_offsets( off_reader, offset_range, base_offset, base_offset, offsets, counts );
-        if( MB_SUCCESS != rval ) MB_SET_ERR( rval, "ReadHDF5 Failure" );
+        MB_CHK_SET_ERR( tool.read_offsets( off_reader, offset_range, base_offset, base_offset, offsets, counts ),
+                        "ReadHDF5 Failure" );
 
         // Read tag values
         Range empty;
         ReadHDF5Dataset val_reader( ( tn + " values" ).c_str(), val_table, nativeParallel, mpiComm, false );
-        rval = tool.read_data( val_reader, offsets, base_offset, hdf_read_type, handle_range, counts, empty );
-        if( MB_SUCCESS != rval ) MB_SET_ERR( rval, "ReadHDF5 Failure" );
+        MB_CHK_SET_ERR( tool.read_data( val_reader, offsets, base_offset, hdf_read_type, handle_range, counts, empty ),
+                        "ReadHDF5 Failure" );
     }
     catch( ReadHDF5Dataset::Exception )
     {

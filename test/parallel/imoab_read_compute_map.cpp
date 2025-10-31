@@ -45,6 +45,8 @@ int main( int argc, char* argv[] )
     moab::CpuTimer timer;
     double timer_ops;
     std::string opName;
+    constexpr bool gen_baseline = false;
+    constexpr double epsilon = 0.0;
 
     int rankInGlobalComm, numProcesses;
     MPI_Group jgroup;
@@ -341,6 +343,7 @@ int main( int argc, char* argv[] )
                        "cannot compute scalar projection weights" )
             POP_TIMER( couComm, rankInCouComm )
 
+	    if ( false )
             {
                 const iMOAB_String atmocn_map_file_name = "atm_ocn_map_computed.nc";
                 CHECKIERR( iMOAB_WriteMapFile( cplAtmOcnMemPID, map_from_mem_identifier, atmocn_map_file_name ),
@@ -606,7 +609,7 @@ int main( int argc, char* argv[] )
                                                       tempElems.data() ),
                            "failed to get bottomProjectedFieldsM field" );
                 // check against the baseline
-                check_baseline_file( baseline, gidElems, tempElems, 1.e-9, err_code );
+                check_baseline_file( baseline, gidElems, tempElems, epsilon+1e-12, err_code );
                 if( 0 == err_code )
                     std::cout << " passed baseline test atm2ocn (in-memory map projection) on ocean task "
                               << rankInOcnComm << "\n";
@@ -632,7 +635,6 @@ int main( int argc, char* argv[] )
                            "could not write AtmWithProjection.h5m to disk" )
 #endif  // VERBOSE
 
-                constexpr bool gen_baseline = false;
                 if( gen_baseline )
                 {
                     // int tag_type = DENSE_INTEGER, ncomp = 1, tagInd = 0;
@@ -641,7 +643,8 @@ int main( int argc, char* argv[] )
 
                     std::fstream fs;
                     fs.open( baselineATM, std::fstream::out );
-                    fs << std::setprecision( 15 );  // maximum precision for doubles
+                    fs.precision(std::numeric_limits<double>::max_digits10);
+                    //fs << std::setprecision( 18 );  // maximum precision for doubles
                     for( int i = 0; i < nelem[2]; i++ )
                         fs << gidElems[i] << " " << tempElems[i] << "\n";
                     fs.close();
@@ -649,7 +652,7 @@ int main( int argc, char* argv[] )
                 else
                 {
                     // check against the baseline
-                    check_baseline_file( baselineATM, gidElems, tempElems, 1.e-9, err_code );
+                    check_baseline_file( baselineATM, gidElems, tempElems, epsilon, err_code );
                     if( 0 == err_code )
                         std::cout << " passed baseline test ocn2atm (file-based map projection) on ocean task "
                                   << rankInOcnComm << "\n";
@@ -667,11 +670,24 @@ int main( int argc, char* argv[] )
                                                       tempElems.data() ),
                            "failed to get bottomProjectedFieldsF field" );
 
-                // check against the baseline
-                check_baseline_file( baseline, gidElems, tempElems, 1.e-9, err_code );
-                if( 0 == err_code )
-                    std::cout << " passed baseline test atm2ocn (file-based map projection) on ocean task "
-                              << rankInOcnComm << "\n";
+                 if( gen_baseline )
+                {
+                    std::fstream fs;
+                    fs.open( baseline, std::fstream::out );
+                    fs.precision(std::numeric_limits<double>::max_digits10);
+                    //fs << std::setprecision( 18 );  // maximum precision for doubles
+                    for( int i = 0; i < nelem[2]; i++ )
+                        fs << gidElems[i] << " " << tempElems[i] << "\n";
+                    fs.close();
+                }
+                else
+                {
+                    // check against the baseline
+                    check_baseline_file( baseline, gidElems, tempElems, epsilon, err_code );
+                    if( 0 == err_code )
+                        std::cout << " passed baseline test atm2ocn (file-based map projection) on ocean task "
+                                  << rankInOcnComm << "\n";
+                }
 #endif
             }
         }

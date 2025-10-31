@@ -25,4 +25,4 @@ endforeach()
 
 add_executable( dump_sets dump_sets.c )
 set_target_properties( dump_sets PROPERTIES COMPILE_FLAGS "${MOAB_DEFINES} -DMESHDIR=${MOAB_ABSSRC_DIR}/MeshFiles/unittest" )
-target_link_libraries( dump_sets MOAB ${MOAB_LIBS} ${CGM_LIBRARIES} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
+target_link_libraries( dump_sets MOAB ${MOAB_LIBRARIES} ${CGM_LIBRARIES} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )

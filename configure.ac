@@ -429,23 +429,23 @@ AC_SUBST([python_patterns])
 #                              Version Stuff
 ################################################################################
 
-AC_DEFINE(VERSION,["AC_PACKAGE_VERSION"],[MOAB Version])
+#AC_DEFINE(VERSION,["AC_PACKAGE_VERSION"],[MOAB Version])
 VERSION_MAJOR=`expr AC_PACKAGE_VERSION : '\([[0-9]]*\)'`
 VERSION_MINOR=`expr AC_PACKAGE_VERSION : '[[0-9]]*\.\([[0-9]]*\)'`
 VERSION_PATCH=`expr AC_PACKAGE_VERSION : '[[0-9]]*\.[[0-9]]*\.\(.*\)'`
 test "x" != "x$VERSION_MAJOR" || AC_MSG_ERROR("Invalid version string: AC_PACKAGE_VERSION")
 test "x" != "x$VERSION_MINOR" || AC_MSG_ERROR("Invalid version string: AC_PACKAGE_VERSION")
-AC_DEFINE_UNQUOTED(VERSION_MAJOR,$VERSION_MAJOR,[MOAB Major Version])
-AC_DEFINE_UNQUOTED(VERSION_MINOR,$VERSION_MINOR,[MOAB Minor Version])
+AC_DEFINE_UNQUOTED(PACKAGE_VERSION_MAJOR,$VERSION_MAJOR,[MOAB Major Version])
+AC_DEFINE_UNQUOTED(PACKAGE_VERSION_MINOR,$VERSION_MINOR,[MOAB Minor Version])
 if test "x" != "x$VERSION_PATCH"; then
-  AC_DEFINE_UNQUOTED(VERSION_PATCH,$VERSION_PATCH,[MOAB Patch Level])
+  AC_DEFINE_UNQUOTED(PACKAGE_VERSION_PATCH,$VERSION_PATCH,[MOAB Patch Level])
   VERSION_STRING="AC_PACKAGE_STRING"
 elif test $VERSION_MINOR -eq 99; then
   VERSION_STRING="AC_PACKAGE_STRING (Alpha)"
 else
   VERSION_STRING="AC_PACKAGE_STRING (Beta)"
 fi
-AC_DEFINE_UNQUOTED(VERSION_STRING,"${VERSION_STRING}",[MOAB Version String])
+AC_DEFINE_UNQUOTED(PACKAGE_VERSION_STRING,"${VERSION_STRING}",[MOAB Version String])
 
 # reverse engineer the parameters for libtool's version-info option to accomplish
 # the .so naming we desire based on the version number

@@ -997,7 +997,7 @@ static ErrCode internal_WriteMesh( iMOAB_AppID pid,
     IMOAB_ASSERT( strlen( filename ), "Invalid filename length." );
 
     appData& data        = context.appDatas[*pid];
-    EntityHandle fileSet = data.file_set;
+    EntityHandle fileSet = ( primary_set ? data.file_set : 0 );
 
     std::ostringstream newopts;
 #ifdef MOAB_HAVE_MPI
@@ -2369,13 +2369,11 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
     }
 
     /// @todo Allow for tags of different length
-    int nbLocalVals = *num_tag_storage_length / tagNames.size();  // assumes all tags have the same length?
-    // check global ids to have different values
-    std::set< int > globalIdsSet;
-    for( int j = 0; j < nbLocalVals; j++ )
-        globalIdsSet.insert( globalIds[j] );
+    size_t nbLocalVals = *num_tag_storage_length / tagNames.size();  // assumes all tags have the same length?
 
-    if( static_cast< int >( globalIdsSet.size() ) < nbLocalVals )
+    // check global ids to have different values
+    std::set< int > globalIdsSet( globalIds, globalIds + nbLocalVals );
+    if( globalIdsSet.size() < nbLocalVals )
     {
         std::cout << "iMOAB_SetDoubleTagStorageWithGid: for pid:" << *pid << " tags[0]:" << tagNames[0]
                   << " global ids passed are not unique, major error\n";
@@ -2458,7 +2456,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
         // the processor id that processes global_id is global_id / num_ents_per_proc
 
         int indexInRealLocal = 0;
-        for( int i = 0; i < nbLocalVals; i++ )
+        for( size_t i = 0; i < nbLocalVals; i++ )
         {
             // to proc, marker, element local index, index in el
             int marker              = globalIds[i];
@@ -2498,7 +2496,9 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
             // tag data collect by number of tags
             TLreq.inc_n();
         }
-        ( pco->proc_config().crystal_router() )->gs_transfer( 1, TLreq, 0 );
+
+        // perform communication with crystal router
+        pco->proc_config().crystal_router()->gs_transfer( 1, TLreq, 0 );
 
         // we know now that process TLreq.vi_wr[2 * n] needs tags for gid TLreq.vi_wr[2 * n + 1]
         // we should first order by global id, and then build the new TL with send to proc, global id and
@@ -2537,22 +2537,23 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
                 {
                     // we have a big problem; basically, we are saying that
                     // dof currentValue is on one model and not on the other
-                    // std::cout << " currentValue1:" << currentValue1 << " missing in comp2" << "\n";
                     indexInTLreq++;
                     continue;
                 }
+
                 if( currentValue1 > currentValue2 )
                 {
-                    // std::cout << " currentValue2:" << currentValue2 << " missing in comp1" << "\n";
                     indexInTLsend++;
                     continue;
                 }
+
                 int size1 = 1;
-                int size2 = 1;
                 while( indexInTLreq + size1 < n1 && currentValue1 == TLreq.vi_rd[2 * ( indexInTLreq + size1 ) + 1] )
                     size1++;
+                int size2 = 1;
                 while( indexInTLsend + size2 < n2 && currentValue2 == TLsend.vi_rd[2 * ( indexInTLsend + size2 ) + 1] )
                     size2++;
+
                 // must be found in both lists, find the start and end indices
                 for( int i1 = 0; i1 < size1; i1++ )
                 {
@@ -2577,19 +2578,22 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
                 indexInTLsend += size2;
             }
         }
-        ( pco->proc_config().crystal_router() )->gs_transfer( 1, TLBack, 0 );
+
+        // invoke crystal router
+        pco->proc_config().crystal_router()->gs_transfer( 1, TLBack, 0 );
+
         // end copy from comm graph
         // after we are done sending, we need to set those tag values, in a reverse process compared to send
         n1             = TLBack.get_n();
         double* ptrVal = &TLBack.vr_rd[0];  //
         for( int i = 0; i < n1; i++ )
         {
-            int gid                                       = TLBack.vi_rd[3 * i + 1];  // marker
-            std::map< int, EntityHandle >::iterator mapIt = eh_by_gid.find( gid );
+            const int gid    = TLBack.vi_rd[3 * i + 1];  // marker
+            const auto mapIt = eh_by_gid.find( gid );
             if( mapIt == eh_by_gid.end() ) continue;
+
             EntityHandle eh = mapIt->second;
             // now loop over tags
-
             for( size_t j = 0; j < tagList.size(); j++ )
             {
                 MB_CHK_ERR( context.MBI->tag_set_data( tagList[j], &eh, 1, (void*)ptrVal ) );
@@ -2601,6 +2605,7 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
 #endif
     return MB_SUCCESS;
 }
+
 ErrCode iMOAB_GetDoubleTagStorage( iMOAB_AppID pid,
                                    const iMOAB_String tag_storage_names,
                                    int* num_tag_storage_length,
@@ -4958,7 +4963,7 @@ ErrCode iMOAB_WriteMapFile( iMOAB_AppID pid_intersection,
     attrMap["concave_a"]   = "false";  // defaults
     attrMap["concave_b"]   = "false";  // defaults
     attrMap["bubble"]      = "true";   // defaults
-    attrMap["MOABversion"] = std::string( MOAB_VERSION );
+    attrMap["MOABversion"] = std::string( MOAB_PACKAGE_VERSION_STRING );
 
     // Write the map file to disk in parallel using either HDF5 or SCRIP interface
     MB_CHK_ERR( weightMap->WriteParallelMap( filename, attrMap ) );
@@ -5390,7 +5395,7 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                 cellMap;  // do not create one if it already exists, maybe from other processes
             for( int i = 0; i < n; i++ )
             {
-                int from_proc  = TLc.vi_rd[size_tuple * i];
+                // int from_proc  = TLc.vi_rd[size_tuple * i];
                 int globalIdEl = TLc.vi_rd[size_tuple * i + 1];
                 if( cellMap.find( globalIdEl ) == cellMap.end() )  // need to create the cell
                 {

@@ -79,7 +79,6 @@ void test_coords_connect_iterate()
         rval = mb.coords_iterate( vit, verts.end(), xcoord, ycoord, zcoord, count );
         if( MB_SUCCESS && ( !xcoord || !ycoord || !zcoord ) ) rval = MB_FAILURE;CHECK_ERR( rval );
 
-        assert( total + count <= (int)verts.size() );
         for( int i = 0; i < count; i++ )
         {
             // vertex handles start at 1, so need to subtract one
@@ -111,6 +110,8 @@ void test_coords_connect_iterate()
 
         vit += count;
         total += count;
+
+        CHECK( total <= static_cast<int>(verts.size()) );
     }
 
     // now check connectivity
@@ -135,7 +136,6 @@ void test_coords_connect_iterate()
         }
 
         hit += count;
-        // total += count;
     }
 
     // ok, done
@@ -224,8 +224,8 @@ void test_iterates()
     {
         rval = mb.tag_set_data( idtag, &start_hex, 1, &i );CHECK_ERR( rval );
     }
-    int count = 0;
 
+    int count = 0;
     // now check connectivity
     start_hex             = hexes.front();
     Range::iterator hit   = hexes.begin();

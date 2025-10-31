@@ -84,13 +84,7 @@ case $with_lapack in
 esac
 
 # Get fortran linker name of LAPACK function to check for.
-if (test "x$ENABLE_FORTRAN" != "xno"); then
-  AC_LANG_PUSH(Fortran)dnl
-  _AC_FC_FUNC(cheev)
-  AC_LANG_POP(Fortran)dnl
-else
-  cheev="cheev$FCMANGLE_SUFFIX"
-fi
+cheev="$lapack_symbol_var"
 
 # We cannot use LAPACK if BLAS is not found
 if test "x$ax_blas_ok" != xyes; then

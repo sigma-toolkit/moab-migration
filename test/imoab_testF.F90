@@ -16,9 +16,10 @@ program fdriver
 
 #include "moab/MOABConfig.h"
 #ifdef MOAB_HAVE_MPI
-!include 'mpif.h'
-#endif
    use mpi
+#endif
+
+   !implicit none
 #ifndef MOAB_MESH_DIR
 #error Specify MOAB_MESH_DIR path
 #endif

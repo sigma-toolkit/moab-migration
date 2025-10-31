@@ -86,7 +86,6 @@ int main( int argc, char* argv[] )
     opts.addOpt< int >( "endCoupler,j", "end task for coupler layout", &endG4 );
 
     int disc_orders[2] = { 1, 1 };  // 1 is for FV
-
     std::string fieldstr;
     opts.addOpt< std::string >( "field,f", "field to project using the map ", &fieldstr );
 
@@ -244,7 +243,9 @@ int main( int argc, char* argv[] )
     }
 
     // first hop
+    // make the tag 0, to check we are actually sending needed data
     if( rofComm != MPI_COMM_NULL )
+    // make the tag 0, to check we are actually sending needed data
     {
         // as always, use nonblocking sends
         // this is for projection to ocean:

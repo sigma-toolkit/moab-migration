@@ -9,6 +9,7 @@
 #ifdef MOAB_HAVE_MPI
 #include "moab_mpi.h"
 #endif
+#include <limits>
 
 /* Define these here because they are used by many tests
  * to find the add directory for input files */
@@ -774,7 +775,7 @@ void check_baseline_file( std::string basefile,
     fs.open( basefile.c_str(), std::fstream::in );
     if( !fs.is_open() )
     {
-        std::cout << " error opening base file  " << basefile << "\n";
+        printf( "[%d]: error opening baseline file %s.\n", rank, basefile.c_str() );
         flag_error();
         return;
     }
@@ -791,16 +792,15 @@ void check_baseline_file( std::string basefile,
         std::map< int, double >::iterator it = mapVals.find( gids[i] );
         if( it == mapVals.end() )
         {
-            std::cout << "id - value not found:" << gids[i] << "\n";
+            printf( "[%d]: value not found. Index: %zu, GID: %d\n", rank, i, gids[i] );
             flag_error();
             return;
         }
 
-        // printf( "GID: %d, Value: %3.14f, Expected: %3.14f\n", gids[i], vals[i], it->second );
         if( fabs( it->second - vals[i] ) > eps )
         {
-            std::cout << rank << ": value out of range: index i=" << i << " id: " << gids[i] << "  value:" << vals[i]
-                      << " expected : " << it->second << "\n";
+            printf( "[%d]: value out of range. Index: %zu, GID: %d, Value: %2.14f, Expected: %3.14f, Error: %3.14f\n", 
+                    rank, i, gids[i], vals[i], it->second, fabs( it->second - vals[i] ) );
             flag_error();
             return;
         }

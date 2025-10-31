@@ -5,9 +5,10 @@
 # PNETCDF_LIBRARIES           - list of libraries to link against when using NetCDF
 # PNETCDF_FOUND               - Do not attempt to use PNetCDF if "no", "0", or undefined.
 
-IF (MOAB_HAVE_MPI AND ENABLE_PNETCDF AND MOAB_HAVE_NETCDF)
-  set (PNETCDF_DIR "" CACHE PATH "Path to search for PNetCDF header and library files" )
-  set (PNETCDF_FOUND NO CACHE INTERNAL "Found PNetCDF components successfully." )
+set (PNETCDF_DIR "" CACHE PATH "Path to search for PNetCDF header and library files" )
+set (PNETCDF_FOUND NO CACHE INTERNAL "Found PNetCDF components successfully." )
+
+IF (MOAB_HAVE_MPI AND ENABLE_PNETCDF)
 
   find_path( PNETCDF_INCLUDES pnetcdf.h
     ${PNETCDF_DIR}
@@ -27,10 +28,6 @@ find_library( PNETCDF_LIBRARIES
   IF (NOT PNETCDF_FOUND)
     if ( PNETCDF_INCLUDES AND PNETCDF_LIBRARIES )
       set( PNETCDF_FOUND YES )
-      message (STATUS "---   PNetCDF Configuration ::")
-      message (STATUS "        Directory : ${PNETCDF_DIR}")
-      message (STATUS "        INCLUDES  : ${PNETCDF_INCLUDES}")
-      message (STATUS "        LIBRARIES : ${PNETCDF_LIBRARIES}")
     else ( PNETCDF_INCLUDES AND PNETCDF_LIBRARIES )
       set( PNETCDF_FOUND NO )
       message("finding PNetCDF failed, please try to set the var PNETCDF_DIR")
@@ -38,14 +35,13 @@ find_library( PNETCDF_LIBRARIES
   ENDIF (NOT PNETCDF_FOUND)
 
   mark_as_advanced(
-    PNETCDF_DIR
     PNETCDF_INCLUDES
     PNETCDF_LIBRARIES
   )
-ELSE (MOAB_HAVE_MPI AND ENABLE_PNETCDF AND MOAB_HAVE_NETCDF)
+ELSE (MOAB_HAVE_MPI AND ENABLE_PNETCDF)
   message (STATUS "Not configuring with PNetCDF since MPI installation not specified or explicitly disabled by user")
-ENDIF (MOAB_HAVE_MPI AND ENABLE_PNETCDF AND MOAB_HAVE_NETCDF)
+ENDIF (MOAB_HAVE_MPI AND ENABLE_PNETCDF)
 
 include (FindPackageHandleStandardArgs)
-find_package_handle_standard_args (PNetCDF "PNetCDF not found, check the CMake PNETCDF_DIR variable"
+find_package_handle_standard_args (PNETCDF "PNetCDF not found, check the CMake PNETCDF_DIR variable"
   PNETCDF_DIR PNETCDF_INCLUDES PNETCDF_LIBRARIES)

@@ -900,7 +900,7 @@ int main( int argc, char* argv[] )
             if( runCtx->outFilename.size() )
             {
                 std::map< std::string, std::string > attrMap;
-                attrMap["MOABversion"]   = std::string( MOAB_VERSION );
+                attrMap["MOABversion"]   = std::string( MOAB_PACKAGE_VERSION_STRING );
                 attrMap["Title"]         = "MOAB-TempestRemap (mbtempest) Offline Regridding Weight Generator";
                 attrMap["normalization"] = "ovarea";
                 attrMap["remap_options"] = runCtx->mapOptions.strMethod;

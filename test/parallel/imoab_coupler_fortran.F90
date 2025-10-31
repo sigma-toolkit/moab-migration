@@ -25,11 +25,11 @@ end
 program imoab_coupler_fortran
 
    use iso_c_binding
+   use mpi
    use iMOAB
+   implicit none
 
-#include "mpif.h"
 #include "moab/MOABConfig.h"
-   !implicit none
    integer :: m ! for number of arguments ; if less than 1, exit
    integer :: global_comm
    integer :: rankInGlobalComm, numProcesses

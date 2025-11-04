@@ -52,8 +52,8 @@ AC_DEFUN([FATHOM_CHECK_MPITYPE], [
         fi # openmpi
       fi # mpich
       if (test "$MPIFAMILY" != "GENERIC"); then
-        MPI_VER="$(grep "MPI_VERSION" $mpifile | sed -e "s/#define MPI_VERSION //g" | tr -d '[:space:]')"
-        MPI_SVER="$(grep "MPI_SUBVERSION" $mpifile | sed -e "s/#define MPI_SUBVERSION //g" | tr -d '[:space:]')"
+        MPI_VER="$(grep "define MPI_VERSION" $mpifile | sed -e "s/#define MPI_VERSION //g" | tr -d '[:space:]')"
+        MPI_SVER="$(grep "define MPI_SUBVERSION" $mpifile | sed -e "s/#define MPI_SUBVERSION //g" | tr -d '[:space:]')"
         MPITYPE="$MPIFAMILY-$MPI_VER-$MPI_SVER"
       fi
     fi # mpifile

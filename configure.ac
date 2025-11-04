@@ -533,7 +533,10 @@ fi
 FATHOM_CHECK_MPITYPE
 
 if (test "$MPIFAMILY" = "OPENMPI" && test "x$ENABLE_FORTRAN" != "xno"); then
-  FCLIBS="$FCLIBS -lmpi_cxx"
+  AS_VERSION_COMPARE([$MPI_VER], [3],
+    [AC_MSG_ERROR([MPI version too old. Require at least 3.0])],
+    [FCLIBS="$FCLIBS -lmpi_cxx"],
+    [])
 fi
 
 if test "xyes" = "x$enablempi"; then

@@ -27,7 +27,7 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 
 project( MOAB 
-         VERSION 5.5.1
+         VERSION 5.6.0
          DESCRIPTION "Mesh-Oriented datABase (MOAB) library"
          LANGUAGES C CXX Fortran
        )

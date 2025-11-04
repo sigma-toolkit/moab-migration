@@ -83,6 +83,10 @@ MPI_DIR=$WITH_MPI
 AC_SUBST(MPI_DIR)
 AC_SUBST(enablempi)
 
+# initialize some BLAS/LAPACK symbol names
+blas_symbol_var="dgemm$FCMANGLE_SUFFIX"
+lapack_symbol_var="cheev$FCMANGLE_SUFFIX"
+
 # Invoke and find all necessary flags for C, C++, FC
 FATHOM_COMPILER_FLAGS([yes],[yes],[$ENABLE_FORTRAN])
 

@@ -571,9 +571,6 @@ AC_DEFUN([FAC_FC_NAME_MANGLING],
 AC_CACHE_CHECK([for Fortran name-mangling scheme],
                ac_cv_[]_AC_LANG_ABBREV[]_mangling,
 [
-  blas_symbol_var="dgemm_"
-  lapack_symbol_var="cheev_"
-
   AC_COMPILE_IFELSE(
   [      subroutine foobar()
       return

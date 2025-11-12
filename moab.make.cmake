@@ -24,7 +24,7 @@ MOAB_INCLUDES = -I@abs_srcdir@/src \
                 -I@abs_srcdir@/src/LocalDiscretization \
                 -I@abs_srcdir@/src/RefineMesh
 
-MOAB_INCLUDES += @ZOLTAN_INCLUDES@
+MOAB_INCLUDES += -I@ZOLTAN_INCLUDES@ -I@NETCDF_INCLUDES@ -I@PNETCDF_INCLUDES@ -I@HDF5_INCLUDES@
 
 MOAB_CPPFLAGS = @CPPFLAGS@ 
 MOAB_CXXFLAGS = @CXXFLAGS@ 

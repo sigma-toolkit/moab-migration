@@ -29,7 +29,7 @@ endif()
 project( MOAB 
          VERSION 5.6.0
          DESCRIPTION "Mesh-Oriented datABase (MOAB) library"
-         LANGUAGES C CXX Fortran
+         LANGUAGES C CXX
        )
 
 # Include standard CMake macros
@@ -173,6 +173,10 @@ mark_as_advanced(
 
 if ( ENABLE_FORTRAN )
   include (${CMAKE_ROOT}/Modules/CMakeDetermineFortranCompiler.cmake)
+else ()
+  # If Fortran is disabled, then disable BLAS/LAPACK by default as well
+  message(STATUS "Disabling BLAS/LAPACK discovery as Fortran has been disabled by user")
+  set( ENABLE_BLASLAPACK OFF )
 endif ()
 
 # patch added to ensure libs have a full-path ID set on Mac

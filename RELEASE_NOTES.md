@@ -1,5 +1,69 @@
 # MOAB Library Release Notes
 
+## Version 5.6.0
+
+### New Features
+- **PR #741**: Significant updates to make CMake build workflow more robust
+- **PR #748**: Edge Split tool for mesh manipulation
+- **PR #735**: Add parent-child link removal methods to PyMOAB
+- **PR #736**: Parallel Read optimizations
+- **PR #734**: Add option for global visualization of any map
+- **PR #733**: Add Support for CMake 4 by Replacing `TestEndianess.c.in`
+- **PR #721**: Fixes for dealing with 2D RLL grids
+- **PR #720**: Add missing baseline files to distribution
+- **PR #711**: Fix ghosting for remapper in iMOAB
+- **PR #709**: Allow empty entity range for integer tag in iMOAB
+- **PR #704**: Redesign Install Directories and Fix RPATH for macOS
+- **PR #705**: Initialize projections with zero values
+- **PR #680**: Support older type domain file and Zoltan partitioning for domain reader
+- **PR #679**: Map generation fix when dealing with RRM grids
+- **PR #674**: Add MOAB Version to Config File
+- **PR #666**: Compare H5M files utility
+- **PR #672**: More robust handling of null-terminated strings in PyMOAB
+- **PR #665**: Add option for culling the mesh for domain reader
+- **PR #664**: Auto-download Zoltan for E3SM workflows
+
+### Bug Fixes
+- **PR #742**: Fix a regression in offline remap workflows
+- **PR #729**: Fix comparison of maps
+- **PR #728**: Consolidate compare files tool and example
+- **PR #682**: Check for NULL pointer in PyMOAB tag_get_default_value
+- **PR #671**: Update the ax_blas and ax_lapack versions
+- **PR #670**: Set default CMake build type
+- **PR #667**: Address clang warnings
+- **PR #661**: Fix various clang compilation issues
+
+### Build System
+- **PR #718**: Add Conan package manager support
+- **PR #707**: Support a uniform API for online vs offline map based computations
+- **PR #704**: Integrate Scikit-Build into PyMOAB build process
+- **PR #683**: Use the CAAS nonlinear filter for bounds preservation
+- **PR #681**: Deprecate all ITAPS code and links to CGM
+- **PR #676**: Integrate Scikit-Build into PyMOAB build process
+- **PR #660**: Update formatting for RELEASE_NOTES.md
+
+### Documentation
+- **PR #746**: Improve Doxygen documentation and enable CMake support
+
+### Performance Improvements
+- **PR #736**: Optimize parallel read operations
+- **PR #734**: Improve global visualization performance
+- **PR #720**: Optimize file distribution for parallel runs
+
+### Dependencies
+- **PR #733**: Add support for CMake 4.0.0
+- **PR #704**: Update Python packaging dependencies
+- **PR #664**: Add automatic Zoltan download capability
+
+### Testing
+- **PR #691**: Add Pytest support
+- **PR #686**: Add warning tests for MDF files
+- **PR #666**: Add file comparison utility for testing
+
+### Known Issues
+- Some legacy features have been deprecated in this release. Please see the deprecation notices in the code for more details.
+- The build system has undergone significant changes; please report any issues with the new CMake configuration.
+
 ## Version 5.5.1
 
 ### Features

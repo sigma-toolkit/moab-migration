@@ -40,6 +40,7 @@ if ( CMAKE_COMPILER_IS_GNUCXX OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang") )
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wno-ignored-attributes")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wno-variadic-macros")
   ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wno-deprecated-declarations")
+  ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wno-shadow")
   # Need to enable or check for this only if user asks for C++11 support
   # ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wno-c++11-long-long")
   if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 4.8)
@@ -64,6 +65,7 @@ else ( CMAKE_COMPILER_IS_GNUCXX OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang") )
     ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-ansi")  # standard compliant
     ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-w2")    # verbose warnings
     ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wall")
+    ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-Wno-shadow")
     # disable some warnings -- consistent with autoconf
     # -wd981 -wd279 -wd1418 -wd383 -wd1572 -wd2259
     ENABLE_IF_SUPPORTED(MOAB_CXX_FLAGS "-wd981")
@@ -75,39 +77,16 @@ else ( CMAKE_COMPILER_IS_GNUCXX OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang") )
 
     if (ENABLE_FORTRAN)
       # ifort (untested)
-      set (CMAKE_Fortran_FLAGS_RELEASE "-f77rtl -O2")
-      set (CMAKE_Fortran_FLAGS_DEBUG   "-f77rtl -O0 -g")
-    endif (ENABLE_FORTRAN)
-  else ()
-    if (ENABLE_FORTRAN)
-      if(NOT WIN32)
-        set (CMAKE_Fortran_FLAGS_RELEASE "-O2")
-        set (CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g")
-      else(NOT WIN32)
-        set (CMAKE_Fortran_FLAGS_RELEASE "-O2")
-        set (CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g")
-      endif(NOT WIN32)
+      set (CMAKE_Fortran_FLAGS_RELEASE "-f77rtl")
+      set (CMAKE_Fortran_FLAGS_DEBUG   "-f77rtl")
     endif (ENABLE_FORTRAN)
   endif()
 endif ( CMAKE_COMPILER_IS_GNUCXX OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang") )
-
-FORCE_ADD_FLAGS(CMAKE_CXX_FLAGS "${MOAB_CXX_FLAGS}")
 
 # Debug targets
 IF (CMAKE_BUILD_TYPE MATCHES "Debug")
 
   if(NOT WIN32)
-    ENABLE_IF_SUPPORTED(CMAKE_CXX_FLAGS "-Og")
-    #
-    # If -Og is not available, fall back to -O0:
-    #
-    IF(NOT CMAKE_HAVE_FLAG_Og)
-      FORCE_ADD_FLAGS(CMAKE_CXX_FLAGS "-O0")
-      FORCE_ADD_FLAGS(CMAKE_C_FLAGS "-O0")
-      if (ENABLE_FORTRAN)
-        FORCE_ADD_FLAGS(CMAKE_Fortran_FLAGS "-O0")
-      endif (ENABLE_FORTRAN)
-    ENDIF()
 
     ENABLE_IF_SUPPORTED(CMAKE_C_FLAGS "-ggdb")
     ENABLE_IF_SUPPORTED(CMAKE_CXX_FLAGS "-ggdb")
@@ -139,6 +118,8 @@ IF (CMAKE_BUILD_TYPE MATCHES "Debug")
 
 ENDIF()
 
+FORCE_ADD_FLAGS(CMAKE_CXX_FLAGS "${MOAB_CXX_FLAGS}")
+
 # Force C99 standard support
 FORCE_ADD_FLAGS(CMAKE_C_FLAGS "-std=c99")
 
@@ -148,11 +129,6 @@ IF (CMAKE_BUILD_TYPE MATCHES "Release")
   # General optimization flags:
   #
   if(NOT WIN32)
-    FORCE_ADD_FLAGS(CMAKE_C_FLAGS "-O2")
-    FORCE_ADD_FLAGS(CMAKE_CXX_FLAGS "-O2")
-    if (ENABLE_FORTRAN)
-      FORCE_ADD_FLAGS(CMAKE_Fortran_FLAGS "-O2")
-    endif (ENABLE_FORTRAN)
 
     ENABLE_IF_SUPPORTED(CMAKE_CXX_FLAGS "-ip")
     ENABLE_IF_SUPPORTED(CMAKE_CXX_FLAGS "-funroll-loops")

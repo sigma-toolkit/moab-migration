@@ -1,7 +1,7 @@
 ################################################################################
 #                           Standard Stuff
 ################################################################################
-AC_INIT([MOAB],[5.5.1],[moab-dev@mcs.anl.gov],[moab],[http://sigma.mcs.anl.gov])
+AC_INIT([MOAB],[5.6.0],[moab-dev@mcs.anl.gov],[moab],[http://sigma.mcs.anl.gov])
 AC_CONFIG_SRCDIR([moab.make.in])
 AC_CONFIG_SRCDIR([config/MOABConfig.cmake.in])
 AC_CONFIG_SRCDIR([examples/makefile.config.in])
@@ -82,6 +82,10 @@ AM_CONDITIONAL(ENABLE_FORTRAN,[test "x$ENABLE_FORTRAN" != "xno"])
 MPI_DIR=$WITH_MPI
 AC_SUBST(MPI_DIR)
 AC_SUBST(enablempi)
+
+# initialize some BLAS/LAPACK symbol names
+blas_symbol_var="dgemm$FCMANGLE_SUFFIX"
+lapack_symbol_var="cheev$FCMANGLE_SUFFIX"
 
 # Invoke and find all necessary flags for C, C++, FC
 FATHOM_COMPILER_FLAGS([yes],[yes],[$ENABLE_FORTRAN])
@@ -529,7 +533,10 @@ fi
 FATHOM_CHECK_MPITYPE
 
 if (test "$MPIFAMILY" = "OPENMPI" && test "x$ENABLE_FORTRAN" != "xno"); then
-  FCLIBS="$FCLIBS -lmpi_cxx"
+  AS_VERSION_COMPARE([$MPI_VER], [3],
+    [AC_MSG_ERROR([MPI version too old. Require at least 3.0])],
+    [FCLIBS="$FCLIBS -lmpi_cxx"],
+    [])
 fi
 
 if test "xyes" = "x$enablempi"; then

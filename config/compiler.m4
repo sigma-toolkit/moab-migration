@@ -226,11 +226,19 @@ fi
 
 if (test "x$enable_cxx_optimize" != "xno"); then  # optimization flags
 #GNU
-EXTRA_GNU_CXXFLAGS="$EXTRA_GNU_CXXFLAGS -fno-fast-math -fsanitize=float-cast-overflow,float-divide-by-zero"
+EXTRA_GNU_CXXFLAGS="$EXTRA_GNU_CXXFLAGS -fno-fast-math"
 EXTRA_GNU_FCFLAGS="$EXTRA_GNU_FCFLAGS -fno-fast-math"
+if (test "x$host_vendor" != "xapple"); then
+  EXTRA_GNU_CXXFLAGS="$EXTRA_GNU_CXXFLAGS -fsanitize=float-cast-overflow,float-divide-by-zero"
+  EXTRA_GNU_FCFLAGS="$EXTRA_GNU_FCFLAGS -fsanitize=float-cast-overflow,float-divide-by-zero"
+fi
 #CLANG
-EXTRA_CLANG_CXXFLAGS="$EXTRA_CLANG_CXXFLAGS -fno-fast-math -fsanitize=float-cast-overflow,float-divide-by-zero"
+EXTRA_CLANG_CXXFLAGS="$EXTRA_CLANG_CXXFLAGS -fno-fast-math"
 EXTRA_CLANG_FCFLAGS="$EXTRA_CLANG_FCFLAGS -fno-fast-math"
+if (test "x$host_vendor" != "xapple"); then
+  EXTRA_CLANG_CXXFLAGS="$EXTRA_CLANG_CXXFLAGS -fsanitize=float-cast-overflow,float-divide-by-zero"
+  EXTRA_CLANG_FCFLAGS="$EXTRA_CLANG_FCFLAGS -fsanitize=float-cast-overflow,float-divide-by-zero"
+fi
 # Intel
 EXTRA_INTEL_CXXFLAGS="$EXTRA_INTEL_CXXFLAGS -fp-model=precise"
 EXTRA_INTEL_FCFLAGS="$EXTRA_INTEL_FCFLAGS -fp-model source -prec-div"
@@ -563,9 +571,6 @@ AC_DEFUN([FAC_FC_NAME_MANGLING],
 AC_CACHE_CHECK([for Fortran name-mangling scheme],
                ac_cv_[]_AC_LANG_ABBREV[]_mangling,
 [
-  blas_symbol_var="dgemm_"
-  lapack_symbol_var="cheev_"
-
   AC_COMPILE_IFELSE(
   [      subroutine foobar()
       return

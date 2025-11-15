@@ -7,17 +7,17 @@ if (NOT WIN32)
   #This all breaks on windows.
   set (CMAKE_Fortran_COMPILER_INIT ${CMAKE_GENERATOR_FC})
   set (CMAKE_CXX_FLAGS_INIT "-fPIC -DPIC")
-  set (CMAKE_CXX_FLAGS_DEBUG_INIT "-O0 -g")
-  set (CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT "-O2 -g")
-  set (CMAKE_CXX_FLAGS_RELEASE_INIT "-O2 -DNDEBUG")
+  #set (CMAKE_CXX_FLAGS_DEBUG_INIT "-O0 -g")
+  #set (CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT "-O2 -g")
+  #set (CMAKE_CXX_FLAGS_RELEASE_INIT "-O2 -DNDEBUG")
   set (CMAKE_C_FLAGS_INIT "-fPIC -DPIC")
-  set (CMAKE_C_FLAGS_DEBUG_INIT "-O0 -g")
-  set (CMAKE_C_FLAGS_RELWITHDEBINFO_INIT "-O2 -g")
-  set (CMAKE_C_FLAGS_RELEASE_INIT "-O2 -DNDEBUG")
+  #set (CMAKE_C_FLAGS_DEBUG_INIT "-O0 -g")
+  #set (CMAKE_C_FLAGS_RELWITHDEBINFO_INIT "-O2 -g")
+  #set (CMAKE_C_FLAGS_RELEASE_INIT "-O2 -DNDEBUG")
   set (CMAKE_Fortran_FLAGS_INIT "-fPIC")
-  set (CMAKE_Fortran_FLAGS_DEBUG_INIT "-O0 -g")
-  set (CMAKE_Fortran_FLAGS_RELWITHDEBINFO_INIT "-O2 -g")
-  set (CMAKE_Fortran_FLAGS_RELEASE_INIT "-O2")
+  #set (CMAKE_Fortran_FLAGS_DEBUG_INIT "-O0 -g")
+  #set (CMAKE_Fortran_FLAGS_RELWITHDEBINFO_INIT "-O2 -g")
+  #set (CMAKE_Fortran_FLAGS_RELEASE_INIT "-O2")
   set (CMAKE_SHARED_LIBRARY_LINK_C_FLAGS_INIT "")
   set (CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS_INIT "")
 endif()
@@ -27,9 +27,9 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 
 project( MOAB 
-         VERSION 5.5.1
+         VERSION 5.6.0
          DESCRIPTION "Mesh-Oriented datABase (MOAB) library"
-         LANGUAGES C CXX Fortran
+         LANGUAGES C CXX
        )
 
 # Include standard CMake macros
@@ -173,6 +173,10 @@ mark_as_advanced(
 
 if ( ENABLE_FORTRAN )
   include (${CMAKE_ROOT}/Modules/CMakeDetermineFortranCompiler.cmake)
+else ()
+  # If Fortran is disabled, then disable BLAS/LAPACK by default as well
+  message(STATUS "Disabling BLAS/LAPACK discovery as Fortran has been disabled by user")
+  set( ENABLE_BLASLAPACK OFF )
 endif ()
 
 # patch added to ensure libs have a full-path ID set on Mac
@@ -440,6 +444,10 @@ function(dump_cmake_variables)
 endfunction()
 
 include (config/CheckCompilerFlags.cmake)
+message("CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
+message("CMAKE_C_FLAGS: ${CMAKE_C_FLAGS}")
+message("CMAKE_Fortran_FLAGS: ${CMAKE_Fortran_FLAGS}")
+message("MOAB_CXX_FLAGS: ${MOAB_CXX_FLAGS}")
 
 # Check for HDF5 availability
 # set (HDF5_DIR "$ENV{HDF5_DIR}" CACHE PATH "Path to search for HDF5 header and library files")

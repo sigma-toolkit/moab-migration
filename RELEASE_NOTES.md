@@ -1,5 +1,53 @@
 # MOAB Library Release Notes
 
+## Version 5.6.0
+
+### Features
+- *PR #748*: A new edge-splitting tool and updated projection/gnomonic-based edge-recovery framework were added, along with extensive robustness fixes, diagnostics, parallel output support, and refactoring to enable accurate edge decomposition, vector-flux computations, and preparation of complete edge-map data for NetCDF workflows.
+- *PR #746*: Comprehensive documentation updates: fixed inconsistencies, enhanced examples, and improved Doxygen integration across all components.
+- *PR #741*: Significant improvements were made to the CMake build system, including consistent dependency resolution, improved tooling, added auto-download capabilities for key TPLs and mesh files, and numerous fixes to warnings, linkage, and configuration logic. Tests and tools were expanded and modernized, while obsolete components were removed and overall workflow reliability was enhanced.
+- *PR #735*: Add parent-child link removal methods to PyMOAB
+- *PR #736*: Improved parallel reading, optimized map application and coverage construction, removed unnecessary TempestRemap matrix creation, simplified migration logic, and added a new river-to-land mapping test.
+- *PR #734*: Added a new `-o 2` option that builds an elevated center-to-center edge visualization directly from map files, offering clearer insight into E3SM map structures and coverage issues.
+- *PR #721*: Correctly propagate the grid dimension for RLL meshes from both TempestRemap and SCRIP formats
+- *PR #707*: Support a uniform API for online vs offline map based computations
+- *PR #683*: Use the CAAS nonlinear filter for bounds preservation
+- *PR #681*: Deprecate all ITAPS code, iMesh dependencies and removed links to CGM, deprecated mbcslam, and cleaned up related code and test files
+- *PR #680*: Support older type domain file and Zoltan partitioning for domain reader
+- *PR #674*: Add MOAB Version to configuration file for downstream use
+- *PR #666*: Compare H5M files utility ​ that is useful for regression testing
+- *PR #672*: More robust handling of null-terminated strings in PyMOAB
+- *PR #665*: Add option for culling the mesh for domain reader (use NO_CULLING to disable)
+- *PR #664*: Auto-download Zoltan for automatic configuration of partitioner
+
+### Fixes
+- *PR #742*: Fix a regression in offline remap workflows
+- *PR #729*: compareMaps: replace min/max difference analysis with a priority queue to report the top N-largest differences, removing the fraction-based output option
+- *PR #728*: Consolidate compare files tool and examples
+- *PR #720*: Add missing baseline files to distribution
+- *PR #711*: Fixed remapper to use the correct parallel communicator (source/target PID) for bilinear and standardized ghost layers to one (\approx order−1 needed).
+- *PR #709*: Allow get/set tag operations on empty entity sets without failing, resolving parallel cases like the imoab_setwithGid test on large numbers of tasks.
+- *PR #705*: Initialize projections with zero values (short-term fix)
+- *PR #686*: Add warning tests for mhdf/h5m files
+- *PR #682*: Check for NULL pointer in PyMOAB tag_get_default_value
+- *PR #679*: Map generation fix when dealing with RRM grids
+- *PR #667*: Address clang warnings
+- *PR #661*: Fix various clang compilation issues
+
+### Build System
+- *PR #733*: Replaced the deprecated TestEndianess.c.in with a self-contained TRY_COMPILE–based endianness check, restoring compatibility with CMake 4.x and eliminating reliance on removed internal templates.
+- *PR #718*: Add Conan package manager support
+- *PR #704*: Modernize PyMOAB with Scikit-Build, update Python packaging, and reorganize install directories with macOS RPATH fix
+- *PR #691*: Add Pytest support for PyMOAB
+- *PR #671*: Update the ax_blas and ax_lapack versions
+- *PR #670*: Set default CMake build type
+- *PR #660*: Update formatting for RELEASE_NOTES.md
+
+### Notes
+- **Deprecation Notice**: The ITAPS interface (iMesh/iRel) and legacy PyMOAB Python bindings have been deprecated as part of MOAB's modernization effort. Users should migrate to the native C++ API or modern Python interfaces.
+- **Modernization**: This release continues MOAB's transition to modern C++ standards, removing deprecated language features and improving type safety with 64-bit global IDs.
+- **Build System**: The build system has been significantly updated with improved CMake support; please report any issues with the new configuration.
+
 ## Version 5.5.1
 
 ### Features

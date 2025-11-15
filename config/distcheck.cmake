@@ -38,7 +38,7 @@
 MACRO(DISTCHECK_SETUP)
   IF(UNIX)
     FIND_PROGRAM(SED sed)
-    SET(INSTDIR ${CMAKE_BINARY_DIR}/${PACKAGE_NAME}-${PROJECT_VERSION}/_inst)
+    SET(INSTDIR ${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}-${CMAKE_PROJECT_VERSION}/_inst)
     SET(DISTCHECK_MAKEFLAGS "" CACHE PATH "MAKEFLAGS used for distcheck's make")
     ADD_CUSTOM_TARGET(distcheck
       COMMAND
@@ -91,14 +91,14 @@ MACRO(DISTCHECK_SETUP)
          || (echo "ERROR: the uninstall target does not work." && false)
       && make clean
          || (echo "ERROR: the clean target failed." && false)
-      && cd ${CMAKE_BINARY_DIR}/${PACKAGE_NAME}-${PROJECT_VERSION}
+      && cd ${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}-${CMAKE_PROJECT_VERSION}
       && chmod u+w . _build _inst && rm -rf _build _inst
       && find . -type d -print0 | xargs -0 chmod u+w
       && echo "=============================================================="
-      && echo "${PACKAGE_NAME}-${PROJECT_VERSION}"
+      && echo "${CMAKE_PROJECT_NAME}-${CMAKE_PROJECT_VERSION}"
               "is ready for distribution."
       && echo "=============================================================="
-      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/${PACKAGE_NAME}-${PROJECT_VERSION}
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}-${CMAKE_PROJECT_VERSION}
       COMMENT "Checking generated tarball..."
       )
     ADD_DEPENDENCIES(distcheck distdir)

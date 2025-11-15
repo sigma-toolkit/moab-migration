@@ -3,7 +3,7 @@ from conan import ConanFile
 from conan.tools.cmake import CMakeToolchain, CMakeDeps, CMake
 
 class Moab(ConanFile):
-    version = "5.5.1"
+    version = "5.6.0"
 
     name = "moab"
     license = "LGPL-3.0/BSD"

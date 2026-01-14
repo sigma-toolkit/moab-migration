@@ -70,27 +70,42 @@
  * @brief MOAB tag types can be: dense/sparse, and of int/double/EntityHandle types.
  * They can also be defined on both elements and vertices of the mesh.
  */
-enum MOAB_TAG_TYPE
+enum iMOAB_TagType
 {
-    DENSE_INTEGER       = 0,
-    DENSE_DOUBLE        = 1,
-    DENSE_ENTITYHANDLE  = 2,
-    SPARSE_INTEGER      = 3,
-    SPARSE_DOUBLE       = 4,
-    SPARSE_ENTITYHANDLE = 5
+    IMOAB_DENSE_INTEGER_TAG       = 0,
+    IMOAB_DENSE_DOUBLE_TAG        = 1,
+    IMOAB_DENSE_ENTITYHANDLE_TAG  = 2,
+    IMOAB_SPARSE_INTEGER_TAG      = 3,
+    IMOAB_SPARSE_DOUBLE_TAG       = 4,
+    IMOAB_SPARSE_ENTITYHANDLE_TAG = 5
 };
 
+
 /**
- * @brief Define MOAB tag ownership information i.e., the entity where the tag is primarily defined
- * This is typically used to query the tag data and to set it back.
+ * @brief iMOAB entity type identifiers (dimension-based)
  */
-enum MOAB_TAG_OWNER_TYPE
+enum iMOAB_EntityType
 {
-    TAG_VERTEX  = 0,
-    TAG_EDGE    = 1,
-    TAG_FACE    = 2,
-    TAG_ELEMENT = 3
+    IMOAB_VERTEX_ENTITY = 0,  /**< 0D vertex */
+    IMOAB_EDGE_ENTITY   = 1,  /**< 1D edge */
+    IMOAB_FACE_ENTITY   = 2,  /**< 2D face */
+    IMOAB_VOLUME_ENTITY = 3   /**< 3D volume/element */
 };
+
+#ifdef MOAB_HAVE_TEMPESTREMAP
+/**
+ * @brief iMOAB discretization type identifiers
+ *
+ * @note These are only valid for intersection applications
+ */
+enum iMOAB_DiscretizationType
+{
+    IMOAB_DGLL_DISCRETIZATION = 0,  /**< Discontinuous Galerkin Spectral Element Method discretization */
+    IMOAB_CGLL_DISCRETIZATION = 1,  /**< Continuous Galerkin Spectral Element Method discretization */
+    IMOAB_PC_DISCRETIZATION = 2,   /**< Vertex-based Point Cloud discretization */
+    IMOAB_FV_DISCRETIZATION = 3  /**< Finite Volume discretization */
+};
+#endif
 
 #define CHK_MPI_ERR( ierr )                          \
     {                                                \
@@ -324,6 +339,26 @@ ErrCode iMOAB_CreateElements( iMOAB_AppID pid,
                               int* block_ID );
 
 /**
+ * \brief Explicitly create all edges for the current application mesh.
+ *
+ * \note <B>Operations:</B> Not collective
+ *
+ * \param[in] pid (iMOAB_AppID)               The unique pointer to the application ID.
+ * \return ErrCode                            The error code indicating success or failure.
+ */
+ErrCode iMOAB_GenerateAllEdges( iMOAB_AppID pid );
+
+/**
+ * \brief Explicitly create all faces for the current application mesh (valid for 3D meshes).
+ *
+ * \note <B>Operations:</B> Not collective
+ *
+ * \param[in] pid (iMOAB_AppID)               The unique pointer to the application ID.
+ * \return ErrCode                            The error code indicating success or failure.
+ */
+ErrCode iMOAB_GenerateAllFaces( iMOAB_AppID pid );
+
+/**
  * \brief Resolve shared entities using global markers on shared vertices.
  *
  * \note  Global markers can be a global node id, for example, or a global DoF number (as for HOMME)
@@ -331,11 +366,11 @@ ErrCode iMOAB_CreateElements( iMOAB_AppID pid,
  * <B>Operations:</B> Collective .
  *
  * \param[in] pid (iMOAB_AppID)            The unique pointer to the application ID.
- * \param[in] num_verts (int*)             Number of vertices.
+ * \param[in] marker_size (int*)           Size of the \p marker array.
  * \param[in] marker (int*)                Resolving marker (global id marker).
  * \return ErrCode                         The error code indicating success or failure.
  */
-ErrCode iMOAB_ResolveSharedEntities( iMOAB_AppID pid, int* num_verts, int* marker );
+ErrCode iMOAB_ResolveSharedEntities( iMOAB_AppID pid, int* marker_size, int* marker );
 
 /**
  * \brief Create the requested number of ghost layers for the parallel mesh.
@@ -427,7 +462,9 @@ ErrCode iMOAB_GetMeshInfo( iMOAB_AppID pid,
                            int* num_visible_elements,
                            int* num_visible_blocks,
                            int* num_visible_surfaceBC,
-                           int* num_visible_vertexBC );
+                           int* num_visible_vertexBC,
+                           int* num_visible_edges,
+                           int* num_visible_faces );
 
 /**
  * \brief Get the global vertex IDs for all locally visible (owned and shared/ghosted) vertices.

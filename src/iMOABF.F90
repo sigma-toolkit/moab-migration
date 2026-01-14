@@ -7,6 +7,26 @@ module iMOAB
    use iso_c_binding
    implicit none
 
+! Tag type identifiers (mirror iMOAB_TagType in C)
+   integer, parameter :: IMOAB_DENSE_INTEGER_TAG       = 0
+   integer, parameter :: IMOAB_DENSE_DOUBLE_TAG        = 1
+   integer, parameter :: IMOAB_DENSE_ENTITYHANDLE_TAG  = 2
+   integer, parameter :: IMOAB_SPARSE_INTEGER_TAG      = 3
+   integer, parameter :: IMOAB_SPARSE_DOUBLE_TAG       = 4
+   integer, parameter :: IMOAB_SPARSE_ENTITYHANDLE_TAG = 5
+
+! Entity type identifiers (mirror iMOAB_EntityType in C)
+   integer, parameter :: IMOAB_VERTEX_ENTITY = 0
+   integer, parameter :: IMOAB_EDGE_ENTITY   = 1
+   integer, parameter :: IMOAB_FACE_ENTITY   = 2
+   integer, parameter :: IMOAB_VOLUME_ENTITY = 3
+
+! Discretization type identifiers (mirror iMOAB_DiscretizationType in C)
+   integer, parameter :: IMOAB_DGLL_DISCRETIZATION = 0
+   integer, parameter :: IMOAB_CGLL_DISCRETIZATION = 1
+   integer, parameter :: IMOAB_PC_DISCRETIZATION = 2
+   integer, parameter :: IMOAB_FV_DISCRETIZATION = 3
+
 ! Interface to all the API routines
    interface
 
@@ -80,10 +100,21 @@ module iMOAB
         integer(c_int), intent(in) :: block_ID
       end function iMOAB_CreateElements
 
-      integer(c_int) function iMOAB_ResolveSharedEntities(pid, num_verts, marker) bind(C, name='iMOAB_ResolveSharedEntities')
+      integer(c_int) function iMOAB_GenerateAllEdges(pid) bind(C, name='iMOAB_GenerateAllEdges')
         use, intrinsic :: iso_c_binding, only: c_int
         integer(c_int), intent(in) :: pid
-        integer(c_int), intent(in) :: num_verts
+      end function iMOAB_GenerateAllEdges
+
+      integer(c_int) function iMOAB_GenerateAllFaces(pid) bind(C, name='iMOAB_GenerateAllFaces')
+        use, intrinsic :: iso_c_binding, only: c_int
+        integer(c_int), intent(in) :: pid
+      end function iMOAB_GenerateAllFaces
+
+      integer(c_int) function iMOAB_ResolveSharedEntities(pid, marker_size, marker) &
+                                  bind(C, name='iMOAB_ResolveSharedEntities')
+        use, intrinsic :: iso_c_binding, only: c_int
+        integer(c_int), intent(in) :: pid
+        integer(c_int), intent(in) :: marker_size
         integer(c_int), intent(in) :: marker(*)
       end function iMOAB_ResolveSharedEntities
 
@@ -109,15 +140,18 @@ module iMOAB
       end function iMOAB_UpdateMeshInfo
 
       integer(c_int) function iMOAB_GetMeshInfo(pid, num_visible_vertices, num_visible_elements, &
-                                                num_visible_blocks, num_visible_surfaceBC, &
-                                                num_visible_vertexBC) bind(C, name='iMOAB_GetMeshInfo')
+                                                num_visible_blocks, num_visible_surfaceBC, num_visible_vertexBC, &
+                                                num_visible_edges, num_visible_faces) &
+                              bind(C, name='iMOAB_GetMeshInfo')
         use, intrinsic :: iso_c_binding, only: c_int
         integer(c_int), intent(in) :: pid
-        integer(c_int), intent(out) :: num_visible_vertices(3)
-        integer(c_int), intent(out) :: num_visible_elements(3)
-        integer(c_int), intent(out) :: num_visible_blocks(3)
-        integer(c_int), intent(out) :: num_visible_surfaceBC(3)
-        integer(c_int), intent(out) :: num_visible_vertexBC(3)
+        integer(c_int), intent(out) :: num_visible_vertices(*)
+        integer(c_int), intent(out) :: num_visible_elements(*)
+        integer(c_int), intent(out) :: num_visible_blocks(*)
+        integer(c_int), intent(out) :: num_visible_surfaceBC(*)
+        integer(c_int), intent(out) :: num_visible_vertexBC(*)
+        integer(c_int), intent(out) :: num_visible_edges(*)
+        integer(c_int), intent(out) :: num_visible_faces(*)
       end function iMOAB_GetMeshInfo
 
       integer(c_int) function iMOAB_GetVertexID(pid, vertices_length, global_vertex_ID) bind(C, name='iMOAB_GetVertexID')

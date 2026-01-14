@@ -98,6 +98,7 @@
 // C++ includes
 #include <cassert>
 #include <sstream>
+
 #include <iostream>
 
 using namespace moab;
@@ -132,6 +133,12 @@ struct appData
     Range local_verts;         // it could include shared, but not owned at the interface
     Range owned_verts;         // owned_verts <= local_verts <= all_verts
     Range ghost_vertices;      // locally ghosted from other processors
+    Range all_edges;           // all edges (owned + ghosted)
+    Range owned_edges;         // owned edges
+    Range ghost_edges;         // ghosted edges
+    Range all_faces;           // all faces (owned + ghosted) for 3D meshes
+    Range owned_faces;         // owned faces
+    Range ghost_faces;         // ghosted faces
     Range primary_elems;       // all primary entities (owned + ghosted)
     Range owned_elems;         // only owned entities
     Range ghost_elems;         // only ghosted entities (filtered)
@@ -140,6 +147,8 @@ struct appData
                                // reading or from reduce
     long num_global_vertices;  // reunion of all nodes, after sharing is resolved; it could be
                                // determined from hdf5 reading
+    long num_global_edges;     // total number of edges (global)
+    long num_global_faces;     // total number of faces (global, only meaningful for 3D)
     int num_ghost_layers;      // number of ghost layers
     Range mat_sets;
     std::map< int, int > matIndex;  // map from global block id to index in mat_sets
@@ -149,6 +158,8 @@ struct appData
     std::vector< Tag > tagList;
     bool point_cloud;
     bool is_fortran;
+    bool edges_created;  // true if edges were explicitly generated
+    bool faces_created;  // true if faces were explicitly generated
 
 #ifdef MOAB_HAVE_MPI
     ParallelComm* pcomm;
@@ -190,6 +201,23 @@ struct GlobalContext
 };
 
 static struct GlobalContext context;
+
+static moab::Range* get_range_for_entity_type( appData& data, int ent_type )
+{
+    switch( ent_type )
+    {
+        case IMOAB_VERTEX_ENTITY:
+            return &data.all_verts;
+        case IMOAB_EDGE_ENTITY:
+            return &data.all_edges;
+        case IMOAB_FACE_ENTITY:
+            return &data.all_faces;
+        case IMOAB_VOLUME_ENTITY:
+            return &data.primary_elems;
+        default:
+            return nullptr;
+    }
+}
 
 /**
  * @brief Initialize iMOAB library and create MOAB instance.
@@ -269,6 +297,40 @@ ErrCode iMOAB_Initialize( int argc, iMOAB_String* argv )
     // Increment reference count to track active users
     context.refCountMB++;
     return moab::MB_SUCCESS;
+}
+
+ErrCode iMOAB_GenerateAllEdges( iMOAB_AppID pid )
+{
+    appData& data = context.appDatas[*pid];
+
+    // Only meaningful for 2D meshes
+    if( data.dimension < 2 )
+    {
+        return moab::MB_SUCCESS;
+    }
+
+    // Build intermediate entities (edges) for existing elements
+    MB_CHK_SET_ERR( context.MBI->get_adjacencies( data.all_verts, 1, true /* create_if_missing */, data.all_edges ), "can't construct edges" );
+
+    data.edges_created = true;
+    return iMOAB_UpdateMeshInfo( pid );
+}
+
+ErrCode iMOAB_GenerateAllFaces( iMOAB_AppID pid )
+{
+    appData& data = context.appDatas[*pid];
+
+    // Only meaningful for 3D meshes
+    if( data.dimension < 3 )
+    {
+        return moab::MB_SUCCESS;
+    }
+
+    // Build intermediate entities (faces) for existing elements
+    MB_CHK_SET_ERR( context.MBI->get_adjacencies( data.all_verts, 2, true /* create_if_missing */, data.all_faces ), "can't construct faces" );
+
+    data.faces_created = true;
+    return iMOAB_UpdateMeshInfo( pid );
 }
 
 /**
@@ -457,6 +519,12 @@ ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
 #ifdef MOAB_HAVE_TEMPESTREMAP
     app_data.secondary_file_set = app_data.file_set;
 #endif
+
+    // set some default values
+    app_data.num_global_edges = 0;
+    app_data.num_global_faces = 0;
+    app_data.edges_created    = false;
+    app_data.faces_created    = false;
 
 #ifdef MOAB_HAVE_MPI
     if( *comm ) app_data.pcomm = new ParallelComm( context.MBI, *comm );
@@ -1195,14 +1263,25 @@ ErrCode iMOAB_UpdateMeshInfo( iMOAB_AppID pid )
     data.local_verts.clear();
     data.owned_verts.clear();
     data.ghost_vertices.clear();
+    // edges
+    data.all_edges.clear();
+    data.owned_edges.clear();
+    data.ghost_edges.clear();
+    // faces
+    data.all_faces.clear();
+    data.owned_faces.clear();
+    data.ghost_faces.clear();
+    // elements
     data.owned_elems.clear();
     data.ghost_elems.clear();
+    // material sets
     data.mat_sets.clear();
+    // boundary condition sets
     data.neu_sets.clear();
     data.diri_sets.clear();
 
     // Let us get all the vertex entities
-    MB_CHK_SET_ERR( context.MBI->get_entities_by_type( fileSet, MBVERTEX, data.all_verts, true ),
+    MB_CHK_SET_ERR( context.MBI->get_entities_by_dimension( fileSet, 0, data.all_verts, true ),
                     "can't get vertices" );
 
     // Let us check first entities of dimension = 3
@@ -1235,46 +1314,85 @@ ErrCode iMOAB_UpdateMeshInfo( iMOAB_AppID pid )
     // check if the current mesh is just a point cloud
     data.point_cloud = ( ( data.primary_elems.size() == 0 && data.all_verts.size() > 0 ) || data.dimension == 0 );
 
+    // Collect edges and faces (if already present)
+    if (!data.point_cloud)
+    {
+        // get all edges and faces but do not explicitly create them here.
+        MB_CHK_SET_ERR( context.MBI->get_entities_by_dimension( fileSet, 1, data.all_edges, false ), "can't get edges" );
+        MB_CHK_SET_ERR( context.MBI->get_entities_by_dimension( fileSet, 2, data.all_faces, false ), "can't get faces" );
+    }
+
 #ifdef MOAB_HAVE_MPI
 
     if( context.MPI_initialized )
     {
         ParallelComm* pco = context.appDatas[*pid].pcomm;
 
+        // now update global number of primary cells and global number of vertices
+        // first, determine number of owned entities and then filter out the ghosted ones
+
         // filter ghost vertices, from local
         MB_CHK_SET_ERR( pco->filter_pstatus( data.all_verts, PSTATUS_GHOST, PSTATUS_NOT, -1, &data.local_verts ),
+                        "can't filter ghost vertices" );
+        MB_CHK_SET_ERR( pco->filter_pstatus( data.all_verts, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &data.owned_verts ),
                         "can't filter ghost vertices" );
 
         // Store handles for all ghosted entities
         data.ghost_vertices = subtract( data.all_verts, data.local_verts );
 
-        // filter ghost elements, from local
-        MB_CHK_SET_ERR( pco->filter_pstatus( data.primary_elems, PSTATUS_GHOST, PSTATUS_NOT, -1, &data.owned_elems ),
-                        "can't filter ghost elements" );
+        // filter ghost edges
+        if (data.all_edges.size())
+        {
+            MB_CHK_SET_ERR( pco->filter_pstatus( data.all_edges, PSTATUS_GHOST, PSTATUS_NOT, -1, &data.owned_edges ),
+                            "can't filter ghost edges" );
+            data.ghost_edges = subtract( data.all_edges, data.owned_edges );
+        }
 
-        data.ghost_elems = subtract( data.primary_elems, data.owned_elems );
-        // now update global number of primary cells and global number of vertices
-        // determine first number of owned vertices
-        // Get local owned vertices
-        MB_CHK_SET_ERR( pco->filter_pstatus( data.all_verts, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &data.owned_verts ),
-                        "can't filter ghost vertices" );
+        // filter ghost faces
+        if (data.all_faces.size())
+        {
+            MB_CHK_SET_ERR( pco->filter_pstatus( data.all_faces, PSTATUS_GHOST, PSTATUS_NOT, -1, &data.owned_faces ),
+                            "can't filter ghost faces" );
+            data.ghost_faces = subtract( data.all_faces, data.owned_faces );
+        }
+
+        // filter ghost elements, from local
+        if (!data.point_cloud)
+        {
+            MB_CHK_SET_ERR( pco->filter_pstatus( data.primary_elems, PSTATUS_GHOST, PSTATUS_NOT, -1, &data.owned_elems ),
+                            "can't filter ghost elements" );
+            data.ghost_elems = subtract( data.primary_elems, data.owned_elems );
+        }
+
         int local[2], global[2];
         local[0] = data.owned_verts.size();
         local[1] = data.owned_elems.size();
         MPI_Allreduce( local, global, 2, MPI_INT, MPI_SUM, pco->comm() );
         MB_CHK_SET_ERR( iMOAB_SetGlobalInfo( pid, &( global[0] ), &( global[1] ) ), "can't set global info" );
+
+        int local_edges_faces[2]  = { static_cast< int >( data.owned_edges.size() ), static_cast< int >( data.owned_faces.size() ) };
+        int global_edges_faces[2] = { 0, 0 };
+        MPI_Allreduce( local_edges_faces, global_edges_faces, 2, MPI_INT, MPI_SUM, pco->comm() );
+        data.num_global_edges = global_edges_faces[0];
+        data.num_global_faces = global_edges_faces[1];
     }
     else
     {
         data.local_verts = data.all_verts;
         data.owned_elems = data.primary_elems;
+        data.owned_edges = data.all_edges;
+        data.owned_faces = data.all_faces;
+        data.num_global_edges = data.all_edges.size();
+        data.num_global_faces = data.all_faces.size();
     }
 
 #else
-
     data.local_verts = data.all_verts;
+    data.owned_edges = data.all_edges;
+    data.owned_faces = data.all_faces;
     data.owned_elems = data.primary_elems;
-
+    data.num_global_edges = data.all_edges.size();
+    data.num_global_faces = data.all_faces.size();
 #endif
 
     // Get the references for some standard internal tags such as material blocks, BCs, etc
@@ -1334,7 +1452,9 @@ ErrCode iMOAB_GetMeshInfo( iMOAB_AppID pid,
                            int* num_visible_elements,
                            int* num_visible_blocks,
                            int* num_visible_surfaceBC,
-                           int* num_visible_vertexBC )
+                           int* num_visible_vertexBC,
+                           int* num_visible_edges,
+                           int* num_visible_faces )
 {
     appData& data        = context.appDatas[*pid];
     EntityHandle fileSet = data.file_set;
@@ -1354,6 +1474,18 @@ ErrCode iMOAB_GetMeshInfo( iMOAB_AppID pid,
         num_visible_vertices[1] = static_cast< int >( data.ghost_vertices.size() );
         // local are those that are not ghosts; they may include shared, not owned vertices
         num_visible_vertices[0] = num_visible_vertices[2] - num_visible_vertices[1];
+    }
+    if( num_visible_edges )
+    {
+        num_visible_edges[2] = static_cast< int >( data.all_edges.size() );
+        num_visible_edges[1] = static_cast< int >( data.ghost_edges.size() );
+        num_visible_edges[0] = num_visible_edges[2] - num_visible_edges[1];
+    }
+    if( num_visible_faces )
+    {
+        num_visible_faces[2] = static_cast< int >( data.all_faces.size() );
+        num_visible_faces[1] = static_cast< int >( data.ghost_faces.size() );
+        num_visible_faces[0] = num_visible_faces[2] - num_visible_faces[1];
     }
 
     if( num_visible_blocks )
@@ -2222,9 +2354,8 @@ ErrCode iMOAB_SetIntTagStorage( iMOAB_AppID pid,
         MB_CHK_SET_ERR( moab::MB_FAILURE, "The tag is not of integer type." );
     }
 
-    // set it on a subset of entities, based on type and length
-    // if *entity_type = 0, then use vertices; else elements
-    Range* ents_to_set  = ( *ent_type == 0 ? &data.all_verts : &data.primary_elems );
+    Range* ents_to_set = get_range_for_entity_type( data, *ent_type );
+    if( nullptr == ents_to_set ) return moab::MB_FAILURE;
     int nents_to_be_set = *num_tag_storage_length / tagLength;
 
     if( nents_to_be_set > (int)ents_to_set->size() )
@@ -2266,10 +2397,9 @@ ErrCode iMOAB_GetIntTagStorage( iMOAB_AppID pid,
         MB_CHK_SET_ERR( moab::MB_FAILURE, "The tag is not of integer type." );
     }
 
-    // set it on a subset of entities, based on type and length
-    // if *entity_type = 0, then use vertices; else elements
-    Range* ents_to_get = ( *ent_type == 0 ? &data.all_verts : &data.primary_elems );
-    int nents_to_get   = *num_tag_storage_length / tagLength;
+    Range* ents_to_get = get_range_for_entity_type( data, *ent_type );
+    if( nullptr == ents_to_get ) return moab::MB_ENTITY_NOT_FOUND;
+    int nents_to_get = *num_tag_storage_length / tagLength;
 
     if( nents_to_get > (int)ents_to_get->size() )
     {
@@ -2296,9 +2426,8 @@ ErrCode iMOAB_SetDoubleTagStorage( iMOAB_AppID pid,
     split_tag_names( tag_names, separator, tagNames );
 
     appData& data = context.appDatas[*pid];
-    // set it on a subset of entities, based on type and length
-    // if *entity_type = 0, then use vertices; else elements
-    Range* ents_to_set = ( *ent_type == 0 ? &data.all_verts : &data.primary_elems );
+    Range* ents_to_set = get_range_for_entity_type( data, *ent_type );
+    if( nullptr == ents_to_set ) return moab::MB_FAILURE;
 
     int nents_to_be_set = (int)( *ents_to_set ).size();
     int position        = 0;
@@ -2348,9 +2477,8 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
     split_tag_names( tag_names, separator, tagNames );
 
     appData& data = context.appDatas[*pid];
-    // set it on a subset of entities, based on type and length
-    // if *entity_type = 0, then use vertices; else elements
-    Range* ents_to_set  = ( *ent_type == 0 ? &data.all_verts : &data.primary_elems );
+    Range* ents_to_set = get_range_for_entity_type( data, *ent_type );
+    if( nullptr == ents_to_set ) return moab::MB_ENTITY_NOT_FOUND;
     int nents_to_be_set = (int)( *ents_to_set ).size();
 
     Tag gidTag = context.MBI->globalId_tag();
@@ -2625,16 +2753,11 @@ ErrCode iMOAB_GetDoubleTagStorage( iMOAB_AppID pid,
     // set it on a subset of entities, based on type and length
     Range* ents_to_get = nullptr;
 
-    if( *ent_type == 0 )  // vertices
-    {
-        ents_to_get = &data.all_verts;
-    }
-    else if( *ent_type == 1 )
-    {
-        ents_to_get = &data.primary_elems;
-    }
-    int nents_to_get = (int)ents_to_get->size();
-    int position     = 0;
+    ents_to_get = get_range_for_entity_type( data, *ent_type );
+    if( nullptr == ents_to_get ) return moab::MB_FAILURE;
+
+    size_t nents_to_get = ents_to_get->size();
+    size_t position     = 0;
     for( size_t i = 0; i < tagNames.size(); i++ )
     {
         if( data.tagMap.find( tagNames[i] ) == data.tagMap.end() )
@@ -2655,7 +2778,7 @@ ErrCode iMOAB_GetDoubleTagStorage( iMOAB_AppID pid,
             return moab::MB_FAILURE;
         }
 
-        if( position + nents_to_get * tagLength > *num_tag_storage_length )
+        if( position + nents_to_get * tagLength - *num_tag_storage_length > 0 )
             return moab::MB_FAILURE;  // too many entity values to get
 
         MB_CHK_ERR( context.MBI->tag_get_data( tag, *ents_to_get, &tag_storage_data[position] ) );
@@ -2669,6 +2792,7 @@ ErrCode iMOAB_SynchronizeTags( iMOAB_AppID pid, int* num_tag, int* tag_indices, 
 {
 #ifdef MOAB_HAVE_MPI
     appData& data = context.appDatas[*pid];
+
     Range ent_exchange;
     std::vector< Tag > tags;
 
@@ -2682,23 +2806,11 @@ ErrCode iMOAB_SynchronizeTags( iMOAB_AppID pid, int* num_tag, int* tag_indices, 
         tags.push_back( data.tagList[tag_indices[i]] );
     }
 
-    if( *ent_type == 0 )
-    {
-        ent_exchange = data.all_verts;
-    }
-    else if( *ent_type == 1 )
-    {
-        ent_exchange = data.primary_elems;
-    }
-    else
-    {
-        return moab::MB_FAILURE;
-    }  // unexpected type
+    Range* ent_range = get_range_for_entity_type( data, *ent_type );
+    if( nullptr == ent_range ) return moab::MB_FAILURE;
+    ent_exchange = *ent_range;
 
-    ParallelComm* pco = context.appDatas[*pid].pcomm;
-
-    MB_CHK_ERR( pco->exchange_tags( tags, tags, ent_exchange ) );
-
+    MB_CHK_SET_ERR( data.pcomm->exchange_tags( tags, tags, ent_exchange ), "can't exchange tags" );
 #else
     /* do nothing if serial */
     UNUSED( pid );
@@ -2714,6 +2826,7 @@ ErrCode iMOAB_ReduceTagsMax( iMOAB_AppID pid, int* tag_index, int* ent_type )
 {
 #ifdef MOAB_HAVE_MPI
     appData& data = context.appDatas[*pid];
+
     Range ent_exchange;
 
     if( *tag_index < 0 || *tag_index >= (int)data.tagList.size() )
@@ -2723,23 +2836,11 @@ ErrCode iMOAB_ReduceTagsMax( iMOAB_AppID pid, int* tag_index, int* ent_type )
 
     Tag tagh = data.tagList[*tag_index];
 
-    if( *ent_type == 0 )
-    {
-        ent_exchange = data.all_verts;
-    }
-    else if( *ent_type == 1 )
-    {
-        ent_exchange = data.primary_elems;
-    }
-    else
-    {
-        return moab::MB_FAILURE;
-    }  // unexpected type
+    Range* ent_range = get_range_for_entity_type( data, *ent_type );
+    if( nullptr == ent_range ) return moab::MB_FAILURE;
+    ent_exchange = *ent_range;
 
-    ParallelComm* pco = context.appDatas[*pid].pcomm;
-    // we could do different MPI_Op; do not bother now, we will call from fortran
-    MB_CHK_ERR( pco->reduce_tags( tagh, MPI_MAX, ent_exchange ) );
-
+    MB_CHK_SET_ERR( data.pcomm->reduce_tags( tagh, MPI_MAX, ent_exchange ), "can't reduce tags" );
 #else
     /* do nothing if serial */
     UNUSED( pid );
@@ -2902,7 +3003,7 @@ ErrCode iMOAB_GetGlobalInfo( iMOAB_AppID pid, int* num_global_verts, int* num_gl
 #ifdef MOAB_HAVE_MPI
 
 // this makes sense only for parallel runs
-ErrCode iMOAB_ResolveSharedEntities( iMOAB_AppID pid, int* num_verts, int* marker )
+ErrCode iMOAB_ResolveSharedEntities( iMOAB_AppID pid, int* marker_size, int* marker )
 {
     appData& data     = context.appDatas[*pid];
     ParallelComm* pco = context.appDatas[*pid].pcomm;
@@ -2918,12 +3019,11 @@ ErrCode iMOAB_ResolveSharedEntities( iMOAB_AppID pid, int* num_verts, int* marke
     {
         // create an integer tag for resolving ; maybe it can be a long tag in the future
         // (more than 2 B vertices;)
-
         Tag stag;
         MB_CHK_ERR( context.MBI->tag_get_handle( "__sharedmarker", 1, MB_TYPE_INTEGER, stag,
                                                  MB_TAG_CREAT | MB_TAG_DENSE, &dum_id ) );
 
-        if( *num_verts > (int)data.local_verts.size() )
+        if( *marker_size > (int)data.local_verts.size() )
         {
             return moab::MB_FAILURE;
         }  // we are not setting the size
@@ -3333,7 +3433,7 @@ ErrCode iMOAB_ReceiveMesh( iMOAB_AppID pid, MPI_Comm* joint_communicator, MPI_Gr
     MB_CHK_ERR( context.MBI->tag_set_data( part_tag, &local_set, 1, &rank ) );
 
     // Ensure that the GLOBAL_ID tag is properly defined for entity identification
-    int tagtype = 0;  // dense, integer
+    int tagtype = IMOAB_DENSE_INTEGER_TAG;  // dense, integer
     int numco   = 1;  // size
     int tagindex;     // not used
     MB_CHK_ERR( iMOAB_DefineTagStorage( pid, "GLOBAL_ID", &tagtype, &numco, &tagindex ) );
@@ -3702,7 +3802,7 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
     // GLOBAL_ID: for vertices (type 2) and 2D elements (type 3)
     Tag gdsTag;
     int lenTagType1 = 1;
-    if( 1 == *type1 || 1 == *type2 )
+    if( iMOAB_DiscretizationType::IMOAB_CGLL_DISCRETIZATION == *type1 || iMOAB_DiscretizationType::IMOAB_CGLL_DISCRETIZATION == *type2 )
     {
         // Get GLOBAL_DOFS tag for spectral elements (usually 16 DOFs per element)
         MB_CHK_ERR( context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag ) );
@@ -3724,20 +3824,20 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
 #endif
 
         Range ents_of_interest;
-        if( *type1 == 1 )  // Spectral elements: get GLOBAL_DOFS from MBQUAD elements
+        if( iMOAB_DiscretizationType::IMOAB_CGLL_DISCRETIZATION == *type1 )  // Spectral elements: get GLOBAL_DOFS from MBQUAD elements
         {
             assert( gdsTag );
             MB_CHK_ERR( context.MBI->get_entities_by_type( fset1, MBQUAD, ents_of_interest ) );
             valuesComp1.resize( ents_of_interest.size() * lenTagType1 );
             MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, ents_of_interest, &valuesComp1[0] ) );
         }
-        else if( *type1 == 2 )  // Vertex-based coupling: get GLOBAL_ID from MBVERTEX entities
+        else if( iMOAB_DiscretizationType::IMOAB_PC_DISCRETIZATION == *type1 )  // Vertex-based coupling: get GLOBAL_ID from MBVERTEX entities
         {
             MB_CHK_ERR( context.MBI->get_entities_by_type( fset1, MBVERTEX, ents_of_interest ) );
             valuesComp1.resize( ents_of_interest.size() );
             MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] ) );
         }
-        else if( *type1 == 3 )  // Finite volume meshes: get GLOBAL_ID from 2D elements
+        else if( iMOAB_DiscretizationType::IMOAB_FV_DISCRETIZATION == *type1 )  // Finite volume meshes: get GLOBAL_ID from 2D elements
         {
             MB_CHK_ERR( context.MBI->get_entities_by_dimension( fset1, 2, ents_of_interest ) );
             valuesComp1.resize( ents_of_interest.size() );
@@ -3798,20 +3898,20 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
 #endif
 
         Range ents_of_interest;
-        if( *type2 == 1 )  // Spectral elements: get GLOBAL_DOFS from MBQUAD elements
+        if( iMOAB_DiscretizationType::IMOAB_CGLL_DISCRETIZATION == *type2 )  // Spectral elements: get GLOBAL_DOFS from MBQUAD elements
         {
             assert( gdsTag );
             MB_CHK_ERR( context.MBI->get_entities_by_type( fset2, MBQUAD, ents_of_interest ) );
             valuesComp2.resize( ents_of_interest.size() * lenTagType1 );
             MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, ents_of_interest, &valuesComp2[0] ) );
         }
-        else if( *type2 == 2 )  // Vertex-based coupling: get GLOBAL_ID from MBVERTEX entities
+        else if( iMOAB_DiscretizationType::IMOAB_PC_DISCRETIZATION == *type2 )  // Vertex-based coupling: get GLOBAL_ID from MBVERTEX entities
         {
             MB_CHK_ERR( context.MBI->get_entities_by_type( fset2, MBVERTEX, ents_of_interest ) );
             valuesComp2.resize( ents_of_interest.size() );
             MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp2[0] ) );
         }
-        else if( *type2 == 3 )  // Finite volume meshes: get GLOBAL_ID from 2D elements
+        else if( iMOAB_DiscretizationType::IMOAB_FV_DISCRETIZATION == *type2 )  // Finite volume meshes: get GLOBAL_ID from 2D elements
         {
             MB_CHK_ERR( context.MBI->get_entities_by_dimension( fset2, 2, ents_of_interest ) );
             valuesComp2.resize( ents_of_interest.size() );

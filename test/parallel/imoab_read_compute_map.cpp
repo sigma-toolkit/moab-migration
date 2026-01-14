@@ -313,7 +313,7 @@ int main( int argc, char* argv[] )
     }
 #endif
 
-    int tagTypes = DENSE_DOUBLE;
+    int tagTypes = IMOAB_DENSE_DOUBLE_TAG;
     int tagIndex[3]; /* OCN, ATM-File, ATM-Mem */
     int disc_orders[2] = { 1, 1 };
     int atmCompNDoFs   = disc_orders[0] * disc_orders[0] /* FV */,
@@ -350,7 +350,7 @@ int main( int argc, char* argv[] )
                            "failed to write map file to disk" );
             }
         }
-        int meshtype = 3;
+        int meshtype = iMOAB_DiscretizationType::IMOAB_FV_DISCRETIZATION;
         PUSH_TIMER( "Compute ATM coverage graph for OCN mesh, for compute graph" )
         CHECKIERR( iMOAB_ComputeCommGraph( cplAtmPID, cplAtmOcnMemPID, &couComm, &couPEGroup, &couPEGroup, &meshtype,
                                            &meshtype, &cplatm, &atmocnmid ),
@@ -586,20 +586,21 @@ int main( int argc, char* argv[] )
             {
                 // get global id storage
                 const char* gidStr = "GLOBAL_ID";  // hard coded too
-                int tag_type = DENSE_INTEGER, ncomp = 1, tagInd = 0;
+                int tag_type = IMOAB_DENSE_INTEGER_TAG, ncomp = 1, tagInd = 0;
                 // the same as remap test
                 // get temp field on ocean, from conservative, the global ids, and dump to the baseline file
                 // first get GlobalIds from OCN, and fields:
                 int nverts[3], nelem[3];
                 std::vector< int > gidElems;
                 std::vector< double > tempElems;
-                int err_code = 1, ent_type = 1;
+                int err_code = 1, ent_type = IMOAB_VOLUME_ENTITY;
 
                 CHECKIERR( iMOAB_DefineTagStorage( cmpOcnPID, gidStr, &tag_type, &ncomp, &tagInd ),
                            "failed to define global id tag" );
 
 #ifdef COMPUTE_ONLINE_MAP
-                CHECKIERR( iMOAB_GetMeshInfo( cmpOcnPID, nverts, nelem, 0, 0, 0 ), "failed to get OCN mesh info" );
+                CHECKIERR( iMOAB_GetMeshInfo( cmpOcnPID, nverts, nelem, 0, 0, 0, 0, 0 ),
+                           "failed to get OCN mesh info" );
                 gidElems.resize( nelem[2] );
                 tempElems.resize( nelem[2] );
 
@@ -616,7 +617,8 @@ int main( int argc, char* argv[] )
 #endif
 
 #ifdef COMPUTE_TRANSPOSE_FILE_MAP
-                CHECKIERR( iMOAB_GetMeshInfo( cmpAtmPID, nverts, nelem, 0, 0, 0 ), "failed to get OCN mesh info" );
+                CHECKIERR( iMOAB_GetMeshInfo( cmpAtmPID, nverts, nelem, 0, 0, 0, 0, 0 ),
+                           "failed to get OCN mesh info" );
                 gidElems.resize( nelem[2] );
                 tempElems.resize( nelem[2] );
 
@@ -660,7 +662,8 @@ int main( int argc, char* argv[] )
 #endif
 
 #ifdef COMPUTE_FILE_MAP
-                CHECKIERR( iMOAB_GetMeshInfo( cmpOcnPID, nverts, nelem, 0, 0, 0 ), "failed to get OCN mesh info" );
+                CHECKIERR( iMOAB_GetMeshInfo( cmpOcnPID, nverts, nelem, 0, 0, 0, 0, 0 ),
+                           "failed to get OCN mesh info" );
                 gidElems.resize( nelem[2] );
                 tempElems.resize( nelem[2] );
 

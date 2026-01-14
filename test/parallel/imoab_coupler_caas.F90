@@ -32,12 +32,12 @@ SUBROUTINE check_baseline(baseline_file, nsize, gids, values, eps, rank, ierr)
    integer  :: gids (nsize)
    double precision  :: values(nsize)
    integer :: rank
-   double precision :: eps 
+   double precision :: eps
    integer , allocatable :: allgids(:)
    double precision , allocatable :: allvals(:)
    integer :: unit, n ! n is for number of rows in the file
-   
-   
+
+
    unit = 21 + rank ! to differentiate them
    open(unit, file = baseline_file,status="old",action="read")
    ierr = 0
@@ -49,11 +49,11 @@ SUBROUTINE check_baseline(baseline_file, nsize, gids, values, eps, rank, ierr)
 1  rewind(unit)
    allocate(allgids(n))
    allocate(allvals(n))
-   
+
    do i = 1,n
       read(unit,*) allgids(i), allvals(i)  ! we should have allgids from 1 to n, actually
    enddo
-   
+
    do i = 1, nsize
       if ( abs( values(i) - allvals(gids(i)) ) .gt. eps) then
           print *, 'rank:', rank, ' index i', i, ' values:', values(i), &
@@ -61,7 +61,7 @@ SUBROUTINE check_baseline(baseline_file, nsize, gids, values, eps, rank, ierr)
           ierr = 1
       endif
    end do
-    
+
    return
 end
 
@@ -112,19 +112,16 @@ program imoab_coupler_fortran
    integer :: fNoBubble, fMonotoneTypeID, fVolumetric, fNoConserve, fValidate, fInverseDistanceMap
    integer :: filter_type
 
-   integer, dimension(2) ::  tagIndex
-   integer, dimension (2) :: tagTypes!  { DENSE_DOUBLE, DENSE_DOUBLE }
+   integer :: tagIndex
    integer :: atmCompNDoFs ! = disc_orders[0] * disc_orders[0],
    integer :: ocnCompNDoFs !  = 1 /*FV*/
    character(:), allocatable :: fields, projectedFields, projectedFieldsBilin, projectedFieldsSecond, projectedFieldsCAAS
-   integer, dimension(3) ::  nverts, nelem, nblocks, nsbc, ndbc
+   integer, dimension(3) ::  nverts, nelem, nblocks, nsbc, ndbc, nedges, nfaces
    double precision, allocatable :: vals(:) ! to set the double values to 0
    integer, allocatable :: gids(:) ! integers global ids
    integer :: i ! for loops
-   integer :: storLeng, eetype ! for tags defs
+   integer :: storLeng ! for tags defs
    character(:), allocatable :: transferFields, outputFileOcn
-   integer :: tagIndexIn2 ! not really needed
-   integer :: type1, type2 ! for comm graph between atm cpl and atm coverage on cpl for ocean
    double precision  :: eps
    integer :: gnomonic
 
@@ -154,7 +151,7 @@ program imoab_coupler_fortran
    ocnFileName = &
      MOAB_MESH_DIR &
      //'unittest/wholeOcn.h5m'//C_NULL_CHAR
-     
+
    base_file3 = &
      MOAB_MESH_DIR &
      //'unittest/baseline3.txt'//C_NULL_CHAR
@@ -164,7 +161,7 @@ program imoab_coupler_fortran
    base_file5 = &
      MOAB_MESH_DIR &
      //'unittest/baseline5.txt'//C_NULL_CHAR
-     
+
 
    ! all comms span the whole world, for simplicity
    atmComm = MPI_COMM_NULL
@@ -277,10 +274,8 @@ program imoab_coupler_fortran
       ! after this, the sending of tags from atm pes to coupler pes will use the new par comm
       ! graph, that has more precise info about what to send for ocean cover ; every time, we
       ! will use the element global id, which should uniquely identify the element
-      type1 = 3;
-      type2 = 3;
       ierr = iMOAB_ComputeCommGraph( cplAtmPID, cplAtmOcnPID, cplComm, cplGroup, cplGroup, &
-         type1, type2, cplatm, atmocnid )
+         IMOAB_FV_DISCRETIZATION, IMOAB_FV_DISCRETIZATION, cplatm, atmocnid )
       call errorout(ierr, 'cannot recompute direct coverage graph for atm coverage for ocean')
    end if
 
@@ -333,8 +328,6 @@ program imoab_coupler_fortran
    end if
 
    ! start copy
-   tagTypes(1) = 1 ! somehow, DENSE_DOUBLE give 0, while it should be 1; maybe moab::DENSE_DOUBLE ?
-   tagTypes(2) = 1 ! ! DENSE_DOUBLE
    atmCompNDoFs = disc_orders1*disc_orders1
    ocnCompNDoFs = 1 ! /*FV*/
 
@@ -347,9 +340,9 @@ program imoab_coupler_fortran
                     'Sa_pbot_o2_proj:Sa_dens_o2_caas_proj:Sa_pbot_o2_caas_proj'//C_NULL_CHAR
 
    if (cplComm .NE. MPI_COMM_NULL) then
-      ierr = iMOAB_DefineTagStorage(cplAtmPID, fields, tagTypes(1), atmCompNDoFs, tagIndex(1))
+      ierr = iMOAB_DefineTagStorage(cplAtmPID, fields, IMOAB_DENSE_DOUBLE_TAG, atmCompNDoFs, tagIndex)
       call errorout(ierr, 'failed to define the field tags a2oTbot:a2oUbot:a2oVbot ')
-      ierr = iMOAB_DefineTagStorage(cplOcnPID, transferFields, tagTypes(2), ocnCompNDoFs, tagIndex(2))
+      ierr = iMOAB_DefineTagStorage(cplOcnPID, transferFields, IMOAB_DENSE_DOUBLE_TAG, ocnCompNDoFs, tagIndex)
       call errorout(ierr, 'failed to define the field tags a2oTbot_proj:a2oUbot_proj:a2oVbot_proj')
    end if
 
@@ -381,8 +374,8 @@ program imoab_coupler_fortran
       call errorout(ierr, 'could not write AtmOnCpl.h5m to disk')
 
    end if
-   
-    ! we need a second hop, to send from cpl atm to atm coverage for ocn 
+
+    ! we need a second hop, to send from cpl atm to atm coverage for ocn
     ! second hop, is from atm towards ocean, on coupler
     !  it should send from each part on coupler towards the coverage set that should form the
     ! rings around target cells (ocean)
@@ -399,8 +392,7 @@ program imoab_coupler_fortran
         ierr = iMOAB_FreeSenderBuffers( cplAtmPID, atmocnid )
         call errorout( ierr, "cannot free buffers" )
     endif
-   
-   
+
    if (cplComm .ne. MPI_COMM_NULL) then
 
       ! We have the remapping weights now. Let us apply the weights onto the tag we defined
@@ -444,9 +436,9 @@ program imoab_coupler_fortran
    ! first makje sure the tags are defined, otherwise they cannot be received
    if (ocnComm .ne. MPI_COMM_NULL) then
 
-      ierr = iMOAB_DefineTagStorage(cmpOcnPID, transferFields, tagTypes(2), ocnCompNDoFs, tagIndexIn2)
+      ierr = iMOAB_DefineTagStorage(cmpOcnPID, transferFields, IMOAB_DENSE_DOUBLE_TAG, ocnCompNDoFs, tagIndex)
       call errorout(ierr, 'failed to define the field tag for receiving back the tag a2oTbot_proj,  on ocn pes')
-      ierr = iMOAB_DefineTagStorage(cmpOcnPID, "GLOBAL_ID"//C_NULL_CHAR, 0, 1, tagIndexIn2)
+      ierr = iMOAB_DefineTagStorage(cmpOcnPID, "GLOBAL_ID"//C_NULL_CHAR, IMOAB_DENSE_INTEGER_TAG, 1, tagIndex)
       call errorout(ierr, 'failed to define the field tag for GLOBAL_ID,  on ocn pes')
 
    end if
@@ -489,37 +481,37 @@ program imoab_coupler_fortran
       !  conditions will be returned in numProcesses 3 arrays, for local, ghost and total
       !  numbers.
 
-      ierr = iMOAB_GetMeshInfo(cmpOcnPID, nverts, nelem, nblocks, nsbc, ndbc)
+      ierr = iMOAB_GetMeshInfo(cmpOcnPID, nverts, nelem, nblocks, nsbc, ndbc, nedges, nfaces)
+      write(*,*) 'nverts, nelem, nblocks, nsbc, ndbc, nedges, nfaces', nverts(1), nelem(1), nblocks(1), nsbc(1), ndbc(1), nedges(1), nfaces(1)
       call errorout(ierr, 'failed to get num primary elems')
       storLeng = nelem(3) ! 1 tag for now
       allocate (vals(storLeng))
       allocate (gids(storLeng))
-      eetype = 1 ! double type
 
       eps = 1.e-9
-      eetype = 1 ! cell type, not vertex
-      ierr         = iMOAB_GetIntTagStorage( cmpOcnPID, "GLOBAL_ID"//C_NULL_CHAR, storLeng, eetype, gids );
+      ierr = iMOAB_GetIntTagStorage( cmpOcnPID, "GLOBAL_ID"//C_NULL_CHAR, storLeng, IMOAB_VOLUME_ENTITY, gids );
       call errorout(ierr, 'failed to get gids')
-      ierr         = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_bilin_proj"//C_NULL_CHAR, storLeng, eetype, vals );
+      ierr = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_bilin_proj"//C_NULL_CHAR, storLeng, IMOAB_VOLUME_ENTITY, vals );
       call errorout(ierr, 'failed to get pbots bilinear')
-      
+
       call check_baseline(base_file3, storLeng, gids, vals, eps, my_id, ierr)
       call errorout(ierr, 'failed to check bilinear values')
       if (ierr .eq. 0 .and. my_id .eq. 0 ) print *, 'checked Sa_pbot_bilin_proj values agains baseline'
-      ierr         = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_o2_proj"//C_NULL_CHAR, storLeng, eetype, vals )
+
+      ierr = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_o2_proj"//C_NULL_CHAR, storLeng, IMOAB_VOLUME_ENTITY, vals )
       call errorout(ierr, 'failed to get pbot order 2')
-      
+
       call check_baseline(base_file4, storLeng, gids, vals, eps, my_id, ierr)
       call errorout(ierr, 'failed to check higher order values')
       if (ierr .eq. 0 .and. my_id .eq. 0 ) print *, 'checked Sa_pbot_o2_proj values against baseline'
 
-      ierr         = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_o2_caas_proj"//C_NULL_CHAR, storLeng, eetype, vals )
+      ierr = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_o2_caas_proj"//C_NULL_CHAR, storLeng, IMOAB_VOLUME_ENTITY, vals )
       call errorout(ierr, 'failed to get pbot order 2 caas')
-      
+
       call check_baseline(base_file5, storLeng, gids, vals, eps, my_id, ierr)
       call errorout(ierr, 'failed to check higher order values caas')
       if (ierr .eq. 0 .and. my_id .eq. 0 ) print *, 'checked Sa_pbot_o2_caas_proj values against baseline'
-      
+
    end if
 
    ! free up resources

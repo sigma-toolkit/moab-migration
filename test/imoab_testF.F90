@@ -33,7 +33,7 @@ program fdriver
    character :: readopts*1024
    integer ngv, nge, ndim, nparts
    integer nghlay
-   integer nverts(3), nelem(3), nblocks(3), nsbc(3), ndbc(3)
+   integer nverts(3), nelem(3), nblocks(3), nsbc(3), ndbc(3), nedges(3), nfaces(3)
    !      large enough work arrays
    integer iwork(100000)
    double precision dwork(100000)
@@ -123,7 +123,7 @@ program fdriver
    call errorout(ierr, 'fail to read file in parallel')
 
    !  number of vertices/elements/blocks/sidesets in the mesh
-   ierr = iMOAB_GetMeshInfo(pid, nverts, nelem, nblocks, nsbc, ndbc)
+   ierr = iMOAB_GetMeshInfo(pid, nverts, nelem, nblocks, nsbc, ndbc, nedges, nfaces)
    call errorout(ierr, 'fail to get mesh info')
 
    vID = 1
@@ -154,10 +154,10 @@ program fdriver
    !      the 2 tags used in this example exist in the file, already
    ! first tag, INTFIELD is on vertices, integer
    ! second tag DFIELD is on elements, double
-   tagtype(1) = 0                                  !dense, int
-   tagtype(2) = 1                                  !dense, double
-   enttype(1) = 0                                  ! on verts
-   enttype(2) = 1                                  ! on elem
+   tagtype(1) = IMOAB_DENSE_INTEGER_TAG    !dense, int
+   tagtype(2) = IMOAB_DENSE_DOUBLE_TAG    !dense, double
+   enttype(1) = IMOAB_VERTEX_ENTITY    ! on verts
+   enttype(2) = IMOAB_VOLUME_ENTITY    ! on elem
    num_co = 1
    tagname1 = 'INTFIELD'//C_NULL_CHAR
    ierr = iMOAB_DefineTagStorage(pid, tagname1, tagtype(1), num_co, tagindex(1))

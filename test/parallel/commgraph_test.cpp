@@ -238,7 +238,7 @@ int commgraphtest()
     {
         // need to define tag storage
         std::string tags1 = tagT1 + separ + tagU1 + separ + tagV1 + separ;
-        int tagType       = DENSE_DOUBLE;
+        int tagType       = IMOAB_DENSE_DOUBLE_TAG;
         int ndof          = 1;
         if( typeB == 1 ) ndof = 16;
         int tagIndex = 0;
@@ -276,7 +276,7 @@ int commgraphtest()
     if( atmComm != MPI_COMM_NULL )
     {
         // need to define tag storage
-        int tagType = DENSE_DOUBLE;
+        int tagType = IMOAB_DENSE_DOUBLE_TAG;
         int ndof    = 16;
         if( typeA == 2 ) ndof = 1;
         int tagIndex = 0;

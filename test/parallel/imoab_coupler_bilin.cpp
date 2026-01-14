@@ -308,7 +308,7 @@ int main( int argc, char* argv[] )
     }
 
     int tagIndex[2];
-    int tagTypes[2]  = { DENSE_DOUBLE, DENSE_DOUBLE };
+    int tagTypes[2]  = { IMOAB_DENSE_DOUBLE_TAG, IMOAB_DENSE_DOUBLE_TAG };
     int atmCompNDoFs = disc_orders[0] * disc_orders[0], ocnCompNDoFs = 1 /*FV*/;
     int filter_type = 0;
 
@@ -348,12 +348,12 @@ int main( int argc, char* argv[] )
              * conditions will be returned in numProcesses 3 arrays, for local, ghost and total
              * numbers.
              */
-            ierr = iMOAB_GetMeshInfo( cplAtmPID, nverts, nelem, nblocks, nsbc, ndbc );
+            ierr = iMOAB_GetMeshInfo( cplAtmPID, nverts, nelem, nblocks, nsbc, ndbc, 0, 0 );
             CHECKIERR( ierr, "failed to get num primary elems" );
             int numAllElem = nelem[2];
             std::vector< double > vals;
             int storLeng = atmCompNDoFs * numAllElem * 3;  // 2 tags
-            int eetype   = 1;
+            int eetype   = IMOAB_VOLUME_ENTITY;
 
             vals.resize( storLeng );
             for( int k = 0; k < storLeng; k++ )
@@ -458,7 +458,7 @@ int main( int argc, char* argv[] )
         // get temp field on ocean, from conservative, the global ids, and check to the baseline file
         // first get GlobalIds from ocn, and fields:
         int nverts[3], nelem[3];
-        ierr = iMOAB_GetMeshInfo( cmpOcnPID, nverts, nelem, 0, 0, 0 );
+        ierr = iMOAB_GetMeshInfo( cmpOcnPID, nverts, nelem, 0, 0, 0, 0, 0 );
         CHECKIERR( ierr, "failed to get ocn mesh info" );
         std::vector< int > gidElems;
         gidElems.resize( nelem[2] );
@@ -466,11 +466,11 @@ int main( int argc, char* argv[] )
         tempElems.resize( nelem[2] );
         // get global id storage
         const std::string GidStr = "GLOBAL_ID";  // hard coded too
-        int tag_type = DENSE_INTEGER, ncomp = 1, tagInd = 0;
+        int tag_type = IMOAB_DENSE_INTEGER_TAG, ncomp = 1, tagInd = 0;
         ierr = iMOAB_DefineTagStorage( cmpOcnPID, GidStr.c_str(), &tag_type, &ncomp, &tagInd );
         CHECKIERR( ierr, "failed to define global id tag" );
 
-        int ent_type = 1;
+        int ent_type = IMOAB_VOLUME_ENTITY;
         ierr         = iMOAB_GetIntTagStorage( cmpOcnPID, GidStr.c_str(), &nelem[2], &ent_type, &gidElems[0] );
         CHECKIERR( ierr, "failed to get global ids" );
         ierr = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot", &nelem[2], &ent_type, &tempElems[0] );

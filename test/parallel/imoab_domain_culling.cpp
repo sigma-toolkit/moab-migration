@@ -114,7 +114,7 @@ int main( int argc, char* argv[] )
 #endif
     int sizeTag  = 1;
     int tagIndex = -1;
-    int tagType  = DENSE_DOUBLE;
+    int tagType  = IMOAB_DENSE_DOUBLE_TAG;
     ierr         = iMOAB_DefineTagStorage( cplAtmPID, tagname.c_str(), &tagType, &sizeTag, &tagIndex );
     CHECKIERR( ierr, "Cannot define source tags tag" )
 

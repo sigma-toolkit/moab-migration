@@ -98,7 +98,7 @@ int main( int argc, char* argv[] )
     CHECKIERR( ierr, "Cannot load second mesh on coupler pes" )
 
     int nverts[3], nelem[3];
-    int tagType[2] = { DENSE_DOUBLE, DENSE_INTEGER };
+    int tagType[2] = { IMOAB_DENSE_DOUBLE_TAG, IMOAB_DENSE_INTEGER_TAG };
     int sizeTag    = 1;
     int tagIndex   = -1;
     /*
@@ -107,7 +107,7 @@ int main( int argc, char* argv[] )
 	 * primary cells, visible blocks, number of sidesets and nodesets boundary conditions will be
 	 * returned in size 3 arrays, for local, ghost and total numbers.
 	 */
-    ierr = iMOAB_GetMeshInfo( cplLnd2PID, nverts, nelem, 0, 0, 0 );
+    ierr = iMOAB_GetMeshInfo( cplLnd2PID, nverts, nelem, 0, 0, 0, 0, 0 );
     CHECKIERR( ierr, "Cannot get info on mct mesh on coupler pes" )
 
     int nvals = ntags * ( ( mctEntType == 1 ) ? nelem[0] : nverts[0] );

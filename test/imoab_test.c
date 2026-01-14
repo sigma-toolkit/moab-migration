@@ -48,8 +48,8 @@ int main( int argc, char* argv[] )
 
     iMOAB_GlobalID* gbIDs;
     int tagIndex[2];
-    int entTypes[2]    = { 0, 1 }; /* first is on vertex, second is on elements; */
-    int tagTypes[2]    = { DENSE_INTEGER, DENSE_DOUBLE };
+    int entTypes[2]    = { IMOAB_VERTEX_ENTITY, IMOAB_VOLUME_ENTITY }; /* first is on vertex, second is on elements; */
+    int tagTypes[2]    = { IMOAB_DENSE_INTEGER_TAG, IMOAB_DENSE_DOUBLE_TAG };
     int num_components = 1;
 
     iMOAB_GlobalID *element_global_IDs, *block_IDs;
@@ -157,7 +157,7 @@ int main( int argc, char* argv[] )
      * primary cells, visible blocks, number of sidesets and nodesets boundary conditions will be
      * returned in size 3 arrays, for local, ghost and total numbers.
      */
-    rc = iMOAB_GetMeshInfo( pid, nverts, nelem, nblocks, nsbc, ndbc );
+    rc = iMOAB_GetMeshInfo( pid, nverts, nelem, nblocks, nsbc, ndbc, 0, 0 );
     CHECKRC( rc, "failed to get mesh info" );
 
     vGlobalID = (iMOAB_GlobalID*)malloc( nverts[2] * sizeof( iMOAB_GlobalID ) );
@@ -195,7 +195,7 @@ int main( int argc, char* argv[] )
      * They also correspond to block IDs in a Cubit model.
      * Local visible blocks might contain ghost cells, owned by other
      * processes.
-     * 
+     *
      * Inside MOAB, a block will correspond to a meshset with a MATERIAL_SET tag,
      * with value the block ID.
      * A MATERIAL_SET tag in moab if SPARSE and type INTEGER.

@@ -148,15 +148,15 @@ int main( int argc, char* argv[] )
      * primary cells, visible blocks, number of sidesets and nodesets boundary conditions will be
      * returned in size 3 arrays, for local, ghost and total numbers.
      */
-    ierr = iMOAB_GetMeshInfo( atmPID, nverts, nelem, 0, 0, 0 );
+    ierr = iMOAB_GetMeshInfo( atmPID, nverts, nelem, 0, 0, 0, 0, 0 );
     CHECKIERR( ierr, "failed to get mesh info" );
     printf( "Atmosphere Component Mesh: %d vertices and %d elements\n", nverts[0], nelem[0] );
 
-    ierr = iMOAB_GetMeshInfo( ocnPID, nverts, nelem, 0, 0, 0 );
+    ierr = iMOAB_GetMeshInfo( ocnPID, nverts, nelem, 0, 0, 0, 0, 0 );
     CHECKIERR( ierr, "failed to get mesh info" );
     printf( "Ocean Component Mesh: %d vertices and %d elements\n", nverts[0], nelem[0] );
 #ifdef ENABLE_ATMLND_COUPLING
-    ierr = iMOAB_GetMeshInfo( lndPID, nverts, nelem, 0, 0, 0 );
+    ierr = iMOAB_GetMeshInfo( lndPID, nverts, nelem, 0, 0, 0, 0, 0 );
     CHECKIERR( ierr, "failed to get mesh info" );
     printf( "Land Component Mesh: %d vertices and %d elements\n", nverts[0], nelem[0] );
 #endif
@@ -187,7 +187,7 @@ int main( int argc, char* argv[] )
     // Attributes for tag data storage
     int tagIndex[4];
     // int entTypes[2] = {1, 1}; /* both on elements; */
-    int tagTypes[2]  = { DENSE_DOUBLE, DENSE_DOUBLE };
+    int tagTypes[2]  = { IMOAB_DENSE_DOUBLE_TAG, IMOAB_DENSE_DOUBLE_TAG };
     int atmCompNDoFs = disc_orders[0] * disc_orders[0], ocnCompNDoFs = 1 /*FV*/;
 
     ierr = iMOAB_DefineTagStorage( atmPID, bottomTempField.c_str(), &tagTypes[0], &atmCompNDoFs, &tagIndex[0] );
@@ -301,7 +301,7 @@ int main( int argc, char* argv[] )
     {
         // get temp field on ocean, from conservative, the global ids, and dump to the baseline file
         // first get GlobalIds from ocn, and fields:
-        ierr = iMOAB_GetMeshInfo( ocnPID, nverts, nelem, 0, 0, 0 );
+        ierr = iMOAB_GetMeshInfo( ocnPID, nverts, nelem, 0, 0, 0, 0, 0 );
         CHECKIERR( ierr, "failed to get ocn mesh info" );
         std::vector< int > gidElems;
         gidElems.resize( nelem[2] );
@@ -310,11 +310,11 @@ int main( int argc, char* argv[] )
         // get global id storage
         const std::string GidStr = "GLOBAL_ID";  // hard coded too
 
-        int tag_type = DENSE_INTEGER, ncomp = 1, tagInd = 0;
+        int tag_type = IMOAB_DENSE_INTEGER_TAG, ncomp = 1, tagInd = 0;
         // we should not have to define global id tag, it is always defined
         ierr = iMOAB_DefineTagStorage( ocnPID, GidStr.c_str(), &tag_type, &ncomp, &tagInd );
         CHECKIERR( ierr, "failed to define global id tag" );
-        int ent_type = 1;
+        int ent_type = IMOAB_VOLUME_ENTITY;
         ierr         = iMOAB_GetIntTagStorage( ocnPID, GidStr.c_str(), &nelem[2], &ent_type, &gidElems[0] );
         CHECKIERR( ierr, "failed to get global ids" );
         ierr =
@@ -331,7 +331,7 @@ int main( int argc, char* argv[] )
     {
         // get temp field on ocean, from conservative, the global ids, and dump to the baseline file
         // first get GlobalIds from ocn, and fields:
-        ierr = iMOAB_GetMeshInfo( ocnPID, nverts, nelem, 0, 0, 0 );
+        ierr = iMOAB_GetMeshInfo( ocnPID, nverts, nelem, 0, 0, 0, 0, 0 );
         CHECKIERR( ierr, "failed to get ocn mesh info" );
         std::vector< int > gidElems;
         gidElems.resize( nelem[2] );
@@ -340,11 +340,11 @@ int main( int argc, char* argv[] )
         // get global id storage
         const std::string GidStr = "GLOBAL_ID";  // hard coded too
 
-        int tag_type = DENSE_INTEGER, ncomp = 1, tagInd = 0;
+        int tag_type = IMOAB_DENSE_INTEGER_TAG, ncomp = 1, tagInd = 0;
         ierr = iMOAB_DefineTagStorage( ocnPID, GidStr.c_str(), &tag_type, &ncomp, &tagInd );
         CHECKIERR( ierr, "failed to define global id tag" );
 
-        int ent_type = 1;
+        int ent_type = IMOAB_VOLUME_ENTITY;
         ierr         = iMOAB_GetIntTagStorage( ocnPID, GidStr.c_str(), &nelem[2], &ent_type, &gidElems[0] );
         CHECKIERR( ierr, "failed to get global ids" );
         ierr =

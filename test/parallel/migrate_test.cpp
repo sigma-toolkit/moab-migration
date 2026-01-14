@@ -192,7 +192,7 @@ ErrorCode migrate( const char* filename, const char* outfile )
     // one is receiving, one is sending the tag; the one that is sending needs to have communicator
     // not null
     int size_tag  = 1;  // a double dense tag, on elements
-    int tagType   = DENSE_DOUBLE;
+    int tagType   = IMOAB_DENSE_DOUBLE_TAG;
     int tagIndex2 = 0, tagIndex1 = 0;  // these will be tag indices on each app pid
 
     std::string fileAfterTagMigr( outfile );  // has h5m

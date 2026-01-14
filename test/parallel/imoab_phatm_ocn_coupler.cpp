@@ -313,9 +313,9 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "Cannot load Atm Phys  mesh on atm pes" )
 
         int nverts[3], nelem[3];
-        ierr = iMOAB_GetMeshInfo( cmpPhAtmPID, nverts, nelem, 0, 0, 0 );
+        ierr = iMOAB_GetMeshInfo( cmpPhAtmPID, nverts, nelem, 0, 0, 0, 0, 0 );
         CHECKIERR( ierr, "failed to get mesh info" );
-        printf( "Phys Atm Component Mesh: %d vertices and %d elements\n", nverts[0], nelem[0] );
+        printf( "Phys Atm Component Mesh: %d vertices and %d elements\n", nverts[2], nelem[2] );
     }
 
     MPI_Barrier( MPI_COMM_WORLD );
@@ -435,7 +435,7 @@ int main( int argc, char* argv[] )
     MPI_Barrier( MPI_COMM_WORLD );
 
     int tagIndex[2];
-    int tagTypes[2]  = { DENSE_DOUBLE, DENSE_DOUBLE };
+    int tagTypes[2]  = { IMOAB_DENSE_DOUBLE_TAG, IMOAB_DENSE_DOUBLE_TAG };
     int atmCompNDoFs = disc_orders[0] * disc_orders[0], ocnCompNDoFs = 1 /*FV*/;
     int filter_type = 0;
 
@@ -480,7 +480,7 @@ int main( int argc, char* argv[] )
     {
         if( cplAtmAppID >= 0 )
         {
-            int nverts[3], nelem[3], nblocks[3], nsbc[3], ndbc[3];
+            int nverts[3], nelem[3];
             /*
              * Each process in the communicator will have access to a local mesh instance, which
              * will contain the original cells in the local partition and ghost entities. Number of
@@ -488,7 +488,7 @@ int main( int argc, char* argv[] )
              * conditions will be returned in numProcesses 3 arrays, for local, ghost and total
              * numbers.
              */
-            ierr = iMOAB_GetMeshInfo( cplAtmPID, nverts, nelem, nblocks, nsbc, ndbc );
+            ierr = iMOAB_GetMeshInfo( cplAtmPID, nverts, nelem, 0, 0, 0, 0, 0 );
             CHECKIERR( ierr, "failed to get num primary elems" );
             int numAllElem = nelem[2];
             std::vector< double > vals;

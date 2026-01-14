@@ -198,8 +198,8 @@ int main( int argc, char* argv[] )
 
     if( rofCouComm != MPI_COMM_NULL )
     {
-        int type1 = 2;  // 2: Vertex (point cloud); rof is point cloud on component side
-        int type2 = 3;  // 3: fv on coupler
+        int type1 = iMOAB_DiscretizationType::IMOAB_PC_DISCRETIZATION;  // 2: Vertex (point cloud); rof is point cloud on component side
+        int type2 = iMOAB_DiscretizationType::IMOAB_FV_DISCRETIZATION;  // 3: fv on coupler
         CHECKIERR( iMOAB_ComputeCommGraph( cmpRofPID, cplRofPID, &rofCouComm, &rofPEGroup, &couPEGroup, &type1, &type2,
                                            &cmprof, &cplrof ),
                    "cannot compute graph between rof on comp and rof on coupler" )
@@ -223,7 +223,7 @@ int main( int argc, char* argv[] )
     MPI_Barrier( MPI_COMM_WORLD );
 
     int tagIndex;
-    int tagTypes[2] = { DENSE_DOUBLE, DENSE_DOUBLE };
+    int tagTypes[2] = { IMOAB_DENSE_DOUBLE_TAG, IMOAB_DENSE_DOUBLE_TAG };
     int compOrder   = disc_orders[0] * disc_orders[0] /*FV*/;
     int filter_type = 0;
 
@@ -330,7 +330,7 @@ int main( int argc, char* argv[] )
             // get rofl field on land, the global ids, and dump to the baseline file
             // first get GlobalIds from lnd, and fields:
             int nverts[3], nelem[3];
-            ierr = iMOAB_GetMeshInfo( cplLndPID, nverts, nelem, 0, 0, 0 );
+            ierr = iMOAB_GetMeshInfo( cplLndPID, nverts, nelem, 0, 0, 0, 0, 0 );
             CHECKIERR( ierr, "failed to get lnd mesh info" );
             std::vector< int > gidElems;
             gidElems.resize( nelem[2] );
@@ -338,11 +338,11 @@ int main( int argc, char* argv[] )
             tempElems.resize( nelem[2] );
             // get global id storage
             const std::string GidStr = "GLOBAL_ID";  // hard coded too
-            int tag_type = DENSE_INTEGER, ncomp = 1, tagInd = 0;
+            int tag_type = IMOAB_DENSE_INTEGER_TAG, ncomp = 1, tagInd = 0;
             ierr = iMOAB_DefineTagStorage( cplLndPID, GidStr.c_str(), &tag_type, &ncomp, &tagInd );
             CHECKIERR( ierr, "failed to define global id tag" );
 
-            int ent_type = 1;
+            int ent_type = IMOAB_VOLUME_ENTITY;
             ierr         = iMOAB_GetIntTagStorage( cplLndPID, GidStr.c_str(), &nelem[2], &ent_type, &gidElems[0] );
             CHECKIERR( ierr, "failed to get global ids" );
             ierr = iMOAB_GetDoubleTagStorage( cplLndPID, field, &nelem[2], &ent_type, &tempElems[0] );

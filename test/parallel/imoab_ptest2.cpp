@@ -143,14 +143,14 @@ int main( int argc, char** argv )
     iMOAB_GetGlobalInfo( pid, &num_global_verts, &num_global_cells );
 
     // test iMOAB_ReduceTagsMax on a tag
-    int tagType        = DENSE_DOUBLE;
+    int tagType        = IMOAB_DENSE_DOUBLE_TAG;
     int num_components = 1;
     int tagIndex       = 0;  // output
 
     rc = iMOAB_DefineTagStorage( pid, "afrac:ifrac", &tagType, &num_components, &tagIndex );
     ERROR( rc, "failed to create tags afrac:ifrac " );
     double af[4] = { 1., 1., 1., 1. };
-    int entType  = 1;  // cells
+    int entType  = IMOAB_VOLUME_ENTITY;  // cells
     rc           = iMOAB_SetDoubleTagStorage( pid, "afrac", &nume, &entType, af );
     ERROR( rc, "failed to set tag afrac " );
     /*     write out the mesh file to disk, in parallel, if h5m*/
@@ -171,7 +171,7 @@ int main( int argc, char** argv )
     ERROR( rc, "can't write mesh 3\n" );
 #endif
 
-    tagType = DENSE_INTEGER;
+    tagType = IMOAB_DENSE_INTEGER_TAG;
     rc      = iMOAB_DefineTagStorage( pid, "INTFIELD", &tagType, &num_components, &tagIndex );
     ERROR( rc, "failed to get tag INTFIELD " );
     // set some values
@@ -181,7 +181,7 @@ int main( int argc, char** argv )
         valstest[k] = my_id + k;
     }
     int num_tag_storage_length = numv * num_components;
-    entType                    = 0;  // vertex
+    entType                    = IMOAB_VERTEX_ENTITY;  // vertex
     // create an integer tag
 
     rc = iMOAB_SetIntTagStorage( pid, "INTFIELD", &num_tag_storage_length, &entType, &valstest[0] );

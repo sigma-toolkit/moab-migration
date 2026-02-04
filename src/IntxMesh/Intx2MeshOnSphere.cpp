@@ -21,7 +21,7 @@
 #include <cassert>
 
 // #define ENABLE_DEBUG
-#define CHECK_CONVEXITY
+// #define CHECK_CONVEXITY
 namespace moab
 {
 
@@ -228,7 +228,7 @@ ErrorCode Intx2MeshOnSphere::computeIntersectionBetweenTgtAndSrc( EntityHandle t
             int k1              = ( k + 1 ) % nP;
             int k2              = ( k1 + 1 ) % nP;
             double orientedArea = IntxUtils::area2D( &P[2 * k], &P[2 * k1], &P[2 * k2] );
-            if( orientedArea < 0 )
+            if( orientedArea < 0 && fabs(orientedArea) > std::numeric_limits<double>::epsilon() )
             {
                 std::cout << " oriented area is negative: " << orientedArea << " k:" << k << " target, src:" << tgt
                           << " " << src << " \n";
@@ -930,10 +930,9 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
                 MB_CHK_SET_ERR( mb->tag_get_length( gdsTag, lenTag ), "can't get tag length" );
                 if( lenTag > 0 )
                 {
-                    valsDOFs.resize( lenTag );
-                    MB_CHK_SET_ERR( mb->tag_get_data( gdsTag, &oneCell, 1, &valsDOFs[0] ),
-                                    "can't get SE DoF tag data" );
-                    if( valsDOFs[0] > 0 )
+                    valsDOFs.resize( lenTag, -1 );
+                    ErrorCode rval = mb->tag_get_data( gdsTag, &oneCell, 1, &valsDOFs[0] );
+                    if( valsDOFs[0] > 0 && rval == moab::MB_SUCCESS )
                     {
                         // first value positive means we really need to transport this data during
                         // coverage

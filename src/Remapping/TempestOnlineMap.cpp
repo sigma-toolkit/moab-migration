@@ -677,13 +677,16 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
 
         if( !m_bPointCloud )
         {
-            // Verify that overlap mesh is in the correct order (sanity check)
-            assert( m_meshOverlap->vecSourceFaceIx.size() == m_meshOverlap->vecTargetFaceIx.size() );
-
             // Calculate Face areas
-            if( is_root ) dbgprint.printf( 0, "Calculating overlap mesh Face areas\n" );
-            local_areas[2] =
-                m_meshOverlap->CalculateFaceAreas( mapOptions.fSourceConcave || mapOptions.fTargetConcave );
+            if (m_meshOverlap)
+            {
+                // Verify that overlap mesh is in the correct order (sanity check)
+                assert( m_meshOverlap->vecSourceFaceIx.size() == m_meshOverlap->vecTargetFaceIx.size() );
+
+                if( is_root ) dbgprint.printf( 0, "Calculating overlap mesh Face areas\n" );
+                local_areas[2] =
+                    m_meshOverlap->CalculateFaceAreas( mapOptions.fSourceConcave || mapOptions.fTargetConcave );
+            }
 
             // store it as global output for now - used later in reduction
             std::copy( local_areas, local_areas + 3, global_areas );
@@ -696,12 +699,12 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             {
                 dbgprint.printf( 0, "Input Mesh Geometric Area: %1.15e\n", global_areas[0] );
                 dbgprint.printf( 0, "Output Mesh Geometric Area: %1.15e\n", global_areas[1] );
-                dbgprint.printf( 0, "Overlap Mesh Recovered Area: %1.15e\n", global_areas[2] );
+                if (m_meshOverlap) dbgprint.printf( 0, "Overlap Mesh Recovered Area: %1.15e\n", global_areas[2] );
             }
 
             // Correct areas to match the areas calculated in the overlap mesh
             constexpr bool fCorrectAreas = true;
-            if( fCorrectAreas )  // In MOAB-TempestRemap, we will always keep this to be true
+            if( fCorrectAreas && m_meshOverlap )  // In MOAB-TempestRemap, we will always keep this to be true
             {
                 if( is_root ) dbgprint.printf( 0, "Correcting source/target areas to overlap mesh areas\n" );
                 DataArray1D< double > dSourceArea( m_meshInputCov->faces.size() );
@@ -797,30 +800,43 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             // Construct OfflineMap
             if( strMapAlgorithm == "invdist" )
             {
-                if( is_root ) dbgprint.printf( 0, "Calculating map (invdist)\n" );
                 if( m_meshInputCov->faces.size() )
+                {
+                    if( is_root ) dbgprint.printf( 0, "Calculating map (invdist)\n" );
                     LinearRemapFVtoFVInvDist( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
+                }
             }
-            else if( strMapAlgorithm == "delaunay" )
+            else if( strMapAlgorithm == "delaunay" ) // does not need intersection mesh
             {
-                if( is_root ) dbgprint.printf( 0, "Calculating map (delaunay)\n" );
                 if( m_meshInputCov->faces.size() )
-                    LinearRemapTriangulation( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
+                {
+                    if( is_root ) dbgprint.printf( 0, "Calculating map (delaunay)\n" );
+                    if (m_meshOverlap) LinearRemapTriangulation( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
+                    else
+                    {
+                        Mesh dummy;
+                        LinearRemapTriangulation( *m_meshInputCov, *m_meshOutput, dummy, *this );
+                    }
+                }
             }
             else if( strMapAlgorithm == "fvintbilin" )
             {
-                if( is_root ) dbgprint.printf( 0, "Calculating map (intbilin)\n" );
                 if( m_meshInputCov->faces.size() )
+                {
+                    if( is_root ) dbgprint.printf( 0, "Calculating map (intbilin)\n" );
                     LinearRemapIntegratedBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
+                }
             }
             else if( strMapAlgorithm == "fvintbilingb" )
             {
-                if( is_root ) dbgprint.printf( 0, "Calculating map (intbilingb)\n" );
                 if( m_meshInputCov->faces.size() )
+                {
+                    if( is_root ) dbgprint.printf( 0, "Calculating map (intbilingb)\n" );
                     LinearRemapIntegratedGeneralizedBarycentric( *m_meshInputCov, *m_meshOutput, *m_meshOverlap,
                                                                  *this );
+                }
             }
-            else if( strMapAlgorithm == "fvbilin" )
+            else if( strMapAlgorithm == "fvbilin" ) // does not need intersection mesh
             {
 #ifdef VERBOSE
                 if( is_root )
@@ -834,9 +850,17 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                     m_meshOutput->Write( "TargetMeshMBTR" + std::to_string( rank ) + ".g" );
                 }
 #endif
-                if( is_root ) dbgprint.printf( 0, "Calculating map (bilin)\n" );
+
                 if( m_meshInputCov->faces.size() )
-                    LinearRemapBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
+                {
+                    if( is_root ) dbgprint.printf( 0, "Calculating map (bilin)\n" );
+                    if (m_meshOverlap) LinearRemapBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
+                    else
+                    {
+                        Mesh dummy;
+                        LinearRemapBilinear( *m_meshInputCov, *m_meshOutput, dummy, *this );
+                    }
+                }
             }
             else
             {
@@ -1106,7 +1130,9 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
         copy_tempest_sparsemat_to_eigen3();
 #endif
 
+        if( is_root ) dbgprint.printf( 0, "Setting sparse matrix done!!\n" );
 #ifdef MOAB_HAVE_MPI
+        if (m_meshOverlap)
         {
             // Remove ghosted entities from overlap set
             moab::Range ghostedEnts;

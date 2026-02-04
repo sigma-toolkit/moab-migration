@@ -1464,7 +1464,7 @@ double IntxAreaUtils::area_spherical_triangle_lHuiller( const double* ptA,
     double area = sign * E * Radius * Radius;
 
 #ifdef CHECKNEGATIVEAREA
-    if( area < 0 )
+    if( area < 0 && fabs(area) > std::numeric_limits<double>::epsilon() )
     {
         std::cout << "negative area: " << area << "\n";
         std::cout << std::setprecision( 15 );

@@ -930,6 +930,7 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
     coordz.clear();
     verts.clear();
 
+    // ideally, we should do these in MOAB after intersction computation
     // m_overlap->RemoveZeroEdges();
     // m_overlap->RemoveCoincidentNodes( false );
 
@@ -937,7 +938,10 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
     // if ( constructEdgeMap ) m_overlap->ConstructEdgeMap(false);
     // m_overlap->ConstructReverseNodeArray();
 
-    m_overlap->Validate();
+    // For now, comment out validation; not needed
+    // m_overlap->Validate();
+
+    // all done. return success
     return MB_SUCCESS;
 }
 

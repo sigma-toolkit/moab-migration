@@ -449,69 +449,25 @@ class ToolContext
             this->inFilenames = { expectedFName };
         }
 
-        // Process discretization options
+        // Process discretization options through processMeshOptions to handle both single and multiple values
+        // Set initial defaults that can be overridden by processMeshOptions
         this->fvMethod     = expectedFVMethod;
         this->disc_orders  = { expectedOrder, expectedOrder };
         this->disc_methods = { expectedMethod, expectedMethod };
         this->doftag_names = { expectedDofTagName, expectedDofTagName };
 
-        this->processMeshOptions( opts, expectedFVMethod, expectedOrder );
+        // Let processMeshOptions handle all the discretization option processing
+        this->processMeshOptions( opts );
 
-        // For computing maps and overlaps, set discretization orders
+        // Now use the processed values for map configuration
         this->mapOptions.nPin           = this->disc_orders[0];
         this->mapOptions.nPout          = this->disc_orders[1];
         this->mapOptions.fSourceConcave = false;
         this->mapOptions.fTargetConcave = false;
         this->mapOptions.strMethod      = "";
 
-        if( this->fvMethod != "none" )
-        {
-            this->mapOptions.strMethod += this->fvMethod + ";";
-            this->mapOptions.fNoConservation = true;
-        }
-
-        switch( this->ensureMonotonicity )
-        {
-            case 0:
-                this->mapOptions.fMonotone = false;
-                break;
-            case 3:
-                this->mapOptions.strMethod += "mono3;";
-                break;
-            case 2:
-                this->mapOptions.strMethod += "mono2;";
-                break;
-            default:
-                this->mapOptions.fMonotone = true;
-        }
-
-        this->mapOptions.fNoCorrectAreas = false;
-        this->mapOptions.fNoCheck        = !this->fCheck;
-
-        if( this->fVolumetric )
-        {
-            this->mapOptions.strMethod += "volumetric;";
-        }
-
-        // Set number of ghost layers based on method
-        if( this->fvMethod != "none" )
-        {
-            this->nlayers           = 3;
-            this->skip_intersection = true;
-        }
-        else
-        {
-            this->nlayers = ( this->mapOptions.nPin > 1 ? this->mapOptions.nPin + 1 : 0 );
-        }
-
-        if( nlayer_input > 0 )
-        {
-            this->nlayers = std::max( nlayer_input, this->nlayers );
-        }
-
-        // Set output map file and format
-        this->mapOptions.strOutputMapFile = this->outFilename;
-        this->mapOptions.strOutputFormat  = "Netcdf4";
+        // Configure map options with the processed values - this handles all remaining setup
+        this->configureMapOptions( nlayer_input );
 
         // Print runtime parameters
         this->printRuntimeParameters();
@@ -710,7 +666,7 @@ class ToolContext
      * @param expectedFVMethod Expected finite volume method
      * @param nlayer_input Number of ghost layers
      */
-    void processMeshOptions( ProgOptions& opts, const std::string& expectedFVMethod, int nlayer_input )
+    void processMeshOptions( ProgOptions& opts )
     {
         if( this->meshType <= moab::TempestRemapper::ICO ) return;
 
@@ -799,9 +755,7 @@ class ToolContext
         {
             this->outFilename = outFile;
         }
-
-        // Configure map options with the processed values
-        configureMapOptions( expectedFVMethod, nlayer_input );
+        // Note: configureMapOptions is now called from ParseCLOptions after processMeshOptions completes
     }
 
     /**
@@ -829,13 +783,9 @@ class ToolContext
 
             std::cout << "\n\nOutput Files:";
             if( !skip_intersection )
-                std::cout << "\n  Intersection mesh:   " << this->intxFilename;
-            else
-                std::cout << "\n  Skipping intersection mesh ...";
+                std::cout << "\n  Intersection mesh:    " << (this->computeWeights ? this->intxFilename : this->outFilename);
             if( computeWeights )
-                std::cout << "\n  Remap weights:       " << this->outFilename;
-            else
-                std::cout << "\n  Mesh filename:       " << this->outFilename;
+                std::cout << "\n  Remap weights:        " << this->outFilename;
         }
 
         // Mesh configuration
@@ -846,7 +796,7 @@ class ToolContext
         if( this->meshType == moab::TempestRemapper::ICO && computeDual )
             std::cout << "\n  Compute dual:           " << ( this->computeDual ? "Yes" : "No" );
 
-        if( this->meshType > moab::TempestRemapper::ICO )
+        if( computeWeights )
         {
             std::cout << "\n  Gnomonic projection:    " << ( this->useGnomonicProjection ? "Yes" : "No" );
             std::cout << "\n  Intersection algorithm: " << ( this->kdtreeSearch ? "KdTree search" : "Advancing front" );
@@ -860,8 +810,8 @@ class ToolContext
 
             // Remapping options
             std::cout << "\n\nRemapping Options:";
-            std::cout << "\n  Method:             " << this->mapOptions.strMethod;
-            std::cout << "\n  Monotonicity:       " << this->ensureMonotonicity;
+            std::cout << "\n  Method:             " << (this->mapOptions.strMethod.empty() ? "Default" : this->mapOptions.strMethod);
+            std::cout << "\n  Monotonicity:       " << (this->ensureMonotonicity ? "Yes" : "No");
             std::cout << "\n  Volumetric:         " << ( this->fVolumetric ? "Yes" : "No" );
             std::cout << "\n  Check consistency:  " << ( this->fCheck ? "Yes" : "No" );
             std::cout << "\n  Skip intersection:  " << ( this->skip_intersection ? "Yes" : "No" );
@@ -870,7 +820,6 @@ class ToolContext
         // Parallel configuration
         std::cout << "\n\nParallel Configuration:";
         std::cout << "\n  MPI Processes:          " << this->n_procs;
-        std::cout << "\n  Process Rank:           " << this->proc_id;
         if( this->meshType > moab::TempestRemapper::ICO ) std::cout << "\n  Number of Ghost Layers: " << this->nlayers;
 
         std::cout << "\n\n" << std::string( width, '=' ) << "\n\n";
@@ -878,10 +827,9 @@ class ToolContext
 
     /**
      * @brief Configure map options based on command line parameters
-     * @param expectedFVMethod Finite volume method specification
      * @param nlayer_input Number of ghost layers
      */
-    void configureMapOptions( const std::string& expectedFVMethod, int nlayer_input )
+    void configureMapOptions( int nlayer_input )
     {
         // Set polynomial orders with bounds checking
         this->mapOptions.nPin  = ( this->disc_orders.empty() ) ? 1 : this->disc_orders[0];
@@ -893,10 +841,9 @@ class ToolContext
         this->mapOptions.strMethod.clear();
 
         // Configure finite volume method if specified
-        if( expectedFVMethod != "none" )
+        if( this->fvMethod != "none" )
         {
-            this->mapOptions.strMethod       = expectedFVMethod + ";";
-            this->fvMethod                   = expectedFVMethod;
+            this->mapOptions.strMethod       = this->fvMethod + ";";
             this->mapOptions.fNoConservation = true;
         }
 
@@ -932,14 +879,14 @@ class ToolContext
         }
 
         // Set number of ghost layers based on method and order
-        if( this->fvMethod != "none" )
+        this->nlayers = 3;  // Default for FV methods
+        if( this->fvMethod == "delaunay" || this->fvMethod == "bilin" )
         {
-            this->nlayers           = 3;  // Default for FV methods
             this->skip_intersection = true;
         }
         else
         {
-            this->nlayers = ( this->mapOptions.nPin > 1 ) ? this->mapOptions.nPin + 1 : 0;
+            if (this->fvMethod.empty()) this->nlayers = ( this->mapOptions.nPin > 1 ) ? this->mapOptions.nPin + 1 : 0;
         }
 
         // Override with user-specified value if provided
@@ -1271,7 +1218,7 @@ int main( int argc, char* argv[] )
 
         if( runCtx->skip_intersection )
         {
-            outputFormatter.printf( 0, "Skipping mesh intersection computation.\n" );
+            if ( !proc_id ) outputFormatter.printf( 0, "Skipping mesh intersection computation.\n" );
         }
         else
         {

@@ -22,6 +22,10 @@
 // Tempest includes
 #ifdef MOAB_HAVE_TEMPESTREMAP
 #include "netcdfcpp.h"
+#ifdef MOAB_HAVE_MPI
+#define TEMPEST_MPIOMP
+#endif
+#include "Announce.h"
 #include "TempestRemapAPI.h"
 #else
 #error "This tool depends on TempestRemap library. Reconfigure using --with-tempestremap"
@@ -46,6 +50,9 @@ class TempestRemapper : public Remapper
           offlineWorkflow( offlineMode ), meshValidate( false ), constructEdgeMap( false ), m_source_type( DEFAULT ),
           m_target_type( DEFAULT )
     {
+#ifdef MOAB_HAVE_MPI
+        AnnounceOnlyOutputOnRankZero();
+#endif
     }
 
     virtual ~TempestRemapper();

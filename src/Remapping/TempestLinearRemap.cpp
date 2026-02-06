@@ -880,7 +880,8 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
                                                           const DataArray3D< double >& dataGLLJacobian,
                                                           int nMonotoneType,
                                                           bool fContinuousIn,
-                                                          bool fNoConservation )
+                                                          bool fNoConservation,
+                                                          bool fSparseConstraints )
 {
     // Order of the polynomial interpolant
     int nP = dataGLLNodes.GetRows();
@@ -1226,7 +1227,7 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
             }
 
             ForceConsistencyConservation3( vecSourceArea, vecTargetArea, dCoeff, ( nMonotoneType > 0 ),
-                                           true /*, m_remapper->lid_to_gid_covsrc[ixFirst]*/ );
+                                           fSparseConstraints );
 
             for( int j = 0; j < nOverlapFaces; j++ )
             {

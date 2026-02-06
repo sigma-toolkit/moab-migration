@@ -193,7 +193,8 @@ class TempestOnlineMap : public OfflineMap
                                       const DataArray3D< double >& dataGLLJacobian,
                                       int nMonotoneType,
                                       bool fContinuousIn,
-                                      bool fNoConservation );
+                                      bool fNoConservation,
+                                      bool fSparseConstraints );
 
     ///	<summary>
     ///		Generate the OfflineMap for remapping from finite volumes to finite

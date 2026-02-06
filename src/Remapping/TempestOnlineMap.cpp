@@ -534,10 +534,6 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             // Piecewise constant monotonicity
             if( it == "mono2" )
             {
-                if( nMonotoneType != 0 )
-                {
-                    _EXCEPTIONT( "Multiple monotonicity specifications found (--mono) or (--method \"mono#\")" );
-                }
                 if( ( m_eInputType == DiscretizationType_FV ) && ( m_eOutputType == DiscretizationType_FV ) )
                 {
                     _EXCEPTIONT( "--method \"mono2\" is only used when remapping to/from CGLL or DGLL grids" );
@@ -548,10 +544,6 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             }
             else if( it == "mono3" )
             {
-                if( nMonotoneType != 0 )
-                {
-                    _EXCEPTIONT( "Multiple monotonicity specifications found (--mono) or (--method \"mono#\")" );
-                }
                 if( ( m_eInputType == DiscretizationType_FV ) && ( m_eOutputType == DiscretizationType_FV ) )
                 {
                     _EXCEPTIONT( "--method \"mono3\" is only used when remapping to/from CGLL or DGLL grids" );

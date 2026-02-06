@@ -109,12 +109,13 @@ int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< unsigne
     unsigned numr = 2 * nv + 3;         //  doubles: area, centerlon, center lat, nv (vertex lon, vertex lat)
     tl.initialize( 3, 0, 0, numr, N );  // to proc, dof, then
     tl.enableWriteAccess();
+
     // populate
     for( unsigned i = 0; i < N; i++ )
     {
         int gdof    = gdofmap[i];
         int to_proc = gdof / size_per_task;
-        int mask    = masks[i];
+        int mask    = (i >= masks.size() ? 1: masks[i]); // assume mask=1 if size is deficient (typically for SE-FV)
         if( to_proc >= size ) to_proc = size - 1;  // the last ones go to last proc
         int n                  = tl.get_n();
         tl.vi_wr[3 * n]        = to_proc;

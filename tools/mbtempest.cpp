@@ -392,7 +392,7 @@ class ToolContext
         {
             if( this->proc_id == 0 )
             {
-                std::cout << "mbtempest is part of the MOAB library version " << MOAB_VERSION << "\n";
+                std::cout << "mbtempest is part of the MOAB library version " << std::string( MOAB_PACKAGE_VERSION ) << "\n";
             }
             exit( 0 );
         }
@@ -1354,7 +1354,7 @@ int main( int argc, char* argv[] )
             if( runCtx->outFilename.size() && !runCtx->skip_io )
             {
                 std::map< std::string, std::string > attrMap;
-                attrMap["MOABversion"]   = std::string( MOAB_VERSION );
+                attrMap["MOABversion"]   = std::string( MOAB_PACKAGE_VERSION );
                 attrMap["Title"]         = "MOAB-TempestRemap (mbtempest) Offline Regridding Weight Generator";
                 attrMap["normalization"] = "ovarea";
                 attrMap["remap_options"] = runCtx->mapOptions.strMethod;

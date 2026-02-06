@@ -1047,7 +1047,7 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                             *this );
 #else
             LinearRemapSE4_Tempest_MOAB( dataGLLNodesSrcCov, dataGLLJacobian, nMonotoneType, fContinuousIn,
-                                         mapOptions.fNoConservation );
+                                         mapOptions.fNoConservation, mapOptions.fSparseConstraints );
 #endif
         }
         else if( ( eInputType != DiscretizationType_FV ) && ( eOutputType != DiscretizationType_FV ) )

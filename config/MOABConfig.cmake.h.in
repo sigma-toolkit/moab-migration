@@ -277,7 +277,7 @@
 #define MOAB_PACKAGE_URL "http://sigma.mcs.anl.gov"
 
 /* Define to the version of this package. */
-#define MOAB_PACKAGE_VERSION @MOAB_VERSION_STRING@
+#define MOAB_PACKAGE_VERSION "@MOAB_VERSION_STRING@"
 
 /* Define to the version of this package. */
 #define MOAB_PACKAGE_VERSION_STRING "@CMAKE_PROJECT_VERSION@"

@@ -1128,7 +1128,6 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
         copy_tempest_sparsemat_to_eigen3();
 #endif
 
-        if( is_root ) dbgprint.printf( 0, "Setting sparse matrix done!!\n" );
 #ifdef MOAB_HAVE_MPI
         if (m_meshOverlap)
         {

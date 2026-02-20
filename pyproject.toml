@@ -41,11 +41,14 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 requires-python = ">=3.8"
-dependencies = ["numpy"]
+dependencies = [
+    "numpy",
+]
 
 # Optional Dependencies
 [project.optional-dependencies]
 test = ["pytest"]
+mpi = ["mpi4py>=3.0.0; platform_system!='Windows'"]  # MPI support for parallel features
 
 # Project URLs
 [project.urls]
@@ -61,6 +64,10 @@ logging.level = "INFO"
 wheel.install-dir = "pymoab"
 wheel.packages = ["pymoab"]
 wheel.exclude = ["CMakeLists.txt", "Makefile.am", "*.pyx", "*.pxd"]
+
+# Add mpi4py include paths to Cython compilation
+[tool.scikit-build.cmake]
+define.MPI4PY_INCLUDE_DIRS = { env = "MPI4PY_INCLUDE_DIRS" }
 
 # Get version from CMakeLists
 [tool.scikit-build.metadata.version]

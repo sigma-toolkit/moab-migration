@@ -433,6 +433,27 @@ if ( ENABLE_MPI )
       MPIEXEC_NUMPROC_FLAG
       MPIEXEC_MAX_NUMPROCS )
 
+    # If PyMOAB is also enabled, check for mpi4py
+    if (ENABLE_PYMOAB)
+      find_package(Python COMPONENTS Interpreter Development REQUIRED)
+      execute_process(
+        COMMAND ${Python_EXECUTABLE} -c "import mpi4py; print(mpi4py.__version__)"
+        RESULT_VARIABLE MPI4PY_FOUND
+        OUTPUT_VARIABLE MPI4PY_VERSION
+        ERROR_QUIET
+      )
+      if (NOT MPI4PY_FOUND EQUAL 0)
+        message(FATAL_ERROR "mpi4py is required when both MPI and PyMOAB are enabled. Please install it using: pip install mpi4py>=3.0.0")
+      else()
+        string(STRIP "${MPI4PY_VERSION}" MPI4PY_VERSION)
+        message(STATUS "Found mpi4py version: ${MPI4PY_VERSION}")
+      endif()
+    endif()
+
+    set_package_properties(MPI PROPERTIES
+                       TYPE RECOMMENDED
+                       PURPOSE "MPI library to enable node-level parallelism")
+
   endif ( MPI_FOUND )
 endif ( ENABLE_MPI )
 

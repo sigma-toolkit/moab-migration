@@ -3,9 +3,18 @@
 from libcpp cimport bool
 from libcpp.vector cimport vector
 from libcpp.string cimport string as std_string
+from libcpp.set cimport set as cpp_set
 
 from eh cimport EntityHandle, EntityID
 cimport numpy as np
+
+# MPI declarations - included conditionally via moab_mpi.pxd
+# When MPI is enabled, moab_mpi.pxd contains mpi4py imports
+# When MPI is disabled, moab_mpi.pxd is empty
+cdef extern from "moab_mpi.pxd":
+    pass
+
+include "moab_defs.pxd"
 
 cdef extern from 'moab/Types.hpp' namespace "moab":
 
@@ -423,3 +432,105 @@ cdef extern from "moab/Skinner.hpp" namespace "moab":
         ErrorCode   find_skin (const EntityHandle meshset, const Range &entities, bool get_vertices,
                                 Range &output_handles, Range *output_reverse_handles, bool create_vert_elem_adjs,
                                 bool create_skin_elements, bool look_for_scd)
+
+
+cdef extern from "moab/ParallelComm.hpp" namespace "moab":
+
+    cdef cppclass ParallelComm:
+        #Constructor
+        ParallelComm(Interface* impl, MPI_Comm cm) except +
+        ParallelComm(Interface* impl, MPI_Comm cm, int* id) except +
+
+        #Public methods
+        ErrorCode load_file(const char* filename,
+                           const EntityHandle* file_set,
+                           const char* read_opts,
+                           const char* file_tag,
+                           const char* partition_tag_name,
+                           int* partition_distribution,
+                           int num_partition_distribution) except +
+        ErrorCode write_file(const char* filename,
+                            const char* write_opts,
+                            const EntityHandle* file_set,
+                            const char* tag_list) except +
+
+        #Getters
+        int rank() except +
+        int size() except +
+        MPI_Comm comm() except +
+
+        #Parallel Query Methods
+        ErrorCode get_shared_entities(int to_proc, Range& shared_ents) except +
+        ErrorCode get_ghosted_entities(int bridge_dim, int ghost_dim, int to_proc,
+                                     int num_layers, int addl_ents, Range& ghosted_ents) except +
+
+        #Parallel Status Methods
+        #ErrorCode filter_pstatus(Range& entities, int pstatus, int operation) except +
+        ErrorCode filter_pstatus(Range& entities, int pstatus, int operation, int target_proc) except +
+
+        #Parallel Communication Methods for Entities
+        ErrorCode resolve_shared_ents(EntityHandle this_set, int to_dim) except +
+
+        ErrorCode exchange_ghost_cells(int ghost_dim,
+                                     int bridge_dim,
+                                     int num_layers,
+                                     int addl_ents,
+                                     bool store_remote_handles,
+                                     bool wait_all,
+                                     EntityHandle* file_set) except +
+
+        # Global ID Methods
+        ErrorCode assign_global_ids(EntityHandle this_set, int dimension, int start_id,
+                                    bool largest_dim_only, bool parallel, bool owned_only) except +
+        ErrorCode check_global_ids(EntityHandle this_set, int dimension, int start_id,
+                                   bool largest_dim_only, bool parallel, bool owned_only) except +
+
+        # Ownership/Sharing Query Methods
+        ErrorCode get_pstatus(EntityHandle entity, unsigned char& pstatus_val) except +
+        ErrorCode get_pstatus_entities(int dim, unsigned char pstatus_val, Range& pstatus_ents) except +
+        ErrorCode get_owner(EntityHandle entity, int& owner) except +
+        ErrorCode get_owner_handle(EntityHandle entity, int& owner, EntityHandle& handle) except +
+        ErrorCode get_sharing_data(EntityHandle entity, int* ps, EntityHandle* hs,
+                                   unsigned char& pstat, unsigned int& num_ps) except +
+        ErrorCode resolve_shared_sets(EntityHandle this_set, Tag id_tag) except +
+        ErrorCode get_interface_procs(cpp_set[unsigned int]& procs, bool get_buffs) except +
+        ErrorCode get_comm_procs(cpp_set[unsigned int]& procs) except +
+
+        # Tag Exchange Methods
+        ErrorCode exchange_tags(vector[Tag]& src_tags, vector[Tag]& dst_tags, Range& entities) except +
+        ErrorCode reduce_tags(vector[Tag]& src_tags, vector[Tag]& dst_tags, MPI_Op mpi_op, Range& entities) except +
+
+        # Partitioning Methods
+        ErrorCode get_part_entities(Range& ents, int dim) except +
+        EntityHandle get_partitioning() except +
+        ErrorCode set_partitioning(EntityHandle h) except +
+        ErrorCode get_global_part_count(int& count) except +
+        ErrorCode get_part_owner(int part_id, int& owner) except +
+        ErrorCode get_part_id(EntityHandle part, int& id) except +
+        ErrorCode create_part(EntityHandle& part) except +
+        ErrorCode destroy_part(EntityHandle part) except +
+
+        # Collective Operations
+        ErrorCode broadcast_entities(int from_proc, Range& entities, bool adjacencies, bool tags) except +
+        ErrorCode scatter_entities(int from_proc, vector[Range]& entities, bool adjacencies, bool tags) except +
+
+        # Utility Methods
+        ErrorCode gather_data(Range& gather_ents, Tag& tag_handle, Tag id_tag, EntityHandle gather_set, int root_proc_rank) except +
+        ErrorCode delete_entities(Range& to_delete) except +
+
+# Define Parallel status macros
+DEF PSTATUS_NOT_OWNED = 0x1
+DEF PSTATUS_SHARED = 0x2
+DEF PSTATUS_MULTISHARED = 0x4
+DEF PSTATUS_INTERFACE = 0x8
+DEF PSTATUS_GHOST = 0x10
+
+# Define Parallel status operations
+DEF PSTATUS_AND = 0x1
+DEF PSTATUS_OR = 0x2
+DEF PSTATUS_NOT = 0x3
+
+# Tag on a meshset representing a parallel partition.
+DEF PARALLEL_PARTITION_TAG_NAME = "PARALLEL_PARTITION"
+# Parallel status tag name
+DEF PARALLEL_STATUS_TAG_NAME = "__PARALLEL_STATUS"

@@ -1,0 +1,6 @@
+#cython: language_level=3
+"""MPI-specific declarations for MOAB - only included when MPI is enabled"""
+
+from mpi4py.MPI cimport Comm as MPIComm
+from mpi4py.libmpi cimport MPI_Comm, MPI_Op, MPI_SUM, MPI_MAX, MPI_MIN, MPI_PROD
+from mpi4py.libmpi cimport MPI_LAND, MPI_LOR, MPI_BAND, MPI_BOR, MPI_BXOR

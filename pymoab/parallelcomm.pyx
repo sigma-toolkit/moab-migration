@@ -93,6 +93,9 @@ cdef class ParallelComm(object):
         self.core = core.inst
         self.comm = comm
 
+        # Detect MPI capabilities
+        self._detect_mpi_capabilities()
+
         print(f"PyMOAB: Creating ParallelComm for process {comm.Get_rank()}")
         comm.Barrier()
 
@@ -103,6 +106,70 @@ cdef class ParallelComm(object):
         comm.Barrier()
         print(f"PyMOAB: ParallelComm created for process {comm.Get_rank()}")
         comm.Barrier()
+
+    cdef _detect_mpi_capabilities(self):
+        """Detect available MPI capabilities."""
+        # Test basic MPI functionality
+        try:
+            # Test basic MPI operations
+            self.comm.Get_rank()
+            self.comm.Get_size()
+            self._mpi_basic = True
+        except:
+            self._mpi_basic = False
+
+        # Test MPI I/O functionality
+        try:
+            # Test MPI file operations
+            MPI_File file
+            MPI_Offset offset
+            MPI_File_open(self.comm.ob_mpi, "test_mpiio.tmp",
+                         MPI_MODE_CREATE | MPI_MODE_RDWR,
+                         MPI_INFO_NULL, &file)
+            self._mpi_io = True
+        except:
+            self._mpi_io = False
+
+        # Set full MPI capability
+        self._mpi_full = self._mpi_basic and self._mpi_io
+
+    def __del__(self):
+        """Destructor"""
+        if self.inst != null:
+            del self.inst
+
+    @property
+    def has_basic_mpi(self):
+        """Check if basic MPI support is available.
+        
+        Returns
+        -------
+        bool
+            True if basic MPI support is available, False otherwise
+        """
+        return self._mpi_basic
+
+    @property
+    def has_mpi_io(self):
+        """Check if MPI I/O support is available.
+        
+        Returns
+        -------
+        bool
+            True if MPI I/O support is available, False otherwise
+        """
+        return self._mpi_io
+
+    @property
+    def has_full_mpi(self):
+        """Check if full MPI support is available.
+        
+        Returns
+        -------
+        bool
+            True if full MPI support is available, False otherwise
+        """
+        return self._mpi_full
 
     def __del__(self):
         """Destructor"""
@@ -129,7 +196,12 @@ cdef class ParallelComm(object):
         ------
         RuntimeError
             If file loading fails
+        RuntimeError
+            If MPI I/O support is not available
         """
+        if not self.has_mpi_io:
+            raise RuntimeError("MPI I/O support is required for parallel file loading")
+            
         cdef moab.ErrorCode err
         cdef bytes b_file_name = file_name.encode('utf-8')
         cdef bytes b_read_opts
@@ -166,7 +238,12 @@ cdef class ParallelComm(object):
         ------
         RuntimeError
             If file writing fails
+        RuntimeError
+            If MPI I/O support is not available
         """
+        if not self.has_mpi_io:
+            raise RuntimeError("MPI I/O support is required for parallel file writing")
+            
         cdef moab.ErrorCode err
         cdef bytes b_file_name = file_name.encode('utf-8')
         cdef bytes b_write_opts
@@ -198,10 +275,9 @@ cdef class ParallelComm(object):
             num_tags = tag_ptrs.size()
 
         # Use the write_file overload that takes tag list
-        #err = self.core.write_file(c_file_name, c_format_type, c_write_opts, ptr, num_sets,
-        #                         tag_ptrs.data() if num_tags > 0 else NULL,
-        #                         num_tags)
-        err = self.core.write_file(c_file_name, c_format_type, c_write_opts, ptr, num_sets)
+        err = self.core.write_file(c_file_name, c_format_type, c_write_opts, ptr, num_sets,
+                                 tag_ptrs.data() if num_tags > 0 else NULL,
+                                 num_tags)
 
         check_error(err)
 
@@ -231,13 +307,18 @@ cdef class ParallelComm(object):
         ------
         RuntimeError
             If ghost entity retrieval fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for ghost entity operations")
+            
         cdef moab.ErrorCode err
         cdef Range ghost_entities = Range()
 
-        #err = self.inst.get_ghosted_entities(bridge_dim, ghost_dim, to_proc,
-        #                                   num_layers, addl_ents, deref(ghost_entities.inst))
-        #check_error(err)
+        err = self.inst.get_ghosted_entities(bridge_dim, ghost_dim, to_proc,
+                                           num_layers, addl_ents, deref(ghost_entities.inst))
+        check_error(err)
         return ghost_entities
 
     def get_shared_entities(self, int other_proc=-1, int dim=-1, bint iface=False, bint owned_filter=False):
@@ -263,7 +344,12 @@ cdef class ParallelComm(object):
         ------
         RuntimeError
             If getting shared entities fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for shared entity operations")
+            
         cdef moab.ErrorCode err
         cdef Range shared_ents = Range()
         cdef Range dim_ents = Range()
@@ -308,7 +394,12 @@ cdef class ParallelComm(object):
         ------
         RuntimeError
             If entity resolution fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for shared entity resolution")
+            
         cdef moab.ErrorCode err
         err = self.inst.resolve_shared_ents(this_set, to_dim)
         check_error(err)
@@ -339,7 +430,12 @@ cdef class ParallelComm(object):
         ------
         RuntimeError
             If ghost cell exchange fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for ghost cell exchange")
+            
         cdef moab.ErrorCode err
         err = self.inst.exchange_ghost_cells(ghost_dim, bridge_dim, num_layers,
                                            addl_ents, store_remote_handles,
@@ -391,7 +487,17 @@ cdef class ParallelComm(object):
         -------
         int
             Parallel status value (PSTATUS constants)
+
+        Raises
+        ------
+        RuntimeError
+            If getting parallel status fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for parallel status operations")
+            
         cdef moab.ErrorCode err
         cdef unsigned char pstatus_val
         err = self.inst.get_pstatus(entity, pstatus_val)
@@ -412,7 +518,17 @@ cdef class ParallelComm(object):
         -------
         Range
             Entities matching the parallel status
+
+        Raises
+        ------
+        RuntimeError
+            If getting entities fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for parallel status entity operations")
+            
         cdef moab.ErrorCode err
         cdef Range ents = Range()
         err = self.inst.get_pstatus_entities(dim, <unsigned char>pstatus_val, deref(ents.inst))
@@ -431,7 +547,17 @@ cdef class ParallelComm(object):
         -------
         int
             The owning processor rank
+
+        Raises
+        ------
+        RuntimeError
+            If getting owner fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for owner operations")
+            
         cdef moab.ErrorCode err
         cdef int owner
         err = self.inst.get_owner(entity, owner)
@@ -450,7 +576,17 @@ cdef class ParallelComm(object):
         -------
         tuple
             (owner_rank, remote_handle)
+
+        Raises
+        ------
+        RuntimeError
+            If getting owner handle fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for owner handle operations")
+            
         cdef moab.ErrorCode err
         cdef int owner
         cdef EntityHandle remote_handle
@@ -470,7 +606,17 @@ cdef class ParallelComm(object):
         -------
         dict
             Dictionary with 'procs', 'handles', 'pstatus', 'num_procs'
+
+        Raises
+        ------
+        RuntimeError
+            If getting sharing data fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for sharing data operations")
+            
         cdef moab.ErrorCode err
         cdef int procs[64]
         cdef EntityHandle handles[64]
@@ -492,7 +638,17 @@ cdef class ParallelComm(object):
         -------
         list
             List of interface processor ranks
+
+        Raises
+        ------
+        RuntimeError
+            If getting interface processors fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for interface processor operations")
+            
         cdef moab.ErrorCode err
         cdef cpp_set[unsigned int] procs
         err = self.inst.get_interface_procs(procs, False)
@@ -506,7 +662,17 @@ cdef class ParallelComm(object):
         -------
         list
             List of all processor ranks
+
+        Raises
+        ------
+        RuntimeError
+            If getting communicator processors fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for communicator operations")
+            
         cdef moab.ErrorCode err
         cdef cpp_set[unsigned int] procs
         err = self.inst.get_comm_procs(procs)
@@ -532,7 +698,12 @@ cdef class ParallelComm(object):
         ------
         RuntimeError
             If getting entities fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for owned entity operations")
+            
         cdef moab.ErrorCode err
         cdef Range ents = Range()
 
@@ -568,7 +739,12 @@ cdef class ParallelComm(object):
         ------
         RuntimeError
             If getting entities fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for ghost entity operations")
+            
         cdef moab.ErrorCode err
         cdef Range ents = Range()
         cdef Range ownedents = Range()
@@ -610,7 +786,17 @@ cdef class ParallelComm(object):
             Do in parallel
         owned_only : bool, optional
             Only assign to owned entities
+
+        Raises
+        ------
+        RuntimeError
+            If assigning global IDs fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for global ID operations")
+            
         cdef moab.ErrorCode err
         err = self.inst.assign_global_ids(this_set, dimension, start_id,
                                           largest_dim_only, parallel, owned_only)
@@ -635,10 +821,20 @@ cdef class ParallelComm(object):
             Do in parallel
         owned_only : bool, optional
             Only check owned entities
+
+        Raises
+        ------
+        RuntimeError
+            If checking global IDs fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for global ID check operations")
+            
         cdef moab.ErrorCode err
         err = self.inst.check_global_ids(this_set, dimension, start_id,
-                                        largest_dim_only, parallel, owned_only)
+                                         largest_dim_only, parallel, owned_only)
         check_error(err)
 
     def exchange_tags(self, list src_tag_names, list dst_tag_names, Range entities):
@@ -652,7 +848,17 @@ cdef class ParallelComm(object):
             Destination tag names
         entities : Range
             Entities to exchange tags for
+
+        Raises
+        ------
+        RuntimeError
+            If exchanging tags fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for tag exchange operations")
+            
         cdef moab.ErrorCode err
         cdef vector[moab.Tag] src_tags
         cdef vector[moab.Tag] dst_tags
@@ -680,12 +886,22 @@ cdef class ParallelComm(object):
         src_tag_names : list of str
             Source tag names
         dst_tag_names : list of str
-            Destination tag names  
+            Destination tag names
         mpi_op_name : str
             MPI operation name ('SUM', 'MAX', 'MIN', 'PROD', 'LAND', 'LOR', etc.)
         entities : Range
             Entities to reduce tags for
+
+        Raises
+        ------
+        RuntimeError
+            If reducing tags fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for tag reduction operations")
+            
         cdef moab.ErrorCode err
         cdef vector[moab.Tag] src_tags
         cdef vector[moab.Tag] dst_tags
@@ -725,7 +941,17 @@ cdef class ParallelComm(object):
         -------
         EntityHandle
             The partitioning set handle
+
+        Raises
+        ------
+        RuntimeError
+            If getting partitioning fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for partitioning operations")
+            
         return self.inst.get_partitioning()
 
     def set_partitioning(self, EntityHandle h):
@@ -735,7 +961,17 @@ cdef class ParallelComm(object):
         ----------
         h : EntityHandle
             The partitioning set handle
+
+        Raises
+        ------
+        RuntimeError
+            If setting partitioning fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for partitioning operations")
+            
         cdef moab.ErrorCode err
         err = self.inst.set_partitioning(h)
         check_error(err)
@@ -752,7 +988,17 @@ cdef class ParallelComm(object):
         -------
         Range
             Entities in the partition
+
+        Raises
+        ------
+        RuntimeError
+            If getting partition entities fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for partition entity operations")
+            
         cdef moab.ErrorCode err
         cdef Range ents = Range()
         err = self.inst.get_part_entities(deref(ents.inst), dim)
@@ -766,7 +1012,17 @@ cdef class ParallelComm(object):
         -------
         int
             Total number of partitions
+
+        Raises
+        ------
+        RuntimeError
+            If getting partition count fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for partition count operations")
+            
         cdef moab.ErrorCode err
         cdef int count
         err = self.inst.get_global_part_count(count)
@@ -785,7 +1041,17 @@ cdef class ParallelComm(object):
         -------
         int
             Owning processor rank
+
+        Raises
+        ------
+        RuntimeError
+            If getting partition owner fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for partition owner operations")
+            
         cdef moab.ErrorCode err
         cdef int owner
         err = self.inst.get_part_owner(part_id, owner)
@@ -799,7 +1065,17 @@ cdef class ParallelComm(object):
         -------
         EntityHandle
             Handle to the new partition
+
+        Raises
+        ------
+        RuntimeError
+            If creating partition fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for partition creation")
+            
         cdef moab.ErrorCode err
         cdef EntityHandle part
         err = self.inst.create_part(part)
@@ -813,13 +1089,23 @@ cdef class ParallelComm(object):
         ----------
         part : EntityHandle
             Handle to the partition to destroy
+
+        Raises
+        ------
+        RuntimeError
+            If destroying partition fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for partition destruction")
+            
         cdef moab.ErrorCode err
         err = self.inst.destroy_part(part)
         check_error(err)
 
     def broadcast_entities(self, int from_proc, Range entities,
-                          bint adjacencies=False, bint tags=True):
+                         bint adjacencies=False, bint tags=True):
         """Broadcast entities from one processor to all others.
 
         Parameters
@@ -832,7 +1118,17 @@ cdef class ParallelComm(object):
             Include adjacencies
         tags : bool, optional
             Include tags
+
+        Raises
+        ------
+        RuntimeError
+            If broadcasting entities fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for broadcast operations")
+            
         cdef moab.ErrorCode err
         err = self.inst.broadcast_entities(from_proc, deref(entities.inst),
                                            adjacencies, tags)
@@ -852,7 +1148,17 @@ cdef class ParallelComm(object):
             Name of the ID tag
         root_proc_rank : int, optional
             Root processor rank
+
+        Raises
+        ------
+        RuntimeError
+            If gathering data fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for gather operations")
+            
         cdef moab.ErrorCode err
         cdef moab.Tag tag_handle
         cdef moab.Tag id_tag = NULL
@@ -874,7 +1180,17 @@ cdef class ParallelComm(object):
         ----------
         to_delete : Range
             Entities to delete
+
+        Raises
+        ------
+        RuntimeError
+            If deleting entities fails
+        RuntimeError
+            If basic MPI support is not available
         """
+        if not self.has_basic_mpi:
+            raise RuntimeError("Basic MPI support is required for delete operations")
+            
         cdef moab.ErrorCode err
         err = self.inst.delete_entities(deref(to_delete.inst))
         check_error(err)

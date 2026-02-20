@@ -438,15 +438,15 @@ if ( ENABLE_MPI )
       find_package(Python COMPONENTS Interpreter Development REQUIRED)
       execute_process(
         COMMAND ${Python_EXECUTABLE} -c "import mpi4py; print(mpi4py.__version__)"
-        RESULT_VARIABLE MPI4PY_FOUND
+        RESULT_VARIABLE MPI4PY_CHECK_RESULT
         OUTPUT_VARIABLE MPI4PY_VERSION
         ERROR_QUIET
       )
-      if (NOT MPI4PY_FOUND EQUAL 0)
-        message(FATAL_ERROR "mpi4py is required when both MPI and PyMOAB are enabled. Please install it using: pip install mpi4py>=3.0.0")
-      else()
+      if (MPI4PY_CHECK_RESULT EQUAL 0)
         string(STRIP "${MPI4PY_VERSION}" MPI4PY_VERSION)
         message(STATUS "Found mpi4py version: ${MPI4PY_VERSION}")
+      else()
+        message(WARNING "mpi4py not found but MPI is enabled in MOAB. PyMOAB parallel features will not be available.")
       endif()
     endif()
 

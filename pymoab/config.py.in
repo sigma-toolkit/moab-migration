@@ -1,0 +1,37 @@
+# Auto-generated configuration
+# MPI support status for PyMOAB
+
+MOAB_MPI_ENABLED = @MPI4PY_FOUND@
+MOAB_MPI_BASIC = @MOAB_MPI_BASIC@
+MOAB_MPI_IO = @MOAB_MPI_IO@
+
+
+def is_mpi_enabled():
+    """Check if PyMOAB was built with MPI support.
+    
+    Returns
+    -------
+    bool
+        True if MPI support is available, False otherwise
+    """
+    return MOAB_MPI_ENABLED
+
+def has_basic_mpi():
+    """Check if PyMOAB has basic MPI support.
+    
+    Returns
+    -------
+    bool
+        True if basic MPI support is available, False otherwise
+    """
+    return MOAB_MPI_BASIC
+
+def has_mpi_io():
+    """Check if PyMOAB has MPI I/O support.
+    
+    Returns
+    -------
+    bool
+        True if MPI I/O support is available, False otherwise
+    """
+    return MOAB_MPI_IO

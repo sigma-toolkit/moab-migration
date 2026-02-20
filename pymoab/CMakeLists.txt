@@ -20,7 +20,7 @@ if (MPI_FOUND)
     find_package(mpi4py QUIET)
     if(NOT mpi4py_FOUND)
         message(WARNING "PyMOAB: mpi4py not found but MPI is enabled in MOAB. parallelcomm module will not be built.")
-        set(MPI4PY_FOUND FALSE)
+        set(MPI4PY_FOUND "False")
     else()
         execute_process(
             COMMAND ${Python_EXECUTABLE} -c "import mpi4py; import os; print(os.path.join(os.path.dirname(mpi4py.__file__), 'include'))"
@@ -34,11 +34,48 @@ if (MPI_FOUND)
             ${CMAKE_BINARY_DIR}/src/parallel
         )
         set(PyMOAB_MPI_INCLUDES "-I${CMAKE_SOURCE_DIR}/src/parallel/moab;-I${CMAKE_SOURCE_DIR}/src/parallel;-I${CMAKE_BINARY_DIR}/src/parallel")
-        set(MPI4PY_FOUND TRUE)
+        set(MPI4PY_FOUND "True")
     endif()
 else()
     message(STATUS "PyMOAB: MPI not found - parallelcomm module will not be built")
-    set(MPI4PY_FOUND FALSE)
+    set(MPI4PY_FOUND "False")
+endif()
+
+# Enhanced MPI capability detection
+if(MPI4PY_FOUND)
+    message(STATUS "PyMOAB: Testing MPI capabilities...")
+    
+    # Test basic MPI functionality
+    try_compile(HAS_BASIC_MPI ${CMAKE_BINARY_DIR}/test_mpi
+        SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_mpi.cpp
+        CMAKE_FLAGS -DINCLUDE_DIRECTORIES=${MPI4PY_INCLUDE_DIR}
+        LINK_LIBRARIES=mpi4py
+    )
+    
+    # Test MPI I/O functionality
+    try_compile(HAS_MPI_IO ${CMAKE_BINARY_DIR}/test_mpi_io
+        SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_mpi_io.cpp
+        CMAKE_FLAGS -DINCLUDE_DIRECTORIES=${MPI4PY_INCLUDE_DIR}
+        LINK_LIBRARIES=mpi4py
+    )
+    
+    # Set capability flags
+    if(HAS_BASIC_MPI)
+        set(MOAB_MPI_BASIC "True" CACHE INTERNAL "Basic MPI support available")
+    else()
+        set(MOAB_MPI_BASIC "False" CACHE INTERNAL "Basic MPI support available")
+    endif()
+    
+    if(HAS_MPI_IO)
+        set(MOAB_MPI_IO "True" CACHE INTERNAL "MPI I/O support available")
+    else()
+        set(MOAB_MPI_IO "False" CACHE INTERNAL "MPI I/O support available")
+    endif()
+    
+    message(STATUS "PyMOAB: MPI capabilities - Basic: ${MOAB_MPI_BASIC}, I/O: ${MOAB_MPI_IO}")
+else()
+    set(MOAB_MPI_BASIC "False" CACHE INTERNAL "Basic MPI support available")
+    set(MOAB_MPI_IO "False" CACHE INTERNAL "MPI I/O support available")
 endif()
 
 # Export MPI4PY_FOUND to be used in Cython
@@ -50,8 +87,24 @@ if(MPI4PY_FOUND)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/moab_mpi.pxd.in ${CMAKE_CURRENT_BINARY_DIR}/moab_mpi.pxd @ONLY)
 else()
     message(STATUS "PyMOAB: Generating empty moab_mpi.pxd (MPI disabled)")
-    # Create an empty moab_mpi.pxd file
-    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/moab_mpi.pxd "# MPI support disabled\n")
+    # Create an empty moab_mpi.pxd file (must be truly empty for Cython)
+    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/moab_mpi.pxd "")
+endif()
+
+# Generate parallelcomm_defs.pxd based on MPI availability and capabilities
+if(MPI4PY_FOUND)
+    message(STATUS "PyMOAB: Generating parallelcomm_defs.pxd with ParallelComm declarations")
+    
+    # Set capability flags for template
+    set(MOAB_MPI_FULL "${MOAB_MPI_FULL}")
+    set(MOAB_MPI_BASIC "${MOAB_MPI_BASIC}")
+    set(MOAB_MPI_IO "${MOAB_MPI_IO}")
+    
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/parallelcomm_defs.pxd.in ${CMAKE_CURRENT_BINARY_DIR}/parallelcomm_defs.pxd @ONLY)
+else()
+    message(STATUS "PyMOAB: Generating empty parallelcomm_defs.pxd (MPI disabled)")
+    # Create an empty parallelcomm_defs.pxd file (must be truly empty for Cython)
+    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/parallelcomm_defs.pxd "")
 endif()
 
 # Get list of Cython files (exclude parallelcomm if MPI not available)
@@ -119,3 +172,6 @@ foreach(CYTHON_FILE ${CYTHON_FILES})
     # Install the target in the pymoab directory
     install(TARGETS ${TARGET_NAME} DESTINATION .)
 endforeach()
+
+# Install generated config.py
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/config.py DESTINATION . RENAME config.py)

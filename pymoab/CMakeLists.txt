@@ -1,32 +1,56 @@
 find_program(CYTHON "cython")
 
-# Find Python 
-find_package(Python COMPONENTS Interpreter Development REQUIRED)
+#find_package(Python COMPONENTS Interpreter Development.Module NumPy REQUIRED)
 
-# Base include directories (always needed)
 include_directories(
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_BINARY_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_BINARY_DIR}
     ${Python_NumPy_INCLUDE_DIRS}
 )
 
-# Check for MPI support in MOAB
 if (MPI_FOUND)
     message(STATUS "PyMOAB: MPI support detected in MOAB")
     
-    # Get mpi4py include directory (required when MPI is enabled)
-    find_package(mpi4py QUIET)
-    if(NOT mpi4py_FOUND)
+    execute_process(
+        COMMAND ${Python_EXECUTABLE} -c "import mpi4py; import os; print(os.path.join(os.path.dirname(mpi4py.__file__), 'include'))"
+        OUTPUT_VARIABLE MPI4PY_INCLUDE_DIR
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE MPI4PY_RESULT
+    )
+    if(NOT MPI4PY_RESULT EQUAL 0)
+        get_filename_component(PY_BIN_DIR ${Python_EXECUTABLE} DIRECTORY)
+        get_filename_component(PY_PREFIX ${PY_BIN_DIR} DIRECTORY)
+        
+        execute_process(
+            COMMAND ${Python_EXECUTABLE} -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+            OUTPUT_VARIABLE PY_VER
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        
+        unset(MPI4PY_INCLUDE_DIR)
+        unset(MPI4PY_INCLUDE_DIR CACHE)
+
+        find_path(MPI4PY_INCLUDE_DIR 
+            NAMES mpi4py/mpi4py.h
+            PATHS 
+                "${PY_PREFIX}/lib/python${PY_VER}/site-packages/mpi4py/include"
+                "${PY_PREFIX}/Lib/site-packages/mpi4py/include"
+                "${Python_SITELIB}/mpi4py/include"
+                "${Python_SITEARCH}/mpi4py/include"
+            NO_DEFAULT_PATH
+        )
+        if(MPI4PY_INCLUDE_DIR)
+            set(MPI4PY_RESULT 0)
+            message(STATUS "PyMOAB: Found mpi4py include via fallback: ${MPI4PY_INCLUDE_DIR}")
+        endif()
+    endif()
+
+    if(NOT MPI4PY_RESULT EQUAL 0)
         message(WARNING "PyMOAB: mpi4py not found but MPI is enabled in MOAB. parallelcomm module will not be built.")
         set(MPI4PY_FOUND "False")
     else()
-        execute_process(
-            COMMAND ${Python_EXECUTABLE} -c "import mpi4py; import os; print(os.path.join(os.path.dirname(mpi4py.__file__), 'include'))"
-            OUTPUT_VARIABLE MPI4PY_INCLUDE_DIR
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-        )
         include_directories(${MPI4PY_INCLUDE_DIR})
         include_directories(
             ${CMAKE_SOURCE_DIR}/src/parallel/moab
@@ -35,79 +59,30 @@ if (MPI_FOUND)
         )
         set(PyMOAB_MPI_INCLUDES "-I${CMAKE_SOURCE_DIR}/src/parallel/moab;-I${CMAKE_SOURCE_DIR}/src/parallel;-I${CMAKE_BINARY_DIR}/src/parallel")
         set(MPI4PY_FOUND "True")
+        set(MOAB_MPI_BASIC "True")
+        if(MOAB_HAVE_HDF5_PARALLEL)
+            set(MOAB_MPI_IO "True")
+        else()
+            set(MOAB_MPI_IO "False")
+        endif()
     endif()
 else()
     message(STATUS "PyMOAB: MPI not found - parallelcomm module will not be built")
     set(MPI4PY_FOUND "False")
+    set(MOAB_MPI_BASIC "False")
+    set(MOAB_MPI_IO "False")
 endif()
 
-# Enhanced MPI capability detection
-if(MPI4PY_FOUND)
-    message(STATUS "PyMOAB: Testing MPI capabilities...")
-    
-    # Test basic MPI functionality
-    try_compile(HAS_BASIC_MPI ${CMAKE_BINARY_DIR}/test_mpi
-        SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_mpi.cpp
-        CMAKE_FLAGS -DINCLUDE_DIRECTORIES=${MPI4PY_INCLUDE_DIR}
-        LINK_LIBRARIES=mpi4py
-    )
-    
-    # Test MPI I/O functionality
-    try_compile(HAS_MPI_IO ${CMAKE_BINARY_DIR}/test_mpi_io
-        SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_mpi_io.cpp
-        CMAKE_FLAGS -DINCLUDE_DIRECTORIES=${MPI4PY_INCLUDE_DIR}
-        LINK_LIBRARIES=mpi4py
-    )
-    
-    # Set capability flags
-    if(HAS_BASIC_MPI)
-        set(MOAB_MPI_BASIC "True" CACHE INTERNAL "Basic MPI support available")
-    else()
-        set(MOAB_MPI_BASIC "False" CACHE INTERNAL "Basic MPI support available")
-    endif()
-    
-    if(HAS_MPI_IO)
-        set(MOAB_MPI_IO "True" CACHE INTERNAL "MPI I/O support available")
-    else()
-        set(MOAB_MPI_IO "False" CACHE INTERNAL "MPI I/O support available")
-    endif()
-    
-    message(STATUS "PyMOAB: MPI capabilities - Basic: ${MOAB_MPI_BASIC}, I/O: ${MOAB_MPI_IO}")
-else()
-    set(MOAB_MPI_BASIC "False" CACHE INTERNAL "Basic MPI support available")
-    set(MOAB_MPI_IO "False" CACHE INTERNAL "MPI I/O support available")
-endif()
-
-# Export MPI4PY_FOUND to be used in Cython
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.py.in ${CMAKE_CURRENT_BINARY_DIR}/config.py @ONLY)
 
-# Generate moab_mpi.pxd based on MPI availability
-if(MPI4PY_FOUND)
-    message(STATUS "PyMOAB: Generating moab_mpi.pxd with MPI support")
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/moab_mpi.pxd.in ${CMAKE_CURRENT_BINARY_DIR}/moab_mpi.pxd @ONLY)
-else()
-    message(STATUS "PyMOAB: Generating empty moab_mpi.pxd (MPI disabled)")
-    # Create an empty moab_mpi.pxd file (must be truly empty for Cython)
-    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/moab_mpi.pxd "")
-endif()
-
-# Generate parallelcomm_defs.pxd based on MPI availability and capabilities
 if(MPI4PY_FOUND)
     message(STATUS "PyMOAB: Generating parallelcomm_defs.pxd with ParallelComm declarations")
-    
-    # Set capability flags for template
-    set(MOAB_MPI_FULL "${MOAB_MPI_FULL}")
-    set(MOAB_MPI_BASIC "${MOAB_MPI_BASIC}")
-    set(MOAB_MPI_IO "${MOAB_MPI_IO}")
-    
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/parallelcomm_defs.pxd.in ${CMAKE_CURRENT_BINARY_DIR}/parallelcomm_defs.pxd @ONLY)
 else()
     message(STATUS "PyMOAB: Generating empty parallelcomm_defs.pxd (MPI disabled)")
-    # Create an empty parallelcomm_defs.pxd file (must be truly empty for Cython)
     file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/parallelcomm_defs.pxd "")
 endif()
 
-# Get list of Cython files (exclude parallelcomm if MPI not available)
 file(GLOB ALL_CYTHON_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.pyx")
 
 # Filter out parallelcomm if MPI not available
@@ -127,8 +102,15 @@ foreach(CYTHON_FILE ${CYTHON_FILES})
     set(MODULE_MPI_INCLUDES "")
     if(${TARGET_NAME} STREQUAL "parallelcomm")
         if(MPI4PY_FOUND)
-            set(MODULE_INCLUDES ${MPI4PY_INCLUDE_DIR})
+            set(MODULE_INCLUDES "-I${MPI4PY_INCLUDE_DIR}")
             set(MODULE_MPI_INCLUDES ${PyMOAB_MPI_INCLUDES})
+            # Add Python site-packages to Cython includes so it can find mpi4py.pxd in isolated builds
+            if(Python_SITELIB)
+                set(MODULE_MPI_INCLUDES ${MODULE_MPI_INCLUDES} -I ${Python_SITELIB})
+            endif()
+            if(Python_SITEARCH)
+                set(MODULE_MPI_INCLUDES ${MODULE_MPI_INCLUDES} -I ${Python_SITEARCH})
+            endif()
         else()
             continue()
         endif()

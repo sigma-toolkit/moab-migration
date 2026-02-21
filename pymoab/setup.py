@@ -1,5 +1,4 @@
 from setuptools import setup, Extension
-from setuptools.command.build_ext import build_ext
 import sys
 import os
 import numpy
@@ -8,37 +7,14 @@ from Cython.Build import cythonize
 # Check for mpi4py availability
 MPI4PY_AVAILABLE = False
 MPI4PY_INCLUDE = None
-MOAB_MPI_BASIC = False
-MOAB_MPI_IO = False
 try:
     import mpi4py
     MPI4PY_AVAILABLE = True
     MPI4PY_INCLUDE = os.path.join(os.path.dirname(mpi4py.__file__), 'include')
-    
-    # Test basic MPI functionality
-    try:
-        from mpi4py import MPI
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        size = comm.Get_size()
-        MOAB_MPI_BASIC = True
-        print("PyMOAB: Basic MPI functionality detected")
-    except:
-        pass
-    
-    # Test MPI I/O functionality
-    try:
-        from mpi4py import MPI
-        comm = MPI.COMM_WORLD
-        # Test MPI file operations
-        MOAB_MPI_IO = True
-        print("PyMOAB: MPI I/O functionality detected")
-    except:
-        pass
 except ImportError:
     pass
 
-# Get MOAB and MPI directories from environment or CMake
+# Get MOAB and MPI directories from environment
 MOAB_DIR = os.environ.get('MOAB_DIR', '')
 MPI_DIR = os.environ.get('MPI_DIR', '')
 
@@ -63,16 +39,20 @@ library_dirs = [
 if MPI_DIR:
     library_dirs.append(os.path.join(MPI_DIR, 'lib'))
 
-# Define extensions - core is always built, parallelcomm only with mpi4py
+# Common extension kwargs
+common_ext_kwargs = dict(
+    include_dirs=include_dirs,
+    library_dirs=library_dirs,
+    libraries=['MOAB'],
+    language='c++',
+)
+
+# All serial modules
+serial_modules = ['core', 'rng', 'scd', 'tag', 'hcoord', 'skinner', 'topo_util', 'types']
+
 extensions = [
-    Extension(
-        'pymoab.core',
-        ['pymoab/core.pyx'],
-        include_dirs=include_dirs,
-        library_dirs=library_dirs,
-        libraries=['MOAB'],
-        language='c++',
-    ),
+    Extension(f'pymoab.{mod}', [f'pymoab/{mod}.pyx'], **common_ext_kwargs)
+    for mod in serial_modules
 ]
 
 # Add parallelcomm only if mpi4py is available
@@ -81,12 +61,12 @@ if MPI4PY_AVAILABLE:
         Extension(
             'pymoab.parallelcomm',
             ['pymoab/parallelcomm.pyx'],
-            include_dirs=include_dirs,
-            library_dirs=library_dirs,
-            libraries=['MOAB'],
-            language='c++',
+            **common_ext_kwargs,
         )
     )
+    print(f"PyMOAB setup.py: mpi4py found, parallelcomm module will be built")
+else:
+    print(f"PyMOAB setup.py: mpi4py not found, parallelcomm module will NOT be built")
 
 # Cython compiler directives
 compiler_directives = {
@@ -94,17 +74,9 @@ compiler_directives = {
     'embedsignature': True,
 }
 
-# Add capability detection test
-if MPI4PY_AVAILABLE:
-    print("PyMOAB: MPI capability detection enabled")
-    print(f"PyMOAB: Basic MPI support: {MOAB_MPI_BASIC}")
-    print(f"PyMOAB: MPI I/O support: {MOAB_MPI_IO}")
-else:
-    print("PyMOAB: MPI capability detection not available")
-
 setup(
     name='pymoab',
-    version='5.4.0',
+    version='5.6.0',
     description='Python interface to MOAB',
     author='MOAB Team',
     author_email='moab-dev@mcs.anl.gov',
@@ -116,5 +88,5 @@ setup(
     extras_require={
         'parallel': ['mpi4py>=3.0.0; platform_system!="Windows"'],
     },
-    python_requires='>=3.6',
+    python_requires='>=3.8',
 )

@@ -442,6 +442,25 @@ if ( ENABLE_MPI )
         OUTPUT_VARIABLE MPI4PY_VERSION
         ERROR_QUIET
       )
+      if(NOT MPI4PY_CHECK_RESULT EQUAL 0)
+        # Fallback for pip isolated builds
+        get_filename_component(PY_BIN_DIR ${Python_EXECUTABLE} DIRECTORY)
+        get_filename_component(PY_PREFIX ${PY_BIN_DIR} DIRECTORY)
+        execute_process(
+            COMMAND ${Python_EXECUTABLE} -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+            OUTPUT_VARIABLE PY_VER
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        if(EXISTS "${PY_PREFIX}/lib/python${PY_VER}/site-packages/mpi4py/__init__.py")
+            execute_process(
+                COMMAND ${Python_EXECUTABLE} -c "import sys; sys.path.insert(0, '${PY_PREFIX}/lib/python${PY_VER}/site-packages'); import mpi4py; print(mpi4py.__version__)"
+                RESULT_VARIABLE MPI4PY_CHECK_RESULT
+                OUTPUT_VARIABLE MPI4PY_VERSION
+                ERROR_QUIET
+            )
+        endif()
+      endif()
+
       if (MPI4PY_CHECK_RESULT EQUAL 0)
         string(STRIP "${MPI4PY_VERSION}" MPI4PY_VERSION)
         message(STATUS "Found mpi4py version: ${MPI4PY_VERSION}")

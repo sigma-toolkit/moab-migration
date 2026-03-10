@@ -999,23 +999,33 @@ static fem::ErrorMetrics run_level(const fem::MoabMeshView& mesh,
 
     Eigen::VectorXd x;
     bool solved = false;
+
+    // Prefer CG with incomplete-Cholesky preconditioner (memory-efficient, scalable).
+    // Relative tolerance 1e-14; fall back to direct LLT if CG fails to converge.
     {
+        Eigen::ConjugateGradient<Eigen::SparseMatrix<double>,
+                                 Eigen::Lower|Eigen::Upper,
+                                 Eigen::IncompleteCholesky<double>> cg;
+        cg.setTolerance(1e-14);
+        cg.setMaxIterations(std::max(10000, 10 * cgdofs.ndofs()));
+        cg.compute(A);
+        x = cg.solve(b);
+        solved = (cg.info() == Eigen::Success);
+        if (solved)
+            std::cout << "  Solver: CG  iters=" << cg.iterations()
+                      << "  res=" << cg.error() << "\n";
+        else
+            std::cout << "  CG did not converge (res=" << cg.error()
+                      << "); falling back to direct LLT.\n";
+    }
+    if (!solved) {
         Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> llt;
         llt.compute(A);
         if (llt.info() == Eigen::Success) {
             x = llt.solve(b);
             solved = (llt.info() == Eigen::Success);
+            if (solved) std::cout << "  Solver: direct LLT\n";
         }
-    }
-    if (!solved) {
-        Eigen::ConjugateGradient<Eigen::SparseMatrix<double>,
-                                 Eigen::Lower,
-                                 Eigen::IncompleteCholesky<double>> cg;
-        cg.setTolerance(1e-10);
-        cg.setMaxIterations(std::max(1000, cgdofs.ndofs()));
-        cg.compute(A);
-        x = cg.solve(b);
-        solved = (cg.info() == Eigen::Success);
     }
     if (!solved) throw std::runtime_error("Linear solver failed");
 

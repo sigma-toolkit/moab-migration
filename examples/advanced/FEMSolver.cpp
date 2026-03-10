@@ -1075,7 +1075,13 @@ static void write_solution(const MoabMeshView& mesh,
     set_tag("PointwiseError", err_vals);
 
     const std::string out = out_base + "_solution.vtk";
-    util::mb_check(core.write_file(out.c_str()), "write_file");
+    // Write only the 2D surface elements (not the 1D edges created for adjacency
+    // queries, which would otherwise flood the VTK file with line segments).
+    moab::EntityHandle eset;
+    util::mb_check(core.create_meshset(moab::MESHSET_SET, eset), "create_meshset");
+    util::mb_check(core.add_entities(eset, mesh.elements()), "add_entities");
+    util::mb_check(core.write_file(out.c_str(), nullptr, nullptr, &eset, 1), "write_file");
+    util::mb_check(core.delete_entities(&eset, 1), "delete meshset");
 }
 
 } // namespace fem

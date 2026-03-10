@@ -484,7 +484,9 @@ refine_one_level(const MoabMeshView& mesh, const GeomInfo& ginfo) {
     // Convert Range to vector for O(1) indexed access
     std::vector<moab::EntityHandle> vh(new_verts.begin(), new_verts.end());
 
-    for (const auto& [et, conn] : new_elements) {
+    for (std::size_t ei = 0; ei < new_elements.size(); ++ei) {
+        const moab::EntityType             et   = new_elements[ei].first;
+        const std::vector<int>&            conn = new_elements[ei].second;
         std::vector<moab::EntityHandle> ch(conn.size());
         for (std::size_t k = 0; k < conn.size(); ++k) ch[k] = vh[conn[k]];
         moab::EntityHandle new_e;

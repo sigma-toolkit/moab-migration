@@ -21,6 +21,7 @@
 
 #include <Eigen/Sparse>
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <Eigen/IterativeLinearSolvers>
 #include <Eigen/SparseCholesky>
 #include <memory>
@@ -71,7 +72,11 @@ inline SurfJac make_surf_jac(const Eigen::Vector3d& a, const Eigen::Vector3d& b)
     Eigen::Matrix2d G;
     G(0,0) = a.dot(a);  G(0,1) = a.dot(b);
     G(1,0) = G(0,1);    G(1,1) = b.dot(b);
-    const double detG = G(0,0)*G(1,1) - G(0,1)*G(1,0);
+    // det(G) = |a|²|b|² - (a·b)² = |a×b|².
+    // Use the cross-product form: numerically stable even when R >> 1
+    // (the algebraic form G₀₀·G₁₁ - G₀₁² suffers catastrophic cancellation
+    //  for large-coordinate meshes such as Earth-radius spheres).
+    const double detG = a.cross(b).squaredNorm();
     if (detG <= 0.0) throw std::runtime_error("Degenerate element: non-positive metric determinant");
     jac.sqrtDetG = std::sqrt(detG);
     jac.Ginv(0,0) =  G(1,1)/detG;  jac.Ginv(0,1) = -G(0,1)/detG;
@@ -297,6 +302,49 @@ static GeomInfo detect_geometry(const MoabMeshView& mesh) {
             return {GeometryType::SPHERE, mean_r};
     }
     return {GeometryType::GENERAL_MANIFOLD, 0.0};
+}
+
+// =============================================================================
+//  Unit-sphere rescaling
+//  For spherical meshes with R >> 1 (e.g. Earth-radius), normalise all vertex
+//  coordinates to the unit sphere before assembly.  This avoids:
+//    • catastrophic cancellation in the metric determinant for large R
+//    • ill-conditioning of the stiffness matrix
+//  The MMS (u = z/R) is the same on the unit sphere (R = 1, u = z).
+// =============================================================================
+static std::unique_ptr<MoabMeshView>
+rescale_sphere(const MoabMeshView& mesh, double R) {
+    const moab::Range& verts = mesh.vertices();
+    std::vector<double> xyz(3 * verts.size());
+    util::mb_check(mesh.core().get_coords(verts, xyz.data()), "rescale:get_coords");
+    for (auto& v : xyz) v /= R;
+
+    // Build vertex-handle → index map for connectivity re-wiring
+    std::unordered_map<moab::EntityHandle, int> vh_to_idx;
+    {
+        int idx = 0;
+        for (moab::EntityHandle v : verts) vh_to_idx[v] = idx++;
+    }
+
+    auto new_core = std::make_unique<moab::Core>();
+    moab::Range new_verts;
+    util::mb_check(new_core->create_vertices(xyz.data(),
+                                              static_cast<int>(verts.size()),
+                                              new_verts), "rescale:create_verts");
+    std::vector<moab::EntityHandle> vh(new_verts.begin(), new_verts.end());
+
+    for (moab::EntityHandle e : mesh.elements()) {
+        const auto conn = mesh.elem_connectivity(e);
+        const auto et   = mesh.elem_type(e);
+        std::vector<moab::EntityHandle> new_conn(conn.size());
+        for (std::size_t k = 0; k < conn.size(); ++k)
+            new_conn[k] = vh[vh_to_idx.at(conn[k])];
+        moab::EntityHandle new_e;
+        util::mb_check(new_core->create_element(et, new_conn.data(),
+                                                 static_cast<int>(new_conn.size()),
+                                                 new_e), "rescale:create_element");
+    }
+    return std::make_unique<MoabMeshView>(std::move(new_core));
 }
 
 // =============================================================================
@@ -588,8 +636,9 @@ static void apply_dirichlet_strong(Eigen::SparseMatrix<double>& A,
 // =============================================================================
 class PoissonAssembler {
 public:
-    PoissonAssembler(const MoabMeshView& m, const DofManagerCGP1& d, double k)
-        : mesh_(m), dofs_(d), kappa_(k) {}
+    PoissonAssembler(const MoabMeshView& m, const DofManagerCGP1& d, double k,
+                     const GeomInfo& g = GeomInfo{GeometryType::FLAT_2D, 1.0})
+        : mesh_(m), dofs_(d), kappa_(k), ginfo_(g) {}
 
     void assemble(Eigen::SparseMatrix<double>& A,
                   Eigen::VectorXd& b,
@@ -614,6 +663,7 @@ private:
     const MoabMeshView&   mesh_;
     const DofManagerCGP1& dofs_;
     double                kappa_;
+    GeomInfo              ginfo_;
 
     // --- P1 triangle ---
     void assemble_tri(moab::EntityHandle e,
@@ -679,7 +729,12 @@ private:
         scatter4(Ke, fe, gdofs, trips, b);
     }
 
-    // --- Polygon: fan-triangulation from vertex 0 ---
+    // --- Polygon: centroid-based triangulation with static condensation ---
+    // Each n-gon is split into n sub-triangles {centroid, v_k, v_{k+1}}.
+    // The centroid DOF is locally condensed out before scattering to the global
+    // system, so no global centroid DOF is introduced.  This avoids the degenerate
+    // sub-triangles that can arise from fan-triangulation (v0 as origin) when three
+    // nearly-collinear vertices appear across the polygon.
     void assemble_polygon(moab::EntityHandle e,
                           const MMSBase& mms,
                           std::vector<Eigen::Triplet<double>>& trips,
@@ -689,15 +744,28 @@ private:
         const int  n     = static_cast<int>(X.size());
         if (n < 3) return;
 
+        // Centroid: mean of vertices, projected onto sphere if needed
+        Eigen::Vector3d cpos = Eigen::Vector3d::Zero();
+        for (const auto& xi : X) cpos += xi;
+        cpos /= static_cast<double>(n);
+        if (ginfo_.type == GeometryType::SPHERE) {
+            const double r = cpos.norm();
+            if (r > 1e-12) cpos *= ginfo_.sphere_radius / r;
+        }
+
+        // Build (n+1)×(n+1) local system.  Local DOF 0 = centroid; 1..n = polygon vertices.
+        const int m = n + 1;
+        Eigen::MatrixXd Ke = Eigen::MatrixXd::Zero(m, m);
+        Eigen::VectorXd fe = Eigen::VectorXd::Zero(m);
+
         const auto dphi = TriP1Basis::eval_dphi_ref();
 
-        for (int k = 1; k <= n-2; ++k) {
-            const std::array<Eigen::Vector3d,3> Xs = {X[0], X[k], X[k+1]};
-            const std::array<int,3>             ds = {gdofs[0], gdofs[k], gdofs[k+1]};
+        for (int k = 0; k < n; ++k) {
+            const int kp1 = (k + 1) % n;
+            const std::array<Eigen::Vector3d,3> Xs = {cpos, X[k], X[kp1]};
+            const std::array<int,3>             ls = {0, k+1, kp1+1};
             const SurfJac jac = make_surf_jac(Xs[1]-Xs[0], Xs[2]-Xs[0]);
-
-            Eigen::Matrix3d Ke = Eigen::Matrix3d::Zero();
-            Eigen::Vector3d fe = Eigen::Vector3d::Zero();
+            if (jac.sqrtDetG < 1e-14) continue;
 
             for (const auto& gp : TriP1Basis::gauss_rule()) {
                 const double dV  = gp.w * 0.5 * jac.sqrtDetG;
@@ -706,17 +774,30 @@ private:
                 const Eigen::Vector3d phi  = TriP1Basis::eval_phi(gp.xi);
                 for (int i = 0; i < 3; ++i) {
                     const Eigen::Vector3d gi = surf_grad(jac, dphi.row(i).transpose());
-                    fe[i] += phi[i] * fval * dV;
+                    fe[ls[i]] += phi[i] * fval * dV;
                     for (int j = 0; j < 3; ++j)
-                        Ke(i,j) += kappa_ * gi.dot(surf_grad(jac, dphi.row(j).transpose())) * dV;
+                        Ke(ls[i], ls[j]) += kappa_ * gi.dot(surf_grad(jac, dphi.row(j).transpose())) * dV;
                 }
             }
-            // Scatter this sub-triangle's 3x3 contribution
-            for (int i = 0; i < 3; ++i) {
-                b[ds[i]] += fe[i];
-                for (int j = 0; j < 3; ++j)
-                    trips.emplace_back(ds[i], ds[j], Ke(i,j));
-            }
+        }
+
+        // Static condensation: eliminate centroid DOF (local index 0).
+        // K_red[i,j] = Ke[i,j] - Ke[i,0]*Ke[0,j]/Ke[0,0]   (i,j = 1..n)
+        // f_red[i]   = fe[i]   - Ke[i,0]*fe[0]  /Ke[0,0]
+        const double Kcc = Ke(0, 0);
+        if (std::abs(Kcc) < 1e-30) return;
+
+        for (int i = 1; i < m; ++i) {
+            fe[i] -= Ke(i,0) * fe[0] / Kcc;
+            for (int j = 1; j < m; ++j)
+                Ke(i,j) -= Ke(i,0) * Ke(0,j) / Kcc;
+        }
+
+        // Scatter condensed n×n system to global
+        for (int i = 1; i < m; ++i) {
+            b[gdofs[i-1]] += fe[i];
+            for (int j = 1; j < m; ++j)
+                trips.emplace_back(gdofs[i-1], gdofs[j-1], Ke(i,j));
         }
     }
 
@@ -755,20 +836,29 @@ static void build_dirichlet(const MoabMeshView& mesh,
     gvals.assign(static_cast<std::size_t>(N), 0.0);
 
     if (gtype == GeometryType::SPHERE) {
-        // Closed surface — no physical boundary. Pin one DOF to remove
-        // the one-dimensional null space of the Laplace-Beltrami operator.
-        moab::EntityHandle vh = *mesh.vertices().begin();
-        double xyz[3] = {};
-        util::mb_check(mesh.core().get_coords(&vh, 1, xyz), "sphere anchor coords");
-        const int d = dofs.vertex_dof(vh);
-        is_bc[static_cast<std::size_t>(d)] = 1;
-        gvals[static_cast<std::size_t>(d)] = mms.u(xyz[0], xyz[1], xyz[2]);
-        std::cout << "  [BC] Sphere: pinned DOF " << d
-                  << " to remove Laplace-Beltrami null space.\n";
-        return;
+        // Check whether this is a closed sphere (no physical boundary) or an open
+        // regional mesh (has boundary edges).  MPAS-style meshes are regional: they
+        // are classified as SPHERE based on vertex radii but have a cut boundary.
+        const moab::Range bnd = mesh.boundary_edges();
+        if (bnd.empty()) {
+            // Closed sphere — pin one DOF to remove the Laplace-Beltrami null space
+            moab::EntityHandle vh = *mesh.vertices().begin();
+            double xyz[3] = {};
+            util::mb_check(mesh.core().get_coords(&vh, 1, xyz), "sphere anchor coords");
+            const int d = dofs.vertex_dof(vh);
+            is_bc[static_cast<std::size_t>(d)] = 1;
+            gvals[static_cast<std::size_t>(d)] = mms.u(xyz[0], xyz[1], xyz[2]);
+            std::cout << "  [BC] Sphere: pinned DOF " << d
+                      << " to remove Laplace-Beltrami null space.\n";
+            return;
+        }
+        // Open (regional) sphere mesh: apply Dirichlet BCs on physical boundary
+        std::cout << "  [BC] Sphere with boundary: applying Dirichlet on "
+                  << bnd.size() << " boundary edges.\n";
+        // Fall through to the boundary-edge Dirichlet loop below
     }
 
-    // Flat 2D or general manifold: Dirichlet on physical boundary edges
+    // Flat 2D, general manifold, or open sphere: Dirichlet on physical boundary edges
     const moab::Range bnd = mesh.boundary_edges();
     int marked = 0;
     for (moab::EntityHandle e : bnd) {
@@ -806,7 +896,8 @@ struct ErrorMetrics { double L2{}, H1semi{}, h{}; };
 static ErrorMetrics compute_errors(const MoabMeshView& mesh,
                                     const DofManagerCGP1& dofs,
                                     const Eigen::VectorXd& x,
-                                    const MMSBase& mms) {
+                                    const MMSBase& mms,
+                                    const GeomInfo& ginfo = GeomInfo{GeometryType::FLAT_2D,1.0}) {
     double L2sq = 0.0, H1sq = 0.0, sum_h = 0.0;
     int count = 0;
 
@@ -881,13 +972,27 @@ static ErrorMetrics compute_errors(const MoabMeshView& mesh,
             const int  n     = static_cast<int>(X.size());
             if (n < 3) continue;
 
+            // Centroid (mirror of assembly)
+            Eigen::Vector3d cpos = Eigen::Vector3d::Zero();
+            for (const auto& xi : X) cpos += xi;
+            cpos /= static_cast<double>(n);
+            if (ginfo.type == GeometryType::SPHERE) {
+                const double r = cpos.norm();
+                if (r > 1e-12) cpos *= ginfo.sphere_radius / r;
+            }
+            // Approximate u_h at centroid as mean of vertex values
+            double uh_c = 0.0;
+            for (int k = 0; k < n; ++k) uh_c += x[gdofs[k]];
+            uh_c /= static_cast<double>(n);
+
             double h_poly = 0.0;
-            for (int k = 1; k <= n-2; ++k) {
-                const std::array<Eigen::Vector3d,3> Xs = {X[0], X[k], X[k+1]};
-                const std::array<int,3>             ds = {gdofs[0], gdofs[k], gdofs[k+1]};
-                Eigen::Vector3d uh; uh << x[ds[0]], x[ds[1]], x[ds[2]];
+            for (int k = 0; k < n; ++k) {
+                const int kp1 = (k + 1) % n;
+                const std::array<Eigen::Vector3d,3> Xs = {cpos, X[k], X[kp1]};
+                Eigen::Vector3d uh; uh << uh_c, x[gdofs[k]], x[gdofs[kp1]];
 
                 const SurfJac jac = make_surf_jac(Xs[1]-Xs[0], Xs[2]-Xs[0]);
+                if (jac.sqrtDetG < 1e-14) continue;
                 Eigen::Vector3d grad_uh = Eigen::Vector3d::Zero();
                 for (int i = 0; i < 3; ++i)
                     grad_uh += uh[i] * surf_grad(jac, dphi_tri.row(i).transpose());
@@ -987,7 +1092,7 @@ static fem::ErrorMetrics run_level(const fem::MoabMeshView& mesh,
     std::cout << "  DOFs=" << cgdofs.ndofs()
               << "  Elems=" << mesh.elements().size() << "\n";
 
-    fem::PoissonAssembler asmbl(mesh, cgdofs, 1.0);
+    fem::PoissonAssembler asmbl(mesh, cgdofs, 1.0, ginfo);
     Eigen::SparseMatrix<double> A;
     Eigen::VectorXd b;
     asmbl.assemble(A, b, mms);
@@ -1029,7 +1134,7 @@ static fem::ErrorMetrics run_level(const fem::MoabMeshView& mesh,
     }
     if (!solved) throw std::runtime_error("Linear solver failed");
 
-    const auto em = fem::compute_errors(mesh, cgdofs, x, mms);
+    const auto em = fem::compute_errors(mesh, cgdofs, x, mms, ginfo);
     std::cout << "  h~" << em.h
               << "  |L2|=" << em.L2
               << "  |H1-semi|=" << em.H1semi << "\n";
@@ -1073,16 +1178,28 @@ int main(int argc, char** argv) {
                       << "  (" << num_levels << " levels) ===\n";
 
             fem::MoabMeshView base_mesh(base_path);
-            const auto ginfo = fem::detect_geometry(base_mesh);
+            auto ginfo = fem::detect_geometry(base_mesh);
             std::cout << "  Geometry : " << fem::gtype_name(ginfo.type);
             if (ginfo.type == fem::GeometryType::SPHERE)
                 std::cout << " (R=" << ginfo.sphere_radius << ")";
             std::cout << "\n";
 
-            // Build the refinement hierarchy: level 0 = original mesh
+            // Rescale spherical meshes to unit sphere for numerical stability
+            std::unique_ptr<fem::MoabMeshView> rescaled_base;
+            const fem::MoabMeshView* working_base = &base_mesh;
+            if (ginfo.type == fem::GeometryType::SPHERE
+                    && std::abs(ginfo.sphere_radius - 1.0) > 1e-3) {
+                std::cout << "  Rescaling to unit sphere (R="
+                          << ginfo.sphere_radius << " → 1)\n";
+                rescaled_base = fem::rescale_sphere(base_mesh, ginfo.sphere_radius);
+                ginfo.sphere_radius = 1.0;
+                working_base = rescaled_base.get();
+            }
+
+            // Build the refinement hierarchy: level 0 = (rescaled) original mesh
             std::vector<const fem::MoabMeshView*> levels;
             std::vector<std::unique_ptr<fem::MoabMeshView>> refined;
-            levels.push_back(&base_mesh);
+            levels.push_back(working_base);
             for (int lv = 0; lv < num_levels; ++lv) {
                 std::cout << "  Refining level " << lv << " → " << lv+1 << " ...\n";
                 refined.push_back(fem::refine_one_level(*levels.back(), ginfo));
@@ -1120,11 +1237,23 @@ int main(int argc, char** argv) {
                 std::cout << "\n=== Mesh: " << path << " ===\n";
 
                 fem::MoabMeshView mesh(path);
-                const auto ginfo = fem::detect_geometry(mesh);
+                auto ginfo = fem::detect_geometry(mesh);
                 std::cout << "  Geometry : " << fem::gtype_name(ginfo.type);
                 if (ginfo.type == fem::GeometryType::SPHERE)
                     std::cout << "  (R=" << ginfo.sphere_radius << ")";
                 std::cout << "\n";
+
+                // Rescale to unit sphere for numerical stability
+                std::unique_ptr<fem::MoabMeshView> rescaled;
+                const fem::MoabMeshView* working_mesh = &mesh;
+                if (ginfo.type == fem::GeometryType::SPHERE
+                        && std::abs(ginfo.sphere_radius - 1.0) > 1e-3) {
+                    std::cout << "  Rescaling to unit sphere (R="
+                              << ginfo.sphere_radius << " → 1)\n";
+                    rescaled = fem::rescale_sphere(mesh, ginfo.sphere_radius);
+                    ginfo.sphere_radius = 1.0;
+                    working_mesh = rescaled.get();
+                }
 
                 std::unique_ptr<fem::MMSBase> mms;
                 if (ginfo.type == fem::GeometryType::SPHERE) {
@@ -1138,7 +1267,7 @@ int main(int argc, char** argv) {
 
                 const bool is_last = (ai == static_cast<int>(mesh_paths.size()) - 1);
                 const std::string vtk = is_last ? fem::basename_no_ext(path) : "";
-                const auto em = run_level(mesh, ginfo, *mms, vtk);
+                const auto em = run_level(*working_mesh, ginfo, *mms, vtk);
                 hs .push_back(em.h);
                 L2s.push_back(em.L2);
                 H1s.push_back(em.H1semi);

@@ -938,19 +938,37 @@ static double compute_rate(const std::vector<double>& hs,
 static void write_solution(const MoabMeshView& mesh,
                             const DofManagerCGP1& dofs,
                             const Eigen::VectorXd& x,
+                            const MMSBase& mms,
                             const std::string& out_base) {
     moab::Core& core = mesh.core();
-    moab::Tag solTag;
-    util::mb_check(core.tag_get_handle("Solution", 1, moab::MB_TYPE_DOUBLE, solTag,
-                                        moab::MB_TAG_CREAT | moab::MB_TAG_DENSE),
-                   "tag_get_handle");
     std::vector<moab::EntityHandle> vhs(mesh.vertices().begin(), mesh.vertices().end());
-    std::vector<double> vals(vhs.size());
-    for (std::size_t i = 0; i < vhs.size(); ++i)
-        vals[i] = x[dofs.vertex_dof(vhs[i])];
-    util::mb_check(core.tag_set_data(solTag, vhs.data(),
-                                      static_cast<int>(vhs.size()), vals.data()),
-                   "tag_set_data");
+    const int nv = static_cast<int>(vhs.size());
+
+    // Vertex coordinates (needed for exact solution evaluation)
+    std::vector<double> xyz(3 * nv);
+    util::mb_check(core.get_coords(vhs.data(), nv, xyz.data()), "write:get_coords");
+
+    std::vector<double> sol_vals(nv), exact_vals(nv), err_vals(nv);
+    for (int i = 0; i < nv; ++i) {
+        const double uh  = x[dofs.vertex_dof(vhs[i])];
+        const double uex = mms.u(xyz[3*i], xyz[3*i+1], xyz[3*i+2]);
+        sol_vals  [i] = uh;
+        exact_vals[i] = uex;
+        err_vals  [i] = std::abs(uh - uex);
+    }
+
+    auto set_tag = [&](const char* name, const std::vector<double>& vals) {
+        moab::Tag tag;
+        util::mb_check(core.tag_get_handle(name, 1, moab::MB_TYPE_DOUBLE, tag,
+                                            moab::MB_TAG_CREAT | moab::MB_TAG_DENSE),
+                       "tag_get_handle");
+        util::mb_check(core.tag_set_data(tag, vhs.data(), nv, vals.data()),
+                       "tag_set_data");
+    };
+    set_tag("Solution",       sol_vals);
+    set_tag("ExactSolution",  exact_vals);
+    set_tag("PointwiseError", err_vals);
+
     const std::string out = out_base + "_solution.vtk";
     util::mb_check(core.write_file(out.c_str()), "write_file");
 }
@@ -1007,7 +1025,7 @@ static fem::ErrorMetrics run_level(const fem::MoabMeshView& mesh,
               << "  |H1-semi|=" << em.H1semi << "\n";
 
     if (!vtk_base.empty()) {
-        fem::write_solution(mesh, cgdofs, x, vtk_base);
+        fem::write_solution(mesh, cgdofs, x, mms, vtk_base);
         std::cout << "  Wrote: " << vtk_base << "_solution.vtk\n";
     }
     return em;

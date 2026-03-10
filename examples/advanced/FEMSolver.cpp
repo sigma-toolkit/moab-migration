@@ -4,14 +4,21 @@
  *       Filename:  FEMSolver.cpp
  *
  *    Description:  FEM Poisson solver for arbitrary 2D meshes:
- *                  triangles (P1), quads (Q1), polygons (fan-tri from vertex 0),
+ *                  triangles (P1), quads (Q1), polygons (centroid-condensed P1),
  *                  embedded flat or on a sphere (Laplace-Beltrami).
  *                  Geometry auto-detected from vertex positions.
  *                  MMS verification: sin(pi x)sin(pi y) for flat,
  *                                    Y1^0 = z/R for sphere.
+ *                  MOAB-native data management:
+ *                    GLOBAL_ID tag  — 1-based vertex global identifier
+ *                    LOCAL_ID  tag  — 0-based DOF index (DofManagerCGP1)
+ *                    IS_DIRICHLET / DIRICHLET_VALUE tags on vertices
+ *                    DIRICHLET_NODES meshset (ghost-exchange ready)
+ *                    Solution / ExactSolution / PointwiseError vertex tags
+ *                    ELEM_L2_ERROR element tag for error visualization
  *
- *        Version:  2.0
- *       Compiler:  g++ -std=c++20
+ *        Version:  3.0
+ *       Compiler:  g++ -std=c++14
  *
  *         Author:  Vijay S. Mahadevan (vijaysm), mahadevan@anl.gov
  *        Company:  Argonne National Lab
@@ -27,7 +34,6 @@
 #include <memory>
 #include <vector>
 #include <array>
-#include <unordered_map>
 #include <map>
 #include <string>
 #include <stdexcept>
@@ -40,6 +46,7 @@
 
 #include "moab/Core.hpp"
 #include "moab/Range.hpp"
+#include "moab/MeshTopoUtil.hpp"
 
 // ─────────────────────────────────────────────────────────────────────────────
 namespace util {
@@ -200,6 +207,14 @@ public:
     const moab::Range& elements() const { return elems_; }
     const moab::Range& vertices()  const { return verts_; }
     const moab::Range& edges()     const { return edges_; }
+    moab::Tag           global_id_tag() const { return gid_tag_; }
+
+    // Returns the GLOBAL_ID for a single vertex (1-based, as MOAB convention)
+    int global_id(moab::EntityHandle vh) const {
+        int gid = -1;
+        core_->tag_get_data(gid_tag_, &vh, 1, &gid);
+        return gid;
+    }
 
     moab::EntityType elem_type(moab::EntityHandle e) const {
         return core_->type_from_handle(e);
@@ -243,10 +258,43 @@ private:
         // Create edge adjacencies if missing, then retrieve all edges
         util::mb_check(core_->get_adjacencies(elems_, 1, true, edges_,
                                                moab::Interface::UNION), "get_edges");
+        setup_global_ids();
+    }
+
+    // Ensure every vertex has a GLOBAL_ID tag.  HDF5 meshes already have one;
+    // for VTK and other formats MOAB may not set it, so we assign 1-based
+    // sequential IDs ordered by entity handle.
+    void setup_global_ids() {
+        const int def = 0;
+        moab::ErrorCode rc = core_->tag_get_handle(
+            "GLOBAL_ID", 1, moab::MB_TYPE_INTEGER, gid_tag_);
+        if (rc != moab::MB_SUCCESS || gid_tag_ == 0) {
+            // Tag absent: create it
+            util::mb_check(
+                core_->tag_get_handle("GLOBAL_ID", 1, moab::MB_TYPE_INTEGER, gid_tag_,
+                                      moab::MB_TAG_DENSE | moab::MB_TAG_CREAT, &def),
+                "create GLOBAL_ID tag");
+        }
+        // Check if vertices already have IDs (HDF5 case)
+        bool needs_init = false;
+        if (!verts_.empty()) {
+            int sample = 0;
+            core_->tag_get_data(gid_tag_, &*verts_.begin(), 1, &sample);
+            needs_init = (sample == 0);
+        }
+        if (needs_init) {
+            int idx = 1; // 1-based
+            for (moab::EntityHandle vh : verts_) {
+                util::mb_check(core_->tag_set_data(gid_tag_, &vh, 1, &idx),
+                               "set GLOBAL_ID");
+                ++idx;
+            }
+        }
     }
 
     std::unique_ptr<moab::Core> core_;
     moab::Range verts_, elems_, edges_;
+    moab::Tag   gid_tag_ = 0;
 };
 
 // =============================================================================
@@ -547,33 +595,66 @@ struct MMSSphere : MMSBase {
 // =============================================================================
 //  DOF manager (vertex-based CG, works for any element type)
 // =============================================================================
+// =============================================================================
+//  DOF manager  —  CG P1: one DOF per vertex
+//  Uses a MOAB dense integer tag "LOCAL_ID" (0-based) on vertices so that
+//  DOF indices live natively in the mesh database.  This is the foundation
+//  for future MPI-parallel assembly: the same tag can be ghost-exchanged via
+//  MOAB's parallel communicator to give remote processors their ghost DOF
+//  indices without any additional bookkeeping.
+// =============================================================================
 class DofManagerCGP1 {
 public:
     explicit DofManagerCGP1(const MoabMeshView& mesh) : mesh_(mesh) {
+        moab::Core& core = mesh_.core();
+        const int def = -1;
+        // Create (or retrieve) a dense integer tag "LOCAL_ID" on all vertices.
+        // Using MB_TAG_DENSE ensures every vertex always has a value; default -1
+        // makes uninitialized entries detectable.
+        util::mb_check(
+            core.tag_get_handle("LOCAL_ID", 1, moab::MB_TYPE_INTEGER, local_id_tag_,
+                                moab::MB_TAG_DENSE | moab::MB_TAG_CREAT, &def),
+            "create LOCAL_ID tag");
+
+        // Assign sequential 0-based DOF indices in Range order (deterministic,
+        // matches entity-handle ordering which is stable for a given Core).
         int idx = 0;
-        for (moab::EntityHandle vh : mesh_.vertices())
-            v2dof_[vh] = idx++;
+        for (moab::EntityHandle vh : mesh_.vertices()) {
+            util::mb_check(core.tag_set_data(local_id_tag_, &vh, 1, &idx),
+                           "set LOCAL_ID");
+            ++idx;
+        }
         ndofs_ = idx;
     }
-    int ndofs() const { return ndofs_; }
 
+    int      ndofs()         const { return ndofs_; }
+    moab::Tag local_id_tag() const { return local_id_tag_; }
+
+    // Single-vertex DOF lookup — reads tag from MOAB Core.
     int vertex_dof(moab::EntityHandle vh) const {
-        auto it = v2dof_.find(vh);
-        if (it == v2dof_.end())
-            throw std::runtime_error("Vertex handle not mapped to DOF");
-        return it->second;
+        int dof = -1;
+        util::mb_check(mesh_.core().tag_get_data(local_id_tag_, &vh, 1, &dof),
+                       "vertex_dof");
+        return dof;
     }
+
+    // Element DOFs — batch tag read on all connectivity handles in one call,
+    // which is significantly faster than N individual tag lookups for large
+    // meshes and avoids hash-map overhead entirely.
     std::vector<int> elem_dofs(moab::EntityHandle e) const {
         const auto conn = mesh_.elem_connectivity(e);
-        std::vector<int> d;
-        d.reserve(conn.size());
-        for (auto vh : conn) d.push_back(vertex_dof(vh));
+        std::vector<int> d(conn.size(), -1);
+        util::mb_check(
+            mesh_.core().tag_get_data(local_id_tag_, conn.data(),
+                                      static_cast<int>(conn.size()), d.data()),
+            "elem_dofs");
         return d;
     }
+
 private:
     const MoabMeshView& mesh_;
-    std::unordered_map<moab::EntityHandle,int> v2dof_;
-    int ndofs_{};
+    moab::Tag           local_id_tag_ = 0;
+    int                 ndofs_{};
 };
 
 // =============================================================================
@@ -826,6 +907,13 @@ private:
 
 // =============================================================================
 //  Dirichlet BC setup — geometry-aware
+//  Persists BC information in two MOAB tags on vertices:
+//    IS_DIRICHLET   (int,    dense, default 0)  — 1 for Dirichlet nodes
+//    DIRICHLET_VALUE(double, dense, default 0.0) — prescribed value
+//  Also creates (or replaces) a meshset "DIRICHLET_NODES" containing exactly
+//  the Dirichlet vertices, ready for ghost exchange in a future parallel run.
+//  The out-parameters is_bc / gvals are LOCAL_ID-indexed arrays for immediate
+//  use in apply_dirichlet_strong(); they are derived from the tags.
 // =============================================================================
 static void build_dirichlet(const MoabMeshView& mesh,
                              const DofManagerCGP1& dofs,
@@ -833,65 +921,148 @@ static void build_dirichlet(const MoabMeshView& mesh,
                              GeometryType gtype,
                              std::vector<char>& is_bc,
                              std::vector<double>& gvals) {
+    moab::Core& core = mesh.core();
     const int N = dofs.ndofs();
-    is_bc.assign(static_cast<std::size_t>(N), 0);
-    gvals.assign(static_cast<std::size_t>(N), 0.0);
 
+    // ── Create (or get) IS_DIRICHLET and DIRICHLET_VALUE tags ──────────────
+    moab::Tag is_dir_tag, dir_val_tag;
+    const int    def_int = 0;
+    const double def_dbl = 0.0;
+    util::mb_check(
+        core.tag_get_handle("IS_DIRICHLET", 1, moab::MB_TYPE_INTEGER, is_dir_tag,
+                            moab::MB_TAG_DENSE | moab::MB_TAG_CREAT, &def_int),
+        "IS_DIRICHLET tag");
+    util::mb_check(
+        core.tag_get_handle("DIRICHLET_VALUE", 1, moab::MB_TYPE_DOUBLE, dir_val_tag,
+                            moab::MB_TAG_DENSE | moab::MB_TAG_CREAT, &def_dbl),
+        "DIRICHLET_VALUE tag");
+
+    // Reset tags to defaults on all vertices (ensures a clean state at each level)
+    {
+        std::vector<moab::EntityHandle> vhs(mesh.vertices().begin(),
+                                             mesh.vertices().end());
+        std::vector<int>    zeros(vhs.size(), 0);
+        std::vector<double> zerods(vhs.size(), 0.0);
+        core.tag_set_data(is_dir_tag,  vhs.data(), static_cast<int>(vhs.size()), zeros.data());
+        core.tag_set_data(dir_val_tag, vhs.data(), static_cast<int>(vhs.size()), zerods.data());
+    }
+
+    // ── Helper: mark one vertex as Dirichlet via tags ───────────────────────
+    auto mark_bc_vertex = [&](moab::EntityHandle vh, double val) {
+        const int one = 1;
+        core.tag_set_data(is_dir_tag,  &vh, 1, &one);
+        core.tag_set_data(dir_val_tag, &vh, 1, &val);
+    };
+
+    // ── Determine which vertices are Dirichlet ───────────────────────────────
     if (gtype == GeometryType::SPHERE) {
-        // Check whether this is a closed sphere (no physical boundary) or an open
-        // regional mesh (has boundary edges).  MPAS-style meshes are regional: they
-        // are classified as SPHERE based on vertex radii but have a cut boundary.
         const moab::Range bnd = mesh.boundary_edges();
         if (bnd.empty()) {
-            // Closed sphere — pin one DOF to remove the Laplace-Beltrami null space
+            // Closed sphere: pin one vertex to remove Laplace-Beltrami null space
             moab::EntityHandle vh = *mesh.vertices().begin();
             double xyz[3] = {};
-            util::mb_check(mesh.core().get_coords(&vh, 1, xyz), "sphere anchor coords");
-            const int d = dofs.vertex_dof(vh);
-            is_bc[static_cast<std::size_t>(d)] = 1;
-            gvals[static_cast<std::size_t>(d)] = mms.u(xyz[0], xyz[1], xyz[2]);
-            std::cout << "  [BC] Sphere: pinned DOF " << d
+            util::mb_check(core.get_coords(&vh, 1, xyz), "sphere anchor coords");
+            mark_bc_vertex(vh, mms.u(xyz[0], xyz[1], xyz[2]));
+            std::cout << "  [BC] Sphere: pinned DOF " << dofs.vertex_dof(vh)
                       << " to remove Laplace-Beltrami null space.\n";
-            return;
-        }
-        // Open (regional) sphere mesh: apply Dirichlet BCs on physical boundary
-        std::cout << "  [BC] Sphere with boundary: applying Dirichlet on "
-                  << bnd.size() << " boundary edges.\n";
-        // Fall through to the boundary-edge Dirichlet loop below
-    }
-
-    // Flat 2D, general manifold, or open sphere: Dirichlet on physical boundary edges
-    const moab::Range bnd = mesh.boundary_edges();
-    int marked = 0;
-    for (moab::EntityHandle e : bnd) {
-        const moab::EntityHandle* vhs = nullptr;
-        int nconn = 0;
-        util::mb_check(mesh.core().get_connectivity(e, vhs, nconn), "edge conn");
-        if (nconn != 2 || vhs == nullptr) continue;
-        double xyz[6] = {};
-        util::mb_check(mesh.core().get_coords(vhs, 2, xyz), "edge vcoords");
-        for (int k = 0; k < 2; ++k) {
-            const int d = dofs.vertex_dof(vhs[k]);
-            if (!is_bc[static_cast<std::size_t>(d)]) {
-                is_bc [static_cast<std::size_t>(d)] = 1;
-                gvals [static_cast<std::size_t>(d)] = mms.u(xyz[3*k], xyz[3*k+1], xyz[3*k+2]);
-                ++marked;
+        } else {
+            // Open (regional) sphere: Dirichlet on all physical boundary vertices
+            std::cout << "  [BC] Sphere with boundary: applying Dirichlet on "
+                      << bnd.size() << " boundary edges.\n";
+            for (moab::EntityHandle e : bnd) {
+                const moab::EntityHandle* vhs = nullptr; int nconn = 0;
+                util::mb_check(core.get_connectivity(e, vhs, nconn), "edge conn");
+                if (nconn != 2 || vhs == nullptr) continue;
+                double xyz[6] = {};
+                util::mb_check(core.get_coords(vhs, 2, xyz), "edge vcoords");
+                for (int k = 0; k < 2; ++k) {
+                    int flag = 0;
+                    core.tag_get_data(is_dir_tag, &vhs[k], 1, &flag);
+                    if (!flag)
+                        mark_bc_vertex(vhs[k], mms.u(xyz[3*k], xyz[3*k+1], xyz[3*k+2]));
+                }
             }
         }
+    } else {
+        // Flat 2D or general manifold: Dirichlet on all physical boundary vertices
+        const moab::Range bnd = mesh.boundary_edges();
+        int marked = 0;
+        for (moab::EntityHandle e : bnd) {
+            const moab::EntityHandle* vhs = nullptr; int nconn = 0;
+            util::mb_check(core.get_connectivity(e, vhs, nconn), "edge conn");
+            if (nconn != 2 || vhs == nullptr) continue;
+            double xyz[6] = {};
+            util::mb_check(core.get_coords(vhs, 2, xyz), "edge vcoords");
+            for (int k = 0; k < 2; ++k) {
+                int flag = 0;
+                core.tag_get_data(is_dir_tag, &vhs[k], 1, &flag);
+                if (!flag) {
+                    mark_bc_vertex(vhs[k], mms.u(xyz[3*k], xyz[3*k+1], xyz[3*k+2]));
+                    ++marked;
+                }
+            }
+        }
+        if (marked == 0) {
+            moab::EntityHandle vh = *mesh.vertices().begin();
+            double xyz[3] = {};
+            util::mb_check(core.get_coords(&vh, 1, xyz), "anchor coords");
+            mark_bc_vertex(vh, mms.u(xyz[0], xyz[1], xyz[2]));
+            std::cerr << "Warning: no boundary detected; anchored DOF "
+                      << dofs.vertex_dof(vh) << ".\n";
+        }
     }
-    if (marked == 0) {
-        moab::EntityHandle vh = *mesh.vertices().begin();
-        double xyz[3] = {};
-        util::mb_check(mesh.core().get_coords(&vh, 1, xyz), "anchor coords");
-        const int d = dofs.vertex_dof(vh);
-        is_bc [static_cast<std::size_t>(d)] = 1;
-        gvals [static_cast<std::size_t>(d)] = mms.u(xyz[0], xyz[1], xyz[2]);
-        std::cerr << "Warning: no boundary detected; anchored DOF " << d << ".\n";
+
+    // ── Build DIRICHLET_NODES meshset (for ghost exchange in parallel) ───────
+    // Delete old set if it exists, then create a fresh one.
+    {
+        moab::Tag set_tag;
+        if (core.tag_get_handle("DIRICHLET_NODES_SET_HANDLE", 1,
+                                moab::MB_TYPE_HANDLE, set_tag) == moab::MB_SUCCESS) {
+            moab::EntityHandle old_set = 0;
+            core.tag_get_data(set_tag, NULL, 0, &old_set);
+            if (old_set) core.delete_entities(&old_set, 1);
+        }
+    }
+    moab::EntityHandle bc_meshset;
+    util::mb_check(core.create_meshset(moab::MESHSET_SET, bc_meshset),
+                   "create DIRICHLET_NODES meshset");
+    // Collect Dirichlet vertices by scanning the tag
+    for (moab::EntityHandle vh : mesh.vertices()) {
+        int flag = 0;
+        core.tag_get_data(is_dir_tag, &vh, 1, &flag);
+        if (flag) core.add_entities(bc_meshset, &vh, 1);
+    }
+    // Store the meshset handle in a tag so it can be retrieved later
+    moab::Tag set_handle_tag;
+    const moab::EntityHandle def_handle = 0;
+    util::mb_check(
+        core.tag_get_handle("DIRICHLET_NODES_SET_HANDLE", 1, moab::MB_TYPE_HANDLE,
+                            set_handle_tag,
+                            moab::MB_TAG_MESH | moab::MB_TAG_CREAT, &def_handle),
+        "DIRICHLET_NODES_SET_HANDLE tag");
+    util::mb_check(core.tag_set_data(set_handle_tag, NULL, 0, &bc_meshset),
+                   "store bc_meshset handle");
+
+    // ── Derive LOCAL_ID-indexed arrays for the linear-algebra layer ──────────
+    is_bc.assign(static_cast<std::size_t>(N), 0);
+    gvals.assign(static_cast<std::size_t>(N), 0.0);
+    for (moab::EntityHandle vh : mesh.vertices()) {
+        int flag = 0;  double val = 0.0;
+        core.tag_get_data(is_dir_tag,  &vh, 1, &flag);
+        core.tag_get_data(dir_val_tag, &vh, 1, &val);
+        if (flag) {
+            const int d = dofs.vertex_dof(vh);
+            is_bc [static_cast<std::size_t>(d)] = 1;
+            gvals [static_cast<std::size_t>(d)] = val;
+        }
     }
 }
 
 // =============================================================================
 //  Error computation (L2 and H1-seminorm)
+//  Also stores the per-element L2-error contribution in a MOAB tag
+//  "ELEM_L2_ERROR" (dense double) on the 2D elements, which can be loaded
+//  into ParaView to visualize where the solution error is concentrated.
 // =============================================================================
 struct ErrorMetrics { double L2{}, H1semi{}, h{}; };
 
@@ -900,6 +1071,16 @@ static ErrorMetrics compute_errors(const MoabMeshView& mesh,
                                     const Eigen::VectorXd& x,
                                     const MMSBase& mms,
                                     const GeomInfo& ginfo = GeomInfo{GeometryType::FLAT_2D,1.0}) {
+    moab::Core& core = mesh.core();
+
+    // Create (or get) element-wise L2 error tag for visualization
+    moab::Tag elem_err_tag;
+    const double def_err = 0.0;
+    util::mb_check(
+        core.tag_get_handle("ELEM_L2_ERROR", 1, moab::MB_TYPE_DOUBLE, elem_err_tag,
+                            moab::MB_TAG_DENSE | moab::MB_TAG_CREAT, &def_err),
+        "ELEM_L2_ERROR tag");
+
     double L2sq = 0.0, H1sq = 0.0, sum_h = 0.0;
     int count = 0;
 
@@ -909,6 +1090,7 @@ static ErrorMetrics compute_errors(const MoabMeshView& mesh,
 
     for (moab::EntityHandle e : mesh.elements()) {
         const moab::EntityType et = mesh.elem_type(e);
+        double elem_L2sq = 0.0;
 
         if (et == moab::MBTRI) {
             const auto X     = mesh.elem_coords(e);
@@ -917,7 +1099,6 @@ static ErrorMetrics compute_errors(const MoabMeshView& mesh,
             uh << x[gdofs[0]], x[gdofs[1]], x[gdofs[2]];
 
             const SurfJac jac = make_surf_jac(X[1]-X[0], X[2]-X[0]);
-            // P1: gradient is constant over the element
             Eigen::Vector3d grad_uh = Eigen::Vector3d::Zero();
             for (int i = 0; i < 3; ++i)
                 grad_uh += uh[i] * surf_grad(jac, dphi_tri.row(i).transpose());
@@ -927,9 +1108,9 @@ static ErrorMetrics compute_errors(const MoabMeshView& mesh,
                 const Eigen::Vector3d xq = X[0] + jac.J * gp.xi;
                 const double uex = mms.u(xq[0], xq[1], xq[2]);
                 const double uhq = uh.dot(TriP1Basis::eval_phi(gp.xi));
-                L2sq += (uex - uhq)*(uex - uhq) * dV;
+                elem_L2sq += (uex - uhq)*(uex - uhq) * dV;
             }
-            // H1: midpoint approximation for exact gradient (constant grad_uh)
+            L2sq += elem_L2sq;
             const Eigen::Vector3d xmid = (X[0]+X[1]+X[2]) / 3.0;
             H1sq += (mms.grad(xmid[0],xmid[1],xmid[2]) - grad_uh).squaredNorm()
                      * (0.5 * jac.sqrtDetG);
@@ -958,12 +1139,13 @@ static ErrorMetrics compute_errors(const MoabMeshView& mesh,
                 const double dV   = gp.w * jac.sqrtDetG;
                 const double uex  = mms.u(xq[0], xq[1], xq[2]);
                 const double uhq  = uh.dot(phi);
-                L2sq += (uex - uhq)*(uex - uhq) * dV;
+                elem_L2sq += (uex - uhq)*(uex - uhq) * dV;
                 Eigen::Vector3d grad_uh = Eigen::Vector3d::Zero();
                 for (int i = 0; i < 4; ++i)
                     grad_uh += uh(i) * surf_grad(jac, dphi.row(i).transpose());
                 H1sq += (mms.grad(xq[0],xq[1],xq[2]) - grad_uh).squaredNorm() * dV;
             }
+            L2sq += elem_L2sq;
             sum_h += std::max({(X[1]-X[0]).norm(),(X[2]-X[1]).norm(),
                                (X[3]-X[2]).norm(),(X[0]-X[3]).norm()});
             ++count;
@@ -974,7 +1156,6 @@ static ErrorMetrics compute_errors(const MoabMeshView& mesh,
             const int  n     = static_cast<int>(X.size());
             if (n < 3) continue;
 
-            // Centroid (mirror of assembly)
             Eigen::Vector3d cpos = Eigen::Vector3d::Zero();
             for (const auto& xi : X) cpos += xi;
             cpos /= static_cast<double>(n);
@@ -982,12 +1163,12 @@ static ErrorMetrics compute_errors(const MoabMeshView& mesh,
                 const double r = cpos.norm();
                 if (r > 1e-12) cpos *= ginfo.sphere_radius / r;
             }
-            // Approximate u_h at centroid as mean of vertex values
             double uh_c = 0.0;
             for (int k = 0; k < n; ++k) uh_c += x[gdofs[k]];
             uh_c /= static_cast<double>(n);
 
-            double h_poly = 0.0;
+            double h_poly    = 0.0;
+            double poly_L2sq = 0.0; // accumulate polygon's own L2sq for tag
             for (int k = 0; k < n; ++k) {
                 const int kp1 = (k + 1) % n;
                 const std::array<Eigen::Vector3d,3> Xs = {cpos, X[k], X[kp1]};
@@ -999,13 +1180,16 @@ static ErrorMetrics compute_errors(const MoabMeshView& mesh,
                 for (int i = 0; i < 3; ++i)
                     grad_uh += uh[i] * surf_grad(jac, dphi_tri.row(i).transpose());
 
+                double subtri_L2sq = 0.0;
                 for (const auto& gp : qr_tri) {
                     const double dV  = gp.w * 0.5 * jac.sqrtDetG;
                     const Eigen::Vector3d xq = Xs[0] + jac.J * gp.xi;
                     const double uex = mms.u(xq[0], xq[1], xq[2]);
                     const double uhq = uh.dot(TriP1Basis::eval_phi(gp.xi));
-                    L2sq += (uex - uhq)*(uex - uhq) * dV;
+                    subtri_L2sq += (uex - uhq)*(uex - uhq) * dV;
                 }
+                poly_L2sq += subtri_L2sq;
+                L2sq      += subtri_L2sq;
                 const Eigen::Vector3d xmid = (Xs[0]+Xs[1]+Xs[2]) / 3.0;
                 H1sq += (mms.grad(xmid[0],xmid[1],xmid[2]) - grad_uh).squaredNorm()
                          * (0.5 * jac.sqrtDetG);
@@ -1014,6 +1198,18 @@ static ErrorMetrics compute_errors(const MoabMeshView& mesh,
             }
             sum_h += h_poly;
             ++count;
+            // Set per-element L2 error tag for polygon elements
+            {
+                const double eL2 = std::sqrt(poly_L2sq);
+                core.tag_set_data(elem_err_tag, &e, 1, &eL2);
+            }
+            elem_L2sq = 0.0; // reset (unused in polygon path beyond this point)
+        }
+
+        // Store per-element L2 error contribution (sqrt) in MOAB tag
+        if (et == moab::MBTRI || et == moab::MBQUAD) {
+            const double eL2 = std::sqrt(elem_L2sq);
+            core.tag_set_data(elem_err_tag, &e, 1, &eL2);
         }
     }
     ErrorMetrics em;
@@ -1040,45 +1236,56 @@ static double compute_rate(const std::vector<double>& hs,
 }
 
 // =============================================================================
-//  Write solution tag and VTK export
+//  Solution tag storage and VTK export
 // =============================================================================
-static void write_solution(const MoabMeshView& mesh,
-                            const DofManagerCGP1& dofs,
-                            const Eigen::VectorXd& x,
-                            const MMSBase& mms,
-                            const std::string& out_base) {
+
+// Store the FEM solution, exact MMS solution, and pointwise error as MOAB
+// dense tags on every mesh vertex immediately after the linear solve.
+// Having this data in MOAB tags means it is:
+//   (a) accessible from any downstream code without passing Eigen vectors, and
+//   (b) ready for ghost exchange once MOAB parallel comm is in place.
+static void store_solution_tags(const MoabMeshView& mesh,
+                                 const DofManagerCGP1& dofs,
+                                 const Eigen::VectorXd& x,
+                                 const MMSBase& mms) {
     moab::Core& core = mesh.core();
-    std::vector<moab::EntityHandle> vhs(mesh.vertices().begin(), mesh.vertices().end());
+    std::vector<moab::EntityHandle> vhs(mesh.vertices().begin(),
+                                         mesh.vertices().end());
     const int nv = static_cast<int>(vhs.size());
 
-    // Vertex coordinates (needed for exact solution evaluation)
     std::vector<double> xyz(3 * nv);
-    util::mb_check(core.get_coords(vhs.data(), nv, xyz.data()), "write:get_coords");
+    util::mb_check(core.get_coords(vhs.data(), nv, xyz.data()), "store_tags:coords");
 
-    std::vector<double> sol_vals(nv), exact_vals(nv), err_vals(nv);
+    std::vector<double> sol(nv), exact(nv), err(nv);
     for (int i = 0; i < nv; ++i) {
         const double uh  = x[dofs.vertex_dof(vhs[i])];
         const double uex = mms.u(xyz[3*i], xyz[3*i+1], xyz[3*i+2]);
-        sol_vals  [i] = uh;
-        exact_vals[i] = uex;
-        err_vals  [i] = std::abs(uh - uex);
+        sol  [i] = uh;
+        exact[i] = uex;
+        err  [i] = std::abs(uh - uex);
     }
 
+    const double def = 0.0;
     auto set_tag = [&](const char* name, const std::vector<double>& vals) {
         moab::Tag tag;
-        util::mb_check(core.tag_get_handle(name, 1, moab::MB_TYPE_DOUBLE, tag,
-                                            moab::MB_TAG_CREAT | moab::MB_TAG_DENSE),
-                       "tag_get_handle");
-        util::mb_check(core.tag_set_data(tag, vhs.data(), nv, vals.data()),
-                       "tag_set_data");
+        util::mb_check(
+            core.tag_get_handle(name, 1, moab::MB_TYPE_DOUBLE, tag,
+                                moab::MB_TAG_DENSE | moab::MB_TAG_CREAT, &def),
+            name);
+        util::mb_check(core.tag_set_data(tag, vhs.data(), nv, vals.data()), name);
     };
-    set_tag("Solution",       sol_vals);
-    set_tag("ExactSolution",  exact_vals);
-    set_tag("PointwiseError", err_vals);
+    set_tag("Solution",       sol);
+    set_tag("ExactSolution",  exact);
+    set_tag("PointwiseError", err);
+}
 
+// Write the mesh with all currently-set tags to a VTK file.
+// Only the 2D surface elements are exported (edges created for adjacency
+// queries are excluded so ParaView sees a proper 3D surface mesh).
+static void write_solution(const MoabMeshView& mesh,
+                            const std::string& out_base) {
+    moab::Core& core = mesh.core();
     const std::string out = out_base + "_solution.vtk";
-    // Write only the 2D surface elements (not the 1D edges created for adjacency
-    // queries, which would otherwise flood the VTK file with line segments).
     moab::EntityHandle eset;
     util::mb_check(core.create_meshset(moab::MESHSET_SET, eset), "create_meshset");
     util::mb_check(core.add_entities(eset, mesh.elements()), "add_entities");
@@ -1142,13 +1349,16 @@ static fem::ErrorMetrics run_level(const fem::MoabMeshView& mesh,
     }
     if (!solved) throw std::runtime_error("Linear solver failed");
 
+    // Store solution fields as MOAB tags on mesh vertices immediately after solve.
+    // compute_errors also stores ELEM_L2_ERROR on elements.
+    fem::store_solution_tags(mesh, cgdofs, x, mms);
     const auto em = fem::compute_errors(mesh, cgdofs, x, mms, ginfo);
     std::cout << "  h~" << em.h
               << "  |L2|=" << em.L2
               << "  |H1-semi|=" << em.H1semi << "\n";
 
     if (!vtk_base.empty()) {
-        fem::write_solution(mesh, cgdofs, x, mms, vtk_base);
+        fem::write_solution(mesh, vtk_base);
         std::cout << "  Wrote: " << vtk_base << "_solution.vtk\n";
     }
     return em;

@@ -1585,17 +1585,14 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             tl = tl_back;
         }
 
-        // set of row and col used on this task
+        // set of row used on this task
         std::set< int > rowSet;
-        std::set< int > colSet;
         // populate the sparsematrix, using rowMap and colMap
         int n = tl->get_n();
         for( int i = 0; i < n; i++ )
         {
             const int vecRowValue = tl->vi_wr[3 * i + 1];
-            const int vecColValue = tl->vi_wr[3 * i + 2];
             rowSet.insert( vecRowValue );
-            colSet.insert( vecColValue );
         }
         int index = 0;
         row_gdofmap.resize( rowSet.size() );
@@ -1605,14 +1602,15 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             rowMap[setIt]      = index++;
         }
         m_nTotDofs_Dest = index;
-        index           = 0;
-        col_gdofmap.resize( colSet.size() );
-        for( auto setIt : colSet )
+        // colMap: identity over the full nA range so every source DOF gets a valid column index,
+        // including DOFs that appear in no non-zero (they map to all-zero columns).
+        col_gdofmap.resize( nA );
+        for( int g = 0; g < nA; g++ )
         {
-            col_gdofmap[index] = setIt;
-            colMap[setIt]      = index++;
+            col_gdofmap[g] = g;
+            colMap[g]      = g;
         }
-        m_nTotDofs_SrcCov = index;
+        m_nTotDofs_SrcCov = nA;
 
         tripletList.reserve( n );
         for( int i = 0; i < n; i++ )
@@ -1627,16 +1625,13 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     else
 #endif
     {
-        // set of row and col used on this task
+        // set of row used on this task
         std::set< int > rowSet;
-        std::set< int > colSet;
         // populate the sparsematrix, using rowMap and colMap
         for( int i = 0; i < nS; i++ )
         {
             const int vecRowValue = vecRow[i] - 1;
-            const int vecColValue = vecCol[i] - 1;
             rowSet.insert( vecRowValue );
-            colSet.insert( vecColValue );
         }
 
         int index = 0;
@@ -1647,14 +1642,15 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             rowMap[setIt]      = index++;
         }
         m_nTotDofs_Dest = index;
-        index           = 0;
-        col_gdofmap.resize( colSet.size() );
-        for( auto setIt : colSet )
+        // colMap: identity over the full nA range so every source DOF gets a valid column index,
+        // including DOFs that appear in no non-zero (they map to all-zero columns).
+        col_gdofmap.resize( nA );
+        for( int g = 0; g < nA; g++ )
         {
-            col_gdofmap[index] = setIt;
-            colMap[setIt]      = index++;
+            col_gdofmap[g] = g;
+            colMap[g]      = g;
         }
-        m_nTotDofs_SrcCov = index;
+        m_nTotDofs_SrcCov = nA;
 
         tripletList.reserve( nS );
         for( int i = 0; i < nS; i++ )

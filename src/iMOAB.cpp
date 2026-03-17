@@ -5103,6 +5103,37 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
     weightMap->SetDestinationNDofsPerElement( tgt_elem_dof_length );
     weightMap->set_row_dc_dofs( tgtDofValues );  // will set row_dtoc_dofmap
 
+    // Diagnostic: report entity association and DoF mapping hit rates
+    {
+        int col_hits   = weightMap->count_col_dof_hits();
+        int col_total  = weightMap->col_dof_map_size();
+        int row_hits   = weightMap->count_row_dof_hits();
+        int row_total  = weightMap->row_dof_map_size();
+        std::cout << "[iMOAB_LoadMapFile] source_entity_type=" << *source_entity_type
+                  << " target_entity_type=" << *target_entity_type << "\n"
+                  << "  src_ents_of_interest.size()=" << src_ents_of_interest.size()
+                  << " tgt_ents_of_interest.size()=" << tgt_ents_of_interest.size() << "\n"
+                  << "  col_dtoc_dofmap: hits=" << col_hits << " misses=" << ( col_total - col_hits )
+                  << " total=" << col_total << "\n"
+                  << "  row_dtoc_dofmap: hits=" << row_hits << " misses=" << ( row_total - row_hits )
+                  << " total=" << row_total << "\n"
+                  << "  weightMatrix: " << weightMap->GetWeightMatrix().rows() << "x"
+                  << weightMap->GetWeightMatrix().cols() << " nnz="
+                  << weightMap->GetWeightMatrix().nonZeros() << "\n";
+        int nsamp = std::min( 5, (int)srcDofValues.size() );
+        std::cout << "  srcDofValues[0.." << nsamp - 1 << "]:";
+        for( int i = 0; i < nsamp; i++ ) std::cout << " " << srcDofValues[i];
+        std::cout << "\n  col_dtoc_dofmap[0.." << nsamp - 1 << "]:";
+        for( int i = 0; i < nsamp; i++ ) std::cout << " " << weightMap->get_col_dof_at( i );
+        std::cout << "\n";
+        nsamp = std::min( 5, (int)tgtDofValues.size() );
+        std::cout << "  tgtDofValues[0.." << nsamp - 1 << "]:";
+        for( int i = 0; i < nsamp; i++ ) std::cout << " " << tgtDofValues[i];
+        std::cout << "\n  row_dtoc_dofmap[0.." << nsamp - 1 << "]:";
+        for( int i = 0; i < nsamp; i++ ) std::cout << " " << weightMap->get_row_dof_at( i );
+        std::cout << "\n";
+    }
+
     /// @todo Ideally, we should get this metadata from remap_weights_filename and propagate it
     std::string metadataStr = std::string( remap_weights_filename ) + ";";
     metadataStr += ( *srctype == IMOAB_CGLL_DISCRETIZATION ? "CGLL" :

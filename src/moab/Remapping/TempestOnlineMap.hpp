@@ -472,6 +472,26 @@ class TempestOnlineMap : public OfflineMap
         m_meshInput = imesh;
     };
 
+    // Diagnostic accessors for DoF map debugging
+    int count_col_dof_hits() const
+    {
+        int hits = 0;
+        for( int v : col_dtoc_dofmap )
+            if( v >= 0 ) hits++;
+        return hits;
+    }
+    int count_row_dof_hits() const
+    {
+        int hits = 0;
+        for( int v : row_dtoc_dofmap )
+            if( v >= 0 ) hits++;
+        return hits;
+    }
+    int col_dof_map_size() const { return (int)col_dtoc_dofmap.size(); }
+    int row_dof_map_size() const { return (int)row_dtoc_dofmap.size(); }
+    int get_col_dof_at( int i ) const { return col_dtoc_dofmap[i]; }
+    int get_row_dof_at( int i ) const { return row_dtoc_dofmap[i]; }
+
   private:
     template < typename SparseMatrixType >
     void serializeSparseMatrix( const SparseMatrixType& mat, const std::string& filename );

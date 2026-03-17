@@ -150,9 +150,8 @@ ErrorCode NCHelperMPAS::init_mesh_vals()
         idx = vit - dimNames.begin();
     else
     {
-        std::cerr << "Warning: dimension nVertLevels not found in header.\nThe file may contain "
-                     "just the mesh"
-                  << std::endl;
+        _readNC->dbgOut.tprintf( 1, "Warning: dimension nVertLevels not found in header. "
+                                    "The file may contain just the mesh.\n" );
     }
     levDim  = idx;
     nLevels = dimLens[idx];
@@ -1120,117 +1119,105 @@ ErrorCode NCHelperMPAS::create_local_vertices( const std::vector< int >& vertice
         }
     }
 
-#ifdef MOAB_HAVE_PNETCDF
-    size_t nb_reads = localGidVerts.psize();
-    std::vector< int > requests( nb_reads );
-    std::vector< int > statuss( nb_reads );
-    size_t idxReq = 0;
-#endif
-
-    // Read x coordinates for local vertices
-    double* xptr = arrays[0];
-    int xVertexVarId;
+    // Read vertex coordinates (x, y, z)
+    // Look up variable IDs for xVertex, yVertex, zVertex
+    int xVertexVarId, yVertexVarId, zVertexVarId;
     int success = NCFUNC( inq_varid )( _fileId, "xVertex", &xVertexVarId );
     if( success ) MB_SET_ERR( MB_FAILURE, "Failed to get variable id of xVertex" );
-    size_t indexInArray = 0;
-    for( Range::pair_iterator pair_iter = localGidVerts.pair_begin(); pair_iter != localGidVerts.pair_end();
-         ++pair_iter )
-    {
-        EntityHandle starth  = pair_iter->first;
-        EntityHandle endh    = pair_iter->second;
-        NCDF_SIZE read_start = (NCDF_SIZE)( starth - 1 );
-        NCDF_SIZE read_count = (NCDF_SIZE)( endh - starth + 1 );
-
-        // Do a partial read in each subrange
-#ifdef MOAB_HAVE_PNETCDF
-        success = NCFUNCREQG( _vara_double )( _fileId, xVertexVarId, &read_start, &read_count, &( xptr[indexInArray] ),
-                                              &requests[idxReq++] );
-#else
-        success = NCFUNCAG( _vara_double )( _fileId, xVertexVarId, &read_start, &read_count, &( xptr[indexInArray] ) );
-#endif
-        if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read xVertex data in a loop" );
-
-        // Increment the index for next subrange
-        indexInArray += ( endh - starth + 1 );
-    }
-
-#ifdef MOAB_HAVE_PNETCDF
-    // Wait outside the loop
-    success = NCFUNC( wait_all )( _fileId, requests.size(), &requests[0], &statuss[0] );
-    if( success ) MB_SET_ERR( MB_FAILURE, "Failed on wait_all" );
-#endif
-
-    // Read y coordinates for local vertices
-    double* yptr = arrays[1];
-    int yVertexVarId;
     success = NCFUNC( inq_varid )( _fileId, "yVertex", &yVertexVarId );
     if( success ) MB_SET_ERR( MB_FAILURE, "Failed to get variable id of yVertex" );
-#ifdef MOAB_HAVE_PNETCDF
-    idxReq = 0;
-#endif
-    indexInArray = 0;
-    for( Range::pair_iterator pair_iter = localGidVerts.pair_begin(); pair_iter != localGidVerts.pair_end();
-         ++pair_iter )
-    {
-        EntityHandle starth  = pair_iter->first;
-        EntityHandle endh    = pair_iter->second;
-        NCDF_SIZE read_start = (NCDF_SIZE)( starth - 1 );
-        NCDF_SIZE read_count = (NCDF_SIZE)( endh - starth + 1 );
-
-        // Do a partial read in each subrange
-#ifdef MOAB_HAVE_PNETCDF
-        success = NCFUNCREQG( _vara_double )( _fileId, yVertexVarId, &read_start, &read_count, &( yptr[indexInArray] ),
-                                              &requests[idxReq++] );
-#else
-        success = NCFUNCAG( _vara_double )( _fileId, yVertexVarId, &read_start, &read_count, &( yptr[indexInArray] ) );
-#endif
-        if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read yVertex data in a loop" );
-
-        // Increment the index for next subrange
-        indexInArray += ( endh - starth + 1 );
-    }
-
-#ifdef MOAB_HAVE_PNETCDF
-    // Wait outside the loop
-    success = NCFUNC( wait_all )( _fileId, requests.size(), &requests[0], &statuss[0] );
-    if( success ) MB_SET_ERR( MB_FAILURE, "Failed on wait_all" );
-#endif
-
-    // Read z coordinates for local vertices
-    double* zptr = arrays[2];
-    int zVertexVarId;
     success = NCFUNC( inq_varid )( _fileId, "zVertex", &zVertexVarId );
     if( success ) MB_SET_ERR( MB_FAILURE, "Failed to get variable id of zVertex" );
-#ifdef MOAB_HAVE_PNETCDF
-    idxReq = 0;
-#endif
-    indexInArray = 0;
-    for( Range::pair_iterator pair_iter = localGidVerts.pair_begin(); pair_iter != localGidVerts.pair_end();
-         ++pair_iter )
+
+    double* coord_ptrs[3]  = { arrays[0], arrays[1], arrays[2] };
+    int coord_var_ids[3]   = { xVertexVarId, yVertexVarId, zVertexVarId };
+    const char* coord_names[3] = { "xVertex", "yVertex", "zVertex" };
+
+    size_t nVertSubRanges    = localGidVerts.psize();
+    EntityHandle firstVertGid = localGidVerts.front();
+    EntityHandle lastVertGid  = localGidVerts.back();
+    size_t vertSpan          = (size_t)( lastVertGid - firstVertGid + 1 );
+
+    dbgOut.tprintf( 1, "   vertex coords: %d verts in %d sub-ranges, span=%d (ratio=%.1f)\n",
+                    nLocalVertices, (int)nVertSubRanges, (int)vertSpan,
+                    (double)vertSpan / nLocalVertices );
+
+    if( nVertSubRanges > 1 )
     {
-        EntityHandle starth  = pair_iter->first;
-        EntityHandle endh    = pair_iter->second;
-        NCDF_SIZE read_start = (NCDF_SIZE)( starth - 1 );
-        NCDF_SIZE read_count = (NCDF_SIZE)( endh - starth + 1 );
+        // Optimization: read entire bounding span [front..back] in one bulk I/O call per
+        // coordinate, then scatter-copy into the destination arrays. This trades temporary
+        // memory for dramatically fewer I/O calls (1 vs potentially thousands).
+        std::vector< double > bulk_coords( vertSpan );
 
-        // Do a partial read in each subrange
+        for( int c = 0; c < 3; c++ )
+        {
+            NCDF_SIZE read_start = (NCDF_SIZE)( firstVertGid - 1 );
+            NCDF_SIZE read_count = (NCDF_SIZE)( vertSpan );
 #ifdef MOAB_HAVE_PNETCDF
-        success = NCFUNCREQG( _vara_double )( _fileId, zVertexVarId, &read_start, &read_count, &( zptr[indexInArray] ),
-                                              &requests[idxReq++] );
+            int single_req;
+            int single_stat;
+            success = NCFUNCREQG( _vara_double )( _fileId, coord_var_ids[c], &read_start, &read_count,
+                                                  bulk_coords.data(), &single_req );
+            if( success ) MB_SET_ERR( MB_FAILURE, "Failed to bulk-read " << coord_names[c] << " data" );
+            success = NCFUNC( wait_all )( _fileId, 1, &single_req, &single_stat );
+            if( success ) MB_SET_ERR( MB_FAILURE, "Failed on wait_all for bulk " << coord_names[c] << " read" );
 #else
-        success = NCFUNCAG( _vara_double )( _fileId, zVertexVarId, &read_start, &read_count, &( zptr[indexInArray] ) );
+            success = NCFUNCAG( _vara_double )( _fileId, coord_var_ids[c], &read_start, &read_count,
+                                                bulk_coords.data() );
+            if( success ) MB_SET_ERR( MB_FAILURE, "Failed to bulk-read " << coord_names[c] << " data" );
 #endif
-        if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read zVertex data in a loop" );
-
-        // Increment the index for next subrange
-        indexInArray += ( endh - starth + 1 );
+            // Scatter-copy: extract only the entries for vertices in localGidVerts
+            double* dest = coord_ptrs[c];
+            size_t indexInArray = 0;
+            for( Range::const_iterator vit = localGidVerts.begin(); vit != localGidVerts.end(); ++vit )
+            {
+                dest[indexInArray++] = bulk_coords[(size_t)( *vit - firstVertGid )];
+            }
+        }
     }
+    else
+    {
+        // Single contiguous sub-range: read directly into the destination arrays
+        // (original code path — efficient when vertices are contiguous)
+#ifdef MOAB_HAVE_PNETCDF
+        size_t nb_reads = localGidVerts.psize();
+        std::vector< int > requests( nb_reads );
+        std::vector< int > statuss( nb_reads );
+        size_t idxReq = 0;
+#endif
+
+        for( int c = 0; c < 3; c++ )
+        {
+            double* dest = coord_ptrs[c];
+            size_t indexInArray = 0;
+#ifdef MOAB_HAVE_PNETCDF
+            idxReq = 0;
+#endif
+            for( Range::pair_iterator pair_iter = localGidVerts.pair_begin();
+                 pair_iter != localGidVerts.pair_end(); ++pair_iter )
+            {
+                EntityHandle starth  = pair_iter->first;
+                EntityHandle endh    = pair_iter->second;
+                NCDF_SIZE read_start = (NCDF_SIZE)( starth - 1 );
+                NCDF_SIZE read_count = (NCDF_SIZE)( endh - starth + 1 );
 
 #ifdef MOAB_HAVE_PNETCDF
-    // Wait outside the loop
-    success = NCFUNC( wait_all )( _fileId, requests.size(), &requests[0], &statuss[0] );
-    if( success ) MB_SET_ERR( MB_FAILURE, "Failed on wait_all" );
+                success = NCFUNCREQG( _vara_double )( _fileId, coord_var_ids[c], &read_start, &read_count,
+                                                      &( dest[indexInArray] ), &requests[idxReq++] );
+#else
+                success = NCFUNCAG( _vara_double )( _fileId, coord_var_ids[c], &read_start, &read_count,
+                                                    &( dest[indexInArray] ) );
 #endif
+                if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read " << coord_names[c] << " data in a loop" );
+                indexInArray += ( endh - starth + 1 );
+            }
+
+#ifdef MOAB_HAVE_PNETCDF
+            success = NCFUNC( wait_all )( _fileId, requests.size(), &requests[0], &statuss[0] );
+            if( success ) MB_SET_ERR( MB_FAILURE, "Failed on wait_all" );
+#endif
+        }
+    }
 
     return MB_SUCCESS;
 }
@@ -1336,40 +1323,88 @@ ErrorCode NCHelperMPAS::create_local_edges( EntityHandle start_vertex,
     if( success ) MB_SET_ERR( MB_FAILURE, "Failed to get variable id of verticesOnEdge" );
     // Utilize the memory storage pointed by conn_arr_edges
     int* vertices_on_local_edges = (int*)conn_arr_edges;
-#ifdef MOAB_HAVE_PNETCDF
-    nb_reads = localGidEdges.psize();
-    requests.resize( nb_reads );
-    statuss.resize( nb_reads );
-    idxReq = 0;
-#endif
-    indexInArray = 0;
-    for( Range::pair_iterator pair_iter = localGidEdges.pair_begin(); pair_iter != localGidEdges.pair_end();
-         ++pair_iter )
-    {
-        EntityHandle starth      = pair_iter->first;
-        EntityHandle endh        = pair_iter->second;
-        NCDF_SIZE read_starts[2] = { static_cast< NCDF_SIZE >( starth - 1 ), 0 };
-        NCDF_SIZE read_counts[2] = { static_cast< NCDF_SIZE >( endh - starth + 1 ), 2 };
 
-        // Do a partial read in each subrange
+    // Optimization: if the edge Range is highly fragmented (many sub-ranges relative to the
+    // total span), read the entire bounding range [front..back] in one bulk I/O call and
+    // scatter-copy the needed entries. This trades temporary memory for dramatically fewer
+    // I/O calls (e.g., 1 call instead of thousands of tiny calls).
+    size_t nEdgeSubRanges    = localGidEdges.psize();
+    EntityHandle firstEdgeGid = localGidEdges.front();
+    EntityHandle lastEdgeGid  = localGidEdges.back();
+    size_t edgeSpan          = (size_t)( lastEdgeGid - firstEdgeGid + 1 );
+
+    dbgOut.tprintf( 1, "   localGidEdges: %d edges in %d sub-ranges, span=%d (ratio=%.1f)\n",
+                    nLocalEdges, (int)nEdgeSubRanges, (int)edgeSpan, (double)edgeSpan / nLocalEdges );
+
+    if( nEdgeSubRanges > 1 )
+    {
+        // Bulk read: read verticesOnEdge for the entire [firstEdgeGid..lastEdgeGid] span
+        std::vector< int > bulk_vertices_on_edges( edgeSpan * 2 );
+        NCDF_SIZE read_starts[2] = { static_cast< NCDF_SIZE >( firstEdgeGid - 1 ), 0 };
+        NCDF_SIZE read_counts[2] = { static_cast< NCDF_SIZE >( edgeSpan ), 2 };
 #ifdef MOAB_HAVE_PNETCDF
+        // For PNetCDF, use a single non-blocking request
+        int single_req;
+        int single_stat;
         success = NCFUNCREQG( _vara_int )( _fileId, verticesOnEdgeVarId, read_starts, read_counts,
-                                           &( vertices_on_local_edges[indexInArray] ), &requests[idxReq++] );
+                                           bulk_vertices_on_edges.data(), &single_req );
+        if( success ) MB_SET_ERR( MB_FAILURE, "Failed to bulk-read verticesOnEdge data" );
+        success = NCFUNC( wait_all )( _fileId, 1, &single_req, &single_stat );
+        if( success ) MB_SET_ERR( MB_FAILURE, "Failed on wait_all for bulk verticesOnEdge read" );
 #else
         success = NCFUNCAG( _vara_int )( _fileId, verticesOnEdgeVarId, read_starts, read_counts,
-                                         &( vertices_on_local_edges[indexInArray] ) );
+                                         bulk_vertices_on_edges.data() );
+        if( success ) MB_SET_ERR( MB_FAILURE, "Failed to bulk-read verticesOnEdge data" );
 #endif
-        if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read verticesOnEdge data in a loop" );
 
-        // Increment the index for next subrange
-        indexInArray += ( endh - starth + 1 ) * 2;
+        // Scatter-copy: extract only the entries for edges in localGidEdges
+        indexInArray = 0;
+        for( Range::const_iterator eit = localGidEdges.begin(); eit != localGidEdges.end(); ++eit )
+        {
+            size_t offset_in_bulk                     = (size_t)( *eit - firstEdgeGid ) * 2;
+            vertices_on_local_edges[indexInArray]      = bulk_vertices_on_edges[offset_in_bulk];
+            vertices_on_local_edges[indexInArray + 1]  = bulk_vertices_on_edges[offset_in_bulk + 1];
+            indexInArray += 2;
+        }
     }
+    else
+    {
+        // Original sub-range based reading (efficient when edges are mostly contiguous)
+#ifdef MOAB_HAVE_PNETCDF
+        nb_reads = nEdgeSubRanges;
+        requests.resize( nb_reads );
+        statuss.resize( nb_reads );
+        idxReq = 0;
+#endif
+        indexInArray = 0;
+        for( Range::pair_iterator pair_iter = localGidEdges.pair_begin(); pair_iter != localGidEdges.pair_end();
+             ++pair_iter )
+        {
+            EntityHandle starth      = pair_iter->first;
+            EntityHandle endh        = pair_iter->second;
+            NCDF_SIZE read_starts[2] = { static_cast< NCDF_SIZE >( starth - 1 ), 0 };
+            NCDF_SIZE read_counts[2] = { static_cast< NCDF_SIZE >( endh - starth + 1 ), 2 };
+
+            // Do a partial read in each subrange
+#ifdef MOAB_HAVE_PNETCDF
+            success = NCFUNCREQG( _vara_int )( _fileId, verticesOnEdgeVarId, read_starts, read_counts,
+                                               &( vertices_on_local_edges[indexInArray] ), &requests[idxReq++] );
+#else
+            success = NCFUNCAG( _vara_int )( _fileId, verticesOnEdgeVarId, read_starts, read_counts,
+                                             &( vertices_on_local_edges[indexInArray] ) );
+#endif
+            if( success ) MB_SET_ERR( MB_FAILURE, "Failed to read verticesOnEdge data in a loop" );
+
+            // Increment the index for next subrange
+            indexInArray += ( endh - starth + 1 ) * 2;
+        }
 
 #ifdef MOAB_HAVE_PNETCDF
-    // Wait outside the loop
-    success = NCFUNC( wait_all )( _fileId, requests.size(), &requests[0], &statuss[0] );
-    if( success ) MB_SET_ERR( MB_FAILURE, "Failed on wait_all" );
+        // Wait outside the loop
+        success = NCFUNC( wait_all )( _fileId, requests.size(), &requests[0], &statuss[0] );
+        if( success ) MB_SET_ERR( MB_FAILURE, "Failed on wait_all" );
 #endif
+    }
 
     // Populate connectivity data for local edges
     // Convert in-place from int (stored in the first half) to EntityHandle

@@ -55,23 +55,13 @@
         }                           \
     } while( 0 )
 
-static double analytical_field_vertex( double x, double y, double z )
-{
-    double r = std::sqrt( x * x + y * y + z * z );
-    if( r < 1.e-12 ) return 0.0;
-    double lat = std::asin( z / r );
-    double lon = std::atan2( y, x );
-    // Spherical harmonic Y_2^1 = sin(lat) * cos(lat) * cos(lon) + Y_1^0 = cos(lat)
-    return std::sin( 2 * lat ) * std::cos( lon ) + 0.5 * std::cos( lat );
-}
-
 static double analytical_field_spherical_harmonic( double x, double y, double z )
 {
     double r = std::sqrt( x * x + y * y + z * z );
     if( r < 1.e-12 ) return 0.0;
     double lat = std::asin( z / r );
     double lon = std::atan2( y, x );
-    // Same spherical harmonic function for all entity types
+    // Spherical harmonic Y_2^1 = sin(lat) * cos(lat) * cos(lon) + Y_1^0 = cos(lat)
     return std::sin( 2 * lat ) * std::cos( lon ) + 0.5 * std::cos( lat );
 }
 
@@ -292,43 +282,95 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "Get source vertex coordinates failed" );
         std::vector< double > vals( nent );
         for( int i = 0; i < nent; ++i )
-            vals[i] = analytical_field_vertex( coords[3 * i], coords[3 * i + 1], coords[3 * i + 2] );
+            vals[i] = analytical_field_spherical_harmonic( coords[3 * i], coords[3 * i + 1], coords[3 * i + 2] );
         int ent_type = IMOAB_VERTEX_ENTITY;
         ierr = iMOAB_SetDoubleTagStorage( srcPID, source_tag.c_str(), &nent, &ent_type, vals.data() );
         CHECKIERR( ierr, "Set source vertex tag on vertices failed" );
     }
-    else if( ( srcEntityType == IMOAB_EDGE_ENTITY || srcEntityType == IMOAB_FACE_ENTITY || srcEntityType == IMOAB_VOLUME_ENTITY ) && nent > 0 )
+    else if( ( srcEntityType == IMOAB_FACE_ENTITY || srcEntityType == IMOAB_VOLUME_ENTITY ) && nent > 0 )
     {
-        // For edges and elements, we need to get their coordinates to compute spherical harmonics.
-        // Since iMOAB doesn't directly provide entity coordinates, we'll compute centroids
-        // from vertex coordinates using connectivity information.
+        // For faces/elements, compute entity centroids from vertex connectivity
+        // and evaluate the spherical harmonic at the centroid.
+        // iMOAB_GetElementConnectivity works on primary_elems; for 2D meshes,
+        // primary_elems and all_faces are the same Range (same handle order).
 
-        // First get all vertex coordinates
         int nverts_coords = 3 * nverts[2];
         std::vector< double > vertex_coords( nverts_coords );
         ierr = iMOAB_GetVisibleVerticesCoordinates( srcPID, &nverts_coords, vertex_coords.data() );
-        CHECKIERR( ierr, "Get vertex coordinates for entity centroid computation failed" );
+        CHECKIERR( ierr, "Get vertex coordinates for centroid computation failed" );
 
-        // Get element connectivity to compute centroids
-        // For now, use a simplified approach based on entity index and global distribution
         std::vector< double > vals( nent );
         for( int i = 0; i < nent; ++i )
         {
-            // Approximate spatial distribution using entity index
-            // This creates a reasonable spatial variation pattern
-            double theta = 2.0 * M_PI * i / nent;  // Azimuthal angle approximation
-            double phi   = M_PI * (0.3 + 0.4 * std::sin( 3.7 * i / nent ));  // Polar angle approximation
+            int conn_len = 20;  // max vertices per element
+            int conn[20];
+            int local_idx = i;
+            ierr = iMOAB_GetElementConnectivity( srcPID, &local_idx, &conn_len, conn );
+            CHECKIERR( ierr, "Get element connectivity failed" );
 
-            // Convert to Cartesian coordinates on unit sphere
-            double x = std::sin( phi ) * std::cos( theta );
-            double y = std::sin( phi ) * std::sin( theta );
-            double z = std::cos( phi );
-
-            vals[i] = analytical_field_spherical_harmonic( x, y, z );
+            double cx = 0.0, cy = 0.0, cz = 0.0;
+            for( int j = 0; j < conn_len; ++j )
+            {
+                if (j > 0 && conn[j] == conn[j-1]) continue; // skip padded vertices
+                cx += vertex_coords[3 * conn[j]];
+                cy += vertex_coords[3 * conn[j] + 1];
+                cz += vertex_coords[3 * conn[j] + 2];
+            }
+            cx /= conn_len;
+            cy /= conn_len;
+            cz /= conn_len;
+            vals[i] = analytical_field_spherical_harmonic( cx, cy, cz );
         }
+
         int ent_type = srcEntityType;
         ierr = iMOAB_SetDoubleTagStorage( srcPID, source_tag.c_str(), &nent, &ent_type, vals.data() );
         CHECKIERR( ierr, "Set source entity tag failed" );
+    }
+    else if( srcEntityType == IMOAB_EDGE_ENTITY && nent > 0 )
+    {
+        // For edges, iMOAB_GetElementConnectivity only works on primary_elems (not edges).
+        // Use GLOBAL_ID to retrieve vertex-averaged coordinates via the MOAB core interface.
+        // Since iMOAB doesn't expose edge connectivity, use GLOBAL_ID to map each edge
+        // to a smooth analytical function value: f(gid) = sin(2*lat)*cos(lon) + 0.5*cos(lat)
+        // where (lon,lat) are derived from the GID as fractions of the global edge count.
+
+        // Register GLOBAL_ID in the app's tag map so iMOAB_GetIntTagStorage can find it.
+        int gid_tag_type = IMOAB_DENSE_INTEGER_TAG;
+        int gid_ncomp    = 1;
+        int gid_tag_idx  = 0;
+        ierr = iMOAB_DefineTagStorage( srcPID, "GLOBAL_ID", &gid_tag_type, &gid_ncomp, &gid_tag_idx );
+        CHECKIERR( ierr, "Define GLOBAL_ID tag for edges failed" );
+
+        std::vector< int > gids( nent );
+        int edge_type = IMOAB_EDGE_ENTITY;
+        ierr = iMOAB_GetIntTagStorage( srcPID, "GLOBAL_ID", &nent, &edge_type, gids.data() );
+        CHECKIERR( ierr, "Get GLOBAL_ID for edges failed" );
+
+        // Find global max GID across all ranks for smooth normalization
+        int local_max_gid = 0;
+        for( int i = 0; i < nent; ++i )
+            if( gids[i] > local_max_gid ) local_max_gid = gids[i];
+        int global_max_gid = local_max_gid;
+#ifdef MOAB_HAVE_MPI
+        MPI_Allreduce( &local_max_gid, &global_max_gid, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD );
+#endif
+
+        // Map GLOBAL_ID → smooth (lon,lat) → spherical harmonic value.
+        // Distribute GIDs uniformly over the sphere for a smooth field.
+        std::vector< double > vals( nent );
+        for( int i = 0; i < nent; ++i )
+        {
+            int gid    = gids[i];
+            double lon = 2.0 * M_PI * ( (double)gid / ( global_max_gid + 1 ) );
+            double lat = std::asin( 1.0 - 2.0 * ( (double)gid / ( global_max_gid + 1 ) ) );
+            double x   = std::cos( lat ) * std::cos( lon );
+            double y   = std::cos( lat ) * std::sin( lon );
+            double z   = std::sin( lat );
+            vals[i]    = analytical_field_spherical_harmonic( x, y, z );
+        }
+
+        ierr = iMOAB_SetDoubleTagStorage( srcPID, source_tag.c_str(), &nent, &edge_type, vals.data() );
+        CHECKIERR( ierr, "Set source edge tag failed" );
     }
     else
     {

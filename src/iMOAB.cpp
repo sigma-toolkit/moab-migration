@@ -4848,9 +4848,16 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
                            int* tgttype,
                            int* arearead,
                            const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
-                           const iMOAB_String remap_weights_filename )
+                           const iMOAB_String remap_weights_filename,
+                           int* source_entity_type,
+                           int* target_entity_type )
 {
     assert( srctype && tgttype );
+    IMOAB_CHECKPOINTER( arearead, 6 );
+    IMOAB_CHECKPOINTER( solution_weights_identifier, 7 );
+    IMOAB_CHECKPOINTER( remap_weights_filename, 8 );
+    IMOAB_CHECKPOINTER( source_entity_type, 9 );
+    IMOAB_CHECKPOINTER( target_entity_type, 10 );
 
     // get the local degrees of freedom, from the pid_cpl and type of mesh
     // Get the source and target data and pcomm objects
@@ -4892,6 +4899,24 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
         tdata.remapper->GetMeshSet( moab::Remapper::CoveringMesh ) = covering_set_new;
     }
 
+    // if( *srctype != IMOAB_PC_DISCRETIZATION ||  )
+    // {
+    //     *source_entity_type = IMOAB_FACE_ENTITY;
+    // }
+    // else
+    // {
+    //     *source_entity_type = IMOAB_VERTEX_ENTITY;
+    // }
+
+    // if( *tgttype != IMOAB_PC_DISCRETIZATION )
+    // {
+    //     *target_entity_type = IMOAB_FACE_ENTITY;
+    // }
+    // else
+    // {
+    //     *target_entity_type = IMOAB_VERTEX_ENTITY;
+    // }
+
     // Setup loading of weights onto TempestOnlineMap
     // Set the context for the remapping weights computation
     tdata.weightMaps[std::string( solution_weights_identifier )] = new moab::TempestOnlineMap( tdata.remapper );
@@ -4900,67 +4925,122 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
     moab::TempestOnlineMap* weightMap = tdata.weightMaps[std::string( solution_weights_identifier )];
     assert( weightMap != nullptr );
 
-    // EntityHandle source_set   = data_source.file_set;
-    // EntityHandle covering_set = tdata.remapper->GetMeshSet( Remapper::CoveringMesh );
-    EntityHandle target_set = data_target.file_set;  // default: row based partition
+    // Build row/col DoF association from requested entity types on pid_source / pid_target.
+    // For FV/PC maps, DoF IDs are taken from GLOBAL_ID on those entities.
+    // For CGLL maps, DoF IDs are taken from GLOBAL_DOFS on element entities (vertex/edge CGLL is not supported).
 
-    int src_elem_dof_length = 1, tgt_elem_dof_length = 1;  // default=1: FV - element average DoF value
-    // tags of interest are either GLOBAL_DOFS (SE) or GLOBAL_ID (FV)
+    // For vertex-based maps, enable point-cloud mode so ApplyWeights reads/writes vertex tags.
+    // tdata.remapper->point_cloud_source = ( *source_entity_type == IMOAB_VERTEX_ENTITY );
+    // tdata.remapper->point_cloud_target = ( *target_entity_type == IMOAB_VERTEX_ENTITY );
+
+    // Ensure intermediate entities exist if the user requests edge/face association.
+    // Note: Edge/face GLOBAL_IDs must exist in the mesh file for map files built on those entities.
+    if( *source_entity_type == IMOAB_EDGE_ENTITY && data_source.all_edges.empty() )
+    {
+        (void)iMOAB_GenerateAllEdges( pid_source );
+    }
+    if( *target_entity_type == IMOAB_EDGE_ENTITY && data_target.all_edges.empty() )
+    {
+        (void)iMOAB_GenerateAllEdges( pid_target );
+    }
+    if( *source_entity_type == IMOAB_FACE_ENTITY && data_source.dimension >= 2 && data_source.all_faces.empty() )
+    {
+        (void)iMOAB_GenerateAllFaces( pid_source );
+    }
+    if( *target_entity_type == IMOAB_FACE_ENTITY && data_target.dimension >= 2 && data_target.all_faces.empty() )
+    {
+        (void)iMOAB_GenerateAllFaces( pid_target );
+    }
+
+    auto get_entity_range = [&]( appData& data, int ent_type, Range& out ) -> ErrorCode {
+        out.clear();
+        switch( ent_type )
+        {
+            case IMOAB_VERTEX_ENTITY:
+                out = data.all_verts;
+                break;
+            case IMOAB_EDGE_ENTITY:
+                out = data.all_edges;
+                break;
+            case IMOAB_FACE_ENTITY:
+                if( !data.all_faces.empty() )
+                    out = data.all_faces;
+                else if( data.dimension == 2 && !data.primary_elems.empty() )
+                    out = data.primary_elems;
+                break;
+            case IMOAB_VOLUME_ENTITY:
+                out = data.primary_elems;
+                break;
+            default:
+                return MB_FAILURE;
+        }
+        return out.empty() ? MB_FAILURE : MB_SUCCESS;
+    };
+
+    Range src_ents_of_interest, tgt_ents_of_interest;
+    MB_CHK_SET_ERR( get_entity_range( data_source, *source_entity_type, src_ents_of_interest ),
+                    "requested source entity type not available on pid_source" );
+    MB_CHK_SET_ERR( get_entity_range( data_target, *target_entity_type, tgt_ents_of_interest ),
+                    "requested target entity type not available on pid_target" );
+
+    if( ( *srctype == IMOAB_CGLL_DISCRETIZATION ) &&
+        ( *source_entity_type == IMOAB_VERTEX_ENTITY || *source_entity_type == IMOAB_EDGE_ENTITY ) )
+        IMOAB_THROW_ERROR( "CGLL discretization not supported on vertex/edge entities when loading a map file", MB_FAILURE );
+    if( ( *tgttype == IMOAB_CGLL_DISCRETIZATION ) &&
+        ( *target_entity_type == IMOAB_VERTEX_ENTITY || *target_entity_type == IMOAB_EDGE_ENTITY ) )
+        IMOAB_THROW_ERROR( "CGLL discretization not supported on vertex/edge entities when loading a map file", MB_FAILURE );
+
+    int src_elem_dof_length = 1, tgt_elem_dof_length = 1;
     Tag gdsTag = nullptr;
-    if( *srctype == 1 || *tgttype == 1 )
+    if( *srctype == IMOAB_CGLL_DISCRETIZATION || *tgttype == IMOAB_CGLL_DISCRETIZATION )
     {
         MB_CHK_ERR( context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag ) );
         assert( gdsTag );
     }
-    //#endif
-    // Find the DoF tag length
-    // if it fails, usually it is 16
-    // first check if we need to query the source
-    if( *srctype == 1 )  // spectral element
-        MB_CHK_ERR( context.MBI->tag_get_length( gdsTag, src_elem_dof_length ) );
-    // find the DoF tag length
-    // next check if we need to query the target
-    if( *tgttype == 1 )  // spectral element
-        MB_CHK_ERR( context.MBI->tag_get_length( gdsTag, tgt_elem_dof_length ) );
+    if( *srctype == IMOAB_CGLL_DISCRETIZATION ) MB_CHK_ERR( context.MBI->tag_get_length( gdsTag, src_elem_dof_length ) );
+    if( *tgttype == IMOAB_CGLL_DISCRETIZATION ) MB_CHK_ERR( context.MBI->tag_get_length( gdsTag, tgt_elem_dof_length ) );
 
     Tag gidTag = context.MBI->globalId_tag();
-    std::vector< int > tgtDofValues;  // srcDofValues,
 
-    // populate first tuple
-    // will be filled with entities on coupler, from which we will get the DOFs, based on type
-    Range tgt_ents_of_interest;
-
-    if( *tgttype == 1 )  // spectral element
+    std::vector< int > srcDofValues, tgtDofValues;
+    if( *srctype == IMOAB_CGLL_DISCRETIZATION )
     {
-        MB_CHK_ERR( context.MBI->tag_get_length( gdsTag, tgt_elem_dof_length ) );
-        MB_CHK_ERR( context.MBI->get_entities_by_type( target_set, MBQUAD, tgt_ents_of_interest ) );
-        tgtDofValues.resize( tgt_ents_of_interest.size() * tgt_elem_dof_length );
-        MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, tgt_ents_of_interest, &tgtDofValues[0] ) );
-    }
-    else if( *tgttype == 2 )
-    {
-        // vertex global ids
-        MB_CHK_ERR( context.MBI->get_entities_by_type( target_set, MBVERTEX, tgt_ents_of_interest ) );
-        tgtDofValues.resize( tgt_ents_of_interest.size() * tgt_elem_dof_length );
-        MB_CHK_ERR( context.MBI->tag_get_data( gidTag, tgt_ents_of_interest, &tgtDofValues[0] ) );
-    }
-    else if( *tgttype == 3 )  // for FV meshes, just get the global id of cell
-    {
-        // element global ids
-        MB_CHK_ERR( context.MBI->get_entities_by_dimension( target_set, 2, tgt_ents_of_interest ) );
-        tgtDofValues.resize( tgt_ents_of_interest.size() * tgt_elem_dof_length );
-        MB_CHK_ERR( context.MBI->tag_get_data( gidTag, tgt_ents_of_interest, &tgtDofValues[0] ) );
+        srcDofValues.resize( src_ents_of_interest.size() * src_elem_dof_length );
+        MB_CHK_SET_ERR( context.MBI->tag_get_data( gdsTag, src_ents_of_interest, &srcDofValues[0] ),
+                        "missing GLOBAL_DOFS on requested source entities" );
     }
     else
     {
-        MB_CHK_ERR( MB_FAILURE );  // we know only type 1 or 2 or 3
+        srcDofValues.resize( src_ents_of_interest.size() );
+        MB_CHK_SET_ERR( context.MBI->tag_get_data( gidTag, src_ents_of_interest, &srcDofValues[0] ),
+                        "missing GLOBAL_ID on requested source entities" );
+    }
+
+    if( *tgttype == IMOAB_CGLL_DISCRETIZATION )
+    {
+        tgtDofValues.resize( tgt_ents_of_interest.size() * tgt_elem_dof_length );
+        MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, tgt_ents_of_interest, &tgtDofValues[0] ) );
+    }
+    else
+    {
+        tgtDofValues.resize( tgt_ents_of_interest.size() );
+        MB_CHK_SET_ERR( context.MBI->tag_get_data( gidTag, tgt_ents_of_interest, &tgtDofValues[0] ),
+                        "missing GLOBAL_ID on requested target entities" );
     }
 
     // pass tgt ordered dofs, and unique
-    // we need to read area_b and set aream tag on target cells, too
     std::vector< int > sortTgtDofs( tgtDofValues.begin(), tgtDofValues.end() );
     std::sort( sortTgtDofs.begin(), sortTgtDofs.end() );
-    sortTgtDofs.erase( std::unique( sortTgtDofs.begin(), sortTgtDofs.end() ), sortTgtDofs.end() );  // remove duplicates
+    sortTgtDofs.erase( std::unique( sortTgtDofs.begin(), sortTgtDofs.end() ), sortTgtDofs.end() );
+
+    // Optional: provide unique source edge DoFs when the source association is edge-based.
+    std::vector< int > sortSrcEdgeDofs;
+    if( ( *source_entity_type == IMOAB_EDGE_ENTITY ) && !srcDofValues.empty() )
+    {
+        sortSrcEdgeDofs = srcDofValues;
+        std::sort( sortSrcEdgeDofs.begin(), sortSrcEdgeDofs.end() );
+        sortSrcEdgeDofs.erase( std::unique( sortSrcEdgeDofs.begin(), sortSrcEdgeDofs.end() ), sortSrcEdgeDofs.end() );
+    }
 
     ///   the tag should be created already in the e3sm workflow; if not, create it here
     Tag areaTag;
@@ -4974,10 +5054,10 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
             std::cout << " aream tag already defined \n ";
     }
 
+    int nA, nB;
     std::vector< double > trvAreaA, trvAreaB;  // passed by reference
-    int nA, nB;                                // passed by reference, so returned
     MB_CHK_SET_ERR( weightMap->ReadParallelMap( remap_weights_filename, sortTgtDofs, *arearead, trvAreaA, nA, trvAreaB,
-                                                nB ),
+                                                nB, sortSrcEdgeDofs ),
                     "reading map from disk failed" );
     // trivially distributed areaAs and areaBs will need to be set on their correct source and target cells, as an aream tag
 
@@ -4988,6 +5068,17 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
     /// @todo Perform filter based on available source/target nnz data in the map when coverage set exists.
     /// The idea is to look at the source coverage and target meshes and figure out only relevant elements
     /// that need to participate in the meshes.
+
+    // Associate CoveringMesh with the requested source entities.
+    // ApplyWeights() reads source tag data from CoveringMesh (entities or vertices depending on point-cloud flags).
+    EntityHandle covering_set = tdata.remapper->GetMeshSet( Remapper::CoveringMesh );
+    MB_CHK_ERR( context.MBI->clear_meshset( &covering_set, 1 ) );
+    MB_CHK_ERR( context.MBI->add_entities( covering_set, src_ents_of_interest ) );
+    tdata.remapper->SetMeshSet( Remapper::CoveringMesh, covering_set, &src_ents_of_interest );
+
+    // Associate TargetMesh with the requested target entities.
+    EntityHandle target_set = data_target.file_set;  // default: row based partition
+    tdata.remapper->SetMeshSet( Remapper::TargetMesh, target_set, &tgt_ents_of_interest );
 
     //tdata.remapper->SetMeshSet( Remapper::SourceMesh, source_set, &srcc_ents_of_interest );
     // we have read the area A from map file, and we will set it as a aream double tag on the source set, knowing that we
@@ -5000,16 +5091,31 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
         MB_CHK_SET_ERR( set_aream_from_trivial_distribution( pid_target, nB, trvAreaB ),
                         " fail to set aream on target " );
 
-    //tdata.remapper->SetMeshSet( Remapper::CoveringMesh, covering_set, &src_ents_of_interest );
     weightMap->SetSourceNDofsPerElement( src_elem_dof_length );
-    //weightMap->set_col_dc_dofs( srcDofValues );  // will set col_dtoc_dofmap
+    weightMap->set_col_dc_dofs( srcDofValues );  // will set col_dtoc_dofmap
 
-    tdata.remapper->SetMeshSet( Remapper::TargetMesh, target_set, &tgt_ents_of_interest );
+    // Associate source edge DoFs if available
+    if( !sortSrcEdgeDofs.empty() )
+    {
+        (void)weightMap->set_col_edge_dofs( sortSrcEdgeDofs );
+    }
+
     weightMap->SetDestinationNDofsPerElement( tgt_elem_dof_length );
     weightMap->set_row_dc_dofs( tgtDofValues );  // will set row_dtoc_dofmap
 
     /// @todo Ideally, we should get this metadata from remap_weights_filename and propagate it
-    std::string metadataStr = std::string( remap_weights_filename ) + ";FV:1:GLOBAL_ID;FV:1:GLOBAL_ID";
+    std::string metadataStr = std::string( remap_weights_filename ) + ";";
+    metadataStr += ( *srctype == IMOAB_CGLL_DISCRETIZATION ? "CGLL" :
+                     ( *srctype == IMOAB_PC_DISCRETIZATION ? "PC" : "FV" ) );
+    metadataStr += ":" + std::to_string( src_elem_dof_length ) + ":";
+    metadataStr += ( *srctype == IMOAB_CGLL_DISCRETIZATION ? "GLOBAL_DOFS" : "GLOBAL_ID" );
+    metadataStr += ":ENTTYPE=" + std::to_string( *source_entity_type );
+    metadataStr += ";";
+    metadataStr += ( *tgttype == IMOAB_CGLL_DISCRETIZATION ? "CGLL" :
+                     ( *tgttype == IMOAB_PC_DISCRETIZATION ? "PC" : "FV" ) );
+    metadataStr += ":" + std::to_string( tgt_elem_dof_length ) + ":";
+    metadataStr += ( *tgttype == IMOAB_CGLL_DISCRETIZATION ? "GLOBAL_DOFS" : "GLOBAL_ID" );
+    metadataStr += ":ENTTYPE=" + std::to_string( *target_entity_type );
 
     data_intx.metadataMap[std::string( solution_weights_identifier )] = metadataStr;
 

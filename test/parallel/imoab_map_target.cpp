@@ -235,8 +235,11 @@ int main( int argc, char* argv[] )
         int src_disc_type = 3;  // element-based FV
         int tgt_disc_type = 3;  // element-based FV
         int arearead      = 0;
+        int src_entity_type = IMOAB_FACE_ENTITY;
+        int tgt_entity_type = IMOAB_FACE_ENTITY;
         CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type, &tgt_disc_type, &arearead,
-                                      intx_from_file_identifier.c_str(), mapFilename.c_str() ),
+                                      intx_from_file_identifier.c_str(), mapFilename.c_str(), &src_entity_type,
+                                      &tgt_entity_type ),
                    "failed to load map file from disk" );
         int type = types[0];  // FV
         // because it is like "coverage", context will be atmocnid

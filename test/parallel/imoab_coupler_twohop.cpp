@@ -426,8 +426,11 @@ int main( int argc, char* argv[] )
             int src_disc_type = 1;  // element-based SE-4
             int tgt_disc_type = 3;  // element-based FV
             int arearead      = 0;  // no aream needed to be set
+            int src_entity_type = IMOAB_FACE_ENTITY;
+            int tgt_entity_type = IMOAB_FACE_ENTITY;
             CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type, &tgt_disc_type, &arearead,
-                                          weights_identifiers[2].c_str(), atmocn_map_file_name.c_str() ),
+                                          weights_identifiers[2].c_str(), atmocn_map_file_name.c_str(),
+                                          &src_entity_type, &tgt_entity_type ),
                        "failed to load map file from disk" );
         }
 #endif
@@ -459,8 +462,11 @@ int main( int argc, char* argv[] )
             int src_disc_type = 1;  // element-based SE-4
             int tgt_disc_type = 3;  // element-based FV
             int arearead      = 0;
+            int src_entity_type2 = IMOAB_FACE_ENTITY;
+            int tgt_entity_type2 = IMOAB_FACE_ENTITY;
             CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtm2OcnPID, &src_disc_type, &tgt_disc_type,
-                                          &arearead, weights_identifiers[3].c_str(), atmocn_map_file_name.c_str() ),
+                                          &arearead, weights_identifiers[3].c_str(), atmocn_map_file_name.c_str(),
+                                          &src_entity_type2, &tgt_entity_type2 ),
                        "failed to load map file from disk" );
         }
 #endif

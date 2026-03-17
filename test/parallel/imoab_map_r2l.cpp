@@ -208,13 +208,14 @@ int main( int argc, char* argv[] )
 
     if( couComm != MPI_COMM_NULL )
     {
-        int src_disc_type = 3;  // element-based FV
-        int tgt_disc_type = 3;  // element-based FV
+        int src_disc_type = iMOAB_DiscretizationType::IMOAB_FV_DISCRETIZATION;  // element-based FV
+        int tgt_disc_type = iMOAB_DiscretizationType::IMOAB_FV_DISCRETIZATION;  // element-based FV
+        int entity_type = iMOAB_EntityType::IMOAB_FACE_ENTITY; // face-based FV map
         int arearead      = 0;  // no need for aream
         CHECKIERR( iMOAB_LoadMapFile( cplRofPID, cplLndPID, cplRofLndPID, &src_disc_type, &tgt_disc_type, &arearead,
-                                      intx_from_file_identifier.c_str(), mapFilename.c_str() ),
+                                      intx_from_file_identifier.c_str(), mapFilename.c_str(), &entity_type, &entity_type ),
                    "failed to load map file from disk" );
-        int type = 3;  // FV
+        int type = iMOAB_DiscretizationType::IMOAB_FV_DISCRETIZATION;  // FV
         // because it is like "coverage", context will be roflndid
         ierr = iMOAB_MigrateMapMesh( cplRofPID, cplRofLndPID, &couComm, &couPEGroup, &couPEGroup, &type, &cplrof,
                                      &roflndid );
@@ -223,22 +224,22 @@ int main( int argc, char* argv[] )
     MPI_Barrier( MPI_COMM_WORLD );
 
     int tagIndex;
-    int tagTypes[2] = { IMOAB_DENSE_DOUBLE_TAG, IMOAB_DENSE_DOUBLE_TAG };
-    int compOrder   = disc_orders[0] * disc_orders[0] /*FV*/;
+    int tagTypes = IMOAB_DENSE_DOUBLE_TAG;
+    int compOrder = disc_orders[0] * disc_orders[0] /*FV*/;
     int filter_type = 0;
 
     if( couComm != MPI_COMM_NULL )
     {
-        ierr = iMOAB_DefineTagStorage( cplRofPID, field, &tagTypes[0], &compOrder, &tagIndex );
+        ierr = iMOAB_DefineTagStorage( cplRofPID, field, &tagTypes, &compOrder, &tagIndex );
         CHECKIERR( ierr, "failed to define the field tag" );
 
-        ierr = iMOAB_DefineTagStorage( cplLndPID, field, &tagTypes[1], &compOrder, &tagIndex );
+        ierr = iMOAB_DefineTagStorage( cplLndPID, field, &tagTypes, &compOrder, &tagIndex );
         CHECKIERR( ierr, "failed to define the field tag on projection" );
     }
 
     if( rofComm != MPI_COMM_NULL )  // we are on source rof pes
     {
-        ierr = iMOAB_DefineTagStorage( cmpRofPID, field, &tagTypes[0], &compOrder, &tagIndex );
+        ierr = iMOAB_DefineTagStorage( cmpRofPID, field, &tagTypes, &compOrder, &tagIndex );
         CHECKIERR( ierr, "failed to define the field tag" );
     }
 

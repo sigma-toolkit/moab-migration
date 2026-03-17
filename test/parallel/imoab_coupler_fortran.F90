@@ -243,9 +243,11 @@ program imoab_coupler_fortran
       intx_from_file_identifier = 'map-from-file'//C_NULL_CHAR
       src_disc_type = 1;  ! element-based SE
       tgt_disc_type = 3;  ! element-based FV
+      dummyType = 2  ! IMOAB_FACE_ENTITY
       ierr = iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &
                                                 src_disc_type, tgt_disc_type, &
-                                               arearead, intx_from_file_identifier, atmocn_map_file_name)
+                                               arearead, intx_from_file_identifier, atmocn_map_file_name, &
+                                               dummyType, dummyType)
       call errorout(ierr, 'failed to load map file from disk')
 #endif
    end if

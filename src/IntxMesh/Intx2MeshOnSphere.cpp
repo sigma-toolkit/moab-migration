@@ -294,8 +294,14 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
             double d2 = IntxUtils::dist2( pp, &tgtCoords2D[2 * j] );
             if( d2 < epsilon_1 / 1000 )  // two orders of magnitude smaller than it should, to avoid concave polygons
             {
-
-                foundIds[i] = tgtConn[j];  // no new node
+                // // Always create a fresh intersection vertex so the intersection mesh is independent
+                // // Copy the target point to intersection set
+                // MB_CHK_ERR( mb->get_coords( &tgtConn[j], 1, pos.array() ) );
+                // MB_CHK_ERR( mb->create_vertex( pos.array(), outNode ) );
+                // // CID 181168; avoid leak storage error
+                // MB_CHK_ERR( mb->add_entities( outSet, &outNode, 1 ) );
+                // foundIds[i] = outNode;
+                foundIds[i] = tgtConn[j];
                 found       = 1;
 #ifdef CHECK_CONVEXITY
                 oldNodes++;
@@ -315,9 +321,13 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
             double d2 = IntxUtils::dist2( pp, &srcCoords2D[2 * j] );
             if( d2 < epsilon_1 / 1000 )
             {
-                // suspect is srcConn[j] corresponding in mbOut
-
-                foundIds[i] = srcConn[j];  // no new node
+                // // Always create a fresh intersection vertex so the intersection mesh is independent
+                // // Copy the source point to intersection set
+                // MB_CHK_ERR( mb->get_coords( &srcConn[j], 1, pos.array() ) );
+                // MB_CHK_ERR( mb->create_vertex( pos.array(), outNode ) );
+                // MB_CHK_ERR( mb->add_entities( outSet, &outNode, 1 ) );
+                // foundIds[i] = outNode;
+                foundIds[i] = srcConn[j];
                 found       = 1;
 #ifdef CHECK_CONVEXITY
                 oldNodes++;
@@ -393,6 +403,7 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
                 }
                 if( !found )
                 {
+                    std::cout << "New intersection point = [" << pos << "]\n";
                     // create a new point in 2d (at the intersection)
                     // foundIds[i] = m_num2dPoints;
                     // expts.push_back(m_num2dPoints);
@@ -950,9 +961,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     // uniformly for all tasks.  Do a collective MPI_MAX to see if it is migrated and if we have
     // (collectively) a GLOBAL_DOFS task
 
-    int local_int_array[2], global_int_array[2];
-    local_int_array[0] = orig_sender;
-    local_int_array[1] = size_gdofs_tag;
+    int local_int_array[2]={orig_sender, size_gdofs_tag}, global_int_array[2] = {0,0};
     // now reduce over all processors
     int mpi_err =
         MPI_Allreduce( local_int_array, global_int_array, 2, MPI_INT, MPI_MAX, parcomm->proc_config().proc_comm() );

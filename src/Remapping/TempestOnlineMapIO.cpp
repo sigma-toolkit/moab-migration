@@ -1251,7 +1251,8 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
                                                          std::vector< double >& vecAreaA,
                                                          int& nA,
                                                          std::vector< double >& vecAreaB,
-                                                         int& nB )
+                                                         int& nB,
+                                                         const std::vector< int >& src_edge_dof_ids )
 {
     NcError error( NcError::silent_nonfatal );
 
@@ -1681,6 +1682,29 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     // TODO: make this flexible and read the order from map with help of metadata
     m_nDofsPEl_Src  = 1;  // always assume FV-FV maps are read from file
     m_nDofsPEl_Dest = 1;  // always assume FV-FV maps are read from file
+
+    // Process source edge DoFs if provided
+    if( !src_edge_dof_ids.empty() )
+    {
+        // Store source edge DoFs for later use in edge-based mapping
+        m_src_edge_gdofmap.resize( src_edge_dof_ids.size() );
+        std::copy( src_edge_dof_ids.begin(), src_edge_dof_ids.end(), m_src_edge_gdofmap.begin() );
+
+        // Create edge DoF to local index mapping
+        m_src_edge_dof_to_local.clear();
+        for( size_t i = 0; i < m_src_edge_gdofmap.size(); ++i )
+        {
+            m_src_edge_dof_to_local[m_src_edge_gdofmap[i]] = i;
+        }
+
+        m_nSrcEdgeDofs = src_edge_dof_ids.size();
+    }
+    else
+    {
+        m_nSrcEdgeDofs = 0;
+        m_src_edge_gdofmap.clear();
+        m_src_edge_dof_to_local.clear();
+    }
 
     return moab::MB_SUCCESS;
 }

@@ -666,9 +666,9 @@ int main( int argc, char* argv[] )
                     use_overlap_context = true;
                     ovmesh              = srcmesh;
 
-                    Tag countTag;
-                    result = gMB->tag_get_handle( "Counting", countTag );
-                    MB_CHK_ERR( result );
+                    // Tag countTag;
+                    // result = gMB->tag_get_handle( "Counting", countTag );
+                    // MB_CHK_ERR( result );
 
                     // Load the meshes and validate
                     Tag order;

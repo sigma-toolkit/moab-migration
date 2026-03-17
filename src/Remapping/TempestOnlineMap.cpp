@@ -428,6 +428,55 @@ moab::ErrorCode moab::TempestOnlineMap::set_row_dc_dofs( std::vector< int >& val
     }
     return moab::MB_SUCCESS;
 }
+
+moab::ErrorCode moab::TempestOnlineMap::set_col_edge_dofs( std::vector< int >& values_entities )
+{
+    // Similar to set_col_dc_dofs but for edge DoFs
+    // Create edge column DoF mapping if edge DoFs are available
+    if( m_src_edge_gdofmap.empty() )
+    {
+        return moab::MB_FAILURE;  // No edge DoFs available
+    }
+
+    // Resize and initialize edge column DoF mapping
+    col_edge_dtoc_dofmap.resize( values_entities.size(), -1 );
+
+    for( size_t j = 0; j < values_entities.size(); j++ )
+    {
+        // values are 1 based, but m_src_edge_dof_to_local uses 0-based indices
+        const auto it = m_src_edge_dof_to_local.find( values_entities[j] - 1 );
+        if( it != m_src_edge_dof_to_local.end() )
+        {
+            col_edge_dtoc_dofmap[j] = it->second;
+        }
+    }
+    return moab::MB_SUCCESS;
+}
+
+moab::ErrorCode moab::TempestOnlineMap::set_row_edge_dofs( std::vector< int >& values_entities )
+{
+    // Similar to set_row_dc_dofs but for edge DoFs
+    // Create edge row DoF mapping if edge DoFs are available
+    if( m_src_edge_gdofmap.empty() )
+    {
+        return moab::MB_FAILURE;  // No edge DoFs available
+    }
+
+    // Resize and initialize edge row DoF mapping
+    row_edge_dtoc_dofmap.resize( values_entities.size(), -1 );
+
+    for( size_t j = 0; j < values_entities.size(); j++ )
+    {
+        // values are 1 based, but m_src_edge_dof_to_local uses 0-based indices
+        const auto it = m_src_edge_dof_to_local.find( values_entities[j] - 1 );
+        if( it != m_src_edge_dof_to_local.end() )
+        {
+            row_edge_dtoc_dofmap[j] = it->second;
+        }
+    }
+    return moab::MB_SUCCESS;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string strInputType,
@@ -1101,10 +1150,13 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
         }
 
 #ifdef MOAB_HAVE_EIGEN3
+        dbgprint.printf( 0, "About to copy tempest sparse matrix to eigen3\n" );
         copy_tempest_sparsemat_to_eigen3();
+        dbgprint.printf( 0, "Done setting eigen3 operators\n" );
 #endif
 
 #ifdef MOAB_HAVE_MPI
+        if (size>1)
         {
             // Remove ghosted entities from overlap set
             moab::Range ghostedEnts;

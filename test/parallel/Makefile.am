@@ -73,8 +73,9 @@ if HAVE_TEMPESTREMAP
   imoab_map_target_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_domain_culling_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_read_compute_map_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
+  imoab_applymap_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
 if HAVE_NETCDF
-  HDF5_TESTS += imoab_map_target imoab_coupler_bilin imoab_domain_culling imoab_read_compute_map
+  HDF5_TESTS += imoab_map_target imoab_coupler_bilin imoab_domain_culling imoab_read_compute_map imoab_applymap
 endif
 
 if HAVE_PNETCDF

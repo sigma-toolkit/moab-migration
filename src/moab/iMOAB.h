@@ -1224,6 +1224,10 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
  * \param[in]  solution_weights_identifier  (iMOAB_String)  The unique identifier used to store the computed projection weights locally.
  *                                                          Typically, values could be identifiers such as "scalar", "flux" or "custom".
  * \param[in]  remap_weights_filename  (iMOAB_String)       The filename path to the mapping file to load in memory.
+ * \param[in]  source_entity_type (int*)                   Entity association for the map columns on the source mesh:
+ *                                                         IMOAB_VERTEX_ENTITY, IMOAB_EDGE_ENTITY, IMOAB_FACE_ENTITY, or IMOAB_VOLUME_ENTITY.
+ * \param[in]  target_entity_type (int*)                   Entity association for the map rows on the target mesh:
+ *                                                         IMOAB_VERTEX_ENTITY, IMOAB_EDGE_ENTITY, IMOAB_FACE_ENTITY, or IMOAB_VOLUME_ENTITY.
 */
 ErrCode iMOAB_LoadMapFile(
     iMOAB_AppID pid_source,
@@ -1233,7 +1237,9 @@ ErrCode iMOAB_LoadMapFile(
     int* tgttype,
     int* arearead,
     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
-    const iMOAB_String remap_weights_filename );
+    const iMOAB_String remap_weights_filename,
+    int* source_entity_type,
+    int* target_entity_type );
 
 /**
  * \brief Write the projection weights to disk in order to transfer a solution from a source surface mesh to a destination

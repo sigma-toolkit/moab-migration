@@ -118,8 +118,104 @@ moab::ErrorCode moab::TempestOnlineMap::LinearRemapNN_MOAB( bool use_GID_matchin
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void moab::TempestOnlineMap::LinearRemapFVtoFV_np1(
+	// const Mesh & meshInput,
+	// const Mesh & meshOutput,
+	// const Mesh & meshOverlap,
+	// OfflineMap & mapRemap
+) {
+	// Verify ReverseNodeArray has been calculated
+	if( m_meshInputCov->faces.size() > 0 && m_meshInputCov->revnodearray.size() == 0 ) {
+		_EXCEPTIONT("ReverseNodeArray has not been calculated for meshInput");
+	}
+
+	// Get SparseMatrix represntation of the OfflineMap
+	// SparseMatrix<double> & smatMap = mapRemap.GetSparseMatrix();
+
+    // Announcements
+    moab::DebugOutput dbgprint( std::cout, this->rank, 0 );
+    dbgprint.set_prefix( "[LinearRemapFVtoFV_Tempest_MOAB]: " );
+
+	// Current overlap face
+	size_t ixOverlap = 0;
+
+	// Loop through all faces on meshInput
+	for (size_t ixFirst = 0; ixFirst < m_meshInputCov->faces.size(); ixFirst++) {
+
+		// Output every 1000 elements
+		if (ixFirst % 1000 == 0) {
+			dbgprint.printf(0, "Element %zu/%zu", ixFirst, m_meshInputCov->faces.size());
+		}
+
+		// This Face
+		const Face & faceFirst = m_meshInputCov->faces[ixFirst];
+
+		// Find the set of Faces that overlap faceFirst
+		size_t ixOverlapBegin = ixOverlap;
+		size_t ixOverlapEnd = ixOverlapBegin;
+
+		for (; ixOverlapEnd < m_meshOverlap->faces.size(); ixOverlapEnd++) {
+			if (m_meshOverlap->vecSourceFaceIx[ixOverlapEnd] != ixFirst) {
+				break;
+			}
+		}
+
+		size_t nOverlapFaces = ixOverlapEnd - ixOverlapBegin;
+
+		// Put composed array into map
+		for (size_t j = 0; j < nOverlapFaces; j++) {
+			int ixFirstFace = m_meshOverlap->vecSourceFaceIx[ixOverlap + j];
+			int ixSecondFace = m_meshOverlap->vecTargetFaceIx[ixOverlap + j];
+
+			// signal to not participate, because it is a ghost target
+			if( ixSecondFace < 0 ) continue;  // skip and do not do anything
+
+			m_mapRemap(ixSecondFace, ixFirstFace) +=
+				m_meshOverlap->vecFaceArea[ixOverlap + j]
+				/ m_meshOutput->vecFaceArea[ixSecondFace];
+
+			if (m_mapRemap(ixSecondFace, ixFirstFace) > 10.0) {
+				printf("%zu %zu %zu\n", ixFirstFace, ixSecondFace, ixOverlap+j);
+				printf("Input:\n");
+				for (size_t i = 0; i < m_meshInputCov->faces[ixFirstFace].edges.size(); i++) {
+					const Node & node = m_meshInputCov->nodes[ m_meshInputCov->faces[ixFirstFace][i] ];
+					printf("%zu,%1.15e,%1.15e;\n",
+						i, atan2(node.y, node.x), asin(node.z));
+				}
+				printf("Output:\n");
+				for (size_t i = 0; i < m_meshOutput->faces[ixSecondFace].edges.size(); i++) {
+					const Node & node = m_meshOutput->nodes[ m_meshOutput->faces[ixSecondFace][i] ];
+					printf("%zu,%1.15e,%1.15e;\n",
+						i, atan2(node.y, node.x), asin(node.z));
+				}
+				printf("Overlap:\n");
+				for (size_t i = 0; i < m_meshOverlap->faces[ixOverlap + j].edges.size(); i++) {
+					const Node & node = m_meshOverlap->nodes[ m_meshOverlap->faces[ixOverlap + j][i] ];
+					printf("%zu,%1.15e,%1.15e;\n",
+						i, atan2(node.y, node.x), asin(node.z));
+				}
+
+
+				printf("%1.15e\n", m_meshInputCov->vecFaceArea[ixFirstFace]);
+				printf("%1.15e\n", m_meshOverlap->vecFaceArea[ixOverlap + j]);
+				printf("%1.15e\n", m_meshOutput->vecFaceArea[ixSecondFace]);
+				_EXCEPTIONT("Anomalous map weight detected");
+			}
+		}
+
+		// Increment the current overlap index
+		ixOverlap += nOverlapFaces;
+
+	}
+}
+
 void moab::TempestOnlineMap::LinearRemapFVtoFV_Tempest_MOAB( int nOrder )
 {
+    // Use streamlined helper function for first order
+	if (nOrder == 1) {
+		return LinearRemapFVtoFV_np1();
+	}
+
     // Order of triangular quadrature rule
     const int TriQuadRuleOrder = 4;
 

@@ -516,7 +516,8 @@ module iMOAB
 #ifdef MOAB_HAVE_NETCDF
 
       integer(c_int) function iMOAB_LoadMapFile(pid_source, pid_target, pid_intersection, src_disc_type, tgt_disc_type, &
-                                                            arearead, solution_weights_identifier, remap_weights_filename) &
+                                                            arearead, solution_weights_identifier, remap_weights_filename, &
+                                                            source_entity_type, target_entity_type) &
                                                                   bind(C, name='iMOAB_LoadMapFile')
             use, intrinsic :: iso_c_binding, only : c_int, c_char
             integer(c_int), intent(in) :: pid_source
@@ -527,6 +528,8 @@ module iMOAB
             integer(c_int), intent(in) :: arearead
             character(kind=c_char), intent(in) :: solution_weights_identifier(*)
             character(kind=c_char), intent(in) :: remap_weights_filename(*)
+            integer(c_int), intent(in) :: source_entity_type
+            integer(c_int), intent(in) :: target_entity_type
       end function iMOAB_LoadMapFile
 
       integer(c_int) function iMOAB_WriteMapFile(pid_intersection, solution_weights_identifier,  &

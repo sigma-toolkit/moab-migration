@@ -117,7 +117,8 @@ class TempestOnlineMap : public OfflineMap
                                      std::vector< double >& areaA,
                                      int& nA,
                                      std::vector< double >& areaB,
-                                     int& nB );
+                                     int& nB,
+                                     const std::vector< int >& src_edge_dof_ids = std::vector< int >() );
 
     ///	<summary>
     ///		Write the TempestOnlineMap to a parallel NetCDF file.
@@ -170,6 +171,13 @@ class TempestOnlineMap : public OfflineMap
     ///     FV field defined on the target mesh.
     ///	</summary>
     void LinearRemapFVtoFV_Tempest_MOAB( int nOrder );
+
+    ///	<summary>
+    ///		Compute the remapping weights for a FV field defined on the source to a
+    ///     FV field defined on the target mesh. This function is a streamlined version of
+    ///     LinearRemapFVtoFV_Tempest_MOAB for first order.
+    ///	</summary>
+    void LinearRemapFVtoFV_np1();
 
     ///	<summary>
     ///		Generate the OfflineMap for linear conserative element-average
@@ -450,6 +458,14 @@ class TempestOnlineMap : public OfflineMap
 
     moab::ErrorCode set_row_dc_dofs( std::vector< int >& values_entities );
 
+    // Edge DoF management methods
+    moab::ErrorCode set_col_edge_dofs( std::vector< int >& values_entities );
+    moab::ErrorCode set_row_edge_dofs( std::vector< int >& values_entities );
+
+    // Accessor methods for edge DoF information
+    const std::vector< int >& get_src_edge_gdofmap() const { return m_src_edge_gdofmap; }
+    int get_num_src_edge_dofs() const { return m_nSrcEdgeDofs; }
+
     // hack
     void SetMeshInput( Mesh* imesh )
     {
@@ -530,12 +546,20 @@ class TempestOnlineMap : public OfflineMap
     // make it int, because it can be -1 in new logic
     std::vector< int > row_dtoc_dofmap, col_dtoc_dofmap, srccol_dtoc_dofmap;
 
+    // Edge DoF mappings (similar to row_dtoc_dofmap, col_dtoc_dofmap but for edges)
+    std::vector< int > row_edge_dtoc_dofmap, col_edge_dtoc_dofmap;
+
     std::map< int, int > rowMap, colMap;
     int m_input_order, m_output_order;
 
     DataArray3D< int > dataGLLNodesSrc, dataGLLNodesSrcCov, dataGLLNodesDest;
     DiscretizationType m_srcDiscType, m_destDiscType;
     int m_nTotDofs_Src, m_nTotDofs_SrcCov, m_nTotDofs_Dest;
+
+    // Edge DoF related member variables
+    std::vector< int > m_src_edge_gdofmap;           // Global edge DoF IDs for source mesh
+    std::map< int, int > m_src_edge_dof_to_local;    // Global to local edge DoF mapping
+    int m_nSrcEdgeDofs;                              // Total number of source edge DoFs
 
     // Key details about the current map
     int m_nDofsPEl_Src, m_nDofsPEl_Dest;

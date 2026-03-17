@@ -652,14 +652,14 @@ int main( int argc, char* argv[] )
             outputFormatter.printf( 0, "The intersection set contains %lu elements and %lu vertices \n",
                                     intxelems.size(), intxverts.size() );
 
-            moab::IntxAreaUtils areaAdaptorHuiller( moab::IntxAreaUtils::lHuiller );  // lHuiller, GaussQuadrature
+            moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::GaussQuadrature );  // lHuiller, GaussQuadrature
             double initial_sarea =
-                areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[0],
+                areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0],
                                                    radius_src );  // use the target to compute the initial area
             double initial_tarea =
-                areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[1],
+                areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[1],
                                                    radius_dest );  // use the target to compute the initial area
-            double intx_area = areaAdaptorHuiller.area_on_sphere( mbCore, intxset, radius_src );
+            double intx_area = areaAdaptor.area_on_sphere( mbCore, intxset, radius_src );
 
             outputFormatter.printf( 0, "mesh areas: source = %12.10f, target = %12.10f, intersection = %12.10f \n",
                                     initial_sarea, initial_tarea, intx_area );
@@ -779,14 +779,14 @@ int main( int argc, char* argv[] )
         double dTotalOverlapArea = 0.0;
         if( runCtx->print_diagnostics )
         {
-            moab::IntxAreaUtils areaAdaptorHuiller(
+            moab::IntxAreaUtils areaAdaptor(
                 moab::IntxAreaUtils::GaussQuadrature );  // lHuiller, GaussQuadrature
             double local_areas[3],
                 global_areas[3];  // Array for Initial area, and through Method 1 and Method 2
             // local_areas[0] = area_on_sphere_lHuiller ( mbCore, runCtx->meshsets[1], radius_src );
-            local_areas[0] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
-            local_areas[1] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[1], radius_dest );
-            local_areas[2] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[2], radius_src );
+            local_areas[0] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
+            local_areas[1] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[1], radius_dest );
+            local_areas[2] = areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[2], radius_src );
 
 #ifdef MOAB_HAVE_MPI
             MPI_Allreduce( &local_areas[0], &global_areas[0], 3, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
@@ -884,6 +884,8 @@ int main( int argc, char* argv[] )
                 runCtx->doftag_names[1]   // const std::string& target_tag_name
                 ) );
             runCtx->timer_pop();
+
+            std::cout << proc_id << ": About to write remapping weights\n";
 
             weightMap->PrintMapStatistics();
 

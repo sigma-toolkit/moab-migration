@@ -62,6 +62,7 @@ endif ( MOAB_USE_MPI )
 set ( ADVANCED_EXAMPLES
   advanced/CrystalRouterExample.cpp
   advanced/ExtrudePoly.cpp
+  advanced/iMOABApplyMap.cpp
   advanced/LloydRelaxation.cpp
   advanced/VisTags.cpp
 )

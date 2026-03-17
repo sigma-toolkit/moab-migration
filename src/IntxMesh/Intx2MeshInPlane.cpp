@@ -249,8 +249,12 @@ ErrorCode Intx2MeshInPlane::findNodes( EntityHandle tgt, int nsTgt, EntityHandle
             double d2 = IntxUtils::dist2( pp, &tgtCoords2D[2 * j] );
             if( d2 < epsilon_1 )
             {
-
-                foundIds[i] = tgtConn[j];  // no new node
+                // // Always create a fresh intersection vertex so the intersection mesh is independent
+                // MB_CHK_ERR( mb->get_coords( &tgtConn[j], 1, pos.array() ) );
+                // MB_CHK_ERR( mb->create_vertex( pos.array(), outNode ) );
+                // MB_CHK_ERR( mb->add_entities( outSet, &outNode, 1 ) );
+                // foundIds[i] = outNode;
+                foundIds[i] = tgtConn[j];
                 found       = 1;
 #ifdef ENABLE_DEBUG
                 if( dbg_1 )
@@ -267,9 +271,12 @@ ErrorCode Intx2MeshInPlane::findNodes( EntityHandle tgt, int nsTgt, EntityHandle
             double d2 = IntxUtils::dist2( pp, &srcCoords2D[2 * j] );
             if( d2 < epsilon_1 )
             {
-                // suspect is srcConn[j] corresponding in mbOut
-
-                foundIds[i] = srcConn[j];  // no new node
+                // // Always create a fresh intersection vertex so the intersection mesh is independent
+                // MB_CHK_ERR( mb->get_coords( &srcConn[j], 1, pos.array() ) );
+                // MB_CHK_ERR( mb->create_vertex( pos.array(), outNode ) );
+                // MB_CHK_ERR( mb->add_entities( outSet, &outNode, 1 ) );
+                // foundIds[i] = outNode;
+                foundIds[i] = srcConn[j];
                 found       = 1;
 #ifdef ENABLE_DEBUG
                 if( dbg_1 )

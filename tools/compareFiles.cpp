@@ -21,31 +21,126 @@
 
 #include "moab/ProgOptions.hpp"
 #include "moab/Core.hpp"
+#include "moab/CartVect.hpp"
 
+#include <array>
 #include <cmath>
-#include <sstream>
-#include <iostream>
-#include <iomanip>
 #include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <limits>
+#include <sstream>
+#include <unordered_map>
+#include <vector>
 
 using namespace moab;
 using namespace std;
 
-int main( int argc, char* argv[] )
+namespace
 {
 
+// Simple hashable key from coordinates with tolerance snapping
+struct CoordKey
+{
+    std::array< long long, 3 > v;
+    CoordKey() : v() {}
+    CoordKey( long long x, long long y, long long z ) : v{{ x, y, z }} {}
+    bool operator==( const CoordKey& other ) const { return v == other.v; }
+};
+
+struct CoordKeyHash
+{
+    std::size_t operator()( const CoordKey& k ) const
+    {
+        // A small hash combiner
+        return std::hash< long long >{}( k.v[0] ) ^ ( std::hash< long long >{}( k.v[1] ) << 1 ) ^
+               ( std::hash< long long >{}( k.v[2] ) << 2 );
+    }
+};
+
+CoordKey make_key( const CartVect& c, double tol )
+{
+    double inv = 1.0 / tol;
+    return CoordKey( llround( c[0] * inv ), llround( c[1] * inv ), llround( c[2] * inv ) );
+}
+
+CartVect entity_centroid( Interface* mb, EntityHandle eh )
+{
+    const EntityHandle* conn = nullptr;
+    int nnodes               = 0;
+    MB_CHK_ERR_RET_VAL( mb->get_connectivity( eh, conn, nnodes ), CartVect( 0.0 ) );
+    std::vector< double > coords( 3 * nnodes );
+    MB_CHK_ERR_RET_VAL( mb->get_coords( conn, nnodes, coords.data() ), CartVect( 0.0 ) );
+    CartVect c( 0.0 );
+    for( int i = 0; i < nnodes; ++i )
+    {
+        c[0] += coords[3 * i + 0];
+        c[1] += coords[3 * i + 1];
+        c[2] += coords[3 * i + 2];
+    }
+    if( nnodes > 0 ) c /= static_cast< double >( nnodes );
+    return c;
+}
+
+// Build a coordinate-key map for either vertices (dim==0) or elements (by centroid)
+std::unordered_map< CoordKey, EntityHandle, CoordKeyHash >
+build_coordinate_map( Interface* mb, const Range& ents, bool use_centroid, double tol )
+{
+    std::unordered_map< CoordKey, EntityHandle, CoordKeyHash > key_to_ent;
+    key_to_ent.reserve( ents.size() );
+    for( Range::const_iterator it = ents.begin(); it != ents.end(); ++it )
+    {
+        CartVect c;
+        if( use_centroid )
+            c = entity_centroid( mb, *it );
+        else
+        {
+            ErrorCode rval = mb->get_coords( &( *it ), 1, c.array() );
+            if( MB_SUCCESS != rval )
+            {
+                std::cerr << "Warning: failed to get coords for entity " << mb->id_from_handle( *it ) << "\n";
+                continue;
+            }
+        }
+
+        CoordKey key = make_key( c, tol );
+        if( key_to_ent.find( key ) != key_to_ent.end() )
+        {
+            std::cerr << "Warning: duplicate coordinate key encountered; keeping first occurrence\n";
+            continue;
+        }
+        key_to_ent[key] = *it;
+    }
+    return key_to_ent;
+}
+
+template < typename T >
+void update_minmax( const T val, T& minv, T& maxv )
+{
+    if( val < minv ) minv = val;
+    if( val > maxv ) maxv = val;
+}
+
+}  // namespace
+
+int main( int argc, char* argv[] )
+{
     ProgOptions opts;
 
     std::string inputfile1, inputfile2, outfile;
 
     std::string tag_name;
     int dim = 2;
+    bool coord_match = false;  // when true, match by coordinates/centroids instead of GLOBAL_ID
+    double tol        = 1e-12; // tolerance for coordinate snapping
 
     opts.addOpt< std::string >( "input1,i", "input mesh filename 1", &inputfile1 );
     opts.addOpt< std::string >( "input2,j", "input mesh filename 2", &inputfile2 );
     opts.addOpt< std::string >( "tagname,n", "tag to compare (compare all tags if not specified)", &tag_name );
     opts.addOpt< int >( "dimension,d", "topological dimension of entities to compare", &dim );
     opts.addOpt< std::string >( "outfile,o", "output file with differences", &outfile );
+    opts.addOpt< void >( "coord,c", "match entities by coordinates (verts) or centroids (elements)", &coord_match );
+    opts.addOpt< double >( "tolerance,t", "tolerance for coordinate matching", &tol );
 
     opts.parseCommandLine( argc, argv );
 
@@ -126,11 +221,72 @@ int main( int argc, char* argv[] )
         cGidHandle2[gids2[i++]] = *vit;
     }
 
-    if( ents.size() != ents2.size() )
+    // Build aligned match lists based on either GLOBAL_ID or coordinate keys
+    std::vector< EntityHandle > match1, match2;
+    match1.reserve( ents.size() );
+    match2.reserve( ents2.size() );
+
+    if( coord_match )
     {
-        std::cout << "cannot compare tags, because number of entities is different:" << ents.size() << " "
-                  << ents2.size() << "\n";
-        exit( 1 );
+        bool use_centroid = ( dim != 0 );
+        auto map2         = build_coordinate_map( mb2, ents2, use_centroid, tol );
+        for( Range::iterator it = ents.begin(); it != ents.end(); ++it )
+        {
+            CartVect c;
+            if( use_centroid )
+                c = entity_centroid( mb, *it );
+            else
+                MB_CHK_SET_ERR( mb->get_coords( &( *it ), 1, c.array() ), "can't get coords for matching" );
+            CoordKey key = make_key( c, tol );
+            auto f       = map2.find( key );
+            if( f == map2.end() )
+            {
+                std::cerr << "No coordinate match found for entity " << mb->id_from_handle( *it ) << "\n";
+                continue;
+            }
+            match1.push_back( *it );
+            match2.push_back( f->second );
+        }
+        if( match1.size() != match2.size() )
+        {
+            std::cerr << "Coordinate matching produced unequal pair counts: " << match1.size() << " vs "
+                      << match2.size() << "\n";
+        }
+    }
+    else
+    {
+        if( ents.size() != ents2.size() )
+        {
+            std::cout << "cannot compare tags, because number of entities is different:" << ents.size() << " "
+                      << ents2.size() << "\n";
+            exit( 1 );
+        }
+        // Align via GLOBAL_ID (original behavior)
+        std::map< int, int > gidMap2;
+        for( size_t j = 0; j < ents2.size(); j++ )
+            gidMap2[gids2[j]] = static_cast< int >( j );
+        for( size_t j = 0; j < ents.size(); j++ )
+        {
+            int gid_val = gids[j];
+            if( gidMap2.find( gid_val ) == gidMap2.end() )
+            {
+                std::cerr << "No GLOBAL_ID match for " << gid_val << "\n";
+                continue;
+            }
+            match1.push_back( ents[j] );
+            match2.push_back( ents2[gidMap2[gid_val]] );
+        }
+    }
+
+    if( match1.empty() )
+    {
+        std::cerr << "No matching entities to compare.\n";
+        return 1;
+    }
+    if( match1.size() != match2.size() )
+    {
+        std::cerr << "Mismatched match counts between files: " << match1.size() << " vs " << match2.size() << "\n";
+        return 1;
     }
 
     if( tag_name.length() > 0 )  // old tool
@@ -155,13 +311,15 @@ int main( int argc, char* argv[] )
         std::vector< int > ivals;
         if( doubleType )
         {
-            vals.resize( len_tag * ents.size() );
-            MB_CHK_SET_ERR( mb->tag_get_data( tag, ents, &vals[0] ), "can't get tag data on double tag" );
+            vals.resize( len_tag * match1.size() );
+            MB_CHK_SET_ERR( mb->tag_get_data( tag, &match1[0], match1.size(), &vals[0] ),
+                            "can't get tag data on double tag" );
         }
         else
         {
-            ivals.resize( len_tag * ents.size() );
-            MB_CHK_SET_ERR( mb->tag_get_data( tag, ents, &ivals[0] ), "can't get tag data on integer tag" );
+            ivals.resize( len_tag * match1.size() );
+            MB_CHK_SET_ERR( mb->tag_get_data( tag, &match1[0], match1.size(), &ivals[0] ),
+                            "can't get tag data on integer tag" );
         }
 
         Tag tag2;
@@ -170,13 +328,15 @@ int main( int argc, char* argv[] )
         std::vector< int > ivals2;
         if( doubleType )
         {
-            vals2.resize( len_tag * ents2.size() );
-            MB_CHK_SET_ERR( mb2->tag_get_data( tag2, ents2, &vals2[0] ), "can't get tag data on file 2" );
+            vals2.resize( len_tag * match2.size() );
+            MB_CHK_SET_ERR( mb2->tag_get_data( tag2, &match2[0], match2.size(), &vals2[0] ),
+                            "can't get tag data on file 2" );
         }
         else
         {
-            ivals2.resize( len_tag * ents2.size() );
-            MB_CHK_SET_ERR( mb2->tag_get_data( tag2, ents2, &ivals2[0] ), "can't get tag data on file 2" );
+            ivals2.resize( len_tag * match2.size() );
+            MB_CHK_SET_ERR( mb2->tag_get_data( tag2, &match2[0], match2.size(), &ivals2[0] ),
+                            "can't get tag data on file 2" );
         }
         std::string new_tag_name = tag_name + "_2";
         Tag newTag, newTagDiff;
@@ -205,48 +365,38 @@ int main( int argc, char* argv[] )
                             "can't define new integer tag diff" );
         }
 
-        i             = 0;
         double l2norm = 0;
-        for( Range::iterator c2it = ents2.begin(); c2it != ents2.end(); ++c2it )
+        for( size_t idx = 0; idx < match1.size(); ++idx )
         {
-            double* val2 = nullptr;
-            int* ival2   = nullptr;
-            if( doubleType )
-                val2 = &vals2[i * len_tag];
-            else
-                ival2 = &ivals2[i * len_tag];
+            EntityHandle h1        = match1[idx];
+            const double* val2d    = doubleType ? &vals2[idx * len_tag] : nullptr;
+            const int* val2i       = doubleType ? nullptr : &ivals2[idx * len_tag];
 
-            int id2 = gids2[i];
-            i++;
-            EntityHandle c1 = cGidHandle[id2];
             if( doubleType )
-            {
-                MB_CHK_SET_ERR( mb->tag_set_data( newTag, &c1, 1, val2 ), "can't set new tag" );
-            }
+                MB_CHK_SET_ERR( mb->tag_set_data( newTag, &h1, 1, val2d ), "can't set new tag" );
             else
-            {
-                MB_CHK_SET_ERR( mb->tag_set_data( newTag, &c1, 1, ival2 ), "can't set new tag" );
-            }
-            int indx = ents.index( c1 );
+                MB_CHK_SET_ERR( mb->tag_set_data( newTag, &h1, 1, val2i ), "can't set new tag" );
+
+            int indx = static_cast< int >( idx );  // aligned order
             if( doubleType )
             {
                 double* diff = &vals[indx * len_tag];
                 for( int k = 0; k < len_tag; k++ )
                 {
-                    diff[k] -= val2[k];
+                    diff[k] -= val2d[k];
                     l2norm += diff[k] * diff[k];
                 }
-                MB_CHK_SET_ERR( mb->tag_set_data( newTagDiff, &c1, 1, diff ), "can't set diff double tag" );
+                MB_CHK_SET_ERR( mb->tag_set_data( newTagDiff, &h1, 1, diff ), "can't set diff double tag" );
             }
             else
             {
                 int* diffi = &ivals[indx * len_tag];
                 for( int k = 0; k < len_tag; k++ )
                 {
-                    diffi[k] -= ival2[k];
-                    l2norm += diffi[k] * diffi[k];
+                    diffi[k] -= val2i[k];
+                    l2norm += static_cast< double >( diffi[k] ) * diffi[k];
                 }
-                MB_CHK_SET_ERR( mb->tag_set_data( newTagDiff, &c1, 1, diffi ), "can't set diff int tag" );
+                MB_CHK_SET_ERR( mb->tag_set_data( newTagDiff, &h1, 1, diffi ), "can't set diff int tag" );
             }
         }
         l2norm = sqrt( l2norm );
@@ -263,12 +413,6 @@ int main( int argc, char* argv[] )
         // compare all tags
         std::vector< Tag > list1;
         MB_CHK_SET_ERR( mb->tag_get_tags( list1 ), "can't get tags 1" );
-
-        std::map< int, int > gidMap2;
-        for( size_t i = 0; i < ents2.size(); i++ )
-        {
-            gidMap2[gids2[i]] = i;
-        }
         int k  = 0;  // number of different fields
         int k1 = 0;  // number of exactly the same fields
 
@@ -332,44 +476,20 @@ int main( int argc, char* argv[] )
                 skipped_fields.push_back( name );
             }
 
-            double minv1, maxv1, minv2, maxv2;
-            if( vals1.size() > 0 )
-            {
-                minv1 = maxv1 = vals1[0];
-            }
-            if( vals2.size() > 0 )
-            {
-                minv2 = maxv2 = vals2[0];
-            }
-            if( ivals1.size() > 0 )
-            {
-                minv1 = maxv1 = ivals1[0];
-            }
-            if( ivals2.size() > 0 )
-            {
-                minv2 = maxv2 = ivals2[0];
-            }
+            double minv1 = std::numeric_limits< double >::max();
+            double maxv1 = std::numeric_limits< double >::lowest();
+            double minv2 = std::numeric_limits< double >::max();
+            double maxv2 = std::numeric_limits< double >::lowest();
             // compute the difference
             double sum = 0;
-            for( size_t j = 0; j < ents.size(); j++ )
+            for( size_t j = 0; j < match1.size(); j++ )
             {
-                double value1, value2;
-                if( doubleType )
-                    value1 = vals1[j];
-                else
-                    value1 = ivals1[j];
-
-                int index2 = gidMap2[gids[j]];
-                if( doubleType )
-                    value2 = vals2[index2];
-                else
-                    value2 = ivals2[index2];
+                double value1 = doubleType ? vals1[j] : static_cast< double >( ivals1[j] );
+                double value2 = doubleType ? vals2[j] : static_cast< double >( ivals2[j] );
 
                 sum += fabs( value1 - value2 );
-                if( value1 < minv1 ) minv1 = value1;
-                if( value1 > maxv1 ) maxv1 = value1;
-                if( value2 < minv2 ) minv2 = value2;
-                if( value2 > maxv2 ) maxv2 = value2;
+                update_minmax( value1, minv1, maxv1 );
+                update_minmax( value2, minv2, maxv2 );
             }
 
             if( sum > 0. )
@@ -378,13 +498,12 @@ int main( int argc, char* argv[] )
                           << ") \t (" << minv2 << "/" << maxv2 << ") \n";
                 k++;
 
-                for( size_t j = 0; j < ents.size(); j++ )
+                for( size_t j = 0; j < match1.size(); j++ )
                 {
-                    int index2 = gidMap2[gids[j]];
                     if( doubleType )
-                        vals1[j] -= vals2[index2];
+                        vals1[j] -= vals2[j];
                     else
-                        ivals1[j] -= ivals2[index2];
+                        ivals1[j] -= ivals2[j];
                 }
 
                 std::string diffTagName = name + "_diff";
@@ -392,11 +511,11 @@ int main( int argc, char* argv[] )
                 MB_CHK_ERR( mb->tag_get_handle( diffTagName.c_str(), 1, type, newTag, MB_TAG_CREAT | MB_TAG_DENSE ) );
                 if( doubleType )
                 {
-                    MB_CHK_ERR( mb->tag_set_data( newTag, ents, &vals1[0] ) );
+                    MB_CHK_ERR( mb->tag_set_data( newTag, &match1[0], match1.size(), &vals1[0] ) );
                 }
                 else
                 {
-                    MB_CHK_ERR( mb->tag_set_data( newTag, ents, &ivals1[0] ) );
+                    MB_CHK_ERR( mb->tag_set_data( newTag, &match1[0], match1.size(), &ivals1[0] ) );
                 }
                 diffTags.push_back( newTag );
             }

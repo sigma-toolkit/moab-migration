@@ -64,6 +64,12 @@ static double analytical_field_vertex( double x, double y, double z )
     return std::sin( 2 * lat ) * std::cos( lon );
 }
 
+static double analytical_field_edge( int index, int total )
+{
+    (void)total;
+    return 0.5 + 0.5 * std::sin( index * 0.1 );
+}
+
 static double analytical_field_element( int index, int total )
 {
     (void)total;
@@ -145,6 +151,11 @@ int main( int argc, char* argv[] )
     MPI_Comm comm = MPI_COMM_WORLD;
 #endif
 
+    int myrank = 0;
+#ifdef MOAB_HAVE_MPI
+    MPI_Comm_rank( MPI_COMM_WORLD, &myrank );
+#endif
+
     ErrCode ierr = iMOAB_Initialize( argc, argv );
     CHECKIERR( ierr, "iMOAB_Initialize failed" );
 
@@ -181,19 +192,21 @@ int main( int argc, char* argv[] )
                                       &intxCompID, intxPID );
     CHECKIERR( ierr, "Register intersection app failed" );
 
+#ifdef MOAB_HAVE_MPI
+    const char* read_opts = "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS";
+#else
     const char* read_opts = "";
+#endif
     int num_ghost_layers  = 0;
     CHECKIERR( iMOAB_LoadMesh( srcPID, sourceMeshFile.c_str(), read_opts, &num_ghost_layers ), "Load source mesh failed" );
     CHECKIERR( iMOAB_LoadMesh( tgtPID, targetMeshFile.c_str(), read_opts, &num_ghost_layers ), "Load target mesh failed" );
-    CHECKIERR( ierr, "Load target mesh failed" );
 
     int nverts[3], nelem[3], nedges[3], nfaces[3];
     CHECKIERR( iMOAB_GetMeshInfo( srcPID, nverts, nelem, nullptr, nullptr, nullptr, nedges, nfaces ), "Get source mesh info failed" );
-    CHECKIERR( ierr, "Get source mesh info failed" );
-    std::cout << "Source: " << nverts[0] << " vertices, " << nelem[0] << " elements, " << nedges[0] << " edges, " << nfaces[0] << " faces (local).\n";
+    // std::cout << "Source: " << nverts[0] << " vertices, " << nelem[0] << " elements, " << nedges[0] << " edges, " << nfaces[0] << " faces (local).\n";
 
     CHECKIERR( iMOAB_GetMeshInfo( tgtPID, nverts, nelem, nullptr, nullptr, nullptr, nedges, nfaces ), "Get target mesh info failed" );
-    std::cout << "Target: " << nverts[0] << " vertices, " << nelem[0] << " elements, " << nedges[0] << " edges, " << nfaces[0] << " faces (local).\n";
+    // std::cout << "Target: " << nverts[0] << " vertices, " << nelem[0] << " elements, " << nedges[0] << " edges, " << nfaces[0] << " faces (local).\n";
 
     const std::string weights_id = "scalar";
     const std::string source_tag  = "analytical_field";
@@ -210,6 +223,19 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "Load map file failed" );
         std::cout << "Loaded map from " << mapFile << " (source_entity=" << sourceEntityStr
                   << ", target_entity=" << targetEntityStr << ").\n";
+
+        // Migrate the source mesh to create the correct covering-source mesh
+        // on each rank, consistent with the target decomposition.
+#ifdef MOAB_HAVE_MPI
+        {
+            MPI_Group worldGroup;
+            MPI_Comm_group( comm, &worldGroup );
+            ierr = iMOAB_MigrateMapMesh( srcPID, intxPID, &comm, &worldGroup, &worldGroup,
+                                         &src_disc, &srcCompID, &intxCompID );
+            MPI_Group_free( &worldGroup );
+            CHECKIERR( ierr, "MigrateMapMesh failed" );
+        }
+#endif
 #else
         std::cerr << "Map file requires NetCDF; rebuild MOAB with NetCDF.\n";
         return 1;
@@ -217,6 +243,7 @@ int main( int argc, char* argv[] )
     }
     else
     {
+        // this will only work for FACE to FACE 
         ierr = iMOAB_ComputeMeshIntersectionOnSphere( srcPID, tgtPID, intxPID );
         CHECKIERR( ierr, "Compute mesh intersection failed" );
 
@@ -233,11 +260,14 @@ int main( int argc, char* argv[] )
 
     int tag_type      = IMOAB_DENSE_DOUBLE_TAG;
     int ncomp         = 1;
-    int tag_index_src = 0, tag_index_tgt = 0;
+    int tag_index_src = 0, tag_index_tgt = 0, tag_index_cov = 0;
     ierr = iMOAB_DefineTagStorage( srcPID, source_tag.c_str(), &tag_type, &ncomp, &tag_index_src );
     CHECKIERR( ierr, "Define source tag failed" );
     ierr = iMOAB_DefineTagStorage( tgtPID, target_tag.c_str(), &tag_type, &ncomp, &tag_index_tgt );
     CHECKIERR( ierr, "Define target tag failed" );
+    // Also define source tag on the intersection/coverage app so Send/ReceiveElementTag can populate it.
+    ierr = iMOAB_DefineTagStorage( intxPID, source_tag.c_str(), &tag_type, &ncomp, &tag_index_cov );
+    CHECKIERR( ierr, "Define coverage source tag failed" );
 
     ierr = iMOAB_GetMeshInfo( srcPID, nverts, nelem, nullptr, nullptr, nullptr, nedges, nfaces );
     CHECKIERR( ierr, "Get source mesh info (2) failed" );
@@ -266,7 +296,16 @@ int main( int argc, char* argv[] )
             vals[i] = analytical_field_vertex( coords[3 * i], coords[3 * i + 1], coords[3 * i + 2] );
         int ent_type = IMOAB_VERTEX_ENTITY;
         ierr = iMOAB_SetDoubleTagStorage( srcPID, source_tag.c_str(), &nent, &ent_type, vals.data() );
-        CHECKIERR( ierr, "Set source vertex tag failed" );
+        CHECKIERR( ierr, "Set source vertex tag on vertices failed" );
+    }
+    else if( srcEntityType == IMOAB_EDGE_ENTITY && nent > 0 )
+    {
+        std::vector< double > vals( nent );
+        for( int i = 0; i < nent; ++i )
+            vals[i] = analytical_field_edge( i, nent );
+        int ent_type = IMOAB_EDGE_ENTITY;
+        ierr = iMOAB_SetDoubleTagStorage( srcPID, source_tag.c_str(), &nent, &ent_type, vals.data() );
+        CHECKIERR( ierr, "Set source edge tag failed" );
     }
     else if( nent > 0 )
     {
@@ -275,15 +314,39 @@ int main( int argc, char* argv[] )
             vals[i] = analytical_field_element( i, nent );
         int ent_type = srcEntityType;
         ierr = iMOAB_SetDoubleTagStorage( srcPID, source_tag.c_str(), &nent, &ent_type, vals.data() );
-        CHECKIERR( ierr, "Set source entity tag failed" );
+        CHECKIERR( ierr, "Set source entity tag on elements failed" );
     }
+    else
+    {
+        std::cerr << "[rank " << myrank << "] WARNING: nent=0 for source entity type " << srcEntityType
+                  << ", skipping SetDoubleTagStorage\n";
+    }
+
+    // In parallel, the source field must be communicated from the source mesh to the
+    // covering-source mesh (set up by iMOAB_MigrateMapMesh), so that
+    // iMOAB_ApplyScalarProjectionWeights reads the correct values from the coverage entities.
+#ifdef MOAB_HAVE_MPI
+    if( haveMapFile )
+    {
+        ierr = iMOAB_SendElementTag( srcPID, source_tag.c_str(), &comm, &intxCompID );
+        CHECKIERR( ierr, "SendElementTag source failed" );
+        ierr = iMOAB_ReceiveElementTag( intxPID, source_tag.c_str(), &comm, &srcCompID );
+        CHECKIERR( ierr, "ReceiveElementTag coverage failed" );
+        ierr = iMOAB_FreeSenderBuffers( srcPID, &intxCompID );
+        CHECKIERR( ierr, "FreeSenderBuffers failed" );
+    }
+#endif
 
     int filter_weights = 0;
     ierr = iMOAB_ApplyScalarProjectionWeights( intxPID, &filter_weights, weights_id.c_str(),
                                               source_tag.c_str(), target_tag.c_str() );
     CHECKIERR( ierr, "Apply scalar projection weights failed" );
 
+#ifdef MOAB_HAVE_MPI
+    const char* write_opts = "PARALLEL=WRITE_PART";
+#else
     const char* write_opts = "";
+#endif
     ierr = iMOAB_WriteMesh( tgtPID, outputFile.c_str(), write_opts );
     CHECKIERR( ierr, "Write target mesh failed" );
     std::cout << "Wrote " << outputFile << " with projected field '" << target_tag << "' (visualize with Visit/ParaView).\n";

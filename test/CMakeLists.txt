@@ -251,6 +251,15 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
       add_test( ${noparbase} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${noparbase} ${MPIEXEC_POSTFLAGS} )
     endforeach()
 
+    # 2-rank parallel variant of imoab_applymap (face, vertex, and element entity types)
+    if( MPIEXEC_MAX_NUMPROCS GREATER_EQUAL 2 )
+      add_test( imoab_applymap_parallel
+        ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS}
+        ${EXECUTABLE_OUTPUT_PATH}/imoab_applymap ${MPIEXEC_POSTFLAGS} )
+      set_tests_properties( imoab_applymap_parallel PROPERTIES
+        TIMEOUT 300 LABELS "imoab;parallel" )
+    endif()
+
     # Fortran tests
     set( MBTRF_TESTS parallel/imoab_ptest.F parallel/imoab_coupler_fortran.F90 parallel/imoab_coupler_caas.F90  )
     

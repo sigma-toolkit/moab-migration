@@ -5028,10 +5028,48 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
                         "missing GLOBAL_ID on requested target entities" );
     }
 
-    // pass tgt ordered dofs, and unique
-    std::vector< int > sortTgtDofs( tgtDofValues.begin(), tgtDofValues.end() );
-    std::sort( sortTgtDofs.begin(), sortTgtDofs.end() );
-    sortTgtDofs.erase( std::unique( sortTgtDofs.begin(), sortTgtDofs.end() ), sortTgtDofs.end() );
+    // Build sortTgtDofs so that each target DOF is requested by exactly one MPI rank.
+    // We cannot rely on pstatus for edges/faces (not set by all parallel readers), so
+    // use an MPI_Allreduce MIN over DOF IDs: each DOF is owned by the minimum rank that
+    // holds it. This guarantees no overlap across ranks regardless of entity type.
+    std::vector< int > sortTgtDofs;
+#ifdef MOAB_HAVE_MPI
+    if( data_target.pcomm && data_target.pcomm->size() > 1 )
+    {
+        int myrank  = static_cast< int >( data_target.pcomm->rank() );
+        MPI_Comm tgtComm = data_target.pcomm->comm();
+
+        // Find the global maximum DOF ID to size the ownership array
+        int local_max_dof = tgtDofValues.empty() ? 0
+            : *std::max_element( tgtDofValues.begin(), tgtDofValues.end() );
+        int global_max_dof = 0;
+        MPI_Allreduce( &local_max_dof, &global_max_dof, 1, MPI_INT, MPI_MAX, tgtComm );
+
+        if( global_max_dof > 0 )
+        {
+            // dof_min_rank[d] = minimum rank index that holds DOF d (1-based)
+            int nranks = static_cast< int >( data_target.pcomm->size() );
+            std::vector< int > dof_min_rank( global_max_dof + 1, nranks );
+            for( int d : tgtDofValues )
+                if( d > 0 && d <= global_max_dof )
+                    dof_min_rank[d] = myrank;
+            MPI_Allreduce( MPI_IN_PLACE, dof_min_rank.data(), global_max_dof + 1, MPI_INT, MPI_MIN, tgtComm );
+            // Keep only DOFs where this rank is the canonical owner (min rank)
+            for( int d : tgtDofValues )
+                if( d > 0 && d <= global_max_dof && dof_min_rank[d] == myrank )
+                    sortTgtDofs.push_back( d );
+            std::sort( sortTgtDofs.begin(), sortTgtDofs.end() );
+            sortTgtDofs.erase( std::unique( sortTgtDofs.begin(), sortTgtDofs.end() ), sortTgtDofs.end() );
+        }
+    }
+    else
+#endif
+    {
+        // serial: every DOF is owned by the single rank
+        sortTgtDofs.assign( tgtDofValues.begin(), tgtDofValues.end() );
+        std::sort( sortTgtDofs.begin(), sortTgtDofs.end() );
+        sortTgtDofs.erase( std::unique( sortTgtDofs.begin(), sortTgtDofs.end() ), sortTgtDofs.end() );
+    }
 
     // Optional: provide unique source edge DoFs when the source association is edge-based.
     std::vector< int > sortSrcEdgeDofs;
@@ -5104,35 +5142,6 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
     weightMap->set_row_dc_dofs( tgtDofValues );  // will set row_dtoc_dofmap
 
     // Diagnostic: report entity association and DoF mapping hit rates
-    {
-        int col_hits   = weightMap->count_col_dof_hits();
-        int col_total  = weightMap->col_dof_map_size();
-        int row_hits   = weightMap->count_row_dof_hits();
-        int row_total  = weightMap->row_dof_map_size();
-        std::cout << "[iMOAB_LoadMapFile] source_entity_type=" << *source_entity_type
-                  << " target_entity_type=" << *target_entity_type << "\n"
-                  << "  src_ents_of_interest.size()=" << src_ents_of_interest.size()
-                  << " tgt_ents_of_interest.size()=" << tgt_ents_of_interest.size() << "\n"
-                  << "  col_dtoc_dofmap: hits=" << col_hits << " misses=" << ( col_total - col_hits )
-                  << " total=" << col_total << "\n"
-                  << "  row_dtoc_dofmap: hits=" << row_hits << " misses=" << ( row_total - row_hits )
-                  << " total=" << row_total << "\n"
-                  << "  weightMatrix: " << weightMap->GetWeightMatrix().rows() << "x"
-                  << weightMap->GetWeightMatrix().cols() << " nnz="
-                  << weightMap->GetWeightMatrix().nonZeros() << "\n";
-        int nsamp = std::min( 5, (int)srcDofValues.size() );
-        std::cout << "  srcDofValues[0.." << nsamp - 1 << "]:";
-        for( int i = 0; i < nsamp; i++ ) std::cout << " " << srcDofValues[i];
-        std::cout << "\n  col_dtoc_dofmap[0.." << nsamp - 1 << "]:";
-        for( int i = 0; i < nsamp; i++ ) std::cout << " " << weightMap->get_col_dof_at( i );
-        std::cout << "\n";
-        nsamp = std::min( 5, (int)tgtDofValues.size() );
-        std::cout << "  tgtDofValues[0.." << nsamp - 1 << "]:";
-        for( int i = 0; i < nsamp; i++ ) std::cout << " " << tgtDofValues[i];
-        std::cout << "\n  row_dtoc_dofmap[0.." << nsamp - 1 << "]:";
-        for( int i = 0; i < nsamp; i++ ) std::cout << " " << weightMap->get_row_dof_at( i );
-        std::cout << "\n";
-    }
 
     /// @todo Ideally, we should get this metadata from remap_weights_filename and propagate it
     std::string metadataStr = std::string( remap_weights_filename ) + ";";

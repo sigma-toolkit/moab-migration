@@ -1554,9 +1554,27 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             // tl_re shows to what proc do we need to send the tuple (row, col, val)
             moab::TupleList* tl_back = new moab::TupleList;
             unsigned numr            = 1;  //
-            // localSize is a good guess, but maybe it should be bigger ?
-            // this could be bigger for repeated dofs
-            tl_back->initialize( 3, 0, 0, numr, tl->get_n() );  // to proc, row, col, value
+
+            // Calculate exact capacity needed: sum over all DOFs of (number of requestors per DOF)
+            unsigned tl_back_capacity = 0;
+            for( unsigned k = 0; k < tl->get_n(); k++ )
+            {
+                int valDof = tl->vi_rd[3 * k + 1];
+                if( startDofIndex.find( valDof ) != startDofIndex.end() )
+                    tl_back_capacity += endDofIndex[valDof] - startDofIndex[valDof] + 1;
+            }
+            // Fallback to original size if no requests (shouldn't happen)
+            if( tl_back_capacity == 0 ) tl_back_capacity = tl->get_n();
+
+            // Debug: check if we have capacity issues
+            if( tl_back_capacity > 10 * tl->get_n() )
+            {
+                std::cerr << "[ReadParallelMap] WARNING: tl_back capacity " << tl_back_capacity
+                         << " much larger than tl size " << tl->get_n()
+                         << " (factor " << (double)tl_back_capacity / tl->get_n() << ")" << std::endl;
+            }
+
+            tl_back->initialize( 3, 0, 0, numr, tl_back_capacity );  // to proc, row, col, value
             tl_back->enableWriteAccess();
             // now loop over tl and tl_re to see where to send
             // form the new tuple, which will contain the desired dofs per task, per row or column distribution

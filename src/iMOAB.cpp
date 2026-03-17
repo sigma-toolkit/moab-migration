@@ -98,7 +98,7 @@
 // C++ includes
 #include <cassert>
 #include <sstream>
-
+#include <set>
 #include <iostream>
 
 using namespace moab;
@@ -5028,48 +5028,10 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
                         "missing GLOBAL_ID on requested target entities" );
     }
 
-    // Build sortTgtDofs so that each target DOF is requested by exactly one MPI rank.
-    // We cannot rely on pstatus for edges/faces (not set by all parallel readers), so
-    // use an MPI_Allreduce MIN over DOF IDs: each DOF is owned by the minimum rank that
-    // holds it. This guarantees no overlap across ranks regardless of entity type.
-    std::vector< int > sortTgtDofs;
-#ifdef MOAB_HAVE_MPI
-    if( data_target.pcomm && data_target.pcomm->size() > 1 )
-    {
-        int myrank  = static_cast< int >( data_target.pcomm->rank() );
-        MPI_Comm tgtComm = data_target.pcomm->comm();
-
-        // Find the global maximum DOF ID to size the ownership array
-        int local_max_dof = tgtDofValues.empty() ? 0
-            : *std::max_element( tgtDofValues.begin(), tgtDofValues.end() );
-        int global_max_dof = 0;
-        MPI_Allreduce( &local_max_dof, &global_max_dof, 1, MPI_INT, MPI_MAX, tgtComm );
-
-        if( global_max_dof > 0 )
-        {
-            // dof_min_rank[d] = minimum rank index that holds DOF d (1-based)
-            int nranks = static_cast< int >( data_target.pcomm->size() );
-            std::vector< int > dof_min_rank( global_max_dof + 1, nranks );
-            for( int d : tgtDofValues )
-                if( d > 0 && d <= global_max_dof )
-                    dof_min_rank[d] = myrank;
-            MPI_Allreduce( MPI_IN_PLACE, dof_min_rank.data(), global_max_dof + 1, MPI_INT, MPI_MIN, tgtComm );
-            // Keep only DOFs where this rank is the canonical owner (min rank)
-            for( int d : tgtDofValues )
-                if( d > 0 && d <= global_max_dof && dof_min_rank[d] == myrank )
-                    sortTgtDofs.push_back( d );
-            std::sort( sortTgtDofs.begin(), sortTgtDofs.end() );
-            sortTgtDofs.erase( std::unique( sortTgtDofs.begin(), sortTgtDofs.end() ), sortTgtDofs.end() );
-        }
-    }
-    else
-#endif
-    {
-        // serial: every DOF is owned by the single rank
-        sortTgtDofs.assign( tgtDofValues.begin(), tgtDofValues.end() );
-        std::sort( sortTgtDofs.begin(), sortTgtDofs.end() );
-        sortTgtDofs.erase( std::unique( sortTgtDofs.begin(), sortTgtDofs.end() ), sortTgtDofs.end() );
-    }
+    // pass tgt ordered dofs, and unique
+    std::vector< int > sortTgtDofs( tgtDofValues.begin(), tgtDofValues.end() );
+    std::sort( sortTgtDofs.begin(), sortTgtDofs.end() );
+    sortTgtDofs.erase( std::unique( sortTgtDofs.begin(), sortTgtDofs.end() ), sortTgtDofs.end() );
 
     // Optional: provide unique source edge DoFs when the source association is edge-based.
     std::vector< int > sortSrcEdgeDofs;

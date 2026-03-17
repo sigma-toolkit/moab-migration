@@ -121,6 +121,8 @@ struct TempestMapAppData
     iMOAB_AppID pid_dest;
     int num_src_ghost_layers;  // number of ghost layers
     int num_tgt_ghost_layers;  // number of ghost layers
+    iMOAB_EntityType source_entity_type;  // entity type for source in remap (default: IMOAB_FACE_ENTITY)
+    iMOAB_EntityType target_entity_type;  // entity type for target in remap (default: IMOAB_FACE_ENTITY)
 };
 #endif
 
@@ -510,6 +512,8 @@ ErrCode iMOAB_RegisterApplication( const iMOAB_String app_name,
     app_data.tempestData.remapper             = nullptr;  // Only allocate as needed
     app_data.tempestData.num_src_ghost_layers = 0;
     app_data.tempestData.num_tgt_ghost_layers = 0;
+    app_data.tempestData.source_entity_type   = IMOAB_FACE_ENTITY;  // default: faces
+    app_data.tempestData.target_entity_type   = IMOAB_FACE_ENTITY;  // default: faces
 #endif
 
     // set some default values
@@ -3507,21 +3511,46 @@ ErrCode iMOAB_SendElementTag( iMOAB_AppID pid,
     MPI_Comm global = ( data.is_fortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( joint_communicator ) )
                                         : *joint_communicator );
 
-    // Determine target entities: vertices for point clouds, elements for regular meshes
-    Range owned = ( data.point_cloud ? data.local_verts : data.owned_elems );
+    // Determine target entities: vertices for point clouds, elements for regular meshes.
+    // If the ParCommGraph has an explicit entity dimension (set during ComputeCommGraph for edge/vertex
+    // maps), use it to select the correct entities from this app's file set.
+    Range owned;
+    if( data.point_cloud )
+    {
+        owned = data.local_verts;
+    }
+    else if( cgraph->get_entity_dimension() >= 0 && cgraph->get_entity_dimension() != data.dimension )
+    {
+        // Entity dimension on the comm graph differs from the app's primary element dimension;
+        // fetch entities of the graph's dimension from the file set.
+        MB_CHK_ERR( context.MBI->get_entities_by_dimension( data.file_set, cgraph->get_entity_dimension(), owned ) );
+    }
+    else
+    {
+        owned = data.owned_elems;
+    }
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
     // Handle TempestRemap coverage mesh entities for intersection applications
     if( data.tempestData.remapper != nullptr )  // This is the case for intersection operations
     {
         EntityHandle cover_set = data.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
+        owned.clear();
         MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, owned ) );
+        if( owned.empty() )
+            MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 1, owned ) );
     }
 #else
     // Handle coverage set entities for intersection applications (non-TempestRemap case)
     // This covers cases where elements have been instantiated in coverage sets during intersection
     EntityHandle cover_set = cgraph->get_cover_set();  // Non-null only for intersection applications
-    if( 0 != cover_set ) MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, owned ) );
+    if( 0 != cover_set )
+    {
+        owned.clear();
+        MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, owned ) );
+        if( owned.empty() )
+            MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 1, owned ) );
+    }
 #endif
 
     // Parse tag names from the input string (multiple tags separated by colons)
@@ -3614,20 +3643,43 @@ ErrCode iMOAB_ReceiveElementTag( iMOAB_AppID pid,
     MPI_Comm global = ( data.is_fortran ? MPI_Comm_f2c( *reinterpret_cast< MPI_Fint* >( joint_communicator ) )
                                         : *joint_communicator );
 
-    // Determine target entities: vertices for point clouds, elements for regular meshes
-    Range owned = ( data.point_cloud ? data.local_verts : data.owned_elems );
+    // Determine target entities: vertices for point clouds, elements for regular meshes.
+    // If the ParCommGraph has an explicit entity dimension (set during ComputeCommGraph for edge/vertex
+    // maps), use it to select the correct entities from this app's file set.
+    Range owned;
+    if( data.point_cloud )
+    {
+        owned = data.local_verts;
+    }
+    else if( cgraph->get_entity_dimension() >= 0 && cgraph->get_entity_dimension() != data.dimension )
+    {
+        MB_CHK_ERR( context.MBI->get_entities_by_dimension( data.file_set, cgraph->get_entity_dimension(), owned ) );
+    }
+    else
+    {
+        owned = data.owned_elems;
+    }
 
     // Handle coverage set entities for intersection applications
     // This covers cases where elements have been instantiated in coverage sets during intersection
     EntityHandle cover_set = cgraph->get_cover_set();
-    if( 0 != cover_set ) MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, owned ) );
+    if( 0 != cover_set )
+    {
+        owned.clear();
+        MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, owned ) );
+        if( owned.empty() )
+            MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 1, owned ) );
+    }
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
     // Handle TempestRemap coverage mesh entities for intersection applications
     if( data.tempestData.remapper != nullptr )  // This is the case for intersection operations
     {
         cover_set = data.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
+        owned.clear();
         MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, owned ) );
+        if( owned.empty() )
+            MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 1, owned ) );
     }
 #endif
 
@@ -3810,6 +3862,33 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
     }
     Tag gidTag = context.MBI->globalId_tag();  // Standard GLOBAL_ID tag
 
+    // Determine entity dimension for FV paths from stored entity types on the intersection app.
+    // Default to dim-2 (faces) for backward compatibility when no entity types are stored.
+    int src_dim = 2, tgt_dim = 2;
+#ifdef MOAB_HAVE_TEMPESTREMAP
+    // Check pid1 and pid2 for stored entity type info (one of them is the intersection app)
+    if( *pid1 >= 0 && context.appDatas[*pid1].tempestData.remapper != nullptr )
+    {
+        TempestMapAppData& td = context.appDatas[*pid1].tempestData;
+        if( td.source_entity_type == IMOAB_EDGE_ENTITY ) src_dim = 1;
+        else if( td.source_entity_type == IMOAB_VERTEX_ENTITY ) src_dim = 0;
+        if( td.target_entity_type == IMOAB_EDGE_ENTITY ) tgt_dim = 1;
+        else if( td.target_entity_type == IMOAB_VERTEX_ENTITY ) tgt_dim = 0;
+    }
+    if( *pid2 >= 0 && context.appDatas[*pid2].tempestData.remapper != nullptr )
+    {
+        TempestMapAppData& td = context.appDatas[*pid2].tempestData;
+        if( td.source_entity_type == IMOAB_EDGE_ENTITY ) src_dim = 1;
+        else if( td.source_entity_type == IMOAB_VERTEX_ENTITY ) src_dim = 0;
+        if( td.target_entity_type == IMOAB_EDGE_ENTITY ) tgt_dim = 1;
+        else if( td.target_entity_type == IMOAB_VERTEX_ENTITY ) tgt_dim = 0;
+    }
+#endif
+    // Set entity dimension on both ParCommGraph objects
+    // pid1's graph sends source entities, pid2's graph receives source entities
+    if( cgraph != nullptr ) cgraph->set_entity_dimension( src_dim );
+    if( cgraph_rev != nullptr ) cgraph_rev->set_entity_dimension( src_dim );
+
     // Collect entity IDs from component 1 for rendezvous algorithm
     std::vector< int > valuesComp1;
     if( *pid1 >= 0 )
@@ -3837,9 +3916,9 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
             valuesComp1.resize( ents_of_interest.size() );
             MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] ) );
         }
-        else if( iMOAB_DiscretizationType::IMOAB_FV_DISCRETIZATION == *type1 )  // Finite volume meshes: get GLOBAL_ID from 2D elements
+        else if( iMOAB_DiscretizationType::IMOAB_FV_DISCRETIZATION == *type1 )  // Finite volume meshes: get GLOBAL_ID from elements
         {
-            MB_CHK_ERR( context.MBI->get_entities_by_dimension( fset1, 2, ents_of_interest ) );
+            MB_CHK_ERR( context.MBI->get_entities_by_dimension( fset1, src_dim, ents_of_interest ) );
             valuesComp1.resize( ents_of_interest.size() );
             MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] ) );
         }
@@ -3911,9 +3990,9 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
             valuesComp2.resize( ents_of_interest.size() );
             MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp2[0] ) );
         }
-        else if( iMOAB_DiscretizationType::IMOAB_FV_DISCRETIZATION == *type2 )  // Finite volume meshes: get GLOBAL_ID from 2D elements
+        else if( iMOAB_DiscretizationType::IMOAB_FV_DISCRETIZATION == *type2 )  // Finite volume meshes: get GLOBAL_ID from elements
         {
-            MB_CHK_ERR( context.MBI->get_entities_by_dimension( fset2, 2, ents_of_interest ) );
+            MB_CHK_ERR( context.MBI->get_entities_by_dimension( fset2, src_dim, ents_of_interest ) );
             valuesComp2.resize( ents_of_interest.size() );
             MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp2[0] ) );
         }
@@ -4869,6 +4948,10 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
     //#ifdef MOAB_HAVE_TEMPESTREMAP
     TempestMapAppData& tdata = data_intx.tempestData;
 
+    // Store the entity types on the intersection app so downstream functions can query them
+    tdata.source_entity_type = static_cast< iMOAB_EntityType >( *source_entity_type );
+    tdata.target_entity_type = static_cast< iMOAB_EntityType >( *target_entity_type );
+
     // check if the remapped context is null; we need to fix that, if so
     // what if we read a map and compute a map, on a particular iMOAB app a2o for example?
     // we compute an intx map and read a bilinear map
@@ -5252,7 +5335,15 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         }
         else if( *type == 3 )  // for FV meshes, just get the global id of cell
         {
-            MB_CHK_ERR( context.MBI->get_entities_by_dimension( fset1, 2, ents_of_interest ) );
+            // Derive entity dimension from stored entity type on intersection app (pid2)
+            int dim = 2;  // default: faces
+            if( *pid2 >= 0 )
+            {
+                iMOAB_EntityType src_ent = context.appDatas[*pid2].tempestData.source_entity_type;
+                if( src_ent == IMOAB_EDGE_ENTITY ) dim = 1;
+                else if( src_ent == IMOAB_VERTEX_ENTITY ) dim = 0;
+            }
+            MB_CHK_ERR( context.MBI->get_entities_by_dimension( fset1, dim, ents_of_interest ) );
             valuesComp1.resize( ents_of_interest.size() );
             MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] ) );  // just global ids
         }
@@ -5617,9 +5708,10 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                         conn[j] = vertexMap[TLc.vi_rd[size_tuple * i + current_index + j + 1]];
                     }
                     //
-                    EntityType entType = MBQUAD;
-                    if( nnodes > 4 ) entType = MBPOLYGON;
-                    if( nnodes < 4 ) entType = MBTRI;
+                    EntityType entType = MBPOLYGON;
+                    if( nnodes == 2 ) entType = MBEDGE;
+                    else if( nnodes == 3 ) entType = MBTRI;
+                    else if( nnodes == 4 ) entType = MBQUAD;
                     MB_CHK_SET_ERR( context.MBI->create_element( entType, &conn[0], nnodes, new_element ),
                                     "can't create new element " );
                     primary_ents.insert( new_element );

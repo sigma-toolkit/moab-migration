@@ -177,6 +177,17 @@ class ParCommGraph
         cover_set = cover;
     }
 
+    // entity dimension for the entities communicated through this graph
+    // default -1 means "not set" (use legacy behavior)
+    int get_entity_dimension() const
+    {
+        return entity_dim;
+    }
+    void set_entity_dimension( int dim )
+    {
+        entity_dim = dim;
+    }
+
     // return local graph for a specific task
     ErrorCode split_owned_range( int sender_rank, Range& owned );
 
@@ -252,6 +263,7 @@ class ParCommGraph
     int context_id;          // used to identify the other comp for intersection
     EntityHandle cover_set;  // will be initialized only if it is the receiver parcomm graph, in
                              // CoverageGraph
+    int entity_dim;          // entity dimension for communicated entities (-1 = not set, use legacy)
 
     // communication graph from group1 to group2;
     //  graph[task1] = vec1; // vec1 is a stl vector of tasks in group2

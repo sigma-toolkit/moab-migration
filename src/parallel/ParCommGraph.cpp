@@ -47,6 +47,7 @@ ParCommGraph::ParCommGraph( MPI_Comm joincomm, MPI_Group group1, MPI_Group group
     comm_graph = NULL;
     context_id = -1;
     cover_set  = 0;  // refers to nothing yet
+    entity_dim = -1; // not set; use legacy dimension behavior
 }
 
 // copy constructor will copy only few basic things; split ranges will not be copied
@@ -67,7 +68,7 @@ ParCommGraph::ParCommGraph( const ParCommGraph& src )
     graph_type    = src.graph_type;
     context_id    = src.context_id;
     cover_set     = src.cover_set;
-    return;
+    entity_dim    = src.entity_dim;
 }
 
 ParCommGraph::~ParCommGraph()

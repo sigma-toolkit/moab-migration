@@ -576,7 +576,7 @@ ErrorCode ReadRTT::side_process_faces( rtt_flags side_flags, std::vector< side >
             side_data.push_back( data );
         }
     }
-    //if( side_data.size() == 0 ) return MB_FAILURE;
+    if( side_data.size() == 0 && header_data.contiguity != "discontiguous" ) return MB_FAILURE;
     return MB_SUCCESS;
 }
 
@@ -726,7 +726,7 @@ ErrorCode ReadRTT::read_facets( const char* filename, std::vector< facet >& face
         }
         input_file.close();
     }
-    //if( facet_data.size() == 0 ) return MB_FAILURE;
+    if( facet_data.size() == 0 && header_data.contiguity != "discontiguous" ) return MB_FAILURE;
     return MB_SUCCESS;
 }
 

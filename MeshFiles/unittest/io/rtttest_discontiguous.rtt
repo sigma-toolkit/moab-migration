@@ -1,0 +1,111 @@
+rtt_ascii
+
+header
+  version    v1.0.1
+  title      DiscontiguousTest
+  date       2025-01-01T00:00:00+0000
+  cycle      0
+  time       0
+  contiguity discontiguous
+  ncomments  0
+end_header
+
+dims
+  coor_units       cm
+  prob_time_units  s
+  ncell_defs       4
+  nnodes_max       4
+  nsides_max       4
+  nnodes_side_max  3
+  ndim             3
+  ndim_topo        3
+  nnodes           8
+  nnode_flag_types 0
+  nnode_flags      0
+  nnode_data       0
+  nsides           0
+  nside_types      0
+  side_types       0
+  nside_flag_types 0
+  nside_data       0
+  ncells           2
+  ncell_types      1
+  cell_types       4
+  ncell_flag_types 1
+  ncell_flags      2
+  ncell_data       0
+end_dims
+
+node_flags
+end_node_flags
+
+side_flags
+end_side_flags
+
+cell_flags
+  1 REGIONS
+    1 Vol1
+    2 Vol2
+end_cell_flags
+
+node_data_ids
+end_node_data_ids
+
+side_data_ids
+end_side_data_ids
+
+cell_data_ids
+end_cell_data_ids
+
+cell_defs
+  1 point
+    1 0
+  2 lines
+    2 2
+    1 1
+    1
+    2
+  3 triangle
+    3 3
+    2 2 2
+    2 3
+    3 1
+    1 2
+  4 tetrahedron
+    4 4
+    3 3 3 3
+    2 3 4
+    1 4 3
+    1 2 4
+    1 3 2
+end_cell_defs
+
+nodes
+  1  0.0000000000e+00  0.0000000000e+00  0.0000000000e+00 1
+  2  1.0000000000e+00  0.0000000000e+00  0.0000000000e+00 1
+  3  0.0000000000e+00  1.0000000000e+00  0.0000000000e+00 1
+  4  0.0000000000e+00  0.0000000000e+00  1.0000000000e+00 1
+  5  5.0000000000e+00  0.0000000000e+00  0.0000000000e+00 1
+  6  6.0000000000e+00  0.0000000000e+00  0.0000000000e+00 1
+  7  5.0000000000e+00  1.0000000000e+00  0.0000000000e+00 1
+  8  5.0000000000e+00  0.0000000000e+00  1.0000000000e+00 1
+end_nodes
+
+sides
+end_sides
+
+cells
+  1 4  1 2 3 4  1
+  2 4  5 6 7 8  2
+end_cells
+
+nodedat
+end_nodedat
+
+sidedat
+end_sidedat
+
+celldat
+end_celldat
+
+end_rtt_mesh

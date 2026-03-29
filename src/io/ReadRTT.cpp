@@ -822,6 +822,11 @@ ErrorCode ReadRTT::parse_dims( std::ifstream& input_file )
         return MB_FAILURE;
     }
 
+    // Track header values that are not stored but should be consistent with a tet mesh.
+    // -1 indicates the field was not present in the file.
+    int nnodes_side_max_val = -1;
+    int ndim_topo_val       = -1;
+
     std::string line;
     std::vector< std::string > tokens;
     while( std::getline( input_file, line ) )
@@ -852,15 +857,15 @@ ErrorCode ReadRTT::parse_dims( std::ifstream& input_file )
         }
         else if( tokens[0] == "nnodes_side_max" )
         {
-            dim_data.nnodes_sides_max = std::atoi( tokens[1].c_str() );
+            nnodes_side_max_val = std::atoi( tokens[1].c_str() );
+        }
+        else if( tokens[0] == "ndim_topo" )
+        {
+            ndim_topo_val = std::atoi( tokens[1].c_str() );
         }
         else if( tokens[0] == "ndim" )
         {
             dim_data.ndim = std::atoi( tokens[1].c_str() );
-        }
-        else if( tokens[0] == "ndim_topo" )
-        {
-            dim_data.n_dim_topo = std::atoi( tokens[1].c_str() );
         }
         else if( tokens[0] == "nnodes" )
         {
@@ -936,6 +941,20 @@ ErrorCode ReadRTT::parse_dims( std::ifstream& input_file )
             dim_data.ncell_data = std::atoi( tokens[1].c_str() );
         }
     }
+    // Warn if nnodes_side_max or ndim_topo are missing or inconsistent with a tet mesh.
+    // The reader assumes triangle sides (3 nodes per side) and 3D topology throughout.
+    if( nnodes_side_max_val == -1 )
+        std::cerr << "Warning: nnodes_side_max not found in dims block; expected 3 for a tet mesh." << std::endl;
+    else if( nnodes_side_max_val != 3 )
+        std::cerr << "Warning: nnodes_side_max is " << nnodes_side_max_val
+                  << "; expected 3 for a tet mesh. Results may be incorrect." << std::endl;
+
+    if( ndim_topo_val == -1 )
+        std::cerr << "Warning: ndim_topo not found in dims block; expected 3 for a tet mesh." << std::endl;
+    else if( ndim_topo_val != 3 )
+        std::cerr << "Warning: ndim_topo is " << ndim_topo_val
+                  << "; expected 3 for a tet mesh. Results may be incorrect." << std::endl;
+
     // Check that the data is valid and has the expected number of entries
     dim_data.validate();
 

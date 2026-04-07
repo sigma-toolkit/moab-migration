@@ -1,25 +1,31 @@
 #!/bin/bash
-# Run all parallel tests
 
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
+PYTHON_BIN=${PYTHON_BIN:-/usr/bin/python3}
+MPIEXEC_BIN=${MPIEXEC_BIN:-/opt/mpich/bin/mpiexec}
+
 echo "Running PyMOAB Parallel Tests"
 echo "=============================="
 
 echo ""
 echo "--- Test 1: ParallelComm Creation ---"
-mpiexec -n 2 python test_pcomm_creation.py
+"$MPIEXEC_BIN" -n 2 "$PYTHON_BIN" test_pcomm_creation.py
 
 echo ""
 echo "--- Test 2: Ghost Exchange ---"
-mpiexec -n 2 python test_ghost_exchange.py
+"$MPIEXEC_BIN" -n 2 "$PYTHON_BIN" test_ghost_exchange.py
 
 echo ""
 echo "--- Test 3: Shared Entities ---"
-mpiexec -n 2 python test_shared_entities.py
+"$MPIEXEC_BIN" -n 2 "$PYTHON_BIN" test_shared_entities.py
+
+echo ""
+echo "--- Test 4: ParallelComm Shutdown ---"
+"$MPIEXEC_BIN" -n 2 "$PYTHON_BIN" test_parallel_shutdown.py
 
 echo ""
 echo "=============================="

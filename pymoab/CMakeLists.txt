@@ -24,10 +24,13 @@ if (MPI_FOUND)
         get_filename_component(PY_PREFIX ${PY_BIN_DIR} DIRECTORY)
         
         execute_process(
-            COMMAND ${Python_EXECUTABLE} -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
-            OUTPUT_VARIABLE PY_VER
+            COMMAND ${Python_EXECUTABLE} -c "import site, sys; print(f'{sys.version_info.major}.{sys.version_info.minor}'); print(site.getusersitepackages())"
+            OUTPUT_VARIABLE _moab_python_site_output
             OUTPUT_STRIP_TRAILING_WHITESPACE
         )
+        string(REPLACE "\n" ";" _moab_python_site_lines "${_moab_python_site_output}")
+        list(GET _moab_python_site_lines 0 PY_VER)
+        list(GET _moab_python_site_lines 1 PY_USER_SITE)
         
         unset(MPI4PY_INCLUDE_DIR)
         unset(MPI4PY_INCLUDE_DIR CACHE)
@@ -37,6 +40,7 @@ if (MPI_FOUND)
             PATHS 
                 "${PY_PREFIX}/lib/python${PY_VER}/site-packages/mpi4py/include"
                 "${PY_PREFIX}/Lib/site-packages/mpi4py/include"
+                "${PY_USER_SITE}/mpi4py/include"
                 "${Python_SITELIB}/mpi4py/include"
                 "${Python_SITEARCH}/mpi4py/include"
             NO_DEFAULT_PATH
@@ -74,14 +78,6 @@ else()
 endif()
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.py.in ${CMAKE_CURRENT_BINARY_DIR}/config.py @ONLY)
-
-if(MPI4PY_FOUND)
-    message(STATUS "PyMOAB: Generating parallelcomm_defs.pxd with ParallelComm declarations")
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/parallelcomm_defs.pxd.in ${CMAKE_CURRENT_BINARY_DIR}/parallelcomm_defs.pxd @ONLY)
-else()
-    message(STATUS "PyMOAB: Generating empty parallelcomm_defs.pxd (MPI disabled)")
-    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/parallelcomm_defs.pxd "")
-endif()
 
 file(GLOB ALL_CYTHON_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.pyx")
 

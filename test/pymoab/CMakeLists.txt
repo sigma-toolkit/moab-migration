@@ -1,4 +1,4 @@
-# create symlinks for all fiels in directory
+# Create symlinks for all files in directory
 FILE(GLOB PYMOAB_TEST_FILES ${CMAKE_CURRENT_SOURCE_DIR} "*")
 IF(NOT ${CMAKE_SOURCE_DIR} MATCHES ${CMAKE_BINARY_DIR})
   FOREACH(PYMOAB_TEST_FILE ${PYMOAB_TEST_FILES})
@@ -6,3 +6,12 @@ IF(NOT ${CMAKE_SOURCE_DIR} MATCHES ${CMAKE_BINARY_DIR})
     EXECUTE_PROCESS(COMMAND ${CMAKE_COMMAND} -E create_symlink ${PYMOAB_TEST_FILE} ${CMAKE_CURRENT_BINARY_DIR}/${TEST_FILE})
   ENDFOREACH(PYMOAB_TEST_FILE)
 ENDIF()
+
+# Symlink parallel test directory if MPI is enabled
+if(MPI_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/parallel")
+  if(NOT ${CMAKE_SOURCE_DIR} MATCHES ${CMAKE_BINARY_DIR})
+    EXECUTE_PROCESS(COMMAND ${CMAKE_COMMAND} -E create_symlink
+      ${CMAKE_CURRENT_SOURCE_DIR}/parallel
+      ${CMAKE_CURRENT_BINARY_DIR}/parallel)
+  endif()
+endif()

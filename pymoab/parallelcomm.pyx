@@ -157,6 +157,8 @@ cdef class ParallelComm(object):
         if file_set != 0:
             fset = file_set
             ptr = &fset
+        else:
+            num_sets = 0
 
         if write_opts:
             b_write_opts = write_opts.encode('utf-8')

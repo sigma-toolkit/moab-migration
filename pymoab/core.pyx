@@ -32,9 +32,10 @@ cdef class Core(object):
         """ Constructor """
         self.inst = new moab.Core()
 
-    def __del__(self):
-        """ Destructor """
-        del self.inst
+    def __dealloc__(self):
+        if self.inst != null:
+            del self.inst
+            self.inst = NULL
 
     def impl_version(self):
         """MOAB implementation number as a float."""

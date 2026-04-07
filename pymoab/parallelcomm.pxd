@@ -108,9 +108,9 @@ cdef extern from "moab/ParallelComm.hpp" namespace "moab":
 
 # Python class declaration
 cdef class ParallelComm:
-    """Parallel communication class for MOAB."""
     cdef cParallelComm* inst
     cdef moab.Core* core
+    cdef Core _core_owner
     cdef MPIComm _comm
     cdef bint _mpi_basic
     cdef bint _mpi_io

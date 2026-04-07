@@ -58,6 +58,7 @@ cdef class ParallelComm(object):
         cdef MPI_Comm c_comm = comm.ob_mpi
 
         self.core = core.inst
+        self._core_owner = core
         self._comm = comm
         self._mpi_basic = True
         self._mpi_io = True
@@ -66,10 +67,10 @@ cdef class ParallelComm(object):
         # Create MOAB ParallelComm with C communicator
         self.inst = new cParallelComm(<moab.Interface*>(self.core), c_comm)
 
-    def __del__(self):
-        """Destructor"""
+    def __dealloc__(self):
         if self.inst != null:
             del self.inst
+            self.inst = NULL
 
     @property
     def has_basic_mpi(self):

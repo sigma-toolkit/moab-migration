@@ -691,6 +691,7 @@ if(SKBUILD OR ENABLE_PYMOAB)
       COMPONENTS Interpreter Development.Module NumPy
       REQUIRED
   )
+
   if(SKBUILD)
     # By default, scikit-build will install everything to ${SKBUILD_PLATLIB_DIR}/pymoab
     # Install include and bin directories to ${SKBUILD_PLATLIB_DIR}/pymoab/$SKBUILD_SUBDIR
@@ -712,53 +713,26 @@ if(SKBUILD OR ENABLE_PYMOAB)
       set(PYMOAB_PYTHON_MODULE_RPATH "$ORIGIN/${SKBUILD_SUBDIR}${CMAKE_INSTALL_LIBDIR}")
       set(PYMOAB_BINARY_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
     endif()
-
-    # Add the pymoab subdirectory
-    add_subdirectory(pymoab)
   else()
-    # Get a list of all Python files in the pymoab directory
-    file(GLOB PY_FILES "${CMAKE_SOURCE_DIR}/pymoab/*.py")
-    file(GLOB PXD_FILES "${CMAKE_SOURCE_DIR}/pymoab/*.pxd")
-    file(GLOB PYX_FILES "${CMAKE_SOURCE_DIR}/pymoab/*.pyx")
-
-    # Set the PyMOAB prefix
-    if (NOT PYMOAB_PREFIX)
-        set(PYMOAB_PREFIX ${CMAKE_INSTALL_PREFIX})
+    if(APPLE)
+      set(PYMOAB_LIBRARY_RPATH "@loader_path")
+      set(PYMOAB_PYTHON_MODULE_RPATH "@loader_path/../lib")
+      set(PYMOAB_BINARY_RPATH "@loader_path/../lib")
+    elseif(UNIX)
+      set(PYMOAB_LIBRARY_RPATH "$ORIGIN")
+      set(PYMOAB_PYTHON_MODULE_RPATH "$ORIGIN/../lib")
+      set(PYMOAB_BINARY_RPATH "$ORIGIN/../lib")
     endif()
 
-    # Show PyMOAB prefix
-    message(STATUS "PyMOAB prefix: ${PYMOAB_PREFIX}")
-
-    # Copy the Python files to the current binary directory
-    file( COPY ${PY_FILES} ${PXD_FILES} ${PYX_FILES} DESTINATION ${CMAKE_BINARY_DIR}/pymoab)
-
-    # Copy the pyproject.toml file to the binary directory
-    file( COPY ${CMAKE_SOURCE_DIR}/deprecated/pymoab/pyproject.toml DESTINATION ${CMAKE_BINARY_DIR})
-
-    # Configure the setup.py file
-    configure_file(${CMAKE_SOURCE_DIR}/deprecated/pymoab/setup.py.cmake ${CMAKE_BINARY_DIR}/setup.py)
-
-    # Install the PyMOAB package for testing
-    add_custom_target(
-      pymoab-test-install
-      DEPENDS MOAB
-    )
-    add_custom_command(
-      TARGET pymoab-test-install
-      COMMAND ${Python_EXECUTABLE} -m pip install . --target ${CMAKE_BINARY_DIR}/Testing
-      COMMENT "Installing PyMOAB package for testing..."
-    )
-    add_test(NAME pymoab_test COMMAND ${CMAKE_COMMAND} --build . --target pymoab-test-install)
-
-    # Install the PyMOAB package
-    install(CODE "execute_process(COMMAND ${Python_EXECUTABLE} -m pip install . --prefix ${PYMOAB_PREFIX})")
-
-    # Print a deprecation warning
     message(WARNING "ENABLE_PYMOAB and PYMOAB_PREFIX is deprecated and will be removed in the next release. "
+      "Building PyMOAB via the in-tree CMake path for compatibility. "
       "Consider installing PyMOAB via pip instead. "
       "See README.md for more information."
       )
   endif()
+
+  # Add the pymoab subdirectory
+  add_subdirectory(pymoab)
 endif()
 
 ################################################################################

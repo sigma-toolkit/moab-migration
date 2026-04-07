@@ -68,6 +68,7 @@ wheel.exclude = ["CMakeLists.txt", "Makefile.am", "*.pyx", "*.pxd"]
 # Add mpi4py include paths to Cython compilation
 [tool.scikit-build.cmake]
 define.MPI4PY_INCLUDE_DIRS = { env = "MPI4PY_INCLUDE_DIRS" }
+define.Python_EXECUTABLE = { env = "PYTHON_EXECUTABLE" }
 
 # Get version from CMakeLists
 [tool.scikit-build.metadata.version]

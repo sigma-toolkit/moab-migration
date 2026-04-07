@@ -399,6 +399,84 @@ if ( ENABLE_FORTRAN )
   set(MOAB_FC_FUNC_  "${FortranCInterface_GLOBAL__PREFIX} ${FC_CASE} ${FortranCInterface_GLOBAL__SUFFIX}")
 endif ( ENABLE_FORTRAN )
 
+function(moab_find_python_for_pymoab)
+  set(_python_components ${ARGN})
+
+  find_package(Python COMPONENTS ${_python_components})
+  if(Python_FOUND)
+    set(Python_FOUND ${Python_FOUND} PARENT_SCOPE)
+    return()
+  endif()
+
+  if(NOT APPLE OR NOT Python_EXECUTABLE)
+    set(Python_FOUND ${Python_FOUND} PARENT_SCOPE)
+    return()
+  endif()
+
+  message(STATUS "PyMOAB: retrying Python discovery with macOS interpreter sysconfig hints from ${Python_EXECUTABLE}")
+
+  execute_process(
+    COMMAND ${Python_EXECUTABLE} -c "import sysconfig; print((sysconfig.get_config_var('INCLUDEPY') or '')); print((sysconfig.get_config_var('LIBDIR') or '')); print((sysconfig.get_config_var('LDLIBRARY') or sysconfig.get_config_var('LIBRARY') or '')); print((sysconfig.get_config_var('PYTHONFRAMEWORK') or '')); print((sysconfig.get_config_var('PYTHONFRAMEWORKPREFIX') or '')); print((sysconfig.get_config_var('installed_base') or sysconfig.get_config_var('base') or ''))"
+    RESULT_VARIABLE _moab_python_sysconfig_result
+    OUTPUT_VARIABLE _moab_python_sysconfig_output
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+  )
+
+  if(_moab_python_sysconfig_result EQUAL 0)
+    string(REPLACE "\n" ";" _moab_python_sysconfig_lines "${_moab_python_sysconfig_output}")
+    list(LENGTH _moab_python_sysconfig_lines _moab_python_sysconfig_len)
+    if(_moab_python_sysconfig_len GREATER 5)
+      list(GET _moab_python_sysconfig_lines 0 _moab_python_include_dir)
+      list(GET _moab_python_sysconfig_lines 1 _moab_python_libdir)
+      list(GET _moab_python_sysconfig_lines 2 _moab_python_library_name)
+      list(GET _moab_python_sysconfig_lines 3 _moab_python_framework_name)
+      list(GET _moab_python_sysconfig_lines 4 _moab_python_framework_prefix)
+      list(GET _moab_python_sysconfig_lines 5 _moab_python_root_dir)
+
+      if(_moab_python_root_dir)
+        set(Python_ROOT_DIR "${_moab_python_root_dir}" CACHE PATH "PyMOAB Python root hint" FORCE)
+      endif()
+      if(_moab_python_include_dir)
+        set(Python_INCLUDE_DIR "${_moab_python_include_dir}" CACHE PATH "PyMOAB Python include hint" FORCE)
+      endif()
+      if(_moab_python_libdir AND _moab_python_library_name)
+        if(IS_ABSOLUTE "${_moab_python_library_name}")
+          set(_moab_python_library_path "${_moab_python_library_name}")
+        else()
+          set(_moab_python_library_path "${_moab_python_libdir}/${_moab_python_library_name}")
+        endif()
+        if(EXISTS "${_moab_python_library_path}")
+          set(Python_LIBRARY "${_moab_python_library_path}" CACHE FILEPATH "PyMOAB Python library hint" FORCE)
+        endif()
+      endif()
+      if(_moab_python_framework_name)
+        set(Python_FIND_FRAMEWORK FIRST CACHE STRING "PyMOAB Python framework preference" FORCE)
+      endif()
+      if(_moab_python_framework_prefix)
+        list(PREPEND CMAKE_FRAMEWORK_PATH "${_moab_python_framework_prefix}")
+      endif()
+
+      if("NumPy" IN_LIST _python_components)
+        execute_process(
+          COMMAND ${Python_EXECUTABLE} -c "import numpy; print(numpy.get_include())"
+          RESULT_VARIABLE _moab_numpy_result
+          OUTPUT_VARIABLE _moab_numpy_include_dir
+          OUTPUT_STRIP_TRAILING_WHITESPACE
+          ERROR_QUIET
+        )
+        if(_moab_numpy_result EQUAL 0 AND _moab_numpy_include_dir)
+          set(Python_NumPy_INCLUDE_DIRS "${_moab_numpy_include_dir}" CACHE PATH "PyMOAB NumPy include hint" FORCE)
+        endif()
+      endif()
+    endif()
+  endif()
+
+  unset(Python_FOUND CACHE)
+  find_package(Python COMPONENTS ${_python_components})
+  set(Python_FOUND ${Python_FOUND} PARENT_SCOPE)
+endfunction()
+
 # Check for MPI compiler support and set the necessary flags
 if ( ENABLE_MPI )
   set (MPI_C_COMPILER ${CC} )
@@ -435,7 +513,13 @@ if ( ENABLE_MPI )
 
     # If PyMOAB is also enabled, check for mpi4py
     if (ENABLE_PYMOAB)
-      find_package(Python COMPONENTS Interpreter Development REQUIRED)
+      moab_find_python_for_pymoab(Interpreter Development)
+      if(NOT Python_FOUND)
+        message(FATAL_ERROR
+          "Could not find a usable Python interpreter with development artifacts while checking mpi4py for PyMOAB. "
+          "On macOS, native /usr/bin/python3 support is best-effort only; this build probed ${Python_EXECUTABLE}. "
+          "Pass an explicit Python_EXECUTABLE/Python_ROOT_DIR if needed.")
+      endif()
       execute_process(
         COMMAND ${Python_EXECUTABLE} -c "import mpi4py; print(mpi4py.__version__)"
         RESULT_VARIABLE MPI4PY_CHECK_RESULT
@@ -443,17 +527,28 @@ if ( ENABLE_MPI )
         ERROR_QUIET
       )
       if(NOT MPI4PY_CHECK_RESULT EQUAL 0)
-        # Fallback for pip isolated builds
+        # Fallback for pip isolated builds and user-site installs
         get_filename_component(PY_BIN_DIR ${Python_EXECUTABLE} DIRECTORY)
         get_filename_component(PY_PREFIX ${PY_BIN_DIR} DIRECTORY)
         execute_process(
-            COMMAND ${Python_EXECUTABLE} -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
-            OUTPUT_VARIABLE PY_VER
+            COMMAND ${Python_EXECUTABLE} -c "import site, sys; print(f'{sys.version_info.major}.{sys.version_info.minor}'); print(site.getusersitepackages())"
+            OUTPUT_VARIABLE _moab_python_site_output
             OUTPUT_STRIP_TRAILING_WHITESPACE
         )
+        string(REPLACE "\n" ";" _moab_python_site_lines "${_moab_python_site_output}")
+        list(GET _moab_python_site_lines 0 PY_VER)
+        list(GET _moab_python_site_lines 1 PY_USER_SITE)
         if(EXISTS "${PY_PREFIX}/lib/python${PY_VER}/site-packages/mpi4py/__init__.py")
             execute_process(
                 COMMAND ${Python_EXECUTABLE} -c "import sys; sys.path.insert(0, '${PY_PREFIX}/lib/python${PY_VER}/site-packages'); import mpi4py; print(mpi4py.__version__)"
+                RESULT_VARIABLE MPI4PY_CHECK_RESULT
+                OUTPUT_VARIABLE MPI4PY_VERSION
+                ERROR_QUIET
+            )
+        endif()
+        if(NOT MPI4PY_CHECK_RESULT EQUAL 0 AND PY_USER_SITE AND EXISTS "${PY_USER_SITE}/mpi4py/__init__.py")
+            execute_process(
+                COMMAND ${Python_EXECUTABLE} -c "import sys; sys.path.insert(0, '${PY_USER_SITE}'); import mpi4py; print(mpi4py.__version__)"
                 RESULT_VARIABLE MPI4PY_CHECK_RESULT
                 OUTPUT_VARIABLE MPI4PY_VERSION
                 ERROR_QUIET
@@ -686,11 +781,14 @@ string(STRIP "${MOAB_DEFINES} " MOAB_DEFINES)
 if(SKBUILD OR ENABLE_PYMOAB)
 
   # Find necessary packages
-  find_package(
-      Python
-      COMPONENTS Interpreter Development.Module NumPy
-      REQUIRED
-  )
+  moab_find_python_for_pymoab(Interpreter Development.Module NumPy)
+  if(NOT Python_FOUND)
+    message(FATAL_ERROR
+      "Could not find a usable Python interpreter with Development.Module and NumPy for PyMOAB. "
+      "On macOS, native /usr/bin/python3 support is best-effort only; this build probed ${Python_EXECUTABLE}. "
+      "If you are using the Xcode/system Python, ensure NumPy is installed for that interpreter and try again, "
+      "or pass an explicit Python_EXECUTABLE/Python_ROOT_DIR for a full Python installation.")
+  endif()
 
   if(SKBUILD)
     # By default, scikit-build will install everything to ${SKBUILD_PLATLIB_DIR}/pymoab

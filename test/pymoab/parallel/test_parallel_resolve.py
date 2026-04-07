@@ -107,6 +107,24 @@ def _create_overlapping_mesh(mb):
     return verts, hexes, coords, file_set
 
 
+def _create_partition_set(mb, pcomm):
+    """Create a PARALLEL_PARTITION entity set and populate it with owned entities.
+
+    This creates a proper partition set tagged with PARALLEL_PARTITION = rank,
+    which is required for the output file to contain the standard MOAB partition
+    metadata. Without this, parallel files cannot be read back with
+    PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION.
+
+    Returns the partition EntityHandle.
+    """
+    part_set = pcomm.create_part()
+    owned_verts = pcomm.get_owned_entities(dim=0)
+    owned_hexes = pcomm.get_owned_entities(dim=3)
+    mb.add_entities(part_set, owned_verts)
+    mb.add_entities(part_set, owned_hexes)
+    return part_set
+
+
 def test_create_mesh_per_rank():
     """Each rank creates its portion of the mesh."""
     mb = core.Core()
@@ -264,7 +282,7 @@ def test_exchange_tags_after_resolve():
 
 
 def test_parallel_write_after_resolve():
-    """Write the resolved mesh in parallel and verify the file exists."""
+    """Write the resolved mesh in parallel with PARALLEL_PARTITION sets."""
     if not _have_parallel_io():
         CHECK(True)
         return
@@ -276,6 +294,8 @@ def test_parallel_write_after_resolve():
     pcomm.resolve_shared_ents(this_set=file_set, resolve_dim=3, shared_dim=-1)
     pcomm.assign_global_ids(dimension=3, start_id=1)
 
+    part_set = _create_partition_set(mb, pcomm)
+
     outfile = os.path.join(tempfile.gettempdir(), "pymoab_resolve_write_test.h5m")
     pcomm.write_file(outfile, "PARALLEL=WRITE_PART")
 
@@ -285,11 +305,23 @@ def test_parallel_write_after_resolve():
         fsize = os.path.getsize(outfile)
         print(f"  Written resolved mesh: {outfile} ({fsize} bytes)")
         CHECK(fsize > 0)
-    CHECK(True)
+
+        # Verify the file contains PARALLEL_PARTITION tag
+        mb2 = core.Core()
+        mb2.load_file(outfile)
+        pp_tag = mb2.tag_get_handle("PARALLEL_PARTITION")
+        CHECK(pp_tag is not None)
+        part_sets = mb2.get_entities_by_type_and_tag(
+            0, types.MBENTITYSET, pp_tag, [None])
+        CHECK_EQ(len(part_sets), size)
+        print(f"  File contains {len(part_sets)} PARALLEL_PARTITION sets")
+        os.unlink(outfile)
+    else:
+        CHECK(True)
 
 
 def test_parallel_write_read_roundtrip():
-    """Write mesh in parallel, read it back on rank 0, verify entity counts."""
+    """Write mesh in parallel with partition sets, read back in parallel."""
     if not _have_parallel_io():
         CHECK(True)
         return
@@ -306,26 +338,37 @@ def test_parallel_write_read_roundtrip():
     all_orig_hexes = sum(get_all_values(original_hex_count))
     all_orig_verts = sum(get_all_values(original_owned_vert_count))
 
+    part_set = _create_partition_set(mb, pcomm)
+
     outfile = os.path.join(tempfile.gettempdir(), "pymoab_roundtrip_test.h5m")
     pcomm.write_file(outfile, "PARALLEL=WRITE_PART")
     comm.Barrier()
 
+    # Re-read in parallel using PARALLEL_PARTITION sets
+    mb2 = core.Core()
+    pcomm2 = parallelcomm.ParallelComm(mb2, comm)
+    pcomm2.load_file(outfile,
+                     "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION"
+                     ";PARALLEL_RESOLVE_SHARED_ENTS")
+
+    reread_hexes = mb2.get_entities_by_type(0, types.MBHEX)
+    reread_owned_hexes = pcomm2.get_owned_entities(dim=3)
+    reread_owned_verts = pcomm2.get_owned_entities(dim=0)
+
+    all_reread_hexes = sum(get_all_values(len(reread_owned_hexes)))
+    all_reread_verts = sum(get_all_values(len(reread_owned_verts)))
+
+    CHECK_EQ(all_reread_hexes, all_orig_hexes)
+    CHECK_EQ(all_reread_verts, all_orig_verts)
+
+    print(f"  rank {rank}: roundtrip owned hexes {len(reread_owned_hexes)}, "
+          f"owned verts {len(reread_owned_verts)}")
+    print(f"  rank {rank}: global totals: hexes {all_orig_hexes} -> {all_reread_hexes}, "
+          f"owned verts {all_orig_verts} -> {all_reread_verts}")
+
+    comm.Barrier()
     if rank == 0:
-        mb2 = core.Core()
-        mb2.load_file(outfile)
-
-        reread_hexes = len(mb2.get_entities_by_type(0, types.MBHEX))
-        reread_verts = len(mb2.get_entities_by_type(0, types.MBVERTEX))
-
-        CHECK_EQ(reread_hexes, all_orig_hexes)
-        CHECK(reread_verts > 0)
-
-        print(f"  Roundtrip: hexes {all_orig_hexes} -> {reread_hexes}, "
-              f"verts (owned total) {all_orig_verts}, file verts {reread_verts}")
-
         os.unlink(outfile)
-    else:
-        CHECK(True)
 
 
 def test_reduce_after_resolve():
@@ -370,9 +413,10 @@ def test_reduce_after_resolve():
 
 
 def test_full_resolve_pipeline():
-    """Full pipeline: create -> resolve -> assign IDs -> tag -> exchange -> write.
+    """Full pipeline: create -> resolve -> assign IDs -> partition -> tag -> exchange -> write.
 
-    Exercises the complete in-memory parallel mesh workflow.
+    Exercises the complete in-memory parallel mesh workflow including
+    proper PARALLEL_PARTITION sets for standard MOAB parallel file output.
     """
     if not _have_parallel_io():
         CHECK(True)
@@ -382,15 +426,18 @@ def test_full_resolve_pipeline():
     pcomm = parallelcomm.ParallelComm(mb, comm)
 
     verts, hexes, coords, file_set = _create_overlapping_mesh(mb)
-    print(f"  rank {rank}: [1/5] created {len(hexes)} hexes, {len(verts)} verts")
+    print(f"  rank {rank}: [1/6] created {len(hexes)} hexes, {len(verts)} verts")
 
     pcomm.resolve_shared_ents(this_set=file_set, resolve_dim=3, shared_dim=-1)
     shared = pcomm.get_shared_entities(-1, dim=0)
-    print(f"  rank {rank}: [2/5] resolved {len(shared)} shared vertices")
+    print(f"  rank {rank}: [2/6] resolved {len(shared)} shared vertices")
 
     pcomm.assign_global_ids(dimension=3, start_id=1)
     pcomm.assign_global_ids(dimension=0, start_id=1)
-    print(f"  rank {rank}: [3/5] assigned global IDs")
+    print(f"  rank {rank}: [3/6] assigned global IDs")
+
+    part_set = _create_partition_set(mb, pcomm)
+    print(f"  rank {rank}: [4/6] created PARALLEL_PARTITION set")
 
     tag = mb.tag_get_handle("PIPELINE_DATA", 1, types.MB_TYPE_DOUBLE,
                             types.MB_TAG_DENSE, create_if_missing=True,
@@ -402,7 +449,7 @@ def test_full_resolve_pipeline():
 
     if len(shared) > 0:
         pcomm.exchange_tags(["PIPELINE_DATA"], ["PIPELINE_DATA"], shared)
-    print(f"  rank {rank}: [4/5] set and exchanged distance tag")
+    print(f"  rank {rank}: [5/6] set and exchanged distance tag")
 
     outfile = os.path.join(tempfile.gettempdir(), "pymoab_full_pipeline.h5m")
     pcomm.write_file(outfile, "PARALLEL=WRITE_PART")
@@ -410,10 +457,10 @@ def test_full_resolve_pipeline():
     if rank == 0:
         CHECK(os.path.exists(outfile))
         fsize = os.path.getsize(outfile)
-        print(f"  rank {rank}: [5/5] wrote {fsize} bytes to {outfile}")
+        print(f"  rank {rank}: [6/6] wrote {fsize} bytes to {outfile}")
         os.unlink(outfile)
     else:
-        print(f"  rank {rank}: [5/5] write complete")
+        print(f"  rank {rank}: [6/6] write complete")
     CHECK(True)
 
 

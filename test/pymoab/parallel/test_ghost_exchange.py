@@ -187,7 +187,7 @@ def test_get_ghost_entities_local():
 
 
 def test_parallel_write(tmp_path=None):
-    """Write a mesh in parallel and verify the file was created."""
+    """Write a mesh in parallel with PARALLEL_PARTITION sets."""
     if not _have_parallel_io():
         CHECK(True)
         return
@@ -204,6 +204,12 @@ def test_parallel_write(tmp_path=None):
     verts = mb.create_vertices(coords)
     mb.create_element(types.MBHEX, verts)
 
+    part_set = pcomm.create_part()
+    all_verts = mb.get_entities_by_type(0, types.MBVERTEX)
+    all_hexes = mb.get_entities_by_type(0, types.MBHEX)
+    mb.add_entities(part_set, all_verts)
+    mb.add_entities(part_set, all_hexes)
+
     import tempfile
     outfile = os.path.join(tempfile.gettempdir(), "pymoab_par_write_test.h5m")
     pcomm.write_file(outfile, "PARALLEL=WRITE_PART")
@@ -214,6 +220,16 @@ def test_parallel_write(tmp_path=None):
         fsize = os.path.getsize(outfile)
         print(f"Written parallel file: {outfile} ({fsize} bytes)")
         CHECK(fsize > 0)
+
+        mb2 = core.Core()
+        mb2.load_file(outfile)
+        pp_tag = mb2.tag_get_handle("PARALLEL_PARTITION")
+        CHECK(pp_tag is not None)
+        part_sets = mb2.get_entities_by_type_and_tag(
+            0, types.MBENTITYSET, pp_tag, [None])
+        CHECK_EQ(len(part_sets), size)
+        print(f"  File contains {len(part_sets)} PARALLEL_PARTITION sets")
+
         os.unlink(outfile)
     else:
         CHECK(True)

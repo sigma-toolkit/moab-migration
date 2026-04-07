@@ -33,6 +33,7 @@ cdef class ScdInterface(object):
 
         Requires a moab core, c, to operate on.
         """
+        self._core_ref = c  # prevent Core GC before ScdInterface
         self.interface  = <moab.Interface*> c.inst
         self.inst = new moab.ScdInterface(<moab.Interface*>c.inst, False)
         if not self.inst:
@@ -127,15 +128,16 @@ cdef class ScdInterface(object):
         if lperiodic is not None:
             lp = lperiodic
         err = self.inst.construct_box(deref(hl.inst),
-                                      deref(hh.inst),
-                                      coords_ptr,
-                                      num_c,
-                                      scdb.inst,
-                                      &(lp[0]),
-                                      NULL,
-                                      assn_gids,
-                                      resolve_shared_ents)
+                                       deref(hh.inst),
+                                       coords_ptr,
+                                       num_c,
+                                       scdb.inst,
+                                       &(lp[0]),
+                                       NULL,
+                                       assn_gids,
+                                       resolve_shared_ents)
         check_error(err,exceptions)
+        scdb._scd_ref = self  # prevent ScdInterface GC before ScdBox
         return scdb
 
     def box_set_tag(self, create_if_missing = True):
@@ -203,6 +205,7 @@ cdef class ScdInterface(object):
         if <void*> struct_box.inst == null:
             check_error(MB_FAILURE, exceptions)
         else:
+            struct_box._scd_ref = self  # prevent ScdInterface GC before ScdBox
             return struct_box
 
     def find_boxes(self, exceptions = ()):
@@ -266,6 +269,7 @@ cdef class ScdInterface(object):
         for i in range(vec_boxes.size()):
             new_box = ScdBox()
             new_box.inst = vec_boxes[i] # replace pointer
+            new_box._scd_ref = self  # prevent ScdInterface GC before ScdBox
             boxes_out.append(new_box)
         return boxes_out
 

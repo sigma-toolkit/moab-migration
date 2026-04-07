@@ -846,3 +846,86 @@ cdef class ParallelComm(object):
             Current verbosity level
         """
         return self.inst.get_debug_verbosity()
+
+    def scatter_entities(self, int from_proc, list entities=None,
+                         bint adjacencies=False, bint tags=True):
+        """Scatter entities from one processor to all others.
+
+        On the sending rank (from_proc), entities[i] is the Range
+        to send to rank i.  On receiving ranks the list is populated
+        with the received entities.
+
+        Parameters
+        ----------
+        from_proc : int
+            Source processor rank
+        entities : list of Range, optional
+            List of Range objects, one per processor. Required on from_proc.
+        adjacencies : bool, optional
+            Include adjacencies
+        tags : bool, optional
+            Include tags
+
+        Returns
+        -------
+        list of Range
+            One Range per processor with received entities
+        """
+        cdef moab.ErrorCode err
+        cdef vector[moab.Range] c_entities
+        cdef int i
+        cdef Range r
+
+        c_entities.resize(self.inst.size())
+        if entities is not None:
+            for i in range(min(len(entities), <int>self.inst.size())):
+                r = <Range>entities[i]
+                c_entities[i] = deref(r.inst)
+
+        err = self.inst.scatter_entities(from_proc, c_entities,
+                                          adjacencies, tags)
+        check_error(err)
+
+        result = []
+        for i in range(<int>c_entities.size()):
+            out = Range()
+            out.inst.merge(c_entities[i])
+            result.append(out)
+        return result
+
+    def resolve_shared_sets(self, EntityHandle this_set=0):
+        """Resolve shared sets between processors.
+
+        Matches entity sets across processes using global IDs and
+        populates sharing data for sets.
+
+        Parameters
+        ----------
+        this_set : EntityHandle, optional
+            Set directly containing candidate sets (e.g. file set).
+            Use 0 for root set.
+        """
+        cdef moab.ErrorCode err
+        err = self.inst.resolve_shared_sets(this_set, NULL)
+        check_error(err)
+
+    def get_iface_entities(self, int other_proc, int dim=-1):
+        """Get entities on interfaces shared with another processor.
+
+        Parameters
+        ----------
+        other_proc : int
+            Rank of the other processor sharing the interface
+        dim : int, optional
+            Dimension of entities to return (-1 for all dimensions)
+
+        Returns
+        -------
+        Range
+            Entities on the shared interface
+        """
+        cdef moab.ErrorCode err
+        cdef Range iface_ents = Range()
+        err = self.inst.get_iface_entities(other_proc, dim, deref(iface_ents.inst))
+        check_error(err)
+        return iface_ents

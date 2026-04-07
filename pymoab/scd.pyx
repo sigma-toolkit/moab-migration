@@ -20,6 +20,11 @@ cdef class ScdParData(object):
     def __cinit__(self):
         self.inst = new moab.ScdParData()
 
+    def __dealloc__(self):
+        if self.inst != null:
+            del self.inst
+            self.inst = NULL
+
 cdef class ScdInterface(object):
 
     def __cinit__(self, Core c):
@@ -33,6 +38,10 @@ cdef class ScdInterface(object):
         if not self.inst:
             raise MemoryError("Failed to create ScdInterface object")
 
+    def __dealloc__(self):
+        if self.inst != null:
+            del self.inst
+            self.inst = NULL
 
     def construct_box(self,
                       low,

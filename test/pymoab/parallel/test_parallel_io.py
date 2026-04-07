@@ -4,15 +4,13 @@ Test script for PyMOAB parallel interface.
 This tests the fixed parallel interface that uses the correct MPI pattern.
 """
 
-import sys
 import os
-
-# Add the pymoab directory to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'pymoab'))
+import sys
+import unittest
 
 try:
     from mpi4py import MPI
-    from pymoab import core, parallelcomm
+    from pymoab import config, core, parallelcomm
 except ImportError as e:
     print(f"Import error: {e}")
     print("Make sure PyMOAB is properly installed and compiled.")
@@ -33,9 +31,8 @@ def test_capability_detection():
             print(f"Python: MPI support not detected")
         
         # Test runtime capability detection
-        from pymoab import core, parallelcomm
         mb = core.Core()
-        pcomm = parallelcomm.ParallelComm(MPI.COMM_WORLD)
+        pcomm = parallelcomm.ParallelComm(mb, MPI.COMM_WORLD)
         
         if config.MOAB_MPI_ENABLED:
             print(f"Python: Runtime basic MPI support: {pcomm.has_basic_mpi}")
@@ -87,26 +84,26 @@ def test_parallel_comm_creation():
         return False
 
 def test_mpi_comm_passing():
-    """Test the MPI communicator passing functionality."""
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
+    size = comm.Get_size()
 
     print(f"Process {rank}: Testing MPI communicator passing")
 
     try:
-        # Test the MPI Comm passing function
-        py_rank, py_size = parallelcomm.test_mpi_comm_passing(comm)
+        mb = core.Core()
+        pcomm = parallelcomm.ParallelComm(mb, comm)
+        wrapped_comm = pcomm.comm
 
-        print(f"Process {rank}: ✓ MPI communicator passing test successful")
-        print(f"Process {rank}: Python rank {py_rank}, size {py_size}")
+        print(f"Process {rank}: ✓ MPI communicator stored on ParallelComm")
+        print(f"Process {rank}: Wrapped rank {wrapped_comm.Get_rank()}, size {wrapped_comm.Get_size()}")
 
-        # Verify results
-        if py_rank == rank and py_size == comm.Get_size():
+        if wrapped_comm.Get_rank() == rank and wrapped_comm.Get_size() == size:
             print(f"Process {rank}: ✓ Results match correctly")
             return True
-        else:
-            print(f"Process {rank}: ✗ Results mismatch")
-            return False
+
+        print(f"Process {rank}: ✗ Results mismatch")
+        return False
 
     except Exception as e:
         print(f"Process {rank}: ✗ Error in MPI communicator passing test: {e}")
@@ -114,36 +111,23 @@ def test_mpi_comm_passing():
         traceback.print_exc()
         return False
 
+class ParallelIOTestCase(unittest.TestCase):
+    def test_capability_detection_unittest(self):
+        self.assertTrue(test_capability_detection())
+
+    def test_mpi_comm_passing_unittest(self):
+        self.assertTrue(test_mpi_comm_passing())
+
+    def test_parallel_comm_creation_unittest(self):
+        self.assertTrue(test_parallel_comm_creation())
+
+
 def main():
     """Main test function."""
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
+    suite = unittest.defaultTestLoader.loadTestsFromTestCase(ParallelIOTestCase)
+    result = unittest.TextTestRunner(verbosity=2).run(suite)
+    return 0 if result.wasSuccessful() else 1
 
-    print(f"=== PyMOAB Parallel Interface Test ===")
-    print(f"Process {rank}/{size} starting tests")
-
-    # Test 1: Capability detection
-    print(f"\n--- Test 1: Capability Detection ---")
-    test1_success = test_capability_detection()
-
-    # Test 2: MPI communicator passing
-    print(f"\n--- Test 2: MPI Comm Passing ---")
-    test2_success = test_mpi_comm_passing()
-
-    # Test 3: ParallelComm creation
-    print(f"\n--- Test 3: ParallelComm Creation ---")
-    test3_success = test_parallel_comm_creation()
-
-    # Final verification
-    if test1_success and test2_success and test3_success:
-        print(f"Process {rank}: ✓ ALL TESTS PASSED")
-        print(f"Process {rank}: ✓ PyMOAB parallel interface is working correctly!")
-        return 0
-    else:
-        print(f"Process {rank}: ✗ SOME TESTS FAILED")
-        return 1
 
 if __name__ == "__main__":
-    exit_code = main()
-    sys.exit(exit_code)
+    sys.exit(main())

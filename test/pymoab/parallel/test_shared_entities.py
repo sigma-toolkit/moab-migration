@@ -154,9 +154,11 @@ def test_reduce_tags_after_parallel_load():
     pcomm.load_file(PARTITIONED_MESH, READ_OPTS)
 
     src_tag = mb.tag_get_handle("TEST_REDUCE_SRC", 1, types.MB_TYPE_DOUBLE,
-                                types.MB_TAG_DENSE, create_if_missing=True)
+                                 types.MB_TAG_DENSE, create_if_missing=True,
+                                 default_value=np.array([0.0]))
     dst_tag = mb.tag_get_handle("TEST_REDUCE_DST", 1, types.MB_TYPE_DOUBLE,
-                                types.MB_TAG_DENSE, create_if_missing=True)
+                                 types.MB_TAG_DENSE, create_if_missing=True,
+                                 default_value=np.array([0.0]))
 
     verts = mb.get_entities_by_type(0, types.MBVERTEX)
     vals = np.ones(len(verts), dtype='float64')

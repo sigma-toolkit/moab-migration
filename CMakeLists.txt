@@ -402,9 +402,41 @@ endif ( ENABLE_FORTRAN )
 function(moab_find_python_for_pymoab)
   set(_python_components ${ARGN})
 
+  # Variables that find_package(Python) sets as regular (non-cache) variables.
+  # We must propagate them to the calling scope because CMake functions have
+  # their own variable scope.
+  set(_moab_python_propagate_vars
+    Python_FOUND
+    Python_EXECUTABLE
+    Python_INTERPRETER_ID
+    Python_INCLUDE_DIRS
+    Python_LIBRARIES
+    Python_LIBRARY_DIRS
+    Python_VERSION
+    Python_VERSION_MAJOR
+    Python_VERSION_MINOR
+    Python_VERSION_PATCH
+    Python_Development.Module_FOUND
+    Python_Development.Embed_FOUND
+    Python_Development_FOUND
+    Python_NumPy_FOUND
+    Python_NumPy_INCLUDE_DIRS
+    Python_NumPy_VERSION
+    Python_SITELIB
+    Python_SITEARCH
+  )
+
+  macro(_moab_propagate_python_vars)
+    foreach(_var IN LISTS _moab_python_propagate_vars)
+      if(DEFINED ${_var})
+        set(${_var} "${${_var}}" PARENT_SCOPE)
+      endif()
+    endforeach()
+  endmacro()
+
   find_package(Python COMPONENTS ${_python_components})
   if(Python_FOUND)
-    set(Python_FOUND ${Python_FOUND} PARENT_SCOPE)
+    _moab_propagate_python_vars()
     return()
   endif()
 
@@ -474,7 +506,7 @@ function(moab_find_python_for_pymoab)
 
   unset(Python_FOUND CACHE)
   find_package(Python COMPONENTS ${_python_components})
-  set(Python_FOUND ${Python_FOUND} PARENT_SCOPE)
+  _moab_propagate_python_vars()
 endfunction()
 
 # Check for MPI compiler support and set the necessary flags

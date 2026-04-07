@@ -115,6 +115,8 @@ if(ENABLE_PYMOAB)
       test_ghost_exchange
       test_shared_entities
       test_parallel_shutdown
+      test_parallel_workflow
+      test_parallel_resolve
     )
     FOREACH(pymoab_par_test ${PYMOAB_PARALLEL_TESTS})
       ADD_TEST(NAME pymoab_parallel_${pymoab_par_test}

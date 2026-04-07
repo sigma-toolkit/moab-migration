@@ -29,5 +29,13 @@ echo "--- Test 4: ParallelComm Shutdown ---"
 "$MPIEXEC_BIN" -n "$NP" "$PYTHON_BIN" test_parallel_shutdown.py
 
 echo ""
+echo "--- Test 5: Parallel Workflow (load -> ghost -> tag exchange -> reduce) ---"
+"$MPIEXEC_BIN" -n "$NP" "$PYTHON_BIN" test_parallel_workflow.py
+
+echo ""
+echo "--- Test 6: Parallel Resolve (create -> resolve shared -> write) ---"
+"$MPIEXEC_BIN" -n "$NP" "$PYTHON_BIN" test_parallel_resolve.py
+
+echo ""
 echo "=============================="
 echo "All parallel tests completed!"

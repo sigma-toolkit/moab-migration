@@ -488,8 +488,7 @@ cdef class ParallelComm(object):
             err = self.core.get_entities_by_dimension(file_set, dim, deref(ents.inst), False)
         check_error(err)
 
-        # Get owned entities and subtract from total to get ghosts
-        ownedents = ents
+        ownedents.inst.merge(deref(ents.inst))
         err = self.inst.filter_pstatus(deref(ownedents.inst), PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, NULL)
         check_error(err)
 

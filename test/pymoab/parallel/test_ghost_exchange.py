@@ -3,20 +3,17 @@
 Test ghost exchange and shared entity operations.
 """
 
-import sys
 import os
+import sys
 import numpy as np
 
-# Check if MPI is available first
 try:
     from mpi4py import MPI
 except ImportError:
     print("MPI not available - skipping parallel tests")
     sys.exit(0)
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'pymoab'))
-
-from pymoab import core, parallelcomm, types
+from pymoab import config, core, parallelcomm, types
 from pymoab.rng import Range
 from parallel_driver import run_parallel_tests, CHECK_EQ, CHECK, CHECK_PARALLEL
 

@@ -672,13 +672,13 @@ int main( int argc, char* argv[] )
 
                     // Load the meshes and validate
                     Tag order;
-                    ReorderTool reorder_tool( &core );
-                    result = reorder_tool.handle_order_from_int_tag( srcParentTag, -1, order );
-                    MB_CHK_ERR( result );
-                    result = reorder_tool.reorder_entities( order );
-                    MB_CHK_ERR( result );
-                    result = gMB->tag_delete( order );
-                    MB_CHK_ERR( result );
+                    //ReorderTool reorder_tool( &core );
+                    //result = reorder_tool.handle_order_from_int_tag( srcParentTag, -1, order );
+                    //MB_CHK_ERR( result );
+                    //result = reorder_tool.reorder_entities( order );
+                    //MB_CHK_ERR( result );
+                    //result = gMB->tag_delete( order );
+                    //MB_CHK_ERR( result );
                     result = remapper->ConvertMeshToTempest( moab::Remapper::OverlapMesh );
                     MB_CHK_ERR( result );
                 }

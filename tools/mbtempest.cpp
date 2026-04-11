@@ -249,7 +249,7 @@ class ToolContext
         std::string expectedDofTagName = "GLOBAL_ID";
         int expectedOrder              = 1;
         int useCAAS                    = 0;
-        int nlayer_input               = 0;
+        int nlayer_input               = -1;  // -1 means not set by user
         bool version_info              = false;
 
         // Print command line for debugging
@@ -363,7 +363,7 @@ class ToolContext
         opts.addOpt< int >( "monotonicity", "Ensure monotonicity in the weight generation. Options=[0,1,2,3]",
                             &ensureMonotonicity );
 
-        opts.addOpt< int >( "ghost", "Number of ghost layers in coverage mesh (default=1)", &nlayer_input );
+        opts.addOpt< int >( "ghost", "Number of ghost layers in coverage mesh (overrides automatic selection: 0 for FV order 1, p+1 for FV order p>1)", &nlayer_input );
 
         opts.addOpt< double >( "boxeps", "The tolerance for boxes (default=1e-7)", &boxeps );
 
@@ -878,21 +878,24 @@ class ToolContext
             this->mapOptions.strMethod += "volumetric;";
         }
 
-        // Set number of ghost layers based on method and order
-        this->nlayers = 3;  // Default for FV methods
+        // Set number of ghost layers based on method and order.
+        // FV order 1 needs 0 ghost layers; FV order p > 1 needs p+1 ghost layers.
         if( this->fvMethod == "delaunay" || this->fvMethod == "bilin" )
         {
             this->skip_intersection = true;
+            this->nlayers           = 3; // conservative
         }
         else
         {
-            if (this->fvMethod.empty()) this->nlayers = ( this->mapOptions.nPin > 1 ) ? this->mapOptions.nPin + 1 : 0;
+            // order 1: no ghost layers
+            // order p: p+1 layers (again, being conservative)
+            this->nlayers = ( this->mapOptions.nPin > 1 ) ? this->mapOptions.nPin + 1 : 0;
         }
 
-        // Override with user-specified value if provided
-        if( nlayer_input > 0 )
+        // User-supplied value always overrides the internal default (even 0 is valid).
+        if( nlayer_input >= 0 )
         {
-            this->nlayers = std::max( nlayer_input, this->nlayers );
+            this->nlayers = nlayer_input;
         }
 
         // Configure output
@@ -1231,16 +1234,62 @@ int main( int argc, char* argv[] )
 
         // print some diagnostic checks to see if the overlap grid resolved the input meshes
         // correctly
+        // Compute ghost overlap elements once; reused for both area diagnostics and intx file write
+        moab::Range ghostOverlapElems;
+#ifdef MOAB_HAVE_MPI
+        if( nprocs > 1 && !runCtx->skip_intersection )
+            MB_CHK_SET_ERR( remapper.GetOverlapAugmentedEntities( ghostOverlapElems ),
+                            "Failed to get ghost overlap entities" );
+#endif
+
         double dTotalOverlapArea = 0.0;
         if( runCtx->print_diagnostics && !runCtx->skip_intersection )
         {
             moab::IntxAreaUtils areaAdaptorHuiller( moab::IntxAreaUtils::lHuiller );  // lHuiller, GaussQuadrature
             double local_areas[3],
                 global_areas[3];  // Array for Initial area, and through Method 1 and Method 2
-            // local_areas[0] = area_on_sphere_lHuiller ( mbCore, runCtx->meshsets[1], radius_src );
-            local_areas[0] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[0], radius_src );
-            local_areas[1] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[1], radius_dest );
-            local_areas[2] = areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[2], radius_src );
+
+            // Helper: compute area of a meshset excluding cells with GRID_IMASK==0.
+            // Both source and target SCRIP grids may have a land/sea mask; the intersection
+            // only covers unmasked cells, so comparing full-mesh areas gives a misleading error.
+            auto area_unmasked = [&]( moab::EntityHandle meshset, double radius ) -> double {
+                moab::Tag imaskTag = 0;
+                mbCore->tag_get_handle( "GRID_IMASK", imaskTag );
+                if( !imaskTag )
+                    return areaAdaptorHuiller.area_on_sphere( mbCore, meshset, radius );
+                moab::Range cells;
+                mbCore->get_entities_by_dimension( meshset, 2, cells );
+                std::vector< int > masks( cells.size(), 1 );
+                mbCore->tag_get_data( imaskTag, cells, masks.data() );
+                moab::Range maskedCells;
+                size_t idx = 0;
+                for( auto it = cells.begin(); it != cells.end(); ++it, ++idx )
+                    if( !masks[idx] ) maskedCells.insert( *it );
+                moab::Range unmasked = moab::subtract( cells, maskedCells );
+                moab::EntityHandle tmpSet;
+                mbCore->create_meshset( moab::MESHSET_SET, tmpSet );
+                mbCore->add_entities( tmpSet, unmasked );
+                double area = areaAdaptorHuiller.area_on_sphere( mbCore, tmpSet, radius );
+                mbCore->delete_entities( &tmpSet, 1 );
+                return area;
+            };
+
+            local_areas[0] = area_unmasked( runCtx->meshsets[0], radius_src );
+            local_areas[1] = area_unmasked( runCtx->meshsets[1], radius_dest );
+            // Exclude ghost overlap elements from area sum to avoid double-counting after MPI_Allreduce
+            {
+                moab::Range ownedOverlapElems;
+                MB_CHK_SET_ERR( mbCore->get_entities_by_dimension( runCtx->meshsets[2], 2, ownedOverlapElems ),
+                                "Failed to get overlap elements" );
+                ownedOverlapElems = moab::subtract( ownedOverlapElems, ghostOverlapElems );
+                moab::EntityHandle ownedOverlapSet;
+                MB_CHK_SET_ERR( mbCore->create_meshset( moab::MESHSET_SET, ownedOverlapSet ),
+                                "Can't create owned overlap meshset" );
+                MB_CHK_SET_ERR( mbCore->add_entities( ownedOverlapSet, ownedOverlapElems ),
+                                "Can't add owned overlap elements" );
+                local_areas[2] = areaAdaptorHuiller.area_on_sphere( mbCore, ownedOverlapSet, radius_src );
+                MB_CHK_SET_ERR( mbCore->delete_entities( &ownedOverlapSet, 1 ), "Can't delete temp meshset" );
+            }
 
 #ifdef MOAB_HAVE_MPI
             MPI_Allreduce( &local_areas[0], &global_areas[0], 3, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
@@ -1272,13 +1321,12 @@ int main( int argc, char* argv[] )
             MB_CHK_SET_ERR( mbCore->get_entities_by_dimension( meshOverlapSet, 0, ovEnts ), "Can't create new set" );
 
 #ifdef MOAB_HAVE_MPI
-            // Do not remove ghosted entities if we still haven't computed weights
-            // Remove ghosted entities from overlap set before writing the new mesh set to file
+            // Exclude ghost overlap elements from the write: each ghost element is owned by another
+            // rank and will be written from there. Including ghosts here causes duplicate entity
+            // handles in the parallel HDF5 output and deadlocks the collective write.
             if( nprocs > 1 )
             {
-                moab::Range ghostedEnts;
-                MB_CHK_SET_ERR( remapper.GetOverlapAugmentedEntities( ghostedEnts ), "Failed to get ghosted entities" );
-                ovEnts = moab::subtract( ovEnts, ghostedEnts );
+                ovEnts = moab::subtract( ovEnts, ghostOverlapElems );
 #ifdef MOAB_DBG
                 if( !runCtx->skip_io )
                 {

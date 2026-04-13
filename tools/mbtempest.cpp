@@ -532,7 +532,7 @@ int main( int argc, char* argv[] )
     remapper.initialize();
 
     // Default area_method = lHuiller; Options: Girard, lHuiller, GaussQuadrature (if TR is available)
-    moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::GaussQuadrature );
+    moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::lHuiller );
 
     Mesh* tempest_mesh = new Mesh();
     MB_CHK_ERR( CreateTempestMesh( *runCtx, remapper, tempest_mesh ) );
@@ -652,7 +652,7 @@ int main( int argc, char* argv[] )
             outputFormatter.printf( 0, "The intersection set contains %lu elements and %lu vertices \n",
                                     intxelems.size(), intxverts.size() );
 
-            moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::GaussQuadrature );  // lHuiller, GaussQuadrature
+            moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::lHuiller );  // lHuiller, GaussQuadrature
             double initial_sarea =
                 areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0],
                                                    radius_src );  // use the target to compute the initial area
@@ -780,7 +780,7 @@ int main( int argc, char* argv[] )
         if( runCtx->print_diagnostics )
         {
             moab::IntxAreaUtils areaAdaptor(
-                moab::IntxAreaUtils::GaussQuadrature );  // lHuiller, GaussQuadrature
+                moab::IntxAreaUtils::lHuiller );  // lHuiller, GaussQuadrature
             double local_areas[3],
                 global_areas[3];  // Array for Initial area, and through Method 1 and Method 2
             // local_areas[0] = area_on_sphere_lHuiller ( mbCore, runCtx->meshsets[1], radius_src );
@@ -884,8 +884,6 @@ int main( int argc, char* argv[] )
                 runCtx->doftag_names[1]   // const std::string& target_tag_name
                 ) );
             runCtx->timer_pop();
-
-            std::cout << proc_id << ": About to write remapping weights\n";
 
             weightMap->PrintMapStatistics();
 

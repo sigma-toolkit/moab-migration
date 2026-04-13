@@ -278,8 +278,6 @@ ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType /*meshT
     ReadUtilIface* iface;
     MB_CHK_SET_ERR( m_interface->query_interface( iface ), "Can't get reader interface" );
 
-    Tag gidTag = m_interface->globalId_tag();
-
     // Set the data for the vertices
     std::vector< double* > arrays;
     std::vector< int > gidsv( nodes.size() );
@@ -1425,7 +1423,6 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
         assert( m_covering_source != nullptr );
         assert( m_target != nullptr );
         if( m_overlap != nullptr ) delete m_overlap;
-        bool concaveMeshA = true, concaveMeshB = true;
         // we have reset the overlap mesh - allocate now
         m_overlap = new Mesh();
         // Generate the overlap mesh using TempestRemap

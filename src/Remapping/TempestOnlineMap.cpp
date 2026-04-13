@@ -1156,7 +1156,7 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
 #endif
 
 #ifdef MOAB_HAVE_MPI
-        if (size>1)
+        if ( size>1 && m_meshOverlap )
         {
             // Remove ghosted entities from overlap set
             moab::Range ghostedEnts;

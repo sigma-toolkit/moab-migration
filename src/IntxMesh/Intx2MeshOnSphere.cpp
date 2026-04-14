@@ -403,7 +403,7 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
                 }
                 if( !found )
                 {
-                    std::cout << "New intersection point = [" << pos << "]\n";
+                    // std::cout << "New intersection point = [" << pos << "]\n";
                     // create a new point in 2d (at the intersection)
                     // foundIds[i] = m_num2dPoints;
                     // expts.push_back(m_num2dPoints);

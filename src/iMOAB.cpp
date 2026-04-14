@@ -3850,17 +3850,19 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
     TLcomp1.enableWriteAccess();
 
     // Get tag handles for entity identification
+    // GLOBAL_ID: for vertices and regular elements
+    Tag gidTag = context.MBI->globalId_tag();  // Standard GLOBAL_ID tag
+#ifdef MOAB_HAVE_TEMPESTREMAP
     // GLOBAL_DOFS: for spectral elements (type 1)
-    // GLOBAL_ID: for vertices (type 2) and 2D elements (type 3)
     Tag gdsTag;
     int lenTagType1 = 1;
-    if( iMOAB_DiscretizationType::IMOAB_CGLL_DISCRETIZATION == *type1 || iMOAB_DiscretizationType::IMOAB_CGLL_DISCRETIZATION == *type2 )
+    if( iMOAB_DiscretizationType::IMOAB_CGLL_DISCRETIZATION == *type1 || iMOAB_DiscretizationType::IMOAB_CGLL_DISCRETIZATION == *type2 || iMOAB_DiscretizationType::IMOAB_DGLL_DISCRETIZATION == *type1 || iMOAB_DiscretizationType::IMOAB_DGLL_DISCRETIZATION == *type2 )
     {
         // Get GLOBAL_DOFS tag for spectral elements (usually 16 DOFs per element)
         MB_CHK_ERR( context.MBI->tag_get_handle( "GLOBAL_DOFS", gdsTag ) );
         MB_CHK_ERR( context.MBI->tag_get_length( gdsTag, lenTagType1 ) );  // Usually 16 DOFs per element
     }
-    Tag gidTag = context.MBI->globalId_tag();  // Standard GLOBAL_ID tag
+#endif
 
     // Determine entity dimension for FV paths from stored entity types on the intersection app.
     // Default to dim-2 (faces) for backward compatibility when no entity types are stored.
@@ -3884,6 +3886,7 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
         else if( td.target_entity_type == IMOAB_VERTEX_ENTITY ) tgt_dim = 0;
     }
 #endif
+
     // Set entity dimension on both ParCommGraph objects
     // pid1's graph sends source entities, pid2's graph receives source entities
     if( cgraph != nullptr ) cgraph->set_entity_dimension( src_dim );
@@ -3895,37 +3898,37 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
     {
         appData& data1     = context.appDatas[*pid1];
         EntityHandle fset1 = data1.file_set;
+        Range ents_of_interest;
 
-        // Handle TempestRemap coverage mesh for intersection applications
 #ifdef MOAB_HAVE_TEMPESTREMAP
+        // Handle TempestRemap coverage mesh for intersection applications
         if( data1.tempestData.remapper != nullptr )  // This is the case for intersection operations
             fset1 = data1.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
-#endif
 
-        Range ents_of_interest;
-        if( iMOAB_DiscretizationType::IMOAB_CGLL_DISCRETIZATION == *type1 )  // Spectral elements: get GLOBAL_DOFS from MBQUAD elements
+        if( iMOAB_DiscretizationType::IMOAB_CGLL_DISCRETIZATION == *type1 || iMOAB_DiscretizationType::IMOAB_DGLL_DISCRETIZATION == *type1 )  // Spectral elements: get GLOBAL_DOFS from MBQUAD elements
         {
             assert( gdsTag );
             MB_CHK_ERR( context.MBI->get_entities_by_type( fset1, MBQUAD, ents_of_interest ) );
             valuesComp1.resize( ents_of_interest.size() * lenTagType1 );
             MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, ents_of_interest, &valuesComp1[0] ) );
         }
-        else if( iMOAB_DiscretizationType::IMOAB_PC_DISCRETIZATION == *type1 )  // Vertex-based coupling: get GLOBAL_ID from MBVERTEX entities
+        else if( iMOAB_DiscretizationType::IMOAB_PC_DISCRETIZATION == *type1 )  // Point cloud: get GLOBAL_ID from vertices
         {
             MB_CHK_ERR( context.MBI->get_entities_by_type( fset1, MBVERTEX, ents_of_interest ) );
             valuesComp1.resize( ents_of_interest.size() );
             MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] ) );
         }
-        else if( iMOAB_DiscretizationType::IMOAB_FV_DISCRETIZATION == *type1 )  // Finite volume meshes: get GLOBAL_ID from elements
+        else // Finite volume meshes: get GLOBAL_ID from elements of appropriate dimension
         {
             MB_CHK_ERR( context.MBI->get_entities_by_dimension( fset1, src_dim, ents_of_interest ) );
             valuesComp1.resize( ents_of_interest.size() );
             MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] ) );
         }
-        else
-        {
-            MB_CHK_ERR( MB_FAILURE );  // Only types 1, 2, or 3 are supported
-        }
+#else
+        MB_CHK_ERR( context.MBI->get_entities_by_dimension( fset1, src_dim, ents_of_interest ) );
+        valuesComp1.resize( ents_of_interest.size() );
+        MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp1[0] ) );
+#endif
 
         // Build tuple list for component 1: (target_process, entity_id) pairs
         // Use hash-based distribution: entity_id % numProcs determines target process
@@ -3969,37 +3972,38 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
     {
         appData& data2     = context.appDatas[*pid2];
         EntityHandle fset2 = data2.file_set;
+        Range ents_of_interest;
 
         // Handle TempestRemap coverage mesh for intersection applications
 #ifdef MOAB_HAVE_TEMPESTREMAP
         if( data2.tempestData.remapper != nullptr )  // This is the case for intersection operations
             fset2 = data2.tempestData.remapper->GetMeshSet( Remapper::CoveringMesh );
-#endif
 
-        Range ents_of_interest;
-        if( iMOAB_DiscretizationType::IMOAB_CGLL_DISCRETIZATION == *type2 )  // Spectral elements: get GLOBAL_DOFS from MBQUAD elements
+        if( iMOAB_DiscretizationType::IMOAB_CGLL_DISCRETIZATION == *type2 || iMOAB_DiscretizationType::IMOAB_DGLL_DISCRETIZATION == *type2 )  // Spectral elements: get GLOBAL_DOFS from MBQUAD elements
         {
             assert( gdsTag );
             MB_CHK_ERR( context.MBI->get_entities_by_type( fset2, MBQUAD, ents_of_interest ) );
             valuesComp2.resize( ents_of_interest.size() * lenTagType1 );
             MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, ents_of_interest, &valuesComp2[0] ) );
         }
-        else if( iMOAB_DiscretizationType::IMOAB_PC_DISCRETIZATION == *type2 )  // Vertex-based coupling: get GLOBAL_ID from MBVERTEX entities
+        else if( iMOAB_DiscretizationType::IMOAB_PC_DISCRETIZATION == *type2 )  // Point cloud: get GLOBAL_ID from vertices
         {
             MB_CHK_ERR( context.MBI->get_entities_by_type( fset2, MBVERTEX, ents_of_interest ) );
             valuesComp2.resize( ents_of_interest.size() );
             MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp2[0] ) );
         }
-        else if( iMOAB_DiscretizationType::IMOAB_FV_DISCRETIZATION == *type2 )  // Finite volume meshes: get GLOBAL_ID from elements
+        else // Finite volume meshes: get GLOBAL_ID from elements of appropriate dimension
         {
-            MB_CHK_ERR( context.MBI->get_entities_by_dimension( fset2, src_dim, ents_of_interest ) );
+            MB_CHK_ERR( context.MBI->get_entities_by_dimension( fset2, tgt_dim, ents_of_interest ) );
             valuesComp2.resize( ents_of_interest.size() );
             MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp2[0] ) );
         }
-        else
-        {
-            MB_CHK_ERR( MB_FAILURE );  // Only types 1, 2, or 3 are supported
-        }
+#else
+        MB_CHK_ERR( context.MBI->get_entities_by_dimension( fset2, tgt_dim, ents_of_interest ) );
+        valuesComp2.resize( ents_of_interest.size() );
+        MB_CHK_ERR( context.MBI->tag_get_data( gidTag, ents_of_interest, &valuesComp2[0] ) );
+#endif
+
         // Build tuple list for component 2: (target_process, entity_id) pairs
         // Use hash-based distribution: entity_id % numProcs determines target process
         std::set< int > uniq( valuesComp2.begin(), valuesComp2.end() );  // Remove duplicates

@@ -193,6 +193,7 @@ imoab_phatm_ocn_coupler_SOURCES = imoab_phatm_ocn_coupler.cpp
 imoab_apg2_ol_coupler_SOURCES = imoab_apg2_ol_coupler.cpp
 imoab_map_target_SOURCES = imoab_map_target.cpp
 imoab_read_compute_map_SOURCES = imoab_read_compute_map.cpp
+imoab_applymap_SOURCES = imoab_applymap.cpp
 imoab_setwithGid_SOURCES = imoab_setwithGid.cpp
 migrate_nontrivial_SOURCES = migrate_nontrivial.cpp
 ghost_thin_layers_SOURCES = ghost_thin_layers.cpp

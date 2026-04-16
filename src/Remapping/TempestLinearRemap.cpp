@@ -148,14 +148,14 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_np1(
 		}
 
 		// This Face
-		const Face & faceFirst = m_meshInputCov->faces[ixFirst];
+		// const Face & faceFirst = m_meshInputCov->faces[ixFirst];
 
 		// Find the set of Faces that overlap faceFirst
 		size_t ixOverlapBegin = ixOverlap;
 		size_t ixOverlapEnd = ixOverlapBegin;
 
 		for (; ixOverlapEnd < m_meshOverlap->faces.size(); ixOverlapEnd++) {
-			if (m_meshOverlap->vecSourceFaceIx[ixOverlapEnd] != ixFirst) {
+			if (ixFirst - m_meshOverlap->vecSourceFaceIx[ixOverlapEnd] != 0) {
 				break;
 			}
 		}
@@ -175,7 +175,7 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_np1(
 				/ m_meshOutput->vecFaceArea[ixSecondFace];
 
 			if (m_mapRemap(ixSecondFace, ixFirstFace) > 10.0) {
-				printf("%zu %zu %zu\n", ixFirstFace, ixSecondFace, ixOverlap+j);
+				printf("%d %d %zu\n", ixFirstFace, ixSecondFace, ixOverlap+j);
 				printf("Input:\n");
 				for (size_t i = 0; i < m_meshInputCov->faces[ixFirstFace].edges.size(); i++) {
 					const Node & node = m_meshInputCov->nodes[ m_meshInputCov->faces[ixFirstFace][i] ];

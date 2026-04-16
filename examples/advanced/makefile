@@ -3,7 +3,7 @@ include ../makefile.config
 
 default: all
 
-EXAMPLES =  ExtrudePoly GeneralGnomonic AddEdgeFluxVector FEMSolver
+EXAMPLES =  ExtrudePoly GeneralGnomonic AddEdgeFluxVector
 PAREXAMPLES = LloydRelaxation CrystalRouterExample GenLargeMesh
 EXOIIEXAMPLES = VisTags
 ALLEXAMPLES = ${EXAMPLES}
@@ -15,6 +15,10 @@ endif
 ifeq ("$(MOAB_MPI_ENABLED)","yes")
 parallel: ${PAREXAMPLES}
 ALLEXAMPLES += ${PAREXAMPLES}
+ifeq ("$(MOAB_TEMPESTREMAP_ENABLED)","yes")
+PAREXAMPLES += 
+ALLEXAMPLES += 
+endif
 ifeq ("$(ENABLE_mbcoupler)","yes")
 PAREXAMPLES += CoupleMGen
 endif
@@ -33,9 +37,8 @@ VisTags: VisTags.o ${MOAB_LIBDIR}/libMOAB.la
 GenLargeMesh: GenLargeMesh.o ${MOAB_LIBDIR}/libMOAB.la
 GeneralGnomonic: GeneralGnomonic.o ${MOAB_LIBDIR}/libMOAB.la
 AddEdgeFluxVector: AddEdgeFluxVector.o ${MOAB_LIBDIR}/libMOAB.la
-FEMSolver: FEMSolver.o 
 
-ExtrudePoly LloydRelaxation CrystalRouterExample VisTags GenLargeMesh GeneralGnomonic AddEdgeFluxVector FEMSolver:
+ExtrudePoly LloydRelaxation CrystalRouterExample VisTags GenLargeMesh GeneralGnomonic AddEdgeFluxVector:
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
@@ -82,4 +85,3 @@ run: all $(addprefix run-,$(ALLEXAMPLES))
 
 clean: clobber
 	rm -rf ${ALLEXAMPLES}
-

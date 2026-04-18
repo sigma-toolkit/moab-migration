@@ -518,17 +518,13 @@ if ( ENABLE_NETCDF )
   if (NETCDF_FOUND)
     set (MOAB_HAVE_NETCDF_H 1)
     # Check for parallel NetCDF I/O support:
-    #   1. NetCDF built with parallel HDF5 (nc-config --has-parallel4 = yes)
-    #   2. PNetCDF configured (PNETCDF_FOUND)
-    # Either path provides parallel NetCDF capability for SCRIP map file I/O.
-    if (ENABLE_MPI AND (NETCDF_PARALLEL OR PNETCDF_FOUND))
+    # MOAB_HAVE_NETCDFPAR requires NetCDF built with parallel HDF5 (nc-config --has-parallel4).
+    # This is independent of PNetCDF — NETCDFPAR provides the netcdf_par.h / ParNcFile interface
+    # used by TempestRemap for parallel SCRIP map file writes.
+    if (ENABLE_MPI AND NETCDF_PARALLEL)
       set (MOAB_HAVE_NETCDFPAR 1)
       set (MOAB_HAVE_NETCDF_PAR_H 1)
-      if (NETCDF_PARALLEL)
-        message(STATUS "NetCDF parallel I/O enabled via HDF5 parallel support")
-      else()
-        message(STATUS "NetCDF parallel I/O enabled via PNetCDF")
-      endif()
+      message(STATUS "NetCDF parallel I/O enabled (HDF5 parallel support detected)")
     endif ()
     LIST(APPEND LOGGING_WATCHED_VARIABLES
       NETCDF_DIR

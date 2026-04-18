@@ -200,6 +200,22 @@ moab::ErrorCode moab::TempestOnlineMap::WriteParallelMap( const std::string& str
     // Write the map file to disk in parallel
     if( extension == "nc" )
     {
+#if !defined( MOAB_HAVE_NETCDFPAR )
+        // Without parallel NetCDF, the SCRIP writer cannot handle multiple MPI ranks
+        // writing to the same file. Fall back to the HDF5 format with a .h5m extension
+        // and then the map can be converted to SCRIP format offline if needed.
+        if( this->size > 1 )
+        {
+            std::string h5mFilename = strFilename.substr( 0, lastindex ) + ".h5m";
+            if( !this->rank )
+            {
+                std::cout << "  [WriteParallelMap]: Parallel NetCDF not available; writing map to "
+                          << "HDF5 format (" << h5mFilename << ") instead of SCRIP (.nc)\n";
+            }
+            MB_CHK_ERR( this->WriteHDF5MapFile( h5mFilename.c_str() ) );
+            return moab::MB_SUCCESS;
+        }
+#endif
         /* Invoke the actual call to write the parallel map to disk in SCRIP format */
         MB_CHK_ERR( this->WriteSCRIPMapFile( strFilename.c_str(), attrMap ) );
     }

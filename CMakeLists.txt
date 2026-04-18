@@ -523,13 +523,26 @@ endif ( ENABLE_PNETCDF )
 if ( ENABLE_NETCDF )
   find_package( NETCDF REQUIRED )
 
-  if (MOAB_HAVE_NETCDF)
+  if (NETCDF_FOUND)
     set (MOAB_HAVE_NETCDF_H 1)
+    # Check for parallel NetCDF I/O support:
+    #   1. NetCDF built with parallel HDF5 (nc-config --has-parallel4 = yes)
+    #   2. PNetCDF configured (PNETCDF_FOUND)
+    # Either path provides parallel NetCDF capability for SCRIP map file I/O.
+    if (ENABLE_MPI AND (NETCDF_PARALLEL OR PNETCDF_FOUND))
+      set (MOAB_HAVE_NETCDFPAR 1)
+      set (MOAB_HAVE_NETCDF_PAR_H 1)
+      if (NETCDF_PARALLEL)
+        message(STATUS "NetCDF parallel I/O enabled via HDF5 parallel support")
+      else()
+        message(STATUS "NetCDF parallel I/O enabled via PNetCDF")
+      endif()
+    endif ()
     LIST(APPEND LOGGING_WATCHED_VARIABLES
       NETCDF_DIR
       NETCDF_INCLUDES
       NETCDF_LIBRARIES )
-  endif (MOAB_HAVE_NETCDF)
+  endif (NETCDF_FOUND)
 
   # Print some NetCDF configuration details
   SET_VARS_IF_FOUND(NETCDF RECOMMENDED "NetCDF" "NetCDF library interfaces for MOAB ExodusII file format support" NETCDF_INCLUDES NETCDF_LIBRARIES )

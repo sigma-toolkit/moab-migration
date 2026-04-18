@@ -671,7 +671,7 @@ void test_tempest_map_bcast()
     CHECK_EQUAL( mpierr, 0 );
 
     int allocationSize[NDATA] = { 0, 0, 0 };
-    mpierr = MPI_Scatter( rowAllocation.data(), NDATA, MPI_INT, &allocationSize, NDATA, MPI_INT, rootProc, commW );
+    mpierr = MPI_Scatter( rowAllocation.data(), NDATA, MPI_INT, allocationSize, NDATA, MPI_INT, rootProc, commW );
     CHECK_EQUAL( mpierr, 0 );
 
     // create buffers to receive the data from root process

@@ -243,7 +243,7 @@ ErrorCode WriteNC::parse_options( const FileOptions& opts,
 // Will look at <pargal_source>/src/core/fileinfo.cpp, init dim, vars, atts
 ErrorCode WriteNC::process_conventional_tags( EntityHandle fileSet )
 {
-    ErrorCode rval;
+    ErrorCode rval = MB_SUCCESS;
 
     // Start copy
     Tag dimNamesTag      = 0;

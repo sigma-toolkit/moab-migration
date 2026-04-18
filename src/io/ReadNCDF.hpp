@@ -57,6 +57,12 @@ struct ReadBlockData
     ExoIIElementType elemType;
     std::vector< EntityHandle > polys;  // used only if elem type is polyhedra or polygons
                                         // because the order has to be maintained
+
+    ReadBlockData()
+        : blockId( 0 ), startExoId( 0 ), startMBId( 0 ), numElements( 0 ), reading_in( false ),
+          elemType( EXOII_MAX_ELEM_TYPE )
+    {
+    }
 };
 
 // these are for polyhedra only

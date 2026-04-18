@@ -430,12 +430,18 @@ add_baseline_test(NAME mbtempest_gold_ne30_ico30_fv_fv_o1
   LABELS "mbtempest_remap"
   DEPENDS mbtempest_remap_ne30_ico30_fv_fv_o1)
 
+add_partition_test(NAME mbtempest_partition_ne30_ico30_np2
+  NPROCS 2
+  TARGET ico30.h5m SOURCE ne30.h5m
+  OUTPUT_TARGET ico30_p2.h5m
+  LABELS "mbtempest_remap")
+
 add_mbtempest_mpi_test(NAME mbtempest_remap_ne30_ico30_fv_fv_o1_np2
   NPROCS 2
-  ARGS -t 5 -l ne30.h5m -l ico30.h5m -w -m fv -m fv -o 1 -o 1 --verify --var SH
+  ARGS -t 5 -l ne30_inferred.h5m -l ico30_p2.h5m -w -m fv -m fv -o 1 -o 1 --verify --var SH
        -f map_ne30_ico30_fv_fv_o1_np2.nc
   LABELS "mbtempest_remap"
-  DEPENDS "")
+  DEPENDS "mbtempest_partition_ne30_ico30_np2")
 
 add_map_compare_test(NAME mbtempest_compare_ne30_ico30_fv_fv_o1_serial_vs_np2
   MAP1 ${MBTEMPEST_TEST_DIR}/map_ne30_ico30_fv_fv_o1.nc
@@ -458,12 +464,18 @@ add_baseline_test(NAME mbtempest_gold_ne30_icod30_fv_fv_o1
   LABELS "mbtempest_remap"
   DEPENDS mbtempest_remap_ne30_icod30_fv_fv_o1)
 
+add_partition_test(NAME mbtempest_partition_ne30_icod30_np2
+  NPROCS 2
+  TARGET icod30.h5m SOURCE ne30.h5m
+  OUTPUT_TARGET icod30_p2.h5m
+  LABELS "mbtempest_remap")
+
 add_mbtempest_mpi_test(NAME mbtempest_remap_ne30_icod30_fv_fv_o1_np2
   NPROCS 2
-  ARGS -t 5 -l ne30.h5m -l icod30.h5m -w -m fv -m fv -o 1 -o 1 --verify --var SH
+  ARGS -t 5 -l ne30_inferred.h5m -l icod30_p2.h5m -w -m fv -m fv -o 1 -o 1 --verify --var SH
        -f map_ne30_icod30_fv_fv_o1_np2.nc
   LABELS "mbtempest_remap"
-  DEPENDS "")
+  DEPENDS "mbtempest_partition_ne30_icod30_np2")
 
 add_map_compare_test(NAME mbtempest_compare_ne30_icod30_fv_fv_o1_serial_vs_np2
   MAP1 ${MBTEMPEST_TEST_DIR}/map_ne30_icod30_fv_fv_o1.nc
@@ -486,12 +498,18 @@ add_baseline_test(NAME mbtempest_gold_rll90_ne30_fv_fv_o1
   LABELS "mbtempest_remap"
   DEPENDS mbtempest_remap_rll90_ne30_fv_fv_o1)
 
+add_partition_test(NAME mbtempest_partition_rll90_ne30_np2
+  NPROCS 2
+  TARGET ne30.h5m SOURCE rll90.h5m
+  OUTPUT_TARGET ne30_p2.h5m
+  LABELS "mbtempest_remap")
+
 add_mbtempest_mpi_test(NAME mbtempest_remap_rll90_ne30_fv_fv_o1_np2
   NPROCS 2
-  ARGS -t 5 -l rll90.h5m -l ne30.h5m -w -m fv -m fv -o 1 -o 1 --verify --var SH
+  ARGS -t 5 -l rll90_inferred.h5m -l ne30_p2.h5m -w -m fv -m fv -o 1 -o 1 --verify --var SH
        -f map_rll90_ne30_fv_fv_o1_np2.nc
   LABELS "mbtempest_remap"
-  DEPENDS "")
+  DEPENDS "mbtempest_partition_rll90_ne30_np2")
 
 add_map_compare_test(NAME mbtempest_compare_rll90_ne30_fv_fv_o1_serial_vs_np2
   MAP1 ${MBTEMPEST_TEST_DIR}/map_rll90_ne30_fv_fv_o1.nc
@@ -514,12 +532,18 @@ add_baseline_test(NAME mbtempest_gold_ico30_ne30_fv_fv_o1
   LABELS "mbtempest_remap"
   DEPENDS mbtempest_remap_ico30_ne30_fv_fv_o1)
 
+add_partition_test(NAME mbtempest_partition_ico30_ne30_np2
+  NPROCS 2
+  TARGET ne30.h5m SOURCE ico30.h5m
+  OUTPUT_TARGET ne30_p2_ico.h5m
+  LABELS "mbtempest_remap")
+
 add_mbtempest_mpi_test(NAME mbtempest_remap_ico30_ne30_fv_fv_o1_np2
   NPROCS 2
-  ARGS -t 5 -l ico30.h5m -l ne30.h5m -w -m fv -m fv -o 1 -o 1 --verify --var SH
+  ARGS -t 5 -l ico30_inferred.h5m -l ne30_p2_ico.h5m -w -m fv -m fv -o 1 -o 1 --verify --var SH
        -f map_ico30_ne30_fv_fv_o1_np2.nc
   LABELS "mbtempest_remap"
-  DEPENDS "")
+  DEPENDS "mbtempest_partition_ico30_ne30_np2")
 
 add_map_compare_test(NAME mbtempest_compare_ico30_ne30_fv_fv_o1_serial_vs_np2
   MAP1 ${MBTEMPEST_TEST_DIR}/map_ico30_ne30_fv_fv_o1.nc
@@ -544,10 +568,10 @@ add_baseline_test(NAME mbtempest_gold_ne30_icod30_fv_fv_o2
 
 add_mbtempest_mpi_test(NAME mbtempest_remap_ne30_icod30_fv_fv_o2_np2
   NPROCS 2
-  ARGS -t 5 -l ne30.h5m -l icod30.h5m -w -m fv -m fv -o 2 -o 2 --verify --var SH
+  ARGS -t 5 -l ne30_inferred.h5m -l icod30_p2.h5m -w -m fv -m fv -o 2 -o 2 --verify --var SH
        -f map_ne30_icod30_fv_fv_o2_np2.nc
   LABELS "mbtempest_remap"
-  DEPENDS "")
+  DEPENDS "mbtempest_partition_ne30_icod30_np2")
 
 add_map_compare_test(NAME mbtempest_compare_ne30_icod30_fv_fv_o2_serial_vs_np2
   MAP1 ${MBTEMPEST_TEST_DIR}/map_ne30_icod30_fv_fv_o2.nc

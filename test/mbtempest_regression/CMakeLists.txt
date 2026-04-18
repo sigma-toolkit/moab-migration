@@ -978,10 +978,11 @@ add_mbtempest_test(NAME mbtempest_conv_ne30_rll90_fv_fv_o2
 # CGLL-FV order 4-1 convergence: CS5→RLL5, CS10→RLL10
 # (CS5→RLL5 already defined above)
 add_mbtempest_test(NAME mbtempest_conv_ne30_icod30_cgll_fv_o4_o1
-  ARGS -t 5 -l ne30.h5m -l icod30.h5m -w -m cgll -m fv -o 4 -o 1 --verify --var SV
+  ARGS -t 5 -l ne30_se_o4.h5m -l icod30.h5m -w -m cgll -m fv -o 4 -o 1
+       -g GLOBAL_DOFS -g GLOBAL_ID --verify --var SV
        -f map_ne30_icod30_cgll_fv_o4_o1.nc
-  LABELS "mbtempest_remap;mbtempest_convergence"
-  DEPENDS "")
+  LABELS "mbtempest_remap;mbtempest_convergence;mbtempest_se"
+  DEPENDS "mbtempest_se_convert_cs30_o4")
 
 add_baseline_test(NAME mbtempest_gold_ne30_icod30_cgll_fv_o4_o1
   OUTPUT map_ne30_icod30_cgll_fv_o4_o1.nc

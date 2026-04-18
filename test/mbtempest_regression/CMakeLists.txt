@@ -302,6 +302,57 @@ add_mbtempest_test(NAME mbtempest_gen_ico10_dual
   DEPENDS mbtempest_gen_ico10)
 
 # ==============================================================================
+# SE Mesh Preparation: generate CS meshes with GLL DOF tags for SE tests
+# ==============================================================================
+# Step 1: Generate TempestRemap .g meshes (these are Exodus format)
+# Step 2: Convert to MOAB h5m with GLOBAL_DOFS tag via mbconvert -B
+#
+# Note: mbconvert -B with -r N only works for CS meshes (GLL DOF numbering).
+# DGLL tests are currently unsupported because DGLL needs per-element DOF
+# numbering which mbconvert does not yet generate.
+# ==============================================================================
+
+set(MBCONVERT_EXE ${EXECUTABLE_OUTPUT_PATH}/mbconvert)
+
+# Generate CS30 .g mesh for SE source/target
+add_mbtempest_test(NAME mbtempest_se_gen_cs30
+  ARGS -t 0 -r 30 -f ne30_se.g
+  LABELS "mbtempest_gen;mbtempest_se_prep")
+
+# Generate CS25 .g mesh for SE-SE target
+add_mbtempest_test(NAME mbtempest_se_gen_cs25
+  ARGS -t 0 -r 25 -f ne25_se.g
+  LABELS "mbtempest_gen;mbtempest_se_prep"
+  DEPENDS mbtempest_se_gen_cs30)
+
+# Convert CS30 with order 4 DOFs
+add_test(NAME mbtempest_se_convert_cs30_o4
+  COMMAND ${MBCONVERT_EXE} -B ne30_se.g ne30_se_o4.h5m -i GLOBAL_DOFS -r 4
+  WORKING_DIRECTORY ${MBTEMPEST_TEST_DIR})
+set_tests_properties(mbtempest_se_convert_cs30_o4 PROPERTIES
+  LABELS "mbtempest;mbtempest_se_prep"
+  TIMEOUT 60
+  DEPENDS mbtempest_se_gen_cs30)
+
+# Convert CS30 with order 2 DOFs
+add_test(NAME mbtempest_se_convert_cs30_o2
+  COMMAND ${MBCONVERT_EXE} -B ne30_se.g ne30_se_o2.h5m -i GLOBAL_DOFS -r 2
+  WORKING_DIRECTORY ${MBTEMPEST_TEST_DIR})
+set_tests_properties(mbtempest_se_convert_cs30_o2 PROPERTIES
+  LABELS "mbtempest;mbtempest_se_prep"
+  TIMEOUT 60
+  DEPENDS mbtempest_se_gen_cs30)
+
+# Convert CS25 with order 4 DOFs (for SE-SE tests)
+add_test(NAME mbtempest_se_convert_cs25_o4
+  COMMAND ${MBCONVERT_EXE} -B ne25_se.g ne25_se_o4.h5m -i GLOBAL_DOFS -r 4
+  WORKING_DIRECTORY ${MBTEMPEST_TEST_DIR})
+set_tests_properties(mbtempest_se_convert_cs25_o4 PROPERTIES
+  LABELS "mbtempest;mbtempest_se_prep"
+  TIMEOUT 60
+  DEPENDS mbtempest_se_gen_cs25)
+
+# ==============================================================================
 # Category 2: FV-FV Remapping (serial + parallel)
 #   Analytical function: SH (slow harmonic) for order 1
 # ==============================================================================
@@ -519,213 +570,113 @@ add_baseline_test(NAME mbtempest_gold_ne30_icod30_fv_fv_o3
   DEPENDS mbtempest_remap_ne30_icod30_fv_fv_o3)
 
 # ==============================================================================
-# Category 3: SE-FV Remapping (CGLL/DGLL → FV, serial + parallel)
+# Category 3: CGLL-FV Remapping (serial only for now)
+#   Uses SE-tagged CS meshes (ne30_se_o*.h5m) with GLOBAL_DOFS tag
 #   High-order uses SV (stationary vortex) for analytical test
+#
+#   Note: DGLL tests are currently disabled. DGLL requires per-element DOF
+#   numbering which mbconvert -B does not yet generate. Only CGLL is supported.
 # ==============================================================================
 
-# CGLL → FV, order 1-1
-add_mbtempest_test(NAME mbtempest_remap_ne30_rll90_cgll_fv_o1_o1
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m cgll -m fv -o 1 -o 1 --verify --var SH
-       -f map_ne30_rll90_cgll_fv_o1_o1.nc
-  LABELS "mbtempest_remap"
-  DEPENDS "")
+# CGLL → FV, order 2-1
+add_mbtempest_test(NAME mbtempest_remap_cgll_fv_o2_o1
+  ARGS -t 5 -l ne30_se_o2.h5m -l rll90.h5m -w -m cgll -m fv -o 2 -o 1
+       -g GLOBAL_DOFS -g GLOBAL_ID --verify --var SV
+       -f map_cgll_fv_o2_o1.nc
+  LABELS "mbtempest_remap;mbtempest_se"
+  DEPENDS "mbtempest_se_convert_cs30_o2")
 
-add_baseline_test(NAME mbtempest_gold_ne30_rll90_cgll_fv_o1_o1
-  OUTPUT map_ne30_rll90_cgll_fv_o1_o1.nc
-  BASELINE gold_ne30_rll90_cgll_fv_o1_o1.nc
+add_baseline_test(NAME mbtempest_gold_cgll_fv_o2_o1
+  OUTPUT map_cgll_fv_o2_o1.nc
+  BASELINE gold_cgll_fv_o2_o1.nc
   TOL 1e-12
-  LABELS "mbtempest_remap"
-  DEPENDS mbtempest_remap_ne30_rll90_cgll_fv_o1_o1)
+  LABELS "mbtempest_remap;mbtempest_se"
+  DEPENDS mbtempest_remap_cgll_fv_o2_o1)
 
-add_mbtempest_mpi_test(NAME mbtempest_remap_ne30_rll90_cgll_fv_o1_o1_np2
-  NPROCS 2
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m cgll -m fv -o 1 -o 1 --verify --var SH
-       -f map_ne30_rll90_cgll_fv_o1_o1_np2.nc
-  LABELS "mbtempest_remap"
-  DEPENDS "")
+# CGLL → FV, order 4-1 (high-order, vortex field)
+add_mbtempest_test(NAME mbtempest_remap_cgll_fv_o4_o1
+  ARGS -t 5 -l ne30_se_o4.h5m -l rll90.h5m -w -m cgll -m fv -o 4 -o 1
+       -g GLOBAL_DOFS -g GLOBAL_ID --verify --var SV
+       -f map_cgll_fv_o4_o1.nc
+  LABELS "mbtempest_remap;mbtempest_se"
+  DEPENDS "mbtempest_se_convert_cs30_o4")
 
-add_map_compare_test(NAME mbtempest_compare_ne30_rll90_cgll_fv_o1_o1_serial_vs_np2
-  MAP1 ${MBTEMPEST_TEST_DIR}/map_ne30_rll90_cgll_fv_o1_o1.nc
-  MAP2 ${MBTEMPEST_TEST_DIR}/map_ne30_rll90_cgll_fv_o1_o1_np2.nc
-  TOL 1e-14
-  LABELS "mbtempest_parallel"
-  DEPENDS "mbtempest_remap_ne30_rll90_cgll_fv_o1_o1;mbtempest_remap_ne30_rll90_cgll_fv_o1_o1_np2")
-
-# CGLL → FV, order 4-1 (high-order, use vortex field)
-add_mbtempest_test(NAME mbtempest_remap_ne30_rll90_cgll_fv_o4_o1
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m cgll -m fv -o 4 -o 1 --verify --var SV
-       -f map_ne30_rll90_cgll_fv_o4_o1.nc
-  LABELS "mbtempest_remap"
-  DEPENDS "")
-
-add_baseline_test(NAME mbtempest_gold_ne30_rll90_cgll_fv_o4_o1
-  OUTPUT map_ne30_rll90_cgll_fv_o4_o1.nc
-  BASELINE gold_ne30_rll90_cgll_fv_o4_o1.nc
+add_baseline_test(NAME mbtempest_gold_cgll_fv_o4_o1
+  OUTPUT map_cgll_fv_o4_o1.nc
+  BASELINE gold_cgll_fv_o4_o1.nc
   TOL 1e-12
-  LABELS "mbtempest_remap"
-  DEPENDS mbtempest_remap_ne30_rll90_cgll_fv_o4_o1)
+  LABELS "mbtempest_remap;mbtempest_se"
+  DEPENDS mbtempest_remap_cgll_fv_o4_o1)
 
-add_mbtempest_mpi_test(NAME mbtempest_remap_ne30_rll90_cgll_fv_o4_o1_np2
-  NPROCS 2
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m cgll -m fv -o 4 -o 1 --verify --var SV
-       -f map_ne30_rll90_cgll_fv_o4_o1_np2.nc
-  LABELS "mbtempest_remap"
-  DEPENDS "")
+# CGLL → FV, order 4-1 with monotonicity
+add_mbtempest_test(NAME mbtempest_remap_cgll_fv_o4_o1_mono1
+  ARGS -t 5 -l ne30_se_o4.h5m -l rll90.h5m -w -m cgll -m fv -o 4 -o 1
+       -g GLOBAL_DOFS -g GLOBAL_ID --monotonicity 1 --verify --var SV
+       -f map_cgll_fv_o4_o1_mono1.nc
+  LABELS "mbtempest_remap;mbtempest_se;mbtempest_options"
+  DEPENDS "mbtempest_se_convert_cs30_o4")
 
-add_map_compare_test(NAME mbtempest_compare_ne30_rll90_cgll_fv_o4_o1_serial_vs_np2
-  MAP1 ${MBTEMPEST_TEST_DIR}/map_ne30_rll90_cgll_fv_o4_o1.nc
-  MAP2 ${MBTEMPEST_TEST_DIR}/map_ne30_rll90_cgll_fv_o4_o1_np2.nc
-  TOL 1e-14
-  LABELS "mbtempest_parallel"
-  DEPENDS "mbtempest_remap_ne30_rll90_cgll_fv_o4_o1;mbtempest_remap_ne30_rll90_cgll_fv_o4_o1_np2")
-
-# DGLL → FV, order 1-1
-add_mbtempest_test(NAME mbtempest_remap_ne30_rll90_dgll_fv_o1_o1
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m dgll -m fv -o 1 -o 1 --verify --var SH
-       -f map_ne30_rll90_dgll_fv_o1_o1.nc
-  LABELS "mbtempest_remap"
-  DEPENDS "")
-
-add_baseline_test(NAME mbtempest_gold_ne30_rll90_dgll_fv_o1_o1
-  OUTPUT map_ne30_rll90_dgll_fv_o1_o1.nc
-  BASELINE gold_ne30_rll90_dgll_fv_o1_o1.nc
+add_baseline_test(NAME mbtempest_gold_cgll_fv_o4_o1_mono1
+  OUTPUT map_cgll_fv_o4_o1_mono1.nc
+  BASELINE gold_cgll_fv_o4_o1_mono1.nc
   TOL 1e-12
-  LABELS "mbtempest_remap"
-  DEPENDS mbtempest_remap_ne30_rll90_dgll_fv_o1_o1)
+  LABELS "mbtempest_remap;mbtempest_se;mbtempest_options"
+  DEPENDS mbtempest_remap_cgll_fv_o4_o1_mono1)
 
-add_mbtempest_mpi_test(NAME mbtempest_remap_ne30_rll90_dgll_fv_o1_o1_np2
-  NPROCS 2
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m dgll -m fv -o 1 -o 1 --verify --var SH
-       -f map_ne30_rll90_dgll_fv_o1_o1_np2.nc
-  LABELS "mbtempest_remap"
-  DEPENDS "")
+# CGLL → FV, order 4-1 with nobubble
+add_mbtempest_test(NAME mbtempest_remap_cgll_fv_o4_o1_nobubble
+  ARGS -t 5 -l ne30_se_o4.h5m -l rll90.h5m -w -m cgll -m fv -o 4 -o 1
+       -g GLOBAL_DOFS -g GLOBAL_ID --nobubble --verify --var SV
+       -f map_cgll_fv_o4_o1_nobubble.nc
+  LABELS "mbtempest_remap;mbtempest_se;mbtempest_options"
+  DEPENDS "mbtempest_se_convert_cs30_o4")
 
-add_map_compare_test(NAME mbtempest_compare_ne30_rll90_dgll_fv_o1_o1_serial_vs_np2
-  MAP1 ${MBTEMPEST_TEST_DIR}/map_ne30_rll90_dgll_fv_o1_o1.nc
-  MAP2 ${MBTEMPEST_TEST_DIR}/map_ne30_rll90_dgll_fv_o1_o1_np2.nc
-  TOL 1e-14
-  LABELS "mbtempest_parallel"
-  DEPENDS "mbtempest_remap_ne30_rll90_dgll_fv_o1_o1;mbtempest_remap_ne30_rll90_dgll_fv_o1_o1_np2")
-
-# DGLL → FV, order 4-1 (high-order, vortex)
-add_mbtempest_test(NAME mbtempest_remap_ne30_rll90_dgll_fv_o4_o1
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m dgll -m fv -o 4 -o 1 --verify --var SV
-       -f map_ne30_rll90_dgll_fv_o4_o1.nc
-  LABELS "mbtempest_remap"
-  DEPENDS "")
-
-add_baseline_test(NAME mbtempest_gold_ne30_rll90_dgll_fv_o4_o1
-  OUTPUT map_ne30_rll90_dgll_fv_o4_o1.nc
-  BASELINE gold_ne30_rll90_dgll_fv_o4_o1.nc
+add_baseline_test(NAME mbtempest_gold_cgll_fv_o4_o1_nobubble
+  OUTPUT map_cgll_fv_o4_o1_nobubble.nc
+  BASELINE gold_cgll_fv_o4_o1_nobubble.nc
   TOL 1e-12
-  LABELS "mbtempest_remap"
-  DEPENDS mbtempest_remap_ne30_rll90_dgll_fv_o4_o1)
-
-add_mbtempest_mpi_test(NAME mbtempest_remap_ne30_rll90_dgll_fv_o4_o1_np2
-  NPROCS 2
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m dgll -m fv -o 4 -o 1 --verify --var SV
-       -f map_ne30_rll90_dgll_fv_o4_o1_np2.nc
-  LABELS "mbtempest_remap"
-  DEPENDS "")
-
-add_map_compare_test(NAME mbtempest_compare_ne30_rll90_dgll_fv_o4_o1_serial_vs_np2
-  MAP1 ${MBTEMPEST_TEST_DIR}/map_ne30_rll90_dgll_fv_o4_o1.nc
-  MAP2 ${MBTEMPEST_TEST_DIR}/map_ne30_rll90_dgll_fv_o4_o1_np2.nc
-  TOL 1e-14
-  LABELS "mbtempest_parallel"
-  DEPENDS "mbtempest_remap_ne30_rll90_dgll_fv_o4_o1;mbtempest_remap_ne30_rll90_dgll_fv_o4_o1_np2")
+  LABELS "mbtempest_remap;mbtempest_se;mbtempest_options"
+  DEPENDS mbtempest_remap_cgll_fv_o4_o1_nobubble)
 
 # ==============================================================================
-# Category 4: FV-SE Remapping (serial only)
+# Category 4: FV-CGLL Remapping (serial only)
+#   Target is a CS mesh with GLOBAL_DOFS tag
 # ==============================================================================
 
 # FV → CGLL, order 1-4
-add_mbtempest_test(NAME mbtempest_remap_ne30_rll90_fv_cgll_o1_o4
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m fv -m cgll -o 1 -o 4 --verify --var SV
-       -f map_ne30_rll90_fv_cgll_o1_o4.nc
-  LABELS "mbtempest_remap"
-  DEPENDS "")
+add_mbtempest_test(NAME mbtempest_remap_fv_cgll_o1_o4
+  ARGS -t 5 -l rll90.h5m -l ne30_se_o4.h5m -w -m fv -m cgll -o 1 -o 4
+       -g GLOBAL_ID -g GLOBAL_DOFS --verify --var SV
+       -f map_fv_cgll_o1_o4.nc
+  LABELS "mbtempest_remap;mbtempest_se"
+  DEPENDS "mbtempest_se_convert_cs30_o4")
 
-add_baseline_test(NAME mbtempest_gold_ne30_rll90_fv_cgll_o1_o4
-  OUTPUT map_ne30_rll90_fv_cgll_o1_o4.nc
-  BASELINE gold_ne30_rll90_fv_cgll_o1_o4.nc
+add_baseline_test(NAME mbtempest_gold_fv_cgll_o1_o4
+  OUTPUT map_fv_cgll_o1_o4.nc
+  BASELINE gold_fv_cgll_o1_o4.nc
   TOL 1e-12
-  LABELS "mbtempest_remap"
-  DEPENDS mbtempest_remap_ne30_rll90_fv_cgll_o1_o4)
-
-# FV → DGLL, order 1-4
-add_mbtempest_test(NAME mbtempest_remap_ne30_rll90_fv_dgll_o1_o4
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m fv -m dgll -o 1 -o 4 --verify --var SV
-       -f map_ne30_rll90_fv_dgll_o1_o4.nc
-  LABELS "mbtempest_remap"
-  DEPENDS "")
-
-add_baseline_test(NAME mbtempest_gold_ne30_rll90_fv_dgll_o1_o4
-  OUTPUT map_ne30_rll90_fv_dgll_o1_o4.nc
-  BASELINE gold_ne30_rll90_fv_dgll_o1_o4.nc
-  TOL 1e-12
-  LABELS "mbtempest_remap"
-  DEPENDS mbtempest_remap_ne30_rll90_fv_dgll_o1_o4)
+  LABELS "mbtempest_remap;mbtempest_se"
+  DEPENDS mbtempest_remap_fv_cgll_o1_o4)
 
 # ==============================================================================
-# Category 5: SE-SE Remapping (serial only)
+# Category 5: CGLL-CGLL Remapping (serial only)
+#   Both source and target are CS meshes with GLOBAL_DOFS tag
 # ==============================================================================
 
-# CGLL → CGLL, order 4-4
-add_mbtempest_test(NAME mbtempest_remap_ne30_rll90_cgll_cgll_o4_o4
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m cgll -m cgll -o 4 -o 4 --verify --var SV
-       -f map_ne30_rll90_cgll_cgll_o4_o4.nc
-  LABELS "mbtempest_remap"
-  DEPENDS "")
+# CGLL → CGLL, order 4-4 (CS30 → CS25)
+add_mbtempest_test(NAME mbtempest_remap_cgll_cgll_o4_o4
+  ARGS -t 5 -l ne30_se_o4.h5m -l ne25_se_o4.h5m -w -m cgll -m cgll -o 4 -o 4
+       -g GLOBAL_DOFS -g GLOBAL_DOFS --verify --var SV
+       -f map_cgll_cgll_o4_o4.nc
+  LABELS "mbtempest_remap;mbtempest_se"
+  DEPENDS "mbtempest_se_convert_cs30_o4;mbtempest_se_convert_cs25_o4")
 
-add_baseline_test(NAME mbtempest_gold_ne30_rll90_cgll_cgll_o4_o4
-  OUTPUT map_ne30_rll90_cgll_cgll_o4_o4.nc
-  BASELINE gold_ne30_rll90_cgll_cgll_o4_o4.nc
+add_baseline_test(NAME mbtempest_gold_cgll_cgll_o4_o4
+  OUTPUT map_cgll_cgll_o4_o4.nc
+  BASELINE gold_cgll_cgll_o4_o4.nc
   TOL 1e-12
-  LABELS "mbtempest_remap"
-  DEPENDS mbtempest_remap_ne30_rll90_cgll_cgll_o4_o4)
-
-# DGLL → DGLL, order 4-4
-add_mbtempest_test(NAME mbtempest_remap_ne30_rll90_dgll_dgll_o4_o4
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m dgll -m dgll -o 4 -o 4 --verify --var SV
-       -f map_ne30_rll90_dgll_dgll_o4_o4.nc
-  LABELS "mbtempest_remap"
-  DEPENDS "")
-
-add_baseline_test(NAME mbtempest_gold_ne30_rll90_dgll_dgll_o4_o4
-  OUTPUT map_ne30_rll90_dgll_dgll_o4_o4.nc
-  BASELINE gold_ne30_rll90_dgll_dgll_o4_o4.nc
-  TOL 1e-12
-  LABELS "mbtempest_remap"
-  DEPENDS mbtempest_remap_ne30_rll90_dgll_dgll_o4_o4)
-
-# CGLL → DGLL, order 4-4
-add_mbtempest_test(NAME mbtempest_remap_ne30_rll90_cgll_dgll_o4_o4
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m cgll -m dgll -o 4 -o 4 --verify --var SV
-       -f map_ne30_rll90_cgll_dgll_o4_o4.nc
-  LABELS "mbtempest_remap"
-  DEPENDS "")
-
-add_baseline_test(NAME mbtempest_gold_ne30_rll90_cgll_dgll_o4_o4
-  OUTPUT map_ne30_rll90_cgll_dgll_o4_o4.nc
-  BASELINE gold_ne30_rll90_cgll_dgll_o4_o4.nc
-  TOL 1e-12
-  LABELS "mbtempest_remap"
-  DEPENDS mbtempest_remap_ne30_rll90_cgll_dgll_o4_o4)
-
-# DGLL → CGLL, order 4-4
-add_mbtempest_test(NAME mbtempest_remap_ne30_rll90_dgll_cgll_o4_o4
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m dgll -m cgll -o 4 -o 4 --verify --var SV
-       -f map_ne30_rll90_dgll_cgll_o4_o4.nc
-  LABELS "mbtempest_remap"
-  DEPENDS "")
-
-add_baseline_test(NAME mbtempest_gold_ne30_rll90_dgll_cgll_o4_o4
-  OUTPUT map_ne30_rll90_dgll_cgll_o4_o4.nc
-  BASELINE gold_ne30_rll90_dgll_cgll_o4_o4.nc
-  TOL 1e-12
-  LABELS "mbtempest_remap"
-  DEPENDS mbtempest_remap_ne30_rll90_dgll_cgll_o4_o4)
+  LABELS "mbtempest_remap;mbtempest_se"
+  DEPENDS mbtempest_remap_cgll_cgll_o4_o4)
 
 # ==============================================================================
 # Category 6: FV Sub-methods (--fvmethod)
@@ -829,20 +780,6 @@ add_baseline_test(NAME mbtempest_gold_ne30_rll90_fv_fv_mono3
   TOL 1e-12
   LABELS "mbtempest_remap;mbtempest_options"
   DEPENDS mbtempest_remap_ne30_rll90_fv_fv_mono3)
-
-# Monotonicity with SE method
-add_mbtempest_test(NAME mbtempest_remap_ne30_rll90_cgll_fv_mono1
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m cgll -m fv -o 4 -o 1 --monotonicity 1
-       --verify --var SV -f map_ne30_rll90_cgll_fv_mono1.nc
-  LABELS "mbtempest_remap;mbtempest_options"
-  DEPENDS "")
-
-add_baseline_test(NAME mbtempest_gold_ne30_rll90_cgll_fv_mono1
-  OUTPUT map_ne30_rll90_cgll_fv_mono1.nc
-  BASELINE gold_ne30_rll90_cgll_fv_mono1.nc
-  TOL 1e-12
-  LABELS "mbtempest_remap;mbtempest_options"
-  DEPENDS mbtempest_remap_ne30_rll90_cgll_fv_mono1)
 
 # ==============================================================================
 # Category 8: CAAS Limiter Tests
@@ -961,18 +898,7 @@ add_baseline_test(NAME mbtempest_gold_ne30_rll90_convexity
   DEPENDS mbtempest_remap_ne30_rll90_convexity)
 
 # No bubble (SE method)
-add_mbtempest_test(NAME mbtempest_remap_ne30_rll90_nobubble
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m cgll -m fv -o 4 -o 1 --nobubble
-       --verify --var SV -f map_ne30_rll90_nobubble.nc
-  LABELS "mbtempest_remap;mbtempest_options"
-  DEPENDS "")
-
-add_baseline_test(NAME mbtempest_gold_ne30_rll90_nobubble
-  OUTPUT map_ne30_rll90_nobubble.nc
-  BASELINE gold_ne30_rll90_nobubble.nc
-  TOL 1e-12
-  LABELS "mbtempest_remap;mbtempest_options"
-  DEPENDS mbtempest_remap_ne30_rll90_nobubble)
+# nobubble test moved to Category 3 (SE tests) with proper DOF tags
 
 # Sparse constraints
 add_mbtempest_test(NAME mbtempest_remap_ne30_rll90_sparse

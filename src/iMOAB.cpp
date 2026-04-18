@@ -5158,10 +5158,16 @@ ErrCode iMOAB_LoadMapFile( iMOAB_AppID pid_source,
 
     // Associate CoveringMesh with the requested source entities.
     // ApplyWeights() reads source tag data from CoveringMesh (entities or vertices depending on point-cloud flags).
-    EntityHandle covering_set = tdata.remapper->GetMeshSet( Remapper::CoveringMesh );
-    MB_CHK_ERR( context.MBI->clear_meshset( &covering_set, 1 ) );
-    MB_CHK_ERR( context.MBI->add_entities( covering_set, src_ents_of_interest ) );
-    tdata.remapper->SetMeshSet( Remapper::CoveringMesh, covering_set, &src_ents_of_interest );
+    // For face-based maps (IMOAB_FACE_ENTITY), the ghost-inclusive covering mesh built during intersection
+    // is already correct and must NOT be cleared — it is still referenced by the ParCommGraph cover_set
+    // stored during iMOAB_CoverageGraph, and is needed by iMOAB_ReceiveElementTag.
+    if( *source_entity_type != IMOAB_FACE_ENTITY )
+    {
+        EntityHandle covering_set = tdata.remapper->GetMeshSet( Remapper::CoveringMesh );
+        MB_CHK_ERR( context.MBI->clear_meshset( &covering_set, 1 ) );
+        MB_CHK_ERR( context.MBI->add_entities( covering_set, src_ents_of_interest ) );
+        tdata.remapper->SetMeshSet( Remapper::CoveringMesh, covering_set, &src_ents_of_interest );
+    }
 
     // Associate TargetMesh with the requested target entities.
     EntityHandle target_set = data_target.file_set;  // default: row based partition

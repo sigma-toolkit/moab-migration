@@ -1632,76 +1632,100 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             if( readAreaA ) vecAreaA.resize( localSizeA );
             if( readAreaB ) vecAreaB.resize( localSizeB );
 
-#ifdef MOAB_HAVE_PNETCDF
-            // PNetCDF path (preferred): collective parallel I/O
-            int ncfile = -1;
-            ERR_PARNC( ncmpi_open( m_pcomm->comm(), strSource, NC_NOWRITE, MPI_INFO_NULL, &ncfile ) );
+            // Try parallel readers at runtime. NETCDFPAR (parallel HDF5) handles
+            // NetCDF-4/HDF5 files; PNetCDF handles classic CDF-1/CDF-2/CDF-5 only.
+            // Try NETCDFPAR first since most map files are NetCDF-4, fall back to PNetCDF.
+            bool parReadDone = false;
 
-            MPI_Offset start = static_cast< MPI_Offset >( offsetRead );
-            MPI_Offset count = static_cast< MPI_Offset >( localSize );
-            int varid;
-
-            ERR_PARNC( ncmpi_inq_varid( ncfile, "S", &varid ) );
-            ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &start, &count, vecS.data() ) );
-            ERR_PARNC( ncmpi_inq_varid( ncfile, "row", &varid ) );
-            ERR_PARNC( ncmpi_get_vara_int_all( ncfile, varid, &start, &count, vecRow.data() ) );
-            ERR_PARNC( ncmpi_inq_varid( ncfile, "col", &varid ) );
-            ERR_PARNC( ncmpi_get_vara_int_all( ncfile, varid, &start, &count, vecCol.data() ) );
-
-            if( readAreaA )
+#ifdef MOAB_HAVE_NETCDFPAR
             {
-                MPI_Offset startA = static_cast< MPI_Offset >( offsetReadA );
-                MPI_Offset countA = static_cast< MPI_Offset >( localSizeA );
-                ERR_PARNC( ncmpi_inq_varid( ncfile, "area_a", &varid ) );
-                ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &startA, &countA, vecAreaA.data() ) );
-            }
-            if( readAreaB )
-            {
-                MPI_Offset startB = static_cast< MPI_Offset >( offsetReadB );
-                MPI_Offset countB = static_cast< MPI_Offset >( localSizeB );
-                ERR_PARNC( ncmpi_inq_varid( ncfile, "area_b", &varid ) );
-                ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &startB, &countB, vecAreaB.data() ) );
-            }
-            ERR_PARNC( ncmpi_close( ncfile ) );
+                // Parallel HDF5-backed NetCDF — handles NetCDF-4/HDF5 map files
+                ParNcFile ncMap( m_pcomm->comm(), MPI_INFO_NULL, strSource, NcFile::ReadOnly, NcFile::Netcdf4 );
+                if( ncMap.is_valid() )
+                {
+                    if( rank == 0 )
+                        std::cout << "  [ReadParallelMap]: Reading via parallel NetCDF (HDF5)\n";
 
-#elif defined( MOAB_HAVE_NETCDFPAR )
-            // Parallel HDF5-backed NetCDF path
-            ParNcFile ncMap( m_pcomm->comm(), MPI_INFO_NULL, strSource, NcFile::ReadOnly, NcFile::Netcdf4 );
-            if( !ncMap.is_valid() )
-            {
-                _EXCEPTION1( "Unable to open map file \"%s\" with parallel NetCDF", strSource );
-            }
+                    NcVar* varRowP = ncMap.get_var( "row" );
+                    NcVar* varColP = ncMap.get_var( "col" );
+                    NcVar* varSP   = ncMap.get_var( "S" );
+                    ncMap.enable_var_par_access( varRowP, true );
+                    ncMap.enable_var_par_access( varColP, true );
+                    ncMap.enable_var_par_access( varSP, true );
 
-            NcVar* varRowP = ncMap.get_var( "row" );
-            NcVar* varColP = ncMap.get_var( "col" );
-            NcVar* varSP   = ncMap.get_var( "S" );
-            ncMap.enable_var_par_access( varRowP, true );
-            ncMap.enable_var_par_access( varColP, true );
-            ncMap.enable_var_par_access( varSP, true );
+                    varRowP->set_cur( offsetRead );
+                    varRowP->get( vecRow.data(), localSize );
+                    varColP->set_cur( offsetRead );
+                    varColP->get( vecCol.data(), localSize );
+                    varSP->set_cur( offsetRead );
+                    varSP->get( vecS.data(), localSize );
 
-            varRowP->set_cur( offsetRead );
-            varRowP->get( vecRow.data(), localSize );
-            varColP->set_cur( offsetRead );
-            varColP->get( vecCol.data(), localSize );
-            varSP->set_cur( offsetRead );
-            varSP->get( vecS.data(), localSize );
-
-            if( readAreaA )
-            {
-                NcVar* varAreaAP = ncMap.get_var( "area_a" );
-                ncMap.enable_var_par_access( varAreaAP, true );
-                varAreaAP->set_cur( offsetReadA );
-                varAreaAP->get( vecAreaA.data(), localSizeA );
+                    if( readAreaA )
+                    {
+                        NcVar* varAreaAP = ncMap.get_var( "area_a" );
+                        ncMap.enable_var_par_access( varAreaAP, true );
+                        varAreaAP->set_cur( offsetReadA );
+                        varAreaAP->get( vecAreaA.data(), localSizeA );
+                    }
+                    if( readAreaB )
+                    {
+                        NcVar* varAreaBP = ncMap.get_var( "area_b" );
+                        ncMap.enable_var_par_access( varAreaBP, true );
+                        varAreaBP->set_cur( offsetReadB );
+                        varAreaBP->get( vecAreaB.data(), localSizeB );
+                    }
+                    ncMap.close();
+                    parReadDone = true;
+                }
             }
-            if( readAreaB )
-            {
-                NcVar* varAreaBP = ncMap.get_var( "area_b" );
-                ncMap.enable_var_par_access( varAreaBP, true );
-                varAreaBP->set_cur( offsetReadB );
-                varAreaBP->get( vecAreaB.data(), localSizeB );
-            }
-            ncMap.close();
 #endif
+
+#ifdef MOAB_HAVE_PNETCDF
+            if( !parReadDone )
+            {
+                // PNetCDF path — collective I/O for classic NetCDF formats (CDF-1/2/5)
+                int ncfile = -1;
+                int pnc_err = ncmpi_open( m_pcomm->comm(), strSource, NC_NOWRITE, MPI_INFO_NULL, &ncfile );
+                if( pnc_err == NC_NOERR )
+                {
+                    if( rank == 0 )
+                        std::cout << "  [ReadParallelMap]: Reading via PNetCDF (classic format)\n";
+
+                    MPI_Offset start = static_cast< MPI_Offset >( offsetRead );
+                    MPI_Offset count = static_cast< MPI_Offset >( localSize );
+                    int varid;
+
+                    ERR_PARNC( ncmpi_inq_varid( ncfile, "S", &varid ) );
+                    ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &start, &count, vecS.data() ) );
+                    ERR_PARNC( ncmpi_inq_varid( ncfile, "row", &varid ) );
+                    ERR_PARNC( ncmpi_get_vara_int_all( ncfile, varid, &start, &count, vecRow.data() ) );
+                    ERR_PARNC( ncmpi_inq_varid( ncfile, "col", &varid ) );
+                    ERR_PARNC( ncmpi_get_vara_int_all( ncfile, varid, &start, &count, vecCol.data() ) );
+
+                    if( readAreaA )
+                    {
+                        MPI_Offset startA = static_cast< MPI_Offset >( offsetReadA );
+                        MPI_Offset countA = static_cast< MPI_Offset >( localSizeA );
+                        ERR_PARNC( ncmpi_inq_varid( ncfile, "area_a", &varid ) );
+                        ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &startA, &countA, vecAreaA.data() ) );
+                    }
+                    if( readAreaB )
+                    {
+                        MPI_Offset startB = static_cast< MPI_Offset >( offsetReadB );
+                        MPI_Offset countB = static_cast< MPI_Offset >( localSizeB );
+                        ERR_PARNC( ncmpi_inq_varid( ncfile, "area_b", &varid ) );
+                        ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &startB, &countB, vecAreaB.data() ) );
+                    }
+                    ERR_PARNC( ncmpi_close( ncfile ) );
+                    parReadDone = true;
+                }
+            }
+#endif
+
+            if( !parReadDone )
+            {
+                _EXCEPTION1( "No parallel reader available for map file \"%s\"", strSource );
+            }
         }  // end direct parallel read
     }
     else

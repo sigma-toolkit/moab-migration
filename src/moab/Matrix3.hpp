@@ -557,15 +557,15 @@ class Matrix3
             evals[0]      = devreal[2];
             evals[1]      = devreal[1];
             evals[2]      = devreal[0];
-            evecs._mat[0] = drevecs[6];
-            evecs._mat[1] = drevecs[3];
-            evecs._mat[2] = drevecs[0];
-            evecs._mat[3] = drevecs[7];
-            evecs._mat[4] = drevecs[4];
-            evecs._mat[5] = drevecs[1];
-            evecs._mat[6] = drevecs[8];
-            evecs._mat[7] = drevecs[5];
-            evecs._mat[8] = drevecs[2];
+            evecs( 0 ) = drevecs[6];
+            evecs( 1 ) = drevecs[3];
+            evecs( 2 ) = drevecs[0];
+            evecs( 3 ) = drevecs[7];
+            evecs( 4 ) = drevecs[4];
+            evecs( 5 ) = drevecs[1];
+            evecs( 6 ) = drevecs[8];
+            evecs( 7 ) = drevecs[5];
+            evecs( 8 ) = drevecs[2];
             std::cout << "DGEEV: Optimal work vector: dsize = " << dwork[0] << ".\n";
         }
         else
@@ -576,12 +576,12 @@ class Matrix3
             std::vector< double > devmat( 9, 0.0 );
             std::vector< double > dwork( 38 );
             int N = 3, lwork = 38, liwork = 18;
-            devmat[0] = _mat[0];
-            devmat[1] = _mat[1];
-            devmat[2] = _mat[2];
-            devmat[4] = _mat[4];
-            devmat[5] = _mat[5];
-            devmat[8] = _mat[8];
+            devmat[0] = ( *this )( 0 );
+            devmat[1] = ( *this )( 1 );
+            devmat[2] = ( *this )( 2 );
+            devmat[4] = ( *this )( 4 );
+            devmat[5] = ( *this )( 5 );
+            devmat[8] = ( *this )( 8 );
             if( find_optimal )
             {
                 int _lwork             = -1;
@@ -606,15 +606,15 @@ class Matrix3
             evals[0]      = devreal[0];
             evals[1]      = devreal[1];
             evals[2]      = devreal[2];
-            evecs._mat[0] = drevecs[0];
-            evecs._mat[3] = drevecs[1];
-            evecs._mat[6] = drevecs[2];
-            evecs._mat[1] = drevecs[3];
-            evecs._mat[4] = drevecs[4];
-            evecs._mat[7] = drevecs[5];
-            evecs._mat[2] = drevecs[6];
-            evecs._mat[5] = drevecs[7];
-            evecs._mat[8] = drevecs[8];
+            evecs( 0 ) = drevecs[0];
+            evecs( 3 ) = drevecs[1];
+            evecs( 6 ) = drevecs[2];
+            evecs( 1 ) = drevecs[3];
+            evecs( 4 ) = drevecs[4];
+            evecs( 7 ) = drevecs[5];
+            evecs( 2 ) = drevecs[6];
+            evecs( 5 ) = drevecs[7];
+            evecs( 8 ) = drevecs[8];
         }
 
         if( !info )

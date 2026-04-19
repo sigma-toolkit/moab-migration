@@ -31,7 +31,6 @@
 
 #ifdef MOAB_HAVE_EIGEN3
 #define EIGEN_NO_DEBUG
-#define EIGEN_MAX_CPP_VER 11
 #include "Eigen/Dense"
 #endif
 

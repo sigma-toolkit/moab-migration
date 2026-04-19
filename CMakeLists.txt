@@ -132,7 +132,7 @@ option( BUILD_SHARED_LIBS   "Should shared or static libraries be created?"     
 option( BUILD_DOCUMENTATION "Build Doxygen documentation"                                 OFF ) #
 option( ENABLE_CPM          "Should build with C++/CMake Package Manager (CPM) support?"  OFF ) #
 option( ENABLE_BLASLAPACK   "Should require BLAS/LAPACK?"                                 ON  ) #
-option( ENABLE_EIGEN3       "Should require Eigen3 header-only library?"                  OFF ) #
+option( ENABLE_EIGEN       "Should require Eigen3 header-only library?"                  OFF ) #
 option( ENABLE_CGNS         "Should build with CGNS support?"                             OFF ) #
 option( ENABLE_MPI          "Should MOAB be compiled with MPI support?"                   OFF ) #
 option( ENABLE_HDF5         "Include HDF I/O interfaces in the build?"                    OFF ) #
@@ -162,7 +162,7 @@ auto_enable_package(PNETCDF)
 auto_enable_package(METIS)
 auto_enable_package(PARMETIS)
 auto_enable_package(ZOLTAN)
-auto_enable_package(EIGEN3)
+auto_enable_package(EIGEN)
 auto_enable_package(TEMPESTREMAP)
 
 find_package(PkgConfig QUIET)
@@ -292,9 +292,9 @@ macro(SET_VARS_IF_FOUND PACKAGE_NAME PACKAGE_TYPE PRINT_NAME DESCRIPTION PACKAGE
       if (DEFINED ${PACKAGE_LIBRARIES} AND NOT "${${PACKAGE_LIBRARIES}}" STREQUAL "")
         message (STATUS "        Libraries : ${${PACKAGE_LIBRARIES}}")
         RESOLVE_LIBRARIES(_tmp_resolved_pkglibs "${${PACKAGE_LIBRARIES}}")
-        # set( MOAB_LIBRARIES ${${PACKAGE_LIBRARIES}} ${MOAB_LIBRARIES} )
-        # list( APPEND MOAB_LIBRARIES ${_tmp_resolved_pkglibs} )
-        list( INSERT MOAB_LIBRARIES 0 "${_tmp_resolved_pkglibs}" )
+        # Prepend resolved libraries without quoting to avoid creating
+        # a single list element with embedded semicolons
+        set( MOAB_LIBRARIES ${_tmp_resolved_pkglibs} ${MOAB_LIBRARIES} )
       endif (DEFINED ${PACKAGE_LIBRARIES} AND NOT "${${PACKAGE_LIBRARIES}}" STREQUAL "")
 
       set_package_properties(${PACKAGE_NAME} PROPERTIES
@@ -341,13 +341,11 @@ if ( ENABLE_BLASLAPACK  )
 endif (ENABLE_BLASLAPACK)
 
 # Check for Eigen3 availability
-if ( ENABLE_EIGEN3 )
+if ( ENABLE_EIGEN )
 
-  # Eigen3 is optional if LAPACK has been found
-  FIND_PACKAGE(Eigen3 OPTIONAL_COMPONENTS)
-  
+  message("Checking if we need to download Eigen3")
   ## Use CPM to auto-download Eigen3 directly
-  if ( DOWNLOAD_EIGEN3 AND ENABLE_CPM )
+  if ( DOWNLOAD_EIGEN AND ENABLE_CPM )
     CPMAddPackage(
       NAME Eigen
       VERSION 3.4.0
@@ -358,22 +356,28 @@ if ( ENABLE_EIGEN3 )
     
     if(Eigen_ADDED)
       add_library(Eigen INTERFACE IMPORTED)
-      target_include_directories(Eigen INTERFACE ${Eigen_SOURCE_DIR})
+      target_include_directories(Eigen INTERFACE ${Eigen_SOURCE_DIR})   
     endif()
-  endif ( DOWNLOAD_EIGEN3 AND ENABLE_CPM )
+  endif ( DOWNLOAD_EIGEN AND ENABLE_CPM )
 
-  if ( EIGEN3_FOUND )
-    INCLUDE_DIRECTORIES ( "${EIGEN3_INCLUDE_DIR}" )
-    SET(MOAB_DEFINES "${MOAB_DEFINES} -I${EIGEN3_INCLUDE_DIR}")
-  endif (EIGEN3_FOUND)
+  # search for Eigen3Config.cmake provided by the installed Eigen3 package
+  find_package(Eigen3 3.4...5 REQUIRED NO_MODULE QUIET)
 
+  # Bridge find_package(Eigen3) variables to the EIGEN3_ naming convention
+  # used by SET_VARS_IF_FOUND (which sets MOAB_HAVE_EIGEN3) and all source
+  # code #ifdef guards
+  if (Eigen3_FOUND)
+    set(EIGEN3_FOUND TRUE)
+    get_target_property(EIGEN3_INCLUDE_DIR Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
+  endif()
+
+  message(STATUS "Found Eigen3: ${EIGEN3_INCLUDE_DIR}")
   SET_VARS_IF_FOUND(EIGEN3 RECOMMENDED "Eigen3" "Eigen3 headers as supplement to BLAS/LAPACK implementations" EIGEN3_INCLUDE_DIR EIGEN3_LIBRARIES )
 
   LIST(APPEND LOGGING_WATCHED_VARIABLES
-    EIGEN3_INCLUDES
-    EIGEN3_LIBRARIES )
+    EIGEN3_INCLUDE_DIR )
 
-endif ( ENABLE_EIGEN3 )
+endif ( ENABLE_EIGEN )
 
 # Check for Fortran language support
 if ( ENABLE_FORTRAN )

@@ -1710,6 +1710,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
         // =================================================================
         // Serial path (size == 1): read entire file on the single process.
         // =================================================================
+        std::cout << "  [ReadParallelMap]: Using serial read (single process)\n";
         NcFile ncMap( strSource, NcFile::ReadOnly );
         if( !ncMap.is_valid() )
         {

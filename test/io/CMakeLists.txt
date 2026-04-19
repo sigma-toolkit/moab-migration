@@ -29,7 +29,7 @@ foreach( fname ${TESTS} )
   string( REPLACE ".cpp" "" base ${fname} )
   add_executable( ${base} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname})
   set_target_properties( ${base} PROPERTIES COMPILE_FLAGS "${TEST_COMP_FLAGS} ${MOAB_DEFINES}" )
-  target_link_libraries( ${base} MOAB ${CGM_LIBRARIES} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
+  target_link_libraries( ${base} MOAB ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
   add_test( ${base} ${EXECUTABLE_OUTPUT_PATH}/${base} )
 endforeach()
 

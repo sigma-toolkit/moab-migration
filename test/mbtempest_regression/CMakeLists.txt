@@ -779,31 +779,36 @@ add_baseline_test(NAME mbtempest_gold_ne30_rll90_fv_fv_mono1
   LABELS "mbtempest_remap;mbtempest_options"
   DEPENDS mbtempest_remap_ne30_rll90_fv_fv_mono1)
 
-add_mbtempest_test(NAME mbtempest_remap_ne30_rll90_fv_fv_mono2
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m fv -m fv -o 1 -o 1 --monotonicity 2
-       --verify --var SH -f map_ne30_rll90_fv_fv_mono2.nc
-  LABELS "mbtempest_remap;mbtempest_options"
-  DEPENDS "")
+# Note: --monotonicity 2 and 3 are only valid for SE (CGLL/DGLL) discretizations,
+# not for FV-FV. These tests use CGLL source with SE-tagged mesh.
 
-add_baseline_test(NAME mbtempest_gold_ne30_rll90_fv_fv_mono2
-  OUTPUT map_ne30_rll90_fv_fv_mono2.nc
-  BASELINE gold_ne30_rll90_fv_fv_mono2.nc
+add_mbtempest_test(NAME mbtempest_remap_cgll_fv_o4_o1_mono2
+  ARGS -t 5 -l ne30_se_o4.h5m -l rll90.h5m -w -m cgll -m fv -o 4 -o 1
+       -g GLOBAL_DOFS -g GLOBAL_ID --monotonicity 2 --verify --var SV
+       -f map_cgll_fv_o4_o1_mono2.nc
+  LABELS "mbtempest_remap;mbtempest_options;mbtempest_se"
+  DEPENDS "mbtempest_se_convert_cs30_o4")
+
+add_baseline_test(NAME mbtempest_gold_cgll_fv_o4_o1_mono2
+  OUTPUT map_cgll_fv_o4_o1_mono2.nc
+  BASELINE gold_cgll_fv_o4_o1_mono2.nc
   TOL 1e-12
-  LABELS "mbtempest_remap;mbtempest_options"
-  DEPENDS mbtempest_remap_ne30_rll90_fv_fv_mono2)
+  LABELS "mbtempest_remap;mbtempest_options;mbtempest_se"
+  DEPENDS mbtempest_remap_cgll_fv_o4_o1_mono2)
 
-add_mbtempest_test(NAME mbtempest_remap_ne30_rll90_fv_fv_mono3
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m fv -m fv -o 1 -o 1 --monotonicity 3
-       --verify --var SH -f map_ne30_rll90_fv_fv_mono3.nc
-  LABELS "mbtempest_remap;mbtempest_options"
-  DEPENDS "")
+add_mbtempest_test(NAME mbtempest_remap_cgll_fv_o4_o1_mono3
+  ARGS -t 5 -l ne30_se_o4.h5m -l rll90.h5m -w -m cgll -m fv -o 4 -o 1
+       -g GLOBAL_DOFS -g GLOBAL_ID --monotonicity 3 --verify --var SV
+       -f map_cgll_fv_o4_o1_mono3.nc
+  LABELS "mbtempest_remap;mbtempest_options;mbtempest_se"
+  DEPENDS "mbtempest_se_convert_cs30_o4")
 
-add_baseline_test(NAME mbtempest_gold_ne30_rll90_fv_fv_mono3
-  OUTPUT map_ne30_rll90_fv_fv_mono3.nc
-  BASELINE gold_ne30_rll90_fv_fv_mono3.nc
+add_baseline_test(NAME mbtempest_gold_cgll_fv_o4_o1_mono3
+  OUTPUT map_cgll_fv_o4_o1_mono3.nc
+  BASELINE gold_cgll_fv_o4_o1_mono3.nc
   TOL 1e-12
-  LABELS "mbtempest_remap;mbtempest_options"
-  DEPENDS mbtempest_remap_ne30_rll90_fv_fv_mono3)
+  LABELS "mbtempest_remap;mbtempest_options;mbtempest_se"
+  DEPENDS mbtempest_remap_cgll_fv_o4_o1_mono3)
 
 # ==============================================================================
 # Category 8: CAAS Limiter Tests

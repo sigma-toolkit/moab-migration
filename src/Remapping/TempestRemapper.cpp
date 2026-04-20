@@ -372,6 +372,10 @@ ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType /*meshT
 
         MB_CHK_SET_ERR( m_interface->tag_set_data( gidTag, &mbcells[0], mbcells.size(), &gidse[0] ),
                         "Can't set global_id tag" );
+#ifdef MOAB_HAVE_MPI
+        MB_CHK_SET_ERR( m_pcomm->assign_global_ids(mesh_set, 2, 1, false, true, false ), "Unable to set global IDs" );
+#endif
+
         if( storeParentInfo )
         {
             MB_CHK_SET_ERR( m_interface->tag_set_data( srcParentTag, &mbcells[0], mbcells.size(), &srcParent[0] ),

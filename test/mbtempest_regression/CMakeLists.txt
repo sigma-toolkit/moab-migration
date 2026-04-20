@@ -960,42 +960,65 @@ add_baseline_test(NAME mbtempest_gold_fv_cgll_volumetric
 
 # ==============================================================================
 # Category 10: Convergence Analysis
-#   Run at multiple resolutions, verify error decreases
+#   Each convergence test runs mbtempest at two different mesh resolutions (or
+#   discretization orders) and verifies that the L_inf error decreases.
+#   The test is a single shell command that runs both cases and compares.
 # ==============================================================================
 
-# FV-FV order 1 convergence: CS5→RLL5, CS10→RLL10, CS25→RLL25
-# (CS5→RLL5 already defined above; CS10→RLL10 already defined)
-# Only need CS25→RLL25
-add_mbtempest_test(NAME mbtempest_conv_ico30_rll90_fv_fv_o1
-  ARGS -t 5 -l ico30.h5m -l rll90.h5m -w -m fv -m fv -o 1 -o 1 --verify --var SH
-       -f map_ico30_rll90_fv_fv_o1.nc
-  LABELS "mbtempest_remap;mbtempest_convergence"
-  DEPENDS "")
+set(CONV_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/run_convergence_test.sh)
 
-# FV-FV order 2 convergence: CS5→RLL5, CS10→RLL10
-add_mbtempest_test(NAME mbtempest_conv_ne30_rll90_fv_fv_o2
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m fv -m fv -o 2 -o 2 --verify --var SH
-       -f map_ne30_rll90_fv_fv_o2.nc
-  LABELS "mbtempest_remap;mbtempest_convergence"
-  DEPENDS "")
+# Helper macro: run mbtempest at two configurations and verify error decreases.
+# The bash script runs both, extracts L_inf error, and compares.
+# Usage: add_convergence_test(NAME name
+#          COARSE_ARGS "arg1;arg2;..." FINE_ARGS "arg1;arg2;..." [DEPENDS ...])
+macro(add_convergence_test)
+  cmake_parse_arguments(CV "" "NAME" "COARSE_ARGS;FINE_ARGS;LABELS;DEPENDS" ${ARGN})
+  if(MOAB_HAVE_MPI AND MPI_FOUND)
+    set(_mpi_prefix "${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1")
+  else()
+    set(_mpi_prefix "")
+  endif()
+  add_test(NAME ${CV_NAME}
+    COMMAND bash ${CONV_SCRIPT} ${CV_NAME} ${MBTEMPEST_EXE} "${_mpi_prefix}"
+            -- ${CV_COARSE_ARGS} -- ${CV_FINE_ARGS}
+    WORKING_DIRECTORY ${MBTEMPEST_TEST_DIR}
+  )
+  set_tests_properties(${CV_NAME} PROPERTIES
+    LABELS "mbtempest;mbtempest_convergence;${CV_LABELS}"
+    TIMEOUT 600
+  )
+  if(CV_DEPENDS)
+    set_tests_properties(${CV_NAME} PROPERTIES
+      DEPENDS "${CV_DEPENDS}"
+    )
+  endif()
+endmacro()
 
-# (CS10→RLL10 o2 already defined above as mbtempest_remap_ne30_icod30_fv_fv_o2)
+# --- FV-FV order 1 vs order 2: higher order should have lower error ---
+add_convergence_test(NAME mbtempest_conv_fv_o1_vs_o2
+  COARSE_ARGS "-t;5;-l;ne30.h5m;-l;rll90.h5m;-w;-m;fv;-m;fv;-o;1;-o;1;--verify;--var;SH;-f;conv_fv_o1.nc"
+  FINE_ARGS   "-t;5;-l;ne30.h5m;-l;rll90.h5m;-w;-m;fv;-m;fv;-o;2;-o;2;--verify;--var;SH;-f;conv_fv_o2.nc"
+  LABELS "mbtempest_remap")
 
-# CGLL-FV order 4-1 convergence: CS5→RLL5, CS10→RLL10
-# (CS5→RLL5 already defined above)
-add_mbtempest_test(NAME mbtempest_conv_ne30_icod30_cgll_fv_o4_o1
-  ARGS -t 5 -l ne30_se_o4.h5m -l icod30.h5m -w -m cgll -m fv -o 4 -o 1
-       -g GLOBAL_DOFS -g GLOBAL_ID --verify --var SV
-       -f map_ne30_icod30_cgll_fv_o4_o1.nc
-  LABELS "mbtempest_remap;mbtempest_convergence;mbtempest_se"
-  DEPENDS "mbtempest_se_convert_cs30_o4")
+# --- FV-FV: order 2 vs order 3 (monotonic improvement with order) ---
+add_convergence_test(NAME mbtempest_conv_fv_o2_vs_o3
+  COARSE_ARGS "-t;5;-l;ne30.h5m;-l;icod30.h5m;-w;-m;fv;-m;fv;-o;2;-o;2;--verify;--var;SH;-f;conv_fv_icod30_o2.nc"
+  FINE_ARGS   "-t;5;-l;ne30.h5m;-l;icod30.h5m;-w;-m;fv;-m;fv;-o;3;-o;3;--verify;--var;SH;-f;conv_fv_icod30_o3.nc"
+  LABELS "mbtempest_remap")
 
-add_baseline_test(NAME mbtempest_gold_ne30_icod30_cgll_fv_o4_o1
-  OUTPUT map_ne30_icod30_cgll_fv_o4_o1.nc
-  BASELINE gold_ne30_icod30_cgll_fv_o4_o1.nc
-  TOL 1e-12
-  LABELS "mbtempest_remap;mbtempest_convergence"
-  DEPENDS mbtempest_conv_ne30_icod30_cgll_fv_o4_o1)
+# --- CGLL-FV order 2 vs order 4: higher order should have lower error ---
+add_convergence_test(NAME mbtempest_conv_cgll_o2_vs_o4
+  COARSE_ARGS "-t;5;-l;ne30_se_o2.h5m;-l;rll90.h5m;-w;-m;cgll;-m;fv;-o;2;-o;1;-g;GLOBAL_DOFS;-g;GLOBAL_ID;--verify;--var;SV;-f;conv_cgll_o2.nc"
+  FINE_ARGS   "-t;5;-l;ne30_se_o4.h5m;-l;rll90.h5m;-w;-m;cgll;-m;fv;-o;4;-o;1;-g;GLOBAL_DOFS;-g;GLOBAL_ID;--verify;--var;SV;-f;conv_cgll_o4.nc"
+  LABELS "mbtempest_remap;mbtempest_se"
+  DEPENDS "mbtempest_se_convert_cs30_o2;mbtempest_se_convert_cs30_o4")
+
+# --- CGLL-FV vs CGLL-CGLL: SE-SE should be more accurate than SE-FV ---
+add_convergence_test(NAME mbtempest_conv_cgll_fv_vs_cgll_cgll
+  COARSE_ARGS "-t;5;-l;ne30_se_o4.h5m;-l;rll90.h5m;-w;-m;cgll;-m;fv;-o;4;-o;1;-g;GLOBAL_DOFS;-g;GLOBAL_ID;--verify;--var;SV;-f;conv_cgll_fv.nc"
+  FINE_ARGS   "-t;5;-l;ne30_se_o4.h5m;-l;ne25_se_o4.h5m;-w;-m;cgll;-m;cgll;-o;4;-o;4;-g;GLOBAL_DOFS;-g;GLOBAL_DOFS;--verify;--var;SV;-f;conv_cgll_cgll.nc"
+  LABELS "mbtempest_remap;mbtempest_se"
+  DEPENDS "mbtempest_se_convert_cs30_o4;mbtempest_se_convert_cs25_o4")
 
 # ==============================================================================
 # Summary

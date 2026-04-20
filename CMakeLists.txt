@@ -463,13 +463,20 @@ message("CMAKE_Fortran_FLAGS: ${CMAKE_Fortran_FLAGS}")
 message("MOAB_CXX_FLAGS: ${MOAB_CXX_FLAGS}")
 
 # Check for HDF5 availability
-# set (HDF5_DIR "$ENV{HDF5_DIR}" CACHE PATH "Path to search for HDF5 header and library files")
+if (HDF5_ROOT)
+  set (HDF5_DIR "${HDF5_ROOT}" CACHE PATH "Path to search for HDF5 header and library files")
+else (HDF5_ROOT)
+  if (HDF5_DIR)
+    set (HDF5_ROOT "${HDF5_DIR}" CACHE PATH "Path to search for HDF5 header and library files")
+  endif (HDF5_DIR)
+endif (HDF5_ROOT)
+
 set (MOAB_HAVE_HDF5_PARALLEL OFF CACHE INTERNAL "Found necessary parallel HDF5 components. Configure MOAB with it." )
 if ( ENABLE_HDF5 )
   if ( MOAB_HAVE_MPI )
     set(HDF5_PREFER_PARALLEL true)
   endif( MOAB_HAVE_MPI )
-  set(HDF5_FIND_DEBUG false)
+  set(HDF5_FIND_DEBUG true)
 
   # Call CMake-native FindHDF5 module and specify the components to check
   find_package( HDF5 REQUIRED COMPONENTS C HL )

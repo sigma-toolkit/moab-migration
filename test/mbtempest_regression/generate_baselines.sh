@@ -179,6 +179,37 @@ run_and_save "CGLL→CGLL o4-o4" map_cgll_cgll_o4_o4.nc \
   -f map_cgll_cgll_o4_o4.nc
 
 # ==============================================================================
+# Step 4b: DGLL baselines (uses DGLOBAL_DOFS tag)
+# ==============================================================================
+echo ""
+echo "=== DGLL baselines ==="
+
+run_and_save "DGLL→FV o4-o1" map_dgll_fv_o4_o1.nc \
+  -t 5 -l ne30_se_o4.h5m -l rll90.h5m -w -m dgll -m fv -o 4 -o 1 \
+  -g DGLOBAL_DOFS -g GLOBAL_ID --verify --var SV \
+  -f map_dgll_fv_o4_o1.nc
+
+run_and_save "FV→DGLL o1-o4" map_fv_dgll_o1_o4.nc \
+  -t 5 -l rll90.h5m -l ne30_se_o4.h5m -w -m fv -m dgll -o 1 -o 4 \
+  -g GLOBAL_ID -g DGLOBAL_DOFS --verify --var SV \
+  -f map_fv_dgll_o1_o4.nc
+
+run_and_save "DGLL→DGLL o4-o4" map_dgll_dgll_o4_o4.nc \
+  -t 5 -l ne30_se_o4.h5m -l ne25_se_o4.h5m -w -m dgll -m dgll -o 4 -o 4 \
+  -g DGLOBAL_DOFS -g DGLOBAL_DOFS --verify --var SV \
+  -f map_dgll_dgll_o4_o4.nc
+
+run_and_save "DGLL→CGLL o4-o4" map_dgll_cgll_o4_o4.nc \
+  -t 5 -l ne30_se_o4.h5m -l ne25_se_o4.h5m -w -m dgll -m cgll -o 4 -o 4 \
+  -g DGLOBAL_DOFS -g GLOBAL_DOFS --verify --var SV \
+  -f map_dgll_cgll_o4_o4.nc
+
+run_and_save "CGLL→DGLL o4-o4" map_cgll_dgll_o4_o4.nc \
+  -t 5 -l ne30_se_o4.h5m -l ne25_se_o4.h5m -w -m cgll -m dgll -o 4 -o 4 \
+  -g GLOBAL_DOFS -g DGLOBAL_DOFS --verify --var SV \
+  -f map_cgll_dgll_o4_o4.nc
+
+# ==============================================================================
 # Step 5: FV sub-method baselines
 # ==============================================================================
 echo ""

@@ -240,11 +240,20 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
                     }
                     if( !isSrcContinuous ) m_nTotDofs_SrcCov++;
                     assert( src_soln_gdofs[offsetDOF] > 0 );
-                    col_gdofmap[localDOF]      = src_soln_gdofs[offsetDOF] - 1;
-                    col_dtoc_dofmap[offsetDOF] = localDOF;
-                    if( vprint )
-                        std::cout << "Col: " << offsetDOF << ", " << localDOF << ", " << col_gdofmap[offsetDOF] << ", "
-                                  << m_nTotDofs_SrcCov << "\n";
+                    // For CGLL: weight matrix uses localDOF (continuous shared node index)
+                    //   as column index → col_gdofmap must be indexed by localDOF
+                    // For DGLL: weight matrix uses offsetDOF (= elem*nP*nP + p*nP + q)
+                    //   as column index → col_gdofmap must be indexed by offsetDOF
+                    if( isSrcContinuous )
+                    {
+                        col_gdofmap[localDOF]      = src_soln_gdofs[offsetDOF] - 1;
+                        col_dtoc_dofmap[offsetDOF] = localDOF;
+                    }
+                    else
+                    {
+                        col_gdofmap[offsetDOF]     = src_soln_gdofs[offsetDOF] - 1;
+                        col_dtoc_dofmap[offsetDOF] = offsetDOF;
+                    }
                 }
             }
         }
@@ -299,8 +308,16 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
                     }
                     if( !isSrcContinuous ) m_nTotDofs_Src++;
                     assert( locsrc_soln_gdofs[offsetDOF] > 0 );
-                    srccol_gdofmap[localDOF]      = locsrc_soln_gdofs[offsetDOF] - 1;
-                    srccol_dtoc_dofmap[offsetDOF] = localDOF;
+                    if( isSrcContinuous )
+                    {
+                        srccol_gdofmap[localDOF]      = locsrc_soln_gdofs[offsetDOF] - 1;
+                        srccol_dtoc_dofmap[offsetDOF] = localDOF;
+                    }
+                    else
+                    {
+                        srccol_gdofmap[offsetDOF]     = locsrc_soln_gdofs[offsetDOF] - 1;
+                        srccol_dtoc_dofmap[offsetDOF] = offsetDOF;
+                    }
                 }
             }
         }
@@ -359,8 +376,16 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
                     }
                     if( !isTgtContinuous ) m_nTotDofs_Dest++;
                     assert( tgt_soln_gdofs[offsetDOF] > 0 );
-                    row_gdofmap[localDOF]      = tgt_soln_gdofs[offsetDOF] - 1;
-                    row_dtoc_dofmap[offsetDOF] = localDOF;
+                    if( isTgtContinuous )
+                    {
+                        row_gdofmap[localDOF]      = tgt_soln_gdofs[offsetDOF] - 1;
+                        row_dtoc_dofmap[offsetDOF] = localDOF;
+                    }
+                    else
+                    {
+                        row_gdofmap[offsetDOF]     = tgt_soln_gdofs[offsetDOF] - 1;
+                        row_dtoc_dofmap[offsetDOF] = offsetDOF;
+                    }
                     if( vprint )
                         std::cout << "Row: " << offsetDOF << ", " << localDOF << ", " << row_gdofmap[offsetDOF] << ", "
                                   << m_nTotDofs_Dest << "\n";
@@ -371,11 +396,11 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
 
     // Let us also allocate the local representation of the sparse matrix
 #if defined( MOAB_HAVE_EIGEN3 ) && defined( VERBOSE )
-    if( vprint )
+    if( is_root )
     {
-        std::cout << "[" << rank << "]" << "DoFs: row = " << m_nTotDofs_Dest << ", " << row_gdofmap.size()
-                  << ", col = " << m_nTotDofs_Src << ", " << m_nTotDofs_SrcCov << ", " << col_gdofmap.size() << "\n";
-        // std::cout << "Max col_dofmap: " << maxcol << ", Min col_dofmap" << mincol << "\n";
+        std::cout << "[" << rank << "] DoFs: row = " << m_nTotDofs_Dest << " (gdofmap.size=" << row_gdofmap.size()
+                  << "), col_src = " << m_nTotDofs_Src << ", col_cov = " << m_nTotDofs_SrcCov
+                  << " (gdofmap.size=" << col_gdofmap.size() << ")\n";
     }
 #endif
 
@@ -2409,20 +2434,22 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
             }
         }
 
-        // Number of unique nodes
+        // Number of unique nodes (CGLL) or total element-local DOFs (DGLL)
+        const bool fDiscontinuous = ( discMethod == DiscretizationType_DGLL );
         int iMaxNode = 0;
-        for( int i = 0; i < discOrder; i++ )
+        if( fDiscontinuous )
         {
-            for( int j = 0; j < discOrder; j++ )
-            {
-                for( int k = 0; k < nElements; k++ )
-                {
-                    if( dataGLLNodes[i][j][k] > iMaxNode )
-                    {
-                        iMaxNode = dataGLLNodes[i][j][k];
-                    }
-                }
-            }
+            // DGLL: each element has independent DOFs
+            iMaxNode = nElements * discOrder * discOrder;
+        }
+        else
+        {
+            // CGLL: shared nodes at element boundaries
+            for( int i = 0; i < discOrder; i++ )
+                for( int j = 0; j < discOrder; j++ )
+                    for( int k = 0; k < nElements; k++ )
+                        if( dataGLLNodes[i][j][k] > iMaxNode )
+                            iMaxNode = dataGLLNodes[i][j][k];
         }
 
         // Get Gauss-Lobatto quadrature nodes
@@ -2474,7 +2501,10 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
 
                         double dSample = ( *testFunction )( dNodeLon, dNodeLat );
 
-                        dVar[dataGLLNodes[j][i][k] - 1] = dSample;
+                        if( fDiscontinuous )
+                            dVar[k * discOrder * discOrder + j * discOrder + i] = dSample;
+                        else
+                            dVar[dataGLLNodes[j][i][k] - 1] = dSample;
                     }
                 }
                 // High-order Gaussian integration over basis function

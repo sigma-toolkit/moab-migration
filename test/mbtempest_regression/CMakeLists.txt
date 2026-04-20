@@ -20,6 +20,15 @@
 #   ctest -L mbtempest_gen -L mbtempest_remap
 #   # Upload generated baselines from ${MBTEMPEST_BASELINE_DIR}
 #
+# URL: https://web.cels.anl.gov/projects/sigma/downloads/regression_baseline/
+#      File: gold_mbtempest_baselines_v1.tar.gz (36 golden files, 137 MB)
+#
+#      To update baselines:
+#        1. cmake -DMOAB_MBTEMPEST_GENERATE_BASELINES=ON ..
+#        2. ctest -L mbtempest  (or run generate_baselines.sh)
+#        3. tar czf gold_mbtempest_baselines_v1.tar.gz -C baselines/ gold_*.nc
+#        4. Upload to server
+#        5. Update SHA256 in test/mbtempest_regression/CMakeLists.txt
 # ==============================================================================
 
 # Guard: only build if TempestRemap is available
@@ -71,24 +80,41 @@ endforeach()
 # Download golden reference files when not generating baselines
 # ==============================================================================
 
-# Placeholder URL — user will upload baselines and set this
-set(MBTEMPEST_BASELINE_URL "" CACHE STRING
-  "URL prefix for downloading mbtempest regression baselines")
+# Baseline tarball URL and integrity check
+set(MBTEMPEST_BASELINE_URL
+  "https://web.cels.anl.gov/projects/sigma/downloads/regression_baseline"
+  CACHE STRING "URL prefix for downloading mbtempest regression baselines")
+set(MBTEMPEST_BASELINE_TARBALL "gold_mbtempest_baselines_v1.tar.gz")
+set(MBTEMPEST_BASELINE_SHA256  "d479f3219248bb8ef2fbac07589154938bde712f4ad6504274710433897f1ce1")
 
-# When baselines are available remotely and not generating, download them
-# For now, baselines are generated locally via MOAB_MBTEMPEST_GENERATE_BASELINES=ON
-# and then uploaded. The download logic will be enabled once a URL is configured.
-#
-# if(NOT MOAB_MBTEMPEST_GENERATE_BASELINES AND MBTEMPEST_BASELINE_URL)
-#   foreach(baseline_file ${MBTEMPEST_BASELINE_FILES})
-#     if(NOT EXISTS "${MBTEMPEST_BASELINE_DIR}/${baseline_file}")
-#       file(DOWNLOAD
-#         "${MBTEMPEST_BASELINE_URL}/${baseline_file}"
-#         "${MBTEMPEST_BASELINE_DIR}/${baseline_file}"
-#         STATUS download_status)
-#     endif()
-#   endforeach()
-# endif()
+# Download and extract baselines at configure time if not generating and not already present
+if(NOT MOAB_MBTEMPEST_GENERATE_BASELINES)
+  set(_baseline_archive ${MBTEMPEST_BASELINE_DIR}/${MBTEMPEST_BASELINE_TARBALL})
+  # Check if baselines are already extracted (use one representative file)
+  if(NOT EXISTS "${MBTEMPEST_BASELINE_DIR}/gold_ne30_rll90_fv_fv_o1.nc")
+    message(STATUS "Downloading mbtempest regression baselines...")
+    file(DOWNLOAD
+      "${MBTEMPEST_BASELINE_URL}/${MBTEMPEST_BASELINE_TARBALL}"
+      "${_baseline_archive}"
+      EXPECTED_HASH SHA256=${MBTEMPEST_BASELINE_SHA256}
+      STATUS _dl_status
+      SHOW_PROGRESS
+    )
+    list(GET _dl_status 0 _dl_code)
+    if(NOT _dl_code EQUAL 0)
+      list(GET _dl_status 1 _dl_msg)
+      message(WARNING "Failed to download baselines: ${_dl_msg}\n"
+              "  Baseline comparison tests will fail.\n"
+              "  Generate locally with: cmake -DMOAB_MBTEMPEST_GENERATE_BASELINES=ON ..")
+    else()
+      message(STATUS "Extracting baselines to ${MBTEMPEST_BASELINE_DIR}")
+      execute_process(
+        COMMAND ${CMAKE_COMMAND} -E tar xzf ${_baseline_archive}
+        WORKING_DIRECTORY ${MBTEMPEST_BASELINE_DIR}
+      )
+    endif()
+  endif()
+endif()
 
 # ==============================================================================
 # Helper macros

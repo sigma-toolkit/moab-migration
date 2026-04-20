@@ -1417,7 +1417,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
         {
             if( outputEnabled ) dbgprint.printf( 0, "Computing intersection mesh with the Kd-tree search algorithm" );
             MB_CHK_SET_ERR( mbintx->intersect_meshes_kdtree( m_covering_source_set, m_target_set, m_overlap_set ),
-                            "Can't compute the intersection of meshes on the sphere with brute-force" );
+                            "Can't compute the intersection of meshes on the sphere with kd-tree" );
         }
         else
         {

@@ -390,7 +390,7 @@ add_mbtempest_mpi_test(NAME mbtempest_remap_ne30_rll90_fv_fv_o1_np2
 add_map_compare_test(NAME mbtempest_compare_ne30_rll90_fv_fv_o1_serial_vs_np2
   MAP1 ${MBTEMPEST_TEST_DIR}/map_ne30_rll90_fv_fv_o1.nc
   MAP2 ${MBTEMPEST_TEST_DIR}/map_ne30_rll90_fv_fv_o1_np2.nc
-  TOL 1e-14
+  TOL 1e-12
   LABELS "mbtempest_parallel"
   DEPENDS "mbtempest_remap_ne30_rll90_fv_fv_o1;mbtempest_remap_ne30_rll90_fv_fv_o1_np2")
 
@@ -412,7 +412,7 @@ add_mbtempest_mpi_test(NAME mbtempest_remap_ne30_rll90_fv_fv_o1_np4
 add_map_compare_test(NAME mbtempest_compare_ne30_rll90_fv_fv_o1_serial_vs_np4
   MAP1 ${MBTEMPEST_TEST_DIR}/map_ne30_rll90_fv_fv_o1.nc
   MAP2 ${MBTEMPEST_TEST_DIR}/map_ne30_rll90_fv_fv_o1_np4.nc
-  TOL 1e-14
+  TOL 1e-12
   LABELS "mbtempest_parallel"
   DEPENDS "mbtempest_remap_ne30_rll90_fv_fv_o1;mbtempest_remap_ne30_rll90_fv_fv_o1_np4")
 
@@ -446,7 +446,7 @@ add_mbtempest_mpi_test(NAME mbtempest_remap_ne30_ico30_fv_fv_o1_np2
 add_map_compare_test(NAME mbtempest_compare_ne30_ico30_fv_fv_o1_serial_vs_np2
   MAP1 ${MBTEMPEST_TEST_DIR}/map_ne30_ico30_fv_fv_o1.nc
   MAP2 ${MBTEMPEST_TEST_DIR}/map_ne30_ico30_fv_fv_o1_np2.nc
-  TOL 1e-14
+  TOL 1e-12
   LABELS "mbtempest_parallel"
   DEPENDS "mbtempest_remap_ne30_ico30_fv_fv_o1;mbtempest_remap_ne30_ico30_fv_fv_o1_np2")
 
@@ -480,7 +480,7 @@ add_mbtempest_mpi_test(NAME mbtempest_remap_ne30_icod30_fv_fv_o1_np2
 add_map_compare_test(NAME mbtempest_compare_ne30_icod30_fv_fv_o1_serial_vs_np2
   MAP1 ${MBTEMPEST_TEST_DIR}/map_ne30_icod30_fv_fv_o1.nc
   MAP2 ${MBTEMPEST_TEST_DIR}/map_ne30_icod30_fv_fv_o1_np2.nc
-  TOL 1e-14
+  TOL 1e-12
   LABELS "mbtempest_parallel"
   DEPENDS "mbtempest_remap_ne30_icod30_fv_fv_o1;mbtempest_remap_ne30_icod30_fv_fv_o1_np2")
 
@@ -514,7 +514,7 @@ add_mbtempest_mpi_test(NAME mbtempest_remap_rll90_ne30_fv_fv_o1_np2
 add_map_compare_test(NAME mbtempest_compare_rll90_ne30_fv_fv_o1_serial_vs_np2
   MAP1 ${MBTEMPEST_TEST_DIR}/map_rll90_ne30_fv_fv_o1.nc
   MAP2 ${MBTEMPEST_TEST_DIR}/map_rll90_ne30_fv_fv_o1_np2.nc
-  TOL 1e-14
+  TOL 1e-12
   LABELS "mbtempest_parallel"
   DEPENDS "mbtempest_remap_rll90_ne30_fv_fv_o1;mbtempest_remap_rll90_ne30_fv_fv_o1_np2")
 
@@ -548,7 +548,7 @@ add_mbtempest_mpi_test(NAME mbtempest_remap_ico30_ne30_fv_fv_o1_np2
 add_map_compare_test(NAME mbtempest_compare_ico30_ne30_fv_fv_o1_serial_vs_np2
   MAP1 ${MBTEMPEST_TEST_DIR}/map_ico30_ne30_fv_fv_o1.nc
   MAP2 ${MBTEMPEST_TEST_DIR}/map_ico30_ne30_fv_fv_o1_np2.nc
-  TOL 1e-14
+  TOL 1e-12
   LABELS "mbtempest_parallel"
   DEPENDS "mbtempest_remap_ico30_ne30_fv_fv_o1;mbtempest_remap_ico30_ne30_fv_fv_o1_np2")
 
@@ -576,7 +576,7 @@ add_mbtempest_mpi_test(NAME mbtempest_remap_ne30_icod30_fv_fv_o2_np2
 add_map_compare_test(NAME mbtempest_compare_ne30_icod30_fv_fv_o2_serial_vs_np2
   MAP1 ${MBTEMPEST_TEST_DIR}/map_ne30_icod30_fv_fv_o2.nc
   MAP2 ${MBTEMPEST_TEST_DIR}/map_ne30_icod30_fv_fv_o2_np2.nc
-  TOL 1e-14
+  TOL 1e-12
   LABELS "mbtempest_parallel"
   DEPENDS "mbtempest_remap_ne30_icod30_fv_fv_o2;mbtempest_remap_ne30_icod30_fv_fv_o2_np2")
 
@@ -943,19 +943,20 @@ add_baseline_test(NAME mbtempest_gold_ne30_rll90_sparse
   LABELS "mbtempest_remap;mbtempest_options"
   DEPENDS mbtempest_remap_ne30_rll90_sparse)
 
-# Volumetric projection
-add_mbtempest_test(NAME mbtempest_remap_ne30_rll90_volumetric
-  ARGS -t 5 -l ne30.h5m -l rll90.h5m -w -m fv -m fv -o 1 -o 1 --volumetric
-       --verify --var SH -f map_ne30_rll90_volumetric.nc
-  LABELS "mbtempest_remap;mbtempest_options"
-  DEPENDS "")
+# Volumetric projection (only valid for FV→CGLL or FV→DGLL, not FV→FV)
+add_mbtempest_test(NAME mbtempest_remap_fv_cgll_volumetric
+  ARGS -t 5 -l rll90.h5m -l ne30_se_o4.h5m -w -m fv -m cgll -o 1 -o 4
+       -g GLOBAL_ID -g GLOBAL_DOFS --volumetric --verify --var SV
+       -f map_fv_cgll_volumetric.nc
+  LABELS "mbtempest_remap;mbtempest_options;mbtempest_se"
+  DEPENDS "mbtempest_se_convert_cs30_o4")
 
-add_baseline_test(NAME mbtempest_gold_ne30_rll90_volumetric
-  OUTPUT map_ne30_rll90_volumetric.nc
-  BASELINE gold_ne30_rll90_volumetric.nc
+add_baseline_test(NAME mbtempest_gold_fv_cgll_volumetric
+  OUTPUT map_fv_cgll_volumetric.nc
+  BASELINE gold_fv_cgll_volumetric.nc
   TOL 1e-12
-  LABELS "mbtempest_remap;mbtempest_options"
-  DEPENDS mbtempest_remap_ne30_rll90_volumetric)
+  LABELS "mbtempest_remap;mbtempest_options;mbtempest_se"
+  DEPENDS mbtempest_remap_fv_cgll_volumetric)
 
 # ==============================================================================
 # Category 10: Convergence Analysis

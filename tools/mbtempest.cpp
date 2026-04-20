@@ -1641,6 +1641,7 @@ moab::ErrorCode handleOverlapMOAB( ToolContext& ctx, moab::TempestRemapper& rema
                                                  additional_read_opts_tgt.c_str() ),
                         "Failed to load MOAB Target mesh" );
 
+#ifdef MOAB_HAVE_MPI
         if( ctx.n_procs > 1 && ctx.disc_methods[1].compare( "fv" ) != 0 &&
             false )  // target discretization is cgll or dgll
         {
@@ -1664,7 +1665,6 @@ moab::ErrorCode handleOverlapMOAB( ToolContext& ctx, moab::TempestRemapper& rema
             taglist.push_back( gdofTag );
             MB_CHK_SET_ERR( ctx.pcomm->exchange_tags( taglist, taglist, afterGhost ),
                             "Failed to exchange global dofs for MOAB Target mesh" );
-
             // std::set< unsigned int > commprocs;
             // MB_CHK_SET_ERR( ctx.pcomm->get_comm_procs( commprocs ),
             //                 "Failed to get commprocs for MOAB Target mesh" );
@@ -1681,6 +1681,7 @@ moab::ErrorCode handleOverlapMOAB( ToolContext& ctx, moab::TempestRemapper& rema
             //     }
             // }
         }
+#endif
 
         if( !metadata.empty() )
         {
@@ -1695,12 +1696,14 @@ moab::ErrorCode handleOverlapMOAB( ToolContext& ctx, moab::TempestRemapper& rema
     {
         std::vector< int > metadata;
         auto additional_read_opts_src = ctx.get_file_read_options( ctx.inFilenames[0] );
+#ifdef MOAB_HAVE_MPI
         if( ctx.n_procs > 1 )
         {
             // auto pcomm = new ParallelComm( ctx.mbcore, MPI_COMM_WORLD );
             additional_read_opts_src =
                 additional_read_opts_src + "PARALLEL_COMM=" + std::to_string( ctx.pcomm->get_id() ) + ";";
         }
+#endif
         MB_CHK_SET_ERR( remapper.LoadNativeMesh( ctx.inFilenames[0], ctx.meshsets[0], metadata,
                                                  additional_read_opts_src.c_str() ),
                         "Failed to load MOAB Source mesh" );

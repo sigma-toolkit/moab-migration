@@ -1769,8 +1769,12 @@ moab::ErrorCode convertAndWriteMOABMesh( ToolContext& ctx, moab::TempestRemapper
                     "Failed to convert TempestRemap mesh to MOAB format" );
     ctx.timer_pop();
 
-    // Write the MOAB meshset as h5m file
+    // Fix degenerate quads: RLL meshes from TempestRemap have polar cells stored as
+    // 4-node quads with duplicate vertices. Convert these to proper triangles so the
+    // intersection algorithm can handle them correctly.
     moab::EntityHandle meshSet = remapper.GetMeshSet( moab::Remapper::SourceMesh );
+    MB_CHK_SET_ERR( moab::IntxUtils::fix_degenerate_quads( ctx.mbcore, meshSet ),
+                    "Failed to fix degenerate quads in converted mesh" );
     ctx.timer_push( "write MOAB mesh to h5m file" );
     MB_CHK_SET_ERR( ctx.mbcore->write_file( outFile.c_str(), nullptr, nullptr, &meshSet, 1 ),
                     "Failed to write MOAB mesh to h5m file" );

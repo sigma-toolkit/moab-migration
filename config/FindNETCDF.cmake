@@ -14,7 +14,7 @@ set (NETCDF_DIR "/usr" CACHE PATH "Path to search for NETCDF header and library 
 set (NETCDF_FOUND NO CACHE INTERNAL "Found NETCDF components successfully." )
 
 # Query nc-config script if available
-find_program(NC_CONFIG_EXECUTABLE NAMES nc-config)
+find_program(NC_CONFIG_EXECUTABLE NAMES nc-config HINTS ${NETCDF_DIR}/bin )
 if (NC_CONFIG_EXECUTABLE)
     execute_process(
         COMMAND ${NC_CONFIG_EXECUTABLE} --prefix

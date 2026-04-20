@@ -662,6 +662,54 @@ add_baseline_test(NAME mbtempest_gold_cgll_fv_o4_o1_nobubble
   LABELS "mbtempest_remap;mbtempest_se;mbtempest_options"
   DEPENDS mbtempest_remap_cgll_fv_o4_o1_nobubble)
 
+# --- Parallel CGLL-FV tests ---
+# Partition SE source mesh and FV target mesh for 2-rank runs
+add_partition_test(NAME mbtempest_partition_se_cgll_fv_np2
+  NPROCS 2
+  TARGET rll90.h5m SOURCE ne30_se_o4.h5m
+  OUTPUT_TARGET rll90_p2_se.h5m
+  LABELS "mbtempest_se")
+
+# CGLL→FV order 4, parallel (2 ranks)
+add_mbtempest_mpi_test(NAME mbtempest_remap_cgll_fv_o4_o1_np2
+  NPROCS 2
+  ARGS -t 5 -l ne30_se_o4_inferred.h5m -l rll90_p2_se.h5m -w -m cgll -m fv -o 4 -o 1
+       -g GLOBAL_DOFS -g GLOBAL_ID --verify --var SV
+       -f map_cgll_fv_o4_o1_np2.nc
+  LABELS "mbtempest_remap;mbtempest_se"
+  DEPENDS "mbtempest_se_convert_cs30_o4;mbtempest_partition_se_cgll_fv_np2")
+
+# Serial vs parallel consistency for CGLL→FV
+add_map_compare_test(NAME mbtempest_compare_cgll_fv_o4_o1_serial_vs_np2
+  MAP1 ${MBTEMPEST_TEST_DIR}/map_cgll_fv_o4_o1.nc
+  MAP2 ${MBTEMPEST_TEST_DIR}/map_cgll_fv_o4_o1_np2.nc
+  TOL 1e-12
+  LABELS "mbtempest_parallel;mbtempest_se"
+  DEPENDS "mbtempest_remap_cgll_fv_o4_o1;mbtempest_remap_cgll_fv_o4_o1_np2")
+
+# Partition SE order 2 source mesh
+add_partition_test(NAME mbtempest_partition_se_cgll_o2_fv_np2
+  NPROCS 2
+  TARGET rll90.h5m SOURCE ne30_se_o2.h5m
+  OUTPUT_TARGET rll90_p2_se_o2.h5m
+  LABELS "mbtempest_se")
+
+# CGLL→FV order 2, parallel (2 ranks)
+add_mbtempest_mpi_test(NAME mbtempest_remap_cgll_fv_o2_o1_np2
+  NPROCS 2
+  ARGS -t 5 -l ne30_se_o2_inferred.h5m -l rll90_p2_se_o2.h5m -w -m cgll -m fv -o 2 -o 1
+       -g GLOBAL_DOFS -g GLOBAL_ID --verify --var SV
+       -f map_cgll_fv_o2_o1_np2.nc
+  LABELS "mbtempest_remap;mbtempest_se"
+  DEPENDS "mbtempest_se_convert_cs30_o2;mbtempest_partition_se_cgll_o2_fv_np2")
+
+add_map_compare_test(NAME mbtempest_compare_cgll_fv_o2_o1_serial_vs_np2
+  MAP1 ${MBTEMPEST_TEST_DIR}/map_cgll_fv_o2_o1.nc
+  MAP2 ${MBTEMPEST_TEST_DIR}/map_cgll_fv_o2_o1_np2.nc
+  TOL 1e-12
+  LABELS "mbtempest_parallel;mbtempest_se"
+  DEPENDS "mbtempest_remap_cgll_fv_o2_o1;mbtempest_remap_cgll_fv_o2_o1_np2")
+
 # ==============================================================================
 # Category 4: FV-CGLL Remapping (serial only)
 #   Target is a CS mesh with GLOBAL_DOFS tag

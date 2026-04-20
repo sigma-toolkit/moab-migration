@@ -961,9 +961,50 @@ int main( int argc, char* argv[] )
         // Useful only for SE meshes with GLL DoFs
         if( spectral_order > 1 && globalid_tag_name.size() > 1 )
         {
+            // Generate continuous (CGLL) DoF numbering: shared nodes at element boundaries
+            // get the same global DoF ID. Tag name is user-specified (typically "GLOBAL_DOFS").
             result = remapper->GenerateMeshMetadata( *tempestMesh, ntot_elements, faces, NULL, globalid_tag_name,
                                                      spectral_order );
             MB_CHK_ERR( result );
+
+            // Generate discontinuous (DGLL) DoF numbering: each element owns nP*nP
+            // independent DoFs, numbered sequentially across elements.
+            // Tag name: "D" + user-specified name (e.g., "DGLOBAL_DOFS").
+            {
+                const int nP              = spectral_order;
+                const int dofsPerElem     = nP * nP;
+                const std::string dTagName = "D" + globalid_tag_name;
+
+                Tag dgllTag;
+                result = gMB->tag_get_handle( dTagName.c_str(), dofsPerElem, MB_TYPE_INTEGER, dgllTag,
+                                              MB_TAG_DENSE | MB_TAG_CREAT );
+                MB_CHK_ERR( result );
+
+                // Assign sequential DoF IDs: element k gets [k*nP*nP+1, (k+1)*nP*nP]
+                // Use GLOBAL_ID ordering to ensure consistent numbering across processes
+                Tag gidTag = gMB->globalId_tag();
+                std::vector< int > elemGids( faces.size() );
+                result = gMB->tag_get_data( gidTag, faces, elemGids.data() );
+                MB_CHK_ERR( result );
+
+                std::vector< int > dofIDs( dofsPerElem );
+                for( size_t ie = 0; ie < faces.size(); ++ie )
+                {
+                    // Use 0-based element index from GLOBAL_ID (1-based) for DOF numbering
+                    const int elemIdx = elemGids[ie] - 1;
+                    for( int j = 0; j < nP; ++j )
+                        for( int i = 0; i < nP; ++i )
+                            dofIDs[j * nP + i] = elemIdx * dofsPerElem + j * nP + i + 1;
+
+                    EntityHandle eh = faces[ie];
+                    result = gMB->tag_set_data( dgllTag, &eh, 1, dofIDs.data() );
+                    MB_CHK_ERR( result );
+                }
+
+                if( !proc_id )
+                    std::cout << "Generated discontinuous DoF tag \"" << dTagName << "\" with " << dofsPerElem
+                              << " DoFs/element (" << ntot_elements * dofsPerElem << " total)\n";
+            }
         }
 
         if( tempestout )

@@ -101,6 +101,9 @@ C      used for ghosting
      &             4, 5, 8, 7,
      &             5, 6, 9, 8/
 
+      my_id = 0
+      num_procs = 1
+      ierr = 0
       call MPI_Init ( ierr )
       call errorout(ierr, 'fail to initialize MPI')
 

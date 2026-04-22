@@ -13,6 +13,12 @@ LDADD = $(top_builddir)/src/libMOAB.la
 MESHDIR = $(abs_top_srcdir)/MeshFiles/unittest
 RMESHDIR = $(top_srcdir)/MeshFiles/unittest
 
+# The Intel Fortran runtime links in LLVM MSan when compiled with -C (runtime
+# checks). Since third-party libraries (MPI, HDF5, hwloc) are not MSan-
+# instrumented, all reads from their output produce false positives. Allow
+# the test to report warnings but complete successfully.
+AM_TESTS_ENVIRONMENT = MSAN_OPTIONS="halt_on_error=0:exit_code=0"
+
 AM_CPPFLAGS  = -DIS_BUILDING_MB \
                -DSRCDIR=$(srcdir) \
                -DMESHDIR=$(MESHDIR) \

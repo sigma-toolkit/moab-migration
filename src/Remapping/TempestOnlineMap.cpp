@@ -1524,6 +1524,194 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
     return moab::MB_SUCCESS;
 }
 
+moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSolutionTag,
+                                                                  moab::Tag tgtSolutionTag,
+                                                                  TempestOnlineMap* loWeightMap,
+                                                                  CAASType caasType )
+{
+    // Setup entity ranges (same pattern as ApplyWeights(Tag, Tag))
+    std::vector< double > solSTagVals, solTTagVals;
+    moab::Range sents, tents;
+
+    if( m_remapper->point_cloud_source || m_remapper->point_cloud_target )
+    {
+        if( m_remapper->point_cloud_source )
+        {
+            moab::Range& covSrcEnts = m_remapper->GetMeshVertices( moab::Remapper::CoveringMesh );
+            solSTagVals.resize( covSrcEnts.size(), 0.0 );
+            sents = covSrcEnts;
+        }
+        else
+        {
+            moab::Range& covSrcEnts = m_remapper->GetMeshEntities( moab::Remapper::CoveringMesh );
+            solSTagVals.resize( covSrcEnts.size() * this->GetSourceNDofsPerElement() *
+                                    this->GetSourceNDofsPerElement(),
+                                0.0 );
+            sents = covSrcEnts;
+        }
+        if( m_remapper->point_cloud_target )
+        {
+            moab::Range& tgtEnts = m_remapper->GetMeshVertices( moab::Remapper::TargetMesh );
+            solTTagVals.resize( tgtEnts.size(), 0.0 );
+            tents = tgtEnts;
+        }
+        else
+        {
+            moab::Range& tgtEnts = m_remapper->GetMeshEntities( moab::Remapper::TargetMesh );
+            solTTagVals.resize( tgtEnts.size() * this->GetDestinationNDofsPerElement() *
+                                    this->GetDestinationNDofsPerElement(),
+                                0.0 );
+            tents = tgtEnts;
+        }
+    }
+    else
+    {
+        moab::Range& covSrcEnts = m_remapper->GetMeshEntities( moab::Remapper::CoveringMesh );
+        moab::Range& tgtEnts    = m_remapper->GetMeshEntities( moab::Remapper::TargetMesh );
+        solSTagVals.resize( covSrcEnts.size() * this->GetSourceNDofsPerElement() * this->GetSourceNDofsPerElement(),
+                            0.0 );
+        solTTagVals.resize(
+            tgtEnts.size() * this->GetDestinationNDofsPerElement() * this->GetDestinationNDofsPerElement(), 0.0 );
+        sents = covSrcEnts;
+        tents = tgtEnts;
+    }
+
+    // Read source tag data from coverage mesh
+    MB_CHK_SET_ERR( m_interface->tag_get_data( srcSolutionTag, sents, &solSTagVals[0] ),
+                    "Getting source tag data failed" );
+
+    // Apply high-order projection only (no CAAS — bounds come from the low-order map)
+    MB_CHK_SET_ERR( this->ApplyWeights( solSTagVals, solTTagVals, false ),
+                    "High-order projection failed" );
+
+    // Write initial projection to target tag
+    MB_CHK_SET_ERR( m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] ),
+                    "Setting target tag data failed" );
+
+    if( caasType == CAAS_NONE || loWeightMap == nullptr ) return moab::MB_SUCCESS;
+
+    // === Dual-map CAAS: compute bounds from low-order stencil, clip high-order result ===
+
+    const size_t nTargetDofs = solTTagVals.size();
+    const size_t nSourceDofs = solSTagVals.size();
+
+    // Step 1: Compute absolute bounds from the low-order weight matrix stencil.
+    // For each target row, find min/max of source field values over nonzero columns.
+    WeightMatrix& loW = loWeightMap->GetWeightMatrix();
+    std::vector< double > absLo( nTargetDofs, 1e308 );
+    std::vector< double > absHi( nTargetDofs, -1e308 );
+
+    for( size_t r = 0; r < nTargetDofs && r < (size_t)loW.outerSize(); r++ )
+    {
+        for( WeightMatrix::InnerIterator it( loW, r ); it; ++it )
+        {
+            int c = it.col();
+            if( c >= 0 && c < (int)nSourceDofs )
+            {
+                absLo[r] = std::min( absLo[r], solSTagVals[c] );
+                absHi[r] = std::max( absHi[r], solSTagVals[c] );
+            }
+        }
+        // If the row had no nonzero entries, don't enforce bounds
+        if( absLo[r] > absHi[r] )
+        {
+            absLo[r] = -1e308;
+            absHi[r] = 1e308;
+        }
+    }
+
+    // Step 2: Get target areas for conservative mass redistribution.
+    // Try TempestRemap mesh face areas first; fall back to aream tag.
+    std::vector< double > tgtAreas( nTargetDofs, 1.0 );
+
+    if( m_meshOutput && (size_t)m_meshOutput->faces.size() >= nTargetDofs )
+    {
+        const DataArray1D< double >& faceAreas = m_meshOutput->vecFaceArea;
+        for( size_t i = 0; i < nTargetDofs; i++ )
+            tgtAreas[i] = faceAreas[i];
+    }
+    else
+    {
+        Tag areamTag;
+        moab::ErrorCode tagRval = m_interface->tag_get_handle( "aream", areamTag );
+        if( tagRval == moab::MB_SUCCESS )
+            m_interface->tag_get_data( areamTag, tents, &tgtAreas[0] );
+    }
+
+    // Step 3: CAAS iteration loop — clip to bounds, redistribute mass defect conservatively
+    std::string tgtSolnTagName;
+    m_interface->tag_get_name( tgtSolutionTag, tgtSolnTagName );
+
+    constexpr int nmax_caas_iterations = 10;
+    constexpr double convergence_tol   = 1e-15;
+
+    for( int iter = 0; iter < nmax_caas_iterations; iter++ )
+    {
+        // Clip target values to [absLo, absHi] and compute mass change from clipping
+        double localMassBefore = 0.0, localMassAfter = 0.0;
+        for( size_t i = 0; i < nTargetDofs; i++ )
+        {
+            localMassBefore += tgtAreas[i] * solTTagVals[i];
+            solTTagVals[i] = std::max( absLo[i], std::min( absHi[i], solTTagVals[i] ) );
+            localMassAfter += tgtAreas[i] * solTTagVals[i];
+        }
+
+        double localMassDefect  = localMassBefore - localMassAfter;
+        double globalMassDefect = localMassDefect;
+
+#ifdef MOAB_HAVE_MPI
+        MPI_Allreduce( &localMassDefect, &globalMassDefect, 1, MPI_DOUBLE, MPI_SUM, m_pcomm->comm() );
+#endif
+
+        if( m_remapper->verbose && is_root )
+        {
+            printf( "DualMap CAAS {%s}: iter %d, mass defect (global): %3.6e\n", tgtSolnTagName.c_str(), iter + 1,
+                    globalMassDefect );
+        }
+
+        // Update target tag with clipped values
+        MB_CHK_SET_ERR( m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] ),
+                        "Setting target tag data failed" );
+
+        if( fabs( globalMassDefect ) < convergence_tol ) break;
+
+        // Redistribute mass defect proportionally within remaining room
+        double localRoomUp = 0.0, localRoomDn = 0.0;
+        for( size_t i = 0; i < nTargetDofs; i++ )
+        {
+            localRoomUp += tgtAreas[i] * ( absHi[i] - solTTagVals[i] );
+            localRoomDn += tgtAreas[i] * ( solTTagVals[i] - absLo[i] );
+        }
+
+        double globalRoomUp = localRoomUp, globalRoomDn = localRoomDn;
+#ifdef MOAB_HAVE_MPI
+        double localRooms[2]  = { localRoomUp, localRoomDn };
+        double globalRooms[2] = { 0.0, 0.0 };
+        MPI_Allreduce( localRooms, globalRooms, 2, MPI_DOUBLE, MPI_SUM, m_pcomm->comm() );
+        globalRoomUp = globalRooms[0];
+        globalRoomDn = globalRooms[1];
+#endif
+
+        double totalRoom = ( globalMassDefect > 0 ) ? globalRoomUp : globalRoomDn;
+
+        if( fabs( totalRoom ) > 1e-20 )
+        {
+            for( size_t i = 0; i < nTargetDofs; i++ )
+            {
+                double room = ( globalMassDefect > 0 ) ? ( absHi[i] - solTTagVals[i] )
+                                                       : ( solTTagVals[i] - absLo[i] );
+                solTTagVals[i] += globalMassDefect * room / totalRoom;
+            }
+
+            // Update target tag after redistribution
+            MB_CHK_SET_ERR( m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] ),
+                            "Setting target tag data after redistribution failed" );
+        }
+    }
+
+    return moab::MB_SUCCESS;
+}
+
 moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& solnTag,
                                                                   const std::string& solnName,
                                                                   moab::Remapper::IntersectionContext ctx,

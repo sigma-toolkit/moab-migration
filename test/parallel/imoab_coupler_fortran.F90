@@ -333,7 +333,7 @@ program imoab_coupler_fortran
       ! on the source mesh and get the projection on the target mesh
       ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, weights_identifier1, &
                                                 concat_fieldname, &
-                                                concat_fieldnameT)
+                                                concat_fieldnameT, C_NULL_CHAR)
       call errorout(ierr, 'failed to compute projection weight application')
 
       outputFileOcn = "OcnOnCplF.h5m"//C_NULL_CHAR

@@ -486,7 +486,7 @@ int main( int argc, char* argv[] )
                on the source mesh and get the projection on the target mesh */
             PUSH_TIMER( "Apply from file scalar projection weights" )
             CHECKIERR( iMOAB_ApplyScalarProjectionWeights( cplAtmOcnFilePID, &filter_type, map_from_file_identifier[0],
-                                                           bottomFields, bottomProjectedFieldsF ),
+                                                           bottomFields, bottomProjectedFieldsF , nullptr),
                        "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )
 #endif  // COMPUTE_FILE_MAP
@@ -505,7 +505,7 @@ int main( int argc, char* argv[] )
 
             PUSH_TIMER( "Apply from file scalar projection weights" )
             CHECKIERR( iMOAB_ApplyScalarProjectionWeights( cplOcnAtmFilePID, &filter_type, map_from_file_identifier[1],
-                                                           bottomProjectedFieldsF, bottomProjectedFieldsS ),
+                                                           bottomProjectedFieldsF, bottomProjectedFieldsS , nullptr),
                        "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )
 // #ifdef VERBOSE
@@ -518,7 +518,7 @@ int main( int argc, char* argv[] )
 #ifdef COMPUTE_ONLINE_MAP
             PUSH_TIMER( "Apply in-memory scalar projection weights" )
             CHECKIERR( iMOAB_ApplyScalarProjectionWeights( cplAtmOcnMemPID, &filter_type, map_from_mem_identifier,
-                                                           bottomFields, bottomProjectedFieldsM ),
+                                                           bottomFields, bottomProjectedFieldsM , nullptr),
                        "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )
 #endif

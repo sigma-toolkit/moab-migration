@@ -1278,6 +1278,10 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
  *                                                          names are separated by ";", the same way as for tag migration.
  * \param[in] target_solution_tag_name   (iMOAB_String)     list of tag names corresponding to participating degrees-of-freedom for the target discretization;
  *                                                          names are separated by ";", the same way as for tag migration.
+ * \param[in] lo_weights_identifier (iMOAB_String)          Optional. When non-NULL, identifies a low-order weight map whose stencil is used to
+ *                                                          compute per-target-row bounds from the source data. The CAAS filter then preserves
+ *                                                          these bounds on the high-order projection result. This implements the dual-map
+ *                                                          nonlinear remapping algorithm (Clip-And-Assert-Sum).
  * \return ErrCode                                          The error code indicating success or failure.
 */
 ErrCode iMOAB_ApplyScalarProjectionWeights(
@@ -1285,7 +1289,30 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
     int* filter_type, /*  CAAS_NONE = 0, CAAS_GLOBAL = 1, CAAS_LOCAL = 2, CAAS_LOCAL_ADJACENT = 3 */
     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
     const iMOAB_String source_solution_tag_name,
-    const iMOAB_String target_solution_tag_name );
+    const iMOAB_String target_solution_tag_name,
+    const iMOAB_String lo_weights_identifier /* = NULL */ );
+
+/**
+ * \brief Check whether the nonzero sparsity pattern of one weight map is a subset of another.
+ *
+ * \note For every target row, this function verifies that each source column with a nonzero entry
+ * in the map identified by \p subset_weights_identifier also has a nonzero entry in the map
+ * identified by \p superset_weights_identifier. This check is a prerequisite for dual-map
+ * nonlinear remapping: the low-order map's stencil must be contained in the high-order map's stencil.
+ *
+ * <B>Operations:</B> Collective
+ *
+ * \param[in]  pid_intersection (iMOAB_AppID)                The unique pointer to the intersection application ID.
+ * \param[in]  subset_weights_identifier (iMOAB_String)      The weight map whose pattern should be a subset.
+ * \param[in]  superset_weights_identifier (iMOAB_String)    The weight map whose pattern should be a superset.
+ * \param[out] is_subset (int*)                              Output: 1 if subset relationship holds, 0 otherwise.
+ * \return ErrCode                                           The error code indicating success or failure.
+ */
+ErrCode iMOAB_CheckMapSubset(
+    iMOAB_AppID pid_intersection,
+    const iMOAB_String subset_weights_identifier,
+    const iMOAB_String superset_weights_identifier,
+    int* is_subset );
 
 #endif /* #ifdef MOAB_HAVE_TEMPESTREMAP */
 

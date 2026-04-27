@@ -5970,12 +5970,20 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
     return moab::MB_SUCCESS;
 }
 
+// Forward declaration of internal helper
+static ErrCode ComputeRowBounds( iMOAB_AppID pid_intersection,
+                                 const iMOAB_String solution_weights_identifier,
+                                 const iMOAB_String source_solution_tag_name,
+                                 const iMOAB_String lower_bound_tag_name,
+                                 const iMOAB_String upper_bound_tag_name );
+
 ErrCode iMOAB_ApplyScalarProjectionWeights(
     iMOAB_AppID pid_intersection,
     int* filter_type,
     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
     const iMOAB_String source_solution_tag_name,
-    const iMOAB_String target_solution_tag_name )
+    const iMOAB_String target_solution_tag_name,
+    const iMOAB_String lo_weights_identifier /* = NULL */ )
 {
     assert( solution_weights_identifier && strlen( solution_weights_identifier ) );
     assert( source_solution_tag_name && strlen( source_solution_tag_name ) );
@@ -6101,12 +6109,44 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         }
     }
 
-    for( size_t i = 0; i < srcTagHandles.size(); i++ )
+    // Dual-map nonlinear remapping: use low-order map stencil for CAAS bounds
+    bool useDualMapBounds =
+        ( lo_weights_identifier && strlen( lo_weights_identifier ) > 0 && caasType != moab::TempestOnlineMap::CAAS_NONE );
+
+    if( useDualMapBounds )
     {
-        // Compute the application of weights on the suorce solution data and store it in the
-        // destination solution vector data Optionally, can also perform the transpose application
-        // of the weight matrix. Set the 3rd argument to true if this is needed
-        MB_CHK_ERR( weightMap->ApplyWeights( srcTagHandles[i], tgtTagHandles[i], false, caasType ) );
+        // Look up the low-order weight map
+        std::string loMapKey( lo_weights_identifier );
+        if( !tdata.weightMaps.count( loMapKey ) )
+        {
+            std::cout << " error: low-order weight map '" << loMapKey << "' not found.\n";
+            return moab::MB_INDEX_OUT_OF_RANGE;
+        }
+        moab::TempestOnlineMap* loWeightMap = tdata.weightMaps[loMapKey];
+
+        for( size_t i = 0; i < srcTagHandles.size(); i++ )
+        {
+            // Apply high-order projection with dual-map CAAS bounds from low-order map
+            MB_CHK_ERR(
+                weightMap->ApplyWeightsWithDualMap( srcTagHandles[i], tgtTagHandles[i], loWeightMap, caasType ) );
+        }
+
+        // Store diagnostic per-row bounds from the low-order stencil on target entities
+        for( size_t i = 0; i < srcNames.size(); i++ )
+        {
+            std::string loBoundName = srcNames[i] + "_DualMapLoBound";
+            std::string hiBoundName = srcNames[i] + "_DualMapHiBound";
+            MB_CHK_ERR( ComputeRowBounds( pid_intersection, lo_weights_identifier,
+                                          srcNames[i].c_str(), loBoundName.c_str(), hiBoundName.c_str() ) );
+        }
+    }
+    else
+    {
+        for( size_t i = 0; i < srcTagHandles.size(); i++ )
+        {
+            // Standard: apply projection with optional overlap-based CAAS
+            MB_CHK_ERR( weightMap->ApplyWeights( srcTagHandles[i], tgtTagHandles[i], false, caasType ) );
+        }
     }
 
 // #define VERBOSE
@@ -6172,6 +6212,136 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
     }
 #endif
     // #undef VERBOSE
+
+    return moab::MB_SUCCESS;
+}
+
+static ErrCode ComputeRowBounds( iMOAB_AppID pid_intersection,
+                                const iMOAB_String solution_weights_identifier,
+                                const iMOAB_String source_solution_tag_name,
+                                const iMOAB_String lower_bound_tag_name,
+                                const iMOAB_String upper_bound_tag_name )
+{
+    assert( solution_weights_identifier && strlen( solution_weights_identifier ) );
+    assert( source_solution_tag_name && strlen( source_solution_tag_name ) );
+    assert( lower_bound_tag_name && strlen( lower_bound_tag_name ) );
+    assert( upper_bound_tag_name && strlen( upper_bound_tag_name ) );
+
+    appData& data_intx       = context.appDatas[*pid_intersection];
+    TempestMapAppData& tdata = data_intx.tempestData;
+
+    if( !tdata.weightMaps.count( std::string( solution_weights_identifier ) ) )
+        return moab::MB_INDEX_OUT_OF_RANGE;
+    moab::TempestOnlineMap* weightMap = tdata.weightMaps[std::string( solution_weights_identifier )];
+
+    // Get entity ranges
+    moab::TempestRemapper* remapper = tdata.remapper;
+    moab::Range covSrcEnts          = remapper->GetMeshEntities( moab::Remapper::CoveringMesh );
+    moab::Range tgtEnts             = remapper->GetMeshEntities( moab::Remapper::TargetMesh );
+
+    int srcNDof = weightMap->GetSourceNDofsPerElement();
+    int tgtNDof = weightMap->GetDestinationNDofsPerElement();
+
+    // Read source field values from coverage mesh
+    Tag srcTag;
+    moab::ErrorCode rval = context.MBI->tag_get_handle( source_solution_tag_name, srcTag );
+    if( rval != moab::MB_SUCCESS ) return moab::MB_TAG_NOT_FOUND;
+
+    std::vector< double > srcVals( covSrcEnts.size() * srcNDof * srcNDof, 0.0 );
+    MB_CHK_ERR( context.MBI->tag_get_data( srcTag, covSrcEnts, &srcVals[0] ) );
+
+    // Get or create lower/upper bound tags on target entities
+    size_t nTargetDofs = tgtEnts.size() * tgtNDof * tgtNDof;
+    Tag loTag, hiTag;
+    MB_CHK_SET_ERR( context.MBI->tag_get_handle( lower_bound_tag_name, tgtNDof * tgtNDof, MB_TYPE_DOUBLE, loTag,
+                                         MB_TAG_DENSE | MB_TAG_CREAT ), "Failed to get or create lower bound tag on target entities" );
+    MB_CHK_SET_ERR( context.MBI->tag_get_handle( upper_bound_tag_name, tgtNDof * tgtNDof, MB_TYPE_DOUBLE, hiTag,
+                                         MB_TAG_DENSE | MB_TAG_CREAT ), "Failed to get or create upper bound tag on target entities" );
+
+    // Compute per-row bounds from weight matrix stencil
+    auto& W = weightMap->GetWeightMatrix();
+    std::vector< double > loBound( nTargetDofs, 1e308 );
+    std::vector< double > hiBound( nTargetDofs, -1e308 );
+
+    for( size_t r = 0; r < nTargetDofs && r < (size_t)W.outerSize(); r++ )
+    {
+        for( moab::TempestOnlineMap::WeightMatrix::InnerIterator it( W, r ); it; ++it )
+        {
+            int c = it.col();
+            if( c >= 0 && c < (int)srcVals.size() )
+            {
+                loBound[r] = std::min( loBound[r], srcVals[c] );
+                hiBound[r] = std::max( hiBound[r], srcVals[c] );
+            }
+        }
+        if( loBound[r] > hiBound[r] )
+        {
+            loBound[r] = 0.0;
+            hiBound[r] = 0.0;
+        }
+    }
+
+    // Write bounds to tags
+    MB_CHK_SET_ERR( context.MBI->tag_set_data( loTag, tgtEnts, &loBound[0] ), "Failed to set lower bound tag data on target entities" );
+    MB_CHK_SET_ERR( context.MBI->tag_set_data( hiTag, tgtEnts, &hiBound[0] ), "Failed to set upper bound tag data on target entities" );
+
+    return moab::MB_SUCCESS;
+}
+
+ErrCode iMOAB_CheckMapSubset( iMOAB_AppID pid_intersection,
+                              const iMOAB_String subset_weights_identifier,
+                              const iMOAB_String superset_weights_identifier,
+                              int* is_subset )
+{
+    assert( subset_weights_identifier && strlen( subset_weights_identifier ) );
+    assert( superset_weights_identifier && strlen( superset_weights_identifier ) );
+    assert( is_subset );
+
+    appData& data_intx       = context.appDatas[*pid_intersection];
+    TempestMapAppData& tdata = data_intx.tempestData;
+
+    if( !tdata.weightMaps.count( std::string( subset_weights_identifier ) ) )
+        return moab::MB_INDEX_OUT_OF_RANGE;
+    if( !tdata.weightMaps.count( std::string( superset_weights_identifier ) ) )
+        return moab::MB_INDEX_OUT_OF_RANGE;
+
+    moab::TempestOnlineMap* subMap  = tdata.weightMaps[std::string( subset_weights_identifier )];
+    moab::TempestOnlineMap* supMap  = tdata.weightMaps[std::string( superset_weights_identifier )];
+
+    auto& subW = subMap->GetWeightMatrix();
+    auto& supW = supMap->GetWeightMatrix();
+
+    int localIsSubset = 1;
+    int nrows         = std::min( subW.outerSize(), supW.outerSize() );
+
+    for( int r = 0; r < nrows && localIsSubset; r++ )
+    {
+        // Build set of nonzero columns in the superset map for this row
+        std::unordered_set< int > superCols;
+        for( moab::TempestOnlineMap::WeightMatrix::InnerIterator it( supW, r ); it; ++it )
+            superCols.insert( it.col() );
+
+        // Check that every nonzero column in the subset map is in the superset
+        for( moab::TempestOnlineMap::WeightMatrix::InnerIterator it( subW, r ); it; ++it )
+        {
+            if( superCols.find( it.col() ) == superCols.end() )
+            {
+                localIsSubset = 0;
+                break;
+            }
+        }
+    }
+
+    // Global reduction: all ranks must agree
+#ifdef MOAB_HAVE_MPI
+    ParallelComm* pco = context.appDatas[*pid_intersection].pcomm;
+    if( pco )
+        MPI_Allreduce( &localIsSubset, is_subset, 1, MPI_INT, MPI_MIN, pco->comm() );
+    else
+        *is_subset = localIsSubset;
+#else
+    *is_subset = localIsSubset;
+#endif
 
     return moab::MB_SUCCESS;
 }

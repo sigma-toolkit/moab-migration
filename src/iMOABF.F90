@@ -532,7 +532,8 @@ module iMOAB
       end function iMOAB_ComputeScalarProjectionWeights
 
       integer(c_int) function iMOAB_ApplyScalarProjectionWeights(pid_intersection, filter_type, solution_weights_identifier, &
-                                                                source_solution_tag_name, target_solution_tag_name) &
+                                                                source_solution_tag_name, target_solution_tag_name, &
+                                                                lo_weights_identifier) &
                                                                 bind(C, name='iMOAB_ApplyScalarProjectionWeights')
         use, intrinsic :: iso_c_binding, only: c_int, c_char
         integer(c_int), intent(in) :: pid_intersection
@@ -540,7 +541,18 @@ module iMOAB
         character(kind=c_char), intent(in) :: solution_weights_identifier(*)
         character(kind=c_char), intent(in) :: source_solution_tag_name(*)
         character(kind=c_char), intent(in) :: target_solution_tag_name(*)
+        character(kind=c_char), intent(in) :: lo_weights_identifier(*)  ! pass C_NULL_CHAR for none
       end function iMOAB_ApplyScalarProjectionWeights
+
+      integer(c_int) function iMOAB_CheckMapSubset(pid_intersection, subset_weights_identifier, &
+                                                    superset_weights_identifier, is_subset) &
+                                                    bind(C, name='iMOAB_CheckMapSubset')
+        use, intrinsic :: iso_c_binding, only: c_int, c_char
+        integer(c_int), intent(in) :: pid_intersection
+        character(kind=c_char), intent(in) :: subset_weights_identifier(*)
+        character(kind=c_char), intent(in) :: superset_weights_identifier(*)
+        integer(c_int), intent(out) :: is_subset
+      end function iMOAB_CheckMapSubset
 
 ! closing endif: MOAB_HAVE_TEMPESTREMAP
 #endif

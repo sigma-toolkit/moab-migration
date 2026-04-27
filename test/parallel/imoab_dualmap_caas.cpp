@@ -216,6 +216,7 @@ int main( int argc, char* argv[] )
         // Compute HIGH-ORDER weights (non-monotone FV, 1st order)
         const iMOAB_String hi_map_id = "hi-scalar";
         fMonotone                    = 0;  // no monotonicity constraint
+        disc_order                   = 2;
 
         PUSH_TIMER( "Compute high-order (non-monotone) weights" )
         CHECKIERR( iMOAB_ComputeScalarProjectionWeights( cplDualMapPID, hi_map_id, disc_fv, &disc_order, disc_fv,
@@ -231,7 +232,7 @@ int main( int argc, char* argv[] )
                    "Cannot compute ATM coverage graph" )
 
         // Define source and target tags
-        int tagType                     = 0;  // DENSE_DOUBLE
+        int tagType                     = 1;  // DENSE_DOUBLE
         int tagIndex;
         int atmCompNDoFs = 1, ocnCompNDoFs = 1;
         const iMOAB_String srcField     = "SourceAnalytical";
@@ -252,32 +253,36 @@ int main( int argc, char* argv[] )
     // Set source field values on ATM component: a sharp step function
     if( atmComm != MPI_COMM_NULL )
     {
-        int tagType                       = 0;
         int tagIndex;
-        int atmCompNDoFs                  = 1;
-        const iMOAB_String srcField       = "SourceAnalytical";
-        CHECKIERR( iMOAB_DefineTagStorage( cmpAtmPID, srcField, &tagType, &atmCompNDoFs, &tagIndex ),
+        int tagType[2]              = { 0, 1 };  // dense_int, dense_double
+        int atmCompNDoFs            = 1;
+        const iMOAB_String idField  = "GLOBAL_ID";
+        const iMOAB_String srcField = "SourceAnalytical";
+
+        CHECKIERR( iMOAB_DefineTagStorage( cmpAtmPID, idField, &tagType[0], &atmCompNDoFs, &tagIndex ),
+                   "Cannot define src tag on component" )
+        CHECKIERR( iMOAB_DefineTagStorage( cmpAtmPID, srcField, &tagType[1], &atmCompNDoFs, &tagIndex ),
                    "Cannot define src tag on component" )
 
-        int nverts, nElems;
-        CHECKIERR( iMOAB_GetMeshInfo( cmpAtmPID, &nverts, &nElems, nullptr, nullptr, nullptr ),
+        int nElems[3];
+        CHECKIERR( iMOAB_GetMeshInfo( cmpAtmPID, nullptr, nElems, nullptr, nullptr, nullptr ),
                    "Cannot get ATM mesh info" )
 
         // Get global IDs for elements to set field values
-        std::vector< int > gids( nElems );
+        std::vector< int > gids( nElems[2] );
         int entity_type = 1;  // elements
-        CHECKIERR( iMOAB_GetIntTagStorage( cmpAtmPID, "GLOBAL_ID", &nElems, &entity_type, gids.data() ),
+        CHECKIERR( iMOAB_GetIntTagStorage( cmpAtmPID, idField, &nElems[2], &entity_type, gids.data() ),
                    "Cannot get element global IDs" )
 
         // Create a step function: elements with even GIDs get value 10.0, odd get 0.0
         // This creates sharp discontinuities that will test bounds preservation
-        std::vector< double > srcVals( nElems );
-        for( int i = 0; i < nElems; i++ )
+        std::vector< double > srcVals( nElems[2] );
+        for( int i = 0; i < nElems[2]; i++ )
         {
             srcVals[i] = ( gids[i] % 2 == 0 ) ? 10.0 : 0.0;
         }
 
-        CHECKIERR( iMOAB_SetDoubleTagStorage( cmpAtmPID, srcField, &nElems, &entity_type, srcVals.data() ),
+        CHECKIERR( iMOAB_SetDoubleTagStorage( cmpAtmPID, srcField, &nElems[2], &entity_type, srcVals.data() ),
                    "Cannot set source field values" )
     }
 

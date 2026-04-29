@@ -377,7 +377,7 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         CHECKIERR( iMOAB_DefineTagStorage( cplAtmPID, bottomFields, &tagTypes, &atmCompNDoFs, &tagIndex[0] ),
-                   "failed to define the field tags AnalyticalSolnSrcExact" );
+                   "failed to define the field tags bottomFields" );
 
         // just to be sure it is set, to be visible by iMOAB app
         CHECKIERR( iMOAB_DefineTagStorage( cplAtmPID, "aream", &tagTypes, &atmCompNDoFs, &tagIndex[0] ),
@@ -391,7 +391,7 @@ int main( int argc, char* argv[] )
 
 #ifdef COMPUTE_TRANSPOSE_FILE_MAP
         CHECKIERR( iMOAB_DefineTagStorage( cplAtmPID, bottomProjectedFieldsS, &tagTypes, &atmCompNDoFs, &tagIndex[0] ),
-                   "failed to define the field tags AnalyticalSolnSrcExact" );
+                   "failed to define the field tags bottomProjectedFieldsS" );
 #endif
     }
 

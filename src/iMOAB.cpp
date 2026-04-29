@@ -2606,6 +2606,129 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
     return MB_SUCCESS;
 }
 
+#ifdef MOAB_HAVE_TEMPESTREMAP
+// Helper: get the 2D entities of the TempestRemap CoveringMesh attached to this app.
+// Returns an empty range (and success) if no remapper is attached.
+static ErrCode get_coverage_entities( iMOAB_AppID pid, moab::Range& covEnts )
+{
+    appData& data = context.appDatas[*pid];
+    covEnts.clear();
+    if( data.tempestData.remapper == nullptr ) return moab::MB_SUCCESS;
+    EntityHandle cover_set = data.tempestData.remapper->GetMeshSet( moab::Remapper::CoveringMesh );
+    MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, covEnts ) );
+    return moab::MB_SUCCESS;
+}
+
+/**
+ * \brief Return the number of 2D elements in the TempestRemap CoveringMesh of this app
+ *        and (optionally) their global IDs and centroid coordinates.
+ *
+ * Used to populate analytic source fields directly on the coverage entities of a
+ * dual-map intersection app, bypassing the cmpAtm->cplAtm->cplDualMap migration
+ * chain — useful for BFB testing of dual-map CAAS where every rank must see an
+ * identical input set independent of how the source mesh was partitioned.
+ *
+ * Call once with gids=NULL, centroids=NULL to query num_cov_elems, then allocate
+ * and call again to fill the buffers.
+ *
+ * \param[in]    pid             Application ID with an attached TempestRemap remapper
+ *                               (e.g. the dual-map intersection app).
+ * \param[inout] num_cov_elems   On input: ignored (or capacity); on output: number of
+ *                               2D entities in the covering mesh on this rank.
+ * \param[out]   gids            Optional. If non-null, filled with the global IDs of
+ *                               the covering entities (size num_cov_elems).
+ * \param[out]   centroids       Optional. If non-null, filled with the arithmetic mean
+ *                               of vertex coords per element (size 3*num_cov_elems,
+ *                               x,y,z interleaved).
+ * \return ErrCode               MB_SUCCESS on success.
+ */
+ErrCode iMOAB_GetCoverageMeshInfo( iMOAB_AppID pid, int* num_cov_elems, int* gids, double* centroids )
+{
+    moab::Range covEnts;
+    MB_CHK_ERR( get_coverage_entities( pid, covEnts ) );
+    *num_cov_elems = static_cast< int >( covEnts.size() );
+    if( covEnts.empty() ) return moab::MB_SUCCESS;
+
+    if( gids != nullptr )
+    {
+        std::vector< int > tmpGids( covEnts.size() );
+        MB_CHK_ERR( context.MBI->tag_get_data( context.globalID_tag, covEnts, tmpGids.data() ) );
+        std::copy( tmpGids.begin(), tmpGids.end(), gids );
+    }
+
+    if( centroids != nullptr )
+    {
+        const moab::EntityHandle* conn;
+        int numNodes;
+        std::vector< double > coords;
+        int i = 0;
+        for( moab::Range::iterator it = covEnts.begin(); it != covEnts.end(); ++it, ++i )
+        {
+            MB_CHK_ERR( context.MBI->get_connectivity( *it, conn, numNodes ) );
+            coords.resize( 3 * numNodes );
+            MB_CHK_ERR( context.MBI->get_coords( conn, numNodes, coords.data() ) );
+            double cx = 0.0, cy = 0.0, cz = 0.0;
+            for( int v = 0; v < numNodes; v++ )
+            {
+                cx += coords[3 * v + 0];
+                cy += coords[3 * v + 1];
+                cz += coords[3 * v + 2];
+            }
+            centroids[3 * i + 0] = cx / numNodes;
+            centroids[3 * i + 1] = cy / numNodes;
+            centroids[3 * i + 2] = cz / numNodes;
+        }
+    }
+    return moab::MB_SUCCESS;
+}
+
+/**
+ * \brief Set a double tag on every entity of the TempestRemap CoveringMesh of this app.
+ *
+ * Values are written in the same order as iMOAB_GetCoverageMeshInfo returns gids
+ * (i.e. moab::Range iteration order over the covering set entities). The tag must
+ * already be defined on the app via iMOAB_DefineTagStorage.
+ *
+ * This bypasses the partition-dependent migration path and is useful for BFB tests
+ * that must populate the source field on the actual coverage cells consumed by
+ * iMOAB_ApplyScalarProjectionWeights.
+ *
+ * \param[in] pid                       Application ID with an attached TempestRemap remapper.
+ * \param[in] tag_storage_name          Name of the (already-defined) double tag.
+ * \param[in] num_tag_storage_length    Total number of values supplied (= num_cov_elems *
+ *                                      components_per_entity).
+ * \param[in] tag_storage_data          The values to write, in covering-Range order.
+ * \return ErrCode                      MB_SUCCESS on success.
+ */
+ErrCode iMOAB_SetDoubleTagStorageOnCoverage( iMOAB_AppID pid,
+                                             const iMOAB_String tag_storage_name,
+                                             int* num_tag_storage_length,
+                                             double* tag_storage_data )
+{
+    moab::Range covEnts;
+    MB_CHK_ERR( get_coverage_entities( pid, covEnts ) );
+    if( covEnts.empty() ) return moab::MB_SUCCESS;
+
+    appData& data = context.appDatas[*pid];
+    std::string tagName( tag_storage_name );
+    auto tit = data.tagMap.find( tagName );
+    if( tit == data.tagMap.end() ) return moab::MB_FAILURE;
+    moab::Tag tag = tit->second;
+
+    int tagLen = 0;
+    MB_CHK_ERR( context.MBI->tag_get_length( tag, tagLen ) );
+    moab::DataType dtype;
+    MB_CHK_ERR( context.MBI->tag_get_data_type( tag, dtype ) );
+    if( dtype != moab::MB_TYPE_DOUBLE ) return moab::MB_FAILURE;
+
+    const int needed = tagLen * static_cast< int >( covEnts.size() );
+    if( *num_tag_storage_length < needed ) return moab::MB_FAILURE;
+
+    MB_CHK_ERR( context.MBI->tag_set_data( tag, covEnts, tag_storage_data ) );
+    return moab::MB_SUCCESS;
+}
+#endif  // MOAB_HAVE_TEMPESTREMAP
+
 ErrCode iMOAB_GetDoubleTagStorage( iMOAB_AppID pid,
                                    const iMOAB_String tag_storage_names,
                                    int* num_tag_storage_length,

@@ -61,8 +61,9 @@ int main( int argc, char* argv[] )
 
     int rankInAtmComm = -1, rankInOcnComm = -1, rankInCouComm = -1;
 
-    std::string atmFilename = TestDir + "unittest/wholeATM_T.h5m";
-    std::string ocnFilename = TestDir + "unittest/recMeshOcn.h5m";
+    // Use the same FV mesh files as imoab_read_compute_map.cpp so source field is FV.
+    std::string atmFilename = TestDir + "unittest/srcWithSolnTag.h5m";
+    std::string ocnFilename = TestDir + "unittest/outTri15_8.h5m";
     std::string loMapFile;  // empty = compute online
     std::string hiMapFile;  // empty = compute online
 
@@ -220,7 +221,8 @@ int main( int argc, char* argv[] )
         CHECKIERR( iMOAB_FreeSenderBuffers( cmpOcnPID, &cplocn ), "Cannot free OCN send buffers" )
     }
 
-    const iMOAB_String srcField     = "SourceAnalytical";
+    // FV scalar field already present on srcWithSolnTag.h5m (matches imoab_read_compute_map.cpp).
+    const iMOAB_String srcField     = "AnalyticalSolnSrcExact";
     const iMOAB_String tgtFieldHi   = "TargetHiOrder";
     const iMOAB_String tgtFieldDual = "TargetDualMap";
     const iMOAB_String tgtFieldLo   = "TargetLoOrder";
@@ -258,9 +260,9 @@ int main( int argc, char* argv[] )
             // --- Compute weight maps online ---
 
             // Set the ghost layers on the coupler for the ATM mesh
-            int nghlay = 0;
+            int nghlay = 3;
             int nghlay_tgt = 0;
-            CHECKIERR( iMOAB_SetMapGhostLayers( cplAtmPID, &nghlay, &nghlay_tgt ),
+            CHECKIERR( iMOAB_SetMapGhostLayers( cplDualMapPID, &nghlay, &nghlay_tgt ),
                        "Failed to set number of ghost layers on ATM mesh" );
 
             // Compute mesh intersection between ATM and OCN on coupler
@@ -317,140 +319,48 @@ int main( int argc, char* argv[] )
                    "Cannot define low-order target tag" )
     }
 
-    // Set source field values on ATM component: spherical harmonic evaluated at element centroids.
-    // f(x,y,z) = 1.0 + 0.5*(3z^2 - 1) + 0.8*(x^2 - y^2)
-    //          = 1.0 + P_2(z) + 0.8*Y_2^2(x,y)     [unnormalized]
-    // This is a smooth degree-2 polynomial on the unit sphere that exercises the
-    // remapping well and produces deterministic results independent of mesh partitioning.
-    double localSrcMin = 1e308, localSrcMax = -1e308;
-
-    if( atmComm != MPI_COMM_NULL )
+    // Set source field values directly on the dual-map coverage mesh:
+    // The source tag (srcField = "a2oTbot") is already present on the on-disk
+    // ATM mesh (wholeATM_T.h5m). We follow the exact tag-migration pattern
+    // used by imoab_read_compute_map.cpp: define-on-cpl-side, then
+    // SendElementTag/ReceiveElementTag in two hops:
+    //   cmpAtm -> cplAtm  (via atmCouComm, context cplatm)
+    //   cplAtm -> cplDualMap (via couComm, context dualmap_id)
+    // Both maps (lo + hi) live on cplDualMapPID and consume the same coverage,
+    // so we migrate the source tag once.
+    if( couComm != MPI_COMM_NULL )
     {
-        int tagIndex;
-        int tagType_dbl = 1;  // DENSE_DOUBLE
-        int atmCompNDoFs = 1;
-
-        CHECKIERR( iMOAB_DefineTagStorage( cmpAtmPID, srcField, &tagType_dbl, &atmCompNDoFs, &tagIndex ),
-                   "Cannot define src tag on component" )
-
-        int nVerts[3], nElems[3], nBlocks[3];
-        CHECKIERR( iMOAB_GetMeshInfo( cmpAtmPID, nVerts, nElems, nBlocks, nullptr, nullptr ),
-                   "Cannot get ATM mesh info" )
-
-        // Get vertex coordinates (interleaved x,y,z)
-        int coordsLen = nVerts[2] * 3;
-        std::vector< double > coords( coordsLen );
-        CHECKIERR( iMOAB_GetVisibleVerticesCoordinates( cmpAtmPID, &coordsLen, coords.data() ),
-                   "Cannot get ATM vertex coordinates" )
-
-        // Get block IDs
-        std::vector< int > blockIDs( nBlocks[2] );
-        CHECKIERR( iMOAB_GetBlockID( cmpAtmPID, &nBlocks[2], blockIDs.data() ),
-                   "Cannot get block IDs" )
-
-        // Compute element centroids and evaluate spherical harmonic
-        std::vector< double > srcVals( nElems[2] );
-        int elemOffset = 0;
-
-        for( int b = 0; b < nBlocks[2]; b++ )
-        {
-            int vertsPerElem, numElemsInBlock;
-            CHECKIERR( iMOAB_GetBlockInfo( cmpAtmPID, &blockIDs[b], &vertsPerElem, &numElemsInBlock ),
-                       "Cannot get block info" )
-
-            int connLen = vertsPerElem * numElemsInBlock;
-            std::vector< int > conn( connLen );
-            CHECKIERR( iMOAB_GetBlockElementConnectivities( cmpAtmPID, &blockIDs[b], &connLen, conn.data() ),
-                       "Cannot get element connectivity" )
-
-            for( int e = 0; e < numElemsInBlock; e++ )
-            {
-                // Compute centroid of this element
-                double cx = 0.0, cy = 0.0, cz = 0.0;
-                for( int v = 0; v < vertsPerElem; v++ )
-                {
-                    int vidx = conn[e * vertsPerElem + v] - 1;  // 1-based to 0-based
-                    cx += coords[3 * vidx + 0];
-                    cy += coords[3 * vidx + 1];
-                    cz += coords[3 * vidx + 2];
-                }
-                cx /= vertsPerElem;
-                cy /= vertsPerElem;
-                cz /= vertsPerElem;
-
-                // Normalize to unit sphere (in case mesh radius != 1)
-                double r = std::sqrt( cx * cx + cy * cy + cz * cz );
-                if( r > 1e-14 )
-                {
-                    cx /= r;
-                    cy /= r;
-                    cz /= r;
-                }
-
-                // Spherical harmonic: f = 1.0 + 0.5*(3z^2 - 1) + 0.8*(x^2 - y^2)
-                double val = 1.0 + 0.5 * ( 3.0 * cz * cz - 1.0 ) + 0.8 * ( cx * cx - cy * cy );
-                srcVals[elemOffset + e] = val;
-
-                localSrcMin = std::min( localSrcMin, val );
-                localSrcMax = std::max( localSrcMax, val );
-            }
-            elemOffset += numElemsInBlock;
-        }
-
-        int entity_type = 1;  // elements
-        CHECKIERR( iMOAB_SetDoubleTagStorage( cmpAtmPID, srcField, &nElems[2], &entity_type, srcVals.data() ),
-                   "Cannot set source field values" )
+        int tagType = DENSE_DOUBLE, atmCompNDoFs = 1, tagIndex_ = -1;
+        CHECKIERR( iMOAB_DefineTagStorage( cplAtmPID, srcField, &tagType, &atmCompNDoFs, &tagIndex_ ),
+                   "Cannot define src tag on cplAtm" )
     }
 
-    // Get global min/max of source field for bounds checking later
-    double globalSrcMin, globalSrcMax;
-    MPI_Allreduce( &localSrcMin, &globalSrcMin, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD );
-    MPI_Allreduce( &localSrcMax, &globalSrcMax, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD );
-
-    if( !rankInGlobalComm )
-    {
-        std::cout << " Source field range: [" << globalSrcMin << ", " << globalSrcMax << "]\n";
-    }
-
-    // Send source tag to coupler
+    // First hop: cmpAtm -> cplAtm
     if( atmComm != MPI_COMM_NULL )
     {
         CHECKIERR( iMOAB_SendElementTag( cmpAtmPID, srcField, &atmCouComm, &cplatm ),
-                   "Cannot send source tag" )
+                   "Cannot send src tag from cmpAtm to cplAtm" )
     }
     if( couComm != MPI_COMM_NULL )
     {
         CHECKIERR( iMOAB_ReceiveElementTag( cplAtmPID, srcField, &atmCouComm, &cmpatm ),
-                   "Cannot receive source tag" )
+                   "Cannot receive src tag on cplAtm" )
     }
     if( atmComm != MPI_COMM_NULL )
     {
-        CHECKIERR( iMOAB_FreeSenderBuffers( cmpAtmPID, &cplatm ),
-                   "Cannot free source tag send buffers" )
+        CHECKIERR( iMOAB_FreeSenderBuffers( cmpAtmPID, &cplatm ), "Cannot free sender buffers (cmpAtm)" )
     }
 
-    // Send source tag from coupler-atm coverage to dual-map coverage so that
-    // the high/low order maps can apply weights against actual source values
-    // (otherwise the dual-map app's source tag is the default fill value).
+    // Second hop: cplAtm -> cplDualMap (the intersection app's coverage mesh).
+    // Mirrors the COMPUTE_FILE_MAP / COMPUTE_ONLINE_MAP send-tag block in
+    // imoab_read_compute_map.cpp.
     if( couComm != MPI_COMM_NULL )
     {
         CHECKIERR( iMOAB_SendElementTag( cplAtmPID, srcField, &couComm, &dualmap_id ),
-                   "Cannot send tag to coverage" )
+                   "Cannot send src tag from cplAtm to cplDualMap" )
         CHECKIERR( iMOAB_ReceiveElementTag( cplDualMapPID, srcField, &couComm, &cplatm ),
-                   "Cannot receive tag on coverage" )
-        CHECKIERR( iMOAB_FreeSenderBuffers( cplAtmPID, &dualmap_id ),
-                   "Cannot free coverage send buffers" )
-    }
-
-    if( couComm != MPI_COMM_NULL  )
-    {
-        // Pre-projection snapshot: dual-map coverage with the migrated source field.
-        // Projected target fields live on cplOcnPID and are written below after
-        // projection; writing this here only captures the source-field state.
-        char outputFileRecvd[] = "cplAtmFile.h5m";
-        char fileWriteOptions[] = "PARALLEL=WRITE_PART";
-        CHECKIERR( iMOAB_WriteMesh( cplDualMapPID, outputFileRecvd, fileWriteOptions ),
-                   "could not write cplAtmFile.h5m to disk" )
+                   "Cannot receive src tag on cplDualMap coverage" )
+        CHECKIERR( iMOAB_FreeSenderBuffers( cplAtmPID, &dualmap_id ), "Cannot free sender buffers (cplAtm)" )
     }
 
     // === Apply projections and test ===

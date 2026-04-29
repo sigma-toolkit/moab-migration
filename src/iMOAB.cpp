@@ -5574,24 +5574,18 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
 
     if( meshCleanup )
     {
-        // Address issues for source mesh first
+        // Address issues for source mesh
         // fixes to enforce positive orientation of the vertices (outward normal)
         MB_CHK_ERR(
             areaAdaptor.positive_orientation( context.MBI, data_src.file_set, defaultradius /*radius_source*/ ) );
 
-        // fixes to clean up any degenerate quadrangular elements present in the mesh (RLL specifically?)
-        MB_CHK_ERR( IntxUtils::fix_degenerate_quads( context.MBI, data_src.file_set ) );
-
         // fixes to enforce convexity in case concave elements are present
         MB_CHK_ERR( moab::IntxUtils::enforce_convexity( context.MBI, data_src.file_set, rank ) );
 
-        // Address issues for target mesh first
+        // Address issues for target mesh
         // fixes to enforce positive orientation of the vertices (outward normal)
         MB_CHK_ERR(
             areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ ) );
-
-        // fixes to clean up any degenerate quadrangular elements present in the mesh (RLL specifically?)
-        MB_CHK_ERR( IntxUtils::fix_degenerate_quads( context.MBI, data_tgt.file_set ) );
 
         // fixes to enforce convexity in case concave elements are present
         MB_CHK_ERR( moab::IntxUtils::enforce_convexity( context.MBI, data_tgt.file_set, rank ) );
@@ -5798,7 +5792,6 @@ ErrCode iMOAB_ComputePointDoFIntersection( iMOAB_AppID pid_src, iMOAB_AppID pid_
         moab::Range rintxverts, rintxelems;
         MB_CHK_ERR( context.MBI->get_entities_by_dimension( data_src.file_set, 0, rintxverts ) );
         MB_CHK_ERR( context.MBI->get_entities_by_dimension( data_src.file_set, 2, rintxelems ) );
-        MB_CHK_ERR( IntxUtils::fix_degenerate_quads( context.MBI, data_src.file_set ) );
         MB_CHK_ERR( areaAdaptor.positive_orientation( context.MBI, data_src.file_set, radius_source ) );
 #ifdef VERBOSE
         std::cout << "The red set contains " << rintxverts.size() << " vertices and " << rintxelems.size()
@@ -5808,7 +5801,6 @@ ErrCode iMOAB_ComputePointDoFIntersection( iMOAB_AppID pid_src, iMOAB_AppID pid_
         moab::Range bintxverts, bintxelems;
         MB_CHK_ERR( context.MBI->get_entities_by_dimension( data_tgt.file_set, 0, bintxverts ) );
         MB_CHK_ERR( context.MBI->get_entities_by_dimension( data_tgt.file_set, 2, bintxelems ) );
-        MB_CHK_ERR( IntxUtils::fix_degenerate_quads( context.MBI, data_tgt.file_set ) );
         MB_CHK_ERR( areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, radius_target ) );
 #ifdef VERBOSE
         std::cout << "The blue set contains " << bintxverts.size() << " vertices and " << bintxelems.size()

@@ -6,11 +6,12 @@
  * Workflow:
  *   1. Load ATM (source) and OCN (target) meshes on all processes
  *   2. Migrate meshes to coupler communicator
- *   3. Compute mesh intersection and coverage
- *   4. Compute two sets of FV weights:
- *      - "lo-scalar" : 1st-order FV with monotonicity (low-order monotone map)
- *      - "hi-scalar" : 1st-order FV without monotonicity (high-order non-monotone map)
- *   5. Define an analytical source tag with sharp features
+ *   3. Either compute mesh intersection and weight maps online, or
+ *      load pre-computed weight maps from disk (--lo_map_file, --hi_map_file)
+ *   4. Two sets of FV weights are used:
+ *      - "lo-scalar" : low-order monotone map
+ *      - "hi-scalar" : high-order non-monotone map
+ *   5. Define an analytical source field (degree-2 spherical harmonic)
  *   6. Apply high-order map with dual-map CAAS bounds from low-order map
  *      using the new lo_weights_identifier parameter
  *   7. Verify: target values are within source stencil bounds
@@ -62,50 +63,78 @@ int main( int argc, char* argv[] )
 
     std::string atmFilename = TestDir + "unittest/wholeATM_T.h5m";
     std::string ocnFilename = TestDir + "unittest/recMeshOcn.h5m";
+    std::string loMapFile;  // empty = compute online
+    std::string hiMapFile;  // empty = compute online
 
     int nghlay = 0;
-    int startG1 = 0, endG1 = numProcesses - 1;
-    int startG2 = 0, endG2 = numProcesses - 1;
-    int startG4 = 0, endG4 = numProcesses - 1;
+
+    // PE layout: default all tasks on all groups
+    int startG1 = 0, endG1 = numProcesses - 1;  // ATM
+    int startG2 = 0, endG2 = numProcesses - 1;  // OCN
+    int startG4 = 0, endG4 = numProcesses - 1;  // Coupler
 
     ProgOptions opts;
     opts.addOpt< std::string >( "atmosphere,t", "ATM mesh filename (source)", &atmFilename );
     opts.addOpt< std::string >( "ocean,m", "OCN mesh filename (target)", &ocnFilename );
+    opts.addOpt< std::string >( "lo_map_file,l", "Low-order map file (nc); if set, load from disk", &loMapFile );
+    opts.addOpt< std::string >( "hi_map_file,h", "High-order map file (nc); if set, load from disk", &hiMapFile );
+    opts.addOpt< int >( "startAtm,a", "start task for atmosphere layout", &startG1 );
+    opts.addOpt< int >( "endAtm,b", "end task for atmosphere layout", &endG1 );
+    opts.addOpt< int >( "startOcn,c", "start task for ocean layout", &startG2 );
+    opts.addOpt< int >( "endOcn,d", "end task for ocean layout", &endG2 );
+    opts.addOpt< int >( "startCoupler,g", "start task for coupler layout", &startG4 );
+    opts.addOpt< int >( "endCoupler,j", "end task for coupler layout", &endG4 );
     opts.parseCommandLine( argc, argv );
+
+    bool loadFromDisk = ( !loMapFile.empty() && !hiMapFile.empty() );
 
     if( !rankInGlobalComm )
     {
         std::cout << " === imoab_dualmap_caas test ===\n";
         std::cout << " ATM file: " << atmFilename << "\n";
         std::cout << " OCN file: " << ocnFilename << "\n";
+        if( loadFromDisk )
+        {
+            std::cout << " Lo-order map: " << loMapFile << "\n";
+            std::cout << " Hi-order map: " << hiMapFile << "\n";
+            std::cout << " Mode: load maps from disk\n";
+        }
+        else
+        {
+            std::cout << " Mode: compute maps online\n";
+        }
         std::cout << " Processes: " << numProcesses << "\n";
+        std::cout << " ATM tasks: " << startG1 << ":" << endG1
+                  << ", OCN tasks: " << startG2 << ":" << endG2
+                  << ", Coupler tasks: " << startG4 << ":" << endG4 << "\n";
     }
 
-    // Create MPI groups and communicators
+    // Create MPI communicators and groups using PE layout ranges
     MPI_Group atmPEGroup;
     MPI_Comm atmComm;
     CHECKIERR( create_group_and_comm( startG1, endG1, jgroup, &atmPEGroup, &atmComm ),
-               "Cannot create ATM group" )
+               "Cannot create ATM MPI group and communicator" )
 
     MPI_Group ocnPEGroup;
     MPI_Comm ocnComm;
     CHECKIERR( create_group_and_comm( startG2, endG2, jgroup, &ocnPEGroup, &ocnComm ),
-               "Cannot create OCN group" )
+               "Cannot create OCN MPI group and communicator" )
 
     MPI_Group couPEGroup;
     MPI_Comm couComm;
     CHECKIERR( create_group_and_comm( startG4, endG4, jgroup, &couPEGroup, &couComm ),
-               "Cannot create coupler group" )
+               "Cannot create coupler MPI group and communicator" )
 
+    // Joint communicators for component-coupler data transfer
     MPI_Group joinAtmCouGroup;
     MPI_Comm atmCouComm;
     CHECKIERR( create_joint_comm_group( atmPEGroup, couPEGroup, &joinAtmCouGroup, &atmCouComm ),
-               "Cannot create joint ATM-coupler comm" )
+               "Cannot create joint ATM-coupler communicator" )
 
     MPI_Group joinOcnCouGroup;
     MPI_Comm ocnCouComm;
     CHECKIERR( create_joint_comm_group( ocnPEGroup, couPEGroup, &joinOcnCouGroup, &ocnCouComm ),
-               "Cannot create joint OCN-coupler comm" )
+               "Cannot create joint OCN-coupler communicator" )
 
     CHECKIERR( iMOAB_Initialize( argc, argv ), "Cannot initialize iMOAB" )
 
@@ -191,54 +220,90 @@ int main( int argc, char* argv[] )
         CHECKIERR( iMOAB_FreeSenderBuffers( cmpOcnPID, &cplocn ), "Cannot free OCN send buffers" )
     }
 
+    const iMOAB_String srcField     = "SourceAnalytical";
+    const iMOAB_String tgtFieldHi   = "TargetHiOrder";
+    const iMOAB_String tgtFieldDual = "TargetDualMap";
+    const iMOAB_String tgtFieldLo   = "TargetLoOrder";
     if( couComm != MPI_COMM_NULL )
     {
-        // Compute mesh intersection between ATM and OCN on coupler
-        PUSH_TIMER( "Compute ATM-OCN mesh intersection" )
-        CHECKIERR( iMOAB_ComputeMeshIntersectionOnSphere( cplAtmPID, cplOcnPID, cplDualMapPID ),
-                   "Cannot compute ATM/OCN intersection" )
-        POP_TIMER( couComm, rankInCouComm )
+        if( loadFromDisk )
+        {
+            // --- Load pre-computed weight maps from disk ---
+            int src_disc_type = 3;  // FV cell
+            int tgt_disc_type = 3;  // FV cell
+            int arearead      = 0;  // do not read areas
 
-        // Compute LOW-ORDER weights (monotone FV, 1st order)
-        const iMOAB_String lo_map_id   = "lo-scalar";
-        const iMOAB_String disc_fv     = "fv";
-        const iMOAB_String dof_tag     = "GLOBAL_ID";
-        int disc_order                 = 1;
-        int fNoBubble = 1, fMonotone = 1, fVolumetric = 0, fInvDist = 0, fNoConserve = 0, fValidate = 0;
+            PUSH_TIMER( "Load low-order map from disk" )
+            CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplDualMapPID,
+                                          &src_disc_type, &tgt_disc_type, &arearead,
+                                          "lo-scalar", loMapFile.c_str() ),
+                       "Cannot load low-order map file" )
+            POP_TIMER( couComm, rankInCouComm )
 
-        PUSH_TIMER( "Compute low-order (monotone) weights" )
-        CHECKIERR( iMOAB_ComputeScalarProjectionWeights( cplDualMapPID, lo_map_id, disc_fv, &disc_order, disc_fv,
-                                                         &disc_order, nullptr, &fNoBubble, &fMonotone, &fVolumetric,
-                                                         &fInvDist, &fNoConserve, &fValidate, dof_tag, dof_tag ),
-                   "Cannot compute low-order weights" )
-        POP_TIMER( couComm, rankInCouComm )
+            PUSH_TIMER( "Load high-order map from disk" )
+            CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplDualMapPID,
+                                          &src_disc_type, &tgt_disc_type, &arearead,
+                                          "hi-scalar", hiMapFile.c_str() ),
+                       "Cannot load high-order map file" )
+            POP_TIMER( couComm, rankInCouComm )
 
-        // Compute HIGH-ORDER weights (non-monotone FV, 1st order)
-        const iMOAB_String hi_map_id = "hi-scalar";
-        fMonotone                    = 0;  // no monotonicity constraint
-        disc_order                   = 2;
+            // Migrate the coverage mesh so source tag data can be transferred
+            int meshtype = 3;
+            CHECKIERR( iMOAB_MigrateMapMesh( cplAtmPID, cplDualMapPID, &couComm, &couPEGroup, &couPEGroup, &meshtype,
+                                             &cplatm, &dualmap_id ),
+                       "Cannot migrate map mesh for lo-scalar" )
+        }
+        else
+        {
+            // --- Compute weight maps online ---
 
-        PUSH_TIMER( "Compute high-order (non-monotone) weights" )
-        CHECKIERR( iMOAB_ComputeScalarProjectionWeights( cplDualMapPID, hi_map_id, disc_fv, &disc_order, disc_fv,
-                                                         &disc_order, nullptr, &fNoBubble, &fMonotone, &fVolumetric,
-                                                         &fInvDist, &fNoConserve, &fValidate, dof_tag, dof_tag ),
-                   "Cannot compute high-order weights" )
-        POP_TIMER( couComm, rankInCouComm )
+            // Set the ghost layers on the coupler for the ATM mesh
+            int nghlay = 0;
+            int nghlay_tgt = 0;
+            CHECKIERR( iMOAB_SetMapGhostLayers( cplAtmPID, &nghlay, &nghlay_tgt ),
+                       "Failed to set number of ghost layers on ATM mesh" );
 
-        // Compute coverage comm graph for tag migration
-        int meshtype = 3;
-        CHECKIERR( iMOAB_ComputeCommGraph( cplAtmPID, cplDualMapPID, &couComm, &couPEGroup, &couPEGroup, &meshtype,
-                                           &meshtype, &cplatm, &dualmap_id ),
-                   "Cannot compute ATM coverage graph" )
+            // Compute mesh intersection between ATM and OCN on coupler
+            PUSH_TIMER( "Compute ATM-OCN mesh intersection" )
+            CHECKIERR( iMOAB_ComputeMeshIntersectionOnSphere( cplAtmPID, cplOcnPID, cplDualMapPID ),
+                       "Cannot compute ATM/OCN intersection" )
+            POP_TIMER( couComm, rankInCouComm )
+
+            // Compute LOW-ORDER weights (monotone FV, 1st order)
+            const iMOAB_String disc_fv  = "fv";
+            const iMOAB_String dof_tag  = "GLOBAL_ID";
+            int disc_order              = 1;
+            int fNoBubble = 1, fMonotone = 1, fVolumetric = 0, fInvDist = 0, fNoConserve = 0, fValidate = 0;
+
+            PUSH_TIMER( "Compute low-order (monotone) weights" )
+            CHECKIERR( iMOAB_ComputeScalarProjectionWeights( cplDualMapPID, "lo-scalar", disc_fv, &disc_order, disc_fv,
+                                                             &disc_order, nullptr, &fNoBubble, &fMonotone, &fVolumetric,
+                                                             &fInvDist, &fNoConserve, &fValidate, dof_tag, dof_tag ),
+                       "Cannot compute low-order weights" )
+            POP_TIMER( couComm, rankInCouComm )
+
+            // Compute HIGH-ORDER weights (non-monotone FV)
+            fMonotone  = 0;
+            disc_order = 2;
+
+            PUSH_TIMER( "Compute high-order (non-monotone) weights" )
+            CHECKIERR( iMOAB_ComputeScalarProjectionWeights( cplDualMapPID, "hi-scalar", disc_fv, &disc_order, disc_fv,
+                                                             &disc_order, nullptr, &fNoBubble, &fMonotone, &fVolumetric,
+                                                             &fInvDist, &fNoConserve, &fValidate, dof_tag, dof_tag ),
+                       "Cannot compute high-order weights" )
+            POP_TIMER( couComm, rankInCouComm )
+
+            // Compute coverage comm graph for tag migration
+            int meshtype = 3;
+            CHECKIERR( iMOAB_ComputeCommGraph( cplAtmPID, cplDualMapPID, &couComm, &couPEGroup, &couPEGroup, &meshtype,
+                                               &meshtype, &cplatm, &dualmap_id ),
+                       "Cannot compute ATM coverage graph" )
+        }
 
         // Define source and target tags
         int tagType                     = 1;  // DENSE_DOUBLE
         int tagIndex;
         int atmCompNDoFs = 1, ocnCompNDoFs = 1;
-        const iMOAB_String srcField     = "SourceAnalytical";
-        const iMOAB_String tgtFieldHi   = "TargetHiOrder";
-        const iMOAB_String tgtFieldDual = "TargetDualMap";
-        const iMOAB_String tgtFieldLo   = "TargetLoOrder";
 
         CHECKIERR( iMOAB_DefineTagStorage( cplAtmPID, srcField, &tagType, &atmCompNDoFs, &tagIndex ),
                    "Cannot define source tag" )
@@ -250,51 +315,110 @@ int main( int argc, char* argv[] )
                    "Cannot define low-order target tag" )
     }
 
-    // Set source field values on ATM component: a sharp step function
+    // Set source field values on ATM component: spherical harmonic evaluated at element centroids.
+    // f(x,y,z) = 1.0 + 0.5*(3z^2 - 1) + 0.8*(x^2 - y^2)
+    //          = 1.0 + P_2(z) + 0.8*Y_2^2(x,y)     [unnormalized]
+    // This is a smooth degree-2 polynomial on the unit sphere that exercises the
+    // remapping well and produces deterministic results independent of mesh partitioning.
+    double localSrcMin = 1e308, localSrcMax = -1e308;
+
     if( atmComm != MPI_COMM_NULL )
     {
         int tagIndex;
-        int tagType[2]              = { 0, 1 };  // dense_int, dense_double
-        int atmCompNDoFs            = 1;
-        const iMOAB_String idField  = "GLOBAL_ID";
-        const iMOAB_String srcField = "SourceAnalytical";
+        int tagType_dbl = 1;  // DENSE_DOUBLE
+        int atmCompNDoFs = 1;
 
-        CHECKIERR( iMOAB_DefineTagStorage( cmpAtmPID, idField, &tagType[0], &atmCompNDoFs, &tagIndex ),
-                   "Cannot define src tag on component" )
-        CHECKIERR( iMOAB_DefineTagStorage( cmpAtmPID, srcField, &tagType[1], &atmCompNDoFs, &tagIndex ),
+        CHECKIERR( iMOAB_DefineTagStorage( cmpAtmPID, srcField, &tagType_dbl, &atmCompNDoFs, &tagIndex ),
                    "Cannot define src tag on component" )
 
-        int nElems[3];
-        CHECKIERR( iMOAB_GetMeshInfo( cmpAtmPID, nullptr, nElems, nullptr, nullptr, nullptr ),
+        int nVerts[3], nElems[3], nBlocks[3];
+        CHECKIERR( iMOAB_GetMeshInfo( cmpAtmPID, nVerts, nElems, nBlocks, nullptr, nullptr ),
                    "Cannot get ATM mesh info" )
 
-        // Get global IDs for elements to set field values
-        std::vector< int > gids( nElems[2] );
-        int entity_type = 1;  // elements
-        CHECKIERR( iMOAB_GetIntTagStorage( cmpAtmPID, idField, &nElems[2], &entity_type, gids.data() ),
-                   "Cannot get element global IDs" )
+        // Get vertex coordinates (interleaved x,y,z)
+        int coordsLen = nVerts[2] * 3;
+        std::vector< double > coords( coordsLen );
+        CHECKIERR( iMOAB_GetVisibleVerticesCoordinates( cmpAtmPID, &coordsLen, coords.data() ),
+                   "Cannot get ATM vertex coordinates" )
 
-        // Create a step function: elements with even GIDs get value 10.0, odd get 0.0
-        // This creates sharp discontinuities that will test bounds preservation
+        // Get block IDs
+        std::vector< int > blockIDs( nBlocks[2] );
+        CHECKIERR( iMOAB_GetBlockID( cmpAtmPID, &nBlocks[2], blockIDs.data() ),
+                   "Cannot get block IDs" )
+
+        // Compute element centroids and evaluate spherical harmonic
         std::vector< double > srcVals( nElems[2] );
-        for( int i = 0; i < nElems[2]; i++ )
+        int elemOffset = 0;
+
+        for( int b = 0; b < nBlocks[2]; b++ )
         {
-            srcVals[i] = ( gids[i] % 2 == 0 ) ? 10.0 : 0.0;
+            int vertsPerElem, numElemsInBlock;
+            CHECKIERR( iMOAB_GetBlockInfo( cmpAtmPID, &blockIDs[b], &vertsPerElem, &numElemsInBlock ),
+                       "Cannot get block info" )
+
+            int connLen = vertsPerElem * numElemsInBlock;
+            std::vector< int > conn( connLen );
+            CHECKIERR( iMOAB_GetBlockElementConnectivities( cmpAtmPID, &blockIDs[b], &connLen, conn.data() ),
+                       "Cannot get element connectivity" )
+
+            for( int e = 0; e < numElemsInBlock; e++ )
+            {
+                // Compute centroid of this element
+                double cx = 0.0, cy = 0.0, cz = 0.0;
+                for( int v = 0; v < vertsPerElem; v++ )
+                {
+                    int vidx = conn[e * vertsPerElem + v] - 1;  // 1-based to 0-based
+                    cx += coords[3 * vidx + 0];
+                    cy += coords[3 * vidx + 1];
+                    cz += coords[3 * vidx + 2];
+                }
+                cx /= vertsPerElem;
+                cy /= vertsPerElem;
+                cz /= vertsPerElem;
+
+                // Normalize to unit sphere (in case mesh radius != 1)
+                double r = std::sqrt( cx * cx + cy * cy + cz * cz );
+                if( r > 1e-14 )
+                {
+                    cx /= r;
+                    cy /= r;
+                    cz /= r;
+                }
+
+                // Spherical harmonic: f = 1.0 + 0.5*(3z^2 - 1) + 0.8*(x^2 - y^2)
+                double val = 1.0 + 0.5 * ( 3.0 * cz * cz - 1.0 ) + 0.8 * ( cx * cx - cy * cy );
+                srcVals[elemOffset + e] = val;
+
+                localSrcMin = std::min( localSrcMin, val );
+                localSrcMax = std::max( localSrcMax, val );
+            }
+            elemOffset += numElemsInBlock;
         }
 
+        int entity_type = 1;  // elements
         CHECKIERR( iMOAB_SetDoubleTagStorage( cmpAtmPID, srcField, &nElems[2], &entity_type, srcVals.data() ),
                    "Cannot set source field values" )
+    }
+
+    // Get global min/max of source field for bounds checking later
+    double globalSrcMin, globalSrcMax;
+    MPI_Allreduce( &localSrcMin, &globalSrcMin, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD );
+    MPI_Allreduce( &localSrcMax, &globalSrcMax, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD );
+
+    if( !rankInGlobalComm )
+    {
+        std::cout << " Source field range: [" << globalSrcMin << ", " << globalSrcMax << "]\n";
     }
 
     // Send source tag to coupler
     if( atmComm != MPI_COMM_NULL )
     {
-        CHECKIERR( iMOAB_SendElementTag( cmpAtmPID, "SourceAnalytical", &atmCouComm, &cplatm ),
+        CHECKIERR( iMOAB_SendElementTag( cmpAtmPID, srcField, &atmCouComm, &cplatm ),
                    "Cannot send source tag" )
     }
     if( couComm != MPI_COMM_NULL )
     {
-        CHECKIERR( iMOAB_ReceiveElementTag( cplAtmPID, "SourceAnalytical", &atmCouComm, &cmpatm ),
+        CHECKIERR( iMOAB_ReceiveElementTag( cplAtmPID, srcField, &atmCouComm, &cmpatm ),
                    "Cannot receive source tag" )
     }
     if( atmComm != MPI_COMM_NULL )
@@ -304,15 +428,15 @@ int main( int argc, char* argv[] )
     }
 
     // Send source tag to coverage mesh
-    if( couComm != MPI_COMM_NULL )
-    {
-        CHECKIERR( iMOAB_SendElementTag( cplAtmPID, "SourceAnalytical", &couComm, &dualmap_id ),
-                   "Cannot send tag to coverage" )
-        CHECKIERR( iMOAB_ReceiveElementTag( cplDualMapPID, "SourceAnalytical", &couComm, &cplatm ),
-                   "Cannot receive tag on coverage" )
-        CHECKIERR( iMOAB_FreeSenderBuffers( cplAtmPID, &dualmap_id ),
-                   "Cannot free coverage send buffers" )
-    }
+    // if( couComm != MPI_COMM_NULL )
+    // {
+    //     CHECKIERR( iMOAB_SendElementTag( cplAtmPID, srcField, &couComm, &dualmap_id ),
+    //                "Cannot send tag to coverage" )
+    //     CHECKIERR( iMOAB_ReceiveElementTag( cplDualMapPID, srcField, &couComm, &cplatm ),
+    //                "Cannot receive tag on coverage" )
+    //     CHECKIERR( iMOAB_FreeSenderBuffers( cplAtmPID, &dualmap_id ),
+    //                "Cannot free coverage send buffers" )
+    // }
 
     // === Apply projections and test ===
     if( couComm != MPI_COMM_NULL )
@@ -322,7 +446,7 @@ int main( int argc, char* argv[] )
         // 1) Apply high-order projection WITHOUT CAAS (baseline)
         PUSH_TIMER( "Apply high-order projection (no CAAS)" )
         CHECKIERR( iMOAB_ApplyScalarProjectionWeights( cplDualMapPID, &filter_type, "hi-scalar",
-                                                        "SourceAnalytical", "TargetHiOrder", nullptr ),
+                                                        srcField, tgtFieldHi, nullptr ),
                    "Failed to apply high-order weights" )
         POP_TIMER( couComm, rankInCouComm )
 
@@ -351,50 +475,71 @@ int main( int argc, char* argv[] )
             std::cout << " CheckMapSubset (lo ⊆ hi): " << ( is_subset ? "PASS" : "FAIL" ) << "\n";
         }
 
-        // 5) Verify bounds preservation: source field is a step function with values
-        //    {0.0, 10.0}, so every target element's stencil bounds are [0.0, 10.0].
-        //    The dual-map CAAS result must stay within these source bounds.
-        //    (ComputeRowBounds is an internal iMOAB routine, not exposed in the public API)
-        const double srcBoundLo = 0.0;
-        const double srcBoundHi = 10.0;
-
-        int nOcnVerts, nOcnElems;
-        CHECKIERR( iMOAB_GetMeshInfo( cplOcnPID, &nOcnVerts, &nOcnElems, nullptr, nullptr, nullptr ),
+        // 5) Verify bounds preservation: the dual-map CAAS result must stay within
+        //    the per-row stencil bounds computed from the low-order weight map.
+        //    Note: we check stencil bounds (not global source range) because the CAAS
+        //    algorithm guarantees per-row bounds, not global bounds.
+        int nOcnElems[3];
+        CHECKIERR( iMOAB_GetMeshInfo( cplOcnPID, nullptr, nOcnElems, nullptr, nullptr, nullptr ),
                    "Cannot get OCN mesh info" )
+        int nDualElems[3];
+        CHECKIERR( iMOAB_GetMeshInfo( cplDualMapPID, nullptr, nDualElems, nullptr, nullptr, nullptr ),
+                   "Cannot get DualMap mesh info" )
 
-        std::vector< double > hiVals( nOcnElems ), dualVals( nOcnElems ), loVals( nOcnElems );
+        std::vector< double > hiVals( nOcnElems[2] ), dualVals( nOcnElems[2] ), loVals( nOcnElems[2] );
         int entity_type = 1;
 
-        CHECKIERR( iMOAB_GetDoubleTagStorage( cplOcnPID, "TargetHiOrder", &nOcnElems, &entity_type, hiVals.data() ),
+        CHECKIERR( iMOAB_GetDoubleTagStorage( cplOcnPID, "TargetHiOrder", &nOcnElems[2], &entity_type, hiVals.data() ),
                    "Cannot get hi-order values" )
-        CHECKIERR( iMOAB_GetDoubleTagStorage( cplOcnPID, "TargetDualMap", &nOcnElems, &entity_type, dualVals.data() ),
+        CHECKIERR( iMOAB_GetDoubleTagStorage( cplOcnPID, "TargetDualMap", &nOcnElems[2], &entity_type, dualVals.data() ),
                    "Cannot get dual-map values" )
-        CHECKIERR( iMOAB_GetDoubleTagStorage( cplOcnPID, "TargetLoOrder", &nOcnElems, &entity_type, loVals.data() ),
+        CHECKIERR( iMOAB_GetDoubleTagStorage( cplOcnPID, "TargetLoOrder", &nOcnElems[2], &entity_type, loVals.data() ),
                    "Cannot get lo-order values" )
 
-        // Count violations against source field bounds [0.0, 10.0]
+        // Get per-row stencil bounds from the low-order map (stored by ComputeRowBounds)
+        // These tags were created by iMOAB_ApplyScalarProjectionWeights on the intersection
+        // app's target entities; register them on cplOcnPID so we can read them.
+        std::string loBoundName = std::string("SourceAnalytical") + "_DualMapLoBound";
+        std::string hiBoundName = std::string("SourceAnalytical") + "_DualMapHiBound";
+        {
+            int tagType_dbl = 1, tagIndex, nDoFs = 1;
+            CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, loBoundName.c_str(), &tagType_dbl, &nDoFs, &tagIndex ),
+                       "Cannot define stencil lo bound tag" )
+            CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, hiBoundName.c_str(), &tagType_dbl, &nDoFs, &tagIndex ),
+                       "Cannot define stencil hi bound tag" )
+        }
+        std::vector< double > stencilLo( nOcnElems[2] ), stencilHi( nOcnElems[2] );
+        CHECKIERR( iMOAB_GetDoubleTagStorage( cplOcnPID, loBoundName.c_str(), &nOcnElems[2], &entity_type, stencilLo.data() ),
+                   "Cannot get stencil lower bounds" )
+        CHECKIERR( iMOAB_GetDoubleTagStorage( cplOcnPID, hiBoundName.c_str(), &nOcnElems[2], &entity_type, stencilHi.data() ),
+                   "Cannot get stencil upper bounds" )
+
+        // Count violations against per-row stencil bounds
         int localHiViolations   = 0;
         int localDualViolations = 0;
         double maxHiExceedance  = 0.0;
         double maxDualExceedance = 0.0;
         const double tol_bounds = 1e-10;
 
-        for( int i = 0; i < nOcnElems; i++ )
+        for( int i = 0; i < nOcnElems[2]; i++ )
         {
-            // Check high-order (may violate)
-            if( hiVals[i] < srcBoundLo - tol_bounds || hiVals[i] > srcBoundHi + tol_bounds )
+            // Check high-order against stencil bounds (may violate — that's expected)
+            if( hiVals[i] < stencilLo[i] - tol_bounds || hiVals[i] > stencilHi[i] + tol_bounds )
             {
                 localHiViolations++;
-                double exc = std::max( srcBoundLo - hiVals[i], hiVals[i] - srcBoundHi );
+                double exc = std::max( stencilLo[i] - hiVals[i], hiVals[i] - stencilHi[i] );
                 maxHiExceedance = std::max( maxHiExceedance, exc );
             }
 
-            // Check dual-map (should NOT violate)
-            if( dualVals[i] < srcBoundLo - tol_bounds || dualVals[i] > srcBoundHi + tol_bounds )
+            // Check dual-map against stencil bounds (should NOT violate)
+            if( dualVals[i] < stencilLo[i] - tol_bounds || dualVals[i] > stencilHi[i] + tol_bounds )
             {
                 localDualViolations++;
-                double exc = std::max( srcBoundLo - dualVals[i], dualVals[i] - srcBoundHi );
+                double exc = std::max( stencilLo[i] - dualVals[i], dualVals[i] - stencilHi[i] );
                 maxDualExceedance = std::max( maxDualExceedance, exc );
+                if( localDualViolations <= 5 )
+                    printf( "  [rank %d] dual violation #%d: i=%d dualVal=%.15e bounds=[%.15e,%.15e]\n",
+                            rankInCouComm, localDualViolations, i, dualVals[i], stencilLo[i], stencilHi[i] );
             }
         }
 
@@ -444,6 +589,23 @@ int main( int argc, char* argv[] )
     }
 
     CHECKIERR( iMOAB_Finalize(), "Cannot finalize iMOAB" )
+
+    // Free MPI communicators and groups (matching imoab_read_compute_map.cpp pattern)
+    if( MPI_COMM_NULL != atmCouComm ) MPI_Comm_free( &atmCouComm );
+    MPI_Group_free( &joinAtmCouGroup );
+    if( MPI_COMM_NULL != atmComm ) MPI_Comm_free( &atmComm );
+
+    if( MPI_COMM_NULL != ocnComm ) MPI_Comm_free( &ocnComm );
+    if( MPI_COMM_NULL != ocnCouComm ) MPI_Comm_free( &ocnCouComm );
+    MPI_Group_free( &joinOcnCouGroup );
+
+    if( MPI_COMM_NULL != couComm ) MPI_Comm_free( &couComm );
+
+    MPI_Group_free( &atmPEGroup );
+    MPI_Group_free( &ocnPEGroup );
+    MPI_Group_free( &couPEGroup );
+    MPI_Group_free( &jgroup );
+
     MPI_Finalize();
 
     return 0;

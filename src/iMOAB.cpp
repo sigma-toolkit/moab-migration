@@ -6123,12 +6123,15 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
                 weightMap->ApplyWeightsWithDualMap( srcTagHandles[i], tgtTagHandles[i], loWeightMap, caasType ) );
         }
 
-        // Store diagnostic per-row bounds from the low-order stencil on target entities
+        // Store diagnostic per-row bounds from the HIGH-ORDER stencil on
+        // target entities. ApplyWeightsWithDualMap uses the high-order
+        // stencil to define [lo,hi] (per Bradley et al. 2019); the test
+        // bounds must match for verification to be meaningful.
         for( size_t i = 0; i < srcNames.size(); i++ )
         {
             std::string loBoundName = srcNames[i] + "_DualMapLoBound";
             std::string hiBoundName = srcNames[i] + "_DualMapHiBound";
-            MB_CHK_ERR( ComputeRowBounds( pid_intersection, lo_weights_identifier,
+            MB_CHK_ERR( ComputeRowBounds( pid_intersection, solution_weights_identifier,
                                           srcNames[i].c_str(), loBoundName.c_str(), hiBoundName.c_str() ) );
         }
     }
@@ -6250,26 +6253,45 @@ static ErrCode ComputeRowBounds( iMOAB_AppID pid_intersection,
     MB_CHK_SET_ERR( context.MBI->tag_get_handle( upper_bound_tag_name, tgtNDof * tgtNDof, MB_TYPE_DOUBLE, hiTag,
                                          MB_TAG_DENSE | MB_TAG_CREAT ), "Failed to get or create upper bound tag on target entities" );
 
-    // Compute per-row bounds from weight matrix stencil
+    // Compute per-row bounds from weight matrix stencil.
+    // Matrix column indices are NOT the same as srcVals indices; we must map
+    // matrix-col -> source-vector-index via the inverse of col_dtoc_dofmap.
     auto& W = weightMap->GetWeightMatrix();
+    const std::vector< int >& col_dtoc = weightMap->GetColDofMap();
+    const std::vector< int >& row_dtoc = weightMap->GetRowDofMap();
+    int maxMatCol = -1;
+    for( size_t k = 0; k < srcVals.size() && k < col_dtoc.size(); k++ )
+        if( col_dtoc[k] > maxMatCol ) maxMatCol = col_dtoc[k];
+    std::vector< int > col_inv( maxMatCol + 1, -1 );
+    for( size_t k = 0; k < srcVals.size() && k < col_dtoc.size(); k++ )
+        if( col_dtoc[k] >= 0 ) col_inv[col_dtoc[k]] = (int)k;
+
     std::vector< double > loBound( nTargetDofs, 1e308 );
     std::vector< double > hiBound( nTargetDofs, -1e308 );
 
-    for( size_t r = 0; r < nTargetDofs && r < (size_t)W.outerSize(); r++ )
+    for( size_t i = 0; i < nTargetDofs; i++ )
     {
+        int r = ( i < row_dtoc.size() ) ? row_dtoc[i] : -1;
+        if( r < 0 || r >= W.outerSize() )
+        {
+            loBound[i] = 0.0;
+            hiBound[i] = 0.0;
+            continue;
+        }
         for( moab::TempestOnlineMap::WeightMatrix::InnerIterator it( W, r ); it; ++it )
         {
-            int c = it.col();
-            if( c >= 0 && c < (int)srcVals.size() )
-            {
-                loBound[r] = std::min( loBound[r], srcVals[c] );
-                hiBound[r] = std::max( hiBound[r], srcVals[c] );
-            }
+            int mc = (int)it.col();
+            if( mc < 0 || mc > maxMatCol ) continue;
+            int srcIdx = col_inv[mc];
+            if( srcIdx < 0 || srcIdx >= (int)srcVals.size() ) continue;
+            double v = srcVals[srcIdx];
+            if( v < loBound[i] ) loBound[i] = v;
+            if( v > hiBound[i] ) hiBound[i] = v;
         }
-        if( loBound[r] > hiBound[r] )
+        if( loBound[i] > hiBound[i] )
         {
-            loBound[r] = 0.0;
-            hiBound[r] = 0.0;
+            loBound[i] = 0.0;
+            hiBound[i] = 0.0;
         }
     }
 

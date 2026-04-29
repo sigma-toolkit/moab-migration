@@ -307,6 +307,8 @@ int main( int argc, char* argv[] )
 
         CHECKIERR( iMOAB_DefineTagStorage( cplAtmPID, srcField, &tagType, &atmCompNDoFs, &tagIndex ),
                    "Cannot define source tag" )
+        CHECKIERR( iMOAB_DefineTagStorage( cplDualMapPID, srcField, &tagType, &atmCompNDoFs, &tagIndex ),
+                   "Cannot define source tag on dual-map app" )
         CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, tgtFieldHi, &tagType, &ocnCompNDoFs, &tagIndex ),
                    "Cannot define high-order target tag" )
         CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, tgtFieldDual, &tagType, &ocnCompNDoFs, &tagIndex ),
@@ -427,16 +429,27 @@ int main( int argc, char* argv[] )
                    "Cannot free source tag send buffers" )
     }
 
-    // Send source tag to coverage mesh
-    // if( couComm != MPI_COMM_NULL )
-    // {
-    //     CHECKIERR( iMOAB_SendElementTag( cplAtmPID, srcField, &couComm, &dualmap_id ),
-    //                "Cannot send tag to coverage" )
-    //     CHECKIERR( iMOAB_ReceiveElementTag( cplDualMapPID, srcField, &couComm, &cplatm ),
-    //                "Cannot receive tag on coverage" )
-    //     CHECKIERR( iMOAB_FreeSenderBuffers( cplAtmPID, &dualmap_id ),
-    //                "Cannot free coverage send buffers" )
-    // }
+    // Send source tag from coupler-atm coverage to dual-map coverage so that
+    // the high/low order maps can apply weights against actual source values
+    // (otherwise the dual-map app's source tag is the default fill value).
+    if( couComm != MPI_COMM_NULL )
+    {
+        CHECKIERR( iMOAB_SendElementTag( cplAtmPID, srcField, &couComm, &dualmap_id ),
+                   "Cannot send tag to coverage" )
+        CHECKIERR( iMOAB_ReceiveElementTag( cplDualMapPID, srcField, &couComm, &cplatm ),
+                   "Cannot receive tag on coverage" )
+        CHECKIERR( iMOAB_FreeSenderBuffers( cplAtmPID, &dualmap_id ),
+                   "Cannot free coverage send buffers" )
+    }
+
+    if( couComm != MPI_COMM_NULL  )
+    {
+        // write only for n==1 case
+        char outputFileRecvd[] = "cplAtmFile.h5m";
+        char fileWriteOptions[] = "PARALLEL=WRITE_PART";
+        CHECKIERR( iMOAB_WriteMesh( cplDualMapPID, outputFileRecvd, fileWriteOptions ),
+                   "could not write cplAtmFile.h5m to disk" )
+    }
 
     // === Apply projections and test ===
     if( couComm != MPI_COMM_NULL )

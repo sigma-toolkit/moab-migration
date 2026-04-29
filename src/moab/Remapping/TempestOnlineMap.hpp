@@ -470,6 +470,12 @@ class TempestOnlineMap : public OfflineMap
         m_meshInput = imesh;
     };
 
+    /// Read-only access to the matrix-row -> matrix-col DOF index maps. Used
+    /// by callers (e.g. iMOAB diagnostic helpers) that need to translate
+    /// matrix indices back into source/target tag-vector indices.
+    const std::vector< int >& GetRowDofMap() const { return row_dtoc_dofmap; }
+    const std::vector< int >& GetColDofMap() const { return col_dtoc_dofmap; }
+
   private:
     template < typename SparseMatrixType >
     void serializeSparseMatrix( const SparseMatrixType& mat, const std::string& filename );

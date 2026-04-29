@@ -444,7 +444,9 @@ int main( int argc, char* argv[] )
 
     if( couComm != MPI_COMM_NULL  )
     {
-        // write only for n==1 case
+        // Pre-projection snapshot: dual-map coverage with the migrated source field.
+        // Projected target fields live on cplOcnPID and are written below after
+        // projection; writing this here only captures the source-field state.
         char outputFileRecvd[] = "cplAtmFile.h5m";
         char fileWriteOptions[] = "PARALLEL=WRITE_PART";
         CHECKIERR( iMOAB_WriteMesh( cplDualMapPID, outputFileRecvd, fileWriteOptions ),
@@ -467,15 +469,15 @@ int main( int argc, char* argv[] )
         filter_type = 0;
         PUSH_TIMER( "Apply low-order projection" )
         CHECKIERR( iMOAB_ApplyScalarProjectionWeights( cplDualMapPID, &filter_type, "lo-scalar",
-                                                        "SourceAnalytical", "TargetLoOrder", nullptr ),
+                                                        srcField, tgtFieldLo, nullptr ),
                    "Failed to apply low-order weights" )
         POP_TIMER( couComm, rankInCouComm )
 
         // 3) Apply high-order projection WITH dual-map CAAS bounds from low-order map
         filter_type = 2;  // CAAS_LOCAL
         PUSH_TIMER( "Apply dual-map CAAS projection" )
-        CHECKIERR( iMOAB_ApplyScalarProjectionWeights( cplDualMapPID, &filter_type, "hi-scalar",
-                                                        "SourceAnalytical", "TargetDualMap", "lo-scalar" ),
+        CHECKIERR( iMOAB_ApplyScalarProjectionWeights( cplDualMapPID, &filter_type, "hi-scalar", srcField, tgtFieldDual,
+                                                       "lo-scalar" ),
                    "Failed to apply dual-map CAAS weights" )
         POP_TIMER( couComm, rankInCouComm )
 
@@ -502,18 +504,18 @@ int main( int argc, char* argv[] )
         std::vector< double > hiVals( nOcnElems[2] ), dualVals( nOcnElems[2] ), loVals( nOcnElems[2] );
         int entity_type = 1;
 
-        CHECKIERR( iMOAB_GetDoubleTagStorage( cplOcnPID, "TargetHiOrder", &nOcnElems[2], &entity_type, hiVals.data() ),
+        CHECKIERR( iMOAB_GetDoubleTagStorage( cplOcnPID, tgtFieldHi, &nOcnElems[2], &entity_type, hiVals.data() ),
                    "Cannot get hi-order values" )
-        CHECKIERR( iMOAB_GetDoubleTagStorage( cplOcnPID, "TargetDualMap", &nOcnElems[2], &entity_type, dualVals.data() ),
+        CHECKIERR( iMOAB_GetDoubleTagStorage( cplOcnPID, tgtFieldDual, &nOcnElems[2], &entity_type, dualVals.data() ),
                    "Cannot get dual-map values" )
-        CHECKIERR( iMOAB_GetDoubleTagStorage( cplOcnPID, "TargetLoOrder", &nOcnElems[2], &entity_type, loVals.data() ),
+        CHECKIERR( iMOAB_GetDoubleTagStorage( cplOcnPID, tgtFieldLo, &nOcnElems[2], &entity_type, loVals.data() ),
                    "Cannot get lo-order values" )
 
         // Get per-row stencil bounds from the low-order map (stored by ComputeRowBounds)
         // These tags were created by iMOAB_ApplyScalarProjectionWeights on the intersection
         // app's target entities; register them on cplOcnPID so we can read them.
-        std::string loBoundName = std::string("SourceAnalytical") + "_DualMapLoBound";
-        std::string hiBoundName = std::string("SourceAnalytical") + "_DualMapHiBound";
+        std::string loBoundName = std::string(srcField) + "_DualMapLoBound";
+        std::string hiBoundName = std::string(srcField) + "_DualMapHiBound";
         {
             int tagType_dbl = 1, tagIndex, nDoFs = 1;
             CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, loBoundName.c_str(), &tagType_dbl, &nDoFs, &tagIndex ),
@@ -583,6 +585,26 @@ int main( int argc, char* argv[] )
             MPI_Abort( MPI_COMM_WORLD, 1 );
             return 1;
         }
+    }
+
+    if( couComm != MPI_COMM_NULL )
+    {
+        // Write the OCN coupler-side mesh, which carries the projected target
+        // tags (TargetHiOrder, TargetLoOrder, TargetDualMap) plus the per-row
+        // bound diagnostics (SourceAnalytical_DualMapLoBound/HiBound).
+        char outputFileCpl[]    = "cplOcnProjFile.h5m";
+        char fileWriteOptions[] = "PARALLEL=WRITE_PART";
+        CHECKIERR( iMOAB_WriteMesh( cplOcnPID, outputFileCpl, fileWriteOptions ),
+                   "could not write cplOcnProjFile.h5m to disk" )
+    }
+
+    if( ocnComm != MPI_COMM_NULL )
+    {
+        // write only for n==1 case
+        char outputFileRecvd[]  = "cmpOcnProjFile.h5m";
+        char fileWriteOptions[] = "PARALLEL=WRITE_PART";
+        CHECKIERR( iMOAB_WriteMesh( cmpOcnPID, outputFileRecvd, fileWriteOptions ),
+                   "could not write cmpOcnProjFile.h5m to disk" )
     }
 
     // Cleanup

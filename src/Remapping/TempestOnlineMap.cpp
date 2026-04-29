@@ -1612,11 +1612,12 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
                 absHi[r] = std::max( absHi[r], solSTagVals[c] );
             }
         }
-        // If the row had no nonzero entries, don't enforce bounds
+        // If the row had no nonzero entries, pin bounds to the current value
+        // so the element has zero room and does not participate in redistribution.
         if( absLo[r] > absHi[r] )
         {
-            absLo[r] = -1e308;
-            absHi[r] = 1e308;
+            absLo[r] = solTTagVals[r];
+            absHi[r] = solTTagVals[r];
         }
     }
 
@@ -1675,7 +1676,9 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
 
         if( fabs( globalMassDefect ) < convergence_tol ) break;
 
-        // Redistribute mass defect proportionally within remaining room
+        // Redistribute mass defect proportionally within remaining room.
+        // Cap the redistribution to available room to prevent overshooting bounds
+        // (following the reference CAASLimiter algorithm).
         double localRoomUp = 0.0, localRoomDn = 0.0;
         for( size_t i = 0; i < nTargetDofs; i++ )
         {
@@ -1692,15 +1695,22 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
         globalRoomDn = globalRooms[1];
 #endif
 
-        double totalRoom = ( globalMassDefect > 0 ) ? globalRoomUp : globalRoomDn;
+        // Cap: if defect exceeds available room, only redistribute what fits
+        double redistributeDefect = globalMassDefect;
+        if( globalMassDefect > 0.0 && globalMassDefect > globalRoomUp )
+            redistributeDefect = globalRoomUp;
+        else if( globalMassDefect < 0.0 && ( -globalMassDefect ) > globalRoomDn )
+            redistributeDefect = -globalRoomDn;
 
-        if( fabs( totalRoom ) > 1e-20 )
+        double totalRoom = ( redistributeDefect > 0 ) ? globalRoomUp : globalRoomDn;
+
+        if( fabs( totalRoom ) > 1e-20 && fabs( redistributeDefect ) > convergence_tol )
         {
             for( size_t i = 0; i < nTargetDofs; i++ )
             {
-                double room = ( globalMassDefect > 0 ) ? ( absHi[i] - solTTagVals[i] )
-                                                       : ( solTTagVals[i] - absLo[i] );
-                solTTagVals[i] += globalMassDefect * room / totalRoom;
+                double room = ( redistributeDefect > 0 ) ? ( absHi[i] - solTTagVals[i] )
+                                                         : ( solTTagVals[i] - absLo[i] );
+                solTTagVals[i] += redistributeDefect * room / totalRoom;
             }
 
             // Update target tag after redistribution

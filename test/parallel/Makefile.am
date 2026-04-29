@@ -48,7 +48,7 @@ TESTS = pcomm_unit \
 if HAVE_HDF5_PARALLEL
   HDF5_TESTS += parallel_hdf5_test mhdf_parallel parallel_write_test \
          parallel_adj parmerge_test augment_with_ghosts uref_hirec_test_parallel migrate_test \
-         ghost_thin_layers commgraph_test 
+         ghost_thin_layers commgraph_test
 
 if HAVE_ZOLTAN
   HDF5_TESTS += migrate_nontrivial

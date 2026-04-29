@@ -27,6 +27,7 @@
 #include "LinearRemapFV.h"
 
 #include "moab/Remapping/TempestOnlineMap.hpp"
+#include "moab/IntxMesh/IntxUtils.hpp"
 #include "DebugOutput.hpp"
 #include "moab/TupleList.hpp"
 #include "moab/MeshTopoUtil.hpp"
@@ -1590,134 +1591,353 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
 
     if( caasType == CAAS_NONE || loWeightMap == nullptr ) return moab::MB_SUCCESS;
 
-    // === Dual-map CAAS: compute bounds from low-order stencil, clip high-order result ===
+    // === Dual-map CAAS: faithful port of E3SM's seq_nlmap_avNormArr from
+    //     driver-mct/main/seq_nlmap_mod.F90.
+    //
+    //   Notation matching the reference:
+    //     Am = low-order monotone & conservative map (loWeightMap)
+    //     A  = high-order non-monotone map           (this)
+    //     x  = source field values on coverage mesh  (solSTagVals)
+    //     y_lo = Am * x  (low-order projection, mass reference)
+    //     y_hi = A  * x  (high-order projection, in solTTagVals already)
+    //     [lo, hi] = per-row source-value bounds from A's stencil
+    //
+    //   Algorithm (single pass, Bradley et al. 2019, doi:10.1137/18M1165414):
+    //     1) y_hi = A * x                                    (already done above)
+    //     2) y_lo = Am * x                                   (low-order projection)
+    //     3) [lo, hi](r) = bounds of x over A(r,:)'s nonzero columns
+    //     4) Mask: where y_lo == 0, set y_hi = lo = hi = 0
+    //     5) Per-cell, build CAAS weights:
+    //          dM_local(r)  = (y_hi - clip(y_hi, lo, hi)) * area  (clipping defect)
+    //          cap_low(r)   = (clip(y_hi) - lo) * area            (room to lower)
+    //          cap_high(r)  = (hi - clip(y_hi)) * area            (room to raise)
+    //     6) Reduce globally (BFB) -> dM_clip, cap_low_global, cap_high_global
+    //     7) Reduce M_lo = sum(y_lo * area), M_hi = sum(y_hi_clipped * area)  (BFB)
+    //     8) dM_total = dM_clip + (M_lo - M_hi_clipped)
+    //     9) If dM_total > 0: y_hi(r) += (hi(r)-y_clipped(r))/cap_high_global * dM_total
+    //        If dM_total < 0: y_hi(r) += (y_clipped(r)-lo(r))/cap_low_global  * dM_total
+    //
+    //   Bit-for-bit (BFB) reproducibility across MPI rank counts is achieved by
+    //   summing per-row contributions in a fixed (sorted-by-global-row-id) order
+    //   using Kahan compensated summation. See deterministicGlobalSum below.
 
     const size_t nTargetDofs = solTTagVals.size();
     const size_t nSourceDofs = solSTagVals.size();
 
-    // Step 1: Compute absolute bounds from the low-order weight matrix stencil.
-    // For each target row, find min/max of source field values over nonzero columns.
-    WeightMatrix& loW = loWeightMap->GetWeightMatrix();
-    std::vector< double > absLo( nTargetDofs, 1e308 );
-    std::vector< double > absHi( nTargetDofs, -1e308 );
-
-    for( size_t r = 0; r < nTargetDofs && r < (size_t)loW.outerSize(); r++ )
+    // Map from target tag index to matrix row index. Both A and Am must share
+    // the same row layout (same target mesh, same partitioning); this is true
+    // because both maps are loaded onto the same intersection application.
+    if( row_dtoc_dofmap.size() < nTargetDofs )
     {
-        for( WeightMatrix::InnerIterator it( loW, r ); it; ++it )
+        MB_CHK_SET_ERR( moab::MB_FAILURE, "row_dtoc_dofmap smaller than target tag size" );
+    }
+
+    // ----- Step 2: low-order projection y_lo = Am * x ---------------------
+    std::vector< double > yLow( nTargetDofs, 0.0 );
+    MB_CHK_SET_ERR( loWeightMap->ApplyWeights( solSTagVals, yLow, false ),
+                    "Low-order projection failed" );
+
+    // ----- Step 3: per-row bounds from HIGH-ORDER stencil -----------------
+    // bounds(A, x): for each target row r, [lo, hi] = [min, max] of x over
+    // A(r,:)'s nonzero columns. The proof in the reference paper requires
+    // bounds to come from the larger (high-order) stencil so the constraint
+    // set is provably nonempty.
+    std::vector< double > lcl_lo( nTargetDofs, 1e308 );
+    std::vector< double > lcl_hi( nTargetDofs, -1e308 );
+
+    WeightMatrix& hiW = this->m_weightMatrix;
+    for( size_t i = 0; i < nTargetDofs; i++ )
+    {
+        int r = row_dtoc_dofmap[i];
+        if( r < 0 || r >= hiW.outerSize() ) continue;
+        for( WeightMatrix::InnerIterator it( hiW, r ); it; ++it )
         {
-            int c = it.col();
-            if( c >= 0 && c < (int)nSourceDofs )
-            {
-                absLo[r] = std::min( absLo[r], solSTagVals[c] );
-                absHi[r] = std::max( absHi[r], solSTagVals[c] );
-            }
-        }
-        // If the row had no nonzero entries, pin bounds to the current value
-        // so the element has zero room and does not participate in redistribution.
-        if( absLo[r] > absHi[r] )
-        {
-            absLo[r] = solTTagVals[r];
-            absHi[r] = solTTagVals[r];
+            // it.col() is a matrix column index; map it to source vector index
+            // by inverting col_dtoc_dofmap. For FV-FV with cell-based DOFs
+            // and one-to-one mapping, this is the identity for owned columns.
+            int mc = (int)it.col();
+            // Search col_dtoc_dofmap[k]==mc; for typical FV cases the mapping
+            // is dense and contiguous, so a linear scan over solSTagVals is
+            // avoided by precomputing an inverse (below). For correctness we
+            // fall back to scanning if the inverse is not available.
+            // Build inverse once outside the loop (see below).
+            (void)mc;
         }
     }
 
-    // Step 2: Get target areas for conservative mass redistribution.
-    // Try TempestRemap mesh face areas first; fall back to aream tag.
-    std::vector< double > tgtAreas( nTargetDofs, 1.0 );
+    // Precompute matrix-col -> source-vector-index inverse (cached per call;
+    // O(nSourceDofs) construction). col_dtoc_dofmap has size nSourceDofs and
+    // maps source-vector-index -> matrix-col.
+    int maxMatCol = -1;
+    for( size_t k = 0; k < nSourceDofs && k < col_dtoc_dofmap.size(); k++ )
+        if( col_dtoc_dofmap[k] > maxMatCol ) maxMatCol = col_dtoc_dofmap[k];
+    std::vector< int > col_inv( maxMatCol + 1, -1 );
+    for( size_t k = 0; k < nSourceDofs && k < col_dtoc_dofmap.size(); k++ )
+        if( col_dtoc_dofmap[k] >= 0 ) col_inv[col_dtoc_dofmap[k]] = (int)k;
 
-    if( m_meshOutput && (size_t)m_meshOutput->faces.size() >= nTargetDofs )
+    for( size_t i = 0; i < nTargetDofs; i++ )
     {
-        const DataArray1D< double >& faceAreas = m_meshOutput->vecFaceArea;
-        for( size_t i = 0; i < nTargetDofs; i++ )
-            tgtAreas[i] = faceAreas[i];
+        int r = row_dtoc_dofmap[i];
+        if( r < 0 || r >= hiW.outerSize() ) continue;
+        for( WeightMatrix::InnerIterator it( hiW, r ); it; ++it )
+        {
+            int mc = (int)it.col();
+            if( mc < 0 || mc > maxMatCol ) continue;
+            int srcIdx = col_inv[mc];
+            if( srcIdx < 0 || srcIdx >= (int)nSourceDofs ) continue;
+            double v = solSTagVals[srcIdx];
+            if( v < lcl_lo[i] ) lcl_lo[i] = v;
+            if( v > lcl_hi[i] ) lcl_hi[i] = v;
+        }
+        // If row had no nonzero columns, pin bounds to current value (no room)
+        if( lcl_lo[i] > lcl_hi[i] )
+        {
+            lcl_lo[i] = solTTagVals[i];
+            lcl_hi[i] = solTTagVals[i];
+        }
     }
-    else
+
+    // ----- Step 4: mask -- where y_lo == 0, zero out y_hi and bounds ------
+    // (Per reference: "An exact 0 in the low-order field will mask the
+    //  high-order field unnecessarily, but that's OK: it's a rare, local
+    //  reduction in order to one, not a wrong value.")
+    for( size_t i = 0; i < nTargetDofs; i++ )
     {
-        Tag areamTag;
-        moab::ErrorCode tagRval = m_interface->tag_get_handle( "aream", areamTag );
-        if( tagRval == moab::MB_SUCCESS )
-            m_interface->tag_get_data( areamTag, tents, &tgtAreas[0] );
+        if( yLow[i] == 0.0 )
+        {
+            solTTagVals[i] = 0.0;
+            lcl_lo[i]      = 0.0;
+            lcl_hi[i]      = 0.0;
+        }
     }
 
-    // Step 3: CAAS iteration loop — clip to bounds, redistribute mass defect conservatively
-    std::string tgtSolnTagName;
-    m_interface->tag_get_name( tgtSolutionTag, tgtSolnTagName );
-
-    constexpr int nmax_caas_iterations = 10;
-    constexpr double convergence_tol   = 1e-15;
-
-    for( int iter = 0; iter < nmax_caas_iterations; iter++ )
+    // ----- Get target areas (per matrix-row) ------------------------------
+    // GetTargetAreas() (from OfflineMap) is populated whether the map was
+    // computed online or loaded from disk (area_b in the netcdf file). It is
+    // indexed by matrix row, so we map target-tag-index -> matrix-row -> area.
+    // ----- Get target areas (per matrix-row) ------------------------------
+    // GetTargetAreas() (from OfflineMap) is populated only when the map is
+    // computed online; it is empty for disk-loaded maps because the iMOAB
+    // loader writes the target areas to the "aream" tag on the consumer
+    // (target component) app, not into m_dTargetAreas. To work in both cases
+    // we compute spherical-polygon areas directly from the MOAB target mesh
+    // entities — this is correctness-equivalent (the loader does the same
+    // thing using TempestRemap) and independent of map provenance.
+    std::vector< double > tgtAreas( nTargetDofs, 0.0 );
     {
-        // Clip target values to [absLo, absHi] and compute mass change from clipping
-        double localMassBefore = 0.0, localMassAfter = 0.0;
-        for( size_t i = 0; i < nTargetDofs; i++ )
-        {
-            localMassBefore += tgtAreas[i] * solTTagVals[i];
-            solTTagVals[i] = std::max( absLo[i], std::min( absHi[i], solTTagVals[i] ) );
-            localMassAfter += tgtAreas[i] * solTTagVals[i];
-        }
-
-        double localMassDefect  = localMassBefore - localMassAfter;
-        double globalMassDefect = localMassDefect;
-
-#ifdef MOAB_HAVE_MPI
-        MPI_Allreduce( &localMassDefect, &globalMassDefect, 1, MPI_DOUBLE, MPI_SUM, m_pcomm->comm() );
-#endif
-
-        if( m_remapper->verbose && is_root )
-        {
-            printf( "DualMap CAAS {%s}: iter %d, mass defect (global): %3.6e\n", tgtSolnTagName.c_str(), iter + 1,
-                    globalMassDefect );
-        }
-
-        // Update target tag with clipped values
-        MB_CHK_SET_ERR( m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] ),
-                        "Setting target tag data failed" );
-
-        if( fabs( globalMassDefect ) < convergence_tol ) break;
-
-        // Redistribute mass defect proportionally within remaining room.
-        // Cap the redistribution to available room to prevent overshooting bounds
-        // (following the reference CAASLimiter algorithm).
-        double localRoomUp = 0.0, localRoomDn = 0.0;
-        for( size_t i = 0; i < nTargetDofs; i++ )
-        {
-            localRoomUp += tgtAreas[i] * ( absHi[i] - solTTagVals[i] );
-            localRoomDn += tgtAreas[i] * ( solTTagVals[i] - absLo[i] );
-        }
-
-        double globalRoomUp = localRoomUp, globalRoomDn = localRoomDn;
-#ifdef MOAB_HAVE_MPI
-        double localRooms[2]  = { localRoomUp, localRoomDn };
-        double globalRooms[2] = { 0.0, 0.0 };
-        MPI_Allreduce( localRooms, globalRooms, 2, MPI_DOUBLE, MPI_SUM, m_pcomm->comm() );
-        globalRoomUp = globalRooms[0];
-        globalRoomDn = globalRooms[1];
-#endif
-
-        // Cap: if defect exceeds available room, only redistribute what fits
-        double redistributeDefect = globalMassDefect;
-        if( globalMassDefect > 0.0 && globalMassDefect > globalRoomUp )
-            redistributeDefect = globalRoomUp;
-        else if( globalMassDefect < 0.0 && ( -globalMassDefect ) > globalRoomDn )
-            redistributeDefect = -globalRoomDn;
-
-        double totalRoom = ( redistributeDefect > 0 ) ? globalRoomUp : globalRoomDn;
-
-        if( fabs( totalRoom ) > 1e-20 && fabs( redistributeDefect ) > convergence_tol )
+        const DataArray1D< double >& dTargetAreas = this->GetTargetAreas();
+        const size_t nRows = dTargetAreas.GetRows();
+        if( nRows >= nTargetDofs )
         {
             for( size_t i = 0; i < nTargetDofs; i++ )
             {
-                double room = ( redistributeDefect > 0 ) ? ( absHi[i] - solTTagVals[i] )
-                                                         : ( solTTagVals[i] - absLo[i] );
-                solTTagVals[i] += redistributeDefect * room / totalRoom;
+                int r = row_dtoc_dofmap[i];
+                if( r >= 0 && (size_t)r < nRows )
+                    tgtAreas[i] = dTargetAreas[r];
             }
-
-            // Update target tag after redistribution
-            MB_CHK_SET_ERR( m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] ),
-                            "Setting target tag data after redistribution failed" );
+        }
+        else
+        {
+            // Fallback: compute spherical-polygon areas from MOAB mesh.
+            moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::lHuiller );
+            std::vector< moab::EntityHandle > tentVec;
+            tentVec.reserve( tents.size() );
+            for( moab::Range::iterator it = tents.begin(); it != tents.end(); ++it )
+                tentVec.push_back( *it );
+            const moab::EntityHandle* conn;
+            int numNodes;
+            std::vector< double > coords;
+            for( size_t i = 0; i < tentVec.size() && i < nTargetDofs; i++ )
+            {
+                if( m_interface->get_connectivity( tentVec[i], conn, numNodes ) != moab::MB_SUCCESS )
+                    continue;
+                coords.resize( 3 * numNodes );
+                if( m_interface->get_coords( conn, numNodes, coords.data() ) != moab::MB_SUCCESS )
+                    continue;
+                tgtAreas[i] = areaAdaptor.area_spherical_polygon( coords.data(), numNodes, 1.0 );
+            }
         }
     }
+
+    // ----- Step 5: build per-cell CAAS weights ----------------------------
+    // For BFB summation, we accumulate per-row (gid, value) pairs and reduce
+    // them deterministically.
+    std::vector< int >    rowGids( nTargetDofs, -1 );
+    std::vector< double > massLowPerRow( nTargetDofs, 0.0 );
+    std::vector< double > massHiPerRow( nTargetDofs, 0.0 );  // before clipping
+    std::vector< double > clipDefectPerRow( nTargetDofs, 0.0 );
+    std::vector< double > capLowPerRow( nTargetDofs, 0.0 );
+    std::vector< double > capHighPerRow( nTargetDofs, 0.0 );
+
+    for( size_t i = 0; i < nTargetDofs; i++ )
+    {
+        int r = row_dtoc_dofmap[i];
+        if( r < 0 || r >= (int)row_gdofmap.size() )
+            rowGids[i] = -1;  // not owned by this rank
+        else
+            rowGids[i] = (int)row_gdofmap[r];
+
+        const double area = tgtAreas[i];
+        const double y    = solTTagVals[i];        // y_hi (pre-clip)
+        const double lo   = lcl_lo[i];
+        const double hi   = lcl_hi[i];
+        double yc         = y;                     // clipped value
+        double dm         = 0.0;
+        if( y < lo )
+        {
+            yc = lo;
+            dm = ( y - lo ) * area;                // negative: cell exceeded below
+        }
+        else if( y > hi )
+        {
+            yc = hi;
+            dm = ( y - hi ) * area;                // positive: cell exceeded above
+        }
+        clipDefectPerRow[i] = dm;
+        capLowPerRow[i]     = ( yc - lo ) * area;  // room to subtract
+        capHighPerRow[i]    = ( hi - yc ) * area;  // room to add
+        massLowPerRow[i]    = yLow[i] * area;
+        massHiPerRow[i]     = yc * area;           // mass after clipping
+        // Update solTTagVals to the clipped value for the next stage
+        solTTagVals[i] = yc;
+    }
+
+    // ----- Step 6: BFB-deterministic global reductions --------------------
+    // Lambda: deterministic global sum over (gid, val) pairs using sorted
+    // global-row-id order + Kahan compensation. Owned rows have gid >= 0;
+    // entries with gid == -1 are skipped (not owned by this rank).
+    auto deterministicGlobalSum = [&]( const std::vector< double >& vals ) -> double {
+        // Build local arrays of (gid, val) for owned rows only
+        std::vector< int >    locGids;
+        std::vector< double > locVals;
+        locGids.reserve( vals.size() );
+        locVals.reserve( vals.size() );
+        for( size_t i = 0; i < vals.size(); i++ )
+        {
+            if( rowGids[i] >= 0 )
+            {
+                locGids.push_back( rowGids[i] );
+                locVals.push_back( vals[i] );
+            }
+        }
+#ifdef MOAB_HAVE_MPI
+        MPI_Comm comm = m_pcomm ? m_pcomm->comm() : MPI_COMM_SELF;
+        int nproc = 1;
+        MPI_Comm_size( comm, &nproc );
+        int locN = (int)locGids.size();
+        std::vector< int > allN( nproc, 0 );
+        MPI_Allgather( &locN, 1, MPI_INT, allN.data(), 1, MPI_INT, comm );
+        std::vector< int > displ( nproc, 0 );
+        int total = allN[0];
+        for( int p = 1; p < nproc; p++ )
+        {
+            displ[p] = displ[p - 1] + allN[p - 1];
+            total += allN[p];
+        }
+        std::vector< int >    allGids( total );
+        std::vector< double > allVals( total );
+        MPI_Allgatherv( locGids.data(), locN, MPI_INT, allGids.data(), allN.data(), displ.data(), MPI_INT, comm );
+        MPI_Allgatherv( locVals.data(), locN, MPI_DOUBLE, allVals.data(), allN.data(), displ.data(), MPI_DOUBLE,
+                        comm );
+#else
+        std::vector< int >&    allGids = locGids;
+        std::vector< double >& allVals = locVals;
+#endif
+        // Indirect sort by gid
+        std::vector< int > idx( allGids.size() );
+        std::iota( idx.begin(), idx.end(), 0 );
+        std::sort( idx.begin(), idx.end(), [&]( int a, int b ) { return allGids[a] < allGids[b]; } );
+        // Kahan compensated summation in fixed (sorted) order
+        double sum = 0.0, c = 0.0;
+        for( int k : idx )
+        {
+            double yval = allVals[k] - c;
+            double t    = sum + yval;
+            c           = ( t - sum ) - yval;
+            sum         = t;
+        }
+        return sum;
+    };
+
+    // Diagnostic: ranges of key arrays
+    if( m_remapper->verbose )
+    {
+        double yloMin = 1e308, yloMax = -1e308, yhiMin = 1e308, yhiMax = -1e308;
+        size_t nOwned = 0, nMasked = 0;
+        for( size_t i = 0; i < nTargetDofs; i++ )
+        {
+            if( rowGids[i] < 0 ) continue;
+            nOwned++;
+            if( yLow[i] == 0.0 ) nMasked++;
+            yloMin = std::min( yloMin, yLow[i] );
+            yloMax = std::max( yloMax, yLow[i] );
+            yhiMin = std::min( yhiMin, solTTagVals[i] );
+            yhiMax = std::max( yhiMax, solTTagVals[i] );
+        }
+        if( is_root )
+            printf( "DualMap: owned=%zu masked=%zu yLow=[%.4e,%.4e] yHiClip=[%.4e,%.4e]\n",
+                    nOwned, nMasked, yloMin, yloMax, yhiMin, yhiMax );
+    }
+
+    const double M_low      = deterministicGlobalSum( massLowPerRow );
+    const double M_hi_clip  = deterministicGlobalSum( massHiPerRow );
+    const double dM_clip    = deterministicGlobalSum( clipDefectPerRow );
+    const double cap_low_g  = deterministicGlobalSum( capLowPerRow );
+    const double cap_high_g = deterministicGlobalSum( capHighPerRow );
+
+    // ----- Step 8: combine clipping defect with linear-map mass error -----
+    // gwts(k) = dM_clip + (M_low - M_hi_clipped)
+    // Sign convention: dM_clip > 0 means cells exceeded the upper bound, so
+    // clipping REMOVED that mass. (M_low - M_hi_clip) > 0 means low-order
+    // map carries more mass than the (clipped) high-order, so we need to ADD
+    // mass back. Reference uses the same sign convention.
+    const double dM_total = dM_clip + ( M_low - M_hi_clip );
+
+    std::string tgtSolnTagName;
+    m_interface->tag_get_name( tgtSolutionTag, tgtSolnTagName );
+    if( m_remapper->verbose && is_root )
+    {
+        printf( "DualMap CAAS {%s}: M_low=%.10e  M_hi_clip=%.10e  dM_clip=%.10e  dM_total=%.10e\n",
+                tgtSolnTagName.c_str(), M_low, M_hi_clip, dM_clip, dM_total );
+        printf( "DualMap CAAS {%s}: cap_low=%.10e  cap_high=%.10e\n", tgtSolnTagName.c_str(), cap_low_g, cap_high_g );
+    }
+
+    // ----- Step 9: redistribute -------------------------------------------
+    if( dM_total > 0.0 && cap_high_g > 0.0 )
+    {
+        const double scale = dM_total / cap_high_g;
+        for( size_t i = 0; i < nTargetDofs; i++ )
+        {
+            const double area = tgtAreas[i];
+            const double yc   = solTTagVals[i];
+            const double room = ( lcl_hi[i] - yc ) * area;  // == capHighPerRow[i]
+            // delta tag-units = (room_in_mass / area) * scale = (hi-yc) * scale
+            // but using room/area gives same result with one division
+            if( area > 0.0 ) solTTagVals[i] = yc + ( room / area ) * scale;
+        }
+    }
+    else if( dM_total < 0.0 && cap_low_g > 0.0 )
+    {
+        const double scale = dM_total / cap_low_g;
+        for( size_t i = 0; i < nTargetDofs; i++ )
+        {
+            const double area = tgtAreas[i];
+            const double yc   = solTTagVals[i];
+            const double room = ( yc - lcl_lo[i] ) * area;  // == capLowPerRow[i]
+            if( area > 0.0 ) solTTagVals[i] = yc + ( room / area ) * scale;
+        }
+    }
+
+    // Final hard clip for floating-point safety, against per-row bounds
+    for( size_t i = 0; i < nTargetDofs; i++ )
+    {
+        if( solTTagVals[i] < lcl_lo[i] ) solTTagVals[i] = lcl_lo[i];
+        if( solTTagVals[i] > lcl_hi[i] ) solTTagVals[i] = lcl_hi[i];
+    }
+
+    // Store result back to the target tag
+    MB_CHK_SET_ERR( m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] ),
+                    "Setting target tag data failed" );
 
     return moab::MB_SUCCESS;
 }

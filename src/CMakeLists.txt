@@ -318,6 +318,45 @@ endif()
 
 set(MOAB_ALL_LIBS ${MOAB_LIBRARIES} ${TEMPESTREMAP_LIBRARIES} ${NETCDF_LIBRARIES} ${PNETCDF_LIBRARIES} ${HDF5_LIBRARIES} ${ZOLTAN_LIBRARIES} ${PARMETIS_LIBRARIES} ${METIS_LIBRARIES} ${MPI_LIBRARIES} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
 
+# When Fortran-driven executables link against libMOAB (a C++ static library),
+# the Fortran linker may not automatically include the C++ standard library.
+# This is common with NVHPC/PGI and Intel Fortran compilers, and with Cray
+# compiler wrappers where CMAKE_CXX_IMPLICIT_LINK_LIBRARIES is empty.
+# Add the C++ standard library explicitly so it propagates transitively.
+if (ENABLE_FORTRAN)
+  include(CheckCXXSourceCompiles)
+  set(CMAKE_REQUIRED_LIBRARIES "stdc++")
+  check_cxx_source_compiles("int main() { return 0; }" MOAB_HAVE_LIBSTDCXX)
+  unset(CMAKE_REQUIRED_LIBRARIES)
+  if (MOAB_HAVE_LIBSTDCXX)
+    list(APPEND MOAB_ALL_LIBS stdc++)
+  endif()
+endif()
+
+# Filter MOAB_ALL_LIBS: remove bare directory paths and unrecognized linker
+# flags (e.g. -fortranlibs from NVHPC LAPACK) that CMake cannot handle in
+# target_link_libraries.  Keep: absolute paths to files, -l flags, and plain
+# library names (e.g. "stdc++", "m").
+set(_filtered_libs "")
+foreach(_item IN LISTS MOAB_ALL_LIBS)
+  if (IS_ABSOLUTE "${_item}")
+    if (EXISTS "${_item}" AND NOT IS_DIRECTORY "${_item}")
+      list(APPEND _filtered_libs "${_item}")
+    else()
+      message(STATUS "Dropping non-file path from link libraries: ${_item}")
+    endif()
+  elseif (_item MATCHES "^-l")
+    list(APPEND _filtered_libs "${_item}")
+  elseif (_item MATCHES "^[A-Za-z]")
+    # Plain library name (e.g. "stdc++", "m", "z") — pass through
+    list(APPEND _filtered_libs "${_item}")
+  else()
+    message(STATUS "Dropping unrecognized item from link libraries: ${_item}")
+  endif()
+endforeach()
+set(MOAB_ALL_LIBS ${_filtered_libs})
+unset(_filtered_libs)
+
 include(../config/CleanLibraryList.cmake)
 clean_library_list(MOAB_ALL_LIBS)
 target_link_libraries(MOAB ${MOAB_ALL_LIBS})

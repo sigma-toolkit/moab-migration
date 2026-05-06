@@ -38,10 +38,10 @@
 
 using namespace moab;
 
-const static double radius               = 1.0;
+static const double radius               = 1.0;
 const double MOAB_PI                     = 3.1415926535897932384626433832795028841971693993751058209749445923;
-const static double surface_area         = 4.0 * MOAB_PI * radius * radius;
-const static std::string outFilenames[5] = { "outTempestCS.g", "outTempestRLL.g", "outTempestICO.g", "outTempestICOD.g",
+static const double surface_area         = 4.0 * MOAB_PI * radius * radius;
+static const std::string outFilenames[5] = { "outTempestCS.g", "outTempestRLL.g", "outTempestICO.g", "outTempestICOD.g",
                                              "outTempestOV.g" };
 
 void test_tempest_cs_create();

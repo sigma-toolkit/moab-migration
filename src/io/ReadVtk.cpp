@@ -571,18 +571,13 @@ ErrorCode ReadVtk::vtk_read_polydata( FileTokenizer& tokens, Range& vertex_list,
             break;
         case 1:
             MB_SET_ERR( MB_FAILURE, "Vertex element type at line " << tokens.line_number() );
-            break;
         case 2:
             MB_SET_ERR( MB_FAILURE, "Unsupported type: polylines at line " << tokens.line_number() );
-            result = MB_FAILURE;
-            break;
         case 3:
             result = vtk_read_polygons( tokens, start_handle, elem_list );
             break;
         case 4:
             MB_SET_ERR( MB_FAILURE, "Unsupported type: triangle strips at line " << tokens.line_number() );
-            result = MB_FAILURE;
-            break;
     }
 
     return result;

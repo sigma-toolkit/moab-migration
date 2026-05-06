@@ -329,8 +329,6 @@ ErrorCode ReadIDEAS::create_elements( EntityHandle vstart, const Tag* file_id_ta
             MB_CHK_SET_ERR( MBI->tag_set_data( *file_id_tag, &handle, 1, &element_id ), "Failed to assign file IDs" );
         }
     }
-
-    return MB_SUCCESS;
 }
 
 }  // namespace moab

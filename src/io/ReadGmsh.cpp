@@ -123,7 +123,6 @@ ErrorCode ReadGmsh::load_file( const char* filename,
         if( version != 2.0 && version != 2.1 && version != 2.2 )
         {
             MB_SET_ERR( MB_FILE_DOES_NOT_EXIST, filename << ": unknown format version: " << version );
-            return MB_FILE_DOES_NOT_EXIST;
         }
 
         int file_format;

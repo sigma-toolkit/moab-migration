@@ -565,14 +565,13 @@ apply_e3sm_profile() {
     if [[ "$DRY_RUN" == "yes" ]]; then
         log "Dry-run: would source $tmp_env (skipping actual source to keep env clean)"
         log "Inspect: less $tmp_env"
-        # Still apply adapters against the *current* env so the downstream
-        # banner is honest about whether HDF5_ROOT etc. would resolve.
-        adapt_e3sm_env_to_install_moab_vars
-        return 0
+        # Apply adapters + auto-extras against the *current* env. Under dry-run
+        # the user's already-loaded env is what we'd see post-source on a real
+        # machine, so the resulting --extra= preview is honest.
+    else
+        # shellcheck disable=SC1090
+        source "$tmp_env" || die "sourcing E3SM env snippet failed (see $tmp_env)" 2
     fi
-
-    # shellcheck disable=SC1090
-    source "$tmp_env" || die "sourcing E3SM env snippet failed (see $tmp_env)" 2
 
     adapt_e3sm_env_to_install_moab_vars
 

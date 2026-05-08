@@ -341,10 +341,30 @@ The script supports two audiences via a profile knob:
 
 | Profile | When to use | What changes |
 |---|---|---|
-| `e3sm` (default) | You have an E3SM checkout and want the same environment E3SM uses for the target machine. | Sources modules + env vars from `$E3SM_ROOT/cime_config/machines/config_machines.xml`. Requires `--e3sm-root=PATH` or `$E3SM_ROOT`. Auto-fills `--with-blas=`/`--with-lapack=` from `$BLAS_ROOT`/`$LAPACK_ROOT` if E3SM exposes them. |
-| `standalone` | MOAB downstream user without E3SM, or you want full manual control over modules/env. | Trusts your loaded environment as-is. No CIME interaction. |
+| `standalone` (default) | MOAB downstream user; or you want manual control over modules/env. | Trusts your loaded environment as-is. No CIME interaction, no E3SM checkout needed. |
+| `e3sm` (opt-in) | You have an E3SM checkout and want the same environment E3SM uses for the target machine. | Sources modules + env vars from `$E3SM_ROOT/cime_config/machines/config_machines.xml`. Requires `--e3sm-root=PATH` or `$E3SM_ROOT`. Auto-fills `--with-blas=`/`--with-lapack=` from `$BLAS_ROOT`/`$LAPACK_ROOT` if E3SM exposes them. |
 
-### `--profile=e3sm` walk-through
+> **Default flipped in 2026-05.** Earlier revisions defaulted to `--profile=e3sm`,
+> which surprised MOAB downstream users by requiring `--e3sm-root=`. The legacy
+> `install-moab-e3sm.sh` shim still injects `--profile=e3sm` so existing E3SM
+> workflows that reference the old name keep working unchanged.
+
+### `--profile=standalone` walk-through (default)
+
+```bash
+# Load your env yourself (modules, etc.)
+module load gcc/13.2.0 openmpi hdf5 netcdf-c parallel-netcdf
+
+./install/install-moab.sh --machine=auto \
+    --hdf5-root=$HDF5_ROOT --netcdf-root=$NETCDF_C_PATH --pnetcdf-root=$PNETCDF_PATH \
+    --prefix=$PWD/installs
+```
+
+The machine entry's `standalone_hint` is printed informationally but no
+modules are loaded automatically — the script trusts your environment and
+proceeds straight to compiler resolution, TPL builds, and MOAB build.
+
+### `--profile=e3sm` walk-through (opt-in)
 
 ```bash
 # 1. Tell the script where your E3SM checkout is (or set $E3SM_ROOT)
@@ -353,11 +373,15 @@ export E3SM_ROOT=$HOME/Code/E3SM
 # 2. Load your minimum env (anything else needed beyond what config_machines.xml loads)
 #    Typically nothing -- E3SM's XML lists its full module stack
 
-# 3. Run with --profile=e3sm (the default; you can omit it)
-./install/install-moab.sh \
+# 3. Opt in to the e3sm profile explicitly
+./install/install-moab.sh --profile=e3sm \
     --machine=bebop \
     --hdf5-root=/lcrc/group/e3sm/soft/bebop/hdf5/1.12.3/gcc-13.2.0/openmpi-4.1.8 \
     --prefix=$PWD/installs
+
+# OR use the legacy install-moab-e3sm.sh name (same behavior; --profile=e3sm
+# is injected automatically)
+./install/install-moab-e3sm.sh --machine=bebop ...
 ```
 
 The script will:
@@ -402,22 +426,6 @@ ASSUME_YES=yes ./install-moab.sh --profile=e3sm --machine=bebop ...
 If stdin isn't a tty (you piped the invocation, ran from a CI runner,
 etc.) AND you didn't pass `--yes`, the script errors with a clear hint
 rather than hanging on `read`.
-
-### `--profile=standalone` walk-through
-
-```bash
-# Load your env yourself
-module load gcc/13.2.0 openmpi hdf5 netcdf-c parallel-netcdf
-
-./install/install-moab.sh \
-    --machine=bebop --profile=standalone \
-    --hdf5-root=$HDF5_ROOT --netcdf-root=$NETCDF_C_PATH --pnetcdf-root=$PNETCDF_PATH \
-    --prefix=$PWD/installs
-```
-
-Identical behavior to Push 1 / pre-rename. The machine entry's
-`standalone_hint` is printed informationally but no modules are loaded
-automatically.
 
 ### `--print` mode
 
@@ -666,7 +674,7 @@ $HOME/install/MOAB/                              PREFIX_PATH
 
 | Flag | Default | Description |
 |---|---|---|
-| `--profile=NAME` | `e3sm` | `e3sm` (load env from CIME) or `standalone` (trust user env). |
+| `--profile=NAME` | `standalone` | `standalone` (trust user env, default) or `e3sm` (load env from CIME; requires `--e3sm-root=`). |
 | `--e3sm-root=PATH` | `$E3SM_ROOT` env | Path to E3SM checkout; required for `--profile=e3sm`. Must contain `cime_config/machines/config_machines.xml`. |
 | `--yes`, `-y` | — | Bypass the e3sm-profile env-confirmation prompt. Required when stdin is not a tty (CI). Equivalent to `ASSUME_YES=yes`. |
 | `--print` | — | Emit only the resolved MOAB configure/cmake command (copy-pasteable). Implies `--dry-run`. |

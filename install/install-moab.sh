@@ -97,7 +97,11 @@ MACHINE_NAME="${MACHINE_NAME:-auto}"
 COMPILER_FAMILY="${COMPILER_FAMILY:-}"
 
 # Profile + E3SM checkout
-PROFILE="${PROFILE:-e3sm}"           # e3sm | standalone
+# Default: standalone -- trust whatever env the user has loaded; no CIME
+# machinery, no E3SM_ROOT requirement. Most MOAB downstream users want this.
+# E3SM users opt in explicitly via --profile=e3sm (and the legacy
+# install-moab-e3sm.sh shim does so on their behalf).
+PROFILE="${PROFILE:-standalone}"     # standalone | e3sm
 E3SM_ROOT="${E3SM_ROOT:-}"           # Required for --profile=e3sm
 ASSUME_YES="${ASSUME_YES:-no}"       # Bypass the e3sm-profile env confirmation prompt
 
@@ -341,13 +345,14 @@ Common options:
                         (compiler family, MPI, TPL versions). User must run
                         spack themselves: spack install \$(install-moab.sh
                         --print-spack-spec [...]). Implies --dry-run.
-  --profile=NAME        e3sm (default) | standalone. With e3sm, the script
-                        sources modules + env vars from
+  --profile=NAME        standalone (default) | e3sm. With standalone, the
+                        script trusts whatever environment you have already
+                        loaded (typical for MOAB downstream users). With e3sm,
+                        the script sources modules + env vars from
                         \$E3SM_ROOT/cime_config/machines/config_machines.xml
-                        for the resolved (machine, compiler) pair. With
-                        standalone, the script trusts whatever environment
-                        you have already loaded (suitable for MOAB downstream
-                        users who don't have an E3SM checkout).
+                        for the resolved (machine, compiler) pair (the legacy
+                        install-moab-e3sm.sh shim selects this profile
+                        automatically).
   --e3sm-root=PATH      Path to E3SM checkout (or set \$E3SM_ROOT). Required
                         for --profile=e3sm. Must contain
                         cime_config/machines/config_machines.xml.

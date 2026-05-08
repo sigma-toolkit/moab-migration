@@ -67,6 +67,7 @@ CLEAN_BUILD="${CLEAN_BUILD:-no}"
 CLEAN_TPLS="${CLEAN_TPLS:-no}"
 DRY_RUN="${DRY_RUN:-no}"
 PRINT_MODE="${PRINT_MODE:-no}"
+PRINT_SPACK_SPEC="${PRINT_SPACK_SPEC:-no}"
 RECONFIGURE="${RECONFIGURE:-no}"
 SKIP_MPI_VALIDATION="${SKIP_MPI_VALIDATION:-no}"
 
@@ -336,6 +337,10 @@ Common options:
   --dry-run             Print all commands, do nothing
   --print               Print only the resolved MOAB configure/cmake command
                         (copy-pasteable, no banner). Implies --dry-run.
+  --print-spack-spec    Print a Spack spec equivalent to the resolved config
+                        (compiler family, MPI, TPL versions). User must run
+                        spack themselves: spack install \$(install-moab.sh
+                        --print-spack-spec [...]). Implies --dry-run.
   --profile=NAME        e3sm (default) | standalone. With e3sm, the script
                         sources modules + env vars from
                         \$E3SM_ROOT/cime_config/machines/config_machines.xml
@@ -431,6 +436,7 @@ while [[ $# -gt 0 ]]; do
         --no-tail)         TAIL_LOGS=no ;;
         --dry-run)         DRY_RUN=yes ;;
         --print)           PRINT_MODE=yes; DRY_RUN=yes ;;
+        --print-spack-spec) PRINT_SPACK_SPEC=yes; DRY_RUN=yes ;;
         --extra=*)               EXTRA_MOAB_ARGS="${1#*=}" ;;
         --extra-zoltan=*)        EXTRA_ZOLTAN_ARGS="${1#*=}" ;;
         --extra-tempestremap=*)  EXTRA_TEMPESTREMAP_ARGS="${1#*=}" ;;
@@ -1866,6 +1872,72 @@ print_moab_command() {
     printf '\n'
 }
 
+# Emit a Spack spec string equivalent to the resolved (machine, compiler, MPI,
+# TPL) configuration. Doesn't invoke spack; the user is expected to feed the
+# output to `spack install` themselves. Versions are best-effort: we know our
+# pinned TPL versions exactly (EIGEN3_VERSION, ZOLTAN_VERSION,
+# TEMPESTREMAP_VERSION); the rest (compiler, MPI, hdf5, netcdf, pnetcdf) are
+# emitted *without* version specifiers so spack will pick the user's
+# preferred version. Add @VERSION constraints by hand if you need to pin.
+#
+# Compiler family mapping (E3SM CIME -> Spack):
+#   gnu     -> gcc
+#   intel   -> intel    (Intel classic; use 'oneapi' for Intel OneAPI / icx)
+#   nvidia  -> nvhpc    (Nvidia HPC SDK)
+#   nvhpc   -> nvhpc
+#   aocc    -> aocc
+#   cray    -> cce      (Cray CCE)
+print_spack_spec() {
+    local spack_compiler="$COMPILER_FAMILY"
+    case "$COMPILER_FAMILY" in
+        gnu)     spack_compiler="gcc" ;;
+        nvidia)  spack_compiler="nvhpc" ;;
+        cray)    spack_compiler="cce" ;;
+        # intel, oneapi, aocc, nvhpc -- pass through unchanged
+    esac
+
+    # MPI lib hint: derive from CC_BIN basename if available
+    local mpi_lib="mpich"   # safe default
+    case "$(basename "$CC_BIN" 2>/dev/null)" in
+        mpicc|cc)
+            # Canonical wrapper -- guess from MPILIBS in the machine entry
+            if [[ "$MACHINE_NAME" == perlmutter || "$MACHINE_NAME" == pmgpu || "$MACHINE_NAME" == crux ]]; then
+                mpi_lib="cray-mpich"
+            elif [[ "$MACHINE_NAME" == bebop || "$MACHINE_NAME" == improv ]]; then
+                mpi_lib="openmpi"
+            fi
+            ;;
+    esac
+
+    cat <<EOF
+# Spack spec for MOAB matching this $PROFILE-profile / --machine=$MACHINE_NAME / --compiler=$COMPILER_FAMILY config.
+#
+# Usage:
+#     spack install \$(install-moab.sh --print-spack-spec [...same flags...])
+#
+# Versions for compiler/MPI/HDF5/NetCDF/PNetCDF are deliberately unspecified
+# so spack picks your site's preferred (or whatever is concretized first).
+# Pin them by hand when reproducibility matters, e.g.:
+#     spec += " ^hdf5@1.12.3 ^openmpi@4.1.8"
+#
+moab @master +mpi +hdf5 +netcdf +parallel-netcdf +zoltan +tempestremap +eigen \\
+    %${spack_compiler} \\
+    ^${mpi_lib} \\
+    ^hdf5+mpi \\
+    ^netcdf-c+mpi \\
+    ^parallel-netcdf \\
+    ^zoltan \\
+    ^tempest-remap@master \\
+    ^eigen
+#
+# install-moab.sh's pinned TPL versions (for reference; spack package
+# versioning may differ -- e.g. spack zoltan@3.901 == upstream v3.9.1):
+#   eigen3       ${EIGEN3_VERSION}
+#   zoltan       ${ZOLTAN_VERSION}
+#   tempestremap ${TEMPESTREMAP_VERSION} (master / develop)
+EOF
+}
+
 # Hash the planned configure args so we can detect when the user changed flags
 # between runs and force a re-configure even with --reconfigure not set.
 moab_args_fingerprint() {
@@ -2039,6 +2111,11 @@ if [[ "$PRINT_MODE" == "yes" ]]; then
     # use case). Skip resume state, per-TPL recipes, and the orchestration
     # banner -- emit only the resolved configure / cmake command on stdout.
     print_moab_command
+    exit 0
+fi
+
+if [[ "$PRINT_SPACK_SPEC" == "yes" ]]; then
+    print_spack_spec
     exit 0
 fi
 

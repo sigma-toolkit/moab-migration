@@ -66,6 +66,7 @@ RUN_CHECK="${RUN_CHECK:-no}"
 CLEAN_BUILD="${CLEAN_BUILD:-no}"
 CLEAN_TPLS="${CLEAN_TPLS:-no}"
 DRY_RUN="${DRY_RUN:-no}"
+PRINT_MODE="${PRINT_MODE:-no}"
 RECONFIGURE="${RECONFIGURE:-no}"
 SKIP_MPI_VALIDATION="${SKIP_MPI_VALIDATION:-no}"
 
@@ -311,6 +312,8 @@ Common options:
                         cannot compile on this host)
   --no-tail             Suppress live tail of TPL build logs
   --dry-run             Print all commands, do nothing
+  --print               Print only the resolved MOAB configure/cmake command
+                        (copy-pasteable, no banner). Implies --dry-run.
   --profile=NAME        e3sm (default) | standalone. With e3sm, the script
                         sources modules + env vars from
                         \$E3SM_ROOT/cime_config/machines/config_machines.xml
@@ -396,6 +399,7 @@ while [[ $# -gt 0 ]]; do
         --skip-mpi-validation) SKIP_MPI_VALIDATION=yes ;;
         --no-tail)         TAIL_LOGS=no ;;
         --dry-run)         DRY_RUN=yes ;;
+        --print)           PRINT_MODE=yes; DRY_RUN=yes ;;
         --extra=*)               EXTRA_MOAB_ARGS="${1#*=}" ;;
         --extra-zoltan=*)        EXTRA_ZOLTAN_ARGS="${1#*=}" ;;
         --extra-tempestremap=*)  EXTRA_TEMPESTREMAP_ARGS="${1#*=}" ;;
@@ -1715,6 +1719,14 @@ report_state() {
         log "  moab: not configured -- WILL CONFIGURE"
     fi
 }
+
+if [[ "$PRINT_MODE" == "yes" ]]; then
+    # Quiet copy-pasteable mode (absorbs the legacy suggest_configuration.sh
+    # use case). Skip resume state, per-TPL recipes, and the orchestration
+    # banner -- emit only the resolved configure / cmake command on stdout.
+    print_moab_command
+    exit 0
+fi
 
 if [[ "$DRY_RUN" == "yes" ]]; then
     mkdir -p "$BUILD_DIR" "$TPL_PREFIX" "$MOAB_BUILD_DIR" 2>/dev/null || true

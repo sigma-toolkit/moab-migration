@@ -117,10 +117,16 @@ EXEC_FILES=(
 )
 
 # Pick a downloader. Prefer curl (more common on HPC); fall back to wget.
+# Each fetch appends a cache-bust query string (?cb=<unix_ts>) so bitbucket's
+# raw-URL CDN can't return a stale snapshot from a previous push. Without
+# this, a fresh push followed by a curl|bash one-liner can hit a cached
+# bootstrap that fetches files which no longer exist on the branch (404).
+# Bandwidth cost is negligible (~5 small files per invocation).
+_cb() { date +%s 2>/dev/null || echo $RANDOM; }
 if command -v curl >/dev/null 2>&1; then
-    fetch() { curl -fsSL --retry 3 --retry-delay 2 -o "$1" "$2"; }
+    fetch() { curl -fsSL --retry 3 --retry-delay 2 -o "$1" "${2}?cb=$(_cb)"; }
 elif command -v wget >/dev/null 2>&1; then
-    fetch() { wget -q --tries=3 --waitretry=2 -O "$1" "$2"; }
+    fetch() { wget -q --tries=3 --waitretry=2 -O "$1" "${2}?cb=$(_cb)"; }
 else
     die "neither 'curl' nor 'wget' is on PATH; install one and retry"
 fi

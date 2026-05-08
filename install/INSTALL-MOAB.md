@@ -157,6 +157,20 @@ or `install-moab.sh` (everything else). Re-runs reuse the cached
 > the env var applies to `curl`, not to the piped `bash`. Use
 > `--bootstrap-branch=foo` after `bash -s --` instead.
 
+> ⚠️ **Bitbucket raw URLs are CDN-cached.** A fresh `git push` may take a
+> few minutes to propagate; until then the curl|bash one-liner can fetch
+> a stale `install-bootstrap.sh`. The bootstrap itself appends a
+> cache-bust query string (`?cb=<unix-ts>`) to its internal fetches so
+> *those* are always fresh — but the bootstrap **fetched by the
+> one-liner** can still be stale until the CDN refreshes. If you just
+> pushed and are testing your own branch, append `?cb=$RANDOM` to the
+> curl URL too:
+>
+> ```bash
+> curl -fsSL "https://.../install/install-bootstrap.sh?cb=$RANDOM" \
+>     | bash -s -- --bootstrap-branch=mybranch --machine=auto
+> ```
+
 #### Common examples
 
 ```bash

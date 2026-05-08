@@ -6,15 +6,19 @@
 > `install-moab.sh` with all args forwarded — existing E3SM workflows /
 > docs that reference the old name keep working unchanged.
 >
-> **Push 1 (this revision)** added a machine database and `--machine` /
+> **Push 1 (2026-05)** added a machine database and `--machine` /
 > `--list-machines` / `--compiler` flags. Database entries are pure
-> metadata (no hardcoded TPL paths); per-machine paths come from the
-> user's loaded modules.
+> metadata (no hardcoded TPL paths).
 >
-> **Push 2 (planned)** will add `--profile={e3sm,standalone}`, a
-> `--print` mode, and a Python helper that sources E3SM's
-> `cime_config/machines/config_machines.xml` to auto-load the right
-> modules and env vars for `--profile=e3sm --machine=NAME --compiler=NAME`.
+> **Push 2 (this revision)** added `--profile={e3sm,standalone}`, a
+> `--print` mode, `--e3sm-root=PATH` (or `$E3SM_ROOT`), and a Python helper
+> (`install/scripts/e3sm_env.py`) that sources E3SM's
+> `cime_config/machines/config_machines.xml` for the resolved
+> (machine, compiler) pair. The e3sm profile auto-loads modules and env
+> vars and even auto-fills `--with-blas=`/`--with-lapack=` from
+> `$BLAS_ROOT`/`$LAPACK_ROOT` when E3SM exposes them. The legacy
+> `suggest_configuration.sh` is now a 3-line shim onto
+> `install-moab.sh --print --profile=standalone`.
 
 End-to-end orchestrator that builds and installs MOAB plus its three required
 TPLs (Eigen3, Zoltan, TempestRemap) on systems where E3SM is already
@@ -150,6 +154,81 @@ module load PrgEnv-gnu cray-hdf5-parallel cray-netcdf-hdf5parallel cray-parallel
     --netcdf-root=$NETCDF_C_PATH \
     --pnetcdf-root=$PNETCDF_PATH \
     --prefix=$HOME/install/MOAB
+```
+
+---
+
+## Profiles (`--profile`)
+
+The script supports two audiences via a profile knob:
+
+| Profile | When to use | What changes |
+|---|---|---|
+| `e3sm` (default) | You have an E3SM checkout and want the same environment E3SM uses for the target machine. | Sources modules + env vars from `$E3SM_ROOT/cime_config/machines/config_machines.xml`. Requires `--e3sm-root=PATH` or `$E3SM_ROOT`. Auto-fills `--with-blas=`/`--with-lapack=` from `$BLAS_ROOT`/`$LAPACK_ROOT` if E3SM exposes them. |
+| `standalone` | MOAB downstream user without E3SM, or you want full manual control over modules/env. | Trusts your loaded environment as-is. No CIME interaction. |
+
+### `--profile=e3sm` walk-through
+
+```bash
+# 1. Tell the script where your E3SM checkout is (or set $E3SM_ROOT)
+export E3SM_ROOT=$HOME/Code/E3SM
+
+# 2. Load your minimum env (anything else needed beyond what config_machines.xml loads)
+#    Typically nothing -- E3SM's XML lists its full module stack
+
+# 3. Run with --profile=e3sm (the default; you can omit it)
+./install/install-moab.sh \
+    --machine=bebop \
+    --hdf5-root=/lcrc/group/e3sm/soft/bebop/hdf5/1.12.3/gcc-13.2.0/openmpi-4.1.8 \
+    --prefix=$PWD/installs
+```
+
+The script will:
+1. Resolve `--machine=bebop` → `MACHINE_META_E3SM_NAME=bebop` (or whatever your entry maps to).
+2. Run `python3 install/scripts/e3sm_env.py --e3sm-root=... --machine=bebop --compiler=gnu` and `source` its output (skipped under `--dry-run`). This loads modules and exports env vars.
+3. Run two adapter shims:
+   - If `NETCDF_C_PATH` is unset but `NETCDF_PATH` is set (anlgce-ub22, crux), alias.
+   - If `HDF5_ROOT` is unset but `CRAY_HDF5_PARALLEL_PREFIX` is set (Cray PrgEnv), alias.
+4. If `BLAS_ROOT` and `LAPACK_ROOT` got set (bebop, improv pattern) and you didn't pass `--extra` / `--extra-tempestremap`, auto-fill them with the right `--with-blas=`/`--with-lapack=` specs (preferring static `lib*.a` when present).
+5. Continue with normal compiler resolution, MPI validation, TPL builds, MOAB build/install.
+
+### `--profile=standalone` walk-through
+
+```bash
+# Load your env yourself
+module load gcc/13.2.0 openmpi hdf5 netcdf-c parallel-netcdf
+
+./install/install-moab.sh \
+    --machine=bebop --profile=standalone \
+    --hdf5-root=$HDF5_ROOT --netcdf-root=$NETCDF_C_PATH --pnetcdf-root=$PNETCDF_PATH \
+    --prefix=$PWD/installs
+```
+
+Identical behavior to Push 1 / pre-rename. The machine entry's
+`standalone_hint` is printed informationally but no modules are loaded
+automatically.
+
+### `--print` mode
+
+Quiet variant of `--dry-run`: emits **only** the resolved configure
+(autotools) or `cmake` command on stdout, no banner, no resume state.
+Useful when you want to inspect or hand-edit before running, or to feed
+the configure line into a separate workflow.
+
+```bash
+./install/install-moab.sh --print --machine=bebop --profile=standalone
+# /path/to/moab-src/configure \
+#     --with-mpi \
+#     CC=mpicc \
+#     ...
+```
+
+The legacy `suggest_configuration.sh` at the repo root is now a 3-line
+shim that delegates here:
+
+```bash
+./suggest_configuration.sh --machine=bebop      # equivalent to:
+./install/install-moab.sh --print --profile=standalone --machine=bebop
 ```
 
 ---
@@ -347,8 +426,16 @@ $HOME/install/MOAB/                              PREFIX_PATH
 | Flag | Default | Description |
 |---|---|---|
 | `--machine=NAME` | `auto` | Use the named entry from the machine database (`bebop`, `improv`, `crux`, `gce`, `perlmutter`, …). `auto` runs `detect_machine` against `LMOD_SYSTEM_NAME`/`NERSC_HOST`/hostname and silently falls through if no entry matches. |
-| `--compiler=NAME` | entry's `default_compiler` | Compiler family on the chosen machine: `gnu`, `intel`, `cray`, `nvhpc`, `nvidia`, `aocc`. Warning (not error) if not in the entry's `supported_compilers`. Informational in Push 1; Push 2 keys `config_machines.xml` lookup off this. |
+| `--compiler=NAME` | entry's `default_compiler` | Compiler family on the chosen machine: `gnu`, `intel`, `cray`, `nvhpc`, `nvidia`, `aocc`. Warning (not error) if not in the entry's `supported_compilers`. With `--profile=e3sm`, this keys the `<modules compiler="X">` and `<environment_variables compiler="X">` filters in `config_machines.xml`. |
 | `--list-machines` | — | Print the registry (with auto-detected entry marked) and exit. Requires no env vars; safe to run on a login node before any modules are loaded. |
+
+### Profile + E3SM env
+
+| Flag | Default | Description |
+|---|---|---|
+| `--profile=NAME` | `e3sm` | `e3sm` (load env from CIME) or `standalone` (trust user env). |
+| `--e3sm-root=PATH` | `$E3SM_ROOT` env | Path to E3SM checkout; required for `--profile=e3sm`. Must contain `cime_config/machines/config_machines.xml`. |
+| `--print` | — | Emit only the resolved MOAB configure/cmake command (copy-pasteable). Implies `--dry-run`. |
 
 ### Resume / cleanup controls
 
@@ -957,6 +1044,52 @@ cd /scratch/me/moab-src && git checkout 91b54bd8e
 ---
 
 ## Troubleshooting
+
+### `--profile=e3sm` errors
+
+**`--profile=e3sm requires --e3sm-root=PATH or $E3SM_ROOT`**
+Set the env var or pass the flag. The path must contain
+`cime_config/machines/config_machines.xml` — i.e., the root of an E3SM
+checkout, not the CIME submodule.
+
+**`machine 'X' has no E3SM config_machines.xml mapping`**
+The machine entry in `install-moab.sh` has an empty
+`MACHINE_META_E3SM_NAME`. Either fix the entry (look up `MACH=` in
+`config_machines.xml`) or use `--profile=standalone`.
+
+**`HDF5_ROOT is not set` after the e3sm env loaded**
+config_machines.xml deliberately doesn't export `HDF5_ROOT` for some
+machines (bebop, improv, pm-cpu, crux). The e3sm_env.py output prints a
+`# NOTE` explaining this. Pass `--hdf5-root=PATH` explicitly. For Cray
+PrgEnv, the script also auto-aliases `$CRAY_HDF5_PARALLEL_PREFIX` →
+`HDF5_ROOT` after sourcing.
+
+**`e3sm_env.py exited non-zero`**
+Check `$BUILD_DIR/.../e3sm_env.*.sh` (the temp file path is logged). Most
+common cause: machine name not in `config_machines.xml`. Verify with
+`grep MACH= $E3SM_ROOT/cime_config/machines/config_machines.xml`.
+
+**Tier 1 (CIME API) failed; falling back to direct XML parse**
+Cosmetic warning. The direct XML parse handles all current schema features
+correctly; verified byte-identical output for bebop. The only practical
+difference is that CIME's API would catch some schema evolution
+automatically, while the fallback may need an update if CIME ever
+changes the `config_machines.xml` schema significantly.
+
+**Modules fail to load when sourcing the e3sm env**
+The emitted snippet runs `module load` for each module in
+config_machines.xml. If one is unavailable on the target machine, check:
+- That you're on the right machine (the entry in `config_machines.xml`
+  may name modules that only exist on that specific cluster)
+- That your shell has `module` available (the snippet sources Lmod's
+  init script first; if that init script doesn't exist, the warning is
+  printed but bash continues — the next `module load` will fail)
+- That E3SM's master is the version you expect; module names get bumped
+  over time
+
+**Want to skip the e3sm env loading just this once?**
+Pass `--profile=standalone` and load modules yourself. The machine entry's
+`standalone_hint` printed in the orchestration banner shows what to load.
 
 ### "MPI_ROOT is set but empty" warning
 

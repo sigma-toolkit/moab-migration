@@ -744,8 +744,52 @@ apply_e3sm_profile() {
     # user's parent shell. Sourcing under --dry-run is safe and necessary --
     # otherwise HDF5_ROOT / NETCDF_C_PATH / PNETCDF_PATH stay unset and the
     # downstream require_var validation fails before we can preview anything.
+    #
+    # Source under `set +e` so individual `module load` failures don't abort
+    # the entire source: the subsequent `export VAR=...` lines still run, and
+    # the user often gets a usable env even if some modules are missing.
+    # Capture stderr so we can surface the actual error pattern back to the
+    # user as a diagnostic (instead of just an opaque mid-script abort).
+    # The downstream `require_var HDF5_ROOT/NETCDF_C_PATH/PNETCDF_PATH` checks
+    # are the actual safety net for "did we get what we need?"
+    local tmp_stderr
+    tmp_stderr="$(mktemp -t e3sm_source_err.XXXXXX)"
+    set +e
     # shellcheck disable=SC1090
-    source "$tmp_env" || die "sourcing E3SM env snippet failed (see $tmp_env for the snippet content)" 2
+    { source "$tmp_env"; } 2> "$tmp_stderr"
+    set -e
+
+    # Scan stderr for known error patterns. Surface them prominently but
+    # don't abort -- the user's env may still be usable depending on what
+    # CIME exports vs what the failed modules would have provided.
+    if [[ -s "$tmp_stderr" ]]; then
+        local err_count
+        err_count=$(grep -cE "module: command not found|Lmod has detected|Unable to locate|ERROR:" "$tmp_stderr" 2>/dev/null || true)
+        # Trim whitespace
+        err_count="${err_count//[[:space:]]/}"
+        if [[ -n "$err_count" && "$err_count" != "0" ]]; then
+            warn "Sourcing E3SM env: $err_count error(s) detected; relevant lines:"
+            grep -E "module: command not found|Lmod has detected|Unable to locate|ERROR:" "$tmp_stderr" \
+                | head -10 | sed 's/^/    /' >&2
+            warn "  Snippet:    $tmp_env"
+            warn "  Full stderr: $tmp_stderr"
+            warn ""
+            warn "  Common causes:"
+            warn "    * 'module: command not found' -- you're on a host without Lmod"
+            warn "      loaded; e3sm profile is meant for the target machine."
+            warn "      Use --profile=standalone for previewing on a dev box."
+            warn "    * 'Unable to locate a modulefile' -- E3SM master may have"
+            warn "      bumped a module version since your checkout. Try:"
+            warn "        cd $E3SM_ROOT && git log -5 -- cime_config/machines/config_machines.xml"
+            warn "    * 'Lmod has detected the following error' -- inspect $tmp_env"
+            warn "      and try the failing module load by hand."
+            warn ""
+            warn "  Continuing with whatever env vars did get exported."
+            warn "  Downstream HDF5_ROOT/NETCDF_C_PATH/PNETCDF_PATH validation"
+            warn "  will hard-error if required vars are missing."
+            warn ""
+        fi
+    fi
 
     adapt_e3sm_env_to_install_moab_vars
 

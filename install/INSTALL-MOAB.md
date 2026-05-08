@@ -672,8 +672,8 @@ $HOME/install/MOAB/                              PREFIX_PATH
 
 | Flag | Default | Description |
 |---|---|---|
-| `--machine=NAME` | `auto` | Use the named entry from the machine database (`bebop`, `improv`, `crux`, `gce`, `perlmutter`, …). `auto` runs `detect_machine` against `LMOD_SYSTEM_NAME`/`NERSC_HOST`/hostname and silently falls through if no entry matches. |
-| `--compiler=NAME` | entry's `default_compiler` | Compiler family on the chosen machine: `gnu`, `intel`, `cray`, `nvhpc`, `nvidia`, `aocc`. Warning (not error) if not in the entry's `supported_compilers`. With `--profile=e3sm`, this keys the `<modules compiler="X">` and `<environment_variables compiler="X">` filters in `config_machines.xml`. |
+| `--machine=NAME` | `auto` | Use the named entry from the machine database (`bebop`, `improv`, `crux`, `gce`, `perlmutter`, …). `auto` runs `detect_machine` against `LMOD_SYSTEM_NAME`/`NERSC_HOST`/hostname and silently falls through if no entry matches. **Shortcut:** `--machine=NAME:COMPILER` (e.g. `--machine=perlmutter:intel`) is equivalent to `--machine=NAME --compiler=COMPILER`. |
+| `--compiler=NAME` | entry's `default_compiler` | Compiler family on the chosen machine: `gnu`, `intel`, `cray`, `nvhpc`, `nvidia`, `aocc`. Warning (not error) if not in the entry's `supported_compilers`. With `--profile=e3sm`, this keys the `<modules compiler="X">` and `<environment_variables compiler="X">` filters in `config_machines.xml`. An explicit `--compiler=` overrides the inline `:COMPILER` from `--machine=NAME:COMPILER`. |
 | `--list-machines` | — | Print the registry (with auto-detected entry marked) and exit. Requires no env vars; safe to run on a login node before any modules are loaded. |
 
 ### Profile + E3SM env

@@ -362,8 +362,8 @@ Common options:
   --machine=NAME        Use the named machine entry from the database. NAME=auto
                         (default) auto-detects via hostname/NERSC_HOST/
                         LMOD_SYSTEM_NAME. Pass --list-machines to see all entries.
-                        Machine entries currently provide informational hints only;
-                        Push 2 will use them to drive E3SM CIME env resolution.
+                        Shortcut: --machine=NAME:COMPILER (e.g. perlmutter:intel)
+                        is equivalent to --machine=NAME --compiler=COMPILER.
   --compiler=NAME       Compiler family on the chosen machine (gnu, intel, cray,
                         nvidia, aocc, ...). Defaults to the machine entry's
                         default_compiler. Informational in Push 1.
@@ -445,7 +445,19 @@ while [[ $# -gt 0 ]]; do
         --extra=*)               EXTRA_MOAB_ARGS="${1#*=}" ;;
         --extra-zoltan=*)        EXTRA_ZOLTAN_ARGS="${1#*=}" ;;
         --extra-tempestremap=*)  EXTRA_TEMPESTREMAP_ARGS="${1#*=}" ;;
-        --machine=*)             MACHINE_NAME="${1#*=}" ;;
+        --machine=*)
+            # Support --machine=NAME:COMPILER as a shortcut for
+            # --machine=NAME --compiler=COMPILER. An explicit --compiler=
+            # appearing later still wins via this loop's last-flag-wins
+            # parsing.
+            _arg="${1#*=}"
+            if [[ "$_arg" == *:* ]]; then
+                MACHINE_NAME="${_arg%%:*}"
+                COMPILER_FAMILY="${_arg#*:}"
+            else
+                MACHINE_NAME="$_arg"
+            fi
+            ;;
         --compiler=*)            COMPILER_FAMILY="${1#*=}" ;;
         --list-machines)         _LIST_MACHINES=yes ;;
         --self-check)            _SELF_CHECK=yes ;;
@@ -480,7 +492,9 @@ list_machines() {
     done
     printf '\n'
     [[ -n "$detected" ]] && printf '  * = auto-detected on this host (--machine=auto resolves to this)\n\n'
-    printf 'For details on a single machine: --machine=NAME --dry-run\n'
+    printf 'Pick a machine + compiler:  --machine=NAME --compiler=NAME\n'
+    printf 'Or the shortcut form:       --machine=NAME:COMPILER     (e.g. --machine=perlmutter:intel)\n'
+    printf 'Inspect the resolved env:   --machine=NAME --dry-run\n'
 }
 if [[ "${_LIST_MACHINES:-no}" == "yes" ]]; then
     list_machines

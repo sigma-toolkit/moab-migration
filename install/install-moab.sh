@@ -637,6 +637,19 @@ adapt_e3sm_env_to_install_moab_vars() {
     if [[ -z "${HDF5_ROOT:-}" && -n "${CRAY_HDF5_PARALLEL_PREFIX:-}" ]]; then
         export HDF5_ROOT="$CRAY_HDF5_PARALLEL_PREFIX"
     fi
+    # Cray libsci: cray-libsci provides BLAS+LAPACK on Perlmutter / Crux / etc.
+    # Module sets CRAY_LIBSCI_PREFIX_DIR; the libraries live at
+    # $CRAY_LIBSCI_PREFIX_DIR/lib/libsci_<compiler>_<thread>.{a,so}.
+    # Only adopt as a fallback when CIME hasn't set BLAS_ROOT/LAPACK_ROOT
+    # (e.g. for pm-cpu/pm-gpu/crux which don't export them in
+    # config_machines.xml). _resolve_blas_lapack_spec already knows the
+    # libsci_gnu_82_mp / libsci_gnu_82 / libsci_intel_mp library names.
+    if [[ -z "${BLAS_ROOT:-}" && -n "${CRAY_LIBSCI_PREFIX_DIR:-}" ]]; then
+        export BLAS_ROOT="$CRAY_LIBSCI_PREFIX_DIR"
+    fi
+    if [[ -z "${LAPACK_ROOT:-}" && -n "${CRAY_LIBSCI_PREFIX_DIR:-}" ]]; then
+        export LAPACK_ROOT="$CRAY_LIBSCI_PREFIX_DIR"
+    fi
     # HDF5_ROOT sibling-derivation: bebop and improv configs do not export
     # HDF5_ROOT but DO export NETCDF_C_PATH like
     #     /lcrc/group/e3sm/soft/<machine>/netcdf-c/<ver>/<compiler>/<mpi>

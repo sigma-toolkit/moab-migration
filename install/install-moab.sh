@@ -268,6 +268,68 @@ is_known_machine() {
 }
 
 #-----------------------------------------------------------------------------
+# CIME machine auto-discovery (E3SM config_machines.xml lookup)
+#-----------------------------------------------------------------------------
+# When --profile=e3sm and --e3sm-root is set, allow any machine from
+# config_machines.xml even if it's not in the curated MACHINE_REGISTRY.
+# E3SM's XML maintains 40+ machines; we don't try to mirror them all.
+# The curated DB is the convenience path (auto-detect, hand-tuned notes,
+# validated dates); CIME-discovered entries are best-effort.
+
+_cime_xml_path() {
+    printf '%s' "${E3SM_ROOT:-}/cime_config/machines/config_machines.xml"
+}
+
+# Returns 0 if $1 is defined as <machine MACH="$1"> in config_machines.xml.
+_e3sm_machine_exists() {
+    local name="$1" xml
+    xml="$(_cime_xml_path)"
+    [[ -f "$xml" ]] || return 1
+    grep -q "MACH=\"$name\"" "$xml"
+}
+
+# Prints the <COMPILERS> CSV for $1 from config_machines.xml. Empty if not found.
+_e3sm_machine_compilers() {
+    local name="$1" xml
+    xml="$(_cime_xml_path)"
+    [[ -f "$xml" ]] || { printf ''; return 0; }
+    awk -v m="$name" '
+        $0 ~ "<machine MACH=\""m"\">" { in_m = 1 }
+        in_m && /<COMPILERS>/ {
+            sub(/.*<COMPILERS>/, ""); sub(/<\/COMPILERS>.*/, "")
+            print; exit
+        }
+        in_m && /<\/machine>/ { in_m = 0 }
+    ' "$xml"
+}
+
+# Lists every MACH= entry in config_machines.xml (one per line, no sort).
+_e3sm_machine_list() {
+    local xml
+    xml="$(_cime_xml_path)"
+    [[ -f "$xml" ]] || { printf ''; return 0; }
+    grep -oE 'MACH="[^"]+"' "$xml" | sed 's/MACH="//; s/"$//'
+}
+
+# Synthesize MACHINE_META_* globals for a CIME-discovered machine. The
+# curated DB's match()/meta() functions don't exist for these, so we
+# populate the meta directly from config_machines.xml. Fields we leave
+# empty (notes, standalone_hint) are intentional -- the curated DB is
+# where hand-curated guidance lives; CIME entries are pass-through.
+synthesize_cime_machine_meta() {
+    local name="$1" cime_compilers
+    reset_machine_meta
+    MACHINE_META_E3SM_NAME="$name"
+    cime_compilers="$(_e3sm_machine_compilers "$name")"
+    cime_compilers="${cime_compilers:-gnu}"   # safe fallback if XML is malformed
+    MACHINE_META_DEFAULT_COMPILER="${cime_compilers%%,*}"
+    MACHINE_META_SUPPORTED_COMPILERS="$cime_compilers"
+    MACHINE_META_STANDALONE_HINT=""
+    MACHINE_META_LAST_VALIDATED="auto-discovered"
+    MACHINE_META_NOTES="Synthesized from config_machines.xml. Not in install-moab.sh's curated list -- if you'll use this machine regularly, consider adding a hand-tuned entry per install/CONTRIBUTING-MACHINES.md."
+}
+
+#-----------------------------------------------------------------------------
 # Pretty output
 #-----------------------------------------------------------------------------
 COLOR_RED=$'\033[0;31m'
@@ -513,6 +575,30 @@ list_machines() {
     done
     printf '\n'
     [[ -n "$detected" ]] && printf '  * = auto-detected on this host (--machine=auto resolves to this)\n\n'
+
+    # When --e3sm-root is set, also show every CIME-known machine. Skip the
+    # ones already covered by curated entries (matched by E3SM_NAME).
+    if [[ -n "${E3SM_ROOT:-}" && -f "$(_cime_xml_path)" ]]; then
+        printf '\nE3SM CIME-known machines (use any via --machine=NAME --profile=e3sm):\n'
+        printf '  %-22s %s\n' "NAME" "COMPILERS"
+        printf '  %-22s %s\n' "----" "---------"
+        local cime_m curated_e3sm_names="" rname
+        for rname in $MACHINE_REGISTRY; do
+            reset_machine_meta; "machine_${rname}_meta"
+            [[ -n "$MACHINE_META_E3SM_NAME" ]] && curated_e3sm_names="$curated_e3sm_names $MACHINE_META_E3SM_NAME"
+        done
+        for cime_m in $(_e3sm_machine_list | sort); do
+            # Skip CIME entries that are already covered by a curated entry
+            [[ " $curated_e3sm_names " == *" $cime_m "* ]] && continue
+            local cmps; cmps="$(_e3sm_machine_compilers "$cime_m")"
+            printf '  %-22s %s\n' "$cime_m" "$cmps"
+        done
+        printf '\n'
+    else
+        printf '\nTip: pass --e3sm-root=PATH along with --list-machines to also see\n'
+        printf '     the full list of E3SM machines (--profile=e3sm allows any of them).\n\n'
+    fi
+
     printf 'Pick a machine + compiler:  --machine=NAME --compiler=NAME\n'
     printf 'Or the shortcut form:       --machine=NAME:COMPILER     (e.g. --machine=perlmutter:intel)\n'
     printf 'Inspect the resolved env:   --machine=NAME --dry-run\n'
@@ -630,14 +716,30 @@ apply_machine_defaults() {
         fi
         MACHINE_NAME="$resolved"
     else
-        if ! is_known_machine "$requested"; then
-            die "unknown machine: $requested (try --list-machines)" 1
-        fi
         MACHINE_NAME="$requested"
     fi
 
-    reset_machine_meta
-    "machine_${MACHINE_NAME}_meta"
+    # Resolve metadata. Three paths:
+    #   1. Curated entry in MACHINE_REGISTRY -- use the hand-tuned meta()
+    #   2. Not curated, but exists in CIME XML and --profile=e3sm with
+    #      --e3sm-root set -- synthesize a minimal entry on the fly
+    #   3. Neither -- error with a hint about --list-machines and CIME
+    if is_known_machine "$MACHINE_NAME"; then
+        reset_machine_meta
+        "machine_${MACHINE_NAME}_meta"
+    elif [[ "$PROFILE" == "e3sm" && -n "${E3SM_ROOT:-}" ]] && _e3sm_machine_exists "$MACHINE_NAME"; then
+        log "Machine '$MACHINE_NAME' not in install-moab.sh's curated registry,"
+        log "  but found in $(_cime_xml_path) -- using as-is."
+        synthesize_cime_machine_meta "$MACHINE_NAME"
+    else
+        local hint="try --list-machines"
+        if [[ -n "${E3SM_ROOT:-}" ]]; then
+            hint="$hint --e3sm-root=$E3SM_ROOT  (shows all CIME-known machines)"
+        else
+            hint="$hint, or pass --e3sm-root=PATH to allow any machine from E3SM's config_machines.xml"
+        fi
+        die "unknown machine: $MACHINE_NAME ($hint)" 1
+    fi
 
     if [[ -z "$COMPILER_FAMILY" ]]; then
         COMPILER_FAMILY="$MACHINE_META_DEFAULT_COMPILER"

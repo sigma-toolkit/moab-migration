@@ -491,6 +491,65 @@ Registered machines:
 They are still selectable via `--machine=NAME`; please report failures so the
 entry can be promoted (or fixed).
 
+### Beyond the curated list: any E3SM CIME machine works
+
+The 6 entries above are convenience entries — hand-tuned defaults,
+auto-detection predicates, validation dates. **Under `--profile=e3sm` with
+`--e3sm-root` set, `--machine=NAME` will accept *any* `MACH=` value from
+your E3SM checkout's `cime_config/machines/config_machines.xml`** (40+
+machines including frontier, anvil, chrysalis, polaris, aurora,
+alvarez-cpu/gpu, jlse, etc.). Install-moab.sh synthesizes a minimal
+entry on the fly:
+
+- `MACHINE_META_E3SM_NAME` = the requested name (assumed to match CIME's `MACH=`)
+- `MACHINE_META_DEFAULT_COMPILER` = first `<COMPILERS>` entry in the XML
+- `MACHINE_META_SUPPORTED_COMPILERS` = full `<COMPILERS>` list
+- `MACHINE_META_LAST_VALIDATED` = `auto-discovered`
+- The orchestration banner notes that the entry was synthesized
+
+Use the long-form list to see what's available:
+
+```bash
+$ install-moab.sh --list-machines --e3sm-root=$E3SM_ROOT
+Registered machines:                  # the 6 curated ones
+  ...
+
+E3SM CIME-known machines (use any via --machine=NAME --profile=e3sm):
+  NAME                   COMPILERS
+  alvarez-cpu            intel,gnu,nvidia,amdclang
+  alvarez-gpu            gnugpu,gnu,nvidiagpu,nvidia
+  anvil                  intel,gnu
+  aurora                 oneapi-ifxgpu,oneapi-ifx
+  chrysalis              intel,gnu,oneapi-ifx
+  frontier               craygnu-mphipcc,craycray-mphipcc,...
+  jlse                   oneapi-ifx,oneapi-ifxgpu,gnu
+  polaris                gnu,nvhpc,nvhpcgpu
+  sunspot                oneapi-ifxgpu,oneapi-ifx
+  ...
+```
+
+Then build with the auto-discovered entry — same flags as a curated
+machine, no DB edit required:
+
+```bash
+install-moab.sh --machine=anvil:intel --profile=e3sm --e3sm-root=$E3SM_ROOT --yes
+```
+
+The build still uses the same e3sm_env.py helper to source modules and
+env vars — the only difference is install-moab.sh trusts CIME's `MACH=`
+list rather than its own curated list. If a machine is one you build
+on regularly, consider adding a curated entry per
+[CONTRIBUTING-MACHINES.md](CONTRIBUTING-MACHINES.md) so future runs get
+auto-detection, custom notes, and a tracked validation date.
+
+If `--machine=NAME` isn't curated AND not in CIME XML (or no
+`--e3sm-root` was passed), the script errors with a clear hint:
+
+```
+[install-moab] ERROR: unknown machine: foobar
+  (try --list-machines --e3sm-root=PATH for the full CIME list)
+```
+
 #### `perlmutter` vs `pmgpu`
 
 Perlmutter has CPU and GPU partitions sharing the same login nodes, so
@@ -672,7 +731,7 @@ $HOME/install/MOAB/                              PREFIX_PATH
 
 | Flag | Default | Description |
 |---|---|---|
-| `--machine=NAME` | `auto` | Use the named entry from the machine database (`bebop`, `improv`, `crux`, `gce`, `perlmutter`, …). `auto` runs `detect_machine` against `LMOD_SYSTEM_NAME`/`NERSC_HOST`/hostname and silently falls through if no entry matches. **Shortcut:** `--machine=NAME:COMPILER` (e.g. `--machine=perlmutter:intel`) is equivalent to `--machine=NAME --compiler=COMPILER`. |
+| `--machine=NAME` | `auto` | Use the named entry from the machine database (`bebop`, `improv`, `crux`, `gce`, `perlmutter`, `pmgpu`). `auto` runs `detect_machine` against `LMOD_SYSTEM_NAME`/`NERSC_HOST`/hostname and silently falls through if no entry matches. **Any E3SM CIME machine works too:** under `--profile=e3sm` with `--e3sm-root` set, `NAME` can be any `MACH=` from `config_machines.xml` (frontier, anvil, chrysalis, polaris, aurora, …) — install-moab.sh synthesizes a minimal entry on the fly. Run `--list-machines --e3sm-root=PATH` to see the full set. **Shortcut:** `--machine=NAME:COMPILER` (e.g. `--machine=anvil:intel`) is equivalent to `--machine=NAME --compiler=COMPILER`. |
 | `--compiler=NAME` | entry's `default_compiler` | Compiler family on the chosen machine: `gnu`, `intel`, `cray`, `nvhpc`, `nvidia`, `aocc`. Warning (not error) if not in the entry's `supported_compilers`. With `--profile=e3sm`, this keys the `<modules compiler="X">` and `<environment_variables compiler="X">` filters in `config_machines.xml`. An explicit `--compiler=` overrides the inline `:COMPILER` from `--machine=NAME:COMPILER`. |
 | `--list-machines` | — | Print the registry (with auto-detected entry marked) and exit. Requires no env vars; safe to run on a login node before any modules are loaded. |
 

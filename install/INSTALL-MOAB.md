@@ -185,12 +185,46 @@ export E3SM_ROOT=$HOME/Code/E3SM
 
 The script will:
 1. Resolve `--machine=bebop` → `MACHINE_META_E3SM_NAME=bebop` (or whatever your entry maps to).
-2. Run `python3 install/scripts/e3sm_env.py --e3sm-root=... --machine=bebop --compiler=gnu` and `source` its output (skipped under `--dry-run`). This loads modules and exports env vars.
+2. Run `python3 install/scripts/e3sm_env.py --e3sm-root=... --machine=bebop --compiler=gnu` and `source` its output (this happens under `--dry-run` too — the script runs in its own process, so it doesn't pollute your parent shell). This loads modules and exports env vars.
 3. Run two adapter shims:
    - If `NETCDF_C_PATH` is unset but `NETCDF_PATH` is set (anlgce-ub22, crux), alias.
    - If `HDF5_ROOT` is unset but `CRAY_HDF5_PARALLEL_PREFIX` is set (Cray PrgEnv), alias.
 4. If `BLAS_ROOT` and `LAPACK_ROOT` got set (bebop, improv pattern) and you didn't pass `--extra` / `--extra-tempestremap`, auto-fill them with the right `--with-blas=`/`--with-lapack=` specs (preferring static `lib*.a` when present).
-5. Continue with normal compiler resolution, MPI validation, TPL builds, MOAB build/install.
+5. **Show you the resolved env and prompt for y/N confirmation** before continuing. Bypass with `--yes` / `-y` / `ASSUME_YES=yes`. Rejects (anything other than `y` or `yes`) exit cleanly with a hint about re-running.
+6. Continue with normal compiler resolution, MPI validation, TPL builds, MOAB build/install.
+
+### The confirmation prompt
+
+After step 4 you'll see something like:
+
+```
+[install-moab] E3SM env applied. Resolved roots:
+[install-moab]   HDF5_ROOT     = /nfs/gce/projects/climate/.../hdf5/...
+[install-moab]   NETCDF_C_PATH = /nfs/gce/projects/climate/.../netcdf/...
+[install-moab]   PNETCDF_PATH  = /nfs/gce/projects/climate/.../pnetcdf/...
+[install-moab]   BLAS_ROOT     = /lcrc/group/e3sm/soft/.../netlib-lapack/...
+[install-moab]   LAPACK_ROOT   = /lcrc/group/e3sm/soft/.../netlib-lapack/...
+[install-moab] Auto-set --extra-tempestremap from BLAS_ROOT/LAPACK_ROOT
+[install-moab] Auto-set --extra (MOAB) from BLAS_ROOT/LAPACK_ROOT
+
+[install-moab] Does this E3SM environment look correct? [y/N]
+```
+
+This is the safety net for "wrong machine name" or "wrong compiler family"
+mistakes — you spot the bad path immediately rather than 5 minutes later
+in a TPL configure log. Type `y` to continue, anything else to abort
+cleanly.
+
+Skip the prompt for CI / scripted runs:
+```bash
+./install-moab.sh --profile=e3sm --machine=bebop --yes ...
+# or
+ASSUME_YES=yes ./install-moab.sh --profile=e3sm --machine=bebop ...
+```
+
+If stdin isn't a tty (you piped the invocation, ran from a CI runner,
+etc.) AND you didn't pass `--yes`, the script errors with a clear hint
+rather than hanging on `read`.
 
 ### `--profile=standalone` walk-through
 
@@ -435,6 +469,7 @@ $HOME/install/MOAB/                              PREFIX_PATH
 |---|---|---|
 | `--profile=NAME` | `e3sm` | `e3sm` (load env from CIME) or `standalone` (trust user env). |
 | `--e3sm-root=PATH` | `$E3SM_ROOT` env | Path to E3SM checkout; required for `--profile=e3sm`. Must contain `cime_config/machines/config_machines.xml`. |
+| `--yes`, `-y` | — | Bypass the e3sm-profile env-confirmation prompt. Required when stdin is not a tty (CI). Equivalent to `ASSUME_YES=yes`. |
 | `--print` | — | Emit only the resolved MOAB configure/cmake command (copy-pasteable). Implies `--dry-run`. |
 
 ### Resume / cleanup controls

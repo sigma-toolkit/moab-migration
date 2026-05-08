@@ -124,9 +124,71 @@ on first run. Required on the user's side:
 - A working MPI + HDF5 + NetCDF + PNetCDF stack (the script doesn't build
   these; user must have them via modules / Spack / system packages)
 
-### Three ways to hand off
+### Four ways to hand off
 
-#### 1. Tarball (simplest)
+#### 1. One-liner via `install-bootstrap.sh` (recommended for end users)
+
+`install/install-bootstrap.sh` is a 50-line self-fetching wrapper. It
+downloads the rest of `install/` from a configurable URL into a local cache
+directory, then exec's `install-moab.sh` with the args forwarded.
+
+```bash
+# The full one-liner (copy-pasteable):
+curl -fsSL https://bitbucket.org/fathomteam/moab/raw/master/install/install-bootstrap.sh \
+    | bash -s -- --machine=auto --hdf5-root=$HDF5_ROOT \
+                 --netcdf-root=$NETCDF_C_PATH --pnetcdf-root=$PNETCDF_PATH
+```
+
+The `bash -s --` is required to pass args after the pipe; everything after
+`--` is forwarded verbatim to `install-moab.sh`. Re-runs reuse the cached
+`install/` directory in `$PWD/install/` (override with `INSTALL_MOAB_DIR=`).
+
+Env-var configuration (all optional):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `INSTALL_MOAB_BRANCH` | `master` | Branch / tag to fetch from |
+| `INSTALL_MOAB_REPO_RAW_URL` | `https://bitbucket.org/fathomteam/moab/raw` | Raw-URL base; override for a fork |
+| `INSTALL_MOAB_DIR` | `$PWD/install` | Where to download `install/` |
+| `INSTALL_MOAB_REFRESH` | `no` | `yes` forces re-download even if cache present |
+
+Examples:
+
+```bash
+# Pin to a release branch
+INSTALL_MOAB_BRANCH=release-v5.6.0 \
+    curl -fsSL https://bitbucket.org/fathomteam/moab/raw/release-v5.6.0/install/install-bootstrap.sh \
+    | bash -s -- --machine=auto
+
+# Cache install/ in $HOME (so multiple build dirs share one copy)
+INSTALL_MOAB_DIR=$HOME/.local/share/moab-installer \
+    curl -fsSL .../install-bootstrap.sh \
+    | bash -s -- --machine=auto
+
+# Use a fork
+INSTALL_MOAB_REPO_RAW_URL=https://bitbucket.org/myuser/moab/raw \
+    curl -fsSL https://bitbucket.org/myuser/moab/raw/master/install/install-bootstrap.sh \
+    | bash -s -- --machine=auto
+
+# Save the bootstrap and inspect before running
+curl -fsSLo install-bootstrap.sh \
+    https://bitbucket.org/fathomteam/moab/raw/master/install/install-bootstrap.sh
+less install-bootstrap.sh
+bash install-bootstrap.sh --machine=auto --dry-run
+```
+
+The bootstrap requires `bash` ≥ 3.2 and either `curl` or `wget`. Everything
+else is fetched + checked when needed. Verified end-to-end on macOS via a
+local HTTP server.
+
+> ⚠️ **`curl | bash` security note.** The pattern is convenient but blindly
+> executes whatever the URL serves. For first-time use on a sensitive
+> system, fetch into a file first (`curl -fsSLo install-bootstrap.sh ...`),
+> inspect, then run. The bootstrap itself only fetches into the configured
+> `INSTALL_MOAB_DIR` and exec's `install-moab.sh` from there — no other
+> side effects.
+
+#### 2. Tarball (simplest manual handoff)
 
 ```bash
 # On a machine with the MOAB checkout
@@ -140,7 +202,7 @@ tar xzf moab-install.tar.gz
 
 About 100 KB compressed; trivial to email or drop into a shared filesystem.
 
-#### 2. Git sparse-checkout (no tarball, kept up to date)
+#### 3. Git sparse-checkout (no tarball, kept up to date)
 
 ```bash
 # User runs, no full MOAB clone needed
@@ -157,7 +219,7 @@ Sparse-checkout pulls only the `install/` directory (~100 KB), but the
 checkout is a real git repo — `git pull` updates the install scripts in
 place when you ship fixes.
 
-#### 3. Direct file fetch (curl-friendly, no git)
+#### 4. Direct file fetch (no git, no bootstrap)
 
 For environments that don't have git available on the install host (rare on
 HPC, common in containers), fetch the files directly:

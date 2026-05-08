@@ -111,6 +111,7 @@ CMAKE_CONFIGURATION_FILES = CMakeLists.txt \
    pymoab/CMakeLists.txt            config/cython_test.pyx
 
 install_moab_files = install/install-moab.sh \
+                  install/install-bootstrap.sh \
                   install/install-moab-e3sm.sh \
                   install/INSTALL-MOAB.md \
                   install/CONTRIBUTING-MACHINES.md \

@@ -1,4 +1,20 @@
-# `install-moab-e3sm.sh` — Handoff Document
+# `install-moab.sh` — Handoff Document
+
+> **Renamed in 2026-05.** Was `install-moab-e3sm.sh` and lived at
+> `build-e3sm/install-moab-e3sm.sh`. The old path remains as a 3-line
+> backwards-compat shim (`install/install-moab-e3sm.sh`) that exec's
+> `install-moab.sh` with all args forwarded — existing E3SM workflows /
+> docs that reference the old name keep working unchanged.
+>
+> **Push 1 (this revision)** added a machine database and `--machine` /
+> `--list-machines` / `--compiler` flags. Database entries are pure
+> metadata (no hardcoded TPL paths); per-machine paths come from the
+> user's loaded modules.
+>
+> **Push 2 (planned)** will add `--profile={e3sm,standalone}`, a
+> `--print` mode, and a Python helper that sources E3SM's
+> `cime_config/machines/config_machines.xml` to auto-load the right
+> modules and env vars for `--profile=e3sm --machine=NAME --compiler=NAME`.
 
 End-to-end orchestrator that builds and installs MOAB plus its three required
 TPLs (Eigen3, Zoltan, TempestRemap) on systems where E3SM is already
@@ -14,8 +30,9 @@ cascade.
 1. [What the script does](#what-the-script-does)
 2. [Prerequisites](#prerequisites)
 3. [Quick start](#quick-start)
-4. [Directory layout](#directory-layout)
-5. [All command-line options](#all-command-line-options)
+4. [Machine database](#machine-database)
+5. [Directory layout](#directory-layout)
+6. [All command-line options](#all-command-line-options)
 6. [All environment variables](#all-environment-variables)
 7. [Compiler resolution rules](#compiler-resolution-rules)
 8. [MPI wrapper validation](#mpi-wrapper-validation)
@@ -137,6 +154,104 @@ module load PrgEnv-gnu cray-hdf5-parallel cray-netcdf-hdf5parallel cray-parallel
 
 ---
 
+## Machine database
+
+The script ships with a registry of currently-supported HPC environments.
+Each entry is **pure metadata**: a hostname/env-var match predicate, a default
+compiler family, an E3SM machine name (used by Push 2 for CIME lookup), a
+module-load hint string, and a last-validated date. **No TPL paths are
+hardcoded** — the user is expected to load modules so that `HDF5_ROOT`,
+`NETCDF_C_PATH`, and `PNETCDF_PATH` are set in the environment before
+invoking the script. (Push 2 will automate this for `--profile=e3sm` by
+sourcing `config_machines.xml`.)
+
+### Listing entries
+
+```bash
+$ install-moab.sh --list-machines
+Registered machines:
+
+  NAME         DEFAULT SUPPORTED                      LAST-VALIDATED
+  ----         ------- ---------                      --------------
+ *bebop        gnu     gnu,intel                      2026-05-08
+  improv       gnu     gnu,intel,aocc                 TBD
+  crux         gnu     gnu,cray,nvhpc                 TBD
+  gce          gnu     gnu,intel                      2026-05-08
+  perlmutter   gnu     gnu,intel,nvidia,aocc          2026-05-08
+
+  * = auto-detected on this host
+```
+
+`TBD` entries are stubs that have not yet been validated against a real build.
+They are still selectable via `--machine=NAME`; please report failures so the
+entry can be promoted (or fixed).
+
+### Selecting an entry
+
+| Invocation | Behavior |
+|---|---|
+| (no flag) | same as `--machine=auto` |
+| `--machine=auto` | iterate registered `match()` predicates; use the first that returns 0 |
+| `--machine=NAME` | force a specific entry; error if `NAME` isn't registered |
+| `--compiler=NAME` | override the entry's `default_compiler`; warn if not in `supported_compilers` |
+
+### What a match looks like
+
+The orchestration banner reports the resolved machine before any TPL or MOAB
+work begins:
+
+```
+[install-moab] Machine         : bebop (compiler family: gnu; last-validated: 2026-05-08)
+[install-moab] Module hint     : module load gcc/13.2.0 openmpi/4.1.8 hdf5/1.12.3 netcdf-c parallel-netcdf
+[install-moab] Machine notes   : Site-installed netlib BLAS/LAPACK at /lcrc/group/e3sm/soft/... (use --extra to point MOAB/TempestRemap at it; see below)
+```
+
+If no entry matches, the banner says so and the script continues in generic
+mode (same behavior as before the database existed):
+
+```
+[install-moab] Machine         : (none detected; pass --machine=NAME or --list-machines to see options)
+```
+
+### Adding a new machine entry
+
+In `install/install-moab.sh`, define two functions and append to `MACHINE_REGISTRY`.
+Template:
+
+```bash
+machine_<name>_match() {
+    [[ "${LMOD_SYSTEM_NAME:-}" == "<name>" ]] && return 0
+    [[ "$(_hn)" == <hostname-prefix>* ]]
+}
+machine_<name>_meta() {
+    MACHINE_META_E3SM_NAME="<name in config_machines.xml, or empty>"
+    MACHINE_META_DEFAULT_COMPILER="gnu"           # or intel, cray, nvhpc, aocc, nvidia
+    MACHINE_META_SUPPORTED_COMPILERS="gnu,intel"
+    MACHINE_META_STANDALONE_HINT="module load gcc openmpi hdf5 netcdf-c parallel-netcdf"
+    MACHINE_META_LAST_VALIDATED="TBD"             # promote to YYYY-MM-DD after a successful build
+    MACHINE_META_NOTES=""                          # optional, e.g. Cray PrgEnv quirks
+}
+
+# add to the registry list near the top of the database block:
+MACHINE_REGISTRY="bebop improv crux gce perlmutter <name>"
+```
+
+Validate via `install-moab.sh --dry-run --machine=<name>` (no real build needed
+for the resolution step). Promote `last_validated` to a date once a real build
+on the target machine completes successfully.
+
+### Why no paths
+
+`suggest_configuration.sh` (the deprecated predecessor) had hardcoded paths for
+six retired machines (vesta, mira, blogin, theta, cori, edison), all of which
+silently misdirected users for years. The lesson: machine path data ages
+faster than this script does. For Push 1, the only obligation is **detection
+and informational hinting**. Push 2 delegates the path-resolution problem to
+E3SM's `config_machines.xml`, which is maintained by the E3SM team and is
+already the source of truth for E3SM builds.
+
+---
+
 ## Directory layout
 
 With `--build-dir=/scratch/me/build` and `--prefix=$HOME/install/MOAB`:
@@ -226,6 +341,14 @@ $HOME/install/MOAB/                              PREFIX_PATH
 | `--cxx=BIN` | Explicit C++ compiler |
 | `--fc=BIN` | Explicit Fortran compiler |
 | `--f77=BIN` | Explicit F77 compiler |
+
+### Machine selection
+
+| Flag | Default | Description |
+|---|---|---|
+| `--machine=NAME` | `auto` | Use the named entry from the machine database (`bebop`, `improv`, `crux`, `gce`, `perlmutter`, …). `auto` runs `detect_machine` against `LMOD_SYSTEM_NAME`/`NERSC_HOST`/hostname and silently falls through if no entry matches. |
+| `--compiler=NAME` | entry's `default_compiler` | Compiler family on the chosen machine: `gnu`, `intel`, `cray`, `nvhpc`, `nvidia`, `aocc`. Warning (not error) if not in the entry's `supported_compilers`. Informational in Push 1; Push 2 keys `config_machines.xml` lookup off this. |
+| `--list-machines` | — | Print the registry (with auto-detected entry marked) and exit. Requires no env vars; safe to run on a login node before any modules are loaded. |
 
 ### Resume / cleanup controls
 

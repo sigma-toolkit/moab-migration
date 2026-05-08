@@ -33,10 +33,11 @@ cascade.
 
 1. [What the script does](#what-the-script-does)
 2. [Prerequisites](#prerequisites)
-3. [Quick start](#quick-start)
-4. [Machine database](#machine-database)
-5. [Directory layout](#directory-layout)
-6. [All command-line options](#all-command-line-options)
+3. [Standalone distribution (no MOAB checkout required)](#standalone-distribution-no-moab-checkout-required)
+4. [Quick start](#quick-start)
+5. [Machine database](#machine-database)
+6. [Directory layout](#directory-layout)
+7. [All command-line options](#all-command-line-options)
 6. [All environment variables](#all-environment-variables)
 7. [Compiler resolution rules](#compiler-resolution-rules)
 8. [MPI wrapper validation](#mpi-wrapper-validation)
@@ -108,6 +109,106 @@ done and only rebuilds what changed (see [Resume behavior](#resume-behavior)).
 
 The HDF5 / NetCDF / PNetCDF installs must already exist; this script does
 not build them.
+
+---
+
+## Standalone distribution (no MOAB checkout required)
+
+The `install/` directory is **fully self-contained**. You can hand off just
+this directory to a user — the script clones MOAB itself into the build dir
+on first run. Required on the user's side:
+
+- `bash` ≥ 3.2, `git`, `curl` (or `wget`), `tar`, `make`, `autoreconf`
+- `python3` — **only if `--profile=e3sm`** is used (for `e3sm_env.py`); not
+  needed for `--profile=standalone`
+- A working MPI + HDF5 + NetCDF + PNetCDF stack (the script doesn't build
+  these; user must have them via modules / Spack / system packages)
+
+### Three ways to hand off
+
+#### 1. Tarball (simplest)
+
+```bash
+# On a machine with the MOAB checkout
+cd /path/to/moab && tar czf moab-install.tar.gz install/
+
+# Send to user; on their side
+tar xzf moab-install.tar.gz
+./install/install-moab.sh --machine=auto --hdf5-root=$HDF5_ROOT \
+    --netcdf-root=$NETCDF_C_PATH --pnetcdf-root=$PNETCDF_PATH
+```
+
+About 100 KB compressed; trivial to email or drop into a shared filesystem.
+
+#### 2. Git sparse-checkout (no tarball, kept up to date)
+
+```bash
+# User runs, no full MOAB clone needed
+git clone --depth 1 --filter=blob:none --no-checkout \
+    https://bitbucket.org/fathomteam/moab.git moab-installer
+cd moab-installer
+git sparse-checkout init --cone
+git sparse-checkout set install
+git checkout master
+./install/install-moab.sh --machine=auto [...]
+```
+
+Sparse-checkout pulls only the `install/` directory (~100 KB), but the
+checkout is a real git repo — `git pull` updates the install scripts in
+place when you ship fixes.
+
+#### 3. Direct file fetch (curl-friendly, no git)
+
+For environments that don't have git available on the install host (rare on
+HPC, common in containers), fetch the files directly:
+
+```bash
+BASE=https://bitbucket.org/fathomteam/moab/raw/master/install
+mkdir -p install/scripts
+for f in install-moab.sh install-moab-e3sm.sh INSTALL-MOAB.md \
+         CONTRIBUTING-MACHINES.md workflow.sh; do
+    curl -fsSLo install/$f $BASE/$f
+done
+curl -fsSLo install/scripts/e3sm_env.py $BASE/scripts/e3sm_env.py
+chmod +x install/install-moab.sh install/install-moab-e3sm.sh \
+         install/workflow.sh install/scripts/e3sm_env.py
+./install/install-moab.sh --machine=auto [...]
+```
+
+Substitute the canonical raw-file URL for your fork / branch as needed.
+
+### What the script does on a fresh user system
+
+On a user's machine that has nothing but the `install/` directory:
+
+1. **Clones MOAB**: `git clone --branch master --single-branch
+   https://bitbucket.org/fathomteam/moab.git $BUILD_DIR/moab-src`
+   (override the URL with `--moab-repo=URL` or branch with `--moab-branch=NAME`).
+2. **Bootstraps autotools**: runs `autoreconf -fi` if `configure` is missing
+   (some clones may need this).
+3. **Downloads + builds the three TPLs** (Eigen3, Zoltan, TempestRemap) into
+   `$TPL_PREFIX/<tpl>/`. TPL tarballs are cached in `$BUILD_DIR/tpl-archives/`
+   and re-used across runs.
+4. **Configures + builds + installs MOAB** into `$PREFIX_PATH`.
+
+The user never has to clone MOAB by hand or know the TPL versions.
+
+### Verifying the handoff works on a target machine
+
+Before committing to a real build, the user can sanity-check with no env
+vars and no compiles:
+
+```bash
+./install/install-moab.sh --list-machines       # shows registered entries
+./install/install-moab.sh --self-check          # validates the entry DB
+```
+
+For previewing what would happen on the actual machine (no build):
+
+```bash
+# After loading their env (modules, etc.):
+./install/install-moab.sh --dry-run --machine=auto --profile=standalone
+```
 
 ---
 

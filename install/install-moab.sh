@@ -71,6 +71,7 @@ CLEAN_TPLS="${CLEAN_TPLS:-no}"
 DRY_RUN="${DRY_RUN:-no}"
 PRINT_MODE="${PRINT_MODE:-no}"
 PRINT_SPACK_SPEC="${PRINT_SPACK_SPEC:-no}"
+VERBOSE="${VERBOSE:-no}"
 RECONFIGURE="${RECONFIGURE:-no}"
 SKIP_MPI_VALIDATION="${SKIP_MPI_VALIDATION:-no}"
 
@@ -82,7 +83,10 @@ REUSE_TPLS="${REUSE_TPLS:-yes}"
 DOWNLOAD_RETRIES="${DOWNLOAD_RETRIES:-5}"
 DOWNLOAD_RETRY_DELAY="${DOWNLOAD_RETRY_DELAY:-10}"
 TPL_MAX_ATTEMPTS="${TPL_MAX_ATTEMPTS:-3}"
-TAIL_LOGS="${TAIL_LOGS:-yes}"
+# TAIL_LOGS default: empty here; resolved below (after VERBOSE arg parse) to
+# match VERBOSE -- yes when --verbose, no otherwise. Explicit env override
+# wins.
+TAIL_LOGS="${TAIL_LOGS:-}"
 TPL_MIRROR="${TPL_MIRROR:-https://web.cels.anl.gov/projects/sigma/downloads/TPL}"
 
 # Compiler wrappers
@@ -342,11 +346,25 @@ COLOR_RESET=$'\033[0m'
 # All progress output goes to stderr so functions can return values via stdout
 # (e.g. fetch_tpl_archive prints the archive path; capturing with $(...) must
 # not pick up log lines).
-log()    { printf '%s[install-moab]%s %s\n' "$COLOR_BLUE" "$COLOR_RESET" "$*" >&2; }
+# Output functions. Two visibility tiers:
+#   * Always visible (key updates):  section(), ok(), warn(), die()
+#   * Verbose-only:                  log()
+# The default is quiet; users get phase milestones + success/warning/error lines.
+# Pass --verbose (or set VERBOSE=yes) for the full banner-and-progress firehose.
+log()    { [[ "${VERBOSE:-no}" == "yes" ]] && printf '%s[install-moab]%s %s\n' "$COLOR_BLUE" "$COLOR_RESET" "$*" >&2; return 0; }
 ok()     { printf '%s[install-moab]%s %s%s%s\n' "$COLOR_BLUE" "$COLOR_RESET" "$COLOR_GREEN" "$*" "$COLOR_RESET" >&2; }
 warn()   { printf '%s[install-moab]%s %sWARNING:%s %s\n' "$COLOR_BLUE" "$COLOR_RESET" "$COLOR_YELLOW" "$COLOR_RESET" "$*" >&2; }
 die()    { printf '%s[install-moab]%s %sERROR:%s %s\n' "$COLOR_BLUE" "$COLOR_RESET" "$COLOR_RED" "$COLOR_RESET" "$*" >&2; exit "${2:-1}"; }
-section(){ printf '\n%s========== %s ==========%s\n\n' "$COLOR_BLUE" "$*" "$COLOR_RESET" >&2; }
+# section: always visible, but compact in quiet mode (single line) and full
+# equals-bracket banner in verbose. Either form is the user-visible signal
+# that a new phase is starting.
+section(){
+    if [[ "${VERBOSE:-no}" == "yes" ]]; then
+        printf '\n%s========== %s ==========%s\n\n' "$COLOR_BLUE" "$*" "$COLOR_RESET" >&2
+    else
+        printf '%s[install-moab]%s %s>>%s %s\n' "$COLOR_BLUE" "$COLOR_RESET" "$COLOR_BLUE" "$COLOR_RESET" "$*" >&2
+    fi
+}
 
 usage() {
     cat <<EOF
@@ -401,7 +419,12 @@ Common options:
   --reconfigure         Force MOAB re-configure even if already configured
   --skip-mpi-validation Skip the MPI compile/link sanity test (only if you
                         cannot compile on this host)
-  --no-tail             Suppress live tail of TPL build logs
+  --no-tail             Suppress live tail of TPL build logs (off by default
+                        unless --verbose; pass TAIL_LOGS=yes to override).
+  --verbose, -v         Show full informational output: orchestration banner,
+                        per-file verification details, per-line TPL build
+                        log tail. Default mode is quiet -- only phase
+                        milestones, success markers, warnings, and errors.
   --dry-run             Print all commands, do nothing
   --print               Print only the resolved MOAB configure/cmake command
                         (copy-pasteable, no banner). Implies --dry-run.
@@ -522,6 +545,7 @@ while [[ $# -gt 0 ]]; do
         --reconfigure)     RECONFIGURE=yes ;;
         --skip-mpi-validation) SKIP_MPI_VALIDATION=yes ;;
         --no-tail)         TAIL_LOGS=no ;;
+        --verbose|-v)      VERBOSE=yes ;;
         --dry-run)         DRY_RUN=yes ;;
         --print)           PRINT_MODE=yes; DRY_RUN=yes ;;
         --print-spack-spec) PRINT_SPACK_SPEC=yes; DRY_RUN=yes ;;
@@ -552,6 +576,13 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
+
+# Resolve TAIL_LOGS default now that --verbose has been parsed: tail TPL
+# logs in verbose mode; suppress the per-line firehose in quiet mode.
+# Explicit env override (e.g. TAIL_LOGS=yes) takes precedence.
+if [[ -z "$TAIL_LOGS" ]]; then
+    TAIL_LOGS="$([[ "$VERBOSE" == "yes" ]] && echo yes || echo no)"
+fi
 
 #-----------------------------------------------------------------------------
 # --list-machines: print the registry and exit (does not require any env)
@@ -1364,12 +1395,12 @@ validate_all_mpi_wrappers() {
     fi
     local fail=0
     log "  C   : $CC_BIN"
-    validate_mpi_wrapper c       "$CC_BIN"  && ok "  C   wrapper OK" || fail=1
+    validate_mpi_wrapper c       "$CC_BIN"  && log "  C   wrapper OK" || fail=1
     log "  C++ : $CXX_BIN"
-    validate_mpi_wrapper cxx     "$CXX_BIN" && ok "  C++ wrapper OK" || fail=1
+    validate_mpi_wrapper cxx     "$CXX_BIN" && log "  C++ wrapper OK" || fail=1
     log "  FC  : $FC_BIN"
     if validate_mpi_wrapper fortran "$FC_BIN"; then
-        ok "  FC  wrapper OK"
+        log "  FC  wrapper OK"
     else
         warn "  FC  wrapper failed -- MOAB/TempestRemap will likely fail to link MPI Fortran"
         fail=1
@@ -1377,7 +1408,7 @@ validate_all_mpi_wrappers() {
     if [[ "$F77_BIN" != "$FC_BIN" ]]; then
         log "  F77 : $F77_BIN"
         if validate_mpi_wrapper fortran "$F77_BIN"; then
-            ok "  F77 wrapper OK"
+            log "  F77 wrapper OK"
         else
             warn "  F77 wrapper failed -- you can pass --f77=$FC_BIN as a workaround"
             fail=1
@@ -2199,10 +2230,12 @@ run_moab_build_install() {
 verify_install() {
     section "Verification"
     local ok_all=yes
-    must_exist() { if [[ -e "$1" ]]; then ok "  found: $1"; else warn "  missing: $1"; ok_all=no; fi; }
+    # Per-file checks are verbose-only (use log); the aggregate "verification
+    # PASSED" / WARN summary below stays visible in quiet mode.
+    must_exist() { if [[ -e "$1" ]]; then log "  found: $1"; else warn "  missing: $1"; ok_all=no; fi; }
     any_exist()  {
         local f
-        for f in "$@"; do [[ -e "$f" ]] && { ok "  found: $f"; return 0; }; done
+        for f in "$@"; do [[ -e "$f" ]] && { log "  found: $f"; return 0; }; done
         warn "  missing all of: $*"; ok_all=no
     }
     log "TPLs:"
@@ -2268,7 +2301,7 @@ report_state() {
             if [[ "$want_extras" != "$have_extras" ]]; then
                 log "  $tpl: installed but --extra-$tpl changed (have='$have_extras' want='$want_extras') -- WILL REBUILD"
             else
-                ok "  $tpl: installed at $(tpl_install_dir "$tpl") -- WILL SKIP"
+                log "  $tpl: installed at $(tpl_install_dir "$tpl") -- WILL SKIP"
             fi
         else
             log "  $tpl: not installed -- WILL BUILD"
@@ -2278,7 +2311,7 @@ report_state() {
         if [[ "$RECONFIGURE" == "yes" ]]; then
             log "  moab: configured (fingerprint match) -- WILL RECONFIGURE (--reconfigure)"
         else
-            ok "  moab: configured (fingerprint match) -- WILL SKIP CONFIGURE, resume make/install"
+            log "  moab: configured (fingerprint match) -- WILL SKIP CONFIGURE, resume make/install"
         fi
     elif [[ -f "$MOAB_BUILD_DIR/CMakeCache.txt" || -f "$MOAB_BUILD_DIR/Makefile" ]]; then
         log "  moab: configured but args differ (or fingerprint missing) -- WILL RECONFIGURE"

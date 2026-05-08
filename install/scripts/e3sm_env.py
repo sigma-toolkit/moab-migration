@@ -27,13 +27,15 @@ laptop and consuming on a different machine. Instead we translate:
 This keeps the emitted snippet portable and idempotent.
 """
 
-from __future__ import annotations
-
+# Targets Python >= 3.5 for HPC portability. Some sites (NERSC Perlmutter
+# default python3 at time of writing) ship Python older than 3.7, which
+# rules out `from __future__ import annotations` (3.7+) and PEP 585
+# generics like `tuple[str, bool]` (3.9+). Type hints are dropped
+# throughout for the same reason -- runtime behavior doesn't need them.
 import argparse
 import re
 import sys
 from pathlib import Path
-from typing import Iterable, Optional
 
 
 # ---------- variable substitution -------------------------------------------------
@@ -42,7 +44,7 @@ _RE_SHELL = re.compile(r"\$SHELL\{([^}]*)\}")     # nested {} not used in any cu
 _RE_ENV = re.compile(r"\$ENV\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 
-def translate_value(raw: str) -> tuple[str, bool]:
+def translate_value(raw):
     r"""CIME-syntax -> bash-syntax. Returns (translated, needs_outer_double_quotes).
 
     Subtlety: when the value is a pure $SHELL{...} expression we MUST emit it
@@ -85,7 +87,7 @@ def translate_value(raw: str) -> tuple[str, bool]:
     return (out, True)
 
 
-def block_matches(attrs: dict, compiler: str, mpilib: str) -> bool:
+def block_matches(attrs, compiler, mpilib):
     """A compiler/mpilib-attributed block applies if its attrs match the request.
     Blocks with BUILD_THREADED are skipped (we don't build MOAB threaded here)."""
     if "BUILD_THREADED" in attrs:
@@ -101,8 +103,7 @@ def block_matches(attrs: dict, compiler: str, mpilib: str) -> bool:
 # ---------- Tier 1: CIME API ------------------------------------------------------
 
 
-def emit_via_cime(e3sm_root: Path, machine: str, compiler: str, mpilib: str,
-                  shell_lang: str = "sh") -> None:
+def emit_via_cime(e3sm_root, machine, compiler, mpilib, shell_lang="sh"):
     """Walk the XML via CIME's Machines class. Raises on lookup failure."""
     sys.path.insert(0, str(e3sm_root / "cime"))
     from CIME.XML.machines import Machines  # type: ignore
@@ -208,8 +209,7 @@ def emit_via_cime(e3sm_root: Path, machine: str, compiler: str, mpilib: str,
 # ---------- Tier 2: direct XML fallback -------------------------------------------
 
 
-def emit_via_xml(e3sm_root: Path, machine: str, compiler: str, mpilib: str,
-                 shell_lang: str = "sh") -> None:
+def emit_via_xml(e3sm_root, machine, compiler, mpilib, shell_lang="sh"):
     """Pure-stdlib fallback: walk config_machines.xml with ElementTree."""
     import xml.etree.ElementTree as ET
 
@@ -307,7 +307,7 @@ def emit_via_xml(e3sm_root: Path, machine: str, compiler: str, mpilib: str,
 # ---------- main ------------------------------------------------------------------
 
 
-def main() -> int:
+def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     ap.add_argument("--e3sm-root", required=True, type=Path,
                     help="Path to E3SM checkout (must contain cime_config/machines/config_machines.xml)")

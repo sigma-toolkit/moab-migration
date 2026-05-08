@@ -307,6 +307,16 @@ Common options:
                         cannot compile on this host)
   --no-tail             Suppress live tail of TPL build logs
   --dry-run             Print all commands, do nothing
+  --machine=NAME        Use the named machine entry from the database. NAME=auto
+                        (default) auto-detects via hostname/NERSC_HOST/
+                        LMOD_SYSTEM_NAME. Pass --list-machines to see all entries.
+                        Machine entries currently provide informational hints only;
+                        Push 2 will use them to drive E3SM CIME env resolution.
+  --compiler=NAME       Compiler family on the chosen machine (gnu, intel, cray,
+                        nvidia, aocc, ...). Defaults to the machine entry's
+                        default_compiler. Informational in Push 1.
+  --list-machines       Print the registered machine entries with last-validated
+                        dates, mark the auto-detected one, and exit.
   --extra=ARGS          Extra args appended to MOAB invocation
   --extra-zoltan=ARGS   Extra args appended to Zoltan's configure (verbatim)
   --extra-tempestremap=ARGS
@@ -375,11 +385,87 @@ while [[ $# -gt 0 ]]; do
         --extra=*)               EXTRA_MOAB_ARGS="${1#*=}" ;;
         --extra-zoltan=*)        EXTRA_ZOLTAN_ARGS="${1#*=}" ;;
         --extra-tempestremap=*)  EXTRA_TEMPESTREMAP_ARGS="${1#*=}" ;;
+        --machine=*)             MACHINE_NAME="${1#*=}" ;;
+        --compiler=*)            COMPILER_FAMILY="${1#*=}" ;;
+        --list-machines)         _LIST_MACHINES=yes ;;
         -h|--help)         usage; exit 0 ;;
         *) die "unknown option: $1 (use --help)" 1 ;;
     esac
     shift
 done
+
+#-----------------------------------------------------------------------------
+# --list-machines: print the registry and exit (does not require any env)
+#-----------------------------------------------------------------------------
+list_machines() {
+    printf 'Registered machines:\n\n'
+    printf '  %-12s %-7s %-30s %s\n' "NAME" "DEFAULT" "SUPPORTED" "LAST-VALIDATED"
+    printf '  %-12s %-7s %-30s %s\n' "----" "-------" "---------" "--------------"
+    local m detected
+    detected="$(detect_machine)"
+    for m in $MACHINE_REGISTRY; do
+        reset_machine_meta
+        "machine_${m}_meta"
+        local mark=" "
+        [[ -n "$detected" && "$detected" == "$m" ]] && mark="*"
+        printf ' %s%-12s %-7s %-30s %s\n' "$mark" "$m" \
+            "$MACHINE_META_DEFAULT_COMPILER" \
+            "$MACHINE_META_SUPPORTED_COMPILERS" \
+            "$MACHINE_META_LAST_VALIDATED"
+    done
+    printf '\n'
+    [[ -n "$detected" ]] && printf '  * = auto-detected on this host (--machine=auto resolves to this)\n\n'
+    printf 'For details on a single machine: --machine=NAME --dry-run\n'
+}
+if [[ "${_LIST_MACHINES:-no}" == "yes" ]]; then
+    list_machines
+    exit 0
+fi
+
+#-----------------------------------------------------------------------------
+# Resolve --machine and --compiler
+#-----------------------------------------------------------------------------
+# Resolution order:
+#   --machine=NAME       -> exact lookup, error if unknown
+#   --machine=auto       -> detect_machine (matches first registered match() that returns 0)
+#   <unset>              -> same as auto
+# After resolution, the chosen machine's meta() is invoked, populating
+# MACHINE_META_* globals. --compiler=NAME, if not passed, defaults to
+# MACHINE_META_DEFAULT_COMPILER. The compiler family is informational in
+# Push 1; Push 2 will use it to drive E3SM CIME env resolution.
+apply_machine_defaults() {
+    local requested="${MACHINE_NAME:-auto}"
+    local resolved=""
+
+    if [[ "$requested" == "auto" || -z "$requested" ]]; then
+        resolved="$(detect_machine)"
+        if [[ -z "$resolved" ]]; then
+            log "Machine         : (no registered match for this host; running in generic mode)"
+            MACHINE_NAME=""
+            return 0
+        fi
+        MACHINE_NAME="$resolved"
+    else
+        if ! is_known_machine "$requested"; then
+            die "unknown machine: $requested (try --list-machines)" 1
+        fi
+        MACHINE_NAME="$requested"
+    fi
+
+    reset_machine_meta
+    "machine_${MACHINE_NAME}_meta"
+
+    if [[ -z "$COMPILER_FAMILY" ]]; then
+        COMPILER_FAMILY="$MACHINE_META_DEFAULT_COMPILER"
+    fi
+
+    # Validate compiler against supported list (warning only; user may know better)
+    local supported="$MACHINE_META_SUPPORTED_COMPILERS"
+    if [[ -n "$supported" && ",$supported," != *",$COMPILER_FAMILY,"* ]]; then
+        warn "compiler '$COMPILER_FAMILY' not in $MACHINE_NAME's supported list ($supported); proceeding anyway"
+    fi
+}
+apply_machine_defaults
 
 # Recompute TPL_PREFIX default if --prefix changed and TPL_PREFIX wasn't set
 if [[ "$TPL_PREFIX" == "$HOME/install/MOAB/tpls" && "$PREFIX_PATH" != "$HOME/install/MOAB" ]]; then
@@ -1432,6 +1518,13 @@ verify_install() {
 # Report and dispatch
 #-----------------------------------------------------------------------------
 section "MOAB orchestration"
+if [[ -n "${MACHINE_NAME:-}" ]]; then
+    log "Machine         : $MACHINE_NAME (compiler family: $COMPILER_FAMILY; last-validated: $MACHINE_META_LAST_VALIDATED)"
+    [[ -n "$MACHINE_META_STANDALONE_HINT" ]] && log "Module hint     : $MACHINE_META_STANDALONE_HINT"
+    [[ -n "$MACHINE_META_NOTES" ]] && log "Machine notes   : $MACHINE_META_NOTES"
+else
+    log "Machine         : (none detected; pass --machine=NAME or --list-machines to see options)"
+fi
 if [[ "${_USER_SET_MOAB_SRC:-no}" == "yes" ]]; then
     log "MOAB source dir : $MOAB_SRC_DIR (user-managed; no git ops)"
 else

@@ -524,6 +524,52 @@ adapt_e3sm_env_to_install_moab_vars() {
     if [[ -z "${HDF5_ROOT:-}" && -n "${CRAY_HDF5_PARALLEL_PREFIX:-}" ]]; then
         export HDF5_ROOT="$CRAY_HDF5_PARALLEL_PREFIX"
     fi
+    # HDF5_ROOT sibling-derivation: bebop and improv configs do not export
+    # HDF5_ROOT but DO export NETCDF_C_PATH like
+    #     /lcrc/group/e3sm/soft/<machine>/netcdf-c/<ver>/<compiler>/<mpi>
+    # The corresponding hdf5 install lives at the sibling
+    #     /lcrc/group/e3sm/soft/<machine>/hdf5/<ver>/<compiler>/<mpi>
+    # Sniff for it -- conservative: only adopt if the sibling exists AND has
+    # include/hdf5.h (i.e. it's a real HDF5 install, not a coincidental dir).
+    if [[ -z "${HDF5_ROOT:-}" && -n "${NETCDF_C_PATH:-}" ]]; then
+        local derived
+        derived="$(_derive_hdf5_root_from_netcdf "$NETCDF_C_PATH")"
+        if [[ -n "$derived" ]]; then
+            export HDF5_ROOT="$derived"
+            log "Derived HDF5_ROOT from NETCDF_C_PATH sibling: $HDF5_ROOT"
+        fi
+    fi
+}
+
+# Given a NETCDF_C_PATH that follows the .../netcdf-c/<ver>/<rest> convention,
+# look for a sibling .../hdf5/<*>/<rest> with include/hdf5.h. Prints the path
+# on success, empty on failure. Conservative: tries exact-version-suffix match
+# first (rare to align), then any-version match for the same compiler+mpi tail.
+_derive_hdf5_root_from_netcdf() {
+    local nc="$1"
+    [[ "$nc" == */netcdf-c/* ]] || return 0
+    # Split into parent (.../soft/<machine>) and tail (compiler/mpi or whatever
+    # follows the netcdf version segment).
+    local parent="${nc%/netcdf-c/*}"            # .../soft/<machine>
+    local nc_tail="${nc#*/netcdf-c/}"           # <ver>/<compiler>/<mpi>
+    local nc_after_ver="${nc_tail#*/}"          # <compiler>/<mpi>  (drop <ver>)
+    [[ "$nc_after_ver" != "$nc_tail" ]] || return 0   # malformed: no <ver> segment
+
+    local hdf5_parent="$parent/hdf5"
+    [[ -d "$hdf5_parent" ]] || return 0
+
+    # Iterate hdf5 versions present and pick the first one whose tail matches
+    # the netcdf compiler/mpi suffix.
+    local ver d
+    for ver in "$hdf5_parent"/*; do
+        [[ -d "$ver" ]] || continue
+        d="$ver/$nc_after_ver"
+        if [[ -f "$d/include/hdf5.h" ]]; then
+            printf '%s' "$d"
+            return 0
+        fi
+    done
+    return 0
 }
 
 apply_e3sm_profile() {

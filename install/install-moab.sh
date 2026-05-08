@@ -588,28 +588,93 @@ apply_e3sm_profile() {
     # the e3sm env exposed them. Lets the e3sm profile DTRT out of the box.
     if [[ -n "${BLAS_ROOT:-}" && -n "${LAPACK_ROOT:-}" ]]; then
         local blas_spec lapack_spec
-        if [[ -f "$BLAS_ROOT/lib/libblas.a" ]]; then
-            blas_spec="$BLAS_ROOT/lib/libblas.a -lgfortran"
+        blas_spec="$(_resolve_blas_lapack_spec "$BLAS_ROOT" blas '-lgfortran')"
+        lapack_spec="$(_resolve_blas_lapack_spec "$LAPACK_ROOT" lapack '-lm')"
+        if [[ -z "$blas_spec" || -z "$lapack_spec" ]]; then
+            warn "BLAS_ROOT=$BLAS_ROOT / LAPACK_ROOT=$LAPACK_ROOT did not resolve to a known library layout"
+            warn "(probed: \$ROOT/, \$ROOT/lib/, \$ROOT/lib64/, \$ROOT/lib/intel64/ for libblas.a/liblapack.a/libmkl_*.a)"
+            warn "Pass --extra and --extra-tempestremap manually, or extend _resolve_blas_lapack_spec"
         else
-            blas_spec="-L$BLAS_ROOT/lib -lblas -lgfortran"
-        fi
-        if [[ -f "$LAPACK_ROOT/lib/liblapack.a" ]]; then
-            lapack_spec="$LAPACK_ROOT/lib/liblapack.a -lm"
-        else
-            lapack_spec="-L$LAPACK_ROOT/lib -llapack -lm"
-        fi
-        local autodetect_extras="--with-blas=\"$blas_spec\" --with-lapack=\"$lapack_spec\""
-        if [[ -z "$EXTRA_TEMPESTREMAP_ARGS" ]]; then
-            EXTRA_TEMPESTREMAP_ARGS="$autodetect_extras"
-            log "Auto-set --extra-tempestremap from BLAS_ROOT/LAPACK_ROOT"
-        fi
-        if [[ -z "$EXTRA_MOAB_ARGS" ]]; then
-            EXTRA_MOAB_ARGS="$autodetect_extras"
-            log "Auto-set --extra (MOAB) from BLAS_ROOT/LAPACK_ROOT"
+            local autodetect_extras="--with-blas=\"$blas_spec\" --with-lapack=\"$lapack_spec\""
+            if [[ -z "$EXTRA_TEMPESTREMAP_ARGS" ]]; then
+                EXTRA_TEMPESTREMAP_ARGS="$autodetect_extras"
+                log "Auto-set --extra-tempestremap from BLAS_ROOT/LAPACK_ROOT"
+            fi
+            if [[ -z "$EXTRA_MOAB_ARGS" ]]; then
+                EXTRA_MOAB_ARGS="$autodetect_extras"
+                log "Auto-set --extra (MOAB) from BLAS_ROOT/LAPACK_ROOT"
+            fi
         fi
     fi
 
     confirm_e3sm_env
+}
+
+# Resolve a BLAS/LAPACK library spec from a root path. Probes common layouts:
+#   $ROOT/                   (Bebop pattern: libs directly in root, e.g.
+#                             /lcrc/group/e3sm/soft/bebop/netlib-lapack/.../libblas.a)
+#   $ROOT/lib/               (standard Unix prefix)
+#   $ROOT/lib64/             (RHEL-style 64-bit)
+#   $ROOT/lib/intel64/       (Intel MKL: $MKLROOT/lib/intel64/libmkl_intel_lp64.a)
+#   $ROOT/lib/intel64_lin/   (older MKL variant)
+#
+# Args:
+#   $1 = root path (e.g. $BLAS_ROOT, $LAPACK_ROOT, $MKLROOT)
+#   $2 = library base name family: "blas" -> tries libblas.a then libmkl_intel_lp64.a;
+#                                   "lapack" -> tries liblapack.a then libmkl_lapack95_lp64.a
+#   $3 = trailing runtime libs to append (e.g. "-lgfortran" for blas, "-lm" for lapack)
+#
+# Prints (stdout): a single LIBS-style argument string suitable for AX_BLAS /
+# AX_LAPACK's --with-blas=/--with-lapack=. Empty stdout if nothing found.
+_resolve_blas_lapack_spec() {
+    local root="$1" family="$2" runtime="$3"
+    local sub d candidate
+
+    # Build the (libname-list, libname-family) probe order. For MKL we'd need
+    # multiple libs in the link line; treat that as a hint and emit the full
+    # MKL combo if the marker file is found.
+    local primary_names
+    case "$family" in
+        blas)   primary_names=("blas" "openblas" "mkl_intel_lp64" "sci_gnu_82_mp" "sci_gnu_82" "essl") ;;
+        lapack) primary_names=("lapack" "openblas" "mkl_lapack95_lp64" "sci_gnu_82_mp" "sci_gnu_82") ;;
+        *) printf ''; return 1 ;;
+    esac
+
+    # Static archive preferred (better for portability + avoids LD_LIBRARY_PATH gotchas)
+    for sub in "" "/lib" "/lib64" "/lib/intel64" "/lib/intel64_lin"; do
+        d="${root}${sub}"
+        [[ -d "$d" ]] || continue
+        for libname in "${primary_names[@]}"; do
+            candidate="$d/lib${libname}.a"
+            if [[ -f "$candidate" ]]; then
+                # MKL family needs a multi-lib spec
+                if [[ "$libname" == "mkl_intel_lp64" ]]; then
+                    printf '%s/libmkl_intel_lp64.a %s/libmkl_sequential.a %s/libmkl_core.a -lpthread -lm -ldl' "$d" "$d" "$d"
+                elif [[ "$libname" == "mkl_lapack95_lp64" ]]; then
+                    # MKL has LAPACK in the same intel_lp64 trio
+                    printf '%s/libmkl_intel_lp64.a %s/libmkl_sequential.a %s/libmkl_core.a -lpthread -lm -ldl' "$d" "$d" "$d"
+                else
+                    printf '%s %s' "$candidate" "$runtime"
+                fi
+                return 0
+            fi
+        done
+    done
+
+    # Fall back to shared (.so / .dylib) with -L/-l form
+    for sub in "" "/lib" "/lib64" "/lib/intel64" "/lib/intel64_lin"; do
+        d="${root}${sub}"
+        [[ -d "$d" ]] || continue
+        for libname in "${primary_names[@]}"; do
+            if [[ -f "$d/lib${libname}.so" || -f "$d/lib${libname}.dylib" ]]; then
+                printf -- '-L%s -l%s %s' "$d" "$libname" "$runtime"
+                return 0
+            fi
+        done
+    done
+
+    printf ''
+    return 1
 }
 
 # Show the resolved E3SM env and ask the user to confirm it's correct before

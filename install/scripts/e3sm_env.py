@@ -42,15 +42,47 @@ _RE_SHELL = re.compile(r"\$SHELL\{([^}]*)\}")     # nested {} not used in any cu
 _RE_ENV = re.compile(r"\$ENV\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 
-def translate_value(raw: str) -> str:
-    """CIME-syntax -> bash-syntax. Leaves unrelated $VAR and `$()` alone."""
+def translate_value(raw: str) -> tuple[str, bool]:
+    r"""CIME-syntax -> bash-syntax. Returns (translated, needs_outer_double_quotes).
+
+    Subtlety: when the value is a pure $SHELL{...} expression we MUST emit it
+    as `export VAR=$(...)` without outer double quotes. Bash's parsing of
+    "$(...)" does NOT strip backslashes from \" inside the $(); the inner
+    shell treats \" as a literal " character (bash's \ escape rule applied
+    to the next char), so `echo \"foo\"` produces the literal text "foo"
+    (with quotes), and the outer assignment captures those quotes. Sourcing
+    emitted snippets from config_machines.xml's
+        $SHELL{if [ -z "$X" ]; then echo /path; else echo "$X"; fi}
+    pattern was therefore setting the variable to a literal "" (when X was
+    unset) instead of the path. Verified empirically:
+        T="$(echo \"foo\")"   # bash $T == "foo" (literal quotes), not foo
+
+    For a pure $SHELL{} the right form is `export VAR=$(if ...; then echo
+    /path; else echo "$X"; fi)` -- no outer quotes, inner quotes work.
+
+    For mixed content (literal prefix + $ENV{} reference), keep the outer
+    "..." wrapping with ${VAR:-} for safety under set -u.
+    """
     if raw is None:
-        return ""
+        return ("", False)
+
+    raw_stripped = raw.strip()
+    is_pure_shell = (
+        raw_stripped.startswith("$SHELL{")
+        and raw_stripped.endswith("}")
+        and raw_stripped.count("$SHELL{") == 1
+    )
+
     out = _RE_SHELL.sub(lambda m: f"$({m.group(1)})", raw)
     out = _RE_ENV.sub(lambda m: "${" + m.group(1) + ":-}", out)
-    # Escape backslashes and double quotes for safe inclusion inside `export VAR="..."`
+
+    if is_pure_shell:
+        # No outer quoting; the inner $() parses its own quotes correctly.
+        return (out, False)
+
+    # Otherwise we'll wrap in "..." -- escape \ and " so they survive.
     out = out.replace("\\", "\\\\").replace('"', r"\"")
-    return out
+    return (out, True)
 
 
 def block_matches(attrs: dict, compiler: str, mpilib: str) -> bool:
@@ -152,8 +184,11 @@ def emit_via_cime(e3sm_root: Path, machine: str, compiler: str, mpilib: str,
                 continue
             if name == "HDF5_ROOT":
                 saw_hdf5_root = True
-            translated = translate_value(raw)
-            print(f'export {name}="{translated}"')
+            translated, needs_quotes = translate_value(raw)
+            if needs_quotes:
+                print(f'export {name}="{translated}"')
+            else:
+                print(f'export {name}={translated}')
     if emitted_env_header:
         print()
 
@@ -251,8 +286,11 @@ def emit_via_xml(e3sm_root: Path, machine: str, compiler: str, mpilib: str,
                 continue
             if name == "HDF5_ROOT":
                 saw_hdf5_root = True
-            translated = translate_value(raw)
-            print(f'export {name}="{translated}"')
+            translated, needs_quotes = translate_value(raw)
+            if needs_quotes:
+                print(f'export {name}="{translated}"')
+            else:
+                print(f'export {name}={translated}')
     if emitted_env_header:
         print()
 

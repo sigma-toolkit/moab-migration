@@ -850,8 +850,12 @@ apply_e3sm_profile() {
     # the e3sm env exposed them. Lets the e3sm profile DTRT out of the box.
     if [[ -n "${BLAS_ROOT:-}" && -n "${LAPACK_ROOT:-}" ]]; then
         local blas_spec lapack_spec
-        blas_spec="$(_resolve_blas_lapack_spec "$BLAS_ROOT" blas '-lgfortran')"
-        lapack_spec="$(_resolve_blas_lapack_spec "$LAPACK_ROOT" lapack '-lm')"
+        # `|| true` insulates against bash's set -e tripping on
+        # var="$(cmd)" when cmd returns non-zero. _resolve_blas_lapack_spec
+        # is supposed to always return 0, but belt+braces here means a
+        # future bug in the resolver can't silently kill the whole script.
+        blas_spec="$(_resolve_blas_lapack_spec "$BLAS_ROOT" blas '-lgfortran')" || true
+        lapack_spec="$(_resolve_blas_lapack_spec "$LAPACK_ROOT" lapack '-lm')" || true
         if [[ -z "$blas_spec" || -z "$lapack_spec" ]]; then
             warn "BLAS_ROOT=$BLAS_ROOT / LAPACK_ROOT=$LAPACK_ROOT did not resolve to a known library layout"
             warn "(probed: \$ROOT/, \$ROOT/lib/, \$ROOT/lib64/, \$ROOT/lib/intel64/ for libblas.a/liblapack.a/libmkl_*.a)"
@@ -890,16 +894,50 @@ apply_e3sm_profile() {
 # AX_LAPACK's --with-blas=/--with-lapack=. Empty stdout if nothing found.
 _resolve_blas_lapack_spec() {
     local root="$1" family="$2" runtime="$3"
-    local sub d candidate
+    local sub d candidate libname
 
-    # Build the (libname-list, libname-family) probe order. For MKL we'd need
-    # multiple libs in the link line; treat that as a hint and emit the full
-    # MKL combo if the marker file is found.
+    # Build the (libname-list, libname-family) probe order. The list is
+    # priority-ordered: vendor-specific names first (mkl, essl), then Cray
+    # libsci (probed across compiler variants, threaded preferred), then the
+    # generic netlib names. For MKL and Cray libsci we emit a multi-archive
+    # link line because daxpy_/dgemm_ aren't in a single archive.
+    #
+    # Cray libsci compiler variants: libsci_<compiler>[_mp][_mpi].a where
+    # <compiler> covers gnu_<ver>, intel, cray, aocc, nvidia. The _mp suffix
+    # is OpenMP-threaded; we prefer it when present (Cray's recommended
+    # default). The plain (non-_mp) form is the fallback.
     local primary_names
     case "$family" in
-        blas)   primary_names=("blas" "openblas" "mkl_intel_lp64" "sci_gnu_82_mp" "sci_gnu_82" "essl") ;;
-        lapack) primary_names=("lapack" "openblas" "mkl_lapack95_lp64" "sci_gnu_82_mp" "sci_gnu_82") ;;
-        *) printf ''; return 1 ;;
+        blas)
+            primary_names=(
+                "blas" "openblas"
+                "mkl_intel_lp64"
+                "sci_intel_mp" "sci_intel"
+                "sci_gnu_82_mp" "sci_gnu_82"
+                "sci_gnu_92_mp" "sci_gnu_92"
+                "sci_gnu_72_mp" "sci_gnu_72"
+                "sci_gnu_61_mp" "sci_gnu_61"
+                "sci_cray_mp" "sci_cray"
+                "sci_aocc_mp" "sci_aocc"
+                "sci_nvidia_mp" "sci_nvidia"
+                "essl"
+            )
+            ;;
+        lapack)
+            primary_names=(
+                "lapack" "openblas"
+                "mkl_lapack95_lp64"
+                "sci_intel_mp" "sci_intel"
+                "sci_gnu_82_mp" "sci_gnu_82"
+                "sci_gnu_92_mp" "sci_gnu_92"
+                "sci_gnu_72_mp" "sci_gnu_72"
+                "sci_gnu_61_mp" "sci_gnu_61"
+                "sci_cray_mp" "sci_cray"
+                "sci_aocc_mp" "sci_aocc"
+                "sci_nvidia_mp" "sci_nvidia"
+            )
+            ;;
+        *) printf ''; return 0 ;;
     esac
 
     # Static archive preferred (better for portability + avoids LD_LIBRARY_PATH gotchas)
@@ -910,10 +948,7 @@ _resolve_blas_lapack_spec() {
             candidate="$d/lib${libname}.a"
             if [[ -f "$candidate" ]]; then
                 # MKL family needs a multi-lib spec
-                if [[ "$libname" == "mkl_intel_lp64" ]]; then
-                    printf '%s/libmkl_intel_lp64.a %s/libmkl_sequential.a %s/libmkl_core.a -lpthread -lm -ldl' "$d" "$d" "$d"
-                elif [[ "$libname" == "mkl_lapack95_lp64" ]]; then
-                    # MKL has LAPACK in the same intel_lp64 trio
+                if [[ "$libname" == "mkl_intel_lp64" || "$libname" == "mkl_lapack95_lp64" ]]; then
                     printf '%s/libmkl_intel_lp64.a %s/libmkl_sequential.a %s/libmkl_core.a -lpthread -lm -ldl' "$d" "$d" "$d"
                 else
                     printf '%s %s' "$candidate" "$runtime"
@@ -935,8 +970,12 @@ _resolve_blas_lapack_spec() {
         done
     done
 
+    # No match. Empty stdout signals "couldn't resolve" -- caller handles it.
+    # Crucially, return 0 (not 1): bash with `set -e` aborts the parent script
+    # on `var="$(func_returning_nonzero)"`, which silently kills the entire
+    # invocation before the caller's "no spec resolved" warning can fire.
     printf ''
-    return 1
+    return 0
 }
 
 # Show the resolved E3SM env and ask the user to confirm it's correct before

@@ -60,6 +60,9 @@
 
 set -euo pipefail
 
+log() { printf '[install-bootstrap] %s\n' "$*" >&2; }
+die() { printf '[install-bootstrap] ERROR: %s\n' "$*" >&2; exit 1; }
+
 # Defaults (env vars seed the value; CLI flags override below)
 BRANCH="${INSTALL_MOAB_BRANCH:-master}"
 REPO_RAW_URL="${INSTALL_MOAB_REPO_RAW_URL:-https://bitbucket.org/fathomteam/moab/raw}"
@@ -86,6 +89,18 @@ done
 
 URL_BASE="$REPO_RAW_URL/$BRANCH/install"
 
+# Print resolved config up-front so the user can spot "wrong branch" /
+# "wrong repo" mistakes before the fetch fails. Particularly useful when
+# the curl|bash pattern silently drops env vars (set before 'curl', not
+# 'bash') -- you'll see BRANCH=master here when you expected something
+# else, making it obvious to add --bootstrap-branch=NAME.
+log "Bootstrap config:"
+log "  branch     : $BRANCH"
+log "  repo (raw) : $REPO_RAW_URL"
+log "  cache dir  : $INSTALL_DIR"
+log "  refresh    : $REFRESH"
+log ""
+
 # Files that constitute the install/ directory. Keep in sync with the
 # install_moab_files variable in the top-level Makefile.am.
 FILES=(
@@ -104,9 +119,6 @@ EXEC_FILES=(
     "workflow.sh"
     "scripts/e3sm_env.py"
 )
-
-log() { printf '[install-bootstrap] %s\n' "$*" >&2; }
-die() { printf '[install-bootstrap] ERROR: %s\n' "$*" >&2; exit 1; }
 
 # Pick a downloader. Prefer curl (more common on HPC); fall back to wget.
 if command -v curl >/dev/null 2>&1; then

@@ -90,10 +90,148 @@ EXTRA_MOAB_ARGS="${EXTRA_MOAB_ARGS:-}"
 EXTRA_ZOLTAN_ARGS="${EXTRA_ZOLTAN_ARGS:-}"
 EXTRA_TEMPESTREMAP_ARGS="${EXTRA_TEMPESTREMAP_ARGS:-}"
 
+# Machine selection (resolved later, in apply_machine_defaults)
+MACHINE_NAME="${MACHINE_NAME:-auto}"
+COMPILER_FAMILY="${COMPILER_FAMILY:-}"
+
 # TPL versions (must match MOAB's expected sources for consistency with E3SM)
 EIGEN3_VERSION="3.4.0"
 ZOLTAN_VERSION="3.9.1"
 TEMPESTREMAP_VERSION="2.2.x"
+
+#-----------------------------------------------------------------------------
+# Machine database
+#-----------------------------------------------------------------------------
+# Per-machine entries are pure metadata (no hardcoded TPL paths) so the script
+# stays maintainable across path migrations and avoids leaking site-specific
+# layouts. Push 2 will use the metadata to drive E3SM CIME-based environment
+# resolution (--profile=e3sm); for now (Push 1), the metadata is informational
+# only -- the script reports the detected machine in the orchestration banner
+# and prints a module-load hint, but does not auto-load anything.
+#
+# Adding a new machine: define machine_<name>_match() and machine_<name>_meta(),
+# then append <name> to MACHINE_REGISTRY. Mark new entries with
+# last_validated=TBD until you have personally confirmed a successful build.
+#
+# meta() sets these globals:
+#   MACHINE_META_E3SM_NAME         -- name in E3SM's config_machines.xml (may differ)
+#   MACHINE_META_DEFAULT_COMPILER  -- compiler family used if --compiler is unset
+#   MACHINE_META_SUPPORTED_COMPILERS -- comma-separated list (informational)
+#   MACHINE_META_STANDALONE_HINT   -- module-load string printed for standalone users
+#   MACHINE_META_LAST_VALIDATED    -- YYYY-MM-DD or TBD
+#   MACHINE_META_NOTES             -- optional free-form (Cray PrgEnv quirks, etc.)
+
+MACHINE_REGISTRY="bebop improv crux gce perlmutter"
+
+# Default-detection hostname helpers
+_hn() { printf '%s' "${HOSTNAME:-$(hostname 2>/dev/null || true)}"; }
+
+#---------- Bebop (LCRC, ANL) ----------
+machine_bebop_match() {
+    [[ "${LMOD_SYSTEM_NAME:-}" == "bebop" ]] && return 0
+    [[ "$(_hn)" == bebop* ]]
+}
+machine_bebop_meta() {
+    MACHINE_META_E3SM_NAME="anvil"          # TODO verify against E3SM config_machines.xml
+    MACHINE_META_DEFAULT_COMPILER="gnu"
+    MACHINE_META_SUPPORTED_COMPILERS="gnu,intel"
+    MACHINE_META_STANDALONE_HINT="module load gcc/13.2.0 openmpi/4.1.8 hdf5/1.12.3 netcdf-c parallel-netcdf"
+    MACHINE_META_LAST_VALIDATED="2026-05-08"
+    MACHINE_META_NOTES="Site-installed netlib BLAS/LAPACK at /lcrc/group/e3sm/soft/... (use --extra to point MOAB/TempestRemap at it; see INSTALL-MOAB.md)."
+}
+
+#---------- Improv (LCRC, ANL) ----------
+machine_improv_match() {
+    [[ "${LMOD_SYSTEM_NAME:-}" == "improv" ]] && return 0
+    [[ "$(_hn)" == improv* ]]
+}
+machine_improv_meta() {
+    MACHINE_META_E3SM_NAME="improv"         # TODO verify
+    MACHINE_META_DEFAULT_COMPILER="gnu"
+    MACHINE_META_SUPPORTED_COMPILERS="gnu,intel,aocc"
+    MACHINE_META_STANDALONE_HINT="module load gcc/12.3.0 openmpi hdf5 netcdf-c parallel-netcdf"
+    MACHINE_META_LAST_VALIDATED="TBD"
+    MACHINE_META_NOTES="Newer LCRC cluster (replaces Bebop). Validate before promoting last_validated."
+}
+
+#---------- Crux (ALCF, ANL) ----------
+machine_crux_match() {
+    [[ "${LMOD_SYSTEM_NAME:-}" == "crux" ]] && return 0
+    [[ "$(_hn)" == crux* ]]
+}
+machine_crux_meta() {
+    MACHINE_META_E3SM_NAME="crux"           # TODO verify
+    MACHINE_META_DEFAULT_COMPILER="gnu"
+    MACHINE_META_SUPPORTED_COMPILERS="gnu,cray,nvhpc"
+    MACHINE_META_STANDALONE_HINT="module load PrgEnv-gnu cray-hdf5-parallel cray-netcdf-hdf5parallel cray-parallel-netcdf"
+    MACHINE_META_LAST_VALIDATED="TBD"
+    MACHINE_META_NOTES="Cray PrgEnv. Compiler wrappers are cc/CC/ftn (auto-detected); --mpi-root not needed."
+}
+
+#---------- ANL/GCE (Linux Ubuntu) ----------
+machine_gce_match() {
+    [[ "${LMOD_SYSTEM_NAME:-}" == "gce" ]] && return 0
+    case "$(_hn)" in
+        gce*|*.gce.anl.gov|gce-*) return 0 ;;
+    esac
+    return 1
+}
+machine_gce_meta() {
+    MACHINE_META_E3SM_NAME=""                # GCE typically not in E3SM config; leave empty
+    MACHINE_META_DEFAULT_COMPILER="gnu"
+    MACHINE_META_SUPPORTED_COMPILERS="gnu,intel"
+    MACHINE_META_STANDALONE_HINT="module load gcc mpich hdf5 netcdf-c parallel-netcdf"
+    MACHINE_META_LAST_VALIDATED="2026-05-08"
+    MACHINE_META_NOTES="ANL Climate dev cluster. Spack-managed modules; ensure HDF5/NetCDF/PNetCDF are loaded before invoking."
+}
+
+#---------- Perlmutter (NERSC) ----------
+machine_perlmutter_match() {
+    [[ "${NERSC_HOST:-}" == "perlmutter" ]] && return 0
+    [[ "${LMOD_SYSTEM_NAME:-}" == "perlmutter" ]] && return 0
+    [[ "$(_hn)" == nid* || "$(_hn)" == login* ]] && [[ -d /opt/cray/pe ]] && return 0
+    return 1
+}
+machine_perlmutter_meta() {
+    MACHINE_META_E3SM_NAME="pm-cpu"          # E3SM uses pm-cpu / pm-gpu
+    MACHINE_META_DEFAULT_COMPILER="gnu"
+    MACHINE_META_SUPPORTED_COMPILERS="gnu,intel,nvidia,aocc"
+    MACHINE_META_STANDALONE_HINT="module load PrgEnv-gnu cray-hdf5-parallel cray-netcdf-hdf5parallel cray-parallel-netcdf"
+    MACHINE_META_LAST_VALIDATED="2026-05-08"
+    MACHINE_META_NOTES="Cray PrgEnv. Compiler wrappers cc/CC/ftn auto-detected. Pass --machine=perlmutter --compiler=nvidia for GPU builds."
+}
+
+# Reset the meta globals before invoking a machine_<name>_meta() function
+reset_machine_meta() {
+    MACHINE_META_E3SM_NAME=""
+    MACHINE_META_DEFAULT_COMPILER=""
+    MACHINE_META_SUPPORTED_COMPILERS=""
+    MACHINE_META_STANDALONE_HINT=""
+    MACHINE_META_LAST_VALIDATED=""
+    MACHINE_META_NOTES=""
+}
+
+# Returns the name of the first registered machine whose match() returns 0,
+# or empty if none match.
+detect_machine() {
+    local m
+    for m in $MACHINE_REGISTRY; do
+        if "machine_${m}_match" 2>/dev/null; then
+            printf '%s' "$m"
+            return 0
+        fi
+    done
+    printf ''
+}
+
+# Validates that $1 is a registered machine name. Returns 0 if so.
+is_known_machine() {
+    local m="$1" r
+    for r in $MACHINE_REGISTRY; do
+        [[ "$r" == "$m" ]] && return 0
+    done
+    return 1
+}
 
 #-----------------------------------------------------------------------------
 # Pretty output

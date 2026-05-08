@@ -409,6 +409,27 @@ EOF
 #-----------------------------------------------------------------------------
 # Argument parsing
 #-----------------------------------------------------------------------------
+# Normalize space-separated `--flag value` to `--flag=value` for known
+# value-taking flags so users can write either form. The case-statement
+# parser below only handles the `=` form, so this rewrite makes both
+# work without duplicating cases. Boolean flags (--dry-run, --shared,
+# --list-machines, etc.) are not in the list and pass through unchanged.
+_VALUE_FLAGS_RE='^(--prefix|--tpl-prefix|--build-dir|--src-dir|--moab-repo|--moab-branch|--jobs|--build-system|--mpi-root|--hdf5-root|--netcdf-root|--pnetcdf-root|--cc|--cxx|--fc|--f77|--extra|--extra-zoltan|--extra-tempestremap|--machine|--compiler|--profile|--e3sm-root)$'
+_NORMALIZED_ARGS=()
+while [[ $# -gt 0 ]]; do
+    if [[ "$1" =~ $_VALUE_FLAGS_RE ]]; then
+        if [[ $# -lt 2 ]]; then
+            die "flag $1 requires a value (use $1=VALUE or $1 VALUE)" 1
+        fi
+        _NORMALIZED_ARGS+=("$1=$2")
+        shift 2
+    else
+        _NORMALIZED_ARGS+=("$1")
+        shift
+    fi
+done
+set -- ${_NORMALIZED_ARGS[@]+"${_NORMALIZED_ARGS[@]}"}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --prefix=*)        PREFIX_PATH="${1#*=}" ;;

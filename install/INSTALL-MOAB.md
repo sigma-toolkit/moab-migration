@@ -291,6 +291,7 @@ Registered machines:
   crux         gnu     gnu,cray,nvhpc                 TBD
   gce          gnu     gnu,intel                      2026-05-08
   perlmutter   gnu     gnu,intel,nvidia,aocc          2026-05-08
+  pmgpu        nvidia  gnu,nvidia                     TBD
 
   * = auto-detected on this host
 ```
@@ -298,6 +299,27 @@ Registered machines:
 `TBD` entries are stubs that have not yet been validated against a real build.
 They are still selectable via `--machine=NAME`; please report failures so the
 entry can be promoted (or fixed).
+
+#### `perlmutter` vs `pmgpu`
+
+Perlmutter has CPU and GPU partitions sharing the same login nodes, so
+auto-detection can't pick between them. The default behavior:
+
+| Invocation | Selects | E3SM machine name | Default compiler |
+|---|---|---|---|
+| `--machine=auto` (on Perlmutter) | `perlmutter` | `pm-cpu` | `gnu` |
+| `--machine=perlmutter` | `perlmutter` | `pm-cpu` | `gnu` |
+| `--machine=pmgpu` | `pmgpu` | `pm-gpu` | `nvidia` |
+
+GPU users **must** pass `--machine=pmgpu` explicitly. The registry name uses
+`pmgpu` (no dash) because bash function names can't reliably contain `-`;
+the original CIME name `pm-gpu` is preserved in the entry's
+`MACHINE_META_E3SM_NAME` for the e3sm profile lookup. Same trick applied for
+ANL/GCE: registry name `gce`, E3SM name `anlgce-ub22`.
+
+For `--machine=pmgpu --compiler=gnu`, you'll get a GPU-partition build with
+GNU compilers (valid for non-CUDA code paths). Default `--compiler=nvidia`
+gives the typical CUDA-enabled build.
 
 ### Selecting an entry
 

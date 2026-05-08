@@ -1,23 +1,25 @@
-#!/bin/bash
-# DEPRECATED: this script previously printed a suggested MOAB ./configure
-# command based on a hardcoded hostname-keyed database. The database had
-# decayed (vesta, mira, blogin, theta, cori, edison are all retired), and
-# the duplicated machine knowledge between this script and the install
-# scripts in install/ was a maintenance hazard.
+#!/usr/bin/env bash
+# DEPRECATED: machine knowledge has moved to install/install-moab.sh.
 #
-# Replacement:
+# This file used to print a hardcoded ./configure command keyed by hostname,
+# with a database that decayed (vesta, mira, blogin, theta, cori, edison were
+# all retired but still listed). The replacement integrates with the unified
+# install-moab.sh's machine database and standalone profile:
 #
-#   install/install-moab.sh --list-machines        # show registered machines
-#   install/install-moab.sh --machine=NAME         # build for that machine
+#   install/install-moab.sh --print --profile=standalone [other flags]
 #
-# Push 2 will add a --print-only mode that emits just the resolved configure
-# command (for users who want to inspect or edit before running). When that
-# lands, this shim will be updated to delegate via:
+# This shim forwards everything you pass to it through that pipeline so
+# legacy invocations continue to print a suggested configure command,
+# but now sourced from a maintained registry instead of stale paths.
 #
-#   exec install/install-moab.sh --print --profile=standalone "$@"
+# Examples:
+#   ./suggest_configuration.sh                            # uses auto-detected machine
+#   ./suggest_configuration.sh --machine=bebop            # for a specific machine
+#   ./suggest_configuration.sh --build-system=cmake       # cmake variant
 #
-# Until then, this file remains as a placeholder so that EXTRA_DIST in
-# Makefile.am keeps working.
-echo "suggest_configuration.sh is deprecated." >&2
-echo "Use: install/install-moab.sh --list-machines  (or --machine=NAME, see install/INSTALL-MOAB.md)" >&2
-exit 1
+# Note: --profile=standalone deliberately does NOT touch your environment;
+# it trusts whatever modules / env vars you have loaded. For --profile=e3sm
+# (which auto-loads E3SM's modules + env), use install-moab.sh directly.
+
+exec "$(dirname "${BASH_SOURCE[0]}")/install/install-moab.sh" \
+    --print --profile=standalone "$@"

@@ -577,11 +577,18 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-# Resolve TAIL_LOGS default now that --verbose has been parsed: tail TPL
-# logs in verbose mode; suppress the per-line firehose in quiet mode.
-# Explicit env override (e.g. TAIL_LOGS=yes) takes precedence.
-if [[ -z "$TAIL_LOGS" ]]; then
-    TAIL_LOGS="$([[ "$VERBOSE" == "yes" ]] && echo yes || echo no)"
+# Resolve TAIL_LOGS now that --verbose has been parsed.
+# RULE: --verbose is the single source of truth for output verbosity.
+#   * VERBOSE=no  -> TAIL_LOGS forced to no    (env-set TAIL_LOGS=yes is IGNORED;
+#                                                quiet means quiet, period)
+#   * VERBOSE=yes -> TAIL_LOGS defaults to yes (env-set TAIL_LOGS=no still wins
+#                                                so power users can disable just
+#                                                the tail while keeping the rest
+#                                                of the verbose banner)
+if [[ "$VERBOSE" == "yes" ]]; then
+    [[ -z "$TAIL_LOGS" ]] && TAIL_LOGS=yes
+else
+    TAIL_LOGS=no
 fi
 
 #-----------------------------------------------------------------------------

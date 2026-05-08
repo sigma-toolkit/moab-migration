@@ -94,6 +94,10 @@ EXTRA_TEMPESTREMAP_ARGS="${EXTRA_TEMPESTREMAP_ARGS:-}"
 MACHINE_NAME="${MACHINE_NAME:-auto}"
 COMPILER_FAMILY="${COMPILER_FAMILY:-}"
 
+# Profile + E3SM checkout
+PROFILE="${PROFILE:-e3sm}"           # e3sm | standalone
+E3SM_ROOT="${E3SM_ROOT:-}"           # Required for --profile=e3sm
+
 # TPL versions (must match MOAB's expected sources for consistency with E3SM)
 EIGEN3_VERSION="3.4.0"
 ZOLTAN_VERSION="3.9.1"
@@ -132,12 +136,12 @@ machine_bebop_match() {
     [[ "$(_hn)" == bebop* ]]
 }
 machine_bebop_meta() {
-    MACHINE_META_E3SM_NAME="anvil"          # TODO verify against E3SM config_machines.xml
+    MACHINE_META_E3SM_NAME="bebop"          # matches MACH= in cime_config/machines/config_machines.xml
     MACHINE_META_DEFAULT_COMPILER="gnu"
     MACHINE_META_SUPPORTED_COMPILERS="gnu,intel"
     MACHINE_META_STANDALONE_HINT="module load gcc/13.2.0 openmpi/4.1.8 hdf5/1.12.3 netcdf-c parallel-netcdf"
     MACHINE_META_LAST_VALIDATED="2026-05-08"
-    MACHINE_META_NOTES="Site-installed netlib BLAS/LAPACK at /lcrc/group/e3sm/soft/... (use --extra to point MOAB/TempestRemap at it; see INSTALL-MOAB.md)."
+    MACHINE_META_NOTES="config_machines.xml does NOT export HDF5_ROOT; pass --hdf5-root=PATH or load a hdf5 module that sets it. BLAS/LAPACK come from \$LAPACK_ROOT/\$BLAS_ROOT in the e3sm profile."
 }
 
 #---------- Improv (LCRC, ANL) ----------
@@ -177,7 +181,7 @@ machine_gce_match() {
     return 1
 }
 machine_gce_meta() {
-    MACHINE_META_E3SM_NAME=""                # GCE typically not in E3SM config; leave empty
+    MACHINE_META_E3SM_NAME="anlgce-ub22"      # ANL/GCE Ubuntu 22 entry in config_machines.xml
     MACHINE_META_DEFAULT_COMPILER="gnu"
     MACHINE_META_SUPPORTED_COMPILERS="gnu,intel"
     MACHINE_META_STANDALONE_HINT="module load gcc mpich hdf5 netcdf-c parallel-netcdf"
@@ -193,7 +197,7 @@ machine_perlmutter_match() {
     return 1
 }
 machine_perlmutter_meta() {
-    MACHINE_META_E3SM_NAME="pm-cpu"          # E3SM uses pm-cpu / pm-gpu
+    MACHINE_META_E3SM_NAME="pm-cpu"          # E3SM uses pm-cpu / pm-gpu (override with --machine and --e3sm-name=pm-gpu manually for now)
     MACHINE_META_DEFAULT_COMPILER="gnu"
     MACHINE_META_SUPPORTED_COMPILERS="gnu,intel,nvidia,aocc"
     MACHINE_META_STANDALONE_HINT="module load PrgEnv-gnu cray-hdf5-parallel cray-netcdf-hdf5parallel cray-parallel-netcdf"
@@ -307,6 +311,16 @@ Common options:
                         cannot compile on this host)
   --no-tail             Suppress live tail of TPL build logs
   --dry-run             Print all commands, do nothing
+  --profile=NAME        e3sm (default) | standalone. With e3sm, the script
+                        sources modules + env vars from
+                        \$E3SM_ROOT/cime_config/machines/config_machines.xml
+                        for the resolved (machine, compiler) pair. With
+                        standalone, the script trusts whatever environment
+                        you have already loaded (suitable for MOAB downstream
+                        users who don't have an E3SM checkout).
+  --e3sm-root=PATH      Path to E3SM checkout (or set \$E3SM_ROOT). Required
+                        for --profile=e3sm. Must contain
+                        cime_config/machines/config_machines.xml.
   --machine=NAME        Use the named machine entry from the database. NAME=auto
                         (default) auto-detects via hostname/NERSC_HOST/
                         LMOD_SYSTEM_NAME. Pass --list-machines to see all entries.
@@ -388,6 +402,8 @@ while [[ $# -gt 0 ]]; do
         --machine=*)             MACHINE_NAME="${1#*=}" ;;
         --compiler=*)            COMPILER_FAMILY="${1#*=}" ;;
         --list-machines)         _LIST_MACHINES=yes ;;
+        --profile=*)             PROFILE="${1#*=}" ;;
+        --e3sm-root=*)           E3SM_ROOT="${1#*=}" ;;
         -h|--help)         usage; exit 0 ;;
         *) die "unknown option: $1 (use --help)" 1 ;;
     esac
@@ -466,6 +482,129 @@ apply_machine_defaults() {
     fi
 }
 apply_machine_defaults
+
+#-----------------------------------------------------------------------------
+# Profile resolution + E3SM environment loading
+#-----------------------------------------------------------------------------
+# --profile=e3sm        (default) Source modules + env vars from
+#                       $E3SM_ROOT/cime_config/machines/config_machines.xml
+#                       for the resolved machine + compiler. Requires that
+#                       --e3sm-root or $E3SM_ROOT be set, and that
+#                       MACHINE_META_E3SM_NAME is non-empty for the chosen
+#                       machine entry.
+# --profile=standalone  Trust whatever environment the user already has
+#                       loaded. No CIME interaction. Same behavior as Push 1
+#                       and prior, suitable for MOAB downstream users who
+#                       don't have an E3SM checkout.
+case "$PROFILE" in
+    e3sm|standalone) ;;
+    *) die "--profile must be one of: e3sm, standalone (got: $PROFILE)" 1 ;;
+esac
+
+# Adapter: some E3SM machines export aliases that install-moab.sh doesn't
+# look for directly. Normalize so the rest of the script just sees the names
+# it expects.
+adapt_e3sm_env_to_install_moab_vars() {
+    # NETCDF_C_PATH: bebop/improv/pm-cpu use NETCDF_C_PATH; anlgce-ub22 + crux
+    # use NETCDF_PATH. If only the latter is set, alias it.
+    if [[ -z "${NETCDF_C_PATH:-}" && -n "${NETCDF_PATH:-}" ]]; then
+        export NETCDF_C_PATH="$NETCDF_PATH"
+    fi
+    # HDF5_ROOT: Cray PrgEnv sets CRAY_HDF5_PARALLEL_PREFIX via cray-hdf5-parallel.
+    # MOAB / install-moab.sh wants HDF5_ROOT.
+    if [[ -z "${HDF5_ROOT:-}" && -n "${CRAY_HDF5_PARALLEL_PREFIX:-}" ]]; then
+        export HDF5_ROOT="$CRAY_HDF5_PARALLEL_PREFIX"
+    fi
+}
+
+apply_e3sm_profile() {
+    [[ "$PROFILE" == "e3sm" ]] || return 0
+
+    # Resolve E3SM checkout
+    if [[ -z "$E3SM_ROOT" ]]; then
+        die "--profile=e3sm requires --e3sm-root=PATH or \$E3SM_ROOT (must point at an E3SM checkout containing cime_config/machines/config_machines.xml)" 2
+    fi
+    if [[ ! -f "$E3SM_ROOT/cime_config/machines/config_machines.xml" ]]; then
+        die "--e3sm-root=$E3SM_ROOT is not an E3SM checkout (no cime_config/machines/config_machines.xml found)" 2
+    fi
+
+    # Need a machine entry with a non-empty E3SM_NAME mapping
+    if [[ -z "${MACHINE_NAME:-}" ]]; then
+        die "--profile=e3sm requires a known machine; pass --machine=NAME (see --list-machines) or run on a registered host" 2
+    fi
+    if [[ -z "${MACHINE_META_E3SM_NAME:-}" ]]; then
+        die "machine '$MACHINE_NAME' has no E3SM config_machines.xml mapping (MACHINE_META_E3SM_NAME is empty); use --profile=standalone or extend the entry" 2
+    fi
+
+    # Locate the helper next to this script
+    local helper
+    helper="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/scripts/e3sm_env.py"
+    [[ -f "$helper" ]] || die "e3sm_env.py not found at $helper" 2
+
+    log "Loading E3SM env: $MACHINE_META_E3SM_NAME / $COMPILER_FAMILY (via $helper)"
+
+    # Generate to a temp file. Always run the helper (validates it works for
+    # this machine + compiler), but only source the result for non-dry-run
+    # invocations. Dry-run shouldn't pollute the calling shell's env, and
+    # sourcing module loads on a host without the target's Lmod would fail.
+    local tmp_env
+    tmp_env="$(mktemp -t e3sm_env.XXXXXX.sh)"
+    if ! python3 "$helper" \
+            --e3sm-root="$E3SM_ROOT" \
+            --machine="$MACHINE_META_E3SM_NAME" \
+            --compiler="$COMPILER_FAMILY" \
+            > "$tmp_env" 2> >(while IFS= read -r line; do warn "e3sm_env: $line"; done); then
+        warn "e3sm_env.py exited non-zero; see $tmp_env for partial output"
+        die "failed to derive E3SM environment for $MACHINE_META_E3SM_NAME / $COMPILER_FAMILY" 2
+    fi
+
+    if [[ "$DRY_RUN" == "yes" ]]; then
+        log "Dry-run: would source $tmp_env (skipping actual source to keep env clean)"
+        log "Inspect: less $tmp_env"
+        # Still apply adapters against the *current* env so the downstream
+        # banner is honest about whether HDF5_ROOT etc. would resolve.
+        adapt_e3sm_env_to_install_moab_vars
+        return 0
+    fi
+
+    # shellcheck disable=SC1090
+    source "$tmp_env" || die "sourcing E3SM env snippet failed (see $tmp_env)" 2
+
+    adapt_e3sm_env_to_install_moab_vars
+
+    log "E3SM env applied. Resolved roots:"
+    log "  HDF5_ROOT     = ${HDF5_ROOT:-(unset; pass --hdf5-root=PATH)}"
+    log "  NETCDF_C_PATH = ${NETCDF_C_PATH:-(unset; pass --netcdf-root=PATH)}"
+    log "  PNETCDF_PATH  = ${PNETCDF_PATH:-(unset; pass --pnetcdf-root=PATH)}"
+    [[ -n "${BLAS_ROOT:-}"   ]] && log "  BLAS_ROOT     = $BLAS_ROOT"
+    [[ -n "${LAPACK_ROOT:-}" ]] && log "  LAPACK_ROOT   = $LAPACK_ROOT"
+
+    # Auto-populate --extra* with BLAS/LAPACK if user didn't set them and
+    # the e3sm env exposed them. Lets the e3sm profile DTRT out of the box.
+    if [[ -n "${BLAS_ROOT:-}" && -n "${LAPACK_ROOT:-}" ]]; then
+        local blas_spec lapack_spec
+        if [[ -f "$BLAS_ROOT/lib/libblas.a" ]]; then
+            blas_spec="$BLAS_ROOT/lib/libblas.a -lgfortran"
+        else
+            blas_spec="-L$BLAS_ROOT/lib -lblas -lgfortran"
+        fi
+        if [[ -f "$LAPACK_ROOT/lib/liblapack.a" ]]; then
+            lapack_spec="$LAPACK_ROOT/lib/liblapack.a -lm"
+        else
+            lapack_spec="-L$LAPACK_ROOT/lib -llapack -lm"
+        fi
+        local autodetect_extras="--with-blas=\"$blas_spec\" --with-lapack=\"$lapack_spec\""
+        if [[ -z "$EXTRA_TEMPESTREMAP_ARGS" ]]; then
+            EXTRA_TEMPESTREMAP_ARGS="$autodetect_extras"
+            log "Auto-set --extra-tempestremap from BLAS_ROOT/LAPACK_ROOT"
+        fi
+        if [[ -z "$EXTRA_MOAB_ARGS" ]]; then
+            EXTRA_MOAB_ARGS="$autodetect_extras"
+            log "Auto-set --extra (MOAB) from BLAS_ROOT/LAPACK_ROOT"
+        fi
+    fi
+}
+apply_e3sm_profile
 
 # Recompute TPL_PREFIX default if --prefix changed and TPL_PREFIX wasn't set
 if [[ "$TPL_PREFIX" == "$HOME/install/MOAB/tpls" && "$PREFIX_PATH" != "$HOME/install/MOAB" ]]; then
@@ -1518,8 +1657,9 @@ verify_install() {
 # Report and dispatch
 #-----------------------------------------------------------------------------
 section "MOAB orchestration"
+log "Profile         : $PROFILE${E3SM_ROOT:+ (E3SM_ROOT=$E3SM_ROOT)}"
 if [[ -n "${MACHINE_NAME:-}" ]]; then
-    log "Machine         : $MACHINE_NAME (compiler family: $COMPILER_FAMILY; last-validated: $MACHINE_META_LAST_VALIDATED)"
+    log "Machine         : $MACHINE_NAME (compiler family: $COMPILER_FAMILY; last-validated: $MACHINE_META_LAST_VALIDATED${MACHINE_META_E3SM_NAME:+; e3sm_name=$MACHINE_META_E3SM_NAME})"
     [[ -n "$MACHINE_META_STANDALONE_HINT" ]] && log "Module hint     : $MACHINE_META_STANDALONE_HINT"
     [[ -n "$MACHINE_META_NOTES" ]] && log "Machine notes   : $MACHINE_META_NOTES"
 else

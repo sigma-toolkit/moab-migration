@@ -458,6 +458,47 @@ shim that delegates here:
 
 ---
 
+## Output verbosity
+
+By default the script is **quiet** — it shows only phase milestones, success
+markers, warnings, and errors. A typical successful run looks like:
+
+```
+[install-moab] >> MOAB orchestration
+[install-moab] >> Resume state
+[install-moab] >> MPI wrapper validation
+[install-moab] >> MOAB source (/path/to/moab-src)
+[install-moab] MOAB source ready: HEAD=abc12345 (Recent commit subject line)
+[install-moab] >> TPL: eigen3
+[install-moab] eigen3: installed at /path/install/MOAB/tpls/eigen3
+[install-moab] >> TPL: zoltan
+[install-moab] zoltan: installed at /path/install/MOAB/tpls/zoltan
+[install-moab] >> TPL: tempestremap
+[install-moab] tempestremap: installed at /path/install/MOAB/tpls/tempestremap
+[install-moab] >> MOAB configure (autotools)
+[install-moab] >> MOAB build (-j8) and install
+[install-moab] >> Verification
+[install-moab] verification PASSED
+[install-moab] >> Done
+[install-moab] MOAB installed at: /path/install/MOAB
+```
+
+For the full informational firehose — orchestration banner with all resolved
+paths, per-file verification details, live tail of every line emitted by the
+TPL `configure`/`make`/`make install` runs — pass `--verbose` (or `-v`):
+
+```bash
+./install/install-moab.sh --machine=auto --verbose
+```
+
+Errors and warnings are always visible in both modes. The trade-off in quiet
+mode is that long-running TPL builds don't show progress between phase
+milestones; pass `--verbose` if you want to watch the live tail during a
+multi-minute build. Set `TAIL_LOGS=yes` to enable the tail without enabling
+the rest of the verbose output.
+
+---
+
 ## Machine database
 
 The script ships with a registry of currently-supported HPC environments.
@@ -743,6 +784,7 @@ $HOME/install/MOAB/                              PREFIX_PATH
 | `--e3sm-root=PATH` | `$E3SM_ROOT` env | Path to E3SM checkout; required for `--profile=e3sm`. Must contain `cime_config/machines/config_machines.xml`. |
 | `--yes`, `-y` | — | Bypass the e3sm-profile env-confirmation prompt. Required when stdin is not a tty (CI). Equivalent to `ASSUME_YES=yes`. |
 | `--print` | — | Emit only the resolved MOAB configure/cmake command (copy-pasteable). Implies `--dry-run`. |
+| `--verbose`, `-v` | off | Show the full informational firehose: orchestration banner, per-file verification details, per-line TPL build log tail. Default is quiet — only phase milestones, success markers, warnings, and errors. |
 
 ### Resume / cleanup controls
 

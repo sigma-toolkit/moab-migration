@@ -140,37 +140,51 @@ curl -fsSL https://bitbucket.org/fathomteam/moab/raw/master/install/install-boot
 ```
 
 The `bash -s --` is required to pass args after the pipe; everything after
-`--` is forwarded verbatim to `install-moab.sh`. Re-runs reuse the cached
-`install/` directory in `$PWD/install/` (override with `INSTALL_MOAB_DIR=`).
+`--` is forwarded to either the bootstrap (its own `--bootstrap-*` flags)
+or `install-moab.sh` (everything else). Re-runs reuse the cached
+`install/` directory in `$PWD/install/`.
 
-Env-var configuration (all optional):
+#### Configuration (CLI flags or env vars; flags survive the pipe)
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `INSTALL_MOAB_BRANCH` | `master` | Branch / tag to fetch from |
-| `INSTALL_MOAB_REPO_RAW_URL` | `https://bitbucket.org/fathomteam/moab/raw` | Raw-URL base; override for a fork |
-| `INSTALL_MOAB_DIR` | `$PWD/install` | Where to download `install/` |
-| `INSTALL_MOAB_REFRESH` | `no` | `yes` forces re-download even if cache present |
+| Flag | Env var | Default | Purpose |
+|---|---|---|---|
+| `--bootstrap-branch=NAME` | `INSTALL_MOAB_BRANCH` | `master` | Branch / tag to fetch |
+| `--bootstrap-repo=URL` | `INSTALL_MOAB_REPO_RAW_URL` | `https://bitbucket.org/fathomteam/moab/raw` | Raw-URL base; override for a fork |
+| `--bootstrap-dir=PATH` | `INSTALL_MOAB_DIR` | `$PWD/install` | Where to download `install/` |
+| `--bootstrap-refresh` | `INSTALL_MOAB_REFRESH=yes` | off | Force re-download even if cache present |
 
-Examples:
+> ⚠️ **Use flags, not env vars, with the curl|bash pattern.**
+> `INSTALL_MOAB_BRANCH=foo curl ... | bash -s -- ...` does **NOT** work —
+> the env var applies to `curl`, not to the piped `bash`. Use
+> `--bootstrap-branch=foo` after `bash -s --` instead.
+
+#### Common examples
 
 ```bash
+# Default: install from master (the canonical bitbucket repo)
+curl -fsSL https://bitbucket.org/fathomteam/moab/raw/master/install/install-bootstrap.sh \
+    | bash -s -- --machine=auto --hdf5-root=$HDF5_ROOT \
+                 --netcdf-root=$NETCDF_C_PATH --pnetcdf-root=$PNETCDF_PATH
+
 # Pin to a release branch
-INSTALL_MOAB_BRANCH=release-v5.6.0 \
-    curl -fsSL https://bitbucket.org/fathomteam/moab/raw/release-v5.6.0/install/install-bootstrap.sh \
-    | bash -s -- --machine=auto
+curl -fsSL https://bitbucket.org/fathomteam/moab/raw/release-v5.6.0/install/install-bootstrap.sh \
+    | bash -s -- --bootstrap-branch=release-v5.6.0 \
+                 --machine=auto
+
+# Use a fork (note: --bootstrap-repo AND --bootstrap-branch must agree
+# with the URL the bootstrap was fetched from)
+curl -fsSL https://bitbucket.org/myuser/moab/raw/myfeature/install/install-bootstrap.sh \
+    | bash -s -- --bootstrap-repo=https://bitbucket.org/myuser/moab/raw \
+                 --bootstrap-branch=myfeature \
+                 --machine=auto
 
 # Cache install/ in $HOME (so multiple build dirs share one copy)
-INSTALL_MOAB_DIR=$HOME/.local/share/moab-installer \
-    curl -fsSL .../install-bootstrap.sh \
-    | bash -s -- --machine=auto
+curl -fsSL .../install-bootstrap.sh \
+    | bash -s -- --bootstrap-dir=$HOME/.local/share/moab-installer \
+                 --machine=auto
 
-# Use a fork
-INSTALL_MOAB_REPO_RAW_URL=https://bitbucket.org/myuser/moab/raw \
-    curl -fsSL https://bitbucket.org/myuser/moab/raw/master/install/install-bootstrap.sh \
-    | bash -s -- --machine=auto
-
-# Save the bootstrap and inspect before running
+# Save the bootstrap and inspect before running (recommended for
+# first-time use on sensitive systems)
 curl -fsSLo install-bootstrap.sh \
     https://bitbucket.org/fathomteam/moab/raw/master/install/install-bootstrap.sh
 less install-bootstrap.sh

@@ -20,33 +20,69 @@
 #     bash install-bootstrap.sh --machine=auto --hdf5-root=$HDF5_ROOT \
 #         --netcdf-root=$NETCDF_C_PATH --pnetcdf-root=$PNETCDF_PATH
 #
-# Env-var configuration (all optional):
+# Configuration: CLI flags (preferred for the curl|bash pattern -- args
+# survive the pipe naturally) OR env vars. Flags take precedence over env.
 #
-#     INSTALL_MOAB_BRANCH         Branch / tag to fetch     (default: master)
-#     INSTALL_MOAB_REPO_RAW_URL   Raw-URL base for the repo (default: bitbucket fathomteam/moab)
-#     INSTALL_MOAB_DIR            Where to download install/ (default: $PWD/install)
-#     INSTALL_MOAB_REFRESH        Force re-download (yes|no) (default: no)
+#     --bootstrap-branch=NAME     Branch / tag to fetch       (default: master)
+#     --bootstrap-repo=URL        Raw-URL base for the repo   (default: bitbucket fathomteam/moab)
+#     --bootstrap-dir=PATH        Where to download install/  (default: $PWD/install)
+#     --bootstrap-refresh         Force re-download even if cache present
+#
+#     INSTALL_MOAB_BRANCH         (same; env-var fallback)
+#     INSTALL_MOAB_REPO_RAW_URL   (same)
+#     INSTALL_MOAB_DIR            (same)
+#     INSTALL_MOAB_REFRESH=yes    (same)
+#
+# Important: env vars set BEFORE 'curl' do NOT propagate to the piped bash.
+# Use --bootstrap-* flags for the curl|bash pattern, e.g.:
+#
+#     curl -fsSL https://bitbucket.org/fathomteam/moab/raw/myfork-branch/install/install-bootstrap.sh \
+#         | bash -s -- --bootstrap-branch=myfork-branch --machine=auto
+#
+# (The bootstrap intercepts its own --bootstrap-* flags and forwards the
+# rest to install-moab.sh.)
 #
 # Examples:
 #
-#     # Fetch from a fork
-#     INSTALL_MOAB_REPO_RAW_URL=https://bitbucket.org/myuser/moab/raw \
-#         curl -fsSL .../install-bootstrap.sh | bash -s -- --machine=auto
+#     # Fetch from a fork's branch (one-liner, args survive the pipe)
+#     curl -fsSL https://bitbucket.org/myuser/moab/raw/master/install/install-bootstrap.sh \
+#         | bash -s -- --bootstrap-repo=https://bitbucket.org/myuser/moab/raw \
+#                      --machine=auto
 #
 #     # Pin to a release branch
-#     INSTALL_MOAB_BRANCH=release-v5.6.0 \
-#         curl -fsSL .../install-bootstrap.sh | bash -s -- --machine=auto
+#     curl -fsSL .../install-bootstrap.sh \
+#         | bash -s -- --bootstrap-branch=release-v5.6.0 --machine=auto
 #
-#     # Cache install/ in $HOME so re-runs skip the download
-#     INSTALL_MOAB_DIR=$HOME/.local/share/moab-installer \
-#         curl -fsSL .../install-bootstrap.sh | bash -s -- --machine=auto
+#     # Cache install/ in $HOME so re-runs across build dirs share one copy
+#     curl -fsSL .../install-bootstrap.sh \
+#         | bash -s -- --bootstrap-dir=$HOME/.local/share/moab-installer \
+#                      --machine=auto
 
 set -euo pipefail
 
+# Defaults (env vars seed the value; CLI flags override below)
 BRANCH="${INSTALL_MOAB_BRANCH:-master}"
 REPO_RAW_URL="${INSTALL_MOAB_REPO_RAW_URL:-https://bitbucket.org/fathomteam/moab/raw}"
 INSTALL_DIR="${INSTALL_MOAB_DIR:-$PWD/install}"
 REFRESH="${INSTALL_MOAB_REFRESH:-no}"
+
+# Intercept --bootstrap-* flags; pass the rest to install-moab.sh via exec.
+FORWARDED_ARGS=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --bootstrap-branch=*)   BRANCH="${1#*=}" ;;
+        --bootstrap-repo=*)     REPO_RAW_URL="${1#*=}" ;;
+        --bootstrap-dir=*)      INSTALL_DIR="${1#*=}" ;;
+        --bootstrap-refresh)    REFRESH=yes ;;
+        --bootstrap-help)
+            sed -n '1,/^set -euo pipefail$/p' "${BASH_SOURCE[0]:-$0}" \
+                | sed 's/^# \?//; /^set -euo/d; /^#!/d'
+            exit 0
+            ;;
+        *) FORWARDED_ARGS+=("$1") ;;
+    esac
+    shift
+done
 
 URL_BASE="$REPO_RAW_URL/$BRANCH/install"
 
@@ -107,5 +143,5 @@ else
     log "Bootstrap complete."
 fi
 
-log "Exec: $INSTALL_DIR/install-moab.sh $*"
-exec "$INSTALL_DIR/install-moab.sh" "$@"
+log "Exec: $INSTALL_DIR/install-moab.sh ${FORWARDED_ARGS[*]:-}"
+exec "$INSTALL_DIR/install-moab.sh" ${FORWARDED_ARGS[@]+"${FORWARDED_ARGS[@]}"}

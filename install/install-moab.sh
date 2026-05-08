@@ -359,6 +359,12 @@ Common options:
                         default_compiler. Informational in Push 1.
   --list-machines       Print the registered machine entries with last-validated
                         dates, mark the auto-detected one, and exit.
+  --self-check          Validate machine DB integrity (function presence,
+                        required META fields, date format, default-compiler
+                        membership in supported list). If --e3sm-root is set,
+                        also cross-check that each entry's E3SM_NAME exists in
+                        config_machines.xml. Exit 0 on pass, 2 on any problem.
+                        Suitable for CI.
   --extra=ARGS          Extra args appended to MOAB invocation
   --extra-zoltan=ARGS   Extra args appended to Zoltan's configure (verbatim)
   --extra-tempestremap=ARGS
@@ -431,6 +437,7 @@ while [[ $# -gt 0 ]]; do
         --machine=*)             MACHINE_NAME="${1#*=}" ;;
         --compiler=*)            COMPILER_FAMILY="${1#*=}" ;;
         --list-machines)         _LIST_MACHINES=yes ;;
+        --self-check)            _SELF_CHECK=yes ;;
         --profile=*)             PROFILE="${1#*=}" ;;
         --e3sm-root=*)           E3SM_ROOT="${1#*=}" ;;
         --yes|-y|--no-confirm)   ASSUME_YES=yes ;;
@@ -466,6 +473,90 @@ list_machines() {
 if [[ "${_LIST_MACHINES:-no}" == "yes" ]]; then
     list_machines
     exit 0
+fi
+
+#-----------------------------------------------------------------------------
+# --self-check: validate machine DB integrity (CI-friendly)
+#-----------------------------------------------------------------------------
+# Verifies, for every entry in MACHINE_REGISTRY:
+#   * machine_<name>_match  function exists and is callable
+#   * machine_<name>_meta   function exists and populates required fields
+#   * MACHINE_META_DEFAULT_COMPILER is non-empty
+#   * MACHINE_META_DEFAULT_COMPILER appears in MACHINE_META_SUPPORTED_COMPILERS
+#   * MACHINE_META_LAST_VALIDATED is YYYY-MM-DD or "TBD"
+#   * If --e3sm-root is set: MACHINE_META_E3SM_NAME (when non-empty) appears
+#     as a MACH= attribute in config_machines.xml
+#
+# Exits 0 with summary if all entries pass; exits 2 if anything failed.
+self_check() {
+    local fails=0 entries=0 m
+    local cm_xml=""
+    if [[ -n "$E3SM_ROOT" && -f "$E3SM_ROOT/cime_config/machines/config_machines.xml" ]]; then
+        cm_xml="$E3SM_ROOT/cime_config/machines/config_machines.xml"
+    fi
+
+    log "Self-check: validating $(echo $MACHINE_REGISTRY | wc -w | tr -d ' ') machine entries..."
+    [[ -n "$cm_xml" ]] && log "  CIME cross-check enabled (via $cm_xml)"
+
+    for m in $MACHINE_REGISTRY; do
+        entries=$((entries + 1))
+        local prefix="  [$m]"
+
+        # 1. functions exist
+        if ! declare -f "machine_${m}_match" >/dev/null; then
+            warn "$prefix missing function: machine_${m}_match()"
+            fails=$((fails + 1))
+            continue
+        fi
+        if ! declare -f "machine_${m}_meta" >/dev/null; then
+            warn "$prefix missing function: machine_${m}_meta()"
+            fails=$((fails + 1))
+            continue
+        fi
+
+        # 2. meta() populates fields
+        reset_machine_meta
+        "machine_${m}_meta"
+
+        if [[ -z "$MACHINE_META_DEFAULT_COMPILER" ]]; then
+            warn "$prefix MACHINE_META_DEFAULT_COMPILER is empty"
+            fails=$((fails + 1))
+        fi
+        if [[ -z "$MACHINE_META_LAST_VALIDATED" ]]; then
+            warn "$prefix MACHINE_META_LAST_VALIDATED is empty"
+            fails=$((fails + 1))
+        elif [[ "$MACHINE_META_LAST_VALIDATED" != "TBD" \
+             && ! "$MACHINE_META_LAST_VALIDATED" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+            warn "$prefix MACHINE_META_LAST_VALIDATED='$MACHINE_META_LAST_VALIDATED' is not 'TBD' or YYYY-MM-DD"
+            fails=$((fails + 1))
+        fi
+
+        # 3. default compiler ⊂ supported compilers
+        if [[ -n "$MACHINE_META_SUPPORTED_COMPILERS" \
+           && -n "$MACHINE_META_DEFAULT_COMPILER" \
+           && ",$MACHINE_META_SUPPORTED_COMPILERS," != *",$MACHINE_META_DEFAULT_COMPILER,"* ]]; then
+            warn "$prefix default compiler '$MACHINE_META_DEFAULT_COMPILER' not in supported '$MACHINE_META_SUPPORTED_COMPILERS'"
+            fails=$((fails + 1))
+        fi
+
+        # 4. CIME cross-check
+        if [[ -n "$cm_xml" && -n "$MACHINE_META_E3SM_NAME" ]]; then
+            if ! grep -q "MACH=\"$MACHINE_META_E3SM_NAME\"" "$cm_xml"; then
+                warn "$prefix e3sm_name='$MACHINE_META_E3SM_NAME' not found in $cm_xml"
+                fails=$((fails + 1))
+            fi
+        fi
+    done
+
+    if (( fails > 0 )); then
+        warn "Self-check: $fails problem(s) across $entries entries"
+        return 1
+    fi
+    ok "Self-check: $entries entries OK"
+    return 0
+}
+if [[ "${_SELF_CHECK:-no}" == "yes" ]]; then
+    if self_check; then exit 0; else exit 2; fi
 fi
 
 #-----------------------------------------------------------------------------

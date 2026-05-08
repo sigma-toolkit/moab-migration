@@ -440,7 +440,7 @@ apply_machine_defaults() {
     if [[ "$requested" == "auto" || -z "$requested" ]]; then
         resolved="$(detect_machine)"
         if [[ -z "$resolved" ]]; then
-            log "Machine         : (no registered match for this host; running in generic mode)"
+            # No registered match -- the orchestration banner will say so.
             MACHINE_NAME=""
             return 0
         fi

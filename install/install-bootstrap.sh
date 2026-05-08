@@ -134,12 +134,38 @@ if (( BASH_VERSINFO[0] < 3 )) || { (( BASH_VERSINFO[0] == 3 )) && (( BASH_VERSIN
     die "bash >= 3.2 required (you have $BASH_VERSION)"
 fi
 
-# If the cache dir already has install-moab.sh and we weren't asked to refresh,
-# skip the download and exec the cached copy directly. Lets re-runs avoid the
-# network round-trip.
+# Decide whether to reuse the cache. Reuse skips the download AND avoids
+# silently running stale scripts that were fetched from a different branch
+# / repo than the user is now requesting. The .bootstrap-source stamp is
+# written after each successful fetch and read here for source-of-truth
+# comparison.
+STAMP_FILE="$INSTALL_DIR/.bootstrap-source"
+SHOULD_REUSE="no"
 if [[ -x "$INSTALL_DIR/install-moab.sh" && "$REFRESH" != "yes" ]]; then
+    if [[ -f "$STAMP_FILE" ]]; then
+        cached_branch="$(awk -F= '/^BRANCH=/{print $2; exit}' "$STAMP_FILE" 2>/dev/null || true)"
+        cached_repo="$(awk -F= '/^REPO=/{print $2; exit}' "$STAMP_FILE" 2>/dev/null || true)"
+        if [[ "$cached_branch" == "$BRANCH" && "$cached_repo" == "$REPO_RAW_URL" ]]; then
+            SHOULD_REUSE="yes"
+        else
+            log "Cache mismatch detected:"
+            log "  cached:    branch=$cached_branch repo=$cached_repo"
+            log "  requested: branch=$BRANCH repo=$REPO_RAW_URL"
+            log "  -> re-downloading"
+        fi
+    else
+        # No stamp file = fetched by an older bootstrap version, OR the
+        # directory was populated by hand. Treat as untrusted and re-download
+        # once; the new fetch writes a stamp for next time.
+        log "Cache present at $INSTALL_DIR but has no source stamp"
+        log "  (probably from an older bootstrap version)"
+        log "  -> re-downloading once to write the stamp"
+    fi
+fi
+
+if [[ "$SHOULD_REUSE" == "yes" ]]; then
     log "Reusing cached install scripts at $INSTALL_DIR"
-    log "  (set INSTALL_MOAB_REFRESH=yes to re-download from $URL_BASE)"
+    log "  (pass --bootstrap-refresh to force re-download from $URL_BASE)"
 else
     log "Fetching install scripts from $URL_BASE"
     log "  -> $INSTALL_DIR"
@@ -152,6 +178,13 @@ else
     for f in "${EXEC_FILES[@]}"; do
         chmod +x "$INSTALL_DIR/$f"
     done
+    # Stamp the cache with the source so future invocations can detect
+    # mismatch (different branch, different fork, etc.).
+    {
+        echo "BRANCH=$BRANCH"
+        echo "REPO=$REPO_RAW_URL"
+        echo "FETCHED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u)"
+    } > "$STAMP_FILE"
     log "Bootstrap complete."
 fi
 

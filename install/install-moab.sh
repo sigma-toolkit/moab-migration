@@ -98,6 +98,7 @@ COMPILER_FAMILY="${COMPILER_FAMILY:-}"
 # Profile + E3SM checkout
 PROFILE="${PROFILE:-e3sm}"           # e3sm | standalone
 E3SM_ROOT="${E3SM_ROOT:-}"           # Required for --profile=e3sm
+ASSUME_YES="${ASSUME_YES:-no}"       # Bypass the e3sm-profile env confirmation prompt
 
 # TPL versions (must match MOAB's expected sources for consistency with E3SM)
 EIGEN3_VERSION="3.4.0"
@@ -324,6 +325,9 @@ Common options:
   --e3sm-root=PATH      Path to E3SM checkout (or set \$E3SM_ROOT). Required
                         for --profile=e3sm. Must contain
                         cime_config/machines/config_machines.xml.
+  --yes, -y             Skip the e3sm-profile env confirmation prompt. Required
+                        when stdin is not a tty (CI, piped input). Equivalent
+                        to ASSUME_YES=yes.
   --machine=NAME        Use the named machine entry from the database. NAME=auto
                         (default) auto-detects via hostname/NERSC_HOST/
                         LMOD_SYSTEM_NAME. Pass --list-machines to see all entries.
@@ -408,6 +412,7 @@ while [[ $# -gt 0 ]]; do
         --list-machines)         _LIST_MACHINES=yes ;;
         --profile=*)             PROFILE="${1#*=}" ;;
         --e3sm-root=*)           E3SM_ROOT="${1#*=}" ;;
+        --yes|-y|--no-confirm)   ASSUME_YES=yes ;;
         -h|--help)         usage; exit 0 ;;
         *) die "unknown option: $1 (use --help)" 1 ;;
     esac
@@ -562,16 +567,13 @@ apply_e3sm_profile() {
         die "failed to derive E3SM environment for $MACHINE_META_E3SM_NAME / $COMPILER_FAMILY" 2
     fi
 
-    if [[ "$DRY_RUN" == "yes" ]]; then
-        log "Dry-run: would source $tmp_env (skipping actual source to keep env clean)"
-        log "Inspect: less $tmp_env"
-        # Apply adapters + auto-extras against the *current* env. Under dry-run
-        # the user's already-loaded env is what we'd see post-source on a real
-        # machine, so the resulting --extra= preview is honest.
-    else
-        # shellcheck disable=SC1090
-        source "$tmp_env" || die "sourcing E3SM env snippet failed (see $tmp_env)" 2
-    fi
+    log "Sourcing E3SM env snippet: $tmp_env"
+    # The script runs in its own subshell, so sourcing here doesn't pollute the
+    # user's parent shell. Sourcing under --dry-run is safe and necessary --
+    # otherwise HDF5_ROOT / NETCDF_C_PATH / PNETCDF_PATH stay unset and the
+    # downstream require_var validation fails before we can preview anything.
+    # shellcheck disable=SC1090
+    source "$tmp_env" || die "sourcing E3SM env snippet failed (see $tmp_env for the snippet content)" 2
 
     adapt_e3sm_env_to_install_moab_vars
 
@@ -606,6 +608,38 @@ apply_e3sm_profile() {
             log "Auto-set --extra (MOAB) from BLAS_ROOT/LAPACK_ROOT"
         fi
     fi
+
+    confirm_e3sm_env
+}
+
+# Show the resolved E3SM env and ask the user to confirm it's correct before
+# proceeding. Bypass with --yes / -y / ASSUME_YES=yes. Refuse to proceed
+# silently when stdin isn't a tty.
+confirm_e3sm_env() {
+    if [[ "$ASSUME_YES" == "yes" ]]; then
+        log "Skipping confirmation prompt (--yes / ASSUME_YES=yes)"
+        return 0
+    fi
+    if [[ ! -t 0 ]]; then
+        die "stdin is not a tty -- pass --yes (or set ASSUME_YES=yes) to skip the e3sm env confirmation prompt in non-interactive mode" 1
+    fi
+
+    # Print to stderr (matches the rest of the banner) so prompt isn't lost in pipes.
+    printf '\n' >&2
+    printf '%s[install-moab]%s Does this E3SM environment look correct? [y/N] ' \
+        "$COLOR_BLUE" "$COLOR_RESET" >&2
+
+    local reply=""
+    IFS= read -r reply || true
+    case "$reply" in
+        y|Y|yes|YES) log "Confirmed -- continuing" ;;
+        *)
+            log "Aborted at user request. To re-run with a different machine/compiler:"
+            log "  install-moab.sh --machine=NAME --compiler=NAME --profile=e3sm --e3sm-root=$E3SM_ROOT [...]"
+            log "Or pass --profile=standalone to skip env loading entirely."
+            exit 0
+            ;;
+    esac
 }
 apply_e3sm_profile
 

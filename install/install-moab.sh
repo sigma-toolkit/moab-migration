@@ -127,7 +127,7 @@ TEMPESTREMAP_VERSION="2.2.x"
 #   MACHINE_META_LAST_VALIDATED    -- YYYY-MM-DD or TBD
 #   MACHINE_META_NOTES             -- optional free-form (Cray PrgEnv quirks, etc.)
 
-MACHINE_REGISTRY="bebop improv crux gce perlmutter"
+MACHINE_REGISTRY="bebop improv crux gce perlmutter pmgpu"
 
 # Default-detection hostname helpers
 _hn() { printf '%s' "${HOSTNAME:-$(hostname 2>/dev/null || true)}"; }
@@ -191,7 +191,10 @@ machine_gce_meta() {
     MACHINE_META_NOTES="ANL Climate dev cluster. Spack-managed modules; ensure HDF5/NetCDF/PNetCDF are loaded before invoking."
 }
 
-#---------- Perlmutter (NERSC) ----------
+#---------- Perlmutter CPU partition (NERSC) ----------
+# `--machine=perlmutter` is an alias for the CPU partition (the common default).
+# For GPU nodes use `--machine=pm-gpu` explicitly -- auto-detection cannot
+# distinguish CPU vs GPU login nodes, since both share the perlmutter NERSC_HOST.
 machine_perlmutter_match() {
     [[ "${NERSC_HOST:-}" == "perlmutter" ]] && return 0
     [[ "${LMOD_SYSTEM_NAME:-}" == "perlmutter" ]] && return 0
@@ -199,12 +202,30 @@ machine_perlmutter_match() {
     return 1
 }
 machine_perlmutter_meta() {
-    MACHINE_META_E3SM_NAME="pm-cpu"          # E3SM uses pm-cpu / pm-gpu (override with --machine and --e3sm-name=pm-gpu manually for now)
+    MACHINE_META_E3SM_NAME="pm-cpu"
     MACHINE_META_DEFAULT_COMPILER="gnu"
     MACHINE_META_SUPPORTED_COMPILERS="gnu,intel,nvidia,aocc"
     MACHINE_META_STANDALONE_HINT="module load PrgEnv-gnu cray-hdf5-parallel cray-netcdf-hdf5parallel cray-parallel-netcdf"
     MACHINE_META_LAST_VALIDATED="2026-05-08"
-    MACHINE_META_NOTES="Cray PrgEnv. Compiler wrappers cc/CC/ftn auto-detected. Pass --machine=perlmutter --compiler=nvidia for GPU builds."
+    MACHINE_META_NOTES="Cray PrgEnv (CPU partition). Compiler wrappers cc/CC/ftn auto-detected. For GPU builds use --machine=pmgpu."
+}
+
+#---------- Perlmutter GPU partition (NERSC) ----------
+# Same login nodes as pm-cpu; the user must opt in to the GPU build by name.
+# Auto-detection deliberately does NOT match -- 'auto' resolves to perlmutter
+# (CPU). To build for GPU, pass --machine=pmgpu.
+# Registry name uses 'pmgpu' (no dash) because bash function names can't
+# reliably contain '-'. The e3sm_name field still maps to "pm-gpu" for CIME.
+machine_pmgpu_match() {
+    return 1   # explicit-only
+}
+machine_pmgpu_meta() {
+    MACHINE_META_E3SM_NAME="pm-gpu"
+    MACHINE_META_DEFAULT_COMPILER="nvidia"
+    MACHINE_META_SUPPORTED_COMPILERS="gnu,nvidia"
+    MACHINE_META_STANDALONE_HINT="module load PrgEnv-nvidia cudatoolkit cray-hdf5-parallel cray-netcdf-hdf5parallel cray-parallel-netcdf"
+    MACHINE_META_LAST_VALIDATED="TBD"
+    MACHINE_META_NOTES="Perlmutter GPU partition. Default compiler is nvidia. Sibling of perlmutter; no auto-detection -- pass --machine=pmgpu explicitly."
 }
 
 # Reset the meta globals before invoking a machine_<name>_meta() function

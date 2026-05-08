@@ -284,14 +284,14 @@ sourcing `config_machines.xml`.)
 $ install-moab.sh --list-machines
 Registered machines:
 
-  NAME         DEFAULT SUPPORTED                      LAST-VALIDATED
-  ----         ------- ---------                      --------------
- *bebop        gnu     gnu,intel                      2026-05-08
-  improv       gnu     gnu,intel,aocc                 TBD
-  crux         gnu     gnu,cray,nvhpc                 TBD
-  gce          gnu     gnu,intel                      2026-05-08
-  perlmutter   gnu     gnu,intel,nvidia,aocc          2026-05-08
-  pmgpu        nvidia  gnu,nvidia                     TBD
+  NAME         E3SM_NAME      DEFAULT SUPPORTED                 LAST-VALIDATED
+  ----         ---------      ------- ---------                 --------------
+ *bebop        bebop          gnu     gnu,intel                 2026-05-08
+  improv       improv         gnu     gnu,intel,aocc            TBD
+  crux         crux           gnu     gnu,cray,nvhpc            TBD
+  gce          anlgce-ub22    gnu     gnu,intel                 2026-05-08
+  perlmutter   pm-cpu         gnu     gnu,intel,nvidia,aocc     2026-05-08
+  pmgpu        pm-gpu         nvidia  gnu,nvidia                TBD
 
   * = auto-detected on this host
 ```

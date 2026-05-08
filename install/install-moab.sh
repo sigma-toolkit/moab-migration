@@ -452,8 +452,8 @@ done
 #-----------------------------------------------------------------------------
 list_machines() {
     printf 'Registered machines:\n\n'
-    printf '  %-12s %-7s %-30s %s\n' "NAME" "DEFAULT" "SUPPORTED" "LAST-VALIDATED"
-    printf '  %-12s %-7s %-30s %s\n' "----" "-------" "---------" "--------------"
+    printf '  %-12s %-14s %-7s %-25s %s\n' "NAME" "E3SM_NAME" "DEFAULT" "SUPPORTED" "LAST-VALIDATED"
+    printf '  %-12s %-14s %-7s %-25s %s\n' "----" "---------" "-------" "---------" "--------------"
     local m detected
     detected="$(detect_machine)"
     for m in $MACHINE_REGISTRY; do
@@ -461,7 +461,8 @@ list_machines() {
         "machine_${m}_meta"
         local mark=" "
         [[ -n "$detected" && "$detected" == "$m" ]] && mark="*"
-        printf ' %s%-12s %-7s %-30s %s\n' "$mark" "$m" \
+        printf ' %s%-12s %-14s %-7s %-25s %s\n' "$mark" "$m" \
+            "${MACHINE_META_E3SM_NAME:--}" \
             "$MACHINE_META_DEFAULT_COMPILER" \
             "$MACHINE_META_SUPPORTED_COMPILERS" \
             "$MACHINE_META_LAST_VALIDATED"

@@ -1557,10 +1557,21 @@ tpl_install_marker() {
 #-----------------------------------------------------------------------------
 download_one() {
     local url="$1" out="$2"
-    if [[ "$DOWNLOADER" == "curl" ]]; then
-        curl -fSL --connect-timeout 30 -o "$out.part" "$url" && mv "$out.part" "$out"
+    # Honor VERBOSE: in quiet mode (default), suppress curl's progress meter
+    # but keep --show-error so HTTP failures still produce a diagnostic.
+    # In verbose mode show the meter so users can watch slow downloads.
+    local curl_quiet wget_quiet
+    if [[ "${VERBOSE:-no}" == "yes" ]]; then
+        curl_quiet=""        # default progress meter on
+        wget_quiet=""        # default progress dots on
     else
-        wget -q -O "$out.part" "$url" && mv "$out.part" "$out"
+        curl_quiet="-s -S"   # silent + show-error
+        wget_quiet="-q"
+    fi
+    if [[ "$DOWNLOADER" == "curl" ]]; then
+        curl $curl_quiet -fL --connect-timeout 30 -o "$out.part" "$url" && mv "$out.part" "$out"
+    else
+        wget $wget_quiet -O "$out.part" "$url" && mv "$out.part" "$out"
     fi
 }
 

@@ -105,18 +105,14 @@ log ""
 # install_moab_files variable in the top-level Makefile.am.
 FILES=(
     "install-moab.sh"
-    "install-moab-e3sm.sh"
     "INSTALL-MOAB.md"
     "CONTRIBUTING-MACHINES.md"
-    "workflow.sh"
     "scripts/e3sm_env.py"
 )
 
 # Subset that should end up executable.
 EXEC_FILES=(
     "install-moab.sh"
-    "install-moab-e3sm.sh"
-    "workflow.sh"
     "scripts/e3sm_env.py"
 )
 

@@ -1,10 +1,9 @@
 # `install-moab.sh` — Handoff Document
 
-> **Renamed in 2026-05.** Was `install-moab-e3sm.sh` and lived at
-> `build-e3sm/install-moab-e3sm.sh`. The old path remains as a 3-line
-> backwards-compat shim (`install/install-moab-e3sm.sh`) that exec's
-> `install-moab.sh` with all args forwarded — existing E3SM workflows /
-> docs that reference the old name keep working unchanged.
+> **Single entry point: `install/install-moab.sh`.** Earlier work-in-progress
+> revisions had wrapper shims (`install-moab-e3sm.sh`, `workflow.sh`) for
+> backwards compatibility; those have been removed. Use `--profile=e3sm` to
+> opt into the E3SM environment flow.
 >
 > **Push 1 (2026-05)** added a machine database and `--machine` /
 > `--list-machines` / `--compiler` flags. Database entries are pure
@@ -241,13 +240,11 @@ HPC, common in containers), fetch the files directly:
 ```bash
 BASE=https://bitbucket.org/fathomteam/moab/raw/master/install
 mkdir -p install/scripts
-for f in install-moab.sh install-moab-e3sm.sh INSTALL-MOAB.md \
-         CONTRIBUTING-MACHINES.md workflow.sh; do
+for f in install-moab.sh INSTALL-MOAB.md CONTRIBUTING-MACHINES.md; do
     curl -fsSLo install/$f $BASE/$f
 done
 curl -fsSLo install/scripts/e3sm_env.py $BASE/scripts/e3sm_env.py
-chmod +x install/install-moab.sh install/install-moab-e3sm.sh \
-         install/workflow.sh install/scripts/e3sm_env.py
+chmod +x install/install-moab.sh install/scripts/e3sm_env.py
 ./install/install-moab.sh --machine=auto [...]
 ```
 
@@ -298,7 +295,7 @@ module load gcc/12 mpich/4.1 hdf5/1.14 netcdf-c/4.9 parallel-netcdf/1.12
 
 # Run the script — clones MOAB into $PWD/moab-src, installs to $PREFIX
 mkdir -p /scratch/$USER/moab-build && cd /scratch/$USER/moab-build
-/path/to/install-moab-e3sm.sh \
+/path/to/install-moab.sh \
     --hdf5-root=$HDF5_ROOT \
     --netcdf-root=$NETCDF_C_PATH \
     --pnetcdf-root=$PNETCDF_PATH \
@@ -311,7 +308,7 @@ mkdir -p /scratch/$USER/moab-build && cd /scratch/$USER/moab-build
 module load PrgEnv-gnu cray-hdf5-parallel cray-netcdf-hdf5parallel cray-parallel-netcdf
 
 # No --mpi-root needed; Cray detection picks cc/CC/ftn automatically
-/path/to/install-moab-e3sm.sh \
+/path/to/install-moab.sh \
     --hdf5-root=$HDF5_DIR \
     --netcdf-root=$NETCDF_DIR \
     --pnetcdf-root=$PNETCDF_DIR \
@@ -326,7 +323,7 @@ module load PrgEnv-gnu cray-hdf5-parallel cray-netcdf-hdf5parallel cray-parallel
 #   * skip TPLs (already installed)
 #   * reconfigure MOAB if HEAD changed (fingerprint differs)
 #   * incremental make + make install
-/path/to/install-moab-e3sm.sh \
+/path/to/install-moab.sh \
     --hdf5-root=$HDF5_ROOT \
     --netcdf-root=$NETCDF_C_PATH \
     --pnetcdf-root=$PNETCDF_PATH \
@@ -345,9 +342,8 @@ The script supports two audiences via a profile knob:
 | `e3sm` (opt-in) | You have an E3SM checkout and want the same environment E3SM uses for the target machine. | Sources modules + env vars from `$E3SM_ROOT/cime_config/machines/config_machines.xml`. Requires `--e3sm-root=PATH` or `$E3SM_ROOT`. Auto-fills `--with-blas=`/`--with-lapack=` from `$BLAS_ROOT`/`$LAPACK_ROOT` if E3SM exposes them. |
 
 > **Default flipped in 2026-05.** Earlier revisions defaulted to `--profile=e3sm`,
-> which surprised MOAB downstream users by requiring `--e3sm-root=`. The legacy
-> `install-moab-e3sm.sh` shim still injects `--profile=e3sm` so existing E3SM
-> workflows that reference the old name keep working unchanged.
+> which surprised MOAB downstream users by requiring `--e3sm-root=`. E3SM users
+> now opt in explicitly with `--profile=e3sm`.
 
 ### `--profile=standalone` walk-through (default)
 
@@ -378,10 +374,6 @@ export E3SM_ROOT=$HOME/Code/E3SM
     --machine=bebop \
     --hdf5-root=/lcrc/group/e3sm/soft/bebop/hdf5/1.12.3/gcc-13.2.0/openmpi-4.1.8 \
     --prefix=$PWD/installs
-
-# OR use the legacy install-moab-e3sm.sh name (same behavior; --profile=e3sm
-# is injected automatically)
-./install/install-moab-e3sm.sh --machine=bebop ...
 ```
 
 The script will:
@@ -1103,7 +1095,7 @@ What `--dry-run` shows:
 Example (truncated):
 
 ```
-$ ./install-moab-e3sm.sh --dry-run --hdf5-root=/opt/hdf5 --netcdf-root=/opt/netcdf --pnetcdf-root=/opt/pnetcdf
+$ ./install-moab.sh --dry-run --hdf5-root=/opt/hdf5 --netcdf-root=/opt/netcdf --pnetcdf-root=/opt/pnetcdf
 
 ========== MOAB orchestration ==========
 
@@ -1211,11 +1203,11 @@ or to stdout/stderr (CMake). On configure failure, the last 60 lines of
 
 ```bash
 # Inspect what would happen first
-./install-moab-e3sm.sh --dry-run \
+./install-moab.sh --dry-run \
     --hdf5-root=$HDF5_ROOT --netcdf-root=$NETCDF_C_PATH --pnetcdf-root=$PNETCDF_PATH
 
 # Run for real
-./install-moab-e3sm.sh \
+./install-moab.sh \
     --hdf5-root=$HDF5_ROOT --netcdf-root=$NETCDF_C_PATH --pnetcdf-root=$PNETCDF_PATH \
     --prefix=$HOME/install/MOAB --jobs=16
 ```
@@ -1233,37 +1225,37 @@ Same command. The script:
 
 ```bash
 # Option 1: track a different branch
-./install-moab-e3sm.sh --moab-branch=release-v5.6.0 ...
+./install-moab.sh --moab-branch=release-v5.6.0 ...
 
 # Option 2: check out manually and use --src-dir
 git clone https://bitbucket.org/fathomteam/moab.git /scratch/me/moab-src
 cd /scratch/me/moab-src && git checkout 91b54bd8e
-./install-moab-e3sm.sh --src-dir=/scratch/me/moab-src ...
+./install-moab.sh --src-dir=/scratch/me/moab-src ...
 ```
 
 ### Develop on a feature branch
 
 ```bash
 # Use --src-dir to keep your branch and uncommitted changes safe
-./install-moab-e3sm.sh --src-dir=/path/to/my/checkout ...
+./install-moab.sh --src-dir=/path/to/my/checkout ...
 # After editing source: just re-run -- make builds incrementally
-./install-moab-e3sm.sh --src-dir=/path/to/my/checkout ...
+./install-moab.sh --src-dir=/path/to/my/checkout ...
 ```
 
 ### Rebuild MOAB only (TPLs already done)
 
 ```bash
 # Just re-run; TPLs are skipped automatically
-./install-moab-e3sm.sh ...
+./install-moab.sh ...
 
 # Force MOAB re-configure (e.g., after editing configure.ac)
-./install-moab-e3sm.sh --reconfigure ...
+./install-moab.sh --reconfigure ...
 ```
 
 ### Switch from autotools to CMake
 
 ```bash
-./install-moab-e3sm.sh --build-system=cmake \
+./install-moab.sh --build-system=cmake \
     --build-dir=$BUILD_DIR-cmake \      # use a separate build dir
     ...
 ```
@@ -1273,7 +1265,7 @@ cd /scratch/me/moab-src && git checkout 91b54bd8e
 ### CI / scripted build
 
 ```bash
-./install-moab-e3sm.sh \
+./install-moab.sh \
     --hdf5-root=$HDF5_ROOT --netcdf-root=$NETCDF_C_PATH --pnetcdf-root=$PNETCDF_PATH \
     --prefix=$WORK/install/MOAB \
     --build-dir=$WORK/build/moab \
@@ -1366,7 +1358,7 @@ If the retry budget is exhausted before the fix lands, manually:
 
 ```bash
 rm -rf $BUILD_DIR/tpl-work/zoltan
-CFLAGS="-fcommon" ./install-moab-e3sm.sh ... --extra="CFLAGS=-fcommon"
+CFLAGS="-fcommon" ./install-moab.sh ... --extra="CFLAGS=-fcommon"
 ```
 
 ### Site-specific BLAS / LAPACK (MKL, OpenBLAS, ESSL, libsci, AOCL, …)
@@ -1388,20 +1380,20 @@ inner values inside outer single quotes:
 # Static netlib-lapack at a custom prefix (e.g. Bebop/Improv at ANL)
 BLAS_SPEC='/lcrc/group/e3sm/soft/improv/netlib-lapack/3.12.0/gcc-12.3.0/libblas.a -lgfortran'
 LAPACK_SPEC='/lcrc/group/e3sm/soft/improv/netlib-lapack/3.12.0/gcc-12.3.0/liblapack.a -lm'
-./install-moab-e3sm.sh \
+./install-moab.sh \
     --extra-tempestremap="--with-blas=\"$BLAS_SPEC\" --with-lapack=\"$LAPACK_SPEC\"" \
     --extra="--with-blas=\"$BLAS_SPEC\" --with-lapack=\"$LAPACK_SPEC\"" \
     ...
 
 # Intel MKL (sequential)
 MKL_SPEC="-L$MKLROOT/lib/intel64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl"
-./install-moab-e3sm.sh \
+./install-moab.sh \
     --extra-tempestremap="--with-blas=\"$MKL_SPEC\" --with-lapack=\"$MKL_SPEC\"" \
     --extra="--with-blas=\"$MKL_SPEC\" --with-lapack=\"$MKL_SPEC\"" \
     ...
 
 # OpenBLAS at a custom prefix
-./install-moab-e3sm.sh \
+./install-moab.sh \
     --extra-tempestremap='--with-blas="-L/opt/openblas/lib -lopenblas"' \
     --extra='--with-blas="-L/opt/openblas/lib -lopenblas"' \
     ...
@@ -1425,7 +1417,7 @@ The script auto-exports `NETCDFROOT/NETCDF_DIR/NETCDF_PATH` on detection.
 If retries are exhausted:
 
 ```bash
-NETCDFROOT=$NETCDF_C_PATH NETCDF_DIR=$NETCDF_C_PATH ./install-moab-e3sm.sh ...
+NETCDFROOT=$NETCDF_C_PATH NETCDF_DIR=$NETCDF_C_PATH ./install-moab.sh ...
 ```
 
 ### Re-running picks up no changes after a `git pull`
@@ -1433,7 +1425,7 @@ NETCDFROOT=$NETCDF_C_PATH NETCDF_DIR=$NETCDF_C_PATH ./install-moab-e3sm.sh ...
 The fingerprint should detect that. If not, force it:
 
 ```bash
-./install-moab-e3sm.sh --reconfigure ...
+./install-moab.sh --reconfigure ...
 ```
 
 ### "$BUILD_DIR/moab-src exists but is not a git clone"
@@ -1477,7 +1469,7 @@ Everything is in `$BUILD_DIR/tpl-logs/` and `$MOAB_BUILD_DIR/config.log`
 ## File locations summary
 
 ```
-/path/to/install-moab-e3sm.sh         the script
+/path/to/install-moab.sh         the script
 /path/to/INSTALL-MOAB-E3SM.md         this document
 
 # All under $BUILD_DIR (default $PWD/moab-build):

@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 #
-# install-moab-e3sm.sh
+# install-moab.sh
 #
-# Robust orchestrator that builds MOAB for use with E3SM. The orchestrator
+# Robust orchestrator that builds MOAB. Default profile is 'standalone'
+# (trusts the user's loaded environment); pass --profile=e3sm to source
+# modules + env vars from an E3SM checkout's config_machines.xml.
+# The orchestrator
 # owns the full configure/build/install lifecycle for the three TPLs that
 # E3SM-MOAB needs (eigen3, zoltan, tempestremap) and hands the resulting
 # install paths to MOAB. MOAB itself is therefore built generically against
@@ -99,8 +102,7 @@ COMPILER_FAMILY="${COMPILER_FAMILY:-}"
 # Profile + E3SM checkout
 # Default: standalone -- trust whatever env the user has loaded; no CIME
 # machinery, no E3SM_ROOT requirement. Most MOAB downstream users want this.
-# E3SM users opt in explicitly via --profile=e3sm (and the legacy
-# install-moab-e3sm.sh shim does so on their behalf).
+# E3SM users opt in explicitly via --profile=e3sm.
 PROFILE="${PROFILE:-standalone}"     # standalone | e3sm
 E3SM_ROOT="${E3SM_ROOT:-}"           # Required for --profile=e3sm
 ASSUME_YES="${ASSUME_YES:-no}"       # Bypass the e3sm-profile env confirmation prompt
@@ -350,9 +352,7 @@ Common options:
                         loaded (typical for MOAB downstream users). With e3sm,
                         the script sources modules + env vars from
                         \$E3SM_ROOT/cime_config/machines/config_machines.xml
-                        for the resolved (machine, compiler) pair (the legacy
-                        install-moab-e3sm.sh shim selects this profile
-                        automatically).
+                        for the resolved (machine, compiler) pair.
   --e3sm-root=PATH      Path to E3SM checkout (or set \$E3SM_ROOT). Required
                         for --profile=e3sm. Must contain
                         cime_config/machines/config_machines.xml.

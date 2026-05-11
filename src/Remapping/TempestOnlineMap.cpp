@@ -1613,18 +1613,20 @@ static MPI_Op ddpdd_mpi_op_handle()
 }
 #endif
 
-// Reproducible global sum: matches shr_reprosum_calc when called with
-// ddpdd_sum=.true.. Skips entries with rowGids[i] < 0 (not owned by this
-// rank) so each summand is counted exactly once. MPI_Comm parameter is
-// only meaningful when built with MPI; in serial builds it is ignored.
+// Reproducible global sum that returns the FULL DDDouble (hi + lo). The
+// caller can either consume just the .hi (single-double precision) or use
+// the DDDouble form to keep extended precision through subsequent
+// arithmetic — important when the next step is a catastrophic-cancellation
+// subtraction such as `dM_total = M_low - M_hi_clip`. MPI_Comm parameter
+// is only meaningful when built with MPI.
 #ifdef MOAB_HAVE_MPI
-static double reprosumDDPDD( const std::vector< double >& vals,
-                              const std::vector< int >& rowGids,
-                              MPI_Comm comm )
+static DDDouble reprosumDDPDD_dd( const std::vector< double >& vals,
+                                  const std::vector< int >& rowGids,
+                                  MPI_Comm comm )
 #else
-static double reprosumDDPDD( const std::vector< double >& vals,
-                              const std::vector< int >& rowGids,
-                              int /*comm*/ )
+static DDDouble reprosumDDPDD_dd( const std::vector< double >& vals,
+                                  const std::vector< int >& rowGids,
+                                  int /*comm*/ )
 #endif
 {
     DDDouble local = { 0.0, 0.0 };
@@ -1638,7 +1640,44 @@ static double reprosumDDPDD( const std::vector< double >& vals,
 #ifdef MOAB_HAVE_MPI
     MPI_Allreduce( &local, &global, 1, ddpdd_mpi_type(), ddpdd_mpi_op_handle(), comm );
 #endif
-    return global.hi;
+    return global;
+}
+
+// Single-double-precision wrapper: matches MCT shr_reprosum_calc with
+// ddpdd_sum=.true.. Same algorithm as reprosumDDPDD_dd but collapses the
+// DDDouble to its high part for callers that don't need extended precision.
+#ifdef MOAB_HAVE_MPI
+static double reprosumDDPDD( const std::vector< double >& vals,
+                              const std::vector< int >& rowGids,
+                              MPI_Comm comm )
+#else
+static double reprosumDDPDD( const std::vector< double >& vals,
+                              const std::vector< int >& rowGids,
+                              int /*comm*/ )
+#endif
+{
+    return reprosumDDPDD_dd( vals, rowGids, comm ).hi;
+}
+
+// Subtract two DDDoubles preserving extended precision. Used after the
+// reproducible global sums of M_low and M_hi_clip to compute
+// dM_total = M_low - M_hi_clip without losing precision to catastrophic
+// cancellation when the two operands are large and nearly equal.
+static inline DDDouble ddpdd_pair_sub( DDDouble a, DDDouble b )
+{
+    DDDouble neg_b;
+    neg_b.hi = -b.hi;
+    neg_b.lo = -b.lo;
+    return ddpdd_pair_add( a, neg_b );
+}
+
+// Collapse a DDDouble to a single double in a way that preserves the
+// compensation: hi + lo. For typical (well-conditioned) results lo is a
+// tiny correction to hi; for results that came out of catastrophic
+// cancellation, lo can be of comparable magnitude to hi.
+static inline double ddpdd_to_double( DDDouble x )
+{
+    return x.hi + x.lo;
 }
 
 }  // namespace
@@ -1799,6 +1838,16 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
         if( r < 0 || r >= hiW.outerSize() ) continue;
         for( WeightMatrix::InnerIterator it( hiW, r ); it; ++it )
         {
+            // Skip explicit-zero entries. Eigen's InnerIterator visits any
+            // stored coefficient regardless of value; TempestRemap offline
+            // maps routinely emit explicit zeros. MCT's
+            // sMat_avMult_and_calc_bounds explicitly does
+            //     if (wgt == 0) cycle
+            // before extending bounds (seq_nlmap_mod.F90:855). Matching that
+            // here keeps the discrete domain of dependence the same as MCT;
+            // otherwise an explicit-zero entry pulls extra source columns
+            // into the bounds and loosens the per-row [lo, hi] range.
+            if( fabs(it.value()) < 1e-20 ) continue;
             int mc = (int)it.col();
             if( mc < 0 || mc > maxMatCol ) continue;
             int srcIdx = col_inv[mc];
@@ -1883,38 +1932,70 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
     }
 
     // ----- Get target areas (per matrix-row) ------------------------------
-    // GetTargetAreas() (from OfflineMap) is populated whether the map was
-    // computed online or loaded from disk (area_b in the netcdf file). It is
-    // indexed by matrix row, so we map target-tag-index -> matrix-row -> area.
-    // ----- Get target areas (per matrix-row) ------------------------------
-    // GetTargetAreas() (from OfflineMap) is populated only when the map is
-    // computed online; it is empty for disk-loaded maps because the iMOAB
-    // loader writes the target areas to the "aream" tag on the consumer
-    // (target component) app, not into m_dTargetAreas. To work in both cases
-    // we compute spherical-polygon areas directly from the MOAB target mesh
-    // entities — this is correctness-equivalent (the loader does the same
-    // thing using TempestRemap) and independent of map provenance.
+    // For BFB with MCT we MUST use the same area values MCT does. MCT uses
+    // 'aream' (= area_b from the netcdf map file, loaded once when the map
+    // is read). iMOAB_LoadMapFile populates the 'aream' tag on the target
+    // mesh from area_b when arearead != 0 (e.g. arearead=3 for F-maps).
+    //
+    // Earlier this code computed spherical-polygon areas via
+    // IntxAreaUtils::lHuiller from mesh vertex coordinates as a fallback.
+    // That recomputation differs from area_b at FP precision (different
+    // formula path) and was a source of ULP-level CAAS noise that
+    // cascaded into ice/atm physics. Read the loaded 'aream' tag first;
+    // lHuiller stays only as a deeper safety net for online-computed maps
+    // where the tag is absent.
     std::vector< double > tgtAreas( nTargetDofs, 0.0 );
     {
-        const DataArray1D< double >& dTargetAreas = this->GetTargetAreas();
-        const size_t nRows = dTargetAreas.GetRows();
-        if( nRows >= nTargetDofs )
+        // Build a tents-ordered vector of EntityHandles so we can pull the
+        // tag in tag order; also useful for the lHuiller fallback below.
+        std::vector< moab::EntityHandle > tentVec;
+        tentVec.reserve( tents.size() );
+        for( moab::Range::iterator it = tents.begin(); it != tents.end(); ++it )
+            tentVec.push_back( *it );
+
+        bool got_areas = false;
+
+        // Preferred: pull the 'aream' tag from the target MOAB mesh — this
+        // is the area_b value loaded by iMOAB_LoadMapFile and is byte-identical
+        // to the 'aream' field MCT uses in seq_nlmap_avNormArr.
+        moab::Tag aream_tag = nullptr;
+        moab::ErrorCode rval = m_interface->tag_get_handle( "aream", aream_tag );
+        if( MB_SUCCESS == rval && aream_tag != nullptr && !tentVec.empty() )
         {
-            for( size_t i = 0; i < nTargetDofs; i++ )
+            const size_t nents = std::min< size_t >( tentVec.size(), nTargetDofs );
+            std::vector< double > aream_vals( nents, 0.0 );
+            rval = m_interface->tag_get_data( aream_tag, &tentVec[0], (int)nents, &aream_vals[0] );
+            if( MB_SUCCESS == rval )
             {
-                int r = row_dtoc_dofmap[i];
-                if( r >= 0 && (size_t)r < nRows )
-                    tgtAreas[i] = dTargetAreas[r];
+                for( size_t i = 0; i < nents; i++ ) tgtAreas[i] = aream_vals[i];
+                got_areas = true;
             }
         }
-        else
+
+        // Fallback 1: areas were computed online and live in OfflineMap's
+        // m_dTargetAreas (indexed by matrix row).
+        if( !got_areas )
         {
-            // Fallback: compute spherical-polygon areas from MOAB mesh.
+            const DataArray1D< double >& dTargetAreas = this->GetTargetAreas();
+            const size_t nRows = dTargetAreas.GetRows();
+            if( nRows >= nTargetDofs )
+            {
+                for( size_t i = 0; i < nTargetDofs; i++ )
+                {
+                    int r = row_dtoc_dofmap[i];
+                    if( r >= 0 && (size_t)r < nRows )
+                        tgtAreas[i] = dTargetAreas[r];
+                }
+                got_areas = true;
+            }
+        }
+
+        // Fallback 2: recompute via lHuiller from mesh geometry. NOT BFB
+        // with MCT — only used when neither 'aream' tag nor m_dTargetAreas
+        // is available (e.g., a brand-new online map without area metadata).
+        if( !got_areas )
+        {
             moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::lHuiller );
-            std::vector< moab::EntityHandle > tentVec;
-            tentVec.reserve( tents.size() );
-            for( moab::Range::iterator it = tents.begin(); it != tents.end(); ++it )
-                tentVec.push_back( *it );
             const moab::EntityHandle* conn;
             int numNodes;
             std::vector< double > coords;
@@ -2060,11 +2141,19 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
 #else
     int reduce_comm = 0;  // unused, kept to match reprosumDDPDD signature
 #endif
-    const double M_low      = reprosumDDPDD( massLowPerRow,    rowGids, reduce_comm );
-    const double M_hi_clip  = reprosumDDPDD( massHiPerRow,     rowGids, reduce_comm );
-    const double dM_clip    = reprosumDDPDD( clipDefectPerRow, rowGids, reduce_comm );
-    const double cap_low_g  = reprosumDDPDD( capLowPerRow,     rowGids, reduce_comm );
-    const double cap_high_g = reprosumDDPDD( capHighPerRow,    rowGids, reduce_comm );
+    // Reduce in EXTENDED PRECISION (DDDouble = hi+lo). The collapsed-double
+    // form is fine for everything except dM_total, which is the difference
+    // of two large nearly-equal values (M_low and M_hi_clip) and so suffers
+    // catastrophic cancellation. Doing the subtraction in DDDouble preserves
+    // the residual that would otherwise be lost — that residual is what
+    // gets multiplied by `scale = dM_total / cap_high_g` and distributed to
+    // every target cell in Step 9, so even a few-ULP loss here turns into
+    // a global noise floor visible at threshold-sensitive cells downstream.
+    const DDDouble M_low_dd     = reprosumDDPDD_dd( massLowPerRow,    rowGids, reduce_comm );
+    const DDDouble M_hi_clip_dd = reprosumDDPDD_dd( massHiPerRow,     rowGids, reduce_comm );
+    const DDDouble dM_clip_dd   = reprosumDDPDD_dd( clipDefectPerRow, rowGids, reduce_comm );
+    const DDDouble cap_low_dd   = reprosumDDPDD_dd( capLowPerRow,     rowGids, reduce_comm );
+    const DDDouble cap_high_dd  = reprosumDDPDD_dd( capHighPerRow,    rowGids, reduce_comm );
 
     // ----- Step 8: total mass deficit between low-order and clipped high-order
     // The redistribution must drive the (clipped) high-order solution back to
@@ -2081,18 +2170,35 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
     //
     // Sign: dM_total > 0 means low-order carries more mass than the clipped
     // high-order, so we need to ADD mass; dM_total < 0 means we need to REMOVE.
-    const double dM_total = M_low - M_hi_clip;
+    //
+    // Subtraction is performed in DDDouble (Knuth's trick on hi+lo pair) so
+    // the catastrophic cancellation between M_low and M_hi_clip — which can
+    // be many orders of magnitude larger than dM_total itself — is preserved
+    // at extended precision.
+    const DDDouble dM_total_dd = ddpdd_pair_sub( M_low_dd, M_hi_clip_dd );
+    const double dM_total      = ddpdd_to_double( dM_total_dd );
+    const double M_low         = ddpdd_to_double( M_low_dd );
+    const double M_hi_clip     = ddpdd_to_double( M_hi_clip_dd );
+    const double dM_clip       = ddpdd_to_double( dM_clip_dd );
+    const double cap_low_g     = ddpdd_to_double( cap_low_dd );
+    const double cap_high_g    = ddpdd_to_double( cap_high_dd );
 
     std::string tgtSolnTagName;
     m_interface->tag_get_name( tgtSolutionTag, tgtSolnTagName );
     if( m_remapper->verbose && is_root )
     {
-        printf( "DualMap CAAS {%s}: M_low=%.10e  M_hi_clip=%.10e  dM_clip=%.10e  dM_total=%.10e\n",
+        printf( "DualMap CAAS {%s}: M_low=%.18e  M_hi_clip=%.18e  dM_clip=%.18e  dM_total=%.18e\n",
                 tgtSolnTagName.c_str(), M_low, M_hi_clip, dM_clip, dM_total );
-        printf( "DualMap CAAS {%s}: cap_low=%.10e  cap_high=%.10e\n", tgtSolnTagName.c_str(), cap_low_g, cap_high_g );
+        printf( "DualMap CAAS {%s}: dM_total_lo=%.18e (DDDouble residual preserved through cancellation)\n",
+                tgtSolnTagName.c_str(), dM_total_dd.lo );
+        printf( "DualMap CAAS {%s}: cap_low=%.18e  cap_high=%.18e\n",
+                tgtSolnTagName.c_str(), cap_low_g, cap_high_g );
     }
 
     // ----- Step 9: redistribute -------------------------------------------
+    // For the per-cell delta, divide dM_total (hi+lo) by cap_g (hi+lo).
+    // dM_total carries DDDouble precision through the cancellation; cap_g
+    // is well-conditioned so its lo is genuinely negligible.
     if( dM_total > 0.0 && cap_high_g > 0.0 )
     {
         const double scale = dM_total / cap_high_g;

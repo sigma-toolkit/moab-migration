@@ -236,10 +236,10 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
 
   if(MOAB_HAVE_TEMPESTREMAP)
     set( MBTR_TESTS parallel/imoab_coupler.cpp parallel/imoab_coupler_bilin.cpp parallel/imoab_coupler_twohop.cpp
-                    parallel/imoab_domain_culling.cpp parallel/imoab_map_r2l.cpp parallel/imoab_map_target.cpp 
-                    parallel/imoab_ptest2.cpp parallel/imoab_read_compute_map.cpp 
-                    parallel/imoab_scrip.cpp parallel/imoab_setwithGid.cpp parallel/imoab_phatm_ocn_coupler.cpp 
-                    parallel/imoab_apg2_ol_coupler.cpp )
+                    parallel/imoab_domain_culling.cpp parallel/imoab_map_r2l.cpp parallel/imoab_map_target.cpp
+                    parallel/imoab_ptest2.cpp parallel/imoab_read_compute_map.cpp
+                    parallel/imoab_scrip.cpp parallel/imoab_setwithGid.cpp parallel/imoab_phatm_ocn_coupler.cpp
+                    parallel/imoab_apg2_ol_coupler.cpp parallel/imoab_spmv_bfb.cpp )
     
     foreach( fname ${MBTR_TESTS} )
       string( REPLACE ".cpp" "" base ${fname} )

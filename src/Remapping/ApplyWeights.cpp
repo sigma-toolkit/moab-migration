@@ -15,6 +15,10 @@
 
 #include "moab/Remapping/TempestOnlineMap.hpp"
 
+#include <algorithm>
+#include <utility>
+#include <vector>
+
 // ** Kahan Summation Algorithm for improved numerical accuracy **
 struct KahanSum
 {
@@ -144,6 +148,87 @@ inline void deterministicSparseMatVecMulNative( const typename moab::TempestOnli
     result = A * x;  // Perform the matrix-vector multiplication using Eigen3
 }
 
+// Sparse matrix-vector multiplication with a per-row sum order keyed by the
+// GLOBAL source-DOF index. Eigen's CSR InnerIterator visits stored entries in
+// ascending LOCAL-column order, but the local-column index for the same
+// global source DOF can change with the MPI rank count and with the order in
+// which coverage entities were inserted. Sorting each row's contributions by
+// their global column DOF before summing makes the per-row dot product
+// invariant to local matrix layout, hence bit-for-bit reproducible across
+// rank-count and decomposition changes.
+//
+// Cost: O(nnz log K) where K is the average row stencil size. For typical
+// FV-FV (~9-25 nnz/row) and FV-SE (~16-100 nnz/row) coupling maps this is
+// dominated by the SpMV itself; the sort is small per-row work and avoids
+// any global communication.
+inline void deterministicSparseMatVecMulSorted( const typename moab::TempestOnlineMap::WeightMatrix& A,
+                                                const typename moab::TempestOnlineMap::WeightColVector& x,
+                                                typename moab::TempestOnlineMap::WeightRowVector& result,
+                                                const std::vector< unsigned >& col_gdofmap )
+{
+    result.setZero();
+
+    std::vector< std::pair< unsigned, double > > terms;
+    for( int row = 0; row < A.outerSize(); ++row )
+    {
+        terms.clear();
+        for( typename moab::TempestOnlineMap::WeightMatrix::InnerIterator it( A, row ); it; ++it )
+        {
+            const int c          = static_cast< int >( it.col() );
+            const unsigned gcol  = ( c >= 0 && c < static_cast< int >( col_gdofmap.size() ) )
+                                       ? col_gdofmap[c]
+                                       : static_cast< unsigned >( c );
+            const double product = it.value() * x( c );
+            terms.emplace_back( gcol, product );
+        }
+        std::sort( terms.begin(), terms.end(),
+                   []( const std::pair< unsigned, double >& a,
+                       const std::pair< unsigned, double >& b ) { return a.first < b.first; } );
+        double s = 0.0;
+        for( const auto& p : terms )
+            s += p.second;
+        result( row ) = s;
+    }
+}
+
+// Transpose variant: y = A^T x with per-output-column accumulation in
+// global-row-DOF order. Uses one accumulator vector per local matrix column;
+// each accumulator sorts its (global_row, value) pairs before summing so the
+// final entry is independent of the row-traversal order chosen by Eigen.
+inline void deterministicSparseMatTransposeVecMulSorted( const typename moab::TempestOnlineMap::WeightMatrix& A,
+                                                         const typename moab::TempestOnlineMap::WeightRowVector& x,
+                                                         typename moab::TempestOnlineMap::WeightColVector& result,
+                                                         const std::vector< unsigned >& row_gdofmap )
+{
+    result.setZero();
+
+    std::vector< std::vector< std::pair< unsigned, double > > > accumulators( A.cols() );
+
+    for( int row = 0; row < A.outerSize(); ++row )
+    {
+        const unsigned grow = ( row >= 0 && row < static_cast< int >( row_gdofmap.size() ) )
+                                  ? row_gdofmap[row]
+                                  : static_cast< unsigned >( row );
+        const double xr     = x( row );
+        for( typename moab::TempestOnlineMap::WeightMatrix::InnerIterator it( A, row ); it; ++it )
+        {
+            accumulators[it.col()].emplace_back( grow, it.value() * xr );
+        }
+    }
+
+    for( int col = 0; col < A.cols(); ++col )
+    {
+        auto& bin = accumulators[col];
+        std::sort( bin.begin(), bin.end(),
+                   []( const std::pair< unsigned, double >& a,
+                       const std::pair< unsigned, double >& b ) { return a.first < b.first; } );
+        double s = 0.0;
+        for( const auto& p : bin )
+            s += p.second;
+        result( col ) = s;
+    }
+}
+
 // Deterministic sparse matrix-vector multiplication with A^T * x using pairwise summation
 inline void deterministicSparseMatTransposeVecMul( const typename moab::TempestOnlineMap::WeightMatrix& A,
                                                    const typename moab::TempestOnlineMap::WeightRowVector& x,
@@ -226,7 +311,10 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
         }
 
         // Now apply the adjoint operator: m_colVector = m_weightMatrix.adjoint() * m_rowVector;
-        deterministicSparseMatTransposeVecMulClean( m_weightMatrix, m_rowVector, m_colVector );
+        // Use the global-row-DOF sorted accumulation so the result is BFB
+        // across MPI rank counts. See deterministicSparseMatTransposeVecMulSorted.
+        deterministicSparseMatTransposeVecMulSorted( m_weightMatrix, m_rowVector, m_colVector, row_gdofmap );
+        // deterministicSparseMatTransposeVecMulClean( m_weightMatrix, m_rowVector, m_colVector );
         // deterministicSparseMatTransposeVecMul( m_weightMatrix, m_rowVector, m_colVector );
         // deterministicSparseMatTransposeVecMulNative( m_weightMatrix, m_rowVector, m_colVector );
 
@@ -253,7 +341,13 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
         }
         
         // Now apply the operator: m_rowVector = m_weightMatrix * m_colVector;
-        deterministicSparseMatVecMulClean( m_weightMatrix, m_colVector, m_rowVector );
+        // Use the global-col-DOF sorted accumulation so each per-row dot
+        // product is independent of how Eigen's CSR ordered the local
+        // columns. This is the high-order kernel inside the dual-map CAAS
+        // path; pinning its summation order eliminates SpMV as a source of
+        // cross-rank-count residual. See deterministicSparseMatVecMulSorted.
+        deterministicSparseMatVecMulSorted( m_weightMatrix, m_colVector, m_rowVector, col_gdofmap );
+        // deterministicSparseMatVecMulClean( m_weightMatrix, m_colVector, m_rowVector );
         // deterministicSparseMatVecMul( m_weightMatrix, m_colVector, m_rowVector );
         // deterministicSparseMatVecMulNative( m_weightMatrix, m_colVector, m_rowVector );
         // deterministicSparseMatVecMulKahan( m_weightMatrix, m_colVector, m_rowVector );

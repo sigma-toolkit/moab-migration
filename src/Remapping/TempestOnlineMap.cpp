@@ -1525,6 +1525,124 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
     return moab::MB_SUCCESS;
 }
 
+// =====================================================================
+// Reproducible global sum via DDPDD (double-double pair-sum).
+//
+// Bit-for-bit port of E3SM share/util/shr_reprosum_mod.F90's
+// shr_reprosum_ddpdd / DDPDD path (Bailey/Knuth double-double, parallelized
+// per He & Ding). Used to drive ApplyWeightsWithDualMap's mass / capacity
+// reductions to match MCT's seq_nlmap_avNormArr when the MCT case is run
+// with reprosum_use_ddpdd=.true.
+//
+// Local accumulation uses Knuth's asymmetric trick (new summand has implicit
+// lo=0); the MPI_Allreduce step uses the symmetric two-DDDouble add as a
+// custom MPI_Op on a 2*MPI_DOUBLE contiguous datatype (matches MCT's use
+// of MPI_COMPLEX16 + custom op — same byte layout {hi, lo} and same trick).
+// =====================================================================
+namespace {
+
+struct DDDouble
+{
+    double hi;
+    double lo;
+};
+
+// acc += val   (val treated as DDDouble{val, 0})
+static inline void ddpdd_accumulate( DDDouble& acc, double val )
+{
+    // Matches MCT shr_reprosum_ddpdd loop body verbatim:
+    //   t1 = arr(isum,ifld) + real(arr_lsum_dd(ifld))
+    //   e  = t1 - arr(isum,ifld)
+    //   t2 = ((real(arr_lsum_dd(ifld)) - e)
+    //        + (arr(isum,ifld) - (t1 - e)))
+    //        + aimag(arr_lsum_dd(ifld))
+    //   arr_lsum_dd(ifld) = cmplx ( t1 + t2, t2 - ((t1 + t2) - t1), r8 )
+    const double t1 = val + acc.hi;
+    const double e  = t1 - val;
+    const double t2 = ( ( acc.hi - e ) + ( val - ( t1 - e ) ) ) + acc.lo;
+    const double s  = t1 + t2;
+    acc.lo = t2 - ( s - t1 );
+    acc.hi = s;
+}
+
+// out = a + b, both DDDouble (symmetric — matches MCT DDPDD subroutine)
+static inline DDDouble ddpdd_pair_add( DDDouble a, DDDouble b )
+{
+    const double t1 = a.hi + b.hi;
+    const double e  = t1 - a.hi;
+    const double t2 = ( ( b.hi - e ) + ( a.hi - ( t1 - e ) ) ) + a.lo + b.lo;
+    DDDouble r;
+    const double s = t1 + t2;
+    r.lo = t2 - ( s - t1 );
+    r.hi = s;
+    return r;
+}
+
+#ifdef MOAB_HAVE_MPI
+static void ddpdd_mpi_op( void* invec, void* inoutvec, int* len, MPI_Datatype* /*dtype*/ )
+{
+    DDDouble* a = static_cast< DDDouble* >( invec );
+    DDDouble* b = static_cast< DDDouble* >( inoutvec );
+    for( int i = 0; i < *len; ++i )
+    {
+        b[i] = ddpdd_pair_add( a[i], b[i] );
+    }
+}
+
+static MPI_Datatype ddpdd_mpi_type()
+{
+    static MPI_Datatype t = MPI_DATATYPE_NULL;
+    if( t == MPI_DATATYPE_NULL )
+    {
+        MPI_Type_contiguous( 2, MPI_DOUBLE, &t );
+        MPI_Type_commit( &t );
+    }
+    return t;
+}
+
+static MPI_Op ddpdd_mpi_op_handle()
+{
+    static MPI_Op op = MPI_OP_NULL;
+    if( op == MPI_OP_NULL )
+    {
+        // 2nd arg = 1: declare commutative. DDPDD is "almost commutative" up to
+        // the double-double residual; MCT also passes .true. here.
+        MPI_Op_create( &ddpdd_mpi_op, 1, &op );
+    }
+    return op;
+}
+#endif
+
+// Reproducible global sum: matches shr_reprosum_calc when called with
+// ddpdd_sum=.true.. Skips entries with rowGids[i] < 0 (not owned by this
+// rank) so each summand is counted exactly once. MPI_Comm parameter is
+// only meaningful when built with MPI; in serial builds it is ignored.
+#ifdef MOAB_HAVE_MPI
+static double reprosumDDPDD( const std::vector< double >& vals,
+                              const std::vector< int >& rowGids,
+                              MPI_Comm comm )
+#else
+static double reprosumDDPDD( const std::vector< double >& vals,
+                              const std::vector< int >& rowGids,
+                              int /*comm*/ )
+#endif
+{
+    DDDouble local = { 0.0, 0.0 };
+    for( size_t i = 0; i < vals.size(); ++i )
+    {
+        if( rowGids[i] < 0 ) continue;
+        ddpdd_accumulate( local, vals[i] );
+    }
+
+    DDDouble global = local;
+#ifdef MOAB_HAVE_MPI
+    MPI_Allreduce( &local, &global, 1, ddpdd_mpi_type(), ddpdd_mpi_op_handle(), comm );
+#endif
+    return global.hi;
+}
+
+}  // namespace
+
 moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSolutionTag,
                                                                   moab::Tag tgtSolutionTag,
                                                                   TempestOnlineMap* loWeightMap,
@@ -1689,11 +1807,14 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
             if( v < lcl_lo[i] ) lcl_lo[i] = v;
             if( v > lcl_hi[i] ) lcl_hi[i] = v;
         }
-        // If row had no nonzero columns, pin bounds to current value (no room)
+        // If row had no nonzero columns in the high-order stencil, set bounds
+        // to 0 (matching MCT's sMat_avMult_and_calc_bounds: "lop = 0; hip = 0").
+        // Together with the y_lo == 0 masking step below, this forces the cell
+        // to 0 — a "rare, local reduction in order to one" per the reference.
         if( lcl_lo[i] > lcl_hi[i] )
         {
-            lcl_lo[i] = solTTagVals[i];
-            lcl_hi[i] = solTTagVals[i];
+            lcl_lo[i] = 0.0;
+            lcl_hi[i] = 0.0;
         }
     }
 
@@ -1709,6 +1830,56 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
             lcl_lo[i]      = 0.0;
             lcl_hi[i]      = 0.0;
         }
+    }
+
+    // ----- Step 4b: compute UNSCALED global extrema for the final safety
+    // clip (Item 4). MCT's seq_nlmap_avNormArr clips the redistributed result
+    // against gmins/gmaxs = global min/max of the per-row (post-mask) bounds,
+    // not against the per-row bounds themselves. Snapshot here, BEFORE the
+    // bounds get scaled by the mapped norm in Step 4d below.
+    double g_lo = 1e308, g_hi = -1e308;
+    for( size_t i = 0; i < nTargetDofs; i++ )
+    {
+        int r = row_dtoc_dofmap[i];
+        if( r < 0 || r >= (int)row_gdofmap.size() ) continue;  // not owned
+        if( lcl_lo[i] < g_lo ) g_lo = lcl_lo[i];
+        if( lcl_hi[i] > g_hi ) g_hi = lcl_hi[i];
+    }
+#ifdef MOAB_HAVE_MPI
+    {
+        MPI_Comm comm = m_pcomm ? m_pcomm->comm() : MPI_COMM_SELF;
+        double tmp_min = g_lo, tmp_max = g_hi;
+        MPI_Allreduce( &tmp_min, &g_lo, 1, MPI_DOUBLE, MPI_MIN, comm );
+        MPI_Allreduce( &tmp_max, &g_hi, 1, MPI_DOUBLE, MPI_MAX, comm );
+    }
+#endif
+
+    // ----- Step 4c: compute mapped norm8wt = low-order map applied to a
+    // constant-1 source. For target row i this equals the low-order row sum
+    // sum_j w_lo[i,j] — equivalently, the value MCT carries in the natt+1
+    // column of avp_o (the 'norm8wt' field, mapped via mct_sMat_avMult).
+    std::vector< double > mappedNorm8wt( nTargetDofs, 0.0 );
+    {
+        std::vector< double > srcOnes( nSourceDofs, 1.0 );
+        MB_CHK_SET_ERR( loWeightMap->ApplyWeights( srcOnes, mappedNorm8wt, false ),
+                        "Mapped-norm8wt computation (low-order on ones) failed" );
+    }
+
+    // ----- Step 4d: scale per-row bounds by mapped norm8wt (Item 2).
+    // MCT does this inside the CAAS loop:
+    //     if (lnorm) then
+    //        lo = lo*avp_o%rAttr(natt+1,j)
+    //        hi = hi*avp_o%rAttr(natt+1,j)
+    //     end if
+    // Doing it once here propagates correctly into Step 5 (clipping) and
+    // Step 9 (redistribution) which both use lcl_lo/lcl_hi. Note: g_lo/g_hi
+    // were already snapshotted above and remain UNSCALED (matching MCT's
+    // gmins/gmaxs which are the global min/max of the unscaled per-row bounds).
+    for( size_t i = 0; i < nTargetDofs; i++ )
+    {
+        const double w = mappedNorm8wt[i];
+        lcl_lo[i] *= w;
+        lcl_hi[i] *= w;
     }
 
     // ----- Get target areas (per matrix-row) ------------------------------
@@ -1879,19 +2050,38 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
                     nOwned, nMasked, yloMin, yloMax, yhiMin, yhiMax );
     }
 
-    const double M_low      = deterministicGlobalSum( massLowPerRow );
-    const double M_hi_clip  = deterministicGlobalSum( massHiPerRow );
-    const double dM_clip    = deterministicGlobalSum( clipDefectPerRow );
-    const double cap_low_g  = deterministicGlobalSum( capLowPerRow );
-    const double cap_high_g = deterministicGlobalSum( capHighPerRow );
+    // Reproducible global reductions via DDPDD (matches MCT
+    // shr_reprosum_calc when the case sets reprosum_use_ddpdd=.true.).
+    // The deterministicGlobalSum lambda above (Kahan compensated, sorted-by-gid)
+    // is left in place as an alternative reproducible reducer but is not used
+    // here — we want the same algorithm MCT uses, not a different one.
+#ifdef MOAB_HAVE_MPI
+    MPI_Comm reduce_comm = m_pcomm ? m_pcomm->comm() : MPI_COMM_SELF;
+#else
+    int reduce_comm = 0;  // unused, kept to match reprosumDDPDD signature
+#endif
+    const double M_low      = reprosumDDPDD( massLowPerRow,    rowGids, reduce_comm );
+    const double M_hi_clip  = reprosumDDPDD( massHiPerRow,     rowGids, reduce_comm );
+    const double dM_clip    = reprosumDDPDD( clipDefectPerRow, rowGids, reduce_comm );
+    const double cap_low_g  = reprosumDDPDD( capLowPerRow,     rowGids, reduce_comm );
+    const double cap_high_g = reprosumDDPDD( capHighPerRow,    rowGids, reduce_comm );
 
-    // ----- Step 8: combine clipping defect with linear-map mass error -----
-    // gwts(k) = dM_clip + (M_low - M_hi_clipped)
-    // Sign convention: dM_clip > 0 means cells exceeded the upper bound, so
-    // clipping REMOVED that mass. (M_low - M_hi_clip) > 0 means low-order
-    // map carries more mass than the (clipped) high-order, so we need to ADD
-    // mass back. Reference uses the same sign convention.
-    const double dM_total = dM_clip + ( M_low - M_hi_clip );
+    // ----- Step 8: total mass deficit between low-order and clipped high-order
+    // The redistribution must drive the (clipped) high-order solution back to
+    // the low-order mass. M_hi_clip already reflects the clipping defect:
+    //
+    //     M_hi_clip = M_hi_unclipped - dM_clip
+    //
+    // So the per-field adjustment is simply (M_low - M_hi_clip), matching MCT's
+    // seq_nlmap_avNormArr:
+    //     gwts(k) = dM_clip + (M_low - M_hi_unclipped)
+    //             = dM_clip + (M_low - M_hi_clip - dM_clip)
+    //             = M_low - M_hi_clip
+    // Adding dM_clip again here would double-count the clipped mass.
+    //
+    // Sign: dM_total > 0 means low-order carries more mass than the clipped
+    // high-order, so we need to ADD mass; dM_total < 0 means we need to REMOVE.
+    const double dM_total = M_low - M_hi_clip;
 
     std::string tgtSolnTagName;
     m_interface->tag_get_name( tgtSolutionTag, tgtSolnTagName );
@@ -1928,11 +2118,16 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
         }
     }
 
-    // Final hard clip for floating-point safety, against per-row bounds
+    // Final hard clip for floating-point safety, against UNSCALED global
+    // extrema (Item 4). MCT's seq_nlmap_avNormArr does:
+    //   nl_avp_o%rAttr(k,j) = max(gmins(k), min(gmaxs(k), nl_avp_o%rAttr(k,j)))
+    // Per-row bounds (lcl_lo/lcl_hi) are now SCALED by mapped_norm8wt and so
+    // would be a tighter clip than MCT applies; using global g_lo/g_hi keeps
+    // the safety net loose, as the reference algorithm intends.
     for( size_t i = 0; i < nTargetDofs; i++ )
     {
-        if( solTTagVals[i] < lcl_lo[i] ) solTTagVals[i] = lcl_lo[i];
-        if( solTTagVals[i] > lcl_hi[i] ) solTTagVals[i] = lcl_hi[i];
+        if( solTTagVals[i] < g_lo ) solTTagVals[i] = g_lo;
+        if( solTTagVals[i] > g_hi ) solTTagVals[i] = g_hi;
     }
 
     // Store result back to the target tag

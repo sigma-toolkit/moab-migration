@@ -27,6 +27,7 @@
 #include "LinearRemapFV.h"
 
 #include "moab/Remapping/TempestOnlineMap.hpp"
+#include "moab/Remapping/IntegerReprosum.hpp"
 #include "moab/IntxMesh/IntxUtils.hpp"
 #include "DebugOutput.hpp"
 #include "moab/TupleList.hpp"
@@ -2016,7 +2017,7 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
     // them deterministically.
     std::vector< int >    rowGids( nTargetDofs, -1 );
     std::vector< double > massLowPerRow( nTargetDofs, 0.0 );
-    std::vector< double > massHiPerRow( nTargetDofs, 0.0 );  // before clipping
+    std::vector< double > massHiUnclippedPerRow( nTargetDofs, 0.0 );  // y_hi BEFORE clipping
     std::vector< double > clipDefectPerRow( nTargetDofs, 0.0 );
     std::vector< double > capLowPerRow( nTargetDofs, 0.0 );
     std::vector< double > capHighPerRow( nTargetDofs, 0.0 );
@@ -2045,11 +2046,18 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
             yc = hi;
             dm = ( y - hi ) * area;                // positive: cell exceeded above
         }
-        clipDefectPerRow[i] = dm;
-        capLowPerRow[i]     = ( yc - lo ) * area;  // room to subtract
-        capHighPerRow[i]    = ( hi - yc ) * area;  // room to add
-        massLowPerRow[i]    = yLow[i] * area;
-        massHiPerRow[i]     = yc * area;           // mass after clipping
+        clipDefectPerRow[i]      = dm;
+        capLowPerRow[i]          = ( yc - lo ) * area;  // room to subtract
+        capHighPerRow[i]         = ( hi - yc ) * area;  // room to add
+        massLowPerRow[i]         = yLow[i] * area;
+        // Per-row mass of the UNCLIPPED high-order projection. MCT reduces
+        // exactly this quantity to obtain glbl_masses(natt+k) (M_hi_unclipped),
+        // and then computes dM_total = dM_clip + (M_low - M_hi_unclipped) in
+        // that 2-step order. We store the unclipped y here (rather than the
+        // clipped yc as before) so MOAB's reprosum byte-matches MCT's, which
+        // in turn lets the MCT-matching dM_total formula below produce the
+        // same last bits as MCT.
+        massHiUnclippedPerRow[i] = y * area;
         // Update solTTagVals to the clipped value for the next stage
         solTTagVals[i] = yc;
     }
@@ -2139,66 +2147,71 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
 #ifdef MOAB_HAVE_MPI
     MPI_Comm reduce_comm = m_pcomm ? m_pcomm->comm() : MPI_COMM_SELF;
 #else
-    int reduce_comm = 0;  // unused, kept to match reprosumDDPDD signature
+    int reduce_comm = 0;  // serial build: comm unused but kept for API symmetry
 #endif
-    // Reduce in EXTENDED PRECISION (DDDouble = hi+lo). The collapsed-double
-    // form is fine for everything except dM_total, which is the difference
-    // of two large nearly-equal values (M_low and M_hi_clip) and so suffers
-    // catastrophic cancellation. Doing the subtraction in DDDouble preserves
-    // the residual that would otherwise be lost — that residual is what
-    // gets multiplied by `scale = dM_total / cap_high_g` and distributed to
-    // every target cell in Step 9, so even a few-ULP loss here turns into
-    // a global noise floor visible at threshold-sensitive cells downstream.
-    const DDDouble M_low_dd     = reprosumDDPDD_dd( massLowPerRow,    rowGids, reduce_comm );
-    const DDDouble M_hi_clip_dd = reprosumDDPDD_dd( massHiPerRow,     rowGids, reduce_comm );
-    const DDDouble dM_clip_dd   = reprosumDDPDD_dd( clipDefectPerRow, rowGids, reduce_comm );
-    const DDDouble cap_low_dd   = reprosumDDPDD_dd( capLowPerRow,     rowGids, reduce_comm );
-    const DDDouble cap_high_dd  = reprosumDDPDD_dd( capHighPerRow,    rowGids, reduce_comm );
+    // Reproducible global reductions via Worley's integer-vector algorithm
+    // (moab::IntegerReprosum) — bit-identical to MCT's shr_reprosum_int
+    // regardless of MPI rank count, mesh decomposition, or local iteration
+    // order. This is MCT's default reprosum path (use repro_sum_use_ddpdd
+    // = .false. on the MCT side, which is the namelist default).
+    //
+    // Why not DDPDD? DDPDD is "almost commutative" — the local Knuth
+    // accumulation is sensitive to summand order, which differs between the
+    // MCT driver (do j=1,lsize_o over MCT-local ordering) and the MOAB
+    // driver (for(i=0; i<nTargetDofs; i++) over MOAB-local ordering). Even
+    // when the same set of cells is owned per rank, that ordering mismatch
+    // leaves a sub-ULP residual in the reduced sum. The integer-vector
+    // algorithm is order-independent by construction (MPI_Allreduce with
+    // MPI_SUM on int64) and so eliminates this last source of CAAS noise.
+    //
+    // Per-cell mass and capacity values still feed into a final
+    // dM_total = M_low - M_hi_clip subtraction; that's catastrophic
+    // cancellation (two large nearly-equal numbers). We preserve precision
+    // through it by also doing the subtraction in DDDouble using ddpdd_pair_sub
+    // — but now the inputs to the subtraction are themselves bit-reproducible
+    // across all rank/order configurations, so the result is too.
+#ifdef MOAB_HAVE_MPI
+    moab::IntegerReprosum repro( reduce_comm );
+#else
+    moab::IntegerReprosum repro;
+#endif
+    // Build the ownership mask once (rowGids[i] >= 0 ↔ owned).
+    const std::vector< int >& reduce_mask = rowGids;
+    const double M_low           = repro.sum_masked( massLowPerRow,         reduce_mask );
+    const double M_hi_unclipped  = repro.sum_masked( massHiUnclippedPerRow, reduce_mask );
+    const double dM_clip         = repro.sum_masked( clipDefectPerRow,      reduce_mask );
+    const double cap_low_g       = repro.sum_masked( capLowPerRow,          reduce_mask );
+    const double cap_high_g      = repro.sum_masked( capHighPerRow,         reduce_mask );
 
     // ----- Step 8: total mass deficit between low-order and clipped high-order
     // The redistribution must drive the (clipped) high-order solution back to
-    // the low-order mass. M_hi_clip already reflects the clipping defect:
+    // the low-order mass. MCT's seq_nlmap_avNormArr (line 616) computes this
+    // in EXACTLY the following 2-step form, and floating-point rounding makes
+    // it FP-different from the algebraically-equivalent (M_low - M_hi_clip):
     //
-    //     M_hi_clip = M_hi_unclipped - dM_clip
+    //     ! MCT (Fortran array assignment, evaluated element-wise)
+    //     gwts(k) = gwts(k)          ! gwts(k) holds dM_clip after reprosum
+    //             + (glbl_masses(k)  ! M_low
+    //                - glbl_masses(natt+k))   ! M_hi_unclipped
     //
-    // So the per-field adjustment is simply (M_low - M_hi_clip), matching MCT's
-    // seq_nlmap_avNormArr:
-    //     gwts(k) = dM_clip + (M_low - M_hi_unclipped)
-    //             = dM_clip + (M_low - M_hi_clip - dM_clip)
-    //             = M_low - M_hi_clip
-    // Adding dM_clip again here would double-count the clipped mass.
+    // Reproducing MCT's exact bit pattern requires:
+    //   (a) reducing the UNCLIPPED per-cell high-order mass directly via
+    //       reprosum, NOT deriving it as M_hi_clip + dM_clip — that derivation
+    //       drops 1-2 ULP because reprosum is exact only on its inputs.
+    //       => see massHiUnclippedPerRow above.
+    //   (b) computing dM_total in MCT's order: subtract first, then add.
     //
     // Sign: dM_total > 0 means low-order carries more mass than the clipped
     // high-order, so we need to ADD mass; dM_total < 0 means we need to REMOVE.
     //
-    // Subtraction is performed in DDDouble (Knuth's trick on hi+lo pair) so
-    // the catastrophic cancellation between M_low and M_hi_clip — which can
-    // be many orders of magnitude larger than dM_total itself — is preserved
-    // at extended precision.
-    const DDDouble dM_total_dd = ddpdd_pair_sub( M_low_dd, M_hi_clip_dd );
-    const double dM_total      = ddpdd_to_double( dM_total_dd );
-    const double M_low         = ddpdd_to_double( M_low_dd );
-    const double M_hi_clip     = ddpdd_to_double( M_hi_clip_dd );
-    const double dM_clip       = ddpdd_to_double( dM_clip_dd );
-    const double cap_low_g     = ddpdd_to_double( cap_low_dd );
-    const double cap_high_g    = ddpdd_to_double( cap_high_dd );
-
-    std::string tgtSolnTagName;
-    m_interface->tag_get_name( tgtSolutionTag, tgtSolnTagName );
-    if( m_remapper->verbose && is_root )
-    {
-        printf( "DualMap CAAS {%s}: M_low=%.18e  M_hi_clip=%.18e  dM_clip=%.18e  dM_total=%.18e\n",
-                tgtSolnTagName.c_str(), M_low, M_hi_clip, dM_clip, dM_total );
-        printf( "DualMap CAAS {%s}: dM_total_lo=%.18e (DDDouble residual preserved through cancellation)\n",
-                tgtSolnTagName.c_str(), dM_total_dd.lo );
-        printf( "DualMap CAAS {%s}: cap_low=%.18e  cap_high=%.18e\n",
-                tgtSolnTagName.c_str(), cap_low_g, cap_high_g );
-    }
+    const double diff     = M_low - M_hi_unclipped;           // step 1: subtraction
+    const double dM_total = dM_clip + diff;                   // step 2: addition (MCT order)
 
     // ----- Step 9: redistribute -------------------------------------------
-    // For the per-cell delta, divide dM_total (hi+lo) by cap_g (hi+lo).
-    // dM_total carries DDDouble precision through the cancellation; cap_g
-    // is well-conditioned so its lo is genuinely negligible.
+    // dM_total / cap_g uses plain double; both numerator and denominator
+    // are reproducible (integer-vector reprosum) and cap_g is well-
+    // conditioned (no cancellation), so plain double precision is enough
+    // here and matches what MCT does.
     if( dM_total > 0.0 && cap_high_g > 0.0 )
     {
         const double scale = dM_total / cap_high_g;

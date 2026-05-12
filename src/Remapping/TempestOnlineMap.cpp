@@ -1782,6 +1782,32 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
     const size_t nTargetDofs = solTTagVals.size();
     const size_t nSourceDofs = solSTagVals.size();
 
+    // -------- per-cell trace (env-gated, off by default) --------------------
+    // If the env var MOAB_CAAS_DEBUG_GID is set to a non-negative integer,
+    // dump every CAAS intermediate for the OWNED target row whose global ID
+    // matches that value. Used to localize cross-rank-count ULP drift to a
+    // specific algorithmic step. The owning rank prints; root prints the
+    // global reductions. Run at two different rank counts and diff.
+    int        caasDebugGid     = -1;
+    if( const char* envG = std::getenv( "MOAB_CAAS_DEBUG_GID" ) )
+        caasDebugGid = std::atoi( envG );
+    int        caasDebugLocalI  = -1;   // local target index whose row_gdofmap[r]==caasDebugGid
+    bool       caasDebugIsOwner = false;
+    if( caasDebugGid >= 0 )
+    {
+        for( size_t i = 0; i < nTargetDofs; i++ )
+        {
+            const int r = row_dtoc_dofmap[i];
+            if( r < 0 || r >= (int)row_gdofmap.size() ) continue;
+            if( (int)row_gdofmap[r] == caasDebugGid )
+            {
+                caasDebugLocalI  = (int)i;
+                caasDebugIsOwner = true;
+                break;
+            }
+        }
+    }
+
     // Map from target tag index to matrix row index. Both A and Am must share
     // the same row layout (same target mesh, same partitioning); this is true
     // because both maps are loaded onto the same intersection application.
@@ -1980,6 +2006,21 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
         }
     }
 
+    // CAAS trace: post-mask, pre-scale bounds + raw y_hi for the watched cell
+    if( caasDebugIsOwner )
+    {
+        const int i = caasDebugLocalI;
+        int myRank = 0;
+#ifdef MOAB_HAVE_MPI
+        MPI_Comm_rank( m_pcomm ? m_pcomm->comm() : MPI_COMM_SELF, &myRank );
+#endif
+        fprintf( stderr,
+                 "[caas-trace gid=%d rank=%d localI=%d]  step=4-post-mask  "
+                 "yLow=%.17e  y_hi=%.17e  lcl_lo_pre=%.17e  lcl_hi_pre=%.17e\n",
+                 caasDebugGid, myRank, i, yLow[i], solTTagVals[i], lcl_lo[i], lcl_hi[i] );
+        fflush( stderr );
+    }
+
     // ----- Step 4b: compute UNSCALED global extrema for the final safety
     // clip (Item 4). MCT's seq_nlmap_avNormArr clips the redistributed result
     // against gmins/gmaxs = global min/max of the per-row (post-mask) bounds,
@@ -2028,6 +2069,22 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
         const double w = mappedNorm8wt[i];
         lcl_lo[i] *= w;
         lcl_hi[i] *= w;
+    }
+
+    // CAAS trace: post-scale bounds + the scaling factor + g_lo / g_hi
+    if( caasDebugIsOwner )
+    {
+        const int i = caasDebugLocalI;
+        int myRank = 0;
+#ifdef MOAB_HAVE_MPI
+        MPI_Comm_rank( m_pcomm ? m_pcomm->comm() : MPI_COMM_SELF, &myRank );
+#endif
+        fprintf( stderr,
+                 "[caas-trace gid=%d rank=%d localI=%d]  step=4d-post-scale  "
+                 "mappedNorm8wt=%.17e  lcl_lo_post=%.17e  lcl_hi_post=%.17e  "
+                 "g_lo=%.17e  g_hi=%.17e\n",
+                 caasDebugGid, myRank, i, mappedNorm8wt[i], lcl_lo[i], lcl_hi[i], g_lo, g_hi );
+        fflush( stderr );
     }
 
     // ----- Get target areas (per matrix-row) ------------------------------
@@ -2158,6 +2215,25 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
         massHiUnclippedPerRow[i] = y * area;
         // Update solTTagVals to the clipped value for the next stage
         solTTagVals[i] = yc;
+    }
+
+    // CAAS trace: post Step 5 — per-cell area + clipped value + per-cell sums
+    if( caasDebugIsOwner )
+    {
+        const int i = caasDebugLocalI;
+        int myRank = 0;
+#ifdef MOAB_HAVE_MPI
+        MPI_Comm_rank( m_pcomm ? m_pcomm->comm() : MPI_COMM_SELF, &myRank );
+#endif
+        fprintf( stderr,
+                 "[caas-trace gid=%d rank=%d localI=%d]  step=5-percell  "
+                 "area=%.17e  yc=%.17e  clipDefect=%.17e  capLow=%.17e  capHigh=%.17e  "
+                 "massLow=%.17e  massHiUnclipped=%.17e\n",
+                 caasDebugGid, myRank, i,
+                 tgtAreas[i], solTTagVals[i], clipDefectPerRow[i],
+                 capLowPerRow[i], capHighPerRow[i],
+                 massLowPerRow[i], massHiUnclippedPerRow[i] );
+        fflush( stderr );
     }
 
     // ----- Step 6: BFB-deterministic global reductions --------------------
@@ -2305,6 +2381,18 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
     const double diff     = M_low - M_hi_unclipped;           // step 1: subtraction
     const double dM_total = dM_clip + diff;                   // step 2: addition (MCT order)
 
+    // CAAS trace: globally-reduced quantities (root prints; same on all ranks)
+    if( caasDebugGid >= 0 && is_root )
+    {
+        fprintf( stderr,
+                 "[caas-trace gid=%d GLOBAL]  M_low=%.17e  M_hi_unclipped=%.17e  "
+                 "dM_clip=%.17e  cap_low_g=%.17e  cap_high_g=%.17e  "
+                 "diff=%.17e  dM_total=%.17e\n",
+                 caasDebugGid, M_low, M_hi_unclipped,
+                 dM_clip, cap_low_g, cap_high_g, diff, dM_total );
+        fflush( stderr );
+    }
+
     // ----- Step 9: redistribute -------------------------------------------
     // dM_total / cap_g uses plain double; both numerator and denominator
     // are reproducible (integer-vector reprosum) and cap_g is well-
@@ -2345,6 +2433,20 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
     {
         if( solTTagVals[i] < g_lo ) solTTagVals[i] = g_lo;
         if( solTTagVals[i] > g_hi ) solTTagVals[i] = g_hi;
+    }
+
+    // CAAS trace: final per-cell value after redistribute + hard clip
+    if( caasDebugIsOwner )
+    {
+        const int i = caasDebugLocalI;
+        int myRank = 0;
+#ifdef MOAB_HAVE_MPI
+        MPI_Comm_rank( m_pcomm ? m_pcomm->comm() : MPI_COMM_SELF, &myRank );
+#endif
+        fprintf( stderr,
+                 "[caas-trace gid=%d rank=%d localI=%d]  step=9-final  dual=%.17e\n",
+                 caasDebugGid, myRank, i, solTTagVals[i] );
+        fflush( stderr );
     }
 
     // Store result back to the target tag

@@ -311,10 +311,17 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
         }
 
         // Now apply the adjoint operator: m_colVector = m_weightMatrix.adjoint() * m_rowVector;
-        // Use the global-row-DOF sorted accumulation so the result is BFB
-        // across MPI rank counts. See deterministicSparseMatTransposeVecMulSorted.
-        deterministicSparseMatTransposeVecMulSorted( m_weightMatrix, m_rowVector, m_colVector, row_gdofmap );
-        // deterministicSparseMatTransposeVecMulClean( m_weightMatrix, m_rowVector, m_colVector );
+        // Master baseline: Eigen's natural CSR per-column accumulation.
+        // The local-column index assignment in col_dtoc_dofmap is already
+        // partition-invariant on master (low-order SpMV is BFB across rank
+        // counts under this kernel), so reordering by global row DOF —
+        // attempted in deterministicSparseMatTransposeVecMulSorted — gives
+        // a different (also deterministic) summation order and breaks the
+        // BFB property the master baseline relies on. Keep the *Sorted
+        // variant defined for future experimentation but do not call it
+        // from this code path.
+        deterministicSparseMatTransposeVecMulClean( m_weightMatrix, m_rowVector, m_colVector );
+        // deterministicSparseMatTransposeVecMulSorted( m_weightMatrix, m_rowVector, m_colVector, row_gdofmap );
         // deterministicSparseMatTransposeVecMul( m_weightMatrix, m_rowVector, m_colVector );
         // deterministicSparseMatTransposeVecMulNative( m_weightMatrix, m_rowVector, m_colVector );
 
@@ -341,13 +348,18 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( std::vector< double >& src
         }
         
         // Now apply the operator: m_rowVector = m_weightMatrix * m_colVector;
-        // Use the global-col-DOF sorted accumulation so each per-row dot
-        // product is independent of how Eigen's CSR ordered the local
-        // columns. This is the high-order kernel inside the dual-map CAAS
-        // path; pinning its summation order eliminates SpMV as a source of
-        // cross-rank-count residual. See deterministicSparseMatVecMulSorted.
-        deterministicSparseMatVecMulSorted( m_weightMatrix, m_colVector, m_rowVector, col_gdofmap );
-        // deterministicSparseMatVecMulClean( m_weightMatrix, m_colVector, m_rowVector );
+        // Master baseline: Eigen's natural CSR per-row accumulation. The
+        // local-column index assignment in col_dtoc_dofmap is partition-
+        // invariant on master (validated by imoab_read_compute_map's
+        // baseline check up to 16 tasks for the low-order map), so the
+        // per-row sum order is already BFB across rank counts. Sorting
+        // by global col DOF — attempted in deterministicSparseMatVecMulSorted
+        // — produces a different (also deterministic) summation order and
+        // breaks the BFB property the master baseline relies on. Keep the
+        // *Sorted variant defined for future experimentation but do not
+        // call it from this code path.
+        deterministicSparseMatVecMulClean( m_weightMatrix, m_colVector, m_rowVector );
+        // deterministicSparseMatVecMulSorted( m_weightMatrix, m_colVector, m_rowVector, col_gdofmap );
         // deterministicSparseMatVecMul( m_weightMatrix, m_colVector, m_rowVector );
         // deterministicSparseMatVecMulNative( m_weightMatrix, m_colVector, m_rowVector );
         // deterministicSparseMatVecMulKahan( m_weightMatrix, m_colVector, m_rowVector );

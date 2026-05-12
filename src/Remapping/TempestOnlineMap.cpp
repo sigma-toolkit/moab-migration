@@ -2260,17 +2260,15 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
     // is read). iMOAB_LoadMapFile populates the 'aream' tag on the target
     // mesh from area_b when arearead != 0 (e.g. arearead=3 for F-maps).
     //
-    // Earlier this code computed spherical-polygon areas via
-    // IntxAreaUtils::lHuiller from mesh vertex coordinates as a fallback.
-    // That recomputation differs from area_b at FP precision (different
-    // formula path) and was a source of ULP-level CAAS noise that
-    // cascaded into ice/atm physics. Read the loaded 'aream' tag first;
-    // lHuiller stays only as a deeper safety net for online-computed maps
-    // where the tag is absent.
+    // The CAAS path MUST NOT recompute spherical-polygon areas from mesh
+    // geometry via lHuiller (or any other re-derivation): doing so differs
+    // from area_b at FP precision and silently breaks BfB with MCT. If the
+    // caller has not loaded an area-bearing map and there are no online
+    // areas (m_dTargetAreas) either, fail the run loudly so the caller can
+    // fix their map-load configuration instead of getting silent non-BfB
+    // results.
     std::vector< double > tgtAreas( nTargetDofs, 0.0 );
     {
-        // Build a tents-ordered vector of EntityHandles so we can pull the
-        // tag in tag order; also useful for the lHuiller fallback below.
         std::vector< moab::EntityHandle > tentVec;
         tentVec.reserve( tents.size() );
         for( moab::Range::iterator it = tents.begin(); it != tents.end(); ++it )
@@ -2295,8 +2293,10 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
             }
         }
 
-        // Fallback 1: areas were computed online and live in OfflineMap's
-        // m_dTargetAreas (indexed by matrix row).
+        // Fallback: areas were computed online and live in OfflineMap's
+        // m_dTargetAreas (indexed by matrix row). This is BFB with MCT only
+        // when the same online-area code path is used on both couplers; it
+        // is acceptable for runs that build the map online.
         if( !got_areas )
         {
             const DataArray1D< double >& dTargetAreas = this->GetTargetAreas();
@@ -2313,24 +2313,19 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
             }
         }
 
-        // Fallback 2: recompute via lHuiller from mesh geometry. NOT BFB
-        // with MCT — only used when neither 'aream' tag nor m_dTargetAreas
-        // is available (e.g., a brand-new online map without area metadata).
+        // No fallback to lHuiller. Recomputing areas from mesh geometry is
+        // not BFB with MCT and there is no safe silent default — abort.
         if( !got_areas )
         {
-            moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::lHuiller );
-            const moab::EntityHandle* conn;
-            int numNodes;
-            std::vector< double > coords;
-            for( size_t i = 0; i < tentVec.size() && i < nTargetDofs; i++ )
-            {
-                if( m_interface->get_connectivity( tentVec[i], conn, numNodes ) != moab::MB_SUCCESS )
-                    continue;
-                coords.resize( 3 * numNodes );
-                if( m_interface->get_coords( conn, numNodes, coords.data() ) != moab::MB_SUCCESS )
-                    continue;
-                tgtAreas[i] = areaAdaptor.area_spherical_polygon( coords.data(), numNodes, 1.0 );
-            }
+            MB_SET_ERR( moab::MB_FAILURE,
+                        "ApplyWeightsWithDualMap: no target-cell areas available. "
+                        "Neither the 'aream' tag (from iMOAB_LoadMapFile with "
+                        "arearead != 0) nor OfflineMap::GetTargetAreas() (from an "
+                        "online map build) provided areas. Recomputing areas from "
+                        "mesh geometry is not bit-for-bit with MCT and is no longer "
+                        "permitted in the CAAS path. Re-load the map file with an "
+                        "area-bearing arearead setting (e.g. arearead=3 for F-maps), "
+                        "or build the online map so target areas are populated." );
         }
     }
 
@@ -2518,11 +2513,22 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
 #endif
     // Build the ownership mask once (rowGids[i] >= 0 ↔ owned).
     const std::vector< int >& reduce_mask = rowGids;
-    const double M_low           = repro.sum_masked( massLowPerRow,         reduce_mask );
-    const double M_hi_unclipped  = repro.sum_masked( massHiUnclippedPerRow, reduce_mask );
-    const double dM_clip         = repro.sum_masked( clipDefectPerRow,      reduce_mask );
-    const double cap_low_g       = repro.sum_masked( capLowPerRow,          reduce_mask );
-    const double cap_high_g      = repro.sum_masked( capHighPerRow,         reduce_mask );
+    // Batched reduction: one MPI_Allreduce for the per-field metadata
+    // (gmax_exp / gmin_exp / max_nsummands across the 5 fields) and one
+    // MPI_Allreduce for the concatenated integer-vector encoding of all 5
+    // fields. Bit-for-bit identical to calling sum_masked() five times
+    // separately (each field still uses its own per-field metadata and
+    // decode pass), but goes from 10 collective calls to 2.
+    const std::vector< std::vector< double > > caasFields = {
+        massLowPerRow, massHiUnclippedPerRow, clipDefectPerRow,
+        capLowPerRow, capHighPerRow };
+    std::vector< double > caasGsums;
+    repro.sum_masked_batch( caasFields, reduce_mask, caasGsums );
+    const double M_low          = caasGsums[0];
+    const double M_hi_unclipped = caasGsums[1];
+    const double dM_clip        = caasGsums[2];
+    const double cap_low_g      = caasGsums[3];
+    const double cap_high_g     = caasGsums[4];
 
     // ----- Step 8: total mass deficit between low-order and clipped high-order
     // The redistribution must drive the (clipped) high-order solution back to

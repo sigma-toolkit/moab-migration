@@ -33,15 +33,98 @@
 #include "moab/ProgOptions.hpp"
 #include "imoab_coupler_utils.hpp"
 
+#include <algorithm>
+#include <cstdio>
+#include <fstream>
 #include <iostream>
-#include <sstream>
 #include <iomanip>
-#include <cmath>
+#include <limits>
+#include <sstream>
+#include <utility>
 #include <vector>
+#include <cmath>
 
 #ifndef MOAB_HAVE_TEMPESTREMAP
 #error This test requires MOAB configuration with TempestRemap
 #endif
+
+// Gather (gid, value) pairs from every rank to rank 0, sort ascending by
+// gid, drop duplicates that arise from ghost/shared owner overlap, and
+// write to a digest file.  Same global IDs in any decomposition produce
+// the same file iff the per-cell projected values are byte-identical
+// across rank counts.  Diff the digest files from different mpirun -n
+// invocations to verify cross-rank-count BFB reproducibility of the
+// dual-map CAAS path.
+static int gather_and_write_digest( MPI_Comm comm,
+                                    int rankInComm,
+                                    const std::vector< int >& localGids,
+                                    const std::vector< double >& localVals,
+                                    const std::string& outFilename )
+{
+    int sizeInComm = 0;
+    MPI_Comm_size( comm, &sizeInComm );
+
+    int localCount = static_cast< int >( localGids.size() );
+    std::vector< int > counts( sizeInComm, 0 );
+    MPI_Gather( &localCount, 1, MPI_INT, counts.data(), 1, MPI_INT, 0, comm );
+
+    std::vector< int > displs( sizeInComm, 0 );
+    int totalCount = 0;
+    if( rankInComm == 0 )
+    {
+        for( int r = 0; r < sizeInComm; ++r )
+        {
+            displs[r] = totalCount;
+            totalCount += counts[r];
+        }
+    }
+
+    std::vector< int >    allGids;
+    std::vector< double > allVals;
+    if( rankInComm == 0 )
+    {
+        allGids.resize( totalCount );
+        allVals.resize( totalCount );
+    }
+
+    MPI_Gatherv( localGids.data(), localCount, MPI_INT,
+                 rankInComm == 0 ? allGids.data() : nullptr,
+                 counts.data(), displs.data(), MPI_INT, 0, comm );
+    MPI_Gatherv( localVals.data(), localCount, MPI_DOUBLE,
+                 rankInComm == 0 ? allVals.data() : nullptr,
+                 counts.data(), displs.data(), MPI_DOUBLE, 0, comm );
+
+    if( rankInComm != 0 ) return 0;
+
+    std::vector< std::pair< int, double > > pairs;
+    pairs.reserve( totalCount );
+    for( int i = 0; i < totalCount; ++i )
+        pairs.emplace_back( allGids[i], allVals[i] );
+
+    std::sort( pairs.begin(), pairs.end(),
+               []( const std::pair< int, double >& a,
+                   const std::pair< int, double >& b ) {
+                   if( a.first != b.first ) return a.first < b.first;
+                   return a.second < b.second;
+               } );
+
+    std::ofstream out( outFilename );
+    if( !out )
+    {
+        std::cerr << "ERROR: cannot open digest file " << outFilename << "\n";
+        return 1;
+    }
+    out << std::scientific << std::setprecision( 17 );
+    int prevGid = std::numeric_limits< int >::min();
+    for( const auto& p : pairs )
+    {
+        if( p.first == prevGid ) continue;  // skip duplicate ghost entries
+        out << p.first << "  " << p.second << "\n";
+        prevGid = p.first;
+    }
+    out.close();
+    return 0;
+}
 
 int main( int argc, char* argv[] )
 {
@@ -66,6 +149,7 @@ int main( int argc, char* argv[] )
     std::string ocnFilename = TestDir + "unittest/outTri15_8.h5m";
     std::string loMapFile;  // empty = compute online
     std::string hiMapFile;  // empty = compute online
+    std::string digestPrefix;  // empty = skip digest dump
 
     int nghlay = 0;
 
@@ -79,6 +163,9 @@ int main( int argc, char* argv[] )
     opts.addOpt< std::string >( "ocean,m", "OCN mesh filename (target)", &ocnFilename );
     opts.addOpt< std::string >( "lo_map_file,l", "Low-order map file (nc); if set, load from disk", &loMapFile );
     opts.addOpt< std::string >( "hi_map_file,h", "High-order map file (nc); if set, load from disk", &hiMapFile );
+    opts.addOpt< std::string >( "digest_prefix,o",
+                                "If set, write per-cell BFB digest files <prefix>_{lo,hi,dual}_<np>.txt",
+                                &digestPrefix );
     opts.addOpt< int >( "startAtm,a", "start task for atmosphere layout", &startG1 );
     opts.addOpt< int >( "endAtm,b", "end task for atmosphere layout", &endG1 );
     opts.addOpt< int >( "startOcn,c", "start task for ocean layout", &startG2 );
@@ -494,6 +581,51 @@ int main( int argc, char* argv[] )
         {
             MPI_Abort( MPI_COMM_WORLD, 1 );
             return 1;
+        }
+
+        // 6) BFB digest dump (optional). Gather (target_gid, value) per
+        //    OCN cell to root, sort by gid, write digest_{lo,hi,dual}_<np>.txt.
+        //    Source field comes from srcWithSolnTag.h5m so per-cell input
+        //    values are partition-independent by construction. Running this
+        //    binary under different mpirun -n values must produce byte-identical
+        //    digest files for each kernel; if not, the dual-map CAAS path is
+        //    leaking decomposition-dependent rounding (most likely the per-cell
+        //    SpMV column-traversal order in Eigen CSR).
+        if( !digestPrefix.empty() )
+        {
+            // Pull GLOBAL_ID for the same nOcnElems[2] cells we read above.
+            int gidTagType = DENSE_INTEGER;
+            int gidNDoFs   = 1;
+            int gidIndex   = -1;
+            int entType    = 1;
+            CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, "GLOBAL_ID", &gidTagType, &gidNDoFs, &gidIndex ),
+                       "Cannot define GLOBAL_ID tag on cplOcn" )
+            std::vector< int > tgtGids( nOcnElems[2] );
+            int nQuery = nOcnElems[2];
+            CHECKIERR( iMOAB_GetIntTagStorage( cplOcnPID, "GLOBAL_ID", &nQuery, &entType, tgtGids.data() ),
+                       "Cannot get GLOBAL_ID values on cplOcn" )
+
+            std::ostringstream szTag;
+            szTag << "_" << numProcesses << ".txt";
+
+            const int rcLo   = gather_and_write_digest( couComm, rankInCouComm, tgtGids, loVals,
+                                                        digestPrefix + "_lo"   + szTag.str() );
+            const int rcHi   = gather_and_write_digest( couComm, rankInCouComm, tgtGids, hiVals,
+                                                        digestPrefix + "_hi"   + szTag.str() );
+            const int rcDual = gather_and_write_digest( couComm, rankInCouComm, tgtGids, dualVals,
+                                                        digestPrefix + "_dual" + szTag.str() );
+            if( rcLo || rcHi || rcDual )
+            {
+                std::cerr << "ERROR: failed writing one of the digest files\n";
+                MPI_Abort( MPI_COMM_WORLD, 1 );
+            }
+            if( !rankInCouComm )
+            {
+                std::cout << " Digests written: " << digestPrefix
+                          << "_{lo,hi,dual}" << szTag.str() << "\n"
+                          << " Verify cross-rank-count BFB by re-running with a\n"
+                          << " different mpirun -n and diff'ing the digest files.\n";
+            }
         }
     }
 

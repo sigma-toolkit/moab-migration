@@ -160,7 +160,7 @@ int main( int argc, char* argv[] )
 
     // Use the same FV mesh files as imoab_read_compute_map.cpp so source field is FV.
     std::string atmFilename = TestDir + "unittest/srcWithSolnTag.h5m";
-    std::string ocnFilename = TestDir + "unittest/outTri15_8.h5m";
+    std::string ocnFilename = TestDir + "unittest/recMeshOcn.h5m";
     std::string loMapFile;       // primary path: load from disk
     std::string hiMapFile;       // primary path: load from disk
     std::string digestPrefix;    // empty = skip digest dump

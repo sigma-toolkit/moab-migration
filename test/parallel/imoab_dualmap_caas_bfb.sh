@@ -46,21 +46,44 @@ echo " EXE     : $EXE"
 echo " WORKDIR : $WORKDIR"
 echo " RANKS   : ${RANKS[*]}"
 
-# Step 1: serial compute online + write maps + serial baseline digest
+# Step 1a: serial compute online, write maps to disk. We DO NOT digest in
+# this run — CAAS reads per-cell areas from the 'aream' tag, which
+# iMOAB_LoadMapFile populates from area_b in netcdf but
+# iMOAB_ComputeScalarProjectionWeights does not. So an online-compute run
+# would use a different per-cell area than a file-loaded run, and the
+# baseline digest would systematically differ from every parallel digest
+# even though the underlying maps are byte-identical.
 echo ""
-echo "--- Step 1: serial compute online, write maps + baseline digests ---"
-if ! mpirun -n 1 "$EXE" --compute_online --write_maps baseline --digest_prefix digest >step1.log 2>&1 ; then
-    echo "FAIL: serial compute step exited non-zero. See $WORKDIR/step1.log" >&2
-    cat step1.log >&2
+echo "--- Step 1a: serial compute online, write maps to disk ---"
+if ! mpirun -n 1 "$EXE" --compute_online --write_maps baseline >step1a.log 2>&1 ; then
+    echo "FAIL: serial compute step exited non-zero. See $WORKDIR/step1a.log" >&2
+    cat step1a.log >&2
     exit 1
 fi
-for f in baseline_lo.nc baseline_hi.nc digest_lo_1.txt digest_hi_1.txt digest_dual_1.txt ; do
+for f in baseline_lo.nc baseline_hi.nc ; do
     if [ ! -s "$f" ]; then
-        echo "FAIL: expected serial output file '$f' missing or empty" >&2
+        echo "FAIL: expected baseline file '$f' missing or empty" >&2
         exit 1
     fi
 done
 echo "  baseline maps:    baseline_{lo,hi}.nc"
+
+# Step 1b: serial RELOAD of just-written maps + serial baseline digest.
+# Now CAAS uses the same code path (file-loaded → aream-tag area) that
+# every parallel run will use, so the digests are directly comparable.
+echo ""
+echo "--- Step 1b: serial reload, write baseline digests (matches parallel codepath) ---"
+if ! mpirun -n 1 "$EXE" -l baseline_lo.nc -h baseline_hi.nc --digest_prefix digest >step1b.log 2>&1 ; then
+    echo "FAIL: serial reload step exited non-zero. See $WORKDIR/step1b.log" >&2
+    cat step1b.log >&2
+    exit 1
+fi
+for f in digest_lo_1.txt digest_hi_1.txt digest_dual_1.txt ; do
+    if [ ! -s "$f" ]; then
+        echo "FAIL: expected serial digest '$f' missing or empty" >&2
+        exit 1
+    fi
+done
 echo "  serial digests:   digest_{lo,hi,dual}_1.txt"
 
 # Step 2: parallel reload + parallel digests

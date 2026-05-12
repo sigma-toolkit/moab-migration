@@ -210,7 +210,7 @@ par_intx_sph_LDADD = $(LDADD)
 # Other files to clean up (e.g. output from tests)
 MOSTLYCLEANFILES = *.h5m *.nc *.vtk *.txt
 
-EXTRA_DIST = imoab_coupler_utils.hpp
+EXTRA_DIST = imoab_coupler_utils.hpp imoab_dualmap_caas_bfb.sh
 FORTDEFS = $(FCDEFS)
 PPFCCOMPILE = $(FC) $(FORTDEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
     $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS)

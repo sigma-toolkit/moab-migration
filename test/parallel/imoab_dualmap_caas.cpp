@@ -164,6 +164,7 @@ int main( int argc, char* argv[] )
     std::string loMapFile;       // primary path: load from disk
     std::string hiMapFile;       // primary path: load from disk
     std::string digestPrefix;    // empty = skip digest dump
+    std::string writeMapsPrefix; // if set, dump computed/loaded maps to <prefix>_{lo,hi}.nc
     bool compute_online = false; // alternative: compute weight maps online
 
     int nghlay = 0;
@@ -186,6 +187,11 @@ int main( int argc, char* argv[] )
                          "Alternative: compute lo/hi weight maps online via iMOAB_ComputeScalarProjectionWeights "
                          "(non-BFB across rank counts at the ULP level — for testing only)",
                          &compute_online );
+    opts.addOpt< std::string >( "write_maps,w",
+                                "If set, write the active lo/hi weight maps to disk as <prefix>_lo.nc and "
+                                "<prefix>_hi.nc after they are computed or loaded; intended for the BFB regression "
+                                "workflow (serial compute → write → reload in parallel)",
+                                &writeMapsPrefix );
     opts.addOpt< std::string >( "digest_prefix,o",
                                 "If set, write per-cell BFB digest files <prefix>_{lo,hi,dual}_<np>.txt",
                                 &digestPrefix );
@@ -426,6 +432,23 @@ int main( int argc, char* argv[] )
                        "Cannot compute ATM coverage graph" )
         }
 
+        // Optional: persist the active maps to disk for the BFB regression
+        // workflow. Called collectively. Two separate netcdf files are
+        // emitted, one per map identifier, so a subsequent run can reload
+        // them via --lo_map_file / --hi_map_file and verify cross-rank-count
+        // BFB through diff'ing per-cell digests.
+        if( !writeMapsPrefix.empty() )
+        {
+            const std::string loOut = writeMapsPrefix + "_lo.nc";
+            const std::string hiOut = writeMapsPrefix + "_hi.nc";
+            CHECKIERR( iMOAB_WriteMapFile( cplDualMapPID, "lo-scalar", loOut.c_str() ),
+                       "Cannot write low-order map file" )
+            CHECKIERR( iMOAB_WriteMapFile( cplDualMapPID, "hi-scalar", hiOut.c_str() ),
+                       "Cannot write high-order map file" )
+            if( !rankInCouComm )
+                std::cout << " Wrote weight maps to " << loOut << " and " << hiOut << "\n";
+        }
+
         // Define source and target tags
         int tagType                     = 1;  // DENSE_DOUBLE
         int tagIndex;
@@ -621,35 +644,49 @@ int main( int argc, char* argv[] )
         }
 
         // 6) BFB digest dump (optional). Gather (target_gid, value) per
-        //    OCN cell to root, sort by gid, write digest_{lo,hi,dual}_<np>.txt.
+        //    OWNED OCN cell to root, sort by gid, write digest_{lo,hi,dual}_<np>.txt.
         //    Source field comes from srcWithSolnTag.h5m so per-cell input
         //    values are partition-independent by construction. Running this
         //    binary under different mpirun -n values must produce byte-identical
-        //    digest files for each kernel; if not, the dual-map CAAS path is
-        //    leaking decomposition-dependent rounding (most likely the per-cell
-        //    SpMV column-traversal order in Eigen CSR).
+        //    digest files for each kernel.
+        //
+        //    We restrict to OWNED cells (nOcnElems[0], not nOcnElems[2]). MOAB
+        //    orders entities owned-first in the visible range, so the first
+        //    nOcnElems[0] tag entries belong to cells this rank owns. Ghost
+        //    cells (the next nOcnElems[1] entries) are written by
+        //    ApplyWeightsWithDualMap with stale lcl_lo/lcl_hi=0 bounds and
+        //    therefore receive a dM_total/cap_g-scaled garbage value, so
+        //    including them would make the dual digest non-BFB across rank
+        //    counts even though the underlying SpMV result on owned cells
+        //    is bit-identical.
         if( !digestPrefix.empty() )
         {
-            // Pull GLOBAL_ID for the same nOcnElems[2] cells we read above.
             int gidTagType = DENSE_INTEGER;
             int gidNDoFs   = 1;
             int gidIndex   = -1;
             int entType    = 1;
             CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, "GLOBAL_ID", &gidTagType, &gidNDoFs, &gidIndex ),
                        "Cannot define GLOBAL_ID tag on cplOcn" )
-            std::vector< int > tgtGids( nOcnElems[2] );
-            int nQuery = nOcnElems[2];
+            const int nOwned = nOcnElems[0];
+            std::vector< int > tgtGids( nOwned );
+            int nQuery = nOwned;
             CHECKIERR( iMOAB_GetIntTagStorage( cplOcnPID, "GLOBAL_ID", &nQuery, &entType, tgtGids.data() ),
                        "Cannot get GLOBAL_ID values on cplOcn" )
+
+            // Truncate the projected-value vectors to OWNED only too, so the
+            // digest gathers bit-identical (gid, value) pairs across rank counts.
+            std::vector< double > loValsOwned( loVals.begin(), loVals.begin() + nOwned );
+            std::vector< double > hiValsOwned( hiVals.begin(), hiVals.begin() + nOwned );
+            std::vector< double > dualValsOwned( dualVals.begin(), dualVals.begin() + nOwned );
 
             std::ostringstream szTag;
             szTag << "_" << numProcesses << ".txt";
 
-            const int rcLo   = gather_and_write_digest( couComm, rankInCouComm, tgtGids, loVals,
+            const int rcLo   = gather_and_write_digest( couComm, rankInCouComm, tgtGids, loValsOwned,
                                                         digestPrefix + "_lo"   + szTag.str() );
-            const int rcHi   = gather_and_write_digest( couComm, rankInCouComm, tgtGids, hiVals,
+            const int rcHi   = gather_and_write_digest( couComm, rankInCouComm, tgtGids, hiValsOwned,
                                                         digestPrefix + "_hi"   + szTag.str() );
-            const int rcDual = gather_and_write_digest( couComm, rankInCouComm, tgtGids, dualVals,
+            const int rcDual = gather_and_write_digest( couComm, rankInCouComm, tgtGids, dualValsOwned,
                                                         digestPrefix + "_dual" + szTag.str() );
             if( rcLo || rcHi || rcDual )
             {

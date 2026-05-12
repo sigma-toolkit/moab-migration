@@ -250,6 +250,13 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
       add_test( ${noparbase} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${noparbase} ${MPIEXEC_POSTFLAGS} )
     endforeach()
 
+    # End-to-end BFB regression: orchestrates serial compute → write maps →
+    # parallel reload → cmp digests at N=1, 2, 4. Driver script lives in
+    # the source tree; it just needs the imoab_dualmap_caas binary path.
+    add_test( imoab_dualmap_caas_bfb
+              ${CMAKE_SOURCE_DIR}/test/parallel/imoab_dualmap_caas_bfb.sh
+              ${EXECUTABLE_OUTPUT_PATH}/imoab_dualmap_caas 1 2 4 )
+
     # Fortran tests
     set( MBTRF_TESTS parallel/imoab_ptest.F parallel/imoab_coupler_fortran.F90 parallel/imoab_coupler_caas.F90  )
     

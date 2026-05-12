@@ -3,20 +3,34 @@
  *
  * Test for dual-map nonlinear remapping (CAAS with low-order map bounds).
  *
+ * The PRIMARY workflow loads pre-computed weight maps from disk via
+ * --lo_map_file and --hi_map_file. This matches the standard E3SM coupler
+ * workflow (maps are generated offline by TempestRemap and loaded at
+ * runtime), and only this path produces strictly bit-for-bit reproducible
+ * per-cell projection values across MPI rank counts. Online weight
+ * generation via iMOAB_ComputeScalarProjectionWeights has a known
+ * partition-dependent residual at the 1-3 ULP level on master and is
+ * available as an alternative via --compute_online.
+ *
  * Workflow:
  *   1. Load ATM (source) and OCN (target) meshes on all processes
  *   2. Migrate meshes to coupler communicator
- *   3. Either compute mesh intersection and weight maps online, or
- *      load pre-computed weight maps from disk (--lo_map_file, --hi_map_file)
- *   4. Two sets of FV weights are used:
+ *   3. Set up two FV weight maps on the dual-map intersection app:
  *      - "lo-scalar" : low-order monotone map
  *      - "hi-scalar" : high-order non-monotone map
- *   5. Define an analytical source field (degree-2 spherical harmonic)
- *   6. Apply high-order map with dual-map CAAS bounds from low-order map
- *      using the new lo_weights_identifier parameter
- *   7. Verify: target values are within source stencil bounds
- *   8. Test iMOAB_CheckMapSubset
- *   9. Verify bounds preservation against source field range
+ *      Default: load both from disk (--lo_map_file, --hi_map_file).
+ *      With --compute_online: compute both via iMOAB_ComputeScalarProjectionWeights.
+ *   4. Define source field (degree-2 spherical harmonic on the ATM mesh)
+ *   5. Apply lo, hi (no CAAS), and dual-map CAAS projections
+ *   6. Verify: target dual-CAAS values are within per-row stencil bounds
+ *   7. Test iMOAB_CheckMapSubset (lo nonzero pattern subset of hi)
+ *   8. Optionally write per-cell BFB digest files (--digest_prefix)
+ *
+ * BFB digest workflow (cross-rank-count regression check):
+ *   for n in 1 2 4 8; do mpirun -n $n ./imoab_dualmap_caas \
+ *       -l <lo_map.nc> -h <hi_map.nc> -o digest ; done
+ *   for k in lo hi dual; do diff -q digest_${k}_1.txt digest_${k}_4.txt; done
+ *   All file pairs must be byte-identical when maps are loaded from disk.
  */
 
 #include "moab/Core.hpp"
@@ -147,9 +161,10 @@ int main( int argc, char* argv[] )
     // Use the same FV mesh files as imoab_read_compute_map.cpp so source field is FV.
     std::string atmFilename = TestDir + "unittest/srcWithSolnTag.h5m";
     std::string ocnFilename = TestDir + "unittest/outTri15_8.h5m";
-    std::string loMapFile;  // empty = compute online
-    std::string hiMapFile;  // empty = compute online
-    std::string digestPrefix;  // empty = skip digest dump
+    std::string loMapFile;       // primary path: load from disk
+    std::string hiMapFile;       // primary path: load from disk
+    std::string digestPrefix;    // empty = skip digest dump
+    bool compute_online = false; // alternative: compute weight maps online
 
     int nghlay = 0;
 
@@ -161,8 +176,16 @@ int main( int argc, char* argv[] )
     ProgOptions opts;
     opts.addOpt< std::string >( "atmosphere,t", "ATM mesh filename (source)", &atmFilename );
     opts.addOpt< std::string >( "ocean,m", "OCN mesh filename (target)", &ocnFilename );
-    opts.addOpt< std::string >( "lo_map_file,l", "Low-order map file (nc); if set, load from disk", &loMapFile );
-    opts.addOpt< std::string >( "hi_map_file,h", "High-order map file (nc); if set, load from disk", &hiMapFile );
+    opts.addOpt< std::string >( "lo_map_file,l",
+                                "Low-order map file (nc) — primary path: load from disk",
+                                &loMapFile );
+    opts.addOpt< std::string >( "hi_map_file,h",
+                                "High-order map file (nc) — primary path: load from disk",
+                                &hiMapFile );
+    opts.addOpt< void >( "compute_online,n",
+                         "Alternative: compute lo/hi weight maps online via iMOAB_ComputeScalarProjectionWeights "
+                         "(non-BFB across rank counts at the ULP level — for testing only)",
+                         &compute_online );
     opts.addOpt< std::string >( "digest_prefix,o",
                                 "If set, write per-cell BFB digest files <prefix>_{lo,hi,dual}_<np>.txt",
                                 &digestPrefix );
@@ -174,7 +197,13 @@ int main( int argc, char* argv[] )
     opts.addOpt< int >( "endCoupler,j", "end task for coupler layout", &endG4 );
     opts.parseCommandLine( argc, argv );
 
-    bool loadFromDisk = ( !loMapFile.empty() && !hiMapFile.empty() );
+    // Primary path: load lo/hi maps from disk (BFB across rank counts).
+    // Fall back to online computation either when --compute_online is set
+    // explicitly, or when no map files were supplied (so the test still
+    // runs without arguments — but with a non-BFB warning).
+    const bool haveBothMaps = ( !loMapFile.empty() && !hiMapFile.empty() );
+    const bool fallbackOnline = ( !haveBothMaps && !compute_online );
+    const bool loadFromDisk = ( haveBothMaps && !compute_online );
 
     if( !rankInGlobalComm )
     {
@@ -185,11 +214,19 @@ int main( int argc, char* argv[] )
         {
             std::cout << " Lo-order map: " << loMapFile << "\n";
             std::cout << " Hi-order map: " << hiMapFile << "\n";
-            std::cout << " Mode: load maps from disk\n";
+            std::cout << " Mode: load maps from disk (BFB across rank counts)\n";
+        }
+        else if( compute_online )
+        {
+            std::cout << " Mode: compute maps online (--compute_online; non-BFB at ULP level)\n";
         }
         else
         {
-            std::cout << " Mode: compute maps online\n";
+            std::cout << " Mode: compute maps online (no map files supplied; fallback)\n";
+            std::cout << " WARNING: online weight generation is NOT BFB across rank counts.\n"
+                      << "          For BFB validation pass --lo_map_file and --hi_map_file\n"
+                      << "          pointing at pre-computed netcdf weight files.\n";
+            (void)fallbackOnline;
         }
         std::cout << " Processes: " << numProcesses << "\n";
         std::cout << " ATM tasks: " << startG1 << ":" << endG1

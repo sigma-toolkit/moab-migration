@@ -1833,6 +1833,19 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
     for( size_t k = 0; k < nSourceDofs && k < col_dtoc_dofmap.size(); k++ )
         if( col_dtoc_dofmap[k] >= 0 ) col_inv[col_dtoc_dofmap[k]] = (int)k;
 
+    // Track whether any owned row's high-order stencil column failed to
+    // resolve into the local coverage source vector. If that happens the
+    // [lcl_lo, lcl_hi] bounds are computed over an INCOMPLETE stencil and
+    // the CAAS clip + redistribute will produce decomposition-dependent
+    // values — exactly the symptom seen as 1-2 ULP cross-rank-count drift
+    // on file-loaded maps. Fail loudly with the offending coordinates so
+    // the coverage layout (nghlay_cov in the calling code) can be widened.
+    int    bndsLocalErr   = 0;
+    int    bndsFirstRowG  = -1;   // global target row id where the first failure happened
+    int    bndsFirstMc    = -1;   // matrix col index that failed to resolve
+    double bndsFirstWgt   = 0.0;  // the dropped (nonzero) weight value
+    int    bndsFirstKind  = 0;    // 1 = mc out of maxMatCol; 2 = col_inv -> -1; 3 = srcIdx OOB
+
     for( size_t i = 0; i < nTargetDofs; i++ )
     {
         int r = row_dtoc_dofmap[i];
@@ -1848,12 +1861,55 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
             // here keeps the discrete domain of dependence the same as MCT;
             // otherwise an explicit-zero entry pulls extra source columns
             // into the bounds and loosens the per-row [lo, hi] range.
-            if( fabs(it.value()) < 1e-20 ) continue;
-            int mc = (int)it.col();
-            if( mc < 0 || mc > maxMatCol ) continue;
-            int srcIdx = col_inv[mc];
-            if( srcIdx < 0 || srcIdx >= (int)nSourceDofs ) continue;
-            double v = solSTagVals[srcIdx];
+            if( fabs( it.value() ) < 1e-20 ) continue;
+            const int mc = (int)it.col();
+
+            // Hard checks: a nonzero high-order weight at column mc means
+            // this owned row genuinely depends on source-coverage column mc.
+            // If we cannot resolve mc to a local source-vector index, the
+            // 3-ring coverage on this rank is too narrow for the high-order
+            // stencil. Either the caller asked for too few ghost layers,
+            // or the map file references columns not present in any rank's
+            // coverage (a catastrophic mismatch). Either way, silently
+            // skipping corrupts the bounds and breaks BFB.
+            if( mc < 0 || mc > maxMatCol )
+            {
+                if( !bndsLocalErr )
+                {
+                    bndsLocalErr  = 1;
+                    bndsFirstRowG = (r >= 0 && r < (int)row_gdofmap.size()) ? (int)row_gdofmap[r] : -1;
+                    bndsFirstMc   = mc;
+                    bndsFirstWgt  = it.value();
+                    bndsFirstKind = 1;
+                }
+                continue;
+            }
+            const int srcIdx = col_inv[mc];
+            if( srcIdx < 0 )
+            {
+                if( !bndsLocalErr )
+                {
+                    bndsLocalErr  = 1;
+                    bndsFirstRowG = (r >= 0 && r < (int)row_gdofmap.size()) ? (int)row_gdofmap[r] : -1;
+                    bndsFirstMc   = mc;
+                    bndsFirstWgt  = it.value();
+                    bndsFirstKind = 2;
+                }
+                continue;
+            }
+            if( srcIdx >= (int)nSourceDofs )
+            {
+                if( !bndsLocalErr )
+                {
+                    bndsLocalErr  = 1;
+                    bndsFirstRowG = (r >= 0 && r < (int)row_gdofmap.size()) ? (int)row_gdofmap[r] : -1;
+                    bndsFirstMc   = mc;
+                    bndsFirstWgt  = it.value();
+                    bndsFirstKind = 3;
+                }
+                continue;
+            }
+            const double v = solSTagVals[srcIdx];
             if( v < lcl_lo[i] ) lcl_lo[i] = v;
             if( v > lcl_hi[i] ) lcl_hi[i] = v;
         }
@@ -1867,6 +1923,48 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
             lcl_hi[i] = 0.0;
         }
     }
+
+    // Globalize: any rank with bndsLocalErr triggers a collective failure.
+#ifdef MOAB_HAVE_MPI
+    {
+        MPI_Comm comm = m_pcomm ? m_pcomm->comm() : MPI_COMM_SELF;
+        int bndsGlobalErr = 0;
+        MPI_Allreduce( &bndsLocalErr, &bndsGlobalErr, 1, MPI_INT, MPI_MAX, comm );
+        if( bndsGlobalErr )
+        {
+            int myRank = 0;
+            MPI_Comm_rank( comm, &myRank );
+            if( bndsLocalErr )
+            {
+                static const char* kindStr[4] = { "?", "mc>maxMatCol", "col_inv[mc]==-1", "srcIdx>=nSourceDofs" };
+                fprintf( stderr,
+                         "FATAL: ApplyWeightsWithDualMap bounds extraction dropped a nonzero "
+                         "high-order stencil column on rank %d.\n"
+                         "       global_target_row=%d  matrix_col=%d  weight=%.17e  reason=%s\n"
+                         "       This means the source coverage on this rank does NOT contain a "
+                         "column the owned high-order row references — the 3-ring (or whatever) "
+                         "ghost layer setting is too narrow, or the map file was generated against "
+                         "a different mesh. Bounds computed over an incomplete stencil break BFB; "
+                         "aborting rather than silently producing wrong CAAS output.\n",
+                         myRank, bndsFirstRowG, bndsFirstMc, bndsFirstWgt, kindStr[bndsFirstKind] );
+                fflush( stderr );
+            }
+            MPI_Abort( comm, 1 );
+        }
+    }
+#else
+    if( bndsLocalErr )
+    {
+        static const char* kindStr[4] = { "?", "mc>maxMatCol", "col_inv[mc]==-1", "srcIdx>=nSourceDofs" };
+        fprintf( stderr,
+                 "FATAL: ApplyWeightsWithDualMap bounds extraction dropped a nonzero "
+                 "high-order stencil column.\n"
+                 "       global_target_row=%d  matrix_col=%d  weight=%.17e  reason=%s\n",
+                 bndsFirstRowG, bndsFirstMc, bndsFirstWgt, kindStr[bndsFirstKind] );
+        fflush( stderr );
+        return moab::MB_FAILURE;
+    }
+#endif
 
     // ----- Step 4: mask -- where y_lo == 0, zero out y_hi and bounds ------
     // (Per reference: "An exact 0 in the low-order field will mask the

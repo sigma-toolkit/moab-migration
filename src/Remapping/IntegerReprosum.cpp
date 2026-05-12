@@ -580,12 +580,140 @@ void IntegerReprosum::sum_masked_batch( const std::vector< std::vector< double >
                                          const std::vector< int >& mask,
                                          std::vector< double >& gsums ) const
 {
-    gsums.assign( fields.size(), 0.0 );
-    // For now this is just a loop; the metadata Allreduce could be batched
-    // across fields for a small saving but each field still needs its own
-    // integer-vector Allreduce. Leave as-is until profiling says otherwise.
-    for( size_t f = 0; f < fields.size(); ++f )
-        gsums[f] = sum_masked( fields[f], mask );
+    // -----------------------------------------------------------------------
+    // True batched reproducible sum: one MPI_Allreduce for ALL fields'
+    // metadata (gmax_exp / gmin_exp / max_nsummands), one MPI_Allreduce for
+    // ALL fields' encoded integer vectors concatenated end-to-end.
+    //
+    // Bit-for-bit identical to calling sum_masked() once per field: each
+    // field still gets its OWN per-field Metadata derived from its OWN
+    // global extrema, its OWN encode_local pass, and its OWN decode_global
+    // pass on its OWN segment of the concatenated int-vector. Only the
+    // network transport is fused. This drops 5 field-reductions from
+    //   5 * 2 = 10  collective calls  to  2  collective calls — the
+    // per-CAAS-call MPI cost that matters at scale.
+    // -----------------------------------------------------------------------
+    const size_t N = fields.size();
+    gsums.assign( N, 0.0 );
+    if( N == 0 ) return;
+
+    const std::vector< int >* mask_ptr = mask.empty() ? nullptr : &mask;
+
+    // ----- Phase 1: local extrema and count, per field --------------------
+    // local_arr layout per field f (3 ints): [count, max_exp, -min_exp]
+    // (negation trick so a single MPI_MAX recovers all three.)
+    std::vector< int > local_arr( 3 * N, 0 );
+    for( size_t f = 0; f < N; ++f )
+    {
+        const std::vector< double >& vals = fields[f];
+        int local_max_exp = std::numeric_limits< int >::min();
+        int local_min_exp = std::numeric_limits< int >::max();
+        int local_count   = 0;
+        for( size_t i = 0; i < vals.size(); ++i )
+        {
+            if( mask_ptr && ( *mask_ptr )[i] < 0 ) continue;
+            ++local_count;
+            const double v = vals[i];
+            if( v == 0.0 ) continue;
+            int e;
+            std::frexp( v, &e );
+            if( e > local_max_exp ) local_max_exp = e;
+            if( e < local_min_exp ) local_min_exp = e;
+        }
+        local_arr[3 * f + 0] = local_count;
+        local_arr[3 * f + 1] = local_max_exp;
+        local_arr[3 * f + 2] = -local_min_exp;
+    }
+
+    // ----- Phase 2: ONE MPI_Allreduce for all fields' metadata ------------
+    std::vector< int > global_arr( 3 * N, 0 );
+#ifdef MOAB_HAVE_MPI
+    MPI_Allreduce( local_arr.data(), global_arr.data(), static_cast< int >( 3 * N ),
+                   MPI_INT, MPI_MAX, m_comm );
+#else
+    global_arr = local_arr;
+#endif
+
+    // ----- Phase 3: derive per-field Metadata locally (no MPI) -----------
+    std::vector< Metadata > mds( N );
+    for( size_t f = 0; f < N; ++f )
+    {
+        Metadata& md = mds[f];
+        int gcount   = global_arr[3 * f + 0];
+        int gmax_exp = global_arr[3 * f + 1];
+        int gmin_exp = -global_arr[3 * f + 2];
+
+        // Same all-zero fixup as compute_metadata
+        if( gmin_exp > gmax_exp ) gmin_exp = gmax_exp;
+
+        md.max_nsummands = gcount;
+        md.gmax_exp      = gmax_exp;
+        md.gmin_exp      = gmin_exp;
+
+        if( md.max_nsummands == 0 )
+        {
+            md.arr_max_shift = kI8Digits / 4;
+            md.max_levels    = 2;
+            md.extra_levels  = ( kI8Digits - 1 ) / md.arr_max_shift;
+            md.gmax_exp      = 0;
+            md.gmin_exp      = 0;
+            continue;
+        }
+
+        // Mirror compute_metadata's derivation byte-for-byte.
+        const int omp_nthreads_local = 1;
+        int max_n = ( md.max_nsummands / omp_nthreads_local ) + 1;
+#ifdef MOAB_HAVE_MPI
+        int nproc = 1;
+        MPI_Comm_size( m_comm, &nproc );
+        if( max_n < nproc * omp_nthreads_local ) max_n = nproc * omp_nthreads_local;
+#endif
+        int e_of_max_n;
+        std::frexp( static_cast< double >( max_n ), &e_of_max_n );
+        md.arr_max_shift = kI8Digits - ( e_of_max_n + 1 );
+        if( md.arr_max_shift < 2 ) std::abort();
+        md.max_levels = 2 + ( kR8Digits + ( md.gmax_exp - md.gmin_exp ) ) / md.arr_max_shift;
+        if( md.max_levels < 2 ) md.max_levels = 2;
+        md.extra_levels = ( kI8Digits - 1 ) / md.arr_max_shift;
+        if( md.extra_levels < 1 ) md.extra_levels = 1;
+    }
+
+    // ----- Phase 4: encode each field locally and concatenate -------------
+    std::vector< size_t > offsets( N + 1, 0 );
+    for( size_t f = 0; f < N; ++f )
+        offsets[f + 1] = offsets[f] + static_cast< size_t >( mds[f].max_levels + mds[f].extra_levels );
+    std::vector< int64_t > big_iv( offsets[N], 0 );
+
+    for( size_t f = 0; f < N; ++f )
+    {
+        if( mds[f].max_nsummands == 0 ) continue;
+        std::vector< int64_t > iv;
+        encode_local( fields[f], mask_ptr, mds[f], iv );
+        std::copy( iv.begin(), iv.end(), big_iv.begin() + offsets[f] );
+    }
+
+    // ----- Phase 5: ONE MPI_Allreduce for all encoded vectors ------------
+#ifdef MOAB_HAVE_MPI
+    if( !big_iv.empty() )
+    {
+        std::vector< int64_t > out( big_iv.size() );
+        MPI_Allreduce( big_iv.data(), out.data(), static_cast< int >( big_iv.size() ),
+                       mpi_int64(), MPI_SUM, m_comm );
+        big_iv.swap( out );
+    }
+#endif
+
+    // ----- Phase 6: decode each field's segment ---------------------------
+    for( size_t f = 0; f < N; ++f )
+    {
+        if( mds[f].max_nsummands == 0 )
+        {
+            gsums[f] = 0.0;
+            continue;
+        }
+        std::vector< int64_t > seg( big_iv.begin() + offsets[f], big_iv.begin() + offsets[f + 1] );
+        gsums[f] = decode_global( seg, mds[f] );
+    }
 }
 
 }  // namespace moab

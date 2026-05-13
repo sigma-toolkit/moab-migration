@@ -544,16 +544,6 @@ module iMOAB
         character(kind=c_char), intent(in) :: lo_weights_identifier(*)  ! pass C_NULL_CHAR for none
       end function iMOAB_ApplyScalarProjectionWeights
 
-      integer(c_int) function iMOAB_CheckMapSubset(pid_intersection, subset_weights_identifier, &
-                                                    superset_weights_identifier, is_subset) &
-                                                    bind(C, name='iMOAB_CheckMapSubset')
-        use, intrinsic :: iso_c_binding, only: c_int, c_char
-        integer(c_int), intent(in) :: pid_intersection
-        character(kind=c_char), intent(in) :: subset_weights_identifier(*)
-        character(kind=c_char), intent(in) :: superset_weights_identifier(*)
-        integer(c_int), intent(out) :: is_subset
-      end function iMOAB_CheckMapSubset
-
 ! closing endif: MOAB_HAVE_TEMPESTREMAP
 #endif
 

@@ -1332,28 +1332,6 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
     const iMOAB_String target_solution_tag_name,
     const iMOAB_String lo_weights_identifier /* = NULL */ );
 
-/**
- * \brief Check whether the nonzero sparsity pattern of one weight map is a subset of another.
- *
- * \note For every target row, this function verifies that each source column with a nonzero entry
- * in the map identified by \p subset_weights_identifier also has a nonzero entry in the map
- * identified by \p superset_weights_identifier. This check is a prerequisite for dual-map
- * nonlinear remapping: the low-order map's stencil must be contained in the high-order map's stencil.
- *
- * <B>Operations:</B> Collective
- *
- * \param[in]  pid_intersection (iMOAB_AppID)                The unique pointer to the intersection application ID.
- * \param[in]  subset_weights_identifier (iMOAB_String)      The weight map whose pattern should be a subset.
- * \param[in]  superset_weights_identifier (iMOAB_String)    The weight map whose pattern should be a superset.
- * \param[out] is_subset (int*)                              Output: 1 if subset relationship holds, 0 otherwise.
- * \return ErrCode                                           The error code indicating success or failure.
- */
-ErrCode iMOAB_CheckMapSubset(
-    iMOAB_AppID pid_intersection,
-    const iMOAB_String subset_weights_identifier,
-    const iMOAB_String superset_weights_identifier,
-    int* is_subset );
-
 #endif /* #ifdef MOAB_HAVE_TEMPESTREMAP */
 
 #ifdef MOAB_HAVE_MPI

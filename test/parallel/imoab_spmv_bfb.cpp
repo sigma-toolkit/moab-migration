@@ -384,46 +384,89 @@ int main( int argc, char* argv[] )
                        "Cannot compute ATM coverage graph" )
         }
 
-        // Define source tag on dual-map app and the three target tags on cpl OCN.
+        // Define source tag on dual-map app, on cpl ATM (for the two-hop tag
+        // migration), and the three target tags on cpl OCN.
         int tagType = DENSE_DOUBLE;
         int tagIndex_;
         int compNDoFs = 1;
         CHECKIERR( iMOAB_DefineTagStorage( cplDualMapPID, srcField, &tagType, &compNDoFs, &tagIndex_ ),
                    "Cannot define source tag on dual-map app" )
+        CHECKIERR( iMOAB_DefineTagStorage( cplAtmPID, srcField, &tagType, &compNDoFs, &tagIndex_ ),
+                   "Cannot define source tag on cpl ATM" )
         CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, tgtFieldHi, &tagType, &compNDoFs, &tagIndex_ ),
                    "Cannot define hi-order target tag" )
         CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, tgtFieldDual, &tagType, &compNDoFs, &tagIndex_ ),
                    "Cannot define dual-map target tag" )
         CHECKIERR( iMOAB_DefineTagStorage( cplOcnPID, tgtFieldLo, &tagType, &compNDoFs, &tagIndex_ ),
                    "Cannot define lo-order target tag" )
+    }
 
-        // ----- Seed the source field deterministically by GLOBAL_ID -----
-        // iMOAB_GetCoverageMeshInfo + iMOAB_SetDoubleTagStorageOnCoverage write
-        // straight to the intersection app's coverage cells and bypass the
-        // partition-dependent SendElementTag/ReceiveElementTag two-hop. This
-        // guarantees the SpMV input vector is the same logical field on every
-        // rank-count, leaving the SpMV itself as the only thing under test.
-        int nCovElems = 0;
-        CHECKIERR( iMOAB_GetCoverageMeshInfo( cplDualMapPID, &nCovElems, nullptr, nullptr ),
-                   "Cannot query coverage size on dual-map app" )
+    // ----- Seed the source field deterministically by GLOBAL_ID -----
+    // The field is a pure function of source-cell GLOBAL_ID, so seeding on the
+    // compute-side ATM mesh and then migrating via the standard two-hop
+    //   cmpAtm -> cplAtm -> cplDualMap
+    // path (SendElementTag / ReceiveElementTag) yields the same logical field
+    // on the dual-map coverage regardless of how cells were partitioned across
+    // ranks. The SpMV itself is therefore the only thing varying under test.
+    if( atmComm != MPI_COMM_NULL )
+    {
+        int tagType = DENSE_DOUBLE, atmCompNDoFs = 1, srcTagIdx = -1;
+        CHECKIERR( iMOAB_DefineTagStorage( cmpAtmPID, srcField, &tagType, &atmCompNDoFs, &srcTagIdx ),
+                   "Cannot define source tag on cmp ATM" )
 
-        std::vector< int > covGids( nCovElems, 0 );
-        if( nCovElems > 0 )
-        {
-            CHECKIERR( iMOAB_GetCoverageMeshInfo( cplDualMapPID, &nCovElems, covGids.data(), nullptr ),
-                       "Cannot fetch coverage GIDs on dual-map app" )
-        }
+        int nAtmElems[3] = { 0, 0, 0 };
+        CHECKIERR( iMOAB_GetMeshInfo( cmpAtmPID, nullptr, nAtmElems, nullptr, nullptr, nullptr ),
+                   "Cannot get cmp ATM mesh info" )
+        const int nLocalAtm = nAtmElems[2];  // all cells (owned + ghost)
 
-        std::vector< double > srcVals( nCovElems, 0.0 );
-        for( int i = 0; i < nCovElems; ++i )
-            srcVals[i] = source_from_gid( covGids[i] );
+        int gidTagType = DENSE_INTEGER, gidNDoFs = 1, gidIndex = -1;
+        CHECKIERR( iMOAB_DefineTagStorage( cmpAtmPID, "GLOBAL_ID", &gidTagType, &gidNDoFs, &gidIndex ),
+                   "Cannot define GLOBAL_ID tag on cmp ATM" )
+        std::vector< int > atmGids( nLocalAtm );
+        int nQueryAtm = nLocalAtm;
+        int entType   = 1;  // elements
+        CHECKIERR( iMOAB_GetIntTagStorage( cmpAtmPID, "GLOBAL_ID", &nQueryAtm, &entType, atmGids.data() ),
+                   "Cannot read GLOBAL_ID on cmp ATM" )
 
-        if( nCovElems > 0 )
-        {
-            CHECKIERR( iMOAB_SetDoubleTagStorageOnCoverage( cplDualMapPID, srcField, &nCovElems, srcVals.data() ),
-                       "Cannot seed source field on coverage" )
-        }
+        std::vector< double > srcVals( nLocalAtm, 0.0 );
+        for( int i = 0; i < nLocalAtm; ++i )
+            srcVals[i] = source_from_gid( atmGids[i] );
 
+        int storLeng = nLocalAtm;
+        CHECKIERR( iMOAB_SetDoubleTagStorage( cmpAtmPID, srcField, &storLeng, &entType, srcVals.data() ),
+                   "Cannot set source tag on cmp ATM" )
+    }
+
+    // First hop: cmpAtm -> cplAtm
+    if( atmComm != MPI_COMM_NULL )
+    {
+        CHECKIERR( iMOAB_SendElementTag( cmpAtmPID, srcField, &atmCouComm, &cplatm ),
+                   "Cannot send source tag from cmp ATM to cpl ATM" )
+    }
+    if( couComm != MPI_COMM_NULL )
+    {
+        CHECKIERR( iMOAB_ReceiveElementTag( cplAtmPID, srcField, &atmCouComm, &cmpatm ),
+                   "Cannot receive source tag on cpl ATM" )
+    }
+    if( atmComm != MPI_COMM_NULL )
+    {
+        CHECKIERR( iMOAB_FreeSenderBuffers( cmpAtmPID, &cplatm ),
+                   "Cannot free sender buffers (cmp ATM)" )
+    }
+
+    // Second hop: cplAtm -> cplDualMap (coverage mesh of the intersection app).
+    if( couComm != MPI_COMM_NULL )
+    {
+        CHECKIERR( iMOAB_SendElementTag( cplAtmPID, srcField, &couComm, &dualmap_id ),
+                   "Cannot send source tag from cpl ATM to dual-map" )
+        CHECKIERR( iMOAB_ReceiveElementTag( cplDualMapPID, srcField, &couComm, &cplatm ),
+                   "Cannot receive source tag on dual-map coverage" )
+        CHECKIERR( iMOAB_FreeSenderBuffers( cplAtmPID, &dualmap_id ),
+                   "Cannot free sender buffers (cpl ATM)" )
+    }
+
+    if( couComm != MPI_COMM_NULL )
+    {
         // ----- Apply projections -----
         int filter_type = 0;
 

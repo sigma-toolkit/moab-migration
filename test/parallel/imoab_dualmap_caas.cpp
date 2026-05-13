@@ -23,8 +23,7 @@
  *   4. Define source field (degree-2 spherical harmonic on the ATM mesh)
  *   5. Apply lo, hi (no CAAS), and dual-map CAAS projections
  *   6. Verify: target dual-CAAS values are within per-row stencil bounds
- *   7. Test iMOAB_CheckMapSubset (lo nonzero pattern subset of hi)
- *   8. Optionally write per-cell BFB digest files (--digest_prefix)
+ *   7. Optionally write per-cell BFB digest files (--digest_prefix)
  *
  * BFB digest workflow (cross-rank-count regression check):
  *   for n in 1 2 4 8; do mpirun -n $n ./imoab_dualmap_caas \
@@ -539,16 +538,7 @@ int main( int argc, char* argv[] )
                    "Failed to apply dual-map CAAS weights" )
         POP_TIMER( couComm, rankInCouComm )
 
-        // 4) Test iMOAB_CheckMapSubset: low-order stencil subset of high-order
-        int is_subset = 0;
-        CHECKIERR( iMOAB_CheckMapSubset( cplDualMapPID, "lo-scalar", "hi-scalar", &is_subset ),
-                   "Failed to check map subset" )
-        if( !rankInCouComm )
-        {
-            std::cout << " CheckMapSubset (lo ⊆ hi): " << ( is_subset ? "PASS" : "FAIL" ) << "\n";
-        }
-
-        // 5) Verify bounds preservation: the dual-map CAAS result must stay within
+        // 4) Verify bounds preservation: the dual-map CAAS result must stay within
         //    the per-row stencil bounds computed from the low-order weight map.
         //    Note: we check stencil bounds (not global source range) because the CAAS
         //    algorithm guarantees per-row bounds, not global bounds.
@@ -644,7 +634,7 @@ int main( int argc, char* argv[] )
             return 1;
         }
 
-        // 6) BFB digest dump (optional). Gather (target_gid, value) per
+        // 5) BFB digest dump (optional). Gather (target_gid, value) per
         //    OWNED OCN cell to root, sort by gid, write digest_{lo,hi,dual}_<np>.txt.
         //    Source field comes from srcWithSolnTag.h5m so per-cell input
         //    values are partition-independent by construction. Running this

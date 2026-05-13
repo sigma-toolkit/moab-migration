@@ -6433,64 +6433,6 @@ static ErrCode ComputeRowBounds( iMOAB_AppID pid_intersection,
     return moab::MB_SUCCESS;
 }
 
-ErrCode iMOAB_CheckMapSubset( iMOAB_AppID pid_intersection,
-                              const iMOAB_String subset_weights_identifier,
-                              const iMOAB_String superset_weights_identifier,
-                              int* is_subset )
-{
-    assert( subset_weights_identifier && strlen( subset_weights_identifier ) );
-    assert( superset_weights_identifier && strlen( superset_weights_identifier ) );
-    assert( is_subset );
-
-    appData& data_intx       = context.appDatas[*pid_intersection];
-    TempestMapAppData& tdata = data_intx.tempestData;
-
-    if( !tdata.weightMaps.count( std::string( subset_weights_identifier ) ) )
-        return moab::MB_INDEX_OUT_OF_RANGE;
-    if( !tdata.weightMaps.count( std::string( superset_weights_identifier ) ) )
-        return moab::MB_INDEX_OUT_OF_RANGE;
-
-    moab::TempestOnlineMap* subMap  = tdata.weightMaps[std::string( subset_weights_identifier )];
-    moab::TempestOnlineMap* supMap  = tdata.weightMaps[std::string( superset_weights_identifier )];
-
-    auto& subW = subMap->GetWeightMatrix();
-    auto& supW = supMap->GetWeightMatrix();
-
-    int localIsSubset = 1;
-    int nrows         = std::min( subW.outerSize(), supW.outerSize() );
-
-    for( int r = 0; r < nrows && localIsSubset; r++ )
-    {
-        // Build set of nonzero columns in the superset map for this row
-        std::unordered_set< int > superCols;
-        for( moab::TempestOnlineMap::WeightMatrix::InnerIterator it( supW, r ); it; ++it )
-            superCols.insert( it.col() );
-
-        // Check that every nonzero column in the subset map is in the superset
-        for( moab::TempestOnlineMap::WeightMatrix::InnerIterator it( subW, r ); it; ++it )
-        {
-            if( superCols.find( it.col() ) == superCols.end() )
-            {
-                localIsSubset = 0;
-                break;
-            }
-        }
-    }
-
-    // Global reduction: all ranks must agree
-#ifdef MOAB_HAVE_MPI
-    ParallelComm* pco = context.appDatas[*pid_intersection].pcomm;
-    if( pco )
-        MPI_Allreduce( &localIsSubset, is_subset, 1, MPI_INT, MPI_MIN, pco->comm() );
-    else
-        *is_subset = localIsSubset;
-#else
-    *is_subset = localIsSubset;
-#endif
-
-    return moab::MB_SUCCESS;
-}
-
 #endif  // MOAB_HAVE_TEMPESTREMAP
 
 #ifdef __cplusplus

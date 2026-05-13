@@ -363,7 +363,7 @@ int main( int argc, char* argv[] )
             // --- Load pre-computed weight maps from disk ---
             int src_disc_type = 3;  // FV cell
             int tgt_disc_type = 3;  // FV cell
-            int arearead      = 0;  // do not read areas
+            int arearead      = 3;  // read all areas
 
             PUSH_TIMER( "Load low-order map from disk" )
             CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplDualMapPID,
@@ -372,6 +372,7 @@ int main( int argc, char* argv[] )
                        "Cannot load low-order map file" )
             POP_TIMER( couComm, rankInCouComm )
 
+            arearead = 0;  // do not read areas
             PUSH_TIMER( "Load high-order map from disk" )
             CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplDualMapPID,
                                           &src_disc_type, &tgt_disc_type, &arearead,

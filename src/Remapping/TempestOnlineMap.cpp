@@ -2168,37 +2168,20 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSo
 
     // ----- Step 6: BFB-deterministic global reductions --------------------
 
-    // Reproducible global reductions via DDPDD (matches MCT
-    // shr_reprosum_calc when the case sets reprosum_use_ddpdd=.true.).
-    // The deterministicGlobalSum lambda above (Kahan compensated, sorted-by-gid)
-    // is left in place as an alternative reproducible reducer but is not used
-    // here — we want the same algorithm MCT uses, not a different one.
+    // Reproducible global reductions via Worley's integer-vector algorithm
+    // (moab::IntegerReprosum) — bit-identical to MCT's shr_reprosum_int
+    // regardless of MPI rank count, mesh decomposition, or local iteration
+    // order. This is MCT's default reprosum path (the namelist default
+    // repro_sum_use_ddpdd=.false. on the MCT side). The integer-vector
+    // algorithm is order-independent by construction (MPI_Allreduce with
+    // MPI_SUM on int64), which eliminates the cross-rank-count ULP drift
+    // that an order-sensitive reducer (e.g. Kahan or DDPDD) would otherwise
+    // leak into the CAAS bounds and mass totals.
 #ifdef MOAB_HAVE_MPI
     MPI_Comm reduce_comm = m_pcomm ? m_pcomm->comm() : MPI_COMM_SELF;
 #else
     int reduce_comm = 0;  // serial build: comm unused but kept for API symmetry
 #endif
-    // Reproducible global reductions via Worley's integer-vector algorithm
-    // (moab::IntegerReprosum) — bit-identical to MCT's shr_reprosum_int
-    // regardless of MPI rank count, mesh decomposition, or local iteration
-    // order. This is MCT's default reprosum path (use repro_sum_use_ddpdd
-    // = .false. on the MCT side, which is the namelist default).
-    //
-    // Why not DDPDD? DDPDD is "almost commutative" — the local Knuth
-    // accumulation is sensitive to summand order, which differs between the
-    // MCT driver (do j=1,lsize_o over MCT-local ordering) and the MOAB
-    // driver (for(i=0; i<nTargetDofs; i++) over MOAB-local ordering). Even
-    // when the same set of cells is owned per rank, that ordering mismatch
-    // leaves a sub-ULP residual in the reduced sum. The integer-vector
-    // algorithm is order-independent by construction (MPI_Allreduce with
-    // MPI_SUM on int64) and so eliminates this last source of CAAS noise.
-    //
-    // Per-cell mass and capacity values still feed into a final
-    // dM_total = M_low - M_hi_clip subtraction; that's catastrophic
-    // cancellation (two large nearly-equal numbers). We preserve precision
-    // through it by also doing the subtraction in DDDouble using ddpdd_pair_sub
-    // — but now the inputs to the subtraction are themselves bit-reproducible
-    // across all rank/order configurations, so the result is too.
 #ifdef MOAB_HAVE_MPI
     moab::IntegerReprosum repro( reduce_comm );
 #else

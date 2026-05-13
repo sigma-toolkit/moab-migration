@@ -47,93 +47,6 @@ using namespace moab;
 #error Enable either OCN (ENABLE_ATMOCN_COUPLING) and/or LND (ENABLE_ATMLND_COUPLING) for coupling
 #endif
 
-// Gather (GLOBAL_ID, a2oTbot_proj) pairs from every rank in couComm to
-// rank 0, sort by GID, and write to a digest file. The sort-order is
-// decomposition-independent so the digest is byte-identical iff the
-// per-cell projected values are bit-for-bit identical across rank counts.
-static int gather_and_write_proj_tag(
-    MPI_Comm comm, int rankInComm, iMOAB_AppID ocnPID,
-    const std::string& outFilename )
-{
-    int nverts[3], nelem[3];
-    int ierr = iMOAB_GetMeshInfo( ocnPID, nverts, nelem, 0, 0, 0 );
-    if( ierr ) return 1;
-
-    int tag_type = DENSE_INTEGER, ncomp = 1, tagInd = 0;
-    ierr = iMOAB_DefineTagStorage( ocnPID, "GLOBAL_ID", &tag_type, &ncomp, &tagInd );
-    if( ierr ) return 1;
-
-    int ent_type = 1;  // elements
-    int sz       = nelem[2];
-    std::vector< int >    gids( sz, 0 );
-    std::vector< double > vals( sz, 0.0 );
-    ierr = iMOAB_GetIntTagStorage( ocnPID, "GLOBAL_ID", &sz, &ent_type, gids.data() );
-    if( ierr ) return 1;
-    ierr = iMOAB_GetDoubleTagStorage( ocnPID, "a2oTbot_proj", &sz, &ent_type, vals.data() );
-    if( ierr ) return 1;
-
-    int sizeInComm = 0;
-    MPI_Comm_size( comm, &sizeInComm );
-
-    std::vector< int > counts( sizeInComm, 0 );
-    MPI_Gather( &sz, 1, MPI_INT, counts.data(), 1, MPI_INT, 0, comm );
-
-    std::vector< int > displs( sizeInComm, 0 );
-    int totalCount = 0;
-    if( rankInComm == 0 )
-    {
-        for( int r = 0; r < sizeInComm; ++r )
-        {
-            displs[r] = totalCount;
-            totalCount += counts[r];
-        }
-    }
-
-    std::vector< int >    allGids;
-    std::vector< double > allVals;
-    if( rankInComm == 0 )
-    {
-        allGids.resize( totalCount );
-        allVals.resize( totalCount );
-    }
-
-    MPI_Gatherv( gids.data(), sz, MPI_INT,
-                 rankInComm == 0 ? allGids.data() : nullptr,
-                 counts.data(), displs.data(), MPI_INT, 0, comm );
-    MPI_Gatherv( vals.data(), sz, MPI_DOUBLE,
-                 rankInComm == 0 ? allVals.data() : nullptr,
-                 counts.data(), displs.data(), MPI_DOUBLE, 0, comm );
-
-    if( rankInComm != 0 ) return 0;
-
-    // Pair, sort by GID (ascending), dedup
-    std::vector< std::pair< int, double > > pairs;
-    pairs.reserve( totalCount );
-    for( int i = 0; i < totalCount; ++i )
-        pairs.emplace_back( allGids[i], allVals[i] );
-
-    std::sort( pairs.begin(), pairs.end(),
-               []( const std::pair< int, double >& a,
-                   const std::pair< int, double >& b ) {
-                   return a.first < b.first;
-               } );
-
-    auto last = std::unique( pairs.begin(), pairs.end(),
-                             []( const std::pair< int, double >& a,
-                                 const std::pair< int, double >& b ) {
-                                 return a.first == b.first;
-                             } );
-    pairs.erase( last, pairs.end() );
-
-    FILE* fp = fopen( outFilename.c_str(), "w" );
-    if( !fp ) return 1;
-    for( const auto& p : pairs )
-        std::fprintf( fp, "%d %.16g\n", p.first, p.second );
-    std::fclose( fp );
-
-    return 0;
-}
-
 int main( int argc, char* argv[] )
 {
     int ierr;
@@ -795,7 +708,7 @@ ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_i
                 oss << digestPrefix << "_ocn_" << couSize << ".txt";
                 const std::string digestFn = oss.str();
                 ierr = gather_and_write_proj_tag( couComm, rankInCouComm,
-                                                   cplOcnPID, digestFn );
+                                                   cplOcnPID, "a2oTbot_proj", digestFn );
                 if( ierr )
                     std::cerr << "WARNING: could not write digest " << digestFn << "\n";
             }

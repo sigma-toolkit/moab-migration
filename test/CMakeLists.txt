@@ -257,6 +257,32 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
               ${CMAKE_SOURCE_DIR}/test/parallel/imoab_dualmap_caas_bfb.sh
               ${EXECUTABLE_OUTPUT_PATH}/imoab_dualmap_caas 1 2 4 )
 
+    # iMOAB BfB regression harness — individual and aggregate custom targets.
+    # Run with: cmake --build <builddir> --target imoab_bfb_check
+    # or:       cmake --build <builddir> --target imoab_bfb_check_<config>
+    set(_imoab_bfb_configs
+        dualmap_caas spmv_bfb
+        coupler coupler_bfb coupler_bilin coupler_twohop
+        map_target read_compute_map map_r2l
+        phatm_ocn_coupler domain_culling scrip setwithgid ptest2)
+
+    set(_imoab_bfb_targets)
+    foreach(_cfg ${_imoab_bfb_configs})
+      add_custom_target(imoab_bfb_check_${_cfg}
+        COMMAND ${CMAKE_COMMAND} -E env
+          MOAB_BUILD=${CMAKE_BINARY_DIR}
+          MOAB_MESH_DIR=${CMAKE_SOURCE_DIR}/MeshFiles
+          MPIRUN=${MPIEXEC_EXECUTABLE}
+          ${CMAKE_SOURCE_DIR}/test/parallel/regression/imoab_test_runner.sh ${_cfg}
+        COMMENT "iMOAB BfB regression: ${_cfg}"
+        VERBATIM)
+      list(APPEND _imoab_bfb_targets imoab_bfb_check_${_cfg})
+    endforeach()
+
+    add_custom_target(imoab_bfb_check
+      COMMENT "Running all iMOAB BfB regression configs"
+      DEPENDS ${_imoab_bfb_targets})
+
     # Fortran tests
     set( MBTRF_TESTS parallel/imoab_ptest.F parallel/imoab_coupler_fortran.F90 parallel/imoab_coupler_caas.F90  )
     

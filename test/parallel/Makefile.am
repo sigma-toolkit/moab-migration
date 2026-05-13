@@ -95,6 +95,21 @@ endif # tempestremap
 
 endif # HAVE_HDF5_PARALLEL
 
+# iMOAB BfB/tolerance regression harness — run all or one config.
+# Uses the configure-generated wrapper which has build dir, mesh dir, and
+# MPI launcher baked in.  Requires TempestRemap (the binaries won't exist
+# otherwise), but .PHONY and the pattern rule must live outside any
+# Automake conditional block.
+#   make imoabcheck               — run all 14 configs
+#   make imoabcheck-coupler_bilin — run one config by name
+.PHONY: imoabcheck
+
+imoabcheck:
+	$(SHELL) $(top_builddir)/test/parallel/regression/run_imoab_tests.sh
+
+imoabcheck-%:
+	$(SHELL) $(top_builddir)/test/parallel/regression/run_imoab_tests.sh $*
+
 if HAVE_NETCDF
   NETCDF_TESTS += scdpart read_nc_par ucdtrvpart mpastrvpart gcrm_par read_esmf
 endif
@@ -210,7 +225,28 @@ par_intx_sph_LDADD = $(LDADD)
 # Other files to clean up (e.g. output from tests)
 MOSTLYCLEANFILES = *.h5m *.nc *.vtk *.txt
 
-EXTRA_DIST = imoab_coupler_utils.hpp imoab_dualmap_caas_bfb.sh
+EXTRA_DIST = imoab_coupler_utils.hpp imoab_dualmap_caas_bfb.sh \
+             regression/imoab_test_runner.sh \
+             regression/lib_common.sh \
+             regression/lib_bfb_harness.sh \
+             regression/lib_tol_harness.sh \
+             regression/lib_exitcode_harness.sh \
+             regression/README.md \
+             regression/configs/coupler.cfg \
+             regression/configs/coupler_bfb.cfg \
+             regression/configs/coupler_bilin.cfg \
+             regression/configs/coupler_twohop.cfg \
+             regression/configs/domain_culling.cfg \
+             regression/configs/dualmap_caas.cfg \
+             regression/configs/map_r2l.cfg \
+             regression/configs/map_target.cfg \
+             regression/configs/phatm_ocn_coupler.cfg \
+             regression/configs/ptest2.cfg \
+             regression/configs/read_compute_map.cfg \
+             regression/configs/scrip.cfg \
+             regression/configs/setwithgid.cfg \
+             regression/configs/spmv_bfb.cfg \
+             regression/run_imoab_tests.sh.in
 FORTDEFS = $(FCDEFS)
 PPFCCOMPILE = $(FC) $(FORTDEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
     $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS)

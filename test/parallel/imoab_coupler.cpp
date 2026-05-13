@@ -27,6 +27,8 @@
 #include "moab/ProgOptions.hpp"
 #include <iostream>
 #include <sstream>
+#include <algorithm>
+#include <cstdio>
 
 #include "imoab_coupler_utils.hpp"
 
@@ -44,6 +46,93 @@ using namespace moab;
 #if ( !defined( ENABLE_ATMOCN_COUPLING ) && !defined( ENABLE_ATMLND_COUPLING ) )
 #error Enable either OCN (ENABLE_ATMOCN_COUPLING) and/or LND (ENABLE_ATMLND_COUPLING) for coupling
 #endif
+
+// Gather (GLOBAL_ID, a2oTbot_proj) pairs from every rank in couComm to
+// rank 0, sort by GID, and write to a digest file. The sort-order is
+// decomposition-independent so the digest is byte-identical iff the
+// per-cell projected values are bit-for-bit identical across rank counts.
+static int gather_and_write_proj_tag(
+    MPI_Comm comm, int rankInComm, iMOAB_AppID ocnPID,
+    const std::string& outFilename )
+{
+    int nverts[3], nelem[3];
+    int ierr = iMOAB_GetMeshInfo( ocnPID, nverts, nelem, 0, 0, 0 );
+    if( ierr ) return 1;
+
+    int tag_type = DENSE_INTEGER, ncomp = 1, tagInd = 0;
+    ierr = iMOAB_DefineTagStorage( ocnPID, "GLOBAL_ID", &tag_type, &ncomp, &tagInd );
+    if( ierr ) return 1;
+
+    int ent_type = 1;  // elements
+    int sz       = nelem[2];
+    std::vector< int >    gids( sz, 0 );
+    std::vector< double > vals( sz, 0.0 );
+    ierr = iMOAB_GetIntTagStorage( ocnPID, "GLOBAL_ID", &sz, &ent_type, gids.data() );
+    if( ierr ) return 1;
+    ierr = iMOAB_GetDoubleTagStorage( ocnPID, "a2oTbot_proj", &sz, &ent_type, vals.data() );
+    if( ierr ) return 1;
+
+    int sizeInComm = 0;
+    MPI_Comm_size( comm, &sizeInComm );
+
+    std::vector< int > counts( sizeInComm, 0 );
+    MPI_Gather( &sz, 1, MPI_INT, counts.data(), 1, MPI_INT, 0, comm );
+
+    std::vector< int > displs( sizeInComm, 0 );
+    int totalCount = 0;
+    if( rankInComm == 0 )
+    {
+        for( int r = 0; r < sizeInComm; ++r )
+        {
+            displs[r] = totalCount;
+            totalCount += counts[r];
+        }
+    }
+
+    std::vector< int >    allGids;
+    std::vector< double > allVals;
+    if( rankInComm == 0 )
+    {
+        allGids.resize( totalCount );
+        allVals.resize( totalCount );
+    }
+
+    MPI_Gatherv( gids.data(), sz, MPI_INT,
+                 rankInComm == 0 ? allGids.data() : nullptr,
+                 counts.data(), displs.data(), MPI_INT, 0, comm );
+    MPI_Gatherv( vals.data(), sz, MPI_DOUBLE,
+                 rankInComm == 0 ? allVals.data() : nullptr,
+                 counts.data(), displs.data(), MPI_DOUBLE, 0, comm );
+
+    if( rankInComm != 0 ) return 0;
+
+    // Pair, sort by GID (ascending), dedup
+    std::vector< std::pair< int, double > > pairs;
+    pairs.reserve( totalCount );
+    for( int i = 0; i < totalCount; ++i )
+        pairs.emplace_back( allGids[i], allVals[i] );
+
+    std::sort( pairs.begin(), pairs.end(),
+               []( const std::pair< int, double >& a,
+                   const std::pair< int, double >& b ) {
+                   return a.first < b.first;
+               } );
+
+    auto last = std::unique( pairs.begin(), pairs.end(),
+                             []( const std::pair< int, double >& a,
+                                 const std::pair< int, double >& b ) {
+                                 return a.first == b.first;
+                             } );
+    pairs.erase( last, pairs.end() );
+
+    FILE* fp = fopen( outFilename.c_str(), "w" );
+    if( !fp ) return 1;
+    for( const auto& p : pairs )
+        std::fprintf( fp, "%d %.16g\n", p.first, p.second );
+    std::fclose( fp );
+
+    return 0;
+}
 
 int main( int argc, char* argv[] )
 {
@@ -139,6 +228,23 @@ int main( int argc, char* argv[] )
 
     bool no_regression_test = false;
     opts.addOpt< void >( "no_regression,r", "do not do regression test against baseline 1", &no_regression_test );
+
+    std::string ocnMapFile;        // pre-computed ATM-OCN map (load instead of compute online)
+    std::string writeMapsPrefix;   // if set, dump computed map to <prefix>_atm_ocn.nc
+    std::string digestPrefix;      // if set, write per-cell BFB digest file
+
+    opts.addOpt< std::string >( "ocn_map_file,u",
+                                "Pre-computed ATM-OCN map file; if set, load these weights "
+                                "instead of computing them online (BfB across rank counts)",
+                                &ocnMapFile );
+    opts.addOpt< std::string >( "write_maps,w",
+                                "If set, write the online-computed ATM-OCN map to "
+                                "<prefix>_atm_ocn.nc after ComputeScalarProjectionWeights",
+                                &writeMapsPrefix );
+    opts.addOpt< std::string >( "digest_prefix,d",
+                                "If set, write per-cell BFB digest <prefix>_ocn.txt "
+                                "gathering a2oTbot_proj from cplOcnPID sorted by GLOBAL_ID",
+                                &digestPrefix );
     opts.parseCommandLine( argc, argv );
 
     char fileWriteOptions[] = "PARALLEL=WRITE_PART";
@@ -468,30 +574,63 @@ int main( int argc, char* argv[] )
 
     if( couComm != MPI_COMM_NULL )
     {
-        PUSH_TIMER( "Compute the projection weights with TempestRemap" )
-        ierr = iMOAB_ComputeScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0], disc_methods[0],
-                                                     &disc_orders[0], disc_methods[1], &disc_orders[1], nullptr,
-                                                     &fNoBubble, &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap,
-                                                     &fNoConserve, &fValidate, dof_tag_names[0], dof_tag_names[1] );
-        CHECKIERR( ierr, "cannot compute scalar projection weights" )
-        POP_TIMER( couComm, rankInCouComm )
-
-        // Let us now write the map file to disk and then read it back to test the I/O API in iMOAB
-#ifdef MOAB_HAVE_NETCDF
+        if( !ocnMapFile.empty() )
         {
-            const iMOAB_String atmocn_map_file_name = "atm_ocn_map.nc";
-            ierr = iMOAB_WriteMapFile( cplAtmOcnPID, weights_identifiers[0], atmocn_map_file_name );
-            CHECKIERR( ierr, "failed to write map file to disk" );
-
-            const iMOAB_String intx_from_file_identifier = "atmocn-map-from-file";
-            int src_disc_type                            = 1;  // element-based SE-4
-            int tgt_disc_type                            = 3;  // element-based FV
-            int arearead                                 = 1;  // read only area_a (atmosphere)
-            CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type, &tgt_disc_type, &arearead,
-                                          intx_from_file_identifier, atmocn_map_file_name ),
-                       "failed to load map file from disk" );
+            PUSH_TIMER( "Load OCN map from disk" )
+            int src_disc_type = 1;
+            int tgt_disc_type = 3;
+            int arearead      = 1;
+            CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID,
+                                          &src_disc_type, &tgt_disc_type, &arearead,
+                                          weights_identifiers[0], ocnMapFile.c_str() ),
+                       "failed to load OCN map file" );
+            CHECKIERR( iMOAB_MigrateMapMesh( cplAtmPID, cplAtmOcnPID, &couComm,
+                                             &couPEGroup, &couPEGroup, &src_disc_type,
+                                             &cplatm, &atmocnid ),
+                       "failed to migrate map mesh after load" );
+            POP_TIMER( couComm, rankInCouComm )
         }
+        else
+        {
+            PUSH_TIMER( "Compute the projection weights with TempestRemap" )
+            ierr = iMOAB_ComputeScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0], disc_methods[0],
+                                                         &disc_orders[0], disc_methods[1], &disc_orders[1], nullptr,
+                                                         &fNoBubble, &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap,
+                                                         &fNoConserve, &fValidate, dof_tag_names[0], dof_tag_names[1] );
+            CHECKIERR( ierr, "cannot compute scalar projection weights" )
+            POP_TIMER( couComm, rankInCouComm )
+
+            // Write map to disk if requested (for BFB workflow: serial
+            // compute --write_maps → reload on N ranks)
+            if( !writeMapsPrefix.empty() )
+            {
+                const std::string mapFn = writeMapsPrefix + "_atm_ocn.nc";
+                ierr = iMOAB_WriteMapFile( cplAtmOcnPID, weights_identifiers[0],
+                                           mapFn.c_str() );
+                CHECKIERR( ierr, "failed to write map file to disk" );
+            }
+
+            // Let us now write the map file to disk and then read it back to
+            // test the I/O API in iMOAB
+#ifdef MOAB_HAVE_NETCDF
+            {
+                const std::string atmocn_map_file_name = "atm_ocn_map.nc";
+                ierr = iMOAB_WriteMapFile( cplAtmOcnPID, weights_identifiers[0],
+                                           atmocn_map_file_name.c_str() );
+                CHECKIERR( ierr, "failed to write map file to disk" );
+
+                const std::string intx_from_file_identifier = "atmocn-map-from-file";
+                int src_disc_type                            = 1;
+                int tgt_disc_type                            = 3;
+                int arearead                                 = 1;
+                CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID,
+                                              &src_disc_type, &tgt_disc_type, &arearead,
+                                              intx_from_file_identifier.c_str(),
+                                              atmocn_map_file_name.c_str() ),
+                           "failed to load map file from disk" );
+            }
 #endif
+        }
     }
 
 #endif
@@ -634,8 +773,8 @@ int main( int argc, char* argv[] )
             /* We have the remapping weights now. Let us apply the weights onto the tag we defined
                on the source mesh and get the projection on the target mesh */
             PUSH_TIMER( "Apply Scalar projection weights" )
-            ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0], bottomFields,
-                                                       bottomProjectedFields , nullptr);
+ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0], bottomFields,
+                                                        bottomProjectedFields , nullptr);
             CHECKIERR( ierr, "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )
             if( 1 == n )  // write only for n==1 case
@@ -643,6 +782,22 @@ int main( int argc, char* argv[] )
                 char outputFileTgt[] = "fOcnOnCpl.h5m";
                 ierr                 = iMOAB_WriteMesh( cplOcnPID, outputFileTgt, fileWriteOptions );
                 CHECKIERR( ierr, "could not write fOcnOnCpl.h5m to disk" )
+            }
+
+            // Write per-cell BFB digest when requested.
+            // Include the MPI size in the filename so the harness can match
+            // pattern: <prefix>_<kernel>_<nprocs>.txt
+            if( !digestPrefix.empty() )
+            {
+                int couSize;
+                MPI_Comm_size( couComm, &couSize );
+                std::ostringstream oss;
+                oss << digestPrefix << "_ocn_" << couSize << ".txt";
+                const std::string digestFn = oss.str();
+                ierr = gather_and_write_proj_tag( couComm, rankInCouComm,
+                                                   cplOcnPID, digestFn );
+                if( ierr )
+                    std::cerr << "WARNING: could not write digest " << digestFn << "\n";
             }
         }
 

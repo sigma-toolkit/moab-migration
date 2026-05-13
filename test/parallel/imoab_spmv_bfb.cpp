@@ -176,6 +176,7 @@ int main( int argc, char* argv[] )
     std::string loMapFile;   // empty => compute online (low-order, monotone)
     std::string hiMapFile;   // empty => compute online (high-order)
     std::string digestPrefix = "spmv_bfb_digest";
+    std::string writeMapsPrefix; // if set, dump computed maps to <prefix>_{lo,hi}.nc
 
     int nghlay = 0;
     int startG1 = 0, endG1 = numProcesses - 1;
@@ -188,6 +189,11 @@ int main( int argc, char* argv[] )
     opts.addOpt< std::string >( "lo_map_file,l", "Low-order map file (nc); if set, load from disk", &loMapFile );
     opts.addOpt< std::string >( "hi_map_file,h", "High-order map file (nc); if set, load from disk", &hiMapFile );
     opts.addOpt< std::string >( "digest_prefix,o", "Output digest filename prefix", &digestPrefix );
+    opts.addOpt< std::string >( "write_maps,w",
+                                "If set, write the online-computed lo/hi weight maps to disk as "
+                                "<prefix>_lo.nc and <prefix>_hi.nc; intended for the BFB regression "
+                                "workflow (serial compute + write -> reload in parallel)",
+                                &writeMapsPrefix );
     opts.addOpt< int >( "startAtm,a", "start task for atmosphere layout", &startG1 );
     opts.addOpt< int >( "endAtm,b", "end task for atmosphere layout", &endG1 );
     opts.addOpt< int >( "startOcn,c", "start task for ocean layout", &startG2 );
@@ -323,18 +329,22 @@ int main( int argc, char* argv[] )
         {
             int src_disc_type = 3;  // FV cell
             int tgt_disc_type = 3;  // FV cell
-            int arearead      = 0;  // areas not needed for plain SpMV digest
+            int arearead_lo   = 3;  // first load: read all areas (incl. aream)
+                                    // so the dual-map CAAS path has target
+                                    // areas without recomputing from geometry
+                                    // (non-BFB w.r.t. MCT, hard-failed)
+            int arearead_hi   = 0;  // second load: areas already populated
 
             PUSH_TIMER( "Load low-order map from disk" )
             CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplDualMapPID,
-                                          &src_disc_type, &tgt_disc_type, &arearead,
+                                          &src_disc_type, &tgt_disc_type, &arearead_lo,
                                           "lo-scalar", loMapFile.c_str() ),
                        "Cannot load low-order map file" )
             POP_TIMER( couComm, rankInCouComm )
 
             PUSH_TIMER( "Load high-order map from disk" )
             CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplDualMapPID,
-                                          &src_disc_type, &tgt_disc_type, &arearead,
+                                          &src_disc_type, &tgt_disc_type, &arearead_hi,
                                           "hi-scalar", hiMapFile.c_str() ),
                        "Cannot load high-order map file" )
             POP_TIMER( couComm, rankInCouComm )
@@ -382,6 +392,18 @@ int main( int argc, char* argv[] )
             CHECKIERR( iMOAB_ComputeCommGraph( cplAtmPID, cplDualMapPID, &couComm, &couPEGroup, &couPEGroup, &meshtype,
                                                &meshtype, &cplatm, &dualmap_id ),
                        "Cannot compute ATM coverage graph" )
+        }
+
+        if( !writeMapsPrefix.empty() && !loadFromDisk )
+        {
+            const std::string loOut = writeMapsPrefix + "_lo.nc";
+            const std::string hiOut = writeMapsPrefix + "_hi.nc";
+            CHECKIERR( iMOAB_WriteMapFile( cplDualMapPID, "lo-scalar", loOut.c_str() ),
+                       "Cannot write low-order map file" )
+            CHECKIERR( iMOAB_WriteMapFile( cplDualMapPID, "hi-scalar", hiOut.c_str() ),
+                       "Cannot write high-order map file" )
+            if( !rankInCouComm )
+                std::cout << " Wrote weight maps to " << loOut << " and " << hiOut << "\n";
         }
 
         // Define source tag on dual-map app, on cpl ATM (for the two-hop tag

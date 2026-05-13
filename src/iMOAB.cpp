@@ -2614,8 +2614,7 @@ static ErrCode get_coverage_entities( iMOAB_AppID pid, moab::Range& covEnts )
     appData& data = context.appDatas[*pid];
     covEnts.clear();
     if( data.tempestData.remapper == nullptr ) return moab::MB_SUCCESS;
-    EntityHandle cover_set = data.tempestData.remapper->GetMeshSet( moab::Remapper::CoveringMesh );
-    MB_CHK_ERR( context.MBI->get_entities_by_dimension( cover_set, 2, covEnts ) );
+    covEnts = data.tempestData.remapper->GetMeshEntities( moab::Remapper::CoveringMesh );
     return moab::MB_SUCCESS;
 }
 
@@ -2709,11 +2708,10 @@ ErrCode iMOAB_SetDoubleTagStorageOnCoverage( iMOAB_AppID pid,
     MB_CHK_ERR( get_coverage_entities( pid, covEnts ) );
     if( covEnts.empty() ) return moab::MB_SUCCESS;
 
-    appData& data = context.appDatas[*pid];
     std::string tagName( tag_storage_name );
-    auto tit = data.tagMap.find( tagName );
-    if( tit == data.tagMap.end() ) return moab::MB_FAILURE;
-    moab::Tag tag = tit->second;
+    moab::Tag tag = nullptr;
+    if( moab::MB_SUCCESS != context.MBI->tag_get_handle( tagName.c_str(), tag ) || !tag )
+        return moab::MB_FAILURE;
 
     int tagLen = 0;
     MB_CHK_ERR( context.MBI->tag_get_length( tag, tagLen ) );
@@ -4600,12 +4598,15 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
             newRecvGraph->SetReceivingAfterCoverage( idsFromProcs );      // Store coverage requirements
             newRecvGraph->set_cover_set( cover_set );                     // Associate with coverage mesh set
 
-            // Store in application's graph map with unique context_id
-            if( context.appDatas[*pid_migr].pgraph.find( *context_id ) == context.appDatas[*pid_migr].pgraph.end() )
-                context.appDatas[*pid_migr].pgraph[*context_id] = newRecvGraph;
-            else
-                MB_CHK_SET_ERR( moab::MB_FAILURE, "ParCommGraph for context_id="
-                                                      << *context_id << " already exists. Check the workflow" );
+            // Store in application's graph map; replace any existing graph for this context.
+            auto& pgraphMap = context.appDatas[*pid_migr].pgraph;
+            auto  existing  = pgraphMap.find( *context_id );
+            if( existing != pgraphMap.end() )
+            {
+                delete existing->second;
+                pgraphMap.erase( existing );
+            }
+            pgraphMap[*context_id] = newRecvGraph;
         }
 
         // Pack requirements into TupleList for crystal router communication
@@ -5480,6 +5481,15 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         std::vector< int > values_entities;  // will be the size of primary_ents3 * lenTagType1
         EntityHandle fset3 = tdata.remapper->GetMeshSet( Remapper::CoveringMesh );
 
+        // When an intersection-based covering mesh already exists, ReceiveElementTag and
+        // ApplyWeights must share the same entity handles.  Skip populating fset3 with MAP
+        // cells so we don't corrupt the set used by both callers.
+        Range intx_cov_cells;
+        MB_CHK_ERR( context.MBI->get_entities_by_dimension( fset3, 2, intx_cov_cells ) );
+        const bool has_intersection_coverage = !intx_cov_cells.empty();
+
+        if( !has_intersection_coverage )
+        {
         // start copy
         std::map< int, EntityHandle > vertexMap;  //
         Range verts;
@@ -5559,6 +5569,23 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
             else  // *type == 3
             {
                 values_entities.resize( primary_ents.size() );  // just get the global ids !
+                MB_CHK_ERR( context.MBI->tag_get_data( gidTag, primary_ents, &values_entities[0] ) );
+            }
+        }
+        }  // end if( !has_intersection_coverage )
+        else
+        {
+            // Reuse the intersection covering mesh as the entity set for weight application;
+            // rebuild values_entities from it so col_dtoc_dofmap maps those entities to MAP columns.
+            primary_ents = intx_cov_cells;
+            if( 1 == *type )
+            {
+                values_entities.resize( lenTagType1 * primary_ents.size() );
+                MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, primary_ents, &values_entities[0] ) );
+            }
+            else
+            {
+                values_entities.resize( primary_ents.size() );
                 MB_CHK_ERR( context.MBI->tag_get_data( gidTag, primary_ents, &values_entities[0] ) );
             }
         }

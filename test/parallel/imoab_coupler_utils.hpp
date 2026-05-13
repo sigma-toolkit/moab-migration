@@ -11,6 +11,11 @@
 #ifndef TEST_PARALLEL_IMOAB_COUPLER_UTILS_HPP_
 #define TEST_PARALLEL_IMOAB_COUPLER_UTILS_HPP_
 
+#include <algorithm>
+#include <fstream>
+#include <iomanip>
+#include <vector>
+
 #define CHECKIERR( rc, message )                                              \
     if( 0 != ( rc ) )                                                         \
     {                                                                         \
@@ -107,6 +112,92 @@ int setup_component_coupler_meshes( iMOAB_AppID cmpId,
         ierr           = iMOAB_FreeSenderBuffers( cmpId, &context_id );
         CHECKIERR( ierr, "cannot free buffers used to send atm mesh" )
     }
+    return 0;
+}
+
+// Gather (GLOBAL_ID, <tagName>) pairs from every rank in comm to
+// rank 0, sort by GID, and write to a digest file.  The sort-order is
+// decomposition-independent so the digest is byte-identical iff the
+// per-cell projected values are bit-for-bit identical across rank counts.
+static int gather_and_write_proj_tag(
+    MPI_Comm comm, int rankInComm, iMOAB_AppID pid,
+    const std::string& tagName, const std::string& outFilename )
+{
+    int nverts[3], nelem[3];
+    int ierr = iMOAB_GetMeshInfo( pid, nverts, nelem, 0, 0, 0 );
+    if( ierr ) return 1;
+
+    int tag_type = DENSE_INTEGER, ncomp = 1, tagInd = 0;
+    ierr = iMOAB_DefineTagStorage( pid, "GLOBAL_ID", &tag_type, &ncomp, &tagInd );
+    if( ierr ) return 1;
+
+    int ent_type = 1;  // elements
+    int sz       = nelem[2];
+    std::vector< int >    gids( sz, 0 );
+    std::vector< double > vals( sz, 0.0 );
+    ierr = iMOAB_GetIntTagStorage( pid, "GLOBAL_ID", &sz, &ent_type, gids.data() );
+    if( ierr ) return 1;
+    ierr = iMOAB_GetDoubleTagStorage( pid, tagName.c_str(), &sz, &ent_type, vals.data() );
+    if( ierr ) return 1;
+
+    int sizeInComm = 0;
+    MPI_Comm_size( comm, &sizeInComm );
+
+    std::vector< int > counts( sizeInComm, 0 );
+    MPI_Gather( &sz, 1, MPI_INT, counts.data(), 1, MPI_INT, 0, comm );
+
+    std::vector< int > displs( sizeInComm, 0 );
+    int totalCount = 0;
+    if( rankInComm == 0 )
+    {
+        for( int r = 0; r < sizeInComm; ++r )
+        {
+            displs[r] = totalCount;
+            totalCount += counts[r];
+        }
+    }
+
+    std::vector< int >    allGids;
+    std::vector< double > allVals;
+    if( rankInComm == 0 )
+    {
+        allGids.resize( totalCount );
+        allVals.resize( totalCount );
+    }
+
+    MPI_Gatherv( gids.data(), sz, MPI_INT,
+                 rankInComm == 0 ? allGids.data() : nullptr,
+                 counts.data(), displs.data(), MPI_INT, 0, comm );
+    MPI_Gatherv( vals.data(), sz, MPI_DOUBLE,
+                 rankInComm == 0 ? allVals.data() : nullptr,
+                 counts.data(), displs.data(), MPI_DOUBLE, 0, comm );
+
+    if( rankInComm != 0 ) return 0;
+
+    // Pair, sort by GID (ascending), dedup
+    std::vector< std::pair< int, double > > pairs;
+    pairs.reserve( totalCount );
+    for( int i = 0; i < totalCount; ++i )
+        pairs.emplace_back( allGids[i], allVals[i] );
+
+    std::sort( pairs.begin(), pairs.end(),
+               []( const std::pair< int, double >& a,
+                   const std::pair< int, double >& b ) {
+                   return a.first < b.first;
+               } );
+
+    auto last = std::unique( pairs.begin(), pairs.end(),
+                             []( const std::pair< int, double >& a,
+                                 const std::pair< int, double >& b ) {
+                                 return a.first == b.first;
+                             } );
+    pairs.erase( last, pairs.end() );
+
+    std::ofstream fs( outFilename );
+    if( !fs.is_open() ) return 1;
+    fs << std::fixed << std::setprecision( 16 );
+    for( auto& p : pairs )
+        fs << p.first << " " << p.second << "\n";
     return 0;
 }
 

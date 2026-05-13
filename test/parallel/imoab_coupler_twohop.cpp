@@ -131,6 +131,10 @@ int main( int argc, char* argv[] )
 
     bool no_regression_test = false;
     opts.addOpt< void >( "no_regression,r", "do not do regression test against baseline 1", &no_regression_test );
+
+    std::string digestPrefix;
+    opts.addOpt< std::string >( "digest_prefix", "prefix for BfB digest output files", &digestPrefix );
+
     opts.parseCommandLine( argc, argv );
 
     char fileWriteOptions[] = "PARALLEL=WRITE_PART";
@@ -607,6 +611,16 @@ int main( int argc, char* argv[] )
                 ierr                 = iMOAB_WriteMesh( cplOcnPID, outputFileTgt, fileWriteOptions );
                 CHECKIERR( ierr, "could not write fOcnOnCpl1.h5m to disk" )
             }
+            if( !digestPrefix.empty() )
+            {
+                int couSize;
+                MPI_Comm_size( couComm, &couSize );
+                std::ostringstream oss;
+                oss << digestPrefix << "_ocn_" << couSize << ".txt";
+                ierr = gather_and_write_proj_tag( couComm, rankInCouComm, cplOcnPID, "a2oTbot_proj", oss.str() );
+                if( ierr )
+                    std::cerr << "WARNING: could not write digest " << oss.str() << "\n";
+            }
         }
 
         // send the projected tag back to ocean pes, with send/receive tag
@@ -760,6 +774,16 @@ int main( int argc, char* argv[] )
                 char outputFileTgt[] = "fOcnOnCpl0.h5m";
                 ierr                 = iMOAB_WriteMesh( cplOcnPID, outputFileTgt, fileWriteOptions );
                 CHECKIERR( ierr, "could not write the second fOcnOnCpl0.h5m to disk" )
+            }
+            if( !digestPrefix.empty() )
+            {
+                int couSize;
+                MPI_Comm_size( couComm, &couSize );
+                std::ostringstream oss;
+                oss << digestPrefix << "_ocn2_" << couSize << ".txt";
+                ierr = gather_and_write_proj_tag( couComm, rankInCouComm, cplOcnPID, "a2oT2bot_proj", oss.str() );
+                if( ierr )
+                    std::cerr << "WARNING: could not write digest " << oss.str() << "\n";
             }
         }
 

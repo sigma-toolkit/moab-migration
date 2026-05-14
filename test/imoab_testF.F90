@@ -68,6 +68,8 @@ program fdriver
 
    character outfile*1024, wopts*1024
    my_id = 0
+   num_procs = 1
+   ierr = 0
    fname = 'unittest/io/p8ex1.h5m'//C_NULL_CHAR
 
 #ifdef MOAB_HAVE_MPI

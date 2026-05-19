@@ -237,8 +237,7 @@ ErrorCode ReadRTT::generate_topology( std::vector< side > side_data,
     set_surface_senses( num_ents, entmap, side_data, cell_data );
 
     // set the group data
-    rval = setup_group_data( entmap, tet_data, volume_map );
-    if( rval != MB_SUCCESS ) return rval;
+    MB_CHK_ERR(setup_group_data( entmap, tet_data, volume_map ));
 
     return MB_SUCCESS;
 }
@@ -1457,18 +1456,18 @@ EntityHandle ReadRTT::create_group( std::string group_name, int id )
 
     EntityHandle handle;
     rval = MBI->create_meshset( MESHSET_SET, handle );
-    if( MB_SUCCESS != rval ) return 0;
+    if( MB_SUCCESS != rval ) return MB_FAILURE;
 
     char name_buf[NAME_TAG_SIZE] = { 0 };
     std::strncpy( name_buf, group_name.c_str(), NAME_TAG_SIZE - 1 );
     rval = MBI->tag_set_data( name_tag, &handle, 1, name_buf );
-    if( MB_SUCCESS != rval ) return 0;
+    if( MB_SUCCESS != rval ) return MB_FAILURE;
 
     rval = MBI->tag_set_data( id_tag, &handle, 1, &id );
-    if( MB_SUCCESS != rval ) return 0;
+    if( MB_SUCCESS != rval ) return MB_FAILURE;
 
     rval = MBI->tag_set_data( category_tag, &handle, 1, &geom_categories[4] );
-    if( MB_SUCCESS != rval ) return 0;
+    if( MB_SUCCESS != rval ) return MB_FAILURE;
 
     return handle;
 }

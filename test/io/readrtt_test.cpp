@@ -507,12 +507,9 @@ void test_no_material_tag_5()
     read_file( moab, example5.c_str() );
 
     Tag material_number;
-    ErrorCode rval = moab.tag_get_handle( "MATERIAL_NUMBER", 1, MB_TYPE_INTEGER, material_number,
-                                          MB_TAG_SPARSE | MB_TAG_CREAT );CHECK_ERR( rval );
-
-    Range tagged_tets;
-    rval = moab.get_entities_by_type_and_tag( 0, moab::MBTET, &material_number, 0, 1, tagged_tets );CHECK_ERR( rval );
-    CHECK_EQUAL( (int)tagged_tets.size(), 0 );
+    // this test loads a file with no MATERIAL_NUMBER tag, so the tag should not be found
+    ErrorCode rval = moab.tag_get_handle( "MATERIAL_NUMBER", material_number );
+    CHECK_EQUAL(rval, MB_TAG_NOT_FOUND);
 }
 
 void test_surfaces_generated_5()
@@ -523,13 +520,12 @@ void test_surfaces_generated_5()
     read_file( moab, example5.c_str() );
 
     Tag dim_tag;
-    ErrorCode rval = moab.tag_get_handle( GEOM_DIMENSION_TAG_NAME, 1, MB_TYPE_INTEGER, dim_tag,
-                                          MB_TAG_SPARSE | MB_TAG_CREAT );CHECK_ERR( rval );
+    CHECK_ERR(moab.tag_get_handle(GEOM_DIMENSION_TAG_NAME, dim_tag));
 
     int dim2                          = 2;
     const void* const tag_vals_dim2[] = { &dim2 };
     Range surf_sets;
-    rval = moab.get_entities_by_type_and_tag( 0, moab::MBENTITYSET, &dim_tag, tag_vals_dim2, 1, surf_sets );CHECK_ERR( rval );
+    ErrorCode rval = moab.get_entities_by_type_and_tag( 0, moab::MBENTITYSET, &dim_tag, tag_vals_dim2, 1, surf_sets );CHECK_ERR( rval );
     CHECK_EQUAL( (int)surf_sets.size(), 2 );
 
     // Each surface should contain 4 skin triangles (all faces of a single tet)
@@ -551,13 +547,12 @@ void test_volume_surface_links_5()
     read_file( moab, example5.c_str() );
 
     Tag dim_tag;
-    ErrorCode rval = moab.tag_get_handle( GEOM_DIMENSION_TAG_NAME, 1, MB_TYPE_INTEGER, dim_tag,
-                                          MB_TAG_SPARSE | MB_TAG_CREAT );CHECK_ERR( rval );
+    CHECK_ERR(moab.tag_get_handle(GEOM_DIMENSION_TAG_NAME, dim_tag));
 
     int dim3                          = 3;
     const void* const tag_vals_dim3[] = { &dim3 };
     Range vol_sets;
-    rval = moab.get_entities_by_type_and_tag( 0, moab::MBENTITYSET, &dim_tag, tag_vals_dim3, 1, vol_sets );CHECK_ERR( rval );
+    ErrorCode rval = moab.get_entities_by_type_and_tag( 0, moab::MBENTITYSET, &dim_tag, tag_vals_dim3, 1, vol_sets );CHECK_ERR( rval );
     CHECK_EQUAL( (int)vol_sets.size(), 2 );
 
     for( Range::iterator it = vol_sets.begin(); it != vol_sets.end(); ++it )

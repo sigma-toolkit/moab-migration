@@ -11,6 +11,7 @@
 #include <cassert>
 #include <iostream>
 #include <iomanip>
+#include <limits>
 
 #include "moab/IntxMesh/IntxUtils.hpp"
 

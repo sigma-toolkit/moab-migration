@@ -92,6 +92,10 @@ int main( int argc, char* argv[] )
     bool no_regression_test = false;
     opts.addOpt< void >( "no_regression,r", "do not do regression test against baseline 1", &no_regression_test );
     opts.addOpt< std::string >( "newbaseline,n", "baseline to use for test ", &baseline );
+
+    std::string digestPrefix;
+    opts.addOpt< std::string >( "digest_prefix", "prefix for BfB digest output files", &digestPrefix );
+
     opts.parseCommandLine( argc, argv );
 
     char fileWriteOptions[] = "PARALLEL=WRITE_PART";
@@ -308,7 +312,7 @@ int main( int argc, char* argv[] )
            on the source mesh and get the projection on the target mesh */
         PUSH_TIMER( "Apply Scalar projection weights" )
         ierr = iMOAB_ApplyScalarProjectionWeights( cplRofLndPID, &filter_type, intx_from_file_identifier.c_str(), field,
-                                                   field );
+                                                   field , nullptr);
         CHECKIERR( ierr, "failed to compute projection weight application" );
         POP_TIMER( couComm, rankInCouComm )
 
@@ -318,6 +322,16 @@ int main( int argc, char* argv[] )
             outfile << "fLndOnCpl_" << numTasksCpl << ".h5m";
             ierr = iMOAB_WriteMesh( cplLndPID, outfile.str().c_str(), fileWriteOptions );
             CHECKIERR( ierr, "could not write fLndOnCpl5.h5m to disk" )
+        }
+        if( !digestPrefix.empty() )
+        {
+            int couSize;
+            MPI_Comm_size( couComm, &couSize );
+            std::ostringstream oss;
+            oss << digestPrefix << "_lnd_" << couSize << ".txt";
+            ierr = gather_and_write_proj_tag( couComm, rankInCouComm, cplLndPID, field, oss.str() );
+            if( ierr )
+                std::cerr << "WARNING: could not write digest " << oss.str() << "\n";
         }
     }
     MPI_Barrier( MPI_COMM_WORLD );

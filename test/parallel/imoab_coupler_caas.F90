@@ -407,14 +407,14 @@ program imoab_coupler_fortran
       ! on the source mesh and get the projection on the target mesh
       ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, weights_identifier1, &
                                                 fields, &
-                                                projectedFields)
+                                                projectedFields, C_NULL_CHAR)
       call errorout(ierr, 'failed to compute first order projection weight application')
 
       ! We have the remapping weights now. Let us apply the weights onto the tag we defined
       ! on the source mesh and get the projection on the target mesh
       ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, "bilinear"//C_NULL_CHAR, &
                                                 fields, &
-                                                projectedFieldsBilin)
+                                                projectedFieldsBilin, C_NULL_CHAR)
       call errorout(ierr, 'failed to compute bilinear projection weight application')
 
 
@@ -422,7 +422,7 @@ program imoab_coupler_fortran
       ! on the source mesh and get the projection on the target mesh
       ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, "secondorder"//C_NULL_CHAR, &
                                                 fields, &
-                                                projectedFieldsSecond)
+                                                projectedFieldsSecond, C_NULL_CHAR)
       call errorout(ierr, 'failed to compute second order projection weight application')
 
       ! We have the remapping weights now. Let us apply the weights onto the tag we defined
@@ -430,7 +430,7 @@ program imoab_coupler_fortran
       filter_type = 1 ! global CAAS operator application
       ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, "secondorder"//C_NULL_CHAR, &
                                                 fields, &
-                                                projectedFieldsCAAS)
+                                                projectedFieldsCAAS, C_NULL_CHAR)
       call errorout(ierr, 'failed to compute second order with CAAS projection weight application')
 
       write(nproc,"(I0.2)")num_procs !

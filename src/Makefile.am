@@ -328,11 +328,13 @@ if HAVE_TEMPESTREMAP
      Remapping/TempestLinearRemap.cpp \
      Remapping/TempestOnlineMap.cpp \
      Remapping/TempestOnlineMapIO.cpp \
+     Remapping/IntegerReprosum.cpp \
      Remapping/netcdfcpp_par.hpp
 
   MOAB_REMAPPING_HDRS += \
      moab/Remapping/TempestRemapper.hpp \
-     moab/Remapping/TempestOnlineMap.hpp
+     moab/Remapping/TempestOnlineMap.hpp \
+     moab/Remapping/IntegerReprosum.hpp
 
 endif # if HAVE_TEMPESTREMAP
 

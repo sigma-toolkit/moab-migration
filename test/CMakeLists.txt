@@ -236,10 +236,10 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
 
   if(MOAB_HAVE_TEMPESTREMAP)
     set( MBTR_TESTS parallel/imoab_coupler.cpp parallel/imoab_coupler_bilin.cpp parallel/imoab_coupler_twohop.cpp
-                    parallel/imoab_domain_culling.cpp parallel/imoab_map_r2l.cpp parallel/imoab_map_target.cpp 
-                    parallel/imoab_ptest2.cpp parallel/imoab_read_compute_map.cpp 
-                    parallel/imoab_scrip.cpp parallel/imoab_setwithGid.cpp parallel/imoab_phatm_ocn_coupler.cpp 
-                    parallel/imoab_apg2_ol_coupler.cpp )
+                    parallel/imoab_domain_culling.cpp parallel/imoab_map_r2l.cpp parallel/imoab_map_target.cpp
+                    parallel/imoab_ptest2.cpp parallel/imoab_read_compute_map.cpp
+                    parallel/imoab_scrip.cpp parallel/imoab_setwithGid.cpp parallel/imoab_phatm_ocn_coupler.cpp
+                    parallel/imoab_apg2_ol_coupler.cpp parallel/imoab_spmv_bfb.cpp )
     
     foreach( fname ${MBTR_TESTS} )
       string( REPLACE ".cpp" "" base ${fname} )
@@ -249,6 +249,39 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
       target_link_libraries( ${noparbase} MOAB ${TEMPESTREMAP_LIBRARIES} )
       add_test( ${noparbase} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${noparbase} ${MPIEXEC_POSTFLAGS} )
     endforeach()
+
+    # End-to-end BFB regression: orchestrates serial compute → write maps →
+    # parallel reload → cmp digests at N=1, 2, 4. Driver script lives in
+    # the source tree; it just needs the imoab_dualmap_caas binary path.
+    add_test( imoab_dualmap_caas_bfb
+              ${CMAKE_SOURCE_DIR}/test/parallel/imoab_dualmap_caas_bfb.sh
+              ${EXECUTABLE_OUTPUT_PATH}/imoab_dualmap_caas 1 2 4 )
+
+    # iMOAB BfB regression harness — individual and aggregate custom targets.
+    # Run with: cmake --build <builddir> --target imoab_bfb_check
+    # or:       cmake --build <builddir> --target imoab_bfb_check_<config>
+    set(_imoab_bfb_configs
+        dualmap_caas spmv_bfb
+        coupler coupler_bfb coupler_bilin coupler_twohop
+        map_target read_compute_map map_r2l
+        phatm_ocn_coupler domain_culling scrip setwithgid ptest2)
+
+    set(_imoab_bfb_targets)
+    foreach(_cfg ${_imoab_bfb_configs})
+      add_custom_target(imoab_bfb_check_${_cfg}
+        COMMAND ${CMAKE_COMMAND} -E env
+          MOAB_BUILD=${CMAKE_BINARY_DIR}
+          MOAB_MESH_DIR=${CMAKE_SOURCE_DIR}/MeshFiles
+          MPIRUN=${MPIEXEC_EXECUTABLE}
+          ${CMAKE_SOURCE_DIR}/test/parallel/regression/imoab_test_runner.sh ${_cfg}
+        COMMENT "iMOAB BfB regression: ${_cfg}"
+        VERBATIM)
+      list(APPEND _imoab_bfb_targets imoab_bfb_check_${_cfg})
+    endforeach()
+
+    add_custom_target(imoab_bfb_check
+      COMMENT "Running all iMOAB BfB regression configs"
+      DEPENDS ${_imoab_bfb_targets})
 
     # Fortran tests
     set( MBTRF_TESTS parallel/imoab_ptest.F parallel/imoab_coupler_fortran.F90 parallel/imoab_coupler_caas.F90  )

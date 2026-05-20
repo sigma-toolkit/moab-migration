@@ -783,6 +783,46 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
                                           int* entity_type,
                                           double* tag_storage_data,
                                           int* globalIds );
+
+#ifdef MOAB_HAVE_TEMPESTREMAP
+/**
+ * \brief Get the number of 2D entities in the TempestRemap CoveringMesh of this app, and
+ *        optionally their global IDs and centroid coordinates.
+ *
+ * Useful for populating analytic source fields directly on the coverage cells of a
+ * dual-map intersection app, bypassing partition-dependent migration paths. This makes
+ * BFB testing of dual-map CAAS robust against rank-count differences in the source
+ * partition.
+ *
+ * Call once with gids=NULL, centroids=NULL to query num_cov_elems, then allocate and
+ * call again to fill the output buffers.
+ *
+ * \param[in]    pid             Application ID with an attached TempestRemap remapper.
+ * \param[inout] num_cov_elems   On output: number of covering 2D entities on this rank.
+ * \param[out]   gids            Optional. If non-null, filled with global IDs.
+ * \param[out]   centroids       Optional. If non-null, filled with element centroids
+ *                               (size 3*num_cov_elems, x,y,z interleaved).
+ */
+ErrCode iMOAB_GetCoverageMeshInfo( iMOAB_AppID pid, int* num_cov_elems, int* gids, double* centroids );
+
+/**
+ * \brief Set a double tag on every entity of the TempestRemap CoveringMesh of this app.
+ *
+ * Values are written in the same order as iMOAB_GetCoverageMeshInfo returns gids.
+ * The tag must already be defined on the app via iMOAB_DefineTagStorage.
+ *
+ * \param[in] pid                       Application ID with an attached TempestRemap remapper.
+ * \param[in] tag_storage_name          Name of the (already-defined) double tag.
+ * \param[in] num_tag_storage_length    Total number of values supplied (= num_cov_elems *
+ *                                      components_per_entity).
+ * \param[in] tag_storage_data          The values to write, in covering-Range order.
+ */
+ErrCode iMOAB_SetDoubleTagStorageOnCoverage( iMOAB_AppID pid,
+                                             const iMOAB_String tag_storage_name,
+                                             int* num_tag_storage_length,
+                                             double* tag_storage_data );
+#endif
+
 /**
  * \brief Retrieve the specified values in a MOAB double Tag.
  *
@@ -1278,6 +1318,10 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
  *                                                          names are separated by ";", the same way as for tag migration.
  * \param[in] target_solution_tag_name   (iMOAB_String)     list of tag names corresponding to participating degrees-of-freedom for the target discretization;
  *                                                          names are separated by ";", the same way as for tag migration.
+ * \param[in] lo_weights_identifier (iMOAB_String)          Optional. When non-NULL, identifies a low-order weight map whose stencil is used to
+ *                                                          compute per-target-row bounds from the source data. The CAAS filter then preserves
+ *                                                          these bounds on the high-order projection result. This implements the dual-map
+ *                                                          nonlinear remapping algorithm (Clip-And-Assert-Sum).
  * \return ErrCode                                          The error code indicating success or failure.
 */
 ErrCode iMOAB_ApplyScalarProjectionWeights(
@@ -1285,7 +1329,8 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
     int* filter_type, /*  CAAS_NONE = 0, CAAS_GLOBAL = 1, CAAS_LOCAL = 2, CAAS_LOCAL_ADJACENT = 3 */
     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
     const iMOAB_String source_solution_tag_name,
-    const iMOAB_String target_solution_tag_name );
+    const iMOAB_String target_solution_tag_name,
+    const iMOAB_String lo_weights_identifier /* = NULL */ );
 
 #endif /* #ifdef MOAB_HAVE_TEMPESTREMAP */
 

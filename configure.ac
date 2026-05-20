@@ -1176,6 +1176,9 @@ AC_CONFIG_FILES([Makefile
                  MeshFiles/examples/Makefile
                  ])
 
+AC_CONFIG_FILES([test/parallel/regression/run_imoab_tests.sh:test/parallel/regression/run_imoab_tests.sh.in],
+                [chmod +x test/parallel/regression/run_imoab_tests.sh])
+
 DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --enable-static=$enable_static --enable-shared=$enable_shared"
 # DISTCHECK_CONFIGURE_FLAGS="$USER_CONFIGURE_CMD"
 # make distcheck will use this DISTCHECK_CONFIGURE_FLAGS

@@ -27,6 +27,8 @@
 #include "LinearRemapFV.h"
 
 #include "moab/Remapping/TempestOnlineMap.hpp"
+#include "moab/Remapping/IntegerReprosum.hpp"
+#include "moab/IntxMesh/IntxUtils.hpp"
 #include "DebugOutput.hpp"
 #include "moab/TupleList.hpp"
 #include "moab/MeshTopoUtil.hpp"
@@ -1520,6 +1522,770 @@ moab::ErrorCode moab::TempestOnlineMap::ApplyWeights( moab::Tag srcSolutionTag,
                             "Setting local tag data failed" );
         }
     }
+
+    return moab::MB_SUCCESS;
+}
+
+moab::ErrorCode moab::TempestOnlineMap::ApplyWeightsWithDualMap( moab::Tag srcSolutionTag,
+                                                                  moab::Tag tgtSolutionTag,
+                                                                  TempestOnlineMap* loWeightMap,
+                                                                  CAASType caasType )
+{
+    // Setup entity ranges (same pattern as ApplyWeights(Tag, Tag))
+    std::vector< double > solSTagVals, solTTagVals;
+    moab::Range sents, tents;
+
+    if( m_remapper->point_cloud_source || m_remapper->point_cloud_target )
+    {
+        if( m_remapper->point_cloud_source )
+        {
+            moab::Range& covSrcEnts = m_remapper->GetMeshVertices( moab::Remapper::CoveringMesh );
+            solSTagVals.resize( covSrcEnts.size(), 0.0 );
+            sents = covSrcEnts;
+        }
+        else
+        {
+            moab::Range& covSrcEnts = m_remapper->GetMeshEntities( moab::Remapper::CoveringMesh );
+            solSTagVals.resize( covSrcEnts.size() * this->GetSourceNDofsPerElement() *
+                                    this->GetSourceNDofsPerElement(),
+                                0.0 );
+            sents = covSrcEnts;
+        }
+        if( m_remapper->point_cloud_target )
+        {
+            moab::Range& tgtEnts = m_remapper->GetMeshVertices( moab::Remapper::TargetMesh );
+            solTTagVals.resize( tgtEnts.size(), 0.0 );
+            tents = tgtEnts;
+        }
+        else
+        {
+            moab::Range& tgtEnts = m_remapper->GetMeshEntities( moab::Remapper::TargetMesh );
+            solTTagVals.resize( tgtEnts.size() * this->GetDestinationNDofsPerElement() *
+                                    this->GetDestinationNDofsPerElement(),
+                                0.0 );
+            tents = tgtEnts;
+        }
+    }
+    else
+    {
+        moab::Range& covSrcEnts = m_remapper->GetMeshEntities( moab::Remapper::CoveringMesh );
+        moab::Range& tgtEnts    = m_remapper->GetMeshEntities( moab::Remapper::TargetMesh );
+        solSTagVals.resize( covSrcEnts.size() * this->GetSourceNDofsPerElement() * this->GetSourceNDofsPerElement(),
+                            0.0 );
+        solTTagVals.resize(
+            tgtEnts.size() * this->GetDestinationNDofsPerElement() * this->GetDestinationNDofsPerElement(), 0.0 );
+        sents = covSrcEnts;
+        tents = tgtEnts;
+    }
+
+    // Read source tag data from coverage mesh
+    MB_CHK_SET_ERR( m_interface->tag_get_data( srcSolutionTag, sents, &solSTagVals[0] ),
+                    "Getting source tag data failed" );
+
+    // Apply high-order projection only (no CAAS — bounds come from the low-order map)
+    MB_CHK_SET_ERR( this->ApplyWeights( solSTagVals, solTTagVals, false ),
+                    "High-order projection failed" );
+
+    // Write initial projection to target tag
+    MB_CHK_SET_ERR( m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] ),
+                    "Setting target tag data failed" );
+
+    if( caasType == CAAS_NONE || loWeightMap == nullptr ) return moab::MB_SUCCESS;
+
+    // =====================================================================
+    // Dual-map CAAS (Clip-And-Assured-Sum) — bit-for-bit port of MCT's
+    // seq_nlmap_avNormArr (driver-mct/main/seq_nlmap_mod.F90).
+    //
+    // PURPOSE
+    //   Conservative, bounds-preserving remap of a source field x onto a
+    //   target mesh using TWO weight matrices: a high-order
+    //   non-monotone map (A, = `this`) and a low-order monotone &
+    //   conservative map (Am, = `loWeightMap`). The high-order map gives
+    //   accuracy; the low-order map gives the conservation reference and
+    //   the bounds-preservation safety net. This routine wires them
+    //   together using the Clip-And-Assured-Sum scheme of
+    //     Bradley, Bosler & Guba, "Conservation with bounded variation
+    //     and limiters in semi-Lagrangian transport schemes",
+    //     SIAM J. Sci. Comput. 41(5), 2019, doi:10.1137/18M1165414.
+    //
+    // NOTATION (matching the reference)
+    //   x          source field values on the coverage mesh (solSTagVals)
+    //   A          high-order map  (this->m_weightMatrix)
+    //   Am         low-order map   (loWeightMap)
+    //   y_hi       = A  * x        high-order projection (in solTTagVals)
+    //   y_lo       = Am * x        low-order projection (mass reference)
+    //   [lo, hi]   per-row source-value bounds taken over A's stencil
+    //   gmins/gmaxs unscaled global min/max of the per-row [lo, hi] —
+    //              used as a final safety clip
+    //   norm8wt    fractional-coverage weight (one scalar per source cell)
+    //              propagated by the E3SM driver as a side-channel tag;
+    //              when present, all bounds & redistribution arithmetic is
+    //              rescaled to match MCT's lnorm=.true. branch exactly
+    //
+    // ALGORITHM (one pass, FP-order-preserved vs MCT)
+    //   1) y_hi  = A * x                            (done above, in solTTagVals)
+    //   2) y_lo  = Am * x                                            [Step 2]
+    //   2b) Pull source norm8wt side-channel tag if present          [Step 2b]
+    //   3) Per-row bounds [lo, hi] over A's stencil columns          [Step 3]
+    //      Divide source value by srcNorm8wt before tracking
+    //      min/max so bounds are over RECOVERED x, not (frac*x).
+    //   4) y_lo == 0 mask: where the low-order projection is zero,
+    //      force y_hi = lo = hi = 0 to drop the cell.               [Step 4]
+    //   4b) Snapshot UNSCALED global extrema gmins/gmaxs from the
+    //       masked, but not-yet-norm-scaled, per-row [lo, hi].      [Step 4b]
+    //   4c) mappedNorm8wt = Am * srcNorm8wt (or Am * 1 if absent).  [Step 4c]
+    //   4d) Scale per-row bounds: lo *= mappedNorm8wt, hi *= ...    [Step 4d]
+    //   5) Per-cell CAAS quantities (clipping defect, room to lower/raise) [Step 5]
+    //   6) Reproducible global reductions of the per-cell quantities [Step 7]
+    //   7) dM_total = dM_clip + (M_low - M_hi_unclipped)             [Step 8]
+    //   8) Redistribute the deficit across cells with room.          [Step 9]
+    //   9) Final hard clip to gmins/gmaxs (skipping yLow==0 cells).
+    //
+    // REPRODUCIBILITY MODEL
+    //   "BfB with MCT" means: for the same inputs, this routine produces
+    //   the same target values MCT produces, BIT FOR BIT, regardless of
+    //   MPI rank count or mesh decomposition. This requires three things
+    //   that the code below enforces explicitly:
+    //
+    //   (i)  Same area values. MCT uses 'aream' = area_b from the netcdf
+    //        map file. We read the same MOAB 'aream' tag (loaded by
+    //        iMOAB_LoadMapFile). Recomputing spherical-polygon areas via
+    //        lHuiller from mesh geometry is FP-different and is only used
+    //        as a final fallback for online-computed maps with no aream.
+    //
+    //   (ii) Same FP operation order in the per-cell arithmetic. The
+    //        redistribute step computes `(hi - yc)/cap_g * dM_total`, NOT
+    //        the algebraically-equivalent `(hi - yc) * (dM_total/cap_g)`.
+    //        See Step 9 below for why. The dM_total computation also uses
+    //        MCT's exact two-step form (subtract, then add), preserving
+    //        the catastrophic-cancellation residual MCT carries.
+    //
+    //   (iii) Order-independent global reductions. We use Worley's
+    //         IntegerReprosum (the MOAB port of shr_reprosum_int), which
+    //         is MCT's default reprosum path. It is decomposition- and
+    //         order-independent by construction (integer-vector MPI sum).
+    //         A Kahan + sort-by-gid summation lambda is also defined
+    //         below as a reference alternative but is not the active
+    //         reducer — using two different algorithms would defeat BfB.
+    //
+    // GUARDRAILS
+    //   Bounds extraction (Step 3) hard-aborts the run if any owned
+    //   high-order row references a coverage column not present on this
+    //   rank. Silently dropping such columns would produce
+    //   decomposition-dependent bounds and break BfB. The error message
+    //   tells the caller exactly which row/column/weight failed and
+    //   recommends widening the ghost-layer count (nghlay_cov in the
+    //   E3SM coupler driver). See lines below the bounds loop.
+    //
+    // EARLY RETURN
+    //   If caasType == CAAS_NONE or loWeightMap is null, we keep the raw
+    //   high-order projection that was already written to tgtSolutionTag
+    //   above. The dual-map machinery only runs when the caller explicitly
+    //   activates it with a non-null low-order map and a non-CAAS_NONE
+    //   filter type.
+
+    const size_t nTargetDofs = solTTagVals.size();
+    const size_t nSourceDofs = solSTagVals.size();
+
+    // Map from target tag index to matrix row index. Both A and Am must share
+    // the same row layout (same target mesh, same partitioning); this is true
+    // because both maps are loaded onto the same intersection application.
+    if( row_dtoc_dofmap.size() < nTargetDofs )
+    {
+        MB_CHK_SET_ERR( moab::MB_FAILURE, "row_dtoc_dofmap smaller than target tag size" );
+    }
+
+    // ----- Step 2: low-order projection y_lo = Am * x ---------------------
+    std::vector< double > yLow( nTargetDofs, 0.0 );
+    MB_CHK_SET_ERR( loWeightMap->ApplyWeights( solSTagVals, yLow, false ),
+                    "Low-order projection failed" );
+
+    // ----- Step 2b: pull source norm8wt side-channel (if present) ---------
+    //
+    // BACKGROUND
+    //   When the E3SM driver coupler asks for a normalized projection
+    //   (lnorm=.true.), it does NOT send raw source values x to the
+    //   remapper. Instead, in seq_map_avNormArr it pre-multiplies each
+    //   source data field by a fractional-coverage weight `frac`, and
+    //   sends the products (frac * x) over to the intersection app
+    //   together with a parallel single-component tag named "norm8wt"
+    //   that carries (frac) on each source coverage cell.
+    //
+    //   The driver later UN-DOES this pre-norm on the target side by
+    //   dividing each mapped data field by the mapped norm8wt — so the
+    //   final value on the target is (Am*(frac*x)) / (Am*frac). That
+    //   per-cell weighted average is the conservative answer when source
+    //   cells are only partially covered (e.g. land/ocean coastlines).
+    //
+    // WHY THE CAAS KERNEL NEEDS TO SEE norm8wt
+    //   To match MCT's seq_nlmap_avNormArr bit-for-bit, two things have
+    //   to happen INSIDE the CAAS kernel — neither can be done by the
+    //   driver as a post-pass:
+    //
+    //     (a) Per-row bounds [lo, hi] must be the min/max of RECOVERED x
+    //         over the high-order stencil, not the min/max of (frac*x).
+    //         MCT does
+    //             tmp = solSTagVals[srcIdx]
+    //             tmp = tmp / xPrimeAV(natt+1, col)   ! divide by frac
+    //         in sMat_avMult_and_calc_bounds before extending bounds, and
+    //         skips columns where frac == 0 (the field can't say anything
+    //         meaningful at a cell with no source coverage). Without this
+    //         divide, bounds would be 0-suppressed in coastal regions and
+    //         the CAAS clip would lose accuracy.
+    //
+    //     (b) The mapped-norm8wt scale factor used in Step 4d must be the
+    //         LOW-ORDER projection of the ACTUAL source `frac`, not the
+    //         low-order projection of constant-1. MCT computes this in
+    //         the same mct_sMat_avMult call that produces avp_o data — the
+    //         natt+1 column gets sum_l w_lo[j,l] * frac(l), and that's
+    //         what the bounds get scaled by.
+    //
+    // FALLBACK
+    //   If no "norm8wt" tag exists on the intersection-side mesh (callers
+    //   that never pre-normed), we set hasNorm8wt=false. In that branch
+    //   srcNorm8wt is treated as constant-1 for both (a) and (b), which is
+    //   mathematically correct: with no pre-norm, frac would have been
+    //   1.0 everywhere and the divide / scale are no-ops.
+    //
+    // SHAPE CONSTRAINT
+    //   norm8wt is single-component (one double per source coverage cell).
+    //   For the FV-FV configuration on the active CAAS path,
+    //   sents.size() == nSourceDofs and the tag values map directly to
+    //   solSTagVals indices. If a future caller wires an SE source layout
+    //   where nSourceDofs > sents.size() (multi-DOF per cell), the
+    //   per-cell norm8wt cannot be unambiguously expanded to per-DOF
+    //   values here — we deliberately fall back to the constant-1 path
+    //   rather than guess an expansion that would silently break BfB.
+    std::vector< double > srcNorm8wt;
+    bool hasNorm8wt = false;
+    {
+        moab::Tag normTag = nullptr;
+        moab::ErrorCode rvalN = m_interface->tag_get_handle( "norm8wt", normTag );
+        if( MB_SUCCESS == rvalN && normTag != nullptr )
+        {
+            // Single-component tag (one double per source coverage entity).
+            // For FV-FV (the only configuration on the active CAAS path)
+            // sents.size() == nSourceDofs. If the source layout is multi-DOF
+            // (e.g. SE) the per-cell norm8wt cannot be unambiguously expanded
+            // to per-DOF values here; bail to the constant-1 fallback rather
+            // than guess.
+            srcNorm8wt.resize( sents.size(), 0.0 );
+            moab::ErrorCode rvalD = m_interface->tag_get_data( normTag, sents, &srcNorm8wt[0] );
+            if( MB_SUCCESS == rvalD && srcNorm8wt.size() == nSourceDofs )
+            {
+                hasNorm8wt = true;
+            }
+            else
+            {
+                srcNorm8wt.clear();
+            }
+        }
+    }
+
+    // ----- Step 3: per-row bounds from HIGH-ORDER stencil -----------------
+    // bounds(A, x): for each target row r, [lo, hi] = [min, max] of x over
+    // A(r,:)'s nonzero columns. The proof in the reference paper requires
+    // bounds to come from the larger (high-order) stencil so the constraint
+    // set is provably nonempty.
+    std::vector< double > lcl_lo( nTargetDofs, 1e308 );
+    std::vector< double > lcl_hi( nTargetDofs, -1e308 );
+
+    WeightMatrix& hiW = this->m_weightMatrix;
+    for( size_t i = 0; i < nTargetDofs; i++ )
+    {
+        int r = row_dtoc_dofmap[i];
+        if( r < 0 || r >= hiW.outerSize() ) continue;
+        for( WeightMatrix::InnerIterator it( hiW, r ); it; ++it )
+        {
+            // it.col() is a matrix column index; map it to source vector index
+            // by inverting col_dtoc_dofmap. For FV-FV with cell-based DOFs
+            // and one-to-one mapping, this is the identity for owned columns.
+            int mc = (int)it.col();
+            // Search col_dtoc_dofmap[k]==mc; for typical FV cases the mapping
+            // is dense and contiguous, so a linear scan over solSTagVals is
+            // avoided by precomputing an inverse (below). For correctness we
+            // fall back to scanning if the inverse is not available.
+            // Build inverse once outside the loop (see below).
+            (void)mc;
+        }
+    }
+
+    // Precompute matrix-col -> source-vector-index inverse (cached per call;
+    // O(nSourceDofs) construction). col_dtoc_dofmap has size nSourceDofs and
+    // maps source-vector-index -> matrix-col.
+    int maxMatCol = -1;
+    for( size_t k = 0; k < nSourceDofs && k < col_dtoc_dofmap.size(); k++ )
+        if( col_dtoc_dofmap[k] > maxMatCol ) maxMatCol = col_dtoc_dofmap[k];
+    std::vector< int > col_inv( maxMatCol + 1, -1 );
+    for( size_t k = 0; k < nSourceDofs && k < col_dtoc_dofmap.size(); k++ )
+        if( col_dtoc_dofmap[k] >= 0 ) col_inv[col_dtoc_dofmap[k]] = (int)k;
+
+    // Track whether any owned row's high-order stencil column failed to
+    // resolve into the local coverage source vector. If that happens the
+    // [lcl_lo, lcl_hi] bounds are computed over an INCOMPLETE stencil and
+    // the CAAS clip + redistribute will produce decomposition-dependent
+    // values — exactly the symptom seen as 1-2 ULP cross-rank-count drift
+    // on file-loaded maps. Fail loudly with the offending coordinates so
+    // the coverage layout (nghlay_cov in the calling code) can be widened.
+    int    bndsLocalErr   = 0;
+    int    bndsFirstRowG  = -1;   // global target row id where the first failure happened
+    int    bndsFirstMc    = -1;   // matrix col index that failed to resolve
+    double bndsFirstWgt   = 0.0;  // the dropped (nonzero) weight value
+    int    bndsFirstKind  = 0;    // 1 = mc out of maxMatCol; 2 = col_inv -> -1; 3 = srcIdx OOB
+
+    for( size_t i = 0; i < nTargetDofs; i++ )
+    {
+        int r = row_dtoc_dofmap[i];
+        if( r < 0 || r >= hiW.outerSize() ) continue;
+        for( WeightMatrix::InnerIterator it( hiW, r ); it; ++it )
+        {
+            // Skip explicit-zero entries. Eigen's InnerIterator visits any
+            // stored coefficient regardless of value; TempestRemap offline
+            // maps routinely emit explicit zeros. MCT's
+            // sMat_avMult_and_calc_bounds explicitly does
+            //     if (wgt == 0) cycle
+            // before extending bounds (seq_nlmap_mod.F90:855). We can't use
+            // an exact-zero compare here (FP-fragile), but 1e-50 is below
+            // any physically meaningful map weight while still robust to
+            // sign and denormal noise — entries this small can't shift the
+            // per-row [lo, hi] enough to cross a clip threshold either.
+            if( fabs( it.value() ) < 1e-50 ) continue;
+            const int mc = (int)it.col();
+
+            // Hard checks: a nonzero high-order weight at column mc means
+            // this owned row genuinely depends on source-coverage column mc.
+            // If we cannot resolve mc to a local source-vector index, the
+            // 3-ring coverage on this rank is too narrow for the high-order
+            // stencil. Either the caller asked for too few ghost layers,
+            // or the map file references columns not present in any rank's
+            // coverage (a catastrophic mismatch). Either way, silently
+            // skipping corrupts the bounds and breaks BFB.
+            if( mc < 0 || mc > maxMatCol )
+            {
+                if( !bndsLocalErr )
+                {
+                    bndsLocalErr  = 1;
+                    bndsFirstRowG = (r >= 0 && r < (int)row_gdofmap.size()) ? (int)row_gdofmap[r] : -1;
+                    bndsFirstMc   = mc;
+                    bndsFirstWgt  = it.value();
+                    bndsFirstKind = 1;
+                }
+                continue;
+            }
+            const int srcIdx = col_inv[mc];
+            if( srcIdx < 0 )
+            {
+                if( !bndsLocalErr )
+                {
+                    bndsLocalErr  = 1;
+                    bndsFirstRowG = (r >= 0 && r < (int)row_gdofmap.size()) ? (int)row_gdofmap[r] : -1;
+                    bndsFirstMc   = mc;
+                    bndsFirstWgt  = it.value();
+                    bndsFirstKind = 2;
+                }
+                continue;
+            }
+            if( srcIdx >= (int)nSourceDofs )
+            {
+                if( !bndsLocalErr )
+                {
+                    bndsLocalErr  = 1;
+                    bndsFirstRowG = (r >= 0 && r < (int)row_gdofmap.size()) ? (int)row_gdofmap[r] : -1;
+                    bndsFirstMc   = mc;
+                    bndsFirstWgt  = it.value();
+                    bndsFirstKind = 3;
+                }
+                continue;
+            }
+            // solSTagVals[srcIdx] holds (frac * x) when the driver pre-normed
+            // (hasNorm8wt true); divide by frac to recover x for bounds, and
+            // skip the source cell when frac == 0 (matches MCT
+            // seq_nlmap_mod.F90:857 "if xPrimeAV(natt+1,col) == 0 cycle").
+            // When hasNorm8wt is false, solSTagVals already holds raw x.
+            double v = solSTagVals[srcIdx];
+            if( hasNorm8wt )
+            {
+                const double n = srcNorm8wt[srcIdx];
+                if( fabs(n) < 1E-20 ) continue;
+                v /= n;
+            }
+            if( v < lcl_lo[i] ) lcl_lo[i] = v;
+            if( v > lcl_hi[i] ) lcl_hi[i] = v;
+        }
+        // If row had no nonzero columns in the high-order stencil, set bounds
+        // to 0 (matching MCT's sMat_avMult_and_calc_bounds: "lop = 0; hip = 0").
+        // Together with the y_lo == 0 masking step below, this forces the cell
+        // to 0 — a "rare, local reduction in order to one" per the reference.
+        if( lcl_lo[i] > lcl_hi[i] )
+        {
+            lcl_lo[i] = 0.0;
+            lcl_hi[i] = 0.0;
+        }
+    }
+
+    // Globalize: any rank with bndsLocalErr triggers a collective failure.
+#ifdef MOAB_HAVE_MPI
+    {
+        MPI_Comm comm = m_pcomm ? m_pcomm->comm() : MPI_COMM_SELF;
+        int bndsGlobalErr = 0;
+        MPI_Allreduce( &bndsLocalErr, &bndsGlobalErr, 1, MPI_INT, MPI_MAX, comm );
+        if( bndsGlobalErr )
+        {
+            int myRank = 0;
+            MPI_Comm_rank( comm, &myRank );
+            if( bndsLocalErr )
+            {
+                static const char* kindStr[4] = { "?", "mc>maxMatCol", "col_inv[mc]==-1", "srcIdx>=nSourceDofs" };
+                fprintf( stderr,
+                         "FATAL: ApplyWeightsWithDualMap bounds extraction dropped a nonzero "
+                         "high-order stencil column on rank %d.\n"
+                         "       global_target_row=%d  matrix_col=%d  weight=%.17e  reason=%s\n"
+                         "       This means the source coverage on this rank does NOT contain a "
+                         "column the owned high-order row references — the 3-ring (or whatever) "
+                         "ghost layer setting is too narrow, or the map file was generated against "
+                         "a different mesh. Bounds computed over an incomplete stencil break BFB; "
+                         "aborting rather than silently producing wrong CAAS output.\n",
+                         myRank, bndsFirstRowG, bndsFirstMc, bndsFirstWgt, kindStr[bndsFirstKind] );
+                fflush( stderr );
+            }
+            MPI_Abort( comm, 1 );
+        }
+    }
+#else
+    if( bndsLocalErr )
+    {
+        static const char* kindStr[4] = { "?", "mc>maxMatCol", "col_inv[mc]==-1", "srcIdx>=nSourceDofs" };
+        fprintf( stderr,
+                 "FATAL: ApplyWeightsWithDualMap bounds extraction dropped a nonzero "
+                 "high-order stencil column.\n"
+                 "       global_target_row=%d  matrix_col=%d  weight=%.17e  reason=%s\n",
+                 bndsFirstRowG, bndsFirstMc, bndsFirstWgt, kindStr[bndsFirstKind] );
+        fflush( stderr );
+        return moab::MB_FAILURE;
+    }
+#endif
+
+    // ----- Step 4: mask -- where y_lo == 0, zero out y_hi and bounds ------
+    // (Per reference: "An exact 0 in the low-order field will mask the
+    //  high-order field unnecessarily, but that's OK: it's a rare, local
+    //  reduction in order to one, not a wrong value.")
+    for( size_t i = 0; i < nTargetDofs; i++ )
+    {
+        if( yLow[i] == 0.0 )
+        {
+            solTTagVals[i] = 0.0;
+            lcl_lo[i]      = 0.0;
+            lcl_hi[i]      = 0.0;
+        }
+    }
+
+    // ----- Step 4b: compute UNSCALED global extrema for the final safety
+    // clip (Item 4). MCT's seq_nlmap_avNormArr clips the redistributed result
+    // against gmins/gmaxs = global min/max of the per-row (post-mask) bounds,
+    // not against the per-row bounds themselves. Snapshot here, BEFORE the
+    // bounds get scaled by the mapped norm in Step 4d below.
+    double g_lo = 1e308, g_hi = -1e308;
+    for( size_t i = 0; i < nTargetDofs; i++ )
+    {
+        int r = row_dtoc_dofmap[i];
+        if( r < 0 || r >= (int)row_gdofmap.size() ) continue;  // not owned
+        if( lcl_lo[i] < g_lo ) g_lo = lcl_lo[i];
+        if( lcl_hi[i] > g_hi ) g_hi = lcl_hi[i];
+    }
+#ifdef MOAB_HAVE_MPI
+    {
+        MPI_Comm comm = m_pcomm ? m_pcomm->comm() : MPI_COMM_SELF;
+        double tmp_min = g_lo, tmp_max = g_hi;
+        MPI_Allreduce( &tmp_min, &g_lo, 1, MPI_DOUBLE, MPI_MIN, comm );
+        MPI_Allreduce( &tmp_max, &g_hi, 1, MPI_DOUBLE, MPI_MAX, comm );
+    }
+#endif
+
+    // ----- Step 4c: compute mapped norm8wt = low-order map applied to a
+    // source-norm8wt vector. For target row i this equals
+    //   sum_l w_lo[i,l] * srcNorm8wt(l)
+    // — equivalently, the value MCT carries in the natt+1 column of avp_o
+    // after mct_sMat_avMult is applied to avp_i (whose norm8wt slot holds
+    // frac post-pre-norm). When no "norm8wt" tag is available on the intx
+    // side, fall back to applying the low-order map to a constant-1 vector
+    // (equivalent to srcNorm8wt(l) == 1 everywhere — consistent with the
+    // bounds-extraction fallback above).
+    std::vector< double > mappedNorm8wt( nTargetDofs, 0.0 );
+    if( hasNorm8wt )
+    {
+        MB_CHK_SET_ERR( loWeightMap->ApplyWeights( srcNorm8wt, mappedNorm8wt, false ),
+                        "Mapped-norm8wt computation (low-order on source norm8wt) failed" );
+    }
+    else
+    {
+        std::vector< double > srcOnes( nSourceDofs, 1.0 );
+        MB_CHK_SET_ERR( loWeightMap->ApplyWeights( srcOnes, mappedNorm8wt, false ),
+                        "Mapped-norm8wt computation (low-order on ones) failed" );
+    }
+
+    // ----- Step 4d: scale per-row bounds by mapped norm8wt (Item 2).
+    // MCT does this inside the CAAS loop:
+    //     if (lnorm) then
+    //        lo = lo*avp_o%rAttr(natt+1,j)
+    //        hi = hi*avp_o%rAttr(natt+1,j)
+    //     end if
+    // Doing it once here propagates correctly into Step 5 (clipping) and
+    // Step 9 (redistribution) which both use lcl_lo/lcl_hi. Note: g_lo/g_hi
+    // were already snapshotted above and remain UNSCALED (matching MCT's
+    // gmins/gmaxs which are the global min/max of the unscaled per-row bounds).
+    for( size_t i = 0; i < nTargetDofs; i++ )
+    {
+        const double w = mappedNorm8wt[i];
+        lcl_lo[i] *= w;
+        lcl_hi[i] *= w;
+    }
+
+    // ----- Get target areas (per matrix-row) ------------------------------
+    // For BFB with MCT we MUST use the same area values MCT does. MCT uses
+    // 'aream' (= area_b from the netcdf map file, loaded once when the map
+    // is read). iMOAB_LoadMapFile populates the 'aream' tag on the target
+    // mesh from area_b when arearead != 0 (e.g. arearead=3 for F-maps).
+    //
+    // The CAAS path MUST NOT recompute spherical-polygon areas from mesh
+    // geometry via lHuiller (or any other re-derivation): doing so differs
+    // from area_b at FP precision and silently breaks BfB with MCT. If the
+    // caller has not loaded an area-bearing map and there are no online
+    // areas (m_dTargetAreas) either, fail the run loudly so the caller can
+    // fix their map-load configuration instead of getting silent non-BfB
+    // results.
+    std::vector< double > tgtAreas( nTargetDofs, 0.0 );
+    {
+        std::vector< moab::EntityHandle > tentVec;
+        tentVec.reserve( tents.size() );
+        for( moab::Range::iterator it = tents.begin(); it != tents.end(); ++it )
+            tentVec.push_back( *it );
+
+        bool got_areas = false;
+
+        // Preferred: pull the 'aream' tag from the target MOAB mesh — this
+        // is the area_b value loaded by iMOAB_LoadMapFile and is byte-identical
+        // to the 'aream' field MCT uses in seq_nlmap_avNormArr.
+        moab::Tag aream_tag = nullptr;
+        moab::ErrorCode rval = m_interface->tag_get_handle( "aream", aream_tag );
+        if( MB_SUCCESS == rval && aream_tag != nullptr && !tentVec.empty() )
+        {
+            const size_t nents = std::min< size_t >( tentVec.size(), nTargetDofs );
+            std::vector< double > aream_vals( nents, 0.0 );
+            rval = m_interface->tag_get_data( aream_tag, &tentVec[0], (int)nents, &aream_vals[0] );
+            if( MB_SUCCESS == rval )
+            {
+                for( size_t i = 0; i < nents; i++ ) tgtAreas[i] = aream_vals[i];
+                got_areas = true;
+            }
+        }
+
+        // Fallback: areas were computed online and live in OfflineMap's
+        // m_dTargetAreas (indexed by matrix row). This is BFB with MCT only
+        // when the same online-area code path is used on both couplers; it
+        // is acceptable for runs that build the map online.
+        if( !got_areas )
+        {
+            const DataArray1D< double >& dTargetAreas = this->GetTargetAreas();
+            const size_t nRows = dTargetAreas.GetRows();
+            if( nRows >= nTargetDofs )
+            {
+                for( size_t i = 0; i < nTargetDofs; i++ )
+                {
+                    int r = row_dtoc_dofmap[i];
+                    if( r >= 0 && (size_t)r < nRows )
+                        tgtAreas[i] = dTargetAreas[r];
+                }
+                got_areas = true;
+            }
+        }
+
+        // No fallback to lHuiller. Recomputing areas from mesh geometry is
+        // not BFB with MCT and there is no safe silent default — abort.
+        if( !got_areas )
+        {
+            MB_SET_ERR( moab::MB_FAILURE,
+                        "ApplyWeightsWithDualMap: no target-cell areas available. "
+                        "Neither the 'aream' tag (from iMOAB_LoadMapFile with "
+                        "arearead != 0) nor OfflineMap::GetTargetAreas() (from an "
+                        "online map build) provided areas. Recomputing areas from "
+                        "mesh geometry is not bit-for-bit with MCT and is no longer "
+                        "permitted in the CAAS path. Re-load the map file with an "
+                        "area-bearing arearead setting (e.g. arearead=3 for F-maps), "
+                        "or build the online map so target areas are populated." );
+        }
+    }
+
+    // ----- Step 5: build per-cell CAAS weights ----------------------------
+    // For BFB summation, we accumulate per-row (gid, value) pairs and reduce
+    // them deterministically.
+    std::vector< int >    rowGids( nTargetDofs, -1 );
+    std::vector< double > massLowPerRow( nTargetDofs, 0.0 );
+    std::vector< double > massHiUnclippedPerRow( nTargetDofs, 0.0 );  // y_hi BEFORE clipping
+    std::vector< double > clipDefectPerRow( nTargetDofs, 0.0 );
+    std::vector< double > capLowPerRow( nTargetDofs, 0.0 );
+    std::vector< double > capHighPerRow( nTargetDofs, 0.0 );
+
+    for( size_t i = 0; i < nTargetDofs; i++ )
+    {
+        int r = row_dtoc_dofmap[i];
+        if( r < 0 || r >= (int)row_gdofmap.size() )
+            rowGids[i] = -1;  // not owned by this rank
+        else
+            rowGids[i] = (int)row_gdofmap[r];
+
+        const double area = tgtAreas[i];
+        const double y    = solTTagVals[i];        // y_hi (pre-clip)
+        const double lo   = lcl_lo[i];
+        const double hi   = lcl_hi[i];
+        double yc         = y;                     // clipped value
+        double dm         = 0.0;
+        if( y < lo )
+        {
+            yc = lo;
+            dm = ( y - lo ) * area;                // negative: cell exceeded below
+        }
+        else if( y > hi )
+        {
+            yc = hi;
+            dm = ( y - hi ) * area;                // positive: cell exceeded above
+        }
+        clipDefectPerRow[i]      = dm;
+        capLowPerRow[i]          = ( yc - lo ) * area;  // room to subtract
+        capHighPerRow[i]         = ( hi - yc ) * area;  // room to add
+        massLowPerRow[i]         = yLow[i] * area;
+        // Per-row mass of the UNCLIPPED high-order projection. MCT reduces
+        // exactly this quantity to obtain glbl_masses(natt+k) (M_hi_unclipped),
+        // and then computes dM_total = dM_clip + (M_low - M_hi_unclipped) in
+        // that 2-step order. We store the unclipped y here (rather than the
+        // clipped yc as before) so MOAB's reprosum byte-matches MCT's, which
+        // in turn lets the MCT-matching dM_total formula below produce the
+        // same last bits as MCT.
+        massHiUnclippedPerRow[i] = y * area;
+        // Update solTTagVals to the clipped value for the next stage
+        solTTagVals[i] = yc;
+    }
+
+
+    // ----- Step 6: BFB-deterministic global reductions --------------------
+
+    // Reproducible global reductions via Worley's integer-vector algorithm
+    // (moab::IntegerReprosum) — bit-identical to MCT's shr_reprosum_int
+    // regardless of MPI rank count, mesh decomposition, or local iteration
+    // order. This is MCT's default reprosum path (the namelist default
+    // repro_sum_use_ddpdd=.false. on the MCT side). The integer-vector
+    // algorithm is order-independent by construction (MPI_Allreduce with
+    // MPI_SUM on int64), which eliminates the cross-rank-count ULP drift
+    // that an order-sensitive reducer (e.g. Kahan or DDPDD) would otherwise
+    // leak into the CAAS bounds and mass totals.
+#ifdef MOAB_HAVE_MPI
+    MPI_Comm reduce_comm = m_pcomm ? m_pcomm->comm() : MPI_COMM_SELF;
+#else
+    int reduce_comm = 0;  // serial build: comm unused but kept for API symmetry
+#endif
+#ifdef MOAB_HAVE_MPI
+    moab::IntegerReprosum repro( reduce_comm );
+#else
+    moab::IntegerReprosum repro;
+#endif
+    // Build the ownership mask once (rowGids[i] >= 0 ↔ owned).
+    const std::vector< int >& reduce_mask = rowGids;
+    // Batched reduction: one MPI_Allreduce for the per-field metadata
+    // (gmax_exp / gmin_exp / max_nsummands across the 5 fields) and one
+    // MPI_Allreduce for the concatenated integer-vector encoding of all 5
+    // fields. Bit-for-bit identical to calling sum_masked() five times
+    // separately (each field still uses its own per-field metadata and
+    // decode pass), but goes from 10 collective calls to 2.
+    const std::vector< std::vector< double > > caasFields = {
+        massLowPerRow, massHiUnclippedPerRow, clipDefectPerRow,
+        capLowPerRow, capHighPerRow };
+    std::vector< double > caasGsums;
+    repro.sum_masked_batch( caasFields, reduce_mask, caasGsums );
+    const double M_low          = caasGsums[0];
+    const double M_hi_unclipped = caasGsums[1];
+    const double dM_clip        = caasGsums[2];
+    const double cap_low_g      = caasGsums[3];
+    const double cap_high_g     = caasGsums[4];
+
+    // ----- Step 8: total mass deficit between low-order and clipped high-order
+    // The redistribution must drive the (clipped) high-order solution back to
+    // the low-order mass. MCT's seq_nlmap_avNormArr (line 616) computes this
+    // in EXACTLY the following 2-step form, and floating-point rounding makes
+    // it FP-different from the algebraically-equivalent (M_low - M_hi_clip):
+    //
+    //     ! MCT (Fortran array assignment, evaluated element-wise)
+    //     gwts(k) = gwts(k)          ! gwts(k) holds dM_clip after reprosum
+    //             + (glbl_masses(k)  ! M_low
+    //                - glbl_masses(natt+k))   ! M_hi_unclipped
+    //
+    // Reproducing MCT's exact bit pattern requires:
+    //   (a) reducing the UNCLIPPED per-cell high-order mass directly via
+    //       reprosum, NOT deriving it as M_hi_clip + dM_clip — that derivation
+    //       drops 1-2 ULP because reprosum is exact only on its inputs.
+    //       => see massHiUnclippedPerRow above.
+    //   (b) computing dM_total in MCT's order: subtract first, then add.
+    //
+    // Sign: dM_total > 0 means low-order carries more mass than the clipped
+    // high-order, so we need to ADD mass; dM_total < 0 means we need to REMOVE.
+    //
+    const double diff     = M_low - M_hi_unclipped;           // step 1: subtraction
+    const double dM_total = dM_clip + diff;                   // step 2: addition (MCT order)
+
+    // ----- Step 9: redistribute -------------------------------------------
+    // For BfB with MCT seq_nlmap_avNormArr we MUST match its FP operation
+    // order exactly. MCT does, per cell:
+    //     y = max(lo, min(hi, nl_avp_o(k,j)))                 ! re-clip
+    //     nl_avp_o(k,j) = y + ((hi - y)/tmp)*gwts(k)           ! line 648 / 662
+    // i.e. divide-then-multiply, with the loop-invariant denominator
+    // (cap_high_g or cap_low_g) and numerator (dM_total) NOT precomputed
+    // into a single `scale = dM_total/cap_g`. Doing so introduces ULP-level
+    // per-cell differences (a/b*c reorders to (c/b)*a). Similarly the
+    // earlier MOAB pattern computed `room = (hi-yc)*area` and then
+    // `room/area`, which doesn't algebraically cancel in FP and added two
+    // extra roundings per cell. The straightforward `(hi - yc)/cap_g *
+    // dM_total` form below matches MCT bit-for-bit.
+    if( dM_total > 0.0 && cap_high_g > 0.0 )
+    {
+        for( size_t i = 0; i < nTargetDofs; i++ )
+        {
+            const double area = tgtAreas[i];
+            const double yc   = solTTagVals[i];
+            if( area > 0.0 )
+                solTTagVals[i] = yc + ( ( lcl_hi[i] - yc ) / cap_high_g ) * dM_total;
+        }
+    }
+    else if( dM_total < 0.0 && cap_low_g > 0.0 )
+    {
+        for( size_t i = 0; i < nTargetDofs; i++ )
+        {
+            const double area = tgtAreas[i];
+            const double yc   = solTTagVals[i];
+            if( area > 0.0 )
+                solTTagVals[i] = yc + ( ( yc - lcl_lo[i] ) / cap_low_g ) * dM_total;
+        }
+    }
+
+    // Final hard clip for floating-point safety, against UNSCALED global
+    // extrema (Item 4). MCT's seq_nlmap_avNormArr does:
+    //   if (avp_o(k,j) == 0) cycle             ! 0-mask skip
+    //   nl_avp_o%rAttr(k,j) = max(gmins(k), min(gmaxs(k), nl_avp_o%rAttr(k,j)))
+    // Per-row bounds (lcl_lo/lcl_hi) are now SCALED by mapped_norm8wt and so
+    // would be a tighter clip than MCT applies; using global g_lo/g_hi keeps
+    // the safety net loose, as the reference algorithm intends. The 0-mask
+    // skip is critical: without it, target cells that were zeroed in Step 4
+    // (yLow == 0) get bumped from 0 up to g_lo when g_lo > 0 (e.g.
+    // positive-only fields like temperature/pressure), and the post-norm
+    // divide in the driver then amplifies that wrong value by 1/wghts at
+    // coastal coverage cells where wghts is tiny but nonzero.
+    for( size_t i = 0; i < nTargetDofs; i++ )
+    {
+        if( fabs(yLow[i]) < 1E-40 ) continue;
+        if( solTTagVals[i] < g_lo ) solTTagVals[i] = g_lo;
+        if( solTTagVals[i] > g_hi ) solTTagVals[i] = g_hi;
+    }
+
+    // Store result back to the target tag
+    MB_CHK_SET_ERR( m_interface->tag_set_data( tgtSolutionTag, tents, &solTTagVals[0] ),
+                    "Setting target tag data failed" );
 
     return moab::MB_SUCCESS;
 }

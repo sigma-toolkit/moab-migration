@@ -264,18 +264,20 @@ if (MOAB_HAVE_METIS)
 endif()
 
 if (MOAB_HAVE_TEMPESTREMAP)
-  set( MOAB_LIB_SOURCES ${MOAB_LIB_SOURCES} 
+  set( MOAB_LIB_SOURCES ${MOAB_LIB_SOURCES}
                         Remapping/ApplyWeights.cpp
-                        Remapping/TempestRemapper.cpp 
+                        Remapping/TempestRemapper.cpp
                         Remapping/TempestOnlineMap.cpp
                         Remapping/TempestLinearRemap.cpp
                         Remapping/TempestOnlineMapIO.cpp
+                        Remapping/IntegerReprosum.cpp
                         Remapping/netcdfcpp_par.hpp
                         )
   set( MOAB_INSTALL_HEADERS ${MOAB_INSTALL_HEADERS}
         moab/Remapping/Remapper.hpp
         moab/Remapping/TempestRemapper.hpp
-        moab/Remapping/TempestOnlineMap.hpp )
+        moab/Remapping/TempestOnlineMap.hpp
+        moab/Remapping/IntegerReprosum.hpp )
 
 endif (MOAB_HAVE_TEMPESTREMAP)
 

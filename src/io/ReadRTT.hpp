@@ -154,10 +154,8 @@ class ReadRTT : public ReaderIface
         int ncell_defs;
         int nnodes_max;
         int nsides_max;
-        int nnodes_sides_max;
 
         int ndim;
-        int n_dim_topo;
         int nnodes;
         int nnode_flag_types;
         std::vector< int > nnode_flags;
@@ -187,9 +185,7 @@ class ReadRTT : public ReaderIface
             std::cout << "Node information: " << std::endl;
             std::cout << "nnodes_max: " << nnodes_max << std::endl;
             std::cout << "nsides_max: " << nsides_max << std::endl;
-            std::cout << "nnodes_sides_max: " << nnodes_sides_max << std::endl;
             std::cout << "ndim: " << ndim << std::endl;
-            std::cout << "n_dim_topo: " << n_dim_topo << std::endl;
             std::cout << "nnodes: " << nnodes << std::endl;
             std::cout << "nnode_flag_types: " << nnode_flag_types << std::endl;
             std::cout << "nnode_flags: ";

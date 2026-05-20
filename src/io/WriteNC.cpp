@@ -373,7 +373,8 @@ ErrorCode WriteNC::process_conventional_tags( EntityHandle fileSet )
 
             variableDataStruct.varDims.resize( sz );
             const void* ptr = NULL;
-            rval            = mbImpl->tag_get_by_ptr( dims_tag, &fileSet, 1, &ptr );
+            MB_CHK_SET_ERR( mbImpl->tag_get_by_ptr( dims_tag, &fileSet, 1, &ptr ),
+                            "Could not get tag by pointer" );
 
             const Tag* ptags = static_cast< const moab::Tag* >( ptr );
             for( std::size_t j = 0; j != static_cast< std::size_t >( sz ); j++ )
@@ -401,7 +402,7 @@ ErrorCode WriteNC::process_conventional_tags( EntityHandle fileSet )
             int varAttSz          = 0;
             MB_CHK_SET_ERR( mbImpl->tag_get_by_ptr( varAttTag, &fileSet, 1, &varAttPtr, &varAttSz ),
                             "Trouble getting data of conventional tag " << tag_name );
-            if( MB_SUCCESS == rval ) dbgOut.tprintf( 2, "Tag retrieved for variable %s\n", tag_name.c_str() );
+            dbgOut.tprintf( 2, "Tag retrieved for variable %s\n", tag_name.c_str() );
 
             std::string attribString( (char*)varAttPtr, (char*)varAttPtr + varAttSz );
             if( attribString == "NO_ATTRIBS" )
@@ -434,7 +435,7 @@ ErrorCode WriteNC::process_conventional_tags( EntityHandle fileSet )
                                                                 variableDataStruct.varAtts ),
                                 "Trouble processing attributes of variable " << var_name );
 
-                if( MB_SUCCESS == rval ) dbgOut.tprintf( 2, "Tag metadata for variable %s\n", tag_name.c_str() );
+                dbgOut.tprintf( 2, "Tag metadata for variable %s\n", tag_name.c_str() );
             }
             // End attribute
 
@@ -456,7 +457,7 @@ ErrorCode WriteNC::process_conventional_tags( EntityHandle fileSet )
     MB_CHK_SET_ERR( mbImpl->tag_get_by_ptr( globalAttTag, &fileSet, 1, &gattptr, &globalAttSz ),
                     "Trouble getting data of conventional tag " << tag_name );
 
-    if( MB_SUCCESS == rval ) dbgOut.tprintf( 2, "Tag value retrieved for %s size %d\n", tag_name.c_str(), globalAttSz );
+    dbgOut.tprintf( 2, "Tag value retrieved for %s size %d\n", tag_name.c_str(), globalAttSz );
 
     // <__GLOBAL_ATTRIBS_LEN>
     tag_name            = "__GLOBAL_ATTRIBS_LEN";
@@ -467,10 +468,12 @@ ErrorCode WriteNC::process_conventional_tags( EntityHandle fileSet )
     int sizeGAtt = 0;
     MB_CHK_SET_ERR( mbImpl->tag_get_length( globalAttLenTag, sizeGAtt ),
                     "Trouble getting length of conventional tag " << tag_name );
+
     gattLen.resize( sizeGAtt );
     MB_CHK_SET_ERR( mbImpl->tag_get_data( globalAttLenTag, &fileSet, 1, &gattLen[0] ),
                     "Trouble getting data of conventional tag " << tag_name );
-    if( MB_SUCCESS == rval ) dbgOut.tprintf( 2, "Tag retrieved for variable %s\n", tag_name.c_str() );
+
+    dbgOut.tprintf( 2, "Tag retrieved for variable %s\n", tag_name.c_str() );
 
     MB_CHK_SET_ERR( process_concatenated_attribute( gattptr, globalAttSz, gattLen, globalAtts ),
                     "Trouble processing global attributes" );

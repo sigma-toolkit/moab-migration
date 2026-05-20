@@ -734,7 +734,14 @@ endif ()
 ################################################################################
 #turn on ctest if we want testing
 if ( ENABLE_TESTING )
-  enable_testing()
+  # Auto-derive CTEST_SITE / CTEST_BUILD_NAME from the resolved feature
+  # flags so each machine and configuration gets a stable, distinguishable
+  # row on CDash.  Must run after all ENABLE_* / find_package() resolution.
+  include(CTestBuildName)
+  # include(CTest) implies enable_testing() and also generates
+  # DartConfiguration.tcl in the build dir so `ctest -D Experimental` and
+  # friends can submit to the CDash target defined in CTestConfig.cmake.
+  include(CTest)
   add_subdirectory( test )
 endif()
 

@@ -60,6 +60,111 @@
 #
 # ========================================================================================
 
+# ----------------------------------------------------------------------------
+# Linker-token exception table (shared by RESOLVE_LIBRARIES and
+# FILTER_LINK_LIBRARIES).  Items matching any of these regular expressions
+# are kept verbatim instead of being treated as unrecognized flags.  This is
+# required for platform-specific linker syntax that find_library cannot
+# resolve (e.g. Apple "-framework Accelerate", GNU "-Wl,...", "-Xlinker ...").
+# Extend these lists when a new linker construct is being incorrectly dropped.
+# ----------------------------------------------------------------------------
+set(_RCP_KEEP_PATTERNS
+    "^-framework"     # macOS frameworks: "-framework Accelerate" (combined or split)
+    "^-Wl,"           # GNU linker pass-through flags
+    "^-Xlinker"       # Alternative linker pass-through
+    "^-pthread$"      # POSIX threads
+    )
+
+# Subset of keep-patterns whose match consumes the next list element as its
+# argument (e.g. "-framework Accelerate" given as two tokens).  Both tokens
+# must be preserved together and in order.
+set(_RCP_FLAGS_WITH_ARG "^-framework$|^-Xlinker$")
+
+# Internal helper: returns TRUE in OUT_VAR if TOKEN matches any keep-pattern,
+# and TRUE in OUT_CONSUMES if it also consumes the following token.
+function(_RCP_TOKEN_IS_KEPT TOKEN OUT_VAR OUT_CONSUMES)
+    set(${OUT_VAR} FALSE PARENT_SCOPE)
+    set(${OUT_CONSUMES} FALSE PARENT_SCOPE)
+    foreach(_pat IN LISTS _RCP_KEEP_PATTERNS)
+        if(TOKEN MATCHES "${_pat}")
+            set(${OUT_VAR} TRUE PARENT_SCOPE)
+            if(TOKEN MATCHES "${_RCP_FLAGS_WITH_ARG}")
+                set(${OUT_CONSUMES} TRUE PARENT_SCOPE)
+            endif()
+            return()
+        endif()
+    endforeach()
+endfunction()
+
+
+# ============================================================================
+# Macro: FILTER_LINK_LIBRARIES(<listvar>)
+#
+# Validates a CMake list of link-line items in-place, dropping anything that
+# is neither (a) an absolute path to an existing file, (b) a -l flag, (c) a
+# plain library name (e.g. "stdc++"), nor (d) a token covered by the keep-
+# pattern table above.  Items that consume the next argument (e.g.
+# "-framework") keep their following token verbatim and in order.
+#
+# Use this on link-library lists assembled from heterogeneous sources (find
+# modules, hand-set BLAS/LAPACK, etc.) before handing them to
+# target_link_libraries().  Items dropped are reported via message(STATUS).
+# ============================================================================
+macro(FILTER_LINK_LIBRARIES _var)
+    set(_flb_out "")
+    set(_flb_pending "")     # holds a flag like "-framework" awaiting its arg
+    foreach(_flb_item IN LISTS ${_var})
+        # Pair-completion: combine a pending consuming flag with its argument
+        # into a single space-joined string (e.g. "-framework Accelerate"),
+        # so that target_link_libraries() does not mistake the bare argument
+        # for a library name and emit "-l<arg>".
+        if(NOT _flb_pending STREQUAL "")
+            list(APPEND _flb_out "${_flb_pending} ${_flb_item}")
+            set(_flb_pending "")
+            continue()
+        endif()
+
+        _RCP_TOKEN_IS_KEPT("${_flb_item}" _flb_keep _flb_consumes)
+        if(_flb_keep)
+            if(_flb_consumes)
+                # Defer until we see the following token to join them.
+                set(_flb_pending "${_flb_item}")
+            else()
+                list(APPEND _flb_out "${_flb_item}")
+            endif()
+            continue()
+        endif()
+
+        if(IS_ABSOLUTE "${_flb_item}")
+            if(EXISTS "${_flb_item}" AND NOT IS_DIRECTORY "${_flb_item}")
+                list(APPEND _flb_out "${_flb_item}")
+            else()
+                message(STATUS "Dropping non-file path from link libraries: ${_flb_item}")
+            endif()
+        elseif(_flb_item MATCHES "^-l")
+            list(APPEND _flb_out "${_flb_item}")
+        elseif(_flb_item MATCHES "^[A-Za-z]")
+            # Plain library name (e.g. "stdc++", "m", "z") — pass through
+            list(APPEND _flb_out "${_flb_item}")
+        else()
+            message(STATUS "Dropping unrecognized item from link libraries: ${_flb_item}")
+        endif()
+    endforeach()
+
+    # A trailing consuming flag with no following token is malformed; warn.
+    if(NOT _flb_pending STREQUAL "")
+        message(WARNING "Dangling consuming flag '${_flb_pending}' with no argument in ${_var}")
+    endif()
+
+    set(${_var} ${_flb_out})
+    unset(_flb_out)
+    unset(_flb_item)
+    unset(_flb_keep)
+    unset(_flb_consumes)
+    unset(_flb_pending)
+endmacro()
+
+
 macro(RESOLVE_LIBRARIES RESOLVED_LIBS_OUT LINK_LINE )
     # Clear output
     # Initialize the resolved libraries list to an empty list
@@ -79,15 +184,48 @@ macro(RESOLVE_LIBRARIES RESOLVED_LIBS_OUT LINK_LINE )
     math(EXPR _semicolon_count "${_len} - ${_counted_var_len}")
     if(_semicolon_count GREATER 0)
       separate_arguments(LINK_LINE_LIST UNIX_COMMAND "${LINK_LINE}")
-      # If it's a list, we don't need to do any parsing. Just check each element.
+      # Pre-tokenized input.  Preserve original order (use APPEND, not
+      # INSERT 0) and honor the keep-pattern table.  Consuming flags such
+      # as "-framework Accelerate" are emitted as a single space-joined
+      # element so downstream target_link_libraries() calls do not parse
+      # the bare argument as a library name.
+      set(_rl_pending "")
       foreach(_lib IN LISTS LINK_LINE_LIST)
+          if(NOT _rl_pending STREQUAL "")
+              set(_rl_combined "${_rl_pending} ${_lib}")
+              list(FIND _seen_libs "${_rl_combined}" _already_index)
+              if(_already_index EQUAL -1)
+                  list(APPEND ${RESOLVED_LIBS_OUT} "${_rl_combined}")
+                  list(APPEND _seen_libs "${_rl_combined}")
+              endif()
+              set(_rl_pending "")
+              continue()
+          endif()
+
+          _RCP_TOKEN_IS_KEPT("${_lib}" _rl_keep _rl_consumes)
+          if(_rl_keep)
+              if(_rl_consumes)
+                  set(_rl_pending "${_lib}")
+              else()
+                  list(FIND _seen_libs "${_lib}" _already_index)
+                  if(_already_index EQUAL -1)
+                      list(APPEND ${RESOLVED_LIBS_OUT} "${_lib}")
+                      list(APPEND _seen_libs "${_lib}")
+                  endif()
+              endif()
+              continue()
+          endif()
+
           # If it's not already in the resolved list, add it.
           list(FIND _seen_libs "${_lib}" _already_index)
           if(_already_index EQUAL -1)
-            list(INSERT ${RESOLVED_LIBS_OUT} 0 "${_lib}")
-            list(APPEND _seen_libs "${_lib}")
+              list(APPEND ${RESOLVED_LIBS_OUT} "${_lib}")
+              list(APPEND _seen_libs "${_lib}")
           endif()
       endforeach()
+      if(NOT _rl_pending STREQUAL "")
+          message(WARNING "Dangling consuming flag '${_rl_pending}' with no argument in input: ${LINK_LINE}")
+      endif()
 
     else()
       # Tokenize the GNU-style link line into separate flags
@@ -95,8 +233,39 @@ macro(RESOLVE_LIBRARIES RESOLVED_LIBS_OUT LINK_LINE )
       set(_link_flags "")
       separate_arguments(_link_flags UNIX_COMMAND "${LINK_LINE}")
 
-          # Loop over each argument in the link flags list
+          # Loop over each argument in the link flags list.  Consuming
+          # flags (e.g. "-framework Accelerate") are deferred so they can
+          # be emitted as a single space-joined element — keeping the pair
+          # atomic for downstream target_link_libraries() consumers.
+      set(_rl_pending "")
       foreach(_flag IN LISTS _link_flags)
+          if(NOT _rl_pending STREQUAL "")
+              set(_rl_combined "${_rl_pending} ${_flag}")
+              list(FIND _seen_libs "${_rl_combined}" _already_index)
+              if(_already_index EQUAL -1)
+                  list(APPEND ${RESOLVED_LIBS_OUT} "${_rl_combined}")
+                  list(APPEND _seen_libs "${_rl_combined}")
+              endif()
+              set(_rl_pending "")
+              continue()
+          endif()
+
+          # Pass through platform-specific linker syntax (frameworks, -Wl,
+          # -Xlinker, -pthread, ...) covered by the shared keep-pattern table.
+          _RCP_TOKEN_IS_KEPT("${_flag}" _rl_keep _rl_consumes)
+          if(_rl_keep)
+              if(_rl_consumes)
+                  set(_rl_pending "${_flag}")
+              else()
+                  list(FIND _seen_libs "${_flag}" _already_index)
+                  if(_already_index EQUAL -1)
+                      list(APPEND ${RESOLVED_LIBS_OUT} "${_flag}")
+                      list(APPEND _seen_libs "${_flag}")
+                  endif()
+              endif()
+              continue()
+          endif()
+
           # Handle -L<path> flag (library search directory)
           if(_flag MATCHES "^-L(.+)$")
               # Extract the directory path and add it to the search path list
@@ -164,10 +333,19 @@ macro(RESOLVE_LIBRARIES RESOLVED_LIBS_OUT LINK_LINE )
               message(STATUS "Ignoring unrecognized flag: ${_flag}")
           endif()
       endforeach()
+      if(NOT _rl_pending STREQUAL "")
+          message(WARNING "Dangling consuming flag '${_rl_pending}' with no argument in input: ${LINK_LINE}")
+      endif()
     endif()
 
-    # Return the resolved libraries list to the caller 
+    # Return the resolved libraries list to the caller
     set(${RESOLVED_LIBS_OUT} "${${RESOLVED_LIBS_OUT}}")
+
+    # Tidy up macro-local helper variables to avoid leaking into the caller.
+    unset(_rl_pending)
+    unset(_rl_combined)
+    unset(_rl_keep)
+    unset(_rl_consumes)
 endmacro()
 
 

@@ -1,4 +1,4 @@
-cmake_minimum_required( VERSION 3.15 )
+cmake_minimum_required( VERSION 3.20 )
 
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -207,8 +207,16 @@ set( HAVE_INTTYPES_H    ${MOAB_HAVE_INTTYPES_H} )
 set( HAVE_STDLIB_H    ${MOAB_HAVE_STDLIB_H} )
 check_include_file( memory.h     MOAB_HAVE_MEMORY_H )
 
-INCLUDE(TestBigEndian)
-TEST_BIG_ENDIAN(WORDS_BIGENDIAN)
+# check endian-ness
+if(CMAKE_CXX_BYTE_ORDER STREQUAL "BIG_ENDIAN")
+  set(WORDS_BIGENDIAN TRUE)
+elseif(CMAKE_CXX_BYTE_ORDER STREQUAL "LITTLE_ENDIAN")
+  set(WORDS_BIGENDIAN FALSE)
+else()
+  set(WORDS_BIGENDIAN FALSE)
+  message(WARNING "Endianness could not be determined.")
+endif()
+
 ################################################################################
 # Integer size Related Settings
 ################################################################################

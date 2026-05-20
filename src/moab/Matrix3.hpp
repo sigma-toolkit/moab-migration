@@ -173,7 +173,7 @@ namespace Matrix
 class Matrix3
 {
   public:
-    const static int size = 9;
+    static const int size = 9;
 
   private:
 #ifdef MOAB_HAVE_EIGEN3
@@ -1086,8 +1086,8 @@ class Matrix3
         _mat[6] = d_determinant * ( _m[3] * _m[7] - _m[6] * _m[4] );
         _mat[7] = d_determinant * ( _m[1] * _m[6] - _m[7] * _m[0] );
         _mat[8] = d_determinant * ( _m[0] * _m[4] - _m[3] * _m[1] );
-#endif
         return invertible;
+#endif
     }
 
     // Calculate determinant of 2x2 submatrix composed of the

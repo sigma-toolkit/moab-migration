@@ -1780,7 +1780,6 @@ ErrorCode ReadNCDF::read_qa_string( char* temp_string, int record_number, int re
     if( -1 == temp_var )
     {
         MB_SET_ERR( MB_FAILURE, "ReadNCDF:: Problem getting qa record variable" );
-        return MB_FAILURE;
     }
     size_t count[3], start[3];
     start[0] = record_number;

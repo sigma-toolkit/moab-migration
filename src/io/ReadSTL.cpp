@@ -241,9 +241,6 @@ ErrorCode ReadSTL::ascii_read_triangles( const char* name, std::vector< ReadSTL:
 
         tris.push_back( tri );
     }
-
-    fclose( file );
-    return MB_SUCCESS;
 }
 
 // Header block from binary STL file (84 bytes long)

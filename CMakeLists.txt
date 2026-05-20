@@ -145,6 +145,7 @@ option( ENABLE_TEMPESTREMAP "Should enable TempestRemap dependency?"            
 option( ENABLE_FORTRAN      "Should enable FORTRAN?"                                      ON  ) #
 option( ENABLE_PYMOAB       "Build python interface to MOAB?"                             OFF ) #
 option( ENABLE_TESTING      "Enable Testing"                                              ON  ) #
+option( MOAB_BUILD_MBTEMPEST_TESTS  "Build mbtempest regression test suite (requires TempestRemap)" OFF ) #
 option( MOAB_FORCE_32_BIT_HANDLES "Force MBEntityHandle to be 32 bits (uint32_t)"         OFF ) #
 option( MOAB_FORCE_64_BIT_HANDLES "Force MBEntityHandle to be 64 bits (uint64_t)"         ON  ) #
 #################################################################################################

@@ -214,9 +214,9 @@ class ToolContext
      */
     void timer_pop()
     {
-        const double locElapsed = timer->time_since_birth() - timer_ops;
-        double avgElapsed       = locElapsed;
-        double maxElapsed       = locElapsed;
+        double locElapsed = timer->time_since_birth() - timer_ops;
+        double avgElapsed = locElapsed;
+        double maxElapsed = locElapsed;
 
 #ifdef MOAB_HAVE_MPI
         MPI_Reduce( &locElapsed, &maxElapsed, 1, MPI_DOUBLE, MPI_MAX, 0, pcomm->comm() );
@@ -363,7 +363,10 @@ class ToolContext
         opts.addOpt< int >( "monotonicity", "Ensure monotonicity in the weight generation. Options=[0,1,2,3]",
                             &ensureMonotonicity );
 
-        opts.addOpt< int >( "ghost", "Number of ghost layers in coverage mesh (overrides automatic selection: 0 for FV order 1, p+1 for FV order p>1)", &nlayer_input );
+        opts.addOpt< int >( "ghost",
+                            "Number of ghost layers in coverage mesh (overrides automatic selection: 0 for FV order 1, "
+                            "p+1 for FV order p>1)",
+                            &nlayer_input );
 
         opts.addOpt< double >( "boxeps", "The tolerance for boxes (default=1e-7)", &boxeps );
 
@@ -392,7 +395,8 @@ class ToolContext
         {
             if( this->proc_id == 0 )
             {
-                std::cout << "mbtempest is part of the MOAB library version " << std::string( MOAB_PACKAGE_VERSION ) << "\n";
+                std::cout << "mbtempest is part of the MOAB library version " << std::string( MOAB_PACKAGE_VERSION )
+                          << "\n";
             }
             exit( 0 );
         }
@@ -783,9 +787,9 @@ class ToolContext
 
             std::cout << "\n\nOutput Files:";
             if( !skip_intersection )
-                std::cout << "\n  Intersection mesh:    " << (this->computeWeights ? this->intxFilename : this->outFilename);
-            if( computeWeights )
-                std::cout << "\n  Remap weights:        " << this->outFilename;
+                std::cout << "\n  Intersection mesh:    "
+                          << ( this->computeWeights ? this->intxFilename : this->outFilename );
+            if( computeWeights ) std::cout << "\n  Remap weights:        " << this->outFilename;
         }
 
         // Mesh configuration
@@ -810,8 +814,9 @@ class ToolContext
 
             // Remapping options
             std::cout << "\n\nRemapping Options:";
-            std::cout << "\n  Method:             " << (this->mapOptions.strMethod.empty() ? "Default" : this->mapOptions.strMethod);
-            std::cout << "\n  Monotonicity:       " << (this->ensureMonotonicity ? "Yes" : "No");
+            std::cout << "\n  Method:             "
+                      << ( this->mapOptions.strMethod.empty() ? "Default" : this->mapOptions.strMethod );
+            std::cout << "\n  Monotonicity:       " << ( this->ensureMonotonicity ? "Yes" : "No" );
             std::cout << "\n  Volumetric:         " << ( this->fVolumetric ? "Yes" : "No" );
             std::cout << "\n  Check consistency:  " << ( this->fCheck ? "Yes" : "No" );
             std::cout << "\n  Skip intersection:  " << ( this->skip_intersection ? "Yes" : "No" );
@@ -883,7 +888,7 @@ class ToolContext
         if( this->fvMethod == "delaunay" || this->fvMethod == "bilin" )
         {
             this->skip_intersection = true;
-            this->nlayers           = 3; // conservative
+            this->nlayers           = 3;  // conservative
         }
         else
         {
@@ -916,7 +921,6 @@ static inline double sample_stationary_vortex( double dLon, double dLat ) noexce
 //#define MOAB_DBG
 int main( int argc, char* argv[] )
 {
-    moab::ErrorCode rval;
     NcError error( NcError::verbose_nonfatal );
     std::stringstream sstr;
     std::string historyStr;
@@ -966,7 +970,7 @@ int main( int argc, char* argv[] )
     remapper.initialize();
 
     // Default area_method = lHuiller; Options: Girard, lHuiller, GaussQuadrature (if TR is available)
-    moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::GaussQuadrature );
+    moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::lHuiller );
 
     Mesh* tempest_mesh = new Mesh();
     MB_CHK_SET_ERR( CreateTempestMesh( *runCtx, remapper, tempest_mesh ), "Failed to create tempest mesh" );
@@ -987,8 +991,8 @@ int main( int argc, char* argv[] )
         MB_CHK_SET_ERR( remapper.ConvertTempestMesh( moab::Remapper::OverlapMesh ), "Failed to convert overlap mesh" );
         if( !runCtx->skip_io )
         {
-            rval = mbCore->write_mesh( "tempest_intersection.h5m", &runCtx->meshsets[2], 1 );
-            MB_CHK_ERR( rval );
+            MB_CHK_SET_ERR( mbCore->write_mesh( "tempest_intersection.h5m", &runCtx->meshsets[2], 1 ),
+                            "Failed to write TempestRemap intersection mesh in MOAB format" );
         }
 
         // print verbosely about the problem setting
@@ -1096,14 +1100,13 @@ int main( int argc, char* argv[] )
             outputFormatter.printf( 0, "The intersection set contains %lu elements and %lu vertices \n",
                                     intxelems.size(), intxverts.size() );
 
-            moab::IntxAreaUtils areaAdaptorHuiller( moab::IntxAreaUtils::lHuiller );  // lHuiller, GaussQuadrature
             double initial_sarea =
-                areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[0],
-                                                   radius_src );  // use the target to compute the initial area
+                areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[0],
+                                            radius_src );  // use the target to compute the initial area
             double initial_tarea =
-                areaAdaptorHuiller.area_on_sphere( mbCore, runCtx->meshsets[1],
-                                                   radius_dest );  // use the target to compute the initial area
-            double intx_area = areaAdaptorHuiller.area_on_sphere( mbCore, intxset, radius_src );
+                areaAdaptor.area_on_sphere( mbCore, runCtx->meshsets[1],
+                                            radius_dest );  // use the target to compute the initial area
+            double intx_area = areaAdaptor.area_on_sphere( mbCore, intxset, radius_src );
 
             outputFormatter.printf( 0, "mesh areas: source = %12.10f, target = %12.10f, intersection = %12.10f \n",
                                     initial_sarea, initial_tarea, intx_area );
@@ -1124,29 +1127,22 @@ int main( int argc, char* argv[] )
             runCtx->timer_push( "compute weights with the Tempest meshes" );
             // Call to generate an offline map with the tempest meshes
             OfflineMap weightMap;
-            int err = GenerateOfflineMapWithMeshes( *runCtx->meshes[0], *runCtx->meshes[1], *runCtx->meshes[2],
-                                                    runCtx->disc_methods[0],  // std::string strInputType
-                                                    runCtx->disc_methods[1],  // std::string strOutputType,
-                                                    runCtx->mapOptions, weightMap );
+            if( GenerateOfflineMapWithMeshes( *runCtx->meshes[0], *runCtx->meshes[1], *runCtx->meshes[2],
+                                              runCtx->disc_methods[0],  // std::string strInputType
+                                              runCtx->disc_methods[1],  // std::string strOutputType,
+                                              runCtx->mapOptions, weightMap ) != 0 )
+                throw std::runtime_error( "Could not generate offline map with TempestRemap" );
             runCtx->timer_pop();
 
             std::map< std::string, std::string > mapAttributes;
-            if( err )
-            {
-                rval = moab::MB_FAILURE;
-            }
-            else
-            {
-                if( !runCtx->skip_io ) weightMap.Write( "outWeights.nc", mapAttributes );
-            }
+            if( !runCtx->skip_io ) weightMap.Write( "outWeights.nc", mapAttributes );
         }
     }
     else if( runCtx->meshType == moab::TempestRemapper::OVERLAP_MOAB )
     {
         // Usage: mpiexec -n 2 tools/mbtempest -t 5 -l mycs_2.h5m -l myico_2.h5m -f myoverlap_2.h5m
 #ifdef MOAB_HAVE_MPI
-        rval = pcomm->check_all_shared_handles();
-        MB_CHK_ERR( rval );
+        MB_CHK_SET_ERR( pcomm->check_all_shared_handles(), "Checking shared handles failed." );
 #endif
 
         // print verbosely about the problem setting
@@ -1186,8 +1182,8 @@ int main( int argc, char* argv[] )
             velist[2] = tgtverts.size();
             velist[3] = tgtelems.size();
         }
-        //rval = mbCore->write_file( "source_mesh.h5m", nullptr, writeOptions, &runCtx->meshsets[0], 1 );MB_CHK_ERR( rval );
-        //rval = mbCore->write_file( "target_mesh.h5m", nullptr, writeOptions, &runCtx->meshsets[1], 1 );MB_CHK_ERR( rval );
+        //MB_CHK_SET_ERR( mbCore->write_file( "source_mesh.h5m", nullptr, writeOptions, &runCtx->meshsets[0], 1 ), "Could not write source mesh" );
+        //MB_CHK_SET_ERR( mbCore->write_file( "target_mesh.h5m", nullptr, writeOptions, &runCtx->meshsets[1], 1 ), "Could not write target mesh" );
 
         // if( runCtx->nlayers && nprocs > 1 )
         // {
@@ -1199,7 +1195,7 @@ int main( int argc, char* argv[] )
         // local source grid
         runCtx->timer_push( "construct covering set for intersection" );
         // if ghosting, do not use gnomonic projection
-        if( runCtx->nlayers >= 1 ) runCtx->useGnomonicProjection = false;
+        if( runCtx->nlayers > 0 ) runCtx->useGnomonicProjection = false;
         MB_CHK_SET_ERR( remapper.ConstructCoveringSet( runCtx->epsrel, 1.0, 1.0, runCtx->boxeps, runCtx->rrmGrids,
                                                        runCtx->useGnomonicProjection, runCtx->nlayers ),
                         "Failed to construct covering set" );
@@ -1221,7 +1217,7 @@ int main( int argc, char* argv[] )
 
         if( runCtx->skip_intersection )
         {
-            if ( !proc_id ) outputFormatter.printf( 0, "Skipping mesh intersection computation.\n" );
+            if( !proc_id ) outputFormatter.printf( 0, "Skipping mesh intersection computation.\n" );
         }
         else
         {
@@ -1245,9 +1241,9 @@ int main( int argc, char* argv[] )
         double dTotalOverlapArea = 0.0;
         if( runCtx->print_diagnostics && !runCtx->skip_intersection )
         {
-            moab::IntxAreaUtils areaAdaptorHuiller( moab::IntxAreaUtils::lHuiller );  // lHuiller, GaussQuadrature
-            double local_areas[3],
-                global_areas[3];  // Array for Initial area, and through Method 1 and Method 2
+             // Areas for source, target, overlap meshes
+            double local_areas[3]  = { 0, 0, 0 },
+                   global_areas[3] = { 0, 0, 0 };
 
             // Helper: compute area of a meshset excluding cells with GRID_IMASK==0.
             // Both source and target SCRIP grids may have a land/sea mask; the intersection
@@ -1255,8 +1251,7 @@ int main( int argc, char* argv[] )
             auto area_unmasked = [&]( moab::EntityHandle meshset, double radius ) -> double {
                 moab::Tag imaskTag = 0;
                 mbCore->tag_get_handle( "GRID_IMASK", imaskTag );
-                if( !imaskTag )
-                    return areaAdaptorHuiller.area_on_sphere( mbCore, meshset, radius );
+                if( !imaskTag ) return areaAdaptor.area_on_sphere( mbCore, meshset, radius );
                 moab::Range cells;
                 mbCore->get_entities_by_dimension( meshset, 2, cells );
                 std::vector< int > masks( cells.size(), 1 );
@@ -1269,7 +1264,7 @@ int main( int argc, char* argv[] )
                 moab::EntityHandle tmpSet;
                 mbCore->create_meshset( moab::MESHSET_SET, tmpSet );
                 mbCore->add_entities( tmpSet, unmasked );
-                double area = areaAdaptorHuiller.area_on_sphere( mbCore, tmpSet, radius );
+                double area = areaAdaptor.area_on_sphere( mbCore, tmpSet, radius );
                 mbCore->delete_entities( &tmpSet, 1 );
                 return area;
             };
@@ -1287,7 +1282,7 @@ int main( int argc, char* argv[] )
                                 "Can't create owned overlap meshset" );
                 MB_CHK_SET_ERR( mbCore->add_entities( ownedOverlapSet, ownedOverlapElems ),
                                 "Can't add owned overlap elements" );
-                local_areas[2] = areaAdaptorHuiller.area_on_sphere( mbCore, ownedOverlapSet, radius_src );
+                local_areas[2] = areaAdaptor.area_on_sphere( mbCore, ownedOverlapSet, radius_src );
                 MB_CHK_SET_ERR( mbCore->delete_entities( &ownedOverlapSet, 1 ), "Can't delete temp meshset" );
             }
 
@@ -1747,20 +1742,74 @@ moab::ErrorCode handleOverlapFiles( ToolContext& ctx, Mesh* tempest_mesh )
     return moab::MB_SUCCESS;
 }
 
-moab::ErrorCode handleICOMesh( ToolContext& ctx, Mesh* tempest_mesh )
+/**
+ * @brief Convert a generated TempestRemap mesh to MOAB format and write as h5m file.
+ *
+ * When the output filename has a .h5m extension, the mesh is converted from TempestRemap
+ * format to MOAB format in memory and written as a native MOAB HDF5 file. This allows
+ * the generated meshes to be loaded by mbtempest type 5 (OVERLAP_MOAB) workflows.
+ * The TempestRemap format file is still written (with .g extension) for compatibility.
+ */
+moab::ErrorCode convertAndWriteMOABMesh( ToolContext& ctx, moab::TempestRemapper& remapper, Mesh* tempest_mesh )
 {
+    // Check if output filename has .h5m extension
+    const std::string& outFile = ctx.outFilename;
+    const size_t dot           = outFile.find_last_of( "." );
+    if( dot == std::string::npos ) return moab::MB_SUCCESS;
+
+    const std::string ext = outFile.substr( dot + 1 );
+    if( ext != "h5m" ) return moab::MB_SUCCESS;
+
+    // Register the TempestRemap mesh with the remapper as SourceMesh
+    remapper.SetMesh( moab::Remapper::SourceMesh, tempest_mesh, false );
+
+    // Convert TempestRemap mesh to MOAB format
+    ctx.timer_push( "convert TempestRemap mesh to MOAB format" );
+    MB_CHK_SET_ERR( remapper.ConvertTempestMesh( moab::Remapper::SourceMesh ),
+                    "Failed to convert TempestRemap mesh to MOAB format" );
+    ctx.timer_pop();
+
+    // Write the MOAB meshset as h5m file
+    moab::EntityHandle meshSet = remapper.GetMeshSet( moab::Remapper::SourceMesh );
+    ctx.timer_push( "write MOAB mesh to h5m file" );
+    MB_CHK_SET_ERR( ctx.mbcore->write_file( outFile.c_str(), nullptr, nullptr, &meshSet, 1 ),
+                    "Failed to write MOAB mesh to h5m file" );
+    ctx.timer_pop();
+
+    if( !ctx.proc_id )
+        ctx.outputFormatter.printf( 0, "Wrote MOAB mesh to %s\n", outFile.c_str() );
+
+    return moab::MB_SUCCESS;
+}
+
+moab::ErrorCode handleICOMesh( ToolContext& ctx, moab::TempestRemapper& remapper, Mesh* tempest_mesh )
+{
+    std::string trFilename = ctx.outFilename;
+    const size_t dot       = trFilename.find_last_of( "." );
+    if( dot != std::string::npos && trFilename.substr( dot + 1 ) == "h5m" )
+        trFilename = trFilename.substr( 0, dot ) + ".g";
+
     ctx.timer_push( "generate ICO mesh with TempestRemap" );
-    TR_CHK_SET_ERR( GenerateICOMesh( *tempest_mesh, ctx.blockSize, ctx.computeDual, ctx.outFilename, "NetCDF4" ),
+    TR_CHK_SET_ERR( GenerateICOMesh( *tempest_mesh, ctx.blockSize, ctx.computeDual, trFilename, "NetCDF4" ),
                     "Failed to generate ICO mesh with TempestRemap" );
     ctx.timer_pop();
 
     // Add the ICO mesh to the list of meshes
     ctx.meshes.push_back( tempest_mesh );
+
+    MB_CHK_SET_ERR( convertAndWriteMOABMesh( ctx, remapper, tempest_mesh ),
+                    "Failed to convert and write MOAB mesh" );
+
     return moab::MB_SUCCESS;
 }
 
-moab::ErrorCode handleRLLMesh( ToolContext& ctx, Mesh* tempest_mesh )
+moab::ErrorCode handleRLLMesh( ToolContext& ctx, moab::TempestRemapper& remapper, Mesh* tempest_mesh )
 {
+    std::string trFilename = ctx.outFilename;
+    const size_t dot       = trFilename.find_last_of( "." );
+    if( dot != std::string::npos && trFilename.substr( dot + 1 ) == "h5m" )
+        trFilename = trFilename.substr( 0, dot ) + ".g";
+
     ctx.timer_push( "generate RLL mesh with TempestRemap" );
     TR_CHK_SET_ERR( GenerateRLLMesh( *tempest_mesh,                     // Mesh& meshOut,
                                      ctx.blockSize * 2, ctx.blockSize,  // int nLongitudes, int nLatitudes,
@@ -1768,29 +1817,44 @@ moab::ErrorCode handleRLLMesh( ToolContext& ctx, Mesh* tempest_mesh )
                                      -90.0, 90.0,                       // double dLatBegin, double dLatEnd,
                                      false, false, false,  // bool fGlobalCap, bool fFlipLatLon, bool fForceGlobal,
                                      "" /*ctx.inFilename*/,
-                                     "",               // std::string strInputFile, std::string strInputFileLonName
-                                     "",               // std::string strInputFileLatName
-                                     ctx.outFilename,  // std::string strOutputFile
-                                     "NetCDF4",        // std::string strOutputFormat
-                                     true              // bool fVerbose
+                                     "",             // std::string strInputFile, std::string strInputFileLonName
+                                     "",             // std::string strInputFileLatName
+                                     trFilename,     // std::string strOutputFile
+                                     "NetCDF4",      // std::string strOutputFormat
+                                     true            // bool fVerbose
                                      ),
                     "Failed to generate RLL mesh with TempestRemap" );
     ctx.timer_pop();
 
     // Add the RLL mesh to the list of meshes
     ctx.meshes.push_back( tempest_mesh );
+
+    MB_CHK_SET_ERR( convertAndWriteMOABMesh( ctx, remapper, tempest_mesh ),
+                    "Failed to convert and write MOAB mesh" );
+
     return moab::MB_SUCCESS;
 }
 
-moab::ErrorCode handleCSMesh( ToolContext& ctx, Mesh* tempest_mesh )
+moab::ErrorCode handleCSMesh( ToolContext& ctx, moab::TempestRemapper& remapper, Mesh* tempest_mesh )
 {
+    // Generate the TempestRemap Exodus mesh (always written as .g for TempestRemap compatibility)
+    std::string trFilename = ctx.outFilename;
+    const size_t dot       = trFilename.find_last_of( "." );
+    if( dot != std::string::npos && trFilename.substr( dot + 1 ) == "h5m" )
+        trFilename = trFilename.substr( 0, dot ) + ".g";
+
     ctx.timer_push( "generate CS mesh with TempestRemap" );
-    TR_CHK_SET_ERR( GenerateCSMesh( *tempest_mesh, ctx.blockSize, ctx.outFilename, "NetCDF4" ),
+    TR_CHK_SET_ERR( GenerateCSMesh( *tempest_mesh, ctx.blockSize, trFilename, "NetCDF4" ),
                     "Failed to generate CS mesh with TempestRemap" );
     ctx.timer_pop();
 
     // Add the CS mesh to the list of meshes
     ctx.meshes.push_back( tempest_mesh );
+
+    // Convert and write as MOAB h5m if requested
+    MB_CHK_SET_ERR( convertAndWriteMOABMesh( ctx, remapper, tempest_mesh ),
+                    "Failed to convert and write MOAB mesh" );
+
     return moab::MB_SUCCESS;
 }
 
@@ -1831,15 +1895,15 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
 
             case RemapperType::ICO:
                 if( !ctx.proc_id ) outputFormatter.printf( 0, "Creating TempestRemap ICO mesh ...\n" );
-                return handleICOMesh( ctx, tempest_mesh );
+                return handleICOMesh( ctx, remapper, tempest_mesh );
 
             case RemapperType::RLL:
                 if( !ctx.proc_id ) outputFormatter.printf( 0, "Creating TempestRemap RLL mesh ...\n" );
-                return handleRLLMesh( ctx, tempest_mesh );
+                return handleRLLMesh( ctx, remapper, tempest_mesh );
 
             default:  // Default to CS mesh
                 if( !ctx.proc_id ) outputFormatter.printf( 0, "Creating TempestRemap CS mesh ...\n" );
-                return handleCSMesh( ctx, tempest_mesh );
+                return handleCSMesh( ctx, remapper, tempest_mesh );
         }
     }
     catch( const std::exception& e )

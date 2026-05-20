@@ -269,3 +269,8 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
 
 
 endif ( MOAB_HAVE_MPI AND MPI_FOUND )
+
+# mbtempest regression test suite (CTest-based CLI tests)
+if(MOAB_HAVE_TEMPESTREMAP AND MOAB_BUILD_MBTEMPEST_TESTS)
+  add_subdirectory(mbtempest_regression)
+endif()

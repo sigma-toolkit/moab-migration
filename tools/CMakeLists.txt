@@ -34,8 +34,10 @@ include_directories(
 )
 
 if (MOAB_HAVE_TEMPESTREMAP)
-  include_directories( ${TEMPESTREMAP_INCLUDES} ${EIGEN3_DIR} )
+  include_directories( ${TEMPESTREMAP_INCLUDES} ${EIGEN3_INCLUDE_DIR} )
   set(MOAB_BUILD_MBTEMPEST ${MOAB_HAVE_TEMPESTREMAP})
+  # Enable mbcmpmaps when TempestRemap is available (implies Eigen3 + NetCDF)
+  set(MOAB_BUILD_MBCMPMAPS TRUE)
 endif (MOAB_HAVE_TEMPESTREMAP)
 
 # Build mbpart if Zoltan or Metis is configured

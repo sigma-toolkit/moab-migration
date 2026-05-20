@@ -31,6 +31,34 @@ IF (NOT METIS_FOUND)
     set( METIS_FOUND YES )
     SET(METIS_INCLUDES ${METIS_INCLUDE_DIR})
     SET(METIS_LIBRARIES ${METIS_LIBRARY})
+
+    # Detect Metis version from metis.h
+    file(STRINGS "${METIS_INCLUDE_DIR}/metis.h" _metis_ver_major REGEX "^#define METIS_VER_MAJOR[ \t]+[0-9]+")
+    file(STRINGS "${METIS_INCLUDE_DIR}/metis.h" _metis_ver_minor REGEX "^#define METIS_VER_MINOR[ \t]+[0-9]+")
+    file(STRINGS "${METIS_INCLUDE_DIR}/metis.h" _metis_ver_sub   REGEX "^#define METIS_VER_SUBMINOR[ \t]+[0-9]+")
+    if (_metis_ver_major)
+      string(REGEX REPLACE "^#define METIS_VER_MAJOR[ \t]+([0-9]+)" "\\1" METIS_VERSION_MAJOR "${_metis_ver_major}")
+      string(REGEX REPLACE "^#define METIS_VER_MINOR[ \t]+([0-9]+)" "\\1" METIS_VERSION_MINOR "${_metis_ver_minor}")
+      string(REGEX REPLACE "^#define METIS_VER_SUBMINOR[ \t]+([0-9]+)" "\\1" METIS_VERSION_SUBMINOR "${_metis_ver_sub}")
+      set(METIS_VERSION "${METIS_VERSION_MAJOR}.${METIS_VERSION_MINOR}.${METIS_VERSION_SUBMINOR}")
+      message(STATUS "        Version   : ${METIS_VERSION}")
+    endif()
+
+    # Metis >= 5.2.0 requires GKlib as an explicit link dependency
+    if (METIS_VERSION AND NOT "${METIS_VERSION}" VERSION_LESS "5.2.0")
+      find_library(GKLIB_LIBRARY GKlib
+        HINTS
+        ${METIS_DIR}
+        ${METIS_DIR}/lib
+      )
+      if (GKLIB_LIBRARY)
+        list(APPEND METIS_LIBRARIES ${GKLIB_LIBRARY})
+        message(STATUS "        GKlib     : ${GKLIB_LIBRARY}")
+      else()
+        message(WARNING "Metis ${METIS_VERSION} requires GKlib but libGKlib was not found in ${METIS_DIR}/lib")
+      endif()
+    endif()
+
   else ( METIS_INCLUDE_DIR AND METIS_LIBRARY )
     set( METIS_FOUND NO )
     message("finding Metis failed, please try to set the var METIS_DIR")

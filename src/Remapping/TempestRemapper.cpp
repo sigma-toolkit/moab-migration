@@ -372,6 +372,10 @@ ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType /*meshT
 
         MB_CHK_SET_ERR( m_interface->tag_set_data( gidTag, &mbcells[0], mbcells.size(), &gidse[0] ),
                         "Can't set global_id tag" );
+#ifdef MOAB_HAVE_MPI
+        MB_CHK_SET_ERR( m_pcomm->assign_global_ids(mesh_set, 2, 1, false, true, false ), "Unable to set global IDs" );
+#endif
+
         if( storeParentInfo )
         {
             MB_CHK_SET_ERR( m_interface->tag_set_data( srcParentTag, &mbcells[0], mbcells.size(), &srcParent[0] ),
@@ -833,7 +837,8 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
             return ( it != gids.end() ? std::distance( gids.begin(), it ) : -1 );
         };
 #else
-        auto find_lid = []( std::vector< int >& gids, int gid ) -> int {
+        auto find_lid = [this]( std::vector< int >& gids, int gid ) -> int {
+            if (offlineWorkflow) return gid-1;
             auto it = std::find( gids.begin(), gids.end(), gid );
             return ( it != gids.end() ? std::distance( gids.begin(), it ) : -1 );
         };
@@ -858,8 +863,14 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
             std::get< 0 >( sorted_overlap_order[ix] ) = ix;
             std::get< 1 >( sorted_overlap_order[ix] ) = find_lid( gids_src, rbids_src[ix] );
             assert( std::get< 1 >( sorted_overlap_order[ix] ) >= 0 );
-            if( is_parallel && ghFlags[ix] >= 0 )                // it means it is a ghost overlap element
-                std::get< 2 >( sorted_overlap_order[ix] ) = -1;  // this should not participate in the map!
+            if( is_parallel && ghFlags[ix] >= 0 )
+            {
+                // Ghost overlap element: its target cell lives on the rank that owns this element.
+                // Weight contributions for this element are computed on that owning rank (where the
+                // element has ORIG_PROC=-1 and a valid local target face index).  Using -1 here
+                // ensures the element is skipped on this rank to avoid double-counting.
+                std::get< 2 >( sorted_overlap_order[ix] ) = -1;
+            }
             else
                 std::get< 2 >( sorted_overlap_order[ix] ) = find_lid( gids_tgt, rbids_tgt[ix] );
         }
@@ -869,7 +880,6 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
 
         for( unsigned ie = 0; ie < n_overlap_entitites; ++ie )
         {
-            // int ix = std::get< 0 >( sorted_overlap_order[ie] );  // original index of the element
             m_overlap->vecSourceFaceIx[ie] = std::get< 1 >( sorted_overlap_order[ie] );
             m_overlap->vecTargetFaceIx[ie] = std::get< 2 >( sorted_overlap_order[ie] );
         }
@@ -930,6 +940,7 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
     coordz.clear();
     verts.clear();
 
+    // ideally, we should do these in MOAB after intersction computation
     // m_overlap->RemoveZeroEdges();
     // m_overlap->RemoveCoincidentNodes( false );
 
@@ -937,7 +948,10 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
     // if ( constructEdgeMap ) m_overlap->ConstructEdgeMap(false);
     // m_overlap->ConstructReverseNodeArray();
 
-    m_overlap->Validate();
+    // For now, comment out validation; not needed
+    // m_overlap->Validate();
+
+    // all done. return success
     return MB_SUCCESS;
 }
 
@@ -1407,7 +1421,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
         {
             if( outputEnabled ) dbgprint.printf( 0, "Computing intersection mesh with the Kd-tree search algorithm" );
             MB_CHK_SET_ERR( mbintx->intersect_meshes_kdtree( m_covering_source_set, m_target_set, m_overlap_set ),
-                            "Can't compute the intersection of meshes on the sphere with brute-force" );
+                            "Can't compute the intersection of meshes on the sphere with kd-tree" );
         }
         else
         {

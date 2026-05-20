@@ -31,7 +31,6 @@
 
 #ifdef MOAB_HAVE_EIGEN3
 #define EIGEN_NO_DEBUG
-#define EIGEN_MAX_CPP_VER 11
 #include "Eigen/Dense"
 #endif
 
@@ -1464,7 +1463,7 @@ double IntxAreaUtils::area_spherical_triangle_lHuiller( const double* ptA,
     double area = sign * E * Radius * Radius;
 
 #ifdef CHECKNEGATIVEAREA
-    if( area < 0 )
+    if( area < 0 && fabs(area) > std::numeric_limits<double>::epsilon() )
     {
         std::cout << "negative area: " << area << "\n";
         std::cout << std::setprecision( 15 );

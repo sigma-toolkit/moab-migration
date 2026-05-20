@@ -21,7 +21,7 @@
 #include <cassert>
 
 // #define ENABLE_DEBUG
-#define CHECK_CONVEXITY
+// #define CHECK_CONVEXITY
 namespace moab
 {
 
@@ -37,7 +37,6 @@ Intx2MeshOnSphere::~Intx2MeshOnSphere() {}
  */
 double Intx2MeshOnSphere::setup_tgt_cell( EntityHandle tgt, int& nsTgt )
 {
-
     // get coordinates of the target quad, to decide the gnomonic plane
     double cellArea = 0;
 
@@ -228,7 +227,7 @@ ErrorCode Intx2MeshOnSphere::computeIntersectionBetweenTgtAndSrc( EntityHandle t
             int k1              = ( k + 1 ) % nP;
             int k2              = ( k1 + 1 ) % nP;
             double orientedArea = IntxUtils::area2D( &P[2 * k], &P[2 * k1], &P[2 * k2] );
-            if( orientedArea < 0 )
+            if( orientedArea < 0 && fabs(orientedArea) > std::numeric_limits<double>::epsilon() )
             {
                 std::cout << " oriented area is negative: " << orientedArea << " k:" << k << " target, src:" << tgt
                           << " " << src << " \n";
@@ -914,6 +913,12 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     // do not check errors. If gdsTag == nullptr, then no tag found
     mb->tag_get_handle( "GLOBAL_DOFS", gdsTag );
 
+    // detect GRID_IMASK tag (set by SCRIP reader on masked meshes; default=1=unmasked)
+    int size_imask_tag = 0;
+    Tag imaskTag       = nullptr;
+    mb->tag_get_handle( "GRID_IMASK", imaskTag );
+    if( imaskTag ) size_imask_tag = 1;
+
     if( meshCells.size() > 0 )
     {
         oneCell = meshCells[0];  // it is possible we do not have any cells, even after migration
@@ -930,10 +935,9 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
                 MB_CHK_SET_ERR( mb->tag_get_length( gdsTag, lenTag ), "can't get tag length" );
                 if( lenTag > 0 )
                 {
-                    valsDOFs.resize( lenTag );
-                    MB_CHK_SET_ERR( mb->tag_get_data( gdsTag, &oneCell, 1, &valsDOFs[0] ),
-                                    "can't get SE DoF tag data" );
-                    if( valsDOFs[0] > 0 )
+                    valsDOFs.resize( lenTag, -1 );
+                    ErrorCode rval = mb->tag_get_data( gdsTag, &oneCell, 1, &valsDOFs[0] );
+                    if( valsDOFs[0] > 0 && rval == moab::MB_SUCCESS )
                     {
                         // first value positive means we really need to transport this data during
                         // coverage
@@ -950,15 +954,23 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     // uniformly for all tasks.  Do a collective MPI_MAX to see if it is migrated and if we have
     // (collectively) a GLOBAL_DOFS task
 
-    int local_int_array[2], global_int_array[2];
+    int local_int_array[3], global_int_array[3];
     local_int_array[0] = orig_sender;
     local_int_array[1] = size_gdofs_tag;
+    local_int_array[2] = size_imask_tag;
     // now reduce over all processors
     int mpi_err =
-        MPI_Allreduce( local_int_array, global_int_array, 2, MPI_INT, MPI_MAX, parcomm->proc_config().proc_comm() );
+        MPI_Allreduce( local_int_array, global_int_array, 3, MPI_INT, MPI_MAX, parcomm->proc_config().proc_comm() );
     if( MPI_SUCCESS != mpi_err ) return MB_FAILURE;
     orig_sender    = global_int_array[0];
     size_gdofs_tag = global_int_array[1];
+    size_imask_tag = global_int_array[2];
+    // if GRID_IMASK is needed (some rank has it) but not present locally, get/create it with default=1
+    if( size_imask_tag && !imaskTag )
+    {
+        int def_val = 1;
+        mb->tag_get_handle( "GRID_IMASK", 1, MB_TYPE_INTEGER, imaskTag, MB_TAG_DENSE | MB_TAG_CREAT, &def_val );
+    }
 #ifdef VERBOSE
     std::cout << "proc: " << my_rank << " size_gdofs_tag:" << size_gdofs_tag << "\n";
 #endif
@@ -1140,9 +1152,10 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     TLv.initialize( 2, 0, 0, 3, numv );  // to proc, GLOBAL ID, 3 real coordinates
     TLv.enableWriteAccess();
 
-    // add also GLOBAL_DOFS info, if found on the mesh cell; it should be found only on HOMME cells!
+    // add also GLOBAL_DOFS and GRID_IMASK info, if found on the mesh cell
     int sizeTuple =
-        2 + max_edges_1 + migrated_mesh + size_gdofs_tag;  // max edges could be up to MAXEDGES :) for polygons
+        2 + max_edges_1 + migrated_mesh + size_gdofs_tag +
+        size_imask_tag;  // max edges could be up to MAXEDGES :) for polygons
     TLq.initialize( sizeTuple, 0, 0, 0,
                     numq );  // to proc, elem GLOBAL ID, connectivity[max_edges] (global ID v), plus
                              // original sender if set (migrated mesh case)
@@ -1225,6 +1238,13 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
                     TLq.vi_wr[sizeTuple * n + currentIndexIntTuple + i] =
                         valsDOFs[i];  // should be different than 0 or -1
                 }
+            }
+            // GRID_IMASK info, if available (default=1=unmasked when tag exists but value not set)
+            if( size_imask_tag )
+            {
+                int maskVal = 1;  // default: unmasked
+                mb->tag_get_data( imaskTag, &q, 1, &maskVal );
+                TLq.vi_wr[sizeTuple * n + currentIndexIntTuple + size_gdofs_tag] = maskVal;
             }
 
             TLq.inc_n();  // increment tuple list size
@@ -1375,6 +1395,13 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
             }
             MB_CHK_SET_ERR( mb->tag_set_data( gdsTag, &new_element, 1, &valsDOFs[0] ),
                             "can't set GLOBAL_DOFS data on coverage mesh" );
+        }
+        // check if we need to retrieve and set GRID_IMASK data on covering source cells
+        if( size_imask_tag )
+        {
+            int maskVal = TLq.vi_rd[sizeTuple * i + currentIndexIntTuple + size_gdofs_tag];
+            MB_CHK_SET_ERR( mb->tag_set_data( imaskTag, &new_element, 1, &maskVal ),
+                            "can't set GRID_IMASK data on coverage mesh" );
         }
     }
 

@@ -1455,19 +1455,15 @@ EntityHandle ReadRTT::create_group( std::string group_name, int id )
     const char geom_categories[][CATEGORY_TAG_SIZE] = { "Vertex\0", "Curve\0", "Surface\0", "Volume\0", "Group\0" };
 
     EntityHandle handle;
-    rval = MBI->create_meshset( MESHSET_SET, handle );
-    if( MB_SUCCESS != rval ) return MB_FAILURE;
+    MB_CHK_ERR(MBI->create_meshset( MESHSET_SET, handle ));
 
     char name_buf[NAME_TAG_SIZE] = { 0 };
     std::strncpy( name_buf, group_name.c_str(), NAME_TAG_SIZE - 1 );
-    rval = MBI->tag_set_data( name_tag, &handle, 1, name_buf );
-    if( MB_SUCCESS != rval ) return MB_FAILURE;
+    MB_CHK_ERR(MBI->tag_set_data( name_tag, &handle, 1, name_buf ));
 
-    rval = MBI->tag_set_data( id_tag, &handle, 1, &id );
-    if( MB_SUCCESS != rval ) return MB_FAILURE;
+    MB_CHK_ERR(MBI->tag_set_data( id_tag, &handle, 1, &id ));
 
-    rval = MBI->tag_set_data( category_tag, &handle, 1, &geom_categories[4] );
-    if( MB_SUCCESS != rval ) return MB_FAILURE;
+    MB_CHK_ERR(MBI->tag_set_data( category_tag, &handle, 1, &geom_categories[4] ));
 
     return handle;
 }

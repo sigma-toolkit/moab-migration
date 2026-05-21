@@ -705,7 +705,7 @@ int main( int argc, char* argv[] )
            on the source mesh and get the projection on the target mesh */
         PUSH_TIMER( "Apply Scalar projection weights" )
         ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0], concat_fieldname,
-                                                   concat_fieldnameT , nullptr);
+                                                   concat_fieldnameT );
         CHECKIERR( ierr, "failed to compute projection weight application" );
         POP_TIMER( couComm, rankInCouComm )
 
@@ -799,7 +799,7 @@ int main( int argc, char* argv[] )
            on the source mesh and get the projection on the target mesh */
         PUSH_TIMER( "Apply Scalar projection weights" )
         ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmLndPID, &filter_type, weights_identifiers[0], concat_fieldname,
-                                                   concat_fieldnameT , nullptr);
+                                                   concat_fieldnameT );
         CHECKIERR( ierr, "failed to compute projection weight application" );
         POP_TIMER( couComm, rankInCouComm )
 
@@ -901,7 +901,7 @@ int main( int argc, char* argv[] )
 
         PUSH_TIMER( "Apply Scalar projection weights" )
         ierr = iMOAB_ApplyScalarProjectionWeights( cplLndAtmPID, &filter_type, weights_identifiers[0], concat_fieldname,
-                                                   concat_fieldnameT , nullptr);
+                                                   concat_fieldnameT );
         CHECKIERR( ierr, "failed to compute projection weight application" );
         POP_TIMER( couComm, rankInCouComm )
 
@@ -1005,7 +1005,7 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "failed to define the field tag T3_ph" );
 
         ierr = iMOAB_ApplyScalarProjectionWeights( cplLndAtmPID, &filter_type, weights_identifiers[0], concat_fieldname,
-                                                   concat_fieldnameT , nullptr);
+                                                   concat_fieldnameT );
         CHECKIERR( ierr, "failed to compute projection weight application from lnd to atm " );
         POP_TIMER( couComm, rankInCouComm )
 

@@ -119,9 +119,11 @@ int setup_component_coupler_meshes( iMOAB_AppID cmpId,
 // rank 0, sort by GID, and write to a digest file.  The sort-order is
 // decomposition-independent so the digest is byte-identical iff the
 // per-cell projected values are bit-for-bit identical across rank counts.
-static int gather_and_write_proj_tag(
-    MPI_Comm comm, int rankInComm, iMOAB_AppID pid,
-    const std::string& tagName, const std::string& outFilename )
+int gather_and_write_proj_tag( MPI_Comm comm,
+                               int rankInComm,
+                               iMOAB_AppID pid,
+                               const std::string& tagName,
+                               const std::string& outFilename )
 {
     int nverts[3], nelem[3];
     int ierr = iMOAB_GetMeshInfo( pid, nverts, nelem, 0, 0, 0 );
@@ -133,7 +135,7 @@ static int gather_and_write_proj_tag(
 
     int ent_type = 1;  // elements
     int sz       = nelem[2];
-    std::vector< int >    gids( sz, 0 );
+    std::vector< int > gids( sz, 0 );
     std::vector< double > vals( sz, 0.0 );
     ierr = iMOAB_GetIntTagStorage( pid, "GLOBAL_ID", &sz, &ent_type, gids.data() );
     if( ierr ) return 1;
@@ -157,7 +159,7 @@ static int gather_and_write_proj_tag(
         }
     }
 
-    std::vector< int >    allGids;
+    std::vector< int > allGids;
     std::vector< double > allVals;
     if( rankInComm == 0 )
     {
@@ -165,12 +167,10 @@ static int gather_and_write_proj_tag(
         allVals.resize( totalCount );
     }
 
-    MPI_Gatherv( gids.data(), sz, MPI_INT,
-                 rankInComm == 0 ? allGids.data() : nullptr,
-                 counts.data(), displs.data(), MPI_INT, 0, comm );
-    MPI_Gatherv( vals.data(), sz, MPI_DOUBLE,
-                 rankInComm == 0 ? allVals.data() : nullptr,
-                 counts.data(), displs.data(), MPI_DOUBLE, 0, comm );
+    MPI_Gatherv( gids.data(), sz, MPI_INT, rankInComm == 0 ? allGids.data() : nullptr, counts.data(), displs.data(),
+                 MPI_INT, 0, comm );
+    MPI_Gatherv( vals.data(), sz, MPI_DOUBLE, rankInComm == 0 ? allVals.data() : nullptr, counts.data(), displs.data(),
+                 MPI_DOUBLE, 0, comm );
 
     if( rankInComm != 0 ) return 0;
 
@@ -180,15 +180,12 @@ static int gather_and_write_proj_tag(
     for( int i = 0; i < totalCount; ++i )
         pairs.emplace_back( allGids[i], allVals[i] );
 
-    std::sort( pairs.begin(), pairs.end(),
-               []( const std::pair< int, double >& a,
-                   const std::pair< int, double >& b ) {
-                   return a.first < b.first;
-               } );
+    std::sort( pairs.begin(), pairs.end(), []( const std::pair< int, double >& a, const std::pair< int, double >& b ) {
+        return a.first < b.first;
+    } );
 
     auto last = std::unique( pairs.begin(), pairs.end(),
-                             []( const std::pair< int, double >& a,
-                                 const std::pair< int, double >& b ) {
+                             []( const std::pair< int, double >& a, const std::pair< int, double >& b ) {
                                  return a.first == b.first;
                              } );
     pairs.erase( last, pairs.end() );

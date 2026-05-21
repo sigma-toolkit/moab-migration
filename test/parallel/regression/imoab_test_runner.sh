@@ -77,6 +77,15 @@ source "$CFG"
 : "${TEST_MODE:?config must set TEST_MODE (bfb|tol|exitcode)}"
 : "${DEFAULT_RANKS:?config must set DEFAULT_RANKS}"
 
+# When IMOAB_BINDIR is set (e.g. by the CMake build, which puts binaries in
+# ${CMAKE_BINARY_DIR}/bin rather than the autotools-style
+# ${MOAB_BUILD}/test/parallel), rewrite EXE to live under it. Configs only
+# need to encode the basename correctly; the binary's location varies by
+# build system.
+if [ -n "${IMOAB_BINDIR:-}" ]; then
+    EXE="$IMOAB_BINDIR/$(basename "$EXE")"
+fi
+
 [ -x "$EXE" ] || { echo "ERROR: EXE not executable: $EXE" >&2; exit 2; }
 
 if [ "${TEST_MODE}" != "exitcode" ]; then
@@ -101,9 +110,12 @@ else
     RANKS_ARGS=()
 fi
 
+# ${RANKS_ARGS[@]+"${RANKS_ARGS[@]}"} is the portable empty-array expansion:
+# bash 3.2 (the system bash on macOS) errors on "${ARR[@]}" when ARR=() under
+# `set -u`; the +alt form expands to nothing when unset and the array otherwise.
 case "$TEST_MODE" in
-    bfb)      source "$HERE/lib_bfb_harness.sh";      run_bfb_harness      "$SRC" "$TGT" "${RANKS_ARGS[@]}" ;;
-    tol)      source "$HERE/lib_tol_harness.sh";      run_tol_harness      "$SRC" "$TGT" "${RANKS_ARGS[@]}" ;;
-    exitcode) source "$HERE/lib_exitcode_harness.sh"; run_exitcode_harness              "${RANKS_ARGS[@]}" ;;
+    bfb)      source "$HERE/lib_bfb_harness.sh";      run_bfb_harness      "$SRC" "$TGT" ${RANKS_ARGS[@]+"${RANKS_ARGS[@]}"} ;;
+    tol)      source "$HERE/lib_tol_harness.sh";      run_tol_harness      "$SRC" "$TGT" ${RANKS_ARGS[@]+"${RANKS_ARGS[@]}"} ;;
+    exitcode) source "$HERE/lib_exitcode_harness.sh"; run_exitcode_harness              ${RANKS_ARGS[@]+"${RANKS_ARGS[@]}"} ;;
     *)   echo "ERROR: unknown TEST_MODE '$TEST_MODE' (expected bfb|tol|exitcode)" >&2; exit 2 ;;
 esac

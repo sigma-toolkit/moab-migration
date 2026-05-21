@@ -100,15 +100,24 @@ endif # HAVE_HDF5_PARALLEL
 # MPI launcher baked in.  Requires TempestRemap (the binaries won't exist
 # otherwise), but .PHONY and the pattern rule must live outside any
 # Automake conditional block.
-#   make imoabcheck               — run all 14 configs
-#   make imoabcheck-coupler_bilin — run one config by name
+#
+# Examples:
+#   make imoabcheck                                    — run all configs
+#   make imoabcheck-coupler_bilin                      — run one config
+#   make imoabcheck IMOAB_TEST_FLAGS='--ranks "1 2 4"' — custom rank sweep
+#   make imoabcheck-dualmap_caas IMOAB_TEST_FLAGS='--workdir /tmp/run --keep'
+#
+# IMOAB_TEST_FLAGS is forwarded verbatim to run_imoab_tests.sh, which in turn
+# forwards every recognised flag (--ranks, --workdir, --keep, --mbcmp, --tol,
+# --extra) to the per-config dispatcher. See run_imoab_tests.sh -h for the
+# full flag list.
 .PHONY: imoabcheck
 
 imoabcheck:
-	$(SHELL) $(top_builddir)/test/parallel/regression/run_imoab_tests.sh
+	$(SHELL) $(top_builddir)/test/parallel/regression/run_imoab_tests.sh $(IMOAB_TEST_FLAGS)
 
 imoabcheck-%:
-	$(SHELL) $(top_builddir)/test/parallel/regression/run_imoab_tests.sh $*
+	$(SHELL) $(top_builddir)/test/parallel/regression/run_imoab_tests.sh $(IMOAB_TEST_FLAGS) $*
 
 if HAVE_NETCDF
   NETCDF_TESTS += scdpart read_nc_par ucdtrvpart mpastrvpart gcrm_par read_esmf

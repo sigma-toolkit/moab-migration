@@ -43,6 +43,7 @@
 #include "moab/Interface.hpp"
 #include "moab/Range.hpp"
 #include "moab/ReadUtilIface.hpp"
+#include "moab/Skinner.hpp"
 
 namespace moab
 {
@@ -236,7 +237,7 @@ ErrorCode ReadRTT::generate_topology( std::vector< side > side_data,
     set_surface_senses( num_ents, entmap, side_data, cell_data );
 
     // set the group data
-    rval = setup_group_data( entmap, tet_data, volume_map );
+    MB_CHK_ERR(setup_group_data( entmap, tet_data, volume_map ));
 
     return MB_SUCCESS;
 }
@@ -252,8 +253,6 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
 {
     ErrorCode rval;
     EntityHandle file_set;
-
-    UNUSED( volume_map );
 
     rval = MBI->create_meshset( MESHSET_SET, file_set );
     if( MB_SUCCESS != rval ) return rval;
@@ -272,14 +271,18 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
     // add facets to the file set
     MB_CHK_ERR( create_facets( facet_data, surface_map, mb_coords, file_set ) );
 
-    // material number tag
-    Tag mat_num_tag;
-    MB_CHK_ERR(
-        MBI->tag_get_handle( "MATERIAL_NUMBER", 1, MB_TYPE_INTEGER, mat_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT ) );
-
     // adding material groups
     std::string mat_flag = get_material_ref_flag();
     std::string vol_flag = get_volume_ref_flag();
+
+    // Only create the material number tag if a MATERIAL flag exists in the file
+    Tag mat_num_tag = 0;
+    bool have_material_flag = !mat_flag.empty() && cell_flag_idx.find( mat_flag ) != cell_flag_idx.end();
+    if( have_material_flag )
+    {
+        MB_CHK_ERR(
+            MBI->tag_get_handle( "MATERIAL_NUMBER", 1, MB_TYPE_INTEGER, mat_num_tag, MB_TAG_SPARSE | MB_TAG_CREAT ) );
+    }
 
     // add tets to the file set
     Range mb_tets;
@@ -291,8 +294,12 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
         EntityHandle tet_h;
         MB_CHK_ERR( MBI->create_element( MBTET, tet_nodes, 4, tet_h ) );
 
-        int mat_no = t.flag_values[cell_flag_idx[mat_flag]];
-        MB_CHK_ERR( MBI->tag_set_data( mat_num_tag, &tet_h, 1, &mat_no ) );
+        // Tag material number only when a MATERIAL flag is present in the file
+        if( have_material_flag )
+        {
+            int mat_no = t.flag_values[cell_flag_idx[mat_flag]];
+            MB_CHK_ERR( MBI->tag_set_data( mat_num_tag, &tet_h, 1, &mat_no ) );
+        }
 
         int volume_no = t.flag_values[cell_flag_idx[vol_flag]];
         if( volume_map.find( volume_no ) != volume_map.end() )
@@ -308,6 +315,58 @@ ErrorCode ReadRTT::build_moab( std::vector< node > node_data,
         mb_tets.insert( tet_h );
     }
     MB_CHK_ERR( MBI->add_entities( file_set, mb_tets ) );
+
+    // For discontiguous meshes with no side/facet data, generate surfaces by
+    // skinning each volume's tetrahedra. This produces the boundary triangles
+    // needed by DAGMC for ray tracing.
+    if( header_data.contiguity == "discontiguous" && facet_data.empty() )
+    {
+        const char surf_category[CATEGORY_TAG_SIZE] = "Surface\0";
+        int surf_dim                                = 2;
+        int surf_id                                 = 1;
+        Skinner skinner( MBI );
+
+        for( auto it = volume_map.begin(); it != volume_map.end(); ++it )
+        {
+            EntityHandle vol_set = it->second;
+
+            // Get all tets in this volume
+            Range vol_tets;
+            MB_CHK_ERR( MBI->get_entities_by_type( vol_set, MBTET, vol_tets ) );
+            if( vol_tets.empty() ) continue;
+
+            // Skin the tets to get boundary triangles
+            Range skin_tris;
+            rval = skinner.find_skin( 0, vol_tets, false, skin_tris, 0, true, true );
+            MB_CHK_ERR( rval );
+
+            // Get the vertices referenced by the skin triangles
+            Range skin_verts;
+            MB_CHK_ERR( MBI->get_connectivity( skin_tris, skin_verts ) );
+
+            // Create a surface meshset
+            EntityHandle surf_handle;
+            MB_CHK_ERR( MBI->create_meshset( MESHSET_SET, surf_handle ) );
+            MB_CHK_ERR( MBI->tag_set_data( geom_tag, &surf_handle, 1, &surf_dim ) );
+            MB_CHK_ERR( MBI->tag_set_data( id_tag, &surf_handle, 1, &surf_id ) );
+            MB_CHK_ERR( MBI->tag_set_data( category_tag, &surf_handle, 1, surf_category ) );
+
+            // Add skin triangles and vertices to the surface meshset
+            MB_CHK_ERR( MBI->add_entities( surf_handle, skin_tris ) );
+            MB_CHK_ERR( MBI->add_entities( surf_handle, skin_verts ) );
+
+            // Also add the skin triangles to the file set
+            MB_CHK_ERR( MBI->add_entities( file_set, skin_tris ) );
+
+            // Set volume -> surface parent-child link
+            MB_CHK_ERR( MBI->add_parent_child( vol_set, surf_handle ) );
+
+            // Set surface sense: forward with respect to this volume
+            MB_CHK_ERR( myGeomTool->set_sense( surf_handle, vol_set, SENSE_FORWARD ) );
+
+            surf_id++;
+        }
+    }
 
     return MB_SUCCESS;
 }
@@ -516,7 +575,7 @@ ErrorCode ReadRTT::side_process_faces( rtt_flags side_flags, std::vector< side >
             side_data.push_back( data );
         }
     }
-    if( side_data.size() == 0 ) return MB_FAILURE;
+    if( side_data.size() == 0 && header_data.contiguity != "discontiguous" ) return MB_FAILURE;
     return MB_SUCCESS;
 }
 
@@ -666,7 +725,7 @@ ErrorCode ReadRTT::read_facets( const char* filename, std::vector< facet >& face
         }
         input_file.close();
     }
-    if( facet_data.size() == 0 ) return MB_FAILURE;
+    if( facet_data.size() == 0 && header_data.contiguity != "discontiguous" ) return MB_FAILURE;
     return MB_SUCCESS;
 }
 
@@ -762,6 +821,11 @@ ErrorCode ReadRTT::parse_dims( std::ifstream& input_file )
         return MB_FAILURE;
     }
 
+    // Track header values that are not stored but should be consistent with a tet mesh.
+    // -1 indicates the field was not present in the file.
+    int nnodes_side_max_val = -1;
+    int ndim_topo_val       = -1;
+
     std::string line;
     std::vector< std::string > tokens;
     while( std::getline( input_file, line ) )
@@ -790,17 +854,17 @@ ErrorCode ReadRTT::parse_dims( std::ifstream& input_file )
         {
             dim_data.nsides_max = std::atoi( tokens[1].c_str() );
         }
-        else if( tokens[0] == "nnodes_sides_max" )
+        else if( tokens[0] == "nnodes_side_max" )
         {
-            dim_data.nnodes_sides_max = std::atoi( tokens[1].c_str() );
+            nnodes_side_max_val = std::atoi( tokens[1].c_str() );
+        }
+        else if( tokens[0] == "ndim_topo" )
+        {
+            ndim_topo_val = std::atoi( tokens[1].c_str() );
         }
         else if( tokens[0] == "ndim" )
         {
             dim_data.ndim = std::atoi( tokens[1].c_str() );
-        }
-        else if( tokens[0] == "n_dim_topo" )
-        {
-            dim_data.n_dim_topo = std::atoi( tokens[1].c_str() );
         }
         else if( tokens[0] == "nnodes" )
         {
@@ -876,6 +940,20 @@ ErrorCode ReadRTT::parse_dims( std::ifstream& input_file )
             dim_data.ncell_data = std::atoi( tokens[1].c_str() );
         }
     }
+    // Warn if nnodes_side_max or ndim_topo are missing or inconsistent with a tet mesh.
+    // The reader assumes triangle sides (3 nodes per side) and 3D topology throughout.
+    if( nnodes_side_max_val == -1 )
+        std::cerr << "Warning: nnodes_side_max not found in dims block; expected 3 for a tet mesh." << std::endl;
+    else if( nnodes_side_max_val != 3 )
+        std::cerr << "Warning: nnodes_side_max is " << nnodes_side_max_val
+                  << "; expected 3 for a tet mesh. Results may be incorrect." << std::endl;
+
+    if( ndim_topo_val == -1 )
+        std::cerr << "Warning: ndim_topo not found in dims block; expected 3 for a tet mesh." << std::endl;
+    else if( ndim_topo_val != 3 )
+        std::cerr << "Warning: ndim_topo is " << ndim_topo_val
+                  << "; expected 3 for a tet mesh. Results may be incorrect." << std::endl;
+
     // Check that the data is valid and has the expected number of entries
     dim_data.validate();
 
@@ -917,12 +995,6 @@ ErrorCode ReadRTT::read_cell_defs( std::ifstream& input_file )
         for( int i = 0; i < new_cell_def.nsides; i++ )
         {
             int side_type = std::atoi( tokens[i].c_str() );
-            // Ensure side types exists
-            if( cell_def_data.find( side_type ) == cell_def_data.end() )
-            {
-                std::cout << "Error: side type " << side_type << " not found in cell definitions." << std::endl;
-                return MB_FAILURE;
-            }
             new_cell_def.side_type.push_back( side_type );
         }
         // Read the nodes per side
@@ -1305,10 +1377,12 @@ ErrorCode ReadRTT::setup_group_data( std::vector< EntityHandle > entity_map[4],
     ErrorCode rval;  // error codes
     EntityHandle handle;
     handle = create_group( "graveyard_comp", 1 );
+    if( handle == 0 ) return MB_FAILURE;
 
     // add any volume to group graveyard, it is ignored by dag
     EntityHandle vol_handle = entity_map[3][0];
     rval                    = MBI->add_entities( handle, &vol_handle, 1 );
+    if( rval != MB_SUCCESS ) return rval;
 
     if( get_material_ref_flag() == "MATERIAL" )
     {
@@ -1381,17 +1455,15 @@ EntityHandle ReadRTT::create_group( std::string group_name, int id )
     const char geom_categories[][CATEGORY_TAG_SIZE] = { "Vertex\0", "Curve\0", "Surface\0", "Volume\0", "Group\0" };
 
     EntityHandle handle;
-    rval = MBI->create_meshset( MESHSET_SET, handle );
-    if( MB_SUCCESS != rval ) return rval;
+    MB_CHK_ERR(MBI->create_meshset( MESHSET_SET, handle ));
 
-    rval = MBI->tag_set_data( name_tag, &handle, 1, group_name.c_str() );
-    if( MB_SUCCESS != rval ) return MB_FAILURE;
+    char name_buf[NAME_TAG_SIZE] = { 0 };
+    std::strncpy( name_buf, group_name.c_str(), NAME_TAG_SIZE - 1 );
+    MB_CHK_ERR(MBI->tag_set_data( name_tag, &handle, 1, name_buf ));
 
-    rval = MBI->tag_set_data( id_tag, &handle, 1, &id );
-    if( MB_SUCCESS != rval ) return MB_FAILURE;
+    MB_CHK_ERR(MBI->tag_set_data( id_tag, &handle, 1, &id ));
 
-    rval = MBI->tag_set_data( category_tag, &handle, 1, &geom_categories[4] );
-    if( MB_SUCCESS != rval ) return MB_FAILURE;
+    MB_CHK_ERR(MBI->tag_set_data( category_tag, &handle, 1, &geom_categories[4] ));
 
     return handle;
 }

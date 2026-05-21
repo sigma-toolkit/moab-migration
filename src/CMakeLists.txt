@@ -337,27 +337,12 @@ endif()
 
 # Filter MOAB_ALL_LIBS: remove bare directory paths and unrecognized linker
 # flags (e.g. -fortranlibs from NVHPC LAPACK) that CMake cannot handle in
-# target_link_libraries.  Keep: absolute paths to files, -l flags, and plain
-# library names (e.g. "stdc++", "m").
-set(_filtered_libs "")
-foreach(_item IN LISTS MOAB_ALL_LIBS)
-  if (IS_ABSOLUTE "${_item}")
-    if (EXISTS "${_item}" AND NOT IS_DIRECTORY "${_item}")
-      list(APPEND _filtered_libs "${_item}")
-    else()
-      message(STATUS "Dropping non-file path from link libraries: ${_item}")
-    endif()
-  elseif (_item MATCHES "^-l")
-    list(APPEND _filtered_libs "${_item}")
-  elseif (_item MATCHES "^[A-Za-z]")
-    # Plain library name (e.g. "stdc++", "m", "z") — pass through
-    list(APPEND _filtered_libs "${_item}")
-  else()
-    message(STATUS "Dropping unrecognized item from link libraries: ${_item}")
-  endif()
-endforeach()
-set(MOAB_ALL_LIBS ${_filtered_libs})
-unset(_filtered_libs)
+# target_link_libraries.  Platform-specific linker syntax such as Apple
+# "-framework Accelerate", GNU "-Wl,...", "-Xlinker ...", "-pthread" is
+# preserved via the shared keep-pattern table in ResolveCompilerPaths.cmake.
+# Add new exceptions there, not here.
+include(ResolveCompilerPaths)
+filter_link_libraries(MOAB_ALL_LIBS)
 
 include(../config/CleanLibraryList.cmake)
 clean_library_list(MOAB_ALL_LIBS)

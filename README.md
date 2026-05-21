@@ -33,6 +33,81 @@ There are several hooks to online continuous integration systems, nightly and co
 [![codcov](https://codecov.io/bb/fathomteam/moab/branch/master/graph/badge.svg)](https://codecov.io/bb/fathomteam/moab)
 [![Codacy grade](https://app.codacy.com/project/badge/Grade/a796f9d9f5f44d628de15ab95717b1d1)](https://www.codacy.com/bb/fathomteam/moab/dashboard?utm_source=vijaysm@bitbucket.org&amp;utm_medium=referral&amp;utm_content=fathomteam/moab&amp;utm_campaign=Badge_Grade)
 
+### Dashboard submissions (CDash)
+
+MOAB publishes test results to the public CDash instance at
+[my.cdash.org/index.php?project=MOAB](https://my.cdash.org/index.php?project=MOAB).
+Once you have a CMake build directory configured with `-DENABLE_TESTING=ON`,
+you can submit a dashboard from any developer machine.
+
+**One-shot submission** (configure / build / test / submit):
+
+```bash
+ctest -D Experimental -j8       # ad-hoc submission, lands in "Experimental"
+ctest -D Nightly      -j8       # for scheduled overnight runs
+ctest -D Continuous   -j8       # for CI loops
+```
+
+**Granular workflow** (useful when you want to keep going past test failures):
+
+```bash
+ctest -D ExperimentalStart
+ctest -D ExperimentalConfigure
+ctest -D ExperimentalBuild  -j8
+ctest -D ExperimentalTest   -j8 || true   # do not bail on red tests
+ctest -D ExperimentalSubmit
+```
+
+#### Site and build-name conventions
+
+Each submission is identified by two fields visible on CDash:
+
+- **`CTEST_SITE`** — the physical machine. Auto-derived from `hostname`
+  (stripping any trailing `.local`).
+- **`CTEST_BUILD_NAME`** — the build configuration. Auto-derived from the
+  resolved feature flags using the scheme
+  `<os>-<arch>-<compiler><major>-<buildtype>[+tag1+tag2...]`,
+  e.g. `macOS-arm64-appleclang17-Rel+mpi+h5+nc+pnc+eig+zlt+tr+bla+f`.
+
+The auto-derivation lives in `config/CTestBuildName.cmake`. Toggling any
+`ENABLE_*` option (HDF5, MPI, TempestRemap, Zoltan, …) automatically changes
+the build-name suffix, so different feature combinations show up as
+distinct rows on CDash without any per-host editing.
+
+To extend the suffix with a new feature, add a `"ENABLE_FOO;short"` pair to
+`_moab_feature_map` in `config/CTestBuildName.cmake`. Do not reorder
+existing entries: the fixed order is what makes re-runs of the same
+configuration collapse to a single dashboard row.
+
+#### Per-machine overrides
+
+Either field can be overridden from the environment or from the CMake
+command line if you need a non-default identity for one configuration
+(e.g. a parallel GCC trial alongside the normal Clang build):
+
+```bash
+CTEST_SITE="mac-alt" \
+CTEST_BUILD_NAME="macOS-arm64-gcc14-Rel+mpi+h5+experiment-fpe" \
+  ctest -D Experimental
+```
+
+#### CDash configuration files
+
+- `CTestConfig.cmake` (repo root) — defines the CDash drop target
+  (`my.cdash.org`, project `MOAB`) and the nightly start time.
+- `config/CTestBuildName.cmake` — derives `CTEST_SITE` / `CTEST_BUILD_NAME`
+  and the feature-tag suffix.
+- `CMakeLists.txt` — calls `include(CTest)` (inside the `ENABLE_TESTING`
+  block) which generates `DartConfiguration.tcl` in the build directory.
+
+For auth-protected submissions (when MOAB's CDash project requires it),
+export a token before submitting:
+
+```bash
+export CTEST_TOKEN="<paste-token-from-cdash-profile>"
+ctest -D Experimental
+```
+
 ## Documentation
 
 Detailed API documentation and user/development guides are available for the following repository branches, updated daily.

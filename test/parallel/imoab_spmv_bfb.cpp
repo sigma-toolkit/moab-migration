@@ -338,14 +338,14 @@ int main( int argc, char* argv[] )
             PUSH_TIMER( "Load low-order map from disk" )
             CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplDualMapPID,
                                           &src_disc_type, &tgt_disc_type, &arearead_lo,
-                                          "lo-scalar", loMapFile.c_str() ),
+                                          "scalar", loMapFile.c_str() ),
                        "Cannot load low-order map file" )
             POP_TIMER( couComm, rankInCouComm )
 
             PUSH_TIMER( "Load high-order map from disk" )
             CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplDualMapPID,
                                           &src_disc_type, &tgt_disc_type, &arearead_hi,
-                                          "hi-scalar", hiMapFile.c_str() ),
+                                          "ho_scalar", hiMapFile.c_str() ),
                        "Cannot load high-order map file" )
             POP_TIMER( couComm, rankInCouComm )
 
@@ -372,7 +372,7 @@ int main( int argc, char* argv[] )
             int fNoBubble = 1, fMonotone = 1, fVolumetric = 0, fInvDist = 0, fNoConserve = 0, fValidate = 0;
 
             PUSH_TIMER( "Compute low-order (monotone) weights" )
-            CHECKIERR( iMOAB_ComputeScalarProjectionWeights( cplDualMapPID, "lo-scalar", disc_fv, &disc_order, disc_fv,
+            CHECKIERR( iMOAB_ComputeScalarProjectionWeights( cplDualMapPID, "scalar", disc_fv, &disc_order, disc_fv,
                                                              &disc_order, nullptr, &fNoBubble, &fMonotone, &fVolumetric,
                                                              &fInvDist, &fNoConserve, &fValidate, dof_tag, dof_tag ),
                        "Cannot compute low-order weights" )
@@ -382,7 +382,7 @@ int main( int argc, char* argv[] )
             disc_order = 2;
 
             PUSH_TIMER( "Compute high-order (non-monotone) weights" )
-            CHECKIERR( iMOAB_ComputeScalarProjectionWeights( cplDualMapPID, "hi-scalar", disc_fv, &disc_order, disc_fv,
+            CHECKIERR( iMOAB_ComputeScalarProjectionWeights( cplDualMapPID, "ho_scalar", disc_fv, &disc_order, disc_fv,
                                                              &disc_order, nullptr, &fNoBubble, &fMonotone, &fVolumetric,
                                                              &fInvDist, &fNoConserve, &fValidate, dof_tag, dof_tag ),
                        "Cannot compute high-order weights" )
@@ -398,9 +398,9 @@ int main( int argc, char* argv[] )
         {
             const std::string loOut = writeMapsPrefix + "_lo.nc";
             const std::string hiOut = writeMapsPrefix + "_hi.nc";
-            CHECKIERR( iMOAB_WriteMapFile( cplDualMapPID, "lo-scalar", loOut.c_str() ),
+            CHECKIERR( iMOAB_WriteMapFile( cplDualMapPID, "scalar", loOut.c_str() ),
                        "Cannot write low-order map file" )
-            CHECKIERR( iMOAB_WriteMapFile( cplDualMapPID, "hi-scalar", hiOut.c_str() ),
+            CHECKIERR( iMOAB_WriteMapFile( cplDualMapPID, "ho_scalar", hiOut.c_str() ),
                        "Cannot write high-order map file" )
             if( !rankInCouComm )
                 std::cout << " Wrote weight maps to " << loOut << " and " << hiOut << "\n";
@@ -493,21 +493,21 @@ int main( int argc, char* argv[] )
         int filter_type = 0;
 
         PUSH_TIMER( "Low-order projection" )
-        CHECKIERR( iMOAB_ApplyScalarProjectionWeights( cplDualMapPID, &filter_type, "lo-scalar",
-                                                        srcField, tgtFieldLo, nullptr ),
+        CHECKIERR( iMOAB_ApplyScalarProjectionWeights( cplDualMapPID, &filter_type, "scalar",
+                                                        srcField, tgtFieldLo ),
                    "Failed to apply low-order weights" )
         POP_TIMER( couComm, rankInCouComm )
 
         PUSH_TIMER( "High-order projection" )
-        CHECKIERR( iMOAB_ApplyScalarProjectionWeights( cplDualMapPID, &filter_type, "hi-scalar",
-                                                        srcField, tgtFieldHi, nullptr ),
+        CHECKIERR( iMOAB_ApplyScalarProjectionWeights( cplDualMapPID, &filter_type, "ho_scalar",
+                                                        srcField, tgtFieldHi ),
                    "Failed to apply high-order weights" )
         POP_TIMER( couComm, rankInCouComm )
 
         filter_type = 2;  // CAAS_LOCAL — high-order projection clipped to lo-stencil bounds
         PUSH_TIMER( "Dual-map CAAS projection" )
-        CHECKIERR( iMOAB_ApplyScalarProjectionWeights( cplDualMapPID, &filter_type, "hi-scalar",
-                                                        srcField, tgtFieldDual, "lo-scalar" ),
+        CHECKIERR( iMOAB_ApplyScalarProjectionWeights( cplDualMapPID, &filter_type, "ho_scalar",
+                                                        srcField, tgtFieldDual ),
                    "Failed to apply dual-map CAAS weights" )
         POP_TIMER( couComm, rankInCouComm )
 

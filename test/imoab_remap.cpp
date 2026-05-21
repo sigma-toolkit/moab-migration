@@ -288,13 +288,13 @@ int main( int argc, char* argv[] )
     /* We have the remapping weights now. Let us apply the weights onto the tag we defined
        on the srouce mesh and get the projection on the target mesh */
     ierr = iMOAB_ApplyScalarProjectionWeights( atmocnPID, &filter_weights, weights_identifiers[0].c_str(),
-                                               bottomTempField.c_str(), bottomTempProjectedNCField.c_str() , nullptr);
+                                               bottomTempField.c_str(), bottomTempProjectedNCField.c_str() );
     CHECKIERR( ierr, "failed to apply projection weights for scalar non-conservative field" );
 
     /* We have the remapping weights now. Let us apply the weights onto the tag we defined
        on the srouce mesh and get the projection on the target mesh */
     ierr = iMOAB_ApplyScalarProjectionWeights( atmocnPID, &filter_weights, weights_identifiers[2].c_str(),
-                                               bottomTempField.c_str(), bottomTempProjectedField.c_str() , nullptr);
+                                               bottomTempField.c_str(), bottomTempProjectedField.c_str() );
     CHECKIERR( ierr, "failed to apply projection weights for scalar conservative field" );
 
     if( gen_baseline )
@@ -358,18 +358,18 @@ int main( int argc, char* argv[] )
     /* We have the remapping weights now. Let us apply the weights onto the tag we defined
        on the srouce mesh and get the projection on the target mesh */
     ierr = iMOAB_ApplyScalarProjectionWeights( atmlndPID, &filter_weights, weights_identifiers[1].c_str(),
-                                               bottomTempField.c_str(), bottomTempProjectedField.c_str() , nullptr);
+                                               bottomTempField.c_str(), bottomTempProjectedField.c_str() );
     CHECKIERR( ierr, "failed to apply projection weights for ATM-LND scalar field" );
 
     /* We have the remapping weights now. Let us apply the weights onto the tag we defined
        on the srouce mesh and get the projection on the target mesh */
     ierr = iMOAB_ApplyScalarProjectionWeights( lndatmPID, &filter_weights, weights_identifiers[1].c_str(),
-                                               bottomTempProjectedField.c_str(), bottomTempFieldATM.c_str() , nullptr);
+                                               bottomTempProjectedField.c_str(), bottomTempFieldATM.c_str() );
     CHECKIERR( ierr, "failed to apply projection weights for LND-ATM scalar field" );
 
     /* We expect the next test to deliberately fail since there should not be an identifier specified */
     ierr = iMOAB_ApplyScalarProjectionWeights( lndatmPID, &filter_weights, weights_identifiers[3].c_str(),
-                                               bottomTempProjectedField.c_str(), bottomTempFieldATM.c_str() , nullptr);
+                                               bottomTempProjectedField.c_str(), bottomTempFieldATM.c_str() );
     CHECKIERR( ierr != moab::MB_INDEX_OUT_OF_RANGE,
                "failed to fail applying projection weights for LND-ATM scalar field" );
 

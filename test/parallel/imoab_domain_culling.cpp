@@ -175,7 +175,7 @@ int main( int argc, char* argv[] )
     CHECKIERR( ierr, "cannot free buffers used to resend atm tag towards the coverage mesh" )
 
     ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0].c_str(),
-                                               tagname.c_str(), tagname.c_str() , nullptr);
+                                               tagname.c_str(), tagname.c_str() );
     CHECKIERR( ierr, "failed to compute projection weight application" );
 
     char outputFile2[] = "OcnDomMeshProj.h5m";

@@ -1329,8 +1329,7 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
     int* filter_type, /*  CAAS_NONE = 0, CAAS_GLOBAL = 1, CAAS_LOCAL = 2, CAAS_LOCAL_ADJACENT = 3 */
     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
     const iMOAB_String source_solution_tag_name,
-    const iMOAB_String target_solution_tag_name,
-    const iMOAB_String lo_weights_identifier /* = NULL */ );
+    const iMOAB_String target_solution_tag_name );
 
 #endif /* #ifdef MOAB_HAVE_TEMPESTREMAP */
 

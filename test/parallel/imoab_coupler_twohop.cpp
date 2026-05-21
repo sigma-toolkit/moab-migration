@@ -602,7 +602,7 @@ int main( int argc, char* argv[] )
                on the source mesh and get the projection on the target mesh */
             PUSH_TIMER( "Apply Scalar projection weights" )
             ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0].c_str(),
-                                                       bottomFields, bottomProjectedFields , nullptr);
+                                                       bottomFields, bottomProjectedFields );
             CHECKIERR( ierr, "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )
             if( 1 == n )  // write only for n==1 case
@@ -766,7 +766,7 @@ int main( int argc, char* argv[] )
                on the source mesh and get the projection on the target mesh */
             PUSH_TIMER( "Apply Scalar projection weights" )
             ierr = iMOAB_ApplyScalarProjectionWeights( cplAtm2OcnPID, &filter_type, weights_identifiers[0].c_str(),
-                                                       bottomSourceFields2, bottomProjectedFields3 , nullptr);
+                                                       bottomSourceFields2, bottomProjectedFields3 );
             CHECKIERR( ierr, "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )
             if( 1 == n )  // write only for n==1 case

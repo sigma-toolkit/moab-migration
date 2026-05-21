@@ -142,9 +142,9 @@ int main( int argc, char* argv[] )
     bool no_regression_test = false;
     opts.addOpt< void >( "no_regression,r", "do not do regression test against baseline 1", &no_regression_test );
 
-    std::string ocnMapFile;        // pre-computed ATM-OCN map (load instead of compute online)
-    std::string writeMapsPrefix;   // if set, dump computed map to <prefix>_atm_ocn.nc
-    std::string digestPrefix;      // if set, write per-cell BFB digest file
+    std::string ocnMapFile;       // pre-computed ATM-OCN map (load instead of compute online)
+    std::string writeMapsPrefix;  // if set, dump computed map to <prefix>_atm_ocn.nc
+    std::string digestPrefix;     // if set, write per-cell BFB digest file
 
     opts.addOpt< std::string >( "ocn_map_file,u",
                                 "Pre-computed ATM-OCN map file; if set, load these weights "
@@ -493,23 +493,22 @@ int main( int argc, char* argv[] )
             int src_disc_type = 1;
             int tgt_disc_type = 3;
             int arearead      = 1;
-            CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID,
-                                          &src_disc_type, &tgt_disc_type, &arearead,
+            CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type, &tgt_disc_type, &arearead,
                                           weights_identifiers[0], ocnMapFile.c_str() ),
                        "failed to load OCN map file" );
-            CHECKIERR( iMOAB_MigrateMapMesh( cplAtmPID, cplAtmOcnPID, &couComm,
-                                             &couPEGroup, &couPEGroup, &src_disc_type,
-                                             &cplatm, &atmocnid ),
+            CHECKIERR( iMOAB_MigrateMapMesh( cplAtmPID, cplAtmOcnPID, &couComm, &couPEGroup, &couPEGroup,
+                                             &src_disc_type, &cplatm, &atmocnid ),
                        "failed to migrate map mesh after load" );
             POP_TIMER( couComm, rankInCouComm )
         }
         else
         {
             PUSH_TIMER( "Compute the projection weights with TempestRemap" )
-            ierr = iMOAB_ComputeScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0], disc_methods[0],
-                                                         &disc_orders[0], disc_methods[1], &disc_orders[1], nullptr,
-                                                         &fNoBubble, &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap,
-                                                         &fNoConserve, &fValidate, dof_tag_names[0], dof_tag_names[1] );
+            ierr =
+                iMOAB_ComputeScalarProjectionWeights( cplAtmOcnPID, weights_identifiers[0], disc_methods[0],
+                                                      &disc_orders[0], disc_methods[1], &disc_orders[1], nullptr,
+                                                      &fNoBubble, &fMonotoneTypeID, &fVolumetric, &fInverseDistanceMap,
+                                                      &fNoConserve, &fValidate, dof_tag_names[0], dof_tag_names[1] );
             CHECKIERR( ierr, "cannot compute scalar projection weights" )
             POP_TIMER( couComm, rankInCouComm )
 
@@ -518,8 +517,7 @@ int main( int argc, char* argv[] )
             if( !writeMapsPrefix.empty() )
             {
                 const std::string mapFn = writeMapsPrefix + "_atm_ocn.nc";
-                ierr = iMOAB_WriteMapFile( cplAtmOcnPID, weights_identifiers[0],
-                                           mapFn.c_str() );
+                ierr                    = iMOAB_WriteMapFile( cplAtmOcnPID, weights_identifiers[0], mapFn.c_str() );
                 CHECKIERR( ierr, "failed to write map file to disk" );
             }
 
@@ -528,17 +526,15 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_NETCDF
             {
                 const std::string atmocn_map_file_name = "atm_ocn_map.nc";
-                ierr = iMOAB_WriteMapFile( cplAtmOcnPID, weights_identifiers[0],
-                                           atmocn_map_file_name.c_str() );
+                ierr = iMOAB_WriteMapFile( cplAtmOcnPID, weights_identifiers[0], atmocn_map_file_name.c_str() );
                 CHECKIERR( ierr, "failed to write map file to disk" );
 
                 const std::string intx_from_file_identifier = "atmocn-map-from-file";
-                int src_disc_type                            = 1;
-                int tgt_disc_type                            = 3;
-                int arearead                                 = 1;
-                CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID,
-                                              &src_disc_type, &tgt_disc_type, &arearead,
-                                              intx_from_file_identifier.c_str(),
+                int src_disc_type                           = 1;
+                int tgt_disc_type                           = 3;
+                int arearead                                = 1;
+                CHECKIERR( iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &src_disc_type, &tgt_disc_type,
+                                              &arearead, intx_from_file_identifier.c_str(),
                                               atmocn_map_file_name.c_str() ),
                            "failed to load map file from disk" );
             }
@@ -686,8 +682,8 @@ int main( int argc, char* argv[] )
             /* We have the remapping weights now. Let us apply the weights onto the tag we defined
                on the source mesh and get the projection on the target mesh */
             PUSH_TIMER( "Apply Scalar projection weights" )
-ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0], bottomFields,
-                                                        bottomProjectedFields , nullptr);
+            ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_identifiers[0], bottomFields,
+                                                       bottomProjectedFields );
             CHECKIERR( ierr, "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )
             if( 1 == n )  // write only for n==1 case
@@ -707,10 +703,8 @@ ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_i
                 std::ostringstream oss;
                 oss << digestPrefix << "_ocn_" << couSize << ".txt";
                 const std::string digestFn = oss.str();
-                ierr = gather_and_write_proj_tag( couComm, rankInCouComm,
-                                                   cplOcnPID, "a2oTbot_proj", digestFn );
-                if( ierr )
-                    std::cerr << "WARNING: could not write digest " << digestFn << "\n";
+                ierr = gather_and_write_proj_tag( couComm, rankInCouComm, cplOcnPID, "a2oTbot_proj", digestFn );
+                if( ierr ) std::cerr << "WARNING: could not write digest " << digestFn << "\n";
             }
         }
 
@@ -825,7 +819,7 @@ ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmOcnPID, &filter_type, weights_i
         {
             PUSH_TIMER( "Apply Scalar projection weights for land" )
             ierr = iMOAB_ApplyScalarProjectionWeights( cplAtmLndPID, &filter_type, weights_identifiers[1], bottomFields,
-                                                       bottomProjectedFields , nullptr);
+                                                       bottomProjectedFields );
             CHECKIERR( ierr, "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )
         }

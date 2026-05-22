@@ -101,6 +101,10 @@ int main( int argc, char* argv[] )
 
     bool no_regression_test = false;
     opts.addOpt< void >( "no_regression,r", "do not do regression test against baseline 1", &no_regression_test );
+
+    std::string digestPrefix;
+    opts.addOpt< std::string >( "digest_prefix", "prefix for BfB digest output files", &digestPrefix );
+
     opts.parseCommandLine( argc, argv );
 
     char fileWriteOptions[] = "PARALLEL=WRITE_PART";
@@ -377,7 +381,7 @@ int main( int argc, char* argv[] )
     if( couComm != MPI_COMM_NULL )
     {
         CHECKIERR( iMOAB_DefineTagStorage( cplAtmPID, bottomFields, &tagTypes, &atmCompNDoFs, &tagIndex[0] ),
-                   "failed to define the field tags AnalyticalSolnSrcExact" );
+                   "failed to define the field tags bottomFields" );
 
         // just to be sure it is set, to be visible by iMOAB app
         CHECKIERR( iMOAB_DefineTagStorage( cplAtmPID, "aream", &tagTypes, &atmCompNDoFs, &tagIndex[0] ),
@@ -391,7 +395,7 @@ int main( int argc, char* argv[] )
 
 #ifdef COMPUTE_TRANSPOSE_FILE_MAP
         CHECKIERR( iMOAB_DefineTagStorage( cplAtmPID, bottomProjectedFieldsS, &tagTypes, &atmCompNDoFs, &tagIndex[0] ),
-                   "failed to define the field tags AnalyticalSolnSrcExact" );
+                   "failed to define the field tags bottomProjectedFieldsS" );
 #endif
     }
 
@@ -486,9 +490,19 @@ int main( int argc, char* argv[] )
                on the source mesh and get the projection on the target mesh */
             PUSH_TIMER( "Apply from file scalar projection weights" )
             CHECKIERR( iMOAB_ApplyScalarProjectionWeights( cplAtmOcnFilePID, &filter_type, map_from_file_identifier[0],
-                                                           bottomFields, bottomProjectedFieldsF ),
+                                                            bottomFields, bottomProjectedFieldsF ),
                        "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )
+            if( !digestPrefix.empty() )
+            {
+                int couSize;
+                MPI_Comm_size( couComm, &couSize );
+                std::ostringstream oss;
+                oss << digestPrefix << "_ocn_file_" << couSize << ".txt";
+                int dierr = gather_and_write_proj_tag( couComm, rankInCouComm, cplOcnPID, "Target_projF", oss.str() );
+                if( dierr )
+                    std::cerr << "WARNING: could not write digest " << oss.str() << "\n";
+            }
 #endif  // COMPUTE_FILE_MAP
 
 // #undef COMPUTE_FILE_MAP
@@ -518,9 +532,19 @@ int main( int argc, char* argv[] )
 #ifdef COMPUTE_ONLINE_MAP
             PUSH_TIMER( "Apply in-memory scalar projection weights" )
             CHECKIERR( iMOAB_ApplyScalarProjectionWeights( cplAtmOcnMemPID, &filter_type, map_from_mem_identifier,
-                                                           bottomFields, bottomProjectedFieldsM ),
+                                                            bottomFields, bottomProjectedFieldsM ),
                        "failed to compute projection weight application" );
             POP_TIMER( couComm, rankInCouComm )
+            if( !digestPrefix.empty() )
+            {
+                int couSize;
+                MPI_Comm_size( couComm, &couSize );
+                std::ostringstream oss;
+                oss << digestPrefix << "_ocn_mem_" << couSize << ".txt";
+                int dierr = gather_and_write_proj_tag( couComm, rankInCouComm, cplOcnPID, "Target_projM", oss.str() );
+                if( dierr )
+                    std::cerr << "WARNING: could not write digest " << oss.str() << "\n";
+            }
 #endif
         }
 

@@ -15,6 +15,10 @@
 
 #include "moab/Remapping/TempestOnlineMap.hpp"
 
+#include <algorithm>
+#include <utility>
+#include <vector>
+
 // ** Kahan Summation Algorithm for improved numerical accuracy **
 struct KahanSum
 {

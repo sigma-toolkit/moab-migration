@@ -2606,6 +2606,126 @@ ErrCode iMOAB_SetDoubleTagStorageWithGid( iMOAB_AppID pid,
     return MB_SUCCESS;
 }
 
+#ifdef MOAB_HAVE_TEMPESTREMAP
+// Helper: get the 2D entities of the TempestRemap CoveringMesh attached to this app.
+// Returns an empty range (and success) if no remapper is attached.
+static ErrCode get_coverage_entities( iMOAB_AppID pid, moab::Range& covEnts )
+{
+    appData& data = context.appDatas[*pid];
+    covEnts.clear();
+    if( data.tempestData.remapper == nullptr ) return moab::MB_SUCCESS;
+    covEnts = data.tempestData.remapper->GetMeshEntities( moab::Remapper::CoveringMesh );
+    return moab::MB_SUCCESS;
+}
+
+/**
+ * \brief Return the number of 2D elements in the TempestRemap CoveringMesh of this app
+ *        and (optionally) their global IDs and centroid coordinates.
+ *
+ * Used to populate analytic source fields directly on the coverage entities of a
+ * dual-map intersection app, bypassing the cmpAtm->cplAtm->cplDualMap migration
+ * chain — useful for BFB testing of dual-map CAAS where every rank must see an
+ * identical input set independent of how the source mesh was partitioned.
+ *
+ * Call once with gids=NULL, centroids=NULL to query num_cov_elems, then allocate
+ * and call again to fill the buffers.
+ *
+ * \param[in]    pid             Application ID with an attached TempestRemap remapper
+ *                               (e.g. the dual-map intersection app).
+ * \param[inout] num_cov_elems   On input: ignored (or capacity); on output: number of
+ *                               2D entities in the covering mesh on this rank.
+ * \param[out]   gids            Optional. If non-null, filled with the global IDs of
+ *                               the covering entities (size num_cov_elems).
+ * \param[out]   centroids       Optional. If non-null, filled with the arithmetic mean
+ *                               of vertex coords per element (size 3*num_cov_elems,
+ *                               x,y,z interleaved).
+ * \return ErrCode               MB_SUCCESS on success.
+ */
+ErrCode iMOAB_GetCoverageMeshInfo( iMOAB_AppID pid, int* num_cov_elems, int* gids, double* centroids )
+{
+    moab::Range covEnts;
+    MB_CHK_ERR( get_coverage_entities( pid, covEnts ) );
+    *num_cov_elems = static_cast< int >( covEnts.size() );
+    if( covEnts.empty() ) return moab::MB_SUCCESS;
+
+    if( gids != nullptr )
+    {
+        std::vector< int > tmpGids( covEnts.size() );
+        MB_CHK_ERR( context.MBI->tag_get_data( context.globalID_tag, covEnts, tmpGids.data() ) );
+        std::copy( tmpGids.begin(), tmpGids.end(), gids );
+    }
+
+    if( centroids != nullptr )
+    {
+        const moab::EntityHandle* conn;
+        int numNodes;
+        std::vector< double > coords;
+        int i = 0;
+        for( moab::Range::iterator it = covEnts.begin(); it != covEnts.end(); ++it, ++i )
+        {
+            MB_CHK_ERR( context.MBI->get_connectivity( *it, conn, numNodes ) );
+            coords.resize( 3 * numNodes );
+            MB_CHK_ERR( context.MBI->get_coords( conn, numNodes, coords.data() ) );
+            double cx = 0.0, cy = 0.0, cz = 0.0;
+            for( int v = 0; v < numNodes; v++ )
+            {
+                cx += coords[3 * v + 0];
+                cy += coords[3 * v + 1];
+                cz += coords[3 * v + 2];
+            }
+            centroids[3 * i + 0] = cx / numNodes;
+            centroids[3 * i + 1] = cy / numNodes;
+            centroids[3 * i + 2] = cz / numNodes;
+        }
+    }
+    return moab::MB_SUCCESS;
+}
+
+/**
+ * \brief Set a double tag on every entity of the TempestRemap CoveringMesh of this app.
+ *
+ * Values are written in the same order as iMOAB_GetCoverageMeshInfo returns gids
+ * (i.e. moab::Range iteration order over the covering set entities). The tag must
+ * already be defined on the app via iMOAB_DefineTagStorage.
+ *
+ * This bypasses the partition-dependent migration path and is useful for BFB tests
+ * that must populate the source field on the actual coverage cells consumed by
+ * iMOAB_ApplyScalarProjectionWeights.
+ *
+ * \param[in] pid                       Application ID with an attached TempestRemap remapper.
+ * \param[in] tag_storage_name          Name of the (already-defined) double tag.
+ * \param[in] num_tag_storage_length    Total number of values supplied (= num_cov_elems *
+ *                                      components_per_entity).
+ * \param[in] tag_storage_data          The values to write, in covering-Range order.
+ * \return ErrCode                      MB_SUCCESS on success.
+ */
+ErrCode iMOAB_SetDoubleTagStorageOnCoverage( iMOAB_AppID pid,
+                                             const iMOAB_String tag_storage_name,
+                                             int* num_tag_storage_length,
+                                             double* tag_storage_data )
+{
+    moab::Range covEnts;
+    MB_CHK_ERR( get_coverage_entities( pid, covEnts ) );
+    if( covEnts.empty() ) return moab::MB_SUCCESS;
+
+    std::string tagName( tag_storage_name );
+    moab::Tag tag = nullptr;
+    if( moab::MB_SUCCESS != context.MBI->tag_get_handle( tagName.c_str(), tag ) || !tag ) return moab::MB_FAILURE;
+
+    int tagLen = 0;
+    MB_CHK_ERR( context.MBI->tag_get_length( tag, tagLen ) );
+    moab::DataType dtype;
+    MB_CHK_ERR( context.MBI->tag_get_data_type( tag, dtype ) );
+    if( dtype != moab::MB_TYPE_DOUBLE ) return moab::MB_FAILURE;
+
+    const int needed = tagLen * static_cast< int >( covEnts.size() );
+    if( *num_tag_storage_length < needed ) return moab::MB_FAILURE;
+
+    MB_CHK_ERR( context.MBI->tag_set_data( tag, covEnts, tag_storage_data ) );
+    return moab::MB_SUCCESS;
+}
+#endif  // MOAB_HAVE_TEMPESTREMAP
+
 ErrCode iMOAB_GetDoubleTagStorage( iMOAB_AppID pid,
                                    const iMOAB_String tag_storage_names,
                                    int* num_tag_storage_length,
@@ -4477,12 +4597,15 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
             newRecvGraph->SetReceivingAfterCoverage( idsFromProcs );      // Store coverage requirements
             newRecvGraph->set_cover_set( cover_set );                     // Associate with coverage mesh set
 
-            // Store in application's graph map with unique context_id
-            if( context.appDatas[*pid_migr].pgraph.find( *context_id ) == context.appDatas[*pid_migr].pgraph.end() )
-                context.appDatas[*pid_migr].pgraph[*context_id] = newRecvGraph;
-            else
-                MB_CHK_SET_ERR( moab::MB_FAILURE, "ParCommGraph for context_id="
-                                                      << *context_id << " already exists. Check the workflow" );
+            // Store in application's graph map; replace any existing graph for this context.
+            auto& pgraphMap = context.appDatas[*pid_migr].pgraph;
+            auto existing   = pgraphMap.find( *context_id );
+            if( existing != pgraphMap.end() )
+            {
+                delete existing->second;
+                pgraphMap.erase( existing );
+            }
+            pgraphMap[*context_id] = newRecvGraph;
         }
 
         // Pack requirements into TupleList for crystal router communication
@@ -5357,85 +5480,111 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
         std::vector< int > values_entities;  // will be the size of primary_ents3 * lenTagType1
         EntityHandle fset3 = tdata.remapper->GetMeshSet( Remapper::CoveringMesh );
 
-        // start copy
-        std::map< int, EntityHandle > vertexMap;  //
-        Range verts;
-        // always form vertices and add them to the fset3;
-        int n = TLv.get_n();
-        EntityHandle vertex;
-        for( int i = 0; i < n; i++ )
-        {
-            int gid = TLv.vi_rd[2 * i + 1];
-            if( vertexMap.find( gid ) == vertexMap.end() )
-            {
-                // need to form this vertex
-                MB_CHK_ERR( context.MBI->create_vertex( &( TLv.vr_rd[3 * i] ), vertex ) );
-                vertexMap[gid] = vertex;
-                verts.insert( vertex );
-                MB_CHK_ERR( context.MBI->tag_set_data( gidTag, &vertex, 1, &gid ) );
-            }
-        }
-        MB_CHK_ERR( context.MBI->add_entities( fset3, verts ) );
-        if( 2 == *type )
-        {
-            values_entities.resize( verts.size() );  // just get the ids of vertices
-            MB_CHK_ERR( context.MBI->tag_get_data( gidTag, verts, &values_entities[0] ) );
-            primary_ents = verts;
-            //return MB_SUCCESS;
-        }
-        else
-        {
-            n = TLc.get_n();
-            int size_tuple =
-                2 + ( ( *type != 1 ) ? 0 : lenTagType1 ) + 1 + 10;  // 10 is the max number of vertices in cell
+        // When an intersection-based covering mesh already exists, ReceiveElementTag and
+        // ApplyWeights must share the same entity handles.  Skip populating fset3 with MAP
+        // cells so we don't corrupt the set used by both callers.
+        Range intx_cov_cells;
+        MB_CHK_ERR( context.MBI->get_entities_by_dimension( fset3, 2, intx_cov_cells ) );
+        const bool has_intersection_coverage = !intx_cov_cells.empty();
 
-            EntityHandle new_element;
-
-            std::map< int, EntityHandle >
-                cellMap;  // do not create one if it already exists, maybe from other processes
+        if( !has_intersection_coverage )
+        {
+            // start copy
+            std::map< int, EntityHandle > vertexMap;  //
+            Range verts;
+            // always form vertices and add them to the fset3;
+            int n = TLv.get_n();
+            EntityHandle vertex;
             for( int i = 0; i < n; i++ )
             {
-                // int from_proc  = TLc.vi_rd[size_tuple * i];
-                int globalIdEl = TLc.vi_rd[size_tuple * i + 1];
-                if( cellMap.find( globalIdEl ) == cellMap.end() )  // need to create the cell
+                int gid = TLv.vi_rd[2 * i + 1];
+                if( vertexMap.find( gid ) == vertexMap.end() )
                 {
-                    int current_index = 2;
-                    if( 1 == *type ) current_index += lenTagType1;
-                    int nnodes = TLc.vi_rd[size_tuple * i + current_index];
-                    std::vector< EntityHandle > conn;
-                    conn.resize( nnodes );
-                    for( int j = 0; j < nnodes; j++ )
-                    {
-                        conn[j] = vertexMap[TLc.vi_rd[size_tuple * i + current_index + j + 1]];
-                    }
-                    //
-                    EntityType entType = MBQUAD;
-                    if( nnodes > 4 ) entType = MBPOLYGON;
-                    if( nnodes < 4 ) entType = MBTRI;
-                    MB_CHK_SET_ERR( context.MBI->create_element( entType, &conn[0], nnodes, new_element ),
-                                    "can't create new element " );
-                    primary_ents.insert( new_element );
-                    cellMap[globalIdEl] = new_element;
-                    MB_CHK_SET_ERR( context.MBI->tag_set_data( gidTag, &new_element, 1, &globalIdEl ),
-                                    "can't set global id tag on cell " );
-                    if( 1 == *type )
-                    {
-                        // set the gds tag
-                        MB_CHK_SET_ERR( context.MBI->tag_set_data( gdsTag, &new_element, 1,
-                                                                   &( TLc.vi_rd[size_tuple * i + 2] ) ),
-                                        "can't set gds tag on cell " );
-                    }
+                    // need to form this vertex
+                    MB_CHK_ERR( context.MBI->create_vertex( &( TLv.vr_rd[3 * i] ), vertex ) );
+                    vertexMap[gid] = vertex;
+                    verts.insert( vertex );
+                    MB_CHK_ERR( context.MBI->tag_set_data( gidTag, &vertex, 1, &gid ) );
                 }
             }
-            MB_CHK_ERR( context.MBI->add_entities( fset3, primary_ents ) );
+            MB_CHK_ERR( context.MBI->add_entities( fset3, verts ) );
+            if( 2 == *type )
+            {
+                values_entities.resize( verts.size() );  // just get the ids of vertices
+                MB_CHK_ERR( context.MBI->tag_get_data( gidTag, verts, &values_entities[0] ) );
+                primary_ents = verts;
+                //return MB_SUCCESS;
+            }
+            else
+            {
+                n = TLc.get_n();
+                int size_tuple =
+                    2 + ( ( *type != 1 ) ? 0 : lenTagType1 ) + 1 + 10;  // 10 is the max number of vertices in cell
+
+                EntityHandle new_element;
+
+                std::map< int, EntityHandle >
+                    cellMap;  // do not create one if it already exists, maybe from other processes
+                for( int i = 0; i < n; i++ )
+                {
+                    // int from_proc  = TLc.vi_rd[size_tuple * i];
+                    int globalIdEl = TLc.vi_rd[size_tuple * i + 1];
+                    if( cellMap.find( globalIdEl ) == cellMap.end() )  // need to create the cell
+                    {
+                        int current_index = 2;
+                        if( 1 == *type ) current_index += lenTagType1;
+                        int nnodes = TLc.vi_rd[size_tuple * i + current_index];
+                        std::vector< EntityHandle > conn;
+                        conn.resize( nnodes );
+                        for( int j = 0; j < nnodes; j++ )
+                        {
+                            conn[j] = vertexMap[TLc.vi_rd[size_tuple * i + current_index + j + 1]];
+                        }
+                        //
+                        EntityType entType = MBQUAD;
+                        if( nnodes > 4 ) entType = MBPOLYGON;
+                        if( nnodes < 4 ) entType = MBTRI;
+                        MB_CHK_SET_ERR( context.MBI->create_element( entType, &conn[0], nnodes, new_element ),
+                                        "can't create new element " );
+                        primary_ents.insert( new_element );
+                        cellMap[globalIdEl] = new_element;
+                        MB_CHK_SET_ERR( context.MBI->tag_set_data( gidTag, &new_element, 1, &globalIdEl ),
+                                        "can't set global id tag on cell " );
+                        if( 1 == *type )
+                        {
+                            // set the gds tag
+                            MB_CHK_SET_ERR( context.MBI->tag_set_data( gdsTag, &new_element, 1,
+                                                                       &( TLc.vi_rd[size_tuple * i + 2] ) ),
+                                            "can't set gds tag on cell " );
+                        }
+                    }
+                }
+                MB_CHK_ERR( context.MBI->add_entities( fset3, primary_ents ) );
+                if( 1 == *type )
+                {
+                    values_entities.resize( lenTagType1 * primary_ents.size() );
+                    MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, primary_ents, &values_entities[0] ) );
+                }
+                else  // *type == 3
+                {
+                    values_entities.resize( primary_ents.size() );  // just get the global ids !
+                    MB_CHK_ERR( context.MBI->tag_get_data( gidTag, primary_ents, &values_entities[0] ) );
+                }
+            }
+        }  // end if( !has_intersection_coverage )
+        else
+        {
+            // Reuse the intersection covering mesh as the entity set for weight application;
+            // rebuild values_entities from it so col_dtoc_dofmap maps those entities to MAP columns.
+            primary_ents = intx_cov_cells;
             if( 1 == *type )
             {
                 values_entities.resize( lenTagType1 * primary_ents.size() );
                 MB_CHK_ERR( context.MBI->tag_get_data( gdsTag, primary_ents, &values_entities[0] ) );
             }
-            else  // *type == 3
+            else
             {
-                values_entities.resize( primary_ents.size() );  // just get the global ids !
+                values_entities.resize( primary_ents.size() );
                 MB_CHK_ERR( context.MBI->tag_get_data( gidTag, primary_ents, &values_entities[0] ) );
             }
         }
@@ -5970,6 +6119,13 @@ ErrCode iMOAB_ComputeScalarProjectionWeights(
     return moab::MB_SUCCESS;
 }
 
+// Forward declaration of internal helper
+static ErrCode ComputeRowBounds( iMOAB_AppID pid_intersection,
+                                 const iMOAB_String solution_weights_identifier,
+                                 const iMOAB_String source_solution_tag_name,
+                                 const iMOAB_String lower_bound_tag_name,
+                                 const iMOAB_String upper_bound_tag_name );
+
 ErrCode iMOAB_ApplyScalarProjectionWeights(
     iMOAB_AppID pid_intersection,
     int* filter_type,
@@ -6101,12 +6257,48 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         }
     }
 
-    for( size_t i = 0; i < srcTagHandles.size(); i++ )
+    // Look up the low-order weight map
+    std::string lo_weights_identifier =
+        ( strlen( solution_weights_identifier ) > 3 ? std::string( solution_weights_identifier + 3 ) : "" );
+    moab::TempestOnlineMap* loWeightMap = nullptr;
+    bool useDualMapBounds               = false;
+    if( lo_weights_identifier.size() && tdata.weightMaps.count( lo_weights_identifier ) )
     {
-        // Compute the application of weights on the suorce solution data and store it in the
-        // destination solution vector data Optionally, can also perform the transpose application
-        // of the weight matrix. Set the 3rd argument to true if this is needed
-        MB_CHK_ERR( weightMap->ApplyWeights( srcTagHandles[i], tgtTagHandles[i], false, caasType ) );
+        // store the reference to the weight map
+        loWeightMap = tdata.weightMaps[lo_weights_identifier];
+        // Dual-map nonlinear remapping: use low-order map stencil for CAAS bounds
+        useDualMapBounds = ( loWeightMap && caasType != moab::TempestOnlineMap::CAAS_NONE );
+    }
+
+    if( useDualMapBounds )
+    {
+        for( size_t i = 0; i < srcTagHandles.size(); i++ )
+        {
+            // Apply high-order projection with dual-map CAAS bounds from low-order map
+            // If caasType == CAAS_NONE, this just returns the low-order projection back
+            MB_CHK_ERR(
+                weightMap->ApplyWeightsWithDualMap( srcTagHandles[i], tgtTagHandles[i], loWeightMap, caasType ) );
+        }
+
+        // Store diagnostic per-row bounds from the HIGH-ORDER stencil on
+        // target entities. ApplyWeightsWithDualMap uses the high-order
+        // stencil to define [lo,hi] (per Bradley et al. 2019); the test
+        // bounds must match for verification to be meaningful.
+        for( size_t i = 0; i < srcNames.size(); i++ )
+        {
+            std::string loBoundName = srcNames[i] + "_DualMapLoBound";
+            std::string hiBoundName = srcNames[i] + "_DualMapHiBound";
+            MB_CHK_ERR( ComputeRowBounds( pid_intersection, solution_weights_identifier, srcNames[i].c_str(),
+                                          loBoundName.c_str(), hiBoundName.c_str() ) );
+        }
+    }
+    else
+    {
+        for( size_t i = 0; i < srcTagHandles.size(); i++ )
+        {
+            // Standard: apply projection with optional overlap-based CAAS
+            MB_CHK_ERR( weightMap->ApplyWeights( srcTagHandles[i], tgtTagHandles[i], false, caasType ) );
+        }
     }
 
 // #define VERBOSE
@@ -6172,6 +6364,100 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
     }
 #endif
     // #undef VERBOSE
+
+    return moab::MB_SUCCESS;
+}
+
+static ErrCode ComputeRowBounds( iMOAB_AppID pid_intersection,
+                                 const iMOAB_String solution_weights_identifier,
+                                 const iMOAB_String source_solution_tag_name,
+                                 const iMOAB_String lower_bound_tag_name,
+                                 const iMOAB_String upper_bound_tag_name )
+{
+    assert( solution_weights_identifier && strlen( solution_weights_identifier ) );
+    assert( source_solution_tag_name && strlen( source_solution_tag_name ) );
+    assert( lower_bound_tag_name && strlen( lower_bound_tag_name ) );
+    assert( upper_bound_tag_name && strlen( upper_bound_tag_name ) );
+
+    appData& data_intx       = context.appDatas[*pid_intersection];
+    TempestMapAppData& tdata = data_intx.tempestData;
+
+    if( !tdata.weightMaps.count( std::string( solution_weights_identifier ) ) ) return moab::MB_INDEX_OUT_OF_RANGE;
+    moab::TempestOnlineMap* weightMap = tdata.weightMaps[std::string( solution_weights_identifier )];
+
+    // Get entity ranges
+    moab::TempestRemapper* remapper = tdata.remapper;
+    moab::Range covSrcEnts          = remapper->GetMeshEntities( moab::Remapper::CoveringMesh );
+    moab::Range tgtEnts             = remapper->GetMeshEntities( moab::Remapper::TargetMesh );
+
+    int srcNDof = weightMap->GetSourceNDofsPerElement();
+    int tgtNDof = weightMap->GetDestinationNDofsPerElement();
+
+    // Read source field values from coverage mesh
+    Tag srcTag;
+    moab::ErrorCode rval = context.MBI->tag_get_handle( source_solution_tag_name, srcTag );
+    if( rval != moab::MB_SUCCESS ) return moab::MB_TAG_NOT_FOUND;
+
+    std::vector< double > srcVals( covSrcEnts.size() * srcNDof * srcNDof, 0.0 );
+    MB_CHK_ERR( context.MBI->tag_get_data( srcTag, covSrcEnts, &srcVals[0] ) );
+
+    // Get or create lower/upper bound tags on target entities
+    size_t nTargetDofs = tgtEnts.size() * tgtNDof * tgtNDof;
+    Tag loTag, hiTag;
+    MB_CHK_SET_ERR( context.MBI->tag_get_handle( lower_bound_tag_name, tgtNDof * tgtNDof, MB_TYPE_DOUBLE, loTag,
+                                                 MB_TAG_DENSE | MB_TAG_CREAT ),
+                    "Failed to get or create lower bound tag on target entities" );
+    MB_CHK_SET_ERR( context.MBI->tag_get_handle( upper_bound_tag_name, tgtNDof * tgtNDof, MB_TYPE_DOUBLE, hiTag,
+                                                 MB_TAG_DENSE | MB_TAG_CREAT ),
+                    "Failed to get or create upper bound tag on target entities" );
+
+    // Compute per-row bounds from weight matrix stencil.
+    // Matrix column indices are NOT the same as srcVals indices; we must map
+    // matrix-col -> source-vector-index via the inverse of col_dtoc_dofmap.
+    auto& W                            = weightMap->GetWeightMatrix();
+    const std::vector< int >& col_dtoc = weightMap->GetColDofMap();
+    const std::vector< int >& row_dtoc = weightMap->GetRowDofMap();
+    int maxMatCol                      = -1;
+    for( size_t k = 0; k < srcVals.size() && k < col_dtoc.size(); k++ )
+        if( col_dtoc[k] > maxMatCol ) maxMatCol = col_dtoc[k];
+    std::vector< int > col_inv( maxMatCol + 1, -1 );
+    for( size_t k = 0; k < srcVals.size() && k < col_dtoc.size(); k++ )
+        if( col_dtoc[k] >= 0 ) col_inv[col_dtoc[k]] = (int)k;
+
+    std::vector< double > loBound( nTargetDofs, 1e308 );
+    std::vector< double > hiBound( nTargetDofs, -1e308 );
+
+    for( size_t i = 0; i < nTargetDofs; i++ )
+    {
+        int r = ( i < row_dtoc.size() ) ? row_dtoc[i] : -1;
+        if( r < 0 || r >= W.outerSize() )
+        {
+            loBound[i] = 0.0;
+            hiBound[i] = 0.0;
+            continue;
+        }
+        for( moab::TempestOnlineMap::WeightMatrix::InnerIterator it( W, r ); it; ++it )
+        {
+            int mc = (int)it.col();
+            if( mc < 0 || mc > maxMatCol ) continue;
+            int srcIdx = col_inv[mc];
+            if( srcIdx < 0 || srcIdx >= (int)srcVals.size() ) continue;
+            double v = srcVals[srcIdx];
+            if( v < loBound[i] ) loBound[i] = v;
+            if( v > hiBound[i] ) hiBound[i] = v;
+        }
+        if( loBound[i] > hiBound[i] )
+        {
+            loBound[i] = 0.0;
+            hiBound[i] = 0.0;
+        }
+    }
+
+    // Write bounds to tags
+    MB_CHK_SET_ERR( context.MBI->tag_set_data( loTag, tgtEnts, &loBound[0] ),
+                    "Failed to set lower bound tag data on target entities" );
+    MB_CHK_SET_ERR( context.MBI->tag_set_data( hiTag, tgtEnts, &hiBound[0] ),
+                    "Failed to set upper bound tag data on target entities" );
 
     return moab::MB_SUCCESS;
 }

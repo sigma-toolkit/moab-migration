@@ -236,10 +236,11 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
 
   if(MOAB_HAVE_TEMPESTREMAP)
     set( MBTR_TESTS parallel/imoab_coupler.cpp parallel/imoab_coupler_bilin.cpp parallel/imoab_coupler_twohop.cpp
-                    parallel/imoab_domain_culling.cpp parallel/imoab_map_r2l.cpp parallel/imoab_map_target.cpp 
-                    parallel/imoab_ptest2.cpp parallel/imoab_read_compute_map.cpp 
-                    parallel/imoab_scrip.cpp parallel/imoab_setwithGid.cpp parallel/imoab_phatm_ocn_coupler.cpp 
-                    parallel/imoab_apg2_ol_coupler.cpp )
+                    parallel/imoab_domain_culling.cpp parallel/imoab_map_r2l.cpp parallel/imoab_map_target.cpp
+                    parallel/imoab_ptest2.cpp parallel/imoab_read_compute_map.cpp
+                    parallel/imoab_scrip.cpp parallel/imoab_setwithGid.cpp parallel/imoab_phatm_ocn_coupler.cpp
+                    parallel/imoab_apg2_ol_coupler.cpp parallel/imoab_spmv_bfb.cpp
+                    parallel/imoab_dualmap_caas.cpp )
     
     foreach( fname ${MBTR_TESTS} )
       string( REPLACE ".cpp" "" base ${fname} )
@@ -249,6 +250,52 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
       target_link_libraries( ${noparbase} MOAB ${TEMPESTREMAP_LIBRARIES} )
       add_test( ${noparbase} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${noparbase} ${MPIEXEC_POSTFLAGS} )
     endforeach()
+
+    # iMOAB BfB / tolerance / exit-code regression harness.
+    #
+    # Each config under test/parallel/regression/configs/ becomes one CTest
+    # test, gated on MOAB_HAVE_TEMPESTREMAP (this whole block) and run when
+    # the user invokes `ctest`. Pass/fail comes from the dispatcher's exit
+    # code: 0 = harness succeeded, non-zero = a BfB/tolerance/exit-code
+    # check failed for that config.
+    #
+    # Selecting just these from ctest:
+    #     ctest -L imoab_bfb
+    # Excluding them from a wider ctest run:
+    #     ctest -LE imoab_bfb
+    # One-shot convenience target (mirrors `make imoabcheck` in autotools):
+    #     cmake --build <builddir> --target imoab_bfb_check
+    #
+    # The dispatcher honors IMOAB_BINDIR to resolve binary locations
+    # (CMake puts them in ${EXECUTABLE_OUTPUT_PATH}, autotools in
+    # ${MOAB_BUILD}/test/parallel); MBCMPFILES is the h5m comparator the
+    # tol-mode configs require. Both are wired through ENVIRONMENT below.
+    set(_imoab_bfb_configs
+        dualmap_caas spmv_bfb
+        coupler coupler_bfb coupler_bilin coupler_twohop
+        map_target read_compute_map map_r2l
+        phatm_ocn_coupler domain_culling scrip setwithgid ptest2)
+
+    set(_imoab_bfb_dispatcher
+        ${CMAKE_SOURCE_DIR}/test/parallel/regression/imoab_test_runner.sh)
+    set(_imoab_bfb_env
+        "MOAB_BUILD=${CMAKE_BINARY_DIR}"
+        "MOAB_MESH_DIR=${CMAKE_SOURCE_DIR}/MeshFiles"
+        "MPIRUN=${MPIEXEC_EXECUTABLE}"
+        "MBCMPFILES=${EXECUTABLE_OUTPUT_PATH}/mbcmpfiles"
+        "IMOAB_BINDIR=${EXECUTABLE_OUTPUT_PATH}")
+
+    foreach(_cfg ${_imoab_bfb_configs})
+      add_test(NAME imoab_bfb_${_cfg}
+               COMMAND ${_imoab_bfb_dispatcher} ${_cfg})
+      set_tests_properties(imoab_bfb_${_cfg} PROPERTIES
+        LABELS "imoab_bfb"
+        ENVIRONMENT "${_imoab_bfb_env}")
+    endforeach()
+
+    add_custom_target(imoab_bfb_check
+      COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -L imoab_bfb
+      COMMENT "Running all iMOAB BfB regression configs via ctest")
 
     # Fortran tests
     set( MBTRF_TESTS parallel/imoab_ptest.F parallel/imoab_coupler_fortran.F90 parallel/imoab_coupler_caas.F90  )

@@ -412,6 +412,20 @@ class TempestOnlineMap : public OfflineMap
                                   CAASType caasType         = CAAS_NONE,
                                   double default_projection = 0.0 );
 
+    ///	<summary>
+    ///		Apply the high-order weight matrix onto the source vector (tag), and then enforce
+    ///     bounds computed from the stencil of a separate low-order weight map using the
+    ///     Clip-And-Assert-Sum (CAAS) algorithm. This implements the dual-map nonlinear
+    ///     remapping pattern used in E3SM coupling.
+    ///     \p loWeightMap provides the low-order (monotone) map whose per-row stencil defines
+    ///     the min/max bounds. The CAAS filter clips the high-order result to those bounds
+    ///     and redistributes mass proportionally to maintain conservation.
+    ///	</summary>
+    moab::ErrorCode ApplyWeightsWithDualMap( moab::Tag srcSolutionTag,
+                                             moab::Tag tgtSolutionTag,
+                                             TempestOnlineMap* loWeightMap,
+                                             CAASType caasType = CAAS_LOCAL );
+
     typedef double ( *sample_function )( double, double );
 
     /// <summary>
@@ -455,6 +469,12 @@ class TempestOnlineMap : public OfflineMap
     {
         m_meshInput = imesh;
     };
+
+    /// Read-only access to the matrix-row -> matrix-col DOF index maps. Used
+    /// by callers (e.g. iMOAB diagnostic helpers) that need to translate
+    /// matrix indices back into source/target tag-vector indices.
+    const std::vector< int >& GetRowDofMap() const { return row_dtoc_dofmap; }
+    const std::vector< int >& GetColDofMap() const { return col_dtoc_dofmap; }
 
   private:
     template < typename SparseMatrixType >

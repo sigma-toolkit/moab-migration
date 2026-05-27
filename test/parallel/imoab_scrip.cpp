@@ -212,6 +212,12 @@ int main( int argc, char* argv[] )
         ierr = iMOAB_FreeSenderBuffers( rofPID, &cplRof );
         CHECKIERR( ierr, "cannot free buffers  " )
     }
+
+    // Let iMOAB_Finalize sweep any still-registered apps (defensive cleanup
+    // added in iMOAB.cpp) so we don't leak ParCommGraph / pcomm / tempestData.
+    ierr = iMOAB_Finalize();
+    CHECKIERR( ierr, "did not finalize iMOAB" )
+
     MPI_Finalize();
 
     return 0;

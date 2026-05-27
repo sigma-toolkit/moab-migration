@@ -191,8 +191,8 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
     {
         assert( m_nDofsPEl_Src == 1 );
         col_gdofmap.resize( m_remapper->m_covering_source_vertices.size(), UINT_MAX );
-        col_dtoc_dofmap.resize( m_remapper->m_covering_source_vertices.size(), UINT_MAX );
-        src_soln_gdofs.resize( m_remapper->m_covering_source_vertices.size(), UINT_MAX );
+        col_dtoc_dofmap.resize( m_remapper->m_covering_source_vertices.size(), -1 );
+        src_soln_gdofs.resize( m_remapper->m_covering_source_vertices.size(), -1 );
         MB_CHK_ERR(
             m_interface->tag_get_data( m_dofTagSrc, m_remapper->m_covering_source_vertices, &src_soln_gdofs[0] ) );
         srcTagSize = 1;
@@ -200,8 +200,8 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
     else
     {
         col_gdofmap.resize( m_remapper->m_covering_source_entities.size() * srcTagSize, UINT_MAX );
-        col_dtoc_dofmap.resize( m_remapper->m_covering_source_entities.size() * srcTagSize, UINT_MAX );
-        src_soln_gdofs.resize( m_remapper->m_covering_source_entities.size() * srcTagSize, UINT_MAX );
+        col_dtoc_dofmap.resize( m_remapper->m_covering_source_entities.size() * srcTagSize, -1 );
+        src_soln_gdofs.resize( m_remapper->m_covering_source_entities.size() * srcTagSize, -1 );
         MB_CHK_ERR(
             m_interface->tag_get_data( m_dofTagSrc, m_remapper->m_covering_source_entities, &src_soln_gdofs[0] ) );
     }
@@ -254,15 +254,15 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
     {
         assert( m_nDofsPEl_Src == 1 );
         srccol_gdofmap.resize( m_remapper->m_source_vertices.size(), UINT_MAX );
-        srccol_dtoc_dofmap.resize( m_remapper->m_covering_source_vertices.size(), UINT_MAX );
-        locsrc_soln_gdofs.resize( m_remapper->m_source_vertices.size(), UINT_MAX );
+        srccol_dtoc_dofmap.resize( m_remapper->m_covering_source_vertices.size(), -1 );
+        locsrc_soln_gdofs.resize( m_remapper->m_source_vertices.size(), -1 );
         MB_CHK_ERR( m_interface->tag_get_data( m_dofTagSrc, m_remapper->m_source_vertices, &locsrc_soln_gdofs[0] ) );
     }
     else
     {
         srccol_gdofmap.resize( m_remapper->m_source_entities.size() * srcTagSize, UINT_MAX );
-        srccol_dtoc_dofmap.resize( m_remapper->m_source_entities.size() * srcTagSize, UINT_MAX );
-        locsrc_soln_gdofs.resize( m_remapper->m_source_entities.size() * srcTagSize, UINT_MAX );
+        srccol_dtoc_dofmap.resize( m_remapper->m_source_entities.size() * srcTagSize, -1 );
+        locsrc_soln_gdofs.resize( m_remapper->m_source_entities.size() * srcTagSize, -1 );
         MB_CHK_ERR( m_interface->tag_get_data( m_dofTagSrc, m_remapper->m_source_entities, &locsrc_soln_gdofs[0] ) );
     }
 
@@ -311,16 +311,16 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
     {
         assert( m_nDofsPEl_Dest == 1 );
         row_gdofmap.resize( m_remapper->m_target_vertices.size(), UINT_MAX );
-        row_dtoc_dofmap.resize( m_remapper->m_target_vertices.size(), UINT_MAX );
-        tgt_soln_gdofs.resize( m_remapper->m_target_vertices.size(), UINT_MAX );
+        row_dtoc_dofmap.resize( m_remapper->m_target_vertices.size(), -1 );
+        tgt_soln_gdofs.resize( m_remapper->m_target_vertices.size(), -1 );
         MB_CHK_ERR( m_interface->tag_get_data( m_dofTagDest, m_remapper->m_target_vertices, &tgt_soln_gdofs[0] ) );
         tgtTagSize = 1;
     }
     else
     {
         row_gdofmap.resize( m_remapper->m_target_entities.size() * tgtTagSize, UINT_MAX );
-        row_dtoc_dofmap.resize( m_remapper->m_target_entities.size() * tgtTagSize, UINT_MAX );
-        tgt_soln_gdofs.resize( m_remapper->m_target_entities.size() * tgtTagSize, UINT_MAX );
+        row_dtoc_dofmap.resize( m_remapper->m_target_entities.size() * tgtTagSize, -1 );
+        tgt_soln_gdofs.resize( m_remapper->m_target_entities.size() * tgtTagSize, -1 );
         MB_CHK_ERR( m_interface->tag_get_data( m_dofTagDest, m_remapper->m_target_entities, &tgt_soln_gdofs[0] ) );
     }
 

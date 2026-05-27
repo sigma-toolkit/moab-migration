@@ -56,8 +56,14 @@ typedef long double realType;
 typedef double realType;
 #endif
 
-/* apparently uint and ulong can be defined already in standard headers */
-#ifndef uint
+/* apparently uint, sint, and ulong can be defined already in standard headers;
+   they may be typedefs (not macros), so #ifndef may not catch them — suppress
+   the resulting duplicate_typedef warning for compilers that emit it (e.g. NVHPC). */
+#ifdef __NVCOMPILER
+#pragma diag_suppress duplicate_typedef
+#endif
+
+#ifndef sint
 typedef signed INTEGER sint;
 #endif
 
@@ -80,6 +86,10 @@ typedef unsigned GLOBAL_INT ulong;
 #else
 typedef uint ulong;
 #endif
+#endif
+
+#ifdef __NVCOMPILER
+#pragma diag_default duplicate_typedef
 #endif
 
 /*======================================================

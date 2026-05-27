@@ -75,7 +75,12 @@ AC_DEFUN([FATHOM_CONFIGURE_METIS],[
     LDFLAGS="-L$METIS_DIR/lib $ZOLTAN_LIB_FLAGS $LDFLAGS"
     AC_CHECK_LIB([metis], [METIS_MeshToDual],
       [enablemetis=$enablemetis], 
-      [enablemetis=no; AC_MSG_WARN([Could not find Metis library!])],
+      [unset ac_cv_lib_metis_METIS_MeshToDual;
+       AC_CHECK_LIB([metis], [METIS_MeshToDual],
+        [enablemetis=$enablemetis; METIS_LIBS="$METIS_LIBS -lGKlib"],
+        [enablemetis=no; AC_MSG_WARN([Could not find Metis library!])],
+        [-lGKlib $LIBS]
+        )],
       [$LIBS]
     )
     LDFLAGS=$oldLDFLAGS
@@ -87,7 +92,7 @@ AC_DEFUN([FATHOM_CONFIGURE_METIS],[
       PREFIX_PRINT([Configuring library with Metis support])
       ZOLTAN_LIB_FLAGS="-L$METIS_DIR/lib $ZOLTAN_LIB_FLAGS"
       ZOLTAN_INC_FLAGS="$METIS_INCLUDES $ZOLTAN_INC_FLAGS"
-      ZOLTAN_LIBS="$METIS_LIBRARY $ZOLTAN_LIBS"
+      ZOLTAN_LIBS="$METIS_LIBS $ZOLTAN_LIBS"
     else
       AC_MSG_ERROR([Could not find a valid copy of Metis in $METIS_DIR.  See config.log for details.])
     fi
@@ -174,9 +179,9 @@ AC_DEFUN([FATHOM_CONFIGURE_PARMETIS],[
     oldLDFLAGS=$LDFLAGS
     LDFLAGS="-L$PARMETIS_DIR/lib $ZOLTAN_LIB_FLAGS $LDFLAGS"
     AC_CHECK_LIB([parmetis], [ParMETIS_V3_Mesh2Dual], 
-      [enableparmetis=$enableparmetis; PARMETIS_LIBS="-lparmetis"], 
+      [enableparmetis=$enableparmetis; PARMETIS_LIBS="-lparmetis $METIS_LIBS"],
       [enableparmetis=no; AC_MSG_WARN([Could not find ParMetis library!])],
-      [-lmetis $LIBS]
+      [$METIS_LIBS $LIBS]
     )
     LDFLAGS=$oldLDFLAGS
     AC_LANG_POP(C)
@@ -187,7 +192,7 @@ AC_DEFUN([FATHOM_CONFIGURE_PARMETIS],[
       PREFIX_PRINT([Configuring library with ParMetis support])
       ZOLTAN_LIB_FLAGS="-L$PARMETIS_DIR/lib $ZOLTAN_LIB_FLAGS"
       ZOLTAN_INC_FLAGS="$PARMETIS_INCLUDES $ZOLTAN_INC_FLAGS"
-      ZOLTAN_LIBS="$PARMETIS_LIBRARY $ZOLTAN_LIBS"
+      ZOLTAN_LIBS="$PARMETIS_LIBS $ZOLTAN_LIBS"
     else
       AC_MSG_ERROR([Could not find a valid copy of ParMetis in $PARMETIS_DIR.  See config.log for details.])
     fi

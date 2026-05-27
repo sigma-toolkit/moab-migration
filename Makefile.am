@@ -102,12 +102,12 @@ examples_apps_earth_DATA = \
                examples/apps/earth/copyPartition.cpp
 
 CMAKE_CONFIGURATION_FILES = CMakeLists.txt \
-   config/AutoconfHeader.cmake      config/FindNETCDF.cmake        config/FindZOLTAN.cmake      \
+   config/AutoconfHeader.cmake      config/GenerateScript.cmake   config/FindNETCDF.cmake        config/FindZOLTAN.cmake      \
    config/FindEigen3.cmake       config/FindPNETCDF.cmake       config/Findgraphviz.cmake   config/MOABConfig.cmake.cmake \
    config/CMakeLibraryFuncs.cmake   config/FindPARMETIS.cmake    config/FindCython.cmake    config/ResolveCompilerPaths.cmake \
    config/CheckCompilerFlags.cmake  config/FindMETIS.cmake        config/FindTEMPESTREMAP.cmake  config/ForceAddFlags.cmake  config/FindMakeDist.cmake \
    config/TestBigEndian.cmake config/CMakeReplicateConfig.sh   config/TemplateSpecialization.cxx   config/MOABConfig.cmake.h.in   \
-   config/git-archive-all.sh   config/cmake_uninstall.cmake.in moab.make.cmake  \
+   config/git-archive-all.sh   config/cmake_uninstall.cmake.in moab.make.cmake config/logging.cmake config/dist.cmake config/distcheck.cmake \
    pymoab/CMakeLists.txt            config/cython_test.pyx
 
 EXTRA_DIST = $(doc_DATA) \

@@ -58,6 +58,13 @@ namespace moab
 ///	<summary>
 ///		An offline map between two Meshes.
 ///	</summary>
+// The base class OfflineMap declares private multi-arg overloads alongside public
+// single-arg virtual functions (IsConsistent, IsConservative, IsMonotone).
+// Overriding only the public single-arg versions is intentional; suppress the
+// partial_override warning that NVHPC emits for this pattern.
+#ifdef __NVCOMPILER
+#pragma diag_suppress partial_override
+#endif
 class TempestOnlineMap : public OfflineMap
 {
 
@@ -571,6 +578,9 @@ class TempestOnlineMap : public OfflineMap
     bool is_parallel, is_root;
     int rank, size;
 };
+#ifdef __NVCOMPILER
+#pragma diag_default partial_override
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 

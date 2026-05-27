@@ -749,8 +749,8 @@ static int get_attrib_array_length_handle( hid_t attrib_id )
     switch( H5Tget_class( type_id ) )
     {
         case H5T_NO_CLASS:
-            dims[0] = -1;
-            break;
+            H5Tclose( type_id );
+            return -1;
         case H5T_OPAQUE:
             dims[0] = H5Tget_size( type_id );
             break;

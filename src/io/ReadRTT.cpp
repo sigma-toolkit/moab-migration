@@ -1131,7 +1131,6 @@ ReadRTT::facet ReadRTT::get_facet_data( std::string facetdata )
         std::cout << header_data.version << " " << (int)tokens.size() << " " << base_token_size << " "
                   << dim_data.nside_flag_types << std::endl;
         MB_SET_ERR_RET_VAL( "Error, too many tokens found from get_facet_data", new_facet );
-        exit( 1 );
     }
 
     // set the side id

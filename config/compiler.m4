@@ -243,8 +243,8 @@ fi
 EXTRA_INTEL_CXXFLAGS="$EXTRA_INTEL_CXXFLAGS -fp-model=precise"
 EXTRA_INTEL_FCFLAGS="$EXTRA_INTEL_FCFLAGS -fp-model source -prec-div"
 # PGI
-EXTRA_PGI_CXXFLAGS="$EXTRA_PGI_CXXFLAGS -Kieee -Mdaz=flush -Mfprelaxed=no"
-EXTRA_PGI_FCFLAGS="$EXTRA_PGI_FCFLAGS -Kieee -Mdaz=flush -Mfprelaxed=no"
+EXTRA_PGI_CXXFLAGS="$EXTRA_PGI_CXXFLAGS -Kieee -Mdaz -Mfprelaxed=no"
+EXTRA_PGI_FCFLAGS="$EXTRA_PGI_FCFLAGS -Kieee -Mdaz -Mfprelaxed=no"
 # XLC
 EXTRA_BG_CXXFLAGS="$EXTRA_BG_CXXFLAGS -qarch=qp -qtune=auto -qpic=large -qenablevmx"
 EXTRA_BG_FCFLAGS="$EXTRA_BG_FCFLAGS -qarch=qp -qtune=auto -qpic=large -qenablevmx"

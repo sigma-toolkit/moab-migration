@@ -398,9 +398,12 @@ bool FileTokenizer::get_newline( bool report_error )
             bufferEnd = buffer + count;
         }
 
-        // If the current character is not a space, the we've failed.
+        // If the current character is not a space, then we've failed.
         if( !isspace( *nextToken ) )
+        {
             if( report_error ) MB_SET_ERR_RET_VAL( "Expected newline at line " << line_number(), false );
+            return false;
+        }
 
         // If the current space character is a newline,
         // increment the line number count.
@@ -413,8 +416,6 @@ bool FileTokenizer::get_newline( bool report_error )
         }
         ++nextToken;
     }
-
-    return false;
 }
 
 bool FileTokenizer::get_binary( size_t size, void* mem )

@@ -26,10 +26,13 @@ ErrorCode Tree::parse_common_options( FileOptions& options )
     // MESHSET_FLAGS: flags passed into meshset creation for tree nodes; should be a value from
     //          ENTITY_SET_PROPERTY (see Types.hpp); default = MESHSET_SET
     rval = options.get_int_option( "MESHSET_FLAGS", tmp_int );
-    if( MB_SUCCESS == rval && 0 <= tmp_int )
-        meshsetFlags = (unsigned)tmp_int;
-    else if( 0 > tmp_int )
-        return MB_FAILURE;
+    if( MB_SUCCESS == rval )  // only read tmp_int if get_int_option actually wrote it
+    {
+        if( 0 <= tmp_int )
+            meshsetFlags = (unsigned)tmp_int;
+        else
+            return MB_FAILURE;
+    }
 
     // CLEAN_UP: if false, do not delete tree sets upon tree class destruction; default = true
     bool tmp_bool;

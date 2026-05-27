@@ -313,6 +313,20 @@ ErrCode iMOAB_Finalize()
     // Delete MOAB instance only when last user finalizes
     if( 0 == context.refCountMB )
     {
+        // Defensive sweep: if the caller forgot to deregister some apps, do it here so
+        // their pgraph/tempestData/pcomm/ParCommGraph allocations get freed instead of
+        // leaking. Collect pids first because iMOAB_DeregisterApplication erases entries
+        // from context.appDatas mid-iteration.
+        std::vector< int > leftover_pids;
+        leftover_pids.reserve( context.appDatas.size() );
+        for( auto it = context.appDatas.begin(); it != context.appDatas.end(); ++it )
+            leftover_pids.push_back( it->first );
+        for( size_t k = 0; k < leftover_pids.size(); ++k )
+        {
+            int pid = leftover_pids[k];
+            iMOAB_DeregisterApplication( &pid );
+        }
+
         delete context.MBI;
     }
 

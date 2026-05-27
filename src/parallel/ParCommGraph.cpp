@@ -72,7 +72,21 @@ ParCommGraph::ParCommGraph( const ParCommGraph& src )
 
 ParCommGraph::~ParCommGraph()
 {
-    // TODO Auto-generated destructor stub
+    // Wait on any still-outstanding non-blocking sends; this also nullifies them.
+    if( !sendReqs.empty() )
+    {
+        std::vector< MPI_Status > mult_status( sendReqs.size() );
+        MPI_Waitall( static_cast< int >( sendReqs.size() ), sendReqs.data(), mult_status.data() );
+        sendReqs.clear();
+    }
+    // Free any send buffers the caller never released via iMOAB_FreeSenderBuffers.
+    for( std::vector< ParallelComm::Buffer* >::iterator vit = localSendBuffs.begin();
+         vit != localSendBuffs.end(); ++vit )
+        delete( *vit );
+    localSendBuffs.clear();
+    // Free the comm_graph array (delete[] on nullptr is a no-op).
+    delete[] comm_graph;
+    comm_graph = NULL;
 }
 
 // utility to find out the ranks of the processes of a group, with respect to a joint comm,
@@ -573,6 +587,7 @@ ErrorCode ParCommGraph::release_send_buffers()
     for( vit = localSendBuffs.begin(); vit != localSendBuffs.end(); ++vit )
         delete( *vit );
     localSendBuffs.clear();
+    sendReqs.clear();
     return MB_SUCCESS;
 }
 
@@ -583,6 +598,11 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
                                          Range& owned,
                                          std::vector< Tag >& tag_handles )
 {
+    // Defensive: drain any send buffers/requests left over from a prior send
+    // for which the caller forgot to invoke iMOAB_FreeSenderBuffers. Without
+    // this drain, repeated send_tag_values calls without intervening release
+    // would leak ParallelComm::Buffer instances and leave stale MPI_Requests.
+    if( !localSendBuffs.empty() || !sendReqs.empty() ) release_send_buffers();
     // basically, owned.size() needs to be equal to sum(corr_sizes)
     // get info about the tag size, type, etc
     int ierr;
@@ -642,7 +662,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
 
             ierr = MPI_Isend( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, receiver_proc, mtag, jcomm,
                               &sendReqs[indexReq] );  // we have to use global communicator
-            if( ierr != 0 ) return MB_FAILURE;
+            if( ierr != 0 ) { delete buffer; return MB_FAILURE; }
             indexReq++;
             localSendBuffs.push_back( buffer );  // we will release them after nonblocking sends are completed
         }
@@ -719,7 +739,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
             // int size_pack = buffer->get_current_size(); // debug check
             ierr = MPI_Isend( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, receiver_proc, mtag, jcomm,
                               &sendReqs[indexReq] );  // we have to use global communicator
-            if( ierr != 0 ) return MB_FAILURE;
+            if( ierr != 0 ) { delete buffer; return MB_FAILURE; }
             indexReq++;
             localSendBuffs.push_back( buffer );  // we will release them after nonblocking sends are completed
         }
@@ -776,7 +796,7 @@ ErrorCode ParCommGraph::send_tag_values( MPI_Comm jcomm,
             // int size_pack = buffer->get_current_size(); // debug check
             ierr = MPI_Isend( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, receiver_proc, mtag, jcomm,
                               &sendReqs[indexReq] );  // we have to use global communicator
-            if( ierr != 0 ) return MB_FAILURE;
+            if( ierr != 0 ) { delete buffer; return MB_FAILURE; }
             indexReq++;
             localSendBuffs.push_back( buffer );  // we will release them after nonblocking sends are completed
         }
@@ -838,7 +858,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
             // int size_pack = buffer->get_current_size(); // debug check
 
             ierr = MPI_Recv( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, sender_proc, mtag, jcomm, &status );
-            if( ierr != 0 ) return MB_FAILURE;
+            if( ierr != 0 ) { delete buffer; return MB_FAILURE; }
             // now set the tag
             // copy to tag
 
@@ -881,7 +901,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
 
             // receive the buffer
             ierr = MPI_Recv( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, sender_proc, mtag, jcomm, &status );
-            if( ierr != 0 ) return MB_FAILURE;
+            if( ierr != 0 ) { delete buffer; return MB_FAILURE; }
 // start copy
 #ifdef VERBOSE
             std::ofstream dbfile;
@@ -949,7 +969,10 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
             // rval = mb->tag_get_data(owned, (void*)( valuesTags[i].data() ) );MB_CHK_ERR ( rval );
         }
         // now, unpack the data and set the tags
-        sendReqs.resize( involved_IDs_map.size() );
+        // Note: prior code did `sendReqs.resize( involved_IDs_map.size() );` here, but
+        // receive_tag_values issues no non-blocking sends; the resize populated sendReqs
+        // with garbage MPI_Request values that would later trip up MPI_Waitall when the
+        // ParCommGraph is reused as a sender. Removed.
         for( std::map< int, std::vector< int > >::iterator mit = involved_IDs_map.begin();
              mit != involved_IDs_map.end(); ++mit )
         {
@@ -964,7 +987,7 @@ ErrorCode ParCommGraph::receive_tag_values( MPI_Comm jcomm,
 
             // receive the buffer
             ierr = MPI_Recv( buffer->mem_ptr, size_buffer, MPI_UNSIGNED_CHAR, sender_proc, mtag, jcomm, &status );
-            if( ierr != 0 ) return MB_FAILURE;
+            if( ierr != 0 ) { delete buffer; return MB_FAILURE; }
             // use the values in buffer to populate valuesTag arrays, fill it up!
             int j = 0;
             for( std::vector< int >::iterator it = eids.begin(); it != eids.end(); ++it, ++j )

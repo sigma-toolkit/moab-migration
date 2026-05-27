@@ -585,7 +585,14 @@ ErrCode iMOAB_DeregisterApplication( iMOAB_AppID pid )
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
     if( data.tempestData.remapper ) delete data.tempestData.remapper;
-    if( data.tempestData.weightMaps.size() ) data.tempestData.weightMaps.clear();
+    // Delete each TempestOnlineMap object before clearing the map (clear only erases
+    // the pointer slots, not the pointed-to objects). Without this, every map's
+    // rowMap/colMap/m_weightMatrix/SparseMatrix internals leak.
+    for( auto& kv : data.tempestData.weightMaps )
+    {
+        delete kv.second;
+    }
+    data.tempestData.weightMaps.clear();
 #endif
 
 #ifdef MOAB_HAVE_MPI
@@ -3792,7 +3799,11 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
         // Create communication graph for component 1 -> component 2
         appData& data = context.appDatas[*pid1];
         auto mt       = data.pgraph.find( *comp2 );
-        if( mt != data.pgraph.end() ) data.pgraph.erase( mt );  // Remove existing graph if present
+        if( mt != data.pgraph.end() )
+        {
+            delete mt->second;  // free the prior ParCommGraph before dropping the map entry
+            data.pgraph.erase( mt );
+        }
         cgraph                                 = new ParCommGraph( global, srcGroup, tgtGroup, *comp1, *comp2 );
         context.appDatas[*pid1].pgraph[*comp2] = cgraph;  // Store with target component ID as key
     }
@@ -3802,7 +3813,11 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
         // Create reverse communication graph for component 2 -> component 1
         appData& data = context.appDatas[*pid2];
         auto mt       = data.pgraph.find( *comp1 );
-        if( mt != data.pgraph.end() ) data.pgraph.erase( mt );  // Remove existing graph if present
+        if( mt != data.pgraph.end() )
+        {
+            delete mt->second;  // free the prior ParCommGraph before dropping the map entry
+            data.pgraph.erase( mt );
+        }
         cgraph_rev                             = new ParCommGraph( global, tgtGroup, srcGroup, *comp2, *comp1 );
         context.appDatas[*pid2].pgraph[*comp1] = cgraph_rev;  // Store with source component ID as key
     }

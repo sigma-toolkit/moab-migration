@@ -1581,6 +1581,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
 
             tl_re.reset();  // clear memory, although this will go out of scope
             tl->reset();
+            delete tl;      // free the heap-allocated original TupleList before reassign
             tl = tl_back;
         }
 
@@ -1622,6 +1623,7 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             tripletList.emplace_back( rowMap[vecRowValue], colMap[vecColValue], value );
         }
         tl->reset();
+        delete tl;      // free the heap-allocated TupleList (paired with new at line 1474 / re-pointed from tl_back)
     }
     else
 #endif

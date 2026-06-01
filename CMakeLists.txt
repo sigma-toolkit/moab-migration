@@ -533,6 +533,15 @@ if ( ENABLE_NETCDF )
   # Print some NetCDF configuration details
   SET_VARS_IF_FOUND(NETCDF RECOMMENDED "NetCDF" "NetCDF library interfaces for MOAB ExodusII file format support" NETCDF_INCLUDES NETCDF_LIBRARIES )
 
+  # Mirror autotools netcdf.m4: if NetCDF was built with parallel HDF5 support
+  # and MPI is enabled, expose MOAB_HAVE_NETCDFPAR so TempestOnlineMapIO.cpp
+  # uses the ParNcFile parallel SCRIP path instead of the unsafe serial NcFile.
+  if (NETCDF_FOUND AND ENABLE_MPI AND NETCDF_PARALLEL)
+    set (MOAB_HAVE_NETCDFPAR 1)
+    set (MOAB_HAVE_NETCDF_PAR_H 1)
+    message (STATUS "        Parallel NetCDF I/O enabled (netcdf_par.h available)")
+  endif ()
+
 endif ( ENABLE_NETCDF )
 
 # Check for Metis partitioner availability

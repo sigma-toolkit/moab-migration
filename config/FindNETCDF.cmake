@@ -50,6 +50,21 @@ if (NC_CONFIG_EXECUTABLE)
     # Resolve libraries from the raw string
     RESOLVE_LIBRARIES(NETCDF_LIBRARIES "${NETCDF_LIBRARIES_RAW}")
 
+    # Detect whether NetCDF was built with parallel HDF5 support. This
+    # provides the netcdf_par.h / nc_create_par interface that the parallel
+    # SCRIP map writer (TempestOnlineMapIO.cpp) uses. Independent of PNetCDF.
+    execute_process(
+        COMMAND ${NC_CONFIG_EXECUTABLE} --has-parallel4
+        OUTPUT_VARIABLE NETCDF_HAS_PARALLEL4
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if (NETCDF_HAS_PARALLEL4 STREQUAL "yes")
+        set(NETCDF_PARALLEL TRUE CACHE BOOL "NetCDF built with parallel HDF5 support")
+    else()
+        set(NETCDF_PARALLEL FALSE CACHE BOOL "NetCDF built with parallel HDF5 support")
+    endif()
+
 else(NC_CONFIG_EXECUTABLE)
 
     find_package(PkgConfig QUIET)
@@ -65,6 +80,14 @@ else(NC_CONFIG_EXECUTABLE)
         HINTS ${PC_NETCDF_LIBRARY_DIRS} ${NETCDF_DIR}/lib
         NO_DEFAULT_PATH
     )
+
+    # Fallback parallel detection: presence of netcdf_par.h in the include
+    # directory indicates the build supports parallel I/O via parallel HDF5.
+    if (NETCDF_INCLUDES AND EXISTS "${NETCDF_INCLUDES}/netcdf_par.h")
+        set(NETCDF_PARALLEL TRUE CACHE BOOL "NetCDF built with parallel HDF5 support")
+    else()
+        set(NETCDF_PARALLEL FALSE CACHE BOOL "NetCDF built with parallel HDF5 support")
+    endif()
 
 endif(NC_CONFIG_EXECUTABLE)
 

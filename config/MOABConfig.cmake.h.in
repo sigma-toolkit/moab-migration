@@ -175,6 +175,12 @@
 /* Define to 1 if you have the <netcdf.h> header file. */
 #cmakedefine MOAB_HAVE_NETCDF_H @MOAB_HAVE_NETCDF_H@
 
+/* MOAB is configured with MPI-enabled NetCDF (parallel HDF5 backend). */
+#cmakedefine MOAB_HAVE_NETCDFPAR @MOAB_HAVE_NETCDFPAR@
+
+/* Define to 1 if you have the <netcdf_par.h> header file. */
+#cmakedefine MOAB_HAVE_NETCDF_PAR_H @MOAB_HAVE_NETCDF_PAR_H@
+
 /* Define if configured with ParMetis partitioner support */
 #cmakedefine MOAB_HAVE_PARMETIS @MOAB_HAVE_PARMETIS@
 

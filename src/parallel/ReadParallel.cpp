@@ -487,7 +487,7 @@ ErrorCode ReadParallel::load_file( const char** file_names,
                     MB_CHK_SET_ERR( tmp_result, "Can't set trivial partition tag" );
                     Range subrange;
                     size_t num_ents_in_part = nPartEnts;
-                    if( i < iextra ) num_ents_in_part++;
+                    if( k < iextra ) num_ents_in_part++;
                     for( size_t i1 = 0; i1 < num_ents_in_part; i1++, itr++ )
                         subrange.insert( *itr );
                     tmp_result = mbImpl->add_entities( part_set, subrange );

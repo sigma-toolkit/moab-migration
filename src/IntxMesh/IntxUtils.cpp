@@ -2401,7 +2401,7 @@ ErrorCode IntxUtils::remove_padded_vertices( Interface* mb, EntityHandle file_se
             newConnec.push_back( connec[num_verts - 1] );
             new_size++;
         }
-        if( new_size < num_verts )
+        if( new_size < num_verts && new_size >= 3 )
         {
             // cout << "new cell from " << cell << " has only " << new_size << " vertices \n";
             modifiedCells.insert( cell );
@@ -2428,6 +2428,9 @@ ErrorCode IntxUtils::remove_padded_vertices( Interface* mb, EntityHandle file_se
                                 "Failed to set tag value on new cell" );
             }
         }
+        // new_size < 3: degenerate cell collapses below a valid polygon (e.g. SCRIP-style
+        // padded placeholder with only 2 distinct vertices). Leave the original cell in
+        // place — its padded connectivity faithfully represents what the input file stored.
     }
 
     MB_CHK_SET_ERR( mb->remove_entities( file_set, modifiedCells ), "Failed to remove old cells from file set" );

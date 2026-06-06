@@ -113,7 +113,7 @@ int main( int argc, char** argv )
     if( argc < 1 )
     {
         cerr << "Usage: ";
-        cerr << argv[0] << " <file_name> \c tag_name \c tag_value" << endl;
+        cerr << argv[0] << " <file_name> <tag_name> <tag_value>" << endl;
         cerr << "file_name    : mesh file name" << endl;
         cerr << "tag_name     : name of tag to add to mesh" << endl;
         cerr << "tag_value    : a double valued string to set for highest-dimensional entities in "

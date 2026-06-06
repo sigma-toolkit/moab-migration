@@ -72,7 +72,7 @@ ErrorCode get_file_options( int argc, char** argv, string& filename, string& tag
     }
 
     if( argc > 1 && argc < 4 )  // print usage
-        cout << " usage is " << argv[0] << " <file> \c tag_name <value1> <value2> .. \n";
+        cout << " usage is " << argv[0] << " <file> <tag_name> <value1> <value2> ..\n";
     return MB_SUCCESS;
 }
 

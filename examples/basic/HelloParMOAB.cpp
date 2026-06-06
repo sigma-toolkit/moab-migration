@@ -179,7 +179,7 @@ int main( int argc, char** argv )
         MB_CHK_SET_ERR( moab->create_meshset( moab::MESHSET_SET, partnset ), "Creating partition set failed" );
 
         // Create the parallel communicator object with the partition handle associated with MOAB
-        auto pcomm = std::auto_ptr< moab::ParallelComm >( ParallelComm::get_pcomm( moab.get(), partnset, &comm ) );
+        auto pcomm = std::unique_ptr< moab::ParallelComm >( ParallelComm::get_pcomm( moab.get(), partnset, &comm ) );
 
         MB_CHK_SET_ERR( moab->load_file( mesh_file.c_str(), &rootset, DEFAULT_READ_OPTS ),
                         "Failed to load mesh file: " << mesh_file );

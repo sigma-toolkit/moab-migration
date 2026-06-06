@@ -5,6 +5,8 @@
  */
 #include <iostream>
 #include <sstream>
+#include <cmath>
+#include <fstream>
 
 #include "moab/Core.hpp"
 #include "moab/Interface.hpp"
@@ -14,6 +16,54 @@
 
 using namespace moab;
 using namespace std;
+
+// Build a minimal octahedron on the unit sphere and populate the MPAS-style tags
+// so AddEdgeFluxVector can run without an external file.
+static ErrorCode build_demo_mesh( Interface* mb )
+{
+    const double s = 1.0 / sqrt( 2.0 );
+    // 6 vertices of an octahedron on the unit sphere
+    const double vcoords[6][3] = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 },
+                                   { 0, -1, 0 }, { 0, 0, 1 },  { 0, 0, -1 } };
+    (void)s;
+    EntityHandle verts[6];
+    for( int i = 0; i < 6; i++ )
+    {
+        ErrorCode rval = mb->create_vertex( vcoords[i], verts[i] );MB_CHK_ERR( rval );
+    }
+    // 8 triangular faces of the octahedron
+    const int tris[8][3] = { { 0, 2, 4 }, { 2, 1, 4 }, { 1, 3, 4 }, { 3, 0, 4 },
+                             { 2, 0, 5 }, { 1, 2, 5 }, { 3, 1, 5 }, { 0, 3, 5 } };
+    for( int t = 0; t < 8; t++ )
+    {
+        EntityHandle conn[3] = { verts[tris[t][0]], verts[tris[t][1]], verts[tris[t][2]] };
+        EntityHandle tri;
+        ErrorCode rval = mb->create_element( MBTRI, conn, 3, tri );MB_CHK_ERR( rval );
+    }
+    // Generate edges via adjacency
+    Range faces;
+    ErrorCode rval = mb->get_entities_by_dimension( 0, 2, faces );MB_CHK_ERR( rval );
+    Range edges;
+    rval = mb->get_adjacencies( faces, 1, true, edges, Interface::UNION );MB_CHK_ERR( rval );
+
+    // Create synthetic angleEdge and barotropicThicknessFlux0 tags
+    Tag angle, bflux;
+    double def0 = 0.0;
+    rval = mb->tag_get_handle( "angleEdge", 1, MB_TYPE_DOUBLE, angle, MB_TAG_CREAT | MB_TAG_DENSE, &def0 );MB_CHK_ERR( rval );
+    rval = mb->tag_get_handle( "barotropicThicknessFlux0", 1, MB_TYPE_DOUBLE, bflux, MB_TAG_CREAT | MB_TAG_DENSE, &def0 );MB_CHK_ERR( rval );
+
+    int idx = 0;
+    for( Range::iterator eit = edges.begin(); eit != edges.end(); ++eit, ++idx )
+    {
+        EntityHandle eh = *eit;
+        double a        = 0.1 * idx;
+        double f        = 1.0 + 0.5 * idx;
+        rval            = mb->tag_set_data( angle, &eh, 1, &a );MB_CHK_ERR( rval );
+        rval            = mb->tag_set_data( bflux, &eh, 1, &f );MB_CHK_ERR( rval );
+    }
+    cout << "Demo: built octahedron mesh with " << edges.size() << " edges and synthetic flux/angle tags.\n";
+    return MB_SUCCESS;
+}
 
 int main( int argc, char* argv[] )
 {
@@ -30,7 +80,21 @@ int main( int argc, char* argv[] )
     Core moab;
     Interface* mb = &moab;
 
-    ErrorCode rval = mb->load_file( filein.c_str() );MB_CHK_ERR( rval );
+    // If the input file doesn't exist, run the built-in demo instead
+    ErrorCode rval;
+    {
+        ifstream test( filein.c_str() );
+        if( !test.good() )
+        {
+            cout << "Input file '" << filein << "' not found — running built-in demo.\n";
+            rval    = build_demo_mesh( mb );MB_CHK_ERR( rval );
+            fileout = "/tmp/AddEdgeFluxVector_demo_out.h5m";
+        }
+        else
+        {
+            rval = mb->load_file( filein.c_str() );MB_CHK_ERR( rval );
+        }
+    }
 
     // get the angle tag, and the baro tag; compute a 3d vector normal on the edge
     // (or look at the angle) compute also the latitude, long at mid edge, draw the normal and multiply with the edge length?

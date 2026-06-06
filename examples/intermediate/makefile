@@ -56,17 +56,22 @@ ifeq ("$(MOAB_MPI_ENABLED)","yes")
 	${RUNPARALLEL} ./PointInElementSearch
 endif
 
-run-ExtractClose: ExtractClose 
-	${RUNSERIAL} ./ExtractClose -h
+run-ExtractClose: ExtractClose
+	${RUNSERIAL} ./ExtractClose
 
 run-FixPolys: FixPolys
-	${RUNSERIAL} ./FixPolys -h
+	${RUNSERIAL} ./FixPolys
 
 run-QuadTriConv: QuadTriConv
 	${RUNSERIAL} ./QuadTriConv
 
 run-ComputeTriDual: ComputeTriDual
 	${RUNSERIAL} ./ComputeTriDual
+
+run-ExchangeHalos: ExchangeHalos
+ifeq ("$(MOAB_MPI_ENABLED)-$(MOAB_HDF5_ENABLED)","yes-yes")
+	${RUNPARALLEL} ./ExchangeHalos
+endif
 
 run: all $(addprefix run-,$(ALLEXAMPLES))
 

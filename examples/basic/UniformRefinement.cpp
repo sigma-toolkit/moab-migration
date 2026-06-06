@@ -18,6 +18,7 @@
 #include "moab/Core.hpp"
 #include "moab/NestedRefine.hpp"
 #include <iostream>
+#include <memory>
 #include <vector>
 #include <string>
 #include <cstdlib>

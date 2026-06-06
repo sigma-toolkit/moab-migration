@@ -53,7 +53,7 @@ using moab::Tag;
 namespace
 {
 // Default mesh file path
-const char* const DEFAULT_MESH_FILE = "hex01.vtk";
+const char* const DEFAULT_MESH_FILE = MESH_DIR "/hex01.vtk";
 
 // Tag names for conventional tags from MBTagConventions.hpp
 const std::vector< const char* > TAG_NAMES = { MATERIAL_SET_TAG_NAME, DIRICHLET_SET_TAG_NAME, NEUMANN_SET_TAG_NAME };

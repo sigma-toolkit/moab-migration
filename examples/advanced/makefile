@@ -55,6 +55,12 @@ ifeq ("$(MOAB_MPI_ENABLED)","yes")
 	${RUNPARALLEL} ./CrystalRouterExample -n 2 -t 10 -r 0
 endif
 
+run-GeneralGnomonic: GeneralGnomonic
+	${RUNSERIAL} ./GeneralGnomonic -m ${MESH_DIR}/atm.h5m
+
+run-AddEdgeFluxVector: AddEdgeFluxVector
+	${RUNSERIAL} ./AddEdgeFluxVector
+
 run-VisTags: VisTags
 	${RUNSERIAL} ./VisTags
 

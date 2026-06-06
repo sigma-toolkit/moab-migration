@@ -46,6 +46,7 @@ int main( int argc, char** argv )
     Range sets, set_ents;
 
     // Load a file
+    std::string test_file_name = std::string( MESH_DIR ) + "/mbtest2.g";
     if( argc == 1 )
     {
         cout << "Running default case, loading " << test_file_name << endl;

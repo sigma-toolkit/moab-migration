@@ -30,7 +30,7 @@ struct MBuuid
     //! default constructor that initializes to zero
     MBuuid()
     {
-        memset( this, 0, sizeof( MBuuid ) );
+        memset( (void*)this, 0, sizeof( MBuuid ) );
     }
     //! constructor that takes initialization arguments
     MBuuid( unsigned l,
@@ -60,12 +60,12 @@ struct MBuuid
     //! copy constructor
     MBuuid( const MBuuid& mdbuuid )
     {
-        memcpy( this, &mdbuuid, sizeof( MBuuid ) );
+        memcpy( (void*)this, &mdbuuid, sizeof( MBuuid ) );
     }
     //! sets this uuid equal to another one
     MBuuid& operator=( const MBuuid& orig )
     {
-        memcpy( this, &orig, sizeof( MBuuid ) );
+        memcpy( (void*)this, &orig, sizeof( MBuuid ) );
         return *this;
     }
     //! returns whether two uuid's are equal

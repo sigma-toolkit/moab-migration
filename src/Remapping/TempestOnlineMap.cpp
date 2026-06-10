@@ -88,6 +88,9 @@ moab::TempestOnlineMap::TempestOnlineMap( moab::TempestRemapper* remapper ) : Of
     // set default order
     m_input_order = m_output_order = 1;
 
+    // unknown until a map file is read (ReadParallelMap sets it to n_a)
+    m_nTotDofs_SrcGlobal = -1;
+
     // Initialize dimension information from file
     this->setup_sizes_dimensions();
 }
@@ -429,6 +432,66 @@ moab::ErrorCode moab::TempestOnlineMap::set_row_dc_dofs( std::vector< int >& val
         if( it != rowMap.end() ) row_dtoc_dofmap[j] = it->second;
     }
     return moab::MB_SUCCESS;
+}
+
+// Compute which weight-matrix columns the migrated coverage covers.
+// delivered[mc] == true iff some covering cell maps to matrix column mc.
+static void compute_delivered_columns( int ncols, const std::vector< int >& col_dtoc_dofmap,
+                                       std::vector< bool >& delivered )
+{
+    delivered.assign( ncols, false );
+    for( size_t k = 0; k < col_dtoc_dofmap.size(); k++ )
+    {
+        const int mc = col_dtoc_dofmap[k];
+        if( mc >= 0 && mc < ncols ) delivered[mc] = true;
+    }
+}
+
+int moab::TempestOnlineMap::CountAbsentColumns( int& first_absent_gid ) const
+{
+    first_absent_gid = -1;
+    const int ncols = m_nTotDofs_SrcCov;
+    std::vector< bool > delivered;
+    compute_delivered_columns( ncols, col_dtoc_dofmap, delivered );
+    int cnt = 0;
+    for( int mc = 0; mc < ncols; mc++ )
+    {
+        if( !delivered[mc] )
+        {
+            cnt++;
+            if( first_absent_gid < 0 && mc < (int)col_gdofmap.size() )
+                first_absent_gid = (int)col_gdofmap[mc] + 1;  // col_gdofmap is 0-based
+        }
+    }
+    return cnt;
+}
+
+int moab::TempestOnlineMap::DropAbsentColumns()
+{
+    const int ncols = m_nTotDofs_SrcCov;
+    std::vector< bool > delivered;
+    compute_delivered_columns( ncols, col_dtoc_dofmap, delivered );
+
+    // Zero every stored coefficient whose column was not supplied by coverage.
+    // The projection already treats these columns as zero-source (ApplyWeights
+    // leaves m_colVector at 0 for them), so this changes no projected value; it
+    // only lets the dual-map CAAS bounds loop skip them via its |w|<1e-50 test.
+    int dropped = 0;
+    for( int r = 0; r < m_weightMatrix.outerSize(); r++ )
+    {
+        for( WeightMatrix::InnerIterator it( m_weightMatrix, r ); it; ++it )
+        {
+            const int mc = (int)it.col();
+            if( mc < 0 || mc >= ncols || !delivered[mc] )
+            {
+                if( it.value() != 0.0 ) dropped++;
+                it.valueRef() = 0.0;
+            }
+        }
+    }
+    // Remove the explicit zeros so iterators no longer visit them.
+    m_weightMatrix.prune( []( const Eigen::Index&, const Eigen::Index&, const double& v ) { return v != 0.0; } );
+    return dropped;
 }
 ///////////////////////////////////////////////////////////////////////////////
 

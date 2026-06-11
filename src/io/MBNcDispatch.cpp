@@ -77,6 +77,126 @@ std::map< int, BufferedCtx >& buffered_registry()
     static std::map< int, BufferedCtx > reg;
     return reg;
 }
+
+// ----------------------------------------------------------------------------
+// NCB_BUFFERED helpers — rank-0-reads-and-distributes pattern
+//
+// In buffered mode only rank 0 has the file open (via plain serial nc_open).
+// All NC calls are collective by convention: each helper broadcasts rank
+// 0's result for cheap inquiries / attributes, or pulls per-rank slabs to
+// rank 0 + ships back the answer for variable reads.
+// ----------------------------------------------------------------------------
+
+/// Rank 0 already called the underlying nc_* function and produced
+/// (rc_root, value_root). Broadcast both. Returns rc_root on failure;
+/// otherwise writes value_root into *out and returns NC_NOERR.
+inline int bsuf_bcast_int( int taggedId, int rc_root, int value_root, int* out )
+{
+    MPI_Comm comm = mbnc_buffered_comm( taggedId );
+    MPI_Bcast( &rc_root, 1, MPI_INT, 0, comm );
+    if( rc_root != NC_NOERR ) return rc_root;
+    MPI_Bcast( &value_root, 1, MPI_INT, 0, comm );
+    if( out ) *out = value_root;
+    return NC_NOERR;
+}
+
+/// As bsuf_bcast_int but for size_t outputs.
+inline int bsuf_bcast_size( int taggedId, int rc_root, size_t value_root, size_t* out )
+{
+    MPI_Comm comm = mbnc_buffered_comm( taggedId );
+    MPI_Bcast( &rc_root, 1, MPI_INT, 0, comm );
+    if( rc_root != NC_NOERR ) return rc_root;
+    MPI_Bcast( &value_root, static_cast< int >( sizeof( size_t ) ), MPI_BYTE, 0, comm );
+    if( out ) *out = value_root;
+    return NC_NOERR;
+}
+
+/// Broadcast a fixed-length byte buffer (name strings, attribute text).
+/// Caller pre-sized buffer; rank 0 filled it.
+inline int bsuf_bcast_bytes( int taggedId, int rc_root, char* buffer, int nbytes )
+{
+    MPI_Comm comm = mbnc_buffered_comm( taggedId );
+    MPI_Bcast( &rc_root, 1, MPI_INT, 0, comm );
+    if( rc_root != NC_NOERR ) return rc_root;
+    if( buffer && nbytes > 0 ) MPI_Bcast( buffer, nbytes, MPI_BYTE, 0, comm );
+    return NC_NOERR;
+}
+
+/// Broadcast an int-array result (e.g. inq_vardimid output).
+inline int bsuf_bcast_int_array( int taggedId, int rc_root, int* buf, int n )
+{
+    MPI_Comm comm = mbnc_buffered_comm( taggedId );
+    MPI_Bcast( &rc_root, 1, MPI_INT, 0, comm );
+    if( rc_root != NC_NOERR ) return rc_root;
+    if( buf && n > 0 ) MPI_Bcast( buf, n, MPI_INT, 0, comm );
+    return NC_NOERR;
+}
+
+/// Generic buffered get_vara_T: rank 0 owns the file; each non-root rank
+/// sends its (start, count) to rank 0, rank 0 issues the underlying
+/// nc_get_vara_T per requester and ships the data back.
+///
+/// nc_get_fn is the serial libnetcdf entry point with signature
+///   int(*)(int ncid, int varid, const size_t* start, const size_t* count, T* data)
+template < typename T, typename Fn >
+int bsuf_get_vara( int taggedFileId, int varid, const size_t* start, const size_t* count, T* data,
+                   MPI_Datatype mpi_type, Fn nc_get_fn )
+{
+    MPI_Comm comm    = mbnc_buffered_comm( taggedFileId );
+    const int rank   = mbnc_buffered_rank( taggedFileId );
+    const int size   = mbnc_buffered_size( taggedFileId );
+    const int libId  = mbnc_lib_id( taggedFileId );
+
+    // Step 1: rank 0 inquires ndims (only rank 0 has the file), broadcast.
+    int ndims = 0;
+    int rc    = NC_NOERR;
+    if( rank == 0 ) rc = nc_inq_varndims( libId, varid, &ndims );
+    MPI_Bcast( &rc, 1, MPI_INT, 0, comm );
+    if( rc != NC_NOERR ) return rc;
+    MPI_Bcast( &ndims, 1, MPI_INT, 0, comm );
+    if( ndims > kMaxDims ) return NC_EMAXDIMS;
+
+    // Step 2: compute local total element count from caller's count[]
+    size_t my_n = 1;
+    for( int i = 0; i < ndims; ++i )
+        my_n *= count[i];
+
+    if( rank == 0 )
+    {
+        // Step 3a: rank 0 services its own request directly
+        int my_rc = nc_get_fn( libId, varid, start, count, data );
+
+        // Step 3b: serve other ranks in rank order. Each receives its
+        // own slab, computed from its own start/count.
+        for( int src = 1; src < size; ++src )
+        {
+            size_t srcStart[kMaxDims], srcCount[kMaxDims];
+            MPI_Recv( srcStart, ndims * static_cast< int >( sizeof( size_t ) ), MPI_BYTE, src, 0, comm,
+                      MPI_STATUS_IGNORE );
+            MPI_Recv( srcCount, ndims * static_cast< int >( sizeof( size_t ) ), MPI_BYTE, src, 1, comm,
+                      MPI_STATUS_IGNORE );
+            size_t n = 1;
+            for( int i = 0; i < ndims; ++i )
+                n *= srcCount[i];
+            std::vector< T > buf( n );
+            int s_rc = nc_get_fn( libId, varid, srcStart, srcCount, buf.data() );
+            MPI_Send( &s_rc, 1, MPI_INT, src, 2, comm );
+            if( s_rc == NC_NOERR && n > 0 ) MPI_Send( buf.data(), static_cast< int >( n ), mpi_type, src, 3, comm );
+        }
+        return my_rc;
+    }
+    else
+    {
+        // Non-root: send my (start, count) to rank 0, get back data.
+        MPI_Send( start, ndims * static_cast< int >( sizeof( size_t ) ), MPI_BYTE, 0, 0, comm );
+        MPI_Send( count, ndims * static_cast< int >( sizeof( size_t ) ), MPI_BYTE, 0, 1, comm );
+        int recv_rc;
+        MPI_Recv( &recv_rc, 1, MPI_INT, 0, 2, comm, MPI_STATUS_IGNORE );
+        if( recv_rc == NC_NOERR && my_n > 0 )
+            MPI_Recv( data, static_cast< int >( my_n ), mpi_type, 0, 3, comm, MPI_STATUS_IGNORE );
+        return recv_rc;
+    }
+}
 #endif
 
 }  // namespace
@@ -131,7 +251,9 @@ NcBackend mbnc_choose_backend_for_read( int format, int mpi_size )
 #elif defined( MOAB_HAVE_NETCDFPAR )
         return NCB_NETCDF_PAR;  // works if libnetcdf was built with PNetCDF backend
 #else
-        return NCB_NONE;  // buffered fallback comes in Phase 17 (task #17)
+        // No parallel backend at all — degraded buffered fallback (rank 0
+        // reads via plain nc_*, scatters per-rank slabs).
+        return NCB_BUFFERED;
 #endif
     }
 
@@ -139,7 +261,10 @@ NcBackend mbnc_choose_backend_for_read( int format, int mpi_size )
 #ifdef MOAB_HAVE_NETCDFPAR
     return NCB_NETCDF_PAR;
 #else
-    return NCB_NONE;  // PNetCDF alone cannot read NetCDF-4. Buffered fallback in Phase 17.
+    // PNetCDF alone cannot read NetCDF-4 in parallel. Buffered fallback:
+    // rank 0 opens with serial nc_open (libnetcdf handles HDF5 in serial),
+    // scatters per-rank slabs to the rest.
+    return NCB_BUFFERED;
 #endif
 }
 
@@ -418,6 +543,14 @@ int mbnc_inq_natts( int taggedFileId, int* nattsp )
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+    {
+        int rc = NC_NOERR, v = 0;
+        if( mbnc_buffered_rank( taggedFileId ) == 0 ) rc = nc_inq_natts( libId, &v );
+        return bsuf_bcast_int( taggedFileId, rc, v, nattsp );
+    }
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF ) return ncmpi_inq_natts( libId, nattsp );
 #endif
@@ -429,6 +562,14 @@ int mbnc_inq_ndims( int taggedFileId, int* ndimsp )
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+    {
+        int rc = NC_NOERR, v = 0;
+        if( mbnc_buffered_rank( taggedFileId ) == 0 ) rc = nc_inq_ndims( libId, &v );
+        return bsuf_bcast_int( taggedFileId, rc, v, ndimsp );
+    }
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF ) return ncmpi_inq_ndims( libId, ndimsp );
 #endif
@@ -440,6 +581,14 @@ int mbnc_inq_nvars( int taggedFileId, int* nvarsp )
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+    {
+        int rc = NC_NOERR, v = 0;
+        if( mbnc_buffered_rank( taggedFileId ) == 0 ) rc = nc_inq_nvars( libId, &v );
+        return bsuf_bcast_int( taggedFileId, rc, v, nvarsp );
+    }
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF ) return ncmpi_inq_nvars( libId, nvarsp );
 #endif
@@ -451,6 +600,14 @@ int mbnc_inq_dimid( int taggedFileId, const char* name, int* dimidp )
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+    {
+        int rc = NC_NOERR, v = 0;
+        if( mbnc_buffered_rank( taggedFileId ) == 0 ) rc = nc_inq_dimid( libId, name, &v );
+        return bsuf_bcast_int( taggedFileId, rc, v, dimidp );
+    }
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF ) return ncmpi_inq_dimid( libId, name, dimidp );
 #endif
@@ -462,6 +619,25 @@ int mbnc_inq_dim( int taggedFileId, int dimid, char* name, size_t* lenp )
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+    {
+        // Use a fixed-size scratch buffer for the dimension name; libnetcdf
+        // caps names at NC_MAX_NAME (currently 256).
+        char nameBuf[NC_MAX_NAME + 1] = { 0 };
+        size_t len                    = 0;
+        int rc                        = NC_NOERR;
+        if( mbnc_buffered_rank( taggedFileId ) == 0 ) rc = nc_inq_dim( libId, dimid, nameBuf, &len );
+        // Broadcast status, name, and length in three steps.
+        MPI_Bcast( &rc, 1, MPI_INT, 0, mbnc_buffered_comm( taggedFileId ) );
+        if( rc != NC_NOERR ) return rc;
+        if( name ) MPI_Bcast( nameBuf, NC_MAX_NAME + 1, MPI_BYTE, 0, mbnc_buffered_comm( taggedFileId ) );
+        MPI_Bcast( &len, static_cast< int >( sizeof( size_t ) ), MPI_BYTE, 0, mbnc_buffered_comm( taggedFileId ) );
+        if( name ) std::memcpy( name, nameBuf, NC_MAX_NAME + 1 );
+        if( lenp ) *lenp = len;
+        return NC_NOERR;
+    }
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF )
     {
@@ -479,6 +655,15 @@ int mbnc_inq_dimlen( int taggedFileId, int dimid, size_t* lenp )
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+    {
+        int rc    = NC_NOERR;
+        size_t v  = 0;
+        if( mbnc_buffered_rank( taggedFileId ) == 0 ) rc = nc_inq_dimlen( libId, dimid, &v );
+        return bsuf_bcast_size( taggedFileId, rc, v, lenp );
+    }
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF )
     {
@@ -496,6 +681,14 @@ int mbnc_inq_varid( int taggedFileId, const char* name, int* varidp )
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+    {
+        int rc = NC_NOERR, v = 0;
+        if( mbnc_buffered_rank( taggedFileId ) == 0 ) rc = nc_inq_varid( libId, name, &v );
+        return bsuf_bcast_int( taggedFileId, rc, v, varidp );
+    }
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF ) return ncmpi_inq_varid( libId, name, varidp );
 #endif
@@ -507,6 +700,17 @@ int mbnc_inq_varname( int taggedFileId, int varid, char* name )
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+    {
+        char nameBuf[NC_MAX_NAME + 1] = { 0 };
+        int rc                        = NC_NOERR;
+        if( mbnc_buffered_rank( taggedFileId ) == 0 ) rc = nc_inq_varname( libId, varid, nameBuf );
+        int rc2 = bsuf_bcast_bytes( taggedFileId, rc, nameBuf, NC_MAX_NAME + 1 );
+        if( rc2 == NC_NOERR && name ) std::memcpy( name, nameBuf, NC_MAX_NAME + 1 );
+        return rc2;
+    }
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF ) return ncmpi_inq_varname( libId, varid, name );
 #endif
@@ -518,6 +722,23 @@ int mbnc_inq_vartype( int taggedFileId, int varid, nc_type* xtypep )
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+    {
+        // nc_type is just an int alias
+        int rc = NC_NOERR, v = 0;
+        if( mbnc_buffered_rank( taggedFileId ) == 0 )
+        {
+            nc_type t = 0;
+            rc        = nc_inq_vartype( libId, varid, &t );
+            v         = static_cast< int >( t );
+        }
+        int out = 0;
+        int rc2 = bsuf_bcast_int( taggedFileId, rc, v, &out );
+        if( rc2 == NC_NOERR && xtypep ) *xtypep = static_cast< nc_type >( out );
+        return rc2;
+    }
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF ) return ncmpi_inq_vartype( libId, varid, xtypep );
 #endif
@@ -529,6 +750,14 @@ int mbnc_inq_varndims( int taggedFileId, int varid, int* ndimsp )
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+    {
+        int rc = NC_NOERR, v = 0;
+        if( mbnc_buffered_rank( taggedFileId ) == 0 ) rc = nc_inq_varndims( libId, varid, &v );
+        return bsuf_bcast_int( taggedFileId, rc, v, ndimsp );
+    }
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF ) return ncmpi_inq_varndims( libId, varid, ndimsp );
 #endif
@@ -540,6 +769,20 @@ int mbnc_inq_vardimid( int taggedFileId, int varid, int* dimids )
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+    {
+        // Two-step: inquire ndims, then inquire dimids of that length.
+        int ndims = 0;
+        int rc    = NC_NOERR;
+        if( mbnc_buffered_rank( taggedFileId ) == 0 ) rc = nc_inq_varndims( libId, varid, &ndims );
+        MPI_Bcast( &rc, 1, MPI_INT, 0, mbnc_buffered_comm( taggedFileId ) );
+        if( rc != NC_NOERR ) return rc;
+        MPI_Bcast( &ndims, 1, MPI_INT, 0, mbnc_buffered_comm( taggedFileId ) );
+        if( mbnc_buffered_rank( taggedFileId ) == 0 ) rc = nc_inq_vardimid( libId, varid, dimids );
+        return bsuf_bcast_int_array( taggedFileId, rc, dimids, ndims );
+    }
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF ) return ncmpi_inq_vardimid( libId, varid, dimids );
 #endif
@@ -551,6 +794,14 @@ int mbnc_inq_varnatts( int taggedFileId, int varid, int* nattsp )
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+    {
+        int rc = NC_NOERR, v = 0;
+        if( mbnc_buffered_rank( taggedFileId ) == 0 ) rc = nc_inq_varnatts( libId, varid, &v );
+        return bsuf_bcast_int( taggedFileId, rc, v, nattsp );
+    }
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF ) return ncmpi_inq_varnatts( libId, varid, nattsp );
 #endif
@@ -562,6 +813,17 @@ int mbnc_inq_attname( int taggedFileId, int varid, int attnum, char* name )
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+    {
+        char nameBuf[NC_MAX_NAME + 1] = { 0 };
+        int rc                        = NC_NOERR;
+        if( mbnc_buffered_rank( taggedFileId ) == 0 ) rc = nc_inq_attname( libId, varid, attnum, nameBuf );
+        int rc2 = bsuf_bcast_bytes( taggedFileId, rc, nameBuf, NC_MAX_NAME + 1 );
+        if( rc2 == NC_NOERR && name ) std::memcpy( name, nameBuf, NC_MAX_NAME + 1 );
+        return rc2;
+    }
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF ) return ncmpi_inq_attname( libId, varid, attnum, name );
 #endif
@@ -573,6 +835,23 @@ int mbnc_inq_att( int taggedFileId, int varid, const char* name, nc_type* xtypep
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+    {
+        int rc      = NC_NOERR;
+        nc_type t   = 0;
+        size_t len  = 0;
+        if( mbnc_buffered_rank( taggedFileId ) == 0 ) rc = nc_inq_att( libId, varid, name, &t, &len );
+        MPI_Bcast( &rc, 1, MPI_INT, 0, mbnc_buffered_comm( taggedFileId ) );
+        if( rc != NC_NOERR ) return rc;
+        int tInt = static_cast< int >( t );
+        MPI_Bcast( &tInt, 1, MPI_INT, 0, mbnc_buffered_comm( taggedFileId ) );
+        MPI_Bcast( &len, static_cast< int >( sizeof( size_t ) ), MPI_BYTE, 0, mbnc_buffered_comm( taggedFileId ) );
+        if( xtypep ) *xtypep = static_cast< nc_type >( tInt );
+        if( lenp ) *lenp = len;
+        return NC_NOERR;
+    }
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF )
     {
@@ -590,10 +869,43 @@ int mbnc_inq_att( int taggedFileId, int varid, const char* name, nc_type* xtypep
 // Attribute get
 // ============================================================================
 
+// Attribute readers under NCB_BUFFERED: rank 0 inquires the attribute
+// length (number of elements) via nc_inq_attlen, reads the attribute
+// itself, then both length and payload are broadcast to all ranks. A
+// shared helper covers the bookkeeping; per-type wrappers differ only
+// in the underlying nc_get_att_* call and MPI datatype.
+#ifdef MOAB_HAVE_MPI
+namespace
+{
+template < typename T, typename Fn >
+int bsuf_get_att( int taggedFileId, int varid, const char* name, T* value, MPI_Datatype mpi_type, Fn nc_get_att_fn )
+{
+    MPI_Comm comm   = mbnc_buffered_comm( taggedFileId );
+    const int rank  = mbnc_buffered_rank( taggedFileId );
+    const int libId = mbnc_lib_id( taggedFileId );
+    int rc          = NC_NOERR;
+    size_t len      = 0;
+    if( rank == 0 )
+    {
+        rc = nc_inq_attlen( libId, varid, name, &len );
+        if( rc == NC_NOERR ) rc = nc_get_att_fn( libId, varid, name, value );
+    }
+    MPI_Bcast( &rc, 1, MPI_INT, 0, comm );
+    if( rc != NC_NOERR ) return rc;
+    MPI_Bcast( &len, static_cast< int >( sizeof( size_t ) ), MPI_BYTE, 0, comm );
+    if( value && len > 0 ) MPI_Bcast( value, static_cast< int >( len ), mpi_type, 0, comm );
+    return NC_NOERR;
+}
+}  // namespace
+#endif
+
 int mbnc_get_att_text( int taggedFileId, int varid, const char* name, char* value )
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED ) return bsuf_get_att< char >( taggedFileId, varid, name, value, MPI_CHAR, nc_get_att_text );
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF ) return ncmpi_get_att_text( libId, varid, name, value );
 #endif
@@ -605,6 +917,9 @@ int mbnc_get_att_int( int taggedFileId, int varid, const char* name, int* value 
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED ) return bsuf_get_att< int >( taggedFileId, varid, name, value, MPI_INT, nc_get_att_int );
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF ) return ncmpi_get_att_int( libId, varid, name, value );
 #endif
@@ -616,6 +931,10 @@ int mbnc_get_att_short( int taggedFileId, int varid, const char* name, short* va
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+        return bsuf_get_att< short >( taggedFileId, varid, name, value, MPI_SHORT, nc_get_att_short );
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF ) return ncmpi_get_att_short( libId, varid, name, value );
 #endif
@@ -627,6 +946,10 @@ int mbnc_get_att_long( int taggedFileId, int varid, const char* name, long* valu
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+        return bsuf_get_att< long >( taggedFileId, varid, name, value, MPI_LONG, nc_get_att_long );
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF ) return ncmpi_get_att_long( libId, varid, name, value );
 #endif
@@ -638,6 +961,10 @@ int mbnc_get_att_float( int taggedFileId, int varid, const char* name, float* va
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+        return bsuf_get_att< float >( taggedFileId, varid, name, value, MPI_FLOAT, nc_get_att_float );
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF ) return ncmpi_get_att_float( libId, varid, name, value );
 #endif
@@ -649,6 +976,10 @@ int mbnc_get_att_double( int taggedFileId, int varid, const char* name, double* 
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+        return bsuf_get_att< double >( taggedFileId, varid, name, value, MPI_DOUBLE, nc_get_att_double );
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF ) return ncmpi_get_att_double( libId, varid, name, value );
 #endif
@@ -728,6 +1059,10 @@ int mbnc_get_vara_double( int taggedFileId, int varid, const size_t* start, cons
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+        return bsuf_get_vara< double >( taggedFileId, varid, start, count, data, MPI_DOUBLE, nc_get_vara_double );
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF )
     {
@@ -746,6 +1081,10 @@ int mbnc_get_vara_int( int taggedFileId, int varid, const size_t* start, const s
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+        return bsuf_get_vara< int >( taggedFileId, varid, start, count, data, MPI_INT, nc_get_vara_int );
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF )
     {
@@ -764,6 +1103,10 @@ int mbnc_get_vara_long( int taggedFileId, int varid, const size_t* start, const 
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+        return bsuf_get_vara< long >( taggedFileId, varid, start, count, data, MPI_LONG, nc_get_vara_long );
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF )
     {
@@ -782,6 +1125,10 @@ int mbnc_get_vara_text( int taggedFileId, int varid, const size_t* start, const 
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+        return bsuf_get_vara< char >( taggedFileId, varid, start, count, data, MPI_CHAR, nc_get_vara_text );
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF )
     {
@@ -801,6 +1148,62 @@ int mbnc_get_vars_double( int taggedFileId, int varid, const size_t* start, cons
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+    {
+        // Buffered: same per-rank scatter pattern as plain get_vara,
+        // but each rank ships its stride array too. We inline rather than
+        // generalize bsuf_get_vara since stride adds a third per-rank array.
+        MPI_Comm comm   = mbnc_buffered_comm( taggedFileId );
+        const int rank  = mbnc_buffered_rank( taggedFileId );
+        const int size  = mbnc_buffered_size( taggedFileId );
+        int ndims       = 0;
+        int rc          = NC_NOERR;
+        if( rank == 0 ) rc = nc_inq_varndims( libId, varid, &ndims );
+        MPI_Bcast( &rc, 1, MPI_INT, 0, comm );
+        if( rc != NC_NOERR ) return rc;
+        MPI_Bcast( &ndims, 1, MPI_INT, 0, comm );
+        if( ndims > kMaxDims ) return NC_EMAXDIMS;
+        size_t my_n = 1;
+        for( int i = 0; i < ndims; ++i )
+            my_n *= count[i];
+        if( rank == 0 )
+        {
+            int my_rc = nc_get_vars_double( libId, varid, start, count, stride, data );
+            for( int src = 1; src < size; ++src )
+            {
+                size_t s2[kMaxDims], c2[kMaxDims];
+                ptrdiff_t st2[kMaxDims];
+                MPI_Recv( s2, ndims * static_cast< int >( sizeof( size_t ) ), MPI_BYTE, src, 0, comm,
+                          MPI_STATUS_IGNORE );
+                MPI_Recv( c2, ndims * static_cast< int >( sizeof( size_t ) ), MPI_BYTE, src, 1, comm,
+                          MPI_STATUS_IGNORE );
+                MPI_Recv( st2, ndims * static_cast< int >( sizeof( ptrdiff_t ) ), MPI_BYTE, src, 4, comm,
+                          MPI_STATUS_IGNORE );
+                size_t n = 1;
+                for( int i = 0; i < ndims; ++i )
+                    n *= c2[i];
+                std::vector< double > buf( n );
+                int s_rc = nc_get_vars_double( libId, varid, s2, c2, st2, buf.data() );
+                MPI_Send( &s_rc, 1, MPI_INT, src, 2, comm );
+                if( s_rc == NC_NOERR && n > 0 )
+                    MPI_Send( buf.data(), static_cast< int >( n ), MPI_DOUBLE, src, 3, comm );
+            }
+            return my_rc;
+        }
+        else
+        {
+            MPI_Send( start, ndims * static_cast< int >( sizeof( size_t ) ), MPI_BYTE, 0, 0, comm );
+            MPI_Send( count, ndims * static_cast< int >( sizeof( size_t ) ), MPI_BYTE, 0, 1, comm );
+            MPI_Send( stride, ndims * static_cast< int >( sizeof( ptrdiff_t ) ), MPI_BYTE, 0, 4, comm );
+            int recv_rc;
+            MPI_Recv( &recv_rc, 1, MPI_INT, 0, 2, comm, MPI_STATUS_IGNORE );
+            if( recv_rc == NC_NOERR && my_n > 0 )
+                MPI_Recv( data, static_cast< int >( my_n ), MPI_DOUBLE, 0, 3, comm, MPI_STATUS_IGNORE );
+            return recv_rc;
+        }
+    }
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF )
     {
@@ -933,6 +1336,10 @@ int mbnc_get_vara_double_indep( int taggedFileId, int varid, const size_t* start
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+        return bsuf_get_vara< double >( taggedFileId, varid, start, count, data, MPI_DOUBLE, nc_get_vara_double );
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF )
     {
@@ -951,6 +1358,10 @@ int mbnc_get_vara_int_indep( int taggedFileId, int varid, const size_t* start, c
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+        return bsuf_get_vara< int >( taggedFileId, varid, start, count, data, MPI_INT, nc_get_vara_int );
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF )
     {
@@ -969,6 +1380,10 @@ int mbnc_get_vara_long_indep( int taggedFileId, int varid, const size_t* start, 
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+        return bsuf_get_vara< long >( taggedFileId, varid, start, count, data, MPI_LONG, nc_get_vara_long );
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF )
     {
@@ -987,6 +1402,10 @@ int mbnc_get_vara_text_indep( int taggedFileId, int varid, const size_t* start, 
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+        return bsuf_get_vara< char >( taggedFileId, varid, start, count, data, MPI_CHAR, nc_get_vara_text );
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF )
     {
@@ -1006,6 +1425,15 @@ int mbnc_get_vars_double_indep( int taggedFileId, int varid, const size_t* start
 {
     const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_BUFFERED )
+    {
+        // Buffered backend doesn't distinguish indep / collective — re-use
+        // the collective stride wrapper which already implements the
+        // per-rank scatter pattern with stride.
+        return mbnc_get_vars_double( taggedFileId, varid, start, count, stride, data );
+    }
+#endif
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF )
     {

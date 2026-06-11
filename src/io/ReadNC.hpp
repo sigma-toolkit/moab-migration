@@ -27,29 +27,40 @@
 #include "moab/ParallelComm.hpp"
 #endif
 
-#ifdef MOAB_HAVE_PNETCDF
-#include "pnetcdf.h"
-#define NCFUNC( func ) ncmpi_##func
+// Runtime dispatch layer. Replaces the previous compile-time switch
+// between the standard NetCDF C API (nc_*) and Parallel-NetCDF
+// (ncmpi_*) with a per-file backend selection based on the on-disk
+// format detected at open time. See src/io/MBNcDispatch.hpp for the
+// full rationale and the wrapper API surface.
+//
+// The NCFUNC* macros below preserve every existing call site verbatim;
+// they now expand to mbnc_* wrappers that route at runtime. Callers
+// can keep their #ifdef MOAB_HAVE_PNETCDF guards: on non-PNetCDF
+// backends, mbnc_iget_* degrades to an immediate blocking collective
+// call and mbnc_wait_all becomes a no-op, so the existing
+// nonblocking-request-aggregation logic continues to work.
+//
+// NCDF_SIZE / NCDF_DIFF unify on size_t / ptrdiff_t — the dispatch
+// layer handles MPI_Offset conversion internally for the PNetCDF
+// branches.
+#include "MBNcDispatch.hpp"
 
-//! Collective I/O mode get
-#define NCFUNCAG( func ) ncmpi_get##func##_all
+//! Generic NC function dispatch (open, close, redef, def_dim, def_var, ...)
+#define NCFUNC( func ) mbnc_##func
 
-//! Independent I/O mode get
-#define NCFUNCG( func ) ncmpi_get##func
+//! Collective I/O mode get (PNetCDF backend: collective; others: only mode)
+#define NCFUNCAG( func ) mbnc_get##func
 
-//! Nonblocking get (request aggregation), used so far only for ucd mesh
-#define NCFUNCREQG( func ) ncmpi_iget##func
+//! Independent I/O mode get. Wrap calls with mbnc_begin_indep_data /
+//! mbnc_end_indep_data when the PNetCDF independent mode is actually
+//! required; on non-PNetCDF backends those become no-ops.
+#define NCFUNCG( func ) mbnc_get##func
 
-#define NCDF_SIZE MPI_Offset
-#define NCDF_DIFF MPI_Offset
-#else
-#include "netcdf.h"
-#define NCFUNC( func )   nc_##func
-#define NCFUNCAG( func ) nc_get##func
-#define NCFUNCG( func )  nc_get##func
-#define NCDF_SIZE        size_t
-#define NCDF_DIFF        ptrdiff_t
-#endif
+//! Nonblocking get (PNetCDF request aggregation; blocking on other backends)
+#define NCFUNCREQG( func ) mbnc_iget##func
+
+#define NCDF_SIZE size_t
+#define NCDF_DIFF ptrdiff_t
 
 namespace moab
 {

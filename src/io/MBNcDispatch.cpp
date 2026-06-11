@@ -923,6 +923,46 @@ int mbnc_iget_vara_int( int taggedFileId, int varid, const size_t* start, const 
     return mbnc_get_vara_int( taggedFileId, varid, start, count, data );
 }
 
+int mbnc_iput_vara_double( int taggedFileId, int varid, const size_t* start, const size_t* count, const double* data,
+                           int* req )
+{
+    const int libId         = mbnc_lib_id( taggedFileId );
+    const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_PNETCDF
+    if( backend == NCB_PNETCDF )
+    {
+        MPI_Offset s[kMaxDims], c[kMaxDims];
+        int ndims = 0;
+        int rc    = to_mpi_offset_pair( libId, varid, start, count, s, c, &ndims );
+        if( rc != NC_NOERR ) return rc;
+        return ncmpi_iput_vara_double( libId, varid, s, c, data, req );
+    }
+#endif
+    (void)backend;
+    if( req ) *req = MBNC_REQ_NULL;
+    return mbnc_put_vara_double( taggedFileId, varid, start, count, data );
+}
+
+int mbnc_iput_vara_int( int taggedFileId, int varid, const size_t* start, const size_t* count, const int* data,
+                        int* req )
+{
+    const int libId         = mbnc_lib_id( taggedFileId );
+    const NcBackend backend = mbnc_backend_of( taggedFileId );
+#ifdef MOAB_HAVE_PNETCDF
+    if( backend == NCB_PNETCDF )
+    {
+        MPI_Offset s[kMaxDims], c[kMaxDims];
+        int ndims = 0;
+        int rc    = to_mpi_offset_pair( libId, varid, start, count, s, c, &ndims );
+        if( rc != NC_NOERR ) return rc;
+        return ncmpi_iput_vara_int( libId, varid, s, c, data, req );
+    }
+#endif
+    (void)backend;
+    if( req ) *req = MBNC_REQ_NULL;
+    return mbnc_put_vara_int( taggedFileId, varid, start, count, data );
+}
+
 int mbnc_wait_all( int taggedFileId, int nreq, int* requests, int* statuses )
 {
     const NcBackend backend = mbnc_backend_of( taggedFileId );

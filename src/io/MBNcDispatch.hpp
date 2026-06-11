@@ -315,6 +315,14 @@ int mbnc_iget_vara_double( int taggedFileId, int varid, const size_t* start, con
                            int* req );
 int mbnc_iget_vara_int( int taggedFileId, int varid, const size_t* start, const size_t* count, int* data, int* req );
 
+// Nonblocking puts (symmetric to iget_*). On non-PNetCDF backends: blocking
+// collective put; *req = MBNC_REQ_NULL. mbnc_wait_all handles both iget and
+// iput requests on PNetCDF (the underlying ncmpi_wait_all is direction-agnostic).
+int mbnc_iput_vara_double( int taggedFileId, int varid, const size_t* start, const size_t* count, const double* data,
+                           int* req );
+int mbnc_iput_vara_int( int taggedFileId, int varid, const size_t* start, const size_t* count, const int* data,
+                        int* req );
+
 int mbnc_wait_all( int taggedFileId, int nreq, int* requests, int* statuses );
 
 }  // namespace moab

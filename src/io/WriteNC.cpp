@@ -85,31 +85,83 @@ ErrorCode WriteNC::write_file( const char* file_name,
     fileName = file_name;
     int success;
 
+    // Format-aware open/create via the runtime dispatch layer. For append
+    // mode the format is detected from the existing file. For create mode
+    // we pick CLASSIC by default (preserves the behavior of PNetCDF builds
+    // which write CDF-5 via ncmpi_create) — a NetCDF-4 write path can be
+    // added later behind an explicit WriteNC option.
+#ifdef MOAB_HAVE_MPI
+    const int write_mpi_size = isParallel ? myPcomm->proc_config().proc_size() : 1;
+#else
+    const int write_mpi_size = 1;
+#endif
+
     if( append )
     {
         int omode = NC_WRITE;
-#ifdef MOAB_HAVE_PNETCDF
+
+        int existingFormat = NCFMT_UNKNOWN;
+#ifdef MOAB_HAVE_MPI
         if( isParallel )
-            success = NCFUNC( open )( myPcomm->proc_config().proc_comm(), file_name, omode, MPI_INFO_NULL, &fileId );
+        {
+            int rank = myPcomm->proc_config().proc_rank();
+            if( rank == 0 ) existingFormat = mbnc_detect_format( file_name );
+            MPI_Bcast( &existingFormat, 1, MPI_INT, 0, myPcomm->proc_config().proc_comm() );
+        }
         else
-            success = NCFUNC( open )( MPI_COMM_SELF, file_name, omode, MPI_INFO_NULL, &fileId );
+#endif
+        {
+            existingFormat = mbnc_detect_format( file_name );
+        }
+
+        const NcBackend backend = mbnc_choose_backend_for_write( existingFormat, write_mpi_size );
+        if( backend == NCB_NONE )
+        {
+            MB_SET_ERR( MB_FAILURE, "Cannot find a compatible parallel writer for appending to '"
+                                        << file_name << "' (file format not recognized or no compatible backend)" );
+        }
+
+#ifdef MOAB_HAVE_MPI
+        if( backend == NCB_NETCDF_SERIAL || write_mpi_size == 1 )
+        {
+            success = mbnc_open( file_name, omode, &fileId );
+        }
+        else
+        {
+            success =
+                mbnc_open_par( backend, myPcomm->proc_config().proc_comm(), MPI_INFO_NULL, file_name, omode, &fileId );
+        }
 #else
-        // This is a regular netcdf file, open in write mode
-        success = NCFUNC( open )( file_name, omode, &fileId );
+        success = mbnc_open( file_name, omode, &fileId );
 #endif
         if( success ) MB_SET_ERR( MB_FAILURE, "Trouble opening file " << file_name << " for appending" );
     }
     else
-    {  // Case when the file is new, will be overwritten, most likely
+    {
+        // Case when the file is new — choose classic format to match the
+        // long-standing default of the PNetCDF-built path (ncmpi_create
+        // defaults to CDF-5). Future: expose a "FORMAT" option on the
+        // WriteNC option string to let the caller request NetCDF-4.
         int cmode = overwrite ? NC_CLOBBER : NC_NOCLOBBER;
-#ifdef MOAB_HAVE_PNETCDF
-        if( isParallel )
-            success = NCFUNC( create )( myPcomm->proc_config().proc_comm(), file_name, cmode, MPI_INFO_NULL, &fileId );
+
+        const NcBackend backend = mbnc_choose_backend_for_write( NCFMT_CLASSIC, write_mpi_size );
+        if( backend == NCB_NONE )
+        {
+            MB_SET_ERR( MB_FAILURE, "Cannot find a compatible parallel writer for creating '" << file_name << "'" );
+        }
+
+#ifdef MOAB_HAVE_MPI
+        if( backend == NCB_NETCDF_SERIAL || write_mpi_size == 1 )
+        {
+            success = mbnc_create( file_name, cmode, &fileId );
+        }
         else
-            success = NCFUNC( create )( MPI_COMM_SELF, file_name, cmode, MPI_INFO_NULL, &fileId );
+        {
+            success =
+                mbnc_create_par( backend, myPcomm->proc_config().proc_comm(), MPI_INFO_NULL, file_name, cmode, &fileId );
+        }
 #else
-        // This is a regular netcdf file
-        success = NCFUNC( create )( file_name, cmode, &fileId );
+        success = mbnc_create( file_name, cmode, &fileId );
 #endif
         if( success ) MB_SET_ERR( MB_FAILURE, "Trouble creating file " << file_name << " for writing" );
     }

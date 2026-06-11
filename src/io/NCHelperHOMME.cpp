@@ -301,19 +301,50 @@ ErrorCode NCHelperHOMME::create_mesh( Range& faces )
             else
                 conn_fname = "HommeMapping.nc";
         }
-#ifdef MOAB_HAVE_PNETCDF
+        // Format-aware open via the runtime dispatch layer. Mirrors the
+        // open path in ReadNC::load_file — probe the on-disk format on
+        // rank 0, broadcast, pick the backend, then dispatch.
+        int connFormat = NCFMT_UNKNOWN;
 #ifdef MOAB_HAVE_MPI
         if( isParallel )
         {
             ParallelComm*& myPcomm = _readNC->myPcomm;
-            success =
-                NCFUNC( open )( myPcomm->proc_config().proc_comm(), conn_fname.c_str(), 0, MPI_INFO_NULL, &connectId );
+            int rank               = myPcomm->proc_config().proc_rank();
+            if( rank == 0 ) connFormat = mbnc_detect_format( conn_fname.c_str() );
+            MPI_Bcast( &connFormat, 1, MPI_INT, 0, myPcomm->proc_config().proc_comm() );
         }
         else
-            success = NCFUNC( open )( MPI_COMM_SELF, conn_fname.c_str(), 0, MPI_INFO_NULL, &connectId );
 #endif
+        {
+            connFormat = mbnc_detect_format( conn_fname.c_str() );
+        }
+
+#ifdef MOAB_HAVE_MPI
+        const int conn_mpi_size = isParallel ? _readNC->myPcomm->proc_config().proc_size() : 1;
 #else
-        success = NCFUNC( open )( conn_fname.c_str(), 0, &connectId );
+        const int conn_mpi_size = 1;
+#endif
+
+        const NcBackend connBackend = mbnc_choose_backend_for_read( connFormat, conn_mpi_size );
+        if( connBackend == NCB_NONE )
+        {
+            MB_SET_ERR( MB_FAILURE, "Cannot find a compatible reader for HOMME connectivity file '"
+                                        << conn_fname << "'" );
+        }
+
+#ifdef MOAB_HAVE_MPI
+        if( connBackend == NCB_NETCDF_SERIAL || conn_mpi_size == 1 )
+        {
+            success = mbnc_open( conn_fname.c_str(), 0, &connectId );
+        }
+        else
+        {
+            ParallelComm*& myPcomm = _readNC->myPcomm;
+            success                = mbnc_open_par( connBackend, myPcomm->proc_config().proc_comm(), MPI_INFO_NULL,
+                                                    conn_fname.c_str(), 0, &connectId );
+        }
+#else
+        success = mbnc_open( conn_fname.c_str(), 0, &connectId );
 #endif
         if( success ) MB_SET_ERR( MB_FAILURE, "Failed on open" );
     }
@@ -772,7 +803,7 @@ ErrorCode NCHelperHOMME::read_ucd_variables_to_nonset_async( std::vector< ReadNC
                     }
                     assert( ic == localGidVerts.psize() );
 
-                    success = ncmpi_wait_all( _fileId, requests.size(), &requests[0], &statuss[0] );
+                    success = mbnc_wait_all( _fileId, requests.size(), &requests[0], &statuss[0] );
                     if( success ) MB_SET_ERR( MB_FAILURE, "Failed on wait_all" );
 
                     if( vdatas[i].numLev > 1 )

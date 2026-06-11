@@ -294,6 +294,26 @@ int mbnc_put_vara_double( int taggedFileId, int varid, const size_t* start, cons
 int mbnc_put_vara_int( int taggedFileId, int varid, const size_t* start, const size_t* count, const int* data );
 int mbnc_put_vara_text( int taggedFileId, int varid, const size_t* start, const size_t* count, const char* data );
 
+// Independent-mode get/put variants — used inside begin_indep_data /
+// end_indep_data brackets on PNetCDF. On non-PNetCDF backends the
+// collective/independent distinction is per-variable (set externally
+// via nc_var_par_access on NETCDF_PAR; meaningless for SERIAL), so
+// these route to the same nc_get_vara_* / nc_put_vara_* call as the
+// collective wrappers and the caller is responsible for any per-var
+// access-mode toggling on the libnetcdf side.
+int mbnc_get_vara_double_indep( int taggedFileId, int varid, const size_t* start, const size_t* count, double* data );
+int mbnc_get_vara_int_indep( int taggedFileId, int varid, const size_t* start, const size_t* count, int* data );
+int mbnc_get_vara_long_indep( int taggedFileId, int varid, const size_t* start, const size_t* count, long* data );
+int mbnc_get_vara_text_indep( int taggedFileId, int varid, const size_t* start, const size_t* count, char* data );
+int mbnc_get_vars_double_indep( int taggedFileId, int varid, const size_t* start, const size_t* count,
+                                const ptrdiff_t* stride, double* data );
+
+int mbnc_put_vara_double_indep( int taggedFileId, int varid, const size_t* start, const size_t* count,
+                                const double* data );
+int mbnc_put_vara_int_indep( int taggedFileId, int varid, const size_t* start, const size_t* count, const int* data );
+int mbnc_put_vara_text_indep( int taggedFileId, int varid, const size_t* start, const size_t* count,
+                              const char* data );
+
 // ============================================================================
 // Nonblocking variable get + wait (PNetCDF request aggregation)
 //

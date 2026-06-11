@@ -46,10 +46,12 @@
 //! Collective I/O mode put (PNetCDF: collective; others: only mode)
 #define NCFUNCAP( func ) mbnc_put##func
 
-//! Independent I/O mode put. Wrap with mbnc_begin_indep_data /
-//! mbnc_end_indep_data if PNetCDF independent mode is required; on other
-//! backends those become no-ops.
-#define NCFUNCP( func ) mbnc_put##func
+//! Independent I/O mode put. Routes to ncmpi_put_vara_* (no _all) on
+//! PNetCDF; on non-PNetCDF backends maps to the same nc_put_vara_*
+//! call as the collective variant. Caller is still responsible for
+//! mbnc_begin_indep_data / mbnc_end_indep_data brackets when running
+//! on PNetCDF (those are no-ops on other backends).
+#define NCFUNCP( func ) mbnc_put##func##_indep
 
 //! Nonblocking put (PNetCDF request aggregation; blocking on others)
 #define NCFUNCREQP( func ) mbnc_iput##func

@@ -51,10 +51,12 @@
 //! Collective I/O mode get (PNetCDF backend: collective; others: only mode)
 #define NCFUNCAG( func ) mbnc_get##func
 
-//! Independent I/O mode get. Wrap calls with mbnc_begin_indep_data /
-//! mbnc_end_indep_data when the PNetCDF independent mode is actually
-//! required; on non-PNetCDF backends those become no-ops.
-#define NCFUNCG( func ) mbnc_get##func
+//! Independent I/O mode get. Routes to ncmpi_get_vara_* (no _all) on
+//! PNetCDF; on non-PNetCDF backends maps to the same nc_get_vara_*
+//! call as the collective variant. Caller is still responsible for
+//! mbnc_begin_indep_data / mbnc_end_indep_data brackets when running
+//! on PNetCDF (those are no-ops on other backends).
+#define NCFUNCG( func ) mbnc_get##func##_indep
 
 //! Nonblocking get (PNetCDF request aggregation; blocking on other backends)
 #define NCFUNCREQG( func ) mbnc_iget##func

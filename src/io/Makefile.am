@@ -15,7 +15,8 @@ AM_CPPFLAGS  = -DIS_BUILDING_MB \
                $(EIGEN3_INCLUDES)
 
 if HAVE_NETCDF
-  MOAB_NETCDF_SRCS = ReadNCDF.cpp  ReadNCDF.hpp \
+  MOAB_NETCDF_SRCS = MBNcDispatch.cpp MBNcDispatch.hpp \
+                     ReadNCDF.cpp  ReadNCDF.hpp \
                      WriteNCDF.cpp WriteNCDF.hpp \
                      WriteSLAC.cpp WriteSLAC.hpp \
                      ReadNC.cpp ReadNC.hpp \

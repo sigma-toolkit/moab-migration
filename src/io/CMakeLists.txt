@@ -40,6 +40,7 @@ set( MOABIO_LIB_SRCS
 
 if( MOAB_HAVE_NETCDF )
   set( MOAB_NETCDF_SRCS
+          MBNcDispatch.hpp  MBNcDispatch.cpp
           ReadNCDF.hpp      ReadNCDF.cpp
           WriteNCDF.hpp     WriteNCDF.cpp
           WriteSLAC.hpp     WriteSLAC.cpp

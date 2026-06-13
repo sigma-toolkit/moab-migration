@@ -35,7 +35,8 @@ if HAVE_NETCDF
                      NCWriteFV.cpp NCWriteFV.hpp \
                      NCWriteHOMME.cpp NCWriteHOMME.hpp \
                      NCWriteMPAS.cpp NCWriteMPAS.hpp \
-                     NCWriteGCRM.cpp NCWriteGCRM.hpp 
+                     NCWriteGCRM.cpp NCWriteGCRM.hpp \
+                     NCWriteScrip.cpp NCWriteScrip.hpp
 else
   MOAB_NETCDF_SRCS =
 endif

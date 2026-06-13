@@ -75,7 +75,21 @@ ErrorCode WriteNC::write_file( const char* file_name,
     // Important to create some data that will be used to write the file; dimensions, variables, etc
     // new variables still need to have some way of defining their dimensions
     // maybe it will be passed as write options
-    MB_CHK_SET_ERR( process_conventional_tags( *file_set ), "Trouble processing conventional tags" );
+    // Process the climate-style conventional tags only if the user did NOT
+    // override grid_type via WRITE_FORMAT. Grid-output writers (NCWriteScrip,
+    // NCWriteESMF, NCWriteDomain) synthesize their schema from mesh state
+    // and don't need the prior-read __VAR_NAMES / __MESH_TYPE tag chain;
+    // running process_conventional_tags would also fail on meshes that
+    // weren't loaded via ReadNC (h5m, exodus, ...).
+    if( grid_type.empty() )
+    {
+        MB_CHK_SET_ERR( process_conventional_tags( *file_set ), "Trouble processing conventional tags" );
+    }
+    else
+    {
+        dbgOut.tprintf( 2, "Skipping process_conventional_tags; grid_type already set by WRITE_FORMAT: %s\n",
+                        grid_type.c_str() );
+    }
 
     // Create or append the file
     if( append )
@@ -227,6 +241,21 @@ ErrorCode WriteNC::parse_options( const FileOptions& opts,
 
     rval = opts.get_null_option( "APPEND" );
     if( MB_SUCCESS == rval ) append = true;
+
+    // WRITE_FORMAT: optional explicit output grid_type. Set this when you
+    // want to convert FROM one grid type TO another (e.g. MPAS → SCRIP),
+    // or when writing from a mesh that doesn't carry the climate
+    // __MESH_TYPE / __VAR_NAMES tags that process_conventional_tags
+    // expects. Valid values match the strings returned by the readers'
+    // get_mesh_type_name(): "CAM_EUL", "CAM_FV", "CAM_SE", "MPAS",
+    // "GCRM", "SCRIP", "ESMF", "DOMAIN".
+    std::string requestedFormat;
+    rval = opts.get_str_option( "WRITE_FORMAT", requestedFormat );
+    if( MB_SUCCESS == rval && !requestedFormat.empty() )
+    {
+        grid_type = requestedFormat;
+        dbgOut.tprintf( 1, "WRITE_FORMAT override: grid_type = %s\n", grid_type.c_str() );
+    }
 
     if( 2 <= dbgOut.get_verbosity() )
     {

@@ -38,14 +38,17 @@ class NCWriteHelper
     //! Collect data for specified variables (partially implemented in child classes)
     virtual ErrorCode collect_variable_data( std::vector< std::string >& var_names, std::vector< int >& tstep_nums );
 
-    //! Initialize file: this is where all defines are done
-    //! The VarData dimension ids are filled up after define
-    ErrorCode init_file( std::vector< std::string >& var_names,
-                         std::vector< std::string >& desired_names,
-                         bool _append );
+    //! Initialize file: this is where all defines are done.
+    //! Virtual so that grid-output writers (NCWriteScrip / NCWriteESMF /
+    //! NCWriteDomain) can synthesize a fresh schema from mesh state
+    //! instead of going through the climate var_names plumbing.
+    virtual ErrorCode init_file( std::vector< std::string >& var_names,
+                                 std::vector< std::string >& desired_names,
+                                 bool _append );
 
-    //! Take the info from VarData and write first non-set variables, then set variables
-    ErrorCode write_values( std::vector< std::string >& var_names, std::vector< int >& tstep_nums );
+    //! Take the info from VarData and write first non-set variables, then set variables.
+    //! Virtual for the same reason as init_file.
+    virtual ErrorCode write_values( std::vector< std::string >& var_names, std::vector< int >& tstep_nums );
 
   private:
     // Write set variables (common to scd mesh and ucd mesh)

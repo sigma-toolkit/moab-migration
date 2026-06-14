@@ -439,6 +439,26 @@ int main( int argc, char* argv[] )
     Tag srcParentTag, tgtParentTag;
 
 #endif
+    // Allocate a single meshset that owns everything loaded across all
+    // input files. Writers that REQUIRE a designated file set (e.g.
+    // WriteNC and the new SCRIP/ESMF/Domain helpers, which call
+    // process_conventional_tags / synthesize a schema from one mesh
+    // root) need this set explicitly. Writers that don't care (h5m,
+    // vtk, ...) are unaffected — passing &file_set with the loaded
+    // entities is equivalent to passing nothing, since the same
+    // entities also live in the root set.
+    EntityHandle file_set = 0;
+    {
+        ErrorCode mrc = gMB->create_meshset( MESHSET_SET, file_set );
+        if( MB_SUCCESS != mrc )
+        {
+            std::cerr << "Failed to create file set." << std::endl;
+#ifdef MOAB_HAVE_MPI
+            MPI_Finalize();
+#endif
+            return OTHER_ERROR;
+        }
+    }
     for( j = in.begin(); j != in.end(); ++j )
     {
         std::string inFileName = *j;
@@ -698,9 +718,9 @@ int main( int argc, char* argv[] )
             }
         }
         else
-            result = gMB->load_file( j->c_str(), 0, read_options.c_str() );
+            result = gMB->load_file( j->c_str(), &file_set, read_options.c_str() );
 #else
-        result = gMB->load_file( j->c_str(), 0, read_options.c_str() );
+        result = gMB->load_file( j->c_str(), &file_set, read_options.c_str() );
 #endif
         if( MB_SUCCESS != result )
         {
@@ -1035,7 +1055,11 @@ int main( int argc, char* argv[] )
         if( have_sets )
             result = gMB->write_file( out.c_str(), format, write_options.c_str(), &set_list[0], set_list.size() );
         else
-            result = gMB->write_file( out.c_str(), format, write_options.c_str() );
+            // Pass the tracked file_set explicitly. Required by writers
+            // that need exactly one designated set (WriteNC + the
+            // SCRIP/ESMF/Domain helpers); semantically a no-op for the
+            // generic writers that previously took the no-set form.
+            result = gMB->write_file( out.c_str(), format, write_options.c_str(), &file_set, 1 );
         if( MB_SUCCESS != result )
         {
             std::cerr << "Failed to write \"" << out << "\"." << std::endl;

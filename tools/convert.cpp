@@ -69,8 +69,16 @@ static void print_usage( const char* name, std::ostream& stream )
               "SAT_FILE=acis_file\""
            << std::endl
            << "\t-A             - .cub file reader should not dump a SAT file (depricated default)" << std::endl
-           << "\t-o option      - Specify write option." << std::endl
-           << "\t-O option      - Specify read option." << std::endl
+           << "\t-o option      - Specify write option. Repeat for multiple options." << std::endl
+           << "\t                 Common write options:" << std::endl
+           << "\t                   WRITE_FORMAT={SCRIP|ESMF|DOMAIN}" << std::endl
+           << "\t                     Force NetCDF output into a specific grid layout" << std::endl
+           << "\t                     (overrides the source mesh's __MESH_TYPE tag)." << std::endl
+           << "\t                     Example: -o WRITE_FORMAT=SCRIP in.nc out_scrip.nc" << std::endl
+           << "\t                   PARALLEL=WRITE_PART      (auto-set under -M)" << std::endl
+           << "\t                 See README.IO for the full list of writer-specific options." << std::endl
+           << "\t-O option      - Specify read option. Repeat for multiple options." << std::endl
+           << "\t                 See README.IO for the full list of reader-specific options." << std::endl
            << "\t-t             - Time read and write of files." << std::endl
            << "\t-g             - Enable verbose/debug output." << std::endl
            << "\t-h             - Print this help text and exit." << std::endl

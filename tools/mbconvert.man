@@ -74,10 +74,27 @@ List supported file formats to stdout.
 File to store extracted geometry from .cub file.
 .IP -A
 Do not store extracted geometry from .cub file (depricated, default).
-.IP "-O option"
-Specify writer option.  Specify flag multiple times to specify multiple options.
 .IP "-o option"
-Specify reader option.  Specify flag multiple times to specify multiple options.
+Specify writer option.  Repeat the flag to pass multiple options.
+The most useful options for NetCDF output are:
+.RS
+.IP \fBWRITE_FORMAT=SCRIP\fR
+Write the mesh as a SCRIP grid file. Works from any reader-supported
+input (MPAS, HOMME, h5m, exodus, ...), not just from a NetCDF source.
+.IP \fBWRITE_FORMAT=ESMF\fR
+Write the mesh as an ESMF unstructured grid file (deduplicated
+nodeCoords, 1-based elementConn, centerCoords).
+.IP \fBWRITE_FORMAT=DOMAIN\fR
+Write the mesh as a CESM-style domain file (xc/yc/xv/yv/mask/area/frac
+on a flat ni-by-1 layout for unstructured input).
+.IP \fBPARALLEL=WRITE_PART\fR
+Set automatically when running under \fB-M\fR; rarely needed by hand.
+.PP
+See \fIREADME.IO\fR for the complete list of writer-specific options.
+.RE
+.IP "-O option"
+Specify reader option.  Repeat the flag to pass multiple options.
+See \fIREADME.IO\fR for the full list of reader-specific options.
 .IP -t
 Print timing data for read and write operations to stdout.
 .IP -g
@@ -109,6 +126,31 @@ Write all one-dimensional mesh entities (edges.)
 Write all two-dimensional mesh entities (triangles,quads,polygons)
 .IP "-3"
 Write all three-dimensional mesh entities (tets,hexes,etc.)
+.SH EXAMPLES
+.PP
+Convert a NetCDF file from one grid layout to another:
+.PP
+.RS
+.nf
+\fBmbconvert -o WRITE_FORMAT=SCRIP  in_mpas.nc  out_scrip.nc\fR
+\fBmbconvert -o WRITE_FORMAT=ESMF   in_mpas.nc  out_esmf.nc\fR
+\fBmbconvert -o WRITE_FORMAT=DOMAIN in_mpas.nc  out_domain.nc\fR
+.fi
+.RE
+.PP
+The source mesh can be in any reader-supported format — NetCDF
+(MPAS/HOMME/CAM/SCRIP/ESMF/Domain), HDF5 (\fI.h5m\fR), Exodus
+(\fI.exo\fR), VTK, etc. The \fBWRITE_FORMAT\fR option overrides the
+mesh's stored \fI__MESH_TYPE\fR tag so the same mesh can be emitted
+in any of the grid layouts above.
+.PP
+Convert an unstructured mesh to native MOAB HDF5:
+.PP
+.RS
+.nf
+\fBmbconvert  in.nc  out.h5m\fR
+.fi
+.RE
 .SH FILES
 .SH ENVIRONMENT
 .SH DIAGNOSTICS

@@ -1,4 +1,4 @@
-# MOAB Tools Directory
+# MOAB Tools Directory {#tools_build}
 
 This directory contains miscellaneous tools built on MOAB. Some, like `mbconvert` and `mbsize`, are useful examples of how to write MOAB applications. Others, like `mbzoltan`, are useful both as standalone tools and as building blocks to embed in other applications.
 

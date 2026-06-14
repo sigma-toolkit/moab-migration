@@ -1,4 +1,4 @@
-# mbtagprop
+# mbtagprop {#tools_mbtagprop}
 
 Propagate tags from entity sets to the mesh entities those sets contain. Common use case: lift a material/boundary identifier from a `MATERIAL_SET` set onto every element it owns.
 

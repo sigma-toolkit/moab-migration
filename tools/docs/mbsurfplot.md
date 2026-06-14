@@ -1,4 +1,4 @@
-# mbsurfplot
+# mbsurfplot {#tools_mbsurfplot}
 
 Plot the mesh of a single geometric surface projected to a plane. Output is written to stdout (redirect to a file).
 

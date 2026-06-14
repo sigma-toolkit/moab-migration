@@ -1,4 +1,4 @@
-# compareMaps
+# compareMaps {#tools_compareMaps}
 
 Compare two remap-weight map files in NetCDF (SCRIP) format. Loads each file's sparse weight matrix into an Eigen sparse representation, then reports differences in `row`, `col`, `S` entries and matrix norms. Useful for validating that a refactored remap workflow still produces the same matrix, or for diffing two implementations.
 

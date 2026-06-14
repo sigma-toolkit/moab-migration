@@ -1,4 +1,4 @@
-# spheredecomp
+# spheredecomp {#tools_spheredecomp}
 
 Construct an all-hex mesh for a set of spheres embedded in a substrate. Sphere locations and radii are specified as a set of vertices and tags on those vertices; each vertex implicitly defines one sphere.
 

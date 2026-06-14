@@ -1,4 +1,4 @@
-# mbIntxCheck
+# mbIntxCheck {#tools_mbIntxCheck}
 
 Verify a precomputed mesh intersection against its source and target meshes. After a parallel run of `mbtempest` (or any other intersection generator) produces an intersection mesh, this tool checks that the per-element areas balance correctly between source / target / intersection.
 

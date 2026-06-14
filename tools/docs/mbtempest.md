@@ -1,4 +1,4 @@
-# mbtempest
+# mbtempest {#tools_mbtempest}
 
 A unified command-line tool for **climate-style mesh generation** and **conservative remapping weight computation**, built on top of MOAB and the TempestRemap library. Used heavily in the E3SM coupler workflow and as the offline counterpart to the iMOAB remap routines.
 

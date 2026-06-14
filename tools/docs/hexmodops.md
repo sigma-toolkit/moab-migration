@@ -1,4 +1,4 @@
-# hexmodops
+# hexmodops {#tools_hexmodops}
 
 Build sample meshes that illustrate the local hex modification operations developed by Tautges. Useful for studying the operations themselves and for generating test inputs.
 

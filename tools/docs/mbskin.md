@@ -1,4 +1,4 @@
-# mbskin
+# mbskin {#tools_mbskin}
 
 Generate input files for testing **Mesquite** (MESh QUality Improvement Toolkit). Produces a mesh in which interior vertices are marked free and skin (boundary) vertices are marked fixed.
 

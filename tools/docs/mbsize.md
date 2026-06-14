@@ -1,4 +1,4 @@
-# mbsize
+# mbsize {#tools_mbsize}
 
 List the entity types in a MOAB-readable mesh file, plus counts and size statistics. Useful for quick inspection: "how many cells does this mesh have, what types, by which set?"
 

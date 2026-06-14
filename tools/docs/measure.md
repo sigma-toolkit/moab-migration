@@ -1,4 +1,4 @@
-# measure (library)
+# measure (library) {#tools_measure}
 
 A small utility module — **not** a standalone binary — providing geometric measurement (length, area, volume) for MOAB entity types. Used internally by other tools in this directory (`mbsize`, etc.) and available for embedding in client code.
 

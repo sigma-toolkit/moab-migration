@@ -1,4 +1,4 @@
-# compareFiles
+# compareFiles {#tools_compareFiles}
 
 Compare two MOAB `.h5m` files that represent the **same mesh** and emit a third file that carries the per-tag differences. The inputs must share `GLOBAL_ID` values on their elements, but their `EntityHandle` values can differ arbitrarily (e.g. because the two files were partitioned differently or saved by different MPI rank counts).
 

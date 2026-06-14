@@ -1,4 +1,4 @@
-# mbconvert
+# mbconvert {#tools_mbconvert}
 
 Convert mesh files between formats supported by MOAB, optionally extracting subsets of the input.
 
@@ -112,7 +112,7 @@ mbconvert mesh.h5m  mesh.vtk       # MOAB HDF5 → VTK
 mbconvert mesh.nc   mesh.h5m       # NetCDF (MPAS/HOMME/Euler/...) → MOAB HDF5
 ```
 
-### Cross-format NetCDF conversion
+### Cross-format NetCDF conversion {#cross-format-netcdf-conversion}
 
 The new `WRITE_FORMAT` option lets you re-emit the mesh in a different NetCDF grid layout. Source can be any reader-supported format — NetCDF (MPAS/HOMME/CAM/SCRIP/ESMF/Domain), HDF5 (`.h5m`), Exodus (`.exo`), VTK, etc.
 

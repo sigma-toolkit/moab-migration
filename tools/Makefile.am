@@ -15,7 +15,11 @@ docdir = @docdir@
 
 bin_PROGRAMS =
 dist_man1_MANS =
-doc_DATA =
+# Always install the tools doc index + the build-integration overview,
+# regardless of which individual tools are enabled below. Per-tool docs
+# are appended inside the corresponding ENABLE_<tool> blocks; this
+# parallels the unconditional MOAB_DOCS += in tools/CMakeLists.txt.
+doc_DATA = docs/README.md docs/tools.md
 
 EXTRA_DIST = docs/README.md \
              docs/tools.md \
@@ -34,11 +38,13 @@ EXTRA_DIST = docs/README.md \
              CMakeLists.txt
 
 if HAVE_HDF5
-  bin_PROGRAMS += mbcmpfiles mbintxchk mbcleantags 
+  bin_PROGRAMS += mbcmpfiles mbintxchk mbcleantags
+  doc_DATA += docs/compareFiles.md docs/mbIntxCheck.md
 if HAVE_NETCDF
   bin_PROGRAMS += mbaddnc mbaddchunk mbedgesplit
 if HAVE_EIGEN3
   bin_PROGRAMS += mbcmpmaps mbvisumap
+  doc_DATA += docs/compareMaps.md
 endif
 endif
 endif
@@ -56,7 +62,7 @@ endif
 
 if ENABLE_mbsize
   bin_PROGRAMS += mbsize
-  doc_DATA += docs/mbsize.md
+  doc_DATA += docs/mbsize.md docs/measure.md
 endif
 
 if ENABLE_mbskin
@@ -152,6 +158,7 @@ if ENABLE_mbtempest
   bin_PROGRAMS += mbtempest h5mtoscrip
 mbtempest_SOURCES = mbtempest.cpp
 h5mtoscrip_SOURCES = h5mtoscrip.cpp
+  doc_DATA += docs/mbtempest.md
 endif
 
 if ENABLE_mbmerge

@@ -17,14 +17,20 @@ bin_PROGRAMS =
 dist_man1_MANS =
 doc_DATA =
 
-EXTRA_DIST = README.hexmodops \
-             README.mbconvert \
-             README.mbsize \
-             README.mbskin \
-             README.mbsurfplot \
-             README.mbtagprop \
-             README.spheredecomp \
-             README.tools \
+EXTRA_DIST = docs/README.md \
+             docs/tools.md \
+             docs/mbconvert.md \
+             docs/mbtempest.md \
+             docs/mbIntxCheck.md \
+             docs/compareMaps.md \
+             docs/compareFiles.md \
+             docs/measure.md \
+             docs/hexmodops.md \
+             docs/mbsize.md \
+             docs/mbskin.md \
+             docs/mbsurfplot.md \
+             docs/mbtagprop.md \
+             docs/spheredecomp.md \
              CMakeLists.txt
 
 if HAVE_HDF5
@@ -40,23 +46,22 @@ endif
 if ENABLE_mbconvert
   mbconvert_SOURCES = convert.cpp
   bin_PROGRAMS += mbconvert
-  dist_man1_MANS += mbconvert.man
-  doc_DATA += README.mbconvert
+  doc_DATA += docs/mbconvert.md
 endif
 
 if ENABLE_hexmodops
   bin_PROGRAMS += hexmodops
-  doc_DATA += README.hexmodops
+  doc_DATA += docs/hexmodops.md
 endif
 
 if ENABLE_mbsize
   bin_PROGRAMS += mbsize
-  doc_DATA += README.mbsize
+  doc_DATA += docs/mbsize.md
 endif
 
 if ENABLE_mbskin
   bin_PROGRAMS += mbskin
-  doc_DATA += README.mbskin
+  doc_DATA += docs/mbskin.md
 endif
 
 if ENABLE_mbdepth
@@ -65,7 +70,7 @@ endif
 
 if ENABLE_mbtagprop
   bin_PROGRAMS += mbtagprop
-  doc_DATA += README.mbtagprop
+  doc_DATA += docs/mbtagprop.md
 endif
 
 if ENABLE_mbmem
@@ -74,12 +79,12 @@ endif
 
 if ENABLE_spheredecomp
   bin_PROGRAMS += spheredecomp
-  doc_DATA += README.spheredecomp
+  doc_DATA += docs/spheredecomp.md
 endif
 
 if ENABLE_mbsurfplot
   bin_PROGRAMS += mbsurfplot
-  doc_DATA += README.mbsurfplot
+  doc_DATA += docs/mbsurfplot.md
 endif
 
 if ENABLE_gsets

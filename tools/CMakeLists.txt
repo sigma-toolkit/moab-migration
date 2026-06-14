@@ -70,7 +70,7 @@ endmacro()
 # MBSIZE
 if ( MOAB_BUILD_MBSIZE )
   add_moab_tool( mbsize "size.cpp;measure.cpp" MOAB_HAVE_MBSIZE )
-  SET(MOAB_DOCS ${MOAB_DOCS} README.mbsize)
+  SET(MOAB_DOCS ${MOAB_DOCS} docs/mbsize.md docs/measure.md)
 endif ( )
 
 # MBMERGE
@@ -87,8 +87,7 @@ endif ( )
 # MBCONVERT
 if ( MOAB_BUILD_MBCONVERT )
   add_moab_tool( mbconvert convert.cpp MOAB_HAVE_MBCONVERT "${TEMPESTREMAP_LIBRARIES}" )
-  SET(MOAB_DOCS ${MOAB_DOCS} README.mbconvert)
-  INSTALL(FILES mbconvert.man DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 RENAME mbconvert.1)
+  SET(MOAB_DOCS ${MOAB_DOCS} docs/mbconvert.md)
 endif ( )
 
 # MBHONODES
@@ -104,19 +103,19 @@ endif ( )
 # MBSKIN
 if ( MOAB_BUILD_MBSKIN )
   add_moab_tool( mbskin skin.cpp MOAB_HAVE_MBSKIN )
-  SET(MOAB_DOCS ${MOAB_DOCS} README.mbskin)
+  SET(MOAB_DOCS ${MOAB_DOCS} docs/mbskin.md)
 endif ( )
 
 # MBSURFPLOT
 if ( MOAB_BUILD_MBSURFPLOT )
   add_moab_tool( mbsurfplot surfplot.cpp MOAB_HAVE_MBSURFPLOT )
-  SET(MOAB_DOCS ${MOAB_DOCS} README.mbsurfplot)
+  SET(MOAB_DOCS ${MOAB_DOCS} docs/mbsurfplot.md)
 endif ( )
 
 # MBTAGPROP
 if ( MOAB_BUILD_MBTAGPROP )
   add_moab_tool( mbtagprop "parse.cpp;propagate_tags.cpp" MOAB_HAVE_MBTAGPROP )
-  SET(MOAB_DOCS ${MOAB_DOCS} README.mbtagprop)
+  SET(MOAB_DOCS ${MOAB_DOCS} docs/mbtagprop.md)
 endif ( )
 
 # MBGSETS
@@ -137,6 +136,7 @@ endif( )
 # MBTEMPEST
 if ( MOAB_BUILD_MBTEMPEST )
   add_moab_tool( mbtempest mbtempest.cpp MOAB_HAVE_MBTEMPEST "${TEMPESTREMAP_LIBRARIES}")
+  SET(MOAB_DOCS ${MOAB_DOCS} docs/mbtempest.md docs/mbIntxCheck.md)
 endif( )
 
 if (MOAB_HAVE_NETCDF OR MOAB_HAVE_PNETCDF)
@@ -144,6 +144,7 @@ if (MOAB_HAVE_NETCDF OR MOAB_HAVE_PNETCDF)
   # MOAB_BUILD_MBCMPMAPS
   if ( MOAB_BUILD_MBCMPMAPS )
     add_moab_tool( mbcmpmaps compareMaps.cpp MOAB_HAVE_MBCMPMAPS )
+    SET(MOAB_DOCS ${MOAB_DOCS} docs/compareMaps.md)
   endif( )
 
   # MBVISUMAP
@@ -156,6 +157,7 @@ endif (MOAB_HAVE_NETCDF OR MOAB_HAVE_PNETCDF)
 # MBCMPFILES
 if ( MOAB_BUILD_MBCMPFILES )
   add_moab_tool( mbcmpfiles compareFiles.cpp MOAB_HAVE_MBCMPFILES )
+  SET(MOAB_DOCS ${MOAB_DOCS} docs/compareFiles.md)
 endif( )
 
 # MBQUALITY
@@ -185,13 +187,17 @@ endif ( )
 # hexmodops
 if( MOAB_BUILD_HEXMODOPS )
   add_moab_tool( hexmodops makeops.cpp MOAB_HAVE_HEXMODOPS )
-  SET(MOAB_DOCS ${MOAB_DOCS} README.hexmodops)
+  SET(MOAB_DOCS ${MOAB_DOCS} docs/hexmodops.md)
 endif()
 
 # MBSPHEREDECOMP
 if ( MOAB_BUILD_SPHEREDECOMP )
   add_moab_tool( spheredecomp "SphereDecomp.cpp;SphereDecomp.hpp;sphere_decomp.cpp" MOAB_HAVE_SPHEREDECOMP )
-  SET(MOAB_DOCS ${MOAB_DOCS} README.spheredecomp)
+  SET(MOAB_DOCS ${MOAB_DOCS} docs/spheredecomp.md)
 endif ( )
+
+# Always install the tools doc index + tools-overview, regardless of which
+# individual tools were enabled.
+SET(MOAB_DOCS ${MOAB_DOCS} docs/README.md docs/tools.md)
 
 install(FILES ${MOAB_DOCS} DESTINATION ${MOABDocLocation})

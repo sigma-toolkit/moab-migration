@@ -63,6 +63,7 @@ if( MOAB_HAVE_NETCDF )
           NCWriteMPAS.hpp   NCWriteMPAS.cpp
           NCWriteScrip.hpp  NCWriteScrip.cpp
           NCWriteESMF.hpp   NCWriteESMF.cpp
+          NCWriteDomain.hpp NCWriteDomain.cpp
        )
         set( MOABIO_LIBS ${MOABIO_LIBS} ${NETCDF_LIBRARIES} )
         include_directories(${NETCDF_INCLUDES})

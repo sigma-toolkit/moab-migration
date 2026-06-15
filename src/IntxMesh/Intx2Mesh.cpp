@@ -462,8 +462,10 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
         int nnodes               = 0;
         MB_CHK_SET_ERR( mb->get_connectivity( tcell, conn, nnodes ), "can't get target connectivity" );
         // find leaves close to those positions
-        double areaTgtCell   = setup_tgt_cell( tcell, nnodes );  // this is the area in the gnomonic plane
-        double recoveredArea = 0;
+        // setup_tgt_cell is called for its side effects (populates tgtConn /
+        // redCoords[] used by computeIntersectionBetweenTgtAndSrc below);
+        // the returned gnomonic-plane area is unused on this serial path.
+        (void)setup_tgt_cell( tcell, nnodes );
         std::vector< double > positions;
         positions.resize( nnodes * 3 );
         MB_CHK_SET_ERR( mb->get_coords( conn, nnodes, &positions[0] ), "can't get target coordinates" );
@@ -531,13 +533,12 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
                               << " g:" << global_id_ent( mb, startSrc, gid ) << " counting: " << counting << "\n";
 #endif
                 }
-                recoveredArea += area;
+                // (Historical: serial path used to accumulate a per-cell
+                // recoveredArea / areaTgtCell ratio here, but neither value
+                // was ever read again. The verbose-print branch for that
+                // ratio lives only in the parallel path ~lines 893-899.)
             }
         }
-        // (Note: serial path historically computed and discarded the recovery
-        // fraction here; the verbose-print branch lives in the parallel path
-        // ~lines 899-905. Keeping the accumulation above for symmetry, but
-        // dropping the dead store of (recoveredArea - areaTgtCell)/areaTgtCell.)
     }
     // before cleaning up , we need to settle the position of the intersection points
     // on the boundary edges

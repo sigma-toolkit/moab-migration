@@ -81,9 +81,9 @@ int IntxUtils::borderPointsOfXinY2( double* X, int nX, double* Y, int nY, double
         int inside = 1;
         for( int j = 0; j < nY; j++ )
         {
-            double* B = Y + 2 * j;
-            int j1    = ( j + 1 ) % nY;
-            double* C = Y + 2 * j1;  // no copy of data
+            const double* B = Y + 2 * j;
+            int j1          = ( j + 1 ) % nY;
+            const double* C = Y + 2 * j1;  // no copy of data
 
             double area2 = ( B[0] - A[0] ) * ( C[1] - A[1] ) - ( C[0] - A[0] ) * ( B[1] - A[1] );
             if( area2 < -epsilon_area )
@@ -1126,12 +1126,12 @@ ErrorCode IntxUtils::ScaleToRadius( Interface* mb, EntityHandle set, double R )
     {
         EntityHandle nd = *nit;
         CartVect pos;
-        rval = mb->get_coords( &nd, 1, (double*)&( pos[0] ) );
+        rval = mb->get_coords( &nd, 1, pos.array() );
         if( rval != moab::MB_SUCCESS ) return rval;
         double len = pos.length();
         if( len == 0. ) return MB_FAILURE;
         pos  = R / len * pos;
-        rval = mb->set_coords( &nd, 1, (double*)&( pos[0] ) );
+        rval = mb->set_coords( &nd, 1, pos.array() );
         if( rval != moab::MB_SUCCESS ) return rval;
     }
     return MB_SUCCESS;
@@ -2236,7 +2236,7 @@ int IntxUtils::borderPointsOfCSinRLL( CartVect* redc,
     // check now each of the red points if they are inside this rectangle
     for( int i = 0; i < nsRed; i++ )
     {
-        CartVect& X = redc[i];
+        const CartVect& X = redc[i];
         if( X[2] > A[2] || X[2] < B[2] ) continue;  // it is above or below the rectangle
         // now decide if it is between the planes OAB and OCD
         if( ( ( A * B ) % X >= -epsil ) && ( ( C * D ) % X >= -epsil ) )
@@ -2422,9 +2422,9 @@ ErrorCode IntxUtils::remove_padded_vertices( Interface* mb, EntityHandle file_se
             double value;  // use the same value to reset the tags, even if the tags are int (like Global ID)
             for( size_t i = 0; i < tagList.size(); i++ )
             {
-                MB_CHK_SET_ERR( mb->tag_get_data( tagList[i], &cell, 1, (void*)( &value ) ),
+                MB_CHK_SET_ERR( mb->tag_get_data( tagList[i], &cell, 1, &value ),
                                 "Failed to get tag value" );
-                MB_CHK_SET_ERR( mb->tag_set_data( tagList[i], &newCell, 1, (void*)( &value ) ),
+                MB_CHK_SET_ERR( mb->tag_set_data( tagList[i], &newCell, 1, &value ),
                                 "Failed to set tag value on new cell" );
             }
         }

@@ -556,7 +556,7 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             }
         }
 
-        for( auto it : setMethodStrings )
+        for( const auto& it : setMethodStrings )
         {
             // Piecewise constant monotonicity
             if( it == "mono2" )
@@ -1282,7 +1282,6 @@ int moab::TempestOnlineMap::IsConservative( double dTolerance )
 
     int nTotVals = 0, nTotColumns = 0; // nTotColumnsUnq = 0;
     std::vector< int > dColumnIndices;
-    std::vector< double > dColumnSourceAreas;
     std::vector< double > dColumnSumsTotal;
     std::vector< int > displs, rcount;
     if( rank == rootProc )

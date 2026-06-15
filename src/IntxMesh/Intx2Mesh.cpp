@@ -72,7 +72,7 @@ ErrorCode Intx2Mesh::FindMaxEdgesInSet( EntityHandle eset, int& max_edges )
     MB_CHK_SET_ERR( mb->get_entities_by_dimension( eset, 2, cells ), "can't get entities by dimension" );
 
     max_edges = 0;  // can be 0 for point clouds
-    for( Range::iterator cit = cells.begin(); cit != cells.end(); cit++ )
+    for( Range::iterator cit = cells.begin(); cit != cells.end(); ++cit )
     {
         EntityHandle cell = *cit;
         const EntityHandle* conn4;
@@ -159,7 +159,7 @@ ErrorCode Intx2Mesh::createTags()
     MB_CHK_SET_ERR( mb->tag_get_handle( "__tgtEdgeNeighbors", max_edges_2, MB_TYPE_HANDLE, neighTgtEdgeTag,
                                         MB_TAG_DENSE | MB_TAG_CREAT, &zeroh[0] ),
                     "can't create target edge neighbors tag" );
-    for( Range::iterator rit = rs2.begin(); rit != rs2.end(); rit++ )
+    for( Range::iterator rit = rs2.begin(); rit != rs2.end(); ++rit )
     {
         EntityHandle tgtCell = *rit;
         int num_nodes        = 0;
@@ -204,7 +204,7 @@ ErrorCode Intx2Mesh::DetermineOrderedNeighbors( EntityHandle inputSet, int max_e
                                         &zeroh[0] ),
                     "can't create neighbors tag" );
 
-    for( Range::iterator cit = cells.begin(); cit != cells.end(); cit++ )
+    for( Range::iterator cit = cells.begin(); cit != cells.end(); ++cit )
     {
         EntityHandle cell = *cit;
         int nnodes        = 3;
@@ -373,7 +373,7 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
                                         MB_TAG_DENSE | MB_TAG_CREAT, &zeroh[0] ),
                     "can't create tgt edge neighbors tag" );
 
-    for( Range::iterator rit = rs2.begin(); rit != rs2.end(); rit++ )
+    for( Range::iterator rit = rs2.begin(); rit != rs2.end(); ++rit )
     {
         EntityHandle tgtCell = *rit;
         int num_nodes        = 0;
@@ -402,7 +402,7 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
     double max_length = 0;
     {
         std::vector< double > coords( 3 * max_edges_1, 0.0 );
-        for( Range::iterator it = rs1.begin(); it != rs1.end(); it++ )
+        for( Range::iterator it = rs1.begin(); it != rs1.end(); ++it )
         {
             const EntityHandle* conn = nullptr;
             int nnodes;
@@ -534,7 +534,10 @@ ErrorCode Intx2Mesh::intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle 
                 recoveredArea += area;
             }
         }
-        recoveredArea = ( recoveredArea - areaTgtCell ) / areaTgtCell;  // replace now with recovery fract
+        // (Note: serial path historically computed and discarded the recovery
+        // fraction here; the verbose-print branch lives in the parallel path
+        // ~lines 899-905. Keeping the accumulation above for symmetry, but
+        // dropping the dead store of (recoveredArea - areaTgtCell)/areaTgtCell.)
     }
     // before cleaning up , we need to settle the position of the intersection points
     // on the boundary edges
@@ -1693,7 +1696,7 @@ ErrorCode Intx2Mesh::resolve_intersection_sharing()
         connectedCells = intersect( connectedCells, intxCells );
         // first duplicate vertices in question:
         std::map< EntityHandle, EntityHandle > duplicatedVerticesMap;
-        for( Range::iterator vit = nodesToDuplicate.begin(); vit != nodesToDuplicate.end(); vit++ )
+        for( Range::iterator vit = nodesToDuplicate.begin(); vit != nodesToDuplicate.end(); ++vit )
         {
             EntityHandle vertex = *vit;
             double coords[3];
@@ -1704,7 +1707,7 @@ ErrorCode Intx2Mesh::resolve_intersection_sharing()
         }
 
         // look now at connectedCells, and change their connectivities:
-        for( Range::iterator eit = connectedCells.begin(); eit != connectedCells.end(); eit++ )
+        for( Range::iterator eit = connectedCells.begin(); eit != connectedCells.end(); ++eit )
         {
             EntityHandle intxCell = *eit;
             // replace connectivity

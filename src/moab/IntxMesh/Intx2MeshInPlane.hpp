@@ -17,9 +17,9 @@ class Intx2MeshInPlane : public moab::Intx2Mesh
   public:
     Intx2MeshInPlane( Interface* mbimpl );
 
-    virtual ~Intx2MeshInPlane();
+    virtual ~Intx2MeshInPlane() override;
 
-    double setup_tgt_cell( EntityHandle tgt, int& nsTgt );
+    double setup_tgt_cell( EntityHandle tgt, int& nsTgt ) override;
 
     ErrorCode computeIntersectionBetweenTgtAndSrc( EntityHandle tgt,
                                                    EntityHandle src,
@@ -30,9 +30,9 @@ class Intx2MeshInPlane : public moab::Intx2Mesh
                                                    int markr[MAXEDGES],
                                                    int& nsSrc,
                                                    int& nsTgt,
-                                                   bool check_boxes_first = false );
+                                                   bool check_boxes_first = false ) override;
 
-    ErrorCode findNodes( EntityHandle tgt, int nsTgt, EntityHandle src, int nsSrc, double* iP, int nP );
+    ErrorCode findNodes( EntityHandle tgt, int nsTgt, EntityHandle src, int nsSrc, double* iP, int nP ) override;
 };
 
 }  // end namespace moab

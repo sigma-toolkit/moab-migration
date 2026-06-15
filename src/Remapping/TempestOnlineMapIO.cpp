@@ -722,7 +722,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     moab::TupleList tgtAreaReq;
     tgtAreaReq.initialize( 2, 0, 0, 0, neededRows.size() );
     tgtAreaReq.enableWriteAccess();
-    for( std::set< int >::iterator sit = neededRows.begin(); sit != neededRows.end(); sit++ )
+    for( std::set< int >::iterator sit = neededRows.begin(); sit != neededRows.end(); ++sit )
     {
         int neededRow = *sit;
         int procRow   = neededRow / nBbase;

@@ -754,7 +754,7 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
         gnplane[i] = pl;
     }
 
-    for( Range::iterator it = localEnts.begin(); it != localEnts.end(); it++ )
+    for( Range::iterator it = localEnts.begin(); it != localEnts.end(); ++it )
     {
         EntityHandle cell   = *it;
         EntityType typeCell = mb->type_from_handle( cell );  // could be vertex, for point cloud
@@ -785,7 +785,7 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
             }
         }
         // now, augment the boxes for all planes involved
-        for( std::set< int >::iterator st = planes.begin(); st != planes.end(); st++ )
+        for( std::set< int >::iterator st = planes.begin(); st != planes.end(); ++st )
         {
             int pl = *st;
             for( int i = 0; i < nnodes; i++ )
@@ -1056,7 +1056,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         if( gnomonic )
         {
             // now loop over all planes that need to be considered for this element
-            for( std::set< int >::iterator st = planes.begin(); st != planes.end(); st++ )
+            for( std::set< int >::iterator st = planes.begin(); st != planes.end(); ++st )
             {
                 int pl         = *st;  // gnomonic plane considered
                 double qmin[2] = { DBL_MAX, DBL_MAX };

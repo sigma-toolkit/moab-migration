@@ -48,29 +48,29 @@ class NCWriteScrip : public NCWriteHelper
     {
     }
 
-    virtual ~NCWriteScrip();
+    virtual ~NCWriteScrip() override;
 
     // ----- NCWriteHelper interface --------------------------------------
 
     //! Collect cells + compute SCRIP-ready center/corner lat/lon arrays.
-    virtual ErrorCode collect_mesh_info();
+    ErrorCode collect_mesh_info() override;
 
     //! Override: synthesize the SCRIP schema directly — no need for
     //! the climate var_names / dim plumbing that the base init_file
     //! walks through.
-    virtual ErrorCode init_file( std::vector< std::string >& var_names,
-                                 std::vector< std::string >& desired_names,
-                                 bool _append );
+    ErrorCode init_file( std::vector< std::string >& var_names,
+                         std::vector< std::string >& desired_names,
+                         bool _append ) override;
 
     //! Override: write SCRIP grid arrays (cells gathered to rank 0
     //! and written serially via the dispatch layer).
-    virtual ErrorCode write_values( std::vector< std::string >& var_names, std::vector< int >& tstep_nums );
+    ErrorCode write_values( std::vector< std::string >& var_names, std::vector< int >& tstep_nums ) override;
 
   protected:
     //! Required by the abstract base; no climate "nonset" variables
     //! exist in a SCRIP grid file, so this is a no-op.
-    virtual ErrorCode write_nonset_variables( std::vector< WriteNC::VarData >& vdatas,
-                                              std::vector< int >& tstep_nums );
+    ErrorCode write_nonset_variables( std::vector< WriteNC::VarData >& vdatas,
+                                      std::vector< int >& tstep_nums ) override;
 
   private:
     //! Per-rank cell count and the global total (set in collect_mesh_info).

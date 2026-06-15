@@ -250,10 +250,10 @@ ErrorCode NCWriteESMF::init_file( std::vector< std::string >& /*var_names*/,
     if( NCFUNC( def_dim )( _fileId, "coordDim", static_cast< size_t >( mCoordDim ), &mDimCoordDim ) )
         MB_SET_ERR( MB_FAILURE, "Failed to define coordDim dim" );
 
-    int dimsNode[2]   = { mDimNodeCount, mDimCoordDim };
-    int dimsElem[2]   = { mDimElementCount, mDimMaxNodePElement };
-    int dimsCenter[2] = { mDimElementCount, mDimCoordDim };
-    int dimsElem1[1]  = { mDimElementCount };
+    const int dimsNode[2]   = { mDimNodeCount, mDimCoordDim };
+    const int dimsElem[2]   = { mDimElementCount, mDimMaxNodePElement };
+    const int dimsCenter[2] = { mDimElementCount, mDimCoordDim };
+    const int dimsElem1[1]  = { mDimElementCount };
 
     if( NCFUNC( def_var )( _fileId, "nodeCoords", NC_DOUBLE, 2, dimsNode, &mVarNodeCoords ) )
         MB_SET_ERR( MB_FAILURE, "Failed to define nodeCoords var" );
@@ -393,13 +393,13 @@ ErrorCode NCWriteESMF::write_values( std::vector< std::string >& /*var_names*/,
         }
 
         // ---- Write to disk via the dispatch layer ----------------------
-        size_t startN[2] = { 0, 0 };
-        size_t countN[2] = { static_cast< size_t >( nNodesU ), static_cast< size_t >( mCoordDim ) };
+        const size_t startN[2] = { 0, 0 };
+        const size_t countN[2] = { static_cast< size_t >( nNodesU ), static_cast< size_t >( mCoordDim ) };
         if( NCFUNCAP( _vara_double )( _fileId, mVarNodeCoords, startN, countN, nodeCoords.data() ) )
             MB_SET_ERR( MB_FAILURE, "Failed to write nodeCoords" );
 
-        size_t startE[2] = { 0, 0 };
-        size_t countE[2] = { static_cast< size_t >( nCellsG ), static_cast< size_t >( ncpc ) };
+        const size_t startE[2] = { 0, 0 };
+        const size_t countE[2] = { static_cast< size_t >( nCellsG ), static_cast< size_t >( ncpc ) };
         if( NCFUNCAP( _vara_int )( _fileId, mVarElementConn, startE, countE, connIdx.data() ) )
             MB_SET_ERR( MB_FAILURE, "Failed to write elementConn" );
 
@@ -407,8 +407,8 @@ ErrorCode NCWriteESMF::write_values( std::vector< std::string >& /*var_names*/,
         if( NCFUNCAP( _vara_int )( _fileId, mVarNumElementConn, &s1, &c1, numNodes.data() ) )
             MB_SET_ERR( MB_FAILURE, "Failed to write numElementConn" );
 
-        size_t startC[2] = { 0, 0 };
-        size_t countC[2] = { static_cast< size_t >( nCellsG ), static_cast< size_t >( mCoordDim ) };
+        const size_t startC[2] = { 0, 0 };
+        const size_t countC[2] = { static_cast< size_t >( nCellsG ), static_cast< size_t >( mCoordDim ) };
         if( NCFUNCAP( _vara_double )( _fileId, mVarCenterCoords, startC, countC, centerCoords.data() ) )
             MB_SET_ERR( MB_FAILURE, "Failed to write centerCoords" );
 

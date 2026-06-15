@@ -354,8 +354,8 @@ ErrorCode NCWriteScrip::write_values( std::vector< std::string >& /*var_names*/,
                 MB_SET_ERR( MB_FAILURE, "Failed to write grid_area" );
         }
 
-        size_t s2[2] = { 0, 0 };
-        size_t c2[2] = { static_cast< size_t >( N ), static_cast< size_t >( ncpc ) };
+        const size_t s2[2] = { 0, 0 };
+        const size_t c2[2] = { static_cast< size_t >( N ), static_cast< size_t >( ncpc ) };
         if( NCFUNCAP( _vara_double )( _fileId, mVarCornerLat, s2, c2, sCornerLat.data() ) )
             MB_SET_ERR( MB_FAILURE, "Failed to write grid_corner_lat" );
         if( NCFUNCAP( _vara_double )( _fileId, mVarCornerLon, s2, c2, sCornerLon.data() ) )

@@ -1290,11 +1290,11 @@ int mbnc_put_vara_text( int taggedFileId, int varid, const size_t* start, const 
 int mbnc_iget_vara_double( int taggedFileId, int varid, const size_t* start, const size_t* count, double* data,
                            int* req )
 {
-    const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF )
     {
+        const int libId = mbnc_lib_id( taggedFileId );
         MPI_Offset s[kMaxDims], c[kMaxDims];
         int ndims = 0;
         int rc    = to_mpi_offset_pair( libId, varid, start, count, s, c, &ndims );
@@ -1309,11 +1309,11 @@ int mbnc_iget_vara_double( int taggedFileId, int varid, const size_t* start, con
 
 int mbnc_iget_vara_int( int taggedFileId, int varid, const size_t* start, const size_t* count, int* data, int* req )
 {
-    const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF )
     {
+        const int libId = mbnc_lib_id( taggedFileId );
         MPI_Offset s[kMaxDims], c[kMaxDims];
         int ndims = 0;
         int rc    = to_mpi_offset_pair( libId, varid, start, count, s, c, &ndims );
@@ -1508,11 +1508,11 @@ int mbnc_put_vara_text_indep( int taggedFileId, int varid, const size_t* start, 
 int mbnc_iput_vara_double( int taggedFileId, int varid, const size_t* start, const size_t* count, const double* data,
                            int* req )
 {
-    const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF )
     {
+        const int libId = mbnc_lib_id( taggedFileId );
         MPI_Offset s[kMaxDims], c[kMaxDims];
         int ndims = 0;
         int rc    = to_mpi_offset_pair( libId, varid, start, count, s, c, &ndims );
@@ -1528,11 +1528,11 @@ int mbnc_iput_vara_double( int taggedFileId, int varid, const size_t* start, con
 int mbnc_iput_vara_int( int taggedFileId, int varid, const size_t* start, const size_t* count, const int* data,
                         int* req )
 {
-    const int libId         = mbnc_lib_id( taggedFileId );
     const NcBackend backend = mbnc_backend_of( taggedFileId );
 #ifdef MOAB_HAVE_PNETCDF
     if( backend == NCB_PNETCDF )
     {
+        const int libId = mbnc_lib_id( taggedFileId );
         MPI_Offset s[kMaxDims], c[kMaxDims];
         int ndims = 0;
         int rc    = to_mpi_offset_pair( libId, varid, start, count, s, c, &ndims );

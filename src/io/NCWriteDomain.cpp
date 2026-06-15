@@ -142,14 +142,15 @@ ErrorCode NCWriteDomain::collect_mesh_info()
         xyz_to_latlon_deg( cx, cy, cz, mYc[ci], mXc[ci] );
     }
 
-    // Optional input tags
+    // Mask is required by the CESM domain schema; pull values from
+    // DOMAIN_MASK if present, otherwise the default-1 mMask buffer
+    // populated above is what gets written.
     Tag maskTag = 0;
     if( MB_SUCCESS == mbImpl->tag_get_handle( "DOMAIN_MASK", 1, MB_TYPE_INTEGER, maskTag ) && maskTag )
     {
-        if( MB_SUCCESS == mbImpl->tag_get_data( maskTag, localCellsOwned, mMask.data() ) ) mHasMask = true;
+        (void)mbImpl->tag_get_data( maskTag, localCellsOwned, mMask.data() );
     }
-    // mask is required by the schema; if no tag found we still emit 1's.
-    mHasMask = true;  // we always write mask
+    mHasMask = true;  // schema-required field; always emit
 
     Tag areaTag = 0;
     if( MB_SUCCESS == mbImpl->tag_get_handle( "GRID_AREA", 1, MB_TYPE_DOUBLE, areaTag ) && areaTag )
@@ -211,8 +212,8 @@ ErrorCode NCWriteDomain::init_file( std::vector< std::string >& /*var_names*/,
         MB_SET_ERR( MB_FAILURE, "Failed to define nv dim" );
 
     // Variable dims: arrays are (nj, ni) or (nj, ni, nv). j is the slow axis.
-    int dimsCenter[2] = { mDimNj, mDimNi };
-    int dimsVertex[3] = { mDimNj, mDimNi, mDimNv };
+    const int dimsCenter[2] = { mDimNj, mDimNi };
+    const int dimsVertex[3] = { mDimNj, mDimNi, mDimNv };
 
     if( NCFUNC( def_var )( _fileId, "xc", NC_DOUBLE, 2, dimsCenter, &mVarXc ) )
         MB_SET_ERR( MB_FAILURE, "Failed to define xc var" );
@@ -317,10 +318,10 @@ ErrorCode NCWriteDomain::write_values( std::vector< std::string >& /*var_names*/
 
         // Writes are 2-D (nj=1, ni=N) for centers and mask/area/frac;
         // 3-D (nj=1, ni=N, nv=ncpc) for the vertex arrays.
-        size_t s2[2] = { 0, 0 };
-        size_t c2[2] = { 1, static_cast< size_t >( N ) };
-        size_t s3[3] = { 0, 0, 0 };
-        size_t c3[3] = { 1, static_cast< size_t >( N ), static_cast< size_t >( ncpc ) };
+        const size_t s2[2] = { 0, 0 };
+        const size_t c2[2] = { 1, static_cast< size_t >( N ) };
+        const size_t s3[3] = { 0, 0, 0 };
+        const size_t c3[3] = { 1, static_cast< size_t >( N ), static_cast< size_t >( ncpc ) };
 
         if( NCFUNCAP( _vara_double )( _fileId, mVarXc, s2, c2, sXc.data() ) )
             MB_SET_ERR( MB_FAILURE, "Failed to write xc" );

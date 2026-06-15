@@ -46,17 +46,17 @@ class NCWriteESMF : public NCWriteHelper
     {
     }
 
-    virtual ~NCWriteESMF();
+    virtual ~NCWriteESMF() override;
 
-    virtual ErrorCode collect_mesh_info();
-    virtual ErrorCode init_file( std::vector< std::string >& var_names,
-                                 std::vector< std::string >& desired_names,
-                                 bool _append );
-    virtual ErrorCode write_values( std::vector< std::string >& var_names, std::vector< int >& tstep_nums );
+    ErrorCode collect_mesh_info() override;
+    ErrorCode init_file( std::vector< std::string >& var_names,
+                         std::vector< std::string >& desired_names,
+                         bool _append ) override;
+    ErrorCode write_values( std::vector< std::string >& var_names, std::vector< int >& tstep_nums ) override;
 
   protected:
-    virtual ErrorCode write_nonset_variables( std::vector< WriteNC::VarData >& vdatas,
-                                              std::vector< int >& tstep_nums );
+    ErrorCode write_nonset_variables( std::vector< WriteNC::VarData >& vdatas,
+                                      std::vector< int >& tstep_nums ) override;
 
   private:
     long mLocalCells;

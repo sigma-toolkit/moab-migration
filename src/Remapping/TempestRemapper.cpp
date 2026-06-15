@@ -1971,7 +1971,7 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
 #endif
                     // estimate what we need to send
                     for( std::map< int, int >::iterator it1 = currentProcsCount.begin(); it1 != currentProcsCount.end();
-                         it1++ )
+                         ++it1 )
                     {
                         int proc1 = it1->first;
                         sourcesForTasks[currentSourceID].insert( proc1 );

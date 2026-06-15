@@ -921,6 +921,8 @@ static inline double sample_stationary_vortex( double dLon, double dLat ) noexce
 //#define MOAB_DBG
 int main( int argc, char* argv[] )
 {
+    try
+    {
     NcError error( NcError::verbose_nonfatal );
     std::stringstream sstr;
     std::string historyStr;
@@ -1561,7 +1563,24 @@ int main( int argc, char* argv[] )
 #ifdef MOAB_HAVE_MPI
     MPI_Finalize();
 #endif
-    exit( 0 );
+    return 0;
+    }
+    catch( const std::exception& e )
+    {
+        std::cerr << "[mbtempest] Fatal error: " << e.what() << std::endl;
+#ifdef MOAB_HAVE_MPI
+        MPI_Abort( MPI_COMM_WORLD, 1 );
+#endif
+        return 1;
+    }
+    catch( ... )
+    {
+        std::cerr << "[mbtempest] Fatal: unknown exception caught" << std::endl;
+#ifdef MOAB_HAVE_MPI
+        MPI_Abort( MPI_COMM_WORLD, 1 );
+#endif
+        return 1;
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

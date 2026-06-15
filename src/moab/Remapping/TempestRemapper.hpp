@@ -470,50 +470,52 @@ class TempestRemapper : public Remapper
     moab::ErrorCode AugmentOverlapSet();
 
     /* Source meshset, mesh and entity references */
-    Mesh* m_source;
-    TempestMeshType m_source_type;
-    moab::Range m_source_entities;
-    moab::Range m_source_vertices;
-    moab::EntityHandle m_source_set;
-    int max_source_edges;
-    bool point_cloud_source;
+    Mesh*              m_source           = nullptr;
+    TempestMeshType    m_source_type;       // initialized in ctor member init list
+    moab::Range        m_source_entities;
+    moab::Range        m_source_vertices;
+    moab::EntityHandle m_source_set        = 0;
+    int                max_source_edges    = 0;
+    bool               point_cloud_source  = false;
     std::vector< int > m_source_metadata;
 
     /* Target meshset, mesh and entity references */
-    Mesh* m_target;
-    TempestMeshType m_target_type;
-    moab::Range m_target_entities;
-    moab::Range m_target_vertices;
-    moab::EntityHandle m_target_set;
-    int max_target_edges;
-    bool point_cloud_target;
+    Mesh*              m_target           = nullptr;
+    TempestMeshType    m_target_type;       // initialized in ctor member init list
+    moab::Range        m_target_entities;
+    moab::Range        m_target_vertices;
+    moab::EntityHandle m_target_set        = 0;
+    int                max_target_edges    = 0;
+    bool               point_cloud_target  = false;
     std::vector< int > m_target_metadata;
 
     /* Overlap meshset, mesh and entity references */
-    Mesh* m_overlap;
-    TempestMeshType m_overlap_type;
-    moab::Range m_overlap_entities;
-    moab::EntityHandle m_overlap_set;
+    Mesh*              m_overlap           = nullptr;
+    TempestMeshType    m_overlap_type      = DEFAULT;
+    moab::Range        m_overlap_entities;
+    moab::EntityHandle m_overlap_set       = 0;
     std::vector< std::pair< int, int > > m_sorted_overlap_order;
 
     /* Intersection context on a sphere */
-    moab::Intx2MeshOnSphere* mbintx;
+    moab::Intx2MeshOnSphere* mbintx        = nullptr;
 
     /* Parallel - migrated mesh that is in the local view */
-    Mesh* m_covering_source;
-    moab::EntityHandle m_covering_source_set;
-    moab::Range m_covering_source_entities;
-    moab::Range m_covering_source_vertices;
+    Mesh*              m_covering_source   = nullptr;
+    moab::EntityHandle m_covering_source_set = 0;
+    moab::Range        m_covering_source_entities;
+    moab::Range        m_covering_source_vertices;
 
     /* local to glboal and global to local ID maps */
     // std::map< int, int > gid_to_lid_src, gid_to_lid_covsrc, gid_to_lid_tgt;
     // std::map< int, int > lid_to_gid_src, lid_to_gid_covsrc, lid_to_gid_tgt;
 
-    IntxAreaUtils::AreaMethod m_area_method;
+    IntxAreaUtils::AreaMethod m_area_method = IntxAreaUtils::lHuiller;
 
-    bool rrmgrids;
-    bool is_parallel, is_root;
-    int rank, size;
+    bool rrmgrids       = false;
+    bool is_parallel    = false;
+    bool is_root        = false;
+    int  rank           = 0;
+    int  size           = 0;
 };
 
 // Inline functions

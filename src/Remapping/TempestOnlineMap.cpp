@@ -1315,10 +1315,15 @@ int moab::TempestOnlineMap::IsConservative( double dTolerance )
     // Need to do a gatherv here since different processes have different number of elements
     // MPI_Reduce(&dColumnSums[0], &dColumnSumsTotal[0], m_mapRemap.GetColumns(), MPI_DOUBLE,
     // MPI_SUM, 0, m_pcomm->comm());
-    ierr = MPI_Gatherv( &dColumnsUnique[0], m_nTotDofs_SrcCov, MPI_INT, &dColumnIndices[0], rcount.data(),
+    // Use .data() rather than &vec[0] -- on non-root ranks dColumnIndices /
+    // dColumnSumsTotal are empty (only resized on root, see ~10 lines above),
+    // and &vec[0] indexing into an empty vector is undefined behavior. The
+    // .data() form returns nullptr for an empty vector, which MPI_Gatherv
+    // ignores since recvcount on non-root paths is effectively zero.
+    ierr = MPI_Gatherv( dColumnsUnique.data(), m_nTotDofs_SrcCov, MPI_INT, dColumnIndices.data(), rcount.data(),
                         displs.data(), MPI_INT, rootProc, m_pcomm->comm() );
     if( ierr != MPI_SUCCESS ) return -1;
-    ierr = MPI_Gatherv( &dColumnSums[0], m_nTotDofs_SrcCov, MPI_DOUBLE, &dColumnSumsTotal[0], rcount.data(),
+    ierr = MPI_Gatherv( dColumnSums.data(), m_nTotDofs_SrcCov, MPI_DOUBLE, dColumnSumsTotal.data(), rcount.data(),
                         displs.data(), MPI_DOUBLE, rootProc, m_pcomm->comm() );
     if( ierr != MPI_SUCCESS ) return -1;
     // ierr = MPI_Gatherv ( &dSourceAreas[0], m_nTotDofs_SrcCov, MPI_DOUBLE, &dColumnSourceAreas[0],

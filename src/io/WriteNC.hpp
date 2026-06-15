@@ -87,7 +87,7 @@ class WriteNC : public WriterIface
     static WriterIface* factory( Interface* );
 
     //! Constructor
-    WriteNC( Interface* impl = NULL );
+    explicit WriteNC( Interface* impl = NULL );
 
     //! Destructor
     virtual ~WriteNC();

@@ -93,20 +93,20 @@ class ScdNCWriteHelper : public NCWriteHelper
             lCDims[i] = -1;
         }
     }
-    virtual ~ScdNCWriteHelper() {}
+    virtual ~ScdNCWriteHelper() override {}
 
   private:
     //! Implementation of NCWriteHelper::collect_mesh_info()
-    virtual ErrorCode collect_mesh_info();
+    ErrorCode collect_mesh_info() override;
 
     //! Collect data for specified variables
-    virtual ErrorCode collect_variable_data( std::vector< std::string >& var_names, std::vector< int >& tstep_nums );
+    ErrorCode collect_variable_data( std::vector< std::string >& var_names, std::vector< int >& tstep_nums ) override;
 
     //! Implementation of NCWriteHelper::write_nonset_variables()
-    virtual ErrorCode write_nonset_variables( std::vector< WriteNC::VarData >& vdatas, std::vector< int >& tstep_nums );
+    ErrorCode write_nonset_variables( std::vector< WriteNC::VarData >& vdatas, std::vector< int >& tstep_nums ) override;
 
     template < typename T >
-    void jik_to_kji( size_t ni, size_t nj, size_t nk, T* dest, T* source )
+    static void jik_to_kji( size_t ni, size_t nj, size_t nk, T* dest, T* source )
     {
         size_t nik = ni * nk, nij = ni * nj;
         for( std::size_t k = 0; k != nk; k++ )
@@ -131,13 +131,13 @@ class UcdNCWriteHelper : public NCWriteHelper
         : NCWriteHelper( writeNC, fileId, opts, fileSet ), cDim( -1 ), eDim( -1 ), vDim( -1 )
     {
     }
-    virtual ~UcdNCWriteHelper() {}
+    virtual ~UcdNCWriteHelper() override {}
 
   protected:
     //! This version takes as input the moab range, from which we actually need just the
     //! size of each sequence, for a proper transpose of the data
     template < typename T >
-    void jik_to_kji_stride( size_t, size_t nj, size_t nk, T* dest, T* source, Range& localGid )
+    static void jik_to_kji_stride( size_t, size_t nj, size_t nk, T* dest, T* source, Range& localGid )
     {
         std::size_t idxInSource = 0;  // Position of the start of the stride
         // For each subrange, we will transpose a matrix of size

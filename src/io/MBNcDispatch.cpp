@@ -11,6 +11,7 @@
 
 #include <cstdio>   // std::fopen / std::fread / std::fclose for format probe
 #include <cstring>  // std::memset
+#include <vector>   // std::vector buffers used by NCB_BUFFERED scatter helpers
 
 #ifdef MOAB_HAVE_MPI
 #include <map>

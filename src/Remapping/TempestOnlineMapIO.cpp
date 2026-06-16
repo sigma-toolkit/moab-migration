@@ -1609,27 +1609,43 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
                 MPI_Barrier( m_pcomm->comm() );
             }  // end buffered read loop
 
-            // Read area arrays on rank 0 and broadcast (small relative to sparse matrix)
-            if( readAreaA )
-            {
-                vecAreaA.resize( nA );
-                if( rank == 0 && varAreaAF )
+            // Read area arrays on rank 0 and scatter the trivial (nA/size, nB/size)
+            // partition to each rank. iMOAB's set_aream_from_trivial_distribution
+            // (iMOAB.cpp) assumes each rank holds exactly its trivial slice of size
+            // N/size (last rank gets the N%size remainder) and computes its local
+            // index as `marker - 1 - rank * (N/size)`. Broadcasting the full array
+            // would silently scramble the per-cell aream tag on every rank > 0,
+            // which breaks BfB on the CAAS dual-map path while leaving the plain
+            // SpMV (lo, hi) projections BfB-correct (those don't use aream).
+            auto scatter_trivial = []( int Ntot, int rk, int sz, NcVar* var, std::vector< double >& localSlice,
+                                       MPI_Comm comm ) {
+                const int base       = Ntot / sz;
+                const int rem        = Ntot % sz;
+                const int localCount = ( rk == sz - 1 ) ? ( base + rem ) : base;
+                localSlice.resize( localCount );
+                if( rk == 0 )
                 {
-                    varAreaAF->set_cur( 0L );
-                    varAreaAF->get( vecAreaA.data(), nA );
+                    std::vector< double > fullBuf( Ntot );
+                    if( var )
+                    {
+                        var->set_cur( 0L );
+                        var->get( fullBuf.data(), Ntot );
+                    }
+                    // Copy rank 0's own slice and send each other rank its slice.
+                    std::copy( fullBuf.begin(), fullBuf.begin() + localCount, localSlice.begin() );
+                    for( int dst = 1; dst < sz; dst++ )
+                    {
+                        const int dstCount = ( dst == sz - 1 ) ? ( base + rem ) : base;
+                        MPI_Send( fullBuf.data() + dst * base, dstCount, MPI_DOUBLE, dst, 0xA9EA, comm );
+                    }
                 }
-                MPI_Bcast( vecAreaA.data(), nA, MPI_DOUBLE, 0, m_pcomm->comm() );
-            }
-            if( readAreaB )
-            {
-                vecAreaB.resize( nB );
-                if( rank == 0 && varAreaBF )
+                else
                 {
-                    varAreaBF->set_cur( 0L );
-                    varAreaBF->get( vecAreaB.data(), nB );
+                    MPI_Recv( localSlice.data(), localCount, MPI_DOUBLE, 0, 0xA9EA, comm, MPI_STATUS_IGNORE );
                 }
-                MPI_Bcast( vecAreaB.data(), nB, MPI_DOUBLE, 0, m_pcomm->comm() );
-            }
+            };
+            if( readAreaA ) scatter_trivial( nA, rank, size, varAreaAF, vecAreaA, m_pcomm->comm() );
+            if( readAreaB ) scatter_trivial( nB, rank, size, varAreaBF, vecAreaB, m_pcomm->comm() );
 
             if( rank == 0 )
             {

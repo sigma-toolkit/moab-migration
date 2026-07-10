@@ -1042,7 +1042,8 @@ ErrorCode AdaptiveKDTree::best_subdivision_snap_plane( int num_planes,
         int plane_count = num_planes;
 
         // if num_planes results in width < eps, reset the plane count
-        if( ( num_planes + 1 ) * eps >= diff[axis] ) plane_count = (int)( diff[axis] / eps ) - 1;
+        if( eps > 0.0 && std::isfinite(diff[axis]) && ( num_planes + 1 ) * eps >= diff[axis] )
+          plane_count = (int)( diff[axis] / eps ) - 1;
 
         for( int p = 1; p <= plane_count; ++p )
         {

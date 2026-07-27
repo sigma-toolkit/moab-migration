@@ -1669,6 +1669,10 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     m_rowVector.resize( m_nTotDofs_Dest );
     m_colVector.resize( m_nTotDofs_SrcCov );
     m_nTotDofs_Src = m_nTotDofs_SrcCov;  // do we need both?
+    // Preserve the map file's global source-DoF count (n_a) so the migration
+    // can tell a masked source mesh (fewer cells than n_a -> drop is BfB-safe)
+    // from a complete one (== n_a but a column missing -> real error).
+    m_nTotDofs_SrcGlobal = nA;
     m_weightMatrix.setFromTriplets( tripletList.begin(), tripletList.end() );
     // Reset the source and target data first
     m_rowVector.setZero();

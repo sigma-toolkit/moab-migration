@@ -109,12 +109,13 @@ int moab::TempestOnlineMap::rearrange_arrays_by_dofs( const std::vector< unsigne
     unsigned numr = 2 * nv + 3;         //  doubles: area, centerlon, center lat, nv (vertex lon, vertex lat)
     tl.initialize( 3, 0, 0, numr, N );  // to proc, dof, then
     tl.enableWriteAccess();
+
     // populate
     for( unsigned i = 0; i < N; i++ )
     {
         int gdof    = gdofmap[i];
         int to_proc = gdof / size_per_task;
-        int mask    = masks[i];
+        int mask    = (i >= masks.size() ? 1: masks[i]); // assume mask=1 if size is deficient (typically for SE-FV)
         if( to_proc >= size ) to_proc = size - 1;  // the last ones go to last proc
         int n                  = tl.get_n();
         tl.vi_wr[3 * n]        = to_proc;
@@ -199,6 +200,22 @@ moab::ErrorCode moab::TempestOnlineMap::WriteParallelMap( const std::string& str
     // Write the map file to disk in parallel
     if( extension == "nc" )
     {
+#if !defined( MOAB_HAVE_NETCDFPAR )
+        // Without parallel NetCDF, the SCRIP writer cannot handle multiple MPI ranks
+        // writing to the same file. Fall back to the HDF5 format with a .h5m extension
+        // and then the map can be converted to SCRIP format offline if needed.
+        if( this->size > 1 )
+        {
+            std::string h5mFilename = strFilename.substr( 0, lastindex ) + ".h5m";
+            if( !this->rank )
+            {
+                std::cout << "  [WriteParallelMap]: Parallel NetCDF not available; writing map to "
+                          << "HDF5 format (" << h5mFilename << ") instead of SCRIP (.nc)\n";
+            }
+            MB_CHK_ERR( this->WriteHDF5MapFile( h5mFilename.c_str() ) );
+            return moab::MB_SUCCESS;
+        }
+#endif
         /* Invoke the actual call to write the parallel map to disk in SCRIP format */
         MB_CHK_ERR( this->WriteSCRIPMapFile( strFilename.c_str(), attrMap ) );
     }
@@ -475,7 +492,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
 
         for( unsigned i = 0; i < srcdimSizes.size(); i++ )
         {
-            snprintf( szDim, 64, "name%i", i );
+            snprintf( szDim, 64, "name%u", i );
             varSrcGridDims->add_att( szDim, srcdimNames[nSrcGridDims - i - 1].c_str() );
         }
 
@@ -487,7 +504,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
 
         for( unsigned i = 0; i < tgtdimSizes.size(); i++ )
         {
-            snprintf( szDim, 64, "name%i", i );
+            snprintf( szDim, 64, "name%u", i );
             varDstGridDims->add_att( szDim, tgtdimNames[nDstGridDims - i - 1].c_str() );
         }
     }
@@ -705,7 +722,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     moab::TupleList tgtAreaReq;
     tgtAreaReq.initialize( 2, 0, 0, 0, neededRows.size() );
     tgtAreaReq.enableWriteAccess();
-    for( std::set< int >::iterator sit = neededRows.begin(); sit != neededRows.end(); sit++ )
+    for( std::set< int >::iterator sit = neededRows.begin(); sit != neededRows.end(); ++sit )
     {
         int neededRow = *sit;
         int procRow   = neededRow / nBbase;
@@ -1245,6 +1262,90 @@ void print_progress( const int barWidth, const float progress, const char* messa
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///////////////////////////////////////////////////////////////////////////////
+//
+// ReadParallelMap: Read a SCRIP-format map file and distribute sparse matrix
+// data across MPI ranks.
+//
+// Strategy (adaptive, based on NNZ count):
+//   1. Serial (size == 1): rank 0 reads entire file directly.
+//   2. Buffered read (size > 1, nS <= NNZ threshold): rank 0 reads the file
+//      using serial NcFile in fixed-size chunks, determines row ownership for
+//      each entry, and scatters data to owning ranks via MPI point-to-point.
+//      This avoids the need for parallel NetCDF and scales well for small-to-
+//      medium maps by reducing file system contention.
+//   3. Direct parallel read (size > 1, nS > NNZ threshold): all ranks read
+//      their stripe of the file simultaneously using PNetCDF (preferred) or
+//      parallel HDF5-backed NetCDF (NETCDFPAR). Falls back to buffered read
+//      if neither is available.
+//
+// After the initial read/scatter, the downstream TupleList redistribution
+// (for owned_dof_ids-based repartitioning) and Eigen sparse matrix assembly
+// are unchanged regardless of which read strategy was used.
+//
+///////////////////////////////////////////////////////////////////////////////
+
+// Tuning constants for the buffered read strategy.
+// Adjust these for scalability studies on different platforms.
+
+/// NNZ threshold: maps with nS <= this value use the buffered read strategy.
+/// Maps with nS > this value use direct parallel I/O (if available).
+/// Default 3M entries corresponds to ~36 MB of raw data (row+col+S).
+static constexpr int BUFFERED_READ_NNZ_THRESHOLD = 3000000;
+
+/// Buffer size in bytes for each chunk read by rank 0 in buffered mode.
+/// Each sparse matrix entry is 12 bytes (2 ints + 1 double), so 64KB holds
+/// ~5461 entries. Larger buffers reduce the number of read+scatter rounds
+/// but increase peak memory on rank 0.
+static constexpr int BUFFERED_READ_CHUNK_BYTES = 64 * 1024;
+
+// Map file NetCDF format classification used for parallel reader selection.
+// Classic (CDF-1/2/5) is preferred for PNetCDF; NetCDF-4 (HDF5) requires
+// parallel NetCDF (NETCDFPAR). Detection only inspects the file header,
+// so no NetCDF library dependency is required for the probe itself.
+enum MapFileFormat
+{
+    MAP_FORMAT_UNKNOWN = 0,
+    MAP_FORMAT_CLASSIC = 1,  // CDF-1, CDF-2, CDF-5
+    MAP_FORMAT_NETCDF4 = 2   // NetCDF-4 / HDF5
+};
+
+/// Inspect the file header to classify NetCDF format. Reads only the first
+/// 8 bytes — relies on the well-known "CDF\\xNN" and HDF5 magic signatures.
+/// Returns MAP_FORMAT_UNKNOWN if the file cannot be opened or the signature
+/// does not match. Safe to call from a single rank.
+///
+/// References:
+///   - NetCDF classic format spec: https://docs.unidata.ucar.edu/nug/current/file_format_specifications.html
+///     ("CDF\\x01" / "CDF\\x02" / "CDF\\x05")
+///   - HDF5 superblock signature: \\x89 H D F \\r \\n \\x1a \\n
+static int detectMapFileNetCDFFormat( const char* path )
+{
+    std::FILE* fp = std::fopen( path, "rb" );
+    if( !fp ) return MAP_FORMAT_UNKNOWN;
+
+    unsigned char magic[8] = { 0 };
+    const size_t nread     = std::fread( magic, 1, sizeof( magic ), fp );
+    std::fclose( fp );
+
+    if( nread < 4 ) return MAP_FORMAT_UNKNOWN;
+
+    // Classic NetCDF families: 'C','D','F' + version byte (0x01, 0x02, or 0x05)
+    if( magic[0] == 'C' && magic[1] == 'D' && magic[2] == 'F' )
+    {
+        if( magic[3] == 0x01 || magic[3] == 0x02 || magic[3] == 0x05 ) return MAP_FORMAT_CLASSIC;
+    }
+
+    // HDF5 signature (used by NetCDF-4)
+    if( nread >= 8 && magic[0] == 0x89 && magic[1] == 'H' && magic[2] == 'D' && magic[3] == 'F' && magic[4] == 0x0D &&
+        magic[5] == 0x0A && magic[6] == 0x1A && magic[7] == 0x0A )
+    {
+        return MAP_FORMAT_NETCDF4;
+    }
+
+    return MAP_FORMAT_UNKNOWN;
+}
+
 moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
                                                          const std::vector< int >& owned_dof_ids,
                                                          int arearead,
@@ -1255,235 +1356,605 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
 {
     NcError error( NcError::silent_nonfatal );
 
-    NcVar *varRow = NULL, *varCol = NULL, *varS = NULL;
-    NcVar *varAreaA = NULL, *varAreaB = NULL;
-    bool readAreaA = false;
-    bool readAreaB = false;
-    if( 1 == arearead || 3 == arearead ) readAreaA = true;
-    if( 2 == arearead || 3 == arearead ) readAreaB = true;
+    const bool readAreaA = ( 1 == arearead || 3 == arearead );
+    const bool readAreaB = ( 2 == arearead || 3 == arearead );
     int nS = 0;
-#ifdef MOAB_HAVE_PNETCDF
-    // some variables will be used just in the case netcdfpar reader fails
-    int ncfile = -1;
-    int ndims, nvars, ngatts, unlimited;
-#endif
-#ifdef MOAB_HAVE_NETCDFPAR
-    bool is_independent = true;
-    ParNcFile ncMap( m_pcomm->comm(), MPI_INFO_NULL, strSource, NcFile::ReadOnly, NcFile::Netcdf4 );
-    // ParNcFile ncMap( m_pcomm->comm(), MPI_INFO_NULL, strFilename.c_str(), NcmpiFile::replace, NcmpiFile::classic5 );
-#else
-    NcFile ncMap( strSource, NcFile::ReadOnly );
-#endif
 
-#define CHECK_EXCEPTION( obj, type, varstr )                                                      \
-    {                                                                                             \
-        if( obj == nullptr )                                                                      \
-        {                                                                                         \
-            _EXCEPTION3( "Map file \"%s\" does not contain %s \"%s\"", strSource, type, varstr ); \
-        }                                                                                         \
-    }
-
-    // Read SparseMatrix entries
-
-    if( ncMap.is_valid() )
-    {
-        NcDim* dimNS = ncMap.get_dim( "n_s" );
-        CHECK_EXCEPTION( dimNS, "dimension", "n_s" );
-
-        NcDim* dimNA = ncMap.get_dim( "n_a" );
-        CHECK_EXCEPTION( dimNA, "dimension", "n_a" );
-
-        NcDim* dimNB = ncMap.get_dim( "n_b" );
-        CHECK_EXCEPTION( dimNB, "dimension", "n_b" );
-
-        // store total number of nonzeros
-        nS = dimNS->size();
-        nA = dimNA->size();
-        nB = dimNB->size();
-
-        varRow = ncMap.get_var( "row" );
-        CHECK_EXCEPTION( varRow, "variable", "row" );
-
-        varCol = ncMap.get_var( "col" );
-        CHECK_EXCEPTION( varCol, "variable", "col" );
-
-        varS = ncMap.get_var( "S" );
-        CHECK_EXCEPTION( varS, "variable", "S" );
-
-        if( readAreaA )
-        {
-            varAreaA = ncMap.get_var( "area_a" );
-            CHECK_EXCEPTION( varAreaA, "variable", "area_a" );
-        }
-        if( readAreaB )
-        {
-            varAreaB = ncMap.get_var( "area_b" );
-            CHECK_EXCEPTION( varAreaB, "variable", "area_b" );
-        }
-
-#ifdef MOAB_HAVE_NETCDFPAR
-        ncMap.enable_var_par_access( varRow, is_independent );
-        ncMap.enable_var_par_access( varCol, is_independent );
-        ncMap.enable_var_par_access( varS, is_independent );
-        if( readAreaA ) ncMap.enable_var_par_access( varAreaA, is_independent );
-        if( readAreaB ) ncMap.enable_var_par_access( varAreaB, is_independent );
-#endif
-    }
-    else
-    {
-#ifdef MOAB_HAVE_PNETCDF
-        // read the file using pnetcdf directly, in parallel; need to have MPI, we do not check that anymore
-        // why build wth pnetcdf without MPI ?
-        // ParNcFile ncMap( m_pcomm->comm(), MPI_INFO_NULL, strSource, NcFile::ReadOnly, NcFile::Netcdf4 );
-        ERR_PARNC(
-            ncmpi_open( m_pcomm->comm(), strSource, NC_NOWRITE, MPI_INFO_NULL, &ncfile ) );  // bail out completely
-        ERR_PARNC( ncmpi_inq( ncfile, &ndims, &nvars, &ngatts, &unlimited ) );
-        // find dimension ids for n_S
-        int ins;
-        ERR_PARNC( ncmpi_inq_dimid( ncfile, "n_s", &ins ) );
-        MPI_Offset leng;
-        ERR_PARNC( ncmpi_inq_dimlen( ncfile, ins, &leng ) );
-        nS = (int)leng;
-        ERR_PARNC( ncmpi_inq_dimid( ncfile, "n_a", &ins ) );
-        ERR_PARNC( ncmpi_inq_dimlen( ncfile, ins, &leng ) );
-        nA = (int)leng;
-        ERR_PARNC( ncmpi_inq_dimid( ncfile, "n_b", &ins ) );
-        ERR_PARNC( ncmpi_inq_dimlen( ncfile, ins, &leng ) );
-        nB = (int)leng;
-#else
-        _EXCEPTION1( "cannot read the file %s", strSource );
-#endif
-    }
-
-    // Let us declare the map object for every process
-    // SparseMatrix< double >& sparseMatrix = this->GetSparseMatrix();
-
-    int localSize   = nS / size;
-    long offsetRead = rank * localSize;
-    // leftovers on last rank
-    if( rank == size - 1 )
-    {
-        localSize += nS % size;
-    }
-
-    int localSizeA   = nA / size;
-    long offsetReadA = rank * localSizeA;
-    // leftovers on last rank
-    if( rank == size - 1 )
-    {
-        localSizeA += nA % size;
-    }
-
-    int localSizeB   = nB / size;
-    long offsetReadB = rank * localSizeB;
-    // leftovers on last rank
-    if( rank == size - 1 )
-    {
-        localSizeB += nB % size;
-    }
+    // =========================================================================
+    // Phase 1: Read map dimensions (nA, nB, nS) and sparse matrix data.
+    //
+    // The read strategy is selected adaptively:
+    //   - Serial or buffered read: rank 0 opens the file with serial NcFile,
+    //     reads dimensions, and (for buffered mode) scatters data in chunks.
+    //   - Direct parallel read: all ranks open the file with PNetCDF or
+    //     NETCDFPAR and read their stripe directly.
+    // =========================================================================
 
     std::vector< int > vecRow, vecCol;
     std::vector< double > vecS;
-    vecRow.resize( localSize );
-    vecCol.resize( localSize );
-    vecS.resize( localSize );
-    if( readAreaA ) vecAreaA.resize( localSizeA );
-    if( readAreaB ) vecAreaB.resize( localSizeB );
+    int localSize = 0;  // number of sparse matrix entries on this rank after read
 
-    if( ncMap.is_valid() )
+    // Determine which read strategy to use. For size == 1, always serial.
+    // For size > 1, decide after reading dimensions (need nS).
+    // We use a two-phase approach: first read dimensions on rank 0 and broadcast,
+    // then select the strategy based on nS.
+
+#ifdef MOAB_HAVE_MPI
+    if( size > 1 )
     {
-        varRow->set_cur( (long)( offsetRead ) );
-        varRow->get( &( vecRow[0] ), localSize );
+        // --- Multi-process path: read dimensions on rank 0 and broadcast ---
+        int dims[3] = { 0, 0, 0 };  // nA, nB, nS
 
-        varCol->set_cur( (long)( offsetRead ) );
-        varCol->get( &( vecCol[0] ), localSize );
-
-        varS->set_cur( (long)( offsetRead ) );
-        varS->get( &( vecS[0] ), localSize );
-
-        if( readAreaA )
+        if( rank == 0 )
         {
-            varAreaA->set_cur( (long)( offsetReadA ) );
-            varAreaA->get( &( vecAreaA[0] ), localSizeA );
+            NcFile ncDims( strSource, NcFile::ReadOnly );
+            if( !ncDims.is_valid() )
+            {
+                _EXCEPTION1( "Unable to open input map file \"%s\" on rank 0", strSource );
+            }
+            NcDim* dimNA = ncDims.get_dim( "n_a" );
+            NcDim* dimNB = ncDims.get_dim( "n_b" );
+            NcDim* dimNS = ncDims.get_dim( "n_s" );
+            if( !dimNA || !dimNB || !dimNS )
+            {
+                _EXCEPTION1( "Map file \"%s\" missing required dimensions (n_a, n_b, n_s)", strSource );
+            }
+            dims[0] = static_cast< int >( dimNA->size() );
+            dims[1] = static_cast< int >( dimNB->size() );
+            dims[2] = static_cast< int >( dimNS->size() );
+            ncDims.close();
         }
 
-        if( readAreaB )
+        MPI_Bcast( dims, 3, MPI_INT, 0, m_pcomm->comm() );
+        nA = dims[0];
+        nB = dims[1];
+        nS = dims[2];
+
+        // Select read strategy based on NNZ count and available parallel I/O
+        bool useBufferedRead = true;  // default for small maps or no parallel I/O
+
+        if( nS > BUFFERED_READ_NNZ_THRESHOLD )
         {
-            varAreaB->set_cur( (long)( offsetReadB ) );
-            varAreaB->get( &( vecAreaB[0] ), localSizeB );
+            // Large map: prefer direct parallel read if available
+#if defined( MOAB_HAVE_PNETCDF ) || defined( MOAB_HAVE_NETCDFPAR )
+            useBufferedRead = false;
+#endif
+            // If neither is available, fall back to buffered read regardless of size
         }
 
-        ncMap.close();
+        if( useBufferedRead )
+        {
+            // =================================================================
+            // Buffered read: rank 0 reads in chunks and scatters to owners.
+            //
+            // Row ownership is determined by trivial partitioning: row i is
+            // owned by rank (i / nRowPerPart), with remainder on rank 0.
+            // Each chunk is read, ownership is computed per entry, and the
+            // data is scattered via MPI_Scatter + MPI_Isend/MPI_Irecv.
+            // =================================================================
+            if( rank == 0 )
+            {
+                std::cout << "  [ReadParallelMap]: Using buffered read strategy for " << nS
+                          << " NNZ entries (threshold=" << BUFFERED_READ_NNZ_THRESHOLD << ")\n";
+            }
+
+            const int nNNZBytes       = 2 * sizeof( int ) + sizeof( double );
+            const int nMaxPerChunk    = BUFFERED_READ_CHUNK_BYTES / nNNZBytes;
+            const int nBufferedReads  = static_cast< int >( std::ceil( 1.0 * nS / nMaxPerChunk ) );
+
+            // Row ownership: trivial partitioning of nB rows across ranks
+            const int nRowPerPart   = nB / size;
+            const int nRowRemainder = nB % size;
+            std::vector< int > rowOwnership( size );
+            rowOwnership[0] = nRowPerPart + nRowRemainder;
+            for( int ip = 1; ip < size; ++ip )
+                rowOwnership[ip] = rowOwnership[ip - 1] + nRowPerPart;
+
+            // File handle and variable pointers (rank 0 only)
+            NcFile* ncMap        = nullptr;
+            NcVar *varRowF       = nullptr, *varColF = nullptr, *varSF = nullptr;
+            NcVar *varAreaAF     = nullptr, *varAreaBF = nullptr;
+
+            if( rank == 0 )
+            {
+                ncMap = new NcFile( strSource, NcFile::ReadOnly );
+                if( !ncMap->is_valid() )
+                {
+                    _EXCEPTION1( "Unable to open map file \"%s\" for buffered read", strSource );
+                }
+                varRowF = ncMap->get_var( "row" );
+                varColF = ncMap->get_var( "col" );
+                varSF   = ncMap->get_var( "S" );
+                if( readAreaA ) varAreaAF = ncMap->get_var( "area_a" );
+                if( readAreaB ) varAreaBF = ncMap->get_var( "area_b" );
+            }
+
+            // Accumulate received entries per rank
+            std::vector< int > localRows, localCols;
+            std::vector< double > localVals;
+            localRows.reserve( nS / size + nS / ( size * 10 ) );  // slight overalloc
+            localCols.reserve( nS / size + nS / ( size * 10 ) );
+            localVals.reserve( nS / size + nS / ( size * 10 ) );
+
+            int nEntriesRemaining = nS;
+            long fileOffset       = 0;
+
+            for( int iRead = 0; iRead < nBufferedReads; ++iRead )
+            {
+                // Per-chunk data and ownership (rank 0 only)
+                std::vector< int > chunkRow, chunkCol;
+                std::vector< double > chunkS;
+                std::vector< std::vector< int > > entriesPerProc( size );
+                std::vector< int > nPerProc( size, 0 );
+
+                if( rank == 0 )
+                {
+                    int chunkSize = std::min( nEntriesRemaining, nMaxPerChunk );
+
+                    chunkRow.resize( chunkSize );
+                    chunkCol.resize( chunkSize );
+                    chunkS.resize( chunkSize );
+
+                    varRowF->set_cur( fileOffset );
+                    varRowF->get( chunkRow.data(), chunkSize );
+                    varColF->set_cur( fileOffset );
+                    varColF->get( chunkCol.data(), chunkSize );
+                    varSF->set_cur( fileOffset );
+                    varSF->get( chunkS.data(), chunkSize );
+
+                    // Determine ownership of each entry by its row index (1-based in file)
+                    for( int ip = 0; ip < size; ++ip )
+                        entriesPerProc[ip].reserve( chunkSize / size + 64 );
+
+                    for( int i = 0; i < chunkSize; ++i )
+                    {
+                        int rowIdx = chunkRow[i] - 1;  // convert to 0-based
+                        int owner  = 0;
+                        if( rowIdx >= rowOwnership[0] )
+                        {
+                            // Binary search for owner
+                            owner = static_cast< int >(
+                                std::upper_bound( rowOwnership.begin(), rowOwnership.end(), rowIdx ) -
+                                rowOwnership.begin() );
+                            if( owner >= size ) owner = size - 1;
+                        }
+                        entriesPerProc[owner].push_back( i );
+                    }
+
+                    fileOffset += chunkSize;
+                    nEntriesRemaining -= chunkSize;
+
+                    for( int ip = 0; ip < size; ++ip )
+                        nPerProc[ip] = static_cast< int >( entriesPerProc[ip].size() );
+                }
+
+                // Scatter count of entries each rank will receive in this chunk
+                int nRecv = 0;
+                MPI_Scatter( nPerProc.data(), 1, MPI_INT, &nRecv, 1, MPI_INT, 0, m_pcomm->comm() );
+
+                if( rank == 0 )
+                {
+                    // Send data to remote ranks via non-blocking sends
+                    std::vector< MPI_Request > requests;
+                    requests.reserve( 2 * ( size - 1 ) );
+
+                    // Pack and send to each remote rank
+                    std::vector< std::vector< int > > sendRowCol( size );
+                    std::vector< std::vector< double > > sendVals( size );
+
+                    for( int ip = 1; ip < size; ++ip )
+                    {
+                        const int nDPP = nPerProc[ip];
+                        if( nDPP > 0 )
+                        {
+                            sendRowCol[ip].resize( 2 * nDPP );
+                            sendVals[ip].resize( nDPP );
+                            for( int j = 0; j < nDPP; ++j )
+                            {
+                                int idx                  = entriesPerProc[ip][j];
+                                sendRowCol[ip][2 * j]     = chunkRow[idx];
+                                sendRowCol[ip][2 * j + 1] = chunkCol[idx];
+                                sendVals[ip][j]           = chunkS[idx];
+                            }
+
+                            MPI_Request rqRC, rqV;
+                            MPI_Isend( sendRowCol[ip].data(), 2 * nDPP, MPI_INT, ip,
+                                       iRead * 1000, m_pcomm->comm(), &rqRC );
+                            MPI_Isend( sendVals[ip].data(), nDPP, MPI_DOUBLE, ip,
+                                       iRead * 1000 + 1, m_pcomm->comm(), &rqV );
+                            requests.push_back( rqRC );
+                            requests.push_back( rqV );
+                        }
+                    }
+
+                    // Process rank 0's own entries while sends are in flight
+                    for( int j = 0; j < nRecv; ++j )
+                    {
+                        int idx = entriesPerProc[0][j];
+                        localRows.push_back( chunkRow[idx] );
+                        localCols.push_back( chunkCol[idx] );
+                        localVals.push_back( chunkS[idx] );
+                    }
+
+                    // Wait for all sends to complete
+                    if( !requests.empty() )
+                    {
+                        std::vector< MPI_Status > stats( requests.size() );
+                        MPI_Waitall( static_cast< int >( requests.size() ), requests.data(), stats.data() );
+                    }
+                }
+                else if( nRecv > 0 )
+                {
+                    // Receive data from rank 0
+                    std::vector< int > recvRowCol( 2 * nRecv );
+                    std::vector< double > recvVals( nRecv );
+
+                    MPI_Request rqs[2];
+                    MPI_Irecv( recvRowCol.data(), 2 * nRecv, MPI_INT, 0,
+                               iRead * 1000, m_pcomm->comm(), &rqs[0] );
+                    MPI_Irecv( recvVals.data(), nRecv, MPI_DOUBLE, 0,
+                               iRead * 1000 + 1, m_pcomm->comm(), &rqs[1] );
+
+                    MPI_Status sts[2];
+                    MPI_Waitall( 2, rqs, sts );
+
+                    for( int j = 0; j < nRecv; ++j )
+                    {
+                        localRows.push_back( recvRowCol[2 * j] );
+                        localCols.push_back( recvRowCol[2 * j + 1] );
+                        localVals.push_back( recvVals[j] );
+                    }
+                }
+
+                MPI_Barrier( m_pcomm->comm() );
+            }  // end buffered read loop
+
+            // Read area arrays on rank 0 and scatter the trivial (nA/size, nB/size)
+            // partition to each rank. iMOAB's set_aream_from_trivial_distribution
+            // (iMOAB.cpp) assumes each rank holds exactly its trivial slice of size
+            // N/size (last rank gets the N%size remainder) and computes its local
+            // index as `marker - 1 - rank * (N/size)`. Broadcasting the full array
+            // would silently scramble the per-cell aream tag on every rank > 0,
+            // which breaks BfB on the CAAS dual-map path while leaving the plain
+            // SpMV (lo, hi) projections BfB-correct (those don't use aream).
+            auto scatter_trivial = []( int Ntot, int rk, int sz, NcVar* var, std::vector< double >& localSlice,
+                                       MPI_Comm comm ) {
+                const int base       = Ntot / sz;
+                const int rem        = Ntot % sz;
+                const int localCount = ( rk == sz - 1 ) ? ( base + rem ) : base;
+                localSlice.resize( localCount );
+                if( rk == 0 )
+                {
+                    std::vector< double > fullBuf( Ntot );
+                    if( var )
+                    {
+                        var->set_cur( 0L );
+                        var->get( fullBuf.data(), Ntot );
+                    }
+                    // Copy rank 0's own slice and send each other rank its slice.
+                    std::copy( fullBuf.begin(), fullBuf.begin() + localCount, localSlice.begin() );
+                    for( int dst = 1; dst < sz; dst++ )
+                    {
+                        const int dstCount = ( dst == sz - 1 ) ? ( base + rem ) : base;
+                        MPI_Send( fullBuf.data() + dst * base, dstCount, MPI_DOUBLE, dst, 0xA9EA, comm );
+                    }
+                }
+                else
+                {
+                    MPI_Recv( localSlice.data(), localCount, MPI_DOUBLE, 0, 0xA9EA, comm, MPI_STATUS_IGNORE );
+                }
+            };
+            if( readAreaA ) scatter_trivial( nA, rank, size, varAreaAF, vecAreaA, m_pcomm->comm() );
+            if( readAreaB ) scatter_trivial( nB, rank, size, varAreaBF, vecAreaB, m_pcomm->comm() );
+
+            if( rank == 0 )
+            {
+                ncMap->close();
+                delete ncMap;
+            }
+
+            // Move accumulated data into the standard vecRow/vecCol/vecS vectors
+            localSize = static_cast< int >( localRows.size() );
+            vecRow.swap( localRows );
+            vecCol.swap( localCols );
+            vecS.swap( localVals );
+        }
+        else
+        {
+            // =================================================================
+            // Direct parallel read: choose reader based on detected file format.
+            //
+            // Selection logic (per format):
+            //   - Classic (CDF-1/2/5): prefer PNetCDF (best fit for the classic
+            //     family); fall back to NETCDFPAR only if PNetCDF is not built in.
+            //   - NetCDF-4 (HDF5):     must use NETCDFPAR — PNetCDF cannot read
+            //     HDF5-backed NetCDF-4 files.
+            //   - Unknown/other:       hard error.
+            //
+            // Format is determined by reading the file's magic bytes on rank 0
+            // and broadcasting the answer. This avoids opening the file twice
+            // in parallel just to probe its format.
+            // =================================================================
+            if( rank == 0 )
+            {
+                std::cout << "  [ReadParallelMap]: Using direct parallel read for " << nS
+                          << " NNZ entries (threshold=" << BUFFERED_READ_NNZ_THRESHOLD << ")\n";
+            }
+
+            int fileFormat = MAP_FORMAT_UNKNOWN;
+            if( rank == 0 ) fileFormat = detectMapFileNetCDFFormat( strSource );
+            MPI_Bcast( &fileFormat, 1, MPI_INT, 0, m_pcomm->comm() );
+
+            const bool isClassic = ( fileFormat == MAP_FORMAT_CLASSIC );
+            const bool isNetCDF4 = ( fileFormat == MAP_FORMAT_NETCDF4 );
+
+            if( !isClassic && !isNetCDF4 )
+            {
+                _EXCEPTION1( "Map file \"%s\" is not in a recognized NetCDF format "
+                             "(expected classic CDF-1/2/5 or NetCDF-4/HDF5)",
+                             strSource );
+            }
+
+            // Compute this rank's stripe of the sparse matrix
+            localSize        = nS / size;
+            long offsetRead  = rank * localSize;
+            if( rank == size - 1 ) localSize += nS % size;
+
+            vecRow.resize( localSize );
+            vecCol.resize( localSize );
+            vecS.resize( localSize );
+
+            // Compute this rank's stripe of area arrays
+            int localSizeA   = nA / size;
+            long offsetReadA = rank * localSizeA;
+            if( rank == size - 1 ) localSizeA += nA % size;
+
+            int localSizeB   = nB / size;
+            long offsetReadB = rank * localSizeB;
+            if( rank == size - 1 ) localSizeB += nB % size;
+
+            if( readAreaA ) vecAreaA.resize( localSizeA );
+            if( readAreaB ) vecAreaB.resize( localSizeB );
+
+            bool parReadDone = false;
+
+            // --- Classic format: prefer PNetCDF, fall back to NETCDFPAR -----
+            if( isClassic )
+            {
+#ifdef MOAB_HAVE_PNETCDF
+                {
+                    // PNetCDF — collective I/O, native fit for CDF-1/2/5
+                    int ncfile  = -1;
+                    int pnc_err = ncmpi_open( m_pcomm->comm(), strSource, NC_NOWRITE, MPI_INFO_NULL, &ncfile );
+                    if( pnc_err == NC_NOERR )
+                    {
+                        if( rank == 0 )
+                            std::cout << "  [ReadParallelMap]: Reading classic-format file via PNetCDF\n";
+
+                        MPI_Offset start = static_cast< MPI_Offset >( offsetRead );
+                        MPI_Offset count = static_cast< MPI_Offset >( localSize );
+                        int varid;
+
+                        ERR_PARNC( ncmpi_inq_varid( ncfile, "S", &varid ) );
+                        ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &start, &count, vecS.data() ) );
+                        ERR_PARNC( ncmpi_inq_varid( ncfile, "row", &varid ) );
+                        ERR_PARNC( ncmpi_get_vara_int_all( ncfile, varid, &start, &count, vecRow.data() ) );
+                        ERR_PARNC( ncmpi_inq_varid( ncfile, "col", &varid ) );
+                        ERR_PARNC( ncmpi_get_vara_int_all( ncfile, varid, &start, &count, vecCol.data() ) );
+
+                        if( readAreaA )
+                        {
+                            MPI_Offset startA = static_cast< MPI_Offset >( offsetReadA );
+                            MPI_Offset countA = static_cast< MPI_Offset >( localSizeA );
+                            ERR_PARNC( ncmpi_inq_varid( ncfile, "area_a", &varid ) );
+                            ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &startA, &countA, vecAreaA.data() ) );
+                        }
+                        if( readAreaB )
+                        {
+                            MPI_Offset startB = static_cast< MPI_Offset >( offsetReadB );
+                            MPI_Offset countB = static_cast< MPI_Offset >( localSizeB );
+                            ERR_PARNC( ncmpi_inq_varid( ncfile, "area_b", &varid ) );
+                            ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &startB, &countB, vecAreaB.data() ) );
+                        }
+                        ERR_PARNC( ncmpi_close( ncfile ) );
+                        parReadDone = true;
+                    }
+                }
+#endif
+
+#ifdef MOAB_HAVE_NETCDFPAR
+                if( !parReadDone )
+                {
+                    // PNetCDF not configured (or its open failed) — try NETCDFPAR.
+                    // Works only if NetCDF-4 was built with parallel-IO support
+                    // for classic files (typically requires NetCDF linked against PNetCDF).
+                    if( rank == 0 )
+                        std::cout << "  [ReadParallelMap]: PNetCDF unavailable; reading classic-format "
+                                     "file via parallel NetCDF (NETCDFPAR)\n";
+                    ParNcFile ncMap( m_pcomm->comm(), MPI_INFO_NULL, strSource, NcFile::ReadOnly, NcFile::Classic );
+                    if( ncMap.is_valid() )
+                    {
+                        NcVar* varRowP = ncMap.get_var( "row" );
+                        NcVar* varColP = ncMap.get_var( "col" );
+                        NcVar* varSP   = ncMap.get_var( "S" );
+                        ncMap.enable_var_par_access( varRowP, true );
+                        ncMap.enable_var_par_access( varColP, true );
+                        ncMap.enable_var_par_access( varSP, true );
+
+                        varRowP->set_cur( offsetRead );
+                        varRowP->get( vecRow.data(), localSize );
+                        varColP->set_cur( offsetRead );
+                        varColP->get( vecCol.data(), localSize );
+                        varSP->set_cur( offsetRead );
+                        varSP->get( vecS.data(), localSize );
+
+                        if( readAreaA )
+                        {
+                            NcVar* varAreaAP = ncMap.get_var( "area_a" );
+                            ncMap.enable_var_par_access( varAreaAP, true );
+                            varAreaAP->set_cur( offsetReadA );
+                            varAreaAP->get( vecAreaA.data(), localSizeA );
+                        }
+                        if( readAreaB )
+                        {
+                            NcVar* varAreaBP = ncMap.get_var( "area_b" );
+                            ncMap.enable_var_par_access( varAreaBP, true );
+                            varAreaBP->set_cur( offsetReadB );
+                            varAreaBP->get( vecAreaB.data(), localSizeB );
+                        }
+                        ncMap.close();
+                        parReadDone = true;
+                    }
+                }
+#endif
+
+                if( !parReadDone )
+                {
+                    _EXCEPTION1( "Classic-format map file \"%s\" cannot be read in parallel: "
+                                 "neither PNetCDF nor parallel NetCDF (NETCDFPAR) is configured "
+                                 "(or both failed to open the file)",
+                                 strSource );
+                }
+            }
+            // --- NetCDF-4/HDF5 format: only NETCDFPAR can handle it ---------
+            else  // isNetCDF4
+            {
+#ifdef MOAB_HAVE_NETCDFPAR
+                {
+                    if( rank == 0 )
+                        std::cout << "  [ReadParallelMap]: Reading NetCDF-4/HDF5 file via parallel NetCDF\n";
+                    ParNcFile ncMap( m_pcomm->comm(), MPI_INFO_NULL, strSource, NcFile::ReadOnly, NcFile::Netcdf4 );
+                    if( ncMap.is_valid() )
+                    {
+                        NcVar* varRowP = ncMap.get_var( "row" );
+                        NcVar* varColP = ncMap.get_var( "col" );
+                        NcVar* varSP   = ncMap.get_var( "S" );
+                        ncMap.enable_var_par_access( varRowP, true );
+                        ncMap.enable_var_par_access( varColP, true );
+                        ncMap.enable_var_par_access( varSP, true );
+
+                        varRowP->set_cur( offsetRead );
+                        varRowP->get( vecRow.data(), localSize );
+                        varColP->set_cur( offsetRead );
+                        varColP->get( vecCol.data(), localSize );
+                        varSP->set_cur( offsetRead );
+                        varSP->get( vecS.data(), localSize );
+
+                        if( readAreaA )
+                        {
+                            NcVar* varAreaAP = ncMap.get_var( "area_a" );
+                            ncMap.enable_var_par_access( varAreaAP, true );
+                            varAreaAP->set_cur( offsetReadA );
+                            varAreaAP->get( vecAreaA.data(), localSizeA );
+                        }
+                        if( readAreaB )
+                        {
+                            NcVar* varAreaBP = ncMap.get_var( "area_b" );
+                            ncMap.enable_var_par_access( varAreaBP, true );
+                            varAreaBP->set_cur( offsetReadB );
+                            varAreaBP->get( vecAreaB.data(), localSizeB );
+                        }
+                        ncMap.close();
+                        parReadDone = true;
+                    }
+                }
+#endif
+
+                if( !parReadDone )
+                {
+                    _EXCEPTION1( "NetCDF-4/HDF5 map file \"%s\" cannot be read in parallel: "
+                                 "parallel NetCDF (NETCDFPAR) is not configured "
+                                 "(PNetCDF cannot read NetCDF-4 files)",
+                                 strSource );
+                }
+            }
+        }  // end direct parallel read
     }
     else
+#endif  // MOAB_HAVE_MPI
     {
-#ifdef MOAB_HAVE_PNETCDF
-        // fill the local vectors with the variables from pnetcdf file; first inquire, then fill
-        MPI_Offset start = (MPI_Offset)offsetRead;
-        MPI_Offset count = (MPI_Offset)localSize;
-        int varid;
-        // get the sparse matrix values, row and column indices
-        ERR_PARNC( ncmpi_inq_varid( ncfile, "S", &varid ) );
-        ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &start, &count, &vecS[0] ) );
-        ERR_PARNC( ncmpi_inq_varid( ncfile, "row", &varid ) );
-        ERR_PARNC( ncmpi_get_vara_int_all( ncfile, varid, &start, &count, &vecRow[0] ) );
-        ERR_PARNC( ncmpi_inq_varid( ncfile, "col", &varid ) );
-        ERR_PARNC( ncmpi_get_vara_int_all( ncfile, varid, &start, &count, &vecCol[0] ) );
+        // =================================================================
+        // Serial path (size == 1): read entire file on the single process.
+        // =================================================================
+        std::cout << "  [ReadParallelMap]: Using serial read (single process)\n";
+        NcFile ncMap( strSource, NcFile::ReadOnly );
+        if( !ncMap.is_valid() )
+        {
+            _EXCEPTION1( "Unable to open input map file \"%s\"", strSource );
+        }
+
+        NcDim* dimNS = ncMap.get_dim( "n_s" );
+        NcDim* dimNA = ncMap.get_dim( "n_a" );
+        NcDim* dimNB = ncMap.get_dim( "n_b" );
+        if( !dimNS || !dimNA || !dimNB )
+        {
+            _EXCEPTION1( "Map file \"%s\" missing required dimensions", strSource );
+        }
+        nS = static_cast< int >( dimNS->size() );
+        nA = static_cast< int >( dimNA->size() );
+        nB = static_cast< int >( dimNB->size() );
+
+        localSize = nS;
+        vecRow.resize( nS );
+        vecCol.resize( nS );
+        vecS.resize( nS );
+
+        NcVar* varRowS = ncMap.get_var( "row" );
+        NcVar* varColS = ncMap.get_var( "col" );
+        NcVar* varSS   = ncMap.get_var( "S" );
+        varRowS->get( vecRow.data(), nS );
+        varColS->get( vecCol.data(), nS );
+        varSS->get( vecS.data(), nS );
 
         if( readAreaA )
         {
-            ERR_PARNC( ncmpi_inq_varid( ncfile, "area_a", &varid ) );
-            MPI_Offset startA = (MPI_Offset)offsetReadA;
-            MPI_Offset countA = (MPI_Offset)localSizeA;
-            ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &startA, &countA, &vecAreaA[0] ) );
+            vecAreaA.resize( nA );
+            NcVar* varAreaAS = ncMap.get_var( "area_a" );
+            if( varAreaAS ) varAreaAS->get( vecAreaA.data(), nA );
         }
         if( readAreaB )
         {
-            ERR_PARNC( ncmpi_inq_varid( ncfile, "area_b", &varid ) );
-            MPI_Offset startB = (MPI_Offset)offsetReadB;
-            MPI_Offset countB = (MPI_Offset)localSizeB;
-            ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &startB, &countB, &vecAreaB[0] ) );
+            vecAreaB.resize( nB );
+            NcVar* varAreaBS = ncMap.get_var( "area_b" );
+            if( varAreaBS ) varAreaBS->get( vecAreaB.data(), nB );
         }
-        ERR_PARNC( ncmpi_close( ncfile ) );
-#endif
+        ncMap.close();
     }
 
-    // NOTE: we can check if the following workflow would help here.
-    // Initial experiments did not show same index map.
-    // Might be useful to understand why that is the case.
-    // First, ensure that all local and global indices are computed
-    // this->m_remapper->ComputeGlobalLocalMaps();
-    // Next, reuse the global to local map
-    // const auto& rowMap = m_remapper->gid_to_lid_tgt;
-    // const auto& colMap = m_remapper->gid_to_lid_covsrc;
+    // =========================================================================
+    // Phase 2: Redistribute sparse matrix entries to their final owning ranks.
+    //
+    // After Phase 1, each rank holds a portion of the sparse matrix entries
+    // (either its owned rows from the buffered read, or a stripe from the
+    // direct parallel read). The rows/cols are still 1-based (SCRIP format).
+    //
+    // This phase uses TupleList-based crystal router communication to send
+    // entries to the rank that owns each row (trivial nB/size partitioning),
+    // and optionally a second redistribution based on owned_dof_ids.
+    // =========================================================================
+
 #ifdef MOAB_HAVE_EIGEN3
 
     typedef Eigen::Triplet< double > Triplet;
     std::vector< Triplet > tripletList;
 
 #ifdef MOAB_HAVE_MPI
-    // bother with tuple list only if size > 1
-    // otherwise, just fill the sparse matrix
     if( size > 1 )
     {
-        std::vector< int > ownership;
-        // the default trivial partitioning scheme
-        int nDofs = nB;  // this is for row partitioning
+        // Trivial row partitioning for redistribution
+        const int nPerPart = nB / size;
 
-        int nPerPart        = nDofs / size;
         moab::TupleList* tl = new moab::TupleList;
-        unsigned numr       = 1;                     //
-        tl->initialize( 3, 0, 0, numr, localSize );  // to proc, row, col, value
+        unsigned numr       = 1;
+        tl->initialize( 3, 0, 0, numr, localSize );  // to_proc, row, col, value
         tl->enableWriteAccess();
-        // populate
+
         for( int i = 0; i < localSize; i++ )
         {
-            int rowval  = vecRow[i] - 1;  // dofs are 1 based in the file; sparse matrix is 0 based
+            int rowval  = vecRow[i] - 1;  // convert from 1-based (SCRIP) to 0-based
             int colval  = vecCol[i] - 1;
-            int to_proc = -1;
-
-            to_proc = rowval / nPerPart;
-            if( to_proc == size ) to_proc = size - 1;
+            int to_proc = rowval / nPerPart;
+            if( to_proc >= size ) to_proc = size - 1;
 
             int n                = tl->get_n();
             tl->vi_wr[3 * n]     = to_proc;
@@ -1492,7 +1963,8 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
             tl->vr_wr[n]         = vecS[i];
             tl->inc_n();
         }
-        // heavy communication
+
+        // Crystal router: redistribute entries by row ownership
         ( m_pcomm->proc_config().crystal_router() )->gs_transfer( 1, *tl, 0 );
 
         if( owned_dof_ids.size() > 0 )

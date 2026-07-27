@@ -302,7 +302,7 @@ ErrorCode Intx2MeshEdges::EdgeSplits( double areaTolerance )
         else
         {
             mb->list_entity( initialEdge );
-            std::vector< EntityHandle >& listSubEdges = mapEdges[initialEdge];
+            const std::vector< EntityHandle >& listSubEdges = mapEdges[initialEdge];
             double newCheckLength                     = 0;
             CartVect vertices[2];
             const EntityHandle* conn2;

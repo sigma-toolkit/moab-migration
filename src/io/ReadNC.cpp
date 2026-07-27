@@ -57,13 +57,57 @@ ErrorCode ReadNC::load_file( const char* file_name,
     fileName = std::string( file_name );
     int success;
 
-#ifdef MOAB_HAVE_PNETCDF
+    // Probe on-disk format and select the backend that can actually read it.
+    // This replaces the old compile-time choice between nc_open and ncmpi_open
+    // (which silently failed on NetCDF-4/HDF5 files under PNetCDF-only builds).
+    // For parallel reads the probe runs on rank 0 and the answer is
+    // broadcast; the file header read is cheap (8 bytes) so the cost is
+    // negligible vs. doing the probe collectively on every rank.
+    int fileFormat = NCFMT_UNKNOWN;
+#ifdef MOAB_HAVE_MPI
     if( isParallel )
-        success = NCFUNC( open )( myPcomm->proc_config().proc_comm(), file_name, 0, MPI_INFO_NULL, &fileId );
+    {
+        int rank = myPcomm->proc_config().proc_rank();
+        if( rank == 0 ) fileFormat = mbnc_detect_format( file_name );
+        MPI_Bcast( &fileFormat, 1, MPI_INT, 0, myPcomm->proc_config().proc_comm() );
+    }
     else
-        success = NCFUNC( open )( MPI_COMM_SELF, file_name, 0, MPI_INFO_NULL, &fileId );
+#endif
+    {
+        fileFormat = mbnc_detect_format( file_name );
+    }
+
+#ifdef MOAB_HAVE_MPI
+    const int mpi_size = isParallel ? myPcomm->proc_config().proc_size() : 1;
 #else
-    success = NCFUNC( open )( file_name, 0, &fileId );
+    const int mpi_size = 1;
+#endif
+
+    const NcBackend backend = mbnc_choose_backend_for_read( fileFormat, mpi_size );
+    if( backend == NCB_NONE )
+    {
+        const char* fmtName = ( fileFormat == NCFMT_CLASSIC )  ? "classic CDF-1/2/5"
+                              : ( fileFormat == NCFMT_NETCDF4 ) ? "NetCDF-4 / HDF5"
+                                                                : "unrecognized / non-NetCDF";
+        MB_SET_ERR( MB_FAILURE,
+                    "Cannot find a compatible parallel reader for file '"
+                        << file_name << "' (detected format: " << fmtName
+                        << "). PNetCDF cannot read NetCDF-4 files; libnetcdf parallel "
+                           "must be configured for that case. Classic-format files require "
+                           "either PNetCDF or libnetcdf built with --enable-pnetcdf." );
+    }
+
+#ifdef MOAB_HAVE_MPI
+    if( backend == NCB_NETCDF_SERIAL || mpi_size == 1 )
+    {
+        success = mbnc_open( file_name, 0, &fileId );
+    }
+    else
+    {
+        success = mbnc_open_par( backend, myPcomm->proc_config().proc_comm(), MPI_INFO_NULL, file_name, 0, &fileId );
+    }
+#else
+    success = mbnc_open( file_name, 0, &fileId );
 #endif
     if( success ) MB_SET_ERR( MB_FAILURE, "Trouble opening file " << file_name );
 

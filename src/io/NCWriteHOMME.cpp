@@ -295,7 +295,7 @@ ErrorCode NCWriteHOMME::write_nonset_variables( std::vector< WriteNC::VarData >&
                     }
                     assert( ic == localGidVertsOwned.psize() );
 #ifdef MOAB_HAVE_PNETCDF
-                    success = ncmpi_wait_all( _fileId, requests.size(), &requests[0], &statuss[0] );
+                    success = mbnc_wait_all( _fileId, requests.size(), &requests[0], &statuss[0] );
                     if( success ) MB_SET_ERR( MB_FAILURE, "Failed on wait_all" );
 #endif
                     break;

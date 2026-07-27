@@ -18,7 +18,7 @@ class Intx2MeshOnSphere : public moab::Intx2Mesh
   public:
     Intx2MeshOnSphere( Interface* mbimpl, IntxAreaUtils::AreaMethod amethod = IntxAreaUtils::lHuiller );
 
-    virtual ~Intx2MeshOnSphere();
+    virtual ~Intx2MeshOnSphere() override;
 
     void set_radius_source_mesh( double radius )
     {
@@ -29,7 +29,7 @@ class Intx2MeshOnSphere : public moab::Intx2Mesh
         Rdest = radius;
     }
 
-    double setup_tgt_cell( EntityHandle tgt, int& nsTgt );
+    double setup_tgt_cell( EntityHandle tgt, int& nsTgt ) override;
 
     // main method to intersect meshes on a sphere
 
@@ -42,9 +42,9 @@ class Intx2MeshOnSphere : public moab::Intx2Mesh
                                                    int markr[MAXEDGES],
                                                    int& nsSrc,
                                                    int& nsTgt,
-                                                   bool check_boxes_first = false );
+                                                   bool check_boxes_first = false ) override;
 
-    ErrorCode findNodes( EntityHandle tgt, int nsTgt, EntityHandle src, int nsSrc, double* iP, int nP );
+    ErrorCode findNodes( EntityHandle tgt, int nsTgt, EntityHandle src, int nsSrc, double* iP, int nP ) override;
 
     ErrorCode update_tracer_data( EntityHandle out_set, Tag& tagElem, Tag& tagArea );
 #ifdef MOAB_HAVE_MPI
@@ -54,7 +54,7 @@ class Intx2MeshOnSphere : public moab::Intx2Mesh
                                               int nb_ghost_layers = 0,
                                               bool include_edges  = false );
 
-    virtual ErrorCode build_processor_euler_boxes( EntityHandle euler_set, Range& local_verts, bool gnomonic = true );
+    virtual ErrorCode build_processor_euler_boxes( EntityHandle euler_set, Range& local_verts, bool gnomonic = true ) override;
 #endif
 
     const IntxAreaUtils::AreaMethod areaMethod;

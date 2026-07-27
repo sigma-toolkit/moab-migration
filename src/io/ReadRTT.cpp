@@ -1449,7 +1449,6 @@ ErrorCode ReadRTT::setup_group_data( std::vector< EntityHandle > entity_map[4],
  */
 EntityHandle ReadRTT::create_group( std::string group_name, int id )
 {
-    ErrorCode rval;
     // category tags
     const char geom_categories[][CATEGORY_TAG_SIZE] = { "Vertex\0", "Curve\0", "Surface\0", "Volume\0", "Group\0" };
 

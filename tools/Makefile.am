@@ -15,24 +15,36 @@ docdir = @docdir@
 
 bin_PROGRAMS =
 dist_man1_MANS =
-doc_DATA =
+# Always install the tools doc index + the build-integration overview,
+# regardless of which individual tools are enabled below. Per-tool docs
+# are appended inside the corresponding ENABLE_<tool> blocks; this
+# parallels the unconditional MOAB_DOCS += in tools/CMakeLists.txt.
+doc_DATA = docs/README.md docs/tools.md
 
-EXTRA_DIST = README.hexmodops \
-             README.mbconvert \
-             README.mbsize \
-             README.mbskin \
-             README.mbsurfplot \
-             README.mbtagprop \
-             README.spheredecomp \
-             README.tools \
+EXTRA_DIST = docs/README.md \
+             docs/tools.md \
+             docs/mbconvert.md \
+             docs/mbtempest.md \
+             docs/mbIntxCheck.md \
+             docs/compareMaps.md \
+             docs/compareFiles.md \
+             docs/measure.md \
+             docs/hexmodops.md \
+             docs/mbsize.md \
+             docs/mbskin.md \
+             docs/mbsurfplot.md \
+             docs/mbtagprop.md \
+             docs/spheredecomp.md \
              CMakeLists.txt
 
 if HAVE_HDF5
-  bin_PROGRAMS += mbcmpfiles mbintxchk mbcleantags 
+  bin_PROGRAMS += mbcmpfiles mbintxchk mbcleantags
+  doc_DATA += docs/compareFiles.md docs/mbIntxCheck.md
 if HAVE_NETCDF
   bin_PROGRAMS += mbaddnc mbaddchunk mbedgesplit
 if HAVE_EIGEN3
   bin_PROGRAMS += mbcmpmaps mbvisumap
+  doc_DATA += docs/compareMaps.md
 endif
 endif
 endif
@@ -40,23 +52,22 @@ endif
 if ENABLE_mbconvert
   mbconvert_SOURCES = convert.cpp
   bin_PROGRAMS += mbconvert
-  dist_man1_MANS += mbconvert.man
-  doc_DATA += README.mbconvert
+  doc_DATA += docs/mbconvert.md
 endif
 
 if ENABLE_hexmodops
   bin_PROGRAMS += hexmodops
-  doc_DATA += README.hexmodops
+  doc_DATA += docs/hexmodops.md
 endif
 
 if ENABLE_mbsize
   bin_PROGRAMS += mbsize
-  doc_DATA += README.mbsize
+  doc_DATA += docs/mbsize.md docs/measure.md
 endif
 
 if ENABLE_mbskin
   bin_PROGRAMS += mbskin
-  doc_DATA += README.mbskin
+  doc_DATA += docs/mbskin.md
 endif
 
 if ENABLE_mbdepth
@@ -65,7 +76,7 @@ endif
 
 if ENABLE_mbtagprop
   bin_PROGRAMS += mbtagprop
-  doc_DATA += README.mbtagprop
+  doc_DATA += docs/mbtagprop.md
 endif
 
 if ENABLE_mbmem
@@ -74,12 +85,12 @@ endif
 
 if ENABLE_spheredecomp
   bin_PROGRAMS += spheredecomp
-  doc_DATA += README.spheredecomp
+  doc_DATA += docs/spheredecomp.md
 endif
 
 if ENABLE_mbsurfplot
   bin_PROGRAMS += mbsurfplot
-  doc_DATA += README.mbsurfplot
+  doc_DATA += docs/mbsurfplot.md
 endif
 
 if ENABLE_gsets
@@ -147,6 +158,7 @@ if ENABLE_mbtempest
   bin_PROGRAMS += mbtempest h5mtoscrip
 mbtempest_SOURCES = mbtempest.cpp
 h5mtoscrip_SOURCES = h5mtoscrip.cpp
+  doc_DATA += docs/mbtempest.md
 endif
 
 if ENABLE_mbmerge

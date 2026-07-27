@@ -75,7 +75,21 @@ ErrorCode WriteNC::write_file( const char* file_name,
     // Important to create some data that will be used to write the file; dimensions, variables, etc
     // new variables still need to have some way of defining their dimensions
     // maybe it will be passed as write options
-    MB_CHK_SET_ERR( process_conventional_tags( *file_set ), "Trouble processing conventional tags" );
+    // Process the climate-style conventional tags only if the user did NOT
+    // override grid_type via WRITE_FORMAT. Grid-output writers (NCWriteScrip,
+    // NCWriteESMF, NCWriteDomain) synthesize their schema from mesh state
+    // and don't need the prior-read __VAR_NAMES / __MESH_TYPE tag chain;
+    // running process_conventional_tags would also fail on meshes that
+    // weren't loaded via ReadNC (h5m, exodus, ...).
+    if( grid_type.empty() )
+    {
+        MB_CHK_SET_ERR( process_conventional_tags( *file_set ), "Trouble processing conventional tags" );
+    }
+    else
+    {
+        dbgOut.tprintf( 2, "Skipping process_conventional_tags; grid_type already set by WRITE_FORMAT: %s\n",
+                        grid_type.c_str() );
+    }
 
     // Create or append the file
     if( append )
@@ -85,31 +99,83 @@ ErrorCode WriteNC::write_file( const char* file_name,
     fileName = file_name;
     int success;
 
+    // Format-aware open/create via the runtime dispatch layer. For append
+    // mode the format is detected from the existing file. For create mode
+    // we pick CLASSIC by default (preserves the behavior of PNetCDF builds
+    // which write CDF-5 via ncmpi_create) — a NetCDF-4 write path can be
+    // added later behind an explicit WriteNC option.
+#ifdef MOAB_HAVE_MPI
+    const int write_mpi_size = isParallel ? myPcomm->proc_config().proc_size() : 1;
+#else
+    const int write_mpi_size = 1;
+#endif
+
     if( append )
     {
         int omode = NC_WRITE;
-#ifdef MOAB_HAVE_PNETCDF
+
+        int existingFormat = NCFMT_UNKNOWN;
+#ifdef MOAB_HAVE_MPI
         if( isParallel )
-            success = NCFUNC( open )( myPcomm->proc_config().proc_comm(), file_name, omode, MPI_INFO_NULL, &fileId );
+        {
+            int rank = myPcomm->proc_config().proc_rank();
+            if( rank == 0 ) existingFormat = mbnc_detect_format( file_name );
+            MPI_Bcast( &existingFormat, 1, MPI_INT, 0, myPcomm->proc_config().proc_comm() );
+        }
         else
-            success = NCFUNC( open )( MPI_COMM_SELF, file_name, omode, MPI_INFO_NULL, &fileId );
+#endif
+        {
+            existingFormat = mbnc_detect_format( file_name );
+        }
+
+        const NcBackend backend = mbnc_choose_backend_for_write( existingFormat, write_mpi_size );
+        if( backend == NCB_NONE )
+        {
+            MB_SET_ERR( MB_FAILURE, "Cannot find a compatible parallel writer for appending to '"
+                                        << file_name << "' (file format not recognized or no compatible backend)" );
+        }
+
+#ifdef MOAB_HAVE_MPI
+        if( backend == NCB_NETCDF_SERIAL || write_mpi_size == 1 )
+        {
+            success = mbnc_open( file_name, omode, &fileId );
+        }
+        else
+        {
+            success =
+                mbnc_open_par( backend, myPcomm->proc_config().proc_comm(), MPI_INFO_NULL, file_name, omode, &fileId );
+        }
 #else
-        // This is a regular netcdf file, open in write mode
-        success = NCFUNC( open )( file_name, omode, &fileId );
+        success = mbnc_open( file_name, omode, &fileId );
 #endif
         if( success ) MB_SET_ERR( MB_FAILURE, "Trouble opening file " << file_name << " for appending" );
     }
     else
-    {  // Case when the file is new, will be overwritten, most likely
+    {
+        // Case when the file is new — choose classic format to match the
+        // long-standing default of the PNetCDF-built path (ncmpi_create
+        // defaults to CDF-5). Future: expose a "FORMAT" option on the
+        // WriteNC option string to let the caller request NetCDF-4.
         int cmode = overwrite ? NC_CLOBBER : NC_NOCLOBBER;
-#ifdef MOAB_HAVE_PNETCDF
-        if( isParallel )
-            success = NCFUNC( create )( myPcomm->proc_config().proc_comm(), file_name, cmode, MPI_INFO_NULL, &fileId );
+
+        const NcBackend backend = mbnc_choose_backend_for_write( NCFMT_CLASSIC, write_mpi_size );
+        if( backend == NCB_NONE )
+        {
+            MB_SET_ERR( MB_FAILURE, "Cannot find a compatible parallel writer for creating '" << file_name << "'" );
+        }
+
+#ifdef MOAB_HAVE_MPI
+        if( backend == NCB_NETCDF_SERIAL || write_mpi_size == 1 )
+        {
+            success = mbnc_create( file_name, cmode, &fileId );
+        }
         else
-            success = NCFUNC( create )( MPI_COMM_SELF, file_name, cmode, MPI_INFO_NULL, &fileId );
+        {
+            success =
+                mbnc_create_par( backend, myPcomm->proc_config().proc_comm(), MPI_INFO_NULL, file_name, cmode, &fileId );
+        }
 #else
-        // This is a regular netcdf file
-        success = NCFUNC( create )( file_name, cmode, &fileId );
+        success = mbnc_create( file_name, cmode, &fileId );
 #endif
         if( success ) MB_SET_ERR( MB_FAILURE, "Trouble creating file " << file_name << " for writing" );
     }
@@ -175,6 +241,21 @@ ErrorCode WriteNC::parse_options( const FileOptions& opts,
 
     rval = opts.get_null_option( "APPEND" );
     if( MB_SUCCESS == rval ) append = true;
+
+    // WRITE_FORMAT: optional explicit output grid_type. Set this when you
+    // want to convert FROM one grid type TO another (e.g. MPAS → SCRIP),
+    // or when writing from a mesh that doesn't carry the climate
+    // __MESH_TYPE / __VAR_NAMES tags that process_conventional_tags
+    // expects. Valid values match the strings returned by the readers'
+    // get_mesh_type_name(): "CAM_EUL", "CAM_FV", "CAM_SE", "MPAS",
+    // "GCRM", "SCRIP", "ESMF", "DOMAIN".
+    std::string requestedFormat;
+    rval = opts.get_str_option( "WRITE_FORMAT", requestedFormat );
+    if( MB_SUCCESS == rval && !requestedFormat.empty() )
+    {
+        grid_type = requestedFormat;
+        dbgOut.tprintf( 1, "WRITE_FORMAT override: grid_type = %s\n", grid_type.c_str() );
+    }
 
     if( 2 <= dbgOut.get_verbosity() )
     {
@@ -373,7 +454,8 @@ ErrorCode WriteNC::process_conventional_tags( EntityHandle fileSet )
 
             variableDataStruct.varDims.resize( sz );
             const void* ptr = NULL;
-            rval            = mbImpl->tag_get_by_ptr( dims_tag, &fileSet, 1, &ptr );
+            MB_CHK_SET_ERR( mbImpl->tag_get_by_ptr( dims_tag, &fileSet, 1, &ptr ),
+                            "Could not get tag by pointer" );
 
             const Tag* ptags = static_cast< const moab::Tag* >( ptr );
             for( std::size_t j = 0; j != static_cast< std::size_t >( sz ); j++ )
@@ -401,7 +483,7 @@ ErrorCode WriteNC::process_conventional_tags( EntityHandle fileSet )
             int varAttSz          = 0;
             MB_CHK_SET_ERR( mbImpl->tag_get_by_ptr( varAttTag, &fileSet, 1, &varAttPtr, &varAttSz ),
                             "Trouble getting data of conventional tag " << tag_name );
-            if( MB_SUCCESS == rval ) dbgOut.tprintf( 2, "Tag retrieved for variable %s\n", tag_name.c_str() );
+            dbgOut.tprintf( 2, "Tag retrieved for variable %s\n", tag_name.c_str() );
 
             std::string attribString( (char*)varAttPtr, (char*)varAttPtr + varAttSz );
             if( attribString == "NO_ATTRIBS" )
@@ -434,7 +516,7 @@ ErrorCode WriteNC::process_conventional_tags( EntityHandle fileSet )
                                                                 variableDataStruct.varAtts ),
                                 "Trouble processing attributes of variable " << var_name );
 
-                if( MB_SUCCESS == rval ) dbgOut.tprintf( 2, "Tag metadata for variable %s\n", tag_name.c_str() );
+                dbgOut.tprintf( 2, "Tag metadata for variable %s\n", tag_name.c_str() );
             }
             // End attribute
 
@@ -456,7 +538,7 @@ ErrorCode WriteNC::process_conventional_tags( EntityHandle fileSet )
     MB_CHK_SET_ERR( mbImpl->tag_get_by_ptr( globalAttTag, &fileSet, 1, &gattptr, &globalAttSz ),
                     "Trouble getting data of conventional tag " << tag_name );
 
-    if( MB_SUCCESS == rval ) dbgOut.tprintf( 2, "Tag value retrieved for %s size %d\n", tag_name.c_str(), globalAttSz );
+    dbgOut.tprintf( 2, "Tag value retrieved for %s size %d\n", tag_name.c_str(), globalAttSz );
 
     // <__GLOBAL_ATTRIBS_LEN>
     tag_name            = "__GLOBAL_ATTRIBS_LEN";
@@ -467,10 +549,12 @@ ErrorCode WriteNC::process_conventional_tags( EntityHandle fileSet )
     int sizeGAtt = 0;
     MB_CHK_SET_ERR( mbImpl->tag_get_length( globalAttLenTag, sizeGAtt ),
                     "Trouble getting length of conventional tag " << tag_name );
+
     gattLen.resize( sizeGAtt );
     MB_CHK_SET_ERR( mbImpl->tag_get_data( globalAttLenTag, &fileSet, 1, &gattLen[0] ),
                     "Trouble getting data of conventional tag " << tag_name );
-    if( MB_SUCCESS == rval ) dbgOut.tprintf( 2, "Tag retrieved for variable %s\n", tag_name.c_str() );
+
+    dbgOut.tprintf( 2, "Tag retrieved for variable %s\n", tag_name.c_str() );
 
     MB_CHK_SET_ERR( process_concatenated_attribute( gattptr, globalAttSz, gattLen, globalAtts ),
                     "Trouble processing global attributes" );

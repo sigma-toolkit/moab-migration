@@ -16,14 +16,14 @@ class IntxRllCssphere : public moab::Intx2Mesh
   public:
     IntxRllCssphere( Interface* mbimpl );
 
-    virtual ~IntxRllCssphere();
+    virtual ~IntxRllCssphere() override;
 
     void set_radius( double radius )
     {
         R = radius;
     }
 
-    double setup_tgt_cell( EntityHandle tgt, int& nsTgt );
+    double setup_tgt_cell( EntityHandle tgt, int& nsTgt ) override;
 
     // src cell will be always lat lon cell, so it will be a rectangle in lat-lon coors
     // it will be used for "interior" determinations of other points
@@ -40,9 +40,9 @@ class IntxRllCssphere : public moab::Intx2Mesh
                                                    int markr[MAXEDGES],
                                                    int& nsSrc,
                                                    int& nsTgt,
-                                                   bool check_boxes_first = false );
+                                                   bool check_boxes_first = false ) override;
 
-    ErrorCode findNodes( EntityHandle tgt, int nsTgt, EntityHandle src, int nsSrc, double* iP, int nP );
+    ErrorCode findNodes( EntityHandle tgt, int nsTgt, EntityHandle src, int nsSrc, double* iP, int nP ) override;
 
   private:
     double R;            // radius of the sphere

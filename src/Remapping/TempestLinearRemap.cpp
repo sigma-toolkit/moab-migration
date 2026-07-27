@@ -290,10 +290,10 @@ void moab::TempestOnlineMap::PrintMapStatistics()
     // find out min/max for NNZ, ncols, nrows
     // should work on std c++ 11
     int arr3[6] = { NNZ, nrows, ncols, -NNZ, -nrows, -ncols };
-    int rarr3[6];
+    int rarr3[6] = {0, 0, 0, 0, 0, 0};
     MPI_Reduce( arr3, rarr3, 6, MPI_INT, MPI_MIN, 0, m_pcomm->comm() );
 
-    int total[3];
+    int total[3] = {0, 0, 0};
     MPI_Reduce( arr3, total, 3, MPI_INT, MPI_SUM, 0, m_pcomm->comm() );
     if( !rank )
         std::cout << "-> Rows (min/max/sum): (" << rarr3[1] << " / " << -rarr3[4] << " / " << total[1] << "), "
@@ -880,7 +880,8 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
                                                           const DataArray3D< double >& dataGLLJacobian,
                                                           int nMonotoneType,
                                                           bool fContinuousIn,
-                                                          bool fNoConservation )
+                                                          bool fNoConservation,
+                                                          bool fSparseConstraints )
 {
     // Order of the polynomial interpolant
     int nP = dataGLLNodes.GetRows();
@@ -992,16 +993,18 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
         for( int j = 0; j < nOverlapFaces; j++ )
         {
             const Face& faceOverlap = m_meshOverlap->faces[ixOverlap + j];
-            if( m_meshOverlap->vecFaceArea[ixOverlap + j] < 1.e-16 )  // machine precision
+            if( m_meshOverlap->vecFaceArea[ixOverlap + j] < std::numeric_limits<double>::epsilon() )  // machine precision
             {
-                Announce( "Very small overlap at index %i area polygon: (%1.10e )", ixOverlap + j,
-                          m_meshOverlap->vecFaceArea[ixOverlap + j] );
-                int n = faceOverlap.edges.size();
-                Announce( "Number nodes: %d", n );
-                for( int k = 0; k < n; k++ )
-                {
-                    Node nd = nodesOverlap[faceOverlap[k]];
-                    Announce( "Node %d  %d  : %1.10e  %1.10e %1.10e ", k, faceOverlap[k], nd.x, nd.y, nd.z );
+                if (false) { // verbose detailed output about small overlap elements (near machine precision area)
+                    Announce( "Very small overlap at index %i area polygon: (%1.10e )", ixOverlap + j,
+                              m_meshOverlap->vecFaceArea[ixOverlap + j] );
+                    int n = faceOverlap.edges.size();
+                    Announce( "Number nodes: %d", n );
+                    for( int k = 0; k < n; k++ )
+                    {
+                        Node nd = nodesOverlap[faceOverlap[k]];
+                        Announce( "Node %d  %d  : %1.10e  %1.10e %1.10e ", k, faceOverlap[k], nd.x, nd.y, nd.z );
+                    }
                 }
                 continue;
             }
@@ -1223,8 +1226,8 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
                 _EXCEPTIONT( "Target grid must be a subset of source grid" );
             }
 
-            ForceConsistencyConservation3( vecSourceArea, vecTargetArea, dCoeff, ( nMonotoneType > 0 )
-                                           /*, m_remapper->lid_to_gid_covsrc[ixFirst]*/ );
+            ForceConsistencyConservation3( vecSourceArea, vecTargetArea, dCoeff, ( nMonotoneType > 0 ),
+                                           fSparseConstraints );
 
             for( int j = 0; j < nOverlapFaces; j++ )
             {

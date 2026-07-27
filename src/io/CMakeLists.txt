@@ -40,6 +40,7 @@ set( MOABIO_LIB_SRCS
 
 if( MOAB_HAVE_NETCDF )
   set( MOAB_NETCDF_SRCS
+          MBNcDispatch.hpp  MBNcDispatch.cpp
           ReadNCDF.hpp      ReadNCDF.cpp
           WriteNCDF.hpp     WriteNCDF.cpp
           WriteSLAC.hpp     WriteSLAC.cpp
@@ -60,6 +61,9 @@ if( MOAB_HAVE_NETCDF )
           NCWriteHOMME.hpp  NCWriteHOMME.cpp
           NCHelperMPAS.hpp  NCHelperMPAS.cpp
           NCWriteMPAS.hpp   NCWriteMPAS.cpp
+          NCWriteScrip.hpp  NCWriteScrip.cpp
+          NCWriteESMF.hpp   NCWriteESMF.cpp
+          NCWriteDomain.hpp NCWriteDomain.cpp
        )
         set( MOABIO_LIBS ${MOABIO_LIBS} ${NETCDF_LIBRARIES} )
         include_directories(${NETCDF_INCLUDES})

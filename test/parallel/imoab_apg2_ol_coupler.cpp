@@ -948,7 +948,7 @@ int main( int argc, char* argv[] )
 
     if( couComm != MPI_COMM_NULL )
     {
-        context_id = cmpatm;
+        context_id = cmpPhysAtm;
         ierr       = iMOAB_FreeSenderBuffers( cplAtmPID, &context_id );
         CHECKIERR( ierr, "cannot free buffers for sending T2_ph from cpl to phys atm" )
     }
@@ -1052,7 +1052,7 @@ int main( int argc, char* argv[] )
 
     if( couComm != MPI_COMM_NULL )
     {
-        context_id = cmpatm;
+        context_id = cmpPhysAtm;
         ierr       = iMOAB_FreeSenderBuffers( cplAtmPID, &context_id );
         CHECKIERR( ierr, "cannot free buffers used for sending back atm tags " )
     }

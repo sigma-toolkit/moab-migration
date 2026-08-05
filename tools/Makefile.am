@@ -135,7 +135,7 @@ endif
 
 if HAVE_HYPRE
 
-AM_CPPFLAGS += $(HYPRE_INCLUDES) -I$(top_srcdir)/src/HYPRE/moab
+AM_CPPFLAGS += $(HYPRE_INCLUDES) -I$(top_srcdir)/src/hypre/moab
 AM_LDFLAGS += $(HYPRE_LIBS)
 
 endif

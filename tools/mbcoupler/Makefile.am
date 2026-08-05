@@ -8,7 +8,7 @@ AM_CPPFLAGS =  -DIS_BUILDING_MB \
                -I$(top_srcdir)/src \
                -I$(top_builddir)/src \
                -I$(top_srcdir)/src/parallel \
-               -I$(top_srcdir)/src/LocalDiscretization \
+               -I$(top_srcdir)/src/local_discretization \
                -I$(top_srcdir)/src/moab/point_locater/lotte \
                -I$(top_srcdir)/test \
                $(EIGEN3_INCLUDES)

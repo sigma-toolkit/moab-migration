@@ -15,7 +15,7 @@
 #include "moab/Range.hpp"
 #include "moab/MeshTopoUtil.hpp"
 #include "moab/NestedRefine.hpp"
-#include "moab/DiscreteGeometry/HiReconstruction.hpp"
+#include "moab/discrete_geometry/HiReconstruction.hpp"
 #include "TestUtil.hpp"
 #include "geomObject.cpp"
 #include <cmath>

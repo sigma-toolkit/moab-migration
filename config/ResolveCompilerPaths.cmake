@@ -96,6 +96,23 @@ function(_RCP_TOKEN_IS_KEPT TOKEN OUT_VAR OUT_CONSUMES)
     endforeach()
 endfunction()
 
+# Internal helper: CMake's FindBLAS/FindLAPACK on macOS resolve to a bare
+# path to the .framework bundle (e.g.
+# ".../System/Library/Frameworks/Accelerate.framework"), not to a
+# "-framework Accelerate" linker flag.  A .framework bundle is a directory,
+# so naive "IS_ABSOLUTE AND EXISTS AND NOT IS_DIRECTORY" checks reject it and
+# it gets silently dropped, losing the BLAS/LAPACK symbols it provides.
+# Detect that shape and rewrite it as the proper "-framework <Name>" flag.
+# Returns TRUE in OUT_VAR and the rewritten flag in OUT_FLAG when TOKEN is a
+# bare framework path; FALSE otherwise (OUT_FLAG left untouched).
+function(_RCP_TRY_FRAMEWORK_PATH TOKEN OUT_VAR OUT_FLAG)
+    set(${OUT_VAR} FALSE PARENT_SCOPE)
+    if(TOKEN MATCHES "/([^/]+)\\.framework/?$")
+        set(${OUT_VAR} TRUE PARENT_SCOPE)
+        set(${OUT_FLAG} "-framework ${CMAKE_MATCH_1}" PARENT_SCOPE)
+    endif()
+endfunction()
+
 
 # ============================================================================
 # Macro: FILTER_LINK_LIBRARIES(<listvar>)
@@ -139,7 +156,12 @@ macro(FILTER_LINK_LIBRARIES _var)
             if(EXISTS "${_flb_item}" AND NOT IS_DIRECTORY "${_flb_item}")
                 list(APPEND _flb_out "${_flb_item}")
             else()
-                message(STATUS "Dropping non-file path from link libraries: ${_flb_item}")
+                _RCP_TRY_FRAMEWORK_PATH("${_flb_item}" _flb_is_fwk _flb_fwk_flag)
+                if(_flb_is_fwk)
+                    list(APPEND _flb_out "${_flb_fwk_flag}")
+                else()
+                    message(STATUS "Dropping non-file path from link libraries: ${_flb_item}")
+                endif()
             endif()
         elseif(_flb_item MATCHES "^-l")
             list(APPEND _flb_out "${_flb_item}")
@@ -315,6 +337,21 @@ macro(RESOLVE_LIBRARIES RESOLVED_LIBS_OUT LINK_LINE )
               endif()
 
           # Handle absolute paths to libraries (e.g., /path/to/libfoo.a)
+          elseif(IS_ABSOLUTE "${_flag}" AND EXISTS "${_flag}" AND IS_DIRECTORY "${_flag}")
+              # A directory path here is a macOS .framework bundle (e.g. from
+              # hand-written BLAS/LAPACK link lines); rewrite it as the
+              # "-framework <Name>" flag the linker actually needs, rather
+              # than passing the bundle directory itself.
+              _RCP_TRY_FRAMEWORK_PATH("${_flag}" _rl_is_fwk _rl_fwk_flag)
+              if(_rl_is_fwk)
+                  list(FIND _seen_libs "${_rl_fwk_flag}" _already_index)
+                  if(_already_index EQUAL -1)
+                      list(APPEND ${RESOLVED_LIBS_OUT} "${_rl_fwk_flag}")
+                      list(APPEND _seen_libs "${_rl_fwk_flag}")
+                  endif()
+              else()
+                  message(STATUS "Ignoring directory path in link line: ${_flag}")
+              endif()
           elseif(IS_ABSOLUTE "${_flag}" AND EXISTS "${_flag}")
               # Add the library path directly to the resolved list if it exists
               list(FIND _seen_libs "${_flag}" _already_index)

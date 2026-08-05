@@ -15,49 +15,13 @@ AM_CPPFLAGS  = -DIS_BUILDING_MB \
                $(EIGEN3_INCLUDES)
 
 if HAVE_NETCDF
+# ExodusII (NetCDF-based) reader/writer.  The climate NetCDF grid
+# readers/writers that used to live here now build from src/climate/io.
   MOAB_NETCDF_SRCS = ReadNCDF.cpp  ReadNCDF.hpp \
                      WriteNCDF.cpp WriteNCDF.hpp \
-                     WriteSLAC.cpp WriteSLAC.hpp \
-                     ReadNC.cpp ReadNC.hpp \
-                     WriteNC.cpp WriteNC.hpp \
-                     NCHelper.cpp NCHelper.hpp \
-                     NCHelperEuler.cpp NCHelperEuler.hpp \
-                     NCHelperFV.cpp NCHelperFV.hpp \
-                     NCHelperDomain.cpp NCHelperDomain.hpp \
-                     NCHelperESMF.cpp NCHelperESMF.hpp \
-                     NCHelperScrip.hpp    NCHelperScrip.cpp \
-                     NCHelperHOMME.cpp NCHelperHOMME.hpp \
-                     NCHelperMPAS.cpp NCHelperMPAS.hpp \
-                     NCHelperGCRM.cpp NCHelperGCRM.hpp \
-                     NCWriteHelper.cpp NCWriteHelper.hpp \
-                     NCWriteEuler.cpp NCWriteEuler.hpp \
-                     NCWriteFV.cpp NCWriteFV.hpp \
-                     NCWriteHOMME.cpp NCWriteHOMME.hpp \
-                     NCWriteMPAS.cpp NCWriteMPAS.hpp \
-                     NCWriteGCRM.cpp NCWriteGCRM.hpp 
+                     WriteSLAC.cpp WriteSLAC.hpp
 else
   MOAB_NETCDF_SRCS =
-endif
-
-if HAVE_PNETCDF
-if !HAVE_NETCDF
-     MOAB_NETCDF_SRCS += ReadNC.cpp ReadNC.hpp \
-                     WriteNC.cpp WriteNC.hpp \
-                     NCHelper.cpp NCHelper.hpp \
-                     NCHelperEuler.cpp NCHelperEuler.hpp \
-                     NCHelperFV.cpp NCHelperFV.hpp \
-                     NCHelperDomain.cpp NCHelperDomain.hpp \
-                     NCHelperScrip.hpp NCHelperScrip.cpp \
-                     NCHelperHOMME.cpp NCHelperHOMME.hpp \
-                     NCHelperMPAS.cpp NCHelperMPAS.hpp \
-                     NCHelperGCRM.cpp NCHelperGCRM.hpp \
-                     NCWriteHelper.cpp NCWriteHelper.hpp \
-                     NCWriteEuler.cpp NCWriteEuler.hpp \
-                     NCWriteFV.cpp NCWriteFV.hpp \
-                     NCWriteHOMME.cpp NCWriteHOMME.hpp \
-                     NCWriteMPAS.cpp NCWriteMPAS.hpp \
-                     NCWriteGCRM.cpp NCWriteGCRM.hpp
-endif
 endif
 
 if ENABLE_mbpart

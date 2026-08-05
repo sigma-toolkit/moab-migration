@@ -4,6 +4,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${CMAKE_CURRENT_BINARY_DIR}
                     parallel
                     io io/mhdf
+                    climate/io
                     ${MOAB_BINARY_DIR}/src/parallel )
 
 if(MOAB_HAVE_MPI AND MPI_FOUND)
@@ -21,6 +22,7 @@ configure_file(${CMAKE_CURRENT_BINARY_DIR}/moab/EntityHandle.hpp.in ${CMAKE_CURR
 set(moab_link_lib)
 add_subdirectory(io)
 add_subdirectory(IntxMesh)
+add_subdirectory(climate)
 
 if( MOAB_HAVE_HDF5 )
   include_directories(${HDF5_INCLUDES})
@@ -286,6 +288,7 @@ add_library(
   ${MOAB_LIB_SOURCES} ${MOAB_INSTALL_HEADERS} ${MOAB_GENERATED_INSTALL_HEADERS}
   $<TARGET_OBJECTS:moabio>
   $<TARGET_OBJECTS:moab_intx_mesh>
+  ${MOAB_CLIMATE_OBJECTS}
   ${MOABPAR_OBJECTS}
   ${MDHF_OBJ}
   )

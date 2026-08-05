@@ -1,4 +1,4 @@
-#include "moab/LocalDiscretization/LinearHex.hpp"
+#include "moab/local_discretization/LinearHex.hpp"
 #include "moab/Matrix3.hpp"
 #include "moab/Forward.hpp"
 #include <cmath>

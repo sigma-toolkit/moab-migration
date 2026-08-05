@@ -24,9 +24,9 @@ AM_CPPFLAGS  = -DIS_BUILDING_MB \
                -DMESHDIR=$(MESHDIR) \
                -I$(top_builddir)/src \
                -I$(top_srcdir)/src  \
-               -I$(top_srcdir)/src/LocalDiscretization \
+               -I$(top_srcdir)/src/local_discretization \
                -I$(top_srcdir)/src/verdict \
-               -I$(top_srcdir)/src/DiscreteGeometry \
+               -I$(top_srcdir)/src/discrete_geometry \
                -I$(top_srcdir)/src/IntxMesh
 
 

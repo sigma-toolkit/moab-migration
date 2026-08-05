@@ -81,12 +81,12 @@ set(MOAB_LIB_SOURCES
         lotte/findpt.c
         lotte/errmem.c
         lotte/tensor.c
-        LocalDiscretization/ElemEvaluator.cpp
-        LocalDiscretization/LinearHex.cpp
-        LocalDiscretization/LinearQuad.cpp
-        LocalDiscretization/LinearTet.cpp
-        LocalDiscretization/LinearTri.cpp
-        LocalDiscretization/QuadraticHex.cpp
+        local_discretization/ElemEvaluator.cpp
+        local_discretization/LinearHex.cpp
+        local_discretization/LinearQuad.cpp
+        local_discretization/LinearTet.cpp
+        local_discretization/LinearTri.cpp
+        local_discretization/QuadraticHex.cpp
         MeshGeneration.cpp
         NestedRefine.cpp
         PolyElementSeq.hpp  PolyElementSeq.cpp
@@ -187,14 +187,14 @@ set( MOAB_INSTALL_HEADERS
         moab/point_locater/element_maps/quadratic_hex_map.hpp
         moab/point_locater/point_locater.hpp
         moab/point_locater/parametrizer.hpp
-        moab/DiscreteGeometry/DGMSolver.hpp
-        moab/DiscreteGeometry/HiReconstruction.hpp
+        moab/discrete_geometry/DGMSolver.hpp
+        moab/discrete_geometry/HiReconstruction.hpp
         moab/ElemEvaluator.hpp
-        moab/LocalDiscretization/LinearHex.hpp
-        moab/LocalDiscretization/LinearQuad.hpp
-        moab/LocalDiscretization/LinearTet.hpp
-        moab/LocalDiscretization/LinearTri.hpp
-        moab/LocalDiscretization/QuadraticHex.hpp
+        moab/local_discretization/LinearHex.hpp
+        moab/local_discretization/LinearQuad.hpp
+        moab/local_discretization/LinearTet.hpp
+        moab/local_discretization/LinearTri.hpp
+        moab/local_discretization/QuadraticHex.hpp
         moab/Matrix3.hpp
         moab/MergeMesh.hpp
         moab/MeshTopoUtil.hpp

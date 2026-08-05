@@ -16,7 +16,7 @@
 #include "moab/CartVect.hpp"
 #include "moab/MeshTopoUtil.hpp"
 #include "moab/NestedRefine.hpp"
-#include "moab/DiscreteGeometry/HiReconstruction.hpp"
+#include "moab/discrete_geometry/HiReconstruction.hpp"
 #include "TestUtil.hpp"
 #include <cmath>
 

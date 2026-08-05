@@ -1,5 +1,5 @@
-#include "moab/DiscreteGeometry/HiReconstruction.hpp"
-#include "moab/DiscreteGeometry/DGMSolver.hpp"
+#include "moab/discrete_geometry/HiReconstruction.hpp"
+#include "moab/discrete_geometry/DGMSolver.hpp"
 #include "moab/HalfFacetRep.hpp"
 
 #ifdef MOAB_HAVE_MPI

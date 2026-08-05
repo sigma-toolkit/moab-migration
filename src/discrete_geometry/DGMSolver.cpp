@@ -1,4 +1,4 @@
-#include "moab/DiscreteGeometry/DGMSolver.hpp"
+#include "moab/discrete_geometry/DGMSolver.hpp"
 #include "moab/ErrorHandler.hpp"
 #include <iostream>
 #include <cassert>

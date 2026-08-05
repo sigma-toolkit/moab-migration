@@ -4,10 +4,10 @@ AM_CPPFLAGS =  -I$(top_srcdir)/src \
                -I$(top_srcdir)/src/io/mhdf/include \
                -I$(top_builddir)/ \
                -I$(top_builddir)/src \
-               -I$(top_srcdir)/src/LocalDiscretization/ \
+               -I$(top_srcdir)/src/local_discretization/ \
                -I$(top_srcdir)/tools/mbcoupler \
                -I$(top_srcdir)/src/moab/point_locator/lotte \
-               -I$(top_srcdir)/src/LocalDiscretization/moab/ \
+               -I$(top_srcdir)/src/local_discretization/moab/ \
                -DMESHDIR=$(MESHDIR) \
                -DIS_BUILDING_MB
 

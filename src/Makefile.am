@@ -18,9 +18,9 @@ AM_CPPFLAGS += -DIS_BUILDING_MB \
                -I$(srcdir)/io \
                -I$(srcdir)/io/mhdf/include \
                -I$(srcdir)/parallel \
-               -I$(srcdir)/LocalDiscretization \
+               -I$(srcdir)/local_discretization \
                -I$(srcdir)/verdict \
-               -I$(srcdir)/DiscreteGeometry \
+               -I$(srcdir)/discrete_geometry \
                -I$(srcdir)/IntxMesh
 
 # The directory in which to install headers
@@ -51,8 +51,8 @@ libMOAB_la_SOURCES = \
   DenseTag.hpp \
   DenseTag.cpp \
   DualTool.cpp \
-  DiscreteGeometry/DGMSolver.cpp \
-  DiscreteGeometry/HiReconstruction.cpp \
+  discrete_geometry/DGMSolver.cpp \
+  discrete_geometry/HiReconstruction.cpp \
   ElementSequence.hpp \
   EntitySequence.cpp \
   EntitySequence.hpp \
@@ -93,12 +93,12 @@ libMOAB_la_SOURCES = \
   lotte/findpt.c \
   lotte/errmem.c \
   lotte/tensor.c \
-  LocalDiscretization/ElemEvaluator.cpp \
-  LocalDiscretization/LinearHex.cpp \
-  LocalDiscretization/LinearQuad.cpp \
-  LocalDiscretization/LinearTet.cpp \
-  LocalDiscretization/LinearTri.cpp \
-  LocalDiscretization/QuadraticHex.cpp \
+  local_discretization/ElemEvaluator.cpp \
+  local_discretization/LinearHex.cpp \
+  local_discretization/LinearQuad.cpp \
+  local_discretization/LinearTet.cpp \
+  local_discretization/LinearTri.cpp \
+  local_discretization/QuadraticHex.cpp \
   MeshGeneration.cpp \
   PolyElementSeq.cpp \
   PolyElementSeq.hpp \
@@ -251,18 +251,18 @@ verdictincludedir = $(includedir)/moab/verdict
 verdictinclude_HEADERS = \
   moab/verdict/VerdictWrapper.hpp
 
-discretegeomincludedir = $(includedir)/moab/DiscreteGeometry
+discretegeomincludedir = $(includedir)/moab/discrete_geometry
 discretegeominclude_HEADERS = \
-	moab/DiscreteGeometry/DGMSolver.hpp \
-	moab/DiscreteGeometry/HiReconstruction.hpp
+	moab/discrete_geometry/DGMSolver.hpp \
+	moab/discrete_geometry/HiReconstruction.hpp
 
-localdiscincludedir = $(includedir)/moab/LocalDiscretization
+localdiscincludedir = $(includedir)/moab/local_discretization
 localdiscinclude_HEADERS = \
-  moab/LocalDiscretization/LinearHex.hpp \
-  moab/LocalDiscretization/LinearQuad.hpp \
-  moab/LocalDiscretization/LinearTet.hpp \
-  moab/LocalDiscretization/LinearTri.hpp \
-  moab/LocalDiscretization/QuadraticHex.hpp
+  moab/local_discretization/LinearHex.hpp \
+  moab/local_discretization/LinearQuad.hpp \
+  moab/local_discretization/LinearTet.hpp \
+  moab/local_discretization/LinearTri.hpp \
+  moab/local_discretization/QuadraticHex.hpp
 
 pointlocincludedir = $(includedir)/moab/point_locater
 pointlocinclude_HEADERS = \
@@ -387,22 +387,22 @@ AM_CPPFLAGS += -I$(srcdir)/parallel
 
 if HAVE_HYPRE
 
-AM_CPPFLAGS += $(HYPRE_INCLUDES) -I$(srcdir)/HYPRE/moab
+AM_CPPFLAGS += $(HYPRE_INCLUDES) -I$(srcdir)/hypre/moab
 AM_LDFLAGS += $(HYPRE_LIBS)
 
 MOAB_HYPRE_SRCS = \
-		HYPRE/HypreParVector.cpp  \
-		HYPRE/hypre_parcsr.cpp \
-		HYPRE/HypreParMatrix.cpp \
-		HYPRE/HypreSolver.cpp
+		hypre/HypreParVector.cpp  \
+		hypre/hypre_parcsr.cpp \
+		hypre/HypreParMatrix.cpp \
+		hypre/HypreSolver.cpp
 libMOAB_la_SOURCES += $(MOAB_HYPRE_SRCS)
 
-moabhypreincludedir = $(includedir)/moab/HYPRE
+moabhypreincludedir = $(includedir)/moab/hypre
 moabhypreinclude_HEADERS = \
-		HYPRE/moab/HypreParVector.hpp \
-		HYPRE/moab/hypre_parcsr.hpp \
-		HYPRE/moab/HypreParMatrix.hpp \
-		HYPRE/moab/HypreSolver.hpp
+		hypre/moab/HypreParVector.hpp \
+		hypre/moab/hypre_parcsr.hpp \
+		hypre/moab/HypreParMatrix.hpp \
+		hypre/moab/HypreSolver.hpp
 
 endif # if HAVE_HYPRE
 

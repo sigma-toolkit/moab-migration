@@ -1,4 +1,4 @@
-#include "moab/LocalDiscretization/SpectralHex.hpp"
+#include "moab/local_discretization/SpectralHex.hpp"
 #include "moab/Forward.hpp"
 
 namespace moab

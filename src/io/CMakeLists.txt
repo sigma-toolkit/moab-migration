@@ -39,27 +39,12 @@ set( MOABIO_LIB_SRCS
         WriteVtk.hpp      WriteVtk.cpp )
 
 if( MOAB_HAVE_NETCDF )
+  # ExodusII (NetCDF-based) reader/writer.  The climate NetCDF grid
+  # readers/writers that used to live here now build from src/climate/io.
   set( MOAB_NETCDF_SRCS
           ReadNCDF.hpp      ReadNCDF.cpp
           WriteNCDF.hpp     WriteNCDF.cpp
           WriteSLAC.hpp     WriteSLAC.cpp
-          ReadNC.hpp        ReadNC.cpp
-          WriteNC.hpp       WriteNC.cpp
-          NCHelper.hpp      NCHelper.cpp
-          NCWriteHelper.hpp NCWriteHelper.cpp
-          NCHelperEuler.hpp NCHelperEuler.cpp
-          NCWriteEuler.hpp  NCWriteEuler.cpp
-          NCHelperFV.hpp    NCHelperFV.cpp
-          NCHelperDomain.hpp    NCHelperDomain.cpp
-          NCHelperScrip.hpp    NCHelperScrip.cpp
-          NCHelperESMF.hpp NCHelperESMF.cpp
-          NCWriteFV.hpp     NCWriteFV.cpp
-          NCHelperGCRM.hpp  NCHelperGCRM.cpp
-          NCWriteGCRM.hpp   NCWriteGCRM.cpp
-          NCHelperHOMME.hpp NCHelperHOMME.cpp
-          NCWriteHOMME.hpp  NCWriteHOMME.cpp
-          NCHelperMPAS.hpp  NCHelperMPAS.cpp
-          NCWriteMPAS.hpp   NCWriteMPAS.cpp
        )
         set( MOABIO_LIBS ${MOABIO_LIBS} ${NETCDF_LIBRARIES} )
         include_directories(${NETCDF_INCLUDES})

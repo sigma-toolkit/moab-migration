@@ -633,6 +633,11 @@ EXPORT_LDFLAGS="$NETCDF_LDFLAGS $EXPORT_LDFLAGS"
 AC_SUBST(NETCDF_LIBS)
 AC_SUBST(enablenetcdf)
 
+# The climate NetCDF grid readers/writers (src/climate/io) build when either
+# NetCDF or PNetCDF is available.
+AM_CONDITIONAL(HAVE_CLIMATE_NETCDF,
+               [test "xno" != "x$enablenetcdf" || test "xyes" = "x$enablepnetcdf"])
+
 
 ################################################################################
 #                             CGNS OPTIONS
@@ -1154,6 +1159,8 @@ AC_CONFIG_FILES([Makefile
                  src/Makefile
                  src/io/Makefile
                  src/io/mhdf/Makefile
+                 src/climate/Makefile
+                 src/climate/io/Makefile
                  test/Makefile
                  test/h5file/Makefile
                  test/obb/Makefile

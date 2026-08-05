@@ -7,8 +7,8 @@ AM_CPPFLAGS =
 libMOAB_la_LDFLAGS = -version-info @LIBTOOL_VERSION@
 
 # Subdirectories to build
-SUBDIRS = io .
-libMOAB_la_LIBADD = io/libmoabio.la
+SUBDIRS = io climate .
+libMOAB_la_LIBADD = io/libmoabio.la climate/io/libmoabclimateio.la
 EXTRA_DIST =
 
 # Some variables
@@ -17,6 +17,7 @@ AM_CPPFLAGS += -DIS_BUILDING_MB \
                -I. \
                -I$(srcdir)/io \
                -I$(srcdir)/io/mhdf/include \
+               -I$(srcdir)/climate/io \
                -I$(srcdir)/parallel \
                -I$(srcdir)/local_discretization \
                -I$(srcdir)/verdict \

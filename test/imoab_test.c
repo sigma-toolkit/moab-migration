@@ -38,13 +38,9 @@ int main( int argc, char* argv[] )
     double* coords;
     int size_coords;
 
-#ifdef MOAB_HAVE_MPI
-    const char* read_opts   = "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS";
-    int num_ghost_layers[1] = { 1 };
-#else
-    const char* read_opts   = "";
-    int num_ghost_layers[1] = { 0 };
-#endif
+    const char* ser_read_opts   = "";
+    const char* par_read_opts   = "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS";
+    int num_ghost_layers[2] = { 0, 1 };
 
     iMOAB_GlobalID* gbIDs;
     int tagIndex[2];
@@ -142,10 +138,10 @@ int main( int argc, char* argv[] )
      * vertex entity should have a GLOBAL ID tag in the file, which will be available for visible
      * entities
      */
-    rc = iMOAB_LoadMesh( pid, filen, read_opts, num_ghost_layers );
+    rc = iMOAB_LoadMesh( pid, filen, (nprocs > 1 ? par_read_opts : ser_read_opts), &num_ghost_layers[nprocs>1?1:0] );
     CHECKRC( rc, "failed to load mesh" );
 
-    rc = iMOAB_LoadMesh( pidDup, filen, read_opts, num_ghost_layers );
+    rc = iMOAB_LoadMesh( pidDup, filen, (nprocs > 1 ? par_read_opts : ser_read_opts), &num_ghost_layers[nprocs>1?1:0] );
     CHECKRC( rc, "failed to load mesh" );
 
     rc = iMOAB_SetGlobalInfo( pid, &num_global_vertices, &num_global_elements );
@@ -419,11 +415,7 @@ int main( int argc, char* argv[] )
     free( vGlobalID );
     free( vranks );
     outputFile = "fnew.h5m";
-#ifdef MOAB_HAVE_MPI
-    writeOptions = "PARALLEL=WRITE_PART";
-#else
-    writeOptions            = "";
-#endif
+    writeOptions = (nprocs > 1 ? "PARALLEL=WRITE_PART" : "");
     /*
      * The file can be written in parallel, and it will contain additional tags defined by the user
      * we may extend the method to write only desired tags to the file

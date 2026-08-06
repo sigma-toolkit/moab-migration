@@ -30,7 +30,7 @@ program fdriver
    character :: appname*32
    character :: filename*1024
    character :: fname*1024
-   character :: readopts*1024
+   character :: serreadopts*1024, parreadopts*1024
    integer ngv, nge, ndim, nparts
    integer nghlay
    integer nverts(3), nelem(3), nblocks(3), nsbc(3), ndbc(3)
@@ -66,7 +66,7 @@ program fdriver
    !       indices for surface BC element, reference surf BC, value
    integer isBC, irBC, ivBC
 
-   character outfile*1024, wopts*1024
+   character outfile*1024, serwopts*1024, parwopts*1024
    my_id = 0
    num_procs = 1
    ierr = 0
@@ -112,16 +112,18 @@ program fdriver
    if (0 .eq. my_id) then
       print *, filename, ' has ', nparts, ' parts in partition', ngv, ' vertices ', nge, ' elements of dimension ', ndim
    end if
-#ifdef MOAB_HAVE_MPI
+
    nghlay = 1
-   readopts = 'PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;'// &
+   parreadopts = 'PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;'// &
               'PARALLEL_RESOLVE_SHARED_ENTS'//C_NULL_CHAR
-#else
-   readopts = C_NULL_CHAR
-#endif
+   serreadopts = C_NULL_CHAR
 
    !  now let us load the mesh in parallel
-   ierr = iMOAB_LoadMesh(pid, filename, readopts, nghlay)
+   if (nprocs .gt. 1) then
+     ierr = iMOAB_LoadMesh(pid, filename, parreadopts, nghlay)
+   else
+     ierr = iMOAB_LoadMesh(pid, filename, serreadopts, nghlay)
+   endif
    call errorout(ierr, 'fail to read file in parallel')
 
    !  number of vertices/elements/blocks/sidesets in the mesh
@@ -310,14 +312,15 @@ program fdriver
    end do
 
    outfile = 'fnew2.h5m'//C_NULL_CHAR
-#ifdef MOAB_HAVE_MPI
-   wopts = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
-#else
-   wopts = C_NULL_CHAR
-#endif
+   parwopts = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
+   serwopts = C_NULL_CHAR
 
    !     write out the mesh file to disk
-   ierr = iMOAB_WriteMesh(pid, outfile, wopts)
+   if (nprocs .gt. 1) then
+     ierr = iMOAB_WriteMesh(pid, outfile, parwopts)
+   else
+     ierr = iMOAB_WriteMesh(pid, outfile, serwopts)
+   endif
    call errorout(ierr, 'fail to write the mesh file')
 
    !     all done. de-register and finalize

@@ -14,7 +14,7 @@ set (NETCDF_DIR "/usr" CACHE PATH "Path to search for NETCDF header and library 
 set (NETCDF_FOUND NO CACHE INTERNAL "Found NETCDF components successfully." )
 
 # Query nc-config script if available
-find_program(NC_CONFIG_EXECUTABLE NAMES nc-config)
+find_program(NC_CONFIG_EXECUTABLE NAMES nc-config HINTS ${NETCDF_DIR}/bin )
 if (NC_CONFIG_EXECUTABLE)
     execute_process(
         COMMAND ${NC_CONFIG_EXECUTABLE} --prefix
@@ -88,5 +88,25 @@ find_package_handle_standard_args(NETCDF
     REQUIRED_VARS NETCDF_INCLUDES NETCDF_LIBRARIES
     VERSION_VAR NETCDF_VERSION
 )
+
+# Check for parallel NetCDF support via nc-config or header presence
+if (NETCDF_INCLUDES)
+    # Prefer nc-config --has-parallel4 (checks if NetCDF was built with parallel HDF5)
+    if (NC_CONFIG_EXECUTABLE)
+        execute_process(
+            COMMAND ${NC_CONFIG_EXECUTABLE} --has-parallel4
+            OUTPUT_VARIABLE _nc_has_parallel4
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET)
+        if ("${_nc_has_parallel4}" STREQUAL "yes")
+            set(NETCDF_PARALLEL TRUE)
+        endif()
+    else()
+        # Fallback: check for netcdf_par.h header
+        if (EXISTS "${NETCDF_INCLUDES}/netcdf_par.h")
+            set(NETCDF_PARALLEL TRUE)
+        endif()
+    endif()
+endif()
 
 mark_as_advanced(NETCDF_INCLUDES NETCDF_LIBRARIES)

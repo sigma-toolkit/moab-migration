@@ -11,6 +11,9 @@
 #include "NCWriteHOMME.hpp"
 #include "NCWriteMPAS.hpp"
 #include "NCWriteGCRM.hpp"
+#include "NCWriteScrip.hpp"
+#include "NCWriteESMF.hpp"
+#include "NCWriteDomain.hpp"
 
 #include "moab/WriteUtilIface.hpp"
 #include "MBTagConventions.hpp"
@@ -43,6 +46,12 @@ NCWriteHelper* NCWriteHelper::get_nc_helper( WriteNC* writeNC,
         return new( std::nothrow ) NCWriteMPAS( writeNC, fileId, opts, fileSet );
     else if( grid_type == "GCRM" )
         return new( std::nothrow ) NCWriteGCRM( writeNC, fileId, opts, fileSet );
+    else if( grid_type == "SCRIP" )
+        return new( std::nothrow ) NCWriteScrip( writeNC, fileId, opts, fileSet );
+    else if( grid_type == "ESMF" )
+        return new( std::nothrow ) NCWriteESMF( writeNC, fileId, opts, fileSet );
+    else if( grid_type == "DOMAIN" )
+        return new( std::nothrow ) NCWriteDomain( writeNC, fileId, opts, fileSet );
 
     // Unknown NetCDF grid
     return NULL;

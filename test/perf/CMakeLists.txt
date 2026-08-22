@@ -11,15 +11,6 @@ set( TOOLS seqperf.cpp
            perftool.cpp
            umr_perf.cpp )
 
-if ( MOAB_HAVE_IMESH )
-  set(TESTS ${TESTS} tstt_perf_binding.cpp)
-  set(tstt_perf_binding_CMDARGS 4;B)
-  set(LIBS ${LIBS} iMesh )
-endif()
-if ( MOAB_HAVE_CGM )
-  set(LIBS ${LIBS} ${CGM_LIBRARIES})
-endif()
-
 set(TEST_COMP_FLAGS "-DMESHDIR=${MOAB_ABSSRC_DIR}/MeshFiles/unittest")
 
 foreach( fname ${TESTS} )

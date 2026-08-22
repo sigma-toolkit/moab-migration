@@ -310,6 +310,8 @@ int main( int argc, char* argv[] )
     opts.addOpt< std::string >( "secondMap,j", "input second map", &inputfile2 );
     int print_diff = 10;
     opts.addOpt< int >( "print_differences,p", "print differences ", &print_diff );
+    double tolerance = -1.0;
+    opts.addOpt< double >( "tolerance,t", "tolerance for pass/fail (exit code 1 if diff norm exceeds this)", &tolerance );
 
     opts.parseCommandLine( argc, argv );
 
@@ -443,6 +445,20 @@ int main( int argc, char* argv[] )
     diff_2d_vect( "yv_a", na1 * nv_a );
     diff_2d_vect( "xv_b", nb1 * nv_b );
     diff_2d_vect( "yv_b", nb1 * nv_b );
+
+    double diffNorm = diff.norm();
+    if( tolerance >= 0.0 && diffNorm > tolerance )
+    {
+        std::cout << " FAILED: diff norm " << std::setprecision( 16 ) << diffNorm << " exceeds tolerance " << tolerance
+                  << "\n";
+        return 1;
+    }
+
+    if( tolerance >= 0.0 )
+    {
+        std::cout << " PASSED: diff norm " << std::setprecision( 16 ) << diffNorm << " within tolerance " << tolerance
+                  << "\n";
+    }
 
     return 0;
 }

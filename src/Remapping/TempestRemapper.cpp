@@ -372,6 +372,10 @@ ErrorCode TempestRemapper::convert_tempest_mesh_private( TempestMeshType /*meshT
 
         MB_CHK_SET_ERR( m_interface->tag_set_data( gidTag, &mbcells[0], mbcells.size(), &gidse[0] ),
                         "Can't set global_id tag" );
+#ifdef MOAB_HAVE_MPI
+        MB_CHK_SET_ERR( m_pcomm->assign_global_ids(mesh_set, 2, 1, false, true, false ), "Unable to set global IDs" );
+#endif
+
         if( storeParentInfo )
         {
             MB_CHK_SET_ERR( m_interface->tag_set_data( srcParentTag, &mbcells[0], mbcells.size(), &srcParent[0] ),
@@ -667,7 +671,7 @@ ErrorCode TempestRemapper::convert_mesh_to_tempest_private( Mesh* mesh,
     if( verts.compactness() > 0.01 )
     {
         int j = 0;
-        for( Range::iterator it = verts.begin(); it != verts.end(); it++ )
+        for( Range::iterator it = verts.begin(); it != verts.end(); ++it )
             indxMap[*it] = j++;
         useRange = false;
     }
@@ -833,7 +837,8 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
             return ( it != gids.end() ? std::distance( gids.begin(), it ) : -1 );
         };
 #else
-        auto find_lid = []( std::vector< int >& gids, int gid ) -> int {
+        auto find_lid = [this]( std::vector< int >& gids, int gid ) -> int {
+            if (offlineWorkflow) return gid-1;
             auto it = std::find( gids.begin(), gids.end(), gid );
             return ( it != gids.end() ? std::distance( gids.begin(), it ) : -1 );
         };
@@ -858,8 +863,14 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
             std::get< 0 >( sorted_overlap_order[ix] ) = ix;
             std::get< 1 >( sorted_overlap_order[ix] ) = find_lid( gids_src, rbids_src[ix] );
             assert( std::get< 1 >( sorted_overlap_order[ix] ) >= 0 );
-            if( is_parallel && ghFlags[ix] >= 0 )                // it means it is a ghost overlap element
-                std::get< 2 >( sorted_overlap_order[ix] ) = -1;  // this should not participate in the map!
+            if( is_parallel && ghFlags[ix] >= 0 )
+            {
+                // Ghost overlap element: its target cell lives on the rank that owns this element.
+                // Weight contributions for this element are computed on that owning rank (where the
+                // element has ORIG_PROC=-1 and a valid local target face index).  Using -1 here
+                // ensures the element is skipped on this rank to avoid double-counting.
+                std::get< 2 >( sorted_overlap_order[ix] ) = -1;
+            }
             else
                 std::get< 2 >( sorted_overlap_order[ix] ) = find_lid( gids_tgt, rbids_tgt[ix] );
         }
@@ -869,7 +880,6 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
 
         for( unsigned ie = 0; ie < n_overlap_entitites; ++ie )
         {
-            // int ix = std::get< 0 >( sorted_overlap_order[ie] );  // original index of the element
             m_overlap->vecSourceFaceIx[ie] = std::get< 1 >( sorted_overlap_order[ie] );
             m_overlap->vecTargetFaceIx[ie] = std::get< 2 >( sorted_overlap_order[ie] );
         }
@@ -930,6 +940,7 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
     coordz.clear();
     verts.clear();
 
+    // ideally, we should do these in MOAB after intersction computation
     // m_overlap->RemoveZeroEdges();
     // m_overlap->RemoveCoincidentNodes( false );
 
@@ -937,7 +948,10 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
     // if ( constructEdgeMap ) m_overlap->ConstructEdgeMap(false);
     // m_overlap->ConstructReverseNodeArray();
 
-    m_overlap->Validate();
+    // For now, comment out validation; not needed
+    // m_overlap->Validate();
+
+    // all done. return success
     return MB_SUCCESS;
 }
 
@@ -1068,7 +1082,7 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
                                                  const int ntot_elements,
                                                  moab::Range& ents,
                                                  moab::Range* secondary_ents,
-                                                 const std::string dofTagName,
+                                                 const std::string& dofTagName,
                                                  int nP )
 {
     Tag dofTag;
@@ -1407,7 +1421,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
         {
             if( outputEnabled ) dbgprint.printf( 0, "Computing intersection mesh with the Kd-tree search algorithm" );
             MB_CHK_SET_ERR( mbintx->intersect_meshes_kdtree( m_covering_source_set, m_target_set, m_overlap_set ),
-                            "Can't compute the intersection of meshes on the sphere with brute-force" );
+                            "Can't compute the intersection of meshes on the sphere with kd-tree" );
         }
         else
         {
@@ -1453,7 +1467,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
                 Tag srcParentTag;
                 MB_CHK_ERR( m_interface->tag_get_handle( "SourceParent", srcParentTag ) );
                 MB_CHK_ERR( m_interface->get_entities_by_dimension( m_overlap_set, 2, intxCells ) );
-                for( Range::iterator it = intxCells.begin(); it != intxCells.end(); it++ )
+                for( Range::iterator it = intxCells.begin(); it != intxCells.end(); ++it )
                 {
                     EntityHandle intxCell = *it;
                     int srcParent         = -1;
@@ -1607,7 +1621,7 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
     //   find the ids of the boundary cells;
     Tag gid = m_interface->globalId_tag();
     std::set< int > targetBoundaryIds;
-    for( Range::iterator it = boundaryCells.begin(); it != boundaryCells.end(); it++ )
+    for( Range::iterator it = boundaryCells.begin(); it != boundaryCells.end(); ++it )
     {
         int tid;
         EntityHandle targetCell = *it;
@@ -1624,7 +1638,7 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
     Tag targetParentTag, sourceParentTag;  // do not use blue/red, as it is more confusing
     MB_CHK_ERR( m_interface->tag_get_handle( "TargetParent", targetParentTag ) );
     MB_CHK_ERR( m_interface->tag_get_handle( "SourceParent", sourceParentTag ) );
-    for( Range::iterator it = overlapCells.begin(); it != overlapCells.end(); it++ )
+    for( Range::iterator it = overlapCells.begin(); it != overlapCells.end(); ++it )
     {
         EntityHandle intxCell = *it;
         int targetParentID, sourceParentID;
@@ -1653,7 +1667,7 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
     Range covCells;
     MB_CHK_ERR( m_interface->get_entities_by_dimension( m_covering_source_set, 2, covCells ) );
     // loop thru all cov cells, to find the ones with global ids in affectedSourceCellsIds
-    for( Range::iterator it = covCells.begin(); it != covCells.end(); it++ )
+    for( Range::iterator it = covCells.begin(); it != covCells.end(); ++it )
     {
         EntityHandle covCell = *it;  //
         int covID;
@@ -1678,7 +1692,7 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
     //   that are organized per task on the above map )
     std::set< EntityHandle > overlapCellsToSend;
 
-    for( Range::iterator it = overlapCells.begin(); it != overlapCells.end(); it++ )
+    for( Range::iterator it = overlapCells.begin(); it != overlapCells.end(); ++it )
     {
         EntityHandle intxCell = *it;
         int sourceParentID;
@@ -1701,7 +1715,7 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
     // find out the maximum number of edges of the polygons needed to be sent
     // we could we conservative and use a big number, or the number from intx, if we store it then?
     int maxEdges = 0;
-    for( std::set< EntityHandle >::iterator it = overlapCellsToSend.begin(); it != overlapCellsToSend.end(); it++ )
+    for( std::set< EntityHandle >::iterator it = overlapCellsToSend.begin(); it != overlapCellsToSend.end(); ++it )
     {
         EntityHandle intxCell = *it;
         int nnodes;
@@ -1725,12 +1739,12 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
     EntityHandle tmpSet2;
     MB_CHK_SET_ERR( m_interface->create_meshset( MESHSET_SET, tmpSet2 ), "Can't create temporary set2" );
     // add the affected source and overlap elements
-    for( std::set< EntityHandle >::iterator it = overlapCellsToSend.begin(); it != overlapCellsToSend.end(); it++ )
+    for( std::set< EntityHandle >::iterator it = overlapCellsToSend.begin(); it != overlapCellsToSend.end(); ++it )
     {
         EntityHandle intxCell = *it;
         MB_CHK_SET_ERR( m_interface->add_entities( tmpSet2, &intxCell, 1 ), "Can't add entities" );
     }
-    for( std::set< EntityHandle >::iterator it = affectedCovCells.begin(); it != affectedCovCells.end(); it++ )
+    for( std::set< EntityHandle >::iterator it = affectedCovCells.begin(); it != affectedCovCells.end(); ++it )
     {
         EntityHandle covCell = *it;
         MB_CHK_SET_ERR( m_interface->add_entities( tmpSet2, &covCell, 1 ), "Can't add entities" );
@@ -1757,10 +1771,10 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
     int numVerts        = 0;
     int numOverlapCells = 0;
     for( std::map< int, std::set< EntityHandle > >::iterator it = overlapCellsForTask.begin();
-         it != overlapCellsForTask.end(); it++ )
+         it != overlapCellsForTask.end(); ++it )
     {
-        int sendToProc                                = it->first;
-        std::set< EntityHandle >& overlapCellsToSend2 = it->second;  // organize vertices in std::set per processor
+        int sendToProc                                      = it->first;
+        const std::set< EntityHandle >& overlapCellsToSend2 = it->second;  // organize vertices in std::set per processor
         // Range vertices;
         std::set< EntityHandle > vertices;  // collect all vertices connected to overlapCellsToSend2
         for( std::set< EntityHandle >::iterator set_it = overlapCellsToSend2.begin();
@@ -1780,7 +1794,7 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
     // build the index map, from entity handle to index in all vert set
     int j = 0;
     for( std::set< EntityHandle >::iterator vert_it = allVerticesToSend.begin(); vert_it != allVerticesToSend.end();
-         vert_it++, j++ )
+         ++vert_it, ++j )
     {
         EntityHandle vert          = *vert_it;
         allVerticesToSendMap[vert] = j;
@@ -1793,12 +1807,12 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
     TLv.enableWriteAccess();
 
     for( std::map< int, std::set< EntityHandle > >::iterator it = verticesOverlapForTask.begin();
-         it != verticesOverlapForTask.end(); it++ )
+         it != verticesOverlapForTask.end(); ++it )
     {
-        int sendToProc                     = it->first;
-        std::set< EntityHandle >& vertices = it->second;
-        int i                              = 0;
-        for( std::set< EntityHandle >::iterator it2 = vertices.begin(); it2 != vertices.end(); it2++, i++ )
+        int sendToProc                           = it->first;
+        const std::set< EntityHandle >& vertices = it->second;
+        int i                                    = 0;
+        for( std::set< EntityHandle >::iterator it2 = vertices.begin(); it2 != vertices.end(); ++it2, ++i )
         {
             int n                = TLv.get_n();
             TLv.vi_wr[2 * n]     = sendToProc;  // send to processor
@@ -1824,13 +1838,13 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
     TLc.enableWriteAccess();
 
     for( std::map< int, std::set< EntityHandle > >::iterator it = overlapCellsForTask.begin();
-         it != overlapCellsForTask.end(); it++ )
+         it != overlapCellsForTask.end(); ++it )
     {
-        int sendToProc                                = it->first;
-        std::set< EntityHandle >& overlapCellsToSend2 = it->second;
+        int sendToProc                                      = it->first;
+        const std::set< EntityHandle >& overlapCellsToSend2 = it->second;
         // send also the target and source parents for these overlap cells
-        for( std::set< EntityHandle >::iterator it2 = overlapCellsToSend2.begin(); it2 != overlapCellsToSend2.end();
-             it2++ )
+        for( std::set< EntityHandle >::const_iterator it2 = overlapCellsToSend2.begin();
+             it2 != overlapCellsToSend2.end(); ++it2 )
         {
             EntityHandle intxCell = *it2;
             int sourceParentID, targetParentID;
@@ -1947,7 +1961,7 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
                     std::cout << " source element " << currentSourceID << " intersects with "
                               << currentProcsCount.size() << " target partitions\n";
                     for( std::map< int, int >::iterator it = currentProcsCount.begin(); it != currentProcsCount.end();
-                         it++ )
+                         ++it )
                     {
                         int procID       = it->first;
                         int numOverCells = it->second;
@@ -1957,12 +1971,12 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
 #endif
                     // estimate what we need to send
                     for( std::map< int, int >::iterator it1 = currentProcsCount.begin(); it1 != currentProcsCount.end();
-                         it1++ )
+                         ++it1 )
                     {
                         int proc1 = it1->first;
                         sourcesForTasks[currentSourceID].insert( proc1 );
                         for( std::map< int, int >::iterator it2 = currentProcsCount.begin();
-                             it2 != currentProcsCount.end(); it2++ )
+                             it2 != currentProcsCount.end(); ++it2 )
                         {
                             int proc2 = it2->first;
                             if( proc1 != proc2 ) sizeOfTLc2 += it2->second;
@@ -2009,7 +2023,7 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
             // will need to be sent to all other procs from above set; also, need to mark the vertex
             // indices for that proc, and check that they are available to populate TLv2
             std::map< int, int >& availableVerticesFromThisProc = availVertexIndicesPerProcessor[orgProc];
-            for( std::set< int >::iterator setIt = procs.begin(); setIt != procs.end(); setIt++ )
+            for( std::set< int >::iterator setIt = procs.begin(); setIt != procs.end(); ++setIt )
             {
                 int procID = *setIt;
                 // send this cell to the other processors, not to orgProc this cell is coming from
@@ -2062,21 +2076,21 @@ ErrorCode TempestRemapper::AugmentOverlapSet()
     int numVerts2 = 0;
     // how many vertices to send?
     for( std::map< int, std::set< int > >::iterator it = verticesToSendForProc.begin();
-         it != verticesToSendForProc.end(); it++ )
+         it != verticesToSendForProc.end(); ++it )
     {
-        std::set< int >& indexInTLvSet = it->second;
+        const std::set< int >& indexInTLvSet = it->second;
         numVerts2 += (int)indexInTLvSet.size();
     }
     TLv2.initialize( 3, 0, 0, 3,
                      numVerts2 );  // send to, original proc, index in original proc, and 3 coords
     TLv2.enableWriteAccess();
     for( std::map< int, std::set< int > >::iterator it = verticesToSendForProc.begin();
-         it != verticesToSendForProc.end(); it++ )
+         it != verticesToSendForProc.end(); ++it )
     {
-        int sendToProc                 = it->first;
-        std::set< int >& indexInTLvSet = it->second;
+        int sendToProc                       = it->first;
+        const std::set< int >& indexInTLvSet = it->second;
         // now, look at indices in TLv, to find out the original proc, and the index in that list
-        for( std::set< int >::iterator itSet = indexInTLvSet.begin(); itSet != indexInTLvSet.end(); itSet++ )
+        for( std::set< int >::iterator itSet = indexInTLvSet.begin(); itSet != indexInTLvSet.end(); ++itSet )
         {
             int indexInTLv           = *itSet;
             int orgProc              = TLv.vi_rd[2 * indexInTLv];

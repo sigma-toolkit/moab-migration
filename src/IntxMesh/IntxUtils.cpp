@@ -11,6 +11,7 @@
 #include <cassert>
 #include <iostream>
 #include <iomanip>
+#include <limits>
 
 #include "moab/IntxMesh/IntxUtils.hpp"
 
@@ -31,7 +32,6 @@
 
 #ifdef MOAB_HAVE_EIGEN3
 #define EIGEN_NO_DEBUG
-#define EIGEN_MAX_CPP_VER 11
 #include "Eigen/Dense"
 #endif
 
@@ -81,9 +81,9 @@ int IntxUtils::borderPointsOfXinY2( double* X, int nX, double* Y, int nY, double
         int inside = 1;
         for( int j = 0; j < nY; j++ )
         {
-            double* B = Y + 2 * j;
-            int j1    = ( j + 1 ) % nY;
-            double* C = Y + 2 * j1;  // no copy of data
+            const double* B = Y + 2 * j;
+            int j1          = ( j + 1 ) % nY;
+            const double* C = Y + 2 * j1;  // no copy of data
 
             double area2 = ( B[0] - A[0] ) * ( C[1] - A[1] ) - ( C[0] - A[0] ) * ( B[1] - A[1] );
             if( area2 < -epsilon_area )
@@ -1126,12 +1126,12 @@ ErrorCode IntxUtils::ScaleToRadius( Interface* mb, EntityHandle set, double R )
     {
         EntityHandle nd = *nit;
         CartVect pos;
-        rval = mb->get_coords( &nd, 1, (double*)&( pos[0] ) );
+        rval = mb->get_coords( &nd, 1, pos.array() );
         if( rval != moab::MB_SUCCESS ) return rval;
         double len = pos.length();
         if( len == 0. ) return MB_FAILURE;
         pos  = R / len * pos;
-        rval = mb->set_coords( &nd, 1, (double*)&( pos[0] ) );
+        rval = mb->set_coords( &nd, 1, pos.array() );
         if( rval != moab::MB_SUCCESS ) return rval;
     }
     return MB_SUCCESS;
@@ -1464,7 +1464,7 @@ double IntxAreaUtils::area_spherical_triangle_lHuiller( const double* ptA,
     double area = sign * E * Radius * Radius;
 
 #ifdef CHECKNEGATIVEAREA
-    if( area < 0 )
+    if( area < 0 && fabs(area) > std::numeric_limits<double>::epsilon() )
     {
         std::cout << "negative area: " << area << "\n";
         std::cout << std::setprecision( 15 );
@@ -2236,7 +2236,7 @@ int IntxUtils::borderPointsOfCSinRLL( CartVect* redc,
     // check now each of the red points if they are inside this rectangle
     for( int i = 0; i < nsRed; i++ )
     {
-        CartVect& X = redc[i];
+        const CartVect& X = redc[i];
         if( X[2] > A[2] || X[2] < B[2] ) continue;  // it is above or below the rectangle
         // now decide if it is between the planes OAB and OCD
         if( ( ( A * B ) % X >= -epsil ) && ( ( C * D ) % X >= -epsil ) )
@@ -2401,7 +2401,7 @@ ErrorCode IntxUtils::remove_padded_vertices( Interface* mb, EntityHandle file_se
             newConnec.push_back( connec[num_verts - 1] );
             new_size++;
         }
-        if( new_size < num_verts )
+        if( new_size < num_verts && new_size >= 3 )
         {
             // cout << "new cell from " << cell << " has only " << new_size << " vertices \n";
             modifiedCells.insert( cell );
@@ -2422,12 +2422,15 @@ ErrorCode IntxUtils::remove_padded_vertices( Interface* mb, EntityHandle file_se
             double value;  // use the same value to reset the tags, even if the tags are int (like Global ID)
             for( size_t i = 0; i < tagList.size(); i++ )
             {
-                MB_CHK_SET_ERR( mb->tag_get_data( tagList[i], &cell, 1, (void*)( &value ) ),
+                MB_CHK_SET_ERR( mb->tag_get_data( tagList[i], &cell, 1, &value ),
                                 "Failed to get tag value" );
-                MB_CHK_SET_ERR( mb->tag_set_data( tagList[i], &newCell, 1, (void*)( &value ) ),
+                MB_CHK_SET_ERR( mb->tag_set_data( tagList[i], &newCell, 1, &value ),
                                 "Failed to set tag value on new cell" );
             }
         }
+        // new_size < 3: degenerate cell collapses below a valid polygon (e.g. SCRIP-style
+        // padded placeholder with only 2 distinct vertices). Leave the original cell in
+        // place — its padded connectivity faithfully represents what the input file stored.
     }
 
     MB_CHK_SET_ERR( mb->remove_entities( file_set, modifiedCells ), "Failed to remove old cells from file set" );

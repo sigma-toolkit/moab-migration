@@ -147,6 +147,7 @@ ErrorCode TempestRemapper::clear()
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
+#ifdef MOAB_HAVE_NETCDF
 
 ErrorCode TempestRemapper::LoadMesh( Remapper::IntersectionContext ctx,
                                      std::string inputFilename,
@@ -179,7 +180,9 @@ ErrorCode TempestRemapper::load_tempest_mesh_private( std::string inputFilename,
     if( outputEnabled ) std::cout << "\nLoading TempestRemap Mesh object from file = " << inputFilename << " ...\n";
 
     {
+#ifdef MOAB_HAVE_NETCDF
         NcError error( NcError::silent_nonfatal );
+#endif
 
         try
         {
@@ -219,7 +222,7 @@ ErrorCode TempestRemapper::load_tempest_mesh_private( std::string inputFilename,
     }
     return MB_SUCCESS;
 }
-
+#endif
 ///////////////////////////////////////////////////////////////////////////////////
 
 ErrorCode TempestRemapper::ConvertTempestMesh( Remapper::IntersectionContext ctx )
@@ -962,6 +965,12 @@ moab::ErrorCode moab::TempestRemapper::WriteTempestIntersectionMesh( std::string
                                                                      const bool fInputConcave,
                                                                      const bool fOutputConcave )
 {
+
+#ifndef MOAB_HAVE_NETCDF
+    if( is_root )
+        std::cout << "NetCDF is not configured. Intersection mesh write will be skipped...\n";
+#endif
+
     // Let us alos write out the TempestRemap equivalent so that we can do some verification checks
     if( fAllParallel )
     {
@@ -969,7 +978,9 @@ moab::ErrorCode moab::TempestRemapper::WriteTempestIntersectionMesh( std::string
         {
             this->m_source->CalculateFaceAreas( fInputConcave );
             this->m_target->CalculateFaceAreas( fOutputConcave );
+#ifdef MOAB_HAVE_NETCDF
             this->m_overlap->Write( strOutputFileName.c_str(), NcFile::Netcdf4 );
+#endif
         }
         else
         {
@@ -980,14 +991,18 @@ moab::ErrorCode moab::TempestRemapper::WriteTempestIntersectionMesh( std::string
             this->m_source->CalculateFaceAreas( fInputConcave );
             this->m_covering_source->CalculateFaceAreas( fInputConcave );
             this->m_target->CalculateFaceAreas( fOutputConcave );
+#ifdef MOAB_HAVE_NETCDF
             this->m_overlap->Write( strOutputFileName.c_str(), NcFile::Netcdf4 );
+#endif
         }
     }
     else
     {
         this->m_source->CalculateFaceAreas( fInputConcave );
         this->m_target->CalculateFaceAreas( fOutputConcave );
+#ifdef MOAB_HAVE_NETCDF
         this->m_overlap->Write( strOutputFileName.c_str(), NcFile::Netcdf4 );
+#endif
     }
 
     return moab::MB_SUCCESS;

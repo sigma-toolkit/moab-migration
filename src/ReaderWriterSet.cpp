@@ -50,9 +50,10 @@
 #include "ReadNC.hpp"
 #endif
 
-// 2nd include of ReadNC in case we have pnetcdf and not netcdf
+// 2nd include of ReadNC/WriteNC in case we have pnetcdf and not netcdf
 #if defined( MOAB_HAVE_PNETCDF ) && !defined( MOAB_HAVE_NETCDF )
 #include "ReadNC.hpp"
+#include "WriteNC.hpp"
 #endif
 
 #ifdef MOAB_HAVE_CGNS
@@ -98,6 +99,10 @@ ReaderWriterSet::ReaderWriterSet( Core* mdb ) : mbCore( mdb )
 #ifdef MOAB_HAVE_NETCDF
     const char* exo_sufxs[] = { "exo", "exoII", "exo2", "g", "gen", NULL };
     register_factory( ReadNCDF::factory, WriteNCDF::factory, "Exodus II", exo_sufxs, "EXODUS" );
+    register_factory( ReadNC::factory, WriteNC::factory, "Climate NC", "nc", "NC" );
+#elif defined( MOAB_HAVE_PNETCDF )
+    // PNetCDF-only build: no Exodus (ReadNCDF needs serial NetCDF), but the climate NC
+    // reader/writer works for classic CDF files through the PNetCDF dispatch layer.
     register_factory( ReadNC::factory, WriteNC::factory, "Climate NC", "nc", "NC" );
 #endif
 

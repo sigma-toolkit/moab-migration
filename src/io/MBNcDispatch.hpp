@@ -70,14 +70,14 @@
 // libnetcdf is a transitive dependency of libpnetcdf, so its headers are
 // reachable whenever PNetCDF is configured. The wrapper layer needs both
 // pnetcdf.h (for ncmpi_*) AND netcdf.h (for nc_*) compiled in simultaneously.
-#ifdef MOAB_HAVE_NETCFF
+#ifdef MOAB_HAVE_NETCDF
 #include "netcdf.h"
 
 #ifdef MOAB_HAVE_NETCDFPAR
 #include "netcdf_par.h"
 #endif
 
-#endif // MOAB_HAVE_NETCFF
+#endif // MOAB_HAVE_NETCDF
 
 #ifdef MOAB_HAVE_PNETCDF
 #include "pnetcdf.h"

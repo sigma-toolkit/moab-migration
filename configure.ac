@@ -1136,6 +1136,23 @@ AC_SUBST([CPPFLAGS])
 AC_SUBST([FCPPFLAGS])
 AC_SUBST([MB_DEFS])
 AC_SUBST([FCDEFS])
+
+# Intel oneAPI ifx links against the system gcc libstdc++ by default, which may be older
+# than the libstdc++ that the C++ compiler (e.g. icpx) uses to build libMOAB. The mismatch
+# produces undefined GLIBCXX_* / std::__throw_bad_array_new_length references when a
+# Fortran-linked executable pulls in the C++ MOAB library. Add the C++ compiler's own
+# libstdc++ directory to the link flags so every executable (C, C++ or Fortran) resolves
+# the same C++ runtime. Harmless for GNU builds (adds the default libstdc++ directory).
+AC_MSG_CHECKING([for C++ compiler libstdc++ directory])
+CXX_LIBSTDCXX_PATH=`$CXX -print-file-name=libstdc++.so.6 2>/dev/null`
+CXX_LIBSTDCXX_DIR=
+AS_CASE([$CXX_LIBSTDCXX_PATH],
+        [/*], [CXX_LIBSTDCXX_DIR=`AS_DIRNAME([$CXX_LIBSTDCXX_PATH])`])
+AS_IF([test "x$CXX_LIBSTDCXX_DIR" != x && test -d "$CXX_LIBSTDCXX_DIR"],
+      [AM_LDFLAGS="$AM_LDFLAGS -L$CXX_LIBSTDCXX_DIR -Wl,-rpath,$CXX_LIBSTDCXX_DIR"
+       AC_MSG_RESULT([$CXX_LIBSTDCXX_DIR])],
+      [AC_MSG_RESULT([not found; skipping])])
+
 AM_LDFLAGS="$AM_LDFLAGS $EXPORT_LTFLAGS $EXPORT_LDFLAGS"
 AC_SUBST([AM_LDFLAGS])
 AC_SUBST([EXPORT_LTFLAGS])

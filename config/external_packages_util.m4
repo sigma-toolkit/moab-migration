@@ -1852,20 +1852,33 @@ AC_DEFUN([AUSCM_AUTOMATED_CONFIGURE_TEMPESTREMAP],
     # configure PACKAGE with a minimal build: MPI, HDF5, TEMPESTREMAP
     compiler_opts="CC=\"$CC\" CXX=\"$CXX\" FC=\"$FC\" F90=\"$FC\" F77=\"$F77\""
     configure_command="$compiler_opts $tempestremap_src_dir/configure --prefix=$tempestremap_install_dir --libdir=$tempestremap_install_dir/lib --with-pic=1 --enable-shared=$enable_shared --enable-static=$enable_static"
+    TRCPPFLAGS=""
+    TRLDFLAGS=""
+    TRDEPLIBS=""
     if (test "$enablenetcdf" != "no"); then
       configure_command="$configure_command --with-netcdf=$NETCDF_DIR"
+      TRCPPFLAGS="$NETCDF_CPPFLAGS $TRCPPFLAGS"
+      TRLDFLAGS="$NETCDF_LDFLAGS $TRLDFLAGS"
+      TRDEPLIBS="$NETCDF_LIBS $TRDEPLIBS"
     else
-      AC_MSG_ERROR([TempestRemap requires NetCDF to be enabled.])
+      configure_command="$configure_command --disable-netcdf"
+      #AC_MSG_ERROR([TempestRemap requires NetCDF to be enabled.])
     fi
     if (test "$enablehdf5" != "no"); then
       configure_command="$configure_command --with-hdf5=$HDF5_DIR"
+      TRCPPFLAGS="$TRCPPFLAGS $HDF5_CPPFLAGS"
+      TRLDFLAGS="$HDF5_LDFLAGS $TRLDFLAGS"
+      TRDEPLIBS="$HDF5_LIBS $TRDEPLIBS"
     else
-      AC_MSG_ERROR([TempestRemap requires HDF5 to be enabled.])
+      configure_command="$configure_command --disable-hdf5"
+      #AC_MSG_ERROR([TempestRemap requires HDF5 to be enabled.])
     fi
-    configure_command="$configure_command LDFLAGS=\"$NETCDF_LDFLAGS $HDF5_LDFLAGS $LDFLAGS\" CPPFLAGS=\"$NETCDF_CPPFLAGS $HDF5_CPPFLAGS $CPPFLAGS\" LIBS=\"$NETCDF_LIBS $HDF5_LIBS $LIBS\""
+    TRCPPFLAGS="$TRCPPFLAGS $CPPFLAGS"
+    TRDEPLIBS="$TRDEPLIBS $LIBS"
+    configure_command="$configure_command LDFLAGS=\"$TRLDFLAGS\" CPPFLAGS=\"$TRCPPFLAGS\" LIBS=\"$TRDEPLIBS\""
 
     eval "echo 'Using configure command :==> cd $tempestremap_build_dir && $configure_command > $tempestremap_src_dir/../config_tempestremap.log' > $tempestremap_src_dir/../config_tempestremap.log"
-    PREFIX_PRINT([Configuring with default options  (debug=$enable_debug with-netcdf=$enablenetcdf with-hdf5=$enablehdf5 shared=$enable_shared) ])
+    PREFIX_PRINT([Configuring with default options  (debug=$enable_debug shared=$enable_shared) ])
     eval "cd $tempestremap_build_dir && $configure_command >> $tempestremap_src_dir/../config_tempestremap.log 2>&1 && cd \"\$OLDPWD\""
   fi
 

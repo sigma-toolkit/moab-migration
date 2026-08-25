@@ -180,9 +180,9 @@ ErrorCode TempestRemapper::load_tempest_mesh_private( std::string inputFilename,
     if( outputEnabled ) std::cout << "\nLoading TempestRemap Mesh object from file = " << inputFilename << " ...\n";
 
     {
-#ifdef MOAB_HAVE_NETCDF
+        // NcError is a TempestRemap/netcdfcpp type; this whole routine is already inside the
+        // enclosing #ifdef MOAB_HAVE_NETCDF (LoadMesh forwards to TempestRemap's file reader).
         NcError error( NcError::silent_nonfatal );
-#endif
 
         try
         {
@@ -966,11 +966,6 @@ moab::ErrorCode moab::TempestRemapper::WriteTempestIntersectionMesh( std::string
                                                                      const bool fOutputConcave )
 {
 
-#ifndef MOAB_HAVE_NETCDF
-    if( is_root )
-        std::cout << "NetCDF is not configured. Intersection mesh write will be skipped...\n";
-#endif
-
     // Let us alos write out the TempestRemap equivalent so that we can do some verification checks
     if( fAllParallel )
     {
@@ -978,32 +973,29 @@ moab::ErrorCode moab::TempestRemapper::WriteTempestIntersectionMesh( std::string
         {
             this->m_source->CalculateFaceAreas( fInputConcave );
             this->m_target->CalculateFaceAreas( fOutputConcave );
-#ifdef MOAB_HAVE_NETCDF
-            this->m_overlap->Write( strOutputFileName.c_str(), NcFile::Netcdf4 );
-#endif
         }
         else
         {
             // Perform reduction and write from root processor
-            // if ( is_root )
-            //     std::cout << "--- PARALLEL IMPLEMENTATION is NOT AVAILABLE yet ---\n";
-
             this->m_source->CalculateFaceAreas( fInputConcave );
             this->m_covering_source->CalculateFaceAreas( fInputConcave );
             this->m_target->CalculateFaceAreas( fOutputConcave );
-#ifdef MOAB_HAVE_NETCDF
-            this->m_overlap->Write( strOutputFileName.c_str(), NcFile::Netcdf4 );
-#endif
         }
     }
     else
     {
         this->m_source->CalculateFaceAreas( fInputConcave );
         this->m_target->CalculateFaceAreas( fOutputConcave );
-#ifdef MOAB_HAVE_NETCDF
-        this->m_overlap->Write( strOutputFileName.c_str(), NcFile::Netcdf4 );
-#endif
     }
+
+    // The overlap mesh is written by TempestRemap's own NetCDF writer (Mesh::Write). This is
+    // forwarded to libTempestRemap and cannot go through the MBNcDispatch layer; guard it in
+    // one place and skip with a notice when NetCDF is unavailable.
+#ifdef MOAB_HAVE_NETCDF
+    this->m_overlap->Write( strOutputFileName.c_str(), NcFile::Netcdf4 );
+#else
+    if( is_root ) std::cout << "NetCDF is not configured. Intersection mesh write will be skipped...\n";
+#endif
 
     return moab::MB_SUCCESS;
 }

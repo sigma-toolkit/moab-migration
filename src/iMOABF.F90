@@ -80,6 +80,7 @@ module iMOAB
         integer(c_int), intent(in) :: block_ID
       end function iMOAB_CreateElements
 
+#ifdef MOAB_HAVE_MPI
       integer(c_int) function iMOAB_ResolveSharedEntities(pid, num_verts, marker) bind(C, name='iMOAB_ResolveSharedEntities')
         use, intrinsic :: iso_c_binding, only: c_int
         integer(c_int), intent(in) :: pid
@@ -95,6 +96,8 @@ module iMOAB
         integer(c_int), intent(in) :: num_ghost_layers
         integer(c_int), intent(in) :: bridge_dim
       end function iMOAB_DetermineGhostEntities
+! closing endif: MOAB_HAVE_MPI
+#endif
 
       integer(c_int) function iMOAB_WriteMesh(pid, filename, write_options) bind(C, name='iMOAB_WriteMesh')
         use, intrinsic :: iso_c_binding, only: c_int, c_char
@@ -399,6 +402,8 @@ module iMOAB
         integer(c_int), intent(in) :: comp2
       end function iMOAB_ComputeCommGraph
 
+#ifdef MOAB_HAVE_TEMPESTREMAP
+      ! CoverageGraph operates on the TempestRemapper covering set, so it requires TempestRemap.
       integer(c_int) function iMOAB_CoverageGraph(joint_comm, pid_source, pid_migration, pid_intx, source_id, &
                                                   migration_id, context_id) bind(C, name='iMOAB_CoverageGraph')
         use, intrinsic :: iso_c_binding, only: c_int, c_ptr
@@ -410,6 +415,7 @@ module iMOAB
         integer(c_int), intent(in) :: migration_id
         integer(c_int), intent(in) :: context_id
       end function iMOAB_CoverageGraph
+#endif
 
       integer(c_int) function iMOAB_DumpCommGraph(pid, context_id, is_sender, prefix) bind(C, name='iMOAB_DumpCommGraph')
         use, intrinsic :: iso_c_binding, only: c_int, c_char
@@ -424,6 +430,20 @@ module iMOAB
         integer(c_int), intent(in) :: pid
       end function iMOAB_MergeVertices
 
+! closing endif: MOAB_HAVE_MPI
+#endif
+
+#ifdef MOAB_HAVE_TEMPESTREMAP
+      integer(c_int) function iMOAB_ComputeCoverageMesh(pid_source, pid_target, pid_intersection) &
+                                                    bind(C, name='iMOAB_ComputeCoverageMesh')
+        use, intrinsic :: iso_c_binding, only: c_int
+        integer(c_int), intent(in) :: pid_source
+        integer(c_int), intent(in) :: pid_target
+        integer(c_int), intent(in) :: pid_intersection
+      end function iMOAB_ComputeCoverageMesh
+
+#ifdef MOAB_HAVE_MPI
+      ! MigrateMapMesh does no NC I/O; it needs TempestRemap + MPI only.
       integer(c_int) function iMOAB_MigrateMapMesh( pid1, pid2, jointcomm, groupA, groupB, type, comp1, comp2) &
             bind(C, name='iMOAB_MigrateMapMesh')
         use, intrinsic :: iso_c_binding, only : c_int
@@ -436,6 +456,8 @@ module iMOAB
         integer(c_int), intent(in) :: comp1
         integer(c_int), intent(in) :: comp2
       end function iMOAB_MigrateMapMesh
+! closing endif: MOAB_HAVE_MPI
+#endif
 
       integer(c_int) function iMOAB_SetMapGhostLayers(pid, num_src_layers, num_tgt_layers) bind(C, name='iMOAB_SetMapGhostLayers')
         use, intrinsic :: iso_c_binding, only: c_int
@@ -444,18 +466,6 @@ module iMOAB
         integer(c_int), intent(in) :: num_tgt_layers
       end function iMOAB_SetMapGhostLayers
 
-! closing endif: MOAB_HAVE_MPI
-#endif
-
-      integer(c_int) function iMOAB_ComputeCoverageMesh(pid_source, pid_target, pid_intersection) &
-                                                    bind(C, name='iMOAB_ComputeCoverageMesh')
-        use, intrinsic :: iso_c_binding, only: c_int
-        integer(c_int), intent(in) :: pid_source
-        integer(c_int), intent(in) :: pid_target
-        integer(c_int), intent(in) :: pid_intersection
-      end function iMOAB_ComputeCoverageMesh
-
-#ifdef MOAB_HAVE_TEMPESTREMAP
       integer(c_int) function iMOAB_WriteCoverageMesh(  pid,   prefix )&
                                                     bind(C, name='iMOAB_WriteCoverageMesh')
       use, intrinsic :: iso_c_binding, only: c_int, c_char
@@ -479,7 +489,7 @@ module iMOAB
         integer(c_int), intent(in) :: pid_intersection
       end function iMOAB_ComputePointDoFIntersection
 
-#ifdef MOAB_HAVE_NETCDF
+#if defined( MOAB_HAVE_NETCDF ) || defined( MOAB_HAVE_PNETCDF )
 
       integer(c_int) function iMOAB_LoadMapFile(pid_source, pid_target, pid_intersection, src_disc_type, tgt_disc_type, &
                                                             arearead, solution_weights_identifier, remap_weights_filename) &
@@ -503,7 +513,7 @@ module iMOAB
         character(kind=c_char), intent(in) :: remap_weights_filename(*)
       end function iMOAB_WriteMapFile
 
-! closing endif: MOAB_HAVE_NETCDF
+! closing endif: MOAB_HAVE_NETCDF || MOAB_HAVE_PNETCDF
 #endif
 
       integer(c_int) function iMOAB_ComputeScalarProjectionWeights(pid_intersection, solution_weights_identifier, &

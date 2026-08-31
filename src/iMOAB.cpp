@@ -4652,6 +4652,9 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
     return moab::MB_SUCCESS;
 }
 
+#endif  // #ifdef MOAB_HAVE_TEMPESTREMAP
+
+// iMOAB_DumpCommGraph only dumps a ParCommGraph and only needs MPI.
 ErrCode iMOAB_DumpCommGraph( iMOAB_AppID pid, int* context_id, int* is_sender, const iMOAB_String prefix )
 {
     assert( prefix && strlen( prefix ) );
@@ -4669,13 +4672,14 @@ ErrCode iMOAB_DumpCommGraph( iMOAB_AppID pid, int* context_id, int* is_sender, c
     return moab::MB_SUCCESS;
 }
 
-#endif  // #ifdef MOAB_HAVE_TEMPESTREMAP
-
 #endif  // #ifdef MOAB_HAVE_MPI
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
 
-#ifdef MOAB_HAVE_NETCDF
+// Map (SCRIP weight-file) I/O routes through TempestOnlineMap::ReadParallelMap
+// or WriteParallelMap, which support either NetCDF or a PnetCDF fallback. 
+// So we can enable the public map-file API whenever any NC backend is present.
+#if defined( MOAB_HAVE_NETCDF ) || defined( MOAB_HAVE_PNETCDF )
 
 /**
  * @brief Internal helper: redistributes area values from trivial to arbitrary mesh distribution.
@@ -5093,6 +5097,11 @@ ErrCode iMOAB_WriteMapFile( iMOAB_AppID pid_intersection,
 
     return moab::MB_SUCCESS;
 }
+
+#endif  // #if defined( MOAB_HAVE_NETCDF ) || defined( MOAB_HAVE_PNETCDF )
+
+// iMOAB_MigrateMapMesh only migrates the (already-read) map mesh across process
+// groups via crystal router
 //#define VERBOSE
 #ifdef MOAB_HAVE_MPI
 ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
@@ -5692,8 +5701,6 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
 }
 #undef VERBOSE
 #endif  // #ifdef MOAB_HAVE_MPI
-
-#endif  // #ifdef MOAB_HAVE_NETCDF
 
 #define USE_API
 static ErrCode ComputeSphereRadius( iMOAB_AppID pid, double* radius )

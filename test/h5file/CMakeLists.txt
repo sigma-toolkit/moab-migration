@@ -8,6 +8,7 @@ set( TESTS h5file_test.cpp
            h5sets_test.cpp
            h5regression.cpp
            h5partial.cpp
+           h5adjacency.cpp
            h5portable.cpp )
 
 set(TEST_COMP_FLAGS "-DMESHDIR=${MOAB_ABSSRC_DIR}/MeshFiles/unittest")

@@ -2653,10 +2653,12 @@ ErrorCode ReadHDF5::read_adjacencies( hid_t table, long table_len )
     const bool convert = !H5Tequal( read_type, handleType );
 
     EntityHandle* buffer = (EntityHandle*)dataBuffer;
-    size_t chunk_size    = bufferSize / H5Tget_size( read_type );
-    size_t remaining     = table_len;
-    size_t left_over     = 0;
-    size_t offset        = 0;
+    // The buffer is read as \c read_type and then converted in place to
+    // EntityHandle, so it must be sized for the larger of the two types.
+    size_t chunk_size = bufferSize / std::max( sizeof( EntityHandle ), H5Tget_size( read_type ) );
+    size_t remaining  = table_len;
+    size_t left_over  = 0;
+    size_t offset     = 0;
     dbgOut.printf( 3, "Reading adjacency list in %lu chunks\n",
                    (unsigned long)( remaining + chunk_size - 1 ) / chunk_size );
     int nn = 0;
@@ -2664,13 +2666,25 @@ ErrorCode ReadHDF5::read_adjacencies( hid_t table, long table_len )
     {
         dbgOut.printf( 3, "Reading chunk %d of adjacency list\n", ++nn );
 
-        size_t count = std::min( chunk_size, remaining );
-        count -= left_over;
-        remaining -= count;
+        // \c left_over values from the previous chunk are still at the front of
+        // the buffer, so only the remainder of the buffer can be filled.  A
+        // single adjacency record larger than the buffer can never be
+        // assembled, so fail rather than spin forever with count == 0.
+        if( left_over >= chunk_size )
+        {
+            MB_SET_ERR( MB_FAILURE, "Adjacency record longer than " << chunk_size
+                                                                    << " entries exceeds the read buffer. "
+                                                                       "Increase the 'BUFFER_SIZE' read option." );
+        }
+
+        size_t count = std::min( chunk_size - left_over, remaining );
 
         assert_range( buffer + left_over, count );
         mhdf_readAdjacencyWithOpt( table, offset, count, read_type, buffer + left_over, collIO, &status );
         if( is_error( status ) ) MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
+
+        offset += count;
+        remaining -= count;
 
         if( convert )
         {
@@ -2679,40 +2693,47 @@ ErrorCode ReadHDF5::read_adjacencies( hid_t table, long table_len )
         }
 
         EntityHandle* iter = buffer;
-        EntityHandle* end  = buffer + count + left_over;
+        EntityHandle* end  = buffer + left_over + count;
         while( end - iter >= 3 )
         {
-            EntityHandle h      = idMap.find( *iter++ );
-            EntityHandle count2 = *iter++;
-            if( !h )
-            {
-                iter += count2;
-                continue;
-            }
+            EntityHandle h      = idMap.find( iter[0] );
+            EntityHandle count2 = iter[1];
 
             if( count2 < 1 ) MB_SET_ERR( MB_FAILURE, "ReadHDF5 Failure" );
 
-            if( end < count2 + iter )
-            {
-                iter -= 2;
-                break;
-            }
+            // Bail out if the record is not entirely contained in this chunk.
+            // Checked before advancing \c iter (and for both the mapped and
+            // unmapped cases) so that \c iter can never run past \c end.
+            if( (EntityHandle)( end - ( iter + 2 ) ) < count2 ) break;
 
-            size_t valid;
-            convert_id_to_handle( iter, count2, valid, idMap );
-            rval = iFace->add_adjacencies( h, iter, valid, false );
-            if( MB_SUCCESS != rval ) MB_SET_ERR( rval, "ReadHDF5 Failure" );
+            iter += 2;
+            if( h )
+            {
+                size_t valid;
+                convert_id_to_handle( iter, count2, valid, idMap );
+                rval = iFace->add_adjacencies( h, iter, valid, false );
+                if( MB_SUCCESS != rval ) MB_SET_ERR( rval, "ReadHDF5 Failure" );
+            }
 
             iter += count2;
         }
 
+        // Move the trailing partial record to the front of the buffer.  Note
+        // that \c left_over is a count of EntityHandles, not of bytes.
+        assert( iter <= end );
         left_over = end - iter;
-        assert_range( (char*)buffer, left_over );
-        assert_range( (char*)iter, left_over );
-        memmove( buffer, iter, left_over );
+        assert_range( buffer, left_over );
+        assert_range( iter, left_over );
+        memmove( buffer, iter, left_over * sizeof( EntityHandle ) );
     }
 
-    assert( !left_over );  // Unexpected truncation of data
+    // A partial record left after consuming the whole table means the file is
+    // truncated or malformed.  This used to be a bare assert(), which is
+    // compiled out in release builds.
+    if( left_over )
+    {
+        MB_SET_ERR( MB_FAILURE, "Unexpected truncation of adjacency data: " << left_over << " trailing entries" );
+    }
 
     return MB_SUCCESS;
 }

@@ -63,7 +63,8 @@ endif()
 
 if(MOAB_HAVE_NETCDF)
   set ( TESTS ${TESTS}
-              intx_rll_cs_sphere_test.cpp )
+              intx_rll_cs_sphere_test.cpp
+              intx_orientation_test.cpp )
 endif()
 
 foreach( fname ${HDF5_C_TESTS} )

@@ -49,7 +49,8 @@ namespace moab
  */
 
 #define CORRTAGNAME "__correspondent"
-#define MAXEDGES    10
+// MAXEDGES comes from IntxUtils.hpp; it used to be redefined here with an
+// independent value, which would silently diverge if either was changed.
 
 /**
  * Computes the border points of X in Y2.
@@ -1578,7 +1579,7 @@ ErrorCode IntxUtils::enforce_convexity( Interface* mb, EntityHandle lset, int my
     Tag gidTag = mb->globalId_tag();
 
     std::vector< double > coords;
-    coords.resize( 3 * MAXEDGES );  // at most 10 vertices per polygon
+    coords.resize( 3 * MAXEDGES );  // initial guess only; resized per cell below
     // we should create a queue with new polygons that need processing for reflex angles
     //  (obtuse)
     std::queue< EntityHandle > newPolys;

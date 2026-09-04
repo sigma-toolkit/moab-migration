@@ -24,9 +24,8 @@
 
 // #define ENABLE_DEBUG
 
-// maximum number of edges on each convex polygon of interest
-#define MAXEDGES    10
-#define MAXEDGES2   20  // used for coordinates in plane
+// MAXEDGES / MAXEDGES2 are defined in IntxUtils.hpp (included above) so that
+// this header and IntxUtils.cpp cannot drift apart.
 #define CORRTAGNAME "__correspondent"
 
 namespace moab
@@ -75,8 +74,7 @@ class Intx2Mesh
      */
     ErrorCode intersect_meshes_kdtree( EntityHandle mbset1, EntityHandle mbset2, EntityHandle& outputSet );
 
-    // mark could be (3 or 4, depending on type: ) no, it could go to 10
-    // no, it will be MAXEDGES = 10
+    // mark could be (3 or 4, depending on type: ) no, it could go up to MAXEDGES
     // this is pure abstract, this needs to be implemented by
     // all derivations
     // the max number of intersection points could be 2*MAXEDGES

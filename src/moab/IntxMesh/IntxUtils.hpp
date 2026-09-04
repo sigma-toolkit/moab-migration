@@ -9,6 +9,25 @@
 
 #include "moab/CartVect.hpp"
 #include "moab/Core.hpp"
+
+// Maximum number of edges on each convex polygon of interest.
+//
+// Several intersection routines use fixed-size stack buffers dimensioned from
+// these values, so a mesh containing a cell with more vertices than MAXEDGES
+// would overflow them.  Intx2Mesh::FindMaxEdges() checks the actual maximum of
+// both input meshes against MAXEDGES and fails with a descriptive error rather
+// than corrupting the stack.
+//
+// Defined here (rather than in Intx2Mesh.hpp) so that IntxUtils.cpp and the
+// Intx2Mesh family share a single definition; they used to carry independent
+// copies that could silently diverge.
+#ifndef MAXEDGES
+#define MAXEDGES 10
+#endif
+#ifndef MAXEDGES2
+#define MAXEDGES2 ( 2 * MAXEDGES )  // used for coordinates in plane
+#endif
+
 namespace moab
 {
 

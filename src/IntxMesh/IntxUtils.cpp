@@ -1627,7 +1627,12 @@ double IntxAreaUtils::area_spherical_element( Interface* mb, EntityHandle elem, 
     // A negative area for a complete element means the cell is inverted (wound
     // clockwise) -- unlike an individual fan sub-triangle, this is always a defect.
     // Report the whole cell so the offending element can actually be located.
-    if( area < 0 && fabs( area ) > std::numeric_limits< double >::epsilon() )
+    //
+    // Only report cells whose area is negative by a meaningful margin.  Vertices
+    // closer than the merge tolerance (1e-12) are collapsed before intersection, so
+    // any residual sliver sits far below this threshold and its sign carries no
+    // information -- reporting those is noise, not diagnosis.
+    if( area < -NEGATIVE_AREA_TOLERANCE )
     {
         const std::streamsize oldprec = std::cout.precision();
         std::cout << "negative area: " << std::setprecision( 15 ) << area << " for element "

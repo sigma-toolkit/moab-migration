@@ -30,6 +30,17 @@
 
 #define CORRTAGNAME "__correspondent"
 
+// Magnitude below which a negative element area is not worth reporting.
+//
+// Vertices closer together than the merge tolerance (1e-12) are collapsed before
+// intersection, so a well-formed overlap mesh contains no slivers large enough to
+// produce a meaningful negative area.  Anything under this threshold is rounding
+// noise whose sign carries no information; reporting it drowns out the genuinely
+// inverted cells the check exists to catch.
+#ifndef NEGATIVE_AREA_TOLERANCE
+#define NEGATIVE_AREA_TOLERANCE 1.0e-13
+#endif
+
 namespace moab
 {
 

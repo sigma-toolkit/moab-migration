@@ -22,7 +22,7 @@
 // Intx2Mesh family share a single definition; they used to carry independent
 // copies that could silently diverge.
 #ifndef MAXEDGES
-#define MAXEDGES 10
+#define MAXEDGES 16
 #endif
 #ifndef MAXEDGES2
 #define MAXEDGES2 ( 2 * MAXEDGES )  // used for coordinates in plane

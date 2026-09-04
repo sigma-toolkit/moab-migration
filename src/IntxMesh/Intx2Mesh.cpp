@@ -7,6 +7,7 @@
 #include <limits>
 #include <queue>
 #include <sstream>
+#include <algorithm>  // std::max
 //
 #include "moab/IntxMesh/Intx2Mesh.hpp"
 #ifdef MOAB_HAVE_MPI
@@ -100,6 +101,26 @@ ErrorCode Intx2Mesh::FindMaxEdges( EntityHandle set1, EntityHandle set2 )
 {
     MB_CHK_SET_ERR( FindMaxEdgesInSet( set1, max_edges_1 ), "can't determine max_edges in set 1" );
     MB_CHK_SET_ERR( FindMaxEdgesInSet( set2, max_edges_2 ), "can't determine max_edges in set 2" );
+
+    // Numerous routines below use fixed-size stack buffers dimensioned from
+    // MAXEDGES (coordinates, edge-neighbor tags, connectivity scratch, ...),
+    // but max_edges_1/2 are whatever the meshes actually contain.  A cell with
+    // more vertices than MAXEDGES silently overruns those buffers, which shows
+    // up much later as corrupted geometry or a crash far from the cause.
+    // Fail here instead, where the diagnosis is obvious.
+    //
+    // Dual meshes of high-order spectral-element grids are the usual source of
+    // high-valence cells; if this triggers, either raise MAXEDGES in
+    // IntxUtils.hpp or regenerate the mesh with lower-valence cells.
+    const int max_edges = std::max( max_edges_1, max_edges_2 );
+    if( max_edges > MAXEDGES )
+    {
+        MB_SET_ERR( MB_FAILURE, "mesh contains a cell with "
+                                    << max_edges << " vertices, which exceeds MAXEDGES (" << MAXEDGES
+                                    << "); source mesh max = " << max_edges_1
+                                    << ", target mesh max = " << max_edges_2
+                                    << ". Increase MAXEDGES in moab/IntxMesh/IntxUtils.hpp and rebuild." );
+    }
 
     return MB_SUCCESS;
 }

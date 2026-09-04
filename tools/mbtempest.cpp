@@ -131,6 +131,8 @@ class ToolContext
     bool skip_intersection{ false };          ///< Skip intersection computation (for debugging)
     double boxeps{ 1e-7 };                    ///< Epsilon for bounding box checks
     double epsrel{ ReferenceTolerance };      ///< Relative tolerance for convergence
+    std::string areaMethodName{ "vos" };      ///< Spherical area formula (see --area_method)
+    moab::IntxAreaUtils::AreaMethod areaMethod{ moab::IntxAreaUtils::DEFAULT_AREA_METHOD };
 
     // Mesh operations control
     bool skip_io{ false };             ///< Skip file I/O operations (for testing)
@@ -322,6 +324,12 @@ class ToolContext
                                     "intbilingb, none. Default: none)",
                                     &expectedFVMethod );
 
+        opts.addOpt< std::string >(
+            "area_method",
+            "Formula used to compute spherical areas: vos (Van Oosterom-Strackee, default), "
+            "lhuiller, girard, or gquad (Gauss quadrature).",
+            &areaMethodName );
+
         opts.addOpt< void >(
             "noconserve", "Do not apply conservation to the resultant weights (relevant only when computing weights)",
             &mapOptions.fNoConservation );
@@ -388,6 +396,14 @@ class ToolContext
 
         // "--advfront/-a" requests the advancing-front algorithm, i.e. NOT the Kd-tree search.
         if( advFrontSearch ) kdtreeSearch = false;
+
+        if( !moab::IntxAreaUtils::area_method_from_name( areaMethodName, areaMethod ) )
+        {
+            if( !proc_id )
+                std::cerr << "Unknown --area_method \"" << areaMethodName
+                          << "\"; expected one of: vos, lhuiller, girard, gquad" << std::endl;
+            exit( 1 );
+        }
 
         // Handle call for detailed information
         if( opts.numOptSet( "manual" ) > 0 )
@@ -812,6 +828,7 @@ class ToolContext
         {
             std::cout << "\n  Gnomonic projection:    " << ( this->useGnomonicProjection ? "Yes" : "No" );
             std::cout << "\n  Intersection algorithm: " << ( this->kdtreeSearch ? "KdTree search" : "Advancing front" );
+        std::cout << "\n  Area computation:       " << moab::IntxAreaUtils::area_method_name( this->areaMethod );
 
             // Discretization settings
             std::cout << "\n\nDiscretization:";
@@ -1000,8 +1017,8 @@ int main( int argc, char* argv[] )
     remapper.constructEdgeMap = true;
     remapper.initialize();
 
-    // Default area_method = lHuiller; Options: Girard, lHuiller, GaussQuadrature (if TR is available)
-    moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::lHuiller );
+    // Area formula selected by --area_method (default: Van Oosterom-Strackee)
+    moab::IntxAreaUtils areaAdaptor( runCtx->areaMethod );
 
     Mesh* tempest_mesh = new Mesh();
     MB_CHK_SET_ERR( CreateTempestMesh( *runCtx, remapper, tempest_mesh ), "Failed to create tempest mesh" );

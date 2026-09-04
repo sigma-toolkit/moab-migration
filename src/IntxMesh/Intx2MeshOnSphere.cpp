@@ -274,7 +274,7 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
     int npBefore1 = nP;
     int oldNodes  = 0;
     int otherIntx = 0;
-    moab::IntxAreaUtils areaAdaptor;
+    moab::IntxAreaUtils areaAdaptor( this->areaMethod );
 #endif
     for( int i = 0; i < nP; i++ )
     {

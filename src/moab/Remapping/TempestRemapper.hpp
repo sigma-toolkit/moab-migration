@@ -151,6 +151,28 @@ class TempestRemapper : public Remapper
      *                    if false only report the diagnosis and continue.
      * @return ErrorCode MB_SUCCESS when both meshes carry valid ids
      */
+    /**
+     * @brief Select the formula used for all spherical area computations driven by this
+     *        remapper: the intersection kernel, the covering-set construction and the
+     *        overlap-orientation fixups.
+     *
+     * Offline drivers (mbtempest) should call this so that a single choice applies
+     * uniformly; online users get IntxAreaUtils::DEFAULT_AREA_METHOD, which is the
+     * adaptive Van Oosterom-Strackee formula.
+     *
+     * Must be called before ConstructCoveringSet()/ComputeOverlapMesh() to take effect.
+     */
+    void SetAreaMethod( IntxAreaUtils::AreaMethod method )
+    {
+        m_area_method = method;
+    }
+
+    //! Formula currently used for spherical area computations.
+    IntxAreaUtils::AreaMethod GetAreaMethod() const
+    {
+        return m_area_method;
+    }
+
     moab::ErrorCode ValidateGlobalIds( bool throw_error = true );
 
   private:
@@ -539,7 +561,7 @@ class TempestRemapper : public Remapper
     // std::map< int, int > gid_to_lid_src, gid_to_lid_covsrc, gid_to_lid_tgt;
     // std::map< int, int > lid_to_gid_src, lid_to_gid_covsrc, lid_to_gid_tgt;
 
-    IntxAreaUtils::AreaMethod m_area_method = IntxAreaUtils::lHuiller;
+    IntxAreaUtils::AreaMethod m_area_method = IntxAreaUtils::DEFAULT_AREA_METHOD;
 
     bool rrmgrids       = false;
     bool is_parallel    = false;

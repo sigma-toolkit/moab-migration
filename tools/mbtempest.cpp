@@ -1016,6 +1016,9 @@ int main( int argc, char* argv[] )
     remapper.meshValidate     = true;
     remapper.constructEdgeMap = true;
     remapper.initialize();
+    // The command-line choice supersedes the remapper default, so that intersection,
+    // coverage construction and orientation fixups all use one formula.
+    remapper.SetAreaMethod( runCtx->areaMethod );
 
     // Area formula selected by --area_method (default: Van Oosterom-Strackee)
     moab::IntxAreaUtils areaAdaptor( runCtx->areaMethod );
@@ -1070,7 +1073,7 @@ int main( int argc, char* argv[] )
             // Create the intersection on the sphere object
             runCtx->timer_push( "setup the intersector" );
 
-            moab::Intx2MeshOnSphere* mbintx = new moab::Intx2MeshOnSphere( mbCore );
+            moab::Intx2MeshOnSphere* mbintx = new moab::Intx2MeshOnSphere( mbCore, runCtx->areaMethod );
             mbintx->set_error_tolerance( runCtx->epsrel );
             mbintx->set_box_error( runCtx->boxeps );
             mbintx->set_radius_source_mesh( radius_src );

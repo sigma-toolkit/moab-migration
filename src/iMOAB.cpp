@@ -5786,12 +5786,9 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
         MB_CHK_ERR( IntxUtils::ScaleToRadius( context.MBI, data_tgt.file_set, defaultradius ) );
     }
 
-    // Default area_method = lHuiller; Options: Girard, GaussQuadrature (if TR is available)
-#ifdef MOAB_HAVE_TEMPESTREMAP
-    IntxAreaUtils areaAdaptor( IntxAreaUtils::GaussQuadrature );
-#else
-    IntxAreaUtils areaAdaptor( IntxAreaUtils::lHuiller );
-#endif
+    // Online workflows use the adaptive default (Van Oosterom-Strackee), which is
+    // robust for sliver and polar cells and does not depend on TempestRemap.
+    IntxAreaUtils areaAdaptor( IntxAreaUtils::DEFAULT_AREA_METHOD );
 
     if( meshCleanup )
     {
@@ -5948,8 +5945,7 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     // Mapping computation done
     if( validate )
     {
-        // Default area_method = lHuiller; Options: Girard, GaussQuadrature (if TR is available)
-        IntxAreaUtils areaAdaptor( IntxAreaUtils::lHuiller );
+        IntxAreaUtils areaAdaptor( IntxAreaUtils::DEFAULT_AREA_METHOD );
         double local_areas[3] = { 0.0, 0.0, 0.0 }, global_areas[3] = { 0.0, 0.0, 0.0 };
         local_areas[0] = areaAdaptor.area_on_sphere( context.MBI, data_src.file_set, defaultradius /*radius_source*/ );
         local_areas[1] = areaAdaptor.area_on_sphere( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ );

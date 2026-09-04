@@ -1357,7 +1357,9 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
     MB_CHK_ERR( ValidateGlobalIds() );
 
     // Initialize intersection context
-    mbintx = new moab::Intx2MeshOnSphere( m_interface, moab::IntxAreaUtils::GaussQuadrature );
+    // Use the remapper-wide area formula rather than a hardcoded one, so that a single
+    // choice (see SetAreaMethod) governs intersection, coverage and orientation fixups.
+    mbintx = new moab::Intx2MeshOnSphere( m_interface, m_area_method );
 
     mbintx->set_error_tolerance( tolerance );
     mbintx->set_radius_source_mesh( radius_src );
@@ -1667,7 +1669,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
 
         // Fix any inconsistencies in the overlap mesh
         {
-            IntxAreaUtils areaAdaptor;
+            IntxAreaUtils areaAdaptor( m_area_method );
             MB_CHK_ERR( IntxUtils::fix_degenerate_quads( m_interface, m_overlap_set ) );
             MB_CHK_ERR( areaAdaptor.positive_orientation( m_interface, m_overlap_set, 1.0 /*radius*/ ) );
         }

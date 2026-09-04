@@ -892,11 +892,32 @@ class ToolContext
         }
 
         // Set number of ghost layers based on method and order.
-        // FV order 1 needs 0 ghost layers; FV order p > 1 needs p+1 ghost layers.
-        if( this->fvMethod == "delaunay" || this->fvMethod == "bilin" )
+        //
+        // Every bilinear-family kernel reconstructs a DUAL mesh of the source
+        // (Dual()/ConstructLocalDualFace() via meshInput.revnodearray), so it
+        // needs the full ring of cells around each source vertex.  In parallel
+        // the coverage mesh is cut at partition boundaries, and without ghost
+        // layers the dual of a boundary vertex is incomplete -- which shows up
+        // as wrong weights near partition boundaries rather than as an error.
+        // The kernels involved are:
+        //   bilin      -> LinearRemapBilinear
+        //   intbilin   -> LinearRemapIntegratedBilinear
+        //   intbilingb -> LinearRemapIntegratedGeneralizedBarycentric
+        // and delaunay likewise needs a neighbourhood for its triangulation.
+        //
+        // "intbilin" and "intbilingb" were previously omitted here purely
+        // because this test matched on the user-facing --fvmethod string and
+        // only listed two of the four names; they silently ran with 0 layers.
+        const bool needsDualMesh = ( this->fvMethod == "delaunay" || this->fvMethod == "bilin" ||
+                                     this->fvMethod == "intbilin" || this->fvMethod == "intbilingb" );
+
+        if( needsDualMesh )
         {
-            this->skip_intersection = true;
-            this->nlayers           = 3;  // conservative
+            this->nlayers = 3;  // conservative
+            // Only "bilin" and "delaunay" work purely off the coverage mesh.
+            // The integrated variants quadrature over the overlap polygons
+            // (they take meshOverlap), so the intersection is still required.
+            if( this->fvMethod == "delaunay" || this->fvMethod == "bilin" ) this->skip_intersection = true;
         }
         else
         {
@@ -1204,8 +1225,17 @@ int main( int argc, char* argv[] )
         // First compute the covering set such that the target elements are fully covered by the
         // local source grid
         runCtx->timer_push( "construct covering set for intersection" );
-        // if ghosting, do not use gnomonic projection
-        if( runCtx->nlayers > 0 ) runCtx->useGnomonicProjection = false;
+        // Ghosting and the gnomonic-projection coverage path are mutually
+        // exclusive.  Ghost layers are now enabled by default for the
+        // bilinear-family methods, so warn rather than silently dropping an
+        // explicit --gnomonic request.
+        if( runCtx->nlayers > 0 && runCtx->useGnomonicProjection )
+        {
+            if( !proc_id )
+                std::cout << "  [WARNING] --gnomonic is ignored when ghost layers are used (nlayers = "
+                          << runCtx->nlayers << "); pass '--ghost 0' to force the gnomonic coverage path.\n";
+            runCtx->useGnomonicProjection = false;
+        }
         MB_CHK_SET_ERR( remapper.ConstructCoveringSet( runCtx->epsrel, 1.0, 1.0, runCtx->boxeps, runCtx->rrmGrids,
                                                        runCtx->useGnomonicProjection, runCtx->nlayers ),
                         "Failed to construct covering set" );

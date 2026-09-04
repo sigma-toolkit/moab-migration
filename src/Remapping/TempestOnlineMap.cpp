@@ -766,6 +766,24 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                 if( is_root ) dbgprint.printf( 0, "Calculating overlap mesh Face areas\n" );
                 local_areas[2] =
                     m_meshOverlap->CalculateFaceAreas( mapOptions.fSourceConcave || mapOptions.fTargetConcave );
+
+#ifdef MOAB_HAVE_MPI
+                // CalculateFaceAreas() sums every face it holds; it has no notion of ownership.
+                // In parallel the overlap mesh also carries ghost elements -- intersections whose
+                // target cell is owned by another rank -- which ConvertOverlapMeshSourceOrdered()
+                // flags by setting vecTargetFaceIx to -1 so they are skipped when the weights are
+                // accumulated.  Summing the raw total therefore counts those intersections twice
+                // (once here, once on the owning rank) and the reduced "Recovered Area" overshoots
+                // the sphere.  Subtract the ghost contribution so the reported area matches the
+                // area the map is actually built from.
+                if( m_pcomm && is_parallel )
+                {
+                    double ghost_area = 0.0;
+                    for( size_t iover = 0; iover < m_meshOverlap->faces.size(); iover++ )
+                        if( m_meshOverlap->vecTargetFaceIx[iover] < 0 ) ghost_area += m_meshOverlap->vecFaceArea[iover];
+                    local_areas[2] -= ghost_area;
+                }
+#endif
             }
 
             // store it as global output for now - used later in reduction

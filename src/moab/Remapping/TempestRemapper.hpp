@@ -133,6 +133,36 @@ class TempestRemapper : public Remapper
                                           int nb_ghost_layers = 0 );
 
     /**
+     * @brief Validate the GLOBAL_ID tags on the source and target meshes.
+     *
+     * The remapping machinery identifies entities across MPI ranks solely by their
+     * GLOBAL_ID: the coverage migration packs vertex ids into tuple lists and resolves
+     * them on the receiving rank, and the map writer indexes rows/columns by element id.
+     * A missing tag reads back as the dense-tag default of -1 (see Core::globalId_tag),
+     * which is silently accepted and produces collapsed cells or a corrupt map far from
+     * the actual cause.
+     *
+     * This checks, collectively, that every vertex and every element of both meshes has
+     * a strictly positive id, and that ids are locally unique.  It is intended to run
+     * before any expensive operation so that a bad mesh fails immediately with a
+     * descriptive message.
+     *
+     * @param throw_error If true (default) return MB_FAILURE on the first problem found;
+     *                    if false only report the diagnosis and continue.
+     * @return ErrorCode MB_SUCCESS when both meshes carry valid ids
+     */
+    moab::ErrorCode ValidateGlobalIds( bool throw_error = true );
+
+  private:
+    /// Helper for ValidateGlobalIds: check one mesh set at one dimension.
+    moab::ErrorCode validate_global_ids_private( moab::EntityHandle mesh_set,
+                                                 int dimension,
+                                                 const char* mesh_name,
+                                                 std::string& error_message );
+
+  public:
+
+    /**
      * @brief Compute the intersection mesh between the source and target grids that have been
      *        instantiated in the Remapper. This function invokes the parallel advancing-front
      *        intersection algorithm internally for spherical meshes and can handle arbitrary

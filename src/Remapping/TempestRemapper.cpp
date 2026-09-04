@@ -1235,6 +1235,110 @@ ErrorCode TempestRemapper::GenerateMeshMetadata( Mesh& csMesh,
 ///////////////////////////////////////////////////////////////////////////////////
 
 //#define MOAB_DBG
+ErrorCode TempestRemapper::validate_global_ids_private( EntityHandle mesh_set,
+                                                        int dimension,
+                                                        const char* mesh_name,
+                                                        std::string& error_message )
+{
+    Range ents;
+    MB_CHK_ERR( m_interface->get_entities_by_dimension( mesh_set, dimension, ents ) );
+    if( ents.empty() ) return MB_SUCCESS;  // nothing to check (e.g. empty partition)
+
+    const char* what = ( 0 == dimension ? "vertex" : "element" );
+
+    std::vector< int > gids( ents.size(), -1 );
+    MB_CHK_ERR( m_interface->tag_get_data( m_interface->globalId_tag(), ents, gids.data() ) );
+
+    // 1) every id must be strictly positive.  A missing tag reads back as the
+    //    dense default of -1, which is the common failure mode.
+    size_t n_bad = 0;
+    int first_bad = 0;
+    for( size_t i = 0; i < gids.size(); ++i )
+        if( gids[i] <= 0 )
+        {
+            if( !n_bad ) first_bad = gids[i];
+            ++n_bad;
+        }
+
+    if( n_bad )
+    {
+        std::ostringstream os;
+        os << mesh_name << " mesh has " << n_bad << " of " << ents.size() << " " << what
+           << " entities with a non-positive GLOBAL_ID (first bad value = " << first_bad << ")";
+        if( n_bad == ents.size() )
+            os << "; the GLOBAL_ID tag is most likely absent, so every entry is the tag default";
+        error_message = os.str();
+        return MB_FAILURE;
+    }
+
+    // 2) ids must be locally unique.  Duplicates make entity identification
+    //    ambiguous during migration and corrupt the map rows/columns.
+    std::vector< int > sorted( gids );
+    std::sort( sorted.begin(), sorted.end() );
+    std::vector< int >::iterator dup = std::adjacent_find( sorted.begin(), sorted.end() );
+    if( dup != sorted.end() )
+    {
+        const size_t n_unique = std::distance( sorted.begin(), std::unique( sorted.begin(), sorted.end() ) );
+        std::ostringstream os;
+        os << mesh_name << " mesh has duplicate " << what << " GLOBAL_IDs: " << ents.size() << " entities but only "
+           << n_unique << " distinct ids (e.g. id " << *dup << " appears more than once)";
+        error_message = os.str();
+        return MB_FAILURE;
+    }
+
+    return MB_SUCCESS;
+}
+
+ErrorCode TempestRemapper::ValidateGlobalIds( bool throw_error )
+{
+    // Check both dimensions of both meshes.  Vertices matter because the coverage
+    // migration keys on them; elements matter because the map rows/columns do.
+    const EntityHandle sets[2] = { m_source_set, m_target_set };
+    const char* names[2]       = { "source", "target" };
+
+    std::string message;
+    int local_bad = 0;
+    for( int im = 0; im < 2 && !local_bad; ++im )
+    {
+        if( !sets[im] ) continue;
+        for( int dim = 0; dim <= 2; dim += 2 )  // vertices (0) and faces (2)
+        {
+            if( MB_SUCCESS != validate_global_ids_private( sets[im], dim, names[im], message ) )
+            {
+                local_bad = 1;
+                break;
+            }
+        }
+    }
+
+    int global_bad = local_bad;
+#ifdef MOAB_HAVE_MPI
+    if( m_pcomm )
+    {
+        // Collective: a mesh is only valid if it is valid on every rank, and every
+        // rank must agree so that they fail (or continue) together.
+        MPI_Allreduce( &local_bad, &global_bad, 1, MPI_INT, MPI_MAX, m_pcomm->comm() );
+    }
+#endif
+
+    if( global_bad )
+    {
+        if( local_bad )
+            std::cout << "[ERROR] rank " << rank << ": " << message << std::endl;
+        else if( is_root )
+            std::cout << "[ERROR] invalid GLOBAL_IDs detected on another rank" << std::endl;
+
+        if( throw_error )
+            MB_SET_ERR( MB_FAILURE, "Invalid GLOBAL_ID tags on input meshes; refusing to proceed. "
+                                    "Ensure both meshes carry unique, strictly positive GLOBAL_IDs on "
+                                    "vertices and elements (e.g. re-partition with 'mbpart -j', or read "
+                                    "SCRIP/NetCDF sources in parallel so ids are assigned)." );
+        return MB_FAILURE;
+    }
+
+    return MB_SUCCESS;
+}
+
 ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
                                                  double radius_src,
                                                  double radius_tgt,
@@ -1246,6 +1350,11 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
     if( nb_ghost_layers >= 1 ) gnomonic = false;
     rrmgrids = regional_mesh;
     moab::Range local_verts;
+
+    // Fail fast on meshes whose GLOBAL_IDs cannot support the coverage migration or
+    // the map assembly.  Doing this before any expensive work turns what used to be a
+    // silent corruption (collapsed cells, bogus map rows) into an immediate diagnosis.
+    MB_CHK_ERR( ValidateGlobalIds() );
 
     // Initialize intersection context
     mbintx = new moab::Intx2MeshOnSphere( m_interface, moab::IntxAreaUtils::GaussQuadrature );

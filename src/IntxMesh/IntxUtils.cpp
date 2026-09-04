@@ -48,10 +48,6 @@ namespace moab
  * The code also defines some helper structs and functions used by these utility functions.
  */
 
-#define CORRTAGNAME "__correspondent"
-// MAXEDGES comes from IntxUtils.hpp; it used to be redefined here with an
-// independent value, which would silently diverge if either was changed.
-
 /**
  * Computes the border points of X in Y2.
  *

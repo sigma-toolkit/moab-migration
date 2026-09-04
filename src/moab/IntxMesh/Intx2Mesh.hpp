@@ -24,10 +24,6 @@
 
 // #define ENABLE_DEBUG
 
-// MAXEDGES / MAXEDGES2 are defined in IntxUtils.hpp (included above) so that
-// this header and IntxUtils.cpp cannot drift apart.
-#define CORRTAGNAME "__correspondent"
-
 namespace moab
 {
 

@@ -28,6 +28,8 @@
 #define MAXEDGES2 ( 2 * MAXEDGES )  // used for coordinates in plane
 #endif
 
+#define CORRTAGNAME "__correspondent"
+
 namespace moab
 {
 

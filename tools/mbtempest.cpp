@@ -123,6 +123,7 @@ class ToolContext
     int ensureMonotonicity{ 0 };              ///< Monotonicity enforcement level (0=none, 1=basic, 2=full, 3=strict)
     bool rrmGrids{ false };                   ///< Flag to use RRM (Regional Refinement Meshes)
     bool kdtreeSearch{ true };                ///< Enable KD-tree for spatial searches
+    bool advFrontSearch{ false };             ///< Set by "--advfront/-a"; disables kdtreeSearch after parsing
     bool fCheck{ false };                     ///< Enable additional checking during remapping
     bool fVolumetric{ false };                ///< Enable volumetric (3D) remapping
     bool useGnomonicProjection{ false };      ///< Use gnomonic projection for certain operations
@@ -284,10 +285,14 @@ class ToolContext
             "load,l", "Input mesh filenames for source and target meshes. (relevant only when computing weights)",
             &expectedFName );
 
+        // NOTE: addOpt<void> sets the target bool to true when the flag is present.
+        // Pointing it at kdtreeSearch (which already defaults to true) made "-a" a no-op,
+        // so the advancing-front algorithm could never be selected.  Use a separate flag
+        // and invert it after parsing instead.
         opts.addOpt< void >( "advfront,a",
                              "Use the advancing front intersection instead of the Kd-tree based algorithm to compute "
                              "mesh intersections.",
-                             &kdtreeSearch );
+                             &advFrontSearch );
 
         opts.addOpt< std::string >( "intx,i", "Output TempestRemap intersection mesh filename", &intxFilename );
 
@@ -380,6 +385,9 @@ class ToolContext
 
         // Parse command line
         opts.parseCommandLine( argc, argv );
+
+        // "--advfront/-a" requests the advancing-front algorithm, i.e. NOT the Kd-tree search.
+        if( advFrontSearch ) kdtreeSearch = false;
 
         // Handle call for detailed information
         if( opts.numOptSet( "manual" ) > 0 )

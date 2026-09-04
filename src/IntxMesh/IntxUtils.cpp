@@ -9,6 +9,8 @@
 
 #include <cmath>
 #include <cassert>
+#include <algorithm>
+#include <string>
 #include <iostream>
 #include <iomanip>
 #include <limits>
@@ -1184,8 +1186,10 @@ double IntxAreaUtils::area_spherical_triangle( const double* A, const double* B,
             return area_spherical_triangle_GQ( A, B, C );
 #endif
         case lHuiller:
-        default:
             return area_spherical_triangle_lHuiller( A, B, C, Radius );
+        case VanOosteromStrackee:
+        default:
+            return area_spherical_triangle_VOS( A, B, C, Radius );
     }
 }
 
@@ -1200,9 +1204,97 @@ double IntxAreaUtils::area_spherical_polygon( const double* A, int N, double Rad
             return area_spherical_polygon_GQ( A, N ) * Radius * Radius;  //area_spherical_polygon_GQ normalizes
 #endif
         case lHuiller:
-        default:
             return area_spherical_polygon_lHuiller( A, N, Radius, sign );
+        case VanOosteromStrackee:
+        default:
+            return area_spherical_polygon_VOS( A, N, Radius, sign );
     }
+}
+
+bool IntxAreaUtils::area_method_from_name( const std::string& name, AreaMethod& method )
+{
+    std::string lname( name );
+    std::transform( lname.begin(), lname.end(), lname.begin(), ::tolower );
+
+    if( lname == "lhuiller" || lname == "lhuilier" )
+        method = lHuiller;
+    else if( lname == "girard" )
+        method = Girard;
+    else if( lname == "gquad" || lname == "gaussquadrature" )
+        method = GaussQuadrature;
+    else if( lname == "vos" || lname == "vanoosterom" )
+        method = VanOosteromStrackee;
+    else
+        return false;
+
+    return true;
+}
+
+const char* IntxAreaUtils::area_method_name( AreaMethod method )
+{
+    switch( method )
+    {
+        case Girard:
+            return "girard";
+        case GaussQuadrature:
+            return "gquad";
+        case VanOosteromStrackee:
+            return "vos";
+        case lHuiller:
+        default:
+            return "lhuiller";
+    }
+}
+
+/*
+ * Van Oosterom & Strackee (1983), "The Solid Angle of a Plane Triangle",
+ * IEEE Trans. Biomed. Eng. BME-30(2):125-126.
+ *
+ * The signed spherical excess of the triangle ABC on the unit sphere is
+ *
+ *     E = 2 * atan2( A . (B x C),  1 + A.B + B.C + C.A )
+ *
+ * The sign follows the orientation of ABC, so unlike the l'Huilier path there is
+ * no need for a separate triple-product test.  Both arguments of atan2 are formed
+ * from dot/cross products of the vertices directly: no differences of nearly equal
+ * arc lengths are taken, which is exactly the cancellation that destroys l'Huilier
+ * for sliver triangles.
+ */
+double IntxAreaUtils::area_spherical_triangle_VOS( const double* A, const double* B, const double* C, double Radius )
+{
+    CartVect ua( A ), ub( B ), uc( C );
+
+    // Work on the unit sphere; scale the excess by Radius^2 at the end.  Normalize
+    // rather than dividing by Radius so that inputs which are only approximately on
+    // the sphere do not bias the excess.
+    ua.normalize();
+    ub.normalize();
+    uc.normalize();
+
+    const double numerator   = ua % ( ub * uc );  // ua . (ub x uc)
+    const double denominator = 1.0 + ( ua % ub ) + ( ub % uc ) + ( uc % ua );
+
+    // atan2 is well defined for denominator <= 0 (triangles covering more than a
+    // hemisphere), and returns 0 for a fully degenerate triangle.
+    const double excess = 2.0 * atan2( numerator, denominator );
+
+    return excess * Radius * Radius;
+}
+
+double IntxAreaUtils::area_spherical_polygon_VOS( const double* A, int N, double Radius, int* sign )
+{
+    // Fan the polygon from its first vertex.  Each sub-triangle contributes its
+    // signed excess, so concave polygons accumulate correctly without any special
+    // handling and the total carries the polygon orientation.
+    double area = 0.0;
+    for( int i = 1; i < N - 1; i++ )
+    {
+        area += area_spherical_triangle_VOS( A, A + 3 * i, A + 3 * ( i + 1 ), Radius );
+    }
+
+    if( sign ) *sign = ( area < 0.0 ? -1 : ( area > 0.0 ? 1 : 0 ) );
+
+    return area;
 }
 
 double IntxAreaUtils::area_spherical_triangle_girard( const double* A, const double* B, const double* C, double Radius )

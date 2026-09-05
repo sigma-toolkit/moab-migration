@@ -16,8 +16,9 @@
 #include <iostream>
 #include <cassert>
 #include <array>
-#include <numeric>    // std::iota
-#include <algorithm>  // std::sort, std::stable_sort
+#include <numeric>        // std::iota
+#include <algorithm>      // std::sort, std::stable_sort
+#include <unordered_map>  // global-id -> local-index lookup
 
 #include "DebugOutput.hpp"
 #include "moab/Remapping/TempestRemapper.hpp"
@@ -823,26 +824,36 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
         MB_CHK_ERR( m_interface->tag_get_data( gidtag, m_covering_source_entities, gids_src.data() ) );
         MB_CHK_ERR( m_interface->tag_get_data( gidtag, m_target_entities, gids_tgt.data() ) );
 
-// #define USE_SORTED_GIDS
-#ifdef USE_SORTED_GIDS
-        // let us sort the global indices so that we always have a consistent ordering
-        std::sort( gids_src.begin(), gids_src.end() );
-        std::sort( gids_tgt.begin(), gids_tgt.end() );
-
-        auto find_lid = []( std::vector< int >& gids, int gid ) -> int {
-            // auto it = std::equal_range( gids.begin(), gids.end(), gid );
-            // return ( ( it.first != it.second ) ? std::distance( gids.begin(), it.first ) : -1 );
-
-            auto it = std::lower_bound( gids.begin(), gids.end(), gid );
-            return ( it != gids.end() ? std::distance( gids.begin(), it ) : -1 );
+        // Global-id -> local-index lookup.
+        //
+        // This used to be a std::find() over the whole gid vector for every overlap
+        // element, making the loop below O(n_overlap * n_source).  On a 288k-cell RLL
+        // source that single std::find accounted for 68% of total runtime (13029 of
+        // 19243 samples).  Build the index once instead, so each lookup is O(1) and
+        // the loop becomes O(n_overlap + n_source).
+        //
+        // Insert with first-occurrence-wins so the result matches what std::find
+        // returned when a global id appears more than once.
+        auto build_index = []( const std::vector< int >& gids ) {
+            std::unordered_map< int, int > index;
+            index.reserve( gids.size() * 2 );
+            for( size_t i = 0; i < gids.size(); i++ )
+                index.emplace( gids[i], static_cast< int >( i ) );
+            return index;
         };
-#else
-        auto find_lid = [this]( std::vector< int >& gids, int gid ) -> int {
-            if (offlineWorkflow) return gid-1;
-            auto it = std::find( gids.begin(), gids.end(), gid );
-            return ( it != gids.end() ? std::distance( gids.begin(), it ) : -1 );
+
+        std::unordered_map< int, int > index_src, index_tgt;
+        if( !offlineWorkflow )
+        {
+            index_src = build_index( gids_src );
+            index_tgt = build_index( gids_tgt );
+        }
+
+        auto find_lid = [this]( const std::unordered_map< int, int >& index, int gid ) -> int {
+            if( offlineWorkflow ) return gid - 1;
+            auto it = index.find( gid );
+            return ( it != index.end() ? it->second : -1 );
         };
-#endif
 
         std::vector< int > ghFlags;
         if( is_parallel )
@@ -861,7 +872,7 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
         for( size_t ix = 0; ix < n_overlap_entitites; ++ix )
         {
             std::get< 0 >( sorted_overlap_order[ix] ) = ix;
-            std::get< 1 >( sorted_overlap_order[ix] ) = find_lid( gids_src, rbids_src[ix] );
+            std::get< 1 >( sorted_overlap_order[ix] ) = find_lid( index_src, rbids_src[ix] );
             assert( std::get< 1 >( sorted_overlap_order[ix] ) >= 0 );
             if( is_parallel && ghFlags[ix] >= 0 )
             {
@@ -872,7 +883,7 @@ ErrorCode TempestRemapper::ConvertOverlapMeshSourceOrdered()
                 std::get< 2 >( sorted_overlap_order[ix] ) = -1;
             }
             else
-                std::get< 2 >( sorted_overlap_order[ix] ) = find_lid( gids_tgt, rbids_tgt[ix] );
+                std::get< 2 >( sorted_overlap_order[ix] ) = find_lid( index_tgt, rbids_tgt[ix] );
         }
         // now sort the overlap elements such that they are ordered by source parent first
         // and then target parent next

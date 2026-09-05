@@ -88,7 +88,7 @@ For modes 3–5, you must supply both meshes with `--load src.h5m --load tgt.h5m
 | `-a`, `--advfront` | flag | off | Use advancing-front intersection instead of the Kd-tree algorithm. |
 | `--gnomonic` | flag | off | Project to gnomonic plane when computing the coverage mesh. |
 | `--enforce_convexity` | flag | off | Check convexity of input meshes before intersection. |
-| `--rrmgrids` | flag | off | At least one input is a regionally-refined mesh (RRM); enables an accelerated intersection path. |
+| `--rrmgrids` | flag | off | The source and target domains need not coincide (e.g. a regionally-refined mesh, or meshes with holes). Cell areas are taken from the actual overlap where a cell is only partially covered, and the covered fraction is reported. |
 | `--ghost <N>` | int | auto | Number of ghost layers in the coverage mesh. Auto-selects `0` for FV order 1, `p+1` for FV order `p > 1`. Override only if you know you need more. |
 | `--boxeps <eps>` | double | `1e-7` | Tolerance used for bounding-box checks during the intersection. |
 
@@ -156,9 +156,13 @@ The intersection, weight computation, and output write all parallelize via MPI. 
 ```bash
 mbtempest --type 5 --load ... --load ... \
     --weights --file w.nc \
-    --rrmgrids --sparseconstraints --ghost 3 \
+    --sparseconstraints --ghost 3 \
     --intx /tmp/intx_cache.h5m
 ```
+
+Add `--rrmgrids` when the two meshes do not cover the same domain. It is a correctness
+flag, not a performance one: it tells the area correction that a partially covered cell
+should take its area from the overlap rather than from geometry.
 
 `--intx` caches the intersection so subsequent runs (e.g. trying different weight options) can use `--skip_intersection`.
 

@@ -1019,6 +1019,8 @@ int main( int argc, char* argv[] )
     // The command-line choice supersedes the remapper default, so that intersection,
     // coverage construction and orientation fixups all use one formula.
     remapper.SetAreaMethod( runCtx->areaMethod );
+    // --rrmgrids: the two domains need not coincide, so cells may be partially covered.
+    remapper.SetRegionalMesh( runCtx->rrmGrids );
 
     // Area formula selected by --area_method (default: Van Oosterom-Strackee)
     moab::IntxAreaUtils areaAdaptor( runCtx->areaMethod );
@@ -1362,6 +1364,18 @@ int main( int argc, char* argv[] )
                 outputFormatter.printf( 0, "relative error w.r.t source = %12.14e, and target = %12.14e\n",
                                         fabs( global_areas[0] - global_areas[2] ) / global_areas[0],
                                         fabs( global_areas[1] - global_areas[2] ) / global_areas[1] );
+                if( runCtx->rrmGrids )
+                {
+                    // For coincident domains the shortfall below is roundoff and the
+                    // relative errors above already say so.  For a regional mesh it is
+                    // the physically meaningful quantity: how much of each mesh the
+                    // other one actually covers.
+                    outputFormatter.printf( 0,
+                                            "regional mesh: overlap covers %6.2f%% of source and %6.2f%% of "
+                                            "target area\n",
+                                            100.0 * global_areas[2] / global_areas[0],
+                                            100.0 * global_areas[2] / global_areas[1] );
+                }
             }
             dTotalOverlapArea = global_areas[2];
         }

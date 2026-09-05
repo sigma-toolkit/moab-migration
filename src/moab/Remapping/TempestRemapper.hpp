@@ -173,6 +173,30 @@ class TempestRemapper : public Remapper
         return m_area_method;
     }
 
+    /**
+     * @brief Declare that the source and/or target mesh is regionally refined, so their
+     * domains need not coincide.
+     *
+     * With this set, a source or target cell may be only partially covered by the other
+     * mesh (or not covered at all).  The overlap-based area correction then treats the
+     * accumulated overlap area as authoritative for partially covered cells, rather than
+     * requiring it to agree with the geometric area to 1e-10.  Without it a partially
+     * covered cell keeps its full geometric area while receiving only part of the
+     * overlap, which drives its map row sum below one.
+     *
+     * Must be set before GenerateRemappingWeights() to take effect.
+     */
+    void SetRegionalMesh( bool regional )
+    {
+        rrmgrids = regional;
+    }
+
+    //! Whether the meshes have been declared regionally refined; see SetRegionalMesh().
+    bool IsRegionalMesh() const
+    {
+        return rrmgrids;
+    }
+
     moab::ErrorCode ValidateGlobalIds( bool throw_error = true );
 
   private:

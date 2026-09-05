@@ -1402,90 +1402,19 @@ ErrorCode TempestRemapper::ConstructCoveringSet( double tolerance,
     else
     {
 #endif
-        if( rrmgrids )
-        {
-            MB_CHK_SET_ERR( m_interface->create_meshset( moab::MESHSET_SET, m_covering_source_set ),
-                            "Can't create new set" );
-
-            double tolerance = 1e-6, btolerance = 1e-3;
-            moab::AdaptiveKDTree tree( m_interface );
-            moab::Range targetVerts;
-
-            MB_CHK_ERR( m_interface->get_connectivity( m_target_entities, targetVerts, true ) );
-
-            MB_CHK_ERR( tree.build_tree( m_source_entities, &m_source_set ) );
-
-            for( unsigned ie = 0; ie < targetVerts.size(); ++ie )
-            {
-                EntityHandle el = targetVerts[ie], leaf;
-                double point[3];
-
-                // Get the element centroid to be queried
-                MB_CHK_ERR( m_interface->get_coords( &el, 1, point ) );
-
-                // Search for the closest source element in the master mesh corresponding
-                // to the target element centroid in the slave mesh
-                MB_CHK_ERR( tree.point_search( point, leaf, tolerance, btolerance ) );
-
-                if( leaf == 0 )
-                {
-                    leaf = m_source_set;  // no hint
-                }
-
-                std::vector< moab::EntityHandle > leaf_elems;
-                // We only care about the dimension that the user specified.
-                // MOAB partitions are ordered by elements anyway.
-                MB_CHK_ERR( m_interface->get_entities_by_dimension( leaf, 2, leaf_elems ) );
-
-                if( !leaf_elems.size() )
-                {
-                    // std::cout << ie << ": " << " No leaf elements found." << std::endl;
-                    continue;
-                }
-
-                // Now get the master element centroids so that we can compute
-                // the minimum distance to the target point
-                std::vector< double > centroids( leaf_elems.size() * 3 );
-                MB_CHK_ERR( m_interface->get_coords( &leaf_elems[0], leaf_elems.size(), &centroids[0] ) );
-
-                double dist = 1e5;
-                int pinelem = -1;
-                for( size_t il = 0; il < leaf_elems.size(); ++il )
-                {
-                    const double* centroid = &centroids[il * 3];
-                    const double locdist   = std::pow( point[0] - centroid[0], 2 ) +
-                                           std::pow( point[1] - centroid[1], 2 ) +
-                                           std::pow( point[2] - centroid[2], 2 );
-
-                    if( locdist < dist )
-                    {
-                        dist    = locdist;
-                        pinelem = il;
-                        m_covering_source_entities.insert( leaf_elems[il] );
-                    }
-                }
-
-                if( pinelem < 0 )
-                {
-                    std::cout << ie
-                              << ": [Error] - Could not find a minimum distance within the leaf "
-                                 "nodes. Dist = "
-                              << dist << std::endl;
-                }
-            }
-            // MB_CHK_ERR( tree.reset_tree() );
-            std::cout << "[INFO] - Total covering source entities = " << m_covering_source_entities.size() << std::endl;
-            MB_CHK_ERR( m_interface->add_entities( m_covering_source_set, m_covering_source_entities ) );
-        }
-        else
-        {
-            m_covering_source_set      = m_source_set;
-            m_covering_source          = m_source;
-            m_covering_source_entities = m_source_entities;  // this is a tempest mesh object; careful about
-                                                             // incrementing the reference?
-            m_covering_source_vertices = m_source_vertices;  // this is a tempest mesh object; careful about
-                                                             // incrementing the reference?
-        }
+        // Serial: every source cell is trivially in the coverage set.
+        //
+        // A "regional mesh" shortcut used to live here, picking for each target vertex
+        // the source cell with the nearest centroid.  Nearest centroid is not the same
+        // relation as overlaps, so it dropped most of the covering set and produced a
+        // silently wrong map (row sums down to 0.004).  Holes are handled where they
+        // belong instead -- in the overlap-based area correction; see IsRegionalMesh().
+        m_covering_source_set      = m_source_set;
+        m_covering_source          = m_source;
+        m_covering_source_entities = m_source_entities;  // this is a tempest mesh object; careful about
+                                                         // incrementing the reference?
+        m_covering_source_vertices = m_source_vertices;  // this is a tempest mesh object; careful about
+                                                         // incrementing the reference?
 #ifdef MOAB_HAVE_MPI
     }
 #endif
@@ -1548,7 +1477,7 @@ ErrorCode TempestRemapper::ComputeOverlapMesh( bool kdtree_search, bool use_temp
         }
 
 #ifdef MOAB_HAVE_MPI
-        if( is_parallel || rrmgrids )
+        if( is_parallel )
         {
 #ifdef VERBOSE
             std::stringstream ffc, fft, ffo;

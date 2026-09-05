@@ -1859,8 +1859,29 @@ ErrorCode IntxAreaUtils::positive_orientation( Interface* mb, EntityHandle set, 
         MB_CHK_ERR( mb->get_connectivity( cell, conn, num_nodes ) );
         if( num_nodes < 3 ) return MB_FAILURE;
 
+        // Pick three distinct vertices for the winding probe.
+        //
+        // Taking conn[0..2] blindly breaks on degenerate cells: a quad carrying a
+        // duplicate vertex (as RLL polar cells do before fix_degenerate_quads() runs)
+        // can place that duplicate inside the probe triangle, collapsing it to ~1e-18
+        // with an arbitrary sign.  When the sign comes out positive the cell is judged
+        // correctly wound and an inverted cell survives.  Callers are expected to run
+        // fix_degenerate_quads() first, but the probe should not depend on it.
+        EntityHandle probe[3];
+        int nprobe = 0;
+        for( int i = 0; i < num_nodes && nprobe < 3; i++ )
+        {
+            bool duplicate = false;
+            for( int j = 0; j < nprobe; j++ )
+                if( probe[j] == conn[i] ) duplicate = true;
+            if( !duplicate ) probe[nprobe++] = conn[i];
+        }
+        // Fewer than three distinct vertices means the cell has no area at all; there
+        // is no orientation to correct, so leave it for the caller's degeneracy pass.
+        if( nprobe < 3 ) continue;
+
         double coords[9];
-        MB_CHK_ERR( mb->get_coords( conn, 3, coords ) );
+        MB_CHK_ERR( mb->get_coords( probe, 3, coords ) );
 
         // Probe the winding of the cell.  This deliberately looks for negatively
         // oriented cells -- they are the ones about to be repaired -- so it must not

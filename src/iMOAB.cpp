@@ -5874,9 +5874,21 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
 
     // First, compute the covering source set.
     if( tdata.num_src_ghost_layers >= 1 ) gnomonic = false;  // do not use gnomonic when we need ghost layers;
-    MB_CHK_SET_ERR( tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic,
-                                                          tdata.num_src_ghost_layers ),
-                    "failed to compute covering set" );
+    {
+        // Do not leave a half-built remapper behind on failure.  Callers such as
+        // iMOAB_ComputeMeshIntersectionOnSphere() test `remapper == nullptr` to decide
+        // whether coverage still needs computing; a non-null pointer whose coverage set
+        // was never built makes them skip that step and carry on with empty meshes,
+        // turning a clean error return into a downstream hang.
+        ErrorCode rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic,
+                                                               tdata.num_src_ghost_layers );
+        if( MB_SUCCESS != rval )
+        {
+            delete tdata.remapper;
+            tdata.remapper = nullptr;
+            MB_CHK_SET_ERR( rval, "failed to compute covering set" );
+        }
+    }
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
     // set the reference to the covering set in the source PID

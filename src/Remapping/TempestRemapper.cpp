@@ -1296,8 +1296,16 @@ ErrorCode TempestRemapper::validate_global_ids_private( EntityHandle mesh_set,
 
 ErrorCode TempestRemapper::ValidateGlobalIds( bool throw_error )
 {
-    // Check both dimensions of both meshes.  Vertices matter because the coverage
-    // migration keys on them; elements matter because the map rows/columns do.
+    // Element ids are always required: they become the rows and columns of the map.
+    //
+    // Vertex ids are only required in parallel, where construct_covering_set() keys on
+    // them to identify the corners of migrated source cells -- unnumbered vertices
+    // collapse every corner to one handle and produce degenerate cells.  Nothing
+    // migrates in serial, so the vertex ids are never consulted and demanding them
+    // rejects meshes that work perfectly well: in-memory NetCDF domain meshes, for
+    // instance, carry element ids but no vertex ids.
+    const bool check_vertices = is_parallel;
+
     const EntityHandle sets[2] = { m_source_set, m_target_set };
     const char* names[2]       = { "source", "target" };
 
@@ -1306,7 +1314,7 @@ ErrorCode TempestRemapper::ValidateGlobalIds( bool throw_error )
     for( int im = 0; im < 2 && !local_bad; ++im )
     {
         if( !sets[im] ) continue;
-        for( int dim = 0; dim <= 2; dim += 2 )  // vertices (0) and faces (2)
+        for( int dim = ( check_vertices ? 0 : 2 ); dim <= 2; dim += 2 )  // vertices (0) and faces (2)
         {
             if( MB_SUCCESS != validate_global_ids_private( sets[im], dim, names[im], message ) )
             {

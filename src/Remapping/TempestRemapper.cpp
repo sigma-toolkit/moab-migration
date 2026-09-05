@@ -137,12 +137,6 @@ ErrorCode TempestRemapper::clear()
     m_target_entities.clear();
     m_target_vertices.clear();
     m_overlap_entities.clear();
-    // gid_to_lid_src.clear();
-    // gid_to_lid_tgt.clear();
-    // gid_to_lid_covsrc.clear();
-    // lid_to_gid_src.clear();
-    // lid_to_gid_tgt.clear();
-    // lid_to_gid_covsrc.clear();
 
     return MB_SUCCESS;
 }

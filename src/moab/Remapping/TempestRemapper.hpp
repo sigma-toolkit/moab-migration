@@ -557,10 +557,6 @@ class TempestRemapper : public Remapper
     moab::Range        m_covering_source_entities;
     moab::Range        m_covering_source_vertices;
 
-    /* local to glboal and global to local ID maps */
-    // std::map< int, int > gid_to_lid_src, gid_to_lid_covsrc, gid_to_lid_tgt;
-    // std::map< int, int > lid_to_gid_src, lid_to_gid_covsrc, lid_to_gid_tgt;
-
     IntxAreaUtils::AreaMethod m_area_method = IntxAreaUtils::DEFAULT_AREA_METHOD;
 
     bool rrmgrids       = false;
@@ -813,40 +809,6 @@ inline moab::EntityHandle& TempestRemapper::GetCoveringSet()
 {
     return m_covering_source_set;
 }
-
-// inline int TempestRemapper::GetGlobalID( Remapper::IntersectionContext ctx, int localID )
-// {
-//     switch( ctx )
-//     {
-//         case Remapper::SourceMesh:
-//             return lid_to_gid_src[localID];
-//         case Remapper::TargetMesh:
-//             return lid_to_gid_tgt[localID];
-//         case Remapper::CoveringMesh:
-//             return lid_to_gid_covsrc[localID];
-//         case Remapper::OverlapMesh:
-//         case Remapper::DEFAULT:
-//         default:
-//             return -1;
-//     }
-// }
-
-// inline int TempestRemapper::GetLocalID( Remapper::IntersectionContext ctx, int globalID )
-// {
-//     switch( ctx )
-//     {
-//         case Remapper::SourceMesh:
-//             return gid_to_lid_src[globalID];
-//         case Remapper::TargetMesh:
-//             return gid_to_lid_tgt[globalID];
-//         case Remapper::CoveringMesh:
-//             return gid_to_lid_covsrc[globalID];
-//         case Remapper::DEFAULT:
-//         case Remapper::OverlapMesh:
-//         default:
-//             return -1;
-//     }
-// }
 
 }  // namespace moab
 

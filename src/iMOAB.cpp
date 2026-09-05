@@ -6395,12 +6395,15 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         std::stringstream sstr;
         sstr << "covsrcTagData_" << *pid_intersection << "_" << ivar << "_" << pco_intx->rank() << ".txt";
         std::ofstream output_file( sstr.str().c_str() );
+        Tag gidTag = context.MBI->globalId_tag();
         for( unsigned i = 0; i < sents.size(); ++i )
         {
             EntityHandle elem = sents[i];
             std::vector< double > locsolSTagVals( 16 );
             MB_CHK_ERR( context.MBI->tag_get_data( ssolnTag, &elem, 1, &locsolSTagVals[0] ) );
-            output_file << "\n" << remapper->GetGlobalID( Remapper::CoveringMesh, i ) << "-- \n\t";
+            int gid = -1;
+            MB_CHK_ERR( context.MBI->tag_get_data( gidTag, &elem, 1, &gid ) );
+            output_file << "\n" << gid << "-- \n\t";
             for( unsigned j = 0; j < 16; ++j )
                 output_file << locsolSTagVals[j] << " ";
         }

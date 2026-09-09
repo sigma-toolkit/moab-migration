@@ -9,6 +9,8 @@
 
 #include <cmath>
 #include <cassert>
+#include <algorithm>
+#include <string>
 #include <iostream>
 #include <iomanip>
 #include <limits>
@@ -47,9 +49,6 @@ namespace moab
  *
  * The code also defines some helper structs and functions used by these utility functions.
  */
-
-#define CORRTAGNAME "__correspondent"
-#define MAXEDGES    10
 
 /**
  * Computes the border points of X in Y2.
@@ -1187,8 +1186,10 @@ double IntxAreaUtils::area_spherical_triangle( const double* A, const double* B,
             return area_spherical_triangle_GQ( A, B, C );
 #endif
         case lHuiller:
-        default:
             return area_spherical_triangle_lHuiller( A, B, C, Radius );
+        case VanOosteromStrackee:
+        default:
+            return area_spherical_triangle_VOS( A, B, C, Radius );
     }
 }
 
@@ -1203,9 +1204,97 @@ double IntxAreaUtils::area_spherical_polygon( const double* A, int N, double Rad
             return area_spherical_polygon_GQ( A, N ) * Radius * Radius;  //area_spherical_polygon_GQ normalizes
 #endif
         case lHuiller:
-        default:
             return area_spherical_polygon_lHuiller( A, N, Radius, sign );
+        case VanOosteromStrackee:
+        default:
+            return area_spherical_polygon_VOS( A, N, Radius, sign );
     }
+}
+
+bool IntxAreaUtils::area_method_from_name( const std::string& name, AreaMethod& method )
+{
+    std::string lname( name );
+    std::transform( lname.begin(), lname.end(), lname.begin(), ::tolower );
+
+    if( lname == "lhuiller" || lname == "lhuilier" )
+        method = lHuiller;
+    else if( lname == "girard" )
+        method = Girard;
+    else if( lname == "gquad" || lname == "gaussquadrature" )
+        method = GaussQuadrature;
+    else if( lname == "vos" || lname == "vanoosterom" )
+        method = VanOosteromStrackee;
+    else
+        return false;
+
+    return true;
+}
+
+const char* IntxAreaUtils::area_method_name( AreaMethod method )
+{
+    switch( method )
+    {
+        case Girard:
+            return "girard";
+        case GaussQuadrature:
+            return "gquad";
+        case VanOosteromStrackee:
+            return "vos";
+        case lHuiller:
+        default:
+            return "lhuiller";
+    }
+}
+
+/*
+ * Van Oosterom & Strackee (1983), "The Solid Angle of a Plane Triangle",
+ * IEEE Trans. Biomed. Eng. BME-30(2):125-126.
+ *
+ * The signed spherical excess of the triangle ABC on the unit sphere is
+ *
+ *     E = 2 * atan2( A . (B x C),  1 + A.B + B.C + C.A )
+ *
+ * The sign follows the orientation of ABC, so unlike the l'Huilier path there is
+ * no need for a separate triple-product test.  Both arguments of atan2 are formed
+ * from dot/cross products of the vertices directly: no differences of nearly equal
+ * arc lengths are taken, which is exactly the cancellation that destroys l'Huilier
+ * for sliver triangles.
+ */
+double IntxAreaUtils::area_spherical_triangle_VOS( const double* A, const double* B, const double* C, double Radius )
+{
+    CartVect ua( A ), ub( B ), uc( C );
+
+    // Work on the unit sphere; scale the excess by Radius^2 at the end.  Normalize
+    // rather than dividing by Radius so that inputs which are only approximately on
+    // the sphere do not bias the excess.
+    ua.normalize();
+    ub.normalize();
+    uc.normalize();
+
+    const double numerator   = ua % ( ub * uc );  // ua . (ub x uc)
+    const double denominator = 1.0 + ( ua % ub ) + ( ub % uc ) + ( uc % ua );
+
+    // atan2 is well defined for denominator <= 0 (triangles covering more than a
+    // hemisphere), and returns 0 for a fully degenerate triangle.
+    const double excess = 2.0 * atan2( numerator, denominator );
+
+    return excess * Radius * Radius;
+}
+
+double IntxAreaUtils::area_spherical_polygon_VOS( const double* A, int N, double Radius, int* sign )
+{
+    // Fan the polygon from its first vertex.  Each sub-triangle contributes its
+    // signed excess, so concave polygons accumulate correctly without any special
+    // handling and the total carries the polygon orientation.
+    double area = 0.0;
+    for( int i = 1; i < N - 1; i++ )
+    {
+        area += area_spherical_triangle_VOS( A, A + 3 * i, A + 3 * ( i + 1 ), Radius );
+    }
+
+    if( sign ) *sign = ( area < 0.0 ? -1 : ( area > 0.0 ? 1 : 0 ) );
+
+    return area;
 }
 
 double IntxAreaUtils::area_spherical_triangle_girard( const double* A, const double* B, const double* C, double Radius )
@@ -1463,20 +1552,12 @@ double IntxAreaUtils::area_spherical_triangle_lHuiller( const double* ptA,
 
     double area = sign * E * Radius * Radius;
 
-#ifdef CHECKNEGATIVEAREA
-    if( area < 0 && fabs(area) > std::numeric_limits<double>::epsilon() )
-    {
-        std::cout << "negative area: " << area << "\n";
-        std::cout << std::setprecision( 15 );
-        std::cout << "vA: " << vA << "\n";
-        std::cout << "vB: " << vB << "\n";
-        std::cout << "vC: " << vC << "\n";
-        std::cout << "sign: " << sign << "\n";
-        std::cout << " a: " << a << "\n";
-        std::cout << " b: " << b << "\n";
-        std::cout << " c: " << c << "\n";
-    }
-#endif
+    // NOTE: no negative-area diagnostic here.  A single sub-triangle of a fan is
+    // legitimately negative for concave cells, and orientation probes call this
+    // precisely to *find* negatively wound cells before repairing them, so a report
+    // at this level fires once per sub-triangle on perfectly valid input.  The check
+    // now lives in area_spherical_element(), which sees a whole cell and can tell a
+    // genuinely inverted element from an ordinary negative fan contribution.
 
     return area;
 }
@@ -1539,8 +1620,33 @@ double IntxAreaUtils::area_spherical_element( Interface* mb, EntityHandle elem, 
     std::vector< double > coords( 3 * nsides );
     rval = mb->get_coords( verts, nsides, &coords[0] );MB_CHK_ERR_RET_VAL( rval, -1.0 );
 
-    // compute and return the area of the polygonal element
-    return area_spherical_polygon( &coords[0], nsides, R );
+    // compute the area of the polygonal element
+    const double area = area_spherical_polygon( &coords[0], nsides, R );
+
+#ifdef CHECKNEGATIVEAREA
+    // A negative area for a complete element means the cell is inverted (wound
+    // clockwise) -- unlike an individual fan sub-triangle, this is always a defect.
+    // Report the whole cell so the offending element can actually be located.
+    //
+    // Only report cells whose area is negative by a meaningful margin.  Vertices
+    // closer than the merge tolerance (1e-12) are collapsed before intersection, so
+    // any residual sliver sits far below this threshold and its sign carries no
+    // information -- reporting those is noise, not diagnosis.
+    if( area < -NEGATIVE_AREA_TOLERANCE )
+    {
+        const std::streamsize oldprec = std::cout.precision();
+        std::cout << "negative area: " << std::setprecision( 15 ) << area << " for element "
+                  << mb->id_from_handle( elem ) << " with " << nsides << " vertices\n";
+        for( int iv = 0; iv < nsides; iv++ )
+        {
+            std::cout << "  v" << iv << ": " << coords[3 * iv] << " " << coords[3 * iv + 1] << " "
+                      << coords[3 * iv + 2] << "\n";
+        }
+        std::cout.precision( oldprec );
+    }
+#endif
+
+    return area;
 }
 
 double IntxUtils::distance_on_great_circle( CartVect& p1, CartVect& p2 )
@@ -1578,7 +1684,7 @@ ErrorCode IntxUtils::enforce_convexity( Interface* mb, EntityHandle lset, int my
     Tag gidTag = mb->globalId_tag();
 
     std::vector< double > coords;
-    coords.resize( 3 * MAXEDGES );  // at most 10 vertices per polygon
+    coords.resize( 3 * MAXEDGES );  // initial guess only; resized per cell below
     // we should create a queue with new polygons that need processing for reflex angles
     //  (obtuse)
     std::queue< EntityHandle > newPolys;
@@ -1753,12 +1859,41 @@ ErrorCode IntxAreaUtils::positive_orientation( Interface* mb, EntityHandle set, 
         MB_CHK_ERR( mb->get_connectivity( cell, conn, num_nodes ) );
         if( num_nodes < 3 ) return MB_FAILURE;
 
-        double coords[9];
-        MB_CHK_ERR( mb->get_coords( conn, 3, coords ) );
+        // Pick three distinct vertices for the winding probe.
+        //
+        // Taking conn[0..2] blindly breaks on degenerate cells: a quad carrying a
+        // duplicate vertex (as RLL polar cells do before fix_degenerate_quads() runs)
+        // can place that duplicate inside the probe triangle, collapsing it to ~1e-18
+        // with an arbitrary sign.  When the sign comes out positive the cell is judged
+        // correctly wound and an inverted cell survives.  Callers are expected to run
+        // fix_degenerate_quads() first, but the probe should not depend on it.
+        EntityHandle probe[3];
+        int nprobe = 0;
+        for( int i = 0; i < num_nodes && nprobe < 3; i++ )
+        {
+            bool duplicate = false;
+            for( int j = 0; j < nprobe; j++ )
+                if( probe[j] == conn[i] ) duplicate = true;
+            if( !duplicate ) probe[nprobe++] = conn[i];
+        }
+        // Fewer than three distinct vertices means the cell has no area at all; there
+        // is no orientation to correct, so leave it for the caller's degeneracy pass.
+        if( nprobe < 3 ) continue;
 
+        double coords[9];
+        MB_CHK_ERR( mb->get_coords( probe, 3, coords ) );
+
+        // Probe the winding of the cell.  This deliberately looks for negatively
+        // oriented cells -- they are the ones about to be repaired -- so it must not
+        // route through a path that reports a negative result as an anomaly.
+        //
+        // Van Oosterom & Strackee returns the signed excess directly and exactly,
+        // which is precisely what an orientation test needs, and it stays accurate
+        // for the sliver cells found near RLL poles where l'Huilier's tan((s-a)/2)
+        // terms lose all significance.
         double area;
         if( R > 0 )
-            area = area_spherical_triangle_lHuiller( coords, coords + 3, coords + 6, R );
+            area = area_spherical_triangle_VOS( coords, coords + 3, coords + 6, R );
         else
             area = IntxUtils::area2D( coords, coords + 3, coords + 6 );
         if( area < 0 )
@@ -1767,7 +1902,8 @@ ErrorCode IntxAreaUtils::positive_orientation( Interface* mb, EntityHandle set, 
             std::vector< double > coords2( 3 * num_nodes );
             // get coordinates
             MB_CHK_ERR( mb->get_coords( conn, num_nodes, &coords2[0] ) );
-            double totArea = area_spherical_polygon_lHuiller( &coords2[0], num_nodes, R );
+            double totArea = ( R > 0 ? area_spherical_polygon_VOS( &coords2[0], num_nodes, R )
+                                     : area_spherical_polygon_lHuiller( &coords2[0], num_nodes, R ) );
             if( totArea < 0 )
             {
                 std::vector< EntityHandle > newconn( num_nodes );

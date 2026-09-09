@@ -5786,36 +5786,46 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
         MB_CHK_ERR( IntxUtils::ScaleToRadius( context.MBI, data_tgt.file_set, defaultradius ) );
     }
 
-    // Default area_method = lHuiller; Options: Girard, GaussQuadrature (if TR is available)
-#ifdef MOAB_HAVE_TEMPESTREMAP
-    IntxAreaUtils areaAdaptor( IntxAreaUtils::GaussQuadrature );
-#else
-    IntxAreaUtils areaAdaptor( IntxAreaUtils::lHuiller );
-#endif
+    // Online workflows use the adaptive default (Van Oosterom-Strackee), which is
+    // robust for sliver and polar cells and does not depend on TempestRemap.
+    IntxAreaUtils areaAdaptor( IntxAreaUtils::DEFAULT_AREA_METHOD );
 
     if( meshCleanup )
     {
-        // Address issues for source mesh first
-        // fixes to enforce positive orientation of the vertices (outward normal)
-        MB_CHK_ERR(
-            areaAdaptor.positive_orientation( context.MBI, data_src.file_set, defaultradius /*radius_source*/ ) );
+        // Order matters here, and must stay degenerate -> convexity -> orientation.
+        //
+        // positive_orientation() probes a cell's winding using only its first three
+        // nodes.  On a degenerate quad the duplicate vertex can fall inside that probe
+        // triangle, giving an area of ~1e-18 whose sign is arbitrary; when it comes out
+        // positive the cell is judged correctly wound and an inverted cell survives into
+        // the intersection.  Collapsing degenerate quads to triangles first removes the
+        // duplicate, so the probe always sees a non-degenerate triangle.
+        //
+        // This also runs before the remapper migrates any entities: fix_degenerate_quads()
+        // deletes and recreates elements, so it must not be applied to a mesh that has
+        // already been distributed.
 
+        // Address issues for source mesh first
         // fixes to clean up any degenerate quadrangular elements present in the mesh (RLL specifically?)
         MB_CHK_ERR( IntxUtils::fix_degenerate_quads( context.MBI, data_src.file_set ) );
 
         // fixes to enforce convexity in case concave elements are present
         MB_CHK_ERR( moab::IntxUtils::enforce_convexity( context.MBI, data_src.file_set, rank ) );
 
-        // Address issues for target mesh first
         // fixes to enforce positive orientation of the vertices (outward normal)
         MB_CHK_ERR(
-            areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ ) );
+            areaAdaptor.positive_orientation( context.MBI, data_src.file_set, defaultradius /*radius_source*/ ) );
 
+        // Address issues for target mesh next
         // fixes to clean up any degenerate quadrangular elements present in the mesh (RLL specifically?)
         MB_CHK_ERR( IntxUtils::fix_degenerate_quads( context.MBI, data_tgt.file_set ) );
 
         // fixes to enforce convexity in case concave elements are present
         MB_CHK_ERR( moab::IntxUtils::enforce_convexity( context.MBI, data_tgt.file_set, rank ) );
+
+        // fixes to enforce positive orientation of the vertices (outward normal)
+        MB_CHK_ERR(
+            areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ ) );
     }
 
     // print verbosely about the problem setting
@@ -5864,9 +5874,21 @@ ErrCode iMOAB_ComputeCoverageMesh( iMOAB_AppID pid_src, iMOAB_AppID pid_tgt, iMO
 
     // First, compute the covering source set.
     if( tdata.num_src_ghost_layers >= 1 ) gnomonic = false;  // do not use gnomonic when we need ghost layers;
-    MB_CHK_SET_ERR( tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic,
-                                                          tdata.num_src_ghost_layers ),
-                    "failed to compute covering set" );
+    {
+        // Do not leave a half-built remapper behind on failure.  Callers such as
+        // iMOAB_ComputeMeshIntersectionOnSphere() test `remapper == nullptr` to decide
+        // whether coverage still needs computing; a non-null pointer whose coverage set
+        // was never built makes them skip that step and carry on with empty meshes,
+        // turning a clean error return into a downstream hang.
+        ErrorCode rval = tdata.remapper->ConstructCoveringSet( epsrel, 1.0, 1.0, boxeps, false, gnomonic,
+                                                               tdata.num_src_ghost_layers );
+        if( MB_SUCCESS != rval )
+        {
+            delete tdata.remapper;
+            tdata.remapper = nullptr;
+            MB_CHK_SET_ERR( rval, "failed to compute covering set" );
+        }
+    }
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
     // set the reference to the covering set in the source PID
@@ -5948,8 +5970,7 @@ ErrCode iMOAB_ComputeMeshIntersectionOnSphere( iMOAB_AppID pid_src, iMOAB_AppID 
     // Mapping computation done
     if( validate )
     {
-        // Default area_method = lHuiller; Options: Girard, GaussQuadrature (if TR is available)
-        IntxAreaUtils areaAdaptor( IntxAreaUtils::lHuiller );
+        IntxAreaUtils areaAdaptor( IntxAreaUtils::DEFAULT_AREA_METHOD );
         double local_areas[3] = { 0.0, 0.0, 0.0 }, global_areas[3] = { 0.0, 0.0, 0.0 };
         local_areas[0] = areaAdaptor.area_on_sphere( context.MBI, data_src.file_set, defaultradius /*radius_source*/ );
         local_areas[1] = areaAdaptor.area_on_sphere( context.MBI, data_tgt.file_set, defaultradius /*radius_target*/ );
@@ -6014,28 +6035,31 @@ ErrCode iMOAB_ComputePointDoFIntersection( iMOAB_AppID pid_src, iMOAB_AppID pid_
     ComputeSphereRadius( pid_tgt, &radius_target );
 
     IntxAreaUtils areaAdaptor;
+
+    // Clean up both meshes before any intersection work.  Degenerate quads must be
+    // collapsed before positive_orientation(), whose winding probe reads only the
+    // first three nodes and is meaningless when one of them is a duplicate.
+    MB_CHK_ERR( IntxUtils::fix_degenerate_quads( context.MBI, data_src.file_set ) );
+    MB_CHK_ERR( areaAdaptor.positive_orientation( context.MBI, data_src.file_set, radius_source ) );
+    MB_CHK_ERR( IntxUtils::fix_degenerate_quads( context.MBI, data_tgt.file_set ) );
+    MB_CHK_ERR( areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, radius_target ) );
+
+#ifdef VERBOSE
     // print verbosely about the problem setting
     {
         moab::Range rintxverts, rintxelems;
         MB_CHK_ERR( context.MBI->get_entities_by_dimension( data_src.file_set, 0, rintxverts ) );
         MB_CHK_ERR( context.MBI->get_entities_by_dimension( data_src.file_set, 2, rintxelems ) );
-        MB_CHK_ERR( IntxUtils::fix_degenerate_quads( context.MBI, data_src.file_set ) );
-        MB_CHK_ERR( areaAdaptor.positive_orientation( context.MBI, data_src.file_set, radius_source ) );
-#ifdef VERBOSE
         std::cout << "The red set contains " << rintxverts.size() << " vertices and " << rintxelems.size()
                   << " elements \n";
-#endif
 
         moab::Range bintxverts, bintxelems;
         MB_CHK_ERR( context.MBI->get_entities_by_dimension( data_tgt.file_set, 0, bintxverts ) );
         MB_CHK_ERR( context.MBI->get_entities_by_dimension( data_tgt.file_set, 2, bintxelems ) );
-        MB_CHK_ERR( IntxUtils::fix_degenerate_quads( context.MBI, data_tgt.file_set ) );
-        MB_CHK_ERR( areaAdaptor.positive_orientation( context.MBI, data_tgt.file_set, radius_target ) );
-#ifdef VERBOSE
         std::cout << "The blue set contains " << bintxverts.size() << " vertices and " << bintxelems.size()
                   << " elements \n";
-#endif
     }
+#endif
 
     data_intx.dimension = data_tgt.dimension;
     // set the context for the source and destination applications
@@ -6383,12 +6407,15 @@ ErrCode iMOAB_ApplyScalarProjectionWeights(
         std::stringstream sstr;
         sstr << "covsrcTagData_" << *pid_intersection << "_" << ivar << "_" << pco_intx->rank() << ".txt";
         std::ofstream output_file( sstr.str().c_str() );
+        Tag gidTag = context.MBI->globalId_tag();
         for( unsigned i = 0; i < sents.size(); ++i )
         {
             EntityHandle elem = sents[i];
             std::vector< double > locsolSTagVals( 16 );
             MB_CHK_ERR( context.MBI->tag_get_data( ssolnTag, &elem, 1, &locsolSTagVals[0] ) );
-            output_file << "\n" << remapper->GetGlobalID( Remapper::CoveringMesh, i ) << "-- \n\t";
+            int gid = -1;
+            MB_CHK_ERR( context.MBI->tag_get_data( gidTag, &elem, 1, &gid ) );
+            output_file << "\n" << gid << "-- \n\t";
             for( unsigned j = 0; j < 16; ++j )
                 output_file << locsolSTagVals[j] << " ";
         }

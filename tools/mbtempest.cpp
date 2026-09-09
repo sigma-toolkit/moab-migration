@@ -123,6 +123,7 @@ class ToolContext
     int ensureMonotonicity{ 0 };              ///< Monotonicity enforcement level (0=none, 1=basic, 2=full, 3=strict)
     bool rrmGrids{ false };                   ///< Flag to use RRM (Regional Refinement Meshes)
     bool kdtreeSearch{ true };                ///< Enable KD-tree for spatial searches
+    bool advFrontSearch{ false };             ///< Set by "--advfront/-a"; disables kdtreeSearch after parsing
     bool fCheck{ false };                     ///< Enable additional checking during remapping
     bool fVolumetric{ false };                ///< Enable volumetric (3D) remapping
     bool useGnomonicProjection{ false };      ///< Use gnomonic projection for certain operations
@@ -130,6 +131,8 @@ class ToolContext
     bool skip_intersection{ false };          ///< Skip intersection computation (for debugging)
     double boxeps{ 1e-7 };                    ///< Epsilon for bounding box checks
     double epsrel{ ReferenceTolerance };      ///< Relative tolerance for convergence
+    std::string areaMethodName{ "vos" };      ///< Spherical area formula (see --area_method)
+    moab::IntxAreaUtils::AreaMethod areaMethod{ moab::IntxAreaUtils::DEFAULT_AREA_METHOD };
 
     // Mesh operations control
     bool skip_io{ false };             ///< Skip file I/O operations (for testing)
@@ -284,10 +287,14 @@ class ToolContext
             "load,l", "Input mesh filenames for source and target meshes. (relevant only when computing weights)",
             &expectedFName );
 
+        // NOTE: addOpt<void> sets the target bool to true when the flag is present.
+        // Pointing it at kdtreeSearch (which already defaults to true) made "-a" a no-op,
+        // so the advancing-front algorithm could never be selected.  Use a separate flag
+        // and invert it after parsing instead.
         opts.addOpt< void >( "advfront,a",
                              "Use the advancing front intersection instead of the Kd-tree based algorithm to compute "
                              "mesh intersections.",
-                             &kdtreeSearch );
+                             &advFrontSearch );
 
         opts.addOpt< std::string >( "intx,i", "Output TempestRemap intersection mesh filename", &intxFilename );
 
@@ -316,6 +323,12 @@ class ToolContext
                                     "Sub-type method for FV-FV projections (invdist, delaunay, bilin, intbilin, "
                                     "intbilingb, none. Default: none)",
                                     &expectedFVMethod );
+
+        opts.addOpt< std::string >(
+            "area_method",
+            "Formula used to compute spherical areas: vos (Van Oosterom-Strackee, default), "
+            "lhuiller, girard, or gquad (Gauss quadrature).",
+            &areaMethodName );
 
         opts.addOpt< void >(
             "noconserve", "Do not apply conservation to the resultant weights (relevant only when computing weights)",
@@ -380,6 +393,17 @@ class ToolContext
 
         // Parse command line
         opts.parseCommandLine( argc, argv );
+
+        // "--advfront/-a" requests the advancing-front algorithm, i.e. NOT the Kd-tree search.
+        if( advFrontSearch ) kdtreeSearch = false;
+
+        if( !moab::IntxAreaUtils::area_method_from_name( areaMethodName, areaMethod ) )
+        {
+            if( !proc_id )
+                std::cerr << "Unknown --area_method \"" << areaMethodName
+                          << "\"; expected one of: vos, lhuiller, girard, gquad" << std::endl;
+            exit( 1 );
+        }
 
         // Handle call for detailed information
         if( opts.numOptSet( "manual" ) > 0 )
@@ -804,6 +828,7 @@ class ToolContext
         {
             std::cout << "\n  Gnomonic projection:    " << ( this->useGnomonicProjection ? "Yes" : "No" );
             std::cout << "\n  Intersection algorithm: " << ( this->kdtreeSearch ? "KdTree search" : "Advancing front" );
+        std::cout << "\n  Area computation:       " << moab::IntxAreaUtils::area_method_name( this->areaMethod );
 
             // Discretization settings
             std::cout << "\n\nDiscretization:";
@@ -884,11 +909,32 @@ class ToolContext
         }
 
         // Set number of ghost layers based on method and order.
-        // FV order 1 needs 0 ghost layers; FV order p > 1 needs p+1 ghost layers.
-        if( this->fvMethod == "delaunay" || this->fvMethod == "bilin" )
+        //
+        // Every bilinear-family kernel reconstructs a DUAL mesh of the source
+        // (Dual()/ConstructLocalDualFace() via meshInput.revnodearray), so it
+        // needs the full ring of cells around each source vertex.  In parallel
+        // the coverage mesh is cut at partition boundaries, and without ghost
+        // layers the dual of a boundary vertex is incomplete -- which shows up
+        // as wrong weights near partition boundaries rather than as an error.
+        // The kernels involved are:
+        //   bilin      -> LinearRemapBilinear
+        //   intbilin   -> LinearRemapIntegratedBilinear
+        //   intbilingb -> LinearRemapIntegratedGeneralizedBarycentric
+        // and delaunay likewise needs a neighbourhood for its triangulation.
+        //
+        // "intbilin" and "intbilingb" were previously omitted here purely
+        // because this test matched on the user-facing --fvmethod string and
+        // only listed two of the four names; they silently ran with 0 layers.
+        const bool needsDualMesh = ( this->fvMethod == "delaunay" || this->fvMethod == "bilin" ||
+                                     this->fvMethod == "intbilin" || this->fvMethod == "intbilingb" );
+
+        if( needsDualMesh )
         {
-            this->skip_intersection = true;
-            this->nlayers           = 3;  // conservative
+            this->nlayers = 3;  // conservative
+            // Only "bilin" and "delaunay" work purely off the coverage mesh.
+            // The integrated variants quadrature over the overlap polygons
+            // (they take meshOverlap), so the intersection is still required.
+            if( this->fvMethod == "delaunay" || this->fvMethod == "bilin" ) this->skip_intersection = true;
         }
         else
         {
@@ -970,9 +1016,14 @@ int main( int argc, char* argv[] )
     remapper.meshValidate     = true;
     remapper.constructEdgeMap = true;
     remapper.initialize();
+    // The command-line choice supersedes the remapper default, so that intersection,
+    // coverage construction and orientation fixups all use one formula.
+    remapper.SetAreaMethod( runCtx->areaMethod );
+    // --rrmgrids: the two domains need not coincide, so cells may be partially covered.
+    remapper.SetRegionalMesh( runCtx->rrmGrids );
 
-    // Default area_method = lHuiller; Options: Girard, lHuiller, GaussQuadrature (if TR is available)
-    moab::IntxAreaUtils areaAdaptor( moab::IntxAreaUtils::lHuiller );
+    // Area formula selected by --area_method (default: Van Oosterom-Strackee)
+    moab::IntxAreaUtils areaAdaptor( runCtx->areaMethod );
 
     Mesh* tempest_mesh = new Mesh();
     MB_CHK_SET_ERR( CreateTempestMesh( *runCtx, remapper, tempest_mesh ), "Failed to create tempest mesh" );
@@ -1024,7 +1075,7 @@ int main( int argc, char* argv[] )
             // Create the intersection on the sphere object
             runCtx->timer_push( "setup the intersector" );
 
-            moab::Intx2MeshOnSphere* mbintx = new moab::Intx2MeshOnSphere( mbCore );
+            moab::Intx2MeshOnSphere* mbintx = new moab::Intx2MeshOnSphere( mbCore, runCtx->areaMethod );
             mbintx->set_error_tolerance( runCtx->epsrel );
             mbintx->set_box_error( runCtx->boxeps );
             mbintx->set_radius_source_mesh( radius_src );
@@ -1196,8 +1247,17 @@ int main( int argc, char* argv[] )
         // First compute the covering set such that the target elements are fully covered by the
         // local source grid
         runCtx->timer_push( "construct covering set for intersection" );
-        // if ghosting, do not use gnomonic projection
-        if( runCtx->nlayers > 0 ) runCtx->useGnomonicProjection = false;
+        // Ghosting and the gnomonic-projection coverage path are mutually
+        // exclusive.  Ghost layers are now enabled by default for the
+        // bilinear-family methods, so warn rather than silently dropping an
+        // explicit --gnomonic request.
+        if( runCtx->nlayers > 0 && runCtx->useGnomonicProjection )
+        {
+            if( !proc_id )
+                std::cout << "  [WARNING] --gnomonic is ignored when ghost layers are used (nlayers = "
+                          << runCtx->nlayers << "); pass '--ghost 0' to force the gnomonic coverage path.\n";
+            runCtx->useGnomonicProjection = false;
+        }
         MB_CHK_SET_ERR( remapper.ConstructCoveringSet( runCtx->epsrel, 1.0, 1.0, runCtx->boxeps, runCtx->rrmGrids,
                                                        runCtx->useGnomonicProjection, runCtx->nlayers ),
                         "Failed to construct covering set" );
@@ -1304,6 +1364,18 @@ int main( int argc, char* argv[] )
                 outputFormatter.printf( 0, "relative error w.r.t source = %12.14e, and target = %12.14e\n",
                                         fabs( global_areas[0] - global_areas[2] ) / global_areas[0],
                                         fabs( global_areas[1] - global_areas[2] ) / global_areas[1] );
+                if( runCtx->rrmGrids )
+                {
+                    // For coincident domains the shortfall below is roundoff and the
+                    // relative errors above already say so.  For a regional mesh it is
+                    // the physically meaningful quantity: how much of each mesh the
+                    // other one actually covers.
+                    outputFormatter.printf( 0,
+                                            "regional mesh: overlap covers %6.2f%% of source and %6.2f%% of "
+                                            "target area\n",
+                                            100.0 * global_areas[2] / global_areas[0],
+                                            100.0 * global_areas[2] / global_areas[1] );
+                }
             }
             dTotalOverlapArea = global_areas[2];
         }

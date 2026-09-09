@@ -9,6 +9,38 @@
 
 #include "moab/CartVect.hpp"
 #include "moab/Core.hpp"
+
+// Maximum number of edges on each convex polygon of interest.
+//
+// Several intersection routines use fixed-size stack buffers dimensioned from
+// these values, so a mesh containing a cell with more vertices than MAXEDGES
+// would overflow them.  Intx2Mesh::FindMaxEdges() checks the actual maximum of
+// both input meshes against MAXEDGES and fails with a descriptive error rather
+// than corrupting the stack.
+//
+// Defined here (rather than in Intx2Mesh.hpp) so that IntxUtils.cpp and the
+// Intx2Mesh family share a single definition; they used to carry independent
+// copies that could silently diverge.
+#ifndef MAXEDGES
+#define MAXEDGES 16
+#endif
+#ifndef MAXEDGES2
+#define MAXEDGES2 ( 2 * MAXEDGES )  // used for coordinates in plane
+#endif
+
+#define CORRTAGNAME "__correspondent"
+
+// Magnitude below which a negative element area is not worth reporting.
+//
+// Vertices closer together than the merge tolerance (1e-12) are collapsed before
+// intersection, so a well-formed overlap mesh contains no slivers large enough to
+// produce a meaningful negative area.  Anything under this threshold is rounding
+// noise whose sign carries no information; reporting it drowns out the genuinely
+// inverted cells the check exists to catch.
+#ifndef NEGATIVE_AREA_TOLERANCE
+#define NEGATIVE_AREA_TOLERANCE 1.0e-13
+#endif
+
 namespace moab
 {
 
@@ -236,10 +268,37 @@ class IntxAreaUtils
     {
         lHuiller        = 0,
         Girard          = 1,
-        GaussQuadrature = 2
+        GaussQuadrature = 2,
+        //! Van Oosterom & Strackee (1983): the signed spherical excess of a triangle
+        //! evaluated as 2*atan2( A . (B x C), 1 + A.B + B.C + C.A ).
+        //!
+        //! Unlike l'Huilier this stays accurate for slivers -- the arguments never
+        //! suffer the cancellation that makes tan((s-a)/2) lose all significance when
+        //! a triangle degenerates -- and it returns the sign directly, so no separate
+        //! orientation test is needed.  Cost is the same O(1) as l'Huilier, with no
+        //! quadrature involved.  Measured against a 60-digit reference on collapsing
+        //! triangles (relative error, exact area in parentheses):
+        //!
+        //!     offset 1e-05 (1e-09 sr):  lHuiller 1.8e-14   VOS 2.1e-16
+        //!     offset 1e-09 (1e-13 sr):  lHuiller 1.2e-06   VOS 0
+        //!     offset 1e-13 (1e-17 sr):  lHuiller 1.0e+00   VOS 0
+        //!
+        //! l'Huilier returns exactly zero below roughly 1e-15 sr, which is what makes
+        //! RLL polar caps and intersection slivers report bogus (often negative) areas.
+        VanOosteromStrackee = 3
     };
 
-    IntxAreaUtils( AreaMethod p_eAreaMethod = lHuiller ) : m_eAreaMethod( p_eAreaMethod ) {}
+    //! Default area method used throughout the intersection and remapping code.
+    static const AreaMethod DEFAULT_AREA_METHOD = VanOosteromStrackee;
+
+    IntxAreaUtils( AreaMethod p_eAreaMethod = DEFAULT_AREA_METHOD ) : m_eAreaMethod( p_eAreaMethod ) {}
+
+    //! Map a user-facing name ("lhuiller", "girard", "gquad", "vos") to an AreaMethod.
+    //! Returns false if the name is not recognized.
+    static bool area_method_from_name( const std::string& name, AreaMethod& method );
+
+    //! Inverse of area_method_from_name(), for diagnostics.
+    static const char* area_method_name( AreaMethod method );
 
     ~IntxAreaUtils() {}
 
@@ -277,6 +336,13 @@ class IntxAreaUtils
 
     /* Girard method for computing area on a spherical polygon with spherical excess */
     double area_spherical_polygon_girard( const double* A, int N, double Radius );
+
+    /* Van Oosterom & Strackee method for the signed area of a spherical triangle */
+    double area_spherical_triangle_VOS( const double* A, const double* B, const double* C, double Radius );
+
+    /* Van Oosterom & Strackee method for the signed area of a spherical polygon,
+     * accumulated as a triangle fan from the first vertex */
+    double area_spherical_polygon_VOS( const double* A, int N, double Radius, int* sign = NULL );
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
     /* Gauss-quadrature based integration method for computing area on a spherical triangle */

@@ -102,5 +102,7 @@ cdef class _TagArray(object):
                 self.inst[i] = t.inst
         self.ptr = self.inst
 
-    def __del__(self):
-        free(self.inst)
+    def __dealloc__(self):
+        if self.inst != NULL:
+            free(self.inst)
+            self.inst = NULL

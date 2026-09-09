@@ -109,6 +109,28 @@ if(ENABLE_PYMOAB)
       COMMAND "env" "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/lib/:$ENV{LD_LIBRARY_PATH}" "PYTHONPATH=${PROJECT_BINARY_DIR}/Testing:$ENV{PYTHONPATH}" "${Python_EXECUTABLE}" "${pymoab_test}.py"
       WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/test/pymoab/")
   ENDFOREACH(pymoab_test)
+
+  if(MPI_FOUND AND MPI4PY_FOUND)
+    SET(PYMOAB_PARALLEL_TESTS
+      test_pcomm_creation
+      test_ghost_exchange
+      test_shared_entities
+      test_parallel_shutdown
+      test_parallel_workflow
+      test_parallel_resolve
+    )
+    FOREACH(pymoab_par_test ${PYMOAB_PARALLEL_TESTS})
+      ADD_TEST(NAME pymoab_parallel_${pymoab_par_test}
+        COMMAND "env"
+          "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/lib/:$ENV{LD_LIBRARY_PATH}"
+          "PYTHONPATH=${PROJECT_BINARY_DIR}/Testing:$ENV{PYTHONPATH}"
+          ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2
+          ${MPIEXEC_PREFLAGS}
+          "${Python_EXECUTABLE}" "${pymoab_par_test}.py"
+          ${MPIEXEC_POSTFLAGS}
+        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/test/pymoab/parallel/")
+    ENDFOREACH(pymoab_par_test)
+  endif()
 endif()
 
 add_executable( TestTypeSequenceManager ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp TestTypeSequenceManager.cpp)

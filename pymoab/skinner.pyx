@@ -23,9 +23,10 @@ cdef class Skinner(object):
         self.interface  = <moab.Interface*> c.inst
         self.inst = new moab.Skinner(self.interface)
 
-    def __del__(self):
-        """ Destructor """
-        del self.inst
+    def __dealloc__(self):
+        if self.inst != null:
+            del self.inst
+            self.inst = NULL
 
     def find_geometric_skin(self, moab.EntityHandle ms_handle, exceptions = ()):
         """

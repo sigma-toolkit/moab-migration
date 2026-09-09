@@ -16,8 +16,10 @@ cdef class MeshTopoUtil(object):
         self.interface  = <moab.Interface*> c.inst
         self.inst = new moab.MeshTopoUtil(self.interface)
 
-    def __del__(self):
-        del self.inst
+    def __dealloc__(self):
+        if self.inst != NULL:
+            del self.inst
+            self.inst = NULL
 
     def get_bridge_adjacencies(self,
                                from_ent,

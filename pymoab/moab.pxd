@@ -3,6 +3,7 @@
 from libcpp cimport bool
 from libcpp.vector cimport vector
 from libcpp.string cimport string as std_string
+from libcpp.set cimport set as cpp_set
 
 from eh cimport EntityHandle, EntityID
 cimport numpy as np
@@ -168,6 +169,9 @@ cdef extern from "moab/Core.hpp" namespace "moab":
         ErrorCode write_file(const char *file_name, const char *file_type,
                              const char *options, const EntityHandle *output_sets,
                              int num_output_sets)
+        ErrorCode write_file(const char *file_name, const char *file_type,
+                             const char *options, const EntityHandle *output_sets,
+                             int num_output_sets, const Tag *tag_list, int num_tags)
         ErrorCode write_file(const char *file_name, const char *file_type,
                              const char *options, Range output_sets,
                              const Tag *tag_list, int num_tags)
@@ -423,3 +427,5 @@ cdef extern from "moab/Skinner.hpp" namespace "moab":
         ErrorCode   find_skin (const EntityHandle meshset, const Range &entities, bool get_vertices,
                                 Range &output_handles, Range *output_reverse_handles, bool create_vert_elem_adjs,
                                 bool create_skin_elements, bool look_for_scd)
+
+

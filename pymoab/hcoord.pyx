@@ -35,11 +35,10 @@ cdef class HomCoord(object):
         else:
             assert False
     
-    def __del__(self):
-        """
-        Destructor
-        """
-        del self.inst
+    def __dealloc__(self):
+        if self.inst != NULL:
+            del self.inst
+            self.inst = NULL
 
     def __getitem__(self, int index):
         """

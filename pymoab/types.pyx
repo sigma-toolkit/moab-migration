@@ -36,7 +36,7 @@ cdef class MOABErrorCode:
                              moab.MB_UNHANDLED_OPTION : "MB_UNHANDLED_OPTION",
                              moab.MB_STRUCTURED_MESH : "MB_STRUCTURED_MESH",
                              moab.MB_FAILURE : "MB_FAILURE" }
-        
+
     def __richcmp__(self, other, op):
         if op == 2:
             if isinstance(other, MOABErrorCode):
@@ -45,32 +45,32 @@ cdef class MOABErrorCode:
                 return self.error_value == other
         else:
             return NotImplemented
-        
+
     def __hash__(self):
         return self.error_value
 
     def __repr__(self):
         return self.__str__()
-    
+
     def __str__(self):
         return "MOAB ErrorCode: "+self.err_strings[self.error_value]
-        
-    
+
+
 # Error codes
 MB_SUCCESS = MOABErrorCode(moab.MB_SUCCESS)
 MB_INDEX_OUT_OF_RANGE = MOABErrorCode(moab.MB_INDEX_OUT_OF_RANGE)
-MB_TYPE_OUT_OF_RANGE = MOABErrorCode(moab.MB_TYPE_OUT_OF_RANGE) 
-MB_MEMORY_ALLOCATION_FAILED = MOABErrorCode(moab.MB_MEMORY_ALLOCATION_FAILED)     
+MB_TYPE_OUT_OF_RANGE = MOABErrorCode(moab.MB_TYPE_OUT_OF_RANGE)
+MB_MEMORY_ALLOCATION_FAILED = MOABErrorCode(moab.MB_MEMORY_ALLOCATION_FAILED)
 MB_ENTITY_NOT_FOUND = MOABErrorCode(moab.MB_ENTITY_NOT_FOUND)
-MB_MULTIPLE_ENTITIES_FOUND = MOABErrorCode(moab.MB_MULTIPLE_ENTITIES_FOUND)  
+MB_MULTIPLE_ENTITIES_FOUND = MOABErrorCode(moab.MB_MULTIPLE_ENTITIES_FOUND)
 MB_TAG_NOT_FOUND = MOABErrorCode(moab.MB_TAG_NOT_FOUND)
-MB_FILE_DOES_NOT_EXIST = MOABErrorCode(moab.MB_FILE_DOES_NOT_EXIST)  
+MB_FILE_DOES_NOT_EXIST = MOABErrorCode(moab.MB_FILE_DOES_NOT_EXIST)
 MB_FILE_WRITE_ERROR = MOABErrorCode(moab.MB_FILE_WRITE_ERROR)
 MB_NOT_IMPLEMENTED = MOABErrorCode(moab.MB_NOT_IMPLEMENTED)
-MB_ALREADY_ALLOCATED = MOABErrorCode(moab.MB_ALREADY_ALLOCATED)    
-MB_VARIABLE_DATA_LENGTH = MOABErrorCode(moab.MB_VARIABLE_DATA_LENGTH)     
+MB_ALREADY_ALLOCATED = MOABErrorCode(moab.MB_ALREADY_ALLOCATED)
+MB_VARIABLE_DATA_LENGTH = MOABErrorCode(moab.MB_VARIABLE_DATA_LENGTH)
 MB_INVALID_SIZE = MOABErrorCode(moab.MB_INVALID_SIZE)
-MB_UNSUPPORTED_OPERATION = MOABErrorCode(moab.MB_UNSUPPORTED_OPERATION)    
+MB_UNSUPPORTED_OPERATION = MOABErrorCode(moab.MB_UNSUPPORTED_OPERATION)
 MB_UNHANDLED_OPTION = MOABErrorCode(moab.MB_UNHANDLED_OPTION)
 MB_STRUCTURED_MESH = MOABErrorCode(moab.MB_STRUCTURED_MESH)
 MB_FAILURE = MOABErrorCode(moab.MB_FAILURE)
@@ -84,7 +84,7 @@ cdef dict _ERROR_MSGS = {
     MB_MULTIPLE_ENTITIES_FOUND: (RuntimeError, 'Multiple entities found'),
     MB_TAG_NOT_FOUND: (RuntimeError, 'Tag not found'),
     MB_FILE_DOES_NOT_EXIST: (IOError, 'File not found'),
-    MB_FILE_WRITE_ERROR: (IOError, 'File write error'), 
+    MB_FILE_WRITE_ERROR: (IOError, 'File write error'),
     MB_NOT_IMPLEMENTED: (NotImplementedError, '[MOAB]'),
     MB_ALREADY_ALLOCATED: (MemoryError, 'already allocated'),
     MB_VARIABLE_DATA_LENGTH: (TypeError, 'variable length data'),
@@ -154,7 +154,7 @@ _VALID_NATIVE_TYPES = {
 
 def pymoab_data_type(input_type):
     """
-    Attempts to find a PyMOAB datatype given a Python native type or 
+    Attempts to find a PyMOAB datatype given a Python native type or
     NumPy dtype
     """
 
@@ -171,7 +171,7 @@ def pymoab_data_type(input_type):
             return k
 
     raise ValueError("Could not determine the PyMOAB data type.")
-    
+
 def _convert_array(iterable, accepted_types, return_dtype):
     err_msg = "Incorrect datatype found in array: {}"
     #if this is already an array of the correct type, avoid the loop
@@ -197,7 +197,7 @@ def _eh_array(iterable):
         raise ValueError(err_msg)
     # return array if successful
     return arr
-    
+
 def np_tag_type(type):
     return _DTYPE_CONV[type]
 
@@ -208,7 +208,7 @@ def validate_type(tag_type,tag_length,tag_data):
     #and that it is the correct shape
     assert tag_data.ndim == 0 or tag_data.ndim == 1, "Not a flat array"
 
-    
+
     if MB_TYPE_OPAQUE == tag_type:
         #so long as the array is some kind of string type, we're happy
         is_valid = tag_data.dtype.char in _VALID_DTYPES[tag_type]
@@ -237,18 +237,18 @@ MBENTITYSET = moab.MBENTITYSET
 MBMAXTYPE = moab.MBMAXTYPE
 
 # Tag Types
-MB_TAG_BIT  = moab.MB_TAG_BIT   
+MB_TAG_BIT  = moab.MB_TAG_BIT
 MB_TAG_SPARSE = moab.MB_TAG_SPARSE
 MB_TAG_DENSE = moab.MB_TAG_DENSE
-MB_TAG_MESH = moab.MB_TAG_MESH  
-MB_TAG_BYTES = moab.MB_TAG_BYTES 
+MB_TAG_MESH = moab.MB_TAG_MESH
+MB_TAG_BYTES = moab.MB_TAG_BYTES
 MB_TAG_VARLEN = moab.MB_TAG_VARLEN
-MB_TAG_CREAT = moab.MB_TAG_CREAT 
-MB_TAG_EXCL = moab.MB_TAG_EXCL  
-MB_TAG_STORE = moab.MB_TAG_STORE 
-MB_TAG_ANY = moab.MB_TAG_ANY   
-MB_TAG_NOOPQ = moab.MB_TAG_NOOPQ 
-MB_TAG_DFTOK = moab.MB_TAG_DFTOK 
+MB_TAG_CREAT = moab.MB_TAG_CREAT
+MB_TAG_EXCL = moab.MB_TAG_EXCL
+MB_TAG_STORE = moab.MB_TAG_STORE
+MB_TAG_ANY = moab.MB_TAG_ANY
+MB_TAG_NOOPQ = moab.MB_TAG_NOOPQ
+MB_TAG_DFTOK = moab.MB_TAG_DFTOK
 
 # Query selection types
 INTERSECT = 0
@@ -269,3 +269,5 @@ CATEGORY_TAG_NAME       = str(tag_conventions.CATEGORY_TAG_NAME.decode())
 CATEGORY_TAG_SIZE       = tag_conventions.CATEGORY_TAG_SIZE
 NAME_TAG_NAME           = str(tag_conventions.NAME_TAG_NAME.decode())
 NAME_TAG_SIZE           = tag_conventions.NAME_TAG_SIZE
+
+# Parallel 

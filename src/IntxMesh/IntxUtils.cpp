@@ -1913,8 +1913,18 @@ ErrorCode IntxAreaUtils::positive_orientation( Interface* mb, EntityHandle set, 
                 }
                 MB_CHK_ERR( mb->set_connectivity( cell, &newconn[0], num_nodes ) );
             }
-            else
+            else if( area < -NEGATIVE_AREA_TOLERANCE )
             {
+                // The probe triangle (first three distinct vertices) came out negative
+                // while the whole cell integrates to a non-negative area: a genuinely
+                // concave/reflex first vertex, not an inverted cell -- no repair needed.
+                //
+                // Only report this when the probe area is negative by more than noise.
+                // For a fine mesh the probe triangle can be a near-degenerate sliver
+                // (near-collinear vertices), and unit-vector dot/cross products carry
+                // ~1e-16 absolute error; areas below NEGATIVE_AREA_TOLERANCE are that
+                // noise, not a signal, and reporting them floods the log on meshes with
+                // many small concave overlap cells without indicating any problem.
                 std::cout << " nonconvex problem first area:" << area << " total area: " << totArea << std::endl;
             }
         }

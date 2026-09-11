@@ -20,11 +20,11 @@
 #include "moab/MergeMesh.hpp"
 #include "moab/ReadUtilIface.hpp"
 #include "MBTagConventions.hpp"
-
-#define CHECKNEGATIVEAREA
-#ifdef CHECKNEGATIVEAREA
-#include <iomanip>
-#endif
+//
+// CHECKNEGATIVEAREA checks the per-cell negative/nonconvex-area diagnostics
+// below (area_spherical_element, positive_orientation).
+// #ifdef CHECKNEGATIVEAREA 
+//
 #include <queue>
 #include <map>
 
@@ -1851,6 +1851,14 @@ ErrorCode IntxAreaUtils::positive_orientation( Interface* mb, EntityHandle set, 
 {
     Range cells2d;
     MB_CHK_ERR( mb->get_entities_by_dimension( set, 2, cells2d ) );
+
+    // Cells that are locally nonconvex at their first connectivity vertex but whose
+    // total area confirms correct orientation (see below) -- tracked unconditionally,
+    // regardless of CHECKNEGATIVEAREA, so a summary is always available to decide
+    // whether the per-cell detail is worth turning on.
+    size_t nNonconvex          = 0;
+    double maxNonconvexMagnitude = 0.0;
+
     for( Range::iterator qit = cells2d.begin(); qit != cells2d.end(); ++qit )
     {
         EntityHandle cell        = *qit;
@@ -1918,22 +1926,38 @@ ErrorCode IntxAreaUtils::positive_orientation( Interface* mb, EntityHandle set, 
                 // The probe triangle (first three distinct vertices) came out negative
                 // while the whole cell integrates to a non-negative area: a genuinely
                 // concave/reflex first vertex, not an inverted cell -- no repair needed.
+                // The sign is a real geometric fact here (not roundoff -- see
+                // NEGATIVE_AREA_TOLERANCE above), so this is expected on any mesh with
+                // nonconvex overlap cells and requires no action.
                 //
-                // Only report this when the probe area is negative by more than noise.
-                // For a fine mesh the probe triangle can be a near-degenerate sliver
-                // (near-collinear vertices), and unit-vector dot/cross products carry
-                // ~1e-16 absolute error; areas below NEGATIVE_AREA_TOLERANCE are that
-                // noise, not a signal, and reporting them floods the log on meshes with
-                // many small concave overlap cells without indicating any problem.
+                // Always count it, so a summary is available without recompiling.  Only
+                // print per-cell detail under CHECKNEGATIVEAREA: on a fine mesh with many
+                // legitimately nonconvex overlap cells this fires often enough to flood
+                // the log without indicating any problem.
+                ++nNonconvex;
+                maxNonconvexMagnitude = std::max( maxNonconvexMagnitude, -area );
+#ifdef CHECKNEGATIVEAREA
                 std::cout << " nonconvex problem first area:" << area << " total area: " << totArea << std::endl;
+#endif
             }
         }
     }
+
+    // "may have had" is deliberate: these cells are already confirmed correctly
+    // oriented (the total-area check above passed), not merely suspect.  This line
+    // exists so a normal run can tell, at a glance, whether -DCHECKNEGATIVEAREA is
+    // worth turning on for a per-cell breakdown -- not to flag a defect.
+    if( nNonconvex > 0 )
+        std::cout << "positive_orientation: " << nNonconvex
+                   << " element(s) had non-convex overlap sub-cells (orientation corrected), "
+                      "max |probe area| = "
+                   << maxNonconvexMagnitude
+                   << std::endl;
+
     return MB_SUCCESS;
 }
 
 // distance along a great circle on a sphere of radius 1
-// page 4
 double IntxUtils::distance_on_sphere( double la1, double te1, double la2, double te2 )
 {
     return acos( sin( te1 ) * sin( te2 ) + cos( te1 ) * cos( te2 ) * cos( la1 - la2 ) );

@@ -75,7 +75,8 @@ TESTS = range_test \
         gnom_project_test
 
 if HAVE_NETCDF
-   TESTS += intx_rll_cs_sphere_test
+   TESTS += intx_rll_cs_sphere_test \
+        intx_orientation_test
 endif
 
 if HAVE_HDF5
@@ -195,6 +196,7 @@ intx_in_plane_test_SOURCES = intx_in_plane_test.cpp
 spherical_area_test_SOURCES = spherical_area_test.cpp
 arc_intx_tests_SOURCES = arc_intx_tests.cpp
 intx_rll_cs_sphere_test_SOURCES = intx_rll_cs_sphere_test.cpp
+intx_orientation_test_SOURCES = intx_orientation_test.cpp
 gnom_project_test_SOURCES = gnom_project_test.cpp
 
 #mbcn_test_SOURCES = $(top_srcdir)/src/moab/CN.hpp \

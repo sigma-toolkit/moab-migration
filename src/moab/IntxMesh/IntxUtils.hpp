@@ -291,7 +291,7 @@ class IntxAreaUtils
     //! Default area method used throughout the intersection and remapping code.
     static const AreaMethod DEFAULT_AREA_METHOD = VanOosteromStrackee;
 
-    IntxAreaUtils( AreaMethod p_eAreaMethod = DEFAULT_AREA_METHOD ) : m_eAreaMethod( p_eAreaMethod ) {}
+    explicit IntxAreaUtils( AreaMethod p_eAreaMethod = DEFAULT_AREA_METHOD ) : m_eAreaMethod( p_eAreaMethod ) {}
 
     //! Map a user-facing name ("lhuiller", "girard", "gquad", "vos") to an AreaMethod.
     //! Returns false if the name is not recognized.

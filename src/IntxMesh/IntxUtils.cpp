@@ -21,9 +21,14 @@
 #include "moab/ReadUtilIface.hpp"
 #include "MBTagConventions.hpp"
 //
-// CHECKNEGATIVEAREA checks the per-cell negative/nonconvex-area diagnostics
-// below (area_spherical_element, positive_orientation).
-// #ifdef CHECKNEGATIVEAREA 
+// CHECKNEGATIVEAREA gates positive_orientation()'s per-cell "nonconvex problem"
+// detail. That diagnostic fires on any locally concave sub-triangle of a valid,
+// correctly oriented cell, so on a fine mesh it is noise, not a defect signal
+// (see the summary line in positive_orientation() for the always-on version).
+// area_spherical_element()'s "negative area" report is not gated: a negative
+// whole-cell area is always a genuine inversion, rare, and worth surfacing
+// unconditionally.
+// #ifdef CHECKNEGATIVEAREA
 //
 #include <queue>
 #include <map>
@@ -1623,10 +1628,11 @@ double IntxAreaUtils::area_spherical_element( Interface* mb, EntityHandle elem, 
     // compute the area of the polygonal element
     const double area = area_spherical_polygon( &coords[0], nsides, R );
 
-#ifdef CHECKNEGATIVEAREA
     // A negative area for a complete element means the cell is inverted (wound
     // clockwise) -- unlike an individual fan sub-triangle, this is always a defect.
-    // Report the whole cell so the offending element can actually be located.
+    // Report the whole cell so the offending element can actually be located. This
+    // is deliberately NOT gated by CHECKNEGATIVEAREA: it fires only on a genuinely
+    // inverted cell (rare), unlike positive_orientation()'s per-sub-triangle probe.
     //
     // Only report cells whose area is negative by a meaningful margin.  Vertices
     // closer than the merge tolerance (1e-12) are collapsed before intersection, so
@@ -1644,7 +1650,6 @@ double IntxAreaUtils::area_spherical_element( Interface* mb, EntityHandle elem, 
         }
         std::cout.precision( oldprec );
     }
-#endif
 
     return area;
 }

@@ -49,12 +49,12 @@ TESTS = pcomm_unit \
         hireconst_test_parallel \
         $(NETCDF_TESTS) \
         $(HDF5_TESTS) \
-        $(MBCSLAM_TESTS) $(IMOAB_TESTS)
+        $(IMOAB_TESTS)
 
 if HAVE_HDF5_PARALLEL
   HDF5_TESTS += parallel_hdf5_test mhdf_parallel parallel_write_test \
          parallel_adj parmerge_test augment_with_ghosts uref_hirec_test_parallel migrate_test \
-         ghost_thin_layers commgraph_test
+         ghost_thin_layers
 
 if HAVE_ZOLTAN
   HDF5_TESTS += migrate_nontrivial
@@ -64,40 +64,13 @@ if HAVE_TEMPESTREMAP
 AM_CPPFLAGS += $(TEMPESTREMAP_INCLUDE)
 migrate_test_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
 migrate_nontrivial_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
-commgraph_test_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
 else
 migrate_test_LDADD = $(LDADD) $(FCLIBS)
 migrate_nontrivial_LDADD = $(LDADD) $(FCLIBS)
-commgraph_test_LDADD = $(LDADD) $(FCLIBS)
 endif
 
-if HAVE_TEMPESTREMAP
-  HDF5_TESTS += imoab_coupler imoab_coupler_twohop imoab_phatm_ocn_coupler test_mapweights_bcast imoab_scrip imoab_dualmap_caas imoab_spmv_bfb
-  imoab_coupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_coupler_twohop_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_phatm_ocn_coupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_map_target_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_domain_culling_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_read_compute_map_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_dualmap_caas_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_spmv_bfb_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-if HAVE_NETCDF
-  HDF5_TESTS += imoab_map_target imoab_coupler_bilin imoab_domain_culling imoab_read_compute_map
-endif
-
-if HAVE_PNETCDF
-  NETCDF_TESTS += imoab_map_r2l
-  imoab_map_r2l_SOURCES = imoab_map_r2l.cpp
-endif
-
-if HAVE_EXTMESHES
-  HDF5_TESTS +=  imoab_apg2_ol_coupler
-  DEFS += -DEXT_DATA_DIR="$(builddir)/../../sandbox/MeshFiles/"
-  imoab_apg2_ol_coupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-endif
-
-  test_mapweights_bcast_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
-endif # tempestremap
+# The coupler drivers, commgraph_test, par_intx_sph and test_mapweights_bcast
+# moved to test/earthsystem/parallel.
 
 endif # HAVE_HDF5_PARALLEL
 
@@ -125,20 +98,18 @@ imoabcheck:
 imoabcheck-%:
 	$(SHELL) $(top_builddir)/test/parallel/regression/run_imoab_tests.sh $(IMOAB_TEST_FLAGS) $*
 
+# The parallel Earth system format readers - read_nc_par, write_nc_par,
+# ucdtrvpart, mpastrvpart, gcrm_par and read_esmf - moved to
+# test/earthsystem/parallel.  scdpart is a structured-mesh partition test and
+# stays here.
 if HAVE_NETCDF
-  NETCDF_TESTS += scdpart read_nc_par ucdtrvpart mpastrvpart gcrm_par read_esmf
+  NETCDF_TESTS += scdpart
 endif
 
 if HAVE_PNETCDF
 if !HAVE_NETCDF
-  NETCDF_TESTS += scdpart read_nc_par ucdtrvpart mpastrvpart write_nc_par read_esmf
-else
-  NETCDF_TESTS += write_nc_par
+  NETCDF_TESTS += scdpart
 endif
-endif
-
-if HAVE_PNETCDF
-  write_nc_par_LDADD = $(LDADD) $(PNETCDF_LIBS)
 endif
 
 if HAVE_HYPRE
@@ -147,29 +118,16 @@ else
   MBHYPRE_TESTS =
 endif
 
-if HAVE_HDF5_PARALLEL
-  MBCSLAM_TESTS = par_intx_sph
-else
-  MBCSLAM_TESTS =
-endif
-
 IMOAB_TESTS =
 if ENABLE_FORTRAN
    IMOAB_TESTS += imoab_ptest imoab_ptest2
 if HAVE_TEMPESTREMAP
-IMOAB_TESTS += imoab_coupler_fortran imoab_coupler_caas
 imoab_ptest_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
 imoab_ptest2_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
-imoab_coupler_fortran_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
-imoab_coupler_caas_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
 else
 imoab_ptest_LDADD = $(LDADD) $(FCLIBS)
 imoab_ptest2_LDADD = $(LDADD) $(FCLIBS)
 endif
-endif
-
-if HAVE_HDF5_PARALLEL
- IMOAB_TESTS += imoab_setwithGid
 endif
 
 if HAVE_HYPRE
@@ -200,48 +158,25 @@ partcheck_SOURCES = partcheck.cpp
 structured3_SOURCES = structured3.cpp
 parmerge_SOURCES = parmerge.cpp
 scdpart_SOURCES = scdpart.cpp
-read_nc_par_SOURCES = ../io/read_nc.cpp
-ucdtrvpart_SOURCES = ucdtrvpart.cpp
-mpastrvpart_SOURCES = mpastrvpart.cpp
-read_esmf_SOURCES = read_esmf.cpp
-gcrm_par_SOURCES = gcrm_par.cpp
-write_nc_par_SOURCES = ../io/write_nc.cpp
 par_spatial_locator_test_SOURCES = par_spatial_locator_test.cpp
 parallel_adj_SOURCES = ../adj_moab_test.cpp
 parmerge_test_SOURCES = parmerge_test.cpp
 augment_with_ghosts_SOURCES = augment_with_ghosts.cpp
 imoab_ptest_SOURCES = imoab_ptest.F
-imoab_coupler_fortran_SOURCES = imoab_coupler_fortran.F90
-imoab_coupler_caas_SOURCES = imoab_coupler_caas.F90
 imoab_ptest2_SOURCES = imoab_ptest2.cpp
 hireconst_test_parallel_SOURCES = hireconst_test_parallel.cpp
 uref_hirec_test_parallel_SOURCES = uref_hirec_test_parallel.cpp ../geomObject.cpp
 migrate_test_SOURCES = migrate_test.cpp
-imoab_coupler_SOURCES = imoab_coupler.cpp
-imoab_scrip_SOURCES = imoab_scrip.cpp
-imoab_coupler_twohop_SOURCES = imoab_coupler_twohop.cpp
-imoab_phatm_ocn_coupler_SOURCES = imoab_phatm_ocn_coupler.cpp
-imoab_apg2_ol_coupler_SOURCES = imoab_apg2_ol_coupler.cpp
-imoab_map_target_SOURCES = imoab_map_target.cpp
-imoab_read_compute_map_SOURCES = imoab_read_compute_map.cpp
-imoab_setwithGid_SOURCES = imoab_setwithGid.cpp
 migrate_nontrivial_SOURCES = migrate_nontrivial.cpp
 ghost_thin_layers_SOURCES = ghost_thin_layers.cpp
-commgraph_test_SOURCES = commgraph_test.cpp
-test_mapweights_bcast_SOURCES = test_mapweights_bcast.cpp
-imoab_coupler_bilin_SOURCES = imoab_coupler_bilin.cpp
-imoab_domain_culling_SOURCES = imoab_domain_culling.cpp
-imoab_dualmap_caas_SOURCES = imoab_dualmap_caas.cpp
-imoab_spmv_bfb_SOURCES = imoab_spmv_bfb.cpp
 
-par_intx_sph_SOURCES = par_intx_sph.cpp
-par_intx_sph_LDADD = $(LDADD)
 
 # Other files to clean up (e.g. output from tests)
 MOSTLYCLEANFILES = *.h5m *.nc *.vtk *.txt
 
-EXTRA_DIST = imoab_coupler_utils.hpp imoab_dualmap_caas_bfb.sh \
-             regression/imoab_test_runner.sh \
+# imoab_coupler_utils.hpp and imoab_dualmap_caas_bfb.sh moved with the coupler
+# drivers.  The regression harness stays here: it also drives imoab_ptest2.
+EXTRA_DIST = regression/imoab_test_runner.sh \
              regression/lib_common.sh \
              regression/lib_bfb_harness.sh \
              regression/lib_tol_harness.sh \

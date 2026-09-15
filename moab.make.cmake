@@ -8,6 +8,12 @@
 # the ON/OFF values of MOAB_HAVE_<PKG> directly.
 MOAB_MPI_ENABLED = @MOAB_MAKE_MPI_ENABLED@
 MOAB_FORTRAN_ENABLED = @MOAB_MAKE_FORTRAN_ENABLED@
+# The iTAPS/iMesh bindings are not part of this source tree - there is no
+# itaps/ directory and no --enable-imesh - so this is fixed at "no" rather than
+# substituted.  It still has to be *defined*: examples/fortran/makefile tests
+# it, and against an undefined variable that test silently compared against the
+# empty string.  Substitute it properly if iMesh support ever returns.
+MOAB_IMESH_ENABLED = no
 MOAB_HDF5_ENABLED = @MOAB_MAKE_HDF5_ENABLED@
 MOAB_NETCDF_ENABLED = @MOAB_MAKE_NETCDF_ENABLED@
 MOAB_PNETCDF_ENABLED = @MOAB_MAKE_PNETCDF_ENABLED@

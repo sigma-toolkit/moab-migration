@@ -33,6 +33,9 @@ namespace
 {
 constexpr const char* DEFAULT_OUTPUT_FILE = "mesh_hierarchy.h5m";
 constexpr int DEFAULT_REFINEMENT_LEVELS   = 2;
+// NestedRefine only accepts a degree of 2 or 3, so the default cannot be left
+// as the value-initialized 0 - that asserts inside generate_mesh_hierarchy().
+constexpr int DEFAULT_REFINEMENT_DEGREE = 2;
 
 void print_usage( const char* program_name )
 {
@@ -70,7 +73,7 @@ std::vector< int > parse_refinement_levels( int argc, char* argv[] )
     else
     {
         // Default: two levels with default degrees
-        level_degrees.resize( DEFAULT_REFINEMENT_LEVELS );
+        level_degrees.assign( DEFAULT_REFINEMENT_LEVELS, DEFAULT_REFINEMENT_DEGREE );
     }
 
     return level_degrees;

@@ -19,6 +19,10 @@ message ( "++ Found MOAB configuration details at: ${MOAB_DIR}" )
 
 project( MOAB_Examples )
 
+# The add_test() calls below were dead without this: CTest never generated a
+# test file for the examples tree, so `ctest` here reported "No tests found".
+enable_testing()
+
 if ( ENABLE_IMESH )
   enable_language(Fortran)
 endif ( ENABLE_IMESH )
@@ -122,6 +126,11 @@ endif ( MOAB_USE_MPI )
 
 set ( ALLCXXEXAMPLES ${BEGINNER_EXAMPLES} ${BASIC_EXAMPLES} ${INTERMEDIATE_EXAMPLES} ${ADVANCED_EXAMPLES} ${APPS_EXAMPLES} )
 
+# A few examples require a mesh file on the command line rather than falling
+# back to a default, so give them one when CTest runs them. Same "<base>_..."
+# convention as the per-example dependency lists above.
+set ( UniformRefinement_TEST_ARGS "${MOAB_MESH_DIR}/32hex_ef.h5m" )
+
 set ( EXAMPLE_LIBRARIES ${MOAB_LIBRARIES} )
 if ( MOAB_USE_MPI )
   list ( APPEND EXAMPLE_LIBRARIES ${MPI_CXX_LIBRARIES} )
@@ -134,7 +143,7 @@ foreach( fname ${ALLCXXEXAMPLES} )
   add_executable( ${base} ${fname})
   set_target_properties( ${base} PROPERTIES COMPILE_FLAGS "'-DMESH_DIR=\"${MOAB_MESH_DIR}\"' ${TEST_COMP_FLAGS} ${MOAB_DEFINES}" )
   target_link_libraries( ${base} LINK_PUBLIC ${${base}_DEPS} ${EXAMPLE_LIBRARIES} )
-  add_test( ${base} ${EXECUTABLE_OUTPUT_PATH}/${base} )
+  add_test( NAME ${base} COMMAND $<TARGET_FILE:${base}> ${${base}_TEST_ARGS} )
 endforeach()
 
 #set ( CMAKE_Fortran_COMPILER ${MOAB_FC} )
@@ -146,7 +155,7 @@ if ( ENABLE_IMESH )
     add_executable( ${base} ${fname})
     set_target_properties( ${base} PROPERTIES COMPILE_FLAGS "'-DMESH_DIR=\"${MOAB_MESH_DIR}\"' ${TEST_COMP_FLAGS} ${MOAB_DEFINES}" LINKER_LANGUAGE Fortran )
     target_link_libraries( ${base} LINK_PUBLIC ${IMESH_LIBRARIES} )
-    add_test( ${base} ${EXECUTABLE_OUTPUT_PATH}/${base} )
+    add_test( NAME ${base} COMMAND $<TARGET_FILE:${base}> ${${base}_TEST_ARGS} )
   endforeach()
 endif ( ENABLE_IMESH )
 

@@ -88,19 +88,23 @@ if( MOAB_HAVE_MPI AND MPI_FOUND AND MOAB_HAVE_TEMPESTREMAP )
     add_test( ${noparbase} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${noparbase} ${MPIEXEC_POSTFLAGS} )
   endforeach()
 
-  # Fortran coupler drivers.
-  set( ES_PARF_TESTS parallel/imoab_coupler_fortran.F90 parallel/imoab_coupler_caas.F90 )
+  # Fortran coupler drivers.  Guarded on ENABLE_FORTRAN: without it the
+  # top-level CMakeLists never calls enable_language(Fortran), and handing a
+  # .F90 source to add_executable then fails for want of a Fortran compiler.
+  if ( ENABLE_FORTRAN )
+    set( ES_PARF_TESTS parallel/imoab_coupler_fortran.F90 parallel/imoab_coupler_caas.F90 )
 
-  foreach( fname ${ES_PARF_TESTS} )
-    string( REPLACE ".F90" "" base ${fname} )
-    string( REPLACE "parallel/" "" noparbase ${base} )
-    add_executable( ${noparbase} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname} )
-    set_property( TARGET ${noparbase} PROPERTY LINKER_LANGUAGE Fortran )
-    set_target_properties( ${noparbase} PROPERTIES COMPILE_FLAGS "${TEST_COMP_FLAGS} ${MOAB_DEFINES} -DTEST" )
-    # MOAB propagates MPI_CXX_LIBRARIES only, which does not define the mpi_*_
-    # symbols an F90 unit references, so the MPI Fortran bindings have to be
-    # named here as well.
-    target_link_libraries( ${noparbase} MOAB ${TEMPESTREMAP_LIBRARIES} ${MPI_Fortran_LIBRARIES} )
-    add_test( ${noparbase} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${noparbase} ${MPIEXEC_POSTFLAGS} )
-  endforeach()
+    foreach( fname ${ES_PARF_TESTS} )
+      string( REPLACE ".F90" "" base ${fname} )
+      string( REPLACE "parallel/" "" noparbase ${base} )
+      add_executable( ${noparbase} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname} )
+      set_property( TARGET ${noparbase} PROPERTY LINKER_LANGUAGE Fortran )
+      set_target_properties( ${noparbase} PROPERTIES COMPILE_FLAGS "${TEST_COMP_FLAGS} ${MOAB_DEFINES} -DTEST" )
+      # MOAB propagates MPI_CXX_LIBRARIES only, which does not define the mpi_*_
+      # symbols an F90 unit references, so the MPI Fortran bindings have to be
+      # named here as well.
+      target_link_libraries( ${noparbase} MOAB ${TEMPESTREMAP_LIBRARIES} ${MPI_Fortran_LIBRARIES} )
+      add_test( ${noparbase} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${noparbase} ${MPIEXEC_POSTFLAGS} )
+    endforeach()
+  endif ( ENABLE_FORTRAN )
 endif()

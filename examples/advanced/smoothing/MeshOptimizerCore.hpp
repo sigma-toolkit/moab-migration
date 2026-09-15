@@ -647,7 +647,21 @@ inline ErrorCode MeshOptimizer::optimize( OptimizerResult& result )
         {
             // Restore the last good iterate before giving up.
             rval = set_free_positions( x );MB_CHK_ERR( rval );
-            if( mOpts.verbosity > 0 && !mRank ) std::printf( "  line search failed; stopping\n" );
+            if( mOpts.verbosity > 0 && !mRank )
+            {
+                // Distinguish a stall at the precision limit from a real
+                // failure.  On a curved domain the tangent space rotates as
+                // vertices move, so the curvature pairs go stale and L-BFGS
+                // runs out of progress while the gradient is already tiny -
+                // that is expected, not an error.
+                const double reduction = ( result.gnorm_initial > 0.0 ) ? gnorm / result.gnorm_initial : 1.0;
+                if( reduction < 1.0e-3 )
+                    std::printf( "  no further decrease available at this precision "
+                                 "(gradient reduced %.1e-fold); stopping\n",
+                                 1.0 / reduction );
+                else
+                    std::printf( "  line search failed with the gradient still at %.3e; stopping\n", gnorm );
+            }
             break;
         }
 

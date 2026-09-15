@@ -881,6 +881,11 @@ int main( int argc, char* argv[] )
 
     }  // end loop iterations n
 #ifdef ENABLE_ATMLND_COUPLING
+    if( couComm != MPI_COMM_NULL )
+    {
+        ierr = iMOAB_DeregisterApplication( cplAtmLndPID );
+        CHECKIERR( ierr, "cannot deregister app intx AL" )
+    }
     if( lndComm != MPI_COMM_NULL )
     {
         ierr = iMOAB_DeregisterApplication( cmpLndPID );

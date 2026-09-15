@@ -287,7 +287,7 @@ int main( int argc, char* argv[] )
     // we can now free the sender buffers
     if( atmComm != MPI_COMM_NULL )
     {
-        int context_id = cplatm;
+        int context_id = cplatm2;  // mesh above was sent with the atm2 context
         ierr           = iMOAB_FreeSenderBuffers( cmpAtmPID, &context_id );
         CHECKIERR( ierr, "cannot free buffers used to send atm mesh" )
     }
@@ -717,7 +717,7 @@ int main( int argc, char* argv[] )
         // we can now free the sender buffers
         if( atmComm != MPI_COMM_NULL )
         {
-            ierr = iMOAB_FreeSenderBuffers( cmpAtmPID, &cplatm );  // context is for ocean
+            ierr = iMOAB_FreeSenderBuffers( cmpAtmPID, &cplatm2 );  // context is the atm2 mesh on coupler
             CHECKIERR( ierr, "cannot free buffers used to resend atm tag towards the coverage mesh" )
         }
         // #ifdef VERBOSE
@@ -787,7 +787,6 @@ int main( int argc, char* argv[] )
             }
         }
 
-        std::cout << "applied scalar projection\n";
         // send the projected tag back to ocean pes, with send/receive tag
         if( ocnComm != MPI_COMM_NULL )
         {
@@ -797,7 +796,6 @@ int main( int argc, char* argv[] )
             CHECKIERR( ierr, "failed to define the field tag for receiving back the tags "
                              "a2oTbot_proj, a2oUbot_proj, a2oVbot_proj on ocn pes" );
         }
-        std::cout << "defined tag agian on ocn\n";
         // send the tag to ocean pes, from ocean mesh on coupler pes
         //   from couComm, using common joint comm ocn_coupler
         // as always, use nonblocking sends
@@ -809,7 +807,6 @@ int main( int argc, char* argv[] )
             ierr       = iMOAB_SendElementTag( cplOcnPID, bottomProjectedFields3, &ocnCouComm, &context_id );
             CHECKIERR( ierr, "cannot send tag values back to ocean pes" )
         }
-        std::cout << "sent ocn data from coupler to component\n";
 
         // receive on component 2, ocean
         if( ocnComm != MPI_COMM_NULL )
@@ -818,7 +815,6 @@ int main( int argc, char* argv[] )
             ierr       = iMOAB_ReceiveElementTag( cmpOcnPID, bottomProjectedFields3, &ocnCouComm, &context_id );
             CHECKIERR( ierr, "cannot receive tag values from ocean mesh on coupler pes" )
         }
-        std::cout << "received ocn data from coupler to component\n";
 
         MPI_Barrier( MPI_COMM_WORLD );
 
@@ -828,7 +824,6 @@ int main( int argc, char* argv[] )
             ierr       = iMOAB_FreeSenderBuffers( cplOcnPID, &context_id );
             CHECKIERR( ierr, "cannot free send/receive buffers for OCN context" )
         }
-        std::cout << "freed send/recv ocn data from coupler to component\n";
         if( ocnComm != MPI_COMM_NULL && 1 == n )  // write only for n==1 case
         {
             char outputFileOcn[] = "Ocn2WithProj.h5m";
@@ -863,8 +858,6 @@ int main( int argc, char* argv[] )
                 if( 0 == err_code )
                     std::cout << " passed baseline test atm2ocn on ocean task " << rankInOcnComm << "\n";
             }
-
-            std::cout << "wrote ocn data on component to disk\n";
         }
 #endif  // ENABLE_ATMCPLOCN_COUPLING
 
@@ -903,6 +896,14 @@ int main( int argc, char* argv[] )
         CHECKIERR( ierr, "cannot deregister app OCNX" )
     }
 #endif  // ENABLE_ATMOCN_COUPLING
+
+#ifdef ENABLE_ATMCPLOCN_COUPLING
+    if( couComm != MPI_COMM_NULL )
+    {
+        ierr = iMOAB_DeregisterApplication( cplAtm2PID );
+        CHECKIERR( ierr, "cannot deregister app ATMX2" )
+    }
+#endif  // ENABLE_ATMCPLOCN_COUPLING
 
     if( couComm != MPI_COMM_NULL )
     {

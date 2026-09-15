@@ -308,7 +308,10 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
       add_executable( ${noparbase} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname})
       set_property(TARGET ${noparbase} PROPERTY LINKER_LANGUAGE Fortran)
       set_target_properties( ${noparbase} PROPERTIES COMPILE_FLAGS "${TEST_COMP_FLAGS} ${MOAB_DEFINES} -DTEST" )
-      target_link_libraries( ${noparbase} MOAB ${TEMPESTREMAP_LIBRARIES} )
+      # MOAB propagates MPI_CXX_LIBRARIES only, which does not define the mpi_*_
+      # symbols an F77/F90 unit references, so the MPI Fortran bindings have to
+      # be named here as well.
+      target_link_libraries( ${noparbase} MOAB ${TEMPESTREMAP_LIBRARIES} ${MPI_Fortran_LIBRARIES} )
       add_test( ${noparbase} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${noparbase} ${MPIEXEC_POSTFLAGS} )
     endforeach()
 

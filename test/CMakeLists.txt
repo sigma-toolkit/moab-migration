@@ -216,6 +216,23 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
     target_link_libraries( parmerge_test MOAB )
     add_test( Testparmerge_test ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/parmerge_test ${MPIEXEC_POSTFLAGS}  )
 
+    # migrate_test exercises the iMOAB mesh/tag migration API.  It reads and
+    # writes in parallel, so it needs a parallel HDF5, and it needs at least
+    # two ranks (the smallest case migrates from rank 0 to rank 1).  This
+    # mirrors test/parallel/Makefile.am, where it lives under
+    # HAVE_HDF5_PARALLEL and picks up TempestRemap when available.
+    if ( MOAB_HAVE_HDF5_PARALLEL )
+      set_source_files_properties( parallel/migrate_test.cpp
+        COMPILE_FLAGS "-DTEST ${MOAB_DEFINES} ${TEST_COMP_FLAGS}" )
+      add_executable( migrate_test ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp parallel/migrate_test.cpp )
+      target_link_libraries( migrate_test MOAB )
+      if ( MOAB_HAVE_TEMPESTREMAP )
+        target_link_libraries( migrate_test ${TEMPESTREMAP_LIBRARIES} )
+      endif ( MOAB_HAVE_TEMPESTREMAP )
+      add_test( migrate_test ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS}
+        ${EXECUTABLE_OUTPUT_PATH}/migrate_test ${MPIEXEC_POSTFLAGS} )
+    endif ( MOAB_HAVE_HDF5_PARALLEL )
+
   endif ( MOAB_HAVE_HDF5 )
 
   set_source_files_properties( parallel/parallel_unit_tests.cpp

@@ -15,7 +15,8 @@ AM_CPPFLAGS  = $(BGDEF)-DSRCDIR=$(srcdir) \
 
 if HAVE_NETCDF
   EXODUS_TEST = exodus_test
-  NC_TEST = read_nc read_ucd_nc read_mpas_nc write_nc read_gcrm_nc
+  # The NetCDF climate readers and writer moved to test/earthsystem/io.
+  NC_TEST =
   LDADD += $(NETCDF_LIBS) $(PNETCDF_LIBS) $(HDF5_LIBS)
 else
   EXODUS_TEST =
@@ -63,11 +64,6 @@ cub_file_test_SOURCES = $(srcdir)/../TestUtil.hpp cub_file_test.cpp
 exodus_test_SOURCES = $(srcdir)/../TestUtil.hpp exodus_test.cpp
 gmsh_test_SOURCES = $(srcdir)/../TestUtil.hpp gmsh_test.cpp
 nastran_test_SOURCES = $(srcdir)/../TestUtil.hpp nastran_test.cpp
-read_nc_SOURCES = $(srcdir)/../TestUtil.hpp read_nc.cpp
-read_ucd_nc_SOURCES = $(srcdir)/../TestUtil.hpp read_ucd_nc.cpp
-read_mpas_nc_SOURCES = $(srcdir)/../TestUtil.hpp read_mpas_nc.cpp
-read_gcrm_nc_SOURCES = $(srcdir)/../TestUtil.hpp read_gcrm_nc.cpp
-write_nc_SOURCES = $(srcdir)/../TestUtil.hpp write_nc.cpp
 ideas_test_SOURCES = $(srcdir)/../TestUtil.hpp ideas_test.cpp
 stl_test_SOURCES = $(srcdir)/../TestUtil.hpp stl_test.cpp
 smf_test_SOURCES = $(srcdir)/../TestUtil.hpp smf_test.cpp

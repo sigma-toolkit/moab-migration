@@ -1,7 +1,7 @@
 # Don't require GNU-standard files (Changelog, README, etc.)
 AUTOMAKE_OPTIONS = foreign subdir-objects no-dependencies
 
-SUBDIRS = . io obb perf
+SUBDIRS = . io earthsystem obb perf
 if HAVE_HDF5
   SUBDIRS += h5file
 endif
@@ -68,15 +68,8 @@ TESTS = range_test \
         hireconst_test \
         uref_hirec_test \
         spherical_area_test \
-        arc_intx_tests \
-        intx_in_plane_test \
-        intx_on_sphere_test \
         mgen_test \
         gnom_project_test
-
-if HAVE_NETCDF
-   TESTS += intx_rll_cs_sphere_test
-endif
 
 if HAVE_HDF5
   TESTS += mbfacet_test \
@@ -189,12 +182,8 @@ var_len_test_no_template_CPPFLAGS = -UTEMPLATE_SPECIALIZATION $(AM_CPPFLAGS) $(C
 tag_test_SOURCES = TestUtil.hpp TagTest.cpp
 spatial_locator_test_SOURCES = TestUtil.hpp spatial_locator_test.cpp
 mergemesh_test_SOURCES = mergemesh_test.cpp
-# intersection related tests
-intx_on_sphere_test_SOURCES = intx_on_sphere_test.cpp
-intx_in_plane_test_SOURCES = intx_in_plane_test.cpp
+# The intersection tests moved to test/earthsystem.
 spherical_area_test_SOURCES = spherical_area_test.cpp
-arc_intx_tests_SOURCES = arc_intx_tests.cpp
-intx_rll_cs_sphere_test_SOURCES = intx_rll_cs_sphere_test.cpp
 gnom_project_test_SOURCES = gnom_project_test.cpp
 
 #mbcn_test_SOURCES = $(top_srcdir)/src/moab/CN.hpp \
@@ -244,18 +233,7 @@ endif
 seq_man_test_CPPFLAGS = $(AM_CPPFLAGS) $(PTHREAD_CFLAGS)
 seq_man_test_LDFLAGS = $(AM_LDFLAGS) $(PTHREAD_LIBS)
 
-# Tests for remapping
-if ENABLE_mbtempest
-if HAVE_TEMPESTREMAP
-  test_remapping_SOURCES = test_remapping.cpp
-  test_remapping_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/src/earthsystem/remapping -I$(top_srcdir)/src/earthsystem/intx_mesh $(TEMPESTREMAP_INCLUDE)
-  test_remapping_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_remapping_SOURCES = imoab_remap.cpp
-  imoab_remapping_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/src/earthsystem/remapping -I$(top_srcdir)/src/earthsystem/intx_mesh $(TEMPESTREMAP_INCLUDE)
-  imoab_remapping_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  TESTS += test_remapping imoab_remapping
-endif
-endif
+# The remapping tests moved to test/earthsystem.
 
 if ENABLE_pymoab
 

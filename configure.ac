@@ -1167,6 +1167,9 @@ AC_CONFIG_FILES([Makefile
                  test/perf/Makefile
                  test/perf/point_location/Makefile
                  test/io/Makefile
+                 test/earthsystem/Makefile
+                 test/earthsystem/io/Makefile
+                 test/earthsystem/parallel/Makefile
                  test/parallel/Makefile
                  tools/Makefile
                  tools/mbcoupler/Makefile

@@ -94,6 +94,20 @@ if ( MOAB_USE_MPI )
   set ( ADVANCED_EXAMPLES ${ADVANCED_EXAMPLES}
                           advanced/GenLargeMesh.cpp
     )
+  # advanced/smoothing was not referenced here at all, so an installed CMake
+  # examples tree built none of it.  The two optimization examples take their
+  # gradients from Eigen's unsupported AutoDiff module, so Eigen3 is a hard
+  # requirement rather than an optimization.
+  if ( MOAB_USE_EIGEN )
+    set ( ADVANCED_EXAMPLES ${ADVANCED_EXAMPLES}
+                            advanced/smoothing/MeshOptimization.cpp
+                            advanced/smoothing/SphericalCVTOptimization.cpp
+      )
+  else ( MOAB_USE_EIGEN )
+    message ( STATUS "Skipping the mesh optimization examples: MOAB was built without Eigen3" )
+  endif ( MOAB_USE_EIGEN )
+  # LaplacianSmoother is left to advanced/smoothing/makefile: it needs an input
+  # mesh as well as HDF5, so it has nothing to run as an argument-free CTest.
   # CoupleMGen is guarded by MOAB_HAVE_MBCOUPLER and links against the separate
   # mbcoupler library, so it can only be built when MOAB was configured with the
   # mesh coupler.  "mbcoupler" on its own is not a target here, it has to be
@@ -159,6 +173,13 @@ set ( ALLCXXEXAMPLES ${BEGINNER_EXAMPLES} ${BASIC_EXAMPLES} ${INTERMEDIATE_EXAMP
 # back to a default, so give them one when CTest runs them. Same "<base>_..."
 # convention as the per-example dependency lists above.
 set ( UniformRefinement_TEST_ARGS "${MOAB_MESH_DIR}/32hex_ef.h5m" )
+
+# MeshOptimization's default run would optimize a 10x10 mesh; --selftest is both
+# faster and an actual check, since it verifies the metric against closed-form
+# values and against Verdict, and the AutoDiff gradient against finite
+# differences.  Keep the spherical case small so it stays a smoke test.
+set ( MeshOptimization_TEST_ARGS "--selftest" )
+set ( SphericalCVTOptimization_TEST_ARGS "-N" "120" "-l" "10" "-n" "20" )
 
 set ( EXAMPLE_LIBRARIES ${MOAB_LIBRARIES} )
 if ( MOAB_USE_MPI )

@@ -911,7 +911,7 @@ CONFIGURE_FILE(config/MOABConfigVersion.cmake.cmake "${PROJECT_BINARY_DIR}/MOABC
 # every one of those tests fail, so an installed examples tree built nothing at
 # all: "make" reported "Nothing to be done" and exited 0, silently.  Translate to
 # the spelling the makefiles expect rather than editing every example makefile.
-foreach( _moab_make_feature MPI HDF5 NETCDF PNETCDF TEMPESTREMAP METIS PARMETIS ZOLTAN )
+foreach( _moab_make_feature MPI HDF5 NETCDF PNETCDF TEMPESTREMAP METIS PARMETIS ZOLTAN EIGEN3 )
   if( MOAB_HAVE_${_moab_make_feature} )
     set( MOAB_MAKE_${_moab_make_feature}_ENABLED "yes" )
   else()
@@ -1158,7 +1158,10 @@ SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
 SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/advanced/smoothing/makefile
   examples/advanced/smoothing/LaplacianSmoother.cpp
-  examples/advanced/smoothing/OptimizeMeshMesquite.cpp )
+  examples/advanced/smoothing/MeshOptimizationMetrics.hpp
+  examples/advanced/smoothing/MeshOptimizerCore.hpp
+  examples/advanced/smoothing/MeshOptimization.cpp
+  examples/advanced/smoothing/SphericalCVTOptimization.cpp )
 SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/fortran/makefile
   examples/fortran/DirectAccessNoHolesF90.F90

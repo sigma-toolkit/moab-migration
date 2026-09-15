@@ -77,7 +77,10 @@ examples_advancedsmoothdir = $(datadir)/examples/advanced/smoothing
 examples_advancedsmooth_DATA = \
                examples/advanced/smoothing/makefile \
                examples/advanced/smoothing/LaplacianSmoother.cpp \
-               examples/advanced/smoothing/OptimizeMeshMesquite.cpp
+               examples/advanced/smoothing/MeshOptimizationMetrics.hpp \
+               examples/advanced/smoothing/MeshOptimizerCore.hpp \
+               examples/advanced/smoothing/MeshOptimization.cpp \
+               examples/advanced/smoothing/SphericalCVTOptimization.cpp
 examples_fortrandir = $(datadir)/examples/fortran
 examples_fortran_DATA = \
                examples/fortran/makefile \

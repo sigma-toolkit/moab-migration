@@ -19,6 +19,7 @@ MOAB_TEMPESTREMAP_ENABLED = @enabletempestremap@
 MOAB_METIS_ENABLED = @enablemetis@
 MOAB_PARMETIS_ENABLED = @enableparmetis@
 MOAB_ZOLTAN_ENABLED = @enablezoltan@
+MOAB_EIGEN3_ENABLED = @enableeigen@
 
 # Library and Include paths
 MOAB_LIBDIR = @abs_builddir@/src/.libs

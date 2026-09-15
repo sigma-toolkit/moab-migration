@@ -48,6 +48,10 @@ MOAB_EXT_LIBS = @TEMPESTREMAP_LIBS@ @NETCDF_LIBS@ @PNETCDF_LIBS@ @CGNS_LIBS@ @HD
 # libtool's compiler_lib_search_path for the C++ compiler; it has not been
 # exercised by a Fortran example here, so verify it on a real autotools build.
 MOAB_CXX_RUNTIME_LIBS = @MOAB_CXX_LINKFLAGS@
+# Empty here on purpose: the autotools build drives the Fortran link with the
+# mpif90 wrapper, which supplies its own bindings.  The CMake build may use the
+# plain compiler plus FindMPI, so its template substitutes the libraries.
+MOAB_FC_MPI_LIBS =
 MOAB_LIBS_LINK = ${MOAB_LDFLAGS} -L${MOAB_LIBDIR} -lMOAB $(MOAB_EXT_LIBS)
 DAGMC_LIBS_LINK = ${MOAB_LDFLAGS} -L${MOAB_LIBDIR} @DAGMC_LIBS@ -lMOAB $(MOAB_EXT_LIBS)
 

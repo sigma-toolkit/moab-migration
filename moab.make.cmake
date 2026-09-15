@@ -50,6 +50,9 @@ MOAB_EXT_LIBS = @MOAB_MAKE_EXT_LIBS@
 # The C++ runtime, for the Fortran examples: libMOAB is C++ but they are linked
 # by the Fortran driver, which does not pull it in on its own.
 MOAB_CXX_RUNTIME_LIBS = @MOAB_MAKE_CXX_RUNTIME@
+# MPI's Fortran bindings, likewise: MOAB_EXT_LIBS carries the C/C++ MPI libraries
+# only, and those do not define the mpi_*_ symbols an F90 unit references.
+MOAB_FC_MPI_LIBS = @MOAB_MAKE_FC_MPI_LIBS@
 MOAB_LIBS_LINK = ${MOAB_LDFLAGS} -L${MOAB_LIBDIR} -lMOAB $(MOAB_EXT_LIBS)
 DAGMC_LIBS_LINK = ${MOAB_LDFLAGS} -L${MOAB_LIBDIR} @DAGMC_LIBS@ -lMOAB $(MOAB_EXT_LIBS)
 

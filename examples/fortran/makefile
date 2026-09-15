@@ -50,7 +50,7 @@ endif
 
 MigrateMesh: MigrateMesh.o ${MOAB_LIBFILE}
 	@echo "[F90LD]  $@"
-	${VERBOSE}${MOAB_FC} -o $@ $< ${MOAB_LIBS_LINK} ${MOAB_CXX_RUNTIME_LIBS}
+	${VERBOSE}${MOAB_FC} -o $@ $< ${MOAB_LIBS_LINK} ${MOAB_CXX_RUNTIME_LIBS} ${MOAB_FC_MPI_LIBS}
 
 run-MigrateMesh: MigrateMesh
 ifeq ("$(MOAB_MPI_ENABLED)","yes")

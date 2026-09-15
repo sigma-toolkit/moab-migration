@@ -1014,6 +1014,16 @@ foreach( _moab_make_rt_lib ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES} )
 endforeach()
 string( REPLACE ";" " " MOAB_MAKE_CXX_RUNTIME "${_moab_make_cxx_runtime}" )
 
+# MPI's Fortran bindings, for the Fortran examples.  MPI_CXX_LIBRARIES above does
+# not carry the mpi_*_ symbols an F90 translation unit references, so when MOAB is
+# configured through FindMPI rather than the mpif90 wrapper the Fortran link fails
+# on undefined _mpi_init_ and friends.
+set( _moab_make_fc_mpi "" )
+if( MOAB_HAVE_MPI )
+  set( _moab_make_fc_mpi ${MPI_Fortran_LIBRARIES} )
+endif()
+string( REPLACE ";" " " MOAB_MAKE_FC_MPI_LIBS "${_moab_make_fc_mpi}" )
+
 CONFIGURE_FILE(moab.make.cmake "${PROJECT_BINARY_DIR}/lib/moab.make" @ONLY)
 CONFIGURE_FILE(config/MOAB.pc.cmake.in "${PROJECT_BINARY_DIR}/MOAB.pc" @ONLY)
 

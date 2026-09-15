@@ -23,9 +23,20 @@ project( MOAB_Examples )
 # test file for the examples tree, so `ctest` here reported "No tests found".
 enable_testing()
 
-if ( ENABLE_IMESH )
-  enable_language(Fortran)
-endif ( ENABLE_IMESH )
+# MigrateMesh.F90 only calls the iMOAB Fortran entry points, which live in
+# libMOAB itself, so it needs a Fortran compiler but not iMesh.  Enable the
+# language only when a compiler is actually available, so that a MOAB built
+# without Fortran still configures.  This has to happen before find_package(MPI)
+# below, otherwise FindMPI never probes the Fortran bindings.
+include ( CheckLanguage )
+check_language ( Fortran )
+if ( CMAKE_Fortran_COMPILER )
+  enable_language ( Fortran )
+  set ( MOAB_EXAMPLES_HAVE_FORTRAN TRUE )
+else ( CMAKE_Fortran_COMPILER )
+  set ( MOAB_EXAMPLES_HAVE_FORTRAN FALSE )
+  message ( STATUS "No Fortran compiler available; skipping the Fortran examples" )
+endif ( CMAKE_Fortran_COMPILER )
 
 # MOAB may have been configured against MPI through FindMPI rather than through
 # the compiler wrappers, in which case MOAB_CC/MOAB_CXX are the plain compilers
@@ -101,15 +112,24 @@ if ( MOAB_USE_MPI )
   endif ( MOAB_USE_MBCOUPLER )
 endif ( MOAB_USE_MPI )
 
+# Fortran examples that go through iMesh.  iMesh is only built by the autotools
+# build of MOAB, so these are gated on ENABLE_IMESH further down.
 set ( FORTRAN_EXAMPLES
   fortran/DirectAccessNoHolesF90.F90
 )
 if ( MOAB_USE_MPI )
   set ( FORTRAN_EXAMPLES ${FORTRAN_EXAMPLES}
           fortran/PushParMeshIntoMoabF90.F90
-          fortran/MigrateMesh.F90
     )
 endif ( MOAB_USE_MPI )
+
+# Fortran examples that only use iMOAB, and so link against libMOAB directly.
+set ( IMOAB_FORTRAN_EXAMPLES )
+if ( MOAB_USE_MPI AND MOAB_EXAMPLES_HAVE_FORTRAN )
+  set ( IMOAB_FORTRAN_EXAMPLES ${IMOAB_FORTRAN_EXAMPLES}
+          fortran/MigrateMesh.F90
+    )
+endif ( MOAB_USE_MPI AND MOAB_EXAMPLES_HAVE_FORTRAN )
 
 set ( APPS_EXAMPLES
   apps/earth/ContinentsOnGlobe.cpp
@@ -158,4 +178,36 @@ if ( ENABLE_IMESH )
     add_test( NAME ${base} COMMAND $<TARGET_FILE:${base}> ${${base}_TEST_ARGS} )
   endforeach()
 endif ( ENABLE_IMESH )
+
+# iMOAB Fortran examples.  These link against libMOAB like the C++ examples,
+# but are compiled and linked as Fortran, so they additionally need the MPI
+# Fortran bindings - MPI_CXX_LIBRARIES does not provide mpif.h or the
+# mpi_*_ symbols.
+foreach( fname ${IMOAB_FORTRAN_EXAMPLES} )
+  get_filename_component( base ${fname} NAME_WE )
+  message("-- Driver [${base}] (F90 sources) :: ${fname}")
+  add_executable( ${base} ${fname} )
+  set_target_properties( ${base} PROPERTIES
+    COMPILE_FLAGS "'-DMESH_DIR=\"${MOAB_MESH_DIR}\"' ${TEST_COMP_FLAGS} ${MOAB_DEFINES}"
+    LINKER_LANGUAGE Fortran )
+  target_include_directories( ${base} PRIVATE ${MPI_Fortran_INCLUDE_DIRS} ${MPI_Fortran_INCLUDE_PATH} )
+  # The link is driven by the Fortran compiler, which does not pull in the C++
+  # runtime on its own, and libMOAB is C++.  MOABTargets.cmake asks for
+  # "stdc++" unconditionally, which is wrong for a libc++ toolchain, so use the
+  # runtime CMake actually detected for this compiler instead.
+  target_link_libraries( ${base} LINK_PUBLIC ${EXAMPLE_LIBRARIES} ${MPI_Fortran_LIBRARIES}
+                         ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES} )
+endforeach()
+
+if ( TARGET MigrateMesh )
+  # MigrateMesh reads spherecube.h5m from the working directory and writes its
+  # output beside it, so stage the input in the build tree rather than running
+  # the test inside the source tree.
+  configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/fortran/spherecube.h5m
+                  ${CMAKE_CURRENT_BINARY_DIR}/spherecube.h5m COPYONLY )
+  add_test( NAME MigrateMesh
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS}
+                    $<TARGET_FILE:MigrateMesh> ${MPIEXEC_POSTFLAGS}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} )
+endif ( TARGET MigrateMesh )
 

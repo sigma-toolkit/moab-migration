@@ -1,5 +1,7 @@
 
 program MigrateMesh
+  use iso_c_binding
+  use iMOAB
   implicit none
 
 #include "moab/MOABConfig.h"
@@ -29,10 +31,8 @@ program MigrateMesh
     character*132 wopts
     integer allgroup, group1, group2 ! Corresponding to MPI_Group in C
     integer tagcomm1, tagcomm2
-    integer iMOAB_InitializeFortran, iMOAB_RegisterFortranApplication
-    integer iMOAB_LoadMesh, iMOAB_SendMesh, iMOAB_ReceiveMesh, iMOAB_WriteMesh
-    integer iMOAB_FreeSenderBuffers
-    integer iMOAB_DeregisterApplication, iMOAB_Finalize
+    ! The iMOAB entry points come from the iMOAB module used above; they must
+    ! not be redeclared as plain external integers here.
     integer repart_scheme , context_id
 
     call MPI_INIT(ierr)
@@ -63,7 +63,7 @@ program MigrateMesh
     sizeG1 = endG1 - startG1 + 1
     ! used for new API in iMOAB, for tag migrate, release buffers
     context_id = -1
-    
+
     do i=1, sizeG1
       groupTasks (i) = startG1+i-1
     end do 
@@ -101,7 +101,7 @@ program MigrateMesh
     call errorout(ierr, 'cannot create communicator 2' )
 
 
-    ierr = iMOAB_InitializeFortran()
+    ierr = iMOAB_Initialize()
 
     repart_scheme = 0 !  this is for trivial partitioning
 #ifdef MOAB_HAVE_ZOLTAN
@@ -116,12 +116,12 @@ program MigrateMesh
 
     if (comm1 /= MPI_COMM_NULL) then
        appname='phis1'//CHAR(0)
-       ierr = iMOAB_RegisterFortranApplication(trim(appname), comm1, compid1, pid1)
+       ierr = iMOAB_RegisterApplication(trim(appname), comm1, compid1, pid1)
        print *, ' register ', appname, " on rank ", rank, " pid1 ", pid1
     endif
     if (comm2 /= MPI_COMM_NULL) then
        appname = 'phis2'//CHAR(0)
-       ierr = iMOAB_RegisterFortranApplication(trim(appname), comm2, compid2, pid2)
+       ierr = iMOAB_RegisterApplication(trim(appname), comm2, compid2, pid2)
        print *, ' register ', appname, " on rank ", rank, " pid2 ", pid2
     endif
     
@@ -143,10 +143,13 @@ program MigrateMesh
        call errorout(ierr, 'cannot receive elements' )
     endif
 
-    ! we can now free the sender buffers
+    ! we can now free the sender buffers; the mesh above was sent with the
+    ! compid2 context, and iMOAB_FreeSenderBuffers looks the send buffers up by
+    ! that context, so passing the default -1 here would silently free nothing
+    context_id = compid2
     if (comm1 /= MPI_COMM_NULL) then
-
        ierr = iMOAB_FreeSenderBuffers(pid1, context_id)
+       call errorout(ierr, 'cannot free sender buffers' )
     endif
     call MPI_Barrier(gcomm, ierr)
     call errorout(ierr, 'cannot stop at barrier' )

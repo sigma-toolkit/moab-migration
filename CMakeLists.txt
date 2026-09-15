@@ -959,10 +959,31 @@ string( STRIP "${MOAB_MAKE_TPL_INCLUDES}" MOAB_MAKE_TPL_INCLUDES )
 # Join with spaces, dropping empty entries but keeping order and duplicates -
 # repeated archives matter when resolving static libraries.
 set( _moab_make_ext_libs "" )
-foreach( _moab_make_lib ${NETCDF_LIBRARIES} ${PNETCDF_LIBRARIES} ${CGNS_LIBRARIES}
-                        ${HDF5_LIBRARIES} ${TEMPESTREMAP_LIBRARIES} ${ZOLTAN_LIBRARIES}
-                        ${PARMETIS_LIBRARIES} ${METIS_LIBRARIES} ${HYPRE_LIBRARIES}
-                        ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
+set( _moab_make_libs ${NETCDF_LIBRARIES} ${PNETCDF_LIBRARIES} ${CGNS_LIBRARIES}
+                     ${HDF5_LIBRARIES} ${TEMPESTREMAP_LIBRARIES} ${ZOLTAN_LIBRARIES}
+                     ${PARMETIS_LIBRARIES} ${METIS_LIBRARIES} ${HYPRE_LIBRARIES}
+                     ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
+if( MOAB_HAVE_MPI )
+  list( APPEND _moab_make_libs ${MPI_CXX_LIBRARIES} )
+endif()
+foreach( _moab_make_lib ${_moab_make_libs} )
+  # Packages found through their own CMake config package hand back imported
+  # target names rather than paths - HDF5 gives "hdf5_hl-shared".  A target name
+  # means nothing to a makefile, and the linker reads it as a filename, so
+  # resolve it to the library it stands for or drop it.
+  if( TARGET "${_moab_make_lib}" )
+    get_target_property( _moab_make_imploc "${_moab_make_lib}" IMPORTED_LOCATION )
+    foreach( _moab_make_cfg RELEASE RELWITHDEBINFO MINSIZEREL DEBUG NOCONFIG )
+      if( NOT _moab_make_imploc )
+        get_target_property( _moab_make_imploc "${_moab_make_lib}" IMPORTED_LOCATION_${_moab_make_cfg} )
+      endif()
+    endforeach()
+    if( _moab_make_imploc )
+      set( _moab_make_lib "${_moab_make_imploc}" )
+    else()
+      continue()
+    endif()
+  endif()
   # On macOS, FindBLAS/FindLAPACK hand back a bare path to the Accelerate
   # .framework bundle, which the linker cannot mmap.  Reuse the rewrite that
   # ResolveCompilerPaths.cmake already applies to the CMake targets, so the

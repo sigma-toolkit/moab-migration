@@ -99,7 +99,9 @@ examples_earthsystem_earth_DATA = \
                examples/earthsystem/earth/BoundaryContinents.cpp \
                examples/earthsystem/earth/addPCdata.cpp \
                examples/earthsystem/earth/AddFieldtoPG2.cpp \
-               examples/earthsystem/earth/copyPartition.cpp
+               examples/earthsystem/earth/copyPartition.cpp \
+               examples/earthsystem/earth/ExtractLand.cpp \
+               examples/earthsystem/earth/addConnec.cpp
 
 CMAKE_CONFIGURATION_FILES = CMakeLists.txt \
    config/AutoconfHeader.cmake      config/GenerateScript.cmake   config/FindNETCDF.cmake        config/FindZOLTAN.cmake      \

@@ -1008,7 +1008,11 @@ SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/earthsystem/earth/makefile
   examples/earthsystem/earth/ContinentsOnGlobe.cpp
   examples/earthsystem/earth/BoundaryContinents.cpp
-  examples/earthsystem/earth/addPCdata.cpp )
+  examples/earthsystem/earth/addPCdata.cpp
+  examples/earthsystem/earth/AddFieldtoPG2.cpp
+  examples/earthsystem/earth/copyPartition.cpp
+  examples/earthsystem/earth/ExtractLand.cpp
+  examples/earthsystem/earth/addConnec.cpp )
 
 include(AutoconfHeader)
 moab_install_docs(${MOAB_EXAMPLES})

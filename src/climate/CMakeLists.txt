@@ -19,4 +19,15 @@ if( MOAB_HAVE_NETCDF )
   list( APPEND MOAB_CLIMATE_OBJECTS $<TARGET_OBJECTS:moab_climate_io> )
 endif()
 
+# Spherical mesh intersection, the geometric kernel underneath conservative
+# remapping.  Always built, as it has no external dependencies.
+add_subdirectory(intx_mesh)
+list( APPEND MOAB_CLIMATE_OBJECTS $<TARGET_OBJECTS:moab_intx_mesh> )
+
+# TempestRemap-based conservative remapping.
+if( MOAB_HAVE_TEMPESTREMAP )
+  add_subdirectory(remapping)
+  list( APPEND MOAB_CLIMATE_OBJECTS $<TARGET_OBJECTS:moab_climate_remapping> )
+endif()
+
 set( MOAB_CLIMATE_OBJECTS ${MOAB_CLIMATE_OBJECTS} PARENT_SCOPE )

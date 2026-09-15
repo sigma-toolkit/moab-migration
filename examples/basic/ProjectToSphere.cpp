@@ -11,7 +11,7 @@
 #include <iostream>
 #include <cmath>
 
-#include "moab/IntxMesh/IntxUtils.hpp"
+#include "moab/climate/intx_mesh/IntxUtils.hpp"
 #include <cassert>
 using namespace moab;
 

@@ -70,7 +70,7 @@
 #include "moab/ParallelComm.hpp"
 #include "moab/ParCommGraph.hpp"
 #include "moab/ParallelMergeMesh.hpp"
-#include "moab/IntxMesh/IntxUtils.hpp"
+#include "moab/climate/intx_mesh/IntxUtils.hpp"
 #endif
 #include "DebugOutput.hpp"
 #include "moab/iMOAB.h"
@@ -89,10 +89,10 @@
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
 #include "STLStringHelper.h"
-#include "moab/IntxMesh/IntxUtils.hpp"
+#include "moab/climate/intx_mesh/IntxUtils.hpp"
 
-#include "moab/Remapping/TempestRemapper.hpp"
-#include "moab/Remapping/TempestOnlineMap.hpp"
+#include "moab/climate/remapping/TempestRemapper.hpp"
+#include "moab/climate/remapping/TempestOnlineMap.hpp"
 #endif
 
 // C++ includes

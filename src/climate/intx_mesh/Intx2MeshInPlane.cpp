@@ -5,9 +5,9 @@
  *      Author: iulian
  */
 
-#include "moab/IntxMesh/Intx2MeshInPlane.hpp"
+#include "moab/climate/intx_mesh/Intx2MeshInPlane.hpp"
 #include "moab/GeomUtil.hpp"
-#include "moab/IntxMesh/IntxUtils.hpp"
+#include "moab/climate/intx_mesh/IntxUtils.hpp"
 
 namespace moab
 {

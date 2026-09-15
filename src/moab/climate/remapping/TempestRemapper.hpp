@@ -15,9 +15,9 @@
 #ifndef MB_TEMPESTREMAPPER_HPP
 #define MB_TEMPESTREMAPPER_HPP
 
-#include "moab/Remapping/Remapper.hpp"
-#include "moab/IntxMesh/Intx2MeshOnSphere.hpp"
-#include "moab/IntxMesh/IntxUtils.hpp"
+#include "moab/climate/remapping/Remapper.hpp"
+#include "moab/climate/intx_mesh/Intx2MeshOnSphere.hpp"
+#include "moab/climate/intx_mesh/IntxUtils.hpp"
 
 // Tempest includes
 #ifdef MOAB_HAVE_TEMPESTREMAP

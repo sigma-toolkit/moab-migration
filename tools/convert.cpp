@@ -42,7 +42,7 @@
 #endif
 
 #ifdef MOAB_HAVE_TEMPESTREMAP
-#include "moab/Remapping/TempestRemapper.hpp"
+#include "moab/climate/remapping/TempestRemapper.hpp"
 
 constexpr bool offlineGenerator = true;
 #endif

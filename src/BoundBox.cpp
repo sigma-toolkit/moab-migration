@@ -2,7 +2,7 @@
 #include "moab/BoundBox.hpp"
 
 // this is used for spherical elements, bounding box needs to be updated due to curvature
-#include "moab/IntxMesh/IntxUtils.hpp"
+#include "moab/climate/intx_mesh/IntxUtils.hpp"
 
 namespace moab
 {

@@ -26,7 +26,7 @@
 #include "DebugOutput.hpp"
 #include "moab/AdaptiveKDTree.hpp"
 
-#include "moab/Remapping/TempestOnlineMap.hpp"
+#include "moab/climate/remapping/TempestOnlineMap.hpp"
 #include "moab/TupleList.hpp"
 #include "moab/MeshTopoUtil.hpp"
 

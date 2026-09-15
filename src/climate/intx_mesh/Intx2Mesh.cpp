@@ -8,7 +8,7 @@
 #include <queue>
 #include <sstream>
 //
-#include "moab/IntxMesh/Intx2Mesh.hpp"
+#include "moab/climate/intx_mesh/Intx2Mesh.hpp"
 #ifdef MOAB_HAVE_MPI
 #include "moab/ParallelComm.hpp"
 #include "MBParallelConventions.h"

@@ -17,7 +17,7 @@
 #include <cstring>
 #include "moab/Core.hpp"
 #include "moab/Interface.hpp"
-#include "moab/IntxMesh/Intx2MeshOnSphere.hpp"
+#include "moab/climate/intx_mesh/Intx2MeshOnSphere.hpp"
 #include <cmath>
 #include "TestUtil.hpp"
 #include "moab/ParallelComm.hpp"
@@ -26,7 +26,7 @@
 #include "moab/ReadUtilIface.hpp"
 #include "MBTagConventions.hpp"
 
-#include "moab/IntxMesh/IntxUtils.hpp"
+#include "moab/climate/intx_mesh/IntxUtils.hpp"
 
 // for M_PI
 #include <cmath>

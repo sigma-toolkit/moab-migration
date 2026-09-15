@@ -143,7 +143,7 @@ endif
 geometry_DIR = geometry
 
 if ENABLE_mbtempest
-  AM_CPPFLAGS += $(TEMPESTREMAP_INCLUDE) -I$(top_srcdir)/src/Remapping -I$(top_srcdir)/src/IntxMesh
+  AM_CPPFLAGS += $(TEMPESTREMAP_INCLUDE) -I$(top_srcdir)/src/climate/remapping -I$(top_srcdir)/src/climate/intx_mesh
   bin_PROGRAMS += mbtempest h5mtoscrip
 mbtempest_SOURCES = mbtempest.cpp
 h5mtoscrip_SOURCES = h5mtoscrip.cpp

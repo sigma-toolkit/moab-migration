@@ -11,8 +11,8 @@
 #include <cstring>
 #include "moab/Core.hpp"
 #include "moab/Interface.hpp"
-#include "moab/IntxMesh/Intx2MeshInPlane.hpp"
-#include "moab/IntxMesh/IntxUtils.hpp"
+#include "moab/climate/intx_mesh/Intx2MeshInPlane.hpp"
+#include "moab/climate/intx_mesh/IntxUtils.hpp"
 #include "TestUtil.hpp"
 #include <cmath>
 

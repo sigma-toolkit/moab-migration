@@ -264,6 +264,13 @@ if (MOAB_HAVE_METIS)
 
 endif()
 
+if (MOAB_HAVE_MPI AND MPI_FOUND)
+  # ParCommGraph builds in src/earthsystem/parallel; only the public header is
+  # declared here so it is installed with the rest.
+  set( MOAB_INSTALL_HEADERS ${MOAB_INSTALL_HEADERS}
+        moab/earthsystem/parallel/ParCommGraph.hpp )
+endif()
+
 if (MOAB_HAVE_TEMPESTREMAP)
   # Remapping sources build in src/earthsystem/remapping; only the public
   # headers are declared here so they are installed with the rest.

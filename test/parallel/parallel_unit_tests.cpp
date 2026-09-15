@@ -1,6 +1,6 @@
 #include "moab/ParallelComm.hpp"
 #include "MBParallelConventions.h"
-#include "moab/ParCommGraph.hpp"
+#include "moab/earthsystem/parallel/ParCommGraph.hpp"
 #include "ReadParallel.hpp"
 #include "moab/FileOptions.hpp"
 #include "MBTagConventions.hpp"

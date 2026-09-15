@@ -68,7 +68,7 @@
 #ifdef MOAB_HAVE_MPI
 #include "moab_mpi.h"
 #include "moab/ParallelComm.hpp"
-#include "moab/ParCommGraph.hpp"
+#include "moab/earthsystem/parallel/ParCommGraph.hpp"
 #include "moab/ParallelMergeMesh.hpp"
 #include "moab/earthsystem/intx_mesh/IntxUtils.hpp"
 #endif

@@ -14,7 +14,7 @@
 #include "moab/AdaptiveKDTree.hpp"
 #include "moab/BVHTree.hpp"
 
-#include "moab/climate/intx_mesh/IntxUtils.hpp"
+#include "moab/earthsystem/intx_mesh/IntxUtils.hpp"
 
 #ifdef MOAB_HAVE_MPI
 #include "moab_mpi.h"
@@ -67,7 +67,7 @@ int main( int argc, char* argv[] )
     opts.addOpt< void >( "keep,K",
                          "Keep the existing partitions in the slave mesh (use PARALLEL_PARTITION_SLAVE instead)",
                          &keepsparts );
-    opts.addOpt< void >( "spherical", "Hint that the meshes are defined on a spherical surface (Climate problems)",
+    opts.addOpt< void >( "spherical", "Hint that the meshes are defined on a spherical surface (Earth system problems)",
                          &use_spherical );
     opts.parseCommandLine( argc, argv );
 

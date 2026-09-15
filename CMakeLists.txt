@@ -601,7 +601,7 @@ if ( ENABLE_TEMPESTREMAP )
     find_package( TEMPESTREMAP REQUIRED )
 
     # Print some TempestRemap configuration details
-    SET_VARS_IF_FOUND(TEMPESTREMAP OPTIONAL "TempestRemap" "TempestRemap library interfaces for MOAB climate remapping support" TEMPESTREMAP_INCLUDES TEMPESTREMAP_LIBRARIES )
+    SET_VARS_IF_FOUND(TEMPESTREMAP OPTIONAL "TempestRemap" "TempestRemap library interfaces for MOAB Earth system remapping support" TEMPESTREMAP_INCLUDES TEMPESTREMAP_LIBRARIES )
 
     if (MOAB_HAVE_TEMPESTREMAP)
       LIST(APPEND LOGGING_WATCHED_VARIABLES

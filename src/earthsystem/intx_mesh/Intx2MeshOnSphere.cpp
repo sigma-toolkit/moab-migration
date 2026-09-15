@@ -8,8 +8,8 @@
 #define _USE_MATH_DEFINES  // For M_PI
 #endif
 
-#include "moab/climate/intx_mesh/Intx2MeshOnSphere.hpp"
-#include "moab/climate/intx_mesh/IntxUtils.hpp"
+#include "moab/earthsystem/intx_mesh/Intx2MeshOnSphere.hpp"
+#include "moab/earthsystem/intx_mesh/IntxUtils.hpp"
 #include "moab/GeomUtil.hpp"
 #include "moab/BoundBox.hpp"
 #include "moab/MeshTopoUtil.hpp"

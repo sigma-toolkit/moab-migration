@@ -1,8 +1,8 @@
 # Spherical mesh intersection: the geometric kernel underneath conservative
-# remapping between climate grids.
+# remapping between Earth system grids.
 include_directories( ${MOAB_BINARY_DIR}/src
                      ${MOAB_SOURCE_DIR}/src
-                     ${MOAB_SOURCE_DIR}/src/climate/intx_mesh
+                     ${MOAB_SOURCE_DIR}/src/earthsystem/intx_mesh
                      ${MOAB_BINARY_DIR}/src/parallel )
 
 if( MOAB_HAVE_HDF5 )

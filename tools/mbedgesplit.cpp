@@ -16,8 +16,8 @@
 #ifdef MOAB_HAVE_MPI
 #include "moab/ParallelComm.hpp"
 #endif
-#include "moab/climate/intx_mesh/Intx2MeshEdges.hpp"
-#include "moab/climate/intx_mesh/IntxUtils.hpp"
+#include "moab/earthsystem/intx_mesh/Intx2MeshEdges.hpp"
+#include "moab/earthsystem/intx_mesh/IntxUtils.hpp"
 #include "moab/ProgOptions.hpp"
 #include <cmath>
 

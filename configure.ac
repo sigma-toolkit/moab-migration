@@ -633,9 +633,9 @@ EXPORT_LDFLAGS="$NETCDF_LDFLAGS $EXPORT_LDFLAGS"
 AC_SUBST(NETCDF_LIBS)
 AC_SUBST(enablenetcdf)
 
-# The climate NetCDF grid readers/writers (src/climate/io) build when either
+# The Earth system NetCDF grid readers/writers (src/earthsystem/io) build when either
 # NetCDF or PNetCDF is available.
-AM_CONDITIONAL(HAVE_CLIMATE_NETCDF,
+AM_CONDITIONAL(HAVE_EARTHSYSTEM_NETCDF,
                [test "xno" != "x$enablenetcdf" || test "xyes" = "x$enablepnetcdf"])
 
 
@@ -897,7 +897,7 @@ if (test "x$WITH_TEMPEST" != "xno" && test "x$WITH_TEMPEST" != "x"); then
     AC_SUBST(TEMPESTREMAP_LIBS)
 
       # Define macro HAVE_TEMPESTREMAP
-    AC_DEFINE([HAVE_TEMPESTREMAP],[1],[Enable use of TempestRemap library API for computing intersection and remapping for Climate problems])
+    AC_DEFINE([HAVE_TEMPESTREMAP],[1],[Enable use of TempestRemap library API for computing intersection and remapping for Earth system problems])
     HAVE_TEMPEST=yes
 
     TEMPESTREMAP_DIR=$WITH_TEMPEST
@@ -1159,8 +1159,8 @@ AC_CONFIG_FILES([Makefile
                  src/Makefile
                  src/io/Makefile
                  src/io/mhdf/Makefile
-                 src/climate/Makefile
-                 src/climate/io/Makefile
+                 src/earthsystem/Makefile
+                 src/earthsystem/io/Makefile
                  test/Makefile
                  test/h5file/Makefile
                  test/obb/Makefile

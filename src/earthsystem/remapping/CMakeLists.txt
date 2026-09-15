@@ -1,8 +1,8 @@
-# Conservative remapping between climate grids, built on TempestRemap.
+# Conservative remapping between Earth system grids, built on TempestRemap.
 # Only built when TempestRemap is available.
 include_directories( ${MOAB_BINARY_DIR}/src
                      ${MOAB_SOURCE_DIR}/src
-                     ${MOAB_SOURCE_DIR}/src/climate/remapping
+                     ${MOAB_SOURCE_DIR}/src/earthsystem/remapping
                      ${MOAB_BINARY_DIR}/src/parallel
                      ${TEMPESTREMAP_INCLUDES} )
 
@@ -29,6 +29,6 @@ set( MOAB_REMAPPING_SRCS
         netcdfcpp_par.hpp
    )
 
-add_library( moab_climate_remapping OBJECT ${MOAB_REMAPPING_SRCS} )
-set_target_properties( moab_climate_remapping PROPERTIES
+add_library( moab_earthsystem_remapping OBJECT ${MOAB_REMAPPING_SRCS} )
+set_target_properties( moab_earthsystem_remapping PROPERTIES
                        COMPILE_FLAGS "-DIS_BUILDING_MB ${MOAB_DEFINES}" )

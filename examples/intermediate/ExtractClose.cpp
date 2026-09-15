@@ -38,7 +38,7 @@
 #include "moab/Range.hpp"
 #include "moab/ProgOptions.hpp"
 #include "moab/CartVect.hpp"
-#include "moab/climate/intx_mesh/IntxUtils.hpp"
+#include "moab/earthsystem/intx_mesh/IntxUtils.hpp"
 
 #ifdef MOAB_HAVE_MPI
 #include "moab_mpi.h"

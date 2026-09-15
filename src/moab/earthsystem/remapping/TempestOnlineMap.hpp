@@ -13,7 +13,7 @@
 #error Re-configure with TempestRemap
 #endif
 
-#include "moab/climate/remapping/TempestRemapper.hpp"
+#include "moab/earthsystem/remapping/TempestRemapper.hpp"
 
 // Tempest includes
 #pragma GCC diagnostic push

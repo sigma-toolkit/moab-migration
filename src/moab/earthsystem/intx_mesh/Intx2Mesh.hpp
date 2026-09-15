@@ -20,7 +20,7 @@
 #include "moab/Interface.hpp"
 #include "moab/Range.hpp"
 #include "moab/CartVect.hpp"
-#include "moab/climate/intx_mesh/IntxUtils.hpp"
+#include "moab/earthsystem/intx_mesh/IntxUtils.hpp"
 
 // #define ENABLE_DEBUG
 

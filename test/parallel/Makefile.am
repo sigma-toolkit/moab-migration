@@ -23,7 +23,7 @@ AM_CPPFLAGS  = -I. \
                -I$(top_builddir)/src \
                -I$(top_srcdir)/src \
                -I$(top_srcdir)/src/parallel \
-               -I$(top_srcdir)/src/climate/intx_mesh \
+               -I$(top_srcdir)/src/earthsystem/intx_mesh \
                -I$(top_srcdir)/src/io/mhdf/include
 
 # initialize

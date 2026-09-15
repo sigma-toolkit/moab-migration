@@ -26,9 +26,9 @@
 #include "LinearRemapSE0.h"
 #include "LinearRemapFV.h"
 
-#include "moab/climate/remapping/TempestOnlineMap.hpp"
-#include "moab/climate/remapping/IntegerReprosum.hpp"
-#include "moab/climate/intx_mesh/IntxUtils.hpp"
+#include "moab/earthsystem/remapping/TempestOnlineMap.hpp"
+#include "moab/earthsystem/remapping/IntegerReprosum.hpp"
+#include "moab/earthsystem/intx_mesh/IntxUtils.hpp"
 #include "DebugOutput.hpp"
 #include "moab/TupleList.hpp"
 #include "moab/MeshTopoUtil.hpp"

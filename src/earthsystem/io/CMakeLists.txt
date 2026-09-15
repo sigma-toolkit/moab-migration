@@ -1,5 +1,5 @@
-# Climate NetCDF readers/writers (CAM Euler/FV/HOMME, MPAS, GCRM, SCRIP,
-# ESMF and domain grids).  These are the climate-specific half of the old
+# EarthSystem NetCDF readers/writers (CAM Euler/FV/HOMME, MPAS, GCRM, SCRIP,
+# ESMF and domain grids).  These are the Earth-system-specific half of the old
 # src/io directory; the ExodusII NetCDF reader/writer (ReadNCDF/WriteNCDF)
 # is general-purpose and stays in src/io.
 #
@@ -8,11 +8,11 @@
 include_directories( ${MOAB_BINARY_DIR}/src
                      ${MOAB_SOURCE_DIR}/src
                      ${MOAB_SOURCE_DIR}/src/io
-                     ${MOAB_SOURCE_DIR}/src/climate/io
+                     ${MOAB_SOURCE_DIR}/src/earthsystem/io
                      ${MOAB_BINARY_DIR}/src/parallel
                     )
 
-set( MOAB_CLIMATE_IO_SRCS
+set( MOAB_EARTHSYSTEM_IO_SRCS
         ReadNC.hpp        ReadNC.cpp
         WriteNC.hpp       WriteNC.cpp
         NCHelper.hpp      NCHelper.cpp
@@ -45,6 +45,6 @@ if( MOAB_HAVE_ZOLTAN )
   include_directories(${ZOLTAN_INCLUDES})
 endif()
 
-add_library( moab_climate_io OBJECT ${MOAB_CLIMATE_IO_SRCS} )
-set_target_properties( moab_climate_io PROPERTIES
+add_library( moab_earthsystem_io OBJECT ${MOAB_EARTHSYSTEM_IO_SRCS} )
+set_target_properties( moab_earthsystem_io PROPERTIES
                        COMPILE_FLAGS "-DIS_BUILDING_MB ${MOAB_DEFINES}" )

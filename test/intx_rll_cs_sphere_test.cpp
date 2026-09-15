@@ -2,8 +2,8 @@
  * IntxRllCssphere_test.cpp
  */
 
-#include "moab/climate/intx_mesh/IntxRllCssphere.hpp"
-#include "moab/climate/intx_mesh/IntxUtils.hpp"
+#include "moab/earthsystem/intx_mesh/IntxRllCssphere.hpp"
+#include "moab/earthsystem/intx_mesh/IntxUtils.hpp"
 #include "TestUtil.hpp"
 
 using namespace moab;

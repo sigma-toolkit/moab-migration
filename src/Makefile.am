@@ -22,7 +22,7 @@ AM_CPPFLAGS += -DIS_BUILDING_MB \
                -I$(srcdir)/local_discretization \
                -I$(srcdir)/verdict \
                -I$(srcdir)/discrete_geometry \
-               -I$(srcdir)/IntxMesh
+               -I$(srcdir)/climate/intx_mesh
 
 # The directory in which to install headers
 libMOAB_la_includedir = $(includedir)
@@ -71,12 +71,12 @@ libMOAB_la_SOURCES = \
   HomXform.cpp \
   iMOAB.cpp \
   Internals.hpp \
-  IntxMesh/Intx2Mesh.cpp  \
-  IntxMesh/Intx2MeshInPlane.cpp  \
-  IntxMesh/Intx2MeshOnSphere.cpp \
-  IntxMesh/Intx2MeshEdges.cpp \
-  IntxMesh/IntxRllCssphere.cpp \
-  IntxMesh/IntxUtils.cpp \
+  climate/intx_mesh/Intx2Mesh.cpp  \
+  climate/intx_mesh/Intx2MeshInPlane.cpp  \
+  climate/intx_mesh/Intx2MeshOnSphere.cpp \
+  climate/intx_mesh/Intx2MeshEdges.cpp \
+  climate/intx_mesh/IntxRllCssphere.cpp \
+  climate/intx_mesh/IntxUtils.cpp \
   LloydSmoother.cpp \
   MBCNArrays.hpp \
   MergeMesh.cpp \
@@ -284,14 +284,14 @@ pointlocelementmapsinclude_HEADERS = \
   moab/point_locater/element_maps/spectral_hex_map.hpp  \
   moab/point_locater/element_maps/quadratic_hex_map.hpp  
 
-intxmeshincludedir = $(includedir)/moab/IntxMesh
+intxmeshincludedir = $(includedir)/moab/climate/intx_mesh
 intxmeshinclude_HEADERS = \
-	moab/IntxMesh/Intx2Mesh.hpp \
-	moab/IntxMesh/IntxUtils.hpp \
-  moab/IntxMesh/Intx2MeshInPlane.hpp \
-  moab/IntxMesh/Intx2MeshOnSphere.hpp \
-  moab/IntxMesh/Intx2MeshEdges.hpp \
-  moab/IntxMesh/IntxRllCssphere.hpp
+	moab/climate/intx_mesh/Intx2Mesh.hpp \
+	moab/climate/intx_mesh/IntxUtils.hpp \
+  moab/climate/intx_mesh/Intx2MeshInPlane.hpp \
+  moab/climate/intx_mesh/Intx2MeshOnSphere.hpp \
+  moab/climate/intx_mesh/Intx2MeshEdges.hpp \
+  moab/climate/intx_mesh/IntxRllCssphere.hpp
 
 # Conditional sources
 if ENABLE_FORTRAN
@@ -313,36 +313,36 @@ endif # ENABLE_FORTRAN
 if ENABLE_mbtempest
 MOAB_REMAPPING_SRCS =
 
-MOAB_REMAPPING_HDRS = moab/Remapping/Remapper.hpp
+MOAB_REMAPPING_HDRS = moab/climate/remapping/Remapper.hpp
 
-AM_CPPFLAGS += -I$(srcdir)/Remapping
+AM_CPPFLAGS += -I$(srcdir)/climate/remapping
 
-EXTRA_DIST += Remapping/netcdfcpp_par.hpp
+EXTRA_DIST += climate/remapping/netcdfcpp_par.hpp
 
 if HAVE_TEMPESTREMAP
   AM_CPPFLAGS += $(TEMPESTREMAP_INCLUDE)
   libMOAB_la_LIBADD += $(TEMPESTREMAP_LIBS)
 
   MOAB_REMAPPING_SRCS += \
-     Remapping/ApplyWeights.cpp \
-     Remapping/TempestRemapper.cpp  \
-     Remapping/TempestLinearRemap.cpp \
-     Remapping/TempestOnlineMap.cpp \
-     Remapping/TempestOnlineMapIO.cpp \
-     Remapping/IntegerReprosum.cpp \
-     Remapping/netcdfcpp_par.hpp
+     climate/remapping/ApplyWeights.cpp \
+     climate/remapping/TempestRemapper.cpp  \
+     climate/remapping/TempestLinearRemap.cpp \
+     climate/remapping/TempestOnlineMap.cpp \
+     climate/remapping/TempestOnlineMapIO.cpp \
+     climate/remapping/IntegerReprosum.cpp \
+     climate/remapping/netcdfcpp_par.hpp
 
   MOAB_REMAPPING_HDRS += \
-     moab/Remapping/TempestRemapper.hpp \
-     moab/Remapping/TempestOnlineMap.hpp \
-     moab/Remapping/IntegerReprosum.hpp
+     moab/climate/remapping/TempestRemapper.hpp \
+     moab/climate/remapping/TempestOnlineMap.hpp \
+     moab/climate/remapping/IntegerReprosum.hpp
 
 endif # if HAVE_TEMPESTREMAP
 
 # Add the remapping sources to the library
 libMOAB_la_SOURCES += $(MOAB_REMAPPING_SRCS)
 # Add the include headers to installation paths
-remappingincludedir = $(includedir)/moab/Remapping
+remappingincludedir = $(includedir)/moab/climate/remapping
 remappinginclude_HEADERS = $(MOAB_REMAPPING_HDRS)
 
 endif # if ENABLE_mbtempest
@@ -439,7 +439,7 @@ endif
 
 
 CLEANFILES = a.out imoab.mod
-EXTRA_DIST += CMakeLists.txt parallel/CMakeLists.txt IntxMesh/CMakeLists.txt
+EXTRA_DIST += CMakeLists.txt parallel/CMakeLists.txt climate/intx_mesh/CMakeLists.txt
 
 ## Rules for Fortran sources compilation
 FORTDEFS = $(FCDEFS)

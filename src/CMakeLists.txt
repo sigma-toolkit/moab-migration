@@ -21,7 +21,6 @@ configure_file(${CMAKE_CURRENT_BINARY_DIR}/moab/EntityHandle.hpp.in ${CMAKE_CURR
 
 set(moab_link_lib)
 add_subdirectory(io)
-add_subdirectory(IntxMesh)
 add_subdirectory(climate)
 
 if( MOAB_HAVE_HDF5 )
@@ -172,12 +171,12 @@ set( MOAB_INSTALL_HEADERS
         moab/GeomUtil.hpp
         moab/iMOAB.h
         moab/Interface.hpp
-        moab/IntxMesh/Intx2Mesh.hpp
-        moab/IntxMesh/IntxUtils.hpp
-        moab/IntxMesh/Intx2MeshInPlane.hpp
-        moab/IntxMesh/Intx2MeshOnSphere.hpp
-        moab/IntxMesh/Intx2MeshEdges.hpp
-        moab/IntxMesh/IntxRllCssphere.hpp
+        moab/climate/intx_mesh/Intx2Mesh.hpp
+        moab/climate/intx_mesh/IntxUtils.hpp
+        moab/climate/intx_mesh/Intx2MeshInPlane.hpp
+        moab/climate/intx_mesh/Intx2MeshOnSphere.hpp
+        moab/climate/intx_mesh/Intx2MeshEdges.hpp
+        moab/climate/intx_mesh/IntxRllCssphere.hpp
         moab/LloydSmoother.hpp
         moab/point_locater/tree/common_tree.hpp
         moab/point_locater/tree/element_tree.hpp
@@ -266,20 +265,13 @@ if (MOAB_HAVE_METIS)
 endif()
 
 if (MOAB_HAVE_TEMPESTREMAP)
-  set( MOAB_LIB_SOURCES ${MOAB_LIB_SOURCES}
-                        Remapping/ApplyWeights.cpp
-                        Remapping/TempestRemapper.cpp
-                        Remapping/TempestOnlineMap.cpp
-                        Remapping/TempestLinearRemap.cpp
-                        Remapping/TempestOnlineMapIO.cpp
-                        Remapping/IntegerReprosum.cpp
-                        Remapping/netcdfcpp_par.hpp
-                        )
+  # Remapping sources build in src/climate/remapping; only the public
+  # headers are declared here so they are installed with the rest.
   set( MOAB_INSTALL_HEADERS ${MOAB_INSTALL_HEADERS}
-        moab/Remapping/Remapper.hpp
-        moab/Remapping/TempestRemapper.hpp
-        moab/Remapping/TempestOnlineMap.hpp
-        moab/Remapping/IntegerReprosum.hpp )
+        moab/climate/remapping/Remapper.hpp
+        moab/climate/remapping/TempestRemapper.hpp
+        moab/climate/remapping/TempestOnlineMap.hpp
+        moab/climate/remapping/IntegerReprosum.hpp )
 
 endif (MOAB_HAVE_TEMPESTREMAP)
 
@@ -287,7 +279,6 @@ add_library(
   MOAB
   ${MOAB_LIB_SOURCES} ${MOAB_INSTALL_HEADERS} ${MOAB_GENERATED_INSTALL_HEADERS}
   $<TARGET_OBJECTS:moabio>
-  $<TARGET_OBJECTS:moab_intx_mesh>
   ${MOAB_CLIMATE_OBJECTS}
   ${MOABPAR_OBJECTS}
   ${MDHF_OBJ}

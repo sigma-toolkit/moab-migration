@@ -25,7 +25,7 @@ typedef int PartType;
 #include <list>
 #include <ctime>
 
-#include "moab/IntxMesh/IntxUtils.hpp"
+#include "moab/climate/intx_mesh/IntxUtils.hpp"
 
 using namespace moab;
 

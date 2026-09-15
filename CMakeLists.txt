@@ -1003,12 +1003,12 @@ SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/python/makefile
   examples/python/laplaciansmoother.py )
 SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
-  examples/apps/makefile )
+  examples/earthsystem/makefile )
 SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
-  examples/apps/earth/makefile
-  examples/apps/earth/ContinentsOnGlobe.cpp
-  examples/apps/earth/BoundaryContinents.cpp
-  examples/apps/earth/addPCdata.cpp )
+  examples/earthsystem/earth/makefile
+  examples/earthsystem/earth/ContinentsOnGlobe.cpp
+  examples/earthsystem/earth/BoundaryContinents.cpp
+  examples/earthsystem/earth/addPCdata.cpp )
 
 include(AutoconfHeader)
 moab_install_docs(${MOAB_EXAMPLES})

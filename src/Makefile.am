@@ -445,7 +445,7 @@ endif
 
 CLEANFILES = a.out imoab.mod
 EXTRA_DIST += CMakeLists.txt parallel/CMakeLists.txt earthsystem/intx_mesh/CMakeLists.txt \
-              earthsystem/parallel/CMakeLists.txt
+              earthsystem/parallel/CMakeLists.txt earthsystem/remapping/CMakeLists.txt
 
 ## Rules for Fortran sources compilation
 FORTDEFS = $(FCDEFS)

@@ -1051,6 +1051,9 @@ SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
 SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/basic/makefile
   examples/basic/ErrorHandlingSimulation.cpp
+  examples/basic/DeleteEdges.cpp
+  examples/basic/ProjectToSphere.cpp
+  examples/basic/ReadPartFile.cpp
   examples/basic/GetEntities.cpp
   examples/basic/HelloMOAB.cpp
   examples/basic/HelloParMOAB.cpp
@@ -1063,15 +1066,22 @@ SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/basic/UniformRefinement.cpp )
 SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/intermediate/makefile
+  examples/intermediate/ComputeTriDual.cpp
   examples/intermediate/DirectAccessNoHoles.cpp
   examples/intermediate/DirectAccessWithHoles.cpp
+  examples/intermediate/ExchangeHalos.cpp
+  examples/intermediate/ExtractClose.cpp
+  examples/intermediate/FixPolys.cpp
   examples/intermediate/LoadPartial.cpp
   examples/intermediate/PointInElementSearch.cpp
+  examples/intermediate/QuadTriConv.cpp
   examples/intermediate/ReduceExchangeTags.cpp )
 SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/advanced/makefile
+  examples/advanced/AddEdgeFluxVector.cpp
   examples/advanced/CrystalRouterExample.cpp
   examples/advanced/ExtrudePoly.cpp
+  examples/advanced/GeneralGnomonic.cpp
   examples/advanced/GenLargeMesh.cpp
   examples/advanced/LloydRelaxation.cpp
   examples/advanced/VisTags.cpp

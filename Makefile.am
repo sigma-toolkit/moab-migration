@@ -47,6 +47,7 @@ examples_basic_DATA = \
                examples/basic/TestErrorHandlingPar.cpp \
                examples/basic/TestExodusII.cpp \
                examples/basic/ReadPartFile.cpp \
+               examples/basic/ProjectToSphere.cpp \
                examples/basic/UniformRefinement.cpp
 examples_intermediatedir = $(datadir)/examples/intermediate
 examples_intermediate_DATA = \
@@ -59,6 +60,7 @@ examples_intermediate_DATA = \
                examples/intermediate/QuadTriConv.cpp \
                examples/intermediate/ExtractClose.cpp \
                examples/intermediate/ComputeTriDual.cpp \
+               examples/intermediate/ExchangeHalos.cpp \
                examples/intermediate/FixPolys.cpp
 examples_advanceddir = $(datadir)/examples/advanced
 examples_advanced_DATA = \
@@ -68,6 +70,8 @@ examples_advanced_DATA = \
                examples/advanced/GenLargeMesh.cpp \
                examples/advanced/LloydRelaxation.cpp \
                examples/advanced/CoupleMGen.cpp \
+               examples/advanced/AddEdgeFluxVector.cpp \
+               examples/advanced/GeneralGnomonic.cpp \
                examples/advanced/VisTags.cpp
 examples_advancedsmoothdir = $(datadir)/examples/advanced/smoothing
 examples_advancedsmooth_DATA = \

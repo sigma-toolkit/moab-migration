@@ -56,8 +56,10 @@
 #include "moab/ProgOptions.hpp"
 #include "moab/CartVect.hpp"
 #include "moab/NestedRefine.hpp"
-#include "moab/VerdictWrapper.hpp"
-#include "matrix.h"
+#include "moab/verdict/VerdictWrapper.hpp"
+#ifdef MOAB_HAVE_EIGEN3
+#include <Eigen/Dense>
+#endif
 
 using namespace moab;
 using namespace std;
@@ -71,10 +73,13 @@ string test_file_name = string( "input/surfrandomtris-4part.h5m" );
 #endif
 
 #define RC MB_CHK_ERR( rval )
-#define dbgprint( MSG )                                       \
-    do                                                        \
-    {                                                         \
-        if( !global_rank ) std::cerr << ( MSG ) << std::endl; \
+// MSG is an unparenthesized stream expression: every call site writes
+// dbgprint( "a" << x << "b" ), so wrapping it would bind the first << to the
+// string literal rather than to std::cerr.
+#define dbgprint( MSG )                                   \
+    do                                                    \
+    {                                                     \
+        if( !global_rank ) std::cerr << MSG << std::endl; \
     } while( false )
 
 ErrorCode perform_laplacian_smoothing( Core* mb,
@@ -529,7 +534,7 @@ ErrorCode perform_laplacian_smoothing( Core* mb,
                     }
                 }
                 else if( acc_method == 5 )
-                { /* Minimum polynomial extrapolation of vector sequenes :
+                {   /* Minimum polynomial extrapolation of vector sequenes :
                      https://en.wikipedia.org/wiki/Minimum_polynomial_extrapolation */
                     /* Pseudo-code
                           U=x(:,2:end-1)-x(:,1:end-2);
@@ -537,22 +542,32 @@ ErrorCode perform_laplacian_smoothing( Core* mb,
                           c(end+1,1)=1;
                           s=(x(:,2:end)*c)/sum(c);
                     */
-                    Matrix U( verts_n.size(), 2 );
-                    Vector res( verts_n.size() );
+#ifdef MOAB_HAVE_EIGEN3
+                    Eigen::MatrixXd U( verts_n.size(), 2 );
+                    Eigen::VectorXd res( verts_n.size() );
                     for( unsigned ir = 0; ir < verts_n.size(); ir++ )
                     {
                         U( ir, 0 ) = verts_acc2[ir] - verts_acc1[ir];
                         U( ir, 1 ) = verts_acc3[ir] - verts_acc2[ir];
-                        res[ir]    = -( verts_n[ir] - verts_acc3[ir] );
+                        res( ir )  = -( verts_n[ir] - verts_acc3[ir] );
                     }
-                    // U.print();
-                    // Vector acc = QR(U).solve(res);
-                    Vector acc    = solve( U, res );
-                    double accsum = acc[0] + acc[1] + 1.0;
+                    // c = -pinv(U)*res above.  U is 3*nverts by 2 and overdetermined, so
+                    // this is a least-squares solve; the complete orthogonal decomposition
+                    // is Eigen's rank-revealing equivalent of the pseudo-inverse and still
+                    // returns the minimum-norm solution once the two difference vectors
+                    // become parallel, which they do as the iteration converges.
+                    const Eigen::Vector2d acc = U.completeOrthogonalDecomposition().solve( res );
+                    const double accsum       = acc( 0 ) + acc( 1 ) + 1.0;
                     for( unsigned ir = 0; ir < verts_n.size(); ir++ )
                     {
-                        verts_n[ir] = ( verts_acc1[ir] * acc[0] + verts_acc2[ir] * acc[1] + verts_acc3[ir] ) / accsum;
+                        verts_n[ir] =
+                            ( verts_acc1[ir] * acc( 0 ) + verts_acc2[ir] * acc( 1 ) + verts_acc3[ir] ) / accsum;
                     }
+#else
+                    MB_SET_ERR( MB_NOT_IMPLEMENTED,
+                                "Acceleration method 5 (minimum polynomial extrapolation) needs a least-squares "
+                                "solve; rebuild MOAB with Eigen3 enabled, or choose -a 0..4" );
+#endif
 
                     memcpy( &verts_acc1[0], &verts_acc2[0], nbytes );
                     memcpy( &verts_acc2[0], &verts_acc3[0], nbytes );

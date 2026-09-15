@@ -34,7 +34,7 @@
 #include "MBTagConventions.hpp"
 #include "moab/CN.hpp"
 // used for gnomonic projection
-#include "moab/climate/intx_mesh/IntxUtils.hpp"
+#include "moab/earthsystem/intx_mesh/IntxUtils.hpp"
 
 using namespace moab;
 

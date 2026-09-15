@@ -16,8 +16,8 @@
 #endif
 
 #include "OfflineMap.h"
-#include "moab/climate/remapping/TempestRemapper.hpp"
-#include "moab/climate/remapping/TempestOnlineMap.hpp"
+#include "moab/earthsystem/remapping/TempestRemapper.hpp"
+#include "moab/earthsystem/remapping/TempestOnlineMap.hpp"
 #include "moab/ParallelComm.hpp"
 
 #ifndef IS_BUILDING_MB

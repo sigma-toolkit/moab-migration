@@ -18,7 +18,7 @@
  *   E3SM/share/util/shr_reprosum_mod.F90.
  */
 
-#include "moab/climate/remapping/IntegerReprosum.hpp"
+#include "moab/earthsystem/remapping/IntegerReprosum.hpp"
 
 #include <cmath>
 #include <cstdlib>

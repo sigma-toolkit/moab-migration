@@ -15,7 +15,7 @@
  */
 
 #include "FiniteElementTools.h"
-#include "moab/climate/remapping/TempestOnlineMap.hpp"
+#include "moab/earthsystem/remapping/TempestOnlineMap.hpp"
 #include "moab/TupleList.hpp"
 
 #ifdef MOAB_HAVE_NETCDFPAR

@@ -1,7 +1,7 @@
 #include "NCHelperDomain.hpp"
 #include "moab/FileOptions.hpp"
 #include "moab/ReadUtilIface.hpp"
-#include "moab/climate/intx_mesh/IntxUtils.hpp"
+#include "moab/earthsystem/intx_mesh/IntxUtils.hpp"
 #include "AEntityFactory.hpp"
 #ifdef MOAB_HAVE_MPI
 #include "moab/ParallelMergeMesh.hpp"

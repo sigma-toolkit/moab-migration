@@ -7,8 +7,8 @@ AM_CPPFLAGS =
 libMOAB_la_LDFLAGS = -version-info @LIBTOOL_VERSION@
 
 # Subdirectories to build
-SUBDIRS = io climate .
-libMOAB_la_LIBADD = io/libmoabio.la climate/io/libmoabclimateio.la
+SUBDIRS = io earthsystem .
+libMOAB_la_LIBADD = io/libmoabio.la earthsystem/io/libmoabearthsystemio.la
 EXTRA_DIST =
 
 # Some variables
@@ -17,12 +17,12 @@ AM_CPPFLAGS += -DIS_BUILDING_MB \
                -I. \
                -I$(srcdir)/io \
                -I$(srcdir)/io/mhdf/include \
-               -I$(srcdir)/climate/io \
+               -I$(srcdir)/earthsystem/io \
                -I$(srcdir)/parallel \
                -I$(srcdir)/local_discretization \
                -I$(srcdir)/verdict \
                -I$(srcdir)/discrete_geometry \
-               -I$(srcdir)/climate/intx_mesh
+               -I$(srcdir)/earthsystem/intx_mesh
 
 # The directory in which to install headers
 libMOAB_la_includedir = $(includedir)
@@ -71,12 +71,12 @@ libMOAB_la_SOURCES = \
   HomXform.cpp \
   iMOAB.cpp \
   Internals.hpp \
-  climate/intx_mesh/Intx2Mesh.cpp  \
-  climate/intx_mesh/Intx2MeshInPlane.cpp  \
-  climate/intx_mesh/Intx2MeshOnSphere.cpp \
-  climate/intx_mesh/Intx2MeshEdges.cpp \
-  climate/intx_mesh/IntxRllCssphere.cpp \
-  climate/intx_mesh/IntxUtils.cpp \
+  earthsystem/intx_mesh/Intx2Mesh.cpp  \
+  earthsystem/intx_mesh/Intx2MeshInPlane.cpp  \
+  earthsystem/intx_mesh/Intx2MeshOnSphere.cpp \
+  earthsystem/intx_mesh/Intx2MeshEdges.cpp \
+  earthsystem/intx_mesh/IntxRllCssphere.cpp \
+  earthsystem/intx_mesh/IntxUtils.cpp \
   LloydSmoother.cpp \
   MBCNArrays.hpp \
   MergeMesh.cpp \
@@ -284,14 +284,14 @@ pointlocelementmapsinclude_HEADERS = \
   moab/point_locater/element_maps/spectral_hex_map.hpp  \
   moab/point_locater/element_maps/quadratic_hex_map.hpp  
 
-intxmeshincludedir = $(includedir)/moab/climate/intx_mesh
+intxmeshincludedir = $(includedir)/moab/earthsystem/intx_mesh
 intxmeshinclude_HEADERS = \
-	moab/climate/intx_mesh/Intx2Mesh.hpp \
-	moab/climate/intx_mesh/IntxUtils.hpp \
-  moab/climate/intx_mesh/Intx2MeshInPlane.hpp \
-  moab/climate/intx_mesh/Intx2MeshOnSphere.hpp \
-  moab/climate/intx_mesh/Intx2MeshEdges.hpp \
-  moab/climate/intx_mesh/IntxRllCssphere.hpp
+	moab/earthsystem/intx_mesh/Intx2Mesh.hpp \
+	moab/earthsystem/intx_mesh/IntxUtils.hpp \
+  moab/earthsystem/intx_mesh/Intx2MeshInPlane.hpp \
+  moab/earthsystem/intx_mesh/Intx2MeshOnSphere.hpp \
+  moab/earthsystem/intx_mesh/Intx2MeshEdges.hpp \
+  moab/earthsystem/intx_mesh/IntxRllCssphere.hpp
 
 # Conditional sources
 if ENABLE_FORTRAN
@@ -313,36 +313,36 @@ endif # ENABLE_FORTRAN
 if ENABLE_mbtempest
 MOAB_REMAPPING_SRCS =
 
-MOAB_REMAPPING_HDRS = moab/climate/remapping/Remapper.hpp
+MOAB_REMAPPING_HDRS = moab/earthsystem/remapping/Remapper.hpp
 
-AM_CPPFLAGS += -I$(srcdir)/climate/remapping
+AM_CPPFLAGS += -I$(srcdir)/earthsystem/remapping
 
-EXTRA_DIST += climate/remapping/netcdfcpp_par.hpp
+EXTRA_DIST += earthsystem/remapping/netcdfcpp_par.hpp
 
 if HAVE_TEMPESTREMAP
   AM_CPPFLAGS += $(TEMPESTREMAP_INCLUDE)
   libMOAB_la_LIBADD += $(TEMPESTREMAP_LIBS)
 
   MOAB_REMAPPING_SRCS += \
-     climate/remapping/ApplyWeights.cpp \
-     climate/remapping/TempestRemapper.cpp  \
-     climate/remapping/TempestLinearRemap.cpp \
-     climate/remapping/TempestOnlineMap.cpp \
-     climate/remapping/TempestOnlineMapIO.cpp \
-     climate/remapping/IntegerReprosum.cpp \
-     climate/remapping/netcdfcpp_par.hpp
+     earthsystem/remapping/ApplyWeights.cpp \
+     earthsystem/remapping/TempestRemapper.cpp  \
+     earthsystem/remapping/TempestLinearRemap.cpp \
+     earthsystem/remapping/TempestOnlineMap.cpp \
+     earthsystem/remapping/TempestOnlineMapIO.cpp \
+     earthsystem/remapping/IntegerReprosum.cpp \
+     earthsystem/remapping/netcdfcpp_par.hpp
 
   MOAB_REMAPPING_HDRS += \
-     moab/climate/remapping/TempestRemapper.hpp \
-     moab/climate/remapping/TempestOnlineMap.hpp \
-     moab/climate/remapping/IntegerReprosum.hpp
+     moab/earthsystem/remapping/TempestRemapper.hpp \
+     moab/earthsystem/remapping/TempestOnlineMap.hpp \
+     moab/earthsystem/remapping/IntegerReprosum.hpp
 
 endif # if HAVE_TEMPESTREMAP
 
 # Add the remapping sources to the library
 libMOAB_la_SOURCES += $(MOAB_REMAPPING_SRCS)
 # Add the include headers to installation paths
-remappingincludedir = $(includedir)/moab/climate/remapping
+remappingincludedir = $(includedir)/moab/earthsystem/remapping
 remappinginclude_HEADERS = $(MOAB_REMAPPING_HDRS)
 
 endif # if ENABLE_mbtempest
@@ -439,7 +439,7 @@ endif
 
 
 CLEANFILES = a.out imoab.mod
-EXTRA_DIST += CMakeLists.txt parallel/CMakeLists.txt climate/intx_mesh/CMakeLists.txt
+EXTRA_DIST += CMakeLists.txt parallel/CMakeLists.txt earthsystem/intx_mesh/CMakeLists.txt
 
 ## Rules for Fortran sources compilation
 FORTDEFS = $(FCDEFS)

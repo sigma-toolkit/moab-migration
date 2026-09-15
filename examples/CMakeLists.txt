@@ -138,7 +138,7 @@ set ( APPS_EXAMPLES
 )
 
 # MOAB's own headers, plus the third-party headers its public headers include
-# (Eigen from Matrix3.hpp, NetCDF/TempestRemap from the climate headers, ...).
+# (Eigen from Matrix3.hpp, NetCDF/TempestRemap from the Earth system headers, ...).
 include_directories(${MOAB_INCLUDE_DIRS} ${MOAB_PACKAGE_INCLUDES})
 if ( MOAB_USE_MPI )
   include_directories(${MPI_CXX_INCLUDE_PATH})

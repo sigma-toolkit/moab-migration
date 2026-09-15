@@ -27,7 +27,7 @@ AM_CPPFLAGS  = -DIS_BUILDING_MB \
                -I$(top_srcdir)/src/local_discretization \
                -I$(top_srcdir)/src/verdict \
                -I$(top_srcdir)/src/discrete_geometry \
-               -I$(top_srcdir)/src/climate/intx_mesh
+               -I$(top_srcdir)/src/earthsystem/intx_mesh
 
 
 if PARALLEL
@@ -248,10 +248,10 @@ seq_man_test_LDFLAGS = $(AM_LDFLAGS) $(PTHREAD_LIBS)
 if ENABLE_mbtempest
 if HAVE_TEMPESTREMAP
   test_remapping_SOURCES = test_remapping.cpp
-  test_remapping_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/src/climate/remapping -I$(top_srcdir)/src/climate/intx_mesh $(TEMPESTREMAP_INCLUDE)
+  test_remapping_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/src/earthsystem/remapping -I$(top_srcdir)/src/earthsystem/intx_mesh $(TEMPESTREMAP_INCLUDE)
   test_remapping_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   imoab_remapping_SOURCES = imoab_remap.cpp
-  imoab_remapping_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/src/climate/remapping -I$(top_srcdir)/src/climate/intx_mesh $(TEMPESTREMAP_INCLUDE)
+  imoab_remapping_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/src/earthsystem/remapping -I$(top_srcdir)/src/earthsystem/intx_mesh $(TEMPESTREMAP_INCLUDE)
   imoab_remapping_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
   TESTS += test_remapping imoab_remapping
 endif

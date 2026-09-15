@@ -228,7 +228,7 @@
 #cmakedefine MOAB_HAVE_SYS_TYPES_H @MOAB_HAVE_SYS_TYPES_H@
 
 /* Enable use of TempestRemap library API for computing intersection and
-   remapping for Climate problems */
+   remapping for Earth system problems */
 #cmakedefine MOAB_HAVE_TEMPESTREMAP @MOAB_HAVE_TEMPESTREMAP@
 
 /* Define to 1 if you have the <unistd.h> header file. */

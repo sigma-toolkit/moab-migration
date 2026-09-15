@@ -39,8 +39,8 @@ set( MOABIO_LIB_SRCS
         WriteVtk.hpp      WriteVtk.cpp )
 
 if( MOAB_HAVE_NETCDF )
-  # ExodusII (NetCDF-based) reader/writer.  The climate NetCDF grid
-  # readers/writers that used to live here now build from src/climate/io.
+  # ExodusII (NetCDF-based) reader/writer.  The Earth system NetCDF grid
+  # readers/writers that used to live here now build from src/earthsystem/io.
   set( MOAB_NETCDF_SRCS
           ReadNCDF.hpp      ReadNCDF.cpp
           WriteNCDF.hpp     WriteNCDF.cpp

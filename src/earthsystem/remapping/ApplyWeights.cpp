@@ -13,7 +13,7 @@
  * =====================================================================================
  */
 
-#include "moab/climate/remapping/TempestOnlineMap.hpp"
+#include "moab/earthsystem/remapping/TempestOnlineMap.hpp"
 
 #include <algorithm>
 #include <utility>

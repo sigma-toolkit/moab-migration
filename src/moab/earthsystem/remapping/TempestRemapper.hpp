@@ -15,9 +15,9 @@
 #ifndef MB_TEMPESTREMAPPER_HPP
 #define MB_TEMPESTREMAPPER_HPP
 
-#include "moab/climate/remapping/Remapper.hpp"
-#include "moab/climate/intx_mesh/Intx2MeshOnSphere.hpp"
-#include "moab/climate/intx_mesh/IntxUtils.hpp"
+#include "moab/earthsystem/remapping/Remapper.hpp"
+#include "moab/earthsystem/intx_mesh/Intx2MeshOnSphere.hpp"
+#include "moab/earthsystem/intx_mesh/IntxUtils.hpp"
 
 // Tempest includes
 #ifdef MOAB_HAVE_TEMPESTREMAP
@@ -50,7 +50,7 @@ class TempestRemapper : public Remapper
 
     virtual ~TempestRemapper();
 
-    // Mesh type with a correspondence to Tempest/Climate formats
+    // Mesh type with a correspondence to Tempest/EarthSystem formats
     enum TempestMeshType
     {
         DEFAULT        = -1,

@@ -12,7 +12,7 @@
 #include <iostream>
 #include <iomanip>
 
-#include "moab/climate/intx_mesh/IntxUtils.hpp"
+#include "moab/earthsystem/intx_mesh/IntxUtils.hpp"
 
 #include "moab/MergeMesh.hpp"
 #include "moab/ReadUtilIface.hpp"

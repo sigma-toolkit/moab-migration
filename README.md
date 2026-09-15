@@ -17,7 +17,7 @@ Several computational solvers in various scientific domains such as nuclear engi
 - Mesh quality computation along with algorithms for smoothing and optimization
 - Solution field transfers for multi-physics problems
   - High-order interpolation between unstructured grids in two and three dimensions
-  - Conservative remappng between meshes on the sphere for Climate problems
+  - Conservative remappng between meshes on the sphere for Earth system problems
 
 MOAB was developed originally as part of the CUBIT project at Sandia National Laboratories, and has been partially funded by the DOE SciDAC program (TSTT, ITAPS, FASTMath), ASCR (CESAR), and DOE-NE (NEAMS program). More recently, DOE-BER programs under the E3SM project have provided support for enabling scalable solution transfer techniques for climate applications.
 
@@ -140,7 +140,7 @@ The documentation will be generated in `build/html/` and can be viewed by openin
 - **NetCDF**: MOAB library optionally depends on the NetCDF libraries (C and C++) to compile the ExodusII reader/writer. To get netcdf, go to [NetCDF].
 - **Metis**/**ParMetis**: MOAB can use the Metis or ParMetis library for partitioning mesh files in serial and parallel respectively
 - **Zoltan**: Support for online partitioning through Zoltan (and its dependencies on Scotch, ParMetis etc) can be utilized through the partitioner tool
-- **TempestRemap**: Provide support for both offline and online remapping of Climate field data on unstructured spherical meshes
+- **TempestRemap**: Provide support for both offline and online remapping of Earth system field data on unstructured spherical meshes
 - **Eigen3**: A substitute for BLAS/LAPACK interfaces. However if _TempestRemap_ tools are to be built, this becomes a required dependency
 
 ## Configuration and Build from Source
@@ -243,7 +243,7 @@ Even though the MOAB library is written in C++ language (conforming to C++11 sta
 
   - Supports both serial and parallel invocation under one interface. MOAB needs to be configured using `--with-mpi` option.
   - Supports ability to migrate meshes and tags between processes
-  - Supports capability to compute remapping weights for Climate science applications
+  - Supports capability to compute remapping weights for Earth system science applications
 
   Note that the **ITAPS iMesh** interfaces are now deprecated and we encourage users to directly use MOAB or iMOAB interfaces if possible.
 

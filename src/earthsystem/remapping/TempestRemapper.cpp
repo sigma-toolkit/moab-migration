@@ -20,15 +20,15 @@
 #include <algorithm>  // std::sort, std::stable_sort
 
 #include "DebugOutput.hpp"
-#include "moab/climate/remapping/TempestRemapper.hpp"
+#include "moab/earthsystem/remapping/TempestRemapper.hpp"
 #include "moab/ReadUtilIface.hpp"
 // needed for higher order mapping, retrieve additional layers of cells with bridge methods
 #include "moab/MeshTopoUtil.hpp"
 #include "AEntityFactory.hpp"
 
 // Intersection includes
-#include "moab/climate/intx_mesh/Intx2MeshOnSphere.hpp"
-#include "moab/climate/intx_mesh/IntxUtils.hpp"
+#include "moab/earthsystem/intx_mesh/Intx2MeshOnSphere.hpp"
+#include "moab/earthsystem/intx_mesh/IntxUtils.hpp"
 
 #include "moab/AdaptiveKDTree.hpp"
 #include "moab/SpatialLocator.hpp"

@@ -23,9 +23,9 @@
 
 // MOAB includes
 #include "moab/Core.hpp"
-#include "moab/climate/intx_mesh/IntxUtils.hpp"
-#include "moab/climate/remapping/TempestRemapper.hpp"
-#include "moab/climate/remapping/TempestOnlineMap.hpp"
+#include "moab/earthsystem/intx_mesh/IntxUtils.hpp"
+#include "moab/earthsystem/remapping/TempestRemapper.hpp"
+#include "moab/earthsystem/remapping/TempestOnlineMap.hpp"
 #include "moab/ProgOptions.hpp"
 #include "moab/CpuTimer.hpp"
 #include "DebugOutput.hpp"

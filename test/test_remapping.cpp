@@ -23,7 +23,7 @@
 
 #include <iostream>
 #include "moab/Core.hpp"
-#include "moab/climate/remapping/TempestRemapper.hpp"
+#include "moab/earthsystem/remapping/TempestRemapper.hpp"
 
 #ifdef MOAB_HAVE_MPI
 #include "moab/ParallelComm.hpp"

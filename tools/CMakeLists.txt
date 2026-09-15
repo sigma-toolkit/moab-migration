@@ -178,6 +178,15 @@ endif ( MOAB_BUILD_MBPART )
 # MBCoupler
 if ( MOAB_HAVE_MPI AND MPI_FOUND AND MOAB_BUILD_MBCOUPLER )
   add_subdirectory( mbcoupler )
+  # MOABConfig.h carries a MOAB_HAVE_MBCOUPLER slot, but nothing ever set the
+  # variable that fills it, so the macro stayed undefined even when
+  # libmbcoupler was built and installed.  Code guarded by it - notably
+  # examples/advanced/CoupleMGen.cpp - could therefore never compile.  Use the
+  # cache so the value survives into the parent scope, where MOABConfig.h is
+  # generated.
+  set( MOAB_HAVE_MBCOUPLER 1 CACHE INTERNAL "MOAB is configured with the mesh coupler" )
+else ( )
+  unset( MOAB_HAVE_MBCOUPLER CACHE )
 endif ( )
 
 # hexmodops

@@ -4,6 +4,12 @@ MOAB_DIR := @CMAKE_INSTALL_PREFIX@
 # MESH_DIR is the directory containing mesh files that come with MOAB source
 MESH_DIR="@CMAKE_SOURCE_DIR@/MeshFiles/unittest"
 
+# The flag this compiler uses to define a preprocessor macro in Fortran source.
+# The .F90.o rule below has always referenced $(FC_DEFINE) but nothing ever
+# assigned it, so the define was passed as a bare "MESH_DIR=..." and the
+# compiler treated it as an input file.
+FC_DEFINE = @MOAB_MAKE_FC_DEFINE@
+
 MOAB_CMAKE="yes"
 
 ####### COMMON SETUP FOR ALL EXAMPLES ##########
@@ -46,7 +52,7 @@ endif
 
 .F90.o:
 	@echo "   [FC]  $<"
-  ${VERBOSE}${MOAB_FC} ${FCFLAGS} ${MOAB_CPPFLAGS} $(FC_DEFINE)MESH_DIR=\"${MESH_DIR}\" -c $<
+	${VERBOSE}${MOAB_FC} ${FCFLAGS} ${MOAB_CPPFLAGS} ${MOAB_INCLUDES} $(FC_DEFINE)MESH_DIR=\"${MESH_DIR}\" -c $<
 
 info:
 	@echo "Using installation MOAB_DIR = ${MOAB_DIR}"

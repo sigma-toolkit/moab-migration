@@ -196,6 +196,7 @@ int main( int argc, char* argv[] )
     ierr = iMOAB_Finalize();
     CHECKIERR( ierr, "did not finalize iMOAB" )
 
+    MPI_Group_free( &mpigrp_CPLID );
     MPI_Comm_free( &dup_comm_world );
     MPI_Finalize();
     return 0;

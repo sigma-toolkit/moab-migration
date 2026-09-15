@@ -212,6 +212,44 @@ int main( int argc, char* argv[] )
         ierr = iMOAB_FreeSenderBuffers( rofPID, &cplRof );
         CHECKIERR( ierr, "cannot free buffers  " )
     }
+
+    // deregister the applications, in reverse order of registration
+    if( couComm != MPI_COMM_NULL )
+    {
+        ierr = iMOAB_DeregisterApplication( cplRofPID );
+        CHECKIERR( ierr, "cannot deregister app ROFX" )
+        ierr = iMOAB_DeregisterApplication( cplAtmPID );
+        CHECKIERR( ierr, "cannot deregister app ATMX" )
+    }
+    if( atmComm != MPI_COMM_NULL )
+    {
+        ierr = iMOAB_DeregisterApplication( cmpAtmPID );
+        CHECKIERR( ierr, "cannot deregister app ATM" )
+    }
+    if( rofComm != MPI_COMM_NULL )
+    {
+        ierr = iMOAB_DeregisterApplication( rofPID );
+        CHECKIERR( ierr, "cannot deregister app ROF" )
+    }
+
+    ierr = iMOAB_Finalize();
+    CHECKIERR( ierr, "did not finalize iMOAB" )
+
+    // free the joint communicators and groups, then the component ones
+    if( MPI_COMM_NULL != rofCouComm ) MPI_Comm_free( &rofCouComm );
+    MPI_Group_free( &joinRofCouGroup );
+    if( MPI_COMM_NULL != atmCouComm ) MPI_Comm_free( &atmCouComm );
+    MPI_Group_free( &joinAtmCouGroup );
+
+    if( MPI_COMM_NULL != couComm ) MPI_Comm_free( &couComm );
+    if( MPI_COMM_NULL != rofComm ) MPI_Comm_free( &rofComm );
+    if( MPI_COMM_NULL != atmComm ) MPI_Comm_free( &atmComm );
+
+    MPI_Group_free( &couPEGroup );
+    MPI_Group_free( &rofPEGroup );
+    MPI_Group_free( &atmPEGroup );
+    MPI_Group_free( &jgroup );
+
     MPI_Finalize();
 
     return 0;

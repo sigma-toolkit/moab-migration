@@ -186,7 +186,12 @@ ErrorCode migrate( const char* filename, const char* outfile )
     MPI_Barrier( jcomm );
 
     // we can now free the sender buffers
-    if( comm1 != MPI_COMM_NULL ) ierr = iMOAB_FreeSenderBuffers( pid1, &context_id );
+    context_id = compid2;  // the mesh above was sent with the compid2 context
+    if( comm1 != MPI_COMM_NULL )
+    {
+        ierr = iMOAB_FreeSenderBuffers( pid1, &context_id );
+        CHECKRC( ierr, "cannot free sender buffers" )
+    }
 
     // exchange tag, from component to component
     // one is receiving, one is sending the tag; the one that is sending needs to have communicator
@@ -231,7 +236,12 @@ ErrorCode migrate( const char* filename, const char* outfile )
     MPI_Barrier( jcomm );
 
     // we can now free the sender buffers
-    if( comm2 != MPI_COMM_NULL ) ierr = iMOAB_FreeSenderBuffers( pid2, &context_id );
+    context_id = compid1;  // the tag above was sent from pid2 with the compid1 context
+    if( comm2 != MPI_COMM_NULL )
+    {
+        ierr = iMOAB_FreeSenderBuffers( pid2, &context_id );
+        CHECKRC( ierr, "cannot free sender buffers" )
+    }
 
     if( comm2 != MPI_COMM_NULL )
     {

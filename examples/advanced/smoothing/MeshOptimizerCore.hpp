@@ -208,7 +208,8 @@ class MeshOptimizer
 
     Range mElems;       //!< owned elements
     Range mAllVerts;    //!< every vertex touched by mElems, ghosts included
-    Range mSharedVerts; //!< subset of mAllVerts on the partition interface
+    Range mSharedVerts; //!< every shared vertex on this rank, NOT just those in mAllVerts
+    Range mTagVerts;    //!< mAllVerts + mSharedVerts: the vertices both tags are written over
     std::vector< EntityHandle > mFreeVerts;  //!< owned, movable
     std::map< EntityHandle, int > mFreeIndex;
 
@@ -248,11 +249,26 @@ inline ErrorCode MeshOptimizer::setup( const Range& elements )
     {
         ownedVerts.clear();
         rval = mPcomm->filter_pstatus( mAllVerts, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &ownedVerts );MB_CHK_ERR( rval );
+        // Deliberately NOT intersected with mAllVerts.  mAllVerts is derived from
+        // this rank's supported-element subset, so intersecting would make the
+        // exchange set rank-local: a rank holding only unsupported elements - or
+        // no elements at all, which happens whenever the partition hands a rank
+        // nothing - would end up with an empty set while its neighbours still
+        // list it in ParallelComm's buffProcs.  exchange_tags/reduce_tags post
+        // their Irecv and Isend over buffProcs, not over the Range argument, so
+        // that rank staying silent hangs everyone who shares with it.
         mSharedVerts.clear();
         rval = mPcomm->get_shared_entities( -1, mSharedVerts, 0, false, false );MB_CHK_ERR( rval );
-        mSharedVerts = intersect( mSharedVerts, mAllVerts );
     }
 #endif
+
+    // Both tags must carry a meaningful value on every vertex that can be
+    // exchanged, not merely on the ones this rank's elements touch: the tags are
+    // created with a default of {0,0,0}, and exchange_tags packs a defaulted tag
+    // over the whole range without checking which entities were actually set.
+    // An owner that never wrote MESHOPT_POS would otherwise broadcast the origin
+    // to its sharers.
+    mTagVerts = unite( mAllVerts, mSharedVerts );
 
     Tag fixedTag = 0;
     if( MB_SUCCESS != mMB->tag_get_handle( "fixed", 1, MB_TYPE_INTEGER, fixedTag ) ) fixedTag = 0;
@@ -341,15 +357,28 @@ inline ErrorCode MeshOptimizer::compute_characteristic_length()
 inline ErrorCode MeshOptimizer::push_positions()
 {
 #ifdef MOAB_HAVE_MPI
-    if( !mPcomm || mSize == 1 || mSharedVerts.empty() ) return MB_SUCCESS;
+    // The guard has to be a globally consistent predicate.  Anything rank-local
+    // - an empty mSharedVerts, no supported elements, no elements at all - would
+    // let one rank skip a collective its neighbours still enter, and exchange_tags
+    // sends to buffProcs regardless of what we pass it.
+    if( !mPcomm || mSize == 1 ) return MB_SUCCESS;
 
     ErrorCode rval;
-    std::vector< double > buf( 3 * mAllVerts.size() );
-    rval = mMB->get_coords( mAllVerts, &buf[0] );MB_CHK_ERR( rval );
-    rval = mMB->tag_set_data( mPosTag, mAllVerts, &buf[0] );MB_CHK_ERR( rval );
+    // A rank can legitimately reach here owning nothing, so index the buffer
+    // through a pointer that stays null when it is empty rather than &buf[0].
+    std::vector< double > buf( 3 * mTagVerts.size() );
+    double* bufp = ( buf.empty() ? NULL : &buf[0] );
+    if( !mTagVerts.empty() )
+    {
+        rval = mMB->get_coords( mTagVerts, bufp );MB_CHK_ERR( rval );
+        rval = mMB->tag_set_data( mPosTag, mTagVerts, bufp );MB_CHK_ERR( rval );
+    }
     rval = mPcomm->exchange_tags( mPosTag, mSharedVerts );MB_CHK_ERR( rval );
-    rval = mMB->tag_get_data( mPosTag, mAllVerts, &buf[0] );MB_CHK_ERR( rval );
-    rval = mMB->set_coords( mAllVerts, &buf[0] );MB_CHK_ERR( rval );
+    if( !mTagVerts.empty() )
+    {
+        rval = mMB->tag_get_data( mPosTag, mTagVerts, bufp );MB_CHK_ERR( rval );
+        rval = mMB->set_coords( mTagVerts, bufp );MB_CHK_ERR( rval );
+    }
 #endif
     return MB_SUCCESS;
 }
@@ -359,10 +388,13 @@ inline ErrorCode MeshOptimizer::evaluate( double& f, bool need_gradient )
     ErrorCode rval;
     ++mEvaluations;
 
-    if( need_gradient )
+    // Zero over mTagVerts, not mAllVerts: a shared vertex none of this rank's
+    // elements touch is still inside the range reduce_tags packs, so leaving it
+    // alone would feed the previous iteration's gradient back into the sum.
+    if( need_gradient && !mTagVerts.empty() )
     {
-        std::vector< double > zeros( 3 * mAllVerts.size(), 0.0 );
-        rval = mMB->tag_set_data( mGradTag, mAllVerts, &zeros[0] );MB_CHK_ERR( rval );
+        std::vector< double > zeros( 3 * mTagVerts.size(), 0.0 );
+        rval = mMB->tag_set_data( mGradTag, mTagVerts, &zeros[0] );MB_CHK_ERR( rval );
     }
 
     double localSum = 0.0;
@@ -436,7 +468,10 @@ inline ErrorCode MeshOptimizer::evaluate( double& f, bool need_gradient )
     f = globalSum / (double)mGlobalElems;
 
 #ifdef MOAB_HAVE_MPI
-    if( need_gradient && mPcomm && mSize > 1 && !mSharedVerts.empty() )
+    // need_gradient is the same on every rank (the caller decides it), so this
+    // predicate is globally consistent.  mSharedVerts is deliberately not part
+    // of it - see push_positions().
+    if( need_gradient && mPcomm && mSize > 1 )
     {
         // Sum the partial contributions onto the owner, then hand the total
         // back to the sharers.  The exchange is not strictly needed for the

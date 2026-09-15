@@ -524,6 +524,19 @@ if ( ENABLE_NETCDF )
 
   if (MOAB_HAVE_NETCDF)
     set (MOAB_HAVE_NETCDF_H 1)
+
+    # Check for the parallel NetCDF C header, mirroring config/netcdf.m4.  This
+    # gates the ParNcFile code paths in TempestOnlineMapIO.cpp; without it every
+    # rank opens the map file through the serial NcFile writer, so parallel map
+    # I/O fails at more than one rank.
+    include(CheckIncludeFiles)
+    set (CMAKE_REQUIRED_INCLUDES ${NETCDF_INCLUDES})
+    if (MOAB_HAVE_MPI)
+      list (APPEND CMAKE_REQUIRED_INCLUDES ${MPI_C_INCLUDE_PATH})
+    endif (MOAB_HAVE_MPI)
+    CHECK_INCLUDE_FILES("netcdf.h;netcdf_par.h" MOAB_HAVE_NETCDFPAR)
+    unset (CMAKE_REQUIRED_INCLUDES)
+
     LIST(APPEND LOGGING_WATCHED_VARIABLES
       NETCDF_DIR
       NETCDF_INCLUDES

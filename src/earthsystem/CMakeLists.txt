@@ -19,6 +19,15 @@ if( MOAB_HAVE_NETCDF )
   list( APPEND MOAB_EARTHSYSTEM_OBJECTS $<TARGET_OBJECTS:moab_earthsystem_io> )
 endif()
 
+# Component-coupler communication graph, behind the iMOAB mesh and tag
+# migration calls.  Needs MPI, and src/parallel must be configured first so
+# that the generated moab_mpi_config.h is in place; the parent adds that
+# subdirectory before this one.
+if( MOAB_HAVE_MPI AND MPI_FOUND )
+  add_subdirectory(parallel)
+  list( APPEND MOAB_EARTHSYSTEM_OBJECTS $<TARGET_OBJECTS:moab_earthsystem_parallel> )
+endif()
+
 # Spherical mesh intersection, the geometric kernel underneath conservative
 # remapping.  Always built, as it has no external dependencies.
 add_subdirectory(intx_mesh)

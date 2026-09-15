@@ -361,7 +361,7 @@ if PARALLEL
      parallel/ReadParallel.hpp \
      parallel/SharedSetData.cpp \
      parallel/SharedSetData.hpp \
-     parallel/ParCommGraph.cpp \
+     earthsystem/parallel/ParCommGraph.cpp \
      parallel/gs.cpp
 
 if HAVE_HDF5_PARALLEL
@@ -381,8 +381,13 @@ moabparallelinclude_HEADERS = \
      parallel/moab/ParallelComm.hpp \
      parallel/moab/ParallelMergeMesh.hpp \
      parallel/moab/ProcConfig.hpp \
-     parallel/moab/ParallelData.hpp \
-     parallel/moab/ParCommGraph.hpp
+     parallel/moab/ParallelData.hpp
+
+# ParCommGraph lives in the earthsystem subtree but is only built under MPI,
+# so its installed header is declared here rather than next to the other
+# earthsystem headers above.
+escommgraphincludedir = $(includedir)/moab/earthsystem/parallel
+escommgraphinclude_HEADERS = moab/earthsystem/parallel/ParCommGraph.hpp
 
 AM_CPPFLAGS += -I$(srcdir)/parallel
 
@@ -439,7 +444,8 @@ endif
 
 
 CLEANFILES = a.out imoab.mod
-EXTRA_DIST += CMakeLists.txt parallel/CMakeLists.txt earthsystem/intx_mesh/CMakeLists.txt
+EXTRA_DIST += CMakeLists.txt parallel/CMakeLists.txt earthsystem/intx_mesh/CMakeLists.txt \
+              earthsystem/parallel/CMakeLists.txt
 
 ## Rules for Fortran sources compilation
 FORTDEFS = $(FCDEFS)

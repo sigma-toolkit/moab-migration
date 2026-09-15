@@ -3,7 +3,7 @@
  *
  */
 
-#include "moab/ParCommGraph.hpp"
+#include "moab/earthsystem/parallel/ParCommGraph.hpp"
 // we need to recompute adjacencies for merging to work
 #include "moab/Core.hpp"
 #include "AEntityFactory.hpp"

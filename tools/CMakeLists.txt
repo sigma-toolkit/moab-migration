@@ -47,11 +47,30 @@ set(MOAB_BUILD_MBCMPFILES ${MOAB_HAVE_HDF5})
 
 set( TOOLS_LINK_LIBS MOAB ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
 
+# Clear the MOAB_HAVE_<TOOL> variables recorded by add_moab_tool on the previous
+# configure.  Without this, disabling a tool in an existing build tree would
+# leave its cache entry - and therefore its #define in MOABConfig.h - behind.
+foreach( _moab_tool_var $CACHE{MOAB_TOOL_HAVE_VARS} )
+  unset( ${_moab_tool_var} CACHE )
+endforeach()
+unset( MOAB_TOOL_HAVE_VARS CACHE )
+
 macro(add_moab_tool target source_file variable)
   add_executable(${target} ${source_file})
   set_source_files_properties(${source_file} COMPILE_FLAGS "${MOAB_DEFINES}")
   target_link_libraries(${target} ${TOOLS_LINK_LIBS} ${ARGN})
-  set( ${variable} 1 )
+  # MOABConfig.h has a MOAB_HAVE_<TOOL> slot for most of these tools, but it is
+  # configured at the top level, after add_subdirectory(tools) returns.  A plain
+  # set() here only reaches this directory's scope, so every slot stayed #undef
+  # no matter which tools were built.  Write to the cache instead: it is global,
+  # so it also works for the calls from tools/earthsystem and tools/mbcoupler,
+  # where PARENT_SCOPE would stop one directory short of the top level.
+  set( ${variable} 1 CACHE INTERNAL "MOAB is configured with the ${target} tool" )
+  # Record the name so the next configure can clear it (see the loop above).
+  set( _moab_tool_vars $CACHE{MOAB_TOOL_HAVE_VARS} )
+  list( APPEND _moab_tool_vars ${variable} )
+  set( MOAB_TOOL_HAVE_VARS "${_moab_tool_vars}" CACHE INTERNAL
+       "MOAB_HAVE_<TOOL> variables defined by add_moab_tool" )
   if(PYMOAB_BINARY_RPATH)
     # Set the install RPATH
     set_target_properties(${target} PROPERTIES INSTALL_RPATH "${PYMOAB_BINARY_RPATH}")
@@ -163,7 +182,7 @@ endif( )
 
 # MOAB_BUILD_MBCLEANTAGS
 if ( MOAB_BUILD_MBCLEANTAGS )
-  add_moab_tool( mbcleantags cleanTags.cpp MOAB_BUILD_MBCLEANTAGS )
+  add_moab_tool( mbcleantags cleanTags.cpp MOAB_HAVE_MBCLEANTAGS )
 endif( )
 
 

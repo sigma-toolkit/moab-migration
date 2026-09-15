@@ -1,4 +1,7 @@
-AUTOMAKE_OPTIONS = foreign
+# subdir-objects is required now that mbtempest and h5mtoscrip build from
+# earthsystem/; without it automake warns and puts the objects in this
+# directory, where two sources of the same basename would collide.
+AUTOMAKE_OPTIONS = foreign subdir-objects
 AM_CPPFLAGS =  -I$(top_srcdir)/src \
                -I$(top_builddir)/src \
                -I$(top_srcdir)/src/parallel \
@@ -25,7 +28,8 @@ EXTRA_DIST = README.hexmodops \
              README.mbtagprop \
              README.spheredecomp \
              README.tools \
-             CMakeLists.txt
+             CMakeLists.txt \
+             earthsystem/CMakeLists.txt
 
 if HAVE_HDF5
   bin_PROGRAMS += mbcmpfiles mbintxchk mbcleantags 
@@ -145,8 +149,8 @@ geometry_DIR = geometry
 if ENABLE_mbtempest
   AM_CPPFLAGS += $(TEMPESTREMAP_INCLUDE) -I$(top_srcdir)/src/earthsystem/remapping -I$(top_srcdir)/src/earthsystem/intx_mesh
   bin_PROGRAMS += mbtempest h5mtoscrip
-mbtempest_SOURCES = mbtempest.cpp
-h5mtoscrip_SOURCES = h5mtoscrip.cpp
+mbtempest_SOURCES = earthsystem/mbtempest.cpp
+h5mtoscrip_SOURCES = earthsystem/h5mtoscrip.cpp
 endif
 
 if ENABLE_mbmerge

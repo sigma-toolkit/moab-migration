@@ -132,9 +132,9 @@ if ( MOAB_BUILD_MBSLAVEPART )
   add_moab_tool( mbslavepart mbslavepart.cpp MOAB_HAVE_MBSLAVEPART )
 endif( )
 
-# MBTEMPEST
+# MBTEMPEST - the TempestRemap tools now live in tools/earthsystem
 if ( MOAB_BUILD_MBTEMPEST )
-  add_moab_tool( mbtempest mbtempest.cpp MOAB_HAVE_MBTEMPEST "${TEMPESTREMAP_LIBRARIES}")
+  add_subdirectory( earthsystem )
 endif( )
 
 if (MOAB_HAVE_NETCDF OR MOAB_HAVE_PNETCDF)

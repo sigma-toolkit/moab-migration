@@ -3,15 +3,24 @@ include ../makefile.config
 
 default: all
 
+# DirectAccessNoHolesF90 and PushParMeshIntoMoabF90 go through iMesh
+# (iMesh_f.h, iMeshP_f.h) and link ${IMESH_LIBS}.  MigrateMesh only calls the
+# iMOAB Fortran module, which lives in libMOAB itself, so it must not be gated
+# on iMesh - doing so was why this directory built nothing at all.
 F90EXAMPLES = DirectAccessNoHolesF90
-F90PAREXAMPLES = PushParMeshIntoMoabF90 MigrateMesh
+F90PAREXAMPLES = PushParMeshIntoMoabF90
+IMOAB_F90PAREXAMPLES = MigrateMesh
 
 ALLEXAMPLES =
 ifeq ("$(MOAB_FORTRAN_ENABLED)-$(MOAB_IMESH_ENABLED)","yes-yes")
-ALLEXAMPLES += ${F90EXAMPLES} 
+ALLEXAMPLES += ${F90EXAMPLES}
 endif
 
 ifeq ("$(MOAB_MPI_ENABLED)","yes")
+ifeq ("$(MOAB_FORTRAN_ENABLED)","yes")
+parallel: ${IMOAB_F90PAREXAMPLES}
+ALLEXAMPLES += ${IMOAB_F90PAREXAMPLES}
+endif
 ifeq ("$(MOAB_FORTRAN_ENABLED)-$(MOAB_IMESH_ENABLED)","yes-yes")
 parallel: ${F90PAREXAMPLES}
 ALLEXAMPLES += ${F90PAREXAMPLES}
@@ -39,9 +48,9 @@ ifeq ("$(MOAB_MPI_ENABLED)","yes")
 	${RUNPARALLEL} ./PushParMeshIntoMoabF90
 endif
 
-MigrateMesh: MigrateMesh.o
+MigrateMesh: MigrateMesh.o ${MOAB_LIBFILE}
 	@echo "[F90LD]  $@"
-	${VERBOSE}${MOAB_FC} -o $@ $< ${IMESH_LIBS}
+	${VERBOSE}${MOAB_FC} -o $@ $< ${MOAB_LIBS_LINK} ${MOAB_CXX_RUNTIME_LIBS}
 
 run-MigrateMesh: MigrateMesh
 ifeq ("$(MOAB_MPI_ENABLED)","yes")

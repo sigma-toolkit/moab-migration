@@ -4,7 +4,7 @@ include ../makefile.config
 default: all
 
 EXAMPLES =  ExtrudePoly GeneralGnomonic AddEdgeFluxVector
-PAREXAMPLES = LloydRelaxation CrystalRouterExample GenLargeMesh
+PAREXAMPLES = CrystalRouterExample GenLargeMesh
 EXOIIEXAMPLES = VisTags
 ALLEXAMPLES = ${EXAMPLES}
 
@@ -25,14 +25,13 @@ endif
 all: $(ALLEXAMPLES)
 
 ExtrudePoly: ExtrudePoly.o ${MOAB_LIBFILE}
-LloydRelaxation: LloydRelaxation.o ${MOAB_LIBFILE}
 CrystalRouterExample: CrystalRouterExample.o ${MOAB_LIBFILE}
 VisTags: VisTags.o ${MOAB_LIBFILE}
 GenLargeMesh: GenLargeMesh.o ${MOAB_LIBFILE}
 GeneralGnomonic: GeneralGnomonic.o ${MOAB_LIBFILE}
 AddEdgeFluxVector: AddEdgeFluxVector.o ${MOAB_LIBFILE}
 
-ExtrudePoly LloydRelaxation CrystalRouterExample VisTags GenLargeMesh GeneralGnomonic AddEdgeFluxVector:
+ExtrudePoly CrystalRouterExample VisTags GenLargeMesh GeneralGnomonic AddEdgeFluxVector:
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
@@ -42,12 +41,6 @@ CoupleMGen: CoupleMGen.o ${MOAB_LIBFILE}
 
 run-ExtrudePoly: ExtrudePoly
 	${RUNSERIAL} ./ExtrudePoly
-
-run-LloydRelaxation: LloydRelaxation
-ifeq ("$(MOAB_MPI_ENABLED)-$(MOAB_HDF5_ENABLED)","yes-yes")
-	${RUNSERIAL} ./LloydRelaxation
-	${RUNPARALLEL} ./LloydRelaxation
-endif
 
 run-CrystalRouterExample: CrystalRouterExample
 	${RUNSERIAL} ./CrystalRouterExample

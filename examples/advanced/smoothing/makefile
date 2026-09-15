@@ -11,6 +11,13 @@ ifeq ("$(MOAB_MPI_ENABLED)-$(MOAB_HDF5_ENABLED)","yes-yes")
 ALLEXAMPLES += LaplacianSmoother
 endif
 
+# LloydRelaxation builds against MPI alone but reads an .h5m and writes
+# lloydfinal.h5m, so only its run rule needs HDF5.  This is the gating it had in
+# examples/advanced/makefile, kept as-is by the move.
+ifeq ("$(MOAB_MPI_ENABLED)","yes")
+ALLEXAMPLES += LloydRelaxation
+endif
+
 # The optimization examples take their gradients from Eigen's unsupported
 # AutoDiff module, so Eigen3 is not optional for them.  They generate their own
 # meshes and so need no HDF5, but they do call MPI_Init unconditionally.
@@ -26,6 +33,16 @@ LaplacianSmoother: LaplacianSmoother.o ${MOAB_LIBFILE}
 
 run-LaplacianSmoother: LaplacianSmoother
 	${RUNPARALLEL} ./LaplacianSmoother -n 5
+
+LloydRelaxation: LloydRelaxation.o ${MOAB_LIBFILE}
+	@echo "[CXXLD]  $@"
+	${VERBOSE}$(MOAB_CXX) -o $@ $< $(MOAB_LIBS_LINK)
+
+run-LloydRelaxation: LloydRelaxation
+ifeq ("$(MOAB_MPI_ENABLED)-$(MOAB_HDF5_ENABLED)","yes-yes")
+	${RUNSERIAL} ./LloydRelaxation
+	${RUNPARALLEL} ./LloydRelaxation
+endif
 
 MeshOptimization: MeshOptimization.o ${MOAB_LIBFILE}
 	@echo "[CXXLD]  $@"

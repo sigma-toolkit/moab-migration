@@ -1155,12 +1155,12 @@ SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/advanced/ExtrudePoly.cpp
   examples/advanced/GeneralGnomonic.cpp
   examples/advanced/GenLargeMesh.cpp
-  examples/advanced/LloydRelaxation.cpp
   examples/advanced/VisTags.cpp
   examples/advanced/CoupleMGen.cpp )
 SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/advanced/smoothing/makefile
   examples/advanced/smoothing/LaplacianSmoother.cpp
+  examples/advanced/smoothing/LloydRelaxation.cpp
   examples/advanced/smoothing/MeshOptimizationMetrics.hpp
   examples/advanced/smoothing/MeshOptimizerCore.hpp
   examples/advanced/smoothing/MeshOptimization.cpp

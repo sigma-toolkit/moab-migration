@@ -98,7 +98,11 @@ endif ( MOAB_USE_MPI )
 set ( ADVANCED_EXAMPLES
   advanced/CrystalRouterExample.cpp
   advanced/ExtrudePoly.cpp
-  advanced/LloydRelaxation.cpp
+  # LloydRelaxation now lives in advanced/smoothing with the other smoothers,
+  # but it stays in this unguarded list rather than in the MPI+Eigen3 block
+  # below: it has #ifdef MOAB_HAVE_MPI guards and builds serially, which the
+  # two AutoDiff optimization examples do not.
+  advanced/smoothing/LloydRelaxation.cpp
   advanced/VisTags.cpp
 )
 if ( MOAB_USE_MPI )

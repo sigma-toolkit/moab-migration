@@ -2,6 +2,17 @@ cmake_minimum_required( VERSION 3.5 )
 
 set ( MOAB_ROOT "" CACHE PATH "Path to MOAB library installation" )
 
+# find_package(MOAB) has to run before project() below, because the compilers
+# MOAB was built with are only known afterwards and project() bakes the compiler
+# in permanently.  But MOABTargets.cmake declares the MOAB library with
+# add_library(MOAB SHARED IMPORTED), and add_library() rejects SHARED while the
+# global TARGET_SUPPORTS_SHARED_LIBS property is unset - which it is until a
+# language is enabled - with "the target platform does not support dynamic
+# linking".  The property is meaningless for an IMPORTED target since nothing is
+# built from it, so seed it here to get through the declaration; project() then
+# sets it authoritatively from the platform module and this value is discarded.
+set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
+
 find_package(MOAB REQUIRED
   HINTS ${MOAB_ROOT} ${MOAB_ROOT}/lib/cmake/MOAB)
 

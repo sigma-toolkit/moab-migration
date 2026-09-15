@@ -47,7 +47,10 @@ MOAB_LDFLAGS = @EXPORT_LDFLAGS@ @CXX_LDFLAGS@ @LDFLAGS@
 # cannot be substituted directly, or their separating semicolons end up in the
 # makefile.
 MOAB_EXT_LIBS = @MOAB_MAKE_EXT_LIBS@
-MOAB_LIBS_LINK = ${MOAB_LDFLAGS} -L${MOAB_LIBDIR} -lMOAB $(MOAB_EXT_LIBS) 
+# The C++ runtime, for the Fortran examples: libMOAB is C++ but they are linked
+# by the Fortran driver, which does not pull it in on its own.
+MOAB_CXX_RUNTIME_LIBS = @MOAB_MAKE_CXX_RUNTIME@
+MOAB_LIBS_LINK = ${MOAB_LDFLAGS} -L${MOAB_LIBDIR} -lMOAB $(MOAB_EXT_LIBS)
 DAGMC_LIBS_LINK = ${MOAB_LDFLAGS} -L${MOAB_LIBDIR} @DAGMC_LIBS@ -lMOAB $(MOAB_EXT_LIBS)
 
 MOAB_CXX = @CXX@

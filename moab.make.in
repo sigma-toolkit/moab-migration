@@ -43,7 +43,12 @@ MOAB_LDFLAGS = @EXPORT_LDFLAGS@ @CXX_LDFLAGS@ @LDFLAGS@
 MOAB_EXT_LIBS = @TEMPESTREMAP_LIBS@ @NETCDF_LIBS@ @PNETCDF_LIBS@ @CGNS_LIBS@ @HDF5_LIBS@ @DAMSEL_LIBS@ @CCMIO_LIBS@ \
                 @ZOLTAN_LIBS@ @PARMETIS_LIBS@ @METIS_LIBS@ \
                 @HYPRE_LIBS@ @LAPACK_LIBS@ @BLAS_LIBS@ @LIBS@ 
-MOAB_LIBS_LINK = ${MOAB_LDFLAGS} -L${MOAB_LIBDIR} -lMOAB $(MOAB_EXT_LIBS) 
+# The C++ runtime, for the Fortran examples: libMOAB is C++ but they are linked
+# by the Fortran driver, which does not pull it in on its own.  This is
+# libtool's compiler_lib_search_path for the C++ compiler; it has not been
+# exercised by a Fortran example here, so verify it on a real autotools build.
+MOAB_CXX_RUNTIME_LIBS = @MOAB_CXX_LINKFLAGS@
+MOAB_LIBS_LINK = ${MOAB_LDFLAGS} -L${MOAB_LIBDIR} -lMOAB $(MOAB_EXT_LIBS)
 DAGMC_LIBS_LINK = ${MOAB_LDFLAGS} -L${MOAB_LIBDIR} @DAGMC_LIBS@ -lMOAB $(MOAB_EXT_LIBS)
 
 MOAB_CXX = @CXX@

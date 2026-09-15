@@ -963,6 +963,23 @@ foreach( _moab_make_lib ${NETCDF_LIBRARIES} ${PNETCDF_LIBRARIES} ${CGNS_LIBRARIE
 endforeach()
 string( REPLACE ";" " " MOAB_MAKE_EXT_LIBS "${_moab_make_ext_libs}" )
 
+# libMOAB is C++, but the Fortran examples are linked by the Fortran driver,
+# which does not pull in the C++ runtime on its own.  examples/CMakeLists.txt
+# already appends CMAKE_CXX_IMPLICIT_LINK_LIBRARIES to the iMOAB Fortran
+# targets for this reason; export the same thing for the makefile build.
+set( _moab_make_cxx_runtime "" )
+foreach( _moab_make_rt_dir ${CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES} )
+  list( APPEND _moab_make_cxx_runtime "-L${_moab_make_rt_dir}" )
+endforeach()
+foreach( _moab_make_rt_lib ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES} )
+  if( IS_ABSOLUTE "${_moab_make_rt_lib}" )
+    list( APPEND _moab_make_cxx_runtime "${_moab_make_rt_lib}" )
+  else()
+    list( APPEND _moab_make_cxx_runtime "-l${_moab_make_rt_lib}" )
+  endif()
+endforeach()
+string( REPLACE ";" " " MOAB_MAKE_CXX_RUNTIME "${_moab_make_cxx_runtime}" )
+
 CONFIGURE_FILE(moab.make.cmake "${PROJECT_BINARY_DIR}/lib/moab.make" @ONLY)
 CONFIGURE_FILE(config/MOAB.pc.cmake.in "${PROJECT_BINARY_DIR}/MOAB.pc" @ONLY)
 
@@ -1025,6 +1042,14 @@ if( BUILD_SHARED_LIBS )
   set( MOAB_MAKE_LIBNAME "${CMAKE_SHARED_LIBRARY_PREFIX}MOAB${CMAKE_SHARED_LIBRARY_SUFFIX}" )
 else()
   set( MOAB_MAKE_LIBNAME "${CMAKE_STATIC_LIBRARY_PREFIX}MOAB${CMAKE_STATIC_LIBRARY_SUFFIX}" )
+endif()
+
+# The autotools build detects this with AC_FC_PP_DEFINE; CMake has no
+# equivalent, and every Fortran compiler MOAB supports takes -D except XL.
+if( CMAKE_Fortran_COMPILER_ID MATCHES "XL" )
+  set( MOAB_MAKE_FC_DEFINE "-WF,-D" )
+else()
+  set( MOAB_MAKE_FC_DEFINE "-D" )
 endif()
 
 CONFIGURE_FILE(examples/makefile.config.cmake "${PROJECT_BINARY_DIR}/share/examples/makefile.config" @ONLY)

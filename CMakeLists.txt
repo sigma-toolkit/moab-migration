@@ -1166,7 +1166,10 @@ SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/fortran/makefile
   examples/fortran/DirectAccessNoHolesF90.F90
   examples/fortran/PushParMeshIntoMoabF90.F90
-  examples/fortran/MigrateMesh.F90 )
+  examples/fortran/MigrateMesh.F90
+  # examples/CMakeLists.txt stages this into the build tree for the MigrateMesh
+  # test, so an install that omits it cannot even be configured.
+  examples/fortran/spherecube.h5m )
 SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/python/makefile
   examples/python/laplaciansmoother.py )

@@ -933,7 +933,20 @@ endif()
 # variable holding more than one directory into "-I/a;/b".  Emit one -I per
 # non-empty entry instead.
 set( MOAB_MAKE_TPL_INCLUDES "" )
-foreach( _moab_make_incdir ${ZOLTAN_INCLUDES} ${NETCDF_INCLUDES} ${PNETCDF_INCLUDES} ${HDF5_INCLUDES} )
+# The package list is the one MOABConfig.cmake.cmake and moab.make.in already use;
+# PARMETIS, METIS, TEMPESTREMAP and EIGEN3 were missing here, so an installed
+# example including Eigen (LaplacianSmoother) or a TempestRemap header could not
+# find it even though libMOAB itself was built against them.
+# MPI is included here rather than left to the compiler: when MOAB is configured
+# through FindMPI instead of the mpicc/mpicxx wrappers, MOAB_CXX and MOAB_FC are
+# the plain compilers, and nothing else on the line supplies mpi.h or mpif.h.
+set( _moab_make_incdirs ${ZOLTAN_INCLUDES} ${PNETCDF_INCLUDES} ${NETCDF_INCLUDES} ${HDF5_INCLUDES}
+                        ${PARMETIS_INCLUDES} ${METIS_INCLUDES} ${TEMPESTREMAP_INCLUDES} ${EIGEN3_INCLUDES} )
+if( MOAB_HAVE_MPI )
+  list( APPEND _moab_make_incdirs ${MPI_CXX_INCLUDE_DIRS} ${MPI_C_INCLUDE_DIRS} ${MPI_Fortran_INCLUDE_DIRS} )
+endif()
+list( REMOVE_DUPLICATES _moab_make_incdirs )
+foreach( _moab_make_incdir ${_moab_make_incdirs} )
   if( _moab_make_incdir )
     set( MOAB_MAKE_TPL_INCLUDES "${MOAB_MAKE_TPL_INCLUDES} -I${_moab_make_incdir}" )
   endif()

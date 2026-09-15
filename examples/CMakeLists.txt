@@ -132,9 +132,9 @@ if ( MOAB_USE_MPI AND MOAB_EXAMPLES_HAVE_FORTRAN )
 endif ( MOAB_USE_MPI AND MOAB_EXAMPLES_HAVE_FORTRAN )
 
 set ( APPS_EXAMPLES
-  apps/earth/ContinentsOnGlobe.cpp
-  apps/earth/BoundaryContinents.cpp
-  apps/earth/addPCdata.cpp
+  earthsystem/earth/ContinentsOnGlobe.cpp
+  earthsystem/earth/BoundaryContinents.cpp
+  earthsystem/earth/addPCdata.cpp
 )
 
 # MOAB's own headers, plus the third-party headers its public headers include

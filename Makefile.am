@@ -89,17 +89,17 @@ examples_pythonex_DATA = \
                examples/python/gr3rd.py \
                examples/python/interrogate_mesh.py \
                examples/python/scrip3d.py 
-examples_appsdir = $(datadir)/examples/apps
-examples_apps_DATA = \
-               examples/apps/makefile
-examples_apps_earthdir = $(datadir)/examples/apps/earth
-examples_apps_earth_DATA = \
-               examples/apps/earth/makefile \
-               examples/apps/earth/ContinentsOnGlobe.cpp \
-               examples/apps/earth/BoundaryContinents.cpp \
-               examples/apps/earth/addPCdata.cpp \
-               examples/apps/earth/AddFieldtoPG2.cpp \
-               examples/apps/earth/copyPartition.cpp
+examples_earthsystemdir = $(datadir)/examples/earthsystem
+examples_earthsystem_DATA = \
+               examples/earthsystem/makefile
+examples_earthsystem_earthdir = $(datadir)/examples/earthsystem/earth
+examples_earthsystem_earth_DATA = \
+               examples/earthsystem/earth/makefile \
+               examples/earthsystem/earth/ContinentsOnGlobe.cpp \
+               examples/earthsystem/earth/BoundaryContinents.cpp \
+               examples/earthsystem/earth/addPCdata.cpp \
+               examples/earthsystem/earth/AddFieldtoPG2.cpp \
+               examples/earthsystem/earth/copyPartition.cpp
 
 CMAKE_CONFIGURATION_FILES = CMakeLists.txt \
    config/AutoconfHeader.cmake      config/GenerateScript.cmake   config/FindNETCDF.cmake        config/FindZOLTAN.cmake      \

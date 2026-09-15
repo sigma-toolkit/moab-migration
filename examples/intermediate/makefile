@@ -20,16 +20,16 @@ endif
 
 all: $(ALLEXAMPLES)
 
-LoadPartial: LoadPartial.o ${MOAB_LIBDIR}/libMOAB.la
-QuadTriConv: QuadTriConv.o ${MOAB_LIBDIR}/libMOAB.la
-DirectAccessWithHoles: DirectAccessWithHoles.o ${MOAB_LIBDIR}/libMOAB.la
-DirectAccessNoHoles: DirectAccessNoHoles.o ${MOAB_LIBDIR}/libMOAB.la
-ReduceExchangeTags: ReduceExchangeTags.o ${MOAB_LIBDIR}/libMOAB.la
-PointInElementSearch: PointInElementSearch.o ${MOAB_LIBDIR}/libMOAB.la
-ExtractClose: ExtractClose.o ${MOAB_LIBDIR}/libMOAB.la
-FixPolys: FixPolys.o ${MOAB_LIBDIR}/libMOAB.la
-ComputeTriDual: ComputeTriDual.o ${MOAB_LIBDIR}/libMOAB.la
-ExchangeHalos: ExchangeHalos.o ${MOAB_LIBDIR}/libMOAB.la
+LoadPartial: LoadPartial.o ${MOAB_LIBFILE}
+QuadTriConv: QuadTriConv.o ${MOAB_LIBFILE}
+DirectAccessWithHoles: DirectAccessWithHoles.o ${MOAB_LIBFILE}
+DirectAccessNoHoles: DirectAccessNoHoles.o ${MOAB_LIBFILE}
+ReduceExchangeTags: ReduceExchangeTags.o ${MOAB_LIBFILE}
+PointInElementSearch: PointInElementSearch.o ${MOAB_LIBFILE}
+ExtractClose: ExtractClose.o ${MOAB_LIBFILE}
+FixPolys: FixPolys.o ${MOAB_LIBFILE}
+ComputeTriDual: ComputeTriDual.o ${MOAB_LIBFILE}
+ExchangeHalos: ExchangeHalos.o ${MOAB_LIBFILE}
 
 $(EXAMPLES) $(PAREXAMPLES):
 	@echo "[CXXLD]  $@"

@@ -5,7 +5,7 @@ default: build
 
 SUBDIRS = beginner basic intermediate advanced fortran earthsystem# cmake
 
-build: ${MOAB_LIBDIR}/libMOAB.la
+build: ${MOAB_LIBFILE}
 	@for exampledir in ${SUBDIRS} ; do \
 		${MAKE} -C $$exampledir all ; \
 	done

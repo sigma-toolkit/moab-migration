@@ -904,6 +904,65 @@ endif(CLANG_TIDY_EXE)
 CONFIGURE_FILE(config/MOABConfig.cmake.h.in "${PROJECT_BINARY_DIR}/src/moab/MOABConfig.h" @ONLY)
 CONFIGURE_FILE(config/MOABConfig.cmake.cmake "${PROJECT_BINARY_DIR}/MOABConfig.cmake" @ONLY)
 CONFIGURE_FILE(config/MOABConfigVersion.cmake.cmake "${PROJECT_BINARY_DIR}/MOABConfigVersion.cmake" @ONLY)
+# Every installed example makefile gates on the literal string "yes", e.g.
+#   ifeq ("$(MOAB_HDF5_ENABLED)","yes")
+# because the autotools template substitutes @enablehdf5@ and friends, which are
+# already yes/no.  Feeding the CMake template the raw ON/OFF values instead made
+# every one of those tests fail, so an installed examples tree built nothing at
+# all: "make" reported "Nothing to be done" and exited 0, silently.  Translate to
+# the spelling the makefiles expect rather than editing every example makefile.
+foreach( _moab_make_feature MPI HDF5 NETCDF PNETCDF TEMPESTREMAP METIS PARMETIS ZOLTAN )
+  if( MOAB_HAVE_${_moab_make_feature} )
+    set( MOAB_MAKE_${_moab_make_feature}_ENABLED "yes" )
+  else()
+    set( MOAB_MAKE_${_moab_make_feature}_ENABLED "no" )
+  endif()
+endforeach()
+# Fortran is an ENABLE_ option rather than a discovered MOAB_HAVE_ package.
+if( ENABLE_FORTRAN )
+  set( MOAB_MAKE_FORTRAN_ENABLED "yes" )
+else()
+  set( MOAB_MAKE_FORTRAN_ENABLED "no" )
+endif()
+
+# The template used to spell these out as "-I@ZOLTAN_INCLUDES@ -I@NETCDF_INCLUDES@
+# ...", which emits a bare "-I" for every package that was not found - and a bare
+# -I swallows the next argument on the command line.  With HDF5_INCLUDES empty
+# that ate the -DMESH_DIR flag that follows, so examples referencing MESH_DIR
+# failed to compile with "use of undeclared identifier".  It also mangled any
+# variable holding more than one directory into "-I/a;/b".  Emit one -I per
+# non-empty entry instead.
+set( MOAB_MAKE_TPL_INCLUDES "" )
+foreach( _moab_make_incdir ${ZOLTAN_INCLUDES} ${NETCDF_INCLUDES} ${PNETCDF_INCLUDES} ${HDF5_INCLUDES} )
+  if( _moab_make_incdir )
+    set( MOAB_MAKE_TPL_INCLUDES "${MOAB_MAKE_TPL_INCLUDES} -I${_moab_make_incdir}" )
+  endif()
+endforeach()
+string( STRIP "${MOAB_MAKE_TPL_INCLUDES}" MOAB_MAKE_TPL_INCLUDES )
+
+# Same problem on the link line: these are CMake lists, and substituting them
+# raw left semicolons in a makefile variable, so the shell read each library
+# path as a separate command ("/opt/metis/lib/libmetis.a: Permission denied").
+# Join with spaces, dropping empty entries but keeping order and duplicates -
+# repeated archives matter when resolving static libraries.
+set( _moab_make_ext_libs "" )
+foreach( _moab_make_lib ${NETCDF_LIBRARIES} ${PNETCDF_LIBRARIES} ${CGNS_LIBRARIES}
+                        ${HDF5_LIBRARIES} ${TEMPESTREMAP_LIBRARIES} ${ZOLTAN_LIBRARIES}
+                        ${PARMETIS_LIBRARIES} ${METIS_LIBRARIES} ${HYPRE_LIBRARIES}
+                        ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
+  # On macOS, FindBLAS/FindLAPACK hand back a bare path to the Accelerate
+  # .framework bundle, which the linker cannot mmap.  Reuse the rewrite that
+  # ResolveCompilerPaths.cmake already applies to the CMake targets, so the
+  # makefile link line gets "-framework Accelerate" too.
+  _RCP_TRY_FRAMEWORK_PATH( "${_moab_make_lib}" _moab_make_is_framework _moab_make_framework_flag )
+  if( _moab_make_is_framework )
+    list( APPEND _moab_make_ext_libs "${_moab_make_framework_flag}" )
+  elseif( _moab_make_lib )
+    list( APPEND _moab_make_ext_libs "${_moab_make_lib}" )
+  endif()
+endforeach()
+string( REPLACE ";" " " MOAB_MAKE_EXT_LIBS "${_moab_make_ext_libs}" )
+
 CONFIGURE_FILE(moab.make.cmake "${PROJECT_BINARY_DIR}/lib/moab.make" @ONLY)
 CONFIGURE_FILE(config/MOAB.pc.cmake.in "${PROJECT_BINARY_DIR}/MOAB.pc" @ONLY)
 
@@ -920,11 +979,18 @@ if(NOT SKBUILD)
   install(FILES ${PROJECT_BINARY_DIR}/MOAB.pc
     DESTINATION ${MOABPKGCONFIG_LOCATION}
     )
+  # Point the installed moab.make at the install tree.  These used to append to
+  # a *relative* ${CMAKE_INSTALL_LIBDIR}/moab.make, which file(APPEND) resolves
+  # against the build directory: the overrides landed in the build tree's copy -
+  # growing it by two lines on every `make install` - while the installed copy
+  # kept pointing MOAB_LIBDIR at the build tree.  Mirror the autotools
+  # install-data-hook: write to $DESTDIR<full libdir>, and use += for the
+  # includes so the third-party -I flags configured above are not discarded.
   install(CODE
-    "file(APPEND  ${CMAKE_INSTALL_LIBDIR}/moab.make MOAB_LIBDIR=${CMAKE_INSTALL_FULL_LIBDIR}\\n )"
+    "file(APPEND \"\$ENV{DESTDIR}${CMAKE_INSTALL_FULL_LIBDIR}/moab.make\" \"MOAB_LIBDIR=${CMAKE_INSTALL_FULL_LIBDIR}\\n\")"
     )
   install(CODE
-    "file(APPEND  ${CMAKE_INSTALL_LIBDIR}/moab.make MOAB_INCLUDES=-I${CMAKE_INSTALL_FULL_INCLUDEDIR}\\n )"
+    "file(APPEND \"\$ENV{DESTDIR}${CMAKE_INSTALL_FULL_LIBDIR}/moab.make\" \"MOAB_INCLUDES+=-I${CMAKE_INSTALL_FULL_INCLUDEDIR}\\n\")"
     )
 else()
   set(MOABConfigLocation ${SKBUILD_DATA_DIR}/${MOABConfigLocation})
@@ -951,9 +1017,25 @@ SET(MOAB_DOCS ${MOAB_DOCS}
 )
 install(FILES ${MOAB_DOCS} DESTINATION ${MOABDocLocation})
 
+# The example makefiles used to depend on ${MOAB_LIBDIR}/libMOAB.la, a libtool
+# archive that only the autotools build produces; under CMake the dependency was
+# unsatisfiable and every link failed with "No rule to make target".  They now
+# depend on ${MOAB_LIBFILE}, which each makefile.config template fills in.
+if( BUILD_SHARED_LIBS )
+  set( MOAB_MAKE_LIBNAME "${CMAKE_SHARED_LIBRARY_PREFIX}MOAB${CMAKE_SHARED_LIBRARY_SUFFIX}" )
+else()
+  set( MOAB_MAKE_LIBNAME "${CMAKE_STATIC_LIBRARY_PREFIX}MOAB${CMAKE_STATIC_LIBRARY_SUFFIX}" )
+endif()
+
 CONFIGURE_FILE(examples/makefile.config.cmake "${PROJECT_BINARY_DIR}/share/examples/makefile.config" @ONLY)
+# Must land beside the installed example sources, which moab_install_docs() puts
+# under ${MOABDocLocation}/examples.  Installing it to ${CMAKE_INSTALL_DATADIR}
+# instead split the two halves across separate trees, so the "include
+# ../makefile.config" at the top of every example makefile could never resolve
+# and no installed example was buildable.  ${MOABDocLocation} also carries the
+# SKBUILD prefix that ${CMAKE_INSTALL_DATADIR} only gets applied to separately.
 install(FILES ${PROJECT_BINARY_DIR}/share/examples/makefile.config
-  DESTINATION ${CMAKE_INSTALL_DATADIR}/examples)
+  DESTINATION ${MOABDocLocation}/examples)
 
 SET(MOAB_EXAMPLES
   examples/makefile

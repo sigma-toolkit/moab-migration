@@ -18,6 +18,11 @@ $(error Error cannot build examples without a valid MOAB_DIR (${MOAB_DIR}) build
 
 endif
 
+# The library the examples depend on.  The CMake build produces no libtool
+# archive, so this cannot be the libMOAB.la the autotools build installs; every
+# example rule names ${MOAB_LIBFILE} and lets each build system fill it in.
+MOAB_LIBFILE = ${MOAB_LIBDIR}/@MOAB_MAKE_LIBNAME@
+
 default:
 
 .SUFFIXES: .o .cpp .F90

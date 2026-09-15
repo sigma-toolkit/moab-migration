@@ -25,6 +25,12 @@ RUNLD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${MOAB_LIBDIR}:${IMESH_LIBDIR}:${MSQ_LIBD
 MOAB_DEV = yes
 endif
 
+# The library the examples depend on, so that the per-example rules do not have
+# to name a libtool archive that only the autotools build produces.  libtool
+# installs libMOAB.la alongside the library, so this is correct both against a
+# build tree and against an installation.
+MOAB_LIBFILE = ${MOAB_LIBDIR}/libMOAB.la
+
 default:
 
 .SUFFIXES: .o .cpp .F90

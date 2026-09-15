@@ -22,7 +22,7 @@ endif
 
 all: $(ALLEXAMPLES)
 
-DirectAccessNoHolesF90: DirectAccessNoHolesF90.o ${MOAB_LIBDIR}/libMOAB.la
+DirectAccessNoHolesF90: DirectAccessNoHolesF90.o ${MOAB_LIBFILE}
 	@echo "[F90LD]  $@"
 	${VERBOSE}${MOAB_FC} -o $@ $< ${IMESH_LIBS}
 

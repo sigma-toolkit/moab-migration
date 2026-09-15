@@ -24,19 +24,19 @@ endif
 
 all: $(ALLEXAMPLES)
 
-ExtrudePoly: ExtrudePoly.o ${MOAB_LIBDIR}/libMOAB.la
-LloydRelaxation: LloydRelaxation.o ${MOAB_LIBDIR}/libMOAB.la
-CrystalRouterExample: CrystalRouterExample.o ${MOAB_LIBDIR}/libMOAB.la
-VisTags: VisTags.o ${MOAB_LIBDIR}/libMOAB.la
-GenLargeMesh: GenLargeMesh.o ${MOAB_LIBDIR}/libMOAB.la
-GeneralGnomonic: GeneralGnomonic.o ${MOAB_LIBDIR}/libMOAB.la
-AddEdgeFluxVector: AddEdgeFluxVector.o ${MOAB_LIBDIR}/libMOAB.la
+ExtrudePoly: ExtrudePoly.o ${MOAB_LIBFILE}
+LloydRelaxation: LloydRelaxation.o ${MOAB_LIBFILE}
+CrystalRouterExample: CrystalRouterExample.o ${MOAB_LIBFILE}
+VisTags: VisTags.o ${MOAB_LIBFILE}
+GenLargeMesh: GenLargeMesh.o ${MOAB_LIBFILE}
+GeneralGnomonic: GeneralGnomonic.o ${MOAB_LIBFILE}
+AddEdgeFluxVector: AddEdgeFluxVector.o ${MOAB_LIBFILE}
 
 ExtrudePoly LloydRelaxation CrystalRouterExample VisTags GenLargeMesh GeneralGnomonic AddEdgeFluxVector:
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
-CoupleMGen: CoupleMGen.o ${MOAB_LIBDIR}/libMOAB.la
+CoupleMGen: CoupleMGen.o ${MOAB_LIBFILE}
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< -lmbcoupler ${MOAB_LIBS_LINK}
 

@@ -302,11 +302,12 @@ inline ErrorCode MeshOptimizer::compute_characteristic_length()
 {
     double localSum = 0.0;
     long localCount = 0;
+    std::vector< EntityHandle > connStorage;
     for( Range::iterator it = mElems.begin(); it != mElems.end(); ++it )
     {
         const EntityHandle* conn = NULL;
         int nnodes               = 0;
-        if( MB_SUCCESS != mMB->get_connectivity( *it, conn, nnodes ) || nnodes < 2 ) continue;
+        if( MB_SUCCESS != mMB->get_connectivity( *it, conn, nnodes, false, &connStorage ) || nnodes < 2 ) continue;
         double c[24 * 3];
         if( nnodes > 24 ) nnodes = 24;
         if( MB_SUCCESS != mMB->get_coords( conn, nnodes, c ) ) continue;
@@ -365,6 +366,7 @@ inline ErrorCode MeshOptimizer::evaluate( double& f, bool need_gradient )
     }
 
     double localSum = 0.0;
+    std::vector< EntityHandle > connStorage;
 
     for( Range::iterator it = mElems.begin(); it != mElems.end(); ++it )
     {
@@ -372,9 +374,12 @@ inline ErrorCode MeshOptimizer::evaluate( double& f, bool need_gradient )
         const int nnodes      = metric_num_nodes( type );
         const int nv          = 3 * nnodes;
 
+        // The storage vector matters: a structured-mesh element has no stored
+        // connectivity array, and without somewhere to materialize one this
+        // call fails with MB_STRUCTURED_MESH.
         const EntityHandle* conn = NULL;
         int connlen              = 0;
-        rval                     = mMB->get_connectivity( *it, conn, connlen );MB_CHK_ERR( rval );
+        rval                     = mMB->get_connectivity( *it, conn, connlen, false, &connStorage );MB_CHK_ERR( rval );
         if( connlen < nnodes ) continue;
 
         double c[24];
@@ -527,6 +532,24 @@ inline ErrorCode MeshOptimizer::optimize( OptimizerResult& result )
 
     if( mOpts.verbosity > 0 && !mRank )
         std::printf( "  iter %4d   f = %.12e   |g| = %.6e\n", 0, f, gnorm );
+
+    if( !std::isfinite( f ) )
+    {
+        // An unregularized barrier metric is +inf on an inverted or degenerate
+        // element and its gradient is NaN, so there is no descent direction to
+        // find anywhere.  Say why rather than letting the line search fail 30
+        // times and report zero iterations.
+        if( !mRank )
+            std::printf( "  the mesh contains inverted or degenerate elements, so the objective is infinite\n"
+                         "  at the starting point.  Re-run with --delta > 0 (try %.3g) to regularize the\n"
+                         "  determinant, which makes the metric finite through inversion and lets the\n"
+                         "  optimizer untangle the mesh before improving its shape.\n",
+                         0.1 * mCharLength );
+        result.f_final     = f;
+        result.gnorm_final = gnorm;
+        result.evaluations = mEvaluations;
+        return MB_SUCCESS;
+    }
 
     // L-BFGS history.
     std::vector< std::vector< double > > S, Y;

@@ -131,10 +131,19 @@ if ( MOAB_USE_MPI AND MOAB_EXAMPLES_HAVE_FORTRAN )
     )
 endif ( MOAB_USE_MPI AND MOAB_EXAMPLES_HAVE_FORTRAN )
 
+# Every source in earthsystem/earth is listed here, so that what CMake compiles
+# matches what earthsystem/earth/makefile builds and what both build systems
+# install.  The four E3SM post-processing tools take their meshes on the command
+# line; run with no arguments - as CTest does below - they print their usage and
+# exit 0, which is the same smoke test the other examples get.
 set ( APPS_EXAMPLES
   earthsystem/earth/ContinentsOnGlobe.cpp
   earthsystem/earth/BoundaryContinents.cpp
   earthsystem/earth/addPCdata.cpp
+  earthsystem/earth/AddFieldtoPG2.cpp
+  earthsystem/earth/copyPartition.cpp
+  earthsystem/earth/ExtractLand.cpp
+  earthsystem/earth/addConnec.cpp
 )
 
 # MOAB's own headers, plus the third-party headers its public headers include

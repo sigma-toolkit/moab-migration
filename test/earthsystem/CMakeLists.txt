@@ -5,9 +5,10 @@
 #
 # Only the tests the CMake build already registered are registered here; the
 # ones that were autotools-only (commgraph_test, par_intx_sph,
-# test_mapweights_bcast, gcrm_par, read_esmf, mpastrvpart, ucdtrvpart and
-# read_gcrm_nc) stay that way rather than being enabled silently as part of a
-# move.  See test/Makefile.am and test/parallel/Makefile.am.
+# test_mapweights_bcast, gcrm_par, read_esmf, mpastrvpart, ucdtrvpart,
+# read_gcrm_nc, and the parallel NetCDF drivers read_nc_par and write_nc_par)
+# stay that way rather than being enabled silently as part of a move.
+# See test/Makefile.am and test/parallel/Makefile.am.
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}

@@ -1109,7 +1109,10 @@ install(FILES ${PROJECT_BINARY_DIR}/share/examples/makefile.config
 SET(MOAB_EXAMPLES
   examples/makefile
   examples/makefile.config.in
-  examples/CMakeLists.txt )
+  examples/CMakeLists.txt
+  # The standalone CMake template a downstream project copies; Makefile.am
+  # distributes it as examples_cmake_DATA.
+  examples/cmake/CMakeLists.txt )
 SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/beginner/README
   examples/beginner/makefile
@@ -1172,7 +1175,15 @@ SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/fortran/spherecube.h5m )
 SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/python/makefile
-  examples/python/laplaciansmoother.py )
+  examples/python/laplaciansmoother.py
+  # examples/python/makefile has rules for H5MToScrip and ScripToH5M, so an
+  # install that ships the makefile without them is not buildable.  The rest
+  # match what Makefile.am already distributes.
+  examples/python/H5MToScrip.py
+  examples/python/ScripToH5M.py
+  examples/python/gr3rd.py
+  examples/python/interrogate_mesh.py
+  examples/python/scrip3d.py )
 SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/earthsystem/makefile )
 SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}

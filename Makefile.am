@@ -132,8 +132,8 @@ EXTRA_DIST = $(doc_DATA) \
 						 $(examples_advancedsmooth_DATA) \
 						 $(examples_fortran_DATA) \
 						 $(examples_pythonex_DATA) \
-						 $(examples_apps_DATA) \
-						 $(examples_apps_earth_DATA) \
+						 $(examples_earthsystem_DATA) \
+						 $(examples_earthsystem_earth_DATA) \
 						 suggest_configuration.sh
 
 # Automake doesn't seem to have a directory defined for

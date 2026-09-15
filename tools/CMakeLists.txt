@@ -146,7 +146,7 @@ if (MOAB_HAVE_NETCDF OR MOAB_HAVE_PNETCDF)
 
   # MBVISUMAP
   if ( MOAB_BUILD_MBVISUMAP )
-    add_moab_tool( mbvisumap visuMapVtk.cpp MOAB_HAVE_MBVISUMAP )
+    add_moab_tool( mbvisumap visuMap.cpp MOAB_HAVE_MBVISUMAP )
   endif( )
 
 endif (MOAB_HAVE_NETCDF OR MOAB_HAVE_PNETCDF)

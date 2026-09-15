@@ -15,6 +15,11 @@ add_subdirectory(perf)
 
 set(TEST_COMP_FLAGS "-DMESHDIR=${MOAB_ABSSRC_DIR}/MeshFiles/unittest")
 
+# Earth system tests (intersection, remapping, NetCDF/SCRIP, coupler
+# workflows).  Added after TEST_COMP_FLAGS so the subdirectory inherits it, and
+# it does its own MPI/TempestRemap gating.
+add_subdirectory(earthsystem)
+
 set( TESTS range_test.cpp
            verdict_test.cpp
            test_Matrix3.cpp
@@ -38,9 +43,6 @@ set( TESTS range_test.cpp
            adj_moab_test.cpp
            test_boundbox.cpp
            spherical_area_test.cpp
-           arc_intx_tests.cpp
-           intx_in_plane_test.cpp
-           intx_on_sphere_test.cpp
            dual_test.cpp )
 
 if(MOAB_HAVE_HDF5)
@@ -61,11 +63,6 @@ if(MOAB_HAVE_HDF5)
   set( HDF5_C_TESTS  imoab_test.c )
 endif()
 
-if(MOAB_HAVE_NETCDF)
-  set ( TESTS ${TESTS}
-              intx_rll_cs_sphere_test.cpp )
-endif()
-
 foreach( fname ${HDF5_C_TESTS} )
   string( REPLACE ".c" "" base ${fname} )
   add_executable( ${base} ${fname})
@@ -81,19 +78,6 @@ foreach( fname ${TESTS} )
   target_link_libraries( ${base} MOAB )
   add_test( ${base} ${EXECUTABLE_OUTPUT_PATH}/${base} )
 endforeach()
-
-if(MOAB_HAVE_TEMPESTREMAP)
-  set( MBTR_TESTS imoab_remap.cpp test_remapping.cpp )
-  
-  foreach( fname ${MBTR_TESTS} )
-    string( REPLACE ".cpp" "" base ${fname} )
-    add_executable( ${base} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname})
-    set_target_properties( ${base} PROPERTIES COMPILE_FLAGS "${TEST_COMP_FLAGS} ${MOAB_DEFINES} -DTEST" )
-    target_link_libraries( ${base} MOAB ${TEMPESTREMAP_LIBRARIES} )
-    add_test( ${base} ${EXECUTABLE_OUTPUT_PATH}/${base} )
-  endforeach()
-
-endif()
 
 if(ENABLE_PYMOAB)
   ADD_SUBDIRECTORY(pymoab)
@@ -252,13 +236,11 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
 
 
   if(MOAB_HAVE_TEMPESTREMAP)
-    set( MBTR_TESTS parallel/imoab_coupler.cpp parallel/imoab_coupler_bilin.cpp parallel/imoab_coupler_twohop.cpp
-                    parallel/imoab_domain_culling.cpp parallel/imoab_map_r2l.cpp parallel/imoab_map_target.cpp
-                    parallel/imoab_ptest2.cpp parallel/imoab_read_compute_map.cpp
-                    parallel/imoab_scrip.cpp parallel/imoab_setwithGid.cpp parallel/imoab_phatm_ocn_coupler.cpp
-                    parallel/imoab_apg2_ol_coupler.cpp parallel/imoab_spmv_bfb.cpp
-                    parallel/imoab_dualmap_caas.cpp )
-    
+    # The coupler drivers moved to test/earthsystem/parallel; imoab_ptest2 is a
+    # generic iMOAB exercise over whole.h5m and stays here.
+    set( MBTR_TESTS parallel/imoab_ptest2.cpp )
+
+
     foreach( fname ${MBTR_TESTS} )
       string( REPLACE ".cpp" "" base ${fname} )
       string( REPLACE "parallel/" "" noparbase ${base} )
@@ -314,9 +296,11 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
       COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -L imoab_bfb
       COMMENT "Running all iMOAB BfB regression configs via ctest")
 
-    # Fortran tests
-    set( MBTRF_TESTS parallel/imoab_ptest.F parallel/imoab_coupler_fortran.F90 parallel/imoab_coupler_caas.F90  )
-    
+    # Fortran tests.  The Fortran coupler drivers moved to
+    # test/earthsystem/parallel; imoab_ptest.F is generic and stays.
+    set( MBTRF_TESTS parallel/imoab_ptest.F )
+
+
     foreach( fname ${MBTRF_TESTS} )
       string( REPLACE ".F90" "" base ${fname} ) # For F90
       string( REPLACE ".F" "" base ${base} ) # For F77

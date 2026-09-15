@@ -3,7 +3,10 @@ include makefile.config
 
 default: build
 
-SUBDIRS = beginner basic intermediate advanced fortran earthsystem# cmake
+# advanced/smoothing is listed separately rather than walked from
+# advanced/makefile, which has no SUBDIRS of its own; until now nothing
+# descended into it at all.
+SUBDIRS = beginner basic intermediate advanced advanced/smoothing fortran earthsystem# cmake
 
 build: ${MOAB_LIBFILE}
 	@for exampledir in ${SUBDIRS} ; do \

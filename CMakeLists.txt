@@ -1156,6 +1156,10 @@ SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/advanced/VisTags.cpp
   examples/advanced/CoupleMGen.cpp )
 SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
+  examples/advanced/smoothing/makefile
+  examples/advanced/smoothing/LaplacianSmoother.cpp
+  examples/advanced/smoothing/OptimizeMeshMesquite.cpp )
+SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/fortran/makefile
   examples/fortran/DirectAccessNoHolesF90.F90
   examples/fortran/PushParMeshIntoMoabF90.F90

@@ -9,49 +9,49 @@ endif
 
 all: $(ALLEXAMPLES)
 
-ContinentsOnGlobe: ContinentsOnGlobe.o ${MOAB_LIBDIR}/libMOAB.la
+ContinentsOnGlobe: ContinentsOnGlobe.o ${MOAB_LIBFILE}
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
 run-ContinentsOnGlobe: ContinentsOnGlobe
 	${RUNSERIAL} ./ContinentsOnGlobe
 
-BoundaryContinents: BoundaryContinents.o ${MOAB_LIBDIR}/libMOAB.la
+BoundaryContinents: BoundaryContinents.o ${MOAB_LIBFILE}
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
 run-BoundaryContinents: BoundaryContinents
 	${RUNSERIAL} ./BoundaryContinents
 
-addPCdata: addPCdata.o ${MOAB_LIBDIR}/libMOAB.la
+addPCdata: addPCdata.o ${MOAB_LIBFILE}
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
 run-addPCdata: addPCdata
 	${RUNSERIAL} ./addPCdata
 
-ExtractLand: ExtractLand.o ${MOAB_LIBDIR}/libMOAB.la
+ExtractLand: ExtractLand.o ${MOAB_LIBFILE}
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
 run-ExtractLand: ExtractLand
 	${RUNSERIAL} ./ExtractLand -h
 
-copyPartition: copyPartition.o ${MOAB_LIBDIR}/libMOAB.la
+copyPartition: copyPartition.o ${MOAB_LIBFILE}
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
 run-copyPartition: copyPartition
 	${RUNSERIAL} ./copyPartition
 
-AddFieldtoPG2: AddFieldtoPG2.o ${MOAB_LIBDIR}/libMOAB.la
+AddFieldtoPG2: AddFieldtoPG2.o ${MOAB_LIBFILE}
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
 run-AddFieldtoPG2: AddFieldtoPG2
 	${RUNSERIAL} ./AddFieldtoPG2
 	
-addConnec: addConnec.o ${MOAB_LIBDIR}/libMOAB.la
+addConnec: addConnec.o ${MOAB_LIBFILE}
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 

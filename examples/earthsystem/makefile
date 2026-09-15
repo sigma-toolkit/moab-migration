@@ -7,7 +7,7 @@ all: build
 
 SUBDIRS = earth
 
-build: ${MOAB_LIBDIR}/libMOAB.la
+build: ${MOAB_LIBFILE}
 	@for exampledir in ${SUBDIRS} ; do \
 		${MAKE} -C $$exampledir all ; \
 	done

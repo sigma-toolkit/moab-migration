@@ -153,7 +153,7 @@ int main()
         {
             // Get the handle for this vertex:
             moab::EntityHandle handle = scdbox->get_vertex( i, j );
-            double velocity[2]        = { i, j };
+            double velocity[2]        = { static_cast< double >( i ), static_cast< double >( j ) };
 
             // Set the velocity on a vertex:
             MB_CHK_SET_ERR( mbint.tag_set_data( vel_tag, &handle, 1, velocity ), "mbint.tag_set_data(vel_tag) failed" );

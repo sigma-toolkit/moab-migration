@@ -45,6 +45,7 @@ set(MOAB_USE_EIGEN @MOAB_HAVE_EIGEN3@)
 set(EIGEN3_DIR "@EIGEN3_DIR@")
 set(TEMPESTREMAP_DIR "@TEMPESTREMAP_DIR@")
 set(MOAB_USE_TEMPESTREMAP @MOAB_HAVE_TEMPESTREMAP@)
+set(MOAB_USE_MBCOUPLER @MOAB_HAVE_MBCOUPLER@)
 set(MOAB_USE_SKBUILD @SKBUILD@)
 set(MOAB_MESH_DIR "@CMAKE_SOURCE_DIR@/MeshFiles/unittest")
 
@@ -59,6 +60,32 @@ set (MOAB_PACKAGE_LIBS @MOAB_LIBRARIES@)
 string(STRIP "${MOAB_PACKAGE_LIBS}" MOAB_PACKAGE_LIBS)
 set(MOAB_PACKAGE_LIBS_LIST ${MOAB_PACKAGE_LIBS})
 separate_arguments(MOAB_PACKAGE_LIBS_LIST)
+# separate_arguments() splits on whitespace, which tears a macOS framework
+# reference such as "-framework Accelerate" into two list items.  Consumers
+# then pass "-framework" and "Accelerate" to target_link_libraries()
+# separately and CMake turns the latter into "-lAccelerate", so the link
+# fails with "framework '-lAccelerate' not found".  Re-pair each flag with
+# the argument that follows it before de-duplicating, so the pair stays a
+# single item and dedups as a unit.
+set(_moab_pkg_libs "")
+set(_moab_pending "")
+foreach(_moab_item IN LISTS MOAB_PACKAGE_LIBS_LIST)
+  if(_moab_pending)
+    list(APPEND _moab_pkg_libs "${_moab_pending} ${_moab_item}")
+    set(_moab_pending "")
+  elseif(_moab_item MATCHES "^(-framework|-Xlinker)$")
+    set(_moab_pending "${_moab_item}")
+  else()
+    list(APPEND _moab_pkg_libs "${_moab_item}")
+  endif()
+endforeach()
+if(_moab_pending)
+  list(APPEND _moab_pkg_libs "${_moab_pending}")
+endif()
+set(MOAB_PACKAGE_LIBS_LIST ${_moab_pkg_libs})
+unset(_moab_pkg_libs)
+unset(_moab_pending)
+unset(_moab_item)
 list(REMOVE_DUPLICATES MOAB_PACKAGE_LIBS_LIST)
 set(MOAB_PACKAGE_LIBS "${MOAB_PACKAGE_LIBS_LIST}")
 

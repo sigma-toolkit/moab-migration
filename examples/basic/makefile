@@ -31,10 +31,6 @@ HelloMOAB: HelloMOAB.o
 run-HelloMOAB: HelloMOAB
 	${RUNSERIAL} ./HelloMOAB
 
-CompareH5mFiles: CompareH5mFiles.o
-	@echo "[CXXLD]  $@"
-	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
-
 ProjectToSphere: ProjectToSphere.o
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}

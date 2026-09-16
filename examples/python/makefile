@@ -4,7 +4,7 @@ include ../makefile.config
 
 default: all
 
-ALLEXAMPLES = yt2moab laplaciansmoother H5MToScrip ScripToH5M
+ALLEXAMPLES = laplaciansmoother H5MToScrip ScripToH5M
 
 all: $(ALLEXAMPLES)
 

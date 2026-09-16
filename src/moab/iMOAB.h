@@ -484,6 +484,50 @@ ErrCode iMOAB_GetVertexOwnership( iMOAB_AppID pid, int* vertices_length, int* vi
 ErrCode iMOAB_GetVisibleVerticesCoordinates( iMOAB_AppID pid, int* coords_length, double* coordinates );
 
 /**
+ * \brief Get direct pointers into MOAB's own storage for the vertex coordinates.
+ *
+ * \note Unlike iMOAB_GetVisibleVerticesCoordinates, which copies into a user array, this returns
+ * pointers to the memory MOAB itself holds the coordinates in, so reading or writing through them
+ * needs no copy at all. Coordinates are therefore <I>blocked</I> (separate x, y and z arrays) rather
+ * than interleaved: that is how MOAB stores them, and interleaving would reintroduce the copy.
+ *
+ * \note MOAB's storage is contiguous only in runs. The returned pointers are valid for
+ * <TT>count</TT> vertices starting at <TT>start_index</TT> and no further, so a caller covers the
+ * whole local vertex range by looping until it has consumed num_visible_vertices:
+ * \code
+ *     int i = 0, count, nverts = ...;
+ *     while( i < nverts )
+ *     {
+ *         double *x, *y, *z;
+ *         iMOAB_GetVertexCoordinatesPointer( pid, &i, &count, &x, &y, &z );
+ *         // x[0..count-1] are the coordinates of vertices i .. i+count-1
+ *         i += count;
+ *     }
+ * \endcode
+ *
+ * \warning The pointers are invalidated by anything that changes the mesh (creating or deleting
+ * entities, reading a file, resolving sharing). Re-acquire them after any such call.
+ *
+ * <B>Operations:</B> Not Collective
+ *
+ * \param[in]  pid (iMOAB_AppID) The unique pointer to the application ID.
+ * \param[in]  start_index (int*) 0-based index of the first vertex to return, in the same local
+ *                                ordering as iMOAB_GetVisibleVerticesCoordinates.
+ * \param[out] count (int*)       Number of vertices the returned pointers are valid for; always at
+ *                                least 1 on success, and at most num_visible_vertices-start_index.
+ * \param[out] x (double**)       Pointer to the x coordinates of those <TT>count</TT> vertices.
+ * \param[out] y (double**)       Pointer to the y coordinates.
+ * \param[out] z (double**)       Pointer to the z coordinates.
+ * \return ErrCode                The error code indicating success or failure.
+ */
+ErrCode iMOAB_GetVertexCoordinatesPointer( iMOAB_AppID pid,
+                                           int* start_index,
+                                           int* count,
+                                           double** x,
+                                           double** y,
+                                           double** z );
+
+/**
  * \brief Get the global block IDs for all locally visible (owned and shared/ghosted) blocks.
  *
  * \note Block IDs are corresponding to MATERIAL_SET tags for material sets. Usually the block ID is exported
@@ -843,6 +887,68 @@ ErrCode iMOAB_GetDoubleTagStorage( iMOAB_AppID pid,
                                    int* num_tag_storage_length,
                                    int* entity_type,
                                    double* tag_storage_data );
+
+/**
+ * \brief Get a direct pointer into MOAB's own storage for a double tag.
+ *
+ * \note Unlike iMOAB_GetDoubleTagStorage, which copies into a user array, this returns a pointer to
+ * the memory MOAB holds the tag values in, so reading and writing them costs no copy. Values for
+ * the returned entities are contiguous and unrolled by component, i.e. entity <TT>e</TT> of the
+ * returned run occupies <TT>tag_storage_data[components_per_entity*e .. +components_per_entity-1]</TT>.
+ *
+ * \note Exactly one tag name is accepted. iMOAB_GetDoubleTagStorage packs a colon-separated list
+ * into one user buffer, but each MOAB tag has its own separate allocation, so no single pointer can
+ * describe a list; passing one returns MB_INVALID_SIZE rather than silently returning the first tag.
+ *
+ * \note As with iMOAB_GetVertexCoordinatesPointer, MOAB's storage is contiguous only in runs, so
+ * <TT>count</TT> reports how many entities the pointer covers and the caller loops from
+ * <TT>start_index</TT> until the whole range is consumed.
+ *
+ * \warning The pointer is invalidated by anything that changes the mesh or redefines the tag.
+ *
+ * <B>Operations:</B> Not Collective
+ *
+ * \param[in]  pid (iMOAB_AppID)                 The unique pointer to the application ID.
+ * \param[in]  tag_storage_name (iMOAB_String)   The name of a single already-defined double tag.
+ * \param[in]  entity_type (int*)                Type=0 for vertices, and Type=1 for primary elements.
+ * \param[in]  start_index (int*)                0-based index of the first entity to return.
+ * \param[out] count (int*)                      Number of entities the returned pointer is valid for.
+ * \param[out] components_per_entity (int*)      Values per entity, as given to iMOAB_DefineTagStorage.
+ * \param[out] tag_storage_data (double**)       Pointer to the tag values for those entities.
+ * \return ErrCode                               The error code indicating success or failure.
+ */
+ErrCode iMOAB_GetDoubleTagStoragePointer( iMOAB_AppID pid,
+                                          const iMOAB_String tag_storage_name,
+                                          int* entity_type,
+                                          int* start_index,
+                                          int* count,
+                                          int* components_per_entity,
+                                          double** tag_storage_data );
+
+/**
+ * \brief Get a direct pointer into MOAB's own storage for an integer tag.
+ *
+ * \note Identical in every respect to iMOAB_GetDoubleTagStoragePointer, except that the tag must
+ * have been defined with integer rather than double values.
+ *
+ * <B>Operations:</B> Not Collective
+ *
+ * \param[in]  pid (iMOAB_AppID)                 The unique pointer to the application ID.
+ * \param[in]  tag_storage_name (iMOAB_String)   The name of a single already-defined integer tag.
+ * \param[in]  entity_type (int*)                Type=0 for vertices, and Type=1 for primary elements.
+ * \param[in]  start_index (int*)                0-based index of the first entity to return.
+ * \param[out] count (int*)                      Number of entities the returned pointer is valid for.
+ * \param[out] components_per_entity (int*)      Values per entity, as given to iMOAB_DefineTagStorage.
+ * \param[out] tag_storage_data (int**)          Pointer to the tag values for those entities.
+ * \return ErrCode                               The error code indicating success or failure.
+ */
+ErrCode iMOAB_GetIntTagStoragePointer( iMOAB_AppID pid,
+                                       const iMOAB_String tag_storage_name,
+                                       int* entity_type,
+                                       int* start_index,
+                                       int* count,
+                                       int* components_per_entity,
+                                       int** tag_storage_data );
 
 /**
  * \brief Exchange tag values for the given tags across process boundaries.

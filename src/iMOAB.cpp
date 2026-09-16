@@ -1570,6 +1570,31 @@ ErrCode iMOAB_GetVisibleVerticesCoordinates( iMOAB_AppID pid, int* coords_length
     return moab::MB_SUCCESS;
 }
 
+ErrCode iMOAB_GetVertexCoordinatesPointer( iMOAB_AppID pid,
+                                           int* start_index,
+                                           int* count,
+                                           double** x,
+                                           double** y,
+                                           double** z )
+{
+    assert( start_index );
+    assert( count );
+    assert( x && y && z );
+
+    Range& verts = context.appDatas[*pid].all_verts;
+
+    if( *start_index < 0 || *start_index >= (int)verts.size() ) return moab::MB_INDEX_OUT_OF_RANGE;
+
+    Range::const_iterator iter = verts.begin() + *start_index;
+
+    // Blocked, not interleaved: this is MOAB's own layout, and reinterleaving would be the copy this
+    // entry point exists to avoid.  *count says how far the pointers stay valid.
+    MB_CHK_SET_ERR( context.MBI->coords_iterate( iter, verts.end(), *x, *y, *z, *count ),
+                    "can't get direct access to vertex coordinates" );
+
+    return moab::MB_SUCCESS;
+}
+
 /**
  * @brief Retrieve global IDs for all material blocks in mesh.
  * @ingroup iMOABQuery
@@ -2783,6 +2808,103 @@ ErrCode iMOAB_GetDoubleTagStorage( iMOAB_AppID pid,
     }
 
     return moab::MB_SUCCESS;  // no error
+}
+
+/*
+ * Shared body of iMOAB_GetDoubleTagStoragePointer and iMOAB_GetIntTagStoragePointer.  The two differ
+ * only in the DataType they insist on and in the pointer type they hand back, so keeping the checks
+ * in one place stops the two from drifting apart.
+ */
+static ErrCode iMOAB_GetTagStoragePointer( iMOAB_AppID pid,
+                                           const iMOAB_String tag_storage_name,
+                                           int* entity_type,
+                                           int* start_index,
+                                           int* count,
+                                           int* components_per_entity,
+                                           void** tag_storage_data,
+                                           DataType required_type )
+{
+    assert( tag_storage_name );
+    assert( entity_type );
+    assert( start_index );
+    assert( count );
+    assert( components_per_entity );
+    assert( tag_storage_data );
+
+    // Direct access hands back one pointer, and every MOAB tag has its own separate allocation, so a
+    // colon-separated list cannot be represented.  Refuse it rather than quietly returning the first
+    // tag and letting the caller read past the end of it.
+    std::vector< std::string > tagNames;
+    std::string separator( ":" );
+    split_tag_names( std::string( tag_storage_name ), separator, tagNames );
+
+    if( 1 != tagNames.size() ) return moab::MB_INVALID_SIZE;
+
+    appData& data = context.appDatas[*pid];
+
+    if( data.tagMap.find( tagNames[0] ) == data.tagMap.end() ) return moab::MB_TAG_NOT_FOUND;
+
+    Tag tag = data.tagMap[tagNames[0]];
+
+    DataType dtype;
+    MB_CHK_ERR( context.MBI->tag_get_data_type( tag, dtype ) );
+
+    if( dtype != required_type ) return moab::MB_TYPE_OUT_OF_RANGE;
+
+    MB_CHK_ERR( context.MBI->tag_get_length( tag, *components_per_entity ) );
+
+    Range* ents_to_get = nullptr;
+
+    if( *entity_type == 0 )  // vertices
+    {
+        ents_to_get = &data.all_verts;
+    }
+    else if( *entity_type == 1 )  // primary elements
+    {
+        ents_to_get = &data.primary_elems;
+    }
+    else
+    {
+        return moab::MB_TYPE_OUT_OF_RANGE;
+    }
+
+    if( *start_index < 0 || *start_index >= (int)ents_to_get->size() ) return moab::MB_INDEX_OUT_OF_RANGE;
+
+    Range::const_iterator iter = ents_to_get->begin() + *start_index;
+
+    // allocate=true: dense tag storage is materialized lazily, and the window we hand back is meant to
+    // be written through as well as read, so it has to exist before the caller touches it.
+    MB_CHK_SET_ERR(
+        context.MBI->tag_iterate( tag, iter, ents_to_get->end(), *count, *tag_storage_data, true ),
+        "can't get direct access to tag storage" );
+
+    return moab::MB_SUCCESS;
+}
+
+ErrCode iMOAB_GetDoubleTagStoragePointer( iMOAB_AppID pid,
+                                          const iMOAB_String tag_storage_name,
+                                          int* entity_type,
+                                          int* start_index,
+                                          int* count,
+                                          int* components_per_entity,
+                                          double** tag_storage_data )
+{
+    return iMOAB_GetTagStoragePointer( pid, tag_storage_name, entity_type, start_index, count,
+                                       components_per_entity, reinterpret_cast< void** >( tag_storage_data ),
+                                       MB_TYPE_DOUBLE );
+}
+
+ErrCode iMOAB_GetIntTagStoragePointer( iMOAB_AppID pid,
+                                       const iMOAB_String tag_storage_name,
+                                       int* entity_type,
+                                       int* start_index,
+                                       int* count,
+                                       int* components_per_entity,
+                                       int** tag_storage_data )
+{
+    return iMOAB_GetTagStoragePointer( pid, tag_storage_name, entity_type, start_index, count,
+                                       components_per_entity, reinterpret_cast< void** >( tag_storage_data ),
+                                       MB_TYPE_INTEGER );
 }
 
 ErrCode iMOAB_SynchronizeTags( iMOAB_AppID pid, int* num_tag, int* tag_indices, int* ent_type )

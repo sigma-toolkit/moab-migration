@@ -19,6 +19,8 @@ module iMOAB
    private :: iMOAB_SetIntTagStorage_c, iMOAB_GetIntTagStorage_c
    private :: iMOAB_SetDoubleTagStorage_c, iMOAB_SetDoubleTagStorageWithGid_c
    private :: iMOAB_GetDoubleTagStorage_c
+   private :: iMOAB_GetVertexCoordinatesPointer_c
+   private :: iMOAB_GetDoubleTagStoragePointer_c, iMOAB_GetIntTagStoragePointer_c
 #ifdef MOAB_HAVE_MPI
    private :: iMOAB_SendElementTag_c, iMOAB_ReceiveElementTag_c, iMOAB_DumpCommGraph_c
 #endif
@@ -166,6 +168,43 @@ module iMOAB
         integer(c_int), intent(in) :: coords_length
         real(c_double), intent(out) :: coordinates(*)
       end function iMOAB_GetVisibleVerticesCoordinates
+
+      integer(c_int) function iMOAB_GetVertexCoordinatesPointer_c(pid, start_index, count, x, y, z) &
+                              bind(C, name='iMOAB_GetVertexCoordinatesPointer')
+        use, intrinsic :: iso_c_binding, only: c_int, c_ptr
+        integer(c_int), intent(in) :: pid
+        integer(c_int), intent(in) :: start_index
+        integer(c_int), intent(out) :: count
+        type(c_ptr), intent(out) :: x
+        type(c_ptr), intent(out) :: y
+        type(c_ptr), intent(out) :: z
+      end function iMOAB_GetVertexCoordinatesPointer_c
+
+      integer(c_int) function iMOAB_GetDoubleTagStoragePointer_c(pid, tag_storage_name, entity_type, start_index, &
+                                                                 count, components_per_entity, tag_storage_data) &
+                              bind(C, name='iMOAB_GetDoubleTagStoragePointer')
+        use, intrinsic :: iso_c_binding, only: c_int, c_char, c_ptr
+        integer(c_int), intent(in) :: pid
+        character(kind=c_char), intent(in) :: tag_storage_name(*)
+        integer(c_int), intent(in) :: entity_type
+        integer(c_int), intent(in) :: start_index
+        integer(c_int), intent(out) :: count
+        integer(c_int), intent(out) :: components_per_entity
+        type(c_ptr), intent(out) :: tag_storage_data
+      end function iMOAB_GetDoubleTagStoragePointer_c
+
+      integer(c_int) function iMOAB_GetIntTagStoragePointer_c(pid, tag_storage_name, entity_type, start_index, &
+                                                              count, components_per_entity, tag_storage_data) &
+                              bind(C, name='iMOAB_GetIntTagStoragePointer')
+        use, intrinsic :: iso_c_binding, only: c_int, c_char, c_ptr
+        integer(c_int), intent(in) :: pid
+        character(kind=c_char), intent(in) :: tag_storage_name(*)
+        integer(c_int), intent(in) :: entity_type
+        integer(c_int), intent(in) :: start_index
+        integer(c_int), intent(out) :: count
+        integer(c_int), intent(out) :: components_per_entity
+        type(c_ptr), intent(out) :: tag_storage_data
+      end function iMOAB_GetIntTagStoragePointer_c
 
       integer(c_int) function iMOAB_GetBlockID(pid, block_length, global_block_IDs) bind(C, name='iMOAB_GetBlockID')
         use, intrinsic :: iso_c_binding, only: c_int
@@ -735,6 +774,86 @@ contains
       ierr = iMOAB_GetDoubleTagStorage_c( pid, to_c_string( tag_storage_name ), num_tag_storage_length, entity_type, &
                                           tag_storage_data )
    end function iMOAB_GetDoubleTagStorage
+
+!> Direct (zero-copy) access to the vertex coordinates MOAB holds.
+!!
+!! Returns Fortran pointers aliasing MOAB's own storage - no C_PTR and no
+!! C_F_POINTER in caller code.  Coordinates are blocked, so x, y and z are three
+!! separate arrays.  MOAB's storage is contiguous only in runs, so count says how
+!! many vertices the pointers cover and the caller loops from start_index (0-based)
+!! until num_visible_vertices is consumed.  On failure the pointers are
+!! disassociated and count is zero, so a caller that forgets to test ierr gets a
+!! null-pointer error rather than silent garbage.
+   integer(c_int) function iMOAB_GetVertexCoordinatesPointer( pid, start_index, count, x, y, z ) result( ierr )
+      integer(c_int), intent(in) :: pid
+      integer(c_int), intent(in) :: start_index
+      integer(c_int), intent(out) :: count
+      real(c_double), pointer, intent(out) :: x(:)
+      real(c_double), pointer, intent(out) :: y(:)
+      real(c_double), pointer, intent(out) :: z(:)
+      type(c_ptr) :: cx, cy, cz
+      ierr = iMOAB_GetVertexCoordinatesPointer_c( pid, start_index, count, cx, cy, cz )
+      if ( ierr /= 0 ) then
+         count = 0
+         nullify( x, y, z )
+      else
+         call c_f_pointer( cx, x, [count] )
+         call c_f_pointer( cy, y, [count] )
+         call c_f_pointer( cz, z, [count] )
+      end if
+   end function iMOAB_GetVertexCoordinatesPointer
+
+!> Direct (zero-copy) access to the storage of a single double tag.
+!!
+!! The returned array is unrolled by component: entity e of the run occupies
+!! tag_storage_data(components_per_entity*e + 1 : components_per_entity*(e+1)).
+!! Exactly one tag name is accepted; a colon-separated list is rejected, because
+!! each MOAB tag has its own allocation and no single pointer can span them.
+   integer(c_int) function iMOAB_GetDoubleTagStoragePointer( pid, tag_storage_name, entity_type, start_index, &
+                                                             count, components_per_entity, &
+                                                             tag_storage_data ) result( ierr )
+      integer(c_int), intent(in) :: pid
+      character(len=*), intent(in) :: tag_storage_name
+      integer(c_int), intent(in) :: entity_type
+      integer(c_int), intent(in) :: start_index
+      integer(c_int), intent(out) :: count
+      integer(c_int), intent(out) :: components_per_entity
+      real(c_double), pointer, intent(out) :: tag_storage_data(:)
+      type(c_ptr) :: cptr
+      ierr = iMOAB_GetDoubleTagStoragePointer_c( pid, to_c_string( tag_storage_name ), entity_type, start_index, &
+                                                 count, components_per_entity, cptr )
+      if ( ierr /= 0 ) then
+         count = 0
+         components_per_entity = 0
+         nullify( tag_storage_data )
+      else
+         call c_f_pointer( cptr, tag_storage_data, [count * components_per_entity] )
+      end if
+   end function iMOAB_GetDoubleTagStoragePointer
+
+!> Direct (zero-copy) access to the storage of a single integer tag.
+!! Identical to iMOAB_GetDoubleTagStoragePointer but for integer-valued tags.
+   integer(c_int) function iMOAB_GetIntTagStoragePointer( pid, tag_storage_name, entity_type, start_index, &
+                                                          count, components_per_entity, &
+                                                          tag_storage_data ) result( ierr )
+      integer(c_int), intent(in) :: pid
+      character(len=*), intent(in) :: tag_storage_name
+      integer(c_int), intent(in) :: entity_type
+      integer(c_int), intent(in) :: start_index
+      integer(c_int), intent(out) :: count
+      integer(c_int), intent(out) :: components_per_entity
+      integer(c_int), pointer, intent(out) :: tag_storage_data(:)
+      type(c_ptr) :: cptr
+      ierr = iMOAB_GetIntTagStoragePointer_c( pid, to_c_string( tag_storage_name ), entity_type, start_index, &
+                                              count, components_per_entity, cptr )
+      if ( ierr /= 0 ) then
+         count = 0
+         components_per_entity = 0
+         nullify( tag_storage_data )
+      else
+         call c_f_pointer( cptr, tag_storage_data, [count * components_per_entity] )
+      end if
+   end function iMOAB_GetIntTagStoragePointer
 
 #ifdef MOAB_HAVE_MPI
 

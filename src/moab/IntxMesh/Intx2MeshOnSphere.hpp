@@ -16,7 +16,7 @@ namespace moab
 class Intx2MeshOnSphere : public moab::Intx2Mesh
 {
   public:
-    Intx2MeshOnSphere( Interface* mbimpl, IntxAreaUtils::AreaMethod amethod = IntxAreaUtils::lHuiller );
+    Intx2MeshOnSphere( Interface* mbimpl, IntxAreaUtils::AreaMethod amethod = IntxAreaUtils::DEFAULT_AREA_METHOD );
 
     virtual ~Intx2MeshOnSphere() override;
 

@@ -766,6 +766,24 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                 if( is_root ) dbgprint.printf( 0, "Calculating overlap mesh Face areas\n" );
                 local_areas[2] =
                     m_meshOverlap->CalculateFaceAreas( mapOptions.fSourceConcave || mapOptions.fTargetConcave );
+
+#ifdef MOAB_HAVE_MPI
+                // CalculateFaceAreas() sums every face it holds; it has no notion of ownership.
+                // In parallel the overlap mesh also carries ghost elements -- intersections whose
+                // target cell is owned by another rank -- which ConvertOverlapMeshSourceOrdered()
+                // flags by setting vecTargetFaceIx to -1 so they are skipped when the weights are
+                // accumulated.  Summing the raw total therefore counts those intersections twice
+                // (once here, once on the owning rank) and the reduced "Recovered Area" overshoots
+                // the sphere.  Subtract the ghost contribution so the reported area matches the
+                // area the map is actually built from.
+                if( m_pcomm && is_parallel )
+                {
+                    double ghost_area = 0.0;
+                    for( size_t iover = 0; iover < m_meshOverlap->faces.size(); iover++ )
+                        if( m_meshOverlap->vecTargetFaceIx[iover] < 0 ) ghost_area += m_meshOverlap->vecFaceArea[iover];
+                    local_areas[2] -= ghost_area;
+                }
+#endif
             }
 
             // store it as global output for now - used later in reduction
@@ -809,19 +827,68 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                     dTargetArea[m_meshOverlap->vecTargetFaceIx[i]] += m_meshOverlap->vecFaceArea[i];
                 }
 
+                // How much disagreement between the accumulated overlap area and the
+                // geometric area we are willing to absorb.
+                //
+                // For meshes whose domains coincide, the two agree to roundoff and the
+                // 1e-10 test simply avoids replacing a good geometric area with a
+                // slightly noisier accumulated one.
+                //
+                // For a regionally refined mesh they legitimately differ: a cell on the
+                // edge of the other mesh's domain is only partly covered, so its overlap
+                // contributions sum to a fraction of its geometric area.  The 1e-10 test
+                // then rejects the correction precisely where it is needed, leaving the
+                // cell with its full area while it receives only part of the overlap --
+                // which drives its map row sum below one.  Accept the accumulated area
+                // for any cell that received a contribution, and leave cells with no
+                // coverage at their geometric area (they are outside the other domain;
+                // zeroing them would divide by zero downstream).
+                const bool regional = ( m_remapper != nullptr && m_remapper->IsRegionalMesh() );
+
+                auto accept_area = [regional]( double accumulated, double geometric ) -> bool {
+                    if( regional ) return accumulated > 0.0;
+                    return fabs( accumulated - geometric ) < 1.0e-10;
+                };
+
+                size_t nUncoveredTarget = 0;
                 for( size_t i = 0; i < m_meshInputCov->faces.size(); i++ )
                 {
-                    if( fabs( dSourceArea[i] - m_meshInputCov->vecFaceArea[i] ) < 1.0e-10 )
-                    {
+                    if( accept_area( dSourceArea[i], m_meshInputCov->vecFaceArea[i] ) )
                         m_meshInputCov->vecFaceArea[i] = dSourceArea[i];
-                    }
                 }
                 for( size_t i = 0; i < m_meshOutput->faces.size(); i++ )
                 {
-                    if( fabs( dTargetArea[i] - m_meshOutput->vecFaceArea[i] ) < 1.0e-10 )
-                    {
+                    if( accept_area( dTargetArea[i], m_meshOutput->vecFaceArea[i] ) )
                         m_meshOutput->vecFaceArea[i] = dTargetArea[i];
+                    else if( regional && dTargetArea[i] <= 0.0 )
+                        nUncoveredTarget++;
+                }
+
+                if( regional )
+                {
+                    // A regional remap legitimately leaves parts of the target uncovered.
+                    // Report it: silently emitting empty rows is what made the previous
+                    // behaviour so hard to diagnose.
+                    //
+                    // Only the target count is meaningful.  m_meshInputCov is the
+                    // *coverage* mesh, so in parallel it also holds cells owned by other
+                    // ranks -- these have no overlap here by construction, and their
+                    // number grows with the ghost-layer count rather than with the size
+                    // of any hole.  Reporting that as "uncovered" would be alarming and
+                    // wrong, so it is left out.
+                    size_t nUncovered = nUncoveredTarget;
+#ifdef MOAB_HAVE_MPI
+                    if( m_pcomm && is_parallel )
+                    {
+                        size_t local = nUncoveredTarget;
+                        MPI_Reduce( &local, &nUncovered, 1, MPI_UNSIGNED_LONG, MPI_SUM, 0, m_pcomm->comm() );
                     }
+#endif
+                    if( is_root && nUncovered > 0 )
+                        dbgprint.printf( 0,
+                                         "Regional mesh: %zu target cells have no overlap coverage; their areas "
+                                         "are left geometric and their map rows will be empty\n",
+                                         nUncovered );
                 }
             }
 
@@ -845,15 +912,13 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                 }
             }
 
-            /*
-                // Recalculate input mesh area from overlap mesh
-                if (fabs(dTotalAreaOverlap - dTotalAreaInput) > 1.0e-10) {
-                    dbgprint.printf(0, "Overlap mesh only covers a sub-area of the sphere\n");
-                    dbgprint.printf(0, "Recalculating source mesh areas\n");
-                    dTotalAreaInput = m_meshInput->CalculateFaceAreasFromOverlap(m_meshOverlap);
-                    dbgprint.printf(0, "New Input Mesh Geometric Area: %1.15e\n", dTotalAreaInput);
-                }
-            */
+            // NOTE: Mesh::CalculateFaceAreasFromOverlap() looks like the natural helper
+            // for the sub-area case, but it is the wrong tool here on two counts: it
+            // indexes by vecSourceFaceIx, which refers to the *coverage* mesh rather
+            // than m_meshInput, and it zeroes every area before accumulating, which
+            // would discard the geometric area of cells the overlap never touches.  The
+            // per-cell correction above does the same accumulation with the right
+            // indexing and only replaces areas it can justify.
         }
 
         // Finite volume input / Finite volume output

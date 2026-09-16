@@ -133,6 +133,82 @@ class TempestRemapper : public Remapper
                                           int nb_ghost_layers = 0 );
 
     /**
+     * @brief Validate the GLOBAL_ID tags on the source and target meshes.
+     *
+     * The remapping machinery identifies entities across MPI ranks solely by their
+     * GLOBAL_ID: the coverage migration packs vertex ids into tuple lists and resolves
+     * them on the receiving rank, and the map writer indexes rows/columns by element id.
+     * A missing tag reads back as the dense-tag default of -1 (see Core::globalId_tag),
+     * which is silently accepted and produces collapsed cells or a corrupt map far from
+     * the actual cause.
+     *
+     * This checks, collectively, that every vertex and every element of both meshes has
+     * a strictly positive id, and that ids are locally unique.  It is intended to run
+     * before any expensive operation so that a bad mesh fails immediately with a
+     * descriptive message.
+     *
+     * @param throw_error If true (default) return MB_FAILURE on the first problem found;
+     *                    if false only report the diagnosis and continue.
+     * @return ErrorCode MB_SUCCESS when both meshes carry valid ids
+     */
+    /**
+     * @brief Select the formula used for all spherical area computations driven by this
+     *        remapper: the intersection kernel, the covering-set construction and the
+     *        overlap-orientation fixups.
+     *
+     * Offline drivers (mbtempest) should call this so that a single choice applies
+     * uniformly; online users get IntxAreaUtils::DEFAULT_AREA_METHOD, which is the
+     * adaptive Van Oosterom-Strackee formula.
+     *
+     * Must be called before ConstructCoveringSet()/ComputeOverlapMesh() to take effect.
+     */
+    void SetAreaMethod( IntxAreaUtils::AreaMethod method )
+    {
+        m_area_method = method;
+    }
+
+    //! Formula currently used for spherical area computations.
+    IntxAreaUtils::AreaMethod GetAreaMethod() const
+    {
+        return m_area_method;
+    }
+
+    /**
+     * @brief Declare that the source and/or target mesh is regionally refined, so their
+     * domains need not coincide.
+     *
+     * With this set, a source or target cell may be only partially covered by the other
+     * mesh (or not covered at all).  The overlap-based area correction then treats the
+     * accumulated overlap area as authoritative for partially covered cells, rather than
+     * requiring it to agree with the geometric area to 1e-10.  Without it a partially
+     * covered cell keeps its full geometric area while receiving only part of the
+     * overlap, which drives its map row sum below one.
+     *
+     * Must be set before GenerateRemappingWeights() to take effect.
+     */
+    void SetRegionalMesh( bool regional )
+    {
+        rrmgrids = regional;
+    }
+
+    //! Whether the meshes have been declared regionally refined; see SetRegionalMesh().
+    bool IsRegionalMesh() const
+    {
+        return rrmgrids;
+    }
+
+    moab::ErrorCode ValidateGlobalIds( bool throw_error = true );
+
+  private:
+    /// Helper for ValidateGlobalIds: check one mesh set at one dimension.
+    moab::ErrorCode validate_global_ids_private( moab::EntityHandle mesh_set,
+                                                 int dimension,
+                                                 const char* mesh_name,
+                                                 std::string& error_message );
+
+  public:
+
+    /**
      * @brief Compute the intersection mesh between the source and target grids that have been
      *        instantiated in the Remapper. This function invokes the parallel advancing-front
      *        intersection algorithm internally for spherical meshes and can handle arbitrary
@@ -505,11 +581,7 @@ class TempestRemapper : public Remapper
     moab::Range        m_covering_source_entities;
     moab::Range        m_covering_source_vertices;
 
-    /* local to glboal and global to local ID maps */
-    // std::map< int, int > gid_to_lid_src, gid_to_lid_covsrc, gid_to_lid_tgt;
-    // std::map< int, int > lid_to_gid_src, lid_to_gid_covsrc, lid_to_gid_tgt;
-
-    IntxAreaUtils::AreaMethod m_area_method = IntxAreaUtils::lHuiller;
+    IntxAreaUtils::AreaMethod m_area_method = IntxAreaUtils::DEFAULT_AREA_METHOD;
 
     bool rrmgrids       = false;
     bool is_parallel    = false;
@@ -761,40 +833,6 @@ inline moab::EntityHandle& TempestRemapper::GetCoveringSet()
 {
     return m_covering_source_set;
 }
-
-// inline int TempestRemapper::GetGlobalID( Remapper::IntersectionContext ctx, int localID )
-// {
-//     switch( ctx )
-//     {
-//         case Remapper::SourceMesh:
-//             return lid_to_gid_src[localID];
-//         case Remapper::TargetMesh:
-//             return lid_to_gid_tgt[localID];
-//         case Remapper::CoveringMesh:
-//             return lid_to_gid_covsrc[localID];
-//         case Remapper::OverlapMesh:
-//         case Remapper::DEFAULT:
-//         default:
-//             return -1;
-//     }
-// }
-
-// inline int TempestRemapper::GetLocalID( Remapper::IntersectionContext ctx, int globalID )
-// {
-//     switch( ctx )
-//     {
-//         case Remapper::SourceMesh:
-//             return gid_to_lid_src[globalID];
-//         case Remapper::TargetMesh:
-//             return gid_to_lid_tgt[globalID];
-//         case Remapper::CoveringMesh:
-//             return gid_to_lid_covsrc[globalID];
-//         case Remapper::DEFAULT:
-//         case Remapper::OverlapMesh:
-//         default:
-//             return -1;
-//     }
-// }
 
 }  // namespace moab
 

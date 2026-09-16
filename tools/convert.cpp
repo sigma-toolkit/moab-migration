@@ -494,6 +494,19 @@ int main( int argc, char* argv[] )
 
                 // Load the meshes and validate
                 result = remapper->ConvertTempestMesh( moab::Remapper::SourceMesh );
+                MB_CHK_SET_ERR( result, "can't convert the TempestRemap mesh to MOAB" );
+
+                // ConvertTempestMesh puts the entities in the remapper's own meshset,
+                // and the -B path never calls load_file, so file_set stays empty.
+                // Since the writer is now handed file_set explicitly, the output would
+                // otherwise contain no mesh at all -- only the tag definitions.
+                {
+                    moab::Range srcents;
+                    result = gMB->get_entities_by_handle( srcmesh, srcents, true );
+                    MB_CHK_SET_ERR( result, "can't get entities from the TempestRemap source mesh" );
+                    result = gMB->add_entities( file_set, srcents );
+                    MB_CHK_SET_ERR( result, "can't add the TempestRemap mesh to the file set" );
+                }
 
                 if( unitscaling )
                 {

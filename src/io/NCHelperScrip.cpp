@@ -92,6 +92,21 @@ ErrorCode NCHelperScrip::init_mesh_vals()
 
     return MB_SUCCESS;
 }
+ErrorCode NCHelperScrip::assign_local_vertex_global_ids( Range& verts )
+{
+    Interface*& mbImpl = _readNC->mbImpl;
+    if( verts.empty() ) return MB_SUCCESS;
+
+    Tag gidTag = mbImpl->globalId_tag();
+    std::vector< int > gids( verts.size() );
+    int id = 1;
+    for( size_t i = 0; i < gids.size(); i++ )
+        gids[i] = id++;
+    MB_CHK_SET_ERR( mbImpl->tag_set_data( gidTag, verts, &gids[0] ),
+                    "Failed to assign GLOBAL_ID to SCRIP vertices" );
+    return MB_SUCCESS;
+}
+
 ErrorCode NCHelperScrip::create_mesh( Range& faces )
 {
     Interface*& mbImpl  = _readNC->mbImpl;
@@ -454,7 +469,18 @@ ErrorCode NCHelperScrip::create_mesh( Range& faces )
         //MB_CHK_ERR( myPcomm->delete_entities(sets) ); // will also clean shared ents !
         MB_CHK_ERR( myPcomm->delete_entities( edges ) );  // will also clean shared ents !
     }
+    else
+    {
+        // Serial read (no ParallelComm): still number the vertices.  Consumers such as
+        // Intx2MeshOnSphere::construct_covering_set() identify vertices across ranks purely
+        // by GLOBAL_ID, so a mesh written out here and re-read in parallel later must carry
+        // one; otherwise every vertex reads back as the tag default (-1) and migrated cells
+        // collapse to a single repeated corner.
+        MB_CHK_ERR( assign_local_vertex_global_ids( all_verts ) );
+        MB_CHK_ERR( mbImpl->remove_entities( _fileSet, all_verts ) );
+    }
 #else
+    MB_CHK_ERR( assign_local_vertex_global_ids( all_verts ) );
     MB_CHK_ERR( mbImpl->remove_entities( _fileSet, all_verts ) );
 #endif
 

@@ -31,6 +31,11 @@ class NCHelperScrip : public ScdNCHelper
 #endif
 
   private:
+    //! Number the given vertices 1..n in GLOBAL_ID, for the serial read path where
+    //! ParallelComm::assign_global_ids() is not available.  Downstream consumers (notably
+    //! the coverage-mesh migration in Intx2MeshOnSphere) key vertices by GLOBAL_ID.
+    ErrorCode assign_local_vertex_global_ids( Range& verts );
+
     virtual ErrorCode init_mesh_vals();
     virtual std::string get_mesh_type_name()
     {

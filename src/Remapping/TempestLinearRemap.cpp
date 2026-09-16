@@ -63,13 +63,13 @@ moab::ErrorCode moab::TempestOnlineMap::LinearRemapNN_MOAB( bool use_GID_matchin
     {
         std::ofstream output_file( "rowcolindices.txt", std::ios::out );
         output_file << m_nTotDofs_Dest << " " << m_nTotDofs_SrcCov << " " << row_gdofmap.size() << " "
-                    << row_ldofmap.size() << " " << col_gdofmap.size() << " " << col_ldofmap.size() << "\n";
+                    << col_gdofmap.size() << "\n";
         output_file << "Rows \n";
         for( unsigned iv = 0; iv < row_gdofmap.size(); iv++ )
-            output_file << row_gdofmap[iv] << " " << row_dofmap[iv] << "\n";
+            output_file << iv << " " << row_gdofmap[iv] << "\n";
         output_file << "Cols \n";
         for( unsigned iv = 0; iv < col_gdofmap.size(); iv++ )
-            output_file << col_gdofmap[iv] << " " << col_dofmap[iv] << "\n";
+            output_file << iv << " " << col_gdofmap[iv] << "\n";
         output_file.flush();  // required here
         output_file.close();
     }
@@ -260,9 +260,6 @@ void moab::TempestOnlineMap::LinearRemapFVtoFV_Tempest_MOAB( int nOrder )
             {
                 int& ixFirstFaceLoc  = vecAdjFaces[i].first;
                 int& ixSecondFaceLoc = m_meshOverlap->vecTargetFaceIx[ixOverlap + j];
-                // int ixFirstFaceGlob = m_remapper->GetGlobalID(moab::Remapper::SourceMesh,
-                // ixFirstFaceLoc); int ixSecondFaceGlob =
-                // m_remapper->GetGlobalID(moab::Remapper::TargetMesh, ixSecondFaceLoc);
 
                 // signal to not participate, because it is a ghost target
                 if( ixSecondFaceLoc < 0 ) continue;  // do not do anything
@@ -349,11 +346,8 @@ void moab::TempestOnlineMap::copy_tempest_sparsemat_to_eigen3()
     output_file << "0 " << locrows << " 0 " << loccols << "\n";
     for( unsigned iv = 0; iv < locvals; iv++ )
     {
-        // output_file << lrows[iv] << " " << row_ldofmap[lrows[iv]] << " " <<
-        // row_gdofmap[row_ldofmap[lrows[iv]]] << " " << col_gdofmap[col_ldofmap[lcols[iv]]] << " "
-        // << lvals[iv] << "\n";
-        output_file << row_gdofmap[row_ldofmap[lrows[iv]]] << " " << col_gdofmap[col_ldofmap[lcols[iv]]] << " "
-                    << lvals[iv] << "\n";
+        output_file << GetRowGlobalDoF( lrows[iv] ) << " " << GetColGlobalDoF( lcols[iv] ) << " " << lvals[iv]
+                    << "\n";
     }
     output_file.flush();  // required here
     output_file.close();
@@ -1009,13 +1003,6 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
                 continue;
             }
 
-            // #ifdef VERBOSE
-            // if ( is_root )
-            //     Announce ( "\tLocal ID: %i/%i = %i, areas = %2.8e", j + ixOverlap, nOverlapFaces,
-            //     m_remapper->lid_to_gid_covsrc[m_meshOverlap->vecSourceFaceIx[ixOverlap + j]],
-            //     m_meshOverlap->vecFaceArea[ixOverlap + j] );
-            // #endif
-
             int nbEdges           = faceOverlap.edges.size();
             int nOverlapTriangles = 1;
             Node center;  // not used if nbEdges == 3
@@ -1103,7 +1090,7 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
         }
 
 #ifdef VERBOSE
-        output_file << "[" << m_remapper->lid_to_gid_covsrc[ixFirst] << "] \t";
+        output_file << "[" << ( ixFirst < (int)col_gdofmap.size() ? (int)col_gdofmap[ixFirst] : -1 ) << "] \t";
         for( int j = 0; j < nOverlapFaces; j++ )
         {
             for( int p = 0; p < nP; p++ )
@@ -1242,7 +1229,7 @@ void moab::TempestOnlineMap::LinearRemapSE4_Tempest_MOAB( const DataArray3D< int
         }
 
 #ifdef VERBOSE
-        // output_file << "[" << m_remapper->lid_to_gid_covsrc[ixFirst] << "] \t";
+        // output_file << "[" << col_gdofmap[ixFirst] << "] \t";
         // for ( int j = 0; j < nOverlapFaces; j++ )
         // {
         //     for ( int p = 0; p < nP; p++ )

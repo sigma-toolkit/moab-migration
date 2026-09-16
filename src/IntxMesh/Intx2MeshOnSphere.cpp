@@ -274,7 +274,7 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
     int npBefore1 = nP;
     int oldNodes  = 0;
     int otherIntx = 0;
-    moab::IntxAreaUtils areaAdaptor;
+    moab::IntxAreaUtils areaAdaptor( this->areaMethod );
 #endif
     for( int i = 0; i < nP; i++ )
     {
@@ -1008,6 +1008,41 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
 
     std::vector< int > gids( num_mesh_verts );
     MB_CHK_SET_ERR( mb->tag_get_data( gid, mesh_verts, &gids[0] ), "can't get vertices gids" );
+
+    // The coverage migration below identifies vertices across ranks solely by their GLOBAL_ID
+    // (packed into TLq and resolved through globalID_to_vertex_handle on the receiver).  Some
+    // readers -- notably SCRIP -- do not set a GLOBAL_ID on vertices, in which case every entry
+    // read back here is the tag default (-1).  Every corner of every migrated cell then resolves
+    // to the same handle, producing cells whose connectivity is one vertex repeated N times.
+    // Those collapse to zero-edge faces in Mesh::RemoveZeroEdges() and crash the remap kernels.
+    // Detect that here and assign consistent, parallel-safe vertex ids before migrating.
+    {
+        int local_bad = 0;
+        for( size_t k = 0; k < num_mesh_verts; k++ )
+            if( gids[k] <= 0 )
+            {
+                local_bad = 1;
+                break;
+            }
+        int global_bad = local_bad;
+        MPI_Allreduce( &local_bad, &global_bad, 1, MPI_INT, MPI_MAX, parcomm->proc_config().proc_comm() );
+
+        if( global_bad )
+        {
+            if( 0 == my_rank )
+                std::cout << "[INFO] - source mesh vertices lack a valid GLOBAL_ID; assigning them "
+                             "before computing the coverage mesh.\n";
+            // assign_global_ids() is collective and keeps shared vertices consistent across ranks
+            MB_CHK_SET_ERR( parcomm->assign_global_ids( initial_distributed_set, 0, 1, false, true, false ),
+                            "can't assign global ids to source vertices" );
+            MB_CHK_SET_ERR( mb->tag_get_data( gid, mesh_verts, &gids[0] ), "can't re-read vertices gids" );
+
+            for( size_t k = 0; k < num_mesh_verts; k++ )
+                if( gids[k] <= 0 )
+                    MB_SET_ERR( MB_FAILURE, "vertex global id still invalid (" << gids[k]
+                                            << ") after assign_global_ids on rank " << my_rank );
+        }
+    }
 
     // ranges to send to each processor; will hold vertices and elements (quads/ polygons)
     // will look if the box of the mesh cell covers bounding box(es) (within tolerances)

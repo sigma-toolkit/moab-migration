@@ -1,4 +1,7 @@
-cmake_minimum_required( VERSION 3.5 )
+# 3.12 or newer is what makes <PackageName>_ROOT a search prefix that
+# find_package() honours (CMP0074); below that, MOAB_ROOT was set here and then
+# ignored with a developer warning, and only the explicit HINTS below worked.
+cmake_minimum_required( VERSION 3.12 )
 
 set ( MOAB_ROOT "" CACHE PATH "Path to MOAB library installation" )
 
@@ -69,7 +72,6 @@ set ( BASIC_EXAMPLES
   basic/GetEntities.cpp
   basic/HelloMOAB.cpp
   basic/ProjectToSphere.cpp
-  basic/ReadWriteTest.cpp
   basic/SetsNTags.cpp
   basic/StructuredMeshSimple.cpp
   basic/TestErrorHandling.cpp
@@ -78,8 +80,13 @@ set ( BASIC_EXAMPLES
 )
 
 if ( MOAB_USE_MPI )
+  # ReadWriteTest is parallel throughout - it calls MPI_Init and builds a
+  # ParallelComm with no serial fallback - so it belongs here, next to the other
+  # parallel basics, and not in the unconditional list above.  This also matches
+  # how basic/makefile has always classified it (PAREXAMPLES).
   set ( BASIC_EXAMPLES ${BASIC_EXAMPLES}
                 basic/HelloParMOAB.cpp
+                basic/ReadWriteTest.cpp
                 basic/TestErrorHandlingPar.cpp
     )
 endif ( MOAB_USE_MPI )
@@ -129,14 +136,12 @@ if ( MOAB_USE_MPI )
   # mesh coupler.  "mbcoupler" on its own is not a target here, it has to be
   # resolved to the installed library.
   if ( MOAB_USE_MBCOUPLER )
-    find_library ( MBCOUPLER_LIBRARY NAMES mbcoupler
-                   HINTS ${MOAB_LIBRARY_DIRS} ${MOAB_ROOT}/lib )
-    if ( MBCOUPLER_LIBRARY )
+    if ( TARGET MOAB::mbcoupler )
       set ( ADVANCED_EXAMPLES ${ADVANCED_EXAMPLES} advanced/CoupleMGen.cpp )
-      set ( CoupleMGen_DEPS ${MBCOUPLER_LIBRARY} )
-    else ( MBCOUPLER_LIBRARY )
-      message ( STATUS "Skipping CoupleMGen: libmbcoupler was not found" )
-    endif ( MBCOUPLER_LIBRARY )
+      set ( CoupleMGen_DEPS MOAB::mbcoupler )
+    else ( TARGET MOAB::mbcoupler )
+      message ( STATUS "Skipping CoupleMGen: MOAB::mbcoupler is not in this MOAB package" )
+    endif ( TARGET MOAB::mbcoupler )
   else ( MOAB_USE_MBCOUPLER )
     message ( STATUS "Skipping CoupleMGen: MOAB is not configured with the mesh coupler" )
   endif ( MOAB_USE_MBCOUPLER )
@@ -173,12 +178,12 @@ set ( APPS_EXAMPLES
   earthsystem/earth/addConnec.cpp
 )
 
-# MOAB's own headers, plus the third-party headers its public headers include
-# (Eigen from Matrix3.hpp, NetCDF/TempestRemap from the Earth system headers, ...).
-include_directories(${MOAB_INCLUDE_DIRS} ${MOAB_PACKAGE_INCLUDES})
-if ( MOAB_USE_MPI )
-  include_directories(${MPI_CXX_INCLUDE_PATH})
-endif ( MOAB_USE_MPI )
+# MOAB's own include directories arrive with the MOAB::MOAB target.  The
+# third-party headers its public headers include (Eigen from Matrix3.hpp,
+# NetCDF/TempestRemap from the Earth system headers, ...) do not yet: they are
+# still plain paths in MOAB_PACKAGE_INCLUDES, and move onto the target when the
+# link interface starts naming imported TPL targets.
+include_directories(${MOAB_PACKAGE_INCLUDES})
 
 set ( ALLCXXEXAMPLES ${BEGINNER_EXAMPLES} ${BASIC_EXAMPLES} ${INTERMEDIATE_EXAMPLES} ${ADVANCED_EXAMPLES} ${APPS_EXAMPLES} )
 
@@ -200,9 +205,13 @@ set ( ProjectToSphere_TEST_ARGS "-i" "${MOAB_MESH_DIR}/sphere_tris_5.vtk"
 set ( MeshOptimization_TEST_ARGS "--selftest" )
 set ( SphericalCVTOptimization_TEST_ARGS "-N" "120" "-l" "10" "-n" "20" )
 
-set ( EXAMPLE_LIBRARIES ${MOAB_LIBRARIES} )
+# MOAB::MOAB carries MOAB's include directories and its own link dependencies,
+# so nothing here has to name libMOAB, its path, or what it was built against.
+# MPI::MPI_CXX likewise brings mpi.h and the MPI libraries; MOABConfig.cmake
+# already ran find_dependency(MPI) for a parallel MOAB, so the target exists.
+set ( EXAMPLE_LIBRARIES MOAB::MOAB )
 if ( MOAB_USE_MPI )
-  list ( APPEND EXAMPLE_LIBRARIES ${MPI_CXX_LIBRARIES} )
+  list ( APPEND EXAMPLE_LIBRARIES MPI::MPI_CXX )
 endif ( MOAB_USE_MPI )
 
 foreach( fname ${ALLCXXEXAMPLES} )
@@ -211,7 +220,7 @@ foreach( fname ${ALLCXXEXAMPLES} )
   message("-- Driver [${base}] (C++ sources) :: ${fname}")
   add_executable( ${base} ${fname})
   set_target_properties( ${base} PROPERTIES COMPILE_FLAGS "'-DMESH_DIR=\"${MOAB_MESH_DIR}\"' ${TEST_COMP_FLAGS} ${MOAB_DEFINES}" )
-  target_link_libraries( ${base} LINK_PUBLIC ${${base}_DEPS} ${EXAMPLE_LIBRARIES} )
+  target_link_libraries( ${base} PRIVATE ${${base}_DEPS} ${EXAMPLE_LIBRARIES} )
   add_test( NAME ${base} COMMAND $<TARGET_FILE:${base}> ${${base}_TEST_ARGS} )
 endforeach()
 
@@ -225,12 +234,17 @@ foreach( fname ${FORTRAN_EXAMPLES} )
   set_target_properties( ${base} PROPERTIES
     COMPILE_FLAGS "'-DMESH_DIR=\"${MOAB_MESH_DIR}\"' ${TEST_COMP_FLAGS} ${MOAB_DEFINES}"
     LINKER_LANGUAGE Fortran )
-  target_include_directories( ${base} PRIVATE ${MPI_Fortran_INCLUDE_DIRS} ${MPI_Fortran_INCLUDE_PATH} )
+  # MPI::MPI_Fortran supplies mpif.h and the Fortran bindings; MPI::MPI_CXX in
+  # EXAMPLE_LIBRARIES does neither.
+  set ( ${base}_MPI_FORTRAN )
+  if ( TARGET MPI::MPI_Fortran )
+    set ( ${base}_MPI_FORTRAN MPI::MPI_Fortran )
+  endif ( TARGET MPI::MPI_Fortran )
   # The link is driven by the Fortran compiler, which does not pull in the C++
   # runtime on its own, and libMOAB is C++.  MOABTargets.cmake asks for
   # "stdc++" unconditionally, which is wrong for a libc++ toolchain, so use the
   # runtime CMake actually detected for this compiler instead.
-  target_link_libraries( ${base} LINK_PUBLIC ${EXAMPLE_LIBRARIES} ${MPI_Fortran_LIBRARIES}
+  target_link_libraries( ${base} PRIVATE ${EXAMPLE_LIBRARIES} ${${base}_MPI_FORTRAN}
                          ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES} )
 endforeach()
 

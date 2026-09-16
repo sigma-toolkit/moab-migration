@@ -122,8 +122,17 @@ include(CMakeFindDependencyMacro)
 # MOAB_PACKAGE_INCLUDES paths recorded above; they move to find_dependency()
 # when the link interface starts naming imported targets instead of absolute
 # library paths.
+# FindMPI fails outright if it is asked for a component whose language is not
+# enabled, and find_package(MOAB) is legitimately called before project() by
+# projects that want to reuse MOAB_CXX as their compiler.  Only ask for what the
+# caller has actually enabled; a caller that enables CXX later can call
+# find_package(MPI) itself, exactly as it would for any other dependency.
 if(MOAB_USE_MPI AND NOT TARGET MPI::MPI_CXX)
-  find_dependency(MPI COMPONENTS CXX)
+  get_property(_moab_languages GLOBAL PROPERTY ENABLED_LANGUAGES)
+  if("CXX" IN_LIST _moab_languages)
+    find_dependency(MPI COMPONENTS CXX)
+  endif()
+  unset(_moab_languages)
 endif()
 
 # Target information

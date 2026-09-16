@@ -867,6 +867,11 @@ HAVE_TEMPEST=no
 if (test "x$WITH_TEMPEST" != "xno" && test "x$WITH_TEMPEST" != "x"); then
   if (test "x$enableeigen" != "xyes"); then
     AC_MSG_WARN([TempestRemap remapping operators cannot be computed without Eigen3 support])
+  elif (test "x$ENABLE_FORTRAN" = "xno"); then
+    dnl TempestRemap resolves its linear algebra to LAPACK (dgeqrf, dorgqr,
+    dnl dposv, dsysv), and LAPACK is only looked for when Fortran is enabled.
+    dnl Report the unsupported combination here rather than failing at link time.
+    AC_MSG_WARN([TempestRemap requires LAPACK, which requires Fortran; disabling TempestRemap support])
   else
     # Test for Tempest headers
     AC_LANG_PUSH([C++])

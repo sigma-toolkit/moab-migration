@@ -177,6 +177,14 @@ else ()
   # If Fortran is disabled, then disable BLAS/LAPACK by default as well
   message(STATUS "Disabling BLAS/LAPACK discovery as Fortran has been disabled by user")
   set( ENABLE_BLASLAPACK OFF )
+  # TempestRemap's linear algebra resolves to LAPACK (dgeqrf, dorgqr, dposv,
+  # dsysv), so with BLAS/LAPACK discovery off it configures happily and then
+  # fails at link time with undefined symbols.  Turn it off here instead, so the
+  # unsupported combination is reported once at configure time.
+  if ( ENABLE_TEMPESTREMAP )
+    message(STATUS "Disabling TempestRemap as it requires LAPACK, which requires Fortran")
+  endif ()
+  set( ENABLE_TEMPESTREMAP OFF )
 endif ()
 
 # patch added to ensure libs have a full-path ID set on Mac

@@ -769,13 +769,20 @@ endif()
 ###############################################################################
 # Generate the MOABTargets.cmake file
 ###############################################################################
+# export(EXPORT ...) rather than export(TARGETS ${MOAB_INSTALL_TARGETS}): that
+# variable is appended to from src/CMakeLists.txt, which add_subdirectory() runs
+# in a child scope, so it was empty here and the build-tree MOABTargets.cmake
+# declared no targets at all.  The export set is the same one the targets were
+# registered with by install(TARGETS ... EXPORT MOABTargets), so it cannot drift.
 export(
-  TARGETS ${MOAB_INSTALL_TARGETS}
+  EXPORT MOABTargets
+  NAMESPACE MOAB::
   FILE "${PROJECT_BINARY_DIR}/MOABTargets.cmake"
   )
 set(MOABTargetLocation ${SKBUILD_SUBDIR}${CMAKE_INSTALL_LIBDIR}/cmake/MOAB)
 install(
   EXPORT MOABTargets
+  NAMESPACE MOAB::
   DESTINATION ${MOABTargetLocation}
 )
 
@@ -910,8 +917,6 @@ endif(CLANG_TIDY_EXE)
 #  OUTPUT_STRIP_TRAILING_WHITESPACE
 #  )
 CONFIGURE_FILE(config/MOABConfig.cmake.h.in "${PROJECT_BINARY_DIR}/src/moab/MOABConfig.h" @ONLY)
-CONFIGURE_FILE(config/MOABConfig.cmake.cmake "${PROJECT_BINARY_DIR}/MOABConfig.cmake" @ONLY)
-CONFIGURE_FILE(config/MOABConfigVersion.cmake.cmake "${PROJECT_BINARY_DIR}/MOABConfigVersion.cmake" @ONLY)
 # Every installed example makefile gates on the literal string "yes", e.g.
 #   ifeq ("$(MOAB_HDF5_ENABLED)","yes")
 # because the autotools template substitutes @enablehdf5@ and friends, which are
@@ -1065,8 +1070,51 @@ else()
   set(MOABConfigLocation ${SKBUILD_DATA_DIR}/${MOABConfigLocation})
 endif()
 
+# The package config is generated twice from the same template: once pointing
+# at the build tree, for find_package(MOAB HINTS <builddir>), and once for the
+# install tree.  configure_package_config_file() supplies @PACKAGE_INIT@, which
+# computes PACKAGE_PREFIX_DIR from wherever the file is found at use time, so
+# the installed package survives being moved - the hand-written template baked
+# in the configure-time CMAKE_INSTALL_PREFIX instead.
+include(CMakePackageConfigHelpers)
+
+set(MOAB_CONFIG_IS_BUILD_TREE TRUE)
+configure_package_config_file(
+  config/MOABConfig.cmake.cmake
+  "${PROJECT_BINARY_DIR}/MOABConfig.cmake"
+  INSTALL_DESTINATION "${PROJECT_BINARY_DIR}"
+  INSTALL_PREFIX "${PROJECT_BINARY_DIR}"
+  )
+
+set(MOAB_CONFIG_IS_BUILD_TREE FALSE)
+configure_package_config_file(
+  config/MOABConfig.cmake.cmake
+  "${PROJECT_BINARY_DIR}/install/MOABConfig.cmake"
+  INSTALL_DESTINATION "${MOABConfigLocation}"
+  )
+
+# SameMajorVersion rather than the hand-rolled "anything not older is
+# compatible" check the old MOABConfigVersion template used, which accepted a
+# 6.x MOAB for a project asking for 5.6.
+write_basic_package_version_file(
+  "${PROJECT_BINARY_DIR}/MOABConfigVersion.cmake"
+  VERSION ${MOAB_VERSION_STRING}
+  COMPATIBILITY SameMajorVersion
+  )
+
+# MOABConfig.cmake includes ResolveCompilerPaths.cmake from its own directory.
+# The install rule below puts it next to the installed config; the build tree
+# needs its own copy or find_package(MOAB HINTS <builddir>) fails outright with
+# "include could not find requested file".
+configure_file(
+  "${PROJECT_SOURCE_DIR}/config/ResolveCompilerPaths.cmake"
+  "${PROJECT_BINARY_DIR}/ResolveCompilerPaths.cmake"
+  COPYONLY
+  )
+
 install(
-  FILES "${PROJECT_BINARY_DIR}/MOABConfig.cmake" "${PROJECT_BINARY_DIR}/MOABConfigVersion.cmake"
+  FILES "${PROJECT_BINARY_DIR}/install/MOABConfig.cmake"
+        "${PROJECT_BINARY_DIR}/MOABConfigVersion.cmake"
   DESTINATION ${MOABConfigLocation}
   )
 install(

@@ -294,8 +294,20 @@ add_library(
 include(CMakeLibraryFuncs)
 SciFixupLibrary(MOAB MOAB MOAB)
 
+# MOAB::MOAB is the name find_package() gives consumers, so offer it here too.
+# A project that pulls MOAB in with add_subdirectory() then links the same name
+# as one that finds an installed MOAB.
+add_library(MOAB::MOAB ALIAS MOAB)
+
+# Public headers are reached as <moab/Core.hpp> and <MBEntityType.h>, so the
+# include roots are this directory and its binary counterpart, which is where
+# MOABConfig.h and the generate_export_header() output land.  Only the
+# INSTALL_INTERFACE was set before, which left the exported build-tree target
+# with no usable include path at all.
 target_include_directories(MOAB
   PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>"
   "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
 generate_export_header(MOAB)

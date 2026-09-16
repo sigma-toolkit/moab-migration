@@ -1,15 +1,31 @@
 # Config file for MOAB; use the CMake find_package() function to pull this into
 # your own CMakeLists.txt file.
 #
-# This file defines the following variables:
+# The supported way to consume MOAB is the imported target:
+#
+#   find_package(MOAB REQUIRED)
+#   target_link_libraries(myapp PRIVATE MOAB::MOAB)
+#
+# which carries MOAB's include directories, compile features and link
+# dependencies with it.  MOAB::mbcoupler is available when MOAB was built with
+# the mesh coupler.
+#
+# The variables below are still defined, in terms of those targets, so that
+# existing projects keep building.  Prefer the target in new code.
+#
 # MOAB_FOUND        - boolean indicating that MOAB is found
 # MOAB_VERSION      - version of MOAB
 # MOAB_INCLUDE_DIRS - include directories from which to pick up MOAB includes
-# MOAB_LIBRARIES    - libraries need to link to MOAB; use this in target_link_libraries for MOAB-dependent targets
+# MOAB_LIBRARIES    - what to link against; this is now the MOAB::MOAB target
 # MOAB_CXX, MOAB_CC, MOAB_F77, MOAB_FC - compilers used to compile MOAB
-# MOAB_CXXFLAGS, MOAB_CCFLAGS, MOAB_FFLAGS, MOAB_FCFLAGS - compiler flags used to compile MOAB; possibly need to use these in add_definitions or CMAKE_<LANG>_FLAGS_<MODE> 
+# MOAB_CXXFLAGS, MOAB_CCFLAGS, MOAB_FFLAGS, MOAB_FCFLAGS - compiler flags used to compile MOAB; possibly need to use these in add_definitions or CMAKE_<LANG>_FLAGS_<MODE>
 
-set(MOAB_VERSION @PACKAGE_VERSION@)
+@PACKAGE_INIT@
+
+# @PACKAGE_VERSION@ was used here, but that variable is only ever set much later
+# in the top-level CMakeLists, so MOAB_VERSION came out empty in every generated
+# config and find_package(MOAB 5.6) could not check anything.
+set(MOAB_VERSION @MOAB_VERSION_STRING@)
 
 set(MOAB_CC "@CMAKE_C_COMPILER@")
 set(MOAB_CXX "@CMAKE_CXX_COMPILER@")
@@ -95,6 +111,21 @@ RESOLVE_INCLUDES(MOAB_PACKAGE_INCLUDES "${MOAB_PACKAGE_INCLUDES_LIST}")
 separate_arguments(MOAB_PACKAGE_INCLUDES)
 list(REMOVE_DUPLICATES MOAB_PACKAGE_INCLUDES)
 
+# ---------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------
+include(CMakeFindDependencyMacro)
+
+# moab_mpi.h is a public header and includes <mpi.h>, so a consumer of a
+# parallel MOAB needs the MPI include path whether or not it uses MPI itself.
+# The other third-party include directories still arrive through the
+# MOAB_PACKAGE_INCLUDES paths recorded above; they move to find_dependency()
+# when the link interface starts naming imported targets instead of absolute
+# library paths.
+if(MOAB_USE_MPI AND NOT TARGET MPI::MPI_CXX)
+  find_dependency(MPI COMPONENTS CXX)
+endif()
+
 # Target information
 if(MOAB_USE_HDF5)
   if(EXISTS "@HDF5_DIR@/share/cmake/hdf5/hdf5-config.cmake")
@@ -144,17 +175,41 @@ if(MOAB_USE_SKBUILD)
   file(TO_CMAKE_PATH "${MOAB_LIBRARY_DIRS}/cmake/MOAB/MOABTargets.cmake" MOAB_TARGETS_FILE)
   include(${MOAB_TARGETS_FILE})
 
-  # Add the core library to the list of libraries
   set(MOAB_INCLUDE_DIRS ${MOAB_INCLUDE_DIRS} ${MOAB_PACKAGE_INCLUDES})
-  set(MOAB_LIBRARIES MOAB ${MOAB_PACKAGE_LIBS})
-else()
-  if(NOT TARGET MOAB AND NOT MOAB_BINARY_DIR)
+elseif(@MOAB_CONFIG_IS_BUILD_TREE@)
+  if(NOT TARGET MOAB::MOAB AND NOT MOAB_BINARY_DIR)
     include("${MOAB_CMAKE_DIR}/MOABTargets.cmake")
   endif()
-  set(MOAB_LIBRARY_DIRS "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@")
-  set(MOAB_INCLUDE_DIRS "@CMAKE_INSTALL_PREFIX@/include" ${MOAB_PACKAGE_INCLUDES})
-  set(MOAB_LIBS "-lMOAB")
-  set(MOAB_LIBRARIES "-L@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@ ${MOAB_LIBS} ${MOAB_PACKAGE_LIBS}")
+  set(MOAB_LIBRARY_DIRS "@PROJECT_BINARY_DIR@/lib")
+  set(MOAB_INCLUDE_DIRS "@CMAKE_SOURCE_DIR@/src" "@PROJECT_BINARY_DIR@/src" ${MOAB_PACKAGE_INCLUDES})
+else()
+  if(NOT TARGET MOAB::MOAB AND NOT MOAB_BINARY_DIR)
+    include("${MOAB_CMAKE_DIR}/MOABTargets.cmake")
+  endif()
+  # PACKAGE_PREFIX_DIR is set by the package-init preamble above and is derived
+  # from where this file actually sits, so an install tree that has been moved
+  # or relocated still resolves.  These used to be the configure-time prefix.
+  # (Do not name the init placeholder in a comment here: it is a substitution
+  # token, so configure_package_config_file() would expand it a second time.)
+  set_and_check(MOAB_INCLUDE_DIR "${PACKAGE_PREFIX_DIR}/include")
+  set_and_check(MOAB_LIBRARY_DIRS "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_LIBDIR@")
+  set(MOAB_INCLUDE_DIRS "${MOAB_INCLUDE_DIR}" ${MOAB_PACKAGE_INCLUDES})
+endif()
+
+# MOAB_LIBRARIES was a raw "-L<prefix>/lib -lMOAB <third party libs>" string.
+# CMake rejects a link item with leading or trailing whitespace outright, and
+# even when it did not, the string bypassed the imported target: none of MOAB's
+# include directories, compile features or transitive dependencies came with it.
+# Name the target instead - target_link_libraries(${MOAB_LIBRARIES}) keeps
+# working for every existing consumer, and now carries the usage requirements.
+set(MOAB_LIBRARIES MOAB::MOAB)
+
+# Projects written against older MOAB releases link the un-namespaced "MOAB"
+# name directly.  The export is namespaced now, so give them an INTERFACE
+# target that forwards.  It is IMPORTED, so nothing is built for it.
+if(NOT TARGET MOAB)
+  add_library(MOAB INTERFACE IMPORTED)
+  set_target_properties(MOAB PROPERTIES INTERFACE_LINK_LIBRARIES MOAB::MOAB)
 endif()
 
 # Include standard argument handling for finding packages
@@ -165,3 +220,7 @@ find_package_handle_standard_args(MOAB
   REQUIRED_VARS MOAB_LIBRARIES MOAB_INCLUDE_DIRS
   VERSION_VAR MOAB_VERSION
   )
+
+# Defined by the package-init preamble.  MOAB exports no optional components,
+# so this only reports an error if a caller asks for one that does not exist.
+check_required_components(MOAB)

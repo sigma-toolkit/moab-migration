@@ -19,6 +19,12 @@ set_source_files_properties( ${MBCOUPLER_SRCS}
 add_library( mbcoupler
   ${MBCOUPLER_SRCS}
   ${MBCOUPLER_INCLUDE_SRCS} )
+add_library( MOAB::mbcoupler ALIAS mbcoupler )
+
+target_include_directories( mbcoupler
+  PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
+  "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mbcoupler>" )
 
 target_link_libraries( mbcoupler MOAB ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
 if ( MOAB_HAVE_MPI )
@@ -32,6 +38,7 @@ endif()
 set( MOAB_HAVE_MBCOUPLER 1 )
 install(
   TARGETS mbcoupler
+  EXPORT MOABTargets
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}

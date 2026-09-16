@@ -124,11 +124,13 @@ program DirectAccessF90
       call exit( 1 )
    end if
 
-   ! iMOAB_GetBlockID is what builds the block-id lookup table; the calls below that take a
-   ! block id fail with MB_FAILURE until it has run at least once.
    i = nbinfo(1)
    ierr = iMOAB_GetBlockID( pid, i, blockids )
    call check( ierr, 'iMOAB_GetBlockID' )
+   if ( blockids(1) /= blockid ) then
+      print *, 'unexpected block id: ', blockids(1)
+      call exit( 1 )
+   end if
 
    ierr = iMOAB_GetBlockInfo( pid, blockid, vpe_in_block, nelem_in_block )
    call check( ierr, 'iMOAB_GetBlockInfo' )

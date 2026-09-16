@@ -1150,6 +1150,32 @@ ErrCode iMOAB_WriteLocalMesh( iMOAB_AppID pid, iMOAB_String prefix )
 }
 
 /**
+ * @brief Rebuild the block-id to block-index map from the current set of material sets.
+ *
+ * Callers used to have to run iMOAB_GetBlockID before any other block query would work, because
+ * that was the only routine that filled appData::matIndex.  The query routines are meant to be
+ * read-only - and so safe to call concurrently - so the map is built here instead, at every point
+ * where appData::mat_sets is refreshed.
+ */
+static ErrCode iMOAB_BuildBlockIndex( appData& data )
+{
+    data.matIndex.clear();
+
+    if( data.mat_sets.empty() ) return moab::MB_SUCCESS;
+
+    std::vector< int > blockIDs( data.mat_sets.size() );
+    MB_CHK_SET_ERR( context.MBI->tag_get_data( context.material_tag, data.mat_sets, &blockIDs[0] ),
+                    "can't get material IDs" );
+
+    for( unsigned i = 0; i < data.mat_sets.size(); i++ )
+    {
+        data.matIndex[blockIDs[i]] = i;
+    }
+
+    return moab::MB_SUCCESS;
+}
+
+/**
  * @brief Update application's mesh information after loading or modification.
  * @ingroup iMOABQuery
  *
@@ -1282,6 +1308,8 @@ ErrCode iMOAB_UpdateMeshInfo( iMOAB_AppID pid )
                                                                data.mat_sets, Interface::UNION ),
                     "can't get material sets" );
 
+    MB_CHK_ERR( iMOAB_BuildBlockIndex( data ) );
+
     MB_CHK_SET_ERR( context.MBI->get_entities_by_type_and_tag( fileSet, MBENTITYSET, &( context.neumann_tag ), 0, 1,
                                                                data.neu_sets, Interface::UNION ),
                     "can't get neumann sets" );
@@ -1361,6 +1389,8 @@ ErrCode iMOAB_GetMeshInfo( iMOAB_AppID pid,
         MB_CHK_SET_ERR( context.MBI->get_entities_by_type_and_tag( fileSet, MBENTITYSET, &( context.material_tag ), 0,
                                                                    1, data.mat_sets, Interface::UNION ),
                         "can't get material sets" );
+
+        MB_CHK_ERR( iMOAB_BuildBlockIndex( data ) );
 
         num_visible_blocks[2] = data.mat_sets.size();
         num_visible_blocks[0] = num_visible_blocks[2];
@@ -1611,11 +1641,11 @@ ErrCode iMOAB_GetVertexCoordinatesPointer( iMOAB_AppID pid,
  * @pre global_block_IDs array must be pre-allocated
  *
  * @post global_block_IDs populated with MATERIAL_SET tag values
- * @post Internal matIndex map populated for fast block lookup
  *
  * @note Material blocks are mesh sets containing elements of same material
- * @note Creates internal index map for subsequent block queries
  * @note Block IDs are user-defined and may not be consecutive
+ * @note Read-only: the block index used by the other block queries is built by
+ *       iMOAB_UpdateMeshInfo and iMOAB_GetMeshInfo, so this may be called in any order
  *
  * @return moab::MB_SUCCESS on success, moab::MB_FAILURE if count mismatch
  *
@@ -1635,13 +1665,6 @@ ErrCode iMOAB_GetBlockID( iMOAB_AppID pid, int* block_length, iMOAB_GlobalID* gl
     MB_CHK_SET_ERR( context.MBI->tag_get_data( context.material_tag, matSets, global_block_IDs ),
                     "can't get material IDs" );
 
-    // Build internal index map: block_id -> array_index for fast lookup
-    std::map< int, int >& matIdx = context.appDatas[*pid].matIndex;
-    for( unsigned i = 0; i < matSets.size(); i++ )
-    {
-        matIdx[global_block_IDs[i]] = i;  // Cache block index for future queries
-    }
-
     return moab::MB_SUCCESS;
 }
 
@@ -1658,8 +1681,9 @@ ErrCode iMOAB_GetBlockID( iMOAB_AppID pid, int* block_length, iMOAB_GlobalID* gl
  * @param[out] num_elements_in_block Total number of elements in this block
  *
  * @pre Application must be registered and mesh loaded
- * @pre iMOAB_GetBlockID must have been called first (to populate matIndex)
- * @pre global_block_ID must be valid block ID from iMOAB_GetBlockID
+ * @pre iMOAB_UpdateMeshInfo or iMOAB_GetMeshInfo must have been called since the material
+ *      sets last changed; either one builds the block index this lookup uses
+ * @pre global_block_ID must be a valid block ID, as reported by iMOAB_GetBlockID
  *
  * @post vertices_per_element set to connectivity size
  * @post num_elements_in_block set to element count

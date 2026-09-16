@@ -3,7 +3,7 @@ include ../makefile.config
 
 default: all
 
-EXAMPLES = HelloMOAB GetEntities SetsNTags StructuredMeshSimple UniformRefinement DeleteEdges ReadPartFile
+EXAMPLES = HelloMOAB GetEntities SetsNTags StructuredMeshSimple UniformRefinement DeleteEdges ReadPartFile ProjectToSphere
 PAREXAMPLES = HelloParMOAB ReadWriteTest
 EXOIIEXAMPLES = TestExodusII
 ifeq ("$(MOAB_DEV)","yes")
@@ -110,6 +110,11 @@ TestErrorHandlingPar: TestErrorHandlingPar.o
 UniformRefinement: UniformRefinement.o
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
+
+# -i is required; with no arguments ProjectToSphere tries to load "" and fails.
+# A .vtk input keeps this independent of HDF5.
+run-ProjectToSphere: ProjectToSphere
+	${RUNSERIAL} ./ProjectToSphere -i ${MESH_DIR}/sphere_tris_5.vtk -o ProjectToSphere_out.vtk -R 1.0
 
 run-UniformRefinement: UniformRefinement
 ifeq ("$(MOAB_MPI_ENABLED)-$(MOAB_HDF5_ENABLED)","yes-yes")

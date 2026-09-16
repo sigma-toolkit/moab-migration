@@ -68,6 +68,7 @@ set ( BASIC_EXAMPLES
   basic/ErrorHandlingSimulation.cpp
   basic/GetEntities.cpp
   basic/HelloMOAB.cpp
+  basic/ProjectToSphere.cpp
   basic/ReadWriteTest.cpp
   basic/SetsNTags.cpp
   basic/StructuredMeshSimple.cpp
@@ -188,6 +189,12 @@ set ( ALLCXXEXAMPLES ${BEGINNER_EXAMPLES} ${BASIC_EXAMPLES} ${INTERMEDIATE_EXAMP
 # back to a default, so give them one when CTest runs them. Same "<base>_..."
 # convention as the per-example dependency lists above.
 set ( UniformRefinement_TEST_ARGS "${MOAB_MESH_DIR}/32hex_ef.h5m" )
+
+# ProjectToSphere requires -i; with no arguments it tries to load "" and exits
+# non-zero.  sphere_tris_5.vtk is used rather than an .h5m so the test does not
+# silently depend on HDF5.
+set ( ProjectToSphere_TEST_ARGS "-i" "${MOAB_MESH_DIR}/sphere_tris_5.vtk"
+                                "-o" "ProjectToSphere_out.vtk" "-R" "1.0" )
 
 # MeshOptimization's default run would optimize a 10x10 mesh; --selftest is both
 # faster and an actual check, since it verifies the metric against closed-form

@@ -1,7 +1,6 @@
 # MOAB_DIR points to top-level install dir, below which MOAB's lib/ and include/ are located
 MOAB_DIR := @prefix@
 include ${MOAB_DIR}/lib/moab.make
-include ${MOAB_DIR}/lib/iMesh-Defs.inc
 
 .SUFFIXES: .o .cpp .F90
 
@@ -22,5 +21,5 @@ clean:
 	${MOAB_CXX} ${CXXFLAGS} ${MOAB_CXXFLAGS} ${MOAB_CPPFLAGS} ${MOAB_INCLUDES} -DMESH_DIR=\"${MESH_DIR}\" -c $<
 
 .F90.o:
-	${IMESH_FC} ${FCFLAGS} ${IMESH_FCFLAGS} ${MOAB_CPPFLAGS} ${IMESH_INCLUDES} ${IMESH_FCDEFS} -DMESH_DIR=\"${MESH_DIR}\" -c $<
+	${MOAB_FC} ${FCFLAGS} ${MOAB_CPPFLAGS} ${MOAB_INCLUDES} -DMESH_DIR=\"${MESH_DIR}\" -c $<
 

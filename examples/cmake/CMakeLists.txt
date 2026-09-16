@@ -24,10 +24,6 @@ set ( CMAKE_CXX_FLAGS ${MOAB_CXX_FLAGS} )
 set ( CMAKE_Fortran_FLAGS ${MOAB_FC_FLAGS} )
 set ( CMAKE_CXX_LINK_FLAGS ${CMAKE_CXX_LINK_FLAGS} )
 
-if ( ENABLE_IMESH )
-  enable_language(Fortran)
-endif ( ENABLE_IMESH )
-
 message ( "++ Found MOAB configuration details at: ${MOAB_DIR}" )
 
 ####################################################################################

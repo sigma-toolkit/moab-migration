@@ -5,7 +5,7 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 ACLOCAL_AMFLAGS = -I config
 
 # Subdirectories to build
-SUBDIRS = src MeshFiles $(itaps_dir) tools test
+SUBDIRS = src MeshFiles tools test
 
 # Utility target: build but don't run tests
 build-check:
@@ -85,8 +85,6 @@ examples_fortrandir = $(datadir)/examples/fortran
 examples_fortran_DATA = \
                examples/fortran/makefile \
                examples/fortran/DirectAccessF90.F90 \
-               examples/fortran/DirectAccessNoHolesF90.F90 \
-               examples/fortran/PushParMeshIntoMoabF90.F90 \
                examples/fortran/MigrateMesh.F90 \
                examples/fortran/spherecube.h5m
 examples_pythonexdir = $(datadir)/examples/python

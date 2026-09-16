@@ -35,7 +35,7 @@ project( MOAB_Examples )
 enable_testing()
 
 # MigrateMesh.F90 only calls the iMOAB Fortran entry points, which live in
-# libMOAB itself, so it needs a Fortran compiler but not iMesh.  Enable the
+# libMOAB itself, so it needs a Fortran compiler.  Enable the
 # language only when a compiler is actually available, so that a MOAB built
 # without Fortran still configures.  This has to happen before find_package(MPI)
 # below, otherwise FindMPI never probes the Fortran bindings.
@@ -142,27 +142,17 @@ if ( MOAB_USE_MPI )
   endif ( MOAB_USE_MBCOUPLER )
 endif ( MOAB_USE_MPI )
 
-# Fortran examples that go through iMesh.  iMesh is only built by the autotools
-# build of MOAB, so these are gated on ENABLE_IMESH further down.
-set ( FORTRAN_EXAMPLES
-  fortran/DirectAccessNoHolesF90.F90
-)
-if ( MOAB_USE_MPI )
-  set ( FORTRAN_EXAMPLES ${FORTRAN_EXAMPLES}
-          fortran/PushParMeshIntoMoabF90.F90
-    )
-endif ( MOAB_USE_MPI )
-
-# Fortran examples that only use iMOAB, and so link against libMOAB directly.
-set ( IMOAB_FORTRAN_EXAMPLES )
+# Fortran examples.  These all go through the iMOAB Fortran module, which lives
+# in libMOAB itself.
+set ( FORTRAN_EXAMPLES )
 if ( MOAB_EXAMPLES_HAVE_FORTRAN )
   # DirectAccessF90 builds its mesh in memory and needs neither MPI nor an
   # input file, so it is gated on the Fortran compiler alone.
-  set ( IMOAB_FORTRAN_EXAMPLES ${IMOAB_FORTRAN_EXAMPLES}
+  set ( FORTRAN_EXAMPLES ${FORTRAN_EXAMPLES}
           fortran/DirectAccessF90.F90
     )
   if ( MOAB_USE_MPI )
-    set ( IMOAB_FORTRAN_EXAMPLES ${IMOAB_FORTRAN_EXAMPLES}
+    set ( FORTRAN_EXAMPLES ${FORTRAN_EXAMPLES}
             fortran/MigrateMesh.F90
       )
   endif ( MOAB_USE_MPI )
@@ -225,24 +215,10 @@ foreach( fname ${ALLCXXEXAMPLES} )
   add_test( NAME ${base} COMMAND $<TARGET_FILE:${base}> ${${base}_TEST_ARGS} )
 endforeach()
 
-#set ( CMAKE_Fortran_COMPILER ${MOAB_FC} )
-if ( ENABLE_IMESH )
-  foreach( fname ${FORTRAN_EXAMPLES} )
-    string( REPLACE ".F90" "" base ${fname} )
-    get_filename_component(base ${base} NAME_WE)
-    message("-- Driver [${base}] (F90 sources) :: ${fname}")
-    add_executable( ${base} ${fname})
-    set_target_properties( ${base} PROPERTIES COMPILE_FLAGS "'-DMESH_DIR=\"${MOAB_MESH_DIR}\"' ${TEST_COMP_FLAGS} ${MOAB_DEFINES}" LINKER_LANGUAGE Fortran )
-    target_link_libraries( ${base} LINK_PUBLIC ${IMESH_LIBRARIES} )
-    add_test( NAME ${base} COMMAND $<TARGET_FILE:${base}> ${${base}_TEST_ARGS} )
-  endforeach()
-endif ( ENABLE_IMESH )
-
-# iMOAB Fortran examples.  These link against libMOAB like the C++ examples,
-# but are compiled and linked as Fortran, so they additionally need the MPI
-# Fortran bindings - MPI_CXX_LIBRARIES does not provide mpif.h or the
-# mpi_*_ symbols.
-foreach( fname ${IMOAB_FORTRAN_EXAMPLES} )
+# The Fortran examples link against libMOAB like the C++ examples, but are
+# compiled and linked as Fortran, so they additionally need the MPI Fortran
+# bindings - MPI_CXX_LIBRARIES does not provide mpif.h or the mpi_*_ symbols.
+foreach( fname ${FORTRAN_EXAMPLES} )
   get_filename_component( base ${fname} NAME_WE )
   message("-- Driver [${base}] (F90 sources) :: ${fname}")
   add_executable( ${base} ${fname} )

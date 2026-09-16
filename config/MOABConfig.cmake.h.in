@@ -100,9 +100,6 @@
 /* Defined if configured with IEEE Floating point support */
 #cmakedefine MOAB_HAVE_IEEEFP @MOAB_HAVE_IEEEFP@
 
-/* Define if configured with iMesh interfaces. */
-#cmakedefine MOAB_HAVE_IMESH @MOAB_HAVE_IMESH@
-
 /* MOAB qualified HAVE_INTTYPES_H */
 #cmakedefine MOAB_HAVE_INTTYPES_H @MOAB_HAVE_INTTYPES_H@
 

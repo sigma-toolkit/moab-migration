@@ -5,13 +5,6 @@
 # Feature list
 MOAB_MPI_ENABLED = @enablempi@
 MOAB_FORTRAN_ENABLED = @ENABLE_FORTRAN@
-# The iTAPS/iMesh bindings are not part of this source tree - there is no
-# itaps/ directory and configure.ac has no --enable-imesh - so this is fixed at
-# "no" rather than substituted.  It still has to be *defined*:
-# examples/fortran/makefile tests it, and against an undefined variable that
-# test silently compared against the empty string.  Substitute it properly if
-# iMesh support ever returns.
-MOAB_IMESH_ENABLED = no
 MOAB_HDF5_ENABLED = @enablehdf5@
 MOAB_NETCDF_ENABLED = @enablenetcdf@
 MOAB_PNETCDF_ENABLED = @enablepnetcdf@

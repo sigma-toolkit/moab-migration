@@ -8,7 +8,7 @@ A few highlights of the capabilities in MOAB include:
 - Highly efficient storage and query of structured and unstructured mesh (e.g. a brick-shaped hex mesh requires approximately 25 and 55 MB per million hex elements in the structured and unstructured representations, respectively)
 - Powerful data model allowing representation of various metadata in the form of "sets" (arbitrary groupings of mesh entities and sets) and "tags" (annotation of entities, sets, and entire mesh)
 - Open source (LGPL) mesh readers/writers for Sandia ExodusII, CUBIT .cub save/restore, VTK, GMsh, and other mesh formats with capability to translate between them uniformly
-- Flexible access to MOAB routines from C and Fortran through _iMesh_ and _iMOAB_ interfaces are available
+- Flexible access to MOAB routines from C and Fortran through the _iMOAB_ interface
 - A high level Python interface (_PyMOAB_) based on Cython bindings can also be enabled
 
 Several computational solvers in various scientific domains such as nuclear engineering, climate modeling, nonlinear thermo-mechanics, CFD, etc have been built on top of MOAB. Other common use-cases where MOAB is often applied are:
@@ -244,8 +244,6 @@ Even though the MOAB library is written in C++ language (conforming to C++11 sta
   - Supports both serial and parallel invocation under one interface. MOAB needs to be configured using `--with-mpi` option.
   - Supports ability to migrate meshes and tags between processes
   - Supports capability to compute remapping weights for Earth system science applications
-
-  Note that the **ITAPS iMesh** interfaces are now deprecated and we encourage users to directly use MOAB or iMOAB interfaces if possible.
 
 - **Python3**: The Python bindings for MOAB can be enabled when installing MOAB through `pip3 install .`
   - Supports access to the structured grid interfaces.

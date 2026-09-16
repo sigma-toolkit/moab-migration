@@ -17,17 +17,11 @@ MOAB_CMAKE="no"
 MOAB_DEV = no
 ifneq ($(wildcard ${MOAB_DIR}/lib/moab.make),)
 include ${MOAB_DIR}/lib/moab.make
-ifeq ("$(MOAB_IMESH_ENABLED)","yes")
-	include ${MOAB_DIR}/lib/iMesh-Defs.inc
-endif
 RUNLD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${MOAB_DIR}/lib"
 else
 include ${MOAB_BUILD_DIR}/moab.make
-ifeq ("$(MOAB_IMESH_ENABLED)","yes")
-include ${MOAB_BUILD_DIR}/itaps/imesh/iMesh-Defs.inc
-endif
 
-RUNLD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${MOAB_LIBDIR}:${IMESH_LIBDIR}:${MSQ_LIBDIR}"
+RUNLD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${MOAB_LIBDIR}"
 MOAB_DEV = yes
 endif
 
@@ -60,7 +54,7 @@ endif
 
 .F90.o:
 	@echo "   [FC]  $<"
-	${VERBOSE}${MOAB_FC} ${FCFLAGS} ${IMESH_FCFLAGS} ${MOAB_CPPFLAGS} ${MOAB_INCLUDES} ${IMESH_INCLUDES} ${IMESH_FCDEFS} $(FC_DEFINE)MESH_DIR=\"${MESH_DIR}\" -c $<
+	${VERBOSE}${MOAB_FC} ${FCFLAGS} ${MOAB_CPPFLAGS} ${MOAB_INCLUDES} $(FC_DEFINE)MESH_DIR=\"${MESH_DIR}\" -c $<
 
 info:
 ifeq ("$(MOAB_DEV)","no")

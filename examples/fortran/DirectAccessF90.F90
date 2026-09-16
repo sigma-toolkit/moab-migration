@@ -24,10 +24,10 @@
 !!    -#  Fill vpe_tag through a direct integer tag pointer and read it back with the copying
 !!        accessor
 !!
-!! This supersedes DirectAccessNoHolesF90.F90, which reached MOAB's storage through iMesh.  The
-!! "no holes" restriction is gone: the direct-access entry points report how many entities each
-!! contiguous run covers, and the loops below simply continue until the whole range is consumed,
-!! so a mesh whose handles are not one single block works unchanged.
+!! This supersedes the iMesh-based DirectAccessNoHolesF90 example, and lifts its "no holes"
+!! restriction: the direct-access entry points report how many entities each contiguous run
+!! covers, and the loops below continue until the whole range is consumed, so a mesh whose
+!! handles are not one single block works unchanged.
 !!
 !! <b>To compile</b>: \n
 !!    make DirectAccessF90 \n

@@ -155,11 +155,18 @@ endif ( MOAB_USE_MPI )
 
 # Fortran examples that only use iMOAB, and so link against libMOAB directly.
 set ( IMOAB_FORTRAN_EXAMPLES )
-if ( MOAB_USE_MPI AND MOAB_EXAMPLES_HAVE_FORTRAN )
+if ( MOAB_EXAMPLES_HAVE_FORTRAN )
+  # DirectAccessF90 builds its mesh in memory and needs neither MPI nor an
+  # input file, so it is gated on the Fortran compiler alone.
   set ( IMOAB_FORTRAN_EXAMPLES ${IMOAB_FORTRAN_EXAMPLES}
-          fortran/MigrateMesh.F90
+          fortran/DirectAccessF90.F90
     )
-endif ( MOAB_USE_MPI AND MOAB_EXAMPLES_HAVE_FORTRAN )
+  if ( MOAB_USE_MPI )
+    set ( IMOAB_FORTRAN_EXAMPLES ${IMOAB_FORTRAN_EXAMPLES}
+            fortran/MigrateMesh.F90
+      )
+  endif ( MOAB_USE_MPI )
+endif ( MOAB_EXAMPLES_HAVE_FORTRAN )
 
 # Every source in earthsystem/earth is listed here, so that what CMake compiles
 # matches what earthsystem/earth/makefile builds and what both build systems
@@ -262,4 +269,8 @@ if ( TARGET MigrateMesh )
                     $<TARGET_FILE:MigrateMesh> ${MPIEXEC_POSTFLAGS}
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} )
 endif ( TARGET MigrateMesh )
+
+if ( TARGET DirectAccessF90 )
+  add_test( NAME DirectAccessF90 COMMAND $<TARGET_FILE:DirectAccessF90> )
+endif ( TARGET DirectAccessF90 )
 

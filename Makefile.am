@@ -84,6 +84,7 @@ examples_advancedsmooth_DATA = \
 examples_fortrandir = $(datadir)/examples/fortran
 examples_fortran_DATA = \
                examples/fortran/makefile \
+               examples/fortran/DirectAccessF90.F90 \
                examples/fortran/DirectAccessNoHolesF90.F90 \
                examples/fortran/PushParMeshIntoMoabF90.F90 \
                examples/fortran/MigrateMesh.F90 \

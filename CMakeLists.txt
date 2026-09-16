@@ -1175,6 +1175,7 @@ SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/advanced/smoothing/SphericalCVTOptimization.cpp )
 SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/fortran/makefile
+  examples/fortran/DirectAccessF90.F90
   examples/fortran/DirectAccessNoHolesF90.F90
   examples/fortran/PushParMeshIntoMoabF90.F90
   examples/fortran/MigrateMesh.F90

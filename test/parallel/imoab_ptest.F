@@ -124,7 +124,7 @@ C      used for ghosting
 
       !  give a component id
       compid = 7
-      appname = 'IMTEST'//CHAR(0)
+      appname = 'IMTEST'
       ierr = iMOAB_RegisterApplication(appname, MPI_COMM_WORLD,
      & compid, pid)
       call errorout(ierr, 'fail to initialize fortran app')
@@ -170,8 +170,8 @@ C      used for ghosting
 
       ! write out the mesh file to disk, in parallel, if h5m
 #ifdef MOAB_HAVE_HDF5
-      outfile = 'wholeF.h5m'//CHAR(0)
-      wopts   = 'PARALLEL=WRITE_PART'//CHAR(0)
+      outfile = 'wholeF.h5m'
+      wopts   = 'PARALLEL=WRITE_PART'
       ierr = iMOAB_WriteMesh(pid, outfile, wopts)
       call errorout(ierr, 'fail to write the mesh file')
 #endif

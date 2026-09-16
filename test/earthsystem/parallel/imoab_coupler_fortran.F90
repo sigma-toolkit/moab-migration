@@ -93,13 +93,13 @@ program imoab_coupler_fortran
    ! readoptsLnd( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION" )
    atmFileName = &
      MOAB_MESH_DIR &
-     //'unittest/wholeATM_T.h5m'//C_NULL_CHAR
+     //'unittest/wholeATM_T.h5m'
    ocnFileName = &
      MOAB_MESH_DIR &
-     //'unittest/recMeshOcn.h5m'//C_NULL_CHAR
+     //'unittest/recMeshOcn.h5m'
    baselineFileName = &
      MOAB_MESH_DIR &
-     //'unittest/baseline1.txt'//C_NULL_CHAR
+     //'unittest/baseline1.txt'
 
    ! all comms span the whole world, for simplicity
    atmComm = MPI_COMM_NULL
@@ -118,7 +118,7 @@ program imoab_coupler_fortran
    call MPI_Comm_group( ocnComm, ocnGroup, ierr )
    call MPI_Comm_group( cplComm, cplGroup, ierr )
 
-   readopts ='PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS'//C_NULL_CHAR
+   readopts ='PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS'
    nghlay = 0 ! no ghost layers
 #ifdef MOAB_HAVE_ZOLTAN
    partScheme = 2  ! RCB with zoltan
@@ -135,16 +135,16 @@ program imoab_coupler_fortran
    end if
 
    ierr = iMOAB_Initialize()
-   appname = 'ATM'//C_NULL_CHAR
+   appname = 'ATM'
    ierr = iMOAB_RegisterApplication(appname, atmComm, cmpatm, cmpatmPid)
-   appname = 'ATMX'//C_NULL_CHAR
+   appname = 'ATMX'
    ierr = iMOAB_RegisterApplication(appname, cplComm, cplatm, cplatmPid)
-   appname = 'OCN'//C_NULL_CHAR
+   appname = 'OCN'
    ierr = iMOAB_RegisterApplication(appname, ocnComm, cmpocn, cmpocnPid)
-   appname = 'OCNX'//C_NULL_CHAR
+   appname = 'OCNX'
    ierr = iMOAB_RegisterApplication(appname, cplComm, cplocn, cplocnPid)
 
-   appname = 'ATMOCN'//C_NULL_CHAR
+   appname = 'ATMOCN'
    ierr = iMOAB_RegisterApplication(appname, cplComm, atmocnid, cplAtmOcnPID)
 
    ! read atm and migrate
@@ -204,13 +204,13 @@ program imoab_coupler_fortran
       call errorout(ierr, 'cannot recompute direct coverage graph for ocean')
    end if
 
-   weights_identifier1 = 'scalar'//C_NULL_CHAR
-   disc_methods1 = 'cgll'//C_NULL_CHAR
-   disc_methods2 = 'fv'//C_NULL_CHAR
+   weights_identifier1 = 'scalar'
+   disc_methods1 = 'cgll'
+   disc_methods2 = 'fv'
    disc_orders1 = 4
    disc_orders2 = 1
-   dof_tag_names1 = 'GLOBAL_DOFS'//C_NULL_CHAR
-   dof_tag_names2 = 'GLOBAL_ID'//C_NULL_CHAR
+   dof_tag_names1 = 'GLOBAL_DOFS'
+   dof_tag_names2 = 'GLOBAL_ID'
    ! fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 1, fNoConserve = 0, fNoBubble = 1
    fNoBubble = 1
    fMonotoneTypeID = 0
@@ -225,24 +225,24 @@ program imoab_coupler_fortran
 
       ierr = iMOAB_ComputeScalarProjectionWeights( &
              cplAtmOcnPID, weights_identifier1, disc_methods1, disc_orders1, &
-             disc_methods2, disc_orders2, ""//C_NULL_CHAR, fNoBubble, fMonotoneTypeID, fVolumetric, &
+             disc_methods2, disc_orders2, "", fNoBubble, fMonotoneTypeID, fVolumetric, &
              fInverseDistanceMap, fNoConserve, &
              fValidate, dof_tag_names1, dof_tag_names2)
       call errorout(ierr, 'cannot compute scalar projection weights')
 
       ierr = iMOAB_ComputeScalarProjectionWeights( &
-             cplAtmOcnPID, "bilinear"//C_NULL_CHAR, "fv"//C_NULL_CHAR, 1, &
-             "fv"//C_NULL_CHAR, 1, "bilin"//C_NULL_CHAR, fNoBubble, fMonotoneTypeID, fVolumetric, &
+             cplAtmOcnPID, "bilinear", "fv", 1, &
+             "fv", 1, "bilin", fNoBubble, fMonotoneTypeID, fVolumetric, &
              fInverseDistanceMap, fNoConserve, &
-             fValidate, "GLOBAL_ID"//C_NULL_CHAR, "GLOBAL_ID"//C_NULL_CHAR)
+             fValidate, "GLOBAL_ID", "GLOBAL_ID")
       call errorout(ierr, 'cannot compute scalar projection weights')
 
 #ifdef MOAB_HAVE_NETCDF
-      atmocn_map_file_name = 'atm_ocn_map_f.nc'//C_NULL_CHAR
+      atmocn_map_file_name = 'atm_ocn_map_f.nc'
       ierr = iMOAB_WriteMapFile( cplAtmOcnPID, weights_identifier1, atmocn_map_file_name)
       call errorout(ierr, 'failed to write map file to disk')
 
-      intx_from_file_identifier = 'map-from-file'//C_NULL_CHAR
+      intx_from_file_identifier = 'map-from-file'
       src_disc_type = 1;  ! element-based SE
       tgt_disc_type = 3;  ! element-based FV
       ierr = iMOAB_LoadMapFile( cplAtmPID, cplOcnPID, cplAtmOcnPID, &
@@ -258,8 +258,8 @@ program imoab_coupler_fortran
    atmCompNDoFs = disc_orders1*disc_orders1
    ocnCompNDoFs = 1 ! /*FV*/
 
-   bottomFields = 'a2oTbot:a2oUbot:a2oVbot'//C_NULL_CHAR
-   bottomProjectedFields = 'a2oTbot_proj:a2oUbot_proj:a2oVbot_proj'//C_NULL_CHAR
+   bottomFields = 'a2oTbot:a2oUbot:a2oVbot'
+   bottomProjectedFields = 'a2oTbot_proj:a2oUbot_proj:a2oVbot_proj'
 
    if (cplComm .NE. MPI_COMM_NULL) then
       ierr = iMOAB_DefineTagStorage(cplAtmPID, bottomFields, tagTypes(1), atmCompNDoFs, tagIndex(1))
@@ -294,8 +294,8 @@ program imoab_coupler_fortran
    end if
 
    ! Define the field variables to project
-   concat_fieldname = 'a2oTbot:a2oUbot:a2oVbot'//C_NULL_CHAR
-   concat_fieldnameT = 'a2oTbot_proj:a2oUbot_proj:a2oVbot_proj'//C_NULL_CHAR
+   concat_fieldname = 'a2oTbot:a2oUbot:a2oVbot'
+   concat_fieldnameT = 'a2oTbot_proj:a2oUbot_proj:a2oVbot_proj'
 
    if (atmComm .NE. MPI_COMM_NULL) then
 
@@ -321,8 +321,8 @@ program imoab_coupler_fortran
    end if
    if (cplComm .ne. MPI_COMM_NULL) then
 
-      outputFileOcn = "AtmOnCplF2.h5m"//C_NULL_CHAR
-      fileWriteOptions = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
+      outputFileOcn = "AtmOnCplF2.h5m"
+      fileWriteOptions = 'PARALLEL=WRITE_PART'
       ierr = iMOAB_WriteMesh(cplAtmPID, outputFileOcn, fileWriteOptions)
       call errorout(ierr, 'could not write AtmOnCpl2.h5m to disk')
 
@@ -336,8 +336,8 @@ program imoab_coupler_fortran
                                                 concat_fieldnameT)
       call errorout(ierr, 'failed to compute projection weight application')
 
-      outputFileOcn = "OcnOnCplF.h5m"//C_NULL_CHAR
-      fileWriteOptions = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
+      outputFileOcn = "OcnOnCplF.h5m"
+      fileWriteOptions = 'PARALLEL=WRITE_PART'
       ierr = iMOAB_WriteMesh(cplOcnPID, outputFileOcn, fileWriteOptions)
       call errorout(ierr, 'could not write OcnOnCpl.h5m to disk')
 
@@ -375,8 +375,8 @@ program imoab_coupler_fortran
 
    if (ocnComm .ne. MPI_COMM_NULL) then
 
-      outputFileOcn = "OcnWithProjF2.h5m"//C_NULL_CHAR
-      fileWriteOptions = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
+      outputFileOcn = "OcnWithProjF2.h5m"
+      fileWriteOptions = 'PARALLEL=WRITE_PART'
       if (my_id .eq. 0) then
          print *, ' Writing ocean mesh file with projected solution to disk: ', outputFileOcn
       end if

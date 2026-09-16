@@ -115,20 +115,20 @@ program MigrateMesh
     if (rank == 0) print *, "initialize iMOAB fortran applications"
 
     if (comm1 /= MPI_COMM_NULL) then
-       appname='phis1'//CHAR(0)
+       appname='phis1'
        ierr = iMOAB_RegisterApplication(trim(appname), comm1, compid1, pid1)
        print *, ' register ', appname, " on rank ", rank, " pid1 ", pid1
     endif
     if (comm2 /= MPI_COMM_NULL) then
-       appname = 'phis2'//CHAR(0)
+       appname = 'phis2'
        ierr = iMOAB_RegisterApplication(trim(appname), comm2, compid2, pid2)
        print *, ' register ', appname, " on rank ", rank, " pid2 ", pid2
     endif
     
 
     if (comm1 /= MPI_COMM_NULL) then
-       filename = 'spherecube.h5m'//CHAR(0)
-       readopts = 'PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS'//CHAR(0)
+       filename = 'spherecube.h5m'
+       readopts = 'PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS'
        if (rank .eq. sz-2 ) print *, "loading " , trim(filename) , " with options " , trim(readopts)
        nghlay = 0
 
@@ -155,8 +155,8 @@ program MigrateMesh
     call errorout(ierr, 'cannot stop at barrier' )
 
 if (comm2 /= MPI_COMM_NULL) then
-       outfile = 'receivedMesh.h5m'//CHAR(0)
-       wopts   = 'PARALLEL=WRITE_PART;'//CHAR(0)
+       outfile = 'receivedMesh.h5m'
+       wopts   = 'PARALLEL=WRITE_PART;'
 !      write out the mesh file to disk
        ierr = iMOAB_WriteMesh(pid2, trim(outfile), trim(wopts))
        call errorout(ierr, 'cannot write received mesh' )

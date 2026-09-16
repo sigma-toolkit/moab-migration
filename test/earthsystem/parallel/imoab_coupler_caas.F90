@@ -150,20 +150,20 @@ program imoab_coupler_fortran
    ! readoptsLnd( "PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION" )
    atmFileName = &
      MOAB_MESH_DIR &
-     //'unittest/atm_c2x.h5m'//C_NULL_CHAR
+     //'unittest/atm_c2x.h5m'
    ocnFileName = &
      MOAB_MESH_DIR &
-     //'unittest/wholeOcn.h5m'//C_NULL_CHAR
+     //'unittest/wholeOcn.h5m'
      
    base_file3 = &
      MOAB_MESH_DIR &
-     //'unittest/baseline3.txt'//C_NULL_CHAR
+     //'unittest/baseline3.txt'
    base_file4 = &
      MOAB_MESH_DIR &
-     //'unittest/baseline4.txt'//C_NULL_CHAR
+     //'unittest/baseline4.txt'
    base_file5 = &
      MOAB_MESH_DIR &
-     //'unittest/baseline5.txt'//C_NULL_CHAR
+     //'unittest/baseline5.txt'
      
 
    ! all comms span the whole world, for simplicity
@@ -183,7 +183,7 @@ program imoab_coupler_fortran
    call MPI_Comm_group( ocnComm, ocnGroup, ierr )
    call MPI_Comm_group( cplComm, cplGroup, ierr )
 
-   readopts ='PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS'//C_NULL_CHAR
+   readopts ='PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;PARALLEL_RESOLVE_SHARED_ENTS'
    nghlay = 0 ! no ghost layers
 #ifdef MOAB_HAVE_ZOLTAN
    partScheme = 2  ! RCB with zoltan
@@ -199,16 +199,16 @@ program imoab_coupler_fortran
    end if
 
    ierr = iMOAB_Initialize()
-   appname = 'ATM'//C_NULL_CHAR
+   appname = 'ATM'
    ierr = iMOAB_RegisterApplication(appname, atmComm, cmpatm, cmpatmPid)
-   appname = 'ATMX'//C_NULL_CHAR
+   appname = 'ATMX'
    ierr = iMOAB_RegisterApplication(appname, cplComm, cplatm, cplatmPid)
-   appname = 'OCN'//C_NULL_CHAR
+   appname = 'OCN'
    ierr = iMOAB_RegisterApplication(appname, ocnComm, cmpocn, cmpocnPid)
-   appname = 'OCNX'//C_NULL_CHAR
+   appname = 'OCNX'
    ierr = iMOAB_RegisterApplication(appname, cplComm, cplocn, cplocnPid)
 
-   appname = 'ATMOCN'//C_NULL_CHAR
+   appname = 'ATMOCN'
    ierr = iMOAB_RegisterApplication(appname, cplComm, atmocnid, cplAtmOcnPID)
 
    ! read atm and migrate
@@ -284,13 +284,13 @@ program imoab_coupler_fortran
       call errorout(ierr, 'cannot recompute direct coverage graph for atm coverage for ocean')
    end if
 
-   weights_identifier1 = 'scalar'//C_NULL_CHAR
-   disc_methods1 = 'fv'//C_NULL_CHAR
-   disc_methods2 = 'fv'//C_NULL_CHAR
+   weights_identifier1 = 'scalar'
+   disc_methods1 = 'fv'
+   disc_methods2 = 'fv'
    disc_orders1 = 1
    disc_orders2 = 1
-   dof_tag_names1 = 'GLOBAL_ID'//C_NULL_CHAR
-   dof_tag_names2 = 'GLOBAL_ID'//C_NULL_CHAR
+   dof_tag_names1 = 'GLOBAL_ID'
+   dof_tag_names2 = 'GLOBAL_ID'
    ! fMonotoneTypeID = 0, fVolumetric = 0, fValidate = 1, fNoConserve = 0, fNoBubble = 1
    fNoBubble = 1
    fMonotoneTypeID = 0
@@ -304,29 +304,29 @@ program imoab_coupler_fortran
 
       ierr = iMOAB_ComputeScalarProjectionWeights( &
              cplAtmOcnPID, weights_identifier1, disc_methods1, disc_orders1, &
-             disc_methods2, disc_orders2, ""//C_NULL_CHAR, fNoBubble, fMonotoneTypeID, fVolumetric, &
+             disc_methods2, disc_orders2, "", fNoBubble, fMonotoneTypeID, fVolumetric, &
              fInverseDistanceMap, fNoConserve, &
              fValidate, dof_tag_names1, dof_tag_names2)
       call errorout(ierr, 'cannot compute scalar first order projection weights')
 
       ierr = iMOAB_ComputeScalarProjectionWeights( &
-             cplAtmOcnPID, "bilinear"//C_NULL_CHAR, disc_methods1, 1, &
-             disc_methods2, 1, "bilin"//C_NULL_CHAR, fNoBubble, fMonotoneTypeID, fVolumetric, &
+             cplAtmOcnPID, "bilinear", disc_methods1, 1, &
+             disc_methods2, 1, "bilin", fNoBubble, fMonotoneTypeID, fVolumetric, &
              fInverseDistanceMap, fNoConserve, &
-             fValidate, "GLOBAL_ID"//C_NULL_CHAR, "GLOBAL_ID"//C_NULL_CHAR)
+             fValidate, "GLOBAL_ID", "GLOBAL_ID")
       call errorout(ierr, 'cannot compute scalar bilinear projection weights')
 
       ierr = iMOAB_ComputeScalarProjectionWeights( &
-             cplAtmOcnPID, "secondorder"//C_NULL_CHAR, disc_methods1, 2, &
-             disc_methods2, 2, ""//C_NULL_CHAR, fNoBubble, fMonotoneTypeID, fVolumetric, &
+             cplAtmOcnPID, "secondorder", disc_methods1, 2, &
+             disc_methods2, 2, "", fNoBubble, fMonotoneTypeID, fVolumetric, &
              fInverseDistanceMap, fNoConserve, &
-             fValidate, "GLOBAL_ID"//C_NULL_CHAR, "GLOBAL_ID"//C_NULL_CHAR)
+             fValidate, "GLOBAL_ID", "GLOBAL_ID")
       call errorout(ierr, 'cannot compute scalar 2nd order projection weights')
 
 #if defined( MOAB_HAVE_NETCDF ) && defined( VERBOSE )
       write(nproc,"(I0.2)")num_procs !
-      atmocn_map_file_name = 'atm_ocn_map_second_n'//trim(nproc)//'.nc'//C_NULL_CHAR
-      ierr = iMOAB_WriteMapFile( cplAtmOcnPID, "secondorder"//C_NULL_CHAR, atmocn_map_file_name)
+      atmocn_map_file_name = 'atm_ocn_map_second_n'//trim(nproc)//'.nc'
+      ierr = iMOAB_WriteMapFile( cplAtmOcnPID, "secondorder", atmocn_map_file_name)
       call errorout(ierr, 'failed to write map file to disk')
 #endif
 
@@ -338,13 +338,13 @@ program imoab_coupler_fortran
    atmCompNDoFs = disc_orders1*disc_orders1
    ocnCompNDoFs = 1 ! /*FV*/
 
-   fields = 'Sa_dens:Sa_pbot'//C_NULL_CHAR
-   projectedFields = 'Sa_dens_proj:Sa_pbot_proj'//C_NULL_CHAR
-   projectedFieldsBilin = 'Sa_dens_bilin_proj:Sa_pbot_bilin_proj'//C_NULL_CHAR
-   projectedFieldsSecond = 'Sa_dens_o2_proj:Sa_pbot_o2_proj'//C_NULL_CHAR
-   projectedFieldsCAAS = 'Sa_dens_o2_caas_proj:Sa_pbot_o2_caas_proj'//C_NULL_CHAR
+   fields = 'Sa_dens:Sa_pbot'
+   projectedFields = 'Sa_dens_proj:Sa_pbot_proj'
+   projectedFieldsBilin = 'Sa_dens_bilin_proj:Sa_pbot_bilin_proj'
+   projectedFieldsSecond = 'Sa_dens_o2_proj:Sa_pbot_o2_proj'
+   projectedFieldsCAAS = 'Sa_dens_o2_caas_proj:Sa_pbot_o2_caas_proj'
    transferFields = 'Sa_dens_proj:Sa_pbot_proj:Sa_dens_bilin_proj:Sa_pbot_bilin_proj:Sa_dens_o2_proj:'//&
-                    'Sa_pbot_o2_proj:Sa_dens_o2_caas_proj:Sa_pbot_o2_caas_proj'//C_NULL_CHAR
+                    'Sa_pbot_o2_proj:Sa_dens_o2_caas_proj:Sa_pbot_o2_caas_proj'
 
    if (cplComm .NE. MPI_COMM_NULL) then
       ierr = iMOAB_DefineTagStorage(cplAtmPID, fields, tagTypes(1), atmCompNDoFs, tagIndex(1))
@@ -375,8 +375,8 @@ program imoab_coupler_fortran
 
    if (cplComm .ne. MPI_COMM_NULL) then
 
-      outputFileOcn = "AtmOnCplF.h5m"//C_NULL_CHAR
-      fileWriteOptions = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
+      outputFileOcn = "AtmOnCplF.h5m"
+      fileWriteOptions = 'PARALLEL=WRITE_PART'
       ierr = iMOAB_WriteMesh(cplAtmPID, outputFileOcn, fileWriteOptions)
       call errorout(ierr, 'could not write AtmOnCpl.h5m to disk')
 
@@ -412,7 +412,7 @@ program imoab_coupler_fortran
 
       ! We have the remapping weights now. Let us apply the weights onto the tag we defined
       ! on the source mesh and get the projection on the target mesh
-      ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, "bilinear"//C_NULL_CHAR, &
+      ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, "bilinear", &
                                                 fields, &
                                                 projectedFieldsBilin)
       call errorout(ierr, 'failed to compute bilinear projection weight application')
@@ -420,7 +420,7 @@ program imoab_coupler_fortran
 
       ! We have the remapping weights now. Let us apply the weights onto the tag we defined
       ! on the source mesh and get the projection on the target mesh
-      ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, "secondorder"//C_NULL_CHAR, &
+      ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, "secondorder", &
                                                 fields, &
                                                 projectedFieldsSecond)
       call errorout(ierr, 'failed to compute second order projection weight application')
@@ -428,14 +428,14 @@ program imoab_coupler_fortran
       ! We have the remapping weights now. Let us apply the weights onto the tag we defined
       ! on the source mesh and get the projection on the target mesh
       filter_type = 1 ! global CAAS operator application
-      ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, "secondorder"//C_NULL_CHAR, &
+      ierr = iMOAB_ApplyScalarProjectionWeights(cplAtmOcnPID, filter_type, "secondorder", &
                                                 fields, &
                                                 projectedFieldsCAAS)
       call errorout(ierr, 'failed to compute second order with CAAS projection weight application')
 
       write(nproc,"(I0.2)")num_procs !
-      outputFileOcn = "OcnOnCplF_n"//trim(nproc)//".h5m"//C_NULL_CHAR
-      fileWriteOptions = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
+      outputFileOcn = "OcnOnCplF_n"//trim(nproc)//".h5m"
+      fileWriteOptions = 'PARALLEL=WRITE_PART'
       ierr = iMOAB_WriteMesh(cplOcnPID, outputFileOcn, fileWriteOptions)
       call errorout(ierr, 'could not write OcnOnCpl.h5m to disk')
 
@@ -446,7 +446,7 @@ program imoab_coupler_fortran
 
       ierr = iMOAB_DefineTagStorage(cmpOcnPID, transferFields, tagTypes(2), ocnCompNDoFs, tagIndexIn2)
       call errorout(ierr, 'failed to define the field tag for receiving back the tag a2oTbot_proj,  on ocn pes')
-      ierr = iMOAB_DefineTagStorage(cmpOcnPID, "GLOBAL_ID"//C_NULL_CHAR, 0, 1, tagIndexIn2)
+      ierr = iMOAB_DefineTagStorage(cmpOcnPID, "GLOBAL_ID", 0, 1, tagIndexIn2)
       call errorout(ierr, 'failed to define the field tag for GLOBAL_ID,  on ocn pes')
 
    end if
@@ -475,8 +475,8 @@ program imoab_coupler_fortran
 
    if (ocnComm .ne. MPI_COMM_NULL) then
 
-      outputFileOcn = "OcnWithProjF.h5m"//C_NULL_CHAR
-      fileWriteOptions = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
+      outputFileOcn = "OcnWithProjF.h5m"
+      fileWriteOptions = 'PARALLEL=WRITE_PART'
       if (my_id .eq. 0) then
          print *, ' Writing ocean mesh file with projected solution to disk: ', outputFileOcn
       end if
@@ -498,22 +498,22 @@ program imoab_coupler_fortran
 
       eps = 1.e-9
       eetype = 1 ! cell type, not vertex
-      ierr         = iMOAB_GetIntTagStorage( cmpOcnPID, "GLOBAL_ID"//C_NULL_CHAR, storLeng, eetype, gids );
+      ierr         = iMOAB_GetIntTagStorage( cmpOcnPID, "GLOBAL_ID", storLeng, eetype, gids );
       call errorout(ierr, 'failed to get gids')
-      ierr         = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_bilin_proj"//C_NULL_CHAR, storLeng, eetype, vals );
+      ierr         = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_bilin_proj", storLeng, eetype, vals );
       call errorout(ierr, 'failed to get pbots bilinear')
       
       call check_baseline(base_file3, storLeng, gids, vals, eps, my_id, ierr)
       call errorout(ierr, 'failed to check bilinear values')
       if (ierr .eq. 0 .and. my_id .eq. 0 ) print *, 'checked Sa_pbot_bilin_proj values agains baseline'
-      ierr         = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_o2_proj"//C_NULL_CHAR, storLeng, eetype, vals )
+      ierr         = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_o2_proj", storLeng, eetype, vals )
       call errorout(ierr, 'failed to get pbot order 2')
       
       call check_baseline(base_file4, storLeng, gids, vals, eps, my_id, ierr)
       call errorout(ierr, 'failed to check higher order values')
       if (ierr .eq. 0 .and. my_id .eq. 0 ) print *, 'checked Sa_pbot_o2_proj values against baseline'
 
-      ierr         = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_o2_caas_proj"//C_NULL_CHAR, storLeng, eetype, vals )
+      ierr         = iMOAB_GetDoubleTagStorage( cmpOcnPID, "Sa_pbot_o2_caas_proj", storLeng, eetype, vals )
       call errorout(ierr, 'failed to get pbot order 2 caas')
       
       call check_baseline(base_file5, storLeng, gids, vals, eps, my_id, ierr)

@@ -70,7 +70,7 @@ program fdriver
    my_id = 0
    num_procs = 1
    ierr = 0
-   fname = 'unittest/io/p8ex1.h5m'//C_NULL_CHAR
+   fname = 'unittest/io/p8ex1.h5m'
 
 #ifdef MOAB_HAVE_MPI
    call MPI_INIT(ierr)
@@ -92,7 +92,7 @@ program fdriver
    ierr = iMOAB_Initialize()
    call errorout(ierr, 'fail to initialize iMOAB')
 
-   appname = 'PROTEUS'//C_NULL_CHAR
+   appname = 'PROTEUS'
    ! give a unique external id; here we just use 8?
    compid = 8
    !  number of ghost layers needed by application
@@ -115,9 +115,9 @@ program fdriver
 #ifdef MOAB_HAVE_MPI
    nghlay = 1
    readopts = 'PARALLEL=READ_PART;PARTITION=PARALLEL_PARTITION;'// &
-              'PARALLEL_RESOLVE_SHARED_ENTS'//C_NULL_CHAR
+              'PARALLEL_RESOLVE_SHARED_ENTS'
 #else
-   readopts = C_NULL_CHAR
+   readopts = ''
 #endif
 
    !  now let us load the mesh in parallel
@@ -161,11 +161,11 @@ program fdriver
    enttype(1) = 0                                  ! on verts
    enttype(2) = 1                                  ! on elem
    num_co = 1
-   tagname1 = 'INTFIELD'//C_NULL_CHAR
+   tagname1 = 'INTFIELD'
    ierr = iMOAB_DefineTagStorage(pid, tagname1, tagtype(1), num_co, tagindex(1))
    call errorout(ierr, 'failed to get tag INTFIELD')
 
-   tagname2 = 'DFIELD'//C_NULL_CHAR
+   tagname2 = 'DFIELD'
    ierr = iMOAB_DefineTagStorage(pid, tagname2, tagtype(2), num_co, tagindex(2))
    call errorout(ierr, 'failed to get tag DFIELD')
 
@@ -309,11 +309,11 @@ program fdriver
       call errorout(ierr, 'fail at barrier')
    end do
 
-   outfile = 'fnew2.h5m'//C_NULL_CHAR
+   outfile = 'fnew2.h5m'
 #ifdef MOAB_HAVE_MPI
-   wopts = 'PARALLEL=WRITE_PART'//C_NULL_CHAR
+   wopts = 'PARALLEL=WRITE_PART'
 #else
-   wopts = C_NULL_CHAR
+   wopts = ''
 #endif
 
    !     write out the mesh file to disk

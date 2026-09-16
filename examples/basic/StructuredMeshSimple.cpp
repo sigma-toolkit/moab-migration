@@ -144,12 +144,12 @@ int main( int argc, char** argv )
     }
 
     // 1. Determine local parameters based on parallel/serial and rank
-    int rank  = 0;
-    int ilow  = 0;
-    int ihigh = elements_per_side;
+    int rank   = 0;
+    int nprocs = 1;
+    int ilow   = 0;
+    int ihigh  = elements_per_side;
 
 #ifdef MOAB_HAVE_MPI
-    int nprocs = 1;
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );
     MPI_Comm_size( MPI_COMM_WORLD, &nprocs );
 
@@ -174,16 +174,25 @@ int main( int argc, char** argv )
     const moab::HomCoord high( ihigh, ( dimension > 1 ) ? elements_per_side : -1,
                                ( dimension > 2 ) ? elements_per_side : -1 );
 
+    // resolve_shared_ents is a dimension, and -1 means "do not resolve".  Any
+    // other value asks for a parallel operation, so a serial MOAB rejects the
+    // call outright with "Parallel capability requested but MOAB not compiled
+    // parallel"; there is also nothing to resolve on a single rank.
+#ifdef MOAB_HAVE_MPI
+    const int resolve_shared_ents = ( nprocs > 1 ) ? 0 : -1;
+#else
+    const int resolve_shared_ents = -1;
+#endif
+
     // Create the structured mesh box
     MB_CHK_SET_ERR( scd_interface->construct_box( low, high,
                                                   nullptr,  // No coordinates array
-                                                  0,        // No coordinates
+                                                  0,        // Number of coordinates
                                                   box,      // Output parameter
                                                   nullptr,  // Periodicity
                                                   nullptr,  // Parallel data
-                                                  true,     // No coordinates
-                                                  0         // Resolve dimensionality
-                                                  ),
+                                                  true,     // Assign global ids
+                                                  resolve_shared_ents ),
                     "Failed to construct structured box" );
 
     if( !box )
@@ -199,8 +208,11 @@ int main( int argc, char** argv )
     MB_CHK_SET_ERR( moab_instance->get_entities_by_dimension( 0, 0, vertices ), "Failed to get vertices" );
     MB_CHK_SET_ERR( moab_instance->get_entities_by_dimension( 0, dimension, elements ), "Failed to get elements" );
 
+    // Serially the local counts are already the global ones; the reduction below
+    // is what makes them global when there is more than one rank.
+    std::size_t global_entities_size[2] = { vertices.size(), elements.size() };
 #ifdef MOAB_HAVE_MPI
-    std::size_t local_entities_size[2] = { vertices.size(), elements.size() }, global_entities_size[2] = { 0, 0 };
+    const std::size_t local_entities_size[2] = { vertices.size(), elements.size() };
     MPI_Allreduce( local_entities_size, global_entities_size, 2, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD );
 #endif
 

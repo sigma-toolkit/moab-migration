@@ -45,7 +45,9 @@
 using moab::Core;
 using moab::EntityHandle;
 using moab::ErrorCode;
+#ifdef MOAB_HAVE_MPI
 using moab::ParallelComm;
+#endif
 
 namespace
 {

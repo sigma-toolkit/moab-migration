@@ -203,6 +203,15 @@ AC_DEFUN([DOWNLOAD_EXTERNAL_PACKAGE],
     *)  remoteprotocol=yes ;;
   esac
   currdir="$PWD"
+  dnl A failed transfer leaves the destination behind as an empty file.  That
+  dnl counted as "already downloaded", so one offline configure was enough to
+  dnl wedge the file at 0 bytes for every configure afterwards.  Delete it
+  dnl rather than just skipping the check: the retry path below treats an
+  dnl existing destination plus an unreachable URL as a fatal configure error,
+  dnl so leaving the empty file in place turns a warning into a hard failure.
+  if (test -f "$3" && test ! -s "$3"); then
+    rm -f "$3"
+  fi
   if (test -f "$3" || test -d "$3"); then
     filedownloaded=yes # Perhaps from a previous run
   else

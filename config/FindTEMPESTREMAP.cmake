@@ -43,3 +43,8 @@ include (FindPackageHandleStandardArgs)
 find_package_handle_standard_args (TEMPESTREMAP "TempestRemap not found, check environment variables TEMPESTREMAP_DIR"
   TEMPESTREMAP_DIR TEMPESTREMAP_INCLUDES TEMPESTREMAP_LIBRARIES)
 
+if (TEMPESTREMAP_FOUND)
+  include(MOABTPLTargets)
+  moab_declare_tpl_target(TempestRemap::TempestRemap TEMPESTREMAP_INCLUDES TEMPESTREMAP_LIBRARIES)
+endif (TEMPESTREMAP_FOUND)
+

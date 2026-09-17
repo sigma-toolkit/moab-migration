@@ -90,3 +90,8 @@ find_package_handle_standard_args(NETCDF
 )
 
 mark_as_advanced(NETCDF_INCLUDES NETCDF_LIBRARIES)
+
+if (NETCDF_FOUND)
+  include(MOABTPLTargets)
+  moab_declare_tpl_target(NetCDF::NetCDF NETCDF_INCLUDES NETCDF_LIBRARIES)
+endif (NETCDF_FOUND)

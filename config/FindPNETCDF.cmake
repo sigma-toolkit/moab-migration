@@ -45,3 +45,8 @@ ENDIF (MOAB_HAVE_MPI AND ENABLE_PNETCDF)
 include (FindPackageHandleStandardArgs)
 find_package_handle_standard_args (PNETCDF "PNetCDF not found, check the CMake PNETCDF_DIR variable"
   PNETCDF_DIR PNETCDF_INCLUDES PNETCDF_LIBRARIES)
+
+if (PNETCDF_FOUND)
+  include(MOABTPLTargets)
+  moab_declare_tpl_target(PNetCDF::PNetCDF PNETCDF_INCLUDES PNETCDF_LIBRARIES)
+endif (PNETCDF_FOUND)

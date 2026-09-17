@@ -48,3 +48,8 @@ find_package_handle_standard_args (
   METIS_INCLUDES
   METIS_LIBRARIES
   )
+
+if (METIS_FOUND)
+  include(MOABTPLTargets)
+  moab_declare_tpl_target(METIS::METIS METIS_INCLUDES METIS_LIBRARIES)
+endif (METIS_FOUND)

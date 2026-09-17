@@ -75,3 +75,8 @@ include (FindPackageHandleStandardArgs)
 find_package_handle_standard_args (ZOLTAN "Zoltan not found, check environment variables ZOLTAN_DIR"
   ZOLTAN_DIR ZOLTAN_INCLUDES ZOLTAN_LIBRARIES)
 
+if (ZOLTAN_FOUND)
+  include(MOABTPLTargets)
+  moab_declare_tpl_target(Zoltan::Zoltan ZOLTAN_INCLUDES ZOLTAN_LIBRARIES)
+endif (ZOLTAN_FOUND)
+

@@ -46,3 +46,8 @@ find_package_handle_standard_args (
   PARMETIS_INCLUDES
   PARMETIS_LIBRARIES
   )
+
+if (PARMETIS_FOUND)
+  include(MOABTPLTargets)
+  moab_declare_tpl_target(ParMETIS::ParMETIS PARMETIS_INCLUDES PARMETIS_LIBRARIES)
+endif (PARMETIS_FOUND)

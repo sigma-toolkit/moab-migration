@@ -628,7 +628,6 @@ if ( ENABLE_TEMPESTREMAP )
       file(MAKE_DIRECTORY "${EXT_E3SM_DATA_DIR}")
       file(MAKE_DIRECTORY "${EXT_E3SM_DATA_DIR}/ne4pg2_o240")
       file(MAKE_DIRECTORY "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG")
-      set(MOAB_DEFINES "${MOAB_DEFINES} -DEXT_DATA_DIR=${EXT_DATA_DIR}/")
 
       # The autotools build has gated this on --download-extmeshfiles since
       # forever; CMake had no equivalent and always fetched.  Keep the fetching
@@ -713,6 +712,13 @@ if ( ENABLE_TEMPESTREMAP )
         endif()
       else()
         set(MOAB_HAVE_EXTMESHES TRUE)
+        # Defined only now that the meshes it points at are known to be there,
+        # the way test/earthsystem/parallel/Makefile.am only adds its
+        # -DEXT_DATA_DIR inside "if HAVE_EXTMESHES".  The one source that reads
+        # it opens with "#error Specify EXT_DATA_DIR to compile test", so this
+        # keeps that diagnostic honest: the define is absent exactly when the
+        # data is.
+        set(MOAB_DEFINES "${MOAB_DEFINES} -DEXT_DATA_DIR=${EXT_DATA_DIR}/")
       endif()
     endif(MOAB_HAVE_TEMPESTREMAP)
   endif (NOT EIGEN3_FOUND)

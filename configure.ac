@@ -1110,7 +1110,35 @@ if (test "x$download_ext_meshfiles" != "xno"); then
   DOWNLOAD_EXTERNAL_DATA([ne30pg2], [e3sm/ne30pg2_r05_oECv3_ICG],
                         [[AtmPhys_01.h5m], [domain_clean_p16.h5m], [outCS30_pg2_p8.h5m], [wholeMPAS.h5m]])
 fi
-AM_CONDITIONAL([HAVE_EXTMESHES],[test "$download_ext_meshfiles" = "yes"])
+
+dnl HAVE_EXTMESHES used to be "the user asked for the meshes", but asking is
+dnl not getting: DOWNLOAD_EXTERNAL_PACKAGE does not fail configure when a
+dnl transfer fails, so a failed download still built imoab_apg2_ol_coupler and
+dnl left it with nothing to read.  Gate on what actually landed instead.  This
+dnl also picks up meshes left by an earlier run when --download-extmeshfiles
+dnl was not passed this time, since a present file is never re-fetched anyway.
+have_extmeshes=yes
+missing_extmeshes=""
+for meshfile in \
+    e3sm/ne4pg2_o240/AtmPhys_pg2.h5m \
+    e3sm/ne4pg2_o240/land_p8.h5m \
+    e3sm/ne4pg2_o240/ne4pg2_p8.h5m \
+    e3sm/ne30pg2_r05_oECv3_ICG/AtmPhys_01.h5m \
+    e3sm/ne30pg2_r05_oECv3_ICG/domain_clean_p16.h5m \
+    e3sm/ne30pg2_r05_oECv3_ICG/outCS30_pg2_p8.h5m \
+    e3sm/ne30pg2_r05_oECv3_ICG/wholeMPAS.h5m ; do
+  if (test ! -s "$MOAB_EXTERNAL_MESHDIR/$meshfile"); then
+    have_extmeshes=no
+    missing_extmeshes="$missing_extmeshes $meshfile"
+  fi
+done
+dnl Only worth saying out loud when the meshes were actually requested; the
+dnl default is not to download them at all.
+if (test "x$have_extmeshes" = "xno" && test "x$download_ext_meshfiles" != "xno"); then
+  AC_MSG_WARN([Could not obtain these E3SM meshes:$missing_extmeshes])
+  AC_MSG_WARN([Skipping the coupler tests that read them; everything else builds normally.])
+fi
+AM_CONDITIONAL([HAVE_EXTMESHES],[test "x$have_extmeshes" = "xyes"])
 
 ################################################################################
 #                           Output Files

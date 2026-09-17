@@ -27,7 +27,7 @@
 #include <cmath>
 
 #include "moab/Core.hpp"
-#include "moab/IntxMesh/IntxUtils.hpp"
+#include "moab/earthsystem/intx_mesh/IntxUtils.hpp"
 #include "TestUtil.hpp"
 
 using namespace moab;

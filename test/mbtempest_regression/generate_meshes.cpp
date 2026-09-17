@@ -15,7 +15,7 @@
  */
 
 #include "moab/Core.hpp"
-#include "moab/Remapping/TempestRemapper.hpp"
+#include "moab/earthsystem/remapping/TempestRemapper.hpp"
 
 #ifdef MOAB_HAVE_MPI
 #include "moab_mpi.h"

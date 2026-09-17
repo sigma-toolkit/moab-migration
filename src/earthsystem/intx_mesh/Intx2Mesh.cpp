@@ -119,7 +119,7 @@ ErrorCode Intx2Mesh::FindMaxEdges( EntityHandle set1, EntityHandle set2 )
                                     << max_edges << " vertices, which exceeds MAXEDGES (" << MAXEDGES
                                     << "); source mesh max = " << max_edges_1
                                     << ", target mesh max = " << max_edges_2
-                                    << ". Increase MAXEDGES in moab/IntxMesh/IntxUtils.hpp and rebuild." );
+                                    << ". Increase MAXEDGES in moab/earthsystem/intx_mesh/IntxUtils.hpp and rebuild." );
     }
 
     return MB_SUCCESS;

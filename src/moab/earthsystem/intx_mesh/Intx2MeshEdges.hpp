@@ -37,8 +37,8 @@ namespace moab
 class Intx2MeshEdges : public moab::Intx2MeshOnSphere
 {
   public:
-    Intx2MeshEdges( Interface* mbimpl, IntxAreaUtils::AreaMethod amethod = IntxAreaUtils::lHuiller );
-    virtual ~Intx2MeshEdges();
+    Intx2MeshEdges( Interface* mbimpl, IntxAreaUtils::AreaMethod amethod = IntxAreaUtils::DEFAULT_AREA_METHOD );
+    virtual ~Intx2MeshEdges() override;
 
     ErrorCode EdgeSplits( double areaTolerance );
 

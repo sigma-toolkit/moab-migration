@@ -140,6 +140,7 @@ FILE_PATTERNS          = *.cpp \
                          *.h \
                          *.hxx \
                          *.dox \
+                         *.md \
                          *.F90 \
                          *.F \
                          *.f \

@@ -43,7 +43,11 @@ MOAB_EARTHSYSTEM_NETCDF_SRCS = ReadNC.cpp ReadNC.hpp \
                            NCWriteFV.cpp NCWriteFV.hpp \
                            NCWriteHOMME.cpp NCWriteHOMME.hpp \
                            NCWriteMPAS.cpp NCWriteMPAS.hpp \
-                           NCWriteGCRM.cpp NCWriteGCRM.hpp
+                           NCWriteGCRM.cpp NCWriteGCRM.hpp \
+                           NCWriteDomain.cpp NCWriteDomain.hpp \
+                           NCWriteScrip.cpp NCWriteScrip.hpp \
+                           NCWriteESMF.cpp NCWriteESMF.hpp \
+                           MBNcDispatch.cpp MBNcDispatch.hpp
 
 if HAVE_EARTHSYSTEM_NETCDF
   libmoabearthsystemio_la_SOURCES = $(MOAB_EARTHSYSTEM_NETCDF_SRCS)

@@ -27,7 +27,8 @@ set( ES_TESTS arc_intx_tests.cpp
               intx_on_sphere_test.cpp )
 
 if( MOAB_HAVE_NETCDF )
-  list( APPEND ES_TESTS intx_rll_cs_sphere_test.cpp )
+  list( APPEND ES_TESTS intx_rll_cs_sphere_test.cpp
+                        intx_orientation_test.cpp )
 endif()
 
 foreach( fname ${ES_TESTS} )

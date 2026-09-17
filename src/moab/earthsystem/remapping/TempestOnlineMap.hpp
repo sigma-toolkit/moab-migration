@@ -193,7 +193,8 @@ class TempestOnlineMap : public OfflineMap
                                       const DataArray3D< double >& dataGLLJacobian,
                                       int nMonotoneType,
                                       bool fContinuousIn,
-                                      bool fNoConservation );
+                                      bool fNoConservation,
+                                      bool fSparseConstraints );
 
     ///	<summary>
     ///		Generate the OfflineMap for remapping from finite volumes to finite
@@ -471,6 +472,23 @@ class TempestOnlineMap : public OfflineMap
 
     moab::ErrorCode set_row_dc_dofs( std::vector< int >& values_entities );
 
+    /// Global number of source DoFs declared by the map file (n_a), or -1 if unknown.
+    int GlobalSourceDofCount() const { return m_nTotDofs_SrcGlobal; }
+
+    /// Count weight-matrix columns that the migrated coverage did not supply
+    /// (i.e. no covering cell maps to them). For offline file maps this equals
+    /// the set of source DoFs the map references but that are absent from the
+    /// source mesh. Returns the count and, in first_absent_gid, one example
+    /// 1-based source GID (or -1 if none).
+    int CountAbsentColumns( int& first_absent_gid ) const;
+
+    /// Zero the weights of columns the migrated coverage did not supply, then
+    /// compact the matrix. Use ONLY for columns proven globally absent (masked
+    /// source grid): the projection already treats them as zero-source, so this
+    /// is a BfB-safe drop that lets the dual-map CAAS bounds check skip them
+    /// instead of aborting. Returns the number of columns dropped.
+    int DropAbsentColumns();
+
     // hack
     void SetMeshInput( Mesh* imesh )
     {
@@ -563,6 +581,11 @@ class TempestOnlineMap : public OfflineMap
     DataArray3D< int > dataGLLNodesSrc, dataGLLNodesSrcCov, dataGLLNodesDest;
     DiscretizationType m_srcDiscType, m_destDiscType;
     int m_nTotDofs_Src, m_nTotDofs_SrcCov, m_nTotDofs_Dest;
+    // Global number of source DoFs declared by the map file (n_a). Unlike
+    // m_nTotDofs_Src (which ReadParallelMap collapses to the local covered
+    // count), this is preserved so the migration can compare the map's source
+    // space against the actual (possibly masked) source mesh. -1 if unset.
+    int m_nTotDofs_SrcGlobal;
 
     // Key details about the current map
     int m_nDofsPEl_Src, m_nDofsPEl_Dest;

@@ -172,8 +172,11 @@
 /* Define to 1 if you have the <netcdf.h> header file. */
 #cmakedefine MOAB_HAVE_NETCDF_H @MOAB_HAVE_NETCDF_H@
 
-/* MOAB is configured with MPI enabled NetCDF */
+/* Define to 1 if NetCDF has parallel (MPI) support via netcdf_par.h */
 #cmakedefine MOAB_HAVE_NETCDFPAR @MOAB_HAVE_NETCDFPAR@
+
+/* Define to 1 if you have the <netcdf_par.h> header file. */
+#cmakedefine MOAB_HAVE_NETCDF_PAR_H @MOAB_HAVE_NETCDF_PAR_H@
 
 /* Define if configured with ParMetis partitioner support */
 #cmakedefine MOAB_HAVE_PARMETIS @MOAB_HAVE_PARMETIS@
@@ -277,7 +280,7 @@
 #define MOAB_PACKAGE_URL "http://sigma.mcs.anl.gov"
 
 /* Define to the version of this package. */
-#define MOAB_PACKAGE_VERSION @MOAB_VERSION_STRING@
+#define MOAB_PACKAGE_VERSION "@MOAB_VERSION_STRING@"
 
 /* Define to the version of this package. */
 #define MOAB_PACKAGE_VERSION_STRING "@CMAKE_PROJECT_VERSION@"

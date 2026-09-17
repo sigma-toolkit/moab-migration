@@ -30,6 +30,10 @@ set( MOAB_EARTHSYSTEM_IO_SRCS
         NCWriteHOMME.hpp  NCWriteHOMME.cpp
         NCHelperMPAS.hpp  NCHelperMPAS.cpp
         NCWriteMPAS.hpp   NCWriteMPAS.cpp
+        NCWriteDomain.hpp NCWriteDomain.cpp
+        NCWriteScrip.hpp  NCWriteScrip.cpp
+        NCWriteESMF.hpp   NCWriteESMF.cpp
+        MBNcDispatch.hpp  MBNcDispatch.cpp
    )
 
 if( MOAB_HAVE_NETCDF )

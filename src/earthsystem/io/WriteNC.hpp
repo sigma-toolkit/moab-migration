@@ -34,29 +34,30 @@
 #include "moab/ParallelComm.hpp"
 #endif
 
-#ifdef MOAB_HAVE_PNETCDF
-#include "pnetcdf.h"
-#define NCFUNC( func ) ncmpi_##func
+// Runtime dispatch — same rationale as ReadNC.hpp; see MBNcDispatch.hpp.
+// The NCFUNC* macros below now route puts through mbnc_put_* wrappers
+// (which select PNetCDF collective or standard NetCDF at runtime per the
+// backend tag of the fileId returned by WriteNC's open/create path).
+#include "MBNcDispatch.hpp"
 
-//! Collective I/O mode put
-#define NCFUNCAP( func ) ncmpi_put##func##_all
+//! Generic NC function dispatch
+#define NCFUNC( func ) mbnc_##func
 
-//! Independent I/O mode put
-#define NCFUNCP( func ) ncmpi_put##func
+//! Collective I/O mode put (PNetCDF: collective; others: only mode)
+#define NCFUNCAP( func ) mbnc_put##func
 
-//! Nonblocking put (request aggregation)
-#define NCFUNCREQP( func ) ncmpi_iput##func
+//! Independent I/O mode put. Routes to ncmpi_put_vara_* (no _all) on
+//! PNetCDF; on non-PNetCDF backends maps to the same nc_put_vara_*
+//! call as the collective variant. Caller is still responsible for
+//! mbnc_begin_indep_data / mbnc_end_indep_data brackets when running
+//! on PNetCDF (those are no-ops on other backends).
+#define NCFUNCP( func ) mbnc_put##func##_indep
 
-#define NCDF_SIZE MPI_Offset
-#define NCDF_DIFF MPI_Offset
-#else
-#include "netcdf.h"
-#define NCFUNC( func )   nc_##func
-#define NCFUNCAP( func ) nc_put##func
-#define NCFUNCP( func )  nc_put##func
-#define NCDF_SIZE        size_t
-#define NCDF_DIFF        ptrdiff_t
-#endif
+//! Nonblocking put (PNetCDF request aggregation; blocking on others)
+#define NCFUNCREQP( func ) mbnc_iput##func
+
+#define NCDF_SIZE size_t
+#define NCDF_DIFF ptrdiff_t
 
 namespace moab
 {
@@ -77,13 +78,16 @@ class WriteNC : public WriterIface
     friend class NCWriteHOMME;
     friend class NCWriteMPAS;
     friend class NCWriteGCRM;
+    friend class NCWriteScrip;
+    friend class NCWriteESMF;
+    friend class NCWriteDomain;
 
   public:
     //! Factory method
     static WriterIface* factory( Interface* );
 
     //! Constructor
-    WriteNC( Interface* impl = NULL );
+    explicit WriteNC( Interface* impl = NULL );
 
     //! Destructor
     virtual ~WriteNC();

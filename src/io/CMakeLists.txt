@@ -42,6 +42,7 @@ if( MOAB_HAVE_NETCDF )
   # ExodusII (NetCDF-based) reader/writer.  The Earth system NetCDF grid
   # readers/writers that used to live here now build from src/earthsystem/io.
   set( MOAB_NETCDF_SRCS
+          MBNcDispatch.hpp  MBNcDispatch.cpp
           ReadNCDF.hpp      ReadNCDF.cpp
           WriteNCDF.hpp     WriteNCDF.cpp
           WriteSLAC.hpp     WriteSLAC.cpp

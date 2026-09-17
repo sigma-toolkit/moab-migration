@@ -11,6 +11,8 @@ include_directories( ${CMAKE_SOURCE_DIR}/src/earthsystem/intx_mesh
 # MBTEMPEST
 add_moab_tool( mbtempest mbtempest.cpp MOAB_HAVE_MBTEMPEST "${TEMPESTREMAP_LIBRARIES}" )
 
-# h5mtoscrip is built here by the autotools build under the same conditional,
-# but has never been part of the CMake build.  Left as-is rather than added
-# silently; see tools/Makefile.am.
+# H5MTOSCRIP - upstream added this to the CMake build (tools/CMakeLists.txt at
+# 0b62137e4); registered here because h5mtoscrip.cpp lives in this directory.
+if ( MOAB_BUILD_H5MTOSCRIP )
+  add_moab_tool( h5mtoscrip h5mtoscrip.cpp MOAB_HAVE_H5MTOSCRIP "${TEMPESTREMAP_LIBRARIES}" )
+endif( )

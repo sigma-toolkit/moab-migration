@@ -88,6 +88,9 @@ moab::TempestOnlineMap::TempestOnlineMap( moab::TempestRemapper* remapper ) : Of
     // set default order
     m_input_order = m_output_order = 1;
 
+    // unknown until a map file is read (ReadParallelMap sets it to n_a)
+    m_nTotDofs_SrcGlobal = -1;
+
     // Initialize dimension information from file
     this->setup_sizes_dimensions();
 }
@@ -240,11 +243,20 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
                     }
                     if( !isSrcContinuous ) m_nTotDofs_SrcCov++;
                     assert( src_soln_gdofs[offsetDOF] > 0 );
-                    col_gdofmap[localDOF]      = src_soln_gdofs[offsetDOF] - 1;
-                    col_dtoc_dofmap[offsetDOF] = localDOF;
-                    if( vprint )
-                        std::cout << "Col: " << offsetDOF << ", " << localDOF << ", " << col_gdofmap[offsetDOF] << ", "
-                                  << m_nTotDofs_SrcCov << "\n";
+                    // For CGLL: weight matrix uses localDOF (continuous shared node index)
+                    //   as column index → col_gdofmap must be indexed by localDOF
+                    // For DGLL: weight matrix uses offsetDOF (= elem*nP*nP + p*nP + q)
+                    //   as column index → col_gdofmap must be indexed by offsetDOF
+                    if( isSrcContinuous )
+                    {
+                        col_gdofmap[localDOF]      = src_soln_gdofs[offsetDOF] - 1;
+                        col_dtoc_dofmap[offsetDOF] = localDOF;
+                    }
+                    else
+                    {
+                        col_gdofmap[offsetDOF]     = src_soln_gdofs[offsetDOF] - 1;
+                        col_dtoc_dofmap[offsetDOF] = offsetDOF;
+                    }
                 }
             }
         }
@@ -299,8 +311,16 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
                     }
                     if( !isSrcContinuous ) m_nTotDofs_Src++;
                     assert( locsrc_soln_gdofs[offsetDOF] > 0 );
-                    srccol_gdofmap[localDOF]      = locsrc_soln_gdofs[offsetDOF] - 1;
-                    srccol_dtoc_dofmap[offsetDOF] = localDOF;
+                    if( isSrcContinuous )
+                    {
+                        srccol_gdofmap[localDOF]      = locsrc_soln_gdofs[offsetDOF] - 1;
+                        srccol_dtoc_dofmap[offsetDOF] = localDOF;
+                    }
+                    else
+                    {
+                        srccol_gdofmap[offsetDOF]     = locsrc_soln_gdofs[offsetDOF] - 1;
+                        srccol_dtoc_dofmap[offsetDOF] = offsetDOF;
+                    }
                 }
             }
         }
@@ -359,8 +379,16 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
                     }
                     if( !isTgtContinuous ) m_nTotDofs_Dest++;
                     assert( tgt_soln_gdofs[offsetDOF] > 0 );
-                    row_gdofmap[localDOF]      = tgt_soln_gdofs[offsetDOF] - 1;
-                    row_dtoc_dofmap[offsetDOF] = localDOF;
+                    if( isTgtContinuous )
+                    {
+                        row_gdofmap[localDOF]      = tgt_soln_gdofs[offsetDOF] - 1;
+                        row_dtoc_dofmap[offsetDOF] = localDOF;
+                    }
+                    else
+                    {
+                        row_gdofmap[offsetDOF]     = tgt_soln_gdofs[offsetDOF] - 1;
+                        row_dtoc_dofmap[offsetDOF] = offsetDOF;
+                    }
                     if( vprint )
                         std::cout << "Row: " << offsetDOF << ", " << localDOF << ", " << row_gdofmap[offsetDOF] << ", "
                                   << m_nTotDofs_Dest << "\n";
@@ -371,11 +399,11 @@ moab::ErrorCode moab::TempestOnlineMap::SetDOFmapAssociation( DiscretizationType
 
     // Let us also allocate the local representation of the sparse matrix
 #if defined( MOAB_HAVE_EIGEN3 ) && defined( VERBOSE )
-    if( vprint )
+    if( is_root )
     {
-        std::cout << "[" << rank << "]" << "DoFs: row = " << m_nTotDofs_Dest << ", " << row_gdofmap.size()
-                  << ", col = " << m_nTotDofs_Src << ", " << m_nTotDofs_SrcCov << ", " << col_gdofmap.size() << "\n";
-        // std::cout << "Max col_dofmap: " << maxcol << ", Min col_dofmap" << mincol << "\n";
+        std::cout << "[" << rank << "] DoFs: row = " << m_nTotDofs_Dest << " (gdofmap.size=" << row_gdofmap.size()
+                  << "), col_src = " << m_nTotDofs_Src << ", col_cov = " << m_nTotDofs_SrcCov
+                  << " (gdofmap.size=" << col_gdofmap.size() << ")\n";
     }
 #endif
 
@@ -429,6 +457,66 @@ moab::ErrorCode moab::TempestOnlineMap::set_row_dc_dofs( std::vector< int >& val
         if( it != rowMap.end() ) row_dtoc_dofmap[j] = it->second;
     }
     return moab::MB_SUCCESS;
+}
+
+// Compute which weight-matrix columns the migrated coverage covers.
+// delivered[mc] == true iff some covering cell maps to matrix column mc.
+static void compute_delivered_columns( int ncols, const std::vector< int >& col_dtoc_dofmap,
+                                       std::vector< bool >& delivered )
+{
+    delivered.assign( ncols, false );
+    for( size_t k = 0; k < col_dtoc_dofmap.size(); k++ )
+    {
+        const int mc = col_dtoc_dofmap[k];
+        if( mc >= 0 && mc < ncols ) delivered[mc] = true;
+    }
+}
+
+int moab::TempestOnlineMap::CountAbsentColumns( int& first_absent_gid ) const
+{
+    first_absent_gid = -1;
+    const int ncols = m_nTotDofs_SrcCov;
+    std::vector< bool > delivered;
+    compute_delivered_columns( ncols, col_dtoc_dofmap, delivered );
+    int cnt = 0;
+    for( int mc = 0; mc < ncols; mc++ )
+    {
+        if( !delivered[mc] )
+        {
+            cnt++;
+            if( first_absent_gid < 0 && mc < (int)col_gdofmap.size() )
+                first_absent_gid = (int)col_gdofmap[mc] + 1;  // col_gdofmap is 0-based
+        }
+    }
+    return cnt;
+}
+
+int moab::TempestOnlineMap::DropAbsentColumns()
+{
+    const int ncols = m_nTotDofs_SrcCov;
+    std::vector< bool > delivered;
+    compute_delivered_columns( ncols, col_dtoc_dofmap, delivered );
+
+    // Zero every stored coefficient whose column was not supplied by coverage.
+    // The projection already treats these columns as zero-source (ApplyWeights
+    // leaves m_colVector at 0 for them), so this changes no projected value; it
+    // only lets the dual-map CAAS bounds loop skip them via its |w|<1e-50 test.
+    int dropped = 0;
+    for( int r = 0; r < m_weightMatrix.outerSize(); r++ )
+    {
+        for( WeightMatrix::InnerIterator it( m_weightMatrix, r ); it; ++it )
+        {
+            const int mc = (int)it.col();
+            if( mc < 0 || mc >= ncols || !delivered[mc] )
+            {
+                if( it.value() != 0.0 ) dropped++;
+                it.valueRef() = 0.0;
+            }
+        }
+    }
+    // Remove the explicit zeros so iterators no longer visit them.
+    m_weightMatrix.prune( []( const Eigen::Index&, const Eigen::Index&, const double& v ) { return v != 0.0; } );
+    return dropped;
 }
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -531,15 +619,11 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             }
         }
 
-        for( auto it : setMethodStrings )
+        for( const auto& it : setMethodStrings )
         {
             // Piecewise constant monotonicity
             if( it == "mono2" )
             {
-                if( nMonotoneType != 0 )
-                {
-                    _EXCEPTIONT( "Multiple monotonicity specifications found (--mono) or (--method \"mono#\")" );
-                }
                 if( ( m_eInputType == DiscretizationType_FV ) && ( m_eOutputType == DiscretizationType_FV ) )
                 {
                     _EXCEPTIONT( "--method \"mono2\" is only used when remapping to/from CGLL or DGLL grids" );
@@ -550,10 +634,6 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             }
             else if( it == "mono3" )
             {
-                if( nMonotoneType != 0 )
-                {
-                    _EXCEPTIONT( "Multiple monotonicity specifications found (--mono) or (--method \"mono#\")" );
-                }
                 if( ( m_eInputType == DiscretizationType_FV ) && ( m_eOutputType == DiscretizationType_FV ) )
                 {
                     _EXCEPTIONT( "--method \"mono3\" is only used when remapping to/from CGLL or DGLL grids" );
@@ -677,13 +757,34 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
 
         if( !m_bPointCloud )
         {
-            // Verify that overlap mesh is in the correct order (sanity check)
-            assert( m_meshOverlap->vecSourceFaceIx.size() == m_meshOverlap->vecTargetFaceIx.size() );
-
             // Calculate Face areas
-            if( is_root ) dbgprint.printf( 0, "Calculating overlap mesh Face areas\n" );
-            local_areas[2] =
-                m_meshOverlap->CalculateFaceAreas( mapOptions.fSourceConcave || mapOptions.fTargetConcave );
+            if (m_meshOverlap)
+            {
+                // Verify that overlap mesh is in the correct order (sanity check)
+                assert( m_meshOverlap->vecSourceFaceIx.size() == m_meshOverlap->vecTargetFaceIx.size() );
+
+                if( is_root ) dbgprint.printf( 0, "Calculating overlap mesh Face areas\n" );
+                local_areas[2] =
+                    m_meshOverlap->CalculateFaceAreas( mapOptions.fSourceConcave || mapOptions.fTargetConcave );
+
+#ifdef MOAB_HAVE_MPI
+                // CalculateFaceAreas() sums every face it holds; it has no notion of ownership.
+                // In parallel the overlap mesh also carries ghost elements -- intersections whose
+                // target cell is owned by another rank -- which ConvertOverlapMeshSourceOrdered()
+                // flags by setting vecTargetFaceIx to -1 so they are skipped when the weights are
+                // accumulated.  Summing the raw total therefore counts those intersections twice
+                // (once here, once on the owning rank) and the reduced "Recovered Area" overshoots
+                // the sphere.  Subtract the ghost contribution so the reported area matches the
+                // area the map is actually built from.
+                if( m_pcomm && is_parallel )
+                {
+                    double ghost_area = 0.0;
+                    for( size_t iover = 0; iover < m_meshOverlap->faces.size(); iover++ )
+                        if( m_meshOverlap->vecTargetFaceIx[iover] < 0 ) ghost_area += m_meshOverlap->vecFaceArea[iover];
+                    local_areas[2] -= ghost_area;
+                }
+#endif
+            }
 
             // store it as global output for now - used later in reduction
             std::copy( local_areas, local_areas + 3, global_areas );
@@ -696,12 +797,12 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             {
                 dbgprint.printf( 0, "Input Mesh Geometric Area: %1.15e\n", global_areas[0] );
                 dbgprint.printf( 0, "Output Mesh Geometric Area: %1.15e\n", global_areas[1] );
-                dbgprint.printf( 0, "Overlap Mesh Recovered Area: %1.15e\n", global_areas[2] );
+                if (m_meshOverlap) dbgprint.printf( 0, "Overlap Mesh Recovered Area: %1.15e\n", global_areas[2] );
             }
 
             // Correct areas to match the areas calculated in the overlap mesh
             constexpr bool fCorrectAreas = true;
-            if( fCorrectAreas )  // In MOAB-TempestRemap, we will always keep this to be true
+            if( fCorrectAreas && m_meshOverlap )  // In MOAB-TempestRemap, we will always keep this to be true
             {
                 if( is_root ) dbgprint.printf( 0, "Correcting source/target areas to overlap mesh areas\n" );
                 DataArray1D< double > dSourceArea( m_meshInputCov->faces.size() );
@@ -726,19 +827,68 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                     dTargetArea[m_meshOverlap->vecTargetFaceIx[i]] += m_meshOverlap->vecFaceArea[i];
                 }
 
+                // How much disagreement between the accumulated overlap area and the
+                // geometric area we are willing to absorb.
+                //
+                // For meshes whose domains coincide, the two agree to roundoff and the
+                // 1e-10 test simply avoids replacing a good geometric area with a
+                // slightly noisier accumulated one.
+                //
+                // For a regionally refined mesh they legitimately differ: a cell on the
+                // edge of the other mesh's domain is only partly covered, so its overlap
+                // contributions sum to a fraction of its geometric area.  The 1e-10 test
+                // then rejects the correction precisely where it is needed, leaving the
+                // cell with its full area while it receives only part of the overlap --
+                // which drives its map row sum below one.  Accept the accumulated area
+                // for any cell that received a contribution, and leave cells with no
+                // coverage at their geometric area (they are outside the other domain;
+                // zeroing them would divide by zero downstream).
+                const bool regional = ( m_remapper != nullptr && m_remapper->IsRegionalMesh() );
+
+                auto accept_area = [regional]( double accumulated, double geometric ) -> bool {
+                    if( regional ) return accumulated > 0.0;
+                    return fabs( accumulated - geometric ) < 1.0e-10;
+                };
+
+                size_t nUncoveredTarget = 0;
                 for( size_t i = 0; i < m_meshInputCov->faces.size(); i++ )
                 {
-                    if( fabs( dSourceArea[i] - m_meshInputCov->vecFaceArea[i] ) < 1.0e-10 )
-                    {
+                    if( accept_area( dSourceArea[i], m_meshInputCov->vecFaceArea[i] ) )
                         m_meshInputCov->vecFaceArea[i] = dSourceArea[i];
-                    }
                 }
                 for( size_t i = 0; i < m_meshOutput->faces.size(); i++ )
                 {
-                    if( fabs( dTargetArea[i] - m_meshOutput->vecFaceArea[i] ) < 1.0e-10 )
-                    {
+                    if( accept_area( dTargetArea[i], m_meshOutput->vecFaceArea[i] ) )
                         m_meshOutput->vecFaceArea[i] = dTargetArea[i];
+                    else if( regional && dTargetArea[i] <= 0.0 )
+                        nUncoveredTarget++;
+                }
+
+                if( regional )
+                {
+                    // A regional remap legitimately leaves parts of the target uncovered.
+                    // Report it: silently emitting empty rows is what made the previous
+                    // behaviour so hard to diagnose.
+                    //
+                    // Only the target count is meaningful.  m_meshInputCov is the
+                    // *coverage* mesh, so in parallel it also holds cells owned by other
+                    // ranks -- these have no overlap here by construction, and their
+                    // number grows with the ghost-layer count rather than with the size
+                    // of any hole.  Reporting that as "uncovered" would be alarming and
+                    // wrong, so it is left out.
+                    size_t nUncovered = nUncoveredTarget;
+#ifdef MOAB_HAVE_MPI
+                    if( m_pcomm && is_parallel )
+                    {
+                        size_t local = nUncoveredTarget;
+                        MPI_Reduce( &local, &nUncovered, 1, MPI_UNSIGNED_LONG, MPI_SUM, 0, m_pcomm->comm() );
                     }
+#endif
+                    if( is_root && nUncovered > 0 )
+                        dbgprint.printf( 0,
+                                         "Regional mesh: %zu target cells have no overlap coverage; their areas "
+                                         "are left geometric and their map rows will be empty\n",
+                                         nUncovered );
                 }
             }
 
@@ -762,15 +912,13 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                 }
             }
 
-            /*
-                // Recalculate input mesh area from overlap mesh
-                if (fabs(dTotalAreaOverlap - dTotalAreaInput) > 1.0e-10) {
-                    dbgprint.printf(0, "Overlap mesh only covers a sub-area of the sphere\n");
-                    dbgprint.printf(0, "Recalculating source mesh areas\n");
-                    dTotalAreaInput = m_meshInput->CalculateFaceAreasFromOverlap(m_meshOverlap);
-                    dbgprint.printf(0, "New Input Mesh Geometric Area: %1.15e\n", dTotalAreaInput);
-                }
-            */
+            // NOTE: Mesh::CalculateFaceAreasFromOverlap() looks like the natural helper
+            // for the sub-area case, but it is the wrong tool here on two counts: it
+            // indexes by vecSourceFaceIx, which refers to the *coverage* mesh rather
+            // than m_meshInput, and it zeroes every area before accumulating, which
+            // would discard the geometric area of cells the overlap never touches.  The
+            // per-cell correction above does the same accumulation with the right
+            // indexing and only replaces areas it can justify.
         }
 
         // Finite volume input / Finite volume output
@@ -797,30 +945,43 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
             // Construct OfflineMap
             if( strMapAlgorithm == "invdist" )
             {
-                if( is_root ) dbgprint.printf( 0, "Calculating map (invdist)\n" );
                 if( m_meshInputCov->faces.size() )
+                {
+                    if( is_root ) dbgprint.printf( 0, "Calculating map (invdist)\n" );
                     LinearRemapFVtoFVInvDist( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
+                }
             }
-            else if( strMapAlgorithm == "delaunay" )
+            else if( strMapAlgorithm == "delaunay" ) // does not need intersection mesh
             {
-                if( is_root ) dbgprint.printf( 0, "Calculating map (delaunay)\n" );
                 if( m_meshInputCov->faces.size() )
-                    LinearRemapTriangulation( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
+                {
+                    if( is_root ) dbgprint.printf( 0, "Calculating map (delaunay)\n" );
+                    if (m_meshOverlap) LinearRemapTriangulation( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
+                    else
+                    {
+                        Mesh dummy;
+                        LinearRemapTriangulation( *m_meshInputCov, *m_meshOutput, dummy, *this );
+                    }
+                }
             }
             else if( strMapAlgorithm == "fvintbilin" )
             {
-                if( is_root ) dbgprint.printf( 0, "Calculating map (intbilin)\n" );
                 if( m_meshInputCov->faces.size() )
+                {
+                    if( is_root ) dbgprint.printf( 0, "Calculating map (intbilin)\n" );
                     LinearRemapIntegratedBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
+                }
             }
             else if( strMapAlgorithm == "fvintbilingb" )
             {
-                if( is_root ) dbgprint.printf( 0, "Calculating map (intbilingb)\n" );
                 if( m_meshInputCov->faces.size() )
+                {
+                    if( is_root ) dbgprint.printf( 0, "Calculating map (intbilingb)\n" );
                     LinearRemapIntegratedGeneralizedBarycentric( *m_meshInputCov, *m_meshOutput, *m_meshOverlap,
                                                                  *this );
+                }
             }
-            else if( strMapAlgorithm == "fvbilin" )
+            else if( strMapAlgorithm == "fvbilin" ) // does not need intersection mesh
             {
 #ifdef VERBOSE
                 if( is_root )
@@ -834,9 +995,17 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                     m_meshOutput->Write( "TargetMeshMBTR" + std::to_string( rank ) + ".g" );
                 }
 #endif
-                if( is_root ) dbgprint.printf( 0, "Calculating map (bilin)\n" );
+
                 if( m_meshInputCov->faces.size() )
-                    LinearRemapBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
+                {
+                    if( is_root ) dbgprint.printf( 0, "Calculating map (bilin)\n" );
+                    if (m_meshOverlap) LinearRemapBilinear( *m_meshInputCov, *m_meshOutput, *m_meshOverlap, *this );
+                    else
+                    {
+                        Mesh dummy;
+                        LinearRemapBilinear( *m_meshInputCov, *m_meshOutput, dummy, *this );
+                    }
+                }
             }
             else
             {
@@ -1025,7 +1194,7 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                             *this );
 #else
             LinearRemapSE4_Tempest_MOAB( dataGLLNodesSrcCov, dataGLLJacobian, nMonotoneType, fContinuousIn,
-                                         mapOptions.fNoConservation );
+                                         mapOptions.fNoConservation, mapOptions.fSparseConstraints );
 #endif
         }
         else if( ( eInputType != DiscretizationType_FV ) && ( eOutputType != DiscretizationType_FV ) )
@@ -1107,6 +1276,7 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
 #endif
 
 #ifdef MOAB_HAVE_MPI
+        if (m_meshOverlap)
         {
             // Remove ghosted entities from overlap set
             moab::Range ghostedEnts;
@@ -1240,7 +1410,6 @@ int moab::TempestOnlineMap::IsConservative( double dTolerance )
 
     int nTotVals = 0, nTotColumns = 0; // nTotColumnsUnq = 0;
     std::vector< int > dColumnIndices;
-    std::vector< double > dColumnSourceAreas;
     std::vector< double > dColumnSumsTotal;
     std::vector< int > displs, rcount;
     if( rank == rootProc )
@@ -1273,10 +1442,15 @@ int moab::TempestOnlineMap::IsConservative( double dTolerance )
     // Need to do a gatherv here since different processes have different number of elements
     // MPI_Reduce(&dColumnSums[0], &dColumnSumsTotal[0], m_mapRemap.GetColumns(), MPI_DOUBLE,
     // MPI_SUM, 0, m_pcomm->comm());
-    ierr = MPI_Gatherv( &dColumnsUnique[0], m_nTotDofs_SrcCov, MPI_INT, &dColumnIndices[0], rcount.data(),
+    // Use .data() rather than &vec[0] -- on non-root ranks dColumnIndices /
+    // dColumnSumsTotal are empty (only resized on root, see ~10 lines above),
+    // and &vec[0] indexing into an empty vector is undefined behavior. The
+    // .data() form returns nullptr for an empty vector, which MPI_Gatherv
+    // ignores since recvcount on non-root paths is effectively zero.
+    ierr = MPI_Gatherv( dColumnsUnique.data(), m_nTotDofs_SrcCov, MPI_INT, dColumnIndices.data(), rcount.data(),
                         displs.data(), MPI_INT, rootProc, m_pcomm->comm() );
     if( ierr != MPI_SUCCESS ) return -1;
-    ierr = MPI_Gatherv( &dColumnSums[0], m_nTotDofs_SrcCov, MPI_DOUBLE, &dColumnSumsTotal[0], rcount.data(),
+    ierr = MPI_Gatherv( dColumnSums.data(), m_nTotDofs_SrcCov, MPI_DOUBLE, dColumnSumsTotal.data(), rcount.data(),
                         displs.data(), MPI_DOUBLE, rootProc, m_pcomm->comm() );
     if( ierr != MPI_SUCCESS ) return -1;
     // ierr = MPI_Gatherv ( &dSourceAreas[0], m_nTotDofs_SrcCov, MPI_DOUBLE, &dColumnSourceAreas[0],
@@ -2392,20 +2566,22 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
             }
         }
 
-        // Number of unique nodes
+        // Number of unique nodes (CGLL) or total element-local DOFs (DGLL)
+        const bool fDiscontinuous = ( discMethod == DiscretizationType_DGLL );
         int iMaxNode = 0;
-        for( int i = 0; i < discOrder; i++ )
+        if( fDiscontinuous )
         {
-            for( int j = 0; j < discOrder; j++ )
-            {
-                for( int k = 0; k < nElements; k++ )
-                {
-                    if( dataGLLNodes[i][j][k] > iMaxNode )
-                    {
-                        iMaxNode = dataGLLNodes[i][j][k];
-                    }
-                }
-            }
+            // DGLL: each element has independent DOFs
+            iMaxNode = nElements * discOrder * discOrder;
+        }
+        else
+        {
+            // CGLL: shared nodes at element boundaries
+            for( int i = 0; i < discOrder; i++ )
+                for( int j = 0; j < discOrder; j++ )
+                    for( int k = 0; k < nElements; k++ )
+                        if( dataGLLNodes[i][j][k] > iMaxNode )
+                            iMaxNode = dataGLLNodes[i][j][k];
         }
 
         // Get Gauss-Lobatto quadrature nodes
@@ -2457,7 +2633,10 @@ moab::ErrorCode moab::TempestOnlineMap::DefineAnalyticalSolution( moab::Tag& sol
 
                         double dSample = ( *testFunction )( dNodeLon, dNodeLat );
 
-                        dVar[dataGLLNodes[j][i][k] - 1] = dSample;
+                        if( fDiscontinuous )
+                            dVar[k * discOrder * discOrder + j * discOrder + i] = dSample;
+                        else
+                            dVar[dataGLLNodes[j][i][k] - 1] = dSample;
                     }
                 }
                 // High-order Gaussian integration over basis function

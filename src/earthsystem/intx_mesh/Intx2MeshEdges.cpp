@@ -129,7 +129,7 @@ ErrorCode Intx2MeshEdges::EdgeSplits( double areaTolerance )
     std::vector< double > coords( 3 * 20 );  // enough vertices, at most 30, good for intx polygons too
     int num_nodes = 0;                       // num nodes in cells
     const EntityHandle* verts;
-    IntxAreaUtils areaAdaptor( IntxAreaUtils::lHuiller );  // GaussQuadrature , lHuiller
+    IntxAreaUtils areaAdaptor( this->areaMethod );
     std::map< int, double > recoveredAreas;                // get areas of from intersection cells
     std::map< int, EntityHandle > mapFromGIDToParent;
     std::map< int, std::vector< EntityHandle > > mapFromParentGIDToIntxCells;
@@ -302,7 +302,7 @@ ErrorCode Intx2MeshEdges::EdgeSplits( double areaTolerance )
         else
         {
             mb->list_entity( initialEdge );
-            std::vector< EntityHandle >& listSubEdges = mapEdges[initialEdge];
+            const std::vector< EntityHandle >& listSubEdges = mapEdges[initialEdge];
             double newCheckLength                     = 0;
             CartVect vertices[2];
             const EntityHandle* conn2;

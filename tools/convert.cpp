@@ -69,8 +69,16 @@ static void print_usage( const char* name, std::ostream& stream )
               "SAT_FILE=acis_file\""
            << std::endl
            << "\t-A             - .cub file reader should not dump a SAT file (depricated default)" << std::endl
-           << "\t-o option      - Specify write option." << std::endl
-           << "\t-O option      - Specify read option." << std::endl
+           << "\t-o option      - Specify write option. Repeat for multiple options." << std::endl
+           << "\t                 Common write options:" << std::endl
+           << "\t                   WRITE_FORMAT={SCRIP|ESMF|DOMAIN}" << std::endl
+           << "\t                     Force NetCDF output into a specific grid layout" << std::endl
+           << "\t                     (overrides the source mesh's __MESH_TYPE tag)." << std::endl
+           << "\t                     Example: -o WRITE_FORMAT=SCRIP in.nc out_scrip.nc" << std::endl
+           << "\t                   PARALLEL=WRITE_PART      (auto-set under -M)" << std::endl
+           << "\t                 See README.IO for the full list of writer-specific options." << std::endl
+           << "\t-O option      - Specify read option. Repeat for multiple options." << std::endl
+           << "\t                 See README.IO for the full list of reader-specific options." << std::endl
            << "\t-t             - Time read and write of files." << std::endl
            << "\t-g             - Enable verbose/debug output." << std::endl
            << "\t-h             - Print this help text and exit." << std::endl
@@ -439,6 +447,26 @@ int main( int argc, char* argv[] )
     Tag srcParentTag, tgtParentTag;
 
 #endif
+    // Allocate a single meshset that owns everything loaded across all
+    // input files. Writers that REQUIRE a designated file set (e.g.
+    // WriteNC and the new SCRIP/ESMF/Domain helpers, which call
+    // process_conventional_tags / synthesize a schema from one mesh
+    // root) need this set explicitly. Writers that don't care (h5m,
+    // vtk, ...) are unaffected — passing &file_set with the loaded
+    // entities is equivalent to passing nothing, since the same
+    // entities also live in the root set.
+    EntityHandle file_set = 0;
+    {
+        ErrorCode mrc = gMB->create_meshset( MESHSET_SET, file_set );
+        if( MB_SUCCESS != mrc )
+        {
+            std::cerr << "Failed to create file set." << std::endl;
+#ifdef MOAB_HAVE_MPI
+            MPI_Finalize();
+#endif
+            return OTHER_ERROR;
+        }
+    }
     for( j = in.begin(); j != in.end(); ++j )
     {
         std::string inFileName = *j;
@@ -466,6 +494,19 @@ int main( int argc, char* argv[] )
 
                 // Load the meshes and validate
                 result = remapper->ConvertTempestMesh( moab::Remapper::SourceMesh );
+                MB_CHK_SET_ERR( result, "can't convert the TempestRemap mesh to MOAB" );
+
+                // ConvertTempestMesh puts the entities in the remapper's own meshset,
+                // and the -B path never calls load_file, so file_set stays empty.
+                // Since the writer is now handed file_set explicitly, the output would
+                // otherwise contain no mesh at all -- only the tag definitions.
+                {
+                    moab::Range srcents;
+                    result = gMB->get_entities_by_handle( srcmesh, srcents, true );
+                    MB_CHK_SET_ERR( result, "can't get entities from the TempestRemap source mesh" );
+                    result = gMB->add_entities( file_set, srcents );
+                    MB_CHK_SET_ERR( result, "can't add the TempestRemap mesh to the file set" );
+                }
 
                 if( unitscaling )
                 {
@@ -672,13 +713,13 @@ int main( int argc, char* argv[] )
 
                     // Load the meshes and validate
                     Tag order;
-                    ReorderTool reorder_tool( &core );
-                    result = reorder_tool.handle_order_from_int_tag( srcParentTag, -1, order );
-                    MB_CHK_ERR( result );
-                    result = reorder_tool.reorder_entities( order );
-                    MB_CHK_ERR( result );
-                    result = gMB->tag_delete( order );
-                    MB_CHK_ERR( result );
+                    //ReorderTool reorder_tool( &core );
+                    //result = reorder_tool.handle_order_from_int_tag( srcParentTag, -1, order );
+                    //MB_CHK_ERR( result );
+                    //result = reorder_tool.reorder_entities( order );
+                    //MB_CHK_ERR( result );
+                    //result = gMB->tag_delete( order );
+                    //MB_CHK_ERR( result );
                     result = remapper->ConvertMeshToTempest( moab::Remapper::OverlapMesh );
                     MB_CHK_ERR( result );
                 }
@@ -698,9 +739,9 @@ int main( int argc, char* argv[] )
             }
         }
         else
-            result = gMB->load_file( j->c_str(), 0, read_options.c_str() );
+            result = gMB->load_file( j->c_str(), &file_set, read_options.c_str() );
 #else
-        result = gMB->load_file( j->c_str(), 0, read_options.c_str() );
+        result = gMB->load_file( j->c_str(), &file_set, read_options.c_str() );
 #endif
         if( MB_SUCCESS != result )
         {
@@ -961,9 +1002,50 @@ int main( int argc, char* argv[] )
         // Useful only for SE meshes with GLL DoFs
         if( spectral_order > 1 && globalid_tag_name.size() > 1 )
         {
+            // Generate continuous (CGLL) DoF numbering: shared nodes at element boundaries
+            // get the same global DoF ID. Tag name is user-specified (typically "GLOBAL_DOFS").
             result = remapper->GenerateMeshMetadata( *tempestMesh, ntot_elements, faces, NULL, globalid_tag_name,
                                                      spectral_order );
             MB_CHK_ERR( result );
+
+            // Generate discontinuous (DGLL) DoF numbering: each element owns nP*nP
+            // independent DoFs, numbered sequentially across elements.
+            // Tag name: "D" + user-specified name (e.g., "DGLOBAL_DOFS").
+            {
+                const int nP              = spectral_order;
+                const int dofsPerElem     = nP * nP;
+                const std::string dTagName = "D" + globalid_tag_name;
+
+                Tag dgllTag;
+                result = gMB->tag_get_handle( dTagName.c_str(), dofsPerElem, MB_TYPE_INTEGER, dgllTag,
+                                              MB_TAG_DENSE | MB_TAG_CREAT );
+                MB_CHK_ERR( result );
+
+                // Assign sequential DoF IDs: element k gets [k*nP*nP+1, (k+1)*nP*nP]
+                // Use GLOBAL_ID ordering to ensure consistent numbering across processes
+                Tag gidTag = gMB->globalId_tag();
+                std::vector< int > elemGids( faces.size() );
+                result = gMB->tag_get_data( gidTag, faces, elemGids.data() );
+                MB_CHK_ERR( result );
+
+                std::vector< int > dofIDs( dofsPerElem );
+                for( size_t ie = 0; ie < faces.size(); ++ie )
+                {
+                    // Use 0-based element index from GLOBAL_ID (1-based) for DOF numbering
+                    const int elemIdx = elemGids[ie] - 1;
+                    for( int j = 0; j < nP; ++j )
+                        for( int i = 0; i < nP; ++i )
+                            dofIDs[j * nP + i] = elemIdx * dofsPerElem + j * nP + i + 1;
+
+                    EntityHandle eh = faces[ie];
+                    result = gMB->tag_set_data( dgllTag, &eh, 1, dofIDs.data() );
+                    MB_CHK_ERR( result );
+                }
+
+                if( !proc_id )
+                    std::cout << "Generated discontinuous DoF tag \"" << dTagName << "\" with " << dofsPerElem
+                              << " DoFs/element (" << ntot_elements * dofsPerElem << " total)\n";
+            }
         }
 
         if( tempestout )
@@ -994,7 +1076,11 @@ int main( int argc, char* argv[] )
         if( have_sets )
             result = gMB->write_file( out.c_str(), format, write_options.c_str(), &set_list[0], set_list.size() );
         else
-            result = gMB->write_file( out.c_str(), format, write_options.c_str() );
+            // Pass the tracked file_set explicitly. Required by writers
+            // that need exactly one designated set (WriteNC + the
+            // SCRIP/ESMF/Domain helpers); semantically a no-op for the
+            // generic writers that previously took the no-set form.
+            result = gMB->write_file( out.c_str(), format, write_options.c_str(), &file_set, 1 );
         if( MB_SUCCESS != result )
         {
             std::cerr << "Failed to write \"" << out << "\"." << std::endl;

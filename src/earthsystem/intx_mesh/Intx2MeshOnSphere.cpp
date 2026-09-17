@@ -21,7 +21,7 @@
 #include <cassert>
 
 // #define ENABLE_DEBUG
-#define CHECK_CONVEXITY
+// #define CHECK_CONVEXITY
 namespace moab
 {
 
@@ -37,7 +37,6 @@ Intx2MeshOnSphere::~Intx2MeshOnSphere() {}
  */
 double Intx2MeshOnSphere::setup_tgt_cell( EntityHandle tgt, int& nsTgt )
 {
-
     // get coordinates of the target quad, to decide the gnomonic plane
     double cellArea = 0;
 
@@ -228,7 +227,7 @@ ErrorCode Intx2MeshOnSphere::computeIntersectionBetweenTgtAndSrc( EntityHandle t
             int k1              = ( k + 1 ) % nP;
             int k2              = ( k1 + 1 ) % nP;
             double orientedArea = IntxUtils::area2D( &P[2 * k], &P[2 * k1], &P[2 * k2] );
-            if( orientedArea < 0 )
+            if( orientedArea < 0 && fabs(orientedArea) > std::numeric_limits<double>::epsilon() )
             {
                 std::cout << " oriented area is negative: " << orientedArea << " k:" << k << " target, src:" << tgt
                           << " " << src << " \n";
@@ -275,7 +274,7 @@ ErrorCode Intx2MeshOnSphere::findNodes( EntityHandle tgt, int nsTgt, EntityHandl
     int npBefore1 = nP;
     int oldNodes  = 0;
     int otherIntx = 0;
-    moab::IntxAreaUtils areaAdaptor;
+    moab::IntxAreaUtils areaAdaptor( this->areaMethod );
 #endif
     for( int i = 0; i < nP; i++ )
     {
@@ -755,7 +754,7 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
         gnplane[i] = pl;
     }
 
-    for( Range::iterator it = localEnts.begin(); it != localEnts.end(); it++ )
+    for( Range::iterator it = localEnts.begin(); it != localEnts.end(); ++it )
     {
         EntityHandle cell   = *it;
         EntityType typeCell = mb->type_from_handle( cell );  // could be vertex, for point cloud
@@ -786,7 +785,7 @@ ErrorCode Intx2MeshOnSphere::build_processor_euler_boxes( EntityHandle euler_set
             }
         }
         // now, augment the boxes for all planes involved
-        for( std::set< int >::iterator st = planes.begin(); st != planes.end(); st++ )
+        for( std::set< int >::iterator st = planes.begin(); st != planes.end(); ++st )
         {
             int pl = *st;
             for( int i = 0; i < nnodes; i++ )
@@ -914,6 +913,12 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     // do not check errors. If gdsTag == nullptr, then no tag found
     mb->tag_get_handle( "GLOBAL_DOFS", gdsTag );
 
+    // detect GRID_IMASK tag (set by SCRIP reader on masked meshes; default=1=unmasked)
+    int size_imask_tag = 0;
+    Tag imaskTag       = nullptr;
+    mb->tag_get_handle( "GRID_IMASK", imaskTag );
+    if( imaskTag ) size_imask_tag = 1;
+
     if( meshCells.size() > 0 )
     {
         oneCell = meshCells[0];  // it is possible we do not have any cells, even after migration
@@ -930,10 +935,9 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
                 MB_CHK_SET_ERR( mb->tag_get_length( gdsTag, lenTag ), "can't get tag length" );
                 if( lenTag > 0 )
                 {
-                    valsDOFs.resize( lenTag );
-                    MB_CHK_SET_ERR( mb->tag_get_data( gdsTag, &oneCell, 1, &valsDOFs[0] ),
-                                    "can't get SE DoF tag data" );
-                    if( valsDOFs[0] > 0 )
+                    valsDOFs.resize( lenTag, -1 );
+                    ErrorCode rval = mb->tag_get_data( gdsTag, &oneCell, 1, &valsDOFs[0] );
+                    if( valsDOFs[0] > 0 && rval == moab::MB_SUCCESS )
                     {
                         // first value positive means we really need to transport this data during
                         // coverage
@@ -950,15 +954,23 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     // uniformly for all tasks.  Do a collective MPI_MAX to see if it is migrated and if we have
     // (collectively) a GLOBAL_DOFS task
 
-    int local_int_array[2], global_int_array[2];
+    int local_int_array[3], global_int_array[3];
     local_int_array[0] = orig_sender;
     local_int_array[1] = size_gdofs_tag;
+    local_int_array[2] = size_imask_tag;
     // now reduce over all processors
     int mpi_err =
-        MPI_Allreduce( local_int_array, global_int_array, 2, MPI_INT, MPI_MAX, parcomm->proc_config().proc_comm() );
+        MPI_Allreduce( local_int_array, global_int_array, 3, MPI_INT, MPI_MAX, parcomm->proc_config().proc_comm() );
     if( MPI_SUCCESS != mpi_err ) return MB_FAILURE;
     orig_sender    = global_int_array[0];
     size_gdofs_tag = global_int_array[1];
+    size_imask_tag = global_int_array[2];
+    // if GRID_IMASK is needed (some rank has it) but not present locally, get/create it with default=1
+    if( size_imask_tag && !imaskTag )
+    {
+        int def_val = 1;
+        mb->tag_get_handle( "GRID_IMASK", 1, MB_TYPE_INTEGER, imaskTag, MB_TAG_DENSE | MB_TAG_CREAT, &def_val );
+    }
 #ifdef VERBOSE
     std::cout << "proc: " << my_rank << " size_gdofs_tag:" << size_gdofs_tag << "\n";
 #endif
@@ -996,6 +1008,41 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
 
     std::vector< int > gids( num_mesh_verts );
     MB_CHK_SET_ERR( mb->tag_get_data( gid, mesh_verts, &gids[0] ), "can't get vertices gids" );
+
+    // The coverage migration below identifies vertices across ranks solely by their GLOBAL_ID
+    // (packed into TLq and resolved through globalID_to_vertex_handle on the receiver).  Some
+    // readers -- notably SCRIP -- do not set a GLOBAL_ID on vertices, in which case every entry
+    // read back here is the tag default (-1).  Every corner of every migrated cell then resolves
+    // to the same handle, producing cells whose connectivity is one vertex repeated N times.
+    // Those collapse to zero-edge faces in Mesh::RemoveZeroEdges() and crash the remap kernels.
+    // Detect that here and assign consistent, parallel-safe vertex ids before migrating.
+    {
+        int local_bad = 0;
+        for( size_t k = 0; k < num_mesh_verts; k++ )
+            if( gids[k] <= 0 )
+            {
+                local_bad = 1;
+                break;
+            }
+        int global_bad = local_bad;
+        MPI_Allreduce( &local_bad, &global_bad, 1, MPI_INT, MPI_MAX, parcomm->proc_config().proc_comm() );
+
+        if( global_bad )
+        {
+            if( 0 == my_rank )
+                std::cout << "[INFO] - source mesh vertices lack a valid GLOBAL_ID; assigning them "
+                             "before computing the coverage mesh.\n";
+            // assign_global_ids() is collective and keeps shared vertices consistent across ranks
+            MB_CHK_SET_ERR( parcomm->assign_global_ids( initial_distributed_set, 0, 1, false, true, false ),
+                            "can't assign global ids to source vertices" );
+            MB_CHK_SET_ERR( mb->tag_get_data( gid, mesh_verts, &gids[0] ), "can't re-read vertices gids" );
+
+            for( size_t k = 0; k < num_mesh_verts; k++ )
+                if( gids[k] <= 0 )
+                    MB_SET_ERR( MB_FAILURE, "vertex global id still invalid (" << gids[k]
+                                            << ") after assign_global_ids on rank " << my_rank );
+        }
+    }
 
     // ranges to send to each processor; will hold vertices and elements (quads/ polygons)
     // will look if the box of the mesh cell covers bounding box(es) (within tolerances)
@@ -1044,7 +1091,7 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
         if( gnomonic )
         {
             // now loop over all planes that need to be considered for this element
-            for( std::set< int >::iterator st = planes.begin(); st != planes.end(); st++ )
+            for( std::set< int >::iterator st = planes.begin(); st != planes.end(); ++st )
             {
                 int pl         = *st;  // gnomonic plane considered
                 double qmin[2] = { DBL_MAX, DBL_MAX };
@@ -1140,9 +1187,10 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
     TLv.initialize( 2, 0, 0, 3, numv );  // to proc, GLOBAL ID, 3 real coordinates
     TLv.enableWriteAccess();
 
-    // add also GLOBAL_DOFS info, if found on the mesh cell; it should be found only on HOMME cells!
+    // add also GLOBAL_DOFS and GRID_IMASK info, if found on the mesh cell
     int sizeTuple =
-        2 + max_edges_1 + migrated_mesh + size_gdofs_tag;  // max edges could be up to MAXEDGES :) for polygons
+        2 + max_edges_1 + migrated_mesh + size_gdofs_tag +
+        size_imask_tag;  // max edges could be up to MAXEDGES :) for polygons
     TLq.initialize( sizeTuple, 0, 0, 0,
                     numq );  // to proc, elem GLOBAL ID, connectivity[max_edges] (global ID v), plus
                              // original sender if set (migrated mesh case)
@@ -1225,6 +1273,13 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
                     TLq.vi_wr[sizeTuple * n + currentIndexIntTuple + i] =
                         valsDOFs[i];  // should be different than 0 or -1
                 }
+            }
+            // GRID_IMASK info, if available (default=1=unmasked when tag exists but value not set)
+            if( size_imask_tag )
+            {
+                int maskVal = 1;  // default: unmasked
+                mb->tag_get_data( imaskTag, &q, 1, &maskVal );
+                TLq.vi_wr[sizeTuple * n + currentIndexIntTuple + size_gdofs_tag] = maskVal;
             }
 
             TLq.inc_n();  // increment tuple list size
@@ -1375,6 +1430,13 @@ ErrorCode Intx2MeshOnSphere::construct_covering_set( EntityHandle& initial_distr
             }
             MB_CHK_SET_ERR( mb->tag_set_data( gdsTag, &new_element, 1, &valsDOFs[0] ),
                             "can't set GLOBAL_DOFS data on coverage mesh" );
+        }
+        // check if we need to retrieve and set GRID_IMASK data on covering source cells
+        if( size_imask_tag )
+        {
+            int maskVal = TLq.vi_rd[sizeTuple * i + currentIndexIntTuple + size_gdofs_tag];
+            MB_CHK_SET_ERR( mb->tag_set_data( imaskTag, &new_element, 1, &maskVal ),
+                            "can't set GRID_IMASK data on coverage mesh" );
         }
     }
 

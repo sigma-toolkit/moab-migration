@@ -35,7 +35,7 @@ int main( int argc, char* argv[] )
 {
     std::stringstream sstr;
     // Default area_method = lHuiller; Options: Girard, GaussQuadrature (if TR is available)
-    const IntxAreaUtils::AreaMethod areaMethod = IntxAreaUtils::GaussQuadrature;
+    const IntxAreaUtils::AreaMethod areaMethod = IntxAreaUtils::DEFAULT_AREA_METHOD;
 
     int rank = 0, size = 1;
 #ifdef MOAB_HAVE_MPI

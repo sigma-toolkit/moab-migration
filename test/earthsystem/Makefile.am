@@ -35,13 +35,15 @@ TESTS = arc_intx_tests \
         intx_on_sphere_test
 
 if HAVE_NETCDF
-  TESTS += intx_rll_cs_sphere_test
+  TESTS += intx_rll_cs_sphere_test \
+           intx_orientation_test
 endif
 
 arc_intx_tests_SOURCES = arc_intx_tests.cpp
 intx_in_plane_test_SOURCES = intx_in_plane_test.cpp
 intx_on_sphere_test_SOURCES = intx_on_sphere_test.cpp
 intx_rll_cs_sphere_test_SOURCES = intx_rll_cs_sphere_test.cpp
+intx_orientation_test_SOURCES = intx_orientation_test.cpp
 
 # Tests for remapping
 if ENABLE_mbtempest

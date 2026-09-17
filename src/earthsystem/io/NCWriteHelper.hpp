@@ -38,14 +38,17 @@ class NCWriteHelper
     //! Collect data for specified variables (partially implemented in child classes)
     virtual ErrorCode collect_variable_data( std::vector< std::string >& var_names, std::vector< int >& tstep_nums );
 
-    //! Initialize file: this is where all defines are done
-    //! The VarData dimension ids are filled up after define
-    ErrorCode init_file( std::vector< std::string >& var_names,
-                         std::vector< std::string >& desired_names,
-                         bool _append );
+    //! Initialize file: this is where all defines are done.
+    //! Virtual so that grid-output writers (NCWriteScrip / NCWriteESMF /
+    //! NCWriteDomain) can synthesize a fresh schema from mesh state
+    //! instead of going through the climate var_names plumbing.
+    virtual ErrorCode init_file( std::vector< std::string >& var_names,
+                                 std::vector< std::string >& desired_names,
+                                 bool _append );
 
-    //! Take the info from VarData and write first non-set variables, then set variables
-    ErrorCode write_values( std::vector< std::string >& var_names, std::vector< int >& tstep_nums );
+    //! Take the info from VarData and write first non-set variables, then set variables.
+    //! Virtual for the same reason as init_file.
+    virtual ErrorCode write_values( std::vector< std::string >& var_names, std::vector< int >& tstep_nums );
 
   private:
     // Write set variables (common to scd mesh and ucd mesh)
@@ -90,20 +93,20 @@ class ScdNCWriteHelper : public NCWriteHelper
             lCDims[i] = -1;
         }
     }
-    virtual ~ScdNCWriteHelper() {}
+    virtual ~ScdNCWriteHelper() override {}
 
   private:
     //! Implementation of NCWriteHelper::collect_mesh_info()
-    virtual ErrorCode collect_mesh_info();
+    ErrorCode collect_mesh_info() override;
 
     //! Collect data for specified variables
-    virtual ErrorCode collect_variable_data( std::vector< std::string >& var_names, std::vector< int >& tstep_nums );
+    ErrorCode collect_variable_data( std::vector< std::string >& var_names, std::vector< int >& tstep_nums ) override;
 
     //! Implementation of NCWriteHelper::write_nonset_variables()
-    virtual ErrorCode write_nonset_variables( std::vector< WriteNC::VarData >& vdatas, std::vector< int >& tstep_nums );
+    ErrorCode write_nonset_variables( std::vector< WriteNC::VarData >& vdatas, std::vector< int >& tstep_nums ) override;
 
     template < typename T >
-    void jik_to_kji( size_t ni, size_t nj, size_t nk, T* dest, T* source )
+    static void jik_to_kji( size_t ni, size_t nj, size_t nk, T* dest, T* source )
     {
         size_t nik = ni * nk, nij = ni * nj;
         for( std::size_t k = 0; k != nk; k++ )
@@ -128,13 +131,13 @@ class UcdNCWriteHelper : public NCWriteHelper
         : NCWriteHelper( writeNC, fileId, opts, fileSet ), cDim( -1 ), eDim( -1 ), vDim( -1 )
     {
     }
-    virtual ~UcdNCWriteHelper() {}
+    virtual ~UcdNCWriteHelper() override {}
 
   protected:
     //! This version takes as input the moab range, from which we actually need just the
     //! size of each sequence, for a proper transpose of the data
     template < typename T >
-    void jik_to_kji_stride( size_t, size_t nj, size_t nk, T* dest, T* source, Range& localGid )
+    static void jik_to_kji_stride( size_t, size_t nj, size_t nk, T* dest, T* source, Range& localGid )
     {
         std::size_t idxInSource = 0;  // Position of the start of the stride
         // For each subrange, we will transpose a matrix of size

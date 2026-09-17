@@ -368,18 +368,66 @@ if ( ENABLE_EIGEN )
     endif()
   endif ( DOWNLOAD_EIGEN AND ENABLE_CPM )
 
-  # search for Eigen3Config.cmake provided by the installed Eigen3 package
-  find_package(Eigen3 3.4...5 REQUIRED NO_MODULE QUIET)
+  # An explicit EIGEN3_INCLUDE_DIR wins over find_package.  Eigen is header-only
+  # and is commonly used straight from an unpacked source tree, which ships no
+  # Eigen3Config.cmake - find_package(NO_MODULE) cannot see such a tree and would
+  # silently bind to whatever system-wide Eigen it does find instead.  This probe
+  # mirrors autotools' --with-eigen3=PATH (config/eigen3.m4), which accepts any
+  # directory containing Eigen/Eigen, so both build systems resolve the same copy.
+  if (EIGEN3_INCLUDE_DIR AND EXISTS "${EIGEN3_INCLUDE_DIR}/Eigen/Eigen")
 
-  # Bridge find_package(Eigen3) variables to the EIGEN3_ naming convention
-  # used by SET_VARS_IF_FOUND (which sets MOAB_HAVE_EIGEN3) and all source
-  # code #ifdef guards
-  if (Eigen3_FOUND)
+    set(_eigen_macros "${EIGEN3_INCLUDE_DIR}/Eigen/src/Core/util/Macros.h")
+    if (NOT EXISTS "${_eigen_macros}")
+      message(FATAL_ERROR
+        "EIGEN3_INCLUDE_DIR=${EIGEN3_INCLUDE_DIR} has Eigen/Eigen but no "
+        "Eigen/src/Core/util/Macros.h; it does not look like an Eigen3 tree.")
+    endif()
+    file(READ "${_eigen_macros}" _eigen_macros_txt)
+    string(REGEX MATCH "#define EIGEN_WORLD_VERSION[ \t]+([0-9]+)" _m "${_eigen_macros_txt}")
+    set(_eigen_world ${CMAKE_MATCH_1})
+    string(REGEX MATCH "#define EIGEN_MAJOR_VERSION[ \t]+([0-9]+)" _m "${_eigen_macros_txt}")
+    set(_eigen_major ${CMAKE_MATCH_1})
+    string(REGEX MATCH "#define EIGEN_MINOR_VERSION[ \t]+([0-9]+)" _m "${_eigen_macros_txt}")
+    set(_eigen_minor ${CMAKE_MATCH_1})
+    set(EIGEN3_VERSION "${_eigen_world}.${_eigen_major}.${_eigen_minor}")
+
+    # Lower bound only.  The find_package branch nominally asks for 3.4...5 but
+    # in practice accepts 5.x (Eigen3ConfigVersion.cmake decides compatibility),
+    # so an upper bound here would make an explicit path stricter than the
+    # default one; autotools imposes no version check at all.
+    if (EIGEN3_VERSION VERSION_LESS 3.4)
+      message(FATAL_ERROR
+        "Eigen3 at ${EIGEN3_INCLUDE_DIR} is version ${EIGEN3_VERSION}; "
+        "MOAB requires 3.4 or newer.")
+    endif()
+
+    # src/CMakeLists.txt puts Eigen3::Eigen on MOAB's public link interface, so
+    # the target has to exist on this path too, not just the find_package one.
+    if (NOT TARGET Eigen3::Eigen)
+      add_library(Eigen3::Eigen INTERFACE IMPORTED)
+      set_target_properties(Eigen3::Eigen PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${EIGEN3_INCLUDE_DIR}")
+    endif()
     set(EIGEN3_FOUND TRUE)
-    get_target_property(EIGEN3_INCLUDE_DIR Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
-  endif()
+    set(Eigen3_FOUND TRUE)
 
-  message(STATUS "Found Eigen3: ${EIGEN3_INCLUDE_DIR}")
+  else ()
+
+    # No explicit path given: search for Eigen3Config.cmake from an installed package
+    find_package(Eigen3 3.4...5 REQUIRED NO_MODULE QUIET)
+
+    # Bridge find_package(Eigen3) variables to the EIGEN3_ naming convention
+    # used by SET_VARS_IF_FOUND (which sets MOAB_HAVE_EIGEN3) and all source
+    # code #ifdef guards
+    if (Eigen3_FOUND)
+      set(EIGEN3_FOUND TRUE)
+      get_target_property(EIGEN3_INCLUDE_DIR Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
+      set(EIGEN3_VERSION "${Eigen3_VERSION}")
+    endif()
+
+  endif ()
+
+  message(STATUS "Found Eigen3 ${EIGEN3_VERSION}: ${EIGEN3_INCLUDE_DIR}")
   # Pass EIGEN3, not Eigen3: the macro forms MOAB_HAVE_${PACKAGE_NAME} by literal
   # substitution, and MOABConfig.cmake.h.in / every #ifdef spells it MOAB_HAVE_EIGEN3.
   SET_VARS_IF_FOUND(EIGEN3 RECOMMENDED "Eigen3" "Eigen3 headers as supplement to BLAS/LAPACK implementations" EIGEN3_INCLUDE_DIR EIGEN3_LIBRARIES )

@@ -380,7 +380,9 @@ if ( ENABLE_EIGEN )
   endif()
 
   message(STATUS "Found Eigen3: ${EIGEN3_INCLUDE_DIR}")
-  SET_VARS_IF_FOUND(Eigen3 RECOMMENDED "Eigen3" "Eigen3 headers as supplement to BLAS/LAPACK implementations" EIGEN3_INCLUDE_DIR EIGEN3_LIBRARIES )
+  # Pass EIGEN3, not Eigen3: the macro forms MOAB_HAVE_${PACKAGE_NAME} by literal
+  # substitution, and MOABConfig.cmake.h.in / every #ifdef spells it MOAB_HAVE_EIGEN3.
+  SET_VARS_IF_FOUND(EIGEN3 RECOMMENDED "Eigen3" "Eigen3 headers as supplement to BLAS/LAPACK implementations" EIGEN3_INCLUDE_DIR EIGEN3_LIBRARIES )
 
   LIST(APPEND LOGGING_WATCHED_VARIABLES
     EIGEN3_INCLUDE_DIR )
@@ -1217,7 +1219,6 @@ install(
 install(
   FILES "${PROJECT_SOURCE_DIR}/config/ResolveCompilerPaths.cmake"
         "${PROJECT_SOURCE_DIR}/config/MOABTPLTargets.cmake"
-        "${PROJECT_SOURCE_DIR}/config/FindEigen3.cmake"
         "${PROJECT_SOURCE_DIR}/config/FindMETIS.cmake"
         "${PROJECT_SOURCE_DIR}/config/FindNETCDF.cmake"
         "${PROJECT_SOURCE_DIR}/config/FindPARMETIS.cmake"

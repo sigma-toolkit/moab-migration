@@ -5,16 +5,30 @@ cmake_minimum_required( VERSION 3.12 )
 
 set ( MOAB_ROOT "" CACHE PATH "Path to MOAB library installation" )
 
-# find_package(MOAB) has to run before project() below, because the compilers
-# MOAB was built with are only known afterwards and project() bakes the compiler
-# in permanently.  But MOABTargets.cmake declares the MOAB library with
-# add_library(MOAB SHARED IMPORTED), and add_library() rejects SHARED while the
-# global TARGET_SUPPORTS_SHARED_LIBS property is unset - which it is until a
-# language is enabled - with "the target platform does not support dynamic
-# linking".  The property is meaningless for an IMPORTED target since nothing is
-# built from it, so seed it here to get through the declaration; project() then
-# sets it authoritatively from the platform module and this value is discarded.
+# MOAB is found twice, and the order matters.
+#
+# The compilers MOAB was built with are only known once MOABConfig.cmake has
+# been read, but project() bakes a compiler in permanently - so the first
+# find_package() has to happen before any language exists.  With no language
+# enabled, MOABConfig.cmake defines its variables but deliberately skips the
+# find_dependency() calls that create MOAB's third-party imported targets
+# (FindMPI and friends refuse to probe a language that is not enabled).  Linking
+# MOAB::MOAB at that point would fail at generate time on the missing target
+# names, so MOAB is found again below, after the languages are up.
+#
+# project(... NONE) gives us a project without committing to a compiler.
+project( MOAB_Examples NONE )
+
+# MOABTargets.cmake may declare the library with add_library(MOAB SHARED
+# IMPORTED), and add_library() rejects SHARED while the global
+# TARGET_SUPPORTS_SHARED_LIBS property is unset - which it is until a language
+# is enabled - with "the target platform does not support dynamic linking".  The
+# property is meaningless for an IMPORTED target since nothing is built from it,
+# so seed it here to get through the declaration; enabling a language below sets
+# it authoritatively from the platform module.
 set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
+
+set ( MOAB_ROOT "" CACHE PATH "Path to MOAB library installation" )
 
 find_package(MOAB REQUIRED
   HINTS ${MOAB_ROOT} ${MOAB_ROOT}/lib/cmake/MOAB)
@@ -31,17 +45,14 @@ set ( CMAKE_Fortran_FLAGS "${MOAB_FCFLAGS}" )
 
 message ( "++ Found MOAB configuration details at: ${MOAB_DIR}" )
 
-project( MOAB_Examples )
-
-# The add_test() calls below were dead without this: CTest never generated a
-# test file for the examples tree, so `ctest` here reported "No tests found".
-enable_testing()
+enable_language ( C )
+enable_language ( CXX )
 
 # MigrateMesh.F90 only calls the iMOAB Fortran entry points, which live in
 # libMOAB itself, so it needs a Fortran compiler.  Enable the
 # language only when a compiler is actually available, so that a MOAB built
-# without Fortran still configures.  This has to happen before find_package(MPI)
-# below, otherwise FindMPI never probes the Fortran bindings.
+# without Fortran still configures.  This has to happen before MOAB is found
+# again below, otherwise FindMPI never probes the Fortran bindings.
 include ( CheckLanguage )
 check_language ( Fortran )
 if ( CMAKE_Fortran_COMPILER )
@@ -52,10 +63,19 @@ else ( CMAKE_Fortran_COMPILER )
   message ( STATUS "No Fortran compiler available; skipping the Fortran examples" )
 endif ( CMAKE_Fortran_COMPILER )
 
+# Second pass: now that C, CXX and possibly Fortran exist, MOABConfig.cmake runs
+# its find_dependency() calls and MOAB::MOAB becomes linkable.
+find_package(MOAB REQUIRED
+  HINTS ${MOAB_ROOT} ${MOAB_ROOT}/lib/cmake/MOAB)
+
+# The add_test() calls below were dead without this: CTest never generated a
+# test file for the examples tree, so `ctest` here reported "No tests found".
+enable_testing()
+
 # MOAB may have been configured against MPI through FindMPI rather than through
 # the compiler wrappers, in which case MOAB_CC/MOAB_CXX are the plain compilers
-# and nothing above supplies the MPI headers.  Locate MPI ourselves so that
-# moab_mpi.h can find mpi.h either way.
+# and nothing above supplies the MPI Fortran bindings.  MOAB::MOAB carries
+# MPI::MPI_CXX; this is for MPI::MPI_Fortran, which it does not.
 if ( MOAB_USE_MPI )
   find_package( MPI REQUIRED )
 endif ( MOAB_USE_MPI )

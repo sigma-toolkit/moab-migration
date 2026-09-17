@@ -43,23 +43,40 @@ set(MPI_DIR "@MPI_ROOT@")
 set(MOAB_USE_HDF5 @MOAB_HAVE_HDF5@)
 set(MOAB_USE_HDF5_PARALLEL @MOAB_HAVE_HDF5_PARALLEL@)
 set(HDF5_DIR "@HDF5_DIR@")
+# HDF5_DIR is only set when HDF5 was found through its own config package; a
+# plain FindHDF5 search records the prefix in HDF5_ROOT instead, and one of the
+# two is what find_dependency(HDF5) below needs as a hint.
+set(HDF5_ROOT "@HDF5_ROOT@")
+# The six <PKG>_DIR hints below are cache entries rather than plain variables,
+# and that is load-bearing.  Each MOAB Find module opens with
+#
+#   set(<PKG>_DIR "<default>" CACHE PATH "...")
+#
+# and under CMP0126 OLD - which is what any consumer requiring less than CMake
+# 3.21 gets - that call *deletes* a normal variable of the same name.  A hint
+# passed as a normal variable therefore disappeared at the very moment the
+# module started to use it, and the module's own default won instead:
+# find_dependency(NETCDF) aborted with "User specified NETCDF_DIR (/usr) does
+# not match the prefix from nc-config".  Seeding the cache gives the intended
+# precedence for free, since set(CACHE) without FORCE leaves an existing entry
+# alone: a consumer's own -D<PKG>_DIR still wins over what MOAB recorded here.
 set(MOAB_USE_NETCDF @MOAB_HAVE_NETCDF@)
-set(NETCDF_DIR "@NETCDF_DIR@")
+set(NETCDF_DIR "@NETCDF_DIR@" CACHE PATH "Path to search for NETCDF header and library files")
 set(MOAB_USE_PNETCDF @MOAB_HAVE_PNETCDF@)
-set(PNETCDF_DIR "@PNETCDF_DIR@")
+set(PNETCDF_DIR "@PNETCDF_DIR@" CACHE PATH "Path to search for PNetCDF header and library files")
 set(MOAB_USE_METIS @MOAB_HAVE_METIS@)
-set(METIS_DIR "@METIS_DIR@")
+set(METIS_DIR "@METIS_DIR@" CACHE PATH "Path to search for Metis header and library files")
 set(MOAB_USE_PARMETIS @MOAB_HAVE_PARMETIS@)
-set(PARMETIS_DIR "@PARMETIS_DIR@")
+set(PARMETIS_DIR "@PARMETIS_DIR@" CACHE PATH "Path to search for ParMetis header and library files")
 set(MOAB_USE_ZOLTAN @MOAB_HAVE_ZOLTAN@)
-set(ZOLTAN_DIR "@ZOLTAN_DIR@")
+set(ZOLTAN_DIR "@ZOLTAN_DIR@" CACHE PATH "Path to search for Zoltan header and library files")
 set(MOAB_USE_BLAS @MOAB_HAVE_BLAS@)
 set(BLAS_LIBRARIES "@BLAS_LIBRARIES@")
 set(MOAB_USE_LAPACK @MOAB_HAVE_LAPACK@)
 set(LAPACK_LIBRARIES "@LAPACK_LIBRARIES@")
 set(MOAB_USE_EIGEN @MOAB_HAVE_EIGEN3@)
 set(EIGEN3_DIR "@EIGEN3_DIR@")
-set(TEMPESTREMAP_DIR "@TEMPESTREMAP_DIR@")
+set(TEMPESTREMAP_DIR "@TEMPESTREMAP_DIR@" CACHE PATH "Path to search for TempestRemap header and library files")
 set(MOAB_USE_TEMPESTREMAP @MOAB_HAVE_TEMPESTREMAP@)
 set(MOAB_USE_MBCOUPLER @MOAB_HAVE_MBCOUPLER@)
 set(MOAB_USE_SKBUILD @SKBUILD@)
@@ -114,33 +131,107 @@ list(REMOVE_DUPLICATES MOAB_PACKAGE_INCLUDES)
 # ---------------------------------------------------------------------------
 # Dependencies
 # ---------------------------------------------------------------------------
+#
+# libMOAB's exported link interface names imported targets - MPI::MPI_CXX,
+# HDF5::HDF5, NetCDF::NetCDF and so on - rather than the absolute paths those
+# resolved to on the machine MOAB was built on.  Recreating those names here is
+# what makes an installed MOAB usable elsewhere, so this block has to run before
+# MOABTargets.cmake is included below.
+#
+# The MOAB-specific Find modules are installed next to this file, which is also
+# where MOABTPLTargets.cmake (the helper that declares the targets) lives.
 include(CMakeFindDependencyMacro)
+if(@MOAB_CONFIG_IS_BUILD_TREE@)
+  # Nothing is installed yet, so read them straight out of the source tree.
+  list(APPEND CMAKE_MODULE_PATH "@PROJECT_SOURCE_DIR@/config")
+else()
+  list(APPEND CMAKE_MODULE_PATH "${MOAB_CMAKE_DIR}")
+endif()
 
-# moab_mpi.h is a public header and includes <mpi.h>, so a consumer of a
-# parallel MOAB needs the MPI include path whether or not it uses MPI itself.
-# The other third-party include directories still arrive through the
-# MOAB_PACKAGE_INCLUDES paths recorded above; they move to find_dependency()
-# when the link interface starts naming imported targets instead of absolute
-# library paths.
-# FindMPI fails outright if it is asked for a component whose language is not
-# enabled, and find_package(MOAB) is legitimately called before project() by
-# projects that want to reuse MOAB_CXX as their compiler.  Only ask for what the
-# caller has actually enabled; a caller that enables CXX later can call
-# find_package(MPI) itself, exactly as it would for any other dependency.
-if(MOAB_USE_MPI AND NOT TARGET MPI::MPI_CXX)
-  get_property(_moab_languages GLOBAL PROPERTY ENABLED_LANGUAGES)
-  if("CXX" IN_LIST _moab_languages)
+# Every module below probes with the C or C++ compiler, and FindMPI fails
+# outright when asked for a component whose language is not enabled.
+# find_package(MOAB) before project() is a legitimate thing to do - it is how a
+# project reuses MOAB_CXX as its own compiler - so in that case define the
+# variables and skip the targets.  Such a caller must call find_package(MOAB)
+# again once it has enabled its languages, before it links MOAB::MOAB.
+get_property(_moab_languages GLOBAL PROPERTY ENABLED_LANGUAGES)
+if("CXX" IN_LIST _moab_languages)
+
+  # moab_mpi.h is a public header and includes <mpi.h>, so a consumer of a
+  # parallel MOAB needs the MPI include path whether or not it uses MPI itself.
+  if(MOAB_USE_MPI AND NOT TARGET MPI::MPI_CXX)
     find_dependency(MPI COMPONENTS CXX)
   endif()
-  unset(_moab_languages)
-endif()
 
-# Target information
-if(MOAB_USE_HDF5)
-  if(EXISTS "@HDF5_DIR@/share/cmake/hdf5/hdf5-config.cmake")
-    include(@HDF5_DIR@/share/cmake/hdf5/hdf5-config.cmake)
+  if(MOAB_USE_HDF5 AND NOT TARGET HDF5::HDF5)
+    if(MOAB_USE_HDF5_PARALLEL)
+      set(HDF5_PREFER_PARALLEL TRUE)
+    endif()
+    # A "<var>-NOTFOUND" left in HDF5_DIR would send config mode looking in a
+    # directory that does not exist; clear it and let FindHDF5 use HDF5_ROOT.
+    if(HDF5_DIR MATCHES "NOTFOUND$")
+      unset(HDF5_DIR)
+    endif()
+    find_dependency(HDF5 COMPONENTS C HL)
+    # HDF5 can be built against libcurl (the ROS3 virtual file driver); MOAB
+    # adds it to the link line when it is present, so it has to come back.
+    find_dependency(CURL)
   endif()
+
+  # The <PKG>_DIR hints these modules search were seeded near the top of this
+  # file, where the reason they have to be cache entries is spelled out.
+  if(MOAB_USE_NETCDF AND NOT TARGET NetCDF::NetCDF)
+    find_dependency(NETCDF)
+  endif()
+
+  if(MOAB_USE_PNETCDF AND NOT TARGET PNetCDF::PNetCDF)
+    # FindPNETCDF does its whole search inside "if(MOAB_HAVE_MPI AND
+    # ENABLE_PNETCDF)".  Those are knobs from MOAB's own configure and mean
+    # nothing in a consumer's project, so the module skipped the search and
+    # then failed on the empty result.  Reaching this line at all means MOAB
+    # was built with parallel NetCDF, so both are true by construction.
+    set(MOAB_HAVE_MPI TRUE)
+    set(ENABLE_PNETCDF TRUE)
+    find_dependency(PNETCDF)
+  endif()
+
+  if(MOAB_USE_METIS AND NOT TARGET METIS::METIS)
+    find_dependency(METIS)
+  endif()
+
+  if(MOAB_USE_PARMETIS AND NOT TARGET ParMETIS::ParMETIS)
+    find_dependency(PARMETIS)
+  endif()
+
+  if(MOAB_USE_ZOLTAN AND NOT TARGET Zoltan::Zoltan)
+    find_dependency(ZOLTAN)
+  endif()
+
+  if(MOAB_USE_TEMPESTREMAP AND NOT TARGET TempestRemap::TempestRemap)
+    find_dependency(TEMPESTREMAP)
+  endif()
+
+  if(MOAB_USE_EIGEN AND NOT TARGET Eigen3::Eigen)
+    if(NOT EIGEN3_INCLUDE_DIR)
+      set(EIGEN3_INCLUDE_DIR "@EIGEN3_INCLUDE_DIR@")
+    endif()
+    find_dependency(Eigen3)
+  endif()
+
+  if(MOAB_USE_LAPACK AND NOT TARGET LAPACK::LAPACK)
+    find_dependency(LAPACK)
+  endif()
+  if(MOAB_USE_BLAS AND NOT TARGET BLAS::BLAS)
+    find_dependency(BLAS)
+  endif()
+
+  if(NOT TARGET Threads::Threads)
+    set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+    find_dependency(Threads)
+  endif()
+
 endif()
+unset(_moab_languages)
 
 if(MOAB_USE_SKBUILD)
   # Find the Python interpreter and ensure it's available.

@@ -26,9 +26,19 @@ target_include_directories( mbcoupler
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
   "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mbcoupler>" )
 
-target_link_libraries( mbcoupler MOAB ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
-if ( MOAB_HAVE_MPI )
-  target_link_libraries( mbcoupler ${MPI_LIBRARIES} )
+# Link the same imported targets libMOAB does, so that mbcoupler's exported
+# interface is target names too rather than the absolute paths BLAS/LAPACK and
+# MPI resolve to on the build machine.  MOAB is PUBLIC because Coupler.hpp
+# includes MOAB headers; the numerics are an implementation detail.
+target_link_libraries( mbcoupler PUBLIC MOAB )
+if ( MOAB_HAVE_LAPACK AND TARGET LAPACK::LAPACK )
+  target_link_libraries( mbcoupler PRIVATE LAPACK::LAPACK )
+endif ( )
+if ( MOAB_HAVE_BLAS AND TARGET BLAS::BLAS )
+  target_link_libraries( mbcoupler PRIVATE BLAS::BLAS )
+endif ( )
+if ( MOAB_HAVE_MPI AND TARGET MPI::MPI_CXX )
+  target_link_libraries( mbcoupler PUBLIC MPI::MPI_CXX )
 endif ( )
 
 if ( MOAB_HAVE_NETCDF )

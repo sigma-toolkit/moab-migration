@@ -331,35 +331,129 @@ else()
     )
 endif()
 
-set(MOAB_ALL_LIBS ${MOAB_LIBRARIES} ${TEMPESTREMAP_LIBRARIES} ${NETCDF_LIBRARIES} ${PNETCDF_LIBRARIES} ${HDF5_LIBRARIES} ${ZOLTAN_LIBRARIES} ${PARMETIS_LIBRARIES} ${METIS_LIBRARIES} ${MPI_LIBRARIES} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )
+# MOAB's C++11 use is visible in its installed headers, so record it as a usage
+# requirement rather than relying on the consumer to have set CMAKE_CXX_STANDARD
+# the way MOAB's own build did.
+target_compile_features(MOAB PUBLIC cxx_std_11)
+
+# Third-party dependencies are linked as imported targets, not as the absolute
+# paths they resolve to on this machine.  An absolute path is baked verbatim
+# into the exported link interface - including SDK-internal .tbd stubs on macOS
+# - so an installed MOAB could only ever be consumed from the machine it was
+# built on.  A target name is re-resolved by the consumer: MOABConfig.cmake runs
+# the matching find_dependency() calls to recreate exactly these names.
+#
+# PUBLIC vs PRIVATE follows what MOAB's *installed* headers include:
+#
+#   moab/mhdf_public.h                       <H5Tpublic.h>        HDF5
+#   moab/ZoltanPartitioner.hpp               "zoltan_cpp.h"       Zoltan
+#   moab/MetisPartitioner.hpp                "metis.h"            Metis
+#   moab/Matrix3.hpp                         "Eigen/Dense"        Eigen3
+#   .../remapping/TempestRemapper.hpp        "TempestRemapAPI.h"  TempestRemap
+#   .../remapping/TempestRemapper.hpp        "netcdfcpp.h"        NetCDF
+#   moab_mpi.h                               <mpi.h>              MPI
+#
+# Everything else is reached only from MOAB's own .cpp files.  PRIVATE still
+# puts those in the exported interface - libMOAB is normally static, so the
+# consumer has to link them - but wrapped in $<LINK_ONLY:>, so their headers do
+# not leak into the consumer's include path.
+set(MOAB_PUBLIC_LIBS "")
+set(MOAB_PRIVATE_LIBS "")
+
+if (MOAB_HAVE_TEMPESTREMAP AND TARGET TempestRemap::TempestRemap)
+  list(APPEND MOAB_PUBLIC_LIBS TempestRemap::TempestRemap)
+endif()
+if (MOAB_HAVE_NETCDF AND TARGET NetCDF::NetCDF)
+  list(APPEND MOAB_PUBLIC_LIBS NetCDF::NetCDF)
+endif()
+if (MOAB_HAVE_PNETCDF AND TARGET PNetCDF::PNetCDF)
+  list(APPEND MOAB_PRIVATE_LIBS PNetCDF::PNetCDF)
+endif()
+if (MOAB_HAVE_HDF5 AND TARGET HDF5::HDF5)
+  list(APPEND MOAB_PUBLIC_LIBS HDF5::HDF5)
+endif()
+if (CURL_FOUND AND TARGET CURL::libcurl)
+  list(APPEND MOAB_PRIVATE_LIBS CURL::libcurl)
+endif()
+if (MOAB_HAVE_ZOLTAN AND TARGET Zoltan::Zoltan)
+  list(APPEND MOAB_PUBLIC_LIBS Zoltan::Zoltan)
+endif()
+if (MOAB_HAVE_PARMETIS AND TARGET ParMETIS::ParMETIS)
+  list(APPEND MOAB_PRIVATE_LIBS ParMETIS::ParMETIS)
+endif()
+if (MOAB_HAVE_METIS AND TARGET METIS::METIS)
+  list(APPEND MOAB_PUBLIC_LIBS METIS::METIS)
+endif()
+if (MOAB_HAVE_EIGEN3 AND TARGET Eigen3::Eigen)
+  list(APPEND MOAB_PUBLIC_LIBS Eigen3::Eigen)
+endif()
+if (MOAB_HAVE_MPI AND TARGET MPI::MPI_CXX)
+  list(APPEND MOAB_PUBLIC_LIBS MPI::MPI_CXX)
+endif()
+if (MOAB_HAVE_LAPACK AND TARGET LAPACK::LAPACK)
+  list(APPEND MOAB_PRIVATE_LIBS LAPACK::LAPACK)
+endif()
+if (MOAB_HAVE_BLAS AND TARGET BLAS::BLAS)
+  list(APPEND MOAB_PRIVATE_LIBS BLAS::BLAS)
+endif()
+if (TARGET Threads::Threads)
+  list(APPEND MOAB_PRIVATE_LIBS Threads::Threads)
+endif()
 
 # When Fortran-driven executables link against libMOAB (a C++ static library),
-# the Fortran linker may not automatically include the C++ standard library.
-# This is common with NVHPC/PGI and Intel Fortran compilers, and with Cray
-# compiler wrappers where CMAKE_CXX_IMPLICIT_LINK_LIBRARIES is empty.
-# Add the C++ standard library explicitly so it propagates transitively.
+# the Fortran linker does not pull in the C++ standard library on its own.
+# CMAKE_CXX_IMPLICIT_LINK_LIBRARIES is what the C++ compiler actually links, so
+# it names the right runtime - "stdc++" was hard-coded here before and was wrong
+# on every libc++ toolchain, yet the -lstdc++ compile probe still succeeded on
+# macOS because the driver silently maps it to libc++.  Keep an explicit stdc++
+# only for toolchains that report nothing (Cray wrappers, some NVHPC setups).
+#
+# Only the runtime is wanted, not the whole implicit set: with an MPI compiler
+# wrapper as CXX that set also names mpicxx, mpi and pmpi, which already arrive
+# through MPI::MPI_CXX and which, as bare names in the exported interface, the
+# consumer's linker would look for in its default library path.
 if (ENABLE_FORTRAN)
-  include(CheckCXXSourceCompiles)
-  set(CMAKE_REQUIRED_LIBRARIES "stdc++")
-  check_cxx_source_compiles("int main() { return 0; }" MOAB_HAVE_LIBSTDCXX)
-  unset(CMAKE_REQUIRED_LIBRARIES)
-  if (MOAB_HAVE_LIBSTDCXX)
-    list(APPEND MOAB_ALL_LIBS stdc++)
+  set(MOAB_CXX_RUNTIME_LIBS "")
+  foreach (lib ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES})
+    if (lib MATCHES "^(c\\+\\+|stdc\\+\\+|c\\+\\+abi|supc\\+\\+)$")
+      list(APPEND MOAB_CXX_RUNTIME_LIBS ${lib})
+    endif()
+  endforeach()
+  if (MOAB_CXX_RUNTIME_LIBS)
+    list(APPEND MOAB_PRIVATE_LIBS ${MOAB_CXX_RUNTIME_LIBS})
+  else()
+    include(CheckCXXSourceCompiles)
+    set(CMAKE_REQUIRED_LIBRARIES "stdc++")
+    check_cxx_source_compiles("int main() { return 0; }" MOAB_HAVE_LIBSTDCXX)
+    unset(CMAKE_REQUIRED_LIBRARIES)
+    if (MOAB_HAVE_LIBSTDCXX)
+      list(APPEND MOAB_PRIVATE_LIBS stdc++)
+    endif()
   endif()
 endif()
 
-# Filter MOAB_ALL_LIBS: remove bare directory paths and unrecognized linker
+# Filter the two lists: remove bare directory paths and unrecognized linker
 # flags (e.g. -fortranlibs from NVHPC LAPACK) that CMake cannot handle in
 # target_link_libraries.  Platform-specific linker syntax such as Apple
 # "-framework Accelerate", GNU "-Wl,...", "-Xlinker ...", "-pthread" is
 # preserved via the shared keep-pattern table in ResolveCompilerPaths.cmake.
 # Add new exceptions there, not here.
 include(ResolveCompilerPaths)
-filter_link_libraries(MOAB_ALL_LIBS)
+filter_link_libraries(MOAB_PUBLIC_LIBS)
+filter_link_libraries(MOAB_PRIVATE_LIBS)
 
-include(../config/CleanLibraryList.cmake)
-clean_library_list(MOAB_ALL_LIBS)
-target_link_libraries(MOAB ${MOAB_ALL_LIBS})
+# clean_library_list() used to run here.  It exists to preserve the meaning of
+# the "debug"/"optimized"/"general" keywords while de-duplicating, which it does
+# by rewriting every unkeyworded entry into a debug/optimized pair - so each
+# library came out of the export twice, wrapped in $<$<CONFIG:DEBUG>:...> and
+# $<$<NOT:$<CONFIG:DEBUG>>:...>.  Neither list below uses those keywords, so a
+# plain de-duplication is both correct and far easier to read in MOABTargets.
+list(REMOVE_DUPLICATES MOAB_PUBLIC_LIBS)
+list(REMOVE_DUPLICATES MOAB_PRIVATE_LIBS)
+
+target_link_libraries(MOAB
+  PUBLIC ${MOAB_PUBLIC_LIBS}
+  PRIVATE ${MOAB_PRIVATE_LIBS})
 
 # If using clang-tidy, set the target property so that
 # reformatting code does not use full fledged C++11 semantics

@@ -601,6 +601,11 @@ if ( ENABLE_ZOLTAN )
   endif (MOAB_HAVE_ZOLTAN)
 endif (ENABLE_ZOLTAN )
 
+# Set below once the E3SM meshes the coupler tests read are known to be on
+# disk.  Declared here so the tests can be gated on it even when TempestRemap
+# is off and the download block never runs.
+set(MOAB_HAVE_EXTMESHES FALSE)
+
 # Check for TempestRemap availability if Eigen3 headers have been found already
 if ( ENABLE_TEMPESTREMAP )
   if (NOT EIGEN3_FOUND)
@@ -624,6 +629,15 @@ if ( ENABLE_TEMPESTREMAP )
       file(MAKE_DIRECTORY "${EXT_E3SM_DATA_DIR}/ne4pg2_o240")
       file(MAKE_DIRECTORY "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG")
       set(MOAB_DEFINES "${MOAB_DEFINES} -DEXT_DATA_DIR=${EXT_DATA_DIR}/")
+
+      # The autotools build has gated this on --download-extmeshfiles since
+      # forever; CMake had no equivalent and always fetched.  Keep the fetching
+      # as the default - these meshes are only good for the coupler tests, and
+      # those only exist when TempestRemap resolved, so getting this far is
+      # itself the request for them - but make it possible to say no and
+      # configure without touching the network.
+      option(MOAB_DOWNLOAD_EXT_MESHES
+        "Download the external E3SM mesh files that the coupler tests read" ON)
 
       # file(DOWNLOAD) creates and truncates its destination before the
       # transfer starts, and with no STATUS variable to inspect it reports
@@ -652,8 +666,14 @@ if ( ENABLE_TEMPESTREMAP )
         endif()
         # A mesh that is already here is a mesh we do not re-download: these
         # are static inputs, and the old code fetched all seven on every
-        # single configure.
+        # single configure.  Checking this before the option means a tree that
+        # already has the meshes keeps its coupler tests when downloading is
+        # switched off.
         if(mesh_size GREATER 0)
+          continue()
+        endif()
+        if(NOT MOAB_DOWNLOAD_EXT_MESHES)
+          list(APPEND MOAB_MISSING_E3SM_MESHES "${mesh}")
           continue()
         endif()
         message(STATUS "Downloading E3SM test mesh ${mesh}")
@@ -670,15 +690,29 @@ if ( ENABLE_TEMPESTREMAP )
             "${mesh} (${mesh_status_message})")
         endif()
       endforeach()
+
+      # A test whose input is missing cannot pass, so it should not be built at
+      # all rather than be built and fail - which is what the autotools build
+      # has always done by gating those tests on HAVE_EXTMESHES.
       if(MOAB_MISSING_E3SM_MESHES)
         string(REPLACE ";" "\n    " MOAB_MISSING_E3SM_MESHES
           "${MOAB_MISSING_E3SM_MESHES}")
-        message(WARNING
-          "Could not download these E3SM test meshes:\n    "
-          "${MOAB_MISSING_E3SM_MESHES}\n"
-          "The coupler tests that read them will fail until the files are "
-          "placed under ${EXT_E3SM_DATA_DIR} by hand.  Everything else builds "
-          "and tests normally." )
+        if(MOAB_DOWNLOAD_EXT_MESHES)
+          # Asked for and did not get: worth a warning.
+          message(WARNING
+            "Could not download these E3SM test meshes:\n    "
+            "${MOAB_MISSING_E3SM_MESHES}\n"
+            "Skipping the coupler tests that read them.  Everything else "
+            "builds and tests normally; drop the files into "
+            "${EXT_E3SM_DATA_DIR} and reconfigure to get those tests back." )
+        else()
+          message(STATUS
+            "MOAB_DOWNLOAD_EXT_MESHES is off and these E3SM meshes are not "
+            "present, so the coupler tests that read them are skipped:\n    "
+            "${MOAB_MISSING_E3SM_MESHES}" )
+        endif()
+      else()
+        set(MOAB_HAVE_EXTMESHES TRUE)
       endif()
     endif(MOAB_HAVE_TEMPESTREMAP)
   endif (NOT EIGEN3_FOUND)

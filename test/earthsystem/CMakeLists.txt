@@ -77,8 +77,19 @@ if( MOAB_HAVE_MPI AND MPI_FOUND AND MOAB_HAVE_TEMPESTREMAP )
                     parallel/imoab_map_r2l.cpp parallel/imoab_map_target.cpp
                     parallel/imoab_read_compute_map.cpp parallel/imoab_scrip.cpp
                     parallel/imoab_setwithGid.cpp parallel/imoab_phatm_ocn_coupler.cpp
-                    parallel/imoab_apg2_ol_coupler.cpp parallel/imoab_spmv_bfb.cpp
+                    parallel/imoab_spmv_bfb.cpp
                     parallel/imoab_dualmap_caas.cpp )
+
+  # imoab_apg2_ol_coupler is the only test here that reads the downloaded E3SM
+  # meshes rather than MeshFiles/unittest, and it has no fallback: without
+  # them it fails on an unreadable input.  Build it only when the meshes are
+  # actually on disk, which is how test/earthsystem/parallel/Makefile.am has
+  # always gated it (if HAVE_EXTMESHES).
+  if ( MOAB_HAVE_EXTMESHES )
+    set( ES_PAR_TESTS ${ES_PAR_TESTS} parallel/imoab_apg2_ol_coupler.cpp )
+  else ( MOAB_HAVE_EXTMESHES )
+    message( STATUS "Skipping imoab_apg2_ol_coupler: the E3SM meshes it reads are not available" )
+  endif ( MOAB_HAVE_EXTMESHES )
 
   foreach( fname ${ES_PAR_TESTS} )
     string( REPLACE ".cpp" "" base ${fname} )

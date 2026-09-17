@@ -625,16 +625,61 @@ if ( ENABLE_TEMPESTREMAP )
       file(MAKE_DIRECTORY "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG")
       set(MOAB_DEFINES "${MOAB_DEFINES} -DEXT_DATA_DIR=${EXT_DATA_DIR}/")
 
-      # case: ne4pg2_o240
-      file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne4pg2_o240/AtmPhys_pg2.h5m "${EXT_E3SM_DATA_DIR}/ne4pg2_o240/AtmPhys_pg2.h5m" )
-      file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne4pg2_o240/land_p8.h5m "${EXT_E3SM_DATA_DIR}/ne4pg2_o240/land_p8.h5m" )
-      file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne4pg2_o240/ne4pg2_p8.h5m "${EXT_E3SM_DATA_DIR}/ne4pg2_o240/ne4pg2_p8.h5m" )
-
-      # case: ne30pg2_r05_oECv3_ICG
-      file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne30pg2_r05_oECv3_ICG/AtmPhys_01.h5m "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG/AtmPhys_01.h5m" )
-      file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne30pg2_r05_oECv3_ICG/domain_clean_p16.h5m "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG/domain_clean_p16.h5m" )
-      file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne30pg2_r05_oECv3_ICG/outCS30_pg2_p8.h5m "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG/outCS30_pg2_p8.h5m" )
-      file(DOWNLOAD https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm/ne30pg2_r05_oECv3_ICG/wholeMPAS.h5m "${EXT_E3SM_DATA_DIR}/ne30pg2_r05_oECv3_ICG/wholeMPAS.h5m" )
+      # file(DOWNLOAD) creates and truncates its destination before the
+      # transfer starts, and with no STATUS variable to inspect it reports
+      # nothing at all when the transfer then fails.  Every reconfigure on a
+      # machine that could not reach the server therefore replaced each of
+      # these meshes with a 0-byte file, while configure still exited 0; the
+      # coupler tests that read them failed afterwards with an HDF5 error that
+      # points nowhere near the cause.  Fetch to a scratch name, check the
+      # status, and only move the result into place when it succeeded - so a
+      # failed download leaves whatever was already there untouched.
+      set(MOAB_E3SM_MESH_URL
+        "https://web.cels.anl.gov/projects/sigma/downloads/MeshFiles/e3sm")
+      set(MOAB_MISSING_E3SM_MESHES "")
+      foreach(mesh
+          ne4pg2_o240/AtmPhys_pg2.h5m
+          ne4pg2_o240/land_p8.h5m
+          ne4pg2_o240/ne4pg2_p8.h5m
+          ne30pg2_r05_oECv3_ICG/AtmPhys_01.h5m
+          ne30pg2_r05_oECv3_ICG/domain_clean_p16.h5m
+          ne30pg2_r05_oECv3_ICG/outCS30_pg2_p8.h5m
+          ne30pg2_r05_oECv3_ICG/wholeMPAS.h5m )
+        set(mesh_path "${EXT_E3SM_DATA_DIR}/${mesh}")
+        set(mesh_size 0)
+        if(EXISTS "${mesh_path}")
+          file(SIZE "${mesh_path}" mesh_size)
+        endif()
+        # A mesh that is already here is a mesh we do not re-download: these
+        # are static inputs, and the old code fetched all seven on every
+        # single configure.
+        if(mesh_size GREATER 0)
+          continue()
+        endif()
+        message(STATUS "Downloading E3SM test mesh ${mesh}")
+        file(DOWNLOAD "${MOAB_E3SM_MESH_URL}/${mesh}" "${mesh_path}.part"
+          INACTIVITY_TIMEOUT 30
+          STATUS mesh_status )
+        list(GET mesh_status 0 mesh_status_code)
+        if(mesh_status_code EQUAL 0)
+          file(RENAME "${mesh_path}.part" "${mesh_path}")
+        else()
+          list(GET mesh_status 1 mesh_status_message)
+          file(REMOVE "${mesh_path}.part" "${mesh_path}")
+          list(APPEND MOAB_MISSING_E3SM_MESHES
+            "${mesh} (${mesh_status_message})")
+        endif()
+      endforeach()
+      if(MOAB_MISSING_E3SM_MESHES)
+        string(REPLACE ";" "\n    " MOAB_MISSING_E3SM_MESHES
+          "${MOAB_MISSING_E3SM_MESHES}")
+        message(WARNING
+          "Could not download these E3SM test meshes:\n    "
+          "${MOAB_MISSING_E3SM_MESHES}\n"
+          "The coupler tests that read them will fail until the files are "
+          "placed under ${EXT_E3SM_DATA_DIR} by hand.  Everything else builds "
+          "and tests normally." )
+      endif()
     endif(MOAB_HAVE_TEMPESTREMAP)
   endif (NOT EIGEN3_FOUND)
 endif( ENABLE_TEMPESTREMAP )
@@ -1117,8 +1162,19 @@ install(
         "${PROJECT_BINARY_DIR}/MOABConfigVersion.cmake"
   DESTINATION ${MOABConfigLocation}
   )
+# MOABConfig.cmake re-runs these Find modules on the consumer's machine to
+# recreate the imported targets libMOAB's link interface names, so they have to
+# ship with the package - the consumer has no other copy of them.
 install(
   FILES "${PROJECT_SOURCE_DIR}/config/ResolveCompilerPaths.cmake"
+        "${PROJECT_SOURCE_DIR}/config/MOABTPLTargets.cmake"
+        "${PROJECT_SOURCE_DIR}/config/FindEigen3.cmake"
+        "${PROJECT_SOURCE_DIR}/config/FindMETIS.cmake"
+        "${PROJECT_SOURCE_DIR}/config/FindNETCDF.cmake"
+        "${PROJECT_SOURCE_DIR}/config/FindPARMETIS.cmake"
+        "${PROJECT_SOURCE_DIR}/config/FindPNETCDF.cmake"
+        "${PROJECT_SOURCE_DIR}/config/FindTEMPESTREMAP.cmake"
+        "${PROJECT_SOURCE_DIR}/config/FindZOLTAN.cmake"
   DESTINATION ${MOABConfigLocation}
   )
 

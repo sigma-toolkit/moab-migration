@@ -215,7 +215,19 @@ if("CXX" IN_LIST _moab_languages)
     if(NOT EIGEN3_INCLUDE_DIR)
       set(EIGEN3_INCLUDE_DIR "@EIGEN3_INCLUDE_DIR@")
     endif()
-    find_dependency(Eigen3)
+    # MOAB may have been built against an unpacked Eigen source tree, which ships
+    # no Eigen3Config.cmake.  find_dependency() cannot see such a tree, so it
+    # would either fail outright or silently bind this consumer to a different
+    # system-wide Eigen than MOAB was compiled against.  Recreate the
+    # header-only target from the recorded path instead; this mirrors the
+    # EIGEN3_INCLUDE_DIR branch in MOAB's own top-level CMakeLists.txt.
+    if(EXISTS "${EIGEN3_INCLUDE_DIR}/Eigen/Eigen")
+      add_library(Eigen3::Eigen INTERFACE IMPORTED)
+      set_target_properties(Eigen3::Eigen PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${EIGEN3_INCLUDE_DIR}")
+    else()
+      find_dependency(Eigen3)
+    endif()
   endif()
 
   if(MOAB_USE_LAPACK AND NOT TARGET LAPACK::LAPACK)

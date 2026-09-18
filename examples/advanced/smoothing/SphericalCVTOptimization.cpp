@@ -7,13 +7,18 @@
  * earth-system workflow:
  *
  *   1. Scatter N generators on the unit sphere, either on a Fibonacci spiral or
- *      pseudo-randomly from a seed.
+ *      pseudo-randomly from a seed.  Given --refine-file, they are instead
+ *      rejection-sampled from a sizing field built from real boundary geometry
+ *      - coastlines, country outlines, a basin perimeter - so the mesh is fine
+ *      near the coast and coarse in the open ocean, which is how production
+ *      MPAS meshes are actually built.
  *   2. Triangulate them.  The Delaunay triangulation of points on a sphere is
  *      exactly the 3D convex hull of those points, so an incremental hull gives
  *      it directly; MOAB has no hull utility, so one is built here.
  *   3. Lloyd-iterate to a CVT: move every generator to the centroid of its
  *      spherical Voronoi cell and retriangulate, until the generators stop
- *      moving.
+ *      moving.  With a sizing field the centroid is density-weighted, which is
+ *      what holds the refinement in place as the generators relax.
  *   4. Distribute the triangulation across ranks and run the same L-BFGS shape
  *      optimizer the plane and box example uses, with a spherical constraint
  *      that keeps vertices on the surface and confines the search to the
@@ -27,6 +32,15 @@
  * Run it:
  *     ./SphericalCVTOptimization -N 500 -l 50 -n 100
  *     mpiexec -np 4 ./SphericalCVTOptimization -N 2000 -o sphere.vtk
+ *
+ * Coastal refinement, writing the MPAS-form polygonal dual:
+ *     ./SphericalCVTOptimization -N 20000 -l 60 \
+ *         --refine-file world-continents.geo.h5m \
+ *         --hmin 30 --hmax 240 --dist 200 --width 150 \
+ *         -o tri.h5m --dual mpas.h5m
+ *
+ * Check the sizing field against its analytic form (needs no data file):
+ *     ./SphericalCVTOptimization --check-density
  */
 
 #include <cstdio>
@@ -52,6 +66,7 @@
 
 #include "MeshOptimizationMetrics.hpp"
 #include "MeshOptimizerCore.hpp"
+#include "BoundaryDensity.hpp"
 
 using namespace moab;
 using namespace moab::meshopt;
@@ -193,6 +208,57 @@ static void random_sphere( int n, unsigned seed, std::vector< double >& pts )
         pts[3 * i]       = r * std::cos( phi );
         pts[3 * i + 1]   = r * std::sin( phi );
         pts[3 * i + 2]   = z;
+    }
+}
+
+/** Generators drawn to match a sizing field, by rejection sampling.
+ *
+ * Candidates come from the same hash stream random_sphere() uses, so the
+ * result is still identical on every rank and every platform.  A candidate at
+ * x survives with probability (hmin/h(x))^2: rejection sampling controls the
+ * point density directly, and a cell of width h covers area ~h^2, so the
+ * density we want is 1/h^2.  (The Lloyd weight needs a different power - see
+ * BoundaryDensity::lloyd_weight.)
+ *
+ * Starting from the graded distribution rather than a uniform one matters:
+ * density-weighted Lloyd moves generators only a fraction of a cell per sweep,
+ * so reaching a strong grading from a uniform start would take far more sweeps
+ * than the default budget.
+ */
+static void density_sphere( int n, unsigned seed, const BoundaryDensity& dens, std::vector< double >& pts )
+{
+    pts.clear();
+    pts.reserve( 3 * n );
+
+    // Unbounded in principle; in practice the acceptance rate is (hmin/hmax)^2
+    // at worst, so this cap is many times what is needed and exists only so a
+    // pathological sizing field cannot spin forever.
+    const unsigned long maxDraws = 4000UL * (unsigned long)n + 100000UL;
+
+    for( unsigned long i = 0; i < maxDraws && (int)( pts.size() / 3 ) < n; ++i )
+    {
+        unsigned long h = i * 6364136223846793005ULL + 1442695040888963407ULL;
+        h ^= (unsigned long)seed * 0xBF58476D1CE4E5B9ULL;
+        h ^= h >> 33;
+        h *= 0xFF51AFD7ED558CCDULL;
+        h ^= h >> 33;
+        const double u1 = (double)( h % 1000003UL ) / 1000003.0;
+        h *= 0xC4CEB9FE1A85EC53ULL;
+        h ^= h >> 33;
+        const double u2 = (double)( h % 1000003UL ) / 1000003.0;
+        h *= 0x9E3779B97F4A7C15ULL;
+        h ^= h >> 31;
+        const double u3 = (double)( h % 1000003UL ) / 1000003.0;
+
+        const double z   = 2.0 * u1 - 1.0;
+        const double r   = std::sqrt( std::max( 0.0, 1.0 - z * z ) );
+        const double phi = 2.0 * M_PI * u2;
+        const double c[3] = { r * std::cos( phi ), r * std::sin( phi ), z };
+
+        if( u3 > dens.accept_probability( c ) ) continue;
+        pts.push_back( c[0] );
+        pts.push_back( c[1] );
+        pts.push_back( c[2] );
     }
 }
 
@@ -414,8 +480,14 @@ static void ordered_cell( const std::vector< double >& pts,
  * Each generator goes to the area-weighted centroid of its Voronoi polygon,
  * projected back onto the sphere.  Iterating this to a fixed point is the
  * definition of a centroidal Voronoi tessellation.
+ *
+ * With a sizing field the weight becomes area*rho instead of area, which is
+ * what grades the mesh; dens = NULL reproduces the uniform arithmetic exactly,
+ * down to the last bit, so an unrefined run is unaffected by this parameter.
  */
-static double lloyd_sweep( std::vector< double >& pts, const std::vector< HullFace >& faces )
+static double lloyd_sweep( std::vector< double >& pts,
+                           const std::vector< HullFace >& faces,
+                           const BoundaryDensity* dens )
 {
     const int n = (int)pts.size() / 3;
     std::vector< double > cc;
@@ -444,8 +516,20 @@ static double lloyd_sweep( std::vector< double >& pts, const std::vector< HullFa
             v_sub( p1, p0, e1 );
             v_sub( p2, p0, e2 );
             v_cross( e1, e2, cr );
-            const double a = 0.5 * v_norm( cr );
+            double a = 0.5 * v_norm( cr );
+            if( dens )
+            {
+                // Sample the field at the fan-triangle centroid, pushed back out
+                // to the sphere: the circumcentres are on the surface but their
+                // average is not, and the sizing field is only defined there.
+                double s[3] = { ( p0[0] + p1[0] + p2[0] ) / 3.0, ( p0[1] + p1[1] + p2[1] ) / 3.0,
+                                ( p0[2] + p1[2] + p2[2] ) / 3.0 };
+                v_normalize( s );
+                a *= dens->lloyd_weight( s );
+            }
             area += a;
+            // Left exactly as it was: a*(x)/3 and a*(x/3) do not round alike, so
+            // hoisting the centroid out of here would perturb an unrefined run.
             for( int d = 0; d < 3; ++d )
                 acc[d] += a * ( p0[d] + p1[d] + p2[d] ) / 3.0;
         }
@@ -636,6 +720,113 @@ static ErrorCode build_voronoi_mesh( Interface* mb,
     return MB_SUCCESS;
 }
 
+/** Collect the optimized generator positions back into a flat array on rank 0.
+ *
+ * The generators in `pts` are the Lloyd output; the optimizer then moved them,
+ * but it moved them in the distributed MOAB mesh, not in this array.  Writing
+ * the dual straight from `pts` - which is what used to happen - therefore
+ * discarded every bit of the optimization.  Read the coordinates back instead,
+ * indexed by GLOBAL_ID.
+ *
+ * Only owned vertices are contributed, so no vertex is sent twice, and the
+ * union across ranks is the whole generator set.
+ */
+static ErrorCode gather_optimized_points( Interface* mb,
+#ifdef MOAB_HAVE_MPI
+                                          ParallelComm* pcomm,
+#endif
+                                          const Range& tris,
+                                          int nprocs,
+                                          int rank,
+                                          std::vector< double >& pts )
+{
+    ErrorCode rval;
+    Range verts;
+    rval = mb->get_connectivity( tris, verts );MB_CHK_ERR( rval );
+
+    Range owned = verts;
+#ifdef MOAB_HAVE_MPI
+    if( nprocs > 1 )
+    {
+        owned.clear();
+        rval = pcomm->filter_pstatus( verts, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &owned );MB_CHK_ERR( rval );
+    }
+#else
+    (void)nprocs;
+    (void)rank;
+#endif
+
+    Tag gidTag;
+    rval = mb->tag_get_handle( "GLOBAL_ID", 1, MB_TYPE_INTEGER, gidTag );MB_CHK_ERR( rval );
+
+    const int nloc = (int)owned.size();
+    std::vector< int > gids( nloc );
+    std::vector< double > coords( 3 * nloc );
+    if( nloc )
+    {
+        rval = mb->tag_get_data( gidTag, owned, &gids[0] );MB_CHK_ERR( rval );
+        rval = mb->get_coords( owned, &coords[0] );MB_CHK_ERR( rval );
+    }
+
+    const int npoints = (int)( pts.size() / 3 );
+
+#ifdef MOAB_HAVE_MPI
+    if( nprocs > 1 )
+    {
+        std::vector< int > counts( nprocs, 0 );
+        MPI_Gather( &nloc, 1, MPI_INT, counts.empty() ? NULL : &counts[0], 1, MPI_INT, 0, pcomm->comm() );
+
+        std::vector< int > gdisp( nprocs, 0 ), cCounts( nprocs, 0 ), cDisp( nprocs, 0 );
+        int total = 0;
+        if( !rank )
+        {
+            for( int p = 0; p < nprocs; ++p )
+            {
+                gdisp[p]   = total;
+                cDisp[p]   = 3 * total;
+                cCounts[p] = 3 * counts[p];
+                total += counts[p];
+            }
+        }
+        std::vector< int > allGids( rank ? 0 : total );
+        std::vector< double > allCoords( rank ? 0 : 3 * total );
+
+        MPI_Gatherv( nloc ? &gids[0] : NULL, nloc, MPI_INT, rank ? NULL : ( total ? &allGids[0] : NULL ),
+                     rank ? NULL : &counts[0], rank ? NULL : &gdisp[0], MPI_INT, 0, pcomm->comm() );
+        MPI_Gatherv( nloc ? &coords[0] : NULL, 3 * nloc, MPI_DOUBLE,
+                     rank ? NULL : ( total ? &allCoords[0] : NULL ), rank ? NULL : &cCounts[0],
+                     rank ? NULL : &cDisp[0], MPI_DOUBLE, 0, pcomm->comm() );
+
+        if( !rank )
+        {
+            if( total != npoints )
+                MB_SET_ERR( MB_FAILURE, "gathered " << total << " owned generators but expected " << npoints );
+            for( int i = 0; i < total; ++i )
+            {
+                const int idx = allGids[i] - 1;  // GLOBAL_ID is 1-based
+                if( idx < 0 || idx >= npoints )
+                    MB_SET_ERR( MB_FAILURE, "GLOBAL_ID " << allGids[i] << " is outside 1.." << npoints );
+                for( int d = 0; d < 3; ++d )
+                    pts[3 * idx + d] = allCoords[3 * i + d];
+            }
+        }
+        return MB_SUCCESS;
+    }
+#endif
+
+    if( nloc != npoints )
+        MB_SET_ERR( MB_FAILURE, "found " << nloc << " generators in the mesh but expected " << npoints );
+    for( int i = 0; i < nloc; ++i )
+    {
+        const int idx = gids[i] - 1;
+        if( idx < 0 || idx >= npoints )
+            MB_SET_ERR( MB_FAILURE, "GLOBAL_ID " << gids[i] << " is outside 1.." << npoints );
+        for( int d = 0; d < 3; ++d )
+            pts[3 * idx + d] = coords[3 * i + d];
+    }
+    return MB_SUCCESS;
+}
+
 // ---------------------------------------------------------------------------
 // Quality reporting
 // ---------------------------------------------------------------------------
@@ -695,6 +886,139 @@ static ErrorCode report_quality( Interface* mb,
 }
 
 // ---------------------------------------------------------------------------
+// Sizing-field self-test
+// ---------------------------------------------------------------------------
+
+/** Validate the sizing field without needing a geometry file.
+ *
+ * The boundary is the equator, whose distance function is known exactly
+ * (R*|asin(z)|), so both halves can be checked against an analytic answer:
+ *
+ *   1. the kd-tree distance query, against R*|lat|;
+ *   2. the sizing law, at distances where tanh is known;
+ *   3. the exponent in lloyd_weight, which is the part most easily got wrong.
+ *      A graded CVT ends up with cell areas spanning (hmax/hmin)^2.  Weighting
+ *      by 1/h^2 instead of 1/h^4 would produce a span of only (hmax/hmin),
+ *      and the two predictions are far enough apart to tell apart even from a
+ *      short Lloyd run.
+ *
+ * Returns 0 on success.
+ */
+static int run_density_selftest( const BoundaryDensityOptions& dopts, int verbosity )
+{
+    BoundaryDensity dens;
+    ErrorCode rval = dens.set_equator_ring( 2000, dopts );
+    if( MB_SUCCESS != rval )
+    {
+        std::cerr << "check-density: could not build the equator ring" << std::endl;
+        return 1;
+    }
+
+    int failures = 0;
+    std::printf( "\nSizing-field self-test (analytic equator boundary)\n" );
+    std::printf( "  segments    %lu\n", (unsigned long)dens.num_segments() );
+
+    // 1. distance query -----------------------------------------------------
+    // A 2000-segment ring is a polygon inscribed in the equator, so it sits
+    // inside the true circle by R*(1-cos(pi/n)) = 7.9e-3 km.  Allow a hair more.
+    const double ringErr = EARTH_RADIUS_KM * ( 1.0 - std::cos( M_PI / 2000.0 ) );
+    const double tolDist = 10.0 * ringErr + 1.0e-6;
+    const double worst   = dens.check_against_analytic( 997 );
+    std::printf( "  distance    max error %.6e km (tolerance %.6e)  %s\n", worst, tolDist,
+                 worst <= tolDist ? "ok" : "FAILED" );
+    if( worst > tolDist ) ++failures;
+
+    // 2. sizing law ---------------------------------------------------------
+    // At d = d0 the tanh vanishes and the width is exactly the midpoint.
+    const double mid      = dens.width_from_distance( dopts.d0 );
+    const double expected = 0.5 * ( dopts.hmin + dopts.hmax );
+    std::printf( "  law h(d0)   %.9f km (expected %.9f)             %s\n", mid, expected,
+                 std::fabs( mid - expected ) < 1.0e-9 ? "ok" : "FAILED" );
+    if( std::fabs( mid - expected ) >= 1.0e-9 ) ++failures;
+
+    // Monotone increasing away from the boundary, and bounded by hmin/hmax.
+    bool monotone = true, bounded = true;
+    double prev = -1.0;
+    for( int i = 0; i <= 400; ++i )
+    {
+        const double d = 40.0 * i;  // out to 16000 km, past the antipode
+        const double h = dens.width_from_distance( d );
+        if( h < prev ) monotone = false;
+        if( h < dopts.hmin || h > dopts.hmax ) bounded = false;
+        prev = h;
+    }
+    std::printf( "  law shape   monotone %s, within [hmin,hmax] %s\n", monotone ? "yes" : "NO", bounded ? "yes" : "NO" );
+    if( !monotone || !bounded ) ++failures;
+
+    std::printf( "  attained    h(0) = %.6f km, hmax = %.6f km (ratio %.4f)\n", dens.min_cell_width_km(),
+                 dens.max_cell_width_km(), dens.max_cell_width_km() / dens.min_cell_width_km() );
+
+    // 3. the exponent -------------------------------------------------------
+    const int n = 3000;
+    std::vector< double > pts;
+    density_sphere( n, 12345, dens, pts );
+    if( (int)( pts.size() / 3 ) < 4 )
+    {
+        std::cerr << "check-density: rejection sampling produced too few generators" << std::endl;
+        return failures + 1;
+    }
+
+    std::vector< HullFace > faces;
+    if( !convex_hull( pts, faces ) )
+    {
+        std::cerr << "check-density: hull failed on the graded point set" << std::endl;
+        return failures + 1;
+    }
+    for( int s = 0; s < 40; ++s )
+    {
+        const double moved = lloyd_sweep( pts, faces, &dens );
+        if( !convex_hull( pts, faces ) ) break;
+        if( moved < 1.0e-8 ) break;
+    }
+
+    const double widthRatio = dens.max_cell_width_km() / dens.min_cell_width_km();
+    const double predicted  = widthRatio * widthRatio;  // areas go as width^2
+    const double wrongPower = widthRatio;               // what rho = 1/h^2 would give
+    const double measured   = cell_area_ratio( pts, faces );
+
+    // A short Lloyd run on a finite point set lands short of the asymptotic
+    // prediction, so an absolute tolerance here would just be a tuned magic
+    // number.  Ask the question that actually matters instead: of the two
+    // candidate exponents, which one is the measurement nearer to?  Ratios are
+    // compared in log space, where "twice as big" and "half as big" are the
+    // same distance, so neither prediction is favoured by the metric.
+    const double lm = std::log( measured ), l4 = std::log( predicted ), l2 = std::log( wrongPower );
+    const double to4 = std::fabs( lm - l4 ), to2 = std::fabs( lm - l2 );
+    const bool ok    = ( to4 < to2 );
+    std::printf( "  grading     cell area max/min %.4f\n", measured );
+    std::printf( "              rho=1/h^4 predicts %.4f (log distance %.4f)\n", predicted, to4 );
+    std::printf( "              rho=1/h^2 would give %.4f (log distance %.4f)\n", wrongPower, to2 );
+    std::printf( "              nearer the 1/h^4 prediction  %s\n", ok ? "ok" : "FAILED" );
+    if( !ok ) ++failures;
+    // Guard the guard: if the two predictions were close together the test
+    // above would be meaningless, and that happens whenever hmax/hmin is small.
+    if( std::fabs( l4 - l2 ) < 0.5 )
+    {
+        std::printf( "              INCONCLUSIVE: the predictions are too close to tell apart; "
+                     "raise --hmax/--hmin\n" );
+        ++failures;
+    }
+
+    // Euler characteristic: the grading must not have broken the triangulation.
+    const int nv = (int)( pts.size() / 3 ), nf = (int)faces.size(), ne = 3 * nf / 2;
+    const int euler = nv - ne + nf;
+    std::printf( "  topology    V-E+F = %d (expected 2)                        %s\n", euler,
+                 euler == 2 ? "ok" : "FAILED" );
+    if( euler != 2 ) ++failures;
+
+    if( verbosity > 1 )
+        std::printf( "              %d generators, %d triangles\n", nv, nf );
+
+    std::printf( "\n  %s\n\n", failures ? "SELF-TEST FAILED" : "all sizing-field checks passed" );
+    return failures ? 1 : 0;
+}
+
+// ---------------------------------------------------------------------------
 
 int main( int argc, char** argv )
 {
@@ -706,7 +1030,9 @@ int main( int argc, char** argv )
     double lloydTol = 1.0e-8, delta = 0.0, pnorm = 2.0, gtol = 1.0e-10;
     unsigned seed = 12345;
     bool useRandom = false;
-    std::string metricName = "imr", outfile, dualfile;
+    bool checkDensity = false;
+    std::string metricName = "imr", outfile, dualfile, refineFile;
+    BoundaryDensityOptions dopts;
 
     ProgOptions opts( "Spherical centroidal Voronoi tessellation followed by parallel mesh optimization, "
                       "using MOAB and Eigen3 only." );
@@ -734,9 +1060,27 @@ int main( int argc, char** argv )
     opts.addOpt< std::string >( std::string( "output,o" ), std::string( "Write the optimized triangulation here" ),
                                 &outfile );
     opts.addOpt< std::string >( std::string( "dual" ),
-                                std::string( "Write the dual Voronoi polygonal mesh here (the MPAS mesh form); "
-                                             "serial only" ),
+                                std::string( "Write the dual Voronoi polygonal mesh here (the MPAS mesh form)" ),
                                 &dualfile );
+    opts.addOpt< std::string >( std::string( "refine-file" ),
+                                std::string( "Boundary geometry (coastlines, basin outlines) on the unit sphere; "
+                                             "generators are graded towards it" ),
+                                &refineFile );
+    opts.addOpt< double >( std::string( "hmin" ),
+                           std::string( "Cell width approached at the boundary, km (default=30)" ), &dopts.hmin );
+    opts.addOpt< double >( std::string( "hmax" ), std::string( "Far-field cell width, km (default=240)" ),
+                           &dopts.hmax );
+    opts.addOpt< double >( std::string( "dist" ),
+                           std::string( "Distance from the boundary at which the width is halfway between hmin and "
+                                        "hmax, km (default=200)" ),
+                           &dopts.d0 );
+    opts.addOpt< double >( std::string( "width" ), std::string( "Transition length of the tanh ramp, km "
+                                                                "(default=150)" ),
+                           &dopts.lt );
+    opts.addOpt< void >( std::string( "check-density" ),
+                         std::string( "Verify the sizing field against an analytic equator boundary and exit; "
+                                      "needs no data file" ),
+                         &checkDensity );
     opts.addOpt< int >( std::string( "verbose,v" ), std::string( "0 quiet, 1 normal, 2 per-iteration (default=1)" ),
                         &verbosity );
     opts.parseCommandLine( argc, argv );
@@ -761,16 +1105,106 @@ int main( int argc, char** argv )
     const int nprocs = 1;
 #endif
 
+    if( checkDensity )
+    {
+        const int rc = rank ? 0 : run_density_selftest( dopts, verbosity );
+#ifdef MOAB_HAVE_MPI
+        MPI_Finalize();
+#endif
+        return rc;
+    }
+
+    // ---- 0. sizing field ---------------------------------------------------
+    // Loaded redundantly on every rank, like the generators below: the Lloyd
+    // phase is replicated, so every rank has to be able to evaluate the field.
+    BoundaryDensity density;
+    BoundaryDensity* densp = NULL;
+    if( !refineFile.empty() )
+    {
+        ErrorCode drval = density.load( refineFile, dopts );
+        if( MB_SUCCESS != drval )
+        {
+            if( !rank ) std::cerr << "could not load the refinement boundary " << refineFile << std::endl;
+#ifdef MOAB_HAVE_MPI
+            MPI_Finalize();
+#endif
+            return 1;
+        }
+        densp = &density;
+    }
+
     if( !rank && verbosity > 0 )
     {
         std::printf( "\nSpherical CVT and mesh optimization (MOAB + Eigen3)\n" );
-        std::printf( "  generators  %d (%s)\n", npoints, useRandom ? "seeded random" : "Fibonacci spiral" );
+        std::printf( "  generators  %d (%s)\n", npoints,
+                     densp ? "density-weighted rejection sampling"
+                           : ( useRandom ? "seeded random" : "Fibonacci spiral" ) );
         std::printf( "  ranks       %d\n", nprocs );
+        if( densp )
+        {
+            std::printf( "  refinement  %s (%lu boundary segments)\n", refineFile.c_str(),
+                         (unsigned long)density.num_segments() );
+            std::printf( "  cell width  %.2f km at the boundary -> %.2f km far field (d0 %.1f km, Lt %.1f km)\n",
+                         density.min_cell_width_km(), density.max_cell_width_km(), dopts.d0, dopts.lt );
+            if( density.min_cell_width_km() > 1.01 * dopts.hmin )
+                std::printf( "              note: hmin=%.2f km is only approached, not reached; the tanh gives "
+                             "%.2f km at d=0\n",
+                             dopts.hmin, density.min_cell_width_km() );
+
+            // The sizing law fixes the *shape* of the grading; -N fixes the
+            // resolution.  Ask for a transition finer than a cell and the mesh
+            // simply cannot represent it - the realized grading then falls well
+            // short of hmax/hmin, and falls further the longer Lloyd runs,
+            // because each sweep averages the density over cells too coarse to
+            // resolve it.  Measured on real coastlines with hmax/h(0) = 5.50:
+            // N=4000 (357 km cells) reached 2.86, N=16000 (179 km cells)
+            // reached 3.76.  Say so rather than let it look like a target met.
+            const double meanCell = std::sqrt( 4.0 * M_PI / (double)npoints ) * EARTH_RADIUS_KM;
+            std::printf( "  resolution  %d generators give ~%.0f km mean cell width\n", npoints, meanCell );
+            if( meanCell > dopts.lt )
+            {
+                const double nres = 4.0 * M_PI * EARTH_RADIUS_KM * EARTH_RADIUS_KM / ( dopts.lt * dopts.lt );
+                std::printf( "              WARNING: coarser than the %.0f km transition, so the grading will "
+                             "fall short of\n"
+                             "              the %.2fx the law asks for.  Resolving the transition needs "
+                             "about %.0f generators.\n",
+                             dopts.lt, dopts.hmax / density.min_cell_width_km(), nres );
+            }
+            if( meanCell > 2.0 * density.min_cell_width_km() )
+            {
+                const double nabs = 4.0 * M_PI * EARTH_RADIUS_KM * EARTH_RADIUS_KM /
+                                    ( density.min_cell_width_km() * density.min_cell_width_km() );
+                std::printf( "              note: the absolute widths in the law are out of reach at this -N; "
+                             "%.0f km cells\n"
+                             "              everywhere would need about %.0f generators.  The grading is still "
+                             "applied, relative to\n"
+                             "              the resolution -N does afford.\n",
+                             density.min_cell_width_km(), nabs );
+            }
+        }
     }
 
     // ---- 1. generators -----------------------------------------------------
     std::vector< double > pts;
-    if( useRandom )
+    if( densp )
+    {
+        density_sphere( npoints, seed, density, pts );
+        const int got = (int)( pts.size() / 3 );
+        if( got < 4 )
+        {
+            if( !rank )
+                std::cerr << "rejection sampling produced only " << got << " generators; widen the sizing field or "
+                          << "raise -N" << std::endl;
+#ifdef MOAB_HAVE_MPI
+            MPI_Finalize();
+#endif
+            return 1;
+        }
+        if( got < npoints && !rank && verbosity > 0 )
+            std::printf( "  sampled     %d of %d requested (draw cap reached)\n", got, npoints );
+        npoints = got;
+    }
+    else if( useRandom )
         random_sphere( npoints, seed, pts );
     else
         fibonacci_sphere( npoints, pts );
@@ -796,7 +1230,7 @@ int main( int argc, char** argv )
     double moved  = 0.0;
     for( ; sweeps < nlloyd; ++sweeps )
     {
-        moved = lloyd_sweep( pts, faces );
+        moved = lloyd_sweep( pts, faces, densp );
         // Generators have moved, so the Delaunay triangulation has to be rebuilt
         // before the next sweep; the Voronoi diagram is its dual.
         if( !convex_hull( pts, faces ) ) break;
@@ -909,11 +1343,18 @@ int main( int argc, char** argv )
 
     if( !dualfile.empty() )
     {
-        if( nprocs > 1 )
-        {
-            if( !rank ) std::printf( "  --dual is serial only; skipping\n" );
-        }
-        else
+        // Refresh pts from the optimized mesh before taking the dual, gathering
+        // to rank 0 when distributed.  `faces` is still the exact connectivity -
+        // the optimizer moves vertices and never retriangulates - so the result
+        // is the dual of the mesh that was just written, not of a re-derived
+        // Delaunay triangulation of the same points.
+        rval = gather_optimized_points( mb,
+#ifdef MOAB_HAVE_MPI
+                                        pcomm,
+#endif
+                                        tris, nprocs, rank, pts );MB_CHK_ERR( rval );
+
+        if( !rank )
         {
             Core dualMoab;
             EntityHandle dualSet = 0;

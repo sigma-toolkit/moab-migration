@@ -244,6 +244,17 @@ foreach( fname ${ALLCXXEXAMPLES} )
   add_test( NAME ${base} COMMAND $<TARGET_FILE:${base}> ${${base}_TEST_ARGS} )
 endforeach()
 
+# The sizing field used by --refine-file is checked against an analytic
+# boundary (the equator, whose distance function is known in closed form), so
+# this needs no data file and can run anywhere.  Kept separate from the
+# SphericalCVTOptimization test above because it exercises a different path:
+# the kd-tree distance query, the tanh law, and the exponent relating the
+# Lloyd weight to the cell size it is supposed to produce.
+if ( TARGET SphericalCVTOptimization )
+  add_test( NAME SphericalCVTOptimization_density
+            COMMAND $<TARGET_FILE:SphericalCVTOptimization> --check-density )
+endif ()
+
 # The Fortran examples link against libMOAB like the C++ examples, but are
 # compiled and linked as Fortran, so they additionally need the MPI Fortran
 # bindings - MPI_CXX_LIBRARIES does not provide mpif.h or the mpi_*_ symbols.

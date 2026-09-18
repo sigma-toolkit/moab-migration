@@ -563,7 +563,32 @@ static ErrorCode build_triangulation( Interface* mb,
 #ifdef MOAB_HAVE_MPI
     if( pcomm && nprocs > 1 )
     {
-        rval = pcomm->resolve_shared_ents( 0, 2, 0, &gidTag );MB_CHK_ERR( rval );
+        // Pass the triangles explicitly.  The overload that takes this_set = 0
+        // instead collects its entities from ParallelComm's registered partition
+        // sets, and a mesh built in memory like this one has none - so it
+        // resolved an empty range, reported success, and left every rank with
+        // private copies of the partition-boundary vertices.
+        rval = pcomm->resolve_shared_ents( 0, tris, 2, 0, NULL, &gidTag );MB_CHK_ERR( rval );
+
+        // Verify rather than trust: a torn partition is silent.  The optimizer
+        // still runs, but each rank relaxes its own copies of the shared
+        // vertices, so the triangles decouple and converge to a perfect - and
+        // meaningless - mesh that disagrees with the serial answer.  After a
+        // correct resolve every vertex is owned by exactly one rank, so the
+        // owned count must sum to the generator count.
+        Range verts;
+        rval = mb->get_entities_by_dimension( 0, 0, verts );MB_CHK_ERR( rval );
+        Range ownedVerts;
+        rval = pcomm->filter_pstatus( verts, PSTATUS_NOT_OWNED, PSTATUS_NOT, -1, &ownedVerts );MB_CHK_ERR( rval );
+        long localOwned = (long)ownedVerts.size(), globalOwned = 0;
+        MPI_Allreduce( &localOwned, &globalOwned, 1, MPI_LONG, MPI_SUM, pcomm->comm() );
+        const long expected = (long)( pts.size() / 3 );
+        if( globalOwned != expected )
+        {
+            MB_SET_ERR( MB_FAILURE, "resolve_shared_ents left the partition torn: "
+                                        << globalOwned << " owned vertices across all ranks, expected " << expected
+                                        << ".  The parallel result would not match serial." );
+        }
     }
 #endif
     return MB_SUCCESS;

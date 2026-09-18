@@ -1204,12 +1204,25 @@ if(NOT SKBUILD)
   # kept pointing MOAB_LIBDIR at the build tree.  Mirror the autotools
   # install-data-hook: write to $DESTDIR<full libdir>, and use += for the
   # includes so the third-party -I flags configured above are not discarded.
-  install(CODE
-    "file(APPEND \"\$ENV{DESTDIR}${CMAKE_INSTALL_FULL_LIBDIR}/moab.make\" \"MOAB_LIBDIR=${CMAKE_INSTALL_FULL_LIBDIR}\\n\")"
-    )
-  install(CODE
-    "file(APPEND \"\$ENV{DESTDIR}${CMAKE_INSTALL_FULL_LIBDIR}/moab.make\" \"MOAB_INCLUDES+=-I${CMAKE_INSTALL_FULL_INCLUDEDIR}\\n\")"
-    )
+  # CMAKE_INSTALL_FULL_* expand at configure time, so they hard-code the prefix
+  # that was current when CMake ran.  `cmake --install <dir> --prefix <other>`
+  # then silently wrote to the configure-time prefix instead - and failed
+  # outright when that was an unwritable default such as /usr/local.  Resolve
+  # the directories from ${CMAKE_INSTALL_PREFIX} at install time, which is what
+  # --prefix actually overrides.  GNUInstallDirs permits an absolute libdir or
+  # includedir, so only prepend the prefix when the path is relative.
+  install(CODE "
+    set(_moab_libdir \"${CMAKE_INSTALL_LIBDIR}\")
+    set(_moab_incdir \"${CMAKE_INSTALL_INCLUDEDIR}\")
+    if(NOT IS_ABSOLUTE \"\${_moab_libdir}\")
+      set(_moab_libdir \"\${CMAKE_INSTALL_PREFIX}/\${_moab_libdir}\")
+    endif()
+    if(NOT IS_ABSOLUTE \"\${_moab_incdir}\")
+      set(_moab_incdir \"\${CMAKE_INSTALL_PREFIX}/\${_moab_incdir}\")
+    endif()
+    file(APPEND \"\$ENV{DESTDIR}\${_moab_libdir}/moab.make\" \"MOAB_LIBDIR=\${_moab_libdir}\\n\")
+    file(APPEND \"\$ENV{DESTDIR}\${_moab_libdir}/moab.make\" \"MOAB_INCLUDES+=-I\${_moab_incdir}\\n\")
+    ")
 else()
   set(MOABConfigLocation ${SKBUILD_DATA_DIR}/${MOABConfigLocation})
 endif()

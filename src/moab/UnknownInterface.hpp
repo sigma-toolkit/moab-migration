@@ -28,10 +28,7 @@ namespace moab
 struct MBuuid
 {
     //! default constructor that initializes to zero
-    MBuuid()
-    {
-        memset( this, 0, sizeof( MBuuid ) );
-    }
+    MBuuid() : data1( 0 ), data2( 0 ), data3( 0 ), data4{} {}
     //! constructor that takes initialization arguments
     MBuuid( unsigned l,
             unsigned short w1,
@@ -58,16 +55,13 @@ struct MBuuid
         data4[7] = b8;
     }
     //! copy constructor
-    MBuuid( const MBuuid& mdbuuid )
-    {
-        memcpy( this, &mdbuuid, sizeof( MBuuid ) );
-    }
+    //! Defaulted rather than hand-rolled with memcpy: every member is a trivial
+    //! type, so the implicit memberwise copy emits the same code, and declaring
+    //! these makes MBuuid trivially copyable again - which is what lets the
+    //! memcpy-to-GUID above be well defined in the first place.
+    MBuuid( const MBuuid& mdbuuid ) = default;
     //! sets this uuid equal to another one
-    MBuuid& operator=( const MBuuid& orig )
-    {
-        memcpy( this, &orig, sizeof( MBuuid ) );
-        return *this;
-    }
+    MBuuid& operator=( const MBuuid& orig ) = default;
     //! returns whether two uuid's are equal
     bool operator==( const MBuuid& orig ) const
     {

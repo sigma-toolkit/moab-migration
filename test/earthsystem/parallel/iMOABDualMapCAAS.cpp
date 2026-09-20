@@ -1,5 +1,5 @@
 /*
- * imoab_dualmap_caas.cpp
+ * iMOABDualMapCAAS.cpp
  *
  * Test for dual-map nonlinear remapping (CAAS with low-order map bounds).
  *
@@ -26,7 +26,7 @@
  *   7. Optionally write per-cell BFB digest files (--digest_prefix)
  *
  * BFB digest workflow (cross-rank-count regression check):
- *   for n in 1 2 4 8; do mpirun -n $n ./imoab_dualmap_caas \
+ *   for n in 1 2 4 8; do mpirun -n $n ./iMOABDualMapCAAS \
  *       -l <lo_map.nc> -h <hi_map.nc> -o digest ; done
  *   for k in lo hi dual; do diff -q digest_${k}_1.txt digest_${k}_4.txt; done
  *   All file pairs must be byte-identical when maps are loaded from disk.
@@ -44,7 +44,7 @@
 #include "TestUtil.hpp"
 #include "moab/CpuTimer.hpp"
 #include "moab/ProgOptions.hpp"
-#include "imoab_coupler_utils.hpp"
+#include "iMOABCouplerUtils.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -157,7 +157,7 @@ int main( int argc, char* argv[] )
 
     int rankInAtmComm = -1, rankInOcnComm = -1, rankInCouComm = -1;
 
-    // Use the same FV mesh files as imoab_read_compute_map.cpp so source field is FV.
+    // Use the same FV mesh files as iMOABReadComputeMap.cpp so source field is FV.
     std::string atmFilename = TestDir + "unittest/srcWithSolnTag.h5m";
     std::string ocnFilename = TestDir + "unittest/recMeshOcn.h5m";
     std::string loMapFile;       // primary path: load from disk
@@ -212,7 +212,7 @@ int main( int argc, char* argv[] )
 
     if( !rankInGlobalComm )
     {
-        std::cout << " === imoab_dualmap_caas test ===\n";
+        std::cout << " === iMOABDualMapCAAS test ===\n";
         std::cout << " ATM file: " << atmFilename << "\n";
         std::cout << " OCN file: " << ocnFilename << "\n";
         if( loadFromDisk )
@@ -350,7 +350,7 @@ int main( int argc, char* argv[] )
         CHECKIERR( iMOAB_FreeSenderBuffers( cmpOcnPID, &cplocn ), "Cannot free OCN send buffers" )
     }
 
-    // FV scalar field already present on srcWithSolnTag.h5m (matches imoab_read_compute_map.cpp).
+    // FV scalar field already present on srcWithSolnTag.h5m (matches iMOABReadComputeMap.cpp).
     const iMOAB_String srcField     = "AnalyticalSolnSrcExact";
     const iMOAB_String tgtFieldHi   = "TargetHiOrder";
     const iMOAB_String tgtFieldDual = "TargetDualMap";
@@ -469,7 +469,7 @@ int main( int argc, char* argv[] )
     // Set source field values directly on the dual-map coverage mesh:
     // The source tag (srcField = "a2oTbot") is already present on the on-disk
     // ATM mesh (wholeATM_T.h5m). We follow the exact tag-migration pattern
-    // used by imoab_read_compute_map.cpp: define-on-cpl-side, then
+    // used by iMOABReadComputeMap.cpp: define-on-cpl-side, then
     // SendElementTag/ReceiveElementTag in two hops:
     //   cmpAtm -> cplAtm  (via atmCouComm, context cplatm)
     //   cplAtm -> cplDualMap (via couComm, context dualmap_id)
@@ -500,7 +500,7 @@ int main( int argc, char* argv[] )
 
     // Second hop: cplAtm -> cplDualMap (the intersection app's coverage mesh).
     // Mirrors the COMPUTE_FILE_MAP / COMPUTE_ONLINE_MAP send-tag block in
-    // imoab_read_compute_map.cpp.
+    // iMOABReadComputeMap.cpp.
     if( couComm != MPI_COMM_NULL )
     {
         CHECKIERR( iMOAB_SendElementTag( cplAtmPID, srcField, &couComm, &dualmap_id ),
@@ -732,7 +732,7 @@ int main( int argc, char* argv[] )
 
     CHECKIERR( iMOAB_Finalize(), "Cannot finalize iMOAB" )
 
-    // Free MPI communicators and groups (matching imoab_read_compute_map.cpp pattern)
+    // Free MPI communicators and groups (matching iMOABReadComputeMap.cpp pattern)
     if( MPI_COMM_NULL != atmCouComm ) MPI_Comm_free( &atmCouComm );
     MPI_Group_free( &joinAtmCouGroup );
     if( MPI_COMM_NULL != atmComm ) MPI_Comm_free( &atmComm );

@@ -236,20 +236,6 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
 
 
   if(MOAB_HAVE_TEMPESTREMAP)
-    # The coupler drivers moved to test/earthsystem/parallel; imoab_ptest2 is a
-    # generic iMOAB exercise over whole.h5m and stays here.
-    set( MBTR_TESTS parallel/imoab_ptest2.cpp )
-
-
-    foreach( fname ${MBTR_TESTS} )
-      string( REPLACE ".cpp" "" base ${fname} )
-      string( REPLACE "parallel/" "" noparbase ${base} )
-      add_executable( ${noparbase} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname})
-      set_target_properties( ${noparbase} PROPERTIES COMPILE_FLAGS "${TEST_COMP_FLAGS} ${MOAB_DEFINES} -DTEST" )
-      target_link_libraries( ${noparbase} MOAB ${TEMPESTREMAP_LIBRARIES} )
-      add_test( ${noparbase} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${noparbase} ${MPIEXEC_POSTFLAGS} )
-    endforeach()
-
     # iMOAB BfB / tolerance / exit-code regression harness.
     #
     # Each config under test/parallel/regression/configs/ becomes one CTest
@@ -298,35 +284,8 @@ if ( MOAB_HAVE_MPI AND MPI_FOUND )
 
   endif()
 
-  # Fortran tests.  The Fortran coupler drivers moved to
-  # test/earthsystem/parallel; imoab_ptest.F is generic and stays.
-  #
-  # Guarded on ENABLE_FORTRAN alone, and deliberately outside the
-  # MOAB_HAVE_TEMPESTREMAP block above: imoab_ptest.F exercises the iMOAB
-  # Fortran interface and has nothing to do with remapping, so requiring
-  # TempestRemap here dropped it from every build without that library.
-  # test/parallel/Makefile.am:122-123 gates it on ENABLE_FORTRAN only, and this
-  # now matches.  ENABLE_FORTRAN itself is still required: without it the
-  # top-level CMakeLists never calls enable_language(Fortran), and handing a .F
-  # source to add_executable then fails for want of a Fortran compiler.
-  if ( ENABLE_FORTRAN )
-    set( MBTRF_TESTS parallel/imoab_ptest.F )
-
-    foreach( fname ${MBTRF_TESTS} )
-      string( REPLACE ".F90" "" base ${fname} ) # For F90
-      string( REPLACE ".F" "" base ${base} ) # For F77
-      string( REPLACE "parallel/" "" noparbase ${base} )
-      add_executable( ${noparbase} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname})
-      set_property(TARGET ${noparbase} PROPERTY LINKER_LANGUAGE Fortran)
-      set_target_properties( ${noparbase} PROPERTIES COMPILE_FLAGS "${TEST_COMP_FLAGS} ${MOAB_DEFINES} -DTEST" )
-      # MOAB propagates MPI_CXX_LIBRARIES only, which does not define the mpi_*_
-      # symbols an F77/F90 unit references, so the MPI Fortran bindings have to
-      # be named here as well.  TEMPESTREMAP_LIBRARIES is empty unless MOAB was
-      # built with it, in which case libMOAB still needs it on the link line.
-      target_link_libraries( ${noparbase} MOAB ${TEMPESTREMAP_LIBRARIES} ${MPI_Fortran_LIBRARIES} )
-      add_test( ${noparbase} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${noparbase} ${MPIEXEC_POSTFLAGS} )
-    endforeach()
-  endif ( ENABLE_FORTRAN )
+  # Parallel iMOAB Fortran tests live with the Earth-system coupling tests.
+  # They are registered in test/earthsystem/CMakeLists.txt.
 
 
 endif ( MOAB_HAVE_MPI AND MPI_FOUND )

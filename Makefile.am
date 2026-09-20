@@ -77,6 +77,7 @@ examples_advancedsmooth_DATA = \
                examples/advanced/smoothing/makefile \
                examples/advanced/smoothing/LaplacianSmoother.cpp \
                examples/advanced/smoothing/LloydRelaxation.cpp \
+               examples/advanced/smoothing/BoundaryDensity.hpp \
                examples/advanced/smoothing/MeshOptimizationMetrics.hpp \
                examples/advanced/smoothing/MeshOptimizerCore.hpp \
                examples/advanced/smoothing/MeshOptimization.cpp \
@@ -107,7 +108,8 @@ examples_earthsystem_earth_DATA = \
                examples/earthsystem/earth/AddFieldtoPG2.cpp \
                examples/earthsystem/earth/copyPartition.cpp \
                examples/earthsystem/earth/ExtractLand.cpp \
-               examples/earthsystem/earth/addConnec.cpp
+               examples/earthsystem/earth/addConnec.cpp \
+               examples/earthsystem/earth/ParallelRemapTemplate.cpp
 
 CMAKE_CONFIGURATION_FILES = CMakeLists.txt \
    config/AutoconfHeader.cmake      config/GenerateScript.cmake   config/FindNETCDF.cmake        config/FindZOLTAN.cmake      \

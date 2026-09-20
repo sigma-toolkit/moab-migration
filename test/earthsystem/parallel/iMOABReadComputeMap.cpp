@@ -1,5 +1,5 @@
 /*
- * This imoab_read_compute_map test will simulate coupling between 2 components
+ * This iMOABReadComputeMap test will simulate coupling between 2 components
  * 2 meshes will be loaded from 2 files (src, tgt), and one map file
  * We will compute the map FV-FV between the meshes and we will also read the map
  * we will compare both workflows against the baseline test
@@ -19,7 +19,7 @@
 #include "TestUtil.hpp"
 #include "moab/CpuTimer.hpp"
 #include "moab/ProgOptions.hpp"
-#include "imoab_coupler_utils.hpp"
+#include "iMOABCouplerUtils.hpp"
 
 // C++ includes
 #include <iostream>

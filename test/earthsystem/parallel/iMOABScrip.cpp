@@ -17,7 +17,7 @@
 #include <iostream>
 #include <sstream>
 
-#include "imoab_coupler_utils.hpp"
+#include "iMOABCouplerUtils.hpp"
 
 using namespace moab;
 

@@ -119,16 +119,6 @@ else
 endif
 
 IMOAB_TESTS =
-if ENABLE_FORTRAN
-   IMOAB_TESTS += imoab_ptest imoab_ptest2
-if HAVE_TEMPESTREMAP
-imoab_ptest_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
-imoab_ptest2_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
-else
-imoab_ptest_LDADD = $(LDADD) $(FCLIBS)
-imoab_ptest2_LDADD = $(LDADD) $(FCLIBS)
-endif
-endif
 
 if HAVE_HYPRE
 AM_CPPFLAGS += $(HYPRE_INCLUDES) -I$(top_srcdir)/src/hypre/moab
@@ -162,8 +152,6 @@ par_spatial_locator_test_SOURCES = par_spatial_locator_test.cpp
 parallel_adj_SOURCES = ../adj_moab_test.cpp
 parmerge_test_SOURCES = parmerge_test.cpp
 augment_with_ghosts_SOURCES = augment_with_ghosts.cpp
-imoab_ptest_SOURCES = imoab_ptest.F
-imoab_ptest2_SOURCES = imoab_ptest2.cpp
 hireconst_test_parallel_SOURCES = hireconst_test_parallel.cpp
 uref_hirec_test_parallel_SOURCES = uref_hirec_test_parallel.cpp ../geomObject.cpp
 migrate_test_SOURCES = migrate_test.cpp
@@ -174,8 +162,8 @@ ghost_thin_layers_SOURCES = ghost_thin_layers.cpp
 # Other files to clean up (e.g. output from tests)
 MOSTLYCLEANFILES = *.h5m *.nc *.vtk *.txt
 
-# imoab_coupler_utils.hpp and imoab_dualmap_caas_bfb.sh moved with the coupler
-# drivers.  The regression harness stays here: it also drives imoab_ptest2.
+# iMOABCouplerUtils.hpp and iMOABDualMapCAASBfb.sh moved with the coupler
+# drivers. The regression harness stays here and drives the renamed C++ tests.
 EXTRA_DIST = regression/imoab_test_runner.sh \
              regression/lib_common.sh \
              regression/lib_bfb_harness.sh \

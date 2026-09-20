@@ -1,5 +1,5 @@
 /*
- * imoab_spmv_bfb.cpp
+ * iMOABSpMVBfb.cpp
  *
  * Parallel bit-for-bit (BFB) reproducibility test for the deterministic SpMV
  * kernel that backs iMOAB_ApplyScalarProjectionWeights. Verifies that the
@@ -46,7 +46,7 @@
 #include "TestUtil.hpp"
 #include "moab/CpuTimer.hpp"
 #include "moab/ProgOptions.hpp"
-#include "imoab_coupler_utils.hpp"
+#include "iMOABCouplerUtils.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -206,7 +206,7 @@ int main( int argc, char* argv[] )
 
     if( !rankInGlobalComm )
     {
-        std::cout << " === imoab_spmv_bfb test ===\n"
+        std::cout << " === iMOABSpMVBfb test ===\n"
                   << " ATM file      : " << atmFilename << "\n"
                   << " OCN file      : " << ocnFilename << "\n"
                   << " Lo-order map  : " << ( loadFromDisk ? loMapFile : std::string( "<compute online>" ) ) << "\n"

@@ -1,8 +1,8 @@
 /*
- * imoab_coupler_utils.hpp
+ * iMOABCouplerUtils.hpp
  *
  *  Created on: Aug. 22, 2020
- *  \brief will contain utility methods for refactoring imoab*coupler tests, to avoid repetitive tasks
+ *  \brief Utility methods shared by iMOAB coupler tests to avoid repetitive tasks
  *  \ even migrate tests can use some of these utilities
  *  1) create_comm_group(int start, int end, int tag, MPI_Group& group, MPI_Comm& comm)
  *
@@ -43,7 +43,7 @@
 /*
  *  \brief create an MPI group and an MPI communicator for the group, in the global communicator
  */
-int create_group_and_comm( int start, int end, MPI_Group worldGroup, MPI_Group* group, MPI_Comm* comm )
+inline int create_group_and_comm( int start, int end, MPI_Group worldGroup, MPI_Group* group, MPI_Comm* comm )
 {
     std::vector< int > groupTasks;
     groupTasks.resize( end - start + 1, 0 );
@@ -59,7 +59,7 @@ int create_group_and_comm( int start, int end, MPI_Group worldGroup, MPI_Group* 
     return 0;
 }
 
-int create_joint_comm_group( MPI_Group agroup, MPI_Group bgroup, MPI_Group* abgroup, MPI_Comm* abcomm )
+inline int create_joint_comm_group( MPI_Group agroup, MPI_Group bgroup, MPI_Group* abgroup, MPI_Comm* abcomm )
 {
     int ierr = MPI_Group_union( agroup, bgroup, abgroup );
     CHECKIERR( ierr, "Cannot create joint union group" )
@@ -70,7 +70,7 @@ int create_joint_comm_group( MPI_Group agroup, MPI_Group bgroup, MPI_Group* abgr
     return 0;
 }
 
-int setup_component_coupler_meshes( iMOAB_AppID cmpId,
+inline int setup_component_coupler_meshes( iMOAB_AppID cmpId,
                                     int cmpTag,
                                     iMOAB_AppID cplCmpId,
                                     int cmpcouTag,
@@ -79,8 +79,8 @@ int setup_component_coupler_meshes( iMOAB_AppID cmpId,
                                     MPI_Comm* coucomm,
                                     MPI_Group* cplPEGroup,
                                     MPI_Comm* cmpcoucomm,
-                                    std::string& filename,
-                                    std::string& readopts,
+                                     const std::string& filename,
+                                     const std::string& readopts,
                                     int nghlay,
                                     int repartitioner_scheme )
 {
@@ -119,7 +119,7 @@ int setup_component_coupler_meshes( iMOAB_AppID cmpId,
 // rank 0, sort by GID, and write to a digest file.  The sort-order is
 // decomposition-independent so the digest is byte-identical iff the
 // per-cell projected values are bit-for-bit identical across rank counts.
-int gather_and_write_proj_tag( MPI_Comm comm,
+inline int gather_and_write_proj_tag( MPI_Comm comm,
                                int rankInComm,
                                iMOAB_AppID pid,
                                const std::string& tagName,

@@ -1,8 +1,8 @@
 /*
- * imoab_domain_culling.cpp
+ * iMOABDomainCulling.cpp
  *  Created on: Jan. 16, 2024
  *
- *   This imoab_domain_culling test will test reading of a domain with or without culling , and see what is the
+ *   This iMOABDomainCulling test will test reading of a domain with or without culling , and see what is the
  * effect on intersection and map generation
  * basically, 1 moab file will read the domain with or without culling, and see what is the effect on intersection
  * and projection of a field
@@ -23,7 +23,7 @@
 #include <iostream>
 #include <sstream>
 // CHECKIERR
-#include "imoab_coupler_utils.hpp"
+#include "iMOABCouplerUtils.hpp"
 
 using namespace moab;
 

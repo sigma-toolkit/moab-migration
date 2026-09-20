@@ -70,54 +70,73 @@ if( MOAB_HAVE_TEMPESTREMAP )
   endforeach()
 endif()
 
-# Coupler workflows.  Executables keep their unprefixed names so the regression
-# configs and any existing scripts still find them in ${EXECUTABLE_OUTPUT_PATH}.
-if( MOAB_HAVE_MPI AND MPI_FOUND AND MOAB_HAVE_TEMPESTREMAP )
-  set( ES_PAR_TESTS parallel/imoab_coupler.cpp parallel/imoab_coupler_bilin.cpp
-                    parallel/imoab_coupler_twohop.cpp parallel/imoab_domain_culling.cpp
-                    parallel/imoab_map_r2l.cpp parallel/imoab_map_target.cpp
-                    parallel/imoab_read_compute_map.cpp parallel/imoab_scrip.cpp
-                    parallel/imoab_setwithGid.cpp parallel/imoab_phatm_ocn_coupler.cpp
-                    parallel/imoab_spmv_bfb.cpp
-                    parallel/imoab_dualmap_caas.cpp )
+if( MOAB_HAVE_MPI AND MPI_FOUND AND MOAB_HAVE_HDF5_PARALLEL )
+  set( ES_IMOAB_CORE_TESTS parallel/iMOABPtest2.cpp
+                             parallel/iMOABSetWithGid.cpp )
 
-  # imoab_apg2_ol_coupler is the only test here that reads the downloaded E3SM
+  foreach( fname ${ES_IMOAB_CORE_TESTS} )
+    get_filename_component( target ${fname} NAME_WE )
+    add_executable( ${target} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname} )
+    set_target_properties( ${target} PROPERTIES
+      COMPILE_FLAGS "${TEST_COMP_FLAGS} ${MOAB_DEFINES} -DTEST"
+      CXX_STANDARD 17
+      CXX_STANDARD_REQUIRED ON
+      CXX_EXTENSIONS OFF )
+    target_link_libraries( ${target} MOAB )
+    add_test( ${target} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${target} ${MPIEXEC_POSTFLAGS} )
+  endforeach()
+
+  if ( ENABLE_FORTRAN )
+    add_executable( iMOABPtest ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp parallel/iMOABPtest.F )
+    set_property( TARGET iMOABPtest PROPERTY LINKER_LANGUAGE Fortran )
+    set_target_properties( iMOABPtest PROPERTIES COMPILE_FLAGS "${TEST_COMP_FLAGS} ${MOAB_DEFINES} -DTEST" )
+    target_link_libraries( iMOABPtest MOAB ${MPI_Fortran_LIBRARIES} )
+    add_test( iMOABPtest ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/iMOABPtest ${MPIEXEC_POSTFLAGS} )
+  endif()
+endif()
+
+# Coupler workflows. C++ sources use the project spelling "iMOAB" throughout;
+# executable and CTest names follow the renamed sources.
+if( MOAB_HAVE_MPI AND MPI_FOUND AND MOAB_HAVE_TEMPESTREMAP )
+  set( ES_PAR_TESTS parallel/iMOABCoupler.cpp parallel/iMOABCouplerBilin.cpp
+                    parallel/iMOABCouplerTwoHop.cpp parallel/iMOABDomainCulling.cpp
+                    parallel/iMOABMapR2L.cpp parallel/iMOABMapTarget.cpp
+                    parallel/iMOABReadComputeMap.cpp parallel/iMOABScrip.cpp
+                    parallel/iMOABPhAtmOcnCoupler.cpp parallel/iMOABSpMVBFB.cpp
+                    parallel/iMOABDualMapCAAS.cpp )
+
+  # iMOABApg2OlCoupler is the only test here that reads the downloaded E3SM
   # meshes rather than MeshFiles/unittest, and it has no fallback: without
-  # them it fails on an unreadable input.  Build it only when the meshes are
-  # actually on disk, which is how test/earthsystem/parallel/Makefile.am has
-  # always gated it (if HAVE_EXTMESHES).
+  # them it fails on an unreadable input. Build it only when the meshes exist.
   if ( MOAB_HAVE_EXTMESHES )
-    set( ES_PAR_TESTS ${ES_PAR_TESTS} parallel/imoab_apg2_ol_coupler.cpp )
+    list( APPEND ES_PAR_TESTS parallel/iMOABApg2OlCoupler.cpp )
   else ( MOAB_HAVE_EXTMESHES )
-    message( STATUS "Skipping imoab_apg2_ol_coupler: the E3SM meshes it reads are not available" )
+    message( STATUS "Skipping iMOABApg2OlCoupler: the E3SM meshes it reads are not available" )
   endif ( MOAB_HAVE_EXTMESHES )
 
   foreach( fname ${ES_PAR_TESTS} )
-    string( REPLACE ".cpp" "" base ${fname} )
-    string( REPLACE "parallel/" "" noparbase ${base} )
-    add_executable( ${noparbase} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname} )
-    set_target_properties( ${noparbase} PROPERTIES COMPILE_FLAGS "${TEST_COMP_FLAGS} ${MOAB_DEFINES} -DTEST" )
-    target_link_libraries( ${noparbase} MOAB ${TEMPESTREMAP_LIBRARIES} )
-    add_test( ${noparbase} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${noparbase} ${MPIEXEC_POSTFLAGS} )
+    get_filename_component( target ${fname} NAME_WE )
+    add_executable( ${target} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname} )
+    set_target_properties( ${target} PROPERTIES
+      COMPILE_FLAGS "${TEST_COMP_FLAGS} ${MOAB_DEFINES} -DTEST"
+      CXX_STANDARD 17
+      CXX_STANDARD_REQUIRED ON
+      CXX_EXTENSIONS OFF )
+    target_link_libraries( ${target} MOAB ${TEMPESTREMAP_LIBRARIES} )
+    add_test( ${target} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${target} ${MPIEXEC_POSTFLAGS} )
   endforeach()
 
-  # Fortran coupler drivers.  Guarded on ENABLE_FORTRAN: without it the
-  # top-level CMakeLists never calls enable_language(Fortran), and handing a
-  # .F90 source to add_executable then fails for want of a Fortran compiler.
   if ( ENABLE_FORTRAN )
-    set( ES_PARF_TESTS parallel/imoab_coupler_fortran.F90 parallel/imoab_coupler_caas.F90 )
+    set( ES_PARF_TESTS parallel/iMOABCouplerFortran.F90
+                       parallel/iMOABCouplerCAAS.F90 )
 
     foreach( fname ${ES_PARF_TESTS} )
-      string( REPLACE ".F90" "" base ${fname} )
-      string( REPLACE "parallel/" "" noparbase ${base} )
-      add_executable( ${noparbase} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname} )
-      set_property( TARGET ${noparbase} PROPERTY LINKER_LANGUAGE Fortran )
-      set_target_properties( ${noparbase} PROPERTIES COMPILE_FLAGS "${TEST_COMP_FLAGS} ${MOAB_DEFINES} -DTEST" )
-      # MOAB propagates MPI_CXX_LIBRARIES only, which does not define the mpi_*_
-      # symbols an F90 unit references, so the MPI Fortran bindings have to be
-      # named here as well.
-      target_link_libraries( ${noparbase} MOAB ${TEMPESTREMAP_LIBRARIES} ${MPI_Fortran_LIBRARIES} )
-      add_test( ${noparbase} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${noparbase} ${MPIEXEC_POSTFLAGS} )
+      get_filename_component( target ${fname} NAME_WE )
+      add_executable( ${target} ${CMAKE_SOURCE_DIR}/test/TestUtil.hpp ${fname} )
+      set_property( TARGET ${target} PROPERTY LINKER_LANGUAGE Fortran )
+      set_target_properties( ${target} PROPERTIES COMPILE_FLAGS "${TEST_COMP_FLAGS} ${MOAB_DEFINES} -DTEST" )
+      target_link_libraries( ${target} MOAB ${TEMPESTREMAP_LIBRARIES} ${MPI_Fortran_LIBRARIES} )
+      add_test( ${target} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ${EXECUTABLE_OUTPUT_PATH}/${target} ${MPIEXEC_POSTFLAGS} )
     endforeach()
-  endif ( ENABLE_FORTRAN )
+  endif()
 endif()

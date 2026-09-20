@@ -1,5 +1,5 @@
 /*
- * This imoab_setwithGid test will test the method
+ * This iMOABSetWithGid test will test the method
  * iMOAB_SetDoubleTagStorageWithGid, that is used in parallel
  * basically, 2 moab apps have different distribution of the same mesh, and use the method to
  * set the tag from one app to the other
@@ -24,7 +24,7 @@
 #include <iostream>
 #include <sstream>
 // CHECKIERR
-#include "imoab_coupler_utils.hpp"
+#include "iMOABCouplerUtils.hpp"
 
 using namespace moab;
 

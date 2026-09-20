@@ -44,7 +44,7 @@ TESTS = $(NETCDF_TESTS) $(HDF5_TESTS) $(MBCSLAM_TESTS) $(IMOAB_TESTS)
 if HAVE_HDF5_PARALLEL
   HDF5_TESTS += commgraph_test
   MBCSLAM_TESTS += par_intx_sph
-  IMOAB_TESTS += imoab_setwithGid
+  IMOAB_TESTS += iMOABSetWithGid iMOABPtest2
 
 if HAVE_TEMPESTREMAP
 AM_CPPFLAGS += $(TEMPESTREMAP_INCLUDE)
@@ -54,28 +54,27 @@ commgraph_test_LDADD = $(LDADD) $(FCLIBS)
 endif
 
 if HAVE_TEMPESTREMAP
-  HDF5_TESTS += imoab_coupler imoab_coupler_twohop imoab_phatm_ocn_coupler test_mapweights_bcast imoab_scrip imoab_dualmap_caas imoab_spmv_bfb
-  imoab_coupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_coupler_twohop_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_phatm_ocn_coupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_map_target_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_domain_culling_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_read_compute_map_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_dualmap_caas_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
-  imoab_spmv_bfb_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
+  HDF5_TESTS += iMOABCoupler iMOABCouplerTwoHop iMOABPhAtmOcnCoupler test_mapweights_bcast iMOABScrip iMOABDualMapCAAS iMOABSpMVBFB
+  iMOABCoupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
+  iMOABCouplerTwoHop_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
+  iMOABPhAtmOcnCoupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
+  iMOABMapTarget_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
+  iMOABDomainCulling_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
+  iMOABReadComputeMap_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
+  iMOABDualMapCAAS_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
+  iMOABSpMVBFB_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
 if HAVE_NETCDF
-  HDF5_TESTS += imoab_map_target imoab_coupler_bilin imoab_domain_culling imoab_read_compute_map
+  HDF5_TESTS += iMOABMapTarget iMOABCouplerBilin iMOABDomainCulling iMOABReadComputeMap
 endif
 
 if HAVE_PNETCDF
-  NETCDF_TESTS += imoab_map_r2l
-  imoab_map_r2l_SOURCES = imoab_map_r2l.cpp
+  NETCDF_TESTS += iMOABMapR2L
 endif
 
 if HAVE_EXTMESHES
-  HDF5_TESTS +=  imoab_apg2_ol_coupler
+  HDF5_TESTS += iMOABApg2OlCoupler
   DEFS += -DEXT_DATA_DIR="$(builddir)/../../../sandbox/MeshFiles/"
-  imoab_apg2_ol_coupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
+  iMOABApg2OlCoupler_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS)
 endif
 
   test_mapweights_bcast_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
@@ -104,10 +103,12 @@ if HAVE_PNETCDF
 endif
 
 if ENABLE_FORTRAN
+  IMOAB_TESTS += iMOABPtest
+  iMOABPtest_LDADD = $(LDADD) $(FCLIBS)
 if HAVE_TEMPESTREMAP
-IMOAB_TESTS += imoab_coupler_fortran imoab_coupler_caas
-imoab_coupler_fortran_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
-imoab_coupler_caas_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
+  IMOAB_TESTS += iMOABCouplerFortran iMOABCouplerCAAS
+  iMOABCouplerFortran_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
+  iMOABCouplerCAAS_LDADD = $(LDADD) $(TEMPESTREMAP_LIBS) $(FCLIBS)
 endif
 endif
 
@@ -124,27 +125,29 @@ test_mapweights_bcast_SOURCES = test_mapweights_bcast.cpp
 par_intx_sph_SOURCES = par_intx_sph.cpp
 par_intx_sph_LDADD = $(LDADD)
 
-imoab_coupler_SOURCES = imoab_coupler.cpp
-imoab_scrip_SOURCES = imoab_scrip.cpp
-imoab_coupler_twohop_SOURCES = imoab_coupler_twohop.cpp
-imoab_phatm_ocn_coupler_SOURCES = imoab_phatm_ocn_coupler.cpp
-imoab_apg2_ol_coupler_SOURCES = imoab_apg2_ol_coupler.cpp
-imoab_map_target_SOURCES = imoab_map_target.cpp
-imoab_read_compute_map_SOURCES = imoab_read_compute_map.cpp
-imoab_setwithGid_SOURCES = imoab_setwithGid.cpp
-imoab_coupler_bilin_SOURCES = imoab_coupler_bilin.cpp
-imoab_domain_culling_SOURCES = imoab_domain_culling.cpp
-imoab_dualmap_caas_SOURCES = imoab_dualmap_caas.cpp
-imoab_spmv_bfb_SOURCES = imoab_spmv_bfb.cpp
-imoab_coupler_fortran_SOURCES = imoab_coupler_fortran.F90
-imoab_coupler_caas_SOURCES = imoab_coupler_caas.F90
+iMOABCoupler_SOURCES = iMOABCoupler.cpp
+iMOABScrip_SOURCES = iMOABScrip.cpp
+iMOABCouplerTwoHop_SOURCES = iMOABCouplerTwoHop.cpp
+iMOABPhAtmOcnCoupler_SOURCES = iMOABPhAtmOcnCoupler.cpp
+iMOABApg2OlCoupler_SOURCES = iMOABApg2OlCoupler.cpp
+iMOABMapTarget_SOURCES = iMOABMapTarget.cpp
+iMOABReadComputeMap_SOURCES = iMOABReadComputeMap.cpp
+iMOABSetWithGid_SOURCES = iMOABSetWithGid.cpp
+iMOABPtest2_SOURCES = iMOABPtest2.cpp
+iMOABCouplerBilin_SOURCES = iMOABCouplerBilin.cpp
+iMOABDomainCulling_SOURCES = iMOABDomainCulling.cpp
+iMOABMapR2L_SOURCES = iMOABMapR2L.cpp
+iMOABDualMapCAAS_SOURCES = iMOABDualMapCAAS.cpp
+iMOABSpMVBFB_SOURCES = iMOABSpMVBFB.cpp
+iMOABPtest_SOURCES = iMOABPtest.F
+iMOABCouplerFortran_SOURCES = iMOABCouplerFortran.F90
+iMOABCouplerCAAS_SOURCES = iMOABCouplerCAAS.F90
 
 # Other files to clean up (e.g. output from tests)
 MOSTLYCLEANFILES = *.h5m *.nc *.vtk *.txt
 
-# The regression harness stays in test/parallel: it also drives the generic
-# imoab_ptest2, and test/parallel/Makefile.am distributes it.
-EXTRA_DIST = imoab_coupler_utils.hpp imoab_dualmap_caas_bfb.sh
+# The regression harness stays in test/parallel and drives these renamed tests.
+EXTRA_DIST = iMOABCouplerUtils.hpp iMOABDualMapCAASBFB.sh
 
 FORTDEFS = $(FCDEFS)
 PPFCCOMPILE = $(FC) $(FORTDEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \

@@ -1,5 +1,5 @@
 /*
- * This imoab_coupler_bilin test will simulate coupling between atm and ocean using bilinear map
+ * This iMOABCouplerBilin test will simulate coupling between atm and ocean using bilinear map
  * 2 meshes will be loaded from 2 files (atm, ocean), and they will be migrated to
  * coupler processors (coupler pes); then, intx will be performed between migrated meshes
  * and weights will be generated, such that a field from one component will be transferred to
@@ -34,7 +34,7 @@
 #include <iostream>
 #include <sstream>
 //#include <iomanip>
-#include "imoab_coupler_utils.hpp"
+#include "iMOABCouplerUtils.hpp"
 
 using namespace moab;
 
@@ -92,7 +92,7 @@ int main( int argc, char* argv[] )
     int nghlay = 0;  // number of ghost layers for loading the file
     std::vector< int > groupTasks;
     int startG1 = 0, startG2 = 0, endG1 = numProcesses - 1, endG2 = numProcesses - 1;
-    // Support launch of imoab_coupler test on any combo of 2*x processes
+    // Support launch of iMOABCoupler test on any combo of 2*x processes
     int startG4 = startG1, endG4 = endG1;  // these are for coupler layout
     int context_id;                        // used now for freeing buffers
 

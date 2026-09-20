@@ -197,6 +197,9 @@ set ( APPS_EXAMPLES
   earthsystem/earth/ExtractLand.cpp
   earthsystem/earth/addConnec.cpp
 )
+if ( MOAB_USE_MPI AND MOAB_USE_TEMPESTREMAP )
+  list ( APPEND APPS_EXAMPLES earthsystem/earth/ParallelRemapTemplate.cpp )
+endif ()
 
 # MOAB's own include directories arrive with the MOAB::MOAB target.  The
 # third-party headers its public headers include (Eigen from Matrix3.hpp,
@@ -241,8 +244,17 @@ foreach( fname ${ALLCXXEXAMPLES} )
   add_executable( ${base} ${fname})
   set_target_properties( ${base} PROPERTIES COMPILE_FLAGS "'-DMESH_DIR=\"${MOAB_MESH_DIR}\"' ${TEST_COMP_FLAGS} ${MOAB_DEFINES}" )
   target_link_libraries( ${base} PRIVATE ${${base}_DEPS} ${EXAMPLE_LIBRARIES} )
-  add_test( NAME ${base} COMMAND $<TARGET_FILE:${base}> ${${base}_TEST_ARGS} )
+  if ( NOT base STREQUAL "ParallelRemapTemplate" )
+    add_test( NAME ${base} COMMAND $<TARGET_FILE:${base}> ${${base}_TEST_ARGS} )
+  endif ()
 endforeach()
+
+if ( TARGET ParallelRemapTemplate )
+  set_target_properties( ParallelRemapTemplate PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF )
+endif ()
 
 # The sizing field used by --refine-file is checked against an analytic
 # boundary (the equator, whose distance function is known in closed form), so

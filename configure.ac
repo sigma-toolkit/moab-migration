@@ -117,9 +117,8 @@ AM_CONDITIONAL([HAVE_ZCAT],[test "x" = "x$ZCAT"])
 # Check for Pthread usage
 AX_PTHREAD
 
-# Check how to add std=c++14 flag enabled
-# VSM: This is a hard requirement from 5.6.1+
-AX_CXX_COMPILE_STDCXX([14],noext,[mandatory])
+# C++17 is required by the modern iMOAB examples and parallel tests.
+AX_CXX_COMPILE_STDCXX([17],noext,[mandatory])
 
 FATHOM_TEMPLATE_SPECIALIZATION
 FATHOM_TEMPLATE_FUNC_SPECIALIZATION

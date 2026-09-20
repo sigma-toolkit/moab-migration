@@ -1,5 +1,5 @@
 /*
- * This imoab_map_target test will simulate coupling between 2 components
+ * This iMOABMapTarget test will simulate coupling between 2 components
  * 2 meshes will be loaded from 2 files (src, tgt), and one map file
  * the coverage source mesh is migrated to coupler after map read by row
  *  During this migration, par comm graph is computed between source and
@@ -24,7 +24,7 @@
 #include <iostream>
 #include <sstream>
 
-#include "imoab_coupler_utils.hpp"
+#include "iMOABCouplerUtils.hpp"
 
 #ifndef MOAB_HAVE_TEMPESTREMAP
 #error The climate coupler test example requires MOAB configuration with TempestRemap

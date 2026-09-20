@@ -1,7 +1,7 @@
 /**
- * imoab_apg2_ol_coupler.cpp
+ * iMOABApg2OlCoupler.cpp
  *
- *  This imoab_apg2_ol_coupler test will simulate coupling between 3 components
+ *  This iMOABApg2OlCoupler test will simulate coupling between 3 components
  *  meshes will be loaded from 3 files (atm phys + atm pg2, ocean, and land), and
  *  Atm and ocn will be migrated to coupler pes and compute intx on them
  *  then, intx will be performed between migrated meshes
@@ -32,7 +32,7 @@
 #include <iostream>
 #include <sstream>
 
-#include "imoab_coupler_utils.hpp"
+#include "iMOABCouplerUtils.hpp"
 
 #ifdef EXT_DATA_DIR
 #ifdef __cplusplus

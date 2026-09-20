@@ -1,5 +1,5 @@
 #!/bin/bash
-# imoab_dualmap_caas_bfb.sh
+# iMOABDualMapCAAS_bfb.sh
 #
 # End-to-end BFB regression test for the dual-map CAAS path.
 #
@@ -18,7 +18,7 @@
 #         difference is a regression. Exit code 0 iff all pairs match.
 #
 # Usage:
-#   imoab_dualmap_caas_bfb.sh <path-to-imoab_dualmap_caas-binary> [N1 N2 ...]
+#   iMOABDualMapCAAS_bfb.sh <path-to-iMOABDualMapCAAS-binary> [N1 N2 ...]
 # Default rank counts: 1 2 4
 #
 # Required environment: mpirun on PATH, write access to a working dir.
@@ -33,7 +33,7 @@ if [ ${#RANKS[@]} -eq 0 ]; then
 fi
 
 if [ -z "$EXE" ] || [ ! -x "$EXE" ]; then
-    echo "Usage: $0 <path-to-imoab_dualmap_caas> [rank-count ...]" >&2
+    echo "Usage: $0 <path-to-iMOABDualMapCAAS> [rank-count ...]" >&2
     exit 2
 fi
 
@@ -41,7 +41,7 @@ WORKDIR=$(mktemp -d -t dualmap_caas_bfb_XXXXXX)
 trap "rm -rf $WORKDIR" EXIT
 cd "$WORKDIR"
 
-echo "=== imoab_dualmap_caas BFB regression ==="
+echo "=== iMOABDualMapCAAS BFB regression ==="
 echo " EXE     : $EXE"
 echo " WORKDIR : $WORKDIR"
 echo " RANKS   : ${RANKS[*]}"

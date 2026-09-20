@@ -1,5 +1,5 @@
 /*
- * This imoab_coupler test will simulate coupling between 3 components
+ * This iMOABCoupler test will simulate coupling between 3 components
  * 3 meshes will be loaded from 3 files (atm, ocean, lnd), and they will be migrated to
  * all processors (coupler pes); then, intx will be performed between migrated meshes
  * and weights will be generated, such that a field from one component will be transferred to
@@ -28,7 +28,7 @@
 #include <iostream>
 #include <sstream>
 
-#include "imoab_coupler_utils.hpp"
+#include "iMOABCouplerUtils.hpp"
 
 using namespace moab;
 
@@ -102,7 +102,7 @@ int main( int argc, char* argv[] )
     int nghlay = 0;  // number of ghost layers for loading the file
     std::vector< int > groupTasks;
     int startG1 = 0, startG2 = 0, endG1 = numProcesses - 1,
-        endG2   = numProcesses - 1;        // Support launch of imoab_coupler test on any combo of 2*x processes
+        endG2   = numProcesses - 1;        // Support launch of iMOABCoupler test on any combo of 2*x processes
     int startG4 = startG1, endG4 = endG1;  // these are for coupler layout
     int context_id = -1;                   // used now for freeing buffers
 

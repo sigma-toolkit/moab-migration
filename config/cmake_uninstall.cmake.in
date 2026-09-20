@@ -2,14 +2,9 @@
 # Based on CMake FAQ: http://www.cmake.org/Wiki/CMake_FAQ
 # http://www.cmake.org/Wiki/CMake_FAQ#Can_I_do_.22make_uninstall.22_with_CMake.3F
 #
-cmake_policy(SET CMP0007 OLD)
 IF(NOT EXISTS "@CMAKE_CURRENT_BINARY_DIR@/install_manifest.txt")
   MESSAGE(FATAL_ERROR "Cannot find install manifest:\"@CMAKE_CURRENT_BINARY_DIR@/install_manifest.txt\"")
 ENDIF(NOT EXISTS "@CMAKE_CURRENT_BINARY_DIR@/install_manifest.txt")
-
-IF("@ENABLE_PYMOAB@" STREQUAL "ON")
-  FILE(REMOVE_RECURSE "@PYMOAB_INSTALL_PREFIX@")
-ENDIF()
 
 FILE(READ "@CMAKE_CURRENT_BINARY_DIR@/install_manifest.txt" files)
 STRING(REGEX REPLACE "\n" ";" files "${files}")
@@ -22,9 +17,9 @@ FOREACH(file ${files})
       RESULT_VARIABLE rmres
       OUTPUT_VARIABLE rmout
       )
-    IF(NOT ${rm_resval} STREQUAL 0)
+    IF(NOT rmres EQUAL 0)
       MESSAGE(FATAL_ERROR "Problem when removing \"$ENV{DESTDIR}${file}\"")
-    ENDIF(NOT ${rm_resval} STREQUAL 0)
+    ENDIF()
   ELSE(EXISTS "$ENV{DESTDIR}${file}")
     MESSAGE(STATUS "File \"$ENV{DESTDIR}${file}\" does not exist.")
 

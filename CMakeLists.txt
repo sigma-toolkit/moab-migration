@@ -1,6 +1,6 @@
 cmake_minimum_required( VERSION 3.20 )
 
-set (CMAKE_CXX_STANDARD 14)
+set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (NOT WIN32)
@@ -43,10 +43,7 @@ include(config/distcheck.cmake)
 #include(config/release.cmake)
 
 LOGGING_INITIALIZE()
-_SETUP_PROJECT_DIST()
-DISTCHECK_SETUP()
 #RELEASE_SETUP()
-message(STATUS "MOAB: Configured 'distcheck' target")
 
 #Add our Cmake directory to the module search path
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/config ${CMAKE_MODULE_PATH})
@@ -1292,6 +1289,10 @@ install(
 add_custom_target(uninstall
   COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
   )
+
+_moab_add_dist_targets()
+DISTCHECK_SETUP()
+message(STATUS "MOAB: Configured 'distcheck' target")
 ###################
 # INSTALL documentation and examples
 ####################
@@ -1384,6 +1385,7 @@ SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/advanced/smoothing/makefile
   examples/advanced/smoothing/LaplacianSmoother.cpp
   examples/advanced/smoothing/LloydRelaxation.cpp
+  examples/advanced/smoothing/BoundaryDensity.hpp
   examples/advanced/smoothing/MeshOptimizationMetrics.hpp
   examples/advanced/smoothing/MeshOptimizerCore.hpp
   examples/advanced/smoothing/MeshOptimization.cpp
@@ -1416,7 +1418,8 @@ SET(MOAB_EXAMPLES ${MOAB_EXAMPLES}
   examples/earthsystem/earth/AddFieldtoPG2.cpp
   examples/earthsystem/earth/copyPartition.cpp
   examples/earthsystem/earth/ExtractLand.cpp
-  examples/earthsystem/earth/addConnec.cpp )
+  examples/earthsystem/earth/addConnec.cpp
+  examples/earthsystem/earth/ParallelRemapTemplate.cpp )
 
 include(AutoconfHeader)
 moab_install_docs(${MOAB_EXAMPLES})

@@ -7,6 +7,10 @@ ifeq ("$(MOAB_HDF5_ENABLED)","yes")
 ALLEXAMPLES += ContinentsOnGlobe BoundaryContinents addPCdata copyPartition AddFieldtoPG2 ExtractLand addConnec
 endif
 
+ifeq ("$(MOAB_MPI_ENABLED)-$(MOAB_TEMPESTREMAP_ENABLED)","yes-yes")
+ALLEXAMPLES += ParallelRemapTemplate
+endif
+
 all: $(ALLEXAMPLES)
 
 ContinentsOnGlobe: ContinentsOnGlobe.o ${MOAB_LIBFILE}
@@ -54,6 +58,9 @@ run-AddFieldtoPG2: AddFieldtoPG2
 addConnec: addConnec.o ${MOAB_LIBFILE}
 	@echo "[CXXLD]  $@"
 	${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
+
+ParallelRemapTemplate.o: CXXFLAGS += -std=c++17
+ParallelRemapTemplate: ParallelRemapTemplate.o ${MOAB_LIBFILE} ; @echo "[CXXLD]  $@"; ${VERBOSE}${MOAB_CXX} -o $@ $< ${MOAB_LIBS_LINK}
 
 run-addConnec: addConnec
 	${RUNSERIAL} ./addConnec

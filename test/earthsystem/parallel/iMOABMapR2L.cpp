@@ -1,5 +1,5 @@
 /*
- * This imoab_map_r2l test will simulate coupling between land and river
+ * This iMOABMapR2L test will simulate coupling between land and river
  * 2 meshes will be loaded from 2 files (land domain file, source,
  * and target scrip file, tgt), and one map file read from disk
  * the migrate map mesh will be used to generate coverage set over target
@@ -20,7 +20,7 @@
 #include <iostream>
 #include <sstream>
 
-#include "imoab_coupler_utils.hpp"
+#include "iMOABCouplerUtils.hpp"
 
 int main( int argc, char* argv[] )
 {

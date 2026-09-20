@@ -1,7 +1,12 @@
-cmake_minimum_required( VERSION 2.8.12 )
+cmake_minimum_required( VERSION 3.20 )
 
 set ( MOAB_ROOT "" CACHE PATH "Path to MOAB library installation" )
+project( MOAB_Examples NONE )
 
+# Imported shared libraries require platform properties that are normally set
+# when project() enables a language. This property is harmless for imported
+# targets and allows the first package pass to discover MOAB's compilers.
+set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
 find_package(MOAB REQUIRED
   HINTS ${MOAB_ROOT} ${MOAB_ROOT}/lib/cmake/MOAB)
 
@@ -13,13 +18,17 @@ set ( CMAKE_CXX_FLAGS ${MOAB_CXX_FLAGS} )
 set ( CMAKE_Fortran_FLAGS ${MOAB_FC_FLAGS} )
 set ( CMAKE_CXX_LINK_FLAGS ${CMAKE_CXX_LINK_FLAGS} )
 
+enable_language(C)
+enable_language(CXX)
 if ( ENABLE_IMESH )
   enable_language(Fortran)
 endif ( ENABLE_IMESH )
 
-message ( "++ Found MOAB configuration details at: ${MOAB_DIR}" )
+# Re-run dependency discovery after the relevant languages are enabled.
+find_package(MOAB REQUIRED
+  HINTS ${MOAB_ROOT} ${MOAB_ROOT}/lib/cmake/MOAB)
 
-project( MOAB_Examples )
+message ( "++ Found MOAB configuration details at: ${MOAB_DIR}" )
 
 set ( BEGINNER_EXAMPLES
   beginner/mbex1.cpp
@@ -68,10 +77,21 @@ set ( ADVANCED_EXAMPLES
 if ( MOAB_USE_MPI )
   set ( ADVANCED_EXAMPLES ${ADVANCED_EXAMPLES}
                           advanced/GenLargeMesh.cpp
-                          advanced/CoupleMGen.cpp
     )
-  set ( CoupleMGen_DEPS "mbcoupler" )
+  find_path( MBCOUPLER_INCLUDE_DIR mbcoupler/Coupler.hpp HINTS ${MOAB_ROOT}/include )
+  find_library( MBCOUPLER_LIBRARY mbcoupler HINTS ${MOAB_ROOT}/lib )
+  if ( MBCOUPLER_INCLUDE_DIR AND MBCOUPLER_LIBRARY )
+    set ( ADVANCED_EXAMPLES ${ADVANCED_EXAMPLES} advanced/CoupleMGen.cpp )
+    set ( CoupleMGen_DEPS ${MBCOUPLER_LIBRARY} )
+    set ( CoupleMGen_DEFINES -DMOAB_HAVE_MBCOUPLER )
+  endif ()
 endif ( MOAB_USE_MPI )
+
+if ( MOAB_USE_MPI AND MOAB_USE_TEMPESTREMAP )
+  set ( ADVANCED_EXAMPLES ${ADVANCED_EXAMPLES}
+                          advanced/ParallelRemapTemplate.cpp
+    )
+endif ( MOAB_USE_MPI AND MOAB_USE_TEMPESTREMAP )
 
 set ( FORTRAN_EXAMPLES
   fortran/DirectAccessNoHolesF90.F90
@@ -99,7 +119,10 @@ foreach( fname ${ALLCXXEXAMPLES} )
   get_filename_component(base ${base} NAME_WE)
   message("-- Driver [${base}] (C++ sources) :: ${fname}")
   add_executable( ${base} ${fname})
-  set_target_properties( ${base} PROPERTIES COMPILE_FLAGS "'-DMESH_DIR=\"${MOAB_MESH_DIR}\"' ${TEST_COMP_FLAGS} ${MOAB_DEFINES}" )
+  set_target_properties( ${base} PROPERTIES COMPILE_FLAGS "'-DMESH_DIR=\"${MOAB_MESH_DIR}\"' ${TEST_COMP_FLAGS} ${MOAB_DEFINES} ${${base}_DEFINES}" )
+  if ( base STREQUAL "ParallelRemapTemplate" )
+    set_target_properties( ${base} PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF )
+  endif()
   target_link_libraries( ${base} LINK_PUBLIC ${${base}_DEPS} ${MOAB_LIBRARIES} )
   add_test( ${base} ${EXECUTABLE_OUTPUT_PATH}/${base} )
 endforeach()
@@ -116,4 +139,3 @@ if ( ENABLE_IMESH )
     add_test( ${base} ${EXECUTABLE_OUTPUT_PATH}/${base} )
   endforeach()
 endif ( ENABLE_IMESH )
-

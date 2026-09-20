@@ -43,10 +43,7 @@ include(config/distcheck.cmake)
 #include(config/release.cmake)
 
 LOGGING_INITIALIZE()
-_SETUP_PROJECT_DIST()
-DISTCHECK_SETUP()
 #RELEASE_SETUP()
-message(STATUS "MOAB: Configured 'distcheck' target")
 
 #Add our Cmake directory to the module search path
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/config ${CMAKE_MODULE_PATH})
@@ -950,6 +947,10 @@ install(
 add_custom_target(uninstall
   COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
   )
+
+_moab_add_dist_targets()
+DISTCHECK_SETUP()
+message(STATUS "MOAB: Configured 'distcheck' target")
 ###################
 # INSTALL documentation and examples
 ####################

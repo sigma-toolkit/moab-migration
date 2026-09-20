@@ -32,6 +32,10 @@
 using namespace moab;
 using namespace std;
 
+#ifdef MOAB_HAVE_NETCDF
+const string test_file_name = string( MESH_DIR ) + "/mbtest2.g";
+#endif
+
 int main( int argc, char** argv )
 {
 #ifdef MOAB_HAVE_NETCDF

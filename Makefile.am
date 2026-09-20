@@ -110,6 +110,12 @@ CMAKE_CONFIGURATION_FILES = CMakeLists.txt \
    config/git-archive-all.sh   config/cmake_uninstall.cmake.in moab.make.cmake config/logging.cmake config/dist.cmake config/distcheck.cmake \
    pymoab/CMakeLists.txt            config/cython_test.pyx
 
+install_moab_files = install/install-moab.sh \
+                  install/install-bootstrap.sh \
+                  install/INSTALL-MOAB.md \
+                  install/CONTRIBUTING-MACHINES.md \
+                  install/scripts/e3sm_env.py
+
 EXTRA_DIST = $(doc_DATA) \
 						 debian \
 						 config/MOAB.pc.in config/MOAB.pc.cmake.in \
@@ -125,7 +131,8 @@ EXTRA_DIST = $(doc_DATA) \
 						 $(examples_pythonex_DATA) \
 						 $(examples_apps_DATA) \
 						 $(examples_apps_earth_DATA) \
-						 suggest_configuration.sh
+						 suggest_configuration.sh \
+						 $(install_moab_files)
 
 # Automake doesn't seem to have a directory defined for
 # platform-dependent data (or include) files. So put

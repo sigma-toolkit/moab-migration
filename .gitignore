@@ -303,3 +303,12 @@ tools/vtkMOABReaderNew/vtkMoabReaderPlugin_Plugin.h
 tools/vtkMOABReaderNew/vtkSMvtkMoabReaderPluginInstantiator.cxx
 tools/vtkMOABReaderNew/vtkSMvtkMoabReaderPluginInstantiator.h
 build
+
+# install-moab.sh build artifacts (tpl caches, logs, the per-machine
+# moab-build/ output dir). These can land anywhere the user runs the
+# script from; the patterns cover the most common locations.
+build-*/
+moab-build/
+tpl-archives/
+tpl-logs/
+tpl-work/

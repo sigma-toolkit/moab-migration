@@ -39,11 +39,15 @@
 #include <numeric>
 #include <algorithm>
 
+/*
+#ifdef MOAB_HAVE_NETCDF
 #ifdef MOAB_HAVE_NETCDFPAR
 #include "netcdfcpp_par.hpp"
 #else
 #include "netcdfcpp.h"
 #endif
+#endif
+*/
 
 // #define USE_NATIVE_TEMPESTREMAP_ROUTINES
 
@@ -526,7 +530,9 @@ moab::ErrorCode moab::TempestOnlineMap::GenerateRemappingWeights( std::string st
                                                                   const std::string& srcDofTagName,
                                                                   const std::string& tgtDofTagName )
 {
+#ifdef MOAB_HAVE_NETCDF
     NcError error( NcError::silent_nonfatal );
+#endif
 
     moab::DebugOutput dbgprint( std::cout, rank, 0 );
     dbgprint.set_prefix( "[TempestOnlineMap]: " );

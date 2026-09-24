@@ -24,14 +24,6 @@
 #include "moab/ParallelComm.hpp"
 #endif
 
-// Tempest includes
-#ifdef MOAB_HAVE_TEMPESTREMAP
-#include "netcdfcpp.h"
-#include "TempestRemapAPI.h"
-#else
-#error "This tool depends on TempestRemap library. Reconfigure using --with-tempestremap"
-#endif
-
 namespace moab
 {
 

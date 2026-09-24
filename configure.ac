@@ -879,10 +879,10 @@ if (test "x$WITH_TEMPEST" != "xno" && test "x$WITH_TEMPEST" != "x"); then
     old_LIBS="$LIBS"
     LDFLAGS="$LDFLAGS -L$WITH_TEMPEST/lib $PNETCDF_LDFLAGS $NETCDF_LDFLAGS $HDF5_LDFLAGS"
     LIBS="$NETCDF_LIBS $LAPACK_LIBS $BLAS_LIBS $LIBS"
-    AC_CHECK_LIB([TempestRemap],[GenerateOfflineMap],[TEMPESTREMAP_LIBS="-L$WITH_TEMPEST/lib -lTempestRemap $NETCDF_LIBS $LAPACK_LIBS $BLAS_LIBS"],
-      [unset ac_cv_lib_TempestRemap_GenerateOfflineMap
+    AC_CHECK_LIB([TempestRemap],[GenerateOfflineMapWithMeshes],[TEMPESTREMAP_LIBS="-L$WITH_TEMPEST/lib -lTempestRemap $NETCDF_LIBS $LAPACK_LIBS $BLAS_LIBS"],
+      [unset ac_cv_lib_TempestRemap_GenerateOfflineMapWithMeshes
       LIBS="$NETCDF_LIBS $PNETCDF_LIBS $HDF5_LIBS $LAPACK_LIBS $BLAS_LIBS $LIBS"
-      AC_CHECK_LIB([TempestRemap],[GenerateOfflineMap],
+      AC_CHECK_LIB([TempestRemap],[GenerateOfflineMapWithMeshes],
                     [TEMPESTREMAP_LIBS="-L$WITH_TEMPEST/lib -lTempestRemap $NETCDF_LIBS $PNETCDF_LIBS $LAPACK_LIBS $BLAS_LIBS"],
                     [AC_MSG_ERROR([TempestRemap library not found or not usable.])]
                     [$NETCDF_LIBS $PNETCDF_LIBS])],[$NETCDF_LIBS])
@@ -1136,6 +1136,23 @@ AC_SUBST([CPPFLAGS])
 AC_SUBST([FCPPFLAGS])
 AC_SUBST([MB_DEFS])
 AC_SUBST([FCDEFS])
+
+# Intel oneAPI ifx links against the system gcc libstdc++ by default, which may be older
+# than the libstdc++ that the C++ compiler (e.g. icpx) uses to build libMOAB. The mismatch
+# produces undefined GLIBCXX_* / std::__throw_bad_array_new_length references when a
+# Fortran-linked executable pulls in the C++ MOAB library. Add the C++ compiler's own
+# libstdc++ directory to the link flags so every executable (C, C++ or Fortran) resolves
+# the same C++ runtime. Harmless for GNU builds (adds the default libstdc++ directory).
+AC_MSG_CHECKING([for C++ compiler libstdc++ directory])
+CXX_LIBSTDCXX_PATH=`$CXX -print-file-name=libstdc++.so.6 2>/dev/null`
+CXX_LIBSTDCXX_DIR=
+AS_CASE([$CXX_LIBSTDCXX_PATH],
+        [/*], [CXX_LIBSTDCXX_DIR=`AS_DIRNAME([$CXX_LIBSTDCXX_PATH])`])
+AS_IF([test "x$CXX_LIBSTDCXX_DIR" != x && test -d "$CXX_LIBSTDCXX_DIR"],
+      [AM_LDFLAGS="$AM_LDFLAGS -L$CXX_LIBSTDCXX_DIR -Wl,-rpath,$CXX_LIBSTDCXX_DIR"
+       AC_MSG_RESULT([$CXX_LIBSTDCXX_DIR])],
+      [AC_MSG_RESULT([not found; skipping])])
+
 AM_LDFLAGS="$AM_LDFLAGS $EXPORT_LTFLAGS $EXPORT_LDFLAGS"
 AC_SUBST([AM_LDFLAGS])
 AC_SUBST([EXPORT_LTFLAGS])

@@ -543,6 +543,7 @@ class ToolContext
             std::string netcdf_options = "PARALLEL=READ_PART;PARTITION_METHOD=TRIVIAL;";
 #endif
             // Only rank 0 needs to determine the NetCDF file type
+#ifdef MOAB_HAVE_NETCDF
             if( proc_id == 0 )
             {
                 NcFile ncFile( filename.c_str(), NcFile::ReadOnly );
@@ -587,6 +588,7 @@ class ToolContext
                     netcdf_options += "PARALLEL_RESOLVE_SHARED_ENTS;NO_EDGES;NO_MIXED_ELEMENTS;VARIABLE=;";
                 }
             }
+#endif  // MOAB_HAVE_NETCDF
 
             // Broadcast the options to all processes
 #ifdef MOAB_HAVE_MPI
@@ -969,7 +971,9 @@ int main( int argc, char* argv[] )
 {
     try
     {
+#ifdef MOAB_HAVE_NETCDF
     NcError error( NcError::verbose_nonfatal );
+#endif
     std::stringstream sstr;
     std::string historyStr;
 
@@ -1188,7 +1192,14 @@ int main( int argc, char* argv[] )
             runCtx->timer_pop();
 
             std::map< std::string, std::string > mapAttributes;
+#ifdef MOAB_HAVE_NETCDF
             if( !runCtx->skip_io ) weightMap.Write( "outWeights.nc", mapAttributes );
+#else
+            (void)mapAttributes;
+            MB_CHK_SET_ERR( moab::MB_FAILURE,
+                            "Writing a TempestRemap OfflineMap (OVERLAP_MEMORY path) requires NetCDF; use the "
+                            "MOAB (OVERLAP_MOAB) workflow, which writes weights via PnetCDF/HDF5 instead" );
+#endif
         }
     }
     else if( runCtx->meshType == moab::TempestRemapper::OVERLAP_MOAB )
@@ -1668,6 +1679,10 @@ namespace
         MB_CHK_SET_ERR( moab::MB_FAILURE, msg );                                  \
     }
 
+#ifdef MOAB_HAVE_NETCDF
+// TempestRemap-native overlap path: loads source/target meshes as TempestRemap Mesh
+// objects (which require NetCDF) and generates the overlap in memory. Only available when
+// NetCDF is enabled; otherwise use the MOAB-native path (handleOverlapMOAB).
 moab::ErrorCode handleOverlapMemory( ToolContext& ctx, moab::TempestRemapper& remapper, Mesh* tempest_mesh )
 {
     using namespace moab;
@@ -1698,6 +1713,7 @@ moab::ErrorCode handleOverlapMemory( ToolContext& ctx, moab::TempestRemapper& re
 
     return moab::MB_SUCCESS;
 }
+#endif  // MOAB_HAVE_NETCDF
 
 moab::ErrorCode handleOverlapMOAB( ToolContext& ctx, moab::TempestRemapper& remapper )
 {
@@ -1823,6 +1839,9 @@ moab::ErrorCode handleOverlapMOAB( ToolContext& ctx, moab::TempestRemapper& rema
     return moab::MB_SUCCESS;
 }
 
+#ifdef MOAB_HAVE_NETCDF
+// TempestRemap-native, file-based overlap generation (GenerateOverlapMesh reads the mesh
+// files and writes the overlap). Requires NetCDF; use the MOAB-native path otherwise.
 moab::ErrorCode handleOverlapFiles( ToolContext& ctx, Mesh* tempest_mesh )
 {
     ctx.timer_push( "create Tempest OverlapMesh" );
@@ -1835,6 +1854,7 @@ moab::ErrorCode handleOverlapFiles( ToolContext& ctx, Mesh* tempest_mesh )
     ctx.meshes.push_back( tempest_mesh );
     return moab::MB_SUCCESS;
 }
+#endif  // MOAB_HAVE_NETCDF
 
 /**
  * @brief Convert a generated TempestRemap mesh to MOAB format and write as h5m file.
@@ -1978,13 +1998,25 @@ static moab::ErrorCode CreateTempestMesh( ToolContext& ctx, moab::TempestRemappe
         switch( ctx.meshType )
         {
             case RemapperType::OVERLAP_FILES:
+#ifdef MOAB_HAVE_NETCDF
                 if( !ctx.proc_id ) outputFormatter.printf( 0, "Creating TempestRemap overlap mesh ...\n" );
                 return handleOverlapFiles( ctx, tempest_mesh );
+#else
+                MB_CHK_SET_ERR( moab::MB_FAILURE,
+                                "OVERLAP_FILES mode requires NetCDF (TempestRemap file-based overlap "
+                                "generation); build with NetCDF or use OVERLAP_MOAB mode instead" );
+#endif
 
             case RemapperType::OVERLAP_MEMORY:
+#ifdef MOAB_HAVE_NETCDF
                 if( !ctx.proc_id )
                     outputFormatter.printf( 0, "Convert MOAB overlap files to TempestRemap format in-memory ...\n" );
                 return handleOverlapMemory( ctx, remapper, tempest_mesh );
+#else
+                MB_CHK_SET_ERR( moab::MB_FAILURE,
+                                "OVERLAP_MEMORY mode requires NetCDF (TempestRemap-native mesh loading); "
+                                "build with NetCDF or use OVERLAP_MOAB mode instead" );
+#endif
 
             case RemapperType::OVERLAP_MOAB:
                 if( !ctx.proc_id )

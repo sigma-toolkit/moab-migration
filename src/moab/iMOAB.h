@@ -323,6 +323,8 @@ ErrCode iMOAB_CreateElements( iMOAB_AppID pid,
                               int* connectivity,
                               int* block_ID );
 
+#ifdef MOAB_HAVE_MPI
+
 /**
  * \brief Resolve shared entities using global markers on shared vertices.
  *
@@ -352,6 +354,8 @@ ErrCode iMOAB_ResolveSharedEntities( iMOAB_AppID pid, int* num_verts, int* marke
  * \return ErrCode                         The error code indicating success or failure.
  */
 ErrCode iMOAB_DetermineGhostEntities( iMOAB_AppID pid, int* ghost_dim, int* num_ghost_layers, int* bridge_dim );
+
+#endif /* #ifdef MOAB_HAVE_MPI */
 
 /**
  * \brief Write a MOAB mesh along with the solution tags to a file.
@@ -1063,6 +1067,8 @@ ErrCode iMOAB_ComputeCommGraph( iMOAB_AppID pid1,
  * \param[in]  context_id (int*)                   The unique identifier of the other participating component in intersection (target).
  * \return ErrCode                                 The error code indicating success or failure.
  */
+#ifdef MOAB_HAVE_TEMPESTREMAP
+/* CoverageGraph operates on the TempestRemapper covering set, so it requires TempestRemap. */
 ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
                              iMOAB_AppID pid_src,
                              iMOAB_AppID pid_migr,
@@ -1070,6 +1076,7 @@ ErrCode iMOAB_CoverageGraph( MPI_Comm* joint_communicator,
                              int* src_id,
                              int* migr_id,
                              int* context_id );
+#endif /* #ifdef MOAB_HAVE_TEMPESTREMAP */
 
 /**
  * \brief Dump info about communication graph.
@@ -1096,6 +1103,10 @@ ErrCode iMOAB_DumpCommGraph( iMOAB_AppID pid, int* context_id, int* is_sender, c
  */
 ErrCode iMOAB_MergeVertices( iMOAB_AppID pid );
 
+#endif /* #ifdef MOAB_HAVE_MPI */
+
+#ifdef MOAB_HAVE_TEMPESTREMAP
+
 /**
  * @brief Set the number of ghost layers for the map.
  *
@@ -1105,10 +1116,6 @@ ErrCode iMOAB_MergeVertices( iMOAB_AppID pid );
  * @return ErrCode The error code indicating success or failure.
  */
 ErrCode iMOAB_SetMapGhostLayers( iMOAB_AppID pid, int* n_src_ghost_layers, int* n_tgt_ghost_layers );
-
-#endif /* #ifdef MOAB_HAVE_MPI */
-
-#ifdef MOAB_HAVE_TEMPESTREMAP
 
 /**
  * @brief Compute the source coverage mesh that completely encompasses the target surface mesh on a sphere.
@@ -1175,8 +1182,6 @@ ErrCode iMOAB_ComputePointDoFIntersection( iMOAB_AppID pid_source,
                                            iMOAB_AppID pid_target,
                                            iMOAB_AppID pid_intersection );
 
-#ifdef MOAB_HAVE_NETCDF
-
 #ifdef MOAB_HAVE_MPI
 
 /**
@@ -1211,6 +1216,10 @@ ErrCode iMOAB_MigrateMapMesh( iMOAB_AppID pid1,
                               int* comp2);
 
 #endif /* #ifdef MOAB_HAVE_MPI */
+
+/* Map (SCRIP weight-file) I/O supports either NetCDF or a PnetCDF fallback, so
+ * expose the map-file API whenever any NC backend is available. */
+#if defined( MOAB_HAVE_NETCDF ) || defined( MOAB_HAVE_PNETCDF )
 
 /**
  * \brief Load the projection weights from disk to transfer a solution from a source surface mesh to a destination mesh defined on a sphere.
@@ -1255,7 +1264,7 @@ ErrCode iMOAB_WriteMapFile(
     const iMOAB_String solution_weights_identifier, /* "scalar", "flux", "custom" */
     const iMOAB_String remap_weights_filename );
 
-#endif /* #ifdef MOAB_HAVE_NETCDF */
+#endif /* #if defined( MOAB_HAVE_NETCDF ) || defined( MOAB_HAVE_PNETCDF ) */
 
 /**
  * \brief Compute the projection weights to transfer a solution from a source surface mesh to a destination mesh defined

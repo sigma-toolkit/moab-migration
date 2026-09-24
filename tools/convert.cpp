@@ -482,6 +482,7 @@ int main( int argc, char* argv[] )
 
             if( tempestin )
             {
+#ifdef MOAB_HAVE_NETCDF
                 moab::EntityHandle& srcmesh = remapper->GetMeshSet( moab::Remapper::SourceMesh );
 
                 // convert
@@ -681,6 +682,11 @@ int main( int argc, char* argv[] )
                     tgtpar.clear();
                     gids.clear();
                 }
+#else
+                MB_CHK_SET_ERR( moab::MB_FAILURE,
+                                "Reading TempestRemap/SCRIP meshes (-T tempest input) requires NetCDF, which is "
+                                "disabled in this MOAB build" );
+#endif  // MOAB_HAVE_NETCDF
             }
             else if( tempestout )
             {
@@ -1064,8 +1070,14 @@ int main( int argc, char* argv[] )
                 MB_CHK_ERR( result );
             }
             // Write out the mesh using TempestRemap
+#ifdef MOAB_HAVE_NETCDF
             tempestMesh->Write( out, NcFile::Netcdf4 );
             file_written = true;
+#else
+            MB_CHK_SET_ERR( moab::MB_FAILURE,
+                            "Writing TempestRemap meshes (-T tempest output) requires NetCDF, which is "
+                            "disabled in this MOAB build" );
+#endif
         }
         delete remapper;  // cleanup
     }

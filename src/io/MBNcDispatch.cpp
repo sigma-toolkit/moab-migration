@@ -17,17 +17,82 @@
 #include <map>
 #endif
 
-// Phase-1 limitation: this dispatch layer always needs the standard NetCDF
-// C API for the serial / parallel-NetCDF / buffered backends. Pure-PNetCDF
-// builds (HAVE_PNETCDF without HAVE_NETCDF) are rare and currently fall
-// outside this refactor's scope — they continue to work via the legacy
-// NCFUNC macro path until that case is wired up here.
-#ifndef MOAB_HAVE_NETCDF
-#error "MBNcDispatch currently requires MOAB_HAVE_NETCDF. PNetCDF-only builds are not yet supported by this layer."
+// This dispatch layer needs at least one NetCDF backend. With MOAB_HAVE_NETCDF it
+// provides the full serial / parallel-NetCDF / buffered backends and is format-agnostic
+// (classic CDF and NetCDF-4/HDF5). In a PNetCDF-only build (MOAB_HAVE_PNETCDF without
+// MOAB_HAVE_NETCDF) only the classic CDF family is supported: every backend routes to
+// PNetCDF (parallel on the caller's communicator, serial on MPI_COMM_SELF), and
+// NetCDF-4/HDF5 files are rejected up front by mbnc_choose_backend_for_read (PNetCDF
+// cannot read HDF5-based files). The serial nc_* / buffered code paths below are then
+// unreachable and compiled out via #ifdef MOAB_HAVE_NETCDF.
+#if !defined( MOAB_HAVE_NETCDF ) && !defined( MOAB_HAVE_PNETCDF )
+#error "MBNcDispatch requires MOAB_HAVE_NETCDF or MOAB_HAVE_PNETCDF."
+#endif
+
+// In a PNetCDF-only build libnetcdf's serial C API (nc_*) is unavailable. The serial and
+// buffered backends that use it are never selected (see mbnc_choose_backend_for_read and
+// mbnc_open below); guard their bodies so the file still compiles without netcdf.h.
+#if defined( MOAB_HAVE_NETCDF )
+#define MBNC_HAVE_SERIAL_NC 1
 #endif
 
 namespace moab
 {
+
+// ============================================================================
+// PNetCDF-only build: serial libnetcdf (nc_*) is unavailable.
+//
+// The serial (NCB_NETCDF_SERIAL) and buffered (NCB_BUFFERED) backends below call the
+// serial nc_* API. In a PNetCDF-only build those backends are never selected — the
+// chooser routes classic files to PNetCDF (parallel or on MPI_COMM_SELF) and rejects
+// NetCDF-4/HDF5, and mbnc_open/mbnc_create open via PNetCDF. These inline stubs let the
+// unreachable nc_* code compile without netcdf.h; each returns NC_EBADID and is never
+// invoked at runtime. Templates that take an nc_* function as a parameter
+// (bsuf_get_vara / bsuf_get_att) are simply never instantiated here.
+// ============================================================================
+#if !defined( MOAB_HAVE_NETCDF )
+inline int nc_open( const char*, int, int* ) { return NC_EBADID; }
+inline int nc_create( const char*, int, int* ) { return NC_EBADID; }
+inline int nc_close( int ) { return NC_EBADID; }
+inline int nc_redef( int ) { return NC_EBADID; }
+inline int nc_enddef( int ) { return NC_EBADID; }
+inline int nc_def_dim( int, const char*, size_t, int* ) { return NC_EBADID; }
+inline int nc_def_var( int, const char*, nc_type, int, const int*, int* ) { return NC_EBADID; }
+inline int nc_inq_natts( int, int* ) { return NC_EBADID; }
+inline int nc_inq_ndims( int, int* ) { return NC_EBADID; }
+inline int nc_inq_nvars( int, int* ) { return NC_EBADID; }
+inline int nc_inq_dimid( int, const char*, int* ) { return NC_EBADID; }
+inline int nc_inq_dim( int, int, char*, size_t* ) { return NC_EBADID; }
+inline int nc_inq_dimlen( int, int, size_t* ) { return NC_EBADID; }
+inline int nc_inq_varid( int, const char*, int* ) { return NC_EBADID; }
+inline int nc_inq_varname( int, int, char* ) { return NC_EBADID; }
+inline int nc_inq_vartype( int, int, nc_type* ) { return NC_EBADID; }
+inline int nc_inq_varndims( int, int, int* ) { return NC_EBADID; }
+inline int nc_inq_vardimid( int, int, int* ) { return NC_EBADID; }
+inline int nc_inq_varnatts( int, int, int* ) { return NC_EBADID; }
+inline int nc_inq_attname( int, int, int, char* ) { return NC_EBADID; }
+inline int nc_inq_att( int, int, const char*, nc_type*, size_t* ) { return NC_EBADID; }
+inline int nc_inq_attlen( int, int, const char*, size_t* ) { return NC_EBADID; }
+inline int nc_get_att_text( int, int, const char*, char* ) { return NC_EBADID; }
+inline int nc_get_att_int( int, int, const char*, int* ) { return NC_EBADID; }
+inline int nc_get_att_short( int, int, const char*, short* ) { return NC_EBADID; }
+inline int nc_get_att_long( int, int, const char*, long* ) { return NC_EBADID; }
+inline int nc_get_att_float( int, int, const char*, float* ) { return NC_EBADID; }
+inline int nc_get_att_double( int, int, const char*, double* ) { return NC_EBADID; }
+inline int nc_put_att_text( int, int, const char*, size_t, const char* ) { return NC_EBADID; }
+inline int nc_put_att_int( int, int, const char*, nc_type, size_t, const int* ) { return NC_EBADID; }
+inline int nc_put_att_short( int, int, const char*, nc_type, size_t, const short* ) { return NC_EBADID; }
+inline int nc_put_att_float( int, int, const char*, nc_type, size_t, const float* ) { return NC_EBADID; }
+inline int nc_put_att_double( int, int, const char*, nc_type, size_t, const double* ) { return NC_EBADID; }
+inline int nc_get_vara_text( int, int, const size_t*, const size_t*, char* ) { return NC_EBADID; }
+inline int nc_get_vara_int( int, int, const size_t*, const size_t*, int* ) { return NC_EBADID; }
+inline int nc_get_vara_long( int, int, const size_t*, const size_t*, long* ) { return NC_EBADID; }
+inline int nc_get_vara_double( int, int, const size_t*, const size_t*, double* ) { return NC_EBADID; }
+inline int nc_get_vars_double( int, int, const size_t*, const size_t*, const ptrdiff_t*, double* ) { return NC_EBADID; }
+inline int nc_put_vara_text( int, int, const size_t*, const size_t*, const char* ) { return NC_EBADID; }
+inline int nc_put_vara_int( int, int, const size_t*, const size_t*, const int* ) { return NC_EBADID; }
+inline int nc_put_vara_double( int, int, const size_t*, const size_t*, const double* ) { return NC_EBADID; }
+#endif  // !MOAB_HAVE_NETCDF
 
 // ============================================================================
 // Internal helpers
@@ -242,8 +307,15 @@ NcBackend mbnc_choose_backend_for_read( int format, int mpi_size )
 {
     if( format != NCFMT_CLASSIC && format != NCFMT_NETCDF4 ) return NCB_NONE;
 
-    // Serial: plain nc_* always handles both formats (libnetcdf v4+).
+    // Serial.
+#ifdef MOAB_HAVE_NETCDF
+    // libnetcdf present: plain nc_* handles both classic and NetCDF-4 (libnetcdf v4+).
     if( mpi_size <= 1 ) return NCB_NETCDF_SERIAL;
+#else
+    // PNetCDF-only: no serial nc_*; use PNetCDF on MPI_COMM_SELF for classic files.
+    // NetCDF-4/HDF5 cannot be read without libnetcdf.
+    if( mpi_size <= 1 ) return ( format == NCFMT_CLASSIC ) ? NCB_PNETCDF : NCB_NONE;
+#endif
 
     if( format == NCFMT_CLASSIC )
     {
@@ -253,7 +325,7 @@ NcBackend mbnc_choose_backend_for_read( int format, int mpi_size )
         return NCB_NETCDF_PAR;  // works if libnetcdf was built with PNetCDF backend
 #else
         // No parallel backend at all — degraded buffered fallback (rank 0
-        // reads via plain nc_*, scatters per-rank slabs).
+        // reads via plain nc_*, scatters per-rank slabs). Requires libnetcdf.
         return NCB_BUFFERED;
 #endif
     }
@@ -261,11 +333,14 @@ NcBackend mbnc_choose_backend_for_read( int format, int mpi_size )
     // format == NCFMT_NETCDF4
 #ifdef MOAB_HAVE_NETCDFPAR
     return NCB_NETCDF_PAR;
-#else
+#elif defined( MOAB_HAVE_NETCDF )
     // PNetCDF alone cannot read NetCDF-4 in parallel. Buffered fallback:
     // rank 0 opens with serial nc_open (libnetcdf handles HDF5 in serial),
     // scatters per-rank slabs to the rest.
     return NCB_BUFFERED;
+#else
+    // PNetCDF-only build cannot read NetCDF-4/HDF5 at all.
+    return NCB_NONE;
 #endif
 }
 
@@ -406,17 +481,40 @@ int mbnc_create_par( NcBackend backend, MPI_Comm comm, MPI_Info info, const char
 int mbnc_open( const char* path, int omode, int* taggedFileId )
 {
     int libId = -1;
-    int rc    = nc_open( path, omode, &libId );
+#ifdef MOAB_HAVE_NETCDF
+    int rc = nc_open( path, omode, &libId );
     if( rc == NC_NOERR ) *taggedFileId = mbnc_make_tagged( libId, NCB_NETCDF_SERIAL );
     return rc;
+#elif defined( MOAB_HAVE_PNETCDF )
+    // PNetCDF-only: serve serial opens via PNetCDF on MPI_COMM_SELF (classic files only).
+    int rc = ncmpi_open( MPI_COMM_SELF, path, omode, MPI_INFO_NULL, &libId );
+    if( rc == NC_NOERR ) *taggedFileId = mbnc_make_tagged( libId, NCB_PNETCDF );
+    return rc;
+#else
+    (void)path;
+    (void)omode;
+    (void)taggedFileId;
+    return NC_EBADID;
+#endif
 }
 
 int mbnc_create( const char* path, int cmode, int* taggedFileId )
 {
     int libId = -1;
-    int rc    = nc_create( path, cmode, &libId );
+#ifdef MOAB_HAVE_NETCDF
+    int rc = nc_create( path, cmode, &libId );
     if( rc == NC_NOERR ) *taggedFileId = mbnc_make_tagged( libId, NCB_NETCDF_SERIAL );
     return rc;
+#elif defined( MOAB_HAVE_PNETCDF )
+    int rc = ncmpi_create( MPI_COMM_SELF, path, cmode, MPI_INFO_NULL, &libId );
+    if( rc == NC_NOERR ) *taggedFileId = mbnc_make_tagged( libId, NCB_PNETCDF );
+    return rc;
+#else
+    (void)path;
+    (void)cmode;
+    (void)taggedFileId;
+    return NC_EBADID;
+#endif
 }
 
 int mbnc_close( int taggedFileId )

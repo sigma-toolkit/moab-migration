@@ -23,8 +23,10 @@
 
 // TempestRemap includes
 #include "OfflineMap.h"
+#ifdef MOAB_HAVE_NETCDF
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
+#endif
 #include "DataArray2D.h"
 
 using namespace moab;
@@ -80,6 +82,15 @@ void ReadFileMetaData( std::string& metaFilename, std::map< std::string, std::st
 
 int main( int argc, char* argv[] )
 {
+#ifndef MOAB_HAVE_NETCDF
+    // h5mtoscrip converts an .h5m offline map to SCRIP (.nc) format, which requires the
+    // NetCDF C++ interface. This MOAB build has NetCDF disabled, so the tool is a no-op.
+    (void)argc;
+    (void)argv;
+    std::cerr << "h5mtoscrip requires NetCDF support (it writes SCRIP .nc files), but this "
+                 "MOAB build was configured without NetCDF.\n";
+    return 1;
+#else
     int dimension = 2;
     NcError error2( NcError::verbose_nonfatal );
     std::stringstream sstr;
@@ -593,4 +604,5 @@ int main( int argc, char* argv[] )
 #endif
 
     exit( 0 );
+#endif  // MOAB_HAVE_NETCDF
 }

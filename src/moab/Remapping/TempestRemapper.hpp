@@ -21,14 +21,17 @@
 
 // Tempest includes
 #ifdef MOAB_HAVE_TEMPESTREMAP
+#ifdef MOAB_HAVE_NETCDF
 #include "netcdfcpp.h"
+#endif
+
 #ifdef MOAB_HAVE_MPI
 #define TEMPEST_MPIOMP
 #endif
 #include "Announce.h"
 #include "TempestRemapAPI.h"
 #else
-#error "This tool depends on TempestRemap library. Reconfigure using --with-tempestremap"
+#error "This interface depends on TempestRemap library. Reconfigure using --with-tempestremap"
 #endif
 
 namespace moab
@@ -99,6 +102,7 @@ class TempestRemapper : public Remapper
      */
     moab::ErrorCode GenerateMesh( Remapper::IntersectionContext ctx, TempestMeshType type );
 
+#ifdef MOAB_HAVE_NETCDF
     /**
      * @brief Load a mesh from disk of given type and store it under the context specified by the user.
      *
@@ -108,6 +112,7 @@ class TempestRemapper : public Remapper
      * @return ErrorCode indicating the status of the mesh loading
      */
     moab::ErrorCode LoadMesh( Remapper::IntersectionContext ctx, std::string inputFilename, TempestMeshType type );
+#endif
 
     /**
      * @brief Construct a source covering mesh such that it completely encompasses the target grid in
@@ -496,6 +501,7 @@ class TempestRemapper : public Remapper
 
     // Private methods
 
+#ifdef MOAB_HAVE_NETCDF
     /**
      * @brief Load a mesh from disk in TempestRemap format.
      *
@@ -504,6 +510,7 @@ class TempestRemapper : public Remapper
      * @return moab::ErrorCode Status of the load operation
      */
     moab::ErrorCode load_tempest_mesh_private( std::string inputFilename, Mesh** tempest_mesh );
+#endif
 
     /**
      * @brief Convert a MOAB mesh to TempestRemap format.

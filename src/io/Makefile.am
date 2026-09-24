@@ -45,12 +45,14 @@ endif
 
 if HAVE_PNETCDF
 if !HAVE_NETCDF
-     MOAB_NETCDF_SRCS += ReadNC.cpp ReadNC.hpp \
+     MOAB_NETCDF_SRCS += MBNcDispatch.cpp MBNcDispatch.hpp \
+                     ReadNC.cpp ReadNC.hpp \
                      WriteNC.cpp WriteNC.hpp \
                      NCHelper.cpp NCHelper.hpp \
                      NCHelperEuler.cpp NCHelperEuler.hpp \
                      NCHelperFV.cpp NCHelperFV.hpp \
                      NCHelperDomain.cpp NCHelperDomain.hpp \
+                     NCHelperESMF.cpp NCHelperESMF.hpp \
                      NCHelperScrip.hpp NCHelperScrip.cpp \
                      NCHelperHOMME.cpp NCHelperHOMME.hpp \
                      NCHelperMPAS.cpp NCHelperMPAS.hpp \
@@ -60,7 +62,10 @@ if !HAVE_NETCDF
                      NCWriteFV.cpp NCWriteFV.hpp \
                      NCWriteHOMME.cpp NCWriteHOMME.hpp \
                      NCWriteMPAS.cpp NCWriteMPAS.hpp \
-                     NCWriteGCRM.cpp NCWriteGCRM.hpp
+                     NCWriteGCRM.cpp NCWriteGCRM.hpp \
+                     NCWriteScrip.cpp NCWriteScrip.hpp \
+                     NCWriteESMF.cpp NCWriteESMF.hpp \
+                     NCWriteDomain.cpp NCWriteDomain.hpp
 endif
 endif
 

@@ -18,22 +18,30 @@
 #include "moab/Remapping/TempestOnlineMap.hpp"
 #include "moab/TupleList.hpp"
 
+#ifdef MOAB_HAVE_NETCDF
 #ifdef MOAB_HAVE_NETCDFPAR
 #include "netcdfcpp_par.hpp"
 #else
 #include "netcdfcpp.h"
 #endif
+#endif
 
 #ifdef MOAB_HAVE_PNETCDF
 #include <pnetcdf.h>
 
-#define ERR_PARNC( err )                                                              \
-    if( err != NC_NOERR )                                                             \
-    {                                                                                 \
-        fprintf( stderr, "Error at line %d: %s\n", __LINE__, ncmpi_strerror( err ) ); \
-        MPI_Abort( MPI_COMM_WORLD, 1 );                                               \
-    }
 
+#endif
+
+#if defined( MOAB_HAVE_NETCDF ) || defined( MOAB_HAVE_PNETCDF )
+// Central NC I/O: read/write SCRIP maps through the runtime dispatch layer, which picks the
+// serial-NetCDF / parallel-NetCDF / PnetCDF backend from the detected on-disk format.
+#include "MBNcDispatch.hpp"
+#define ERR_MBNC( err, msg )                                                      \
+    do                                                                            \
+    {                                                                             \
+        int _mbrc = ( err );                                                      \
+        if( _mbrc != NC_NOERR ) { _EXCEPTION1( "MBNcDispatch error: %s", msg ); } \
+    } while( 0 )
 #endif
 
 #ifdef MOAB_HAVE_MPI
@@ -200,20 +208,26 @@ moab::ErrorCode moab::TempestOnlineMap::WriteParallelMap( const std::string& str
     // Write the map file to disk in parallel
     if( extension == "nc" )
     {
-#if !defined( MOAB_HAVE_NETCDFPAR )
-        // Without parallel NetCDF, the SCRIP writer cannot handle multiple MPI ranks
-        // writing to the same file. Fall back to the HDF5 format with a .h5m extension
-        // and then the map can be converted to SCRIP format offline if needed.
+#if !defined( MOAB_HAVE_NETCDFPAR ) && !defined( MOAB_HAVE_PNETCDF )
+        // Without a parallel SCRIP backend (parallel NetCDF or PnetCDF), the SCRIP writer
+        // cannot handle multiple MPI ranks writing to the same file.
         if( this->size > 1 )
         {
+#if defined( MOAB_HAVE_HDF5 )
+            // Fall back to the HDF5 format with a .h5m extension; the map can be
+            // converted to SCRIP format offline if needed.
             std::string h5mFilename = strFilename.substr( 0, lastindex ) + ".h5m";
             if( !this->rank )
             {
-                std::cout << "  [WriteParallelMap]: Parallel NetCDF not available; writing map to "
+                std::cout << "  [WriteParallelMap]: Parallel NetCDF/PnetCDF not available; writing map to "
                           << "HDF5 format (" << h5mFilename << ") instead of SCRIP (.nc)\n";
             }
             MB_CHK_ERR( this->WriteHDF5MapFile( h5mFilename.c_str() ) );
             return moab::MB_SUCCESS;
+#else
+            MB_CHK_SET_ERR( moab::MB_FAILURE,
+                            "Parallel SCRIP write requires NETCDFPAR or PnetCDF; HDF5 fallback unavailable" );
+#endif
         }
 #endif
         /* Invoke the actual call to write the parallel map to disk in SCRIP format */
@@ -233,31 +247,13 @@ moab::ErrorCode moab::TempestOnlineMap::WriteParallelMap( const std::string& str
 moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& strFilename,
                                                            const std::map< std::string, std::string >& attrMap )
 {
-    NcError error( NcError::silent_nonfatal );
-
-#ifdef MOAB_HAVE_NETCDFPAR
-    bool is_independent = true;
-    ParNcFile ncMap( m_pcomm->comm(), MPI_INFO_NULL, strFilename.c_str(), NcFile::Replace, NcFile::Netcdf4 );
-    // ParNcFile ncMap( m_pcomm->comm(), MPI_INFO_NULL, strFilename.c_str(), NcmpiFile::replace, NcmpiFile::classic5 );
-#else
-    NcFile ncMap( strFilename.c_str(), NcFile::Replace );
+#if !defined( MOAB_HAVE_NETCDF ) && !defined( MOAB_HAVE_PNETCDF )
+#error "Cannot enable SCRIP writing without NetCDF or PNetCDF interfaces"
 #endif
-
-    if( !ncMap.is_valid() )
-    {
-        _EXCEPTION1( "Unable to open output map file \"%s\"", strFilename.c_str() );
-    }
-
-    // Attributes
-    // ncMap.add_att( "Title", "MOAB-TempestRemap Online Regridding Weight Generator" );
-    auto it = attrMap.begin();
-    while( it != attrMap.end() )
-    {
-        // set the map attributes
-        ncMap.add_att( it->first.c_str(), it->second.c_str() );
-        // increment iterator
-        it++;
-    }
+    // The SCRIP map is written below through the MBNcDispatch layer (mbnc_*), which selects
+    // the NetCDF / parallel-NetCDF / PnetCDF backend at runtime from the target format. The
+    // file is created only after every buffer is computed (classic define-mode -> data-mode),
+    // so nothing is opened here.
 
     /**
      * Need to get the global maximum of number of vertices per element
@@ -416,7 +412,7 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     // Number of non-zeros in the remap matrix operator
     int nS = m_weightMatrix.nonZeros();
 
-#if defined( MOAB_HAVE_MPI ) && defined( MOAB_HAVE_NETCDFPAR )
+#if defined( MOAB_HAVE_MPI )
     int locbuf[5] = { (int)nA, (int)nB, nS, nSourceNodesPerFace, nTargetNodesPerFace };
     int offbuf[3] = { 0, 0, 0 };
     int globuf[5] = { 0, 0, 0, 0, 0 };
@@ -470,170 +466,8 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     unsigned nSrcGridDims = ( srcdimSizes.size() );
     unsigned nDstGridDims = ( tgtdimSizes.size() );
 
-    NcDim* dimSrcGridRank = ncMap.add_dim( "src_grid_rank", nSrcGridDims );
-    NcDim* dimDstGridRank = ncMap.add_dim( "dst_grid_rank", nDstGridDims );
-
-    NcVar* varSrcGridDims = ncMap.add_var( "src_grid_dims", ncInt, dimSrcGridRank );
-    NcVar* varDstGridDims = ncMap.add_var( "dst_grid_dims", ncInt, dimDstGridRank );
-
-#ifdef MOAB_HAVE_NETCDFPAR
-    ncMap.enable_var_par_access( varSrcGridDims, is_independent );
-    ncMap.enable_var_par_access( varDstGridDims, is_independent );
-#endif
-
-    // write dimension names
-    {
-        char szDim[64];
-        for( unsigned i = 0; i < srcdimSizes.size(); i++ )
-        {
-            varSrcGridDims->set_cur( nSrcGridDims - i - 1 );
-            varSrcGridDims->put( &( srcdimSizes[nSrcGridDims - i - 1] ), 1 );
-        }
-
-        for( unsigned i = 0; i < srcdimSizes.size(); i++ )
-        {
-            snprintf( szDim, 64, "name%u", i );
-            varSrcGridDims->add_att( szDim, srcdimNames[nSrcGridDims - i - 1].c_str() );
-        }
-
-        for( unsigned i = 0; i < tgtdimSizes.size(); i++ )
-        {
-            varDstGridDims->set_cur( nDstGridDims - i - 1 );
-            varDstGridDims->put( &( tgtdimSizes[nDstGridDims - i - 1] ), 1 );
-        }
-
-        for( unsigned i = 0; i < tgtdimSizes.size(); i++ )
-        {
-            snprintf( szDim, 64, "name%u", i );
-            varDstGridDims->add_att( szDim, tgtdimNames[nDstGridDims - i - 1].c_str() );
-        }
-    }
-
-    // Source and Target mesh resolutions
-    NcDim* dimNA = ncMap.add_dim( "n_a", globuf[0] );
-    NcDim* dimNB = ncMap.add_dim( "n_b", globuf[1] );
-
-    // Number of nodes per Face
-    NcDim* dimNVA = ncMap.add_dim( "nv_a", globuf[3] );
-    NcDim* dimNVB = ncMap.add_dim( "nv_b", globuf[4] );
-
-    // Write coordinates
-    NcVar* varYCA = ncMap.add_var( "yc_a", ncDouble, dimNA );
-    NcVar* varYCB = ncMap.add_var( "yc_b", ncDouble, dimNB );
-
-    NcVar* varXCA = ncMap.add_var( "xc_a", ncDouble, dimNA );
-    NcVar* varXCB = ncMap.add_var( "xc_b", ncDouble, dimNB );
-
-    NcVar* varYVA = ncMap.add_var( "yv_a", ncDouble, dimNA, dimNVA );
-    NcVar* varYVB = ncMap.add_var( "yv_b", ncDouble, dimNB, dimNVB );
-
-    NcVar* varXVA = ncMap.add_var( "xv_a", ncDouble, dimNA, dimNVA );
-    NcVar* varXVB = ncMap.add_var( "xv_b", ncDouble, dimNB, dimNVB );
-
-    // Write masks
-    NcVar* varMaskA = ncMap.add_var( "mask_a", ncInt, dimNA );
-    NcVar* varMaskB = ncMap.add_var( "mask_b", ncInt, dimNB );
-
-#ifdef MOAB_HAVE_NETCDFPAR
-    ncMap.enable_var_par_access( varYCA, is_independent );
-    ncMap.enable_var_par_access( varYCB, is_independent );
-    ncMap.enable_var_par_access( varXCA, is_independent );
-    ncMap.enable_var_par_access( varXCB, is_independent );
-    ncMap.enable_var_par_access( varYVA, is_independent );
-    ncMap.enable_var_par_access( varYVB, is_independent );
-    ncMap.enable_var_par_access( varXVA, is_independent );
-    ncMap.enable_var_par_access( varXVB, is_independent );
-    ncMap.enable_var_par_access( varMaskA, is_independent );
-    ncMap.enable_var_par_access( varMaskB, is_independent );
-#endif
-
-    varYCA->add_att( "units", "degrees" );
-    varYCB->add_att( "units", "degrees" );
-
-    varXCA->add_att( "units", "degrees" );
-    varXCB->add_att( "units", "degrees" );
-
-    varYVA->add_att( "units", "degrees" );
-    varYVB->add_att( "units", "degrees" );
-
-    varXVA->add_att( "units", "degrees" );
-    varXVB->add_att( "units", "degrees" );
-
-    // Verify dimensionality
-    if( dSourceCenterLon.GetRows() != nA )
-    {
-        _EXCEPTIONT( "Mismatch between dSourceCenterLon and nA" );
-    }
-    if( dSourceCenterLat.GetRows() != nA )
-    {
-        _EXCEPTIONT( "Mismatch between dSourceCenterLat and nA" );
-    }
-    if( dTargetCenterLon.GetRows() != nB )
-    {
-        _EXCEPTIONT( "Mismatch between dTargetCenterLon and nB" );
-    }
-    if( dTargetCenterLat.GetRows() != nB )
-    {
-        _EXCEPTIONT( "Mismatch between dTargetCenterLat and nB" );
-    }
-    if( dSourceVertexLon.GetRows() != nA )
-    {
-        _EXCEPTIONT( "Mismatch between dSourceVertexLon and nA" );
-    }
-    if( dSourceVertexLat.GetRows() != nA )
-    {
-        _EXCEPTIONT( "Mismatch between dSourceVertexLat and nA" );
-    }
-    if( dTargetVertexLon.GetRows() != nB )
-    {
-        _EXCEPTIONT( "Mismatch between dTargetVertexLon and nB" );
-    }
-    if( dTargetVertexLat.GetRows() != nB )
-    {
-        _EXCEPTIONT( "Mismatch between dTargetVertexLat and nB" );
-    }
-
-    varYCA->set_cur( (long)offbuf[0] );
-    varYCA->put( &( dSourceCenterLat[0] ), nA );
-    varYCB->set_cur( (long)offbuf[1] );
-    varYCB->put( &( dTargetCenterLat[0] ), nB );
-
-    varXCA->set_cur( (long)offbuf[0] );
-    varXCA->put( &( dSourceCenterLon[0] ), nA );
-    varXCB->set_cur( (long)offbuf[1] );
-    varXCB->put( &( dTargetCenterLon[0] ), nB );
-
-    varYVA->set_cur( (long)offbuf[0] );
-    varYVA->put( &( dSourceVertexLat[0][0] ), nA, nSourceNodesPerFace );
-    varYVB->set_cur( (long)offbuf[1] );
-    varYVB->put( &( dTargetVertexLat[0][0] ), nB, nTargetNodesPerFace );
-
-    varXVA->set_cur( (long)offbuf[0] );
-    varXVA->put( &( dSourceVertexLon[0][0] ), nA, nSourceNodesPerFace );
-    varXVB->set_cur( (long)offbuf[1] );
-    varXVB->put( &( dTargetVertexLon[0][0] ), nB, nTargetNodesPerFace );
-
-    varMaskA->set_cur( (long)offbuf[0] );
-    varMaskA->put( &( masksA[0] ), nA );
-    varMaskB->set_cur( (long)offbuf[1] );
-    varMaskB->put( &( masksB[0] ), nB );
-
-    // Write areas
-    NcVar* varAreaA = ncMap.add_var( "area_a", ncDouble, dimNA );
-#ifdef MOAB_HAVE_NETCDFPAR
-    ncMap.enable_var_par_access( varAreaA, is_independent );
-#endif
-    varAreaA->set_cur( (long)offbuf[0] );
-    varAreaA->put( &( vecSourceFaceArea[0] ), nA );
-
-    NcVar* varAreaB = ncMap.add_var( "area_b", ncDouble, dimNB );
-#ifdef MOAB_HAVE_NETCDFPAR
-    ncMap.enable_var_par_access( varAreaB, is_independent );
-#endif
-    varAreaB->set_cur( (long)offbuf[1] );
-    varAreaB->put( &( vecTargetFaceArea[0] ), nB );
-
-    // Write SparseMatrix entries
+    // Write SparseMatrix entries (backend-agnostic: fills vecRow/vecCol/vecS and
+    // computes the fractional-coverage arrays dFracA/dFracB via crystal-router comm)
     DataArray1D< int > vecRow( nS );
     DataArray1D< int > vecCol( nS );
     DataArray1D< double > vecS( nS );
@@ -782,56 +616,163 @@ moab::ErrorCode moab::TempestOnlineMap::WriteSCRIPMapFile( const std::string& st
     }
 
 #endif
-    // Load in data
-    NcDim* dimNS = ncMap.add_dim( "n_s", globuf[2] );
+    // ============ Write the SCRIP map through the MBNcDispatch layer (mbnc_*) ============
+    // One code path for every backend (serial NetCDF, parallel NetCDF, PnetCDF). The map is
+    // written as classic CDF-5, which both libnetcdf and PnetCDF read. All dimensions,
+    // variables and attributes are defined first (classic define-mode), then written
+    // collectively with the per-rank hyperslab offsets computed above.
+    {
+        const int mapFormat  = NCFMT_CLASSIC;
+        NcBackend wbackend   = mbnc_choose_backend_for_write( mapFormat, (int)size );
+        if( wbackend == NCB_NONE )
+            _EXCEPTION1( "No NetCDF backend available to write SCRIP map \"%s\"", strFilename.c_str() );
 
-    NcVar* varRow = ncMap.add_var( "row", ncInt, dimNS );
-    NcVar* varCol = ncMap.add_var( "col", ncInt, dimNS );
-    NcVar* varS   = ncMap.add_var( "S", ncDouble, dimNS );
-#ifdef MOAB_HAVE_NETCDFPAR
-    ncMap.enable_var_par_access( varRow, is_independent );
-    ncMap.enable_var_par_access( varCol, is_independent );
-    ncMap.enable_var_par_access( varS, is_independent );
+        int ncid        = -1;
+        const int cmode = NC_CLOBBER | NC_64BIT_DATA;  // CDF-5
+#ifdef MOAB_HAVE_MPI
+        ERR_MBNC( mbnc_create_par( wbackend, m_pcomm->comm(), MPI_INFO_NULL, strFilename.c_str(), cmode, &ncid ),
+                  "create map file" );
+#else
+        ERR_MBNC( mbnc_create( strFilename.c_str(), cmode, &ncid ), "create map file" );
 #endif
 
-    varRow->set_cur( (long)offbuf[2] );
-    varRow->put( vecRow, nS );
+        // ---- global attributes ----
+        for( std::map< std::string, std::string >::const_iterator ait = attrMap.begin(); ait != attrMap.end();
+             ++ait )
+            ERR_MBNC( mbnc_put_att_text( ncid, NC_GLOBAL, ait->first.c_str(), ait->second.size(), ait->second.c_str() ),
+                      "global attribute" );
 
-    varCol->set_cur( (long)offbuf[2] );
-    varCol->put( vecCol, nS );
+        // ---- dimensions ----
+        int dimSrcRank, dimDstRank, dimNAp, dimNBp, dimNVAp, dimNVBp, dimNSp;
+        ERR_MBNC( mbnc_def_dim( ncid, "src_grid_rank", nSrcGridDims, &dimSrcRank ), "def src_grid_rank" );
+        ERR_MBNC( mbnc_def_dim( ncid, "dst_grid_rank", nDstGridDims, &dimDstRank ), "def dst_grid_rank" );
+        ERR_MBNC( mbnc_def_dim( ncid, "n_a", (size_t)globuf[0], &dimNAp ), "def n_a" );
+        ERR_MBNC( mbnc_def_dim( ncid, "n_b", (size_t)globuf[1], &dimNBp ), "def n_b" );
+        ERR_MBNC( mbnc_def_dim( ncid, "nv_a", (size_t)globuf[3], &dimNVAp ), "def nv_a" );
+        ERR_MBNC( mbnc_def_dim( ncid, "nv_b", (size_t)globuf[4], &dimNVBp ), "def nv_b" );
+        ERR_MBNC( mbnc_def_dim( ncid, "n_s", (size_t)globuf[2], &dimNSp ), "def n_s" );
 
-    varS->set_cur( (long)offbuf[2] );
-    varS->put( &( vecS[0] ), nS );
+        // ---- variables ----
+        int vSrcGridDims, vDstGridDims, vYCA, vYCB, vXCA, vXCB, vYVA, vYVB, vXVA, vXVB, vMaskA, vMaskB, vAreaA, vAreaB,
+            vRow, vCol, vS, vFracA, vFracB;
+        int d1[1], d2[2];
+        d1[0] = dimSrcRank;
+        ERR_MBNC( mbnc_def_var( ncid, "src_grid_dims", NC_INT, 1, d1, &vSrcGridDims ), "def src_grid_dims" );
+        d1[0] = dimDstRank;
+        ERR_MBNC( mbnc_def_var( ncid, "dst_grid_dims", NC_INT, 1, d1, &vDstGridDims ), "def dst_grid_dims" );
+        d1[0] = dimNAp;
+        ERR_MBNC( mbnc_def_var( ncid, "yc_a", NC_DOUBLE, 1, d1, &vYCA ), "def yc_a" );
+        ERR_MBNC( mbnc_def_var( ncid, "xc_a", NC_DOUBLE, 1, d1, &vXCA ), "def xc_a" );
+        ERR_MBNC( mbnc_def_var( ncid, "mask_a", NC_INT, 1, d1, &vMaskA ), "def mask_a" );
+        ERR_MBNC( mbnc_def_var( ncid, "area_a", NC_DOUBLE, 1, d1, &vAreaA ), "def area_a" );
+        ERR_MBNC( mbnc_def_var( ncid, "frac_a", NC_DOUBLE, 1, d1, &vFracA ), "def frac_a" );
+        d1[0] = dimNBp;
+        ERR_MBNC( mbnc_def_var( ncid, "yc_b", NC_DOUBLE, 1, d1, &vYCB ), "def yc_b" );
+        ERR_MBNC( mbnc_def_var( ncid, "xc_b", NC_DOUBLE, 1, d1, &vXCB ), "def xc_b" );
+        ERR_MBNC( mbnc_def_var( ncid, "mask_b", NC_INT, 1, d1, &vMaskB ), "def mask_b" );
+        ERR_MBNC( mbnc_def_var( ncid, "area_b", NC_DOUBLE, 1, d1, &vAreaB ), "def area_b" );
+        ERR_MBNC( mbnc_def_var( ncid, "frac_b", NC_DOUBLE, 1, d1, &vFracB ), "def frac_b" );
+        d2[0] = dimNAp;
+        d2[1] = dimNVAp;
+        ERR_MBNC( mbnc_def_var( ncid, "yv_a", NC_DOUBLE, 2, d2, &vYVA ), "def yv_a" );
+        ERR_MBNC( mbnc_def_var( ncid, "xv_a", NC_DOUBLE, 2, d2, &vXVA ), "def xv_a" );
+        d2[0] = dimNBp;
+        d2[1] = dimNVBp;
+        ERR_MBNC( mbnc_def_var( ncid, "yv_b", NC_DOUBLE, 2, d2, &vYVB ), "def yv_b" );
+        ERR_MBNC( mbnc_def_var( ncid, "xv_b", NC_DOUBLE, 2, d2, &vXVB ), "def xv_b" );
+        d1[0] = dimNSp;
+        ERR_MBNC( mbnc_def_var( ncid, "row", NC_INT, 1, d1, &vRow ), "def row" );
+        ERR_MBNC( mbnc_def_var( ncid, "col", NC_INT, 1, d1, &vCol ), "def col" );
+        ERR_MBNC( mbnc_def_var( ncid, "S", NC_DOUBLE, 1, d1, &vS ), "def S" );
 
-    // Calculate and write fractional coverage arrays
-    NcVar* varFracA = ncMap.add_var( "frac_a", ncDouble, dimNA );
-#ifdef MOAB_HAVE_NETCDFPAR
-    ncMap.enable_var_par_access( varFracA, is_independent );
-#endif
-    varFracA->add_att( "name", "fraction of target coverage of source dof" );
-    varFracA->add_att( "units", "unitless" );
-    varFracA->set_cur( (long)offbuf[0] );
-    varFracA->put( &( dFracA[0] ), nA );
+        // ---- variable attributes (reversed grid_dims name ordering preserved) ----
+        {
+            char szDim[64];
+            for( unsigned i = 0; i < srcdimSizes.size(); i++ )
+            {
+                snprintf( szDim, 64, "name%u", i );
+                const std::string& nm = srcdimNames[nSrcGridDims - i - 1];
+                ERR_MBNC( mbnc_put_att_text( ncid, vSrcGridDims, szDim, nm.size(), nm.c_str() ), "src_grid_dims name" );
+            }
+            for( unsigned i = 0; i < tgtdimSizes.size(); i++ )
+            {
+                snprintf( szDim, 64, "name%u", i );
+                const std::string& nm = tgtdimNames[nDstGridDims - i - 1];
+                ERR_MBNC( mbnc_put_att_text( ncid, vDstGridDims, szDim, nm.size(), nm.c_str() ), "dst_grid_dims name" );
+            }
+            const std::string deg( "degrees" );
+            const int vdeg[8] = { vYCA, vYCB, vXCA, vXCB, vYVA, vYVB, vXVA, vXVB };
+            for( int k = 0; k < 8; k++ )
+                ERR_MBNC( mbnc_put_att_text( ncid, vdeg[k], "units", deg.size(), deg.c_str() ), "units" );
+            const std::string faName( "fraction of target coverage of source dof" );
+            const std::string fbName( "fraction of source coverage of target dof" );
+            const std::string unitless( "unitless" );
+            ERR_MBNC( mbnc_put_att_text( ncid, vFracA, "name", faName.size(), faName.c_str() ), "frac_a name" );
+            ERR_MBNC( mbnc_put_att_text( ncid, vFracA, "units", unitless.size(), unitless.c_str() ), "frac_a units" );
+            ERR_MBNC( mbnc_put_att_text( ncid, vFracB, "name", fbName.size(), fbName.c_str() ), "frac_b name" );
+            ERR_MBNC( mbnc_put_att_text( ncid, vFracB, "units", unitless.size(), unitless.c_str() ), "frac_b units" );
+        }
 
-    NcVar* varFracB = ncMap.add_var( "frac_b", ncDouble, dimNB );
-#ifdef MOAB_HAVE_NETCDFPAR
-    ncMap.enable_var_par_access( varFracB, is_independent );
-#endif
-    varFracB->add_att( "name", "fraction of source coverage of target dof" );
-    varFracB->add_att( "units", "unitless" );
-    varFracB->set_cur( (long)offbuf[1] );
-    varFracB->put( &( dFracB[0] ), nB );
+        ERR_MBNC( mbnc_enddef( ncid ), "enddef" );
 
-    // Add global attributes
-    // std::map<std::string, std::string>::const_iterator iterAttributes =
-    //     mapAttributes.begin();
-    // for (; iterAttributes != mapAttributes.end(); iterAttributes++) {
-    //     ncMap.add_att(
-    //         iterAttributes->first.c_str(),
-    //         iterAttributes->second.c_str());
-    // }
+        // ---- collective data writes (every rank participates) ----
+        size_t sA = (size_t)offbuf[0], cA = (size_t)nA;
+        size_t sB = (size_t)offbuf[1], cB = (size_t)nB;
+        size_t sS = (size_t)offbuf[2], cS = (size_t)nS;
+        double* pYCA   = ( nA > 0 ) ? &dSourceCenterLat[0] : NULL;
+        double* pXCA   = ( nA > 0 ) ? &dSourceCenterLon[0] : NULL;
+        double* pYCB   = ( nB > 0 ) ? &dTargetCenterLat[0] : NULL;
+        double* pXCB   = ( nB > 0 ) ? &dTargetCenterLon[0] : NULL;
+        int* pMaskA    = ( nA > 0 ) ? &masksA[0] : NULL;
+        int* pMaskB    = ( nB > 0 ) ? &masksB[0] : NULL;
+        double* pAreaA = ( nA > 0 ) ? &vecSourceFaceArea[0] : NULL;
+        double* pAreaB = ( nB > 0 ) ? &vecTargetFaceArea[0] : NULL;
+        double* pFracA = ( nA > 0 ) ? &dFracA[0] : NULL;
+        double* pFracB = ( nB > 0 ) ? &dFracB[0] : NULL;
+        int* pRow      = ( nS > 0 ) ? &vecRow[0] : NULL;
+        int* pCol      = ( nS > 0 ) ? &vecCol[0] : NULL;
+        double* pS     = ( nS > 0 ) ? &vecS[0] : NULL;
 
-    ncMap.close();
+        ERR_MBNC( mbnc_put_vara_double( ncid, vYCA, &sA, &cA, pYCA ), "put yc_a" );
+        ERR_MBNC( mbnc_put_vara_double( ncid, vXCA, &sA, &cA, pXCA ), "put xc_a" );
+        ERR_MBNC( mbnc_put_vara_double( ncid, vYCB, &sB, &cB, pYCB ), "put yc_b" );
+        ERR_MBNC( mbnc_put_vara_double( ncid, vXCB, &sB, &cB, pXCB ), "put xc_b" );
+        ERR_MBNC( mbnc_put_vara_int( ncid, vMaskA, &sA, &cA, pMaskA ), "put mask_a" );
+        ERR_MBNC( mbnc_put_vara_int( ncid, vMaskB, &sB, &cB, pMaskB ), "put mask_b" );
+        ERR_MBNC( mbnc_put_vara_double( ncid, vAreaA, &sA, &cA, pAreaA ), "put area_a" );
+        ERR_MBNC( mbnc_put_vara_double( ncid, vAreaB, &sB, &cB, pAreaB ), "put area_b" );
+        ERR_MBNC( mbnc_put_vara_double( ncid, vFracA, &sA, &cA, pFracA ), "put frac_a" );
+        ERR_MBNC( mbnc_put_vara_double( ncid, vFracB, &sB, &cB, pFracB ), "put frac_b" );
+        ERR_MBNC( mbnc_put_vara_int( ncid, vRow, &sS, &cS, pRow ), "put row" );
+        ERR_MBNC( mbnc_put_vara_int( ncid, vCol, &sS, &cS, pCol ), "put col" );
+        ERR_MBNC( mbnc_put_vara_double( ncid, vS, &sS, &cS, pS ), "put S" );
+        {
+            size_t s2A[2] = { (size_t)offbuf[0], 0 }, c2A[2] = { (size_t)nA, (size_t)nSourceNodesPerFace };
+            double* pYVA  = ( nA > 0 ) ? &dSourceVertexLat[0][0] : NULL;
+            double* pXVA  = ( nA > 0 ) ? &dSourceVertexLon[0][0] : NULL;
+            ERR_MBNC( mbnc_put_vara_double( ncid, vYVA, s2A, c2A, pYVA ), "put yv_a" );
+            ERR_MBNC( mbnc_put_vara_double( ncid, vXVA, s2A, c2A, pXVA ), "put xv_a" );
+            size_t s2B[2] = { (size_t)offbuf[1], 0 }, c2B[2] = { (size_t)nB, (size_t)nTargetNodesPerFace };
+            double* pYVB  = ( nB > 0 ) ? &dTargetVertexLat[0][0] : NULL;
+            double* pXVB  = ( nB > 0 ) ? &dTargetVertexLon[0][0] : NULL;
+            ERR_MBNC( mbnc_put_vara_double( ncid, vYVB, s2B, c2B, pYVB ), "put yv_b" );
+            ERR_MBNC( mbnc_put_vara_double( ncid, vXVB, s2B, c2B, pXVB ), "put xv_b" );
+        }
+        {
+            // Small global grid_dims arrays: rank 0 writes the full array, others write 0.
+            size_t sg    = 0;
+            size_t cgSrc = ( rank == 0 ) ? (size_t)nSrcGridDims : 0;
+            size_t cgDst = ( rank == 0 ) ? (size_t)nDstGridDims : 0;
+            ERR_MBNC( mbnc_put_vara_int( ncid, vSrcGridDims, &sg, &cgSrc, ( rank == 0 ) ? &srcdimSizes[0] : NULL ),
+                      "put src_grid_dims" );
+            ERR_MBNC( mbnc_put_vara_int( ncid, vDstGridDims, &sg, &cgDst, ( rank == 0 ) ? &tgtdimSizes[0] : NULL ),
+                      "put dst_grid_dims" );
+        }
+
+        ERR_MBNC( mbnc_close( ncid ), "close" );
+    }
+
+
 
 #ifdef VERBOSE
     serializeSparseMatrix( m_weightMatrix, "map_operator_" + std::to_string( rank ) + ".txt" );
@@ -1241,110 +1182,17 @@ moab::ErrorCode moab::TempestOnlineMap::WriteHDF5MapFile( const std::string& str
     return moab::MB_SUCCESS;
 }
 
-///////////////////////////////////////////////////////////////////////////////
-
-void print_progress( const int barWidth, const float progress, const char* message )
-{
-    std::cout << message << " [";
-    int pos = barWidth * progress;
-    for( int i = 0; i < barWidth; ++i )
-    {
-        if( i < pos )
-            std::cout << "=";
-        else if( i == pos )
-            std::cout << ">";
-        else
-            std::cout << " ";
-    }
-    std::cout << "] " << int( progress * 100.0 ) << " %\r";
-    std::cout.flush();
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
 //
-// ReadParallelMap: Read a SCRIP-format map file and distribute sparse matrix
-// data across MPI ranks.
-//
-// Strategy (adaptive, based on NNZ count):
-//   1. Serial (size == 1): rank 0 reads entire file directly.
-//   2. Buffered read (size > 1, nS <= NNZ threshold): rank 0 reads the file
-//      using serial NcFile in fixed-size chunks, determines row ownership for
-//      each entry, and scatters data to owning ranks via MPI point-to-point.
-//      This avoids the need for parallel NetCDF and scales well for small-to-
-//      medium maps by reducing file system contention.
-//   3. Direct parallel read (size > 1, nS > NNZ threshold): all ranks read
-//      their stripe of the file simultaneously using PNetCDF (preferred) or
-//      parallel HDF5-backed NetCDF (NETCDFPAR). Falls back to buffered read
-//      if neither is available.
-//
-// After the initial read/scatter, the downstream TupleList redistribution
-// (for owned_dof_ids-based repartitioning) and Eigen sparse matrix assembly
-// are unchanged regardless of which read strategy was used.
-//
+// ReadParallelMap: read a SCRIP-format map file and distribute the sparse matrix
+// across MPI ranks. All NetCDF I/O goes through the MBNcDispatch layer (mbnc_*),
+// which selects the backend (serial / parallel NetCDF / PnetCDF / buffered) from the
+// detected on-disk format; each rank reads a contiguous stripe and the entries are
+// then redistributed to their owners (owned_dof_ids) before Eigen assembly.
 ///////////////////////////////////////////////////////////////////////////////
-
-// Tuning constants for the buffered read strategy.
-// Adjust these for scalability studies on different platforms.
-
-/// NNZ threshold: maps with nS <= this value use the buffered read strategy.
-/// Maps with nS > this value use direct parallel I/O (if available).
-/// Default 3M entries corresponds to ~36 MB of raw data (row+col+S).
-static constexpr int BUFFERED_READ_NNZ_THRESHOLD = 3000000;
-
-/// Buffer size in bytes for each chunk read by rank 0 in buffered mode.
-/// Each sparse matrix entry is 12 bytes (2 ints + 1 double), so 64KB holds
-/// ~5461 entries. Larger buffers reduce the number of read+scatter rounds
-/// but increase peak memory on rank 0.
-static constexpr int BUFFERED_READ_CHUNK_BYTES = 64 * 1024;
-
-// Map file NetCDF format classification used for parallel reader selection.
-// Classic (CDF-1/2/5) is preferred for PNetCDF; NetCDF-4 (HDF5) requires
-// parallel NetCDF (NETCDFPAR). Detection only inspects the file header,
-// so no NetCDF library dependency is required for the probe itself.
-enum MapFileFormat
-{
-    MAP_FORMAT_UNKNOWN = 0,
-    MAP_FORMAT_CLASSIC = 1,  // CDF-1, CDF-2, CDF-5
-    MAP_FORMAT_NETCDF4 = 2   // NetCDF-4 / HDF5
-};
-
-/// Inspect the file header to classify NetCDF format. Reads only the first
-/// 8 bytes — relies on the well-known "CDF\\xNN" and HDF5 magic signatures.
-/// Returns MAP_FORMAT_UNKNOWN if the file cannot be opened or the signature
-/// does not match. Safe to call from a single rank.
-///
-/// References:
-///   - NetCDF classic format spec: https://docs.unidata.ucar.edu/nug/current/file_format_specifications.html
-///     ("CDF\\x01" / "CDF\\x02" / "CDF\\x05")
-///   - HDF5 superblock signature: \\x89 H D F \\r \\n \\x1a \\n
-static int detectMapFileNetCDFFormat( const char* path )
-{
-    std::FILE* fp = std::fopen( path, "rb" );
-    if( !fp ) return MAP_FORMAT_UNKNOWN;
-
-    unsigned char magic[8] = { 0 };
-    const size_t nread     = std::fread( magic, 1, sizeof( magic ), fp );
-    std::fclose( fp );
-
-    if( nread < 4 ) return MAP_FORMAT_UNKNOWN;
-
-    // Classic NetCDF families: 'C','D','F' + version byte (0x01, 0x02, or 0x05)
-    if( magic[0] == 'C' && magic[1] == 'D' && magic[2] == 'F' )
-    {
-        if( magic[3] == 0x01 || magic[3] == 0x02 || magic[3] == 0x05 ) return MAP_FORMAT_CLASSIC;
-    }
-
-    // HDF5 signature (used by NetCDF-4)
-    if( nread >= 8 && magic[0] == 0x89 && magic[1] == 'H' && magic[2] == 'D' && magic[3] == 'F' && magic[4] == 0x0D &&
-        magic[5] == 0x0A && magic[6] == 0x1A && magic[7] == 0x0A )
-    {
-        return MAP_FORMAT_NETCDF4;
-    }
-
-    return MAP_FORMAT_UNKNOWN;
-}
 
 moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
                                                          const std::vector< int >& owned_dof_ids,
@@ -1354,7 +1202,9 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
                                                          std::vector< double >& vecAreaB,
                                                          int& nB )
 {
-    NcError error( NcError::silent_nonfatal );
+#if !defined( MOAB_HAVE_NETCDF ) && !defined( MOAB_HAVE_PNETCDF )
+#error "Cannot enable SCRIP reading without NetCDF or PNetCDF interfaces"
+#endif
 
     const bool readAreaA = ( 1 == arearead || 3 == arearead );
     const bool readAreaB = ( 2 == arearead || 3 == arearead );
@@ -1374,551 +1224,83 @@ moab::ErrorCode moab::TempestOnlineMap::ReadParallelMap( const char* strSource,
     std::vector< double > vecS;
     int localSize = 0;  // number of sparse matrix entries on this rank after read
 
-    // Determine which read strategy to use. For size == 1, always serial.
-    // For size > 1, decide after reading dimensions (need nS).
-    // We use a two-phase approach: first read dimensions on rank 0 and broadcast,
-    // then select the strategy based on nS.
-
+    // ============ Phase 1: read the map through the MBNcDispatch layer (mbnc_*) ============
+    // Detect the on-disk format, let the dispatch pick the backend (serial / parallel NetCDF /
+    // PnetCDF / rank-0-buffered), and read a contiguous stripe of the sparse matrix on each
+    // rank. row/col/S stripes are redistributed to their owners in Phase 2; area_a/area_b are
+    // read as trivial per-rank slices, which is what the downstream aream code expects.
+    {
+        int fileFormat = NCFMT_UNKNOWN;
 #ifdef MOAB_HAVE_MPI
-    if( size > 1 )
-    {
-        // --- Multi-process path: read dimensions on rank 0 and broadcast ---
-        int dims[3] = { 0, 0, 0 };  // nA, nB, nS
-
-        if( rank == 0 )
-        {
-            NcFile ncDims( strSource, NcFile::ReadOnly );
-            if( !ncDims.is_valid() )
-            {
-                _EXCEPTION1( "Unable to open input map file \"%s\" on rank 0", strSource );
-            }
-            NcDim* dimNA = ncDims.get_dim( "n_a" );
-            NcDim* dimNB = ncDims.get_dim( "n_b" );
-            NcDim* dimNS = ncDims.get_dim( "n_s" );
-            if( !dimNA || !dimNB || !dimNS )
-            {
-                _EXCEPTION1( "Map file \"%s\" missing required dimensions (n_a, n_b, n_s)", strSource );
-            }
-            dims[0] = static_cast< int >( dimNA->size() );
-            dims[1] = static_cast< int >( dimNB->size() );
-            dims[2] = static_cast< int >( dimNS->size() );
-            ncDims.close();
-        }
-
-        MPI_Bcast( dims, 3, MPI_INT, 0, m_pcomm->comm() );
-        nA = dims[0];
-        nB = dims[1];
-        nS = dims[2];
-
-        // Select read strategy based on NNZ count and available parallel I/O
-        bool useBufferedRead = true;  // default for small maps or no parallel I/O
-
-        if( nS > BUFFERED_READ_NNZ_THRESHOLD )
-        {
-            // Large map: prefer direct parallel read if available
-#if defined( MOAB_HAVE_PNETCDF ) || defined( MOAB_HAVE_NETCDFPAR )
-            useBufferedRead = false;
+        if( rank == 0 ) fileFormat = mbnc_detect_format( strSource );
+        MPI_Bcast( &fileFormat, 1, MPI_INT, 0, m_pcomm->comm() );
+#else
+        fileFormat = mbnc_detect_format( strSource );
 #endif
-            // If neither is available, fall back to buffered read regardless of size
-        }
+        NcBackend rbackend = mbnc_choose_backend_for_read( fileFormat, (int)size );
+        if( rbackend == NCB_NONE )
+            _EXCEPTION1( "Cannot read map file \"%s\": unrecognized format, or NetCDF-4/HDF5 without libnetcdf",
+                         strSource );
 
-        if( useBufferedRead )
-        {
-            // =================================================================
-            // Buffered read: rank 0 reads in chunks and scatters to owners.
-            //
-            // Row ownership is determined by trivial partitioning: row i is
-            // owned by rank (i / nRowPerPart), with remainder on rank 0.
-            // Each chunk is read, ownership is computed per entry, and the
-            // data is scattered via MPI_Scatter + MPI_Isend/MPI_Irecv.
-            // =================================================================
-            if( rank == 0 )
-            {
-                std::cout << "  [ReadParallelMap]: Using buffered read strategy for " << nS
-                          << " NNZ entries (threshold=" << BUFFERED_READ_NNZ_THRESHOLD << ")\n";
-            }
-
-            const int nNNZBytes       = 2 * sizeof( int ) + sizeof( double );
-            const int nMaxPerChunk    = BUFFERED_READ_CHUNK_BYTES / nNNZBytes;
-            const int nBufferedReads  = static_cast< int >( std::ceil( 1.0 * nS / nMaxPerChunk ) );
-
-            // Row ownership: trivial partitioning of nB rows across ranks
-            const int nRowPerPart   = nB / size;
-            const int nRowRemainder = nB % size;
-            std::vector< int > rowOwnership( size );
-            rowOwnership[0] = nRowPerPart + nRowRemainder;
-            for( int ip = 1; ip < size; ++ip )
-                rowOwnership[ip] = rowOwnership[ip - 1] + nRowPerPart;
-
-            // File handle and variable pointers (rank 0 only)
-            NcFile* ncMap        = nullptr;
-            NcVar *varRowF       = nullptr, *varColF = nullptr, *varSF = nullptr;
-            NcVar *varAreaAF     = nullptr, *varAreaBF = nullptr;
-
-            if( rank == 0 )
-            {
-                ncMap = new NcFile( strSource, NcFile::ReadOnly );
-                if( !ncMap->is_valid() )
-                {
-                    _EXCEPTION1( "Unable to open map file \"%s\" for buffered read", strSource );
-                }
-                varRowF = ncMap->get_var( "row" );
-                varColF = ncMap->get_var( "col" );
-                varSF   = ncMap->get_var( "S" );
-                if( readAreaA ) varAreaAF = ncMap->get_var( "area_a" );
-                if( readAreaB ) varAreaBF = ncMap->get_var( "area_b" );
-            }
-
-            // Accumulate received entries per rank
-            std::vector< int > localRows, localCols;
-            std::vector< double > localVals;
-            localRows.reserve( nS / size + nS / ( size * 10 ) );  // slight overalloc
-            localCols.reserve( nS / size + nS / ( size * 10 ) );
-            localVals.reserve( nS / size + nS / ( size * 10 ) );
-
-            int nEntriesRemaining = nS;
-            long fileOffset       = 0;
-
-            for( int iRead = 0; iRead < nBufferedReads; ++iRead )
-            {
-                // Per-chunk data and ownership (rank 0 only)
-                std::vector< int > chunkRow, chunkCol;
-                std::vector< double > chunkS;
-                std::vector< std::vector< int > > entriesPerProc( size );
-                std::vector< int > nPerProc( size, 0 );
-
-                if( rank == 0 )
-                {
-                    int chunkSize = std::min( nEntriesRemaining, nMaxPerChunk );
-
-                    chunkRow.resize( chunkSize );
-                    chunkCol.resize( chunkSize );
-                    chunkS.resize( chunkSize );
-
-                    varRowF->set_cur( fileOffset );
-                    varRowF->get( chunkRow.data(), chunkSize );
-                    varColF->set_cur( fileOffset );
-                    varColF->get( chunkCol.data(), chunkSize );
-                    varSF->set_cur( fileOffset );
-                    varSF->get( chunkS.data(), chunkSize );
-
-                    // Determine ownership of each entry by its row index (1-based in file)
-                    for( int ip = 0; ip < size; ++ip )
-                        entriesPerProc[ip].reserve( chunkSize / size + 64 );
-
-                    for( int i = 0; i < chunkSize; ++i )
-                    {
-                        int rowIdx = chunkRow[i] - 1;  // convert to 0-based
-                        int owner  = 0;
-                        if( rowIdx >= rowOwnership[0] )
-                        {
-                            // Binary search for owner
-                            owner = static_cast< int >(
-                                std::upper_bound( rowOwnership.begin(), rowOwnership.end(), rowIdx ) -
-                                rowOwnership.begin() );
-                            if( owner >= size ) owner = size - 1;
-                        }
-                        entriesPerProc[owner].push_back( i );
-                    }
-
-                    fileOffset += chunkSize;
-                    nEntriesRemaining -= chunkSize;
-
-                    for( int ip = 0; ip < size; ++ip )
-                        nPerProc[ip] = static_cast< int >( entriesPerProc[ip].size() );
-                }
-
-                // Scatter count of entries each rank will receive in this chunk
-                int nRecv = 0;
-                MPI_Scatter( nPerProc.data(), 1, MPI_INT, &nRecv, 1, MPI_INT, 0, m_pcomm->comm() );
-
-                if( rank == 0 )
-                {
-                    // Send data to remote ranks via non-blocking sends
-                    std::vector< MPI_Request > requests;
-                    requests.reserve( 2 * ( size - 1 ) );
-
-                    // Pack and send to each remote rank
-                    std::vector< std::vector< int > > sendRowCol( size );
-                    std::vector< std::vector< double > > sendVals( size );
-
-                    for( int ip = 1; ip < size; ++ip )
-                    {
-                        const int nDPP = nPerProc[ip];
-                        if( nDPP > 0 )
-                        {
-                            sendRowCol[ip].resize( 2 * nDPP );
-                            sendVals[ip].resize( nDPP );
-                            for( int j = 0; j < nDPP; ++j )
-                            {
-                                int idx                  = entriesPerProc[ip][j];
-                                sendRowCol[ip][2 * j]     = chunkRow[idx];
-                                sendRowCol[ip][2 * j + 1] = chunkCol[idx];
-                                sendVals[ip][j]           = chunkS[idx];
-                            }
-
-                            MPI_Request rqRC, rqV;
-                            MPI_Isend( sendRowCol[ip].data(), 2 * nDPP, MPI_INT, ip,
-                                       iRead * 1000, m_pcomm->comm(), &rqRC );
-                            MPI_Isend( sendVals[ip].data(), nDPP, MPI_DOUBLE, ip,
-                                       iRead * 1000 + 1, m_pcomm->comm(), &rqV );
-                            requests.push_back( rqRC );
-                            requests.push_back( rqV );
-                        }
-                    }
-
-                    // Process rank 0's own entries while sends are in flight
-                    for( int j = 0; j < nRecv; ++j )
-                    {
-                        int idx = entriesPerProc[0][j];
-                        localRows.push_back( chunkRow[idx] );
-                        localCols.push_back( chunkCol[idx] );
-                        localVals.push_back( chunkS[idx] );
-                    }
-
-                    // Wait for all sends to complete
-                    if( !requests.empty() )
-                    {
-                        std::vector< MPI_Status > stats( requests.size() );
-                        MPI_Waitall( static_cast< int >( requests.size() ), requests.data(), stats.data() );
-                    }
-                }
-                else if( nRecv > 0 )
-                {
-                    // Receive data from rank 0
-                    std::vector< int > recvRowCol( 2 * nRecv );
-                    std::vector< double > recvVals( nRecv );
-
-                    MPI_Request rqs[2];
-                    MPI_Irecv( recvRowCol.data(), 2 * nRecv, MPI_INT, 0,
-                               iRead * 1000, m_pcomm->comm(), &rqs[0] );
-                    MPI_Irecv( recvVals.data(), nRecv, MPI_DOUBLE, 0,
-                               iRead * 1000 + 1, m_pcomm->comm(), &rqs[1] );
-
-                    MPI_Status sts[2];
-                    MPI_Waitall( 2, rqs, sts );
-
-                    for( int j = 0; j < nRecv; ++j )
-                    {
-                        localRows.push_back( recvRowCol[2 * j] );
-                        localCols.push_back( recvRowCol[2 * j + 1] );
-                        localVals.push_back( recvVals[j] );
-                    }
-                }
-
-                MPI_Barrier( m_pcomm->comm() );
-            }  // end buffered read loop
-
-            // Read area arrays on rank 0 and scatter the trivial (nA/size, nB/size)
-            // partition to each rank. iMOAB's set_aream_from_trivial_distribution
-            // (iMOAB.cpp) assumes each rank holds exactly its trivial slice of size
-            // N/size (last rank gets the N%size remainder) and computes its local
-            // index as `marker - 1 - rank * (N/size)`. Broadcasting the full array
-            // would silently scramble the per-cell aream tag on every rank > 0,
-            // which breaks BfB on the CAAS dual-map path while leaving the plain
-            // SpMV (lo, hi) projections BfB-correct (those don't use aream).
-            auto scatter_trivial = []( int Ntot, int rk, int sz, NcVar* var, std::vector< double >& localSlice,
-                                       MPI_Comm comm ) {
-                const int base       = Ntot / sz;
-                const int rem        = Ntot % sz;
-                const int localCount = ( rk == sz - 1 ) ? ( base + rem ) : base;
-                localSlice.resize( localCount );
-                if( rk == 0 )
-                {
-                    std::vector< double > fullBuf( Ntot );
-                    if( var )
-                    {
-                        var->set_cur( 0L );
-                        var->get( fullBuf.data(), Ntot );
-                    }
-                    // Copy rank 0's own slice and send each other rank its slice.
-                    std::copy( fullBuf.begin(), fullBuf.begin() + localCount, localSlice.begin() );
-                    for( int dst = 1; dst < sz; dst++ )
-                    {
-                        const int dstCount = ( dst == sz - 1 ) ? ( base + rem ) : base;
-                        MPI_Send( fullBuf.data() + dst * base, dstCount, MPI_DOUBLE, dst, 0xA9EA, comm );
-                    }
-                }
-                else
-                {
-                    MPI_Recv( localSlice.data(), localCount, MPI_DOUBLE, 0, 0xA9EA, comm, MPI_STATUS_IGNORE );
-                }
-            };
-            if( readAreaA ) scatter_trivial( nA, rank, size, varAreaAF, vecAreaA, m_pcomm->comm() );
-            if( readAreaB ) scatter_trivial( nB, rank, size, varAreaBF, vecAreaB, m_pcomm->comm() );
-
-            if( rank == 0 )
-            {
-                ncMap->close();
-                delete ncMap;
-            }
-
-            // Move accumulated data into the standard vecRow/vecCol/vecS vectors
-            localSize = static_cast< int >( localRows.size() );
-            vecRow.swap( localRows );
-            vecCol.swap( localCols );
-            vecS.swap( localVals );
-        }
-        else
-        {
-            // =================================================================
-            // Direct parallel read: choose reader based on detected file format.
-            //
-            // Selection logic (per format):
-            //   - Classic (CDF-1/2/5): prefer PNetCDF (best fit for the classic
-            //     family); fall back to NETCDFPAR only if PNetCDF is not built in.
-            //   - NetCDF-4 (HDF5):     must use NETCDFPAR — PNetCDF cannot read
-            //     HDF5-backed NetCDF-4 files.
-            //   - Unknown/other:       hard error.
-            //
-            // Format is determined by reading the file's magic bytes on rank 0
-            // and broadcasting the answer. This avoids opening the file twice
-            // in parallel just to probe its format.
-            // =================================================================
-            if( rank == 0 )
-            {
-                std::cout << "  [ReadParallelMap]: Using direct parallel read for " << nS
-                          << " NNZ entries (threshold=" << BUFFERED_READ_NNZ_THRESHOLD << ")\n";
-            }
-
-            int fileFormat = MAP_FORMAT_UNKNOWN;
-            if( rank == 0 ) fileFormat = detectMapFileNetCDFFormat( strSource );
-            MPI_Bcast( &fileFormat, 1, MPI_INT, 0, m_pcomm->comm() );
-
-            const bool isClassic = ( fileFormat == MAP_FORMAT_CLASSIC );
-            const bool isNetCDF4 = ( fileFormat == MAP_FORMAT_NETCDF4 );
-
-            if( !isClassic && !isNetCDF4 )
-            {
-                _EXCEPTION1( "Map file \"%s\" is not in a recognized NetCDF format "
-                             "(expected classic CDF-1/2/5 or NetCDF-4/HDF5)",
-                             strSource );
-            }
-
-            // Compute this rank's stripe of the sparse matrix
-            localSize        = nS / size;
-            long offsetRead  = rank * localSize;
-            if( rank == size - 1 ) localSize += nS % size;
-
-            vecRow.resize( localSize );
-            vecCol.resize( localSize );
-            vecS.resize( localSize );
-
-            // Compute this rank's stripe of area arrays
-            int localSizeA   = nA / size;
-            long offsetReadA = rank * localSizeA;
-            if( rank == size - 1 ) localSizeA += nA % size;
-
-            int localSizeB   = nB / size;
-            long offsetReadB = rank * localSizeB;
-            if( rank == size - 1 ) localSizeB += nB % size;
-
-            if( readAreaA ) vecAreaA.resize( localSizeA );
-            if( readAreaB ) vecAreaB.resize( localSizeB );
-
-            bool parReadDone = false;
-
-            // --- Classic format: prefer PNetCDF, fall back to NETCDFPAR -----
-            if( isClassic )
-            {
-#ifdef MOAB_HAVE_PNETCDF
-                {
-                    // PNetCDF — collective I/O, native fit for CDF-1/2/5
-                    int ncfile  = -1;
-                    int pnc_err = ncmpi_open( m_pcomm->comm(), strSource, NC_NOWRITE, MPI_INFO_NULL, &ncfile );
-                    if( pnc_err == NC_NOERR )
-                    {
-                        if( rank == 0 )
-                            std::cout << "  [ReadParallelMap]: Reading classic-format file via PNetCDF\n";
-
-                        MPI_Offset start = static_cast< MPI_Offset >( offsetRead );
-                        MPI_Offset count = static_cast< MPI_Offset >( localSize );
-                        int varid;
-
-                        ERR_PARNC( ncmpi_inq_varid( ncfile, "S", &varid ) );
-                        ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &start, &count, vecS.data() ) );
-                        ERR_PARNC( ncmpi_inq_varid( ncfile, "row", &varid ) );
-                        ERR_PARNC( ncmpi_get_vara_int_all( ncfile, varid, &start, &count, vecRow.data() ) );
-                        ERR_PARNC( ncmpi_inq_varid( ncfile, "col", &varid ) );
-                        ERR_PARNC( ncmpi_get_vara_int_all( ncfile, varid, &start, &count, vecCol.data() ) );
-
-                        if( readAreaA )
-                        {
-                            MPI_Offset startA = static_cast< MPI_Offset >( offsetReadA );
-                            MPI_Offset countA = static_cast< MPI_Offset >( localSizeA );
-                            ERR_PARNC( ncmpi_inq_varid( ncfile, "area_a", &varid ) );
-                            ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &startA, &countA, vecAreaA.data() ) );
-                        }
-                        if( readAreaB )
-                        {
-                            MPI_Offset startB = static_cast< MPI_Offset >( offsetReadB );
-                            MPI_Offset countB = static_cast< MPI_Offset >( localSizeB );
-                            ERR_PARNC( ncmpi_inq_varid( ncfile, "area_b", &varid ) );
-                            ERR_PARNC( ncmpi_get_vara_double_all( ncfile, varid, &startB, &countB, vecAreaB.data() ) );
-                        }
-                        ERR_PARNC( ncmpi_close( ncfile ) );
-                        parReadDone = true;
-                    }
-                }
+        int ncid = -1;
+#ifdef MOAB_HAVE_MPI
+        ERR_MBNC( mbnc_open_par( rbackend, m_pcomm->comm(), MPI_INFO_NULL, strSource, 0, &ncid ), "open map" );
+#else
+        ERR_MBNC( mbnc_open( strSource, 0, &ncid ), "open map" );
 #endif
 
-#ifdef MOAB_HAVE_NETCDFPAR
-                if( !parReadDone )
-                {
-                    // PNetCDF not configured (or its open failed) — try NETCDFPAR.
-                    // Works only if NetCDF-4 was built with parallel-IO support
-                    // for classic files (typically requires NetCDF linked against PNetCDF).
-                    if( rank == 0 )
-                        std::cout << "  [ReadParallelMap]: PNetCDF unavailable; reading classic-format "
-                                     "file via parallel NetCDF (NETCDFPAR)\n";
-                    ParNcFile ncMap( m_pcomm->comm(), MPI_INFO_NULL, strSource, NcFile::ReadOnly, NcFile::Classic );
-                    if( ncMap.is_valid() )
-                    {
-                        NcVar* varRowP = ncMap.get_var( "row" );
-                        NcVar* varColP = ncMap.get_var( "col" );
-                        NcVar* varSP   = ncMap.get_var( "S" );
-                        ncMap.enable_var_par_access( varRowP, true );
-                        ncMap.enable_var_par_access( varColP, true );
-                        ncMap.enable_var_par_access( varSP, true );
+        int did     = -1;
+        size_t dlen = 0;
+        ERR_MBNC( mbnc_inq_dimid( ncid, "n_a", &did ), "inq n_a" );
+        ERR_MBNC( mbnc_inq_dimlen( ncid, did, &dlen ), "len n_a" );
+        nA = (int)dlen;
+        ERR_MBNC( mbnc_inq_dimid( ncid, "n_b", &did ), "inq n_b" );
+        ERR_MBNC( mbnc_inq_dimlen( ncid, did, &dlen ), "len n_b" );
+        nB = (int)dlen;
+        ERR_MBNC( mbnc_inq_dimid( ncid, "n_s", &did ), "inq n_s" );
+        ERR_MBNC( mbnc_inq_dimlen( ncid, did, &dlen ), "len n_s" );
+        nS = (int)dlen;
 
-                        varRowP->set_cur( offsetRead );
-                        varRowP->get( vecRow.data(), localSize );
-                        varColP->set_cur( offsetRead );
-                        varColP->get( vecCol.data(), localSize );
-                        varSP->set_cur( offsetRead );
-                        varSP->get( vecS.data(), localSize );
+        // Contiguous per-rank stripes (last rank takes the remainder).
+        localSize          = nS / size;
+        size_t offsetRead  = (size_t)rank * (size_t)localSize;
+        if( rank == size - 1 ) localSize += nS % size;
+        int localSizeA     = nA / size;
+        size_t offsetReadA = (size_t)rank * (size_t)localSizeA;
+        if( rank == size - 1 ) localSizeA += nA % size;
+        int localSizeB     = nB / size;
+        size_t offsetReadB = (size_t)rank * (size_t)localSizeB;
+        if( rank == size - 1 ) localSizeB += nB % size;
 
-                        if( readAreaA )
-                        {
-                            NcVar* varAreaAP = ncMap.get_var( "area_a" );
-                            ncMap.enable_var_par_access( varAreaAP, true );
-                            varAreaAP->set_cur( offsetReadA );
-                            varAreaAP->get( vecAreaA.data(), localSizeA );
-                        }
-                        if( readAreaB )
-                        {
-                            NcVar* varAreaBP = ncMap.get_var( "area_b" );
-                            ncMap.enable_var_par_access( varAreaBP, true );
-                            varAreaBP->set_cur( offsetReadB );
-                            varAreaBP->get( vecAreaB.data(), localSizeB );
-                        }
-                        ncMap.close();
-                        parReadDone = true;
-                    }
-                }
-#endif
+        vecRow.resize( localSize );
+        vecCol.resize( localSize );
+        vecS.resize( localSize );
 
-                if( !parReadDone )
-                {
-                    _EXCEPTION1( "Classic-format map file \"%s\" cannot be read in parallel: "
-                                 "neither PNetCDF nor parallel NetCDF (NETCDFPAR) is configured "
-                                 "(or both failed to open the file)",
-                                 strSource );
-                }
-            }
-            // --- NetCDF-4/HDF5 format: only NETCDFPAR can handle it ---------
-            else  // isNetCDF4
-            {
-#ifdef MOAB_HAVE_NETCDFPAR
-                {
-                    if( rank == 0 )
-                        std::cout << "  [ReadParallelMap]: Reading NetCDF-4/HDF5 file via parallel NetCDF\n";
-                    ParNcFile ncMap( m_pcomm->comm(), MPI_INFO_NULL, strSource, NcFile::ReadOnly, NcFile::Netcdf4 );
-                    if( ncMap.is_valid() )
-                    {
-                        NcVar* varRowP = ncMap.get_var( "row" );
-                        NcVar* varColP = ncMap.get_var( "col" );
-                        NcVar* varSP   = ncMap.get_var( "S" );
-                        ncMap.enable_var_par_access( varRowP, true );
-                        ncMap.enable_var_par_access( varColP, true );
-                        ncMap.enable_var_par_access( varSP, true );
-
-                        varRowP->set_cur( offsetRead );
-                        varRowP->get( vecRow.data(), localSize );
-                        varColP->set_cur( offsetRead );
-                        varColP->get( vecCol.data(), localSize );
-                        varSP->set_cur( offsetRead );
-                        varSP->get( vecS.data(), localSize );
-
-                        if( readAreaA )
-                        {
-                            NcVar* varAreaAP = ncMap.get_var( "area_a" );
-                            ncMap.enable_var_par_access( varAreaAP, true );
-                            varAreaAP->set_cur( offsetReadA );
-                            varAreaAP->get( vecAreaA.data(), localSizeA );
-                        }
-                        if( readAreaB )
-                        {
-                            NcVar* varAreaBP = ncMap.get_var( "area_b" );
-                            ncMap.enable_var_par_access( varAreaBP, true );
-                            varAreaBP->set_cur( offsetReadB );
-                            varAreaBP->get( vecAreaB.data(), localSizeB );
-                        }
-                        ncMap.close();
-                        parReadDone = true;
-                    }
-                }
-#endif
-
-                if( !parReadDone )
-                {
-                    _EXCEPTION1( "NetCDF-4/HDF5 map file \"%s\" cannot be read in parallel: "
-                                 "parallel NetCDF (NETCDFPAR) is not configured "
-                                 "(PNetCDF cannot read NetCDF-4 files)",
-                                 strSource );
-                }
-            }
-        }  // end direct parallel read
-    }
-    else
-#endif  // MOAB_HAVE_MPI
-    {
-        // =================================================================
-        // Serial path (size == 1): read entire file on the single process.
-        // =================================================================
-        std::cout << "  [ReadParallelMap]: Using serial read (single process)\n";
-        NcFile ncMap( strSource, NcFile::ReadOnly );
-        if( !ncMap.is_valid() )
-        {
-            _EXCEPTION1( "Unable to open input map file \"%s\"", strSource );
-        }
-
-        NcDim* dimNS = ncMap.get_dim( "n_s" );
-        NcDim* dimNA = ncMap.get_dim( "n_a" );
-        NcDim* dimNB = ncMap.get_dim( "n_b" );
-        if( !dimNS || !dimNA || !dimNB )
-        {
-            _EXCEPTION1( "Map file \"%s\" missing required dimensions", strSource );
-        }
-        nS = static_cast< int >( dimNS->size() );
-        nA = static_cast< int >( dimNA->size() );
-        nB = static_cast< int >( dimNB->size() );
-
-        localSize = nS;
-        vecRow.resize( nS );
-        vecCol.resize( nS );
-        vecS.resize( nS );
-
-        NcVar* varRowS = ncMap.get_var( "row" );
-        NcVar* varColS = ncMap.get_var( "col" );
-        NcVar* varSS   = ncMap.get_var( "S" );
-        varRowS->get( vecRow.data(), nS );
-        varColS->get( vecCol.data(), nS );
-        varSS->get( vecS.data(), nS );
+        int vid   = -1;
+        size_t st = offsetRead, ct = (size_t)localSize;
+        ERR_MBNC( mbnc_inq_varid( ncid, "row", &vid ), "inq row" );
+        ERR_MBNC( mbnc_get_vara_int( ncid, vid, &st, &ct, localSize ? vecRow.data() : NULL ), "get row" );
+        ERR_MBNC( mbnc_inq_varid( ncid, "col", &vid ), "inq col" );
+        ERR_MBNC( mbnc_get_vara_int( ncid, vid, &st, &ct, localSize ? vecCol.data() : NULL ), "get col" );
+        ERR_MBNC( mbnc_inq_varid( ncid, "S", &vid ), "inq S" );
+        ERR_MBNC( mbnc_get_vara_double( ncid, vid, &st, &ct, localSize ? vecS.data() : NULL ), "get S" );
 
         if( readAreaA )
         {
-            vecAreaA.resize( nA );
-            NcVar* varAreaAS = ncMap.get_var( "area_a" );
-            if( varAreaAS ) varAreaAS->get( vecAreaA.data(), nA );
+            vecAreaA.resize( localSizeA );
+            size_t sa = offsetReadA, ca = (size_t)localSizeA;
+            ERR_MBNC( mbnc_inq_varid( ncid, "area_a", &vid ), "inq area_a" );
+            ERR_MBNC( mbnc_get_vara_double( ncid, vid, &sa, &ca, localSizeA ? vecAreaA.data() : NULL ), "get area_a" );
         }
         if( readAreaB )
         {
-            vecAreaB.resize( nB );
-            NcVar* varAreaBS = ncMap.get_var( "area_b" );
-            if( varAreaBS ) varAreaBS->get( vecAreaB.data(), nB );
+            vecAreaB.resize( localSizeB );
+            size_t sb = offsetReadB, cb = (size_t)localSizeB;
+            ERR_MBNC( mbnc_inq_varid( ncid, "area_b", &vid ), "inq area_b" );
+            ERR_MBNC( mbnc_get_vara_double( ncid, vid, &sb, &cb, localSizeB ? vecAreaB.data() : NULL ), "get area_b" );
         }
-        ncMap.close();
+
+        ERR_MBNC( mbnc_close( ncid ), "close" );
     }
 
     // =========================================================================
